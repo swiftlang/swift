@@ -141,3 +141,26 @@ class _ConcatAction(argparse.Action):
         setattr(namespace, self.dest, val)
 
 _register(action, 'concat', _ConcatAction)
+
+
+class _OptionalBoolAction(argparse.Action):
+    def __init__(self,
+                 option_strings,
+                 dest,
+                 default=False,
+                 metavar="BOOL",
+                 help=None):
+        super(_OptionalBoolAction, self).__init__(
+            option_strings=option_strings,
+            dest=dest,
+            default=default,
+            metavar=metavar,
+            nargs="?",
+            type=type.bool,
+            help=help,
+            const=True)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, values)
+
+_register(action, 'optional_bool', _OptionalBoolAction)

@@ -25,8 +25,8 @@ func asString(_ ns: NSString) -> String { return ns as String }
 FoundationTestSuite.test("NSString") {
   var str = "Hello"
   var nsStr = str as NSString
-  assert(nsStr.compare(str).rawValue == NSComparisonResult.orderedSame.rawValue)
-  assert(nsStr.compare(str) == NSComparisonResult.orderedSame)
+  assert(nsStr.compare(str).rawValue == ComparisonResult.orderedSame.rawValue)
+  assert(nsStr.compare(str) == ComparisonResult.orderedSame)
   nsStr = "World"
   str = nsStr as String
   // FIXME: Shouldn't need coercion here to resolve ambiguity. <rdar://problem/14637688>
@@ -181,8 +181,8 @@ FoundationTestSuite.test("patternMatching") {
 // Type checker used to crash on this.
 class ClassWithDtor : NSObject {
   deinit {
-    let noteCenter = NSNotificationCenter.`default`()
-    noteCenter.removeObserver(self, name: "ReceivedContentNotification", object: nil)
+    let noteCenter = NotificationCenter.`default`()
+    noteCenter.removeObserver(self, name: Notification.Name(rawValue: "ReceivedContentNotification"), object: nil)
   }
 }
 
@@ -222,8 +222,8 @@ FoundationTestSuite.test("NSRectEdge/constants") {
 
 
 if #available(OSX 10.11, iOS 9.0, *) {
-  FoundationTestSuite.test("NSUndoManager/ObjCClass") {
-    let UM = NSUndoManager()
+  FoundationTestSuite.test("UndoManager/ObjCClass") {
+    let UM = UndoManager()
 
     // Confirm with an ObjC class.
     class ObjCClass : NSObject {
@@ -237,8 +237,8 @@ if #available(OSX 10.11, iOS 9.0, *) {
     expectEqual(f.someProperty, "expected")
   }
 
-  FoundationTestSuite.test("NSUndoManager/SwiftClass") {
-    let UM = NSUndoManager()
+  FoundationTestSuite.test("UndoManager/SwiftClass") {
+    let UM = UndoManager()
 
     // Confirm with a Swift class.
     class SwiftClass {
@@ -259,7 +259,7 @@ private func createTestArchive() -> NSData {
   let KA = NSKeyedArchiver(forWritingWith: mutableData)
 
   // Set up some fake data.
-  let obj =  NSPredicate(value: true)
+  let obj =  Predicate(value: true)
   KA.encode(obj, forKey: KEY)
   KA.encode(obj, forKey: NSKeyedArchiveRootObjectKey)
   KA.finishEncoding()
@@ -268,43 +268,43 @@ private func createTestArchive() -> NSData {
 }
 
 FoundationTestSuite.test("NSKeyedUnarchiver/decodeObjectOfClass(_:forKey:)") {
-  let obj = NSPredicate(value: true)
+  let obj = Predicate(value: true)
   let data = createTestArchive()
 
-  var KU = NSKeyedUnarchiver(forReadingWith: data)
+  var KU = NSKeyedUnarchiver(forReadingWith: data as Data)
 
-  var missing = KU.decodeObjectOfClass(NSPredicate.self, forKey: "Not there")
+  var missing = KU.decodeObjectOfClass(Predicate.self, forKey: "Not there")
   expectEmpty(missing)
-  expectType((NSPredicate?).self, &missing)
+  expectType((Predicate?).self, &missing)
 
-  var decoded = KU.decodeObjectOfClass(NSPredicate.self, forKey: KEY)
+  var decoded = KU.decodeObjectOfClass(Predicate.self, forKey: KEY)
   expectNotEmpty(decoded)
-  expectType((NSPredicate?).self, &decoded)
+  expectType((Predicate?).self, &decoded)
 
   expectCrashLater()
   // Even though we're doing non-secure coding, this should still be checked in
   // Swift.
-  var wrongType = KU.decodeObjectOfClass(NSDateFormatter.self, forKey: KEY)
-  expectType((NSDateFormatter?).self, &wrongType)
+  var wrongType = KU.decodeObjectOfClass(DateFormatter.self, forKey: KEY)
+  expectType((DateFormatter?).self, &wrongType)
 
   KU.finishDecoding()
 }
 
 if #available(OSX 10.11, iOS 9.0, *) {
   FoundationTestSuite.test("NSKeyedUnarchiver/decodeTopLevel*") {
-    let obj = NSPredicate(value: true)
+    let obj = Predicate(value: true)
     let data = createTestArchive()
 
     // first confirm .decodeObjectWithClasses overlay requires NSSet
-    var KU = NSKeyedUnarchiver(forReadingWith: data)
-    var nonTopLevelResult = KU.decodeObjectOfClasses(NSSet(array: [NSPredicate.self]), forKey: KEY)
+    var KU = NSKeyedUnarchiver(forReadingWith: data as Data)
+    var nonTopLevelResult = KU.decodeObjectOfClasses(NSSet(array: [Predicate.self]), forKey: KEY)
     expectTrue(nonTopLevelResult != nil)
     KU.finishDecoding()
 
-    KU = NSKeyedUnarchiver(forReadingWith: data)
+    KU = NSKeyedUnarchiver(forReadingWith: data as Data)
     do {
       // decodeObjectForKey(_:) throws
-      let decoded1 = try KU.decodeTopLevelObjectForKey(KEY) as? NSPredicate
+      let decoded1 = try KU.decodeTopLevelObjectForKey(KEY) as? Predicate
       let missing1 = try KU.decodeTopLevelObjectForKey("Not there")
       expectTrue(decoded1 != nil)
       expectEqual(obj, decoded1)
@@ -312,19 +312,19 @@ if #available(OSX 10.11, iOS 9.0, *) {
       KU.finishDecoding()
 
       // recreate so we can do the rest securely
-      KU = NSKeyedUnarchiver(forReadingWith: data)
+      KU = NSKeyedUnarchiver(forReadingWith: data as Data)
       KU.requiresSecureCoding = true
 
       // decodeObjectOfClass(_:,forKey:) throws
-      let decoded2 = try KU.decodeTopLevelObjectOfClass(NSPredicate.self, forKey: KEY)
-      let missing2 = try KU.decodeTopLevelObjectOfClass(NSPredicate.self, forKey: "Not there")
+      let decoded2 = try KU.decodeTopLevelObjectOfClass(Predicate.self, forKey: KEY)
+      let missing2 = try KU.decodeTopLevelObjectOfClass(Predicate.self, forKey: "Not there")
       expectTrue(decoded2 != nil)
       expectEqual(obj, decoded2)
       expectTrue(missing2 == nil)
 
       // decodeObjectOfClasses(_:,forKey:) throws
-      let classes = NSSet(array: [NSPredicate.self])
-      let decoded3 = try KU.decodeTopLevelObjectOfClasses(classes, forKey: KEY) as? NSPredicate
+      let classes = NSSet(array: [Predicate.self])
+      let decoded3 = try KU.decodeTopLevelObjectOfClasses(classes, forKey: KEY) as? Predicate
       let missing3 = try KU.decodeTopLevelObjectOfClasses(classes, forKey: "Not there")
       expectTrue(decoded3 != nil)
       expectEqual(obj, decoded3)
@@ -335,11 +335,11 @@ if #available(OSX 10.11, iOS 9.0, *) {
     }
     KU.finishDecoding()
 
-    KU = NSKeyedUnarchiver(forReadingWith: data)
+    KU = NSKeyedUnarchiver(forReadingWith: data as Data)
     KU.requiresSecureCoding = true
     do {
       // recreate so we avoid caches from above
-      let wrong = try KU.decodeTopLevelObjectOfClass(NSDateFormatter.self, forKey: KEY)
+      let wrong = try KU.decodeTopLevelObjectOfClass(DateFormatter.self, forKey: KEY)
       expectUnreachable() // should have error
     }
     catch {
@@ -347,10 +347,10 @@ if #available(OSX 10.11, iOS 9.0, *) {
     }
     KU.finishDecoding()
 
-    KU = NSKeyedUnarchiver(forReadingWith: data)
+    KU = NSKeyedUnarchiver(forReadingWith: data as Data)
     KU.requiresSecureCoding = true
     do {
-      let wrongClasses = NSSet(array: [NSDateFormatter.self])
+      let wrongClasses = NSSet(array: [DateFormatter.self])
       let wrong = try KU.decodeTopLevelObjectOfClasses(wrongClasses, forKey: KEY)
       expectUnreachable() // should have error
     }
@@ -361,7 +361,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
 
     // confirm the that class function works
     do {
-      let decoded = try NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(data) as? NSPredicate
+      let decoded = try NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(data) as? Predicate
       expectEqual(obj, decoded)
     }
     catch {
@@ -370,23 +370,32 @@ if #available(OSX 10.11, iOS 9.0, *) {
   }
 
   FoundationTestSuite.test("NSKeyedUnarchiver/decodeTopLevelObjectOfClass(_:forKey:)/trap") {
-    let obj = NSPredicate(value: true)
+    let obj = Predicate(value: true)
     let data = createTestArchive()
 
-    var KU = NSKeyedUnarchiver(forReadingWith: data)
+    var KU = NSKeyedUnarchiver(forReadingWith: data as Data)
 
     expectCrashLater()
     // Even though we're doing non-secure coding, this should still be checked
     // in Swift.
     do {
-      var wrongType = try KU.decodeTopLevelObjectOfClass(NSDateFormatter.self, forKey: KEY)
-      expectType((NSDateFormatter?).self, &wrongType)
+      var wrongType = try KU.decodeTopLevelObjectOfClass(DateFormatter.self, forKey: KEY)
+      expectType((DateFormatter?).self, &wrongType)
     } catch {
       expectUnreachableCatch(error)
     }
 
     KU.finishDecoding()
   }
+}
+
+FoundationTestSuite.test("NotificationCenter/addObserver(_:selector:name:object:)") {
+  let obj: AnyObject = "Hello"
+  NotificationCenter.default().addObserver(obj, selector: Selector("blah:"),
+                                           name: nil, object: nil)
+  let name = "hello"
+  NotificationCenter.default().addObserver(obj, selector: Selector("blarg:"),
+                                           name: name, object: nil)
 }
 
 runAllTests()

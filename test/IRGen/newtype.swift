@@ -18,9 +18,9 @@ public func getErrorDomain() -> ErrorDomain {
   return .one
 }
 
-// CHECK-LABEL: _TF7newtype6getFooFT_VSC18NSNotificationName
-public func getFoo() -> NSNotificationName {
-  return NSNotificationName.Foo
+// CHECK-LABEL: _TF7newtype6getFooFT_VCSo14NSNotification4Name
+public func getFoo() -> NSNotification.Name {
+  return NSNotification.Name.Foo
   // CHECK: load {{.*}} @FooNotification
   // CHECK: ret
 }
@@ -34,7 +34,7 @@ public func getGlobalNotification(_ x: Int) -> String {
     // CHECK: load {{.*}} @Notification
     case 3: return swiftNamedNotification
     // CHECK: load {{.*}} @kSNNotification
-    default: return NSNotificationName.bar.rawValue
+    default: return NSNotification.Name.bar.rawValue
     // CHECK: load {{.*}} @kBarNotification
   }
 // CHECK: ret

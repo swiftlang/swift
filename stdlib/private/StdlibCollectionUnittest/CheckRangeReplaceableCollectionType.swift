@@ -159,11 +159,11 @@ internal struct RemoveLastNTest {
   }
 }
 
-internal struct RemoveSubrangeTest {
-  let collection: [OpaqueValue<Int>]
-  let rangeSelection: RangeSelection
-  let expected: [Int]
-  let loc: SourceLoc
+public struct RemoveSubrangeTest {
+  public let collection: [OpaqueValue<Int>]
+  public let rangeSelection: RangeSelection
+  public let expected: [Int]
+  public let loc: SourceLoc
 
   internal init(
     collection: [Int], rangeSelection: RangeSelection, expected: [Int],
@@ -394,6 +394,48 @@ public let replaceRangeTests: [ReplaceSubrangeTest] = [
     closedExpected: [1010, 8080, 9090]),
 ]
 
+public let removeRangeTests: [RemoveSubrangeTest] = [
+  RemoveSubrangeTest(
+    collection: [],
+    rangeSelection: .emptyRange,
+    expected: []),
+
+  RemoveSubrangeTest(
+    collection: [1010],
+    rangeSelection: .middle,
+    expected: []),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040],
+    rangeSelection: .leftHalf,
+    expected: [3030, 4040]),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040],
+    rangeSelection: .rightHalf,
+    expected: [1010, 2020]),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    rangeSelection: .middle,
+    expected: [1010, 5050]),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050, 6060],
+    rangeSelection: .leftHalf,
+    expected: [4040, 5050, 6060]),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050, 6060],
+    rangeSelection: .rightHalf,
+    expected: [1010, 2020, 3030]),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050, 6060],
+    rangeSelection: .middle,
+    expected: [1010, 6060]),
+]
+
 extension TestSuite {
   /// Adds a set of tests for `RangeReplaceableCollection`.
   ///
@@ -455,7 +497,7 @@ extension TestSuite {
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
 //===----------------------------------------------------------------------===//
 // init()
@@ -808,52 +850,22 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/removeTooMany/semantics") {
 // removeSubrange()
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).removeSubrange()/semantics") {
-  let tests: [RemoveSubrangeTest] = [
-    RemoveSubrangeTest(
-      collection: [],
-      rangeSelection: .emptyRange,
-      expected: []),
-
-    RemoveSubrangeTest(
-      collection: [1010],
-      rangeSelection: .middle,
-      expected: []),
-
-    RemoveSubrangeTest(
-      collection: [1010, 2020, 3030, 4040],
-      rangeSelection: .leftHalf,
-      expected: [3030, 4040]),
-
-    RemoveSubrangeTest(
-      collection: [1010, 2020, 3030, 4040],
-      rangeSelection: .rightHalf,
-      expected: [1010, 2020]),
-
-    RemoveSubrangeTest(
-      collection: [1010, 2020, 3030, 4040, 5050],
-      rangeSelection: .middle,
-      expected: [1010, 5050]),
-
-    RemoveSubrangeTest(
-      collection: [1010, 2020, 3030, 4040, 5050, 6060],
-      rangeSelection: .leftHalf,
-      expected: [4040, 5050, 6060]),
-
-    RemoveSubrangeTest(
-      collection: [1010, 2020, 3030, 4040, 5050, 6060],
-      rangeSelection: .rightHalf,
-      expected: [1010, 2020, 3030]),
-
-    RemoveSubrangeTest(
-      collection: [1010, 2020, 3030, 4040, 5050, 6060],
-      rangeSelection: .middle,
-      expected: [1010, 6060]),
-  ]
-
-  for test in tests {
+self.test("\(testNamePrefix).removeSubrange()/range/semantics") {
+  for test in removeRangeTests {
     var c = makeWrappedCollection(test.collection)
     let rangeToRemove = test.rangeSelection.range(in: c)
+    c.removeSubrange(rangeToRemove)
+    expectEqualSequence(
+      test.expected,
+      c.map { extractValue($0).value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+self.test("\(testNamePrefix).replaceSubrange()/closedRange/semantics") {
+  for test in removeRangeTests.filter({ !$0.rangeSelection.isEmpty }) {
+    var c = makeWrappedCollection(test.collection)
+    let rangeToRemove = test.rangeSelection.closedRange(in: c)
     c.removeSubrange(rangeToRemove)
     expectEqualSequence(
       test.expected,
@@ -1206,7 +1218,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
 //===----------------------------------------------------------------------===//
 // removeLast()
@@ -1328,7 +1340,7 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
     // No extra checks for collections with random access traversal so far.
   } // addRangeReplaceableRandomAccessCollectionTests

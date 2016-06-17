@@ -192,6 +192,14 @@ TEST(ToLowercaseTest, Words) {
   EXPECT_EQ(camel_case::toLowercaseWord("", scratch), "");
 }
 
+TEST(ToLowercaseInitialismsTest, Words) {
+  llvm::SmallString<64> scratch;
+
+  EXPECT_EQ(camel_case::toLowercaseInitialisms("ToXML", scratch), "toXML");
+  EXPECT_EQ(camel_case::toLowercaseInitialisms("URLsInHand", scratch),
+            "urlsInHand");
+}
+
 TEST(ToSentencecaseTest, Words) {
   llvm::SmallString<64> scratch;
 

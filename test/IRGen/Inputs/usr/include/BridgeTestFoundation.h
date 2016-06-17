@@ -25,6 +25,9 @@
 @interface NSNumber : NSObject
 @end
 
+@interface NSNotification : NSObject
+@end
+
 @interface Foo
 
 - (NSString*) foo;

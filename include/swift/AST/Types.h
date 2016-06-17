@@ -1541,26 +1541,6 @@ public:
   /// Retrieve the set of generic arguments provided at this level.
   ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
 
-  /// \brief Retrieve the set of substitutions used to produce this bound
-  /// generic type from the underlying generic type.
-  ///
-  /// \param module The module in which we should compute the substitutions.
-  /// FIXME: We currently don't account for this properly, so it can be null.
-  ///
-  /// \param resolver The resolver that handles lazy type checking, where
-  /// required. This can be null for a fully-type-checked AST.
-  ///
-  /// \param gpContext The context from which the generic parameters will be
-  /// extracted, which will be either the nominal type declaration or an
-  /// extension thereof. If null, will be set to the nominal type declaration.
-  ArrayRef<Substitution> getSubstitutions(ModuleDecl *module,
-                                          LazyResolver *resolver,
-                                          DeclContext *gpContext = nullptr);
-
-  /// Retrieves the generic parameter context to use with substitutions for
-  /// this bound generic type, using the given context if possible.
-  DeclContext *getGenericParamContext(DeclContext *gpContext) const;
-
   void Profile(llvm::FoldingSetNodeID &ID) {
     RecursiveTypeProperties properties;
     Profile(ID, TheDecl, Parent, GenericArgs, properties);
@@ -3423,7 +3403,7 @@ public:
 
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
-class ProtocolType : public NominalType {
+class ProtocolType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// \brief Retrieve the type when we're referencing the given protocol.
   /// declaration.
@@ -3454,6 +3434,11 @@ public:
   /// use in sorting.
   static int compareProtocols(ProtocolDecl * const* PP1,
                               ProtocolDecl * const* PP2);
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getDecl(), getParent());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D, Type Parent);
 
 private:
   friend class NominalTypeDecl;

@@ -116,18 +116,18 @@ class NestedGeneric<U> {
   }
 }
 
-  // <rdar://problem/15417773>
-  // Ensure that nested closures capture the generic parameters of their nested
-  // context.
+// <rdar://problem/15417773>
+// Ensure that nested closures capture the generic parameters of their nested
+// context.
 
-  // CHECK: sil hidden @_TF16generic_closures25nested_closure_in_generic{{.*}} : $@convention(thin) <T> (@in T) -> @out T
-  // CHECK:   function_ref [[OUTER_CLOSURE:@_TFF16generic_closures25nested_closure_in_genericurFxxU_FT_Q_]]
-  // CHECK: sil shared [[OUTER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T
-  // CHECK:   function_ref [[INNER_CLOSURE:@_TFFF16generic_closures25nested_closure_in_genericurFxxU_FT_Q_U_FT_Q_]]
-  // CHECK: sil shared [[INNER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T {
-  func nested_closure_in_generic<T>(_ x:T) -> T {
-    return { { x }() }()
-  }
+// CHECK: sil hidden @_TF16generic_closures25nested_closure_in_generic{{.*}} : $@convention(thin) <T> (@in T) -> @out T
+// CHECK:   function_ref [[OUTER_CLOSURE:@_TFF16generic_closures25nested_closure_in_genericurFxxU_FT_Q_]]
+// CHECK: sil shared [[OUTER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T
+// CHECK:   function_ref [[INNER_CLOSURE:@_TFFF16generic_closures25nested_closure_in_genericurFxxU_FT_Q_U_FT_Q_]]
+// CHECK: sil shared [[INNER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T {
+func nested_closure_in_generic<T>(_ x:T) -> T {
+  return { { x }() }()
+}
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures16local_properties
 func local_properties<T>(_ t: inout T) {
@@ -276,3 +276,21 @@ func outer_concrete(i: Int) {
   // CHECK: [[RESULT:%.*]] = apply [[FN]]<Int>({{.*}}) : $@convention(thin) <τ_0_0> (@in τ_0_0, Int) -> Int
   _ = inner_generic(u: i)
 }
+
+// CHECK-LABEL: sil hidden @_TF16generic_closures32mixed_generic_nongeneric_nestingurFT1tx_T_ : $@convention(thin) <T> (@in T) -> ()
+func mixed_generic_nongeneric_nesting<T>(t: T) {
+  func outer() {
+    func middle<U>(u: U) {
+      func inner() -> U {
+        return u
+      }
+      inner()
+    }
+    middle(u: 11)
+  }
+  outer()
+}
+
+// CHECK-LABEL: sil shared @_TFF16generic_closures32mixed_generic_nongeneric_nestingurFT1tx_T_L_5outerurFT_T_ : $@convention(thin) <T> () -> ()
+// CHECK-LABEL: sil shared @_TFFF16generic_closures32mixed_generic_nongeneric_nestingurFT1tx_T_L_5outerurFT_T_L_6middleu__rFT1uqd___T_ : $@convention(thin) <T><U> (@in U) -> ()
+// CHECK-LABEL: sil shared @_TFFFF16generic_closures32mixed_generic_nongeneric_nestingurFT1tx_T_L_5outerurFT_T_L_6middleu__rFT1uqd___T_L_5inneru__rfT_qd__ : $@convention(thin) <T><U> (@owned @box U) -> @out U

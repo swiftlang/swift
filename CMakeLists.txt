@@ -140,8 +140,10 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
     "Path to the directory that contains Swift tools that are executable on the build machine")
 
-option(SWIFT_TOOLS_ENABLE_LTO
-  "If set to true, build the swift compiler with link time optimization enabled" FALSE)
+set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
+    must specify the form of LTO by setting this to one of: 'full', 'thin'. This
+    option only affects the tools that run on the host (the compiler), and has
+    no effect on the target libraries (the standard library and the runtime).")
 
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
@@ -160,6 +162,8 @@ set(SWIFT_ANDROID_ICU_I18N "" CACHE STRING
   "Path to a directory containing libicui18n.so")
 set(SWIFT_ANDROID_ICU_I18N_INCLUDE "" CACHE STRING
   "Path to a directory containing headers libicui18n")
+set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
+  "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
 
 #
 # User-configurable Darwin-specific options.

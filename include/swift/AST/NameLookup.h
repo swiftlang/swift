@@ -194,11 +194,18 @@ class NamedDeclConsumer : public VisibleDeclConsumer {
 public:
   DeclName name;
   SmallVectorImpl<UnqualifiedLookupResult> &results;
+  bool isTypeLookup;
+
   NamedDeclConsumer(DeclName name,
-                    SmallVectorImpl<UnqualifiedLookupResult> &results)
-    : name(name), results(results) {}
+                    SmallVectorImpl<UnqualifiedLookupResult> &results,
+                    bool isTypeLookup)
+    : name(name), results(results), isTypeLookup(isTypeLookup) {}
 
   virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    // Give clients an opportunity to filter out non-type declarations early,
+    // to avoid circular validation.
+    if (isTypeLookup && !isa<TypeDecl>(VD))
+      return;
     if (VD->getFullName().matchesRef(name))
       results.push_back(UnqualifiedLookupResult(VD));
   }

@@ -1,4 +1,5 @@
 ()
+// XFAIL: broken_std_regex
 // RUN: %sourcekitd-test -req=complete -pos=1:2 %s -- %s | FileCheck %s -check-prefix=KEYWORDS
 // RUN: %sourcekitd-test -req=complete.open -pos=1:2 %s -- %s | FileCheck %s -check-prefix=LITERALS
 

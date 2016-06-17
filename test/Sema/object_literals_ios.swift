@@ -21,4 +21,4 @@ struct Path: _FileReferenceLiteralConvertible {
 }
 
 let p1: Path = #fileLiteral(resourceName: "what.txt")
-let p2 = #fileLiteral(resourceName: "what.txt") // expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'NSURL' as the default file reference literal type}}
+let p2 = #fileLiteral(resourceName: "what.txt") // expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'URL' as the default file reference literal type}}

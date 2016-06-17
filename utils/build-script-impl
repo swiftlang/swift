@@ -74,8 +74,8 @@ KNOWN_SETTINGS=(
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
-    swift-tools-enable-lto      "0"              "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime."
-    llvm-enable-lto             "0"              "enable LTO compilation of LLVM/Clang."
+    swift-tools-enable-lto      ""               "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime. Must be set to one of 'thin' or 'full'"
+    llvm-enable-lto             ""               "Must be set to one of 'thin' or 'full'"
     swift-tools-num-parallel-lto-link-jobs ""    "The number of parallel link jobs to use when compiling swift tools"
     llvm-num-parallel-lto-link-jobs ""           "The number of parallel link jobs to use when compiling llvm"
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
@@ -144,6 +144,7 @@ KNOWN_SETTINGS=(
     skip-test-tvos-host         ""               "set to skip testing the host parts of the tvOS toolchain"
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
     skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
+    skip-test-android-host      ""               "set to skip testing the host parts of the Android toolchain"
     validation-test             "0"              "set to run the validation test suite"
     long-test                   "0"              "set to run the long test suite"
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
@@ -216,6 +217,7 @@ KNOWN_SETTINGS=(
     android-icu-uc-include             ""        "Path to a directory containing headers for libicuuc"
     android-icu-i18n                   ""        "Path to a directory containing libicui18n.so"
     android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
+    android-deploy-device-path         ""        "Path on an Android device to which built Swift stdlib products will be deployed"
     check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
     common-cmake-options               ""        "CMake options used for all targets, including LLVM/Clang"
     # TODO: Remove this some time later.
@@ -287,6 +289,24 @@ function to_varname() {
 
 function set_lldb_build_mode() {
     LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
+}
+
+function is_llvm_lto_enabled() {
+    if [[ "${LLVM_ENABLE_LTO}" == "thin" ]] ||
+       [[ "${LLVM_ENABLE_LTO}" == "full" ]]; then
+        echo "TRUE"
+    else
+        echo "FALSE"
+    fi
+}
+
+function is_swift_lto_enabled() {
+    if [[ "${SWIFT_TOOLS_ENABLE_LTO}" == "thin" ]] ||
+       [[ "${SWIFT_TOOLS_ENABLE_LTO}" == "full" ]]; then
+        echo "TRUE"
+    else
+        echo "FALSE"
+    fi
 }
 
 # Support for performing isolated actions.
@@ -567,8 +587,8 @@ function set_build_options_for_host() {
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
                 -DSANITIZER_MIN_OSX_VERSION="${cmake_osx_deployment_target}"
             )
-            if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
-                if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
+            if [[ $(is_llvm_lto_enabled) == "TRUE" ]]; then
+                if [[ $(cmake_needs_to_specify_standard_computed_defaults) == "TRUE" ]]; then
                     llvm_cmake_options+=(
                         "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
                         "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
@@ -580,7 +600,7 @@ function set_build_options_for_host() {
                 )
             fi
 
-            if [[ $(true_false "${SWIFT_TOOLS_ENABLE_LTO}") = "TRUE" ]]; then
+            if [[ $(is_swift_lto_enabled) == "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
                     swift_cmake_options+=(
                         "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
@@ -588,14 +608,6 @@ function set_build_options_for_host() {
                     )
                 fi
 
-                # We need to also pass in this flag so that parts of LLVM's
-                # build system that we use (for instance when compiling
-                # unittests) do not use too many threads when we are using lto.
-                if [[ $(true_false "${LLVM_ENABLE_LTO}") == "TRUE" ]]; then
-                    swift_cmake_options+=(
-                        "-DLLVM_PARALLEL_LINK_JOBS=${LLVM_NUM_PARALLEL_LTO_LINK_JOBS}"
-                    )
-                fi
                 swift_cmake_options+=(
                     "-DSWIFT_PARALLEL_LINK_JOBS=${SWIFT_TOOLS_NUM_PARALLEL_LTO_LINK_JOBS}"
                 )
@@ -869,7 +881,7 @@ function false_true() {
 }
 
 function cmake_version() {
-    echo $("${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " ")
+    "${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " "
 }
 
 function cmake_needs_to_specify_standard_computed_defaults() {
@@ -904,7 +916,7 @@ function make_relative_symlink() {
 # - "BUILD_STDLIB_DEPLOYMENT_TARGETS" are the Targets to build in this invocation
 
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
-for t in ${CROSS_COMPILE_HOSTS} ; do
+for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
         iphone* | appletv* | watch* | linux-armv6 | linux-armv7 )
             ;;
@@ -1138,6 +1150,19 @@ if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
 
+# get_host_specific_variable(host, name)
+#
+# Get the value of a host-specific variable expected to have been passed by the
+# `build-script`.
+#
+# This is a total hack, and is part of the SR-237 migration.
+function get_host_specific_variable() {
+    local host="$1"
+    local name="$2"
+    local envvar_name="HOST_VARIABLE_${host//-/_}__${name}"
+    echo "${!envvar_name}"
+}
+
 function calculate_targets_for_host() {
     local host=$1
     
@@ -1148,7 +1173,7 @@ function calculate_targets_for_host() {
     SWIFT_TEST_TARGETS=()
 
     # Get the list of Target platforms for the Host
-    local stdlib_targets=(`echo $(get_stdlib_targets_for_host ${host})`)
+    local stdlib_targets=($(get_stdlib_targets_for_host ${host}))
 
     for stdlib_deployment_target in "${stdlib_targets[@]}"; do
         local swift_sdk=
@@ -1235,9 +1260,7 @@ function calculate_targets_for_host() {
             android-*)
                 swift_sdk="ANDROID"
                 build_for_this_target=$(not ${SKIP_BUILD_ANDROID})
-                # FIXME: Allow Android host tests to be enabled/disabled by the
-                #        build script.
-                test_this_target=
+                test_this_target=$(not ${SKIP_TEST_ANDROID_HOST})
                 ;;
             *)
                 echo "Unknown compiler deployment target: ${stdlib_deployment_target}"
@@ -1292,7 +1315,41 @@ function calculate_targets_for_host() {
 
     # Filter duplicate SWIFT_SDKs
     # We will get them if building for multiple architecture variants
-    SWIFT_SDKS=(`echo "${SWIFT_SDKS[@]}" | tr " " "\n" | sort -u | tr "\n" " "`)
+    SWIFT_SDKS=($(echo "${SWIFT_SDKS[@]}" | tr " " "\n" | sort -u | tr "\n" " "))
+
+    # Get the values passed by `build-script`.
+    LEGACY_SWIFT_STDLIB_TARGETS=(${SWIFT_STDLIB_TARGETS[@]})
+    LEGACY_SWIFT_SDKS=(${SWIFT_SDKS[@]})
+    LEGACY_SWIFT_BENCHMARK_TARGETS=(${SWIFT_BENCHMARK_TARGETS[@]})
+    LEGACY_SWIFT_RUN_BENCHMARK_TARGETS=(${SWIFT_RUN_BENCHMARK_TARGETS[@]})
+    LEGACY_SWIFT_TEST_TARGETS=(${SWIFT_TEST_TARGETS[@]})
+    SWIFT_STDLIB_TARGETS=($(get_host_specific_variable ${host} SWIFT_STDLIB_TARGETS))
+    SWIFT_SDKS=($(get_host_specific_variable ${host} SWIFT_SDKS))
+    SWIFT_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_BENCHMARK_TARGETS))
+    SWIFT_RUN_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_RUN_BENCHMARK_TARGETS))
+    SWIFT_TEST_TARGETS=($(get_host_specific_variable ${host} SWIFT_TEST_TARGETS))
+
+    # Validate the parameters match.
+    if [[ "${SWIFT_STDLIB_TARGETS[*]}" != "${LEGACY_SWIFT_STDLIB_TARGETS[*]}" ]]; then
+        printf "error: invalid build-script refactor for 'SWIFT_STDLIB_TARGETS': '%s' vs '%s'\n" "${SWIFT_STDLIB_TARGETS[*]}" "${LEGACY_SWIFT_STDLIB_TARGETS[*]}"
+        exit 1
+    fi
+    if [[ "${SWIFT_SDKS[*]}" != "${LEGACY_SWIFT_SDKS[*]}" ]]; then
+        printf "error: invalid build-script for 'SWIFT_SDKS' refactor: '%s' vs '%s'\n" "${SWIFT_SDKS[*]}" "${LEGACY_SWIFT_SDKS[*]}"
+        exit 1
+    fi
+    if [[ "${SWIFT_BENCHMARK_TARGETS[*]}" != "${LEGACY_SWIFT_BENCHMARK_TARGETS[*]}" ]]; then
+        printf "error: invalid build-script refactor for 'SWIFT_BENCHMARK_TARGETS': '%s' vs '%s'\n" "${SWIFT_BENCHMARK_TARGETS[*]}" "${LEGACY_SWIFT_BENCHMARK_TARGETS[*]}"
+        exit 1
+    fi
+    if [[ "${SWIFT_RUN_BENCHMARK_TARGETS[*]}" != "${LEGACY_SWIFT_RUN_BENCHMARK_TARGETS[*]}" ]]; then
+        printf "error: invalid build-script refactor for 'SWIFT_RUN_BENCHMARK_TARGETS': '%s' vs '%s'\n" "${SWIFT_RUN_BENCHMARK_TARGETS[*]}" "${LEGACY_SWIFT_RUN_BENCHMARK_TARGETS[*]}"
+        exit 1
+    fi
+    if [[ "${SWIFT_TEST_TARGETS[*]}" != "${LEGACY_SWIFT_TEST_TARGETS[*]}" ]]; then
+        printf "error: invalid build-script refactor for 'SWIFT_TEST_TARGETS': '%s' vs '%s'\n" "${SWIFT_TEST_TARGETS[*]}" "${LEGACY_SWIFT_TEST_TARGETS[*]}"
+        exit 1
+    fi
 }
 
 
@@ -1403,7 +1460,7 @@ function llvm_c_flags() {
     if [[ $(is_cmake_release_build_type "${LLVM_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
     fi
-    if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]] ; then
+    if [[ $(is_llvm_lto_enabled) == "TRUE" ]] ; then
         echo -n " -gline-tables-only"
     fi
 }
@@ -1722,7 +1779,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}"
                     -DLLVM_INCLUDE_TESTS:BOOL=$(true_false "${SOURCE_TREE_INCLUDES_TESTS}")
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
-                    -DLLVM_ENABLE_LTO=$(true_false "${LLVM_ENABLE_LTO}")
+                    -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     "${llvm_cmake_options[@]}"
                 )
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
@@ -1759,6 +1816,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
                         -DSWIFT_ANDROID_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
                         -DSWIFT_ANDROID_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
+                        -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
                     )
                 fi
 
@@ -1817,7 +1875,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_FLAGS="$(swift_c_flags ${host})"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
-                    -DLLVM_ENABLE_LTO=$(true_false "${LLVM_ENABLE_LTO}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
@@ -1838,7 +1895,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")
-                    -DSWIFT_TOOLS_ENABLE_LTO:BOOL=$(true_false "${SWIFT_TOOLS_ENABLE_LTO}")
+                    -DSWIFT_TOOLS_ENABLE_LTO:STRING="${SWIFT_TOOLS_ENABLE_LTO}"
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     "${swift_cmake_options[@]}"
                 )
@@ -2103,7 +2160,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OS X -- use the XCode project instead"
+                    echo "Skipping Foundation on OS X -- use the Xcode project instead"
                     continue
                 fi
     
@@ -2210,7 +2267,6 @@ for host in "${ALL_HOSTS[@]}"; do
 done
 # END OF BUILD PHASE
 
-
 # Trap function to print the current test configuration when tests fail.
 # This is a function so the text is not unnecessarily displayed when running -x.
 tests_busted ()
@@ -2297,7 +2353,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLDB_FORMATTER_OPTS="\
                                        --results-formatter lldbsuite.test_event.formatter.xunit.XunitFormatter \
                                        --results-file ${results_dir}/results.xml \
-                                       -O--xpass=ignore"
+                                       -O--xpass=success \
+                                       -O--xfail=success"
                     # Setup the xUnit results formatter.
                     if [[ "$(uname -s)" != "Darwin" ]] ; then
                         # On non-Darwin, we ignore skipped tests entirely
@@ -2358,7 +2415,7 @@ for host in "${ALL_HOSTS[@]}"; do
             foundation)
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OS X -- use the XCode project instead"
+                    echo "Skipping Foundation on OS X -- use the Xcode project instead"
                     continue
                 fi
                 if [[ "${SKIP_TEST_FOUNDATION}" ]]; then
@@ -2567,7 +2624,7 @@ for host in "${ALL_HOSTS[@]}"; do
             foundation)
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OS X -- use the XCode project instead"
+                    echo "Skipping Foundation on OS X -- use the Xcode project instead"
                     continue
                 fi
                 if [[ -z "${INSTALL_FOUNDATION}" ]] ; then
@@ -2692,7 +2749,8 @@ function build_and_test_installable_package() {
           DARWIN_TOOLCHAIN_INSTALL_LOCATION="/Library/Developer/Toolchains/${DARWIN_TOOLCHAIN_NAME}.xctoolchain"
           DARWIN_TOOLCHAIN_INFO_PLIST="${host_install_destdir}${TOOLCHAIN_PREFIX}/Info.plist"
           DARWIN_TOOLCHAIN_REPORT_URL="https://bugs.swift.org/"
-          COMPATIBILITY_VERSION=1
+          COMPATIBILITY_VERSION=2
+          COMPATIBILITY_VERSION_DISPLAY_STRING="Xcode 8.0"
           DARWIN_TOOLCHAIN_CREATED_DATE="$(date -u +'%a %b %d %T GMT %Y')"
 
           echo "-- Removing: ${DARWIN_TOOLCHAIN_INFO_PLIST}"
@@ -2702,6 +2760,7 @@ function build_and_test_installable_package() {
           call ${PLISTBUDDY_BIN} -c "Add ShortDisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add CreatedDate date '${DARWIN_TOOLCHAIN_CREATED_DATE}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add CompatibilityVersion integer ${COMPATIBILITY_VERSION}" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add CompatibilityVersionDisplayString string ${COMPATIBILITY_VERSION_DISPLAY_STRING}" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add Version string '${DARWIN_TOOLCHAIN_VERSION}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string '${DARWIN_TOOLCHAIN_REPORT_URL}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"

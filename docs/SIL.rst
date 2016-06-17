@@ -865,7 +865,7 @@ entity discriminators:
 - ``ivarinitializer``: a class's ivar initializer
 - ``defaultarg.``\ *n*: the default argument-generating function for
   the *n*\ -th argument of a Swift ``func``
-- ``foreign``: a specific entry point for C/objective-C interoperability
+- ``foreign``: a specific entry point for C/Objective-C interoperability
 
 Methods and curried function definitions in Swift also have multiple
 "uncurry levels" in SIL, representing the function at each possible

@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/InputStream.swift
-// RUN: %S/../../utils/line-directive %t/InputStream.swift -- %target-build-swift %t/InputStream.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/InputStream.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
+
+// FIXME: The Android test runner is incapable of running this test, which
+//        relies on stdin input.
+// UNSUPPORTED: OS=linux-androideabi
 
 import StdlibUnittest
 

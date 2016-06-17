@@ -316,6 +316,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(CodeCompletion)
     NON_LVALUE_EXPR(ObjCSelector)
     NON_LVALUE_EXPR(ObjCKeyPath)
+    NON_LVALUE_EXPR(EnumIsCase)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
     NON_LVALUE_EXPR(KIND)
@@ -327,6 +328,145 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
   };
 
   PropagateAccessKind(allowOverwrite).visit(this, accessKind);
+}
+
+ConcreteDeclRef Expr::getReferencedDecl() const {
+  switch (getKind()) {
+  // No declaration reference.
+  #define NO_REFERENCE(Id) case ExprKind::Id: return ConcreteDeclRef()
+  #define SIMPLE_REFERENCE(Id, Getter)          \
+    case ExprKind::Id:                          \
+      return cast<Id##Expr>(this)->Getter()
+  #define PASS_THROUGH_REFERENCE(Id, GetSubExpr)                      \
+    case ExprKind::Id:                                                \
+      return cast<Id##Expr>(this)->GetSubExpr()->getReferencedDecl()
+
+  NO_REFERENCE(Error);
+  NO_REFERENCE(NilLiteral);
+  NO_REFERENCE(IntegerLiteral);
+  NO_REFERENCE(FloatLiteral);
+  NO_REFERENCE(BooleanLiteral);
+  NO_REFERENCE(StringLiteral);
+  NO_REFERENCE(InterpolatedStringLiteral);
+  NO_REFERENCE(ObjectLiteral);
+  NO_REFERENCE(MagicIdentifierLiteral);
+  NO_REFERENCE(DiscardAssignment);
+
+  SIMPLE_REFERENCE(DeclRef, getDecl);
+  SIMPLE_REFERENCE(SuperRef, getSelf);
+
+  case ExprKind::Type: {
+    auto typeRepr = cast<TypeExpr>(this)->getTypeRepr();
+    if (!typeRepr) return ConcreteDeclRef();
+    auto ident = dyn_cast<IdentTypeRepr>(typeRepr);
+    if (!ident) return ConcreteDeclRef();
+    return ident->getComponentRange().back()->getBoundDecl();
+  }
+
+  SIMPLE_REFERENCE(OtherConstructorDeclRef, getDecl);
+
+  PASS_THROUGH_REFERENCE(DotSyntaxBaseIgnored, getRHS);
+
+  // FIXME: Return multiple results?
+  case ExprKind::OverloadedDeclRef:
+  case ExprKind::OverloadedMemberRef:
+    return ConcreteDeclRef();
+
+  NO_REFERENCE(UnresolvedDeclRef);
+
+  SIMPLE_REFERENCE(MemberRef, getMember);
+  SIMPLE_REFERENCE(DynamicMemberRef, getMember);
+  SIMPLE_REFERENCE(DynamicSubscript, getMember);
+
+  PASS_THROUGH_REFERENCE(UnresolvedSpecialize, getSubExpr);
+
+  NO_REFERENCE(UnresolvedMember);
+  NO_REFERENCE(UnresolvedDot);
+  NO_REFERENCE(Sequence);
+  PASS_THROUGH_REFERENCE(Paren, getSubExpr);
+  PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
+  PASS_THROUGH_REFERENCE(Try, getSubExpr);
+  PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
+  PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
+
+  NO_REFERENCE(Tuple);
+  NO_REFERENCE(Array);
+  NO_REFERENCE(Dictionary);
+
+  case ExprKind::Subscript: {
+    auto subscript = cast<SubscriptExpr>(this);
+    if (subscript->hasDecl()) return subscript->getDecl();
+    return ConcreteDeclRef();
+  }
+
+  NO_REFERENCE(TupleElement);
+  NO_REFERENCE(CaptureList);
+  NO_REFERENCE(Closure);
+
+  PASS_THROUGH_REFERENCE(AutoClosure, getSingleExpressionBody);
+  PASS_THROUGH_REFERENCE(InOut, getSubExpr);
+
+  NO_REFERENCE(DynamicType);
+
+  PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
+
+  NO_REFERENCE(OpaqueValue);
+  PASS_THROUGH_REFERENCE(BindOptional, getSubExpr);
+  PASS_THROUGH_REFERENCE(OptionalEvaluation, getSubExpr);
+  PASS_THROUGH_REFERENCE(ForceValue, getSubExpr);
+  PASS_THROUGH_REFERENCE(OpenExistential, getSubExpr);
+
+  NO_REFERENCE(Call);
+  NO_REFERENCE(PrefixUnary);
+  NO_REFERENCE(PostfixUnary);
+  NO_REFERENCE(Binary);
+  NO_REFERENCE(DotSyntaxCall);
+  NO_REFERENCE(ConstructorRefCall);
+
+  PASS_THROUGH_REFERENCE(Load, getSubExpr);
+  NO_REFERENCE(TupleShuffle);
+  NO_REFERENCE(UnresolvedTypeConversion);
+  PASS_THROUGH_REFERENCE(FunctionConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(CovariantFunctionConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(CovariantReturnConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(MetatypeConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(CollectionUpcastConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(Erasure, getSubExpr);
+  PASS_THROUGH_REFERENCE(DerivedToBase, getSubExpr);
+  PASS_THROUGH_REFERENCE(ArchetypeToSuper, getSubExpr);
+  PASS_THROUGH_REFERENCE(InjectIntoOptional, getSubExpr);
+  PASS_THROUGH_REFERENCE(ClassMetatypeToObject, getSubExpr);
+  PASS_THROUGH_REFERENCE(ExistentialMetatypeToObject, getSubExpr);
+  PASS_THROUGH_REFERENCE(ProtocolMetatypeToObject, getSubExpr);
+  PASS_THROUGH_REFERENCE(InOutToPointer, getSubExpr);
+  PASS_THROUGH_REFERENCE(ArrayToPointer, getSubExpr);
+  PASS_THROUGH_REFERENCE(StringToPointer, getSubExpr);
+  PASS_THROUGH_REFERENCE(PointerToPointer, getSubExpr);
+  PASS_THROUGH_REFERENCE(LValueToPointer, getSubExpr);
+  PASS_THROUGH_REFERENCE(ForeignObjectConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(UnevaluatedInstance, getSubExpr);
+  NO_REFERENCE(Coerce);
+  NO_REFERENCE(ForcedCheckedCast);
+  NO_REFERENCE(ConditionalCheckedCast);
+  NO_REFERENCE(Is);
+
+  NO_REFERENCE(Arrow);
+  NO_REFERENCE(If);
+  NO_REFERENCE(EnumIsCase);
+  NO_REFERENCE(Assign);
+  NO_REFERENCE(DefaultValue);
+  NO_REFERENCE(CodeCompletion);
+  NO_REFERENCE(UnresolvedPattern);
+  NO_REFERENCE(EditorPlaceholder);
+  NO_REFERENCE(ObjCSelector);
+  NO_REFERENCE(ObjCKeyPath);
+
+#undef SIMPLE_REFERENCE
+#undef NO_REFERENCE
+#undef PASS_THROUGH_REFERENCE
+  }
+
+  return ConcreteDeclRef();
 }
 
 /// Enumerate each immediate child expression of this node, invoking the
@@ -600,6 +740,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::LValueToPointer:
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
+  case ExprKind::EnumIsCase:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
     return cast<ImplicitConversionExpr>(this)->getSubExpr()
@@ -1031,6 +1172,25 @@ static ValueDecl *getCalledValue(Expr *E) {
 
 ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
+}
+
+Expr *CallExpr::getDirectCallee() const {
+  auto fn = getFn();
+  while (true) {
+    fn = fn->getSemanticsProvidingExpr();
+
+    if (auto force = dyn_cast<ForceValueExpr>(fn)) {
+      fn = force->getSubExpr();
+      continue;
+    }
+
+    if (auto bind = dyn_cast<BindOptionalExpr>(fn)) {
+      fn = bind->getSubExpr();
+      continue;
+    }
+
+    return fn;
+  }
 }
 
 RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,

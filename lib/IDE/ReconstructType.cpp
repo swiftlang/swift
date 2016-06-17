@@ -77,7 +77,7 @@ static TypeBase *GetTemplateArgument(TypeBase *type, size_t arg_idx) {
       if (!bound_generic_type)
         break;
       const ArrayRef<Substitution> &substitutions =
-          bound_generic_type->getSubstitutions(nullptr, nullptr);
+          bound_generic_type->gatherAllSubstitutions(nullptr, nullptr);
       if (arg_idx >= substitutions.size())
         break;
       const Substitution &substitution = substitutions[arg_idx];
@@ -483,10 +483,6 @@ struct VisitNodeResult {
     _tuple_type_element = TupleTypeElt();
     _error.clear();
   }
-
-  bool HasAnyDecls() { return !_decls.empty(); }
-
-  bool HasAnyTypes() { return !_types.empty(); }
 };
 
 static Identifier

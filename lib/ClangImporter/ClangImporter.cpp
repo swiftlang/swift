@@ -354,22 +354,22 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-D_ISO646_H_", "-D__ISO646_H",
 
       // Request new APIs from Foundation.
-      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=5",
+      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=7",
 
       // Request new APIs from SceneKit.
-      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=1",
-
-      // Request new APIs from SpriteKit.
-      "-DSWIFT_SDK_OVERLAY2_SPRITEKIT_EPOCH=1",
+      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=2",
 
       // Request new APIs from CoreImage.
       "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=2",
 
       // Request new APIs from libdispatch.
-      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=0",
+      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=2",
 
       // Request new APIs from libpthread
       "-DSWIFT_SDK_OVERLAY_PTHREAD_EPOCH=1",
+
+      // Request new APIs from CoreGraphics.
+      "-DSWIFT_SDK_OVERLAY_COREGRAPHICS_EPOCH=0",
     });
 
     // Get the version of this compiler and pass it to
@@ -2350,6 +2350,12 @@ auto ClangImporter::Implementation::importFullName(
   if (isa<clang::ObjCCategoryDecl>(D))
     return result;
 
+  // Dig out the definition, if there is one.
+  if (auto def = getDefinitionForClangTypeDecl(D)) {
+    if (*def)
+      D = static_cast<const clang::NamedDecl *>(*def);
+  }
+
   // Compute the effective context.
   auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
 
@@ -2837,7 +2843,7 @@ auto ClangImporter::Implementation::importFullName(
           owningD = *def;
       }
 
-      std::string moduleName;
+      SmallString<32> moduleName;
       if (auto module = owningD->getImportedOwningModule())
         moduleName = module->getTopLevelModuleName();
       else
@@ -3274,7 +3280,8 @@ ClangImporter::Implementation::shouldSuppressGenericParamsImport(
   while (decl) {
     StringRef name = decl->getName();
     if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
-        name == "NSOrderedSet" || name == "NSEnumerator") {
+        name == "NSOrderedSet" || name == "NSEnumerator" ||
+        name == "NSMeasurement") {
       return true;
     }
     decl = decl->getSuperClass();

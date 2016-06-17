@@ -361,14 +361,15 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
 
   // Check 'Tok', return false if ':' or '=' cannot be found.
-  // Complain if '=' is found and suggest replacing it with ':'.
+  // Complain if '=' is found and suggest replacing it with ": ".
   auto findAttrValueDelimiter = [&]() -> bool {
     if (!Tok.is(tok::colon)) {
       if (!Tok.is(tok::equal))
         return false;
-      else
-        diagnose(Tok.getLoc(), diag::replace_equal_with_colon_for_value)
-          .fixItReplace(Tok.getLoc(), ":");
+
+      bool wantSpace = (Tok.getRange().getEnd() == peekToken().getLoc());
+      diagnose(Tok.getLoc(), diag::replace_equal_with_colon_for_value)
+        .fixItReplace(Tok.getLoc(), wantSpace ? ": " : ":");
     }
     return true;
   };
@@ -1087,119 +1088,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  case DAK_WarnUnusedResult: {
-    // @warn_unused_result with no arguments.
-    if (Tok.isNot(tok::l_paren)) {
-      auto attr = new (Context) WarnUnusedResultAttr(AtLoc, Loc, false);
-      Attributes.add(attr);
-      break;
-    }
-
-    // @warn_unused_result with arguments.
-    StringRef message;
-    StringRef mutableVariant;
-    SourceLoc lParenLoc = consumeToken();
-    bool invalid = false;
-    do {
-      // If we see a closing parenthesis,
-      if (Tok.is(tok::r_paren))
-        break;
-
-      if (Tok.isNot(tok::identifier)) {
-        diagnose(Tok, diag::attr_warn_unused_result_expected_name);
-        if (Tok.isNot(tok::r_paren))
-          skipUntil(tok::r_paren);
-        invalid = true;
-        break;
-      }
-
-      // Consume the identifier.
-      StringRef name = Tok.getText();
-      SourceLoc nameLoc = consumeToken();
-
-      // Figure out which parameter it is.
-      enum class KnownParameter {
-        Message,
-        MutableVariant
-       };
-
-      Optional<KnownParameter> known
-        = llvm::StringSwitch<Optional<KnownParameter>>(name)
-            .Case("message", KnownParameter::Message)
-            .Case("mutable_variant", KnownParameter::MutableVariant)
-            .Default(None);
-
-      // If we don't have the ':', try the deprecated '='. If that doesn't
-      // exist neither, complain.
-      if (findAttrValueDelimiter()) {
-        consumeToken();
-      } else {
-        if (known)
-          diagnose(Tok, diag::attr_warn_unused_result_expected_colon, name);
-        else
-          diagnose(Tok, diag::attr_warn_unused_result_unknown_parameter, name);
-        continue;
-      }
-
-      // If we don't have a string, complain.
-      if (Tok.isNot(tok::string_literal)) {
-        diagnose(Tok, diag::attr_warn_unused_result_expected_string, name);
-        if (Tok.isNot(tok::r_paren))
-          skipUntil(tok::r_paren);
-        invalid = true;
-        break;
-      }
-
-      // Dig out the string.
-      auto string = getStringLiteralIfNotInterpolated(*this, nameLoc, Tok,
-                                                      name.str());
-      consumeToken(tok::string_literal);
-      if (!string) {
-        continue;
-      }
-
-      if (!known) {
-        diagnose(nameLoc, diag::attr_warn_unused_result_unknown_parameter,
-                 name);
-        continue;
-      }
-
-      StringRef *whichParam;
-      switch (*known) {
-      case KnownParameter::Message:
-        whichParam = &message;
-        break; 
-
-      case KnownParameter::MutableVariant:
-        whichParam = &mutableVariant;
-        break;
-      }
-
-      if (!whichParam->empty()) {
-        diagnose(nameLoc, diag::attr_warn_unused_result_duplicate_parameter, 
-                 name);
-      }
-
-      *whichParam = *string;
-    } while (consumeIf(tok::comma));
-
-    // Parse the closing ')'.
-    SourceLoc rParenLoc;
-    if (Tok.isNot(tok::r_paren)) {
-      parseMatchingToken(tok::r_paren, rParenLoc,
-                         diag::attr_warn_unused_result_expected_rparen,
-                         lParenLoc);
-    }
-    if (Tok.is(tok::r_paren)) {
-      rParenLoc = consumeToken();
-    }
-
-    Attributes.add(new (Context) WarnUnusedResultAttr(AtLoc, Loc, lParenLoc,
-                                                      message, mutableVariant,
-                                                      rParenLoc, false));
-    break;
-    }
-
   case DAK_Swift3Migration: {
     if (Tok.isNot(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -1458,6 +1346,41 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     DK = DAK_Available;
     diagnose(Tok, diag::attr_availability_renamed)
         .fixItReplace(Tok.getLoc(), "available");
+  }
+
+
+  if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
+    // The behavior created by @warn_unused_result is now the default. Emit a
+    // Fix-It to remove.
+    SourceLoc attrLoc = consumeToken();
+
+    // @warn_unused_result with no arguments.
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(AtLoc, diag::attr_warn_unused_result_removed)
+        .fixItRemove(SourceRange(AtLoc, attrLoc));
+
+      return false;
+    }
+
+    // @warn_unused_result with arguments.
+    SourceLoc lParenLoc = consumeToken();
+    skipUntil(tok::r_paren);
+
+    // Parse the closing ')'.
+    SourceLoc rParenLoc;
+    if (Tok.isNot(tok::r_paren)) {
+      parseMatchingToken(tok::r_paren, rParenLoc,
+                         diag::attr_warn_unused_result_expected_rparen,
+                         lParenLoc);
+    }
+    if (Tok.is(tok::r_paren)) {
+      rParenLoc = consumeToken();
+    }
+
+    diagnose(AtLoc, diag::attr_warn_unused_result_removed)
+      .fixItRemove(SourceRange(AtLoc, rParenLoc));
+
+    return false;
   }
 
   if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK))
@@ -4277,7 +4200,10 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
     
     // Parse a behavior block if present.
-    if (consumeIf(tok::kw___behavior)) {
+    if (Context.LangOpts.EnableExperimentalPropertyBehaviors
+        && Tok.is(tok::identifier)
+        && Tok.getRawText().equals("__behavior")) {
+      consumeToken(tok::identifier);
       auto type = parseType(diag::expected_behavior_name,
                             /*handle completion*/ true);
       if (type.isParseError())

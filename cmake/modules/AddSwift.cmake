@@ -53,6 +53,15 @@ function(compute_library_subdir result_var_name sdk arch)
   set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
 endfunction()
 
+function(_compute_lto_flag option out_var)
+  string(TOLOWER "${option}" lowercase_option)
+  if (lowercase_option STREQUAL "full")
+    set(${out_var} "-flto=full" PARENT_SCOPE)
+  elseif (lowercase_option STREQUAL "thin")
+    set(${out_var} "-flto=thin" PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Usage:
 # _add_variant_c_compile_link_flags(
 #   SDK sdk
@@ -109,15 +118,16 @@ function(_add_variant_c_compile_link_flags)
     endif()
   endif()
 
-  if(CFLAGS_ENABLE_LTO)
-    list(APPEND result "-flto")
+  _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
+  if (_lto_flag_out)
+    list(APPEND result "${_lto_flag_out}")
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
 function(_add_variant_c_compile_flags)
-  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE DEPLOYMENT_VERSION_IOS RESULT_VAR_NAME)
+  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE DEPLOYMENT_VERSION_IOS RESULT_VAR_NAME ENABLE_LTO)
   cmake_parse_arguments(CFLAGS
     ""
     "${oneValueArgs}"
@@ -131,7 +141,7 @@ function(_add_variant_c_compile_flags)
     ARCH "${CFLAGS_ARCH}"
     BUILD_TYPE "${CFLAGS_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${CFLAGS_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    ENABLE_LTO "${CFLAGS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE FALSE
     DEPLOYMENT_VERSION_IOS "${CFLAGS_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME result)
@@ -150,7 +160,8 @@ function(_add_variant_c_compile_flags)
 
   is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
   if(debuginfo)
-    if(SWIFT_TOOLS_ENABLE_LTO)
+    _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
+    if(_lto_flag_out)
       list(APPEND result "-gline-tables-only")
     else()
       list(APPEND result "-g")
@@ -214,7 +225,7 @@ function(_add_variant_swift_compile_flags
 endfunction()
 
 function(_add_variant_link_flags)
-  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE DEPLOYMENT_VERSION_IOS RESULT_VAR_NAME)
+  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE DEPLOYMENT_VERSION_IOS RESULT_VAR_NAME ENABLE_LTO)
   cmake_parse_arguments(LFLAGS
     ""
     "${oneValueArgs}"
@@ -236,7 +247,7 @@ function(_add_variant_link_flags)
     ARCH "${LFLAGS_ARCH}"
     BUILD_TYPE "${LFLAGS_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LFLAGS_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    ENABLE_LTO "${LFLAGS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${LFLAGS_ANALYZE_CODE_COVERAGE}"
     DEPLOYMENT_VERSION_IOS "${LFLAGS_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME result)
@@ -366,6 +377,7 @@ endfunction()
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
 #     [IS_SDK_OVERLAY]
+#     [FORCE_BUILD_FOR_HOST_SDK]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
@@ -429,12 +441,15 @@ endfunction()
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
+# FORCE_BUILD_FOR_HOST_SDK
+#   Regardless of the defaults, also build this library for the host SDK.
+#
 # source1 ...
 #   Sources to add into this library
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
       SHARED OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
-      TARGET_LIBRARY HOST_LIBRARY
+      TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   cmake_parse_arguments(SWIFTLIB_SINGLE
     "${SWIFTLIB_SINGLE_options}"
@@ -789,7 +804,7 @@ function(_add_swift_library_single target name)
   set(link_flags ${SWIFTLIB_SINGLE_LINK_FLAGS})
 
   # Add variant-specific flags.
-  if(SWIFTLIB_SINGLE_IS_STDLIB)
+  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
     set(build_type "${SWIFT_STDLIB_BUILD_TYPE}")
     set(enable_assertions "${SWIFT_STDLIB_ASSERTIONS}")
   else()
@@ -797,12 +812,18 @@ function(_add_swift_library_single target name)
     set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
     set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
   endif()
+
+  if (NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
+    set(lto_type "${SWIFT_TOOLS_ENABLE_LTO}")
+  endif()
+
   _add_variant_c_compile_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
     ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${build_type}"
     ENABLE_ASSERTIONS "${enable_assertions}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
+    ENABLE_LTO "${lto_type}"
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME c_compile_flags
     )
@@ -812,6 +833,7 @@ function(_add_swift_library_single target name)
     BUILD_TYPE "${build_type}"
     ENABLE_ASSERTIONS "${enable_assertions}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
+    ENABLE_LTO "${lto_type}"
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME link_flags
       )
@@ -916,6 +938,7 @@ endfunction()
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
 #     [TARGET_LIBRARY]
+#     [FORCE_BUILD_FOR_HOST_SDK]
 #     INSTALL_IN_COMPONENT comp
 #     DEPLOYMENT_VERSION_IOS version
 #     source1 [source2 source3 ...])
@@ -998,12 +1021,15 @@ endfunction()
 # DEPLOYMENT_VERSION_IOS
 #   The minimum deployment version to build for if this is an iOS library.
 #
+# FORCE_BUILD_FOR_HOST_SDK
+#   Regardless of the defaults, also build this library for the host SDK.
+#
 # source1 ...
 #   Sources to add into this library.
 function(add_swift_library name)
   set(SWIFTLIB_options
       SHARED OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
-      TARGET_LIBRARY HOST_LIBRARY
+      TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE HAS_SWIFT_CONTENT)
   cmake_parse_arguments(SWIFTLIB
     "${SWIFTLIB_options}"
@@ -1084,7 +1110,7 @@ function(add_swift_library name)
     # SDKs building the variants of this library.
     list_intersect(
         "${SWIFTLIB_TARGET_SDKS}" "${SWIFT_SDKS}" SWIFTLIB_TARGET_SDKS)
-    if(SWIFTLIB_HOST_LIBRARY)
+    if(SWIFTLIB_FORCE_BUILD_FOR_HOST_SDK)
       list_union(
           "${SWIFTLIB_TARGET_SDKS}" "${SWIFT_HOST_VARIANT_SDK}"
           SWIFTLIB_TARGET_SDKS)
@@ -1191,7 +1217,7 @@ function(add_swift_library name)
           ${SWIFTLIB_IS_STDLIB_CORE_keyword}
           ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
           ${SWIFTLIB_TARGET_LIBRARY_keyword}
-          ${SWIFTLIB_HOST_LIBRARY_keyword}
+          ${SWIFTLIB_FORCE_BUILD_FOR_HOST_SDK_keyword}
           INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
           DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
         )
@@ -1415,6 +1441,7 @@ function(_add_swift_executable_single name)
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME c_compile_flags)
   _add_variant_link_flags(
@@ -1422,6 +1449,7 @@ function(_add_swift_executable_single name)
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME link_flags)
 

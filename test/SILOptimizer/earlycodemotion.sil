@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all %s -early-codemotion -disable-sil-cm-rr-cm=0 | FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all %s -early-codemotion -retain-sinking -disable-with-critical-edge=1 | FileCheck %s
 
 import Builtin
 
@@ -181,9 +181,7 @@ bb3(%6 : $Builtin.Int32):
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: switch_enum
 // CHECK: bb1({{.*}}):
-// CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: strong_retain
-// CHECK-NOT: retain_value
+// CHECK-NEXT: retain_value
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value
@@ -299,8 +297,7 @@ bb4:
 // CHECK-NOT: retain_value [[ARG1]]
 // CHECK: switch_enum
 // CHECK: bb1:
-// CHECK: unchecked_enum_data [[ARG1]]
-// CHECK: strong_retain
+// CHECK: retain_value
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value [[ARG1]]
@@ -383,9 +380,7 @@ bb3:
 // CHECK-NEXT: select_enum
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: strong_retain
-// CHECK-NOT: retain_value
+// CHECK-NEXT: retain_value
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value
@@ -426,8 +421,8 @@ bb3:
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: select_enum
 // CHECK-NEXT: retain_value
+// CHECK-NEXT: select_enum
 // CHECK-NEXT: cond_br
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
@@ -469,8 +464,8 @@ bb4:
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: select_enum
 // CHECK-NEXT: retain_value
+// CHECK-NEXT: select_enum
 // CHECK-NEXT: cond_br
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
@@ -510,7 +505,6 @@ bb4:
 // CHECK: select_enum
 // CHECK: cond_br
 // CHECK: bb1:
-// CHECK: unchecked_enum_data [[ARG1]]
 // CHECK: retain_value
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
@@ -666,97 +660,13 @@ sil_vtable Test {
   #Test.testing!1: virtual_callee
 }
 
-// Don't sink a retain over switch_enum with a default case.
-//
-// CHECK-LABEL: sil @dont_sink_retain_over_default_case_switch_enum : $@convention(thin) (Optional<Builtin.Int32>) -> () {
-// CHECK: bb0({{.*}}):
-// CHECK-NEXT: retain_value
-// CHECK-NEXT: switch_enum
-// CHECK: return
-sil @dont_sink_retain_over_default_case_switch_enum : $@convention(thin) (Optional<Builtin.Int32>) -> () {
-bb0(%0 : $Optional<Builtin.Int32>):
-  retain_value %0 : $Optional<Builtin.Int32>
-  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.some!enumelt.1: bb1, default bb2
-
-bb1:
-  br bb3
-
-bb2:
-  br bb3
-
-bb3:
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-sil @arc_user : $@convention(thin) () -> ()
-
-// The retains here aren't able to be moved to a successor BB.  But we still want to move them as far
-// as possible down the current BB.  The first retain should be moved to above the release_value.
-// The second retain shouldn't move at all
-// The third retain should move below the sadd builtin
-// The fourth retain should move below the arc_user builtin, but above the apply
-// The fifth retain should *NOT* move below is_unique, unless we can prove that the pointers do not
-// alias.
-// And the last retain should remain where it is at the end of the BB.
-//
-// CHECK-LABEL: sil @move_retain_down_bb : $@convention(thin) (Optional<Builtin.Int32>, Optional<Builtin.Int32>, Optional<Builtin.Int32>, Optional<Builtin.Int32>, Optional<Builtin.Int32>) -> (Builtin.Int64, Builtin.Int1) {
-// CHECK: bb0({{.*}}):
-// CHECK-NEXT: retain_value %1
-// CHECK-NEXT: retain_value %0
-// CHECK-NEXT: release_value %4
-// CHECK-NEXT: function_ref arc_user
-// CHECK-NEXT: function_ref @arc_user
-// CHECK-NEXT: retain_value %3
-// CHECK-NEXT: retain_value %2
-// CHECK-NEXT: apply
-// CHECK-NEXT: integer_literal $Builtin.Word, 1
-// CHECK-NEXT: retain_value %3
-// CHECK-NEXT: is_unique
-// CHECK-NEXT: retain_value %3
-// CHECK-NEXT: switch_enum
-
-// CHECK: return
-sil @move_retain_down_bb : $@convention(thin) (Optional<Builtin.Int32>, Optional<Builtin.Int32>, Optional<Builtin.Int32>, Optional<Builtin.Int32>, Optional<Builtin.Int32>) -> (Builtin.Int64, Builtin.Int1) {
-bb0(%0 : $Optional<Builtin.Int32>, %1 : $Optional<Builtin.Int32>, %2 : $Optional<Builtin.Int32>, %3 : $Optional<Builtin.Int32>, %4 : $Optional<Builtin.Int32>):
-  retain_value %0 : $Optional<Builtin.Int32>
-  retain_value %1 : $Optional<Builtin.Int32>
-  release_value %4 : $Optional<Builtin.Int32>
-  retain_value %2 : $Optional<Builtin.Int32>
-  retain_value %3 : $Optional<Builtin.Int32>
-  %1000 = function_ref @arc_user : $@convention(thin) () -> ()
-  apply %1000 () : $@convention(thin) () -> ()
-  retain_value %3 : $Optional<Builtin.Int32>
-  %500 = integer_literal $Builtin.Word, 1 //  pointer bits
-  %501 = is_unique %500 : $Builtin.Word
-  retain_value %3 : $Optional<Builtin.Int32>
-  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.some!enumelt.1: bb1, default bb2
-
-bb1:
-  %100 = integer_literal $Builtin.Int64, 1
-  %101 = integer_literal $Builtin.Int64, 2
-  %102 = integer_literal $Builtin.Int1, 1
-  %10 = builtin "ssub_with_overflow_Int64"(%100 : $Builtin.Int64, %101 : $Builtin.Int64, %102 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
-  br bb3(%10 : $(Builtin.Int64, Builtin.Int1))
-
-bb2:
-  %200 = integer_literal $Builtin.Int64, 3
-  %201 = integer_literal $Builtin.Int64, 4
-  %202 = integer_literal $Builtin.Int1, 1
-  %11 = builtin "sadd_with_overflow_Int64"(%200 : $Builtin.Int64, %201 : $Builtin.Int64, %202 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
-  br bb3(%11 : $(Builtin.Int64, Builtin.Int1))
-
-bb3(%12 : $(Builtin.Int64, Builtin.Int1)):
-  return %12 : $(Builtin.Int64, Builtin.Int1)
-}
-
 // CHECK-LABEL: sil @sink_retains_from_preds : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb1:
 // CHECK-NOT: retain_value
 // CHECK: bb2:
 // CHECK-NOT: retain_value
 // CHECK: bb3:
-// CHECK: retain_value
+// CHECK: strong_retain
 sil @sink_retains_from_preds : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   cond_br undef, bb1, bb2
@@ -780,19 +690,6 @@ bb3:
 // CHECK-NEXT: release_value
 sil @enum_simplification_test1 : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : $Optional<Builtin.NativeObject>):
-  retain_value %0 : $Optional<Builtin.NativeObject>
-  release_value %0 : $Optional<Builtin.NativeObject>
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// CHECK-LABEL: sil @enum_simplification_test2 : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
-// CHECK: bb0
-// CHECK: strong_retain
-// CHECK: strong_release
-sil @enum_simplification_test2 : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
-bb0(%0 : $Optional<Builtin.NativeObject>):
-  %1 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
   retain_value %0 : $Optional<Builtin.NativeObject>
   release_value %0 : $Optional<Builtin.NativeObject>
   %9999 = tuple()
@@ -836,11 +733,11 @@ bb0:
 
 // CHECK-LABEL: sil @enum_simplification_test5 : $@convention(thin) () -> () {
 // CHECK: bb1:
-// CHECK: strong_retain
-// CHECK: bb2:
-// CHECK: strong_retain
-// CHECK: bb3:
 // CHECK-NOT: strong_retain
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+// CHECK: bb3:
+// CHECK: strong_retain
 sil @enum_simplification_test5 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @get_object : $@convention(thin) () -> Builtin.NativeObject
@@ -877,7 +774,7 @@ bb3:
 // CHECK-NOT: strong_retain
 // CHECK-NOT: retain_value
 // CHECK: bb3:
-// CHECK: strong_retain
+// CHECK: retain_value
 sil @enum_simplification_test6a : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : $Optional<Builtin.NativeObject>):
   %1 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
@@ -901,11 +798,11 @@ bb3:
 //
 // CHECK-LABEL: sil @enum_simplification_test6b : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 // CHECK: bb1:
-// CHECK: strong_retain
+// CHECK: retain_value
 // CHECK: bb2:
-// CHECK: strong_retain
+// CHECK: retain_value
 // CHECK: bb3:
-// CHECK-NOT: strong_retain
+// CHECK-NOT: retain_value
 sil @enum_simplification_test6b : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : $Optional<Builtin.NativeObject>):
   %1 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
@@ -983,8 +880,7 @@ bb4:
 // CHECK-LABEL: sil @enum_simplification_test9 : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $Optional<Builtin.NativeObject>):
 // CHECK: bb1:
-// CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = unchecked_enum_data [[INPUT]]
-// CHECK-NEXT: strong_retain [[PAYLOAD]]
+// CHECK-NEXT: retain_value [[INPUT]]
 // CHECK: bb2:
 // CHECK-NOT: retain
 // CHECK: bb3:
@@ -1013,8 +909,7 @@ bb3:
 // CHECK-LABEL: sil @enum_simplification_test9_enums : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $Optional<Builtin.NativeObject>):
 // CHECK: bb1:
-// CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = unchecked_enum_data [[INPUT]]
-// CHECK-NEXT: strong_retain [[PAYLOAD]]
+// CHECK-NEXT: retain_value
 // CHECK: bb2:
 // CHECK-NOT: retain
 // CHECK: bb3:
@@ -1238,8 +1133,12 @@ bb5:
 
 // CHECK-LABEL: sil @sink_retains_through_separated_switches : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 // CHECK-NOT: retain_value
-// CHECK: bb5:
+// CHECK: bb3:
 // CHECK: retain_value
+// CHECK: bb4:
+// CHECK: retain_value
+// CHECK: bb5:
+// CHECK-NOT: retain_value
 sil @sink_retains_through_separated_switches : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : $Optional<Builtin.NativeObject>):
   retain_value %0 : $Optional<Builtin.NativeObject>
@@ -1285,11 +1184,13 @@ bb3:
   return %2 : $()
 }
 
+// We can do the deletion in simplify-cfg.
+//
 // CHECK-LABEL: sil @delete_instead_of_sinkretainsintounreachable_bb : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 // CHECK: bb0(
 // CHECK-NOT: retain_value
 // CHECK: bb1:
-// CHECK-NOT: retain_value
+// CHECK: retain_value
 // CHECK: bb2:
 // CHECK: retain_value
 sil @delete_instead_of_sinkretainsintounreachable_bb : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
@@ -1316,7 +1217,7 @@ bb2:
 // CHECK-NOT: retain_value
 // CHECK: br bb3
 // CHECK: bb3:
-// CHECK: retain_value
+// CHECK: strong_retain 
 sil @sink_retain_over_switch_enum_cast : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   retain_value %0 : $Builtin.NativeObject
@@ -1605,7 +1506,7 @@ bb2(%9 : $fuzz):
 //
 // CHECK-LABEL: retain_blocked_by_copyaddr
 // CHECK: bb0
-// CHECK-NEXT: retain_value
+// CHECK-NEXT: strong_retain 
 sil hidden @retain_blocked_by_copyaddr : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
   retain_value %2 : $B
@@ -1621,7 +1522,7 @@ bb0(%0 : $*T, %1 : $*T, %2 : $B):
 // CHECK: bb0
 // CHECK-NEXT: copy_addr 
 // CHECK-NEXT: tuple 
-// CHECK-NEXT: retain_value
+// CHECK-NEXT: strong_retain
 sil hidden @retain_not_blocked_by_copyaddrinit : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
   retain_value %2 : $B
@@ -1637,7 +1538,7 @@ bb0(%0 : $*T, %1 : $*T, %2 : $B):
 // CHECK: bb0
 // CHECK-NEXT: copy_addr 
 // CHECK-NEXT: tuple 
-// CHECK-NEXT: retain_value
+// CHECK-NEXT: strong_retain
 sil hidden @retain_not_blocked_by_copyaddr_notake_init : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
   retain_value %2 : $B

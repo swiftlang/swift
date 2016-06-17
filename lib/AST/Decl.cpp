@@ -286,8 +286,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
 DeclContext *Decl::getInnermostDeclContext() const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return const_cast<AbstractFunctionDecl*>(func);
-  if (auto nominal = dyn_cast<NominalTypeDecl>(this))
-    return const_cast<NominalTypeDecl*>(nominal);
+  if (auto nominal = dyn_cast<GenericTypeDecl>(this))
+    return const_cast<GenericTypeDecl*>(nominal);
   if (auto ext = dyn_cast<ExtensionDecl>(this))
     return const_cast<ExtensionDecl*>(ext);
   if (auto topLevel = dyn_cast<TopLevelCodeDecl>(this))
@@ -1211,6 +1211,17 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       return AccessStrategy::DirectToAccessor;
     }
     llvm_unreachable("bad storage kind");
+  case AccessSemantics::BehaviorInitialization:
+    // Behavior initialization writes to the property as if it has storage.
+    // SIL definite initialization will introduce the logical accesses.
+    // Reads or inouts still go through the getter.
+    switch (accessKind) {
+    case AccessKind::Write:
+      return AccessStrategy::BehaviorStorage;
+    case AccessKind::ReadWrite:
+    case AccessKind::Read:
+      return AccessStrategy::DispatchToAccessor;
+    }
   }
   llvm_unreachable("bad access semantics");
 }
@@ -1673,11 +1684,9 @@ Type ValueDecl::getInterfaceType() const {
 
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(this)) {
     auto proto = cast<ProtocolDecl>(getDeclContext());
-    (void)proto->getType(); // make sure we've computed the type.
-    // FIXME: the generic parameter types list should never be empty.
-    auto selfTy = proto->getInnermostGenericParamTypes().empty()
-                    ? proto->getProtocolSelf()->getType()
-                    : proto->getInnermostGenericParamTypes().back();
+    if (!proto->hasType())
+      proto->computeType(); // make sure we've computed the type.
+    auto selfTy = proto->getProtocolSelf()->getDeclaredType();
     auto &ctx = getASTContext();
     InterfaceTy = DependentMemberType::get(
                     selfTy,
@@ -1898,14 +1907,11 @@ void NominalTypeDecl::computeType() {
   Type parentTy = getDeclContext()->getDeclaredTypeInContext();
   ASTContext &ctx = getASTContext();
   if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-    if (!getDeclaredType()) {
-      ProtocolType::get(proto, ctx);
-      assert(getDeclaredType());
-    }
+    DeclaredTy = ProtocolType::get(proto, ctx);
   } else if (getGenericParams()) {
-    setDeclaredType(UnboundGenericType::get(this, parentTy, ctx));
+    DeclaredTy = UnboundGenericType::get(this, parentTy, ctx);
   } else {
-    setDeclaredType(NominalType::get(this, parentTy, ctx));
+    DeclaredTy = NominalType::get(this, parentTy, ctx);
   }
 
   // Set the type.
@@ -4472,7 +4478,7 @@ bool EnumElementDecl::computeType() {
   if (getArgumentType())
     resultTy = FunctionType::get(getArgumentType(), resultTy);
 
-  if (ED->isGenericTypeContext())
+  if (ED->isGenericContext())
     resultTy = PolymorphicFunctionType::get(argTy, resultTy,
                                             ED->getGenericParamsOfContext());
   else

@@ -3,6 +3,8 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0093](https://github.com/apple/swift-evolution/blob/master/proposals/0093-slice-base.md): Slice types now have a `base` property that allows public readonly access to their base collections.
+
 * Nested generic functions may now capture bindings from the environment, for example:
 
     ```swift
@@ -27,7 +29,8 @@ Swift 3.0
 
     class Derived<T> : Base<T> {
       // init(t: T) is now synthesized to call super.init(t: t)
-    }```
+    }
+    ```
 
 * [SE-0081](https://github.com/apple/swift-evolution/blob/master/proposals/0081-move-where-expression.md)
   "Move 'where' clause to end of declaration" is implemented, allowing you to 

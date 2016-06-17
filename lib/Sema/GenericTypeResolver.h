@@ -27,6 +27,7 @@ class ArchetypeBuilder;
 class AssociatedTypeDecl;
 class Identifier;
 class TypeChecker;
+class TypeDecl;
 
 /// Abstract class that resolves references into generic types during
 /// type resolution.
@@ -77,6 +78,14 @@ public:
   ///
   /// \returns the type of context.
   virtual Type resolveTypeOfContext(DeclContext *dc) = 0;
+
+  /// Retrieve the type when referring to the given type declaration within
+  /// its context.
+  ///
+  /// \param decl A type declaration.
+  ///
+  /// \returns the type of the declaration in context..
+  virtual Type resolveTypeOfDecl(TypeDecl *decl) = 0;
 };
 
 /// Generic type resolver that leaves all generic types dependent.
@@ -102,6 +111,8 @@ public:
                                          AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
+
+  virtual Type resolveTypeOfDecl(TypeDecl *decl);
 };
 
 /// Generic type resolver that maps a generic type parameter type to its
@@ -123,6 +134,7 @@ class GenericTypeToArchetypeResolver : public GenericTypeResolver {
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
+  virtual Type resolveTypeOfDecl(TypeDecl *decl);
 };
 
 /// Generic type resolver that maps any generic type parameter type that
@@ -152,6 +164,8 @@ public:
                                          AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
+
+  virtual Type resolveTypeOfDecl(TypeDecl *decl);
 };
 
 /// Generic type resolver that performs complete resolution of dependent
@@ -181,6 +195,8 @@ public:
                                          AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
+
+  virtual Type resolveTypeOfDecl(TypeDecl *decl);
 };
 
 } // end namespace swift

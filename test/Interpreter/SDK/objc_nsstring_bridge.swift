@@ -52,7 +52,7 @@ var s4 = NSString(string: "\u{f8ff}\u{fffd}") as String
 printDescription(s4 as NSString) // CHECK: �
 
 // NSCFConstantString conversion
-var s5 : String = NSRangeException
+var s5 : String = NSExceptionName.rangeException.rawValue as String
 printDescription(s5 as NSString) // CHECK: NSRangeException
 
 // Check conversions to AnyObject

@@ -115,6 +115,9 @@ SILBasicBlock *splitBasicBlockAndBranch(SILBuilder &B,
                                         SILInstruction *SplitBeforeInst,
                                         DominanceInfo *DT, SILLoopInfo *LI);
 
+/// \brief Return true if the function has a critical edge, false otherwise.
+bool hasCriticalEdges(SILFunction &F, bool OnlyNonCondBr);
+
 /// \brief Split all critical edges in the function updating the dominator tree
 /// and loop information (if they are not set to null). If \p OnlyNonCondBr is
 /// true this will not split cond_br edges (Only edges which can't carry

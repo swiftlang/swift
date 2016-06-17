@@ -611,10 +611,12 @@ static void checkCircularity(TypeChecker &tc, T *decl,
     return;
 
   case CircularityCheck::Checking: {
-    // We're already checking this protocol, which means we have a cycle.
+    // We're already checking this type, which means we have a cycle.
 
     // The beginning of the path might not be part of the cycle, so find
     // where the cycle starts.
+    assert(!path.empty());
+
     auto cycleStart = path.end() - 1;
     while (*cycleStart != decl) {
       assert(cycleStart != path.begin() && "Missing cycle start?");
@@ -1294,7 +1296,7 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
     fnType = FunctionType::get(argType, resultType, extInfo);
   }
   Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
-  if (ctor->getDeclContext()->isGenericTypeContext()) {
+  if (ctor->getDeclContext()->isGenericContext()) {
     allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
                                                outerGenericParams);
     initFnType = PolymorphicFunctionType::get(selfType, fnType,
@@ -2350,7 +2352,8 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
   }
 
   // Make sure we have the appropriate bridging operations.
-  checkBridgedFunctions(TC);
+  if (!isa<DestructorDecl>(D))
+    checkBridgedFunctions(TC);
   TC.useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
                                          D->getInterfaceType());
 
@@ -3546,19 +3549,21 @@ public:
     // We don't support nested types in generics yet.
     if (NTD->isGenericContext()) {
       auto DC = NTD->getDeclContext();
-      if (DC->isTypeContext()) {
-        if (NTD->getGenericParams())
-          TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
-                NTD->getName(),
-                DC->getDeclaredTypeOfContext());
-        else
-          TC.diagnose(NTD->getLoc(),
-                      diag::unsupported_type_nested_in_generic_type,
-                      NTD->getName(),
-                      DC->getDeclaredTypeOfContext());
-        return true;
+      if (!TC.Context.LangOpts.EnableExperimentalNestedGenericTypes) {
+        if (DC->isTypeContext()) {
+          if (NTD->getGenericParams())
+            TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
+                  NTD->getName(),
+                  DC->getDeclaredTypeOfContext());
+          else
+            TC.diagnose(NTD->getLoc(),
+                        diag::unsupported_type_nested_in_generic_type,
+                        NTD->getName(),
+                        DC->getDeclaredTypeOfContext());
+          return true;
+        }
       }
-      
+
       if (DC->isLocalContext() && DC->isGenericContext()) {
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
@@ -3601,6 +3606,7 @@ public:
       {
         // Check for circular inheritance of the raw type.
         SmallVector<EnumDecl *, 8> path;
+        path.push_back(ED);
         checkCircularity(TC, ED, diag::circular_enum_inheritance,
                          diag::enum_here, path);
       }
@@ -3818,6 +3824,7 @@ public:
       {
         // Check for circular inheritance.
         SmallVector<ClassDecl *, 8> path;
+        path.push_back(CD);
         checkCircularity(TC, CD, diag::circular_class_inheritance,
                          diag::class_here, path);
       }
@@ -3902,6 +3909,7 @@ public:
     {
       // Check for circular inheritance within the protocol.
       SmallVector<ProtocolDecl *, 8> path;
+      path.push_back(PD);
       checkCircularity(TC, PD, diag::circular_protocol_def,
                        diag::protocol_here, path);
 
@@ -3996,7 +4004,7 @@ public:
     GenericParamList *outerGenericParams = nullptr;
     auto paramLists = FD->getParameterLists();
     bool hasSelf = FD->getDeclContext()->isTypeContext();
-    if (FD->getDeclContext()->isGenericTypeContext())
+    if (FD->getDeclContext()->isGenericContext())
       outerGenericParams = FD->getDeclContext()->getGenericParamsOfContext();
 
     for (unsigned i = 0, e = paramLists.size(); i != e; ++i) {
@@ -4359,7 +4367,7 @@ public:
         // Assign archetypes.
         finalizeGenericParamList(builder, gp, FD, TC);
       }
-    } else if (FD->getDeclContext()->isGenericTypeContext()) {
+    } else if (FD->getDeclContext()->isGenericContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
         TC.markInvalidGenericSignature(FD);
       } else if (!FD->hasType()) {
@@ -5328,6 +5336,7 @@ public:
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(SILGenName)
     UNINTERESTING_ATTR(Exported)
+    UNINTERESTING_ATTR(GKInspectable)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
@@ -5376,7 +5385,6 @@ public:
     UNINTERESTING_ATTR(SILStored)
     UNINTERESTING_ATTR(Testable)
 
-    UNINTERESTING_ATTR(WarnUnusedResult)
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
     UNINTERESTING_ATTR(DiscardableResult)
 
@@ -5816,7 +5824,7 @@ public:
     // case the enclosing enum type was illegally declared inside of a generic
     // context. (In that case, we'll post a diagnostic while visiting the
     // parent enum.)
-    if (EED->getDeclContext()->isGenericTypeContext())
+    if (EED->getDeclContext()->isGenericContext())
       computeEnumElementInterfaceType(EED);
 
     // Require the carried type to be materializable.
@@ -5989,7 +5997,7 @@ public:
         // Assign archetypes.
         finalizeGenericParamList(builder, gp, CD, TC);
       }
-    } else if (CD->getDeclContext()->isGenericTypeContext()) {
+    } else if (CD->getDeclContext()->isGenericContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
         TC.markInvalidGenericSignature(CD);
       } else {
@@ -6133,7 +6141,7 @@ public:
 
     Type SelfTy = configureImplicitSelf(TC, DD);
 
-    if (DD->getDeclContext()->isGenericTypeContext())
+    if (DD->getDeclContext()->isGenericContext())
       TC.validateGenericFuncSignature(DD);
 
     if (semaFuncParamPatterns(DD)) {
@@ -6143,7 +6151,7 @@ public:
 
     if (!DD->hasType()) {
       Type FnTy;
-      if (DD->getDeclContext()->isGenericTypeContext()) {
+      if (DD->getDeclContext()->isGenericContext()) {
         FnTy = PolymorphicFunctionType::get(SelfTy,
                                             TupleType::getEmpty(TC.Context),
                             DD->getDeclContext()->getGenericParamsOfContext());

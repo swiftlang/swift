@@ -98,7 +98,7 @@ internal func _roundUp<T, DestinationType>(
   return UnsafeMutablePointer<DestinationType>(
     bitPattern: _roundUpImpl(
       UInt(bitPattern: pointer),
-      toAlignment: alignof(DestinationType))
+      toAlignment: alignof(DestinationType.self))
   ).unsafelyUnwrapped
 }
 

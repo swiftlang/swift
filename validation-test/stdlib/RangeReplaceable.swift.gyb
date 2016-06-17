@@ -1,8 +1,5 @@
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/RangeReplaceable.swift
-// RUN: %S/../../utils/line-directive %t/RangeReplaceable.swift -- %target-build-swift %t/RangeReplaceable.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/RangeReplaceable.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -111,6 +108,26 @@ RangeReplaceableTestSuite.test("replaceSubrange/countableClosedRange") {
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
+
+% withRangeTypes = ["countableRange", "countableClosedRange"]
+% for rangeType in withRangeTypes:
+RangeReplaceableTestSuite.test("removeSubrange/${rangeType}") {
+%   if rangeType is "countableClosedRange":
+  for test in removeRangeTests.filter({ !$0.rangeSelection.isEmpty }) {
+%   else:
+  for test in removeRangeTests {
+%   end
+    var c = 
+      MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.collection)
+    let rangeToRemove = test.rangeSelection.${rangeType}(in: c)
+    c.removeSubrange(rangeToRemove)
+    expectEqualSequence(
+      test.expected,
+      c.map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+% end
 
 RangeReplaceableTestSuite.test("reserveCapacity/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester(Array<Int>())

@@ -1,3 +1,4 @@
+// XFAIL: broken_std_regex
 // RUN: %complete-test -tok=INT_OPERATORS %s | FileCheck %s
 // RUN: %complete-test -add-inner-results -tok=INT_OPERATORS_INNER %s | FileCheck %s -check-prefix=INNER
 // RUN: %complete-test -raw -hide-none -tok=INT_OPERATORS %s | FileCheck %s -check-prefix=RAW

@@ -892,7 +892,7 @@ ERROR(invalid_ibdesignable_extension,none,
       "@IBDesignable can only be applied to classes and extensions "
       "of classes", ())
 ERROR(invalid_ibinspectable,none,
-      "only instance properties can be declared @IBInspectable", ())
+      "only instance properties can be declared @%0", (StringRef))
 ERROR(invalid_ibaction_decl,none,
       "only instance methods can be declared @IBAction", ())
 ERROR(invalid_ibaction_result,none,
@@ -1849,12 +1849,6 @@ ERROR(lazy_not_observable,none,
 ERROR(attr_for_debugger_support_only,none,
       "@LLDBDebuggerSupport may only be used when debugger support is on", ())
 
-// warn_unused_result
-ERROR(attr_warn_unused_result_mutable_variable,none,
-      "'mutable_variant' parameter of 'warn_unused_result' attribute does not "
-      "make sense on a %select{non-function|non-method|non-instance method|"
-      "method of a class|mutating method}0", (unsigned))
-
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------
@@ -2174,6 +2168,8 @@ ERROR(value_of_module_type,none,
 
 ERROR(value_of_metatype_type,none,
       "expected member name or constructor call after type name", ())
+WARNING(warn_value_of_metatype_missing_self,none,
+      "missing '.self' for reference to metatype of type %0", (Type))
 
 NOTE(add_parens_to_type,none,
      "add arguments after the type to construct a value of the type", ())

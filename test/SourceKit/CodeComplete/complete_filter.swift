@@ -11,6 +11,7 @@ func foo() {
   x.#^FOO,,a,aa,ab,abc,abcd^#
 }
 
+// XFAIL: broken_std_regex
 // RUN: %sourcekitd-test -req=complete.open -pos=11:5 %s -- %s > %t.all
 // FileCheck -check-prefix=CHECK-ALL %s < %t.all
 // CHECK-ALL: key.name: "aaa

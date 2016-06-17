@@ -1,8 +1,5 @@
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/Slice.swift
-// RUN: %S/../../utils/line-directive %t/Slice.swift -- %target-build-swift %t/Slice.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/Slice.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 %{

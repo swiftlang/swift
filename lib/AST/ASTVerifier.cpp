@@ -835,6 +835,26 @@ struct ASTNodeBase {};
       checkSameType(lhsTy, S->getSrc()->getType(), "assignment operands");
       verifyCheckedBase(S);
     }
+    
+    void verifyChecked(EnumIsCaseExpr *E) {
+      auto nom = E->getSubExpr()->getType()->getAnyNominal();
+      if (!nom || !isa<EnumDecl>(nom)) {
+        Out << "enum_is_decl operand is not an enum: ";
+        E->getSubExpr()->getType().print(Out);
+        Out << '\n';
+        abort();
+      }
+      
+      if (nom != E->getEnumElement()->getParentEnum()) {
+        Out << "enum_is_decl case is not member of enum:\n";
+        Out << "  case: ";
+        E->getEnumElement()->print(Out);
+        Out << "\n  type: ";
+        E->getSubExpr()->getType().print(Out);
+        Out << '\n';
+        abort();
+      }
+    }
 
     void verifyChecked(TupleExpr *E) {
       const TupleType *exprTy = E->getType()->castTo<TupleType>();

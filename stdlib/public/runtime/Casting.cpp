@@ -409,7 +409,7 @@ static void _failCorruptType(const Metadata *type) {
 }
 
 #if SWIFT_OBJC_INTEROP
-// Objective-c bridging helpers.
+// Objective-C bridging helpers.
 namespace {
   struct _ObjectiveCBridgeableWitnessTable;
 }

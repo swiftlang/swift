@@ -1654,12 +1654,11 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   auto SILFnTy = SILType::getPrimitiveObjectType(
       M.Types.getConstantFunctionType(BridgeFuncDeclRef));
-  ArrayRef<Substitution> Subs;
-  if (Source.getNominalOrBoundGenericNominal()->getGenericSignature()) {
-    // Get substitutions, if source is a bound generic type.
-    Subs = Source->castTo<BoundGenericType>()->getSubstitutions(
-        M.getSwiftModule(), nullptr);
-  }
+
+  // Get substitutions, if source is a bound generic type.
+  ArrayRef<Substitution> Subs =
+      Source->gatherAllSubstitutions(
+          M.getSwiftModule(), nullptr);
 
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
   SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();

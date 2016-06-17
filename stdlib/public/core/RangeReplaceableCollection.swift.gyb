@@ -925,7 +925,6 @@ extension RangeReplaceableCollection
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   public mutating func removeSubrange(_ bounds: ${Range}<Index>) {
-    // FIXME: swift-3-indexing-model: tests.
     removeSubrange(_makeHalfOpen(bounds))
   }
 }
@@ -1160,7 +1159,7 @@ extension RangeReplaceableCollection {
     Builtin.unreachable()
   }
   
-  @available(*, unavailable, renamed: "removeAt")
+  @available(*, unavailable, renamed: "remove(at:)")
   public mutating func removeAtIndex(_ i: Index) -> Iterator.Element {
     Builtin.unreachable()
   }

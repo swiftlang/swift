@@ -106,17 +106,12 @@ func test_DistributedObjects(_ o: NSObject,
 
 func test_NSCalendarDate(_ o: NSCalendarDate) {} // expected-error {{'NSCalendarDate' is unavailable in Swift: Use NSCalendar and NSDateComponents and NSDateFormatter instead}}
 
-func test_dispatch(_ object: dispatch_object_t) {
-  dispatch_retain(object);  // expected-error {{'dispatch_retain' is unavailable}}
-  dispatch_release(object); // expected-error {{'dispatch_release' is unavailable}}
-}
-
 func testImportAsMember() {
   _ = CGColorCreateGenericGray(0.5, 1.0) // expected-error {{'CGColorCreateGenericGray' has been replaced by 'CGColor.init(gray:alpha:)'}} {{7-31=CGColor}} {{32-32=gray: }} {{37-37=alpha: }}
   _ = CGColor(gray: 0.5, alpha: 1.0)
 }
 
 func testUnavailableRenamedEnum() {
-  _ = NSClothingStyle.hipster
-  _ = NSClothingStyleOfficeCasual // expected-error{{'NSClothingStyleOfficeCasual' has been renamed to 'NSClothingStyle.semiFormal'}} {{7-34=NSClothingStyle.semiFormal}}
+  _ = ClothingStyle.hipster
+  _ = NSClothingStyleOfficeCasual // expected-error{{'NSClothingStyleOfficeCasual' has been renamed to 'ClothingStyle.semiFormal'}} {{7-34=ClothingStyle.semiFormal}}
 }

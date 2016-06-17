@@ -1,3 +1,4 @@
+// XFAIL: broken_std_regex
 // RUN: %complete-test -raw -tok=INIT_NAME %s | FileCheck %s -check-prefix=INIT_NAME
 // RUN: %complete-test -raw -tok=METHOD_NAME %s | FileCheck %s -check-prefix=METHOD_NAME
 

@@ -175,3 +175,46 @@ class ArgumentsActionTestCase(unittest.TestCase):
             parser.parse_args(['--list-opt', 'foo 12', '--list-opt=bar 42']),
             argparse.Namespace(
                 str_opt=None, list_opt=["foo", "12", "bar", "42"]))
+
+    def test_optional_bool(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--test-default-default",
+            action=argaction.optional_bool)
+        parser.add_argument(
+            "--test-default-true",
+            action=argaction.optional_bool,
+            default=True)
+        parser.add_argument(
+            "--test-default-false",
+            action=argaction.optional_bool,
+            default=False)
+
+        args, unknown_args = parser.parse_known_args([])
+        self.assertEqual(args.test_default_default, False)
+        self.assertEqual(args.test_default_true, True)
+        self.assertEqual(args.test_default_false, False)
+
+        args, unknown_args = parser.parse_known_args(
+            ['--test-default-default', '0',
+             '--test-default-true', '0',
+             '--test-default-false', '0'])
+        self.assertEqual(args.test_default_default, False)
+        self.assertEqual(args.test_default_true, False)
+        self.assertEqual(args.test_default_false, False)
+
+        args, unknown_args = parser.parse_known_args(
+            ['--test-default-default', '1',
+             '--test-default-true', '1',
+             '--test-default-false', '1'])
+        self.assertEqual(args.test_default_default, True)
+        self.assertEqual(args.test_default_true, True)
+        self.assertEqual(args.test_default_false, True)
+
+        args, unknown_args = parser.parse_known_args(
+            ['--test-default-default',
+             '--test-default-true',
+             '--test-default-false'])
+        self.assertEqual(args.test_default_default, True)
+        self.assertEqual(args.test_default_true, True)
+        self.assertEqual(args.test_default_false, True)

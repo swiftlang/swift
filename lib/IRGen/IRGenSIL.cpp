@@ -3362,9 +3362,8 @@ visitIsUniqueOrPinnedInst(swift::IsUniqueOrPinnedInst *i) {
 }
 
 static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
-                                                  const SILInstruction *allocInst,
+                                                  SILInstruction *allocInst,
                                                   const TypeInfo &ti,
-                                                  SILValue addressValue,
                                                   Address fixedSizeBuffer,
                                                   const llvm::Twine &name) {
   // There's no point in doing this for fixed-sized types, since we'll allocate
@@ -3384,8 +3383,8 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
     // Does this instruction use the allocation? If not, continue.
     auto Ops = inst->getAllOperands();
     if (std::none_of(Ops.begin(), Ops.end(),
-                     [&addressValue](const Operand &Op) {
-                       return Op.get() == addressValue;
+                     [allocInst](const Operand &Op) {
+                       return Op.get() == allocInst;
                      }))
       continue;
 
@@ -3409,7 +3408,7 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
       IGF.Builder.CreateLifetimeStart(fixedSizeBuffer,
                                       getFixedBufferSize(IGF.IGM));
     }
-    IGF.setContainerOfUnallocatedAddress(addressValue, fixedSizeBuffer);
+    IGF.setContainerOfUnallocatedAddress(allocInst, fixedSizeBuffer);
     return true;
   }
   
@@ -3456,10 +3455,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   // If a dynamic alloc_stack is immediately initialized by a copy_addr
   // operation, we can combine the allocation and initialization using an
   // optimized value witness.
-  if (tryDeferFixedSizeBufferInitialization(*this, i, type,
-                                            i,
-                                            Address(),
-                                            dbgname))
+  if (tryDeferFixedSizeBufferInitialization(*this, i, type, Address(), dbgname))
     return;
 
   auto addr = type.allocateStack(*this,
@@ -4257,7 +4253,7 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
   auto &srcTI = getTypeInfo(i->getLoweredConcreteType());
 
   // See if we can defer initialization of the buffer to a copy_addr into it.
-  if (tryDeferFixedSizeBufferInitialization(*this, i, srcTI, i, buffer, ""))
+  if (tryDeferFixedSizeBufferInitialization(*this, i, srcTI, buffer, ""))
     return;
   
   // Allocate in the destination fixed-size buffer.
@@ -4460,52 +4456,37 @@ void IRGenSILFunction::setAllocatedAddressForBuffer(SILValue v,
 
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   SILType addrTy = i->getSrc()->getType();
+  const TypeInfo &addrTI = getTypeInfo(addrTy);
   Address src = getLoweredAddress(i->getSrc());
-  Address dest;
-  bool isFixedBufferInitialization;
   // See whether we have a deferred fixed-size buffer initialization.
   auto &loweredDest = getLoweredValue(i->getDest());
   if (loweredDest.isUnallocatedAddressInBuffer()) {
-    isFixedBufferInitialization = true;
-    dest = loweredDest.getContainerOfAddress();
+    assert(i->isInitializationOfDest()
+           && "need to initialize an unallocated buffer");
+    Address cont = loweredDest.getContainerOfAddress();
+    if (i->isTakeOfSrc()) {
+      Address addr = addrTI.initializeBufferWithTake(*this, cont, src, addrTy);
+      setAllocatedAddressForBuffer(i->getDest(), addr);
+    } else {
+      Address addr = addrTI.initializeBufferWithCopy(*this, cont, src, addrTy);
+      setAllocatedAddressForBuffer(i->getDest(), addr);
+    }
   } else {
-    isFixedBufferInitialization = false;
-    dest = loweredDest.getAddress();
-  }
-  
-  const TypeInfo &addrTI = getTypeInfo(addrTy);
-
-  unsigned takeAndOrInitialize =
-    (i->isTakeOfSrc() << 1U) | i->isInitializationOfDest();
-  static const unsigned COPY = 0, TAKE = 2, ASSIGN = 0, INITIALIZE = 1;
-  
-  switch (takeAndOrInitialize) {
-  case ASSIGN | COPY:
-    assert(!isFixedBufferInitialization
-           && "can't assign into an unallocated buffer");
-    addrTI.assignWithCopy(*this, dest, src, addrTy);
-    break;
-  case INITIALIZE | COPY:
-    if (isFixedBufferInitialization) {
-      Address addr = addrTI.initializeBufferWithCopy(*this, dest, src, addrTy);
-      setAllocatedAddressForBuffer(i->getDest(), addr);
-    } else
-      addrTI.initializeWithCopy(*this, dest, src, addrTy);
-    break;
-  case ASSIGN | TAKE:
-    assert(!isFixedBufferInitialization
-           && "can't assign into an unallocated buffer");
-    addrTI.assignWithTake(*this, dest, src, addrTy);
-    break;
-  case INITIALIZE | TAKE:
-    if (isFixedBufferInitialization) {
-      Address addr = addrTI.initializeBufferWithTake(*this, dest, src, addrTy);
-      setAllocatedAddressForBuffer(i->getDest(), addr);
-    } else
-      addrTI.initializeWithTake(*this, dest, src, addrTy);
-    break;
-  default:
-    llvm_unreachable("unexpected take/initialize attribute combination?!");
+    Address dest = loweredDest.getAddress();
+    
+    if (i->isInitializationOfDest()) {
+      if (i->isTakeOfSrc()) {
+        addrTI.initializeWithTake(*this, dest, src, addrTy);
+      } else {
+        addrTI.initializeWithCopy(*this, dest, src, addrTy);
+      }
+    } else {
+      if (i->isTakeOfSrc()) {
+        addrTI.assignWithTake(*this, dest, src, addrTy);
+      } else {
+        addrTI.assignWithCopy(*this, dest, src, addrTy);
+      }
+    }
   }
 }
 

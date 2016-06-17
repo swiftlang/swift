@@ -1,10 +1,8 @@
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/Sequence.swift -D test_path="%S"
-// RUN: %S/../../utils/line-directive %t/Sequence.swift -- %target-build-swift %t/Sequence.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/Sequence.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
+% import os.path
 % import gyb
 
 import StdlibUnittest
@@ -896,7 +894,7 @@ SequenceTypeTests.test("flatMap/Sequence") {
   }
 }
 
-% TLazyFlatMapTest = gyb.parse_template("{}/Inputs/flatMap.gyb".format(test_path))
+% TLazyFlatMapTest = gyb.parse_template(os.path.join(os.path.dirname(__file__), "Inputs/flatMap.gyb"))
 % LazyFlatMapTest = gyb.execute_template(TLazyFlatMapTest, Test='SequenceTypeTests', Kinds=['Sequence'])
 ${LazyFlatMapTest}
 

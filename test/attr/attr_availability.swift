@@ -145,6 +145,12 @@ let _: Int
 @available(*, deprecated, unavailable, message: "message") // expected-error{{'available' attribute cannot be both unconditionally 'unavailable' and 'deprecated'}}
 struct BadUnconditionalAvailability { };
 
+@available(*, unavailable, message="oh no you don't") // expected-error {{'=' has been replaced with ':' in attribute arguments}} {{35-36=: }}
+typealias EqualFixIt1 = Int
+@available(*, unavailable, message = "oh no you don't") // expected-error {{'=' has been replaced with ':' in attribute arguments}} {{36-37=:}}
+typealias EqualFixIt2 = Int
+
+
 // Encoding in messages
 @available(*, deprecated, message: "Say \"Hi\"")
 func deprecated_func_with_message() {}

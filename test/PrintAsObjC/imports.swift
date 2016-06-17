@@ -34,7 +34,7 @@ import Base.ExplicitSub.ExSub
 
 @objc class Test {
   let word: DWORD = 0
-  let number: NSTimeInterval = 0.0
+  let number: TimeInterval = 0.0
 
   let baseI: BaseI = 0
   let baseII: BaseII = 0

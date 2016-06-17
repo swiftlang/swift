@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/FloatingPoint.swift
-// RUN: %S/../../utils/line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %t/FloatingPoint.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
+// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/FloatingPoint.swift
+// RUN: %line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %t/FloatingPoint.swift -o %t/a.out
+// RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 %{

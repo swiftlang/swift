@@ -1,6 +1,5 @@
 // Statically link a "hello world" program
 // XFAIL: linux
-// REQUIRES: non_lto
 // REQUIRES: static_stdlib
 print("hello world!")
 // RUN: rm -rf %t && mkdir %t

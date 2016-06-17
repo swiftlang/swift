@@ -5,3 +5,5 @@
 
 import ObjectiveC
 let v: NSObject? = nil
+
+// REQUIRES: objc_interop

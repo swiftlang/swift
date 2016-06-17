@@ -189,7 +189,7 @@ extension JoinedSequence {
 }
 
 extension Sequence where Iterator.Element : Sequence {
-  @available(*, unavailable, renamed: "joined")
+  @available(*, unavailable, renamed: "joined(separator:)")
   public func joinWithSeparator<Separator : Sequence>(
     _ separator: Separator
   ) -> JoinedSequence<Self>

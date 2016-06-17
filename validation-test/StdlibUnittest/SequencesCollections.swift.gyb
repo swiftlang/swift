@@ -1,8 +1,5 @@
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/StdlibUnittestSequencesCollections.swift
-// RUN: %S/../../utils/line-directive %t/StdlibUnittestSequencesCollections.swift -- %target-build-swift %t/StdlibUnittestSequencesCollections.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/StdlibUnittestSequencesCollections.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 %{

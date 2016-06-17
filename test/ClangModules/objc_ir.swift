@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-clang-importer-objc-overlays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx

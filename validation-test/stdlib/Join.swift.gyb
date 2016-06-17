@@ -10,9 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/Join.swift
-// RUN: %S/../../utils/line-directive %t/Join.swift -- %target-build-swift %t/Join.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/Join.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest

@@ -185,7 +185,6 @@ extension String {
     _ bounds: ${Range}<Index>,
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Character {
-    // FIXME: swift-3-indexing-model: tests.
     withMutableCharacters {
       (v: inout CharacterView)
       in v.replaceSubrange(bounds, with: newElements)
@@ -209,7 +208,6 @@ extension String {
   public mutating func replaceSubrange(
     _ bounds: ${Range}<Index>, with newElements: String
   ) {
-    // FIXME: swift-3-indexing-model: tests.
     replaceSubrange(bounds, with: newElements.characters)
   }
 % end
@@ -293,7 +291,6 @@ extension String {
   ///   lower bounds of `bounds` must be valid indices of the string.
 % end
   public mutating func removeSubrange(_ bounds: ${Range}<Index>) {
-    // FIXME: swift-3-indexing-model: tests.
     withMutableCharacters {
       (v: inout CharacterView) in v.removeSubrange(bounds)
     }

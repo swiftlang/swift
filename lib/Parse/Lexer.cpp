@@ -1373,6 +1373,61 @@ void Lexer::lexEscapedIdentifier() {
   formToken(tok::backtick, Quote);
 }
 
+/// Find the end of a version control conflict marker.
+static const char *findConflictEnd(const char *CurPtr, const char *BufferEnd,
+                                   ConflictMarkerKind CMK) {
+  StringRef terminator = CMK == ConflictMarkerKind::Perforce ? "<<<<\n"
+                                                             : ">>>>>>> ";
+  size_t termLen = terminator.size();
+  
+  // Get a reference to the rest of the buffer minus the length of the start
+  // of the conflict marker.
+  auto restOfBuffer = StringRef(CurPtr, BufferEnd - CurPtr).substr(termLen);
+  size_t endPos = restOfBuffer.find(terminator);
+  while (endPos != StringRef::npos) {
+    // Must occur at start of line.
+    if (endPos != 0 &&
+        (restOfBuffer[endPos - 1] == '\r' || restOfBuffer[endPos - 1] == '\n'))
+    {
+      return restOfBuffer.data() + endPos;
+    }
+    restOfBuffer = restOfBuffer.substr(endPos + termLen);
+    endPos = restOfBuffer.find(terminator);
+  }
+  return nullptr;
+}
+
+bool Lexer::tryLexConflictMarker() {
+  const char *Ptr = CurPtr - 1;
+
+  // Only a conflict marker if it starts at the beginning of a line.
+  if (Ptr != BufferStart && Ptr[-1] != '\n' && Ptr[-1] != '\r')
+    return false;
+  
+  // Check to see if we have <<<<<<< or >>>>.
+  StringRef restOfBuffer(Ptr, BufferEnd - Ptr);
+  if (!restOfBuffer.startswith("<<<<<<< ") && !restOfBuffer.startswith(">>>> "))
+    return false;
+  
+  ConflictMarkerKind Kind = *Ptr == '<' ? ConflictMarkerKind::Normal
+                                        : ConflictMarkerKind::Perforce;
+  if (const char *End = findConflictEnd(Ptr, BufferEnd, Kind)) {
+    // Diagnose at the conflict marker, then jump ahead to the end.
+    diagnose(CurPtr, diag::lex_conflict_marker_in_file);
+    CurPtr = End;
+    
+    // Skip ahead to the end of the marker.
+    if (CurPtr != BufferEnd)
+      skipToEndOfLine();
+    
+    return true;
+  }
+  
+  // No end of conflict marker found.
+  return false;
+}
+
+
 void Lexer::tryLexEditorPlaceholder() {
   assert(CurPtr[-1] == '<' && CurPtr[0] == '#');
   const char *TokStart = CurPtr-1;
@@ -1689,10 +1744,17 @@ Restart:
   case '<':
     if (CurPtr[0] == '#')
       return tryLexEditorPlaceholder();
-    SWIFT_FALLTHROUGH;
+    else if (CurPtr[0] == '<' && tryLexConflictMarker())
+      goto Restart;
+    return lexOperatorIdentifier();
 
-  case '=': case '-': case '+': case '*': case '>':
-  case '&': case '|': case '^': case '~': case '.':
+  case '>':
+    if (CurPtr[0] == '>' && tryLexConflictMarker())
+      goto Restart;
+    return lexOperatorIdentifier();
+ 
+  case '=': case '-': case '+': case '*':
+  case '&': case '|':  case '^': case '~': case '.':
     return lexOperatorIdentifier();
 
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':

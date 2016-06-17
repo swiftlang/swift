@@ -1,17 +1,13 @@
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/Collection.swift -D test_path="%S"
-// RUN: %S/../../utils/line-directive %t/Collection.swift -- %target-build-swift %t/Collection.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/Collection.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 // <rdar://problem/24357067> The compiler never finishes compiling validation-test/stdlib/CollectionType.swift.gyb in -O
 // REQUIRES: swift_test_mode_optimize_none
 
-%{
-import gyb
-from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
-}%
+% import os.path
+% import gyb
+% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -342,7 +338,7 @@ CollectionTypeTests.test(
 // flatMap()
 //===----------------------------------------------------------------------===//
 
-% TLazyFlatMapTest = gyb.parse_template("{}/Inputs/flatMap.gyb".format(test_path))
+% TLazyFlatMapTest = gyb.parse_template(os.path.join(os.path.dirname(__file__), "Inputs/flatMap.gyb"))
 % LazyFlatMapTest = gyb.execute_template(TLazyFlatMapTest, Test='CollectionTypeTests', Kinds=['Collection', 'BidirectionalCollection'])
 ${LazyFlatMapTest}
 

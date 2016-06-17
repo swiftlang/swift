@@ -37,13 +37,13 @@ static void unreachable(const char *Message) {
 
 DemanglerPrinter &DemanglerPrinter::operator<<(unsigned long long n) & {
   char buffer[32];
-  snprintf(buffer, 32, "%llu", n);
+  snprintf(buffer, sizeof(buffer), "%llu", n);
   Stream.append(buffer);
   return *this;
 }
 DemanglerPrinter &DemanglerPrinter::operator<<(long long n) & {
   char buffer[32];
-  snprintf(buffer, 32, "%lld",n);
+  snprintf(buffer, sizeof(buffer), "%lld",n);
   Stream.append(buffer);
   return *this;
 }

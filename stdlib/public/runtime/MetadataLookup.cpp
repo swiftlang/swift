@@ -47,7 +47,7 @@ using namespace Demangle;
 #define SWIFT_TYPE_METADATA_SECTION "__swift2_types"
 #elif defined(__ELF__)
 #define SWIFT_TYPE_METADATA_SECTION ".swift2_type_metadata_start"
-#elif defined(__CYGWIN__)
+#elif defined(__CYGWIN__) || defined(_MSC_VER)
 #define SWIFT_TYPE_METADATA_SECTION ".sw2tymd"
 #endif
 
