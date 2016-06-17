@@ -889,7 +889,7 @@ public:
   std::pair<PatternBindingDecl*, VarDecl*>
     buildPatternAndVariable(Expr *InitExpr) {
     char NameBuf[11] = { 0 };
-    snprintf(NameBuf, 11, "tmp%u", TmpNameIndex);
+    snprintf(NameBuf, sizeof(NameBuf), "tmp%u", TmpNameIndex);
     TmpNameIndex++;
         
     Expr *MaybeLoadInitExpr = nullptr;
