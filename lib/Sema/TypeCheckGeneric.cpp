@@ -51,12 +51,8 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
 }
 
 Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
-    return nominal->getDeclaredInterfaceType();
-
   // FIXME: Should be the interface type of the extension.
-  auto ext = dyn_cast<ExtensionDecl>(dc);
-  return ext->getExtendedType()->getAnyNominal()->getDeclaredInterfaceType();
+  return dc->getDeclaredInterfaceType();
 }
 
 Type DependentGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
@@ -228,12 +224,8 @@ Type CompleteGenericTypeResolver::resolveSelfAssociatedType(Type selfTy,
 }
 
 Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
-    return nominal->getDeclaredInterfaceType();
-
   // FIXME: Should be the interface type of the extension.
-  auto ext = dyn_cast<ExtensionDecl>(dc);
-  return ext->getExtendedType()->getAnyNominal()->getDeclaredInterfaceType();
+  return dc->getDeclaredInterfaceType();
 }
 
 Type CompleteGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
@@ -590,13 +582,15 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
     }
 
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
+    auto *dc = ctor->getDeclContext();
+
     // FIXME: shouldn't this just be
     // ctor->getDeclContext()->getDeclaredInterfaceType()?
-    if (ctor->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
-      funcTy = ctor->getDeclContext()->getProtocolSelf()->getDeclaredType();
+    if (dc->getAsProtocolOrProtocolExtensionContext()) {
+      funcTy = dc->getProtocolSelf()->getDeclaredType();
     } else {
-      funcTy = ctor->getExtensionType()->getAnyNominal()
-                 ->getDeclaredInterfaceType();
+      funcTy = dc->getAsNominalTypeOrNominalTypeExtensionContext()
+          ->getDeclaredInterfaceType();
     }
     
     // Adjust result type for failability.

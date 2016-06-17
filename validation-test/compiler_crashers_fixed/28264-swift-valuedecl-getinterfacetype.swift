@@ -5,15 +5,5 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
-extension String{
-func b{
-{
-a<
-}}
-class A
-extension{
-struct B{
-struct B<T where T:A{
-protocol a{func<
+// RUN: not %target-swift-frontend %s -parse
+{class A{typealias B<T where B:T>:v

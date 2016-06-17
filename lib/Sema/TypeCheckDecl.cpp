@@ -611,10 +611,12 @@ static void checkCircularity(TypeChecker &tc, T *decl,
     return;
 
   case CircularityCheck::Checking: {
-    // We're already checking this protocol, which means we have a cycle.
+    // We're already checking this type, which means we have a cycle.
 
     // The beginning of the path might not be part of the cycle, so find
     // where the cycle starts.
+    assert(!path.empty());
+
     auto cycleStart = path.end() - 1;
     while (*cycleStart != decl) {
       assert(cycleStart != path.begin() && "Missing cycle start?");
@@ -3604,6 +3606,7 @@ public:
       {
         // Check for circular inheritance of the raw type.
         SmallVector<EnumDecl *, 8> path;
+        path.push_back(ED);
         checkCircularity(TC, ED, diag::circular_enum_inheritance,
                          diag::enum_here, path);
       }
@@ -3821,6 +3824,7 @@ public:
       {
         // Check for circular inheritance.
         SmallVector<ClassDecl *, 8> path;
+        path.push_back(CD);
         checkCircularity(TC, CD, diag::circular_class_inheritance,
                          diag::class_here, path);
       }
@@ -3905,6 +3909,7 @@ public:
     {
       // Check for circular inheritance within the protocol.
       SmallVector<ProtocolDecl *, 8> path;
+      path.push_back(PD);
       checkCircularity(TC, PD, diag::circular_protocol_def,
                        diag::protocol_here, path);
 

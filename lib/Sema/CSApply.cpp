@@ -1123,6 +1123,8 @@ namespace {
                        ConstraintLocatorBuilder locator,
                        Optional<Pattern*> typeFromPattern = None);
 
+    using LevelTy = llvm::PointerEmbeddedInt<unsigned, 2>;
+
     /// \brief Coerce the given expression (which is the argument to a call) to
     /// the given parameter type.
     ///
@@ -1136,8 +1138,6 @@ namespace {
     /// \param locator Locator used to describe where in this expression we are.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
-    using LevelTy = llvm::PointerEmbeddedInt<unsigned, 2>;
-
     Expr *
     coerceCallArguments(Expr *arg, Type paramType,
                         llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,

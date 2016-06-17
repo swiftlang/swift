@@ -1500,15 +1500,10 @@ public:
   ///
   /// \param type The type to open.
   ///
-  /// \param dc The declaration context in which the type occurs.
-  ///
   /// \returns The opened type.
-  Type openType(Type type, ConstraintLocatorBuilder locator,
-                DeclContext *dc = nullptr) {
+  Type openType(Type type, ConstraintLocatorBuilder locator) {
     llvm::DenseMap<CanType, TypeVariableType *> replacements;
-    return openType(type, locator, replacements, dc,
-                    /*skipProtocolSelfConstraint=*/false,
-                    /*minOpeningDepth=*/0);
+    return openType(type, locator, replacements);
   }
 
   /// \brief "Open" the given type by replacing any occurrences of generic
@@ -1519,22 +1514,37 @@ public:
   /// \param replacements The mapping from opened types to the type
   /// variables to which they were opened.
   ///
-  /// \param dc The declaration context in which the type occurs.
+  /// \returns The opened type, or \c type if there are no archetypes in it.
+  Type openType(Type type,
+                ConstraintLocatorBuilder locator,
+                llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+
+  /// \brief "Open" the given function type.
+  ///
+  /// If the function type is non-generic, this is equivalent to calling
+  /// openType(). Otherwise, it calls openGeneric() on the generic
+  /// function's signature first.
+  ///
+  /// \param funcType The function type to open.
+  ///
+  /// \param replacements The mapping from opened types to the type
+  /// variables to which they were opened.
+  ///
+  /// \param innerDC The generic context from which the type originates.
+  ///
+  /// \param outerDC The generic context containing the declaration.
   ///
   /// \param skipProtocolSelfConstraint Whether to skip the constraint on a
   /// protocol's 'Self' type.
   ///
-  /// \param minOpeningDepth Whether to skip generic parameters from generic
-  /// contexts that we're inheriting context archetypes from. See the comment
-  /// on openGeneric().
-  ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openType(Type type,
-                ConstraintLocatorBuilder locator,
-                llvm::DenseMap<CanType, TypeVariableType *> &replacements,
-                DeclContext *dc = nullptr,
-                bool skipProtocolSelfConstraint = false,
-                unsigned minOpeningDepth = 0);
+  Type openFunctionType(
+      AnyFunctionType *funcType,
+      ConstraintLocatorBuilder locator,
+      llvm::DenseMap<CanType, TypeVariableType *> &replacements,
+      DeclContext *innerDC,
+      DeclContext *outerDC,
+      bool skipProtocolSelfConstraint);
 
   /// \brief "Open" the given binding type by replacing any occurrences of
   /// archetypes (including those implicit in unbound generic types) with
@@ -1550,36 +1560,17 @@ public:
 
   /// Open the generic parameter list and its requirements, creating
   /// type variables for each of the type parameters.
-  ///
-  /// Note: when a generic declaration is nested inside a generic function, the
-  /// generic parameters of the outer function do not appear in the inner type's
-  /// generic signature.
-  ///
-  /// Eg,
-  ///
-  /// func foo<T>() {
-  ///   func g() -> T {} // type is () -> T
-  /// }
-  ///
-  /// class Foo<T> {
-  ///   func g() -> T {} // type is <T> Foo<T> -> () -> T
-  /// }
-  ///
-  /// Instead, the outer parameters can appear as free variables in the nested
-  /// declaration's signature, but they do not have to, so they might not be
-  /// substituted at all. Since the inner declaration inherits the context
-  /// archetypes of the outer function we do not need to open them here.
-  void openGeneric(DeclContext *dc,
+  void openGeneric(DeclContext *innerDC,
+                   DeclContext *outerDC,
                    GenericSignature *signature,
                    bool skipProtocolSelfConstraint,
-                   unsigned minOpeningDepth,
                    ConstraintLocatorBuilder locator,
                    llvm::DenseMap<CanType, TypeVariableType *> &replacements);
-  void openGeneric(DeclContext *dc,
+  void openGeneric(DeclContext *innerDC,
+                   DeclContext *outerDC,
                    ArrayRef<GenericTypeParamType *> params,
                    ArrayRef<Requirement> requirements,
                    bool skipProtocolSelfConstraint,
-                   unsigned minOpeningDepth,
                    ConstraintLocatorBuilder locator,
                    llvm::DenseMap<CanType, TypeVariableType *> &replacements);
 

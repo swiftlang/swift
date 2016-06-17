@@ -128,7 +128,9 @@ static Type getObjectiveCNominalType(TypeChecker &TC,
     return nullptr;
 
   NameLookupOptions lookupOptions
-    = defaultMemberLookupOptions | NameLookupFlags::KnownPrivate;
+    = defaultMemberLookupOptions |
+      NameLookupFlags::KnownPrivate |
+      NameLookupFlags::OnlyTypes;
   if (auto result = TC.lookupMember(dc, ModuleType::get(module), TypeName,
                                     lookupOptions)) {
     for (auto decl : result) {
@@ -1096,7 +1098,9 @@ static Type resolveNestedIdentTypeComponent(
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isKnownNonCascading)
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  if (options.contains(TR_ExtensionBinding))
+  // FIXME: Lift the restriction for TR_InheritanceClause
+  if (options.contains(TR_ExtensionBinding) ||
+      options.contains(TR_InheritanceClause))
     lookupOptions -= NameLookupFlags::ProtocolMembers;
   auto memberTypes = TC.lookupMemberType(DC, parentTy, comp->getIdentifier(),
                                          lookupOptions);
@@ -1197,22 +1201,7 @@ static Type resolveIdentTypeComponent(
   
   SourceRange parentRange(parentComps.front()->getIdLoc(),
                           parentComps.back()->getSourceRange().End);
-  
-  // Don't resolve the nested type if the parent is equal to the decl context
-  // we are looking in.
-  // FIXME: Should be fixed to allow inheriting from a nested type some day
-  auto selfTypeBase = DC->getSelfTypeInContext().getPointer();
-  if (DC->getAsClassOrClassExtensionContext() &&
-      selfTypeBase && selfTypeBase->isEqual(parentTy)) {
-    if (diagnoseErrors) {
-      TC.diagnose(parentComps.front()->getStartLoc(),
-                  diag::circular_class_inheritance,
-                  parentComps.front()->getIdentifier().str())
-        .fixItRemove(parentRange);
-    }
-    return ErrorType::get(TC.Context);
-  }
-  
+
   // Resolve the nested type.
   return resolveNestedIdentTypeComponent(TC, DC, parentTy,
                                          parentRange, comp,

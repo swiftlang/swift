@@ -431,25 +431,6 @@ bool DeclContext::isGenericContext() const {
   llvm_unreachable("illegal declcontext hierarchy");
 }
 
-/// Determine the maximum depth of the current generic type context's generic
-/// parameters. If the current context is not a generic type context, returns
-/// the maximum depth of any generic parameter in this context.
-unsigned DeclContext::getGenericTypeContextDepth() const {
-  unsigned depth = 0;
-  bool inTypeContext = true;
-  for (const auto *dc = this; dc; dc = dc->getParent()) {
-    // Starting from the innermost context that is not a type context, count
-    // all parent contexts that have generic parameters.
-    if (!dc->isTypeContext())
-      inTypeContext = false;
-
-    if (!inTypeContext && dc->isInnermostContextGeneric())
-      depth++;
-  }
-
-  return depth;
-}
-
 /// Get the most optimal resilience expansion for the body of this function.
 /// If the body is able to be inlined into functions in other resilience
 /// domains, this ensures that only sufficiently-conservative access patterns

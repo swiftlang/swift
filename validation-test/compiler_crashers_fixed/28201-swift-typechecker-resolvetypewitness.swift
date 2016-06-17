@@ -5,6 +5,5 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
-protocol c{associatedtype e:a:protocol a{associatedtype a}func b:e.c
+// RUN: not %target-swift-frontend %s -parse
+{class A:a protocol a{associatedtype e:A}class A:A.e

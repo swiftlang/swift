@@ -3403,7 +3403,7 @@ public:
 
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
-class ProtocolType : public NominalType {
+class ProtocolType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// \brief Retrieve the type when we're referencing the given protocol.
   /// declaration.
@@ -3434,6 +3434,11 @@ public:
   /// use in sorting.
   static int compareProtocols(ProtocolDecl * const* PP1,
                               ProtocolDecl * const* PP2);
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getDecl(), getParent());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D, Type Parent);
 
 private:
   friend class NominalTypeDecl;

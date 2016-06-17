@@ -5,5 +5,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-{class A{typealias B<T where B:T>:v
+// RUN: not %target-swift-frontend %s -parse
+// REQUIRES: asserts
+class S<T:S{func g:T.g
+func g

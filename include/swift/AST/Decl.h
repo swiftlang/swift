@@ -2771,18 +2771,12 @@ protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
 
-  void setDeclaredType(Type declaredTy) {
-    assert(DeclaredTy.isNull() && "Already set declared type");
-    DeclaredTy = declaredTy;
-  }
-
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   SourceLoc NameLoc,
                   MutableArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams) :
     GenericTypeDecl(K, DC, name, NameLoc, inherited, GenericParams),
-    IterableDeclContext(IterableDeclContextKind::NominalTypeDecl),
-    DeclaredTy(nullptr)
+    IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     setGenericParams(GenericParams);
     NominalTypeDeclBits.HasDelayedMembers = false;

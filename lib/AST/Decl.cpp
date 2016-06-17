@@ -1684,11 +1684,9 @@ Type ValueDecl::getInterfaceType() const {
 
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(this)) {
     auto proto = cast<ProtocolDecl>(getDeclContext());
-    (void)proto->getType(); // make sure we've computed the type.
-    // FIXME: the generic parameter types list should never be empty.
-    auto selfTy = proto->getInnermostGenericParamTypes().empty()
-                    ? proto->getProtocolSelf()->getType()
-                    : proto->getInnermostGenericParamTypes().back();
+    if (!proto->hasType())
+      proto->computeType(); // make sure we've computed the type.
+    auto selfTy = proto->getProtocolSelf()->getDeclaredType();
     auto &ctx = getASTContext();
     InterfaceTy = DependentMemberType::get(
                     selfTy,
@@ -1909,14 +1907,11 @@ void NominalTypeDecl::computeType() {
   Type parentTy = getDeclContext()->getDeclaredTypeInContext();
   ASTContext &ctx = getASTContext();
   if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-    if (!getDeclaredType()) {
-      ProtocolType::get(proto, ctx);
-      assert(getDeclaredType());
-    }
+    DeclaredTy = ProtocolType::get(proto, ctx);
   } else if (getGenericParams()) {
-    setDeclaredType(UnboundGenericType::get(this, parentTy, ctx));
+    DeclaredTy = UnboundGenericType::get(this, parentTy, ctx);
   } else {
-    setDeclaredType(NominalType::get(this, parentTy, ctx));
+    DeclaredTy = NominalType::get(this, parentTy, ctx);
   }
 
   // Set the type.
