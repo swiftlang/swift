@@ -32,13 +32,13 @@ typedef pthread_rwlock_t ReadWriteLockHandle;
 // results in a reinterpret_cast which violates constexpr. Similarly, Android's
 // pthread implementation makes use of volatile attributes that prevent it from
 // being marked as constexpr.
-#define CONDITION_SUPPORTS_CONSTEXPR 0
-#define MUTEX_SUPPORTS_CONSTEXPR 0
-#define READWRITELOCK_SUPPORTS_CONSTEXPR 0
+#define SWIFT_CONDITION_SUPPORTS_CONSTEXPR 0
+#define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 0
+#define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 0
 #else
-#define CONDITION_SUPPORTS_CONSTEXPR 1
-#define MUTEX_SUPPORTS_CONSTEXPR 1
-#define READWRITELOCK_SUPPORTS_CONSTEXPR 1
+#define SWIFT_CONDITION_SUPPORTS_CONSTEXPR 1
+#define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 1
+#define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 1
 #endif
 
 /// PThread low-level implementation that supports ConditionVariable
@@ -46,7 +46,7 @@ typedef pthread_rwlock_t ReadWriteLockHandle;
 ///
 /// See ConditionVariable
 struct ConditionPlatformHelper {
-#if CONDITION_SUPPORTS_CONSTEXPR
+#if SWIFT_CONDITION_SUPPORTS_CONSTEXPR
   static constexpr
 #else
   static
@@ -67,7 +67,7 @@ struct ConditionPlatformHelper {
 ///
 /// See Mutex
 struct MutexPlatformHelper {
-#if MUTEX_SUPPORTS_CONSTEXPR
+#if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
   static constexpr
 #else
   static
@@ -96,7 +96,7 @@ struct MutexPlatformHelper {
 ///
 /// See ReadWriteLock
 struct ReadWriteLockPlatformHelper {
-#if READWRITELOCK_SUPPORTS_CONSTEXPR
+#if SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR
   static constexpr
 #else
   static

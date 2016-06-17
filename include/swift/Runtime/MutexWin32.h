@@ -28,9 +28,9 @@ typedef CONDITION_VARIABLE ConditionHandle;
 typedef SRWLOCK MutexHandle;
 typedef SRWLOCK ReadWriteLockHandle;
 
-#define CONDITION_SUPPORTS_CONSTEXPR 1
-#define MUTEX_SUPPORTS_CONSTEXPR 1
-#define READWRITELOCK_SUPPORTS_CONSTEXPR 1
+#define SWIFT_CONDITION_SUPPORTS_CONSTEXPR 1
+#define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 1
+#define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 1
 
 struct ConditionPlatformHelper {
   static constexpr ConditionHandle staticInit() {
