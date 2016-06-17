@@ -782,6 +782,11 @@ Globals
   global ::= 'TV' global                 // vtable override thunk
   global ::= 'TW' protocol-conformance entity
                                          // protocol witness thunk
+  global ::= 'TB' identifier context identifier
+                                         // property behavior initializer thunk
+  global ::= 'Tb' identifier context identifier
+                                         // property behavior setter thunk
+
   entity ::= nominal-type                // named type declaration
   entity ::= static? entity-kind context entity-name
   entity-kind ::= 'F'                    // function (ctor, accessor, etc.)
