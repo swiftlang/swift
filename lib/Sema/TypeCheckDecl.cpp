@@ -3016,19 +3016,15 @@ public:
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.
     if (VD->hasStorage()) {
-      // In a protocol context, variables written as "var x : Int" are errors
-      // and recovered by building a computed property with just a getter.
-      // Diagnose this and create the getter decl now.
-      if (isa<ProtocolDecl>(VD->getDeclContext())) {
-        if (VD->isLet())
-          TC.diagnose(VD->getLoc(),
-                      diag::protocol_property_must_be_computed_var);
-        else
-          TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed);
+      // Stored properties in protocols are diagnosed in
+      // maybeAddAccessorsToVariable(), to ensure they run when a
+      // protocol requirement is validated but not type checked.
 
-        convertStoredVarInProtocolToComputed(VD, TC);
-      } else if (isa<EnumDecl>(VD->getDeclContext()) &&
-                 !VD->isStatic()) {
+      // Enums and extensions cannot have stored instance properties.
+      // Static stored properties are allowed, with restrictions
+      // enforced below.
+      if (isa<EnumDecl>(VD->getDeclContext()) &&
+          !VD->isStatic()) {
         // Enums can only have computed properties.
         TC.diagnose(VD->getLoc(), diag::enum_stored_property);
         VD->setInvalid();

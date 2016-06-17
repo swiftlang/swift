@@ -1878,9 +1878,21 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     if (var->hasFixedLayout())
       return;
 
-  // Stored properties in protocols are converted to computed
-  // elsewhere.
-  } else if (isa<ProtocolDecl>(nominal)) {
+  // In a protocol context, variables written as just "var x : Int" or
+  // "let x : Int" are errors and recovered by building a computed property
+  // with just a getter. Diagnose this and create the getter decl now.
+  } else if (isa<ProtocolDecl>(var->getDeclContext())) {
+    if (var->hasStorage()) {
+      if (var->isLet())
+        TC.diagnose(var->getLoc(),
+                    diag::protocol_property_must_be_computed_var);
+      else
+        TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
+
+      var->setIsBeingTypeChecked();
+      convertStoredVarInProtocolToComputed(var, TC);
+      var->setIsBeingTypeChecked(false);
+    }
     return;
 
   // NSManaged properties on classes require special handling.
