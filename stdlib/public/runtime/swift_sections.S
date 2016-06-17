@@ -76,3 +76,4 @@ define_simple_section swift3_assocty
 
 define_sized_section swift2_protocol_conformances
 define_sized_section swift2_type_metadata
+.section	.note.GNU-stack,"",@progbits
