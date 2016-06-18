@@ -2411,14 +2411,14 @@ public:
     return GenericSig;
   }
   
-  void setIsValidatingGenericSignature(bool ivgs = true) {
-    ValidatingGenericSignature = ivgs;
+  void setIsValidatingGenericSignature(bool validating=true) {
+    ValidatingGenericSignature = validating;
   }
   
   bool isValidatingGenericSignature() const {
     return ValidatingGenericSignature;
   }
-  
+
   // Resolve ambiguity due to multiple base classes.
   using TypeDecl::getASTContext;
   using DeclContext::operator new;

@@ -690,120 +690,6 @@ ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
   return ArchetypeBuilder(*mod, Diags);
 }
 
-static void revertDependentTypeLoc(TypeLoc &tl) {
-  // If there's no type representation, there's nothing to revert.
-  if (!tl.getTypeRepr())
-    return;
-
-  // Don't revert an error type; we've already complained.
-  if (tl.wasValidated() && tl.isError())
-    return;
-
-  // Make sure we validate the type again.
-  tl.setType(Type(), /*validated=*/false);
-}
-
-/// Revert the dependent types within the given generic parameter list.
-void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
-  // Revert the inherited clause of the generic parameter list.
-  for (auto param : *genericParams) {
-    param->setCheckedInheritanceClause(false);
-    for (auto &inherited : param->getInherited())
-      revertDependentTypeLoc(inherited);
-  }
-
-  // Revert the requirements of the generic parameter list.
-  for (auto &req : genericParams->getRequirements()) {
-    if (req.isInvalid())
-      continue;
-
-    switch (req.getKind()) {
-    case RequirementReprKind::TypeConstraint: {
-      revertDependentTypeLoc(req.getSubjectLoc());
-      revertDependentTypeLoc(req.getConstraintLoc());
-      break;
-    }
-
-    case RequirementReprKind::SameType:
-      revertDependentTypeLoc(req.getFirstTypeLoc());
-      revertDependentTypeLoc(req.getSecondTypeLoc());
-      break;
-    }
-  }
-}
-
-/// Finalize the given generic parameter list, assigning archetypes to
-/// the generic parameters.
-static void finalizeGenericParamList(ArchetypeBuilder &builder,
-                                     GenericParamList *genericParams,
-                                     DeclContext *dc, TypeChecker &TC) {
-  Accessibility access;
-  if (auto *fd = dyn_cast<FuncDecl>(dc))
-    access = fd->getFormalAccess();
-  else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
-    access = nominal->getFormalAccess();
-  else
-    access = Accessibility::Internal;
-
-  // Wire up the archetypes.
-  for (auto GP : *genericParams) {
-    GP->setArchetype(builder.getArchetype(GP));
-    TC.checkInheritanceClause(GP);
-    if (!GP->hasAccessibility())
-      GP->setAccessibility(access);
-  }
-  genericParams->setAllArchetypes(
-    TC.Context.AllocateCopy(builder.getAllArchetypes()));
-
-#ifndef NDEBUG
-  // Record archetype contexts.
-  for (auto archetype : genericParams->getAllArchetypes()) {
-    if (TC.Context.ArchetypeContexts.count(archetype) == 0)
-      TC.Context.ArchetypeContexts[archetype] = dc;
-  }
-#endif
-
-  // Replace the generic parameters with their archetypes throughout the
-  // types in the requirements.
-  // FIXME: This should not be necessary at this level; it is a transitional
-  // step.
-  for (auto &Req : genericParams->getRequirements()) {
-    if (Req.isInvalid())
-      continue;
-
-    switch (Req.getKind()) {
-    case RequirementReprKind::TypeConstraint: {
-      revertDependentTypeLoc(Req.getSubjectLoc());
-      if (TC.validateType(Req.getSubjectLoc(), dc)) {
-        Req.setInvalid();
-        continue;
-      }
-
-      revertDependentTypeLoc(Req.getConstraintLoc());
-      if (TC.validateType(Req.getConstraintLoc(), dc)) {
-        Req.setInvalid();
-        continue;
-      }
-      break;
-    }
-
-    case RequirementReprKind::SameType:
-      revertDependentTypeLoc(Req.getFirstTypeLoc());
-      if (TC.validateType(Req.getFirstTypeLoc(), dc)) {
-        Req.setInvalid();
-        continue;
-      }
-
-      revertDependentTypeLoc(Req.getSecondTypeLoc());
-      if (TC.validateType(Req.getSecondTypeLoc(), dc)) {
-        Req.setInvalid();
-        continue;
-      }
-      break;
-    }
-  }
-}
-
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericSignature *TypeChecker::handleSILGenericParams(
                     GenericParamList *genericParams,
@@ -833,38 +719,11 @@ GenericSignature *TypeChecker::handleSILGenericParams(
 
     ArchetypeBuilder builder(*DC->getParentModule(), Diags);
     checkGenericParamList(&builder, genericParams, parentSig);
-    finalizeGenericParamList(builder, genericParams, DC, *this);
+    finalizeGenericParamList(builder, genericParams, DC);
 
     parentSig = genericSig;
   }
   return parentSig;
-}
-
-void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
-  // Revert the result type.
-  if (auto fn = dyn_cast<FuncDecl>(func))
-    if (!fn->getBodyResultTypeLoc().isNull())
-      revertDependentTypeLoc(fn->getBodyResultTypeLoc());
-
-  // Revert the body parameter types.
-  for (auto paramList : func->getParameterLists()) {
-    for (auto &param : *paramList) {
-      // Clear out the type of the decl.
-      if (param->hasType() && !param->isInvalid())
-        param->overwriteType(Type());
-      revertDependentTypeLoc(param->getTypeLoc());
-    }
-  }
-
-  // Revert the generic parameter list.
-  if (func->getGenericParams())
-    revertGenericParamList(func->getGenericParams());
-
-  // Clear out the types.
-  if (auto fn = dyn_cast<FuncDecl>(func))
-    fn->revertType();
-  else
-    func->overwriteType(Type());
 }
 
 /// Check whether the given type representation will be
@@ -4365,7 +4224,7 @@ public:
         TC.revertGenericFuncSignature(FD);
 
         // Assign archetypes.
-        finalizeGenericParamList(builder, gp, FD, TC);
+        TC.finalizeGenericParamList(builder, gp, FD);
       }
     } else if (FD->getDeclContext()->isGenericContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
@@ -5995,7 +5854,7 @@ public:
         TC.revertGenericFuncSignature(CD);
 
         // Assign archetypes.
-        finalizeGenericParamList(builder, gp, CD, TC);
+        TC.finalizeGenericParamList(builder, gp, CD);
       }
     } else if (CD->getDeclContext()->isGenericContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
@@ -6549,24 +6408,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       gp->setOuterParameters(
                      typeAlias->getDeclContext()->getGenericParamsOfContext());
 
-      // Validate the generic type parameters.
-      if (validateGenericTypeSignature(typeAlias)) {
-        markInvalidGenericSignature(typeAlias);
-        return;
-      }
-      
-      // If we're already validating the type declaration's generic signature,
-      // avoid a potential infinite loop by not re-validating the generic
-      // parameter list.
-      if (!typeAlias->isValidatingGenericSignature()) {
-        revertGenericParamList(gp);
-        
-        auto builder = createArchetypeBuilder(typeAlias->getModuleContext());
-        auto *parentSig = typeAlias->getDeclContext()->
-           getGenericSignatureOfContext();
-        checkGenericParamList(&builder, gp, parentSig);
-        finalizeGenericParamList(builder, gp, typeAlias, *this);
-      }
+      validateGenericTypeSignature(typeAlias);
     }
     
     // Otherwise, perform the heavy lifting now.
@@ -6587,24 +6429,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       gp->setOuterParameters(
         nominal->getDeclContext()->getGenericParamsOfContext());
 
-      // Validate the generic type parameters.
-      if (validateGenericTypeSignature(nominal)) {
-        markInvalidGenericSignature(nominal);
-        return;
-      }
-
-      // If we're already validating the type declaration's generic signature,
-      // avoid a potential infinite loop by not re-validating the generic
-      // parameter list.
-      if (!nominal->isValidatingGenericSignature()) {
-        revertGenericParamList(gp);
-
-        ArchetypeBuilder builder =
-          createArchetypeBuilder(nominal->getModuleContext());
-        auto *parentSig = nominal->getDeclContext()->getGenericSignatureOfContext();
-        checkGenericParamList(&builder, gp, parentSig);
-        finalizeGenericParamList(builder, gp, nominal, *this);
-      }
+      validateGenericTypeSignature(nominal);
     }
 
     checkInheritanceClause(D);
@@ -6639,8 +6464,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (proto->hasType())
       return;
     proto->computeType();
-    
-    
+
     auto gp = proto->getGenericParams();
 
     // Resolve the inheritance clauses for each of the associated
@@ -6657,14 +6481,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     assert(gp->getOuterParameters() ==
            proto->getDeclContext()->getGenericParamsOfContext());
 
-    revertGenericParamList(gp);
-
-    ArchetypeBuilder builder =
-      createArchetypeBuilder(proto->getModuleContext());
-    auto *parentSig = proto->getDeclContext()->getGenericSignatureOfContext();
-    checkGenericParamList(&builder, gp, parentSig);
-    finalizeGenericParamList(builder, gp, proto, *this);
-
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
 
@@ -6673,7 +6489,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // Set the underlying type of each of the associated types to the
     // appropriate archetype.
     auto selfDecl = proto->getProtocolSelf();
-    ArchetypeType *selfArchetype = builder.getArchetype(selfDecl);
+    ArchetypeType *selfArchetype = selfDecl->getArchetype();
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         TypeLoc underlyingTy;
@@ -7033,7 +6849,7 @@ static Type checkExtensionGenericParams(
   auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
   tc.checkGenericParamList(&builder, genericParams, parentSig);
   inferExtendedTypeReqs(builder);
-  finalizeGenericParamList(builder, genericParams, ext, tc);
+  tc.finalizeGenericParamList(builder, genericParams, ext);
 
   if (isa<ProtocolDecl>(nominal)) {
     // Retain type sugar if it's there.
