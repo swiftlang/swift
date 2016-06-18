@@ -2926,20 +2926,24 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return parseDeclAssociatedType(Flags, Attributes);
   }
   
-  if (Tok.is(tok::colon)) {
-    // It is a common mistake to write "typealias A : Int" instead of = Int.
-    // Recognize this and produce a fixit.
-    diagnose(Tok, diag::expected_equal_in_typealias)
-        .fixItReplace(Tok.getLoc(), "=");
-    consumeToken(tok::colon);
-  } else if (parseToken(tok::equal, diag::expected_equal_in_typealias)) {
-    Status.setIsParseError();
-    return Status;
+  ParserResult<TypeRepr> UnderlyingTy;
+
+  if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
+    if (Tok.is(tok::colon)) {
+      // It is a common mistake to write "typealias A : Int" instead of = Int.
+      // Recognize this and produce a fixit.
+      diagnose(Tok, diag::expected_equal_in_typealias)
+          .fixItReplace(Tok.getLoc(), "=");
+      consumeToken(tok::colon);
+    } else {
+      consumeToken(tok::equal);
+    }
+
+    UnderlyingTy = parseType(diag::expected_type_in_typealias);
+    Status |= UnderlyingTy;
+    if (UnderlyingTy.isNull())
+      return Status;
   }
-  ParserResult<TypeRepr> UnderlyingTy = parseType(diag::expected_type_in_typealias);
-  Status |= UnderlyingTy;
-  if (UnderlyingTy.isNull())
-    return Status;
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
@@ -2947,7 +2951,13 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     if (whereStatus.shouldStopParsing())
       return whereStatus;
   }
-  
+
+  if (UnderlyingTy.isNull()) {
+    diagnose(Tok, diag::expected_equal_in_typealias);
+    Status.setIsParseError();
+    return Status;
+  }
+
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
                                           UnderlyingTy.getPtrOrNull(),
                                           genericParams, CurDeclContext);
@@ -3019,6 +3029,16 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
       return Status;
   }
   
+  // Parse a 'where' clause if present. These are not supported, but we will
+  // get better QoI this way.
+  if (Tok.is(tok::kw_where)) {
+    GenericParamList *unused = nullptr;
+    auto whereStatus = parseFreestandingGenericWhereClause(
+        unused, WhereClauseKind::AssociatedType);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+  }
+
   if (!Flags.contains(PD_InProtocol)) {
     diagnose(AssociatedTypeLoc, diag::associatedtype_outside_protocol)
         .fixItReplace(AssociatedTypeLoc, "typealias");
@@ -5154,6 +5174,16 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Tok.is(tok::colon)) {
     colonLoc = Tok.getLoc();
     Status |= parseInheritance(InheritedProtocols, &classRequirementLoc);
+  }
+
+  // Parse a 'where' clause if present. These are not supported, but we will
+  // get better QoI this way.
+  if (Tok.is(tok::kw_where)) {
+    GenericParamList *unused = nullptr;
+    auto whereStatus = parseFreestandingGenericWhereClause(
+        unused, WhereClauseKind::Protocol);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
   }
 
   ProtocolDecl *Proto

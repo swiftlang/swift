@@ -251,6 +251,8 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
   if (!genericParams)
     return false;
 
+  assert(genericParams->size() > 0 && "Parsed an empty generic parameter list?");
+
   // Determine where and how to perform name lookup for the generic
   // parameter lists and where clause.
   TypeResolutionOptions options;

@@ -1239,7 +1239,15 @@ public:
   ParserResult<GenericParamList> parseGenericParameters();
   ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
   ParserResult<GenericParamList> maybeParseGenericParams();
-  ParserStatus parseFreestandingGenericWhereClause(GenericParamList *&GPList);
+
+  enum class WhereClauseKind : unsigned {
+    Declaration,
+    Protocol,
+    AssociatedType
+  };
+  ParserStatus
+  parseFreestandingGenericWhereClause(GenericParamList *&GPList,
+                             WhereClauseKind kind=WhereClauseKind::Declaration);
   
   ParserStatus parseGenericWhereClause(SourceLoc &WhereLoc,
                                SmallVectorImpl<RequirementRepr> &Requirements,

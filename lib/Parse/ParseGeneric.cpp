@@ -265,7 +265,8 @@ ParserStatus Parser::parseGenericWhereClause(
 /// Parse a free-standing where clause attached to a declaration, adding it to
 /// a generic parameter list that may (or may not) already exist.
 ParserStatus Parser::
-parseFreestandingGenericWhereClause(GenericParamList *&genericParams) {
+parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
+                                    WhereClauseKind kind) {
   assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
   
   // Push the generic arguments back into a local scope so that references will
@@ -289,9 +290,7 @@ parseFreestandingGenericWhereClause(GenericParamList *&genericParams) {
     return result;
 
   if (!genericParams)
-    genericParams = GenericParamList::create(Context, SourceLoc(),
-                                             {}, WhereLoc, Requirements,
-                                             SourceLoc());
+    diagnose(WhereLoc, diag::where_without_generic_params, unsigned(kind));
   else
     genericParams = GenericParamList::create(Context,
                                              genericParams->getLAngleLoc(),
