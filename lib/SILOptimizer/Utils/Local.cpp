@@ -2581,6 +2581,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   case Accessibility::Internal:
     return M.isWholeModule();
   case Accessibility::Private:
+  case Accessibility::FilePrivate:
     return true;
   }
 }

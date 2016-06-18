@@ -221,3 +221,4 @@ extension ProtoWithReqs where Self : ReqProvider2 {
 public struct AdoptViaCombinedProtocol : ProtoWithReqs, ReqProvider2 {
   public typealias Assoc = Int
 }
+

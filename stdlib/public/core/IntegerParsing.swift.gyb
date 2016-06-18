@@ -107,7 +107,7 @@ internal func _parseAsciiAsIntMax(
 }
 
 /// Strip an optional single leading ASCII plus/minus sign from `utf16`.
-private func _parseOptionalAsciiSign(
+fileprivate func _parseOptionalAsciiSign(
   _ utf16: String.UTF16View
 ) -> (digitsUTF16: String.UTF16View, isMinus: Bool) {
   switch utf16.first {

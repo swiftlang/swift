@@ -1227,7 +1227,7 @@ checkWitnessAccessibility(Accessibility *requiredAccess,
   // FIXME: Handle "private(set)" requirements.
   *requiredAccess = std::min(Proto->getFormalAccess(), *requiredAccess);
 
-  if (*requiredAccess > Accessibility::Private) {
+  if (*requiredAccess > Accessibility::FilePrivate) {
     if (witness->getFormalAccess() < *requiredAccess)
       return true;
 
@@ -4435,13 +4435,13 @@ static void diagnosePotentialWitness(TypeChecker &tc,
                 witness->getFullName(), static_cast<unsigned>(*move));
   }
 
-  // If adding 'private' or 'internal' can help, suggest that.
-  if (accessibility != Accessibility::Private &&
+  // If adding 'fileprivate' or 'internal' can help, suggest that.
+  if (accessibility != Accessibility::FilePrivate &&
       !witness->getAttrs().hasAttribute<AccessibilityAttr>()) {
     tc.diagnose(witness, diag::optional_req_near_match_accessibility,
                 witness->getFullName(),
                 accessibility)
-      .fixItInsert(witness->getAttributeInsertionLoc(true), "private ");
+      .fixItInsert(witness->getAttributeInsertionLoc(true), "fileprivate ");
   }
 
   // If adding @nonobjc can help, suggest that.
@@ -4528,7 +4528,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     if (tracker)
       tracker->addUsedMember({conformance->getProtocol(), Identifier()},
-                             defaultAccessibility != Accessibility::Private);
+                             defaultAccessibility > Accessibility::FilePrivate);
   }
 
   // Diagnose any conflicts attributed to this declaration context.

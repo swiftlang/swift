@@ -2,21 +2,21 @@ import has_accessibility
 
 public let a = 0 // expected-note * {{did you mean 'a'?}}
 internal let b = 0 // expected-note * {{did you mean 'b'?}}
-private let c = 0
+fileprivate let c = 0
 
 extension Foo {
   public static func a() {}
   internal static func b() {}
-  private static func c() {}  // expected-note {{'c' declared here}}
+  fileprivate static func c() {}  // expected-note {{'c' declared here}}
 }
 
 struct PrivateInit {
-  private init() {}  // expected-note {{'init' declared here}}
+  fileprivate init() {}  // expected-note {{'init' declared here}}
 }
 
 extension Foo {
-  private func method() {}
-  private typealias TheType = Float
+  fileprivate func method() {}
+  fileprivate typealias TheType = Float
 }
 
 extension OriginallyEmpty {
@@ -24,6 +24,6 @@ extension OriginallyEmpty {
   typealias TheType = Float
 }
 
-private func privateInBothFiles() {}
+fileprivate func privateInBothFiles() {}
 func privateInPrimaryFile() {} // expected-note {{previously declared here}}
-private func privateInOtherFile() {} // expected-error {{invalid redeclaration}}
+fileprivate func privateInOtherFile() {} // expected-error {{invalid redeclaration}}

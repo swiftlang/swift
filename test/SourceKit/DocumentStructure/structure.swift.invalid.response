@@ -37,7 +37,7 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.class,
-          key.accessibility: source.lang.swift.accessibility.private,
+          key.accessibility: source.lang.swift.accessibility.fileprivate,
           key.name: "MyCoolClass",
           key.offset: 47,
           key.length: 22,

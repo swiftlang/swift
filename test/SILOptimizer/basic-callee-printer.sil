@@ -119,11 +119,11 @@ bb0:
 }
 
 
-private class private_base {
+fileprivate class private_base {
   func foo()
 }
 
-private class private_derived : private_base {
+fileprivate class private_derived : private_base {
   override func foo()
 }
 

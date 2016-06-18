@@ -544,7 +544,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// This is encoded as (1 << maxAccess) | (1 << defaultAccess), which
     /// works because the maximum is always greater than or equal to the
     /// default. 0 represents an uncomputed value.
-    unsigned DefaultAndMaxAccessLevel : 3;
+    unsigned DefaultAndMaxAccessLevel : 4;
 
     /// Whether there is an active conformance loader for this
     /// extension.
@@ -1702,6 +1702,9 @@ public:
         (1 << static_cast<unsigned>(Accessibility::Private)))
       return Accessibility::Private;
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
+        (1 << static_cast<unsigned>(Accessibility::FilePrivate)))
+      return Accessibility::FilePrivate;
+    if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
         (1 << static_cast<unsigned>(Accessibility::Internal)))
       return Accessibility::Internal;
     return Accessibility::Public;
@@ -1715,6 +1718,9 @@ public:
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
         (1 << static_cast<unsigned>(Accessibility::Internal)))
       return Accessibility::Internal;
+    if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
+        (1 << static_cast<unsigned>(Accessibility::FilePrivate)))
+      return Accessibility::FilePrivate;
     return Accessibility::Private;
   }
 
@@ -2084,7 +2090,7 @@ public:
 class ValueDecl : public Decl {
   DeclName Name;
   SourceLoc NameLoc;
-  llvm::PointerIntPair<Type, 2, OptionalEnum<Accessibility>> TypeAndAccess;
+  llvm::PointerIntPair<Type, 3, OptionalEnum<Accessibility>> TypeAndAccess;
 
 protected:
   ValueDecl(DeclKind K,
@@ -3827,8 +3833,8 @@ private:
   void configureObservingRecord(ObservingRecord *record,
                                 FuncDecl *willSet, FuncDecl *didSet);
 
-  llvm::PointerIntPair<GetSetRecord*, 2, OptionalEnum<Accessibility>> GetSetInfo;
-  llvm::PointerIntPair<BehaviorRecord*, 2, OptionalEnum<Accessibility>>
+  llvm::PointerIntPair<GetSetRecord*, 3, OptionalEnum<Accessibility>> GetSetInfo;
+  llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<Accessibility>>
     BehaviorInfo;
 
   ObservingRecord &getDidSetInfo() const {
@@ -5939,6 +5945,8 @@ inline Accessibility ValueDecl::getEffectiveAccess() const {
       return Accessibility::Public;
     }
     return Accessibility::Internal;
+  case Accessibility::FilePrivate:
+    return Accessibility::FilePrivate;
   case Accessibility::Private:
     return Accessibility::Private;
   }

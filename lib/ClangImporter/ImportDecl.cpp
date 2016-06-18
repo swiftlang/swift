@@ -1754,7 +1754,7 @@ namespace {
         ArrayRef<ProtocolDecl *> protocols,
         MakeStructRawValuedOptions options =
             getDefaultMakeStructRawValuedOptions(),
-        Accessibility setterAccessibility = Accessibility::Private) {
+        Accessibility setterAccessibility = Accessibility::FilePrivate) {
       auto &cxt = Impl.SwiftContext;
       addProtocolsToStruct(structDecl, synthesizedProtocolAttrs, protocols);
 
@@ -1816,7 +1816,7 @@ namespace {
       PatternBindingDecl *storedPatternBinding;
       std::tie(storedVar, storedPatternBinding) = createVarWithPattern(
           cxt, structDecl, storedVarName, storedUnderlyingType, /*isLet=*/false,
-          /*isImplicit=*/true, Accessibility::Private);
+          /*isImplicit=*/true, Accessibility::FilePrivate);
 
       //
       // Create a computed value variable
@@ -1826,7 +1826,7 @@ namespace {
                                            structDecl);
       computedVar->setImplicit();
       computedVar->setAccessibility(Accessibility::Public);
-      computedVar->setSetterAccessibility(Accessibility::Private);
+      computedVar->setSetterAccessibility(Accessibility::FilePrivate);
 
       // Create the getter for the computed value variable.
       auto computedVarGetter = makeNewtypeBridgedRawValueGetter(
@@ -2315,7 +2315,7 @@ namespace {
                                                underlyingType, enumDecl);
         rawValue->setImplicit();
         rawValue->setAccessibility(Accessibility::Public);
-        rawValue->setSetterAccessibility(Accessibility::Private);
+        rawValue->setSetterAccessibility(Accessibility::FilePrivate);
 
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(rawValue);

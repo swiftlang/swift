@@ -173,10 +173,10 @@ namespace {
 
   /// An RAII type to exclude tokens contributing to private decls from the
   /// interface hash of the source file. On destruct, it checks if the set of
-  /// attributes includes the "private" attribute; if so, it resets the MD5
-  /// hash of the source file to what it was when the IgnorePrivateDeclTokens
-  /// instance was created, thus excluding from the interface hash all tokens
-  /// parsed in the meantime.
+  /// attributes includes the "private" or "fileprivate" attribute; if so, it
+  /// resets the MD5 hash of the source file to what it was when the
+  /// IgnorePrivateDeclTokens instance was created, thus excluding from the
+  /// interface hash all tokens parsed in the meantime.
   struct IgnorePrivateDeclTokens {
     Parser &TheParser;
     DeclAttributes &Attributes;
@@ -198,7 +198,7 @@ namespace {
         return;
 
       if (auto *attr = Attributes.getAttribute<AbstractAccessibilityAttr>()) {
-        if (attr->getAccess() == Accessibility::Private) {
+        if (attr->getAccess() <= Accessibility::FilePrivate) {
           TheParser.SF.setInterfaceHashState(*SavedHashState);
         }
       }
@@ -536,6 +536,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     auto access = llvm::StringSwitch<Accessibility>(AttrName)
       .Case("private", Accessibility::Private)
+      .Case("fileprivate", Accessibility::FilePrivate)
       .Case("public", Accessibility::Public)
       .Case("internal", Accessibility::Internal);
 
@@ -1725,8 +1726,9 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_internal:
   case tok::kw_let:
   case tok::kw_operator:
-  case tok::kw_private:
   case tok::kw_protocol:
+  case tok::kw_private:
+  case tok::kw_fileprivate:
   case tok::kw_public:
   case tok::kw_static:
   case tok::kw_struct:
@@ -1975,6 +1977,7 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     }
 
     case tok::kw_private:
+    case tok::kw_fileprivate:
     case tok::kw_internal:
     case tok::kw_public:
       // We still model these specifiers as attributes.

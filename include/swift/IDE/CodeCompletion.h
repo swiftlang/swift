@@ -63,7 +63,7 @@ class CodeCompletionStringChunk {
 
 public:
   enum class ChunkKind {
-    /// "internal", "private" or "public".
+    /// "internal", "private", "fileprivate", or "public".
     AccessControlKeyword,
 
     /// such as @"availability".

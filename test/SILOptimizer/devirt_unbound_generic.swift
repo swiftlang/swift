@@ -79,7 +79,7 @@ public protocol ProtocolWithAssocType {
   associatedtype Element
 }
 
-private class CP<Base: ProtocolWithAssocType> {
+fileprivate class CP<Base: ProtocolWithAssocType> {
    var value: Base.Element
    init(_ v: Base.Element) {
      value = v
@@ -90,16 +90,16 @@ private class CP<Base: ProtocolWithAssocType> {
    }
 }
 
-private class Base1: ProtocolWithAssocType {
+fileprivate class Base1: ProtocolWithAssocType {
    typealias Element = Int32
 }
 
 
-private class Base2<T>: ProtocolWithAssocType {
+fileprivate class Base2<T>: ProtocolWithAssocType {
    typealias Element = Int32
 }
 
-private class CP2: CP<Base2<Int>> {
+fileprivate class CP2: CP<Base2<Int>> {
   init() {
     super.init(1)
   }
@@ -109,7 +109,7 @@ private class CP2: CP<Base2<Int>> {
   }
 }
 
-private class CP3: CP<Base2<Int>> {
+fileprivate class CP3: CP<Base2<Int>> {
   init() {
     super.init(1)
   }
@@ -181,7 +181,7 @@ public func testDevirt<T>(_ c: CC<T>) -> T? {
 // CHECK-NOT: class_method
 // CHECK: }
 @inline(never)
-private func test6<T: ProtocolWithAssocType>(_ c: CP<T>) -> T.Element {
+fileprivate func test6<T: ProtocolWithAssocType>(_ c: CP<T>) -> T.Element {
   return c.value
 }
 
@@ -195,7 +195,7 @@ public func doTest6() {
 // CHECK-NOT: class_method
 // CHECK: }
 @inline(never)
-private func test7<T: ProtocolWithAssocType>(_ c: CP<T>) -> Int32 {
+fileprivate func test7<T: ProtocolWithAssocType>(_ c: CP<T>) -> Int32 {
   return c.getCount()
 }
 

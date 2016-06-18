@@ -58,7 +58,7 @@
 public class Foo {
   public let Prop0: Int32 = 1
   let Prop1: Int32 = 1 + 4/2 + 8
-  private let Prop2: Int32 = 3*7
+  fileprivate let Prop2: Int32 = 3*7
   internal let Prop3: Int32  = 4*8
   public init(i:Int32) {}  
   public init(i:Int64) {}
@@ -66,7 +66,7 @@ public class Foo {
 
 public class Foo1 {
   let Prop1: Int32
-  private let Prop2: Int32 = 3*7
+  fileprivate let Prop2: Int32 = 3*7
   internal let Prop3: Int32 = 4*8
   public init(i:Int32) {
     Prop1  = 11
@@ -80,7 +80,7 @@ public class Foo1 {
 public struct Boo {
   public let Prop0: Int32 = 1
   let Prop1: Int32 = 1 + 4/2 + 8  
-  private let Prop2: Int32 = 3*7
+  fileprivate let Prop2: Int32 = 3*7
   internal let Prop3: Int32 = 4*8
   public init(i:Int32) {}
   public init(i:Int64) {}
@@ -104,7 +104,7 @@ struct Boo3 {
   //public 
   let Prop0: Int32
   let Prop1: Int32
-  private let Prop2: Int32
+  fileprivate let Prop2: Int32
   internal let Prop3: Int32
 
   @inline(__always)
@@ -154,7 +154,7 @@ public struct StructWithPublicAndInternalLetProperties {
 public struct StructWithPublicAndInternalAndPrivateLetProperties {
   public let Prop0: Int32
   internal let Prop1: Int32
-  private let Prop2: Int32
+  fileprivate let Prop2: Int32
 
   init(_ v: Int32, _ u: Int32) {
     Prop0 = 10

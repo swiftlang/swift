@@ -35,7 +35,7 @@ extension Refrigerator : _ObjectiveCBridgeable {
 }
 
 public struct ManufacturerInfo<DataType: AnyObject> {
-  private var impl: APPManufacturerInfo<DataType>
+  fileprivate var impl: APPManufacturerInfo<DataType>
   public var value: DataType {
     return impl.value
   }

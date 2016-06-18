@@ -60,7 +60,7 @@ print(test5(Derived()))
 // Check that we handle indirect devirtualization through an intermediate
 // method. rdar://problem/24993618
 
-private class IndirectMethodCall<T> {
+fileprivate class IndirectMethodCall<T> {
     func bug() {
         overrideMe()
     }
@@ -69,46 +69,46 @@ private class IndirectMethodCall<T> {
     func overrideMe() { }
 }
 
-private class IndirectChildConcrete: IndirectMethodCall<Int> {
+fileprivate class IndirectChildConcrete: IndirectMethodCall<Int> {
     @inline(never)
     override func overrideMe() { }
 }
 
-private class IndirectChildTuple<U>: IndirectMethodCall<(U, U)> {
+fileprivate class IndirectChildTuple<U>: IndirectMethodCall<(U, U)> {
     @inline(never)
     override func overrideMe() { }
 }
 
-private class IndirectChildTupleConcrete: IndirectChildTuple<Int> {
+fileprivate class IndirectChildTupleConcrete: IndirectChildTuple<Int> {
     @inline(never)
     override func overrideMe() { }
 }
 
-private class IndirectChildMeta<U>: IndirectMethodCall<U.Type> {
+fileprivate class IndirectChildMeta<U>: IndirectMethodCall<U.Type> {
     @inline(never)
     override func overrideMe() { }
 }
-private class IndirectChildMetaConcrete: IndirectChildMeta<Int> {
-    @inline(never)
-    override func overrideMe() { }
-}
-
-private class IndirectChildBoundGeneric<U>: IndirectMethodCall<Array<U>> {
+fileprivate class IndirectChildMetaConcrete: IndirectChildMeta<Int> {
     @inline(never)
     override func overrideMe() { }
 }
 
-private class IndirectChildBoundGenericConcrete:
+fileprivate class IndirectChildBoundGeneric<U>: IndirectMethodCall<Array<U>> {
+    @inline(never)
+    override func overrideMe() { }
+}
+
+fileprivate class IndirectChildBoundGenericConcrete:
       IndirectChildBoundGeneric<Int> {
     @inline(never)
     override func overrideMe() { }
 }
 
-private class IndirectChildFunction<U>: IndirectMethodCall<(U) -> U> {
+fileprivate class IndirectChildFunction<U>: IndirectMethodCall<(U) -> U> {
     @inline(never)
     override func overrideMe() { }
 }
-private class IndirectChildFunctionConcrete: IndirectChildFunction<Int> {
+fileprivate class IndirectChildFunctionConcrete: IndirectChildFunction<Int> {
     @inline(never)
     override func overrideMe() { }
 }

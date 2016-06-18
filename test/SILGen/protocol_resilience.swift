@@ -53,7 +53,7 @@ extension ResilientMethods {
   public static func staticDefaultWitness(_ x: Int) -> Self {}
 
 // CHECK-LABEL: sil private @_TFE19protocol_resiliencePS_16ResilientMethodsP{{.*}}25defaultWitnessIsNotPublicfT_T_
-  private func defaultWitnessIsNotPublic() {}
+  fileprivate func defaultWitnessIsNotPublic() {}
 
 }
 

@@ -7,16 +7,18 @@ The general guiding principle of Swift access control:
   **No entity can be defined in terms of another entity that has a lower
   access level.**
 
-There are three levels of access: "private", "internal", and "public".
-Private entities can only be accessed from within the source file where they
-are defined. Internal entities can be accessed anywhere within the module they
-are defined. Public entities can be accessed from anywhere within the module
-and from any other context that imports the current module.
+There are four levels of access: "private", "fileprivate", "internal", and
+"public". Private entities can only be accessed from within the current
+declaration where they are defined. FilePrivate entities can only be accessed
+from within the source file where they are defined. Internal entities can be
+accessed anywhere within the module they are defined. Public entities can be
+accessed from anywhere within the module and from any other context that imports
+the current module.
 
 The names ``public`` and ``private`` have precedent in many languages;
-``internal`` comes from C#. In the future, ``public`` may be used for both API
-and SPI, at which point we may design additional annotations to distinguish the
-two.
+``internal`` comes from C# and ``fileprivate`` from the Swift community. In the
+future, ``public`` may be used for both API and SPI, at which point we may
+design additional annotations to distinguish the two.
 
 By default, most entities in a source file have ``internal`` access.
 This optimizes for the most common case—a single-target application

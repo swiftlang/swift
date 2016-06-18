@@ -158,7 +158,7 @@ static bool declIsPrivate(const Decl *member) {
     }
   }
 
-  return VD->getFormalAccess() == Accessibility::Private;
+  return VD->getFormalAccess() <= Accessibility::FilePrivate;
 }
 
 static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
@@ -227,7 +227,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       if (!NTD)
         break;
       if (NTD->hasAccessibility() &&
-          NTD->getFormalAccess() == Accessibility::Private) {
+          NTD->getFormalAccess() <= Accessibility::FilePrivate) {
         break;
       }
 
@@ -261,7 +261,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       if (!NTD->hasName())
         break;
       if (NTD->hasAccessibility() &&
-          NTD->getFormalAccess() == Accessibility::Private) {
+          NTD->getFormalAccess() <= Accessibility::FilePrivate) {
         break;
       }
       out << "- \"" << escape(NTD->getName()) << "\"\n";
@@ -277,7 +277,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       if (!VD->hasName())
         break;
       if (VD->hasAccessibility() &&
-          VD->getFormalAccess() == Accessibility::Private) {
+          VD->getFormalAccess() <= Accessibility::FilePrivate) {
         break;
       }
       out << "- \"" << escape(VD->getName()) << "\"\n";
@@ -326,7 +326,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     for (auto *member : ED->getMembers()) {
       auto *VD = dyn_cast<ValueDecl>(member);
       if (!VD || !VD->hasName() ||
-          VD->getFormalAccess() == Accessibility::Private) {
+          VD->getFormalAccess() <= Accessibility::FilePrivate) {
         continue;
       }
       out << "- [\"" << mangledName << "\", \""
@@ -391,7 +391,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
     if (entry.first.first->hasAccessibility() &&
-        entry.first.first->getFormalAccess() == Accessibility::Private)
+        entry.first.first->getFormalAccess() <= Accessibility::FilePrivate)
       continue;
 
     out << "- ";
@@ -414,7 +414,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     }
 
     if (i->first.first->hasAccessibility() &&
-        i->first.first->getFormalAccess() == Accessibility::Private)
+        i->first.first->getFormalAccess() <= Accessibility::FilePrivate)
       continue;
 
     out << "- ";

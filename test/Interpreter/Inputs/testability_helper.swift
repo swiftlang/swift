@@ -9,7 +9,7 @@ internal class Base : CustomStringConvertible {
   
   var description: String { return "instance \(id)" }
   
-  private func privateFn() -> String {
+  fileprivate func privateFn() -> String {
     return "private \(id)"
   }
   func callPrivate() -> String {
@@ -17,7 +17,7 @@ internal class Base : CustomStringConvertible {
   }
 }
 
-private class PrivateSub : Base {
+fileprivate class PrivateSub : Base {
   override func privateFn() -> String {
     return "really private"
   }

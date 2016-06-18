@@ -1,5 +1,5 @@
 public class ExternalClass {
-  private func foo() {}
+  fileprivate func foo() {}
 }
 
 public func getExternalClass() -> ExternalClass {
@@ -13,6 +13,6 @@ public func getExternalClass() -> ExternalClass {
   obj.foo()
 }
 
-private class PrivateSubclass : ExternalClass {
-  override private func foo() {}
+fileprivate class PrivateSubclass : ExternalClass {
+  override fileprivate func foo() {}
 }

@@ -192,6 +192,7 @@ DECL_ATTR(private, Accessibility,
           OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor |
           DeclModifier | NotSerialized,
           /* Not serialized */ 46)
+DECL_ATTR_ALIAS(fileprivate, Accessibility)
 DECL_ATTR_ALIAS(internal, Accessibility)
 DECL_ATTR_ALIAS(public, Accessibility)
 

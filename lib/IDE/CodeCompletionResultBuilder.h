@@ -115,6 +115,11 @@ public:
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "private ");
       break;
+    case Accessibility::FilePrivate:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "fileprivate ");
+      break;
     case Accessibility::Internal:
       // 'internal' is the default, don't add it.
       break;

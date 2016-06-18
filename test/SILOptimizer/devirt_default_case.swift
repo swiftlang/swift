@@ -25,14 +25,14 @@ public class Derived1 : Base1 {
 }
 
 // private class
-private class Base2 {
+fileprivate class Base2 {
   @inline(never) func inner() { action(3)}
   func middle() { inner() }
   func outer() { middle() }
 }
 
 // private class
-private class Derived2 : Base2 {
+fileprivate class Derived2 : Base2 {
   override func inner() { action(4) }
   @inline(never) final override func middle() { inner() }
 }

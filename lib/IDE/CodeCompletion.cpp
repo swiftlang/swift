@@ -3968,7 +3968,7 @@ public:
             ->getFormalAccess();
 
     bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
-    bool missingAccess = !isKeywordSpecified("private") &&
+    bool missingAccess = !isKeywordSpecified("fileprivate") &&
                          !isKeywordSpecified("public") &&
                          !isKeywordSpecified("internal");
     bool missingOverride = Reason == DeclVisibilityKind::MemberOfSuper &&
