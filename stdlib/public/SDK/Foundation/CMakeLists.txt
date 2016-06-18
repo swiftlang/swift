@@ -1,4 +1,4 @@
-add_swift_library(swiftFoundation IS_SDK_OVERLAY
+add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   Foundation.swift
   Boxing.swift
   NSError.swift

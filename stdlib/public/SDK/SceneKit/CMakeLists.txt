@@ -4,7 +4,7 @@ SET(SWIFT_SCENEKIT_DEPENDENCIES_NON_WATCHOS
   simd
   CoreImage)
 
-add_swift_library(swiftSceneKit IS_SDK_OVERLAY
+add_swift_library(swiftSceneKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   SceneKit.swift
   Thunks.mm
 

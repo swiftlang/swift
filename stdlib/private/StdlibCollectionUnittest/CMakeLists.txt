@@ -9,7 +9,7 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
     Foundation)
 endif()
 
-add_swift_library(swiftStdlibCollectionUnittest SHARED IS_STDLIB
+add_swift_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   StdlibCollectionUnittest.swift

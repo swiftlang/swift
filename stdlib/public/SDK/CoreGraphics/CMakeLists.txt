@@ -1,4 +1,4 @@
-add_swift_library(swiftCoreGraphics IS_SDK_OVERLAY
+add_swift_library(swiftCoreGraphics ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   CoreGraphics.swift
   CGFloat.swift.gyb
   # rdar://problem/20891746

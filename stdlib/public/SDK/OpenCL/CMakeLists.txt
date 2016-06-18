@@ -1,4 +1,4 @@
-add_swift_library(swiftOpenCL IS_SDK_OVERLAY
+add_swift_library(swiftOpenCL ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   OpenCL.swift
   TARGET_SDKS OSX
   SWIFT_MODULE_DEPENDS Dispatch Darwin # also, IOSurface

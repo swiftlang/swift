@@ -1,4 +1,4 @@
-add_swift_library(swiftCoreMedia IS_SDK_OVERLAY
+add_swift_library(swiftCoreMedia ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   CoreMedia.swift
   CMTime.swift
   CMTimeRange.swift

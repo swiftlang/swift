@@ -1,4 +1,4 @@
-add_swift_library(swiftIntents IS_SDK_OVERLAY
+add_swift_library(swiftIntents ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   Intents.swift
   INBooleanResolutionResult.swift
   INDoubleResolutionResult.swift

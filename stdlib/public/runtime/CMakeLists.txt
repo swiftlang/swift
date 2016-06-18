@@ -83,11 +83,11 @@ add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   INSTALL_IN_COMPONENT never_install)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-  add_swift_library(section_magic_begin IS_STDLIB IS_STDLIB_CORE
+  add_swift_library(section_magic_begin STATIC IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
     C_COMPILE_FLAGS ${swift_runtime_compile_flags} "-DSWIFT_BEGIN"
     INSTALL_IN_COMPONENT never_install)
-  add_swift_library(section_magic_end IS_STDLIB IS_STDLIB_CORE
+  add_swift_library(section_magic_end STATIC IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
     C_COMPILE_FLAGS ${swift_runtime_compile_flags} "-DSWIFT_END"
     INSTALL_IN_COMPONENT never_install)

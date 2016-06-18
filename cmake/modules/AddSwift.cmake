@@ -361,6 +361,7 @@ endfunction()
 #     target
 #     name
 #     [SHARED]
+#     [STATIC]
 #     [SDK sdk]
 #     [ARCHITECTURE architecture]
 #     [DEPENDS dep1 ...]
@@ -389,6 +390,9 @@ endfunction()
 #
 # SHARED
 #   Build a shared library.
+#
+# STATIC
+#   Build a static library.
 #
 # SDK sdk
 #   SDK to build for.
@@ -448,7 +452,7 @@ endfunction()
 #   Sources to add into this library
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
-      SHARED OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
+      SHARED STATIC OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
       TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   cmake_parse_arguments(SWIFTLIB_SINGLE
@@ -472,6 +476,13 @@ function(_add_swift_library_single target name)
 
   if("${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}" STREQUAL "")
     message(FATAL_ERROR "INSTALL_IN_COMPONENT is required")
+  endif()
+
+  if(NOT SWIFTLIB_SINGLE_SHARED AND
+     NOT SWIFTLIB_SINGLE_STATIC AND
+     NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY)
+    message(FATAL_ERROR
+        "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
   
   # Determine the subdirectory where this library will be installed.
@@ -681,7 +692,7 @@ function(_add_swift_library_single target name)
   # Do these LAST.
 
   set(target_static)
-  if(SWIFTLIB_SINGLE_IS_STDLIB AND SWIFT_BUILD_STATIC_STDLIB)
+  if(SWIFTLIB_SINGLE_IS_STDLIB AND SWIFTLIB_SINGLE_STATIC)
     set(target_static "${target}-static")
 
     # We have already compiled Swift sources.  Link everything into a static
@@ -920,6 +931,7 @@ endfunction()
 # Usage:
 #   add_swift_library(name
 #     [SHARED]
+#     [STATIC]
 #     [DEPENDS dep1 ...]
 #     [LINK_LIBRARIES dep1 ...]
 #     [INTERFACE_LINK_LIBRARIES dep1 ...]
@@ -948,6 +960,9 @@ endfunction()
 #
 # SHARED
 #   Build a shared library.
+#
+# STATIC
+#   Build a static library.
 #
 # DEPENDS
 #   Targets that this library depends on.
@@ -1028,7 +1043,7 @@ endfunction()
 #   Sources to add into this library.
 function(add_swift_library name)
   set(SWIFTLIB_options
-      SHARED OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
+      SHARED STATIC OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
       TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE HAS_SWIFT_CONTENT)
   cmake_parse_arguments(SWIFTLIB
@@ -1042,7 +1057,6 @@ function(add_swift_library name)
 
   if(SWIFTLIB_IS_SDK_OVERLAY)
     set(SWIFTLIB_HAS_SWIFT_CONTENT TRUE)
-    set(SWIFTLIB_SHARED TRUE)
     set(SWIFTLIB_IS_STDLIB TRUE)
     set(SWIFTLIB_TARGET_LIBRARY TRUE)
 
@@ -1103,6 +1117,13 @@ function(add_swift_library name)
 
   if("${SWIFTLIB_INSTALL_IN_COMPONENT}" STREQUAL "")
     message(FATAL_ERROR "INSTALL_IN_COMPONENT is required")
+  endif()
+
+  if(NOT SWIFTLIB_SHARED AND
+     NOT SWIFTLIB_STATIC AND
+     NOT SWIFTLIB_OBJECT_LIBRARY)
+    message(FATAL_ERROR
+        "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
   
   if(SWIFTLIB_TARGET_LIBRARY)
@@ -1196,6 +1217,7 @@ function(add_swift_library name)
           ${VARIANT_NAME}
           ${name}
           ${SWIFTLIB_SHARED_keyword}
+          ${SWIFTLIB_STATIC_keyword}
           ${SWIFTLIB_OBJECT_LIBRARY_keyword}
           ${SWIFTLIB_SOURCES}
           SDK ${sdk}
@@ -1231,7 +1253,7 @@ function(add_swift_library name)
             endif()
           endforeach()
 
-          if (SWIFT_BUILD_STATIC_STDLIB AND SWIFTLIB_IS_STDLIB)
+          if (SWIFTLIB_IS_STDLIB AND SWIFTLIB_STATIC)
             # Add dependencies on the (not-yet-created) custom lipo target.
             foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
               if (NOT "${DEP}" STREQUAL "icucore")
@@ -1300,7 +1322,7 @@ function(add_swift_library name)
         # If we built static variants of the library, create a lipo target for
         # them.
         set(lipo_target_static)
-        if (SWIFT_BUILD_STATIC_STDLIB AND SWIFTLIB_IS_STDLIB)
+        if (SWIFTLIB_IS_STDLIB AND SWIFTLIB_STATIC)
           set(THIN_INPUT_TARGETS_STATIC)
           foreach(TARGET ${THIN_INPUT_TARGETS})
             list(APPEND THIN_INPUT_TARGETS_STATIC "${TARGET}-static")
@@ -1366,6 +1388,8 @@ function(add_swift_library name)
       ${name}
       ${name}
       ${SWIFTLIB_SHARED_keyword}
+      ${SWIFTLIB_STATIC_keyword}
+      ${SWIFTLIB_OBJECT_LIBRARY_keyword}
       ${SWIFTLIB_SOURCES}
       SDK ${sdk}
       ARCHITECTURE ${arch}

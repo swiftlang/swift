@@ -1,4 +1,4 @@
-add_swift_library(swiftIRGen
+add_swift_library(swiftIRGen STATIC
   DebugTypeInfo.cpp
   EnumPayload.cpp
   ExtraInhabitants.cpp
