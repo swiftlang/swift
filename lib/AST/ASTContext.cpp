@@ -2129,7 +2129,7 @@ static void removeValidObjCConflictingMethods(
   methods = methods.slice(0, newEnd - methods.begin());
 }
 
-/// Determine whether the should associate a conflict among the given
+/// Determine whether we should associate a conflict among the given
 /// set of methods with the specified source file.
 static bool shouldAssociateConflictWithSourceFile(
               SourceFile &sf, 
