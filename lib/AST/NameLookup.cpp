@@ -1125,9 +1125,13 @@ bool DeclContext::lookupQualified(Type type,
     llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
     decls.erase(std::remove_if(decls.begin(), decls.end(),
                                [&](ValueDecl *vd) -> bool {
-                                 return !knownDecls.insert(vd).second;
-                               }),
-                decls.end());
+      // If we're performing a type lookup, don't even attempt to validate
+      // the decl if its not a type.
+      if ((options & NL_OnlyTypes) && !isa<TypeDecl>(vd))
+        return true;
+
+      return !knownDecls.insert(vd).second;
+    }), decls.end());
 
     if (auto *debugClient = topLevelScope->getParentModule()->getDebugClient())
       filterForDiscriminator(decls, debugClient);
@@ -1341,6 +1345,11 @@ bool DeclContext::lookupQualified(Type type,
     // already visited above, add it to the list of declarations.
     llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
     for (auto decl : allDecls) {
+      // If we're performing a type lookup, don't even attempt to validate
+      // the decl if its not a type.
+      if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
+        continue;
+
       // If the declaration has an override, name lookup will also have
       // found the overridden method. Skip this declaration, because we
       // prefer the overridden method.

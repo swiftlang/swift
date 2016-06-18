@@ -345,10 +345,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   llvm::SmallPtrSet<CanType, 4> types;
   SmallVector<AssociatedTypeDecl *, 4> inferredAssociatedTypes;
   for (auto decl : decls) {
-    // Ignore non-types found by name lookup.
-    auto typeDecl = dyn_cast<TypeDecl>(decl);
-    if (!typeDecl)
-      continue;
+    auto *typeDecl = cast<TypeDecl>(decl);
 
     // FIXME: This should happen before we attempt shadowing checks.
     validateDecl(typeDecl);

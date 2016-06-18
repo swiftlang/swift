@@ -572,10 +572,6 @@ NOTE(object_literal_resolve_import,none,
      "import %0 to use '%1' as the default %2 literal type",
      (StringRef, StringRef, StringRef))
 
-ERROR(use_non_type_value,none,
-      "%0 is not a type", (Identifier))
-NOTE(use_non_type_value_prev,none,
-     "%0 declared here", (Identifier))
 ERROR(use_local_before_declaration,none,
       "use of local variable %0 before its declaration", (DeclName))
 ERROR(unsupported_existential_type,none,

@@ -771,17 +771,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // If the component has already been bound to a declaration, handle
   // that now.
   if (ValueDecl *VD = comp->getBoundDecl()) {
-    // Diagnose non-type declarations.
-    auto typeDecl = dyn_cast<TypeDecl>(VD);
-    if (!typeDecl) {
-      if (diagnoseErrors) {
-        TC.diagnose(comp->getIdLoc(), diag::use_non_type_value, VD->getName());
-        TC.diagnose(VD, diag::use_non_type_value_prev, VD->getName());
-      }
-
-      comp->setInvalid();
-      return ErrorType::get(TC.Context);
-    }
+    auto *typeDecl = cast<TypeDecl>(VD);
 
     // Resolve the type declaration within this context.
     return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
@@ -894,11 +884,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   TypeDecl *currentDecl = nullptr;
   bool isAmbiguous = false;
   for (const auto &result : globals) {
-    // Ignore non-type declarations.
-    auto typeDecl = dyn_cast<TypeDecl>(result.Decl);
-    if (!typeDecl)
-      continue;
-    
+    auto typeDecl = cast<TypeDecl>(result.Decl);
+
     // If necessary, add delayed members to the declaration.
     if (auto nomDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
       TC.forceExternalDeclMembers(nomDecl);
@@ -976,19 +963,7 @@ static Type resolveNestedIdentTypeComponent(
 
   // Phase 2: If a declaration has already been bound, use it.
   if (ValueDecl *decl = comp->getBoundDecl()) {
-    // Make sure we have a type declaration.
-    auto typeDecl = dyn_cast<TypeDecl>(decl);
-    if (!typeDecl) {
-      if (diagnoseErrors) {
-        TC.diagnose(comp->getIdLoc(), diag::use_non_type_value,
-                    decl->getName());
-        TC.diagnose(decl, diag::use_non_type_value_prev,
-                    decl->getName());
-      }
-
-      comp->setInvalid();
-      return ErrorType::get(TC.Context);
-    }
+    auto *typeDecl = cast<TypeDecl>(decl);
 
     Type memberType;
 
