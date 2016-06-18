@@ -110,11 +110,11 @@ let _: String = doubleOptional // expected-error {{cannot convert value of type 
 func maybeThrow() throws {}
 try maybeThrow() // okay
 try! maybeThrow() // okay
-try? maybeThrow() // expected-warning {{result of 'try?' is unused}}
+try? maybeThrow() // okay since return type of maybeThrow is Void
 _ = try? maybeThrow() // okay
 
 let _: () -> Void = { try! maybeThrow() } // okay
-let _: () -> Void = { try? maybeThrow() } // expected-warning {{result of 'try?' is unused}}
+let _: () -> Void = { try? maybeThrow() } // okay since return type of maybeThrow is Void
 
 
 if try? maybeThrow() { // expected-error {{cannot be used as a boolean}} {{4-4=((}} {{21-21=) != nil)}}
