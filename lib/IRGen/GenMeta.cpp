@@ -157,7 +157,6 @@ namespace {
   /// the fill operations that the compiler emits for the bound decl.
   ///
   /// FIXME: Rework to use GenericSignature instead of AllArchetypes
-  /// FIXME: Rework for nested generics
   struct GenericArguments {
     /// The values to use to initialize the arguments structure.
     SmallVector<llvm::Value *, 8> Values;
