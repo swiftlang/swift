@@ -85,8 +85,19 @@ function(_add_variant_c_compile_link_flags)
     ${${CFLAGS_RESULT_VAR_NAME}}
     "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
 
-  list(APPEND result
-    "-isysroot" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
+  if("${CFLAGS_SDK}" STREQUAL "OSX" OR
+     "${CFLAGS_SDK}" STREQUAL "TVOS" OR
+     "${CFLAGS_SDK}" STREQUAL "TVOS_SIMULATOR" OR
+     "${CFLAGS_SDK}" STREQUAL "IOS" OR
+     "${CFLAGS_SDK}" STREQUAL "IOS_SIMULATOR" OR
+     "${CFLAGS_SDK}" STREQUAL "WATCHOS" OR
+     "${CFLAGS_SDK}" STREQUAL "WATCHOS_SIMULATOR")
+    list(APPEND result "-isysroot" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
+  else()
+    if(NOT "${SWIFT_SDK_${CFLAGS_SDK}_PATH}" STREQUAL "/")
+      list(APPEND result "--sysroot=${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
+    endif()
+  endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND result
