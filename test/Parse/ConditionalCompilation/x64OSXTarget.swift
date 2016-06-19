@@ -6,3 +6,9 @@ class C {}
 var x = C()
 #endif
 var y = x
+
+#if arch(x86_64) && os(macOS) && _runtime(_ObjC) && _endian(little)
+class D {}
+var z = D()
+#endif
+var w = z
