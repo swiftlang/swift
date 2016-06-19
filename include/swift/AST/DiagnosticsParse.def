@@ -175,8 +175,6 @@ ERROR(disallowed_var_multiple_getset,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
 
-ERROR(disallowed_type,none,
-      "type not allowed here", ())
 ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
 ERROR(var_init_self_referential,none,
@@ -1289,6 +1287,10 @@ ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
+ERROR(where_without_generic_params,none,
+      "'where' clause cannot be attached to "
+      "%select{a non-generic|a protocol|an associated type}0 "
+      "declaration", (unsigned))
 
 //------------------------------------------------------------------------------
 // Conditional compilation parsing diagnostics

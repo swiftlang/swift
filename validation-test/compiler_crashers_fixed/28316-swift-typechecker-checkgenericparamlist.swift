@@ -5,6 +5,5 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-// Crash type: memory error ("Invalid read of size 4")
-var a{class d{var b=B{}let c=(x:d<T{{}}class B<T where h=d>:a
+// RUN: not %target-swift-frontend %s -parse
+{class B{init(T)}class T where g:a

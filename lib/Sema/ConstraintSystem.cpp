@@ -1228,7 +1228,7 @@ ConstraintSystem::getTypeOfMemberReference(
     } else {
       selfTy = outerDC->getDeclaredTypeOfContext();
     }
-    
+
     // If we have a type reference, look through the metatype.
     if (isTypeReference)
       openedType = openedType->castTo<AnyMetatypeType>()->getInstanceType();
@@ -1240,7 +1240,8 @@ ConstraintSystem::getTypeOfMemberReference(
       // qualification.  If we have an lvalue coming in, we expect an inout.
       if (!isClassBoundExistential &&
           !selfTy->hasReferenceSemantics() &&
-          baseTy->is<LValueType>())
+          baseTy->is<LValueType>() &&
+          !selfTy->is<ErrorType>())
         selfTy = InOutType::get(selfTy);
 
       openedType = FunctionType::get(selfTy, openedType);

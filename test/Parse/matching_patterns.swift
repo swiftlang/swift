@@ -13,7 +13,7 @@ var x:Int
 func square(_ x: Int) -> Int { return x*x }
 
 struct A<B> {
-  struct C<D> { } // expected-error{{generic type 'C' nested in type}}
+  struct C<D> { } // expected-error{{generic type 'C' cannot be nested in type 'A'}}
 }
 
 switch x {
@@ -143,7 +143,7 @@ case .Foo: // expected-error{{enum case 'Foo' not found in type 'Int'}}
 }
 
 struct ContainsEnum {
-  enum Possible<T> { // expected-error{{generic type 'Possible' nested in type}}
+  enum Possible<T> { // expected-error{{generic type 'Possible' cannot be nested in type 'ContainsEnum'}}
     case Naught
     case Mere(T)
     case Twain(T, T)

@@ -1019,6 +1019,12 @@ public:
                       std::function<bool(ArchetypeBuilder &)> inferRequirements,
                       bool &invalid);
 
+  /// Finalize the given generic parameter list, assigning archetypes to
+  /// the generic parameters.
+  void finalizeGenericParamList(ArchetypeBuilder &builder,
+                                GenericParamList *genericParams,
+                                DeclContext *dc);
+
   /// Validate the signature of a generic type.
   ///
   /// \param nominal The generic type.

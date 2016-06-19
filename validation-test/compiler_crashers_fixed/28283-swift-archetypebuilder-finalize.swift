@@ -5,6 +5,9 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 // REQUIRES: asserts
-{struct d<h:d.d{struct d struct d:d
+protocol A{class B<U:U.a
+typealias h}}extension A{
+let e=B
+typealias h:n

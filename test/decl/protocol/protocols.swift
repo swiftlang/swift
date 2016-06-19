@@ -102,13 +102,6 @@ protocol C : E { }
 protocol H : E { }
 protocol E { }
 
-struct disallownonglobal { protocol P {} } // expected-error {{declaration is only valid at file scope}}
-
-protocol disallownestp { protocol P {} } // expected-error {{type not allowed here}}
-protocol disallownests { struct S {} } // expected-error {{type not allowed here}}
-protocol disallownestc { class C {} } // expected-error {{type not allowed here}}
-protocol disallownesto { enum O {} } // expected-error {{type not allowed here}}
-
 //===----------------------------------------------------------------------===//
 // Associated types
 //===----------------------------------------------------------------------===//

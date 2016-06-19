@@ -106,89 +106,75 @@ ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
 }
 
 GenericTypeParamDecl *DeclContext::getProtocolSelf() const {
-  assert(getAsProtocolOrProtocolExtensionContext() && "not a protocol");
+  auto *proto = getAsProtocolOrProtocolExtensionContext();
+  assert(proto && "not a protocol");
+
+  // FIXME: This comes up when the extension didn't resolve,
+  // and we have a protocol nested inside that extension
+  // (which is not allowed in the first place).
+  //
+  // Handle this more systematically elsewhere.
+  if (!proto->getGenericParams() || !isInnermostContextGeneric())
+    return nullptr;
+
   return getGenericParamsOfContext()->getParams().front();
 }
 
-Type DeclContext::getDeclaredTypeOfContext() const {
-  switch (getContextKind()) {
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-  case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::AbstractFunctionDecl:
-  case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::Initializer:
-  case DeclContextKind::SerializedLocal:
+enum class DeclTypeKind : unsigned {
+  DeclaredType,
+  DeclaredTypeInContext,
+  DeclaredInterfaceType
+};
+
+static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
+  auto type = ED->getExtendedType();
+
+  if (!type)
     return Type();
 
-  case DeclContextKind::ExtensionDecl: {
-    auto ED = cast<ExtensionDecl>(this);
-    auto type = ED->getExtendedType();
+  if (type->is<UnboundGenericType>()) {
+    ED->getASTContext().getLazyResolver()->resolveExtension(
+      const_cast<ExtensionDecl *>(ED));
+    type = ED->getExtendedType();
+  }
 
-    if (type.isNull() || type->is<ErrorType>()) {
+  if (type->is<ErrorType>())
+    return type;
+
+  switch (kind) {
+  case DeclTypeKind::DeclaredType:
+    return type->getAnyNominal()->getDeclaredType();
+  case DeclTypeKind::DeclaredTypeInContext:
+    if (type->is<UnboundGenericType>())
       return Type();
-    }
-    if (isa<UnboundGenericType>(type.getPointer())) {
-      getASTContext().getLazyResolver()->resolveExtension(
-        const_cast<ExtensionDecl *>(ED));
-
-      type = ED->getExtendedType();
-    }
-
-    if (auto ND = type->getNominalOrBoundGenericNominal())
-      return ND->getDeclaredType();
-    
-    return Type();
+    return type;
+  case DeclTypeKind::DeclaredInterfaceType:
+    // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
+    return type->getAnyNominal()->getDeclaredInterfaceType();
   }
+}
 
-  case DeclContextKind::GenericTypeDecl:
-    return cast<GenericTypeDecl>(this)->getDeclaredType();
-  }
-  llvm_unreachable("bad DeclContextKind");
+Type DeclContext::getDeclaredTypeOfContext() const {
+  if (auto *ED = dyn_cast<ExtensionDecl>(this))
+    return computeExtensionType(ED, DeclTypeKind::DeclaredType);
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
+    return NTD->getDeclaredType();
+  return Type();
 }
 
 Type DeclContext::getDeclaredTypeInContext() const {
-  switch (getContextKind()) {
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-  case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::AbstractFunctionDecl:
-  case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::Initializer:
-  case DeclContextKind::SerializedLocal:
-    return Type();
-
-  case DeclContextKind::ExtensionDecl: {
-    auto ED = cast<ExtensionDecl>(this);
-    auto type = ED->getExtendedType();
-
-    if (type.isNull() || type->is<ErrorType>()) {
-      return ErrorType::get(getASTContext());
-    }
-    if (isa<UnboundGenericType>(type.getPointer())) {
-      getASTContext().getLazyResolver()->resolveExtension(
-        const_cast<ExtensionDecl *>(ED));
-
-      type = ED->getExtendedType();
-    }
-
-    return type;
-  }
-
-  case DeclContextKind::GenericTypeDecl:
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
-      return NTD->getDeclaredTypeInContext();
-    return Type();
-  }
-  llvm_unreachable("bad DeclContextKind");
+  if (auto *ED = dyn_cast<ExtensionDecl>(this))
+    return computeExtensionType(ED, DeclTypeKind::DeclaredTypeInContext);
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
+    return NTD->getDeclaredTypeInContext();
+  return Type();
 }
 
 Type DeclContext::getDeclaredInterfaceType() const {
-  // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
-  if (auto nominal = getAsGenericTypeOrGenericTypeExtensionContext())
-    return nominal->getDeclaredInterfaceType();
+  if (auto *ED = dyn_cast<ExtensionDecl>(this))
+    return computeExtensionType(ED, DeclTypeKind::DeclaredInterfaceType);
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
+    return NTD->getDeclaredInterfaceType();
   return Type();
 }
 

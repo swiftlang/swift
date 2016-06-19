@@ -189,9 +189,11 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
 void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   FuncDecl *FD = cast<FuncDecl>(D);
 
-  if (!FD->getDeclContext()->isTypeContext())
+  auto contextTy = FD->getDeclContext()->getDeclaredTypeInContext();
+  if (!contextTy)
     return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope);
-  if (FD->getDeclContext()->getDeclaredTypeInContext()->hasReferenceSemantics())
+
+  if (contextTy->hasReferenceSemantics())
     return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes);
   
   // Verify we don't have both mutating and nonmutating.

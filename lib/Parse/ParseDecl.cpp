@@ -2926,20 +2926,24 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return parseDeclAssociatedType(Flags, Attributes);
   }
   
-  if (Tok.is(tok::colon)) {
-    // It is a common mistake to write "typealias A : Int" instead of = Int.
-    // Recognize this and produce a fixit.
-    diagnose(Tok, diag::expected_equal_in_typealias)
-        .fixItReplace(Tok.getLoc(), "=");
-    consumeToken(tok::colon);
-  } else if (parseToken(tok::equal, diag::expected_equal_in_typealias)) {
-    Status.setIsParseError();
-    return Status;
+  ParserResult<TypeRepr> UnderlyingTy;
+
+  if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
+    if (Tok.is(tok::colon)) {
+      // It is a common mistake to write "typealias A : Int" instead of = Int.
+      // Recognize this and produce a fixit.
+      diagnose(Tok, diag::expected_equal_in_typealias)
+          .fixItReplace(Tok.getLoc(), "=");
+      consumeToken(tok::colon);
+    } else {
+      consumeToken(tok::equal);
+    }
+
+    UnderlyingTy = parseType(diag::expected_type_in_typealias);
+    Status |= UnderlyingTy;
+    if (UnderlyingTy.isNull())
+      return Status;
   }
-  ParserResult<TypeRepr> UnderlyingTy = parseType(diag::expected_type_in_typealias);
-  Status |= UnderlyingTy;
-  if (UnderlyingTy.isNull())
-    return Status;
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
@@ -2947,7 +2951,13 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     if (whereStatus.shouldStopParsing())
       return whereStatus;
   }
-  
+
+  if (UnderlyingTy.isNull()) {
+    diagnose(Tok, diag::expected_equal_in_typealias);
+    Status.setIsParseError();
+    return Status;
+  }
+
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
                                           UnderlyingTy.getPtrOrNull(),
                                           genericParams, CurDeclContext);
@@ -3019,6 +3029,16 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
       return Status;
   }
   
+  // Parse a 'where' clause if present. These are not supported, but we will
+  // get better QoI this way.
+  if (Tok.is(tok::kw_where)) {
+    GenericParamList *unused = nullptr;
+    auto whereStatus = parseFreestandingGenericWhereClause(
+        unused, WhereClauseKind::AssociatedType);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+  }
+
   if (!Flags.contains(PD_InProtocol)) {
     diagnose(AssociatedTypeLoc, diag::associatedtype_outside_protocol)
         .fixItReplace(AssociatedTypeLoc, "typealias");
@@ -4731,12 +4751,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   addToScope(UD);
 
-  if (Flags & PD_DisallowNominalTypes) {
-    diagnose(EnumLoc, diag::disallowed_type);
-    Status.setIsParseError();
-    UD->setInvalid();
-  }
-
   return DCC.fixupParserResult(Status, UD);
 }
 
@@ -5023,12 +5037,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
 
   addToScope(SD);
 
-  if (Flags & PD_DisallowNominalTypes) {
-    diagnose(StructLoc, diag::disallowed_type);
-    Status.setIsParseError();
-    SD->setInvalid();
-  }
-
   return DCC.fixupParserResult(Status, SD);
 }
 
@@ -5116,12 +5124,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
 
   addToScope(CD);
 
-  if (Flags & PD_DisallowNominalTypes) {
-    diagnose(ClassLoc, diag::disallowed_type);
-    Status.setIsParseError();
-    CD->setInvalid();
-  }
-
   return DCC.fixupParserResult(Status, CD);
 }
 
@@ -5174,6 +5176,16 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Status |= parseInheritance(InheritedProtocols, &classRequirementLoc);
   }
 
+  // Parse a 'where' clause if present. These are not supported, but we will
+  // get better QoI this way.
+  if (Tok.is(tok::kw_where)) {
+    GenericParamList *unused = nullptr;
+    auto whereStatus = parseFreestandingGenericWhereClause(
+        unused, WhereClauseKind::Protocol);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+  }
+
   ProtocolDecl *Proto
     = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,
                                  ProtocolName,
@@ -5200,7 +5212,6 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     } else {
       // Parse the members.
       ParseDeclOptions Options(PD_HasContainerType |
-                               PD_DisallowNominalTypes |
                                PD_DisallowInit |
                                PD_InProtocol);
       if (parseNominalDeclMembers(LBraceLoc, RBraceLoc,
@@ -5213,16 +5224,6 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Proto->setBraces({LBraceLoc, RBraceLoc});
   }
   
-  if (Flags & PD_DisallowNominalTypes) {
-    diagnose(ProtocolLoc, diag::disallowed_type);
-    Status.setIsParseError();
-    Proto->setInvalid();
-  } else if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
-    diagnose(ProtocolLoc, diag::decl_inner_scope);
-    Status.setIsParseError();
-    Proto->setInvalid();
-  }
-
   return DCC.fixupParserResult(Status, Proto);
 }
 

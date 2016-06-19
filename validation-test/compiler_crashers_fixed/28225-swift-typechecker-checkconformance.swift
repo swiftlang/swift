@@ -5,9 +5,6 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
-protocol A{class B<U:U.a
-typealias h}}extension A{
-let e=B
-typealias h:n
+// RUN: not %target-swift-frontend %s -parse
+func e{enum k:A}protocol A{associatedtype B:A
+associatedtype n

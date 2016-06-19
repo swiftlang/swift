@@ -312,7 +312,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
     validateExtension(ext);
 
-    if (ext->checkedInheritanceClause())
+    if (ext->isInvalid() ||
+        ext->checkedInheritanceClause())
       return;
 
     // This breaks infinite recursion, which will be diagnosed separately.
@@ -690,120 +691,6 @@ ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
   return ArchetypeBuilder(*mod, Diags);
 }
 
-static void revertDependentTypeLoc(TypeLoc &tl) {
-  // If there's no type representation, there's nothing to revert.
-  if (!tl.getTypeRepr())
-    return;
-
-  // Don't revert an error type; we've already complained.
-  if (tl.wasValidated() && tl.isError())
-    return;
-
-  // Make sure we validate the type again.
-  tl.setType(Type(), /*validated=*/false);
-}
-
-/// Revert the dependent types within the given generic parameter list.
-void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
-  // Revert the inherited clause of the generic parameter list.
-  for (auto param : *genericParams) {
-    param->setCheckedInheritanceClause(false);
-    for (auto &inherited : param->getInherited())
-      revertDependentTypeLoc(inherited);
-  }
-
-  // Revert the requirements of the generic parameter list.
-  for (auto &req : genericParams->getRequirements()) {
-    if (req.isInvalid())
-      continue;
-
-    switch (req.getKind()) {
-    case RequirementReprKind::TypeConstraint: {
-      revertDependentTypeLoc(req.getSubjectLoc());
-      revertDependentTypeLoc(req.getConstraintLoc());
-      break;
-    }
-
-    case RequirementReprKind::SameType:
-      revertDependentTypeLoc(req.getFirstTypeLoc());
-      revertDependentTypeLoc(req.getSecondTypeLoc());
-      break;
-    }
-  }
-}
-
-/// Finalize the given generic parameter list, assigning archetypes to
-/// the generic parameters.
-static void finalizeGenericParamList(ArchetypeBuilder &builder,
-                                     GenericParamList *genericParams,
-                                     DeclContext *dc, TypeChecker &TC) {
-  Accessibility access;
-  if (auto *fd = dyn_cast<FuncDecl>(dc))
-    access = fd->getFormalAccess();
-  else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
-    access = nominal->getFormalAccess();
-  else
-    access = Accessibility::Internal;
-
-  // Wire up the archetypes.
-  for (auto GP : *genericParams) {
-    GP->setArchetype(builder.getArchetype(GP));
-    TC.checkInheritanceClause(GP);
-    if (!GP->hasAccessibility())
-      GP->setAccessibility(access);
-  }
-  genericParams->setAllArchetypes(
-    TC.Context.AllocateCopy(builder.getAllArchetypes()));
-
-#ifndef NDEBUG
-  // Record archetype contexts.
-  for (auto archetype : genericParams->getAllArchetypes()) {
-    if (TC.Context.ArchetypeContexts.count(archetype) == 0)
-      TC.Context.ArchetypeContexts[archetype] = dc;
-  }
-#endif
-
-  // Replace the generic parameters with their archetypes throughout the
-  // types in the requirements.
-  // FIXME: This should not be necessary at this level; it is a transitional
-  // step.
-  for (auto &Req : genericParams->getRequirements()) {
-    if (Req.isInvalid())
-      continue;
-
-    switch (Req.getKind()) {
-    case RequirementReprKind::TypeConstraint: {
-      revertDependentTypeLoc(Req.getSubjectLoc());
-      if (TC.validateType(Req.getSubjectLoc(), dc)) {
-        Req.setInvalid();
-        continue;
-      }
-
-      revertDependentTypeLoc(Req.getConstraintLoc());
-      if (TC.validateType(Req.getConstraintLoc(), dc)) {
-        Req.setInvalid();
-        continue;
-      }
-      break;
-    }
-
-    case RequirementReprKind::SameType:
-      revertDependentTypeLoc(Req.getFirstTypeLoc());
-      if (TC.validateType(Req.getFirstTypeLoc(), dc)) {
-        Req.setInvalid();
-        continue;
-      }
-
-      revertDependentTypeLoc(Req.getSecondTypeLoc());
-      if (TC.validateType(Req.getSecondTypeLoc(), dc)) {
-        Req.setInvalid();
-        continue;
-      }
-      break;
-    }
-  }
-}
-
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericSignature *TypeChecker::handleSILGenericParams(
                     GenericParamList *genericParams,
@@ -833,38 +720,11 @@ GenericSignature *TypeChecker::handleSILGenericParams(
 
     ArchetypeBuilder builder(*DC->getParentModule(), Diags);
     checkGenericParamList(&builder, genericParams, parentSig);
-    finalizeGenericParamList(builder, genericParams, DC, *this);
+    finalizeGenericParamList(builder, genericParams, DC);
 
     parentSig = genericSig;
   }
   return parentSig;
-}
-
-void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
-  // Revert the result type.
-  if (auto fn = dyn_cast<FuncDecl>(func))
-    if (!fn->getBodyResultTypeLoc().isNull())
-      revertDependentTypeLoc(fn->getBodyResultTypeLoc());
-
-  // Revert the body parameter types.
-  for (auto paramList : func->getParameterLists()) {
-    for (auto &param : *paramList) {
-      // Clear out the type of the decl.
-      if (param->hasType() && !param->isInvalid())
-        param->overwriteType(Type());
-      revertDependentTypeLoc(param->getTypeLoc());
-    }
-  }
-
-  // Revert the generic parameter list.
-  if (func->getGenericParams())
-    revertGenericParamList(func->getGenericParams());
-
-  // Clear out the types.
-  if (auto fn = dyn_cast<FuncDecl>(func))
-    fn->revertType();
-  else
-    func->overwriteType(Type());
 }
 
 /// Check whether the given type representation will be
@@ -3157,19 +3017,15 @@ public:
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.
     if (VD->hasStorage()) {
-      // In a protocol context, variables written as "var x : Int" are errors
-      // and recovered by building a computed property with just a getter.
-      // Diagnose this and create the getter decl now.
-      if (isa<ProtocolDecl>(VD->getDeclContext())) {
-        if (VD->isLet())
-          TC.diagnose(VD->getLoc(),
-                      diag::protocol_property_must_be_computed_var);
-        else
-          TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed);
+      // Stored properties in protocols are diagnosed in
+      // maybeAddAccessorsToVariable(), to ensure they run when a
+      // protocol requirement is validated but not type checked.
 
-        convertStoredVarInProtocolToComputed(VD, TC);
-      } else if (isa<EnumDecl>(VD->getDeclContext()) &&
-                 !VD->isStatic()) {
+      // Enums and extensions cannot have stored instance properties.
+      // Static stored properties are allowed, with restrictions
+      // enforced below.
+      if (isa<EnumDecl>(VD->getDeclContext()) &&
+          !VD->isStatic()) {
         // Enums can only have computed properties.
         TC.diagnose(VD->getLoc(), diag::enum_stored_property);
         VD->setInvalid();
@@ -3546,21 +3402,56 @@ public:
   }
 
   bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
+    // We don't support protocols outside the top level of a file.
+    if (isa<ProtocolDecl>(NTD) &&
+        !NTD->getParent()->isModuleScopeContext()) {
+      TC.diagnose(NTD->getLoc(),
+                  diag::unsupported_nested_protocol,
+                  NTD->getName());
+      return true;
+    }
+
     // We don't support nested types in generics yet.
     if (NTD->isGenericContext()) {
       auto DC = NTD->getDeclContext();
+      if (auto proto = DC->getAsProtocolOrProtocolExtensionContext()) {
+        if (DC->getAsProtocolExtensionContext()) {
+          TC.diagnose(NTD->getLoc(),
+                      diag::unsupported_type_nested_in_protocol_extension,
+                      NTD->getName(),
+                      proto->getName());
+        } else {
+          TC.diagnose(NTD->getLoc(),
+                      diag::unsupported_type_nested_in_protocol,
+                      NTD->getName(),
+                      proto->getName());
+        }
+        return true;
+      }
+
       if (!TC.Context.LangOpts.EnableExperimentalNestedGenericTypes) {
-        if (DC->isTypeContext()) {
+        if (auto parent = dyn_cast<NominalTypeDecl>(DC)) {
           if (NTD->getGenericParams())
             TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
-                  NTD->getName(),
-                  DC->getDeclaredTypeOfContext());
+                        NTD->getName(),
+                        parent->getName());
           else
             TC.diagnose(NTD->getLoc(),
                         diag::unsupported_type_nested_in_generic_type,
                         NTD->getName(),
-                        DC->getDeclaredTypeOfContext());
+                        parent->getName());
           return true;
+        } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
+          auto *parent = ED->getAsNominalTypeOrNominalTypeExtensionContext();
+          if (parent == nullptr) {
+            /* Invalid extension -- diagnosed elsewhere */
+            return true;
+          }
+
+          TC.diagnose(NTD->getLoc(),
+                      diag::unsupported_type_nested_in_generic_extension,
+                      NTD->getName(),
+                      parent->getName());
         }
       }
 
@@ -3579,20 +3470,6 @@ public:
   }
 
   void visitEnumDecl(EnumDecl *ED) {
-    // This enum declaration is technically a parse error, so do not type
-    // check.
-    if (isa<ProtocolDecl>(ED->getParent()))
-      return;
-
-    // Types cannot be defined in a protocol extension.
-    if (ED->getDeclContext()->getAsProtocolExtensionContext()) {
-      if (!ED->isInvalid())
-        TC.diagnose(ED->getLoc(), diag::extension_protocol_type_definition,
-                    ED->getFullName());
-      ED->setInvalid();
-      return;
-    }
-
     TC.checkDeclAttributesEarly(ED);
     TC.computeAccessibility(ED);
 
@@ -3652,20 +3529,6 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    // This struct declaration is technically a parse error, so do not type
-    // check.
-    if (isa<ProtocolDecl>(SD->getParent()))
-      return;
-
-    // Types cannot be defined in a protocol extension.
-    if (SD->getDeclContext()->getAsProtocolExtensionContext()) {
-      if (!SD->isInvalid())
-        TC.diagnose(SD->getLoc(), diag::extension_protocol_type_definition,
-                    SD->getFullName());
-      SD->setInvalid();
-      return;
-    }
-
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);
 
@@ -3797,20 +3660,6 @@ public:
 
 
   void visitClassDecl(ClassDecl *CD) {
-    // This class declaration is technically a parse error, so do not type
-    // check.
-    if (isa<ProtocolDecl>(CD->getParent()))
-      return;
-
-    // Types cannot be defined in a protocol extension.
-    if (CD->getDeclContext()->getAsProtocolExtensionContext()) {
-      if (!CD->isInvalid())
-        TC.diagnose(CD->getLoc(), diag::extension_protocol_type_definition,
-                    CD->getFullName());
-      CD->setInvalid();
-      return;
-    }
-
     TC.checkDeclAttributesEarly(CD);
     TC.computeAccessibility(CD);
 
@@ -3886,13 +3735,11 @@ public:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
-    // This protocol declaration is technically a parse error, so do not type
-    // check.
-    if (isa<ProtocolDecl>(PD->getParent()))
-      return;
-
     TC.checkDeclAttributesEarly(PD);
     TC.computeAccessibility(PD);
+
+    if (!IsSecondPass)
+      checkUnsupportedNestedGeneric(PD);
 
     if (IsSecondPass) {
       checkAccessibility(TC, PD);
@@ -4223,8 +4070,11 @@ public:
     }
 
     // 'Self' is only a dynamic self on class methods.
-    auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
-    assert(nominal && "Non-nominal container for method type?");
+    auto declaredType = dc->getDeclaredTypeOfContext();
+    if (declaredType->is<ErrorType>())
+      return false;
+
+    auto nominal = declaredType->getAnyNominal();
     if (!isa<ClassDecl>(nominal) && !isa<ProtocolDecl>(nominal)) {
       int which;
       if (isa<StructDecl>(nominal))
@@ -4365,7 +4215,7 @@ public:
         TC.revertGenericFuncSignature(FD);
 
         // Assign archetypes.
-        finalizeGenericParamList(builder, gp, FD, TC);
+        TC.finalizeGenericParamList(builder, gp, FD);
       }
     } else if (FD->getDeclContext()->isGenericContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
@@ -5840,36 +5690,27 @@ public:
   void visitExtensionDecl(ExtensionDecl *ED) {
     TC.validateExtension(ED);
 
-    if (ED->isInvalid()) {
-      // Mark children as invalid.
-      // FIXME: This is awful.
-      for (auto member : ED->getMembers()) {
-        member->setInvalid();
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(member))
-          VD->overwriteType(ErrorType::get(TC.Context));
-      }
-      return;
-    }
-
     TC.checkDeclAttributesEarly(ED);
 
     if (!IsSecondPass) {
-      CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
-
-      if (!isa<NominalType>(ExtendedTy) &&
-          !isa<BoundGenericType>(ExtendedTy) &&
-          !isa<ErrorType>(ExtendedTy)) {
-        // FIXME: Redundant diagnostic test here?
-        TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
-                    ExtendedTy);
-        // FIXME: It would be nice to point out where we found the named type
-        // declaration, if any.
-        ED->setInvalid();
+      if (auto extendedTy = ED->getExtendedType()) {
+        if (!extendedTy->is<NominalType>() &&
+            !extendedTy->is<BoundGenericType>() &&
+            !extendedTy->is<ErrorType>()) {
+          // FIXME: Redundant diagnostic test here?
+          TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
+                      extendedTy);
+          // FIXME: It would be nice to point out where we found the named type
+          // declaration, if any.
+          ED->setInvalid();
+        }
       }
 
       TC.checkInheritanceClause(ED);
-      if (auto nominal = ExtendedTy->getAnyNominal()) {
-        TC.validateDecl(nominal);
+      if (auto extendedTy = ED->getExtendedType()) {
+        if (auto nominal = extendedTy->getAnyNominal()) {
+          TC.validateDecl(nominal);
+        }
       }
 
       validateAttributes(TC, ED);
@@ -5886,14 +5727,13 @@ public:
       TC.checkConformancesInContext(ED, ED);
     }
 
-    if (!ED->isInvalid()) {
-      for (Decl *Member : ED->getMembers())
-        visit(Member);
-      for (Decl *Global : ED->getDerivedGlobalDecls())
-        visit(Global);
-    }
+    for (Decl *Member : ED->getMembers())
+      visit(Member);
+    for (Decl *Global : ED->getDerivedGlobalDecls())
+      visit(Global);
 
-    TC.checkDeclAttributes(ED);
+    if (!ED->isInvalid())
+      TC.checkDeclAttributes(ED);
  }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
@@ -5995,7 +5835,7 @@ public:
         TC.revertGenericFuncSignature(CD);
 
         // Assign archetypes.
-        finalizeGenericParamList(builder, gp, CD, TC);
+        TC.finalizeGenericParamList(builder, gp, CD);
       }
     } else if (CD->getDeclContext()->isGenericContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
@@ -6488,7 +6328,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     case DeclContextKind::GenericTypeDecl: {
       auto nominal = cast<GenericTypeDecl>(DC);
-      typeCheckDecl(nominal, true);
+      validateDecl(nominal);
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
         if (!assocType->hasType())
           assocType->computeType();
@@ -6549,24 +6389,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       gp->setOuterParameters(
                      typeAlias->getDeclContext()->getGenericParamsOfContext());
 
-      // Validate the generic type parameters.
-      if (validateGenericTypeSignature(typeAlias)) {
-        markInvalidGenericSignature(typeAlias);
-        return;
-      }
-      
-      // If we're already validating the type declaration's generic signature,
-      // avoid a potential infinite loop by not re-validating the generic
-      // parameter list.
-      if (!typeAlias->isValidatingGenericSignature()) {
-        revertGenericParamList(gp);
-        
-        auto builder = createArchetypeBuilder(typeAlias->getModuleContext());
-        auto *parentSig = typeAlias->getDeclContext()->
-           getGenericSignatureOfContext();
-        checkGenericParamList(&builder, gp, parentSig);
-        finalizeGenericParamList(builder, gp, typeAlias, *this);
-      }
+      validateGenericTypeSignature(typeAlias);
     }
     
     // Otherwise, perform the heavy lifting now.
@@ -6587,24 +6410,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       gp->setOuterParameters(
         nominal->getDeclContext()->getGenericParamsOfContext());
 
-      // Validate the generic type parameters.
-      if (validateGenericTypeSignature(nominal)) {
-        markInvalidGenericSignature(nominal);
-        return;
-      }
-
-      // If we're already validating the type declaration's generic signature,
-      // avoid a potential infinite loop by not re-validating the generic
-      // parameter list.
-      if (!nominal->isValidatingGenericSignature()) {
-        revertGenericParamList(gp);
-
-        ArchetypeBuilder builder =
-          createArchetypeBuilder(nominal->getModuleContext());
-        auto *parentSig = nominal->getDeclContext()->getGenericSignatureOfContext();
-        checkGenericParamList(&builder, gp, parentSig);
-        finalizeGenericParamList(builder, gp, nominal, *this);
-      }
+      validateGenericTypeSignature(nominal);
     }
 
     checkInheritanceClause(D);
@@ -6639,9 +6445,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (proto->hasType())
       return;
     proto->computeType();
-    
-    
-    auto gp = proto->getGenericParams();
 
     // Resolve the inheritance clauses for each of the associated
     // types.
@@ -6652,18 +6455,12 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     }
 
     // Validate the generic type signature, which is just <Self : P>.
+    auto gp = proto->getGenericParams();
+
     validateGenericTypeSignature(proto);
 
     assert(gp->getOuterParameters() ==
            proto->getDeclContext()->getGenericParamsOfContext());
-
-    revertGenericParamList(gp);
-
-    ArchetypeBuilder builder =
-      createArchetypeBuilder(proto->getModuleContext());
-    auto *parentSig = proto->getDeclContext()->getGenericSignatureOfContext();
-    checkGenericParamList(&builder, gp, parentSig);
-    finalizeGenericParamList(builder, gp, proto, *this);
 
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
@@ -6673,7 +6470,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // Set the underlying type of each of the associated types to the
     // appropriate archetype.
     auto selfDecl = proto->getProtocolSelf();
-    ArchetypeType *selfArchetype = builder.getArchetype(selfDecl);
+    ArchetypeType *selfArchetype = selfDecl->getArchetype();
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         TypeLoc underlyingTy;
@@ -6681,11 +6478,12 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         archetype = selfArchetype->getNestedType(assocType->getName())
           .getAsArchetype();
         if (!archetype)
-          return;
-
-        assocType->setArchetype(archetype);
-        if (!assocType->hasType())
-          assocType->computeType();
+          assocType->overwriteType(ErrorType::get(D->getASTContext()));
+        else {
+          assocType->setArchetype(archetype);
+          if (!assocType->hasType())
+            assocType->computeType();
+        }
       }
     }
 
@@ -7033,7 +6831,7 @@ static Type checkExtensionGenericParams(
   auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
   tc.checkGenericParamList(&builder, genericParams, parentSig);
   inferExtendedTypeReqs(builder);
-  finalizeGenericParamList(builder, genericParams, ext, tc);
+  tc.finalizeGenericParamList(builder, genericParams, ext);
 
   if (isa<ProtocolDecl>(nominal)) {
     // Retain type sugar if it's there.

@@ -380,12 +380,6 @@ struct SILConstantInfo {
     return SILType::getPrimitiveObjectType(SILFnType);
   }
 
-  ArrayRef<Substitution> getForwardingSubstitutions(ASTContext &C) {
-    if (!ContextGenericParams)
-      return { };
-    return ContextGenericParams->getForwardingSubstitutions(C);
-  }
-
   friend bool operator==(SILConstantInfo lhs, SILConstantInfo rhs) {
     return lhs.FormalInterfaceType == rhs.FormalInterfaceType &&
            lhs.LoweredInterfaceType == rhs.LoweredInterfaceType &&

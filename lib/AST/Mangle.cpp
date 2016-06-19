@@ -402,10 +402,12 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
         return false;
       }
 
-      auto nominal = dyn_cast<NominalTypeDecl>(DC);
-      if (!nominal)
-        nominal = cast<ExtensionDecl>(DC)->getExtendedType()->getAnyNominal();
-      return nominal->getFormalAccess() == Accessibility::Private;
+      auto declaredType = DC->getDeclaredTypeOfContext();
+      if (!declaredType || declaredType->is<ErrorType>())
+        return false;
+
+      return (declaredType->getAnyNominal()->getFormalAccess()
+              == Accessibility::Private);
     };
 
     if (!isWithinPrivateNominal(decl)) {
