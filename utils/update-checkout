@@ -142,7 +142,8 @@ def validate_config(config):
                     (0, set([])))
     if result[0] == len(result[1]):
         return
-    raise RuntimeError('Overlapping alias names for two types of branches')
+    raise RuntimeError('Configuration file has schemes with duplicate '
+                       'aliases?!')
 
 
 def main():
