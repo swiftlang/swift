@@ -187,7 +187,7 @@ extension AffineTransform : ReferenceConvertible, Hashable, CustomStringConverti
     }
     
     /**
-     Inverts the transformation matrix if possible. Matricies with a determinant that is less than
+     Inverts the transformation matrix if possible. Matrices with a determinant that is less than
      the smallest valid representation of a double value greater than zero are considered to be 
      invalid for representing as an inverse. If the input AffineTransform can potentially fall into
      this case then the inverted() method is suggested to be used instead since that will return

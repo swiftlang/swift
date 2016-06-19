@@ -135,7 +135,7 @@ public func *<UnitType : Unit>(lhs: Measurement<UnitType>, rhs: Double) -> Measu
     return Measurement(value: lhs.value * rhs, unit: lhs.unit)
 }
 
-/// Multiply a scalar value by a measurment.
+/// Multiply a scalar value by a measurement.
 /// - returns: A measurement of value `lhs * rhs.value` with the same unit as `rhs`.
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 public func *<UnitType : Unit>(lhs: Double, rhs: Measurement<UnitType>) -> Measurement<UnitType> {
@@ -188,7 +188,7 @@ public func <<UnitType : Unit>(lhs: Measurement<UnitType>, rhs: Measurement<Unit
 /// Compare two measurements of the same `Dimension`.
 ///
 /// If `lhs.unit == rhs.unit`, returns `lhs.value < rhs.value`. Otherwise, converts `rhs` to the same unit as `lhs` and then compares the resulting values.
-/// - returns: `true` if `lhs` is less than than `rhs`.
+/// - returns: `true` if `lhs` is less than `rhs`.
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 public func <<UnitType : Dimension>(lhs: Measurement<UnitType>, rhs: Measurement<UnitType>) -> Bool {
     if lhs.unit == rhs.unit {
@@ -210,7 +210,7 @@ public func ><UnitType : Unit>(lhs: Measurement<UnitType>, rhs: Measurement<Unit
 /// Compare two measurements of the same `Dimension`.
 ///
 /// If `lhs.unit == rhs.unit`, returns `lhs.value > rhs.value`. Otherwise, converts `rhs` to the same unit as `lhs` and then compares the resulting values.
-/// - returns: `true` if `lhs` is greater than than `rhs`.
+/// - returns: `true` if `lhs` is greater than `rhs`.
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 public func ><UnitType : Dimension>(lhs: Measurement<UnitType>, rhs: Measurement<UnitType>) -> Bool {
     if lhs.unit == rhs.unit {

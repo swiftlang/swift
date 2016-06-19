@@ -625,8 +625,8 @@ class TestData : TestDataSuper {
         free(underlyingBuffer)
     }
 
-    func expectOverride<T: _ObjectiveCBridgeable>(_ convertable: T, _ selector: String) {
-        expectNotEqual(class_getMethodImplementation(T._ObjectiveCType.self, sel_getUid(selector)), class_getMethodImplementation(object_getClass(convertable._bridgeToObjectiveC()), sel_getUid(selector)), "The bridge of \(T.self) should override \(selector)")
+    func expectOverride<T: _ObjectiveCBridgeable>(_ convertible: T, _ selector: String) {
+        expectNotEqual(class_getMethodImplementation(T._ObjectiveCType.self, sel_getUid(selector)), class_getMethodImplementation(object_getClass(convertible._bridgeToObjectiveC()), sel_getUid(selector)), "The bridge of \(T.self) should override \(selector)")
     }
 
     func test_bridgeOverrides() {

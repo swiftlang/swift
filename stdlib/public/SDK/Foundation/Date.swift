@@ -114,7 +114,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
     /// Return a new `Date` by adding a `TimeInterval` to this `Date`.
     ///
     /// - parameter timeInterval: The value to add, in seconds.
-    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexites like daylight saving time, months with different numbers of days, and more.
+    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
     public func addingTimeInterval(_ timeInterval : TimeInterval) -> Date {
         return self + timeInterval
     }
@@ -122,7 +122,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
     /// Add a `TimeInterval` to this `Date`.
     ///
     /// - parameter timeInterval: The value to add, in seconds.
-    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexites like daylight saving time, months with different numbers of days, and more.
+    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
     public mutating func addTimeInterval(_ timeInterval: TimeInterval) {
         self += timeInterval
     }
@@ -215,14 +215,14 @@ public func -(lhs: Date, rhs: TimeInterval) -> Date {
 
 /// Add a `TimeInterval` to a `Date`.
 ///
-/// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexites like daylight saving time, months with different numbers of days, and more.
+/// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
 public func +=(lhs: inout Date, rhs: TimeInterval) {
     lhs = lhs + rhs
 }
 
 /// Subtract a `TimeInterval` from a `Date`.
 ///
-/// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexites like daylight saving time, months with different numbers of days, and more.
+/// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
 public func -=(lhs: inout Date, rhs: TimeInterval) {
     lhs = lhs - rhs
 }
