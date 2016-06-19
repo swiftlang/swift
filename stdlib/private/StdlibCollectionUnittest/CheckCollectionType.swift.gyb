@@ -349,10 +349,13 @@ public struct IndexOffsetByTest {
 }
 
 public let distanceFromToTests = [
+  // 0 - 1: no distance.
   DistanceFromToTest(start: 0, end: 0),
   DistanceFromToTest(start: 10, end: 10),
+  // 2 - 3: forward distance.
   DistanceFromToTest(start: 10, end: 13),
   DistanceFromToTest(start: 7, end: 10),
+  // 4 - 6: backward distance.
   DistanceFromToTest(start: 12, end: 4),
   DistanceFromToTest(start: 8, end: 2),
   DistanceFromToTest(start: 19, end: 0)
@@ -1594,26 +1597,25 @@ extension TestSuite {
     }
 %   end
     
-    self.test("\(testNamePrefix)/distance(from:to:)/semantics") {
-      let c = toCollection(0..<20)
-      for test in distanceFromToTests {
-        let d = c.distance(
-          from: c.nthIndex(test.startOffset), to: c.nthIndex(test.endOffset))
-
-        let backwards = (test.startOffset < test.endOffset)
+    self.test("\(testNamePrefix)/distance(from:to:)/semantics")
+      .forEach(in: distanceFromToTests) { (test) in
+        let c = toCollection(0..<20)
+        let backwards = (test.startOffset > test.endOffset)
         if backwards && !collectionIsBidirectional {
           expectCrashLater()
         }
+
+        let d = c.distance(
+          from: c.nthIndex(test.startOffset), to: c.nthIndex(test.endOffset))
         expectEqual(
           numericCast(test.expectedDistance),
           d, stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
-    self.test("\(testNamePrefix)/index(_:offsetBy: n)/semantics") {
-      for test in indexOffsetByTests.filter(
+    self.test("\(testNamePrefix)/index(_:offsetBy: n)/semantics")
+      .forEach(in: indexOffsetByTests.filter(
         {$0.limit == nil && $0.distance >= 0}
-      ) {
+      )) { (test) in
         let max = 10
         let c = toCollection(0..<max)
 
@@ -1630,13 +1632,12 @@ extension TestSuite {
         // contains exactly index offsets.
         expectEqual(test.expectedOffset!, extractValue(c[new]).value,
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
-    self.test("\(testNamePrefix)/formIndex(_:offsetBy: n)/semantics") {
-      for test in indexOffsetByTests.filter(
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: n)/semantics")
+      .forEach(in: indexOffsetByTests.filter(
         {$0.limit == nil && $0.distance >= 0}
-      ) {
+      )) { (test) in
         let max = 10
         let c = toCollection(0..<max)
 
@@ -1648,14 +1649,13 @@ extension TestSuite {
         c.formIndex(&new, offsetBy: numericCast(test.distance))
         expectEqual(test.expectedOffset!, extractValue(c[new]).value,
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
 %   for function_name in ['index', 'formIndex']:
-    self.test("\(testNamePrefix)/${function_name}(_:offsetBy: -n)/semantics") {
-      for test in indexOffsetByTests.filter(
+    self.test("\(testNamePrefix)/${function_name}(_:offsetBy: -n)/semantics")
+      .forEach(in: indexOffsetByTests.filter(
         {$0.limit == nil && $0.distance < 0}
-      ) {
+      )) { (test) in
         let c = toCollection(0..<20)
 %     if function_name is 'index':
         let start = c.nthIndex(test.startOffset)
@@ -1673,7 +1673,6 @@ extension TestSuite {
 %     end
         expectEqual(test.expectedOffset!, extractValue(c[new]).value,
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 %   end
 
@@ -1716,10 +1715,10 @@ extension TestSuite {
       }
     }
 
-    self.test("\(testNamePrefix)/index(_:offsetBy: -n, limitedBy:)/semantics") {
-      for test in indexOffsetByTests.filter(
+    self.test("\(testNamePrefix)/index(_:offsetBy: -n, limitedBy:)/semantics")
+      .forEach(in: indexOffsetByTests.filter(
         {$0.limit != nil && $0.distance < 0}
-      ) {
+      )) { (test) in
         let c = toCollection(0..<20)
         let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
         if collectionIsBidirectional {
@@ -1740,13 +1739,12 @@ extension TestSuite {
             offsetBy: numericCast(test.distance),
             limitedBy: limit)
         }
-      }
     }
 
-    self.test("\(testNamePrefix)/formIndex(_:offsetBy: -n, limitedBy:)/semantics") {
-      for test in indexOffsetByTests.filter(
-        {$0.limit != nil && $0.distance < 0}
-      ) {
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: -n, limitedBy:)/semantics")
+      .forEach(in: indexOffsetByTests.filter( 
+        {$0.limit != nil && $0.distance < 0} 
+      )) { (test) in
         let c = toCollection(0..<20)
         let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
         var new = c.nthIndex(test.startOffset)
@@ -1767,7 +1765,6 @@ extension TestSuite {
           expectCrashLater()
           _ = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
         }
-      }
     }
 
   }
