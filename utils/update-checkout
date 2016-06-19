@@ -59,7 +59,7 @@ def update_single_repository(repo_path, branch):
 def update_all_repositories(args, config, scheme_name):
     repo_branch = scheme_name
     for repo_name in config['repos'].keys():
-        if repo_name in args.skip_repository:
+        if repo_name in args.skip_repository_list:
             print("--- Skipping '" + repo_name + "' ---")
             continue
         if scheme_name:
@@ -78,11 +78,11 @@ def update_all_repositories(args, config, scheme_name):
 
 
 def obtain_additional_swift_sources(
-        config, with_ssh, scheme_name, skip_history, skip_repositories):
+        config, with_ssh, scheme_name, skip_history, skip_repository_list):
     with shell.pushd(SWIFT_SOURCE_ROOT, dry_run=False,
                      echo=False):
         for repo_name, repo_info in config['repos'].items():
-            if repo_name in skip_repositories:
+            if repo_name in skip_repository_list:
                 print("--- Skipping '" + repo_name + "' ---")
                 continue
 
@@ -169,6 +169,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         metavar="DIRECTORY",
         default=[],
         help="Skip the specified repository",
+        dest='skip_repository_list',
         action="append")
     parser.add_argument(
         "--branch",
@@ -197,7 +198,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
     if clone or clone_with_ssh:
         obtain_additional_swift_sources(
-            config, clone_with_ssh, scheme, skip_history, args.skip_repository)
+            config, clone_with_ssh, scheme, skip_history,
+            args.skip_repository_list)
 
     update_all_repositories(args, config, scheme)
 
