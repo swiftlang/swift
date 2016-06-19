@@ -32,7 +32,7 @@ sys.path.append(os.path.join(SCRIPT_DIR, 'swift_build_support'))
 from swift_build_support import shell  # noqa (E402)
 
 
-def update_working_copy(repo_path, branch):
+def update_single_repository(repo_path, branch):
     if not os.path.isdir(repo_path):
         return
 
@@ -54,6 +54,23 @@ def update_working_copy(repo_path, branch):
         shell.call(["git", "rebase", "FETCH_HEAD"], echo=False)
         shell.call(["git", "submodule", "update", "--recursive"],
                    echo=False)
+
+
+def update_all_repositories(args, config, branch):
+    repo_branch = branch
+    for dir_name in config["repositories"].keys():
+        if dir_name in args.skip_repository:
+            print("--- Skipping '" + dir_name + "' ---")
+            continue
+        if branch:
+            for config_branch_name in config['branch-names']:
+                if branch not in config[config_branch_name]['aliases']:
+                    continue
+                repo_branch = config[config_branch_name]['repos'][dir_name]
+                break
+
+        update_single_repository(os.path.join(SWIFT_SOURCE_ROOT, dir_name),
+                                 repo_branch)
 
 
 def obtain_additional_swift_sources(
@@ -173,23 +190,9 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         obtain_additional_swift_sources(
             config, clone_with_ssh, branch, skip_history, args.skip_repository)
 
-    repo_branch = branch
-    for dir_name in config["repositories"].keys():
-        if dir_name in args.skip_repository:
-            print("--- Skipping '" + dir_name + "' ---")
-            continue
-        if branch:
-            for config_branch_name in config['branch-names']:
-                if branch not in config[config_branch_name]['aliases']:
-                    continue
-                repo_branch = config[config_branch_name]['repos'][dir_name]
-                break
-
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name),
-                            repo_branch)
+    update_all_repositories(args, config, branch)
 
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
