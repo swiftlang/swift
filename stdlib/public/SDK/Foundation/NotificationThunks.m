@@ -17,15 +17,15 @@ __NSNotificationCreate(
     NSString *NS_RELEASES_ARGUMENT __nonnull name,
     id NS_RELEASES_ARGUMENT __nullable object,
     NSDictionary *NS_RELEASES_ARGUMENT __nullable userInfo) {
-	NSNotification *notif = [[NSNotification alloc] initWithName:name object:object userInfo:userInfo];
-	[name release];
-	[object release];
-	[userInfo release];
-	return notif;
+  NSNotification *notif = [[NSNotification alloc] initWithName:name object:object userInfo:userInfo];
+  [name release];
+  [object release];
+  [userInfo release];
+  return notif;
 }
 
 extern NS_RETURNS_RETAINED __nullable id
 __NSNotificationUserInfo(
-	NSNotification *NS_RELEASES_ARGUMENT __nonnull notif) {
-	return [notif.userInfo retain]; // avoid the copy here since this is fetching the stored dictionary and copying it might destroy it's type
+  NSNotification *NS_RELEASES_ARGUMENT __nonnull notif) {
+  return [notif.userInfo retain]; // avoid the copy here since this is fetching the stored dictionary and copying it might destroy it's type
 }

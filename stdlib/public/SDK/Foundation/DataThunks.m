@@ -19,13 +19,13 @@ extern const NSDataDeallocator NSDataDeallocatorFree;
 extern const NSDataDeallocator NSDataDeallocatorNone;
 
 void __NSDataInvokeDeallocatorVM(void *mem, NSUInteger length) {
-	NSDataDeallocatorVM(mem, length);
+  NSDataDeallocatorVM(mem, length);
 }
 
 void __NSDataInvokeDeallocatorUnmap(void *mem, NSUInteger length) {
-	NSDataDeallocatorUnmap(mem, length);
+  NSDataDeallocatorUnmap(mem, length);
 }
 
 void __NSDataInvokeDeallocatorFree(void *mem, NSUInteger length) {
-	NSDataDeallocatorFree(mem, length);
+  NSDataDeallocatorFree(mem, length);
 }

@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// Intents is only public on OSX and iOS
+// Intents is only public on OS X and iOS
 // UNSUPPORTED: OS=watchos OS=tvos
 
 // FIXME: un-XFAIL the test once the build bots have been updated to the

@@ -156,7 +156,7 @@ _swift_dispatch_sync(dispatch_queue_t queue, dispatch_block_t block) {
 // DISPATCH_RUNTIME_STDLIB_INTERFACE
 // extern "C" dispatch_queue_t
 // _swift_apply_current_root_queue() {
-// 	return DISPATCH_APPLY_CURRENT_ROOT_QUEUE;
+//   return DISPATCH_APPLY_CURRENT_ROOT_QUEUE;
 // }
 
 #define SOURCE(t)                                                              \
