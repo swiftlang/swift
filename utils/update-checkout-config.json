@@ -1,19 +1,31 @@
 {
     "ssh-clone-pattern": "git@github.com:%s.git",
     "https-clone-pattern": "https://github.com/%s.git",
-    "repositories" : {
-        "llvm": { "remote-repo-name": "apple/swift-llvm" },
-        "clang": { "remote-repo-name": "apple/swift-clang" },
-        "swift": { "remote-repo-name": "apple/swift-swift" },
-        "lldb": { "remote-repo-name": "apple/swift-lldb" },
-        "cmark": { "remote-repo-name": "apple/swift-cmark" },
-        "llbuild": { "remote-repo-name": "apple/swift-llbuild" },
-        "swiftpm": { "remote-repo-name": "apple/swift-package-manager" },
-        "compiler-rt": { "remote-repo-name": "apple/swift-compiler-rt" },
-        "swift-corelibs-xctest": { "remote-repo-name": "apple/swift-corelibs-xctest" },
-        "swift-corelibs-foundation": { "remote-repo-name": "apple/swift-corelibs-foundation" },
-        "swift-corelibs-libdispatch": { "remote-repo-name": "apple/swift-corelibs-libdispatch" },
-        "swift-integration-tests": { "remote-repo-name": "apple/swift-integration-tests" }
+    "repos" : {
+        "llvm": {
+            "remote": { "id": "apple/swift-llvm" } },
+        "clang": {
+            "remote": { "id": "apple/swift-clang" } },
+        "swift": {
+            "remote": { "id": "apple/swift-swift" } },
+        "lldb": {
+            "remote": { "id": "apple/swift-lldb" } },
+        "cmark": {
+            "remote": { "id": "apple/swift-cmark" } },
+        "llbuild": {
+            "remote": { "id": "apple/swift-llbuild" } },
+        "swiftpm": {
+            "remote": { "id": "apple/swift-package-manager" } },
+        "compiler-rt": {
+            "remote": { "id": "apple/swift-compiler-rt" } },
+        "swift-corelibs-xctest": {
+            "remote": { "id": "apple/swift-corelibs-xctest" } },
+        "swift-corelibs-foundation": {
+            "remote": { "id": "apple/swift-corelibs-foundation" } },
+        "swift-corelibs-libdispatch": {
+            "remote": { "id": "apple/swift-corelibs-libdispatch" } },
+        "swift-integration-tests": {
+            "remote": { "id": "apple/swift-integration-tests" } }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
