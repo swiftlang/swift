@@ -66,37 +66,39 @@ def obtain_additional_swift_sources(
                 print("--- Skipping '" + dir_name + "' ---")
                 continue
 
-            if not os.path.isdir(os.path.join(dir_name, ".git")):
-                print("--- Cloning '" + dir_name + "' ---")
+            if os.path.isdir(os.path.join(dir_name, ".git")):
+                continue
 
-                # If we have a url override, use that url instead of
-                # interpolating.
-                if 'url' in repo_info:
-                    remote = repo_info['url']
-                elif with_ssh is True or 'https-clone-pattern' not in config:
-                    remote = config['ssh-clone-pattern'] % repo
+            print("--- Cloning '" + dir_name + "' ---")
+
+            # If we have a url override, use that url instead of
+            # interpolating.
+            if 'url' in repo_info:
+                remote = repo_info['url']
+            elif with_ssh is True or 'https-clone-pattern' not in config:
+                remote = config['ssh-clone-pattern'] % repo
+            else:
+                remote = config['https-clone-pattern'] % repo
+            if skip_history:
+                shell.call(['git', 'clone', '--recursive', '--depth', '1',
+                            remote, dir_name], echo=False)
+            else:
+                shell.call(['git', 'clone', '--recursive', remote,
+                            dir_name], echo=False)
+            if branch:
+                for config_branch_name in config['branch-names']:
+                    if branch not in config[config_branch_name]['aliases']:
+                        continue
+                    repo_branch = \
+                        config[config_branch_name]['repos'][dir_name]
+                    break
                 else:
-                    remote = config['https-clone-pattern'] % repo
-                if skip_history:
-                    shell.call(['git', 'clone', '--recursive', '--depth', '1',
-                                remote, dir_name], echo=False)
-                else:
-                    shell.call(['git', 'clone', '--recursive', remote,
-                                dir_name], echo=False)
-                if branch:
-                    for config_branch_name in config['branch-names']:
-                        if branch not in config[config_branch_name]['aliases']:
-                            continue
-                        repo_branch = \
-                            config[config_branch_name]['repos'][dir_name]
-                        break
-                    else:
-                        repo_branch = branch
-                    src_path = os.path.join(SWIFT_SOURCE_ROOT, dir_name,
-                                            ".git")
-                    shell.call(['git', '--git-dir', src_path, '--work-tree',
-                                os.path.join(SWIFT_SOURCE_ROOT, dir_name),
-                                'checkout', repo_branch], echo=False)
+                    repo_branch = branch
+                src_path = os.path.join(SWIFT_SOURCE_ROOT, dir_name,
+                                        ".git")
+                shell.call(['git', '--git-dir', src_path, '--work-tree',
+                            os.path.join(SWIFT_SOURCE_ROOT, dir_name),
+                            'checkout', repo_branch], echo=False)
 
 
 def validate_config(config):
