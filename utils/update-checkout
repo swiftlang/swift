@@ -78,7 +78,6 @@ def obtain_additional_swift_sources(
     with shell.pushd(SWIFT_SOURCE_ROOT, dry_run=False,
                      echo=False):
         for dir_name, repo_info in config['repositories'].items():
-            repo = repo_info['name']
             if dir_name in skip_repositories:
                 print("--- Skipping '" + dir_name + "' ---")
                 continue
@@ -92,10 +91,13 @@ def obtain_additional_swift_sources(
             # interpolating.
             if 'url' in repo_info:
                 remote = repo_info['url']
-            elif with_ssh is True or 'https-clone-pattern' not in config:
-                remote = config['ssh-clone-pattern'] % repo
             else:
-                remote = config['https-clone-pattern'] % repo
+                remote_repo_name = repo_info['remote-repo-name']
+                if with_ssh is True or 'https-clone-pattern' not in config:
+                    remote = config['ssh-clone-pattern'] % remote_repo_name
+                else:
+                    remote = config['https-clone-pattern'] % remote_repo_name
+
             if skip_history:
                 shell.call(['git', 'clone', '--recursive', '--depth', '1',
                             remote, dir_name], echo=False)
