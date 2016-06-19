@@ -58,13 +58,14 @@ def update_working_copy(repo_path, branch):
 
 def obtain_additional_swift_sources(
         config, with_ssh, branch, skip_history, skip_repositories):
-    for dir_name, repo_info in config['repositories'].items():
-        repo = repo_info['name']
-        if dir_name in skip_repositories:
-            print("--- Skipping '" + dir_name + "' ---")
-            continue
-        with shell.pushd(SWIFT_SOURCE_ROOT, dry_run=False,
-                         echo=False):
+    with shell.pushd(SWIFT_SOURCE_ROOT, dry_run=False,
+                     echo=False):
+        for dir_name, repo_info in config['repositories'].items():
+            repo = repo_info['name']
+            if dir_name in skip_repositories:
+                print("--- Skipping '" + dir_name + "' ---")
+                continue
+
             if not os.path.isdir(os.path.join(dir_name, ".git")):
                 print("--- Cloning '" + dir_name + "' ---")
 
