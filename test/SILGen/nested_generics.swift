@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-experimental-nested-generic-types -parse-as-library %s | FileCheck %s
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -O -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-ir -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null
 
 // TODO:
 // - test generated SIL -- mostly we're just testing mangling here
@@ -9,7 +10,6 @@
 // - inner generic parameters on protocol requirements
 // - generic parameter list on method in nested type
 // - types nested inside unconstrained extensions of generic types
-// - add IRGen support and tests, and ensure this test runs to completion with -emit-ir
 
 protocol Pizza : class {
   associatedtype Topping

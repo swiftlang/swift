@@ -1558,7 +1558,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
     llvm_unreachable("bad declaration kind");
   }
 
-  assert(decl->getGenericParams());
+  assert(decl->isGenericContext());
 
   // Look to see if we've already emitted this type under a different
   // set of arguments.  We cache under the unbound type, which should
@@ -1567,7 +1567,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   // FIXME: this isn't really inherently good; we might want to use
   // different type implementations for different applications.
   assert(decl->getDeclaredType()->isCanonical());
-  assert(decl->getDeclaredType()->is<UnboundGenericType>());
+  assert(decl->getDeclaredType()->hasUnboundGenericType());
   TypeBase *key = decl->getDeclaredType().getPointer();
   auto &Cache = Types.IndependentCache;
   auto entry = Cache.find(key);

@@ -2338,7 +2338,7 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
   assert(nominal->isGenericContext());
 
   auto type = nominal->getDeclaredType()->getCanonicalType();
-  assert(isa<UnboundGenericType>(type));
+  assert(type->hasUnboundGenericType());
   LinkEntity entity = LinkEntity::forTypeMetadataAccessFunction(type);
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
