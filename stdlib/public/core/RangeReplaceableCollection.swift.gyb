@@ -344,6 +344,13 @@ public protocol RangeReplaceableCollection
   init<S : Sequence>(_ elements: S)
     where S.Iterator.Element == Iterator.Element
 
+  /// Creates a new instance of a collection containing the elements of another
+  /// collection.
+  ///
+  /// - Parameter elements: The collection of elements for the new collection.
+  init<C : Collection>(_ elements: C)
+    where C.Iterator.Element == Iterator.Element
+
   /// Adds an element to the end of the collection.
   ///
   /// For example:
@@ -386,6 +393,23 @@ public protocol RangeReplaceableCollection
   /// - Complexity: O(*n*), where *n* is the length of the resulting collection.
   mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Iterator.Element
+
+  /// Adds the elements of another collection to the end of the collection.
+  ///
+  /// Use this method to append the elements of another collection to the end of a
+  /// collection. This example appends the elements of one array of integers
+  /// to another.
+  ///
+  ///     var numbers = [1, 2, 3, 4, 5]
+  ///     numbers.append(contentsOf: [10, 11, 12, 13, 14, 15])
+  ///     print(numbers)
+  ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
+  ///
+  /// - Parameter newElements: The elements to append to the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of newElements.
+  mutating func append<C : Collection>(contentsOf newElements: C)
+    where C.Iterator.Element == Iterator.Element
 
   /// Inserts a new element into the collection at the specified position.
   ///
@@ -563,6 +587,16 @@ extension RangeReplaceableCollection {
     append(contentsOf: elements)
   }
 
+  /// Creates a new instance of a collection containing the elements of another
+  /// collection.
+  ///
+  /// - Parameter elements: The collection of elements for the new collection.
+  public init<C : Collection>(_ elements: C)
+    where C.Iterator.Element == Iterator.Element {
+    self.init()
+    append(contentsOf: elements)
+  }
+
   /// Adds an element to the end of the collection.
   ///
   /// For example:
@@ -604,6 +638,28 @@ extension RangeReplaceableCollection {
     for element in newElements {
       append(element)
     }
+  }
+
+  /// Adds the elements of another collection to the end of the collection.
+  ///
+  /// Use this method to append the elements of another collection to the end of a
+  /// collection. This example appends the elements of one array of integers
+  /// to another.
+  ///
+  ///     var numbers = [1, 2, 3, 4, 5]
+  ///     numbers.append(contentsOf: [10, 11, 12, 13, 14, 15])
+  ///     print(numbers)
+  ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
+  ///
+  /// - Parameter newElements: The elements to append to the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of newElements.
+  public mutating func append<C : Collection>(contentsOf newElements: C)
+    where C.Iterator.Element == Iterator.Element {
+
+    let requiredCapacity = self.count + numericCast(newElements.count)
+    reserveCapacity(requiredCapacity)
+    insert(contentsOf: newElements, at: endIndex)
   }
 
   /// Inserts a new element into the collection at the specified position.
@@ -1077,7 +1133,7 @@ extension RangeReplaceableCollection
 ///
 /// - Parameters:
 ///   - lhs: A range-replaceable collection.
-///   - rhs: A collection or finite sequence.
+///   - rhs: A finite sequence.
 public func +<C : RangeReplaceableCollection, S : Sequence>(lhs: C, rhs: S) -> C
   where S.Iterator.Element == C.Iterator.Element {
 
@@ -1104,13 +1160,67 @@ public func +<C : RangeReplaceableCollection, S : Sequence>(lhs: C, rhs: S) -> C
 /// is `[Int]`.
 ///
 /// - Parameters:
-///   - lhs: A collection or finite sequence.
+///   - lhs: A finite sequence.
 ///   - rhs: A range-replaceable collection.
 public func +<C : RangeReplaceableCollection, S : Sequence>(lhs: S, rhs: C) -> C
   where S.Iterator.Element == C.Iterator.Element {
 
   var result = C()
   result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
+  result.append(contentsOf: lhs)
+  result.append(contentsOf: rhs)
+  return result
+}
+
+/// Creates a new collection by concatenating the elements of two collections.
+///
+/// The two arguments must have the same `Element` type. For example, you can
+/// concatenate the elements of two integer arrays.
+///
+///     let numbers : ContiguousArray = [1, 2, 3, 4]
+///     let moreNumbers = numbers + [5, 6, 7, 8, 9, 10]
+///     print(moreNumbers)
+///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
+///
+/// The resulting collection has the type of the argument on the left-hand
+/// side. In the example above, `moreNumbers` has the same type as `numbers`,
+/// which is `[Int]`.
+///
+/// - Parameters:
+///   - lhs: A range-replaceable collection.
+///   - rhs: A collection.
+public func +<C : RangeReplaceableCollection, C2 : Collection>(lhs: C, rhs: C2) -> C
+  where C.Iterator.Element == C2.Iterator.Element {
+
+  var lhs = lhs
+  // FIXME: what if lhs is a reference type?  This will mutate it.
+  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
+  lhs.append(contentsOf: rhs)
+  return lhs
+}
+
+/// Creates a new collection by concatenating the elements of two collections.
+///
+/// The two arguments must have the same `Element` type. For example, you can
+/// concatenate the elements of two integer arrays.
+///
+///     let numbers : ContiguousArray = [7, 8, 9, 10]
+///     let moreNumbers = [1, 2, 3, 4, 5, 6] + numbers
+///     print(moreNumbers)
+///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
+///
+/// The resulting collection has the type of argument on the right-hand side.
+/// In the example above, `moreNumbers` has the same type as `numbers`, which
+/// is `[Int]`.
+///
+/// - Parameters:
+///   - lhs: A collection.
+///   - rhs: A range-replaceable collection.
+public func +<C : RangeReplaceableCollection, C2 : Collection>(lhs: C2, rhs: C) -> C
+  where C.Iterator.Element == C2.Iterator.Element {
+
+  var result = C()
+  result.reserveCapacity(rhs.count + numericCast(lhs.count))
   result.append(contentsOf: lhs)
   result.append(contentsOf: rhs)
   return result
