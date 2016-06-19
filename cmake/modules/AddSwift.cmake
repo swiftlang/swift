@@ -499,7 +499,13 @@ function(_add_swift_library_single target name)
   endif()
 
   if (SWIFT_COMPILER_VERSION)
-    if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "OSX" OR
+        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
+        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS_SIMULATOR" OR
+        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
+        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS_SIMULATOR" OR
+        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS" OR
+        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS_SIMULATOR")
       list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" "-Xlinker" "-compatibility_version" "-Xlinker" "1")
     endif()
   endif()
@@ -565,8 +571,8 @@ function(_add_swift_library_single target name)
   # we add markers for metadata sections in the shared libraries using 
   # these object files.  This wouldn't be necessary if the link was done by
   # the swift binary: rdar://problem/19007002
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" OR
-     "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX" OR
+     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "FREEBSD")
 
     if("${libkind}" STREQUAL "SHARED")
       set(arch_subdir "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
@@ -623,8 +629,8 @@ function(_add_swift_library_single target name)
 
   # The section metadata objects are generated sources, and we need to tell CMake
   # not to expect to find them prior to their generation.
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" OR
-     "${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX" OR
+     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "FREEBSD")
     if("${libkind}" STREQUAL "SHARED")
       set_source_files_properties(${SWIFT_SECTIONS_OBJECT_BEGIN} PROPERTIES GENERATED 1)
       set_source_files_properties(${SWIFT_SECTIONS_OBJECT_END} PROPERTIES GENERATED 1)
@@ -661,7 +667,13 @@ function(_add_swift_library_single target name)
     endforeach()
   endif()
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "OSX" OR
+     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
+     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS_SIMULATOR" OR
+     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
+     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS_SIMULATOR" OR
+     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS" OR
+     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS_SIMULATOR")
     set(install_name_dir "@rpath")
 
     if(SWIFTLIB_SINGLE_IS_STDLIB)
@@ -674,11 +686,11 @@ function(_add_swift_library_single target name)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_NAME_DIR "${install_name_dir}")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" AND NOT "${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
+  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX" AND NOT "${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Cygwin")
+  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "CYGWIN")
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/windows")
