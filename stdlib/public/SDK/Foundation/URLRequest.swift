@@ -67,7 +67,7 @@ public struct URLRequest : ReferenceConvertible, CustomStringConvertible, Equata
     
     /// Returns the timeout interval of the receiver.
     /// - discussion: The timeout interval specifies the limit on the idle
-    /// interval alloted to a request in the process of loading. The "idle
+    /// interval allotted to a request in the process of loading. The "idle
     /// interval" is defined as the period of time that has passed since the
     /// last instance of load activity occurred for a request that is in the
     /// process of loading. Hence, when an instance of load activity occurs
@@ -111,7 +111,7 @@ public struct URLRequest : ReferenceConvertible, CustomStringConvertible, Equata
     }
     
     /// `true` if the receiver is allowed to use the built in cellular radios to
-    /// satify the request, `false` otherwise.
+    /// satisfy the request, `false` otherwise.
     @available(OSX 10.8, iOS 6.0, *)
     public var allowsCellularAccess: Bool {
         get {

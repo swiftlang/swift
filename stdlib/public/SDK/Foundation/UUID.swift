@@ -52,7 +52,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
         self.uuid = uuid
     }
     
-    /// Returns a string created from the the UUID, such as "E621E1F8-C36C-495A-93FC-0C247A3E6E5F"
+    /// Returns a string created from the UUID, such as "E621E1F8-C36C-495A-93FC-0C247A3E6E5F"
     public var uuidString: String {
         var bytes: uuid_string_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         var localValue = uuid

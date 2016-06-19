@@ -33,13 +33,13 @@ struct SomeStructure {
 
 /*
  Notification and potentially other structures require a representation of a 
- userInfo dictionary. The objective-c counterparts are represented via 
+ userInfo dictionary. The Objective-C counterparts are represented via
  NSDictionary which can only store a hashable key (actually 
  NSObject<NSCopying> *) and a value of AnyObject (actually NSObject *). However
  it is desired in swift to store Any in the value. These structure expositions
  in swift have an adapter that allows them to pass a specialized NSDictionary
- subclass to the objective-c layer that can round trip the stored Any types back
- out into swift.
+ subclass to the Objective-C layer that can round trip the stored Any types back
+ out into Swift.
 
  In this case NSNotification -> Notification bridging is suitable to verify that
  behavior.

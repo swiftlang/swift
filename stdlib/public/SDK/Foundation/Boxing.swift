@@ -144,7 +144,7 @@ internal protocol _MutablePairBoxing {
 extension _MutablePairBoxing {
     @inline(__always)
     func _mapUnmanaged<ReturnType>(_ whatToDo : @noescape (WrappedSwiftNSType.ImmutableType) throws -> ReturnType) rethrows -> ReturnType {
-        // We are using Unmananged. Make sure that the owning container class
+        // We are using Unmanaged. Make sure that the owning container class
         // 'self' is guaranteed to be alive by extending the lifetime of 'self'
         // to the end of the scope of this function.
         // Note: At the time of this writing using withExtendedLifetime here
@@ -169,7 +169,7 @@ extension _MutablePairBoxing {
 
     @inline(__always)
     mutating func _applyUnmanagedMutation<ReturnType>(_ whatToDo : @noescape (WrappedSwiftNSType.MutableType) throws -> ReturnType) rethrows -> ReturnType {
-        // We are using Unmananged. Make sure that the owning container class
+        // We are using Unmanaged. Make sure that the owning container class
         // 'self' is guaranteed to be alive by extending the lifetime of 'self'
         // to the end of the scope of this function.
         // Note: At the time of this writing using withExtendedLifetime here
@@ -182,7 +182,7 @@ extension _MutablePairBoxing {
         let _unmanagedHandle = Unmanaged.passUnretained(_wrapped)
         let wrapper = _unmanagedHandle._withUnsafeGuaranteedRef { $0.__wrapped }
 
-        // This check is done twice becaue: <rdar://problem/24939065> Value kept live for too long causing uniqueness check to fail
+        // This check is done twice because: <rdar://problem/24939065> Value kept live for too long causing uniqueness check to fail
         switch (wrapper) {
         case .Immutable(_):
             break

@@ -231,7 +231,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 
 public struct DispatchDataIterator : IteratorProtocol, Sequence {
 
-	/// Create an iterator over the given DisaptchData
+	/// Create an iterator over the given DispatchData
 	public init(_data: DispatchData) {
 		var ptr: UnsafePointer<Void>?
 		self._count = 0
