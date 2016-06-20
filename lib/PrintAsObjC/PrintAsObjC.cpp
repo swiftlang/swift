@@ -95,6 +95,14 @@ static StringRef getNameForObjC(const ValueDecl *VD,
   return VD->getName().str();
 }
 
+/// Returns true if the given selector might be mistaken for an init method
+/// by Objective-C ARC.
+static bool isMistakableForInit(ObjCSelector selector) {
+  ArrayRef<Identifier> selectorPieces = selector.getSelectorPieces();
+  assert(!selectorPieces.empty());
+  return selectorPieces.front().str().startswith("init");
+}
+
 
 namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
@@ -474,6 +482,8 @@ private:
           !isa<ProtocolDecl>(ctor->getDeclContext())) {
         os << " OBJC_DESIGNATED_INITIALIZER";
       }
+    } else if (isMistakableForInit(AFD->getObjCSelector())) {
+      os << " SWIFT_METHOD_FAMILY(none)";
     }
 
     os << ";\n";
@@ -695,6 +705,10 @@ private:
       }
     } else {
       os << "\n";
+      if (isMistakableForInit(VD->getObjCGetterSelector()))
+        printAbstractFunctionAsMethod(VD->getGetter(), false);
+      if (isSettable && isMistakableForInit(VD->getObjCSetterSelector()))
+        printAbstractFunctionAsMethod(VD->getSetter(), false);
     }
   }
 
@@ -1815,6 +1829,13 @@ public:
              "__attribute__((swift_name(X)))\n"
            "#else\n"
            "# define SWIFT_COMPILE_NAME(X)\n"
+           "#endif\n"
+           "#if defined(__has_attribute) && "
+             "__has_attribute(objc_method_family)\n"
+           "# define SWIFT_METHOD_FAMILY(X) "
+             "__attribute__((objc_method_family(X)))\n"
+           "#else\n"
+           "# define SWIFT_METHOD_FAMILY(X)\n"
            "#endif\n"
            "#if !defined(SWIFT_CLASS_EXTRA)\n"
            "# define SWIFT_CLASS_EXTRA\n"

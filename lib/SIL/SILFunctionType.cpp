@@ -1383,6 +1383,10 @@ FOREACH_FAMILY(GET_LABEL)
 }
 
 /// Derive the ObjC selector family from an identifier.
+///
+/// Note that this will never derive the Init family, which is too dangerous
+/// to leave to chance. Swift functions starting with "init" are always
+/// emitted as if they are part of the "none" family.
 static SelectorFamily getSelectorFamily(Identifier name) {
   StringRef text = name.get();
   while (!text.empty() && text[0] == '_') text = text.substr(1);
@@ -1396,12 +1400,16 @@ static SelectorFamily getSelectorFamily(Identifier name) {
     return !islower(text[prefix.size()]);
   };
 
-  #define CHECK_PREFIX(LABEL, PREFIX) \
-    if (hasPrefix(text, PREFIX)) return SelectorFamily::LABEL;
+  auto result = SelectorFamily::None;
+  if (false) /*for #define purposes*/;
+#define CHECK_PREFIX(LABEL, PREFIX) \
+  else if (hasPrefix(text, PREFIX)) result = SelectorFamily::LABEL;
   FOREACH_FAMILY(CHECK_PREFIX)
-  #undef CHECK_PREFIX
+#undef CHECK_PREFIX
 
-  return SelectorFamily::None;
+  if (result == SelectorFamily::Init)
+    return SelectorFamily::None;
+  return result;
 }
 
 /// Get the ObjC selector family a SILDeclRef implicitly belongs to.

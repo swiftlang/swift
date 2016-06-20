@@ -160,6 +160,8 @@ class NotObjC {}
 // CHECK-NEXT: - (void)methodWithReservedParameterNames:(id _Nonnull)long_ protected:(id _Nonnull)protected_;
 // CHECK-NEXT: - (void)honorRenames:(CustomName * _Nonnull)_;
 // CHECK-NEXT: - (Methods * _Nullable __unsafe_unretained)unmanaged:(id _Nonnull __unsafe_unretained)_;
+// CHECK-NEXT: - (void)initAllTheThings SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: - (void)initTheOtherThings SWIFT_METHOD_FAMILY(none);
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -215,6 +217,9 @@ class NotObjC {}
   func honorRenames(_: ClassWithCustomName) {}
 
   func unmanaged(_: Unmanaged<AnyObject>) -> Unmanaged<Methods>? { return nil }
+
+  func initAllTheThings() {}
+  @objc(initTheOtherThings) func setUpOtherThings() {}
 }
 
 typealias AliasForNSRect = NSRect
@@ -422,6 +427,14 @@ public class NonObjCClass { }
 // CHECK-NEXT: + (BOOL)customGetterNameForPrivateSetter;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger sharedConstant;)
 // CHECK-NEXT: + (NSInteger)sharedConstant;
+// CHECK-NEXT: @property (nonatomic) NSInteger initContext;
+// CHECK-NEXT: - (NSInteger)initContext SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger initContextRO;
+// CHECK-NEXT: - (NSInteger)initContextRO SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: @property (nonatomic, getter=initGetter) BOOL getterIsInit;
+// CHECK-NEXT: - (BOOL)initGetter SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: @property (nonatomic, setter=initSetter:) BOOL setterIsInit;
+// CHECK-NEXT: - (void)initSetter:(BOOL)newValue SWIFT_METHOD_FAMILY(none);
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -515,6 +528,17 @@ public class NonObjCClass { }
     @objc(customSetterNameForPrivateSetter:) set {}
   }
   static let sharedConstant = 2
+
+  var initContext = 4
+  var initContextRO: Int { return 4 }
+  var getterIsInit: Bool {
+    @objc(initGetter) get { return true }
+    set {}
+  }
+  var setterIsInit: Bool {
+    get { return true }
+    @objc(initSetter:) set {}
+  }
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
