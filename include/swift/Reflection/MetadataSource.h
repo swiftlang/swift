@@ -56,7 +56,7 @@ class MetadataSource {
     if (natural.empty())
       return false;
 
-    result = std::stoi(natural);
+    result = std::atoi(natural.c_str());
     return true;
   }
 
