@@ -27,5 +27,7 @@ __NSNotificationCreate(
 extern NS_RETURNS_RETAINED __nullable id
 __NSNotificationUserInfo(
   NSNotification *NS_RELEASES_ARGUMENT __nonnull notif) {
-  return [notif.userInfo retain]; // avoid the copy here since this is fetching the stored dictionary and copying it might destroy it's type
+  NSDictionary *userInfo = [notif.userInfo retain]; // avoid the copy here since this is fetching the stored dictionary and copying it might destroy it's type
+  [notif release];
+  return userInfo;
 }
