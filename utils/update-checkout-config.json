@@ -64,6 +64,23 @@
                 "swift-integration-tests": "master"
             }
         },
+        "upstream": {
+            "aliases": ["upstream"],
+            "repos": {
+                "llvm": "upstream-with-swift",
+                "clang": "upstream-with-swift",
+                "compiler-rt": "upstream-with-swift",
+                "swift": "master",
+                "lldb": "master",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master"
+            }
+        },
         "swift-3.0-preview-1" : {
             "aliases": ["swift-3.0-preview-1-branch"],
             "repos": {
