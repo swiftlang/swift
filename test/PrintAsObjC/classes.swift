@@ -414,6 +414,8 @@ public class NonObjCClass { }
 // CHECK-NEXT: + (void)setStaticString:(NSString * _Nonnull)value;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) double staticDouble;)
 // CHECK-NEXT: + (double)staticDouble;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, copy) NSDictionary<NSString *, NSString *> * _Nonnull staticDictionary;)
+// CHECK-NEXT: + (NSDictionary<NSString *, NSString *> * _Nonnull)staticDictionary;
 // CHECK-NEXT: @property (nonatomic, strong) Properties * _Nullable wobble;
 // CHECK-NEXT: @property (nonatomic, getter=isEnabled, setter=setIsEnabled:) BOOL enabled;
 // CHECK-NEXT: @property (nonatomic, getter=isAnimated) BOOL animated;
@@ -503,6 +505,7 @@ public class NonObjCClass { }
   static var staticDouble: Double {
     return 2.0
   }
+  static var staticDictionary: [String: String] { return [:] }
 
   @objc(wobble) var wibble: Properties?
 
