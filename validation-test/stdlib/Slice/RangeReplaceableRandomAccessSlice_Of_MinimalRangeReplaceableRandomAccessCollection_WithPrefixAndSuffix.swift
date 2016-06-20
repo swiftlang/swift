@@ -14,14 +14,6 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
 var SliceTests = TestSuite("Collection")
 
 let prefix: [Int] = [-9999, -9998, -9997, -9996, -9995]
