@@ -195,7 +195,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     /// Returns nil when the input is not recognized as valid Base-64.
     /// - parameter base64String: The string to parse.
     /// - parameter options: Encoding options. Default value is `[]`.
-    public init?(base64Encoded base64String: String, options: Data.Base64EncodingOptions = []) {
+    public init?(base64Encoded base64String: String, options: Data.Base64DecodingOptions = []) {
         if let d = NSData(base64Encoded: base64String, options: Base64DecodingOptions(rawValue: options.rawValue)) {
             _wrapped = _SwiftNSData(immutableObject: d)
         } else {
