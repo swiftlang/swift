@@ -7,7 +7,6 @@
 
 import StdlibUnittest
 import StdlibCollectionUnittest
-import SwiftPrivate
 
 
 // Extend LoggingSequence to shadow the new operation.  When
