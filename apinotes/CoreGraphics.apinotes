@@ -386,9 +386,9 @@ Functions:
 - Name: CGPDFContextClose
   SwiftName: CGContext.closePDF(self:)
 - Name: CGPDFContextBeginPage
-  SwiftName: CGContext.beginPage(self:_:)
+  SwiftName: CGContext.beginPDFPage(self:_:)
 - Name: CGPDFContextEndPage
-  SwiftName: CGContext.endPage(self:)
+  SwiftName: CGContext.endPDFPage(self:)
 - Name: CGPDFContextAddDocumentMetadata
   SwiftName: CGContext.addDocumentMetadata(self:_:)
 - Name: CGPDFContextSetURLForRect
