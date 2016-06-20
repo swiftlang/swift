@@ -10,7 +10,7 @@ struct TestHideName {
   func hideThis4(namedParam1 x: Int, namedParam2: Int) {}
   func dontHideThisByName() {}
 
-// XFAIL: broken_std_regex
+// REQUIRES: objc_interop
 
 // RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideNames.json -tok=HIDE_NAMES_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_NAMES
   func testHideName01() {
