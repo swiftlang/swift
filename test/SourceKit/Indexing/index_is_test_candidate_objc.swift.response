@@ -38,7 +38,17 @@
       key.name: "MyPrivateClass",
       key.usr: "s:C28index_is_test_candidate_objcP33_32FED72643814BE1A523406CD2E729AA14MyPrivateClass",
       key.line: 15,
-      key.column: 15
+      key.column: 15,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "test_startsWithTest_takesNoParams_returnsVoid_andIsPrivate()",
+          key.usr: "s:FC28index_is_test_candidate_objcP33_32FED72643814BE1A523406CD2E729AA14MyPrivateClass58test_startsWithTest_takesNoParams_returnsVoid_andIsPrivateFT_T_",
+          key.line: 16,
+          key.column: 8,
+          key.is_test_candidate: 1
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.class,
