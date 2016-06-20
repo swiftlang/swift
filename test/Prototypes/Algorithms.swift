@@ -250,6 +250,70 @@ extension MutableCollection where Self: BidirectionalCollection {
   }
 }
 
+/// Returns the greatest common denominator for `m` and `n`.
+internal func _gcd(_ m: Int, _ n: Int) -> Int {
+  var (m, n) = (m, n)
+  while n != 0 {
+    let t = m % n
+    m = n
+    n = t
+  }
+  return m
+}
+
+extension MutableCollection where Self: RandomAccessCollection,
+  SubSequence: MutableCollection, SubSequence: RandomAccessCollection {
+
+  /// Rotates elements through a cycle, using `sourceForIndex` to generate
+  /// the source index for each movement.
+  @inline(__always)
+  internal mutating func _rotateCycle(start: Index,
+    transform sourceForIndex: @noescape (Index) -> Index)
+  {
+    let tmp = self[start]
+    var (i, j) = (start, sourceForIndex(start))
+    while j != start {
+      self[i] = self[j]
+      i = j
+      j = sourceForIndex(j)
+    }
+    self[i] = tmp
+  }
+  
+  /// Rotates the elements of the collection so that the element
+  /// at `middle` ends up first.
+  ///
+  /// - Returns: The new index of the element that was first
+  ///   pre-rotation.
+  /// - Complexity: O(*n*)
+  @discardableResult
+  public mutating func rotateRandomAccess(
+    shiftingToStart middle: Index) -> Index
+  {
+    if middle == startIndex { return endIndex }
+    if middle == endIndex { return startIndex }
+    
+    // The distance to move an element that is moving ->
+    let plus = distance(from: startIndex, to: middle)
+    // The distance to move an element that is moving <-
+    let minus = distance(from: endIndex, to: middle)
+    // The new pivot point, aka the destination for the first element
+    let pivot = index(startIndex, offsetBy: -minus)
+    
+    // If the difference moving forward and backward are relative primes,
+    // the entire rotation will be completed in one cycle. Otherwise, repeat
+    // cycle, moving the start point forward with each cycle.
+    let cycles = _gcd(numericCast(plus), -numericCast(minus))
+    
+    for cycle in 1...cycles {
+      _rotateCycle(start: index(startIndex, offsetBy: numericCast(cycle))) {
+        index($0, offsetBy: $0 < pivot ? plus : minus)
+      }
+    }
+    return pivot
+  }
+}
+
 extension Collection where SubSequence : Collection {
   public func rotated(
     shiftingToStart middle: Index
@@ -422,6 +486,35 @@ suite.test("rotate") {
       }
       var b = a
       b.rotate(shiftingToStart: p)
+      expectEqual(b, Array(a.rotated(shiftingToStart: p)))
+    }
+  }
+}
+
+suite.test("rotateRandomAccess") {
+  for l in 0..<11 {
+    let a = Array(0..<l)
+    
+    for p in a.startIndex...a.endIndex {
+      let prefix = a.prefix(upTo: p)
+      for q in p...l {
+        let suffix = a.suffix(from: q)
+
+        for m in p...q {
+          var b = a
+          let r0 = b[p..<q].rotateRandomAccess(shiftingToStart: m)
+          let rotated = Array([prefix, a[m..<q], a[p..<m], suffix].flatten())
+          expectEqual(b, rotated)
+          expectEqual(r0, a.index(p, offsetBy: a[m..<q].count))
+
+          b = a
+          let r1 = b[p..<q].rotateRandomAccess(shiftingToStart: m)
+          expectEqual(b, rotated)
+          expectEqual(r1, r0)
+        }
+      }
+      var b = a
+      b.rotateRandomAccess(shiftingToStart: p)
       expectEqual(b, Array(a.rotated(shiftingToStart: p)))
     }
   }
