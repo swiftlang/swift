@@ -107,12 +107,12 @@ struct TwoWordPair {
   // Use an enum class with implicit conversions so we don't dirty C callers
   // too much.
 #if __arm__ || __i386__ || defined(__CYGWIN__) || defined(_MSC_VER)
-#if defined(__CYGWIN__) || defined(_MSC_VER)
+#if defined(__CYGWIN__)
   enum class Return : unsigned __int128 {};
 #else
   enum class Return : unsigned long long {};
 #endif
-  
+
   operator Return() const {
     union {
       TwoWordPair value;
