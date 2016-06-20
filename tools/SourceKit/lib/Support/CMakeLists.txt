@@ -1,4 +1,5 @@
 set(SourceKitSupport_sources
+  Concurrency-libdispatch.cpp
   FuzzyStringMatcher.cpp
   Logging.cpp
   ImmutableTextBuffer.cpp
