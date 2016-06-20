@@ -112,7 +112,7 @@ ${stringSubscriptComment}
 
 % for View in ['UTF8View', 'UTF16View', 'UnicodeScalarView', 'CharacterView']:
 %   Index = 'String.%s.Index' % View
-%   Distance = 'String.%s.Index' % View
+%   Distance = 'String.%s.IndexDistance' % View
 extension ${Index} {
   @available(
     *, unavailable,
