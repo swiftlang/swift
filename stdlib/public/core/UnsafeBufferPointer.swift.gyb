@@ -162,14 +162,15 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     -> ${Mutable}RandomAccessSlice<Unsafe${Mutable}BufferPointer<Element>>
   {
     get {
-      // FIXME: swift-3-indexing-model: range check.
-      // FIXME: swift-3-indexing-model: tests.
+      _debugPrecondition(bounds.lowerBound >= startIndex)
+      _debugPrecondition(bounds.upperBound <= endIndex)
       return ${Mutable}RandomAccessSlice(
         base: self, bounds: bounds)
     }
 %  if Mutable:
     set {
-      // FIXME: swift-3-indexing-model: range check.
+      _debugPrecondition(bounds.lowerBound >= startIndex)
+      _debugPrecondition(bounds.upperBound <= endIndex)
       // FIXME: swift-3-indexing-model: tests.
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }

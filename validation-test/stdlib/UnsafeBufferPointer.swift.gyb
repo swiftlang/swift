@@ -4,6 +4,81 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
+// Tests
+
+struct SubscriptGetTest {
+  // SubscriptGetTest operates on a `(end - start)` sized buffer containing
+  // monotonically increasing integers from `start` to `end - 1`.
+  static let start = 0
+  static let end = 20
+  let rangeSelection: RangeSelection
+  /// The values that should be expected by slicing the UBP, or `nil` if the
+  /// test is expected to crash.
+  let expectedValues: [Int]?
+  let loc: SourceLoc
+
+  static var elementCount = (end - start)
+
+% for SelfType in ['UnsafeBufferPointer', 'UnsafeMutableBufferPointer']:
+  /// Create and populate an `${SelfType}` for use with unit tests.
+  /// PRECONDITION: `memory` must be allocated with space for
+  /// `SubscriptGetTest.elementCount` elements. 
+  func create${SelfType}(from memory: UnsafeMutablePointer<OpaqueValue<Int>>) 
+    -> ${SelfType}<OpaqueValue<Int>> 
+  {
+    for i in SubscriptGetTest.start..<SubscriptGetTest.end {
+      memory[i] = OpaqueValue(i)  
+    }
+    return ${SelfType}(start: memory, count: SubscriptGetTest.elementCount)
+  }
+% end
+
+  init(
+    rangeSelection: RangeSelection, expectedValues: [Int]? = nil,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.rangeSelection = rangeSelection
+    self.expectedValues = expectedValues
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let subscriptGetTests : [SubscriptGetTest] = [
+  // Valid, empty.
+  SubscriptGetTest(rangeSelection: .emptyRange, expectedValues: []),
+
+  // Valid, edges.
+  SubscriptGetTest(rangeSelection: .leftEdge, expectedValues: [0]),
+  SubscriptGetTest(rangeSelection: .rightEdge, expectedValues: [19]),
+
+  // Valid, internal.
+  SubscriptGetTest(rangeSelection: .leftHalf, 
+    expectedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+  SubscriptGetTest(rangeSelection: .rightHalf,
+    expectedValues: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+  SubscriptGetTest(rangeSelection: .middle,
+    expectedValues: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]),
+  SubscriptGetTest(rangeSelection: .full,
+    expectedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+
+  // Invalid, bottom out of bounds.
+  SubscriptGetTest(rangeSelection: .offsets(-1, -1)),
+  SubscriptGetTest(rangeSelection: .offsets(-1, 0)),
+  SubscriptGetTest(rangeSelection: .offsets(-100, 5)),
+
+  // Invalid, top out of bounds.
+  SubscriptGetTest(rangeSelection: .offsets(20, 20)),
+  SubscriptGetTest(rangeSelection: .offsets(19, 20)),
+  SubscriptGetTest(rangeSelection: .offsets(5, 100)),
+
+  // Invalid, both out of bounds.
+  SubscriptGetTest(rangeSelection: .offsets(-1, 20)),
+  SubscriptGetTest(rangeSelection: .offsets(-100, 100)),
+]
+
+
+// Test Suites
+
 var UnsafeBufferPointerTestSuite = TestSuite("UnsafeBufferPointer")
 var UnsafeMutableBufferPointerTestSuite = TestSuite("UnsafeMutableBufferPointer")
 
@@ -104,6 +179,34 @@ ${SelfName}TestSuite.test("badNilCount")
   let buffer = ${SelfType}(start: nil, count: 1)
   _ = buffer
 }
+
+%   for RangeName in ['range', 'countableRange', 'closedRange', 'countableClosedRange']:
+${SelfName}TestSuite.test("subscript/get").forEach(in: subscriptGetTests) { 
+  (test) in
+
+%      if 'closed' in RangeName.lower():
+  if test.rangeSelection.isEmpty {
+    return
+  }
+%      end
+
+  let elementCount = SubscriptGetTest.elementCount
+
+  var memory = UnsafeMutablePointer<OpaqueValue<Int>>(allocatingCapacity: elementCount)
+  let buffer = test.create${SelfName}(from: memory)
+  defer { memory.deallocateCapacity(elementCount) }
+
+  let range = test.rangeSelection.${RangeName}(in: buffer)
+
+  if test.expectedValues == nil { expectCrashLater() }
+  let slice = buffer[range]
+  expectEqual(
+    test.expectedValues!,
+    slice.map { $0.value },
+    stackTrace: SourceLocStack().with(test.loc)
+  )
+}
+%    end
 
 % end
 
