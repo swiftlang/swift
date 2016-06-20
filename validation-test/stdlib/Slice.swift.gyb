@@ -12,7 +12,6 @@ from gyb_stdlib_support import (
 
 import StdlibUnittest
 import StdlibCollectionUnittest
-import SwiftPrivate
 
 
 /// Reference-type collection for testing the `base` property.
