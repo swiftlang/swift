@@ -10,10 +10,10 @@ import Swift
 import Foundation
 import gizmo
 
-@objc class ObjCClass {
-  func method(x x: Int) {}
+@objc class ObjCClass : BaseClassForMethodFamilies {
+  func method(x: Int) {}
   
-  func initFamily() -> ObjCClass { return self }
+  override func fakeInitFamily() -> ObjCClass { return self }
 }
 sil_vtable ObjCClass {}
 sil @_TFC13partial_apply9ObjCClassD : $@convention(method) (ObjCClass) -> ()
@@ -37,7 +37,7 @@ bb0(%0 : $Int, %1 : $ObjCClass):
   return %v : $()
 }
 
-sil @_TToFC13partial_apply9ObjCClass10initFamilyfT_S0_ : $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass {
+sil @_TToFC13partial_apply9ObjCClass14fakeInitFamilyfT_S0_ : $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass {
 bb0(%0 : $ObjCClass):
   return %0 : $ObjCClass
 }
@@ -114,16 +114,19 @@ entry(%c : $ObjCClass):
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* %0 to [[DATA_TYPE]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
 // CHECK:   [[SELF:%.*]] = load %C13partial_apply9ObjCClass*, %C13partial_apply9ObjCClass** [[X_ADDR]], align 8
-// CHECK:   call void @rt_swift_retain(%swift.refcounted* %4)
-// CHECK:   [[CMD:%.*]] = load i8*, i8** @"\01L_selector(initFamily)", align 8
+// CHECK:   call {{.*}}@objc_retain{{.*}}(%{{.*}}* [[SELF]])
+// CHECK:   [[CMD:%.*]] = load i8*, i8** @"\01L_selector(fakeInitFamily)", align 8
 // CHECK:   [[I8PTRSELF:%.*]] = bitcast %C13partial_apply9ObjCClass* [[SELF]] to [[OPAQUE4:%.*]]*
 // CHECK:   call [[OPAQUE3:%.*]]* bitcast (void ()* @objc_msgSend to [[OPAQUE3]]* ([[OPAQUE4:%.*]]*, i8*)*)([[OPAQUE4]]* [[I8PTRSELF]], i8* [[CMD]])
+// CHECK-NOT: release
+// CHECK:   call void @rt_swift_release(%swift.refcounted* %0)
+// CHECK-NOT: release
 // CHECK:   ret void
 // CHECK: }
 
 sil @objc_partial_apply_consumes_self : $@convention(thin) ObjCClass -> @callee_owned () -> @owned ObjCClass {
 entry(%c : $ObjCClass):
-  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.initFamily!1.foreign : (ObjCClass) -> () -> ObjCClass , $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.fakeInitFamily!1.foreign : (ObjCClass) -> () -> ObjCClass , $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass
   %p = partial_apply %m(%c) : $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass
   return %p : $@callee_owned () -> @owned ObjCClass
 }
