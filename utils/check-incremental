@@ -43,7 +43,7 @@ def get_arguments():
     return parser.parse_args()
 
 
-def compile_and_check(args):
+def compile_and_check(output_file):
     """Calls the build arguments with subprocess, then returns a tuple
     containing the MD5 sum and last modification time of the
     output file.
@@ -51,10 +51,10 @@ def compile_and_check(args):
     subprocess.check_call(sys.argv[1:])
 
     if VERBOSE:
-        print("Reference compilation of %s:" % args.output_file)
+        print("Reference compilation of %s:" % output_file)
 
-    md5sum = subprocess.check_output(["md5", "-q", args.output_file])
-    mtime = os.path.getmtime(args.output_file)
+    md5sum = subprocess.check_output(["md5", "-q", output_file])
+    mtime = os.path.getmtime(output_file)
 
     if VERBOSE:
         print("  time = %s" % mtime)
@@ -67,14 +67,14 @@ def main():
 
     args = get_arguments()
 
-    reference_md5, reference_time = compile_and_check(args)
+    reference_md5, reference_time = compile_and_check(args.output_file)
     subprocess.check_call(
         ["cp", args.output_file, args.output_file + ".ref.o"])
 
     for iteration in range(NUM_ITERATIONS):
         if VERBOSE:
             print("Iteration %s:" % iteration)
-        second_md5, second_time = compile_and_check(args)
+        second_md5, second_time = compile_and_check(args.output_file)
 
         # This is the most important check: is the output file exactly the
         # same?
