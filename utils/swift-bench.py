@@ -42,9 +42,20 @@ import subprocess
 import sys
 
 
-# Calculate the population standard deviation
-def pstdev(l):
-    return (sum((x - sum(l) / float(len(l))) ** 2 for x in l) / len(l)) ** 0.5
+def pstdev(sample):
+    """Given a list of numbers, return the population standard deviation.
+
+    For a population x_1, x_2, ..., x_N with mean M, the standard deviation
+    is defined as
+
+        sqrt( 1/N * [ (x_1 - M)^2 + (x_2 - M)^2 + ... + (x_N - M)^2 ] )
+    """
+    if len(sample) == 0:
+        raise ValueError("Cannot calculate the standard deviation of an "
+                         "empty list!")
+    mean = sum(sample) / float(len(sample))
+    inner = 1.0 / len(sample) * (sum((x - mean) ** 2 for x in sample))
+    return math.sqrt(inner)
 
 
 class SwiftBenchHarness(object):
