@@ -331,10 +331,6 @@ namespace irgen {
     // Did the convention decide that the parameter at the given index
     // was a class-pointer source?
     bool isClassPointerSource(unsigned paramIndex);
-    
-    void bindArchetypeAccessPaths();
-    void addPotentialArchetypeAccessPath(CanType targetDepType,
-                                         CanType sourceDepType);
   };
 
 } // end namespace irgen
