@@ -23,11 +23,15 @@ import subprocess
 import sys
 
 
+NUM_ITERATIONS = 4
+VERBOSE = False
+
+
 def get_arguments():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(__doc__)
 
-    parser.add_argument('-o', '--output', metavar='OUTPUT_FILE', required=True,
+    parser.add_argument('-o', metavar='OUTPUT_FILE', required=True,
                         help='output file to compare')
     parser.add_argument('-c', required=True,
                         action='store_true', dest='write_obj_file',
@@ -35,12 +39,6 @@ def get_arguments():
     parser.add_argument('-disable-incremental-llvm-codegen',
                         action='store_false', dest='compare_time',
                         help='compare times on the generated files')
-    parser.add_argument('-n', '--num-iterations', metavar='ITERATIONS',
-                        type=int, action='store', dest='num_iterations',
-                        default=4,
-                        help='number of iterations to run [default 4]')
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='print verbose output')
 
     return parser.parse_args()
 
@@ -52,13 +50,13 @@ def compile_and_check(args):
     """
     subprocess.check_call(sys.argv[1:])
 
-    if args.verbose:
+    if VERBOSE:
         print("Reference compilation of %s:" % args.output_file)
 
     md5sum = subprocess.check_output(["md5", "-q", args.output_file])
     mtime = os.path.getmtime(args.output_file)
 
-    if args.verbose:
+    if VERBOSE:
         print("  time = %s" % mtime)
         print("  md5  = %s" % md5sum)
 
@@ -73,8 +71,8 @@ def main():
     subprocess.check_call(
         ["cp", args.output_file, args.output_file + ".ref.o"])
 
-    for iteration in range(args.num_iterations):
-        if args.verbose:
+    for iteration in range(NUM_ITERATIONS):
+        if VERBOSE:
             print("Iteration %s:" % iteration)
         second_md5, second_time = compile_and_check(args)
 
