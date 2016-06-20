@@ -62,6 +62,20 @@ function(_compute_lto_flag option out_var)
   endif()
 endfunction()
 
+function(is_darwin_based_sdk sdk_name out_var)
+  if ("${sdk_name}" STREQUAL "OSX" OR
+      "${sdk_name}" STREQUAL "IOS" OR
+      "${sdk_name}" STREQUAL "IOS_SIMULATOR" OR
+      "${sdk_name}" STREQUAL "TVOS" OR
+      "${sdk_name}" STREQUAL "TVOS_SIMULATOR" OR
+      "${sdk_name}" STREQUAL "WATCHOS" OR
+      "${sdk_name}" STREQUAL "WATCHOS_SIMULATOR")
+    set(${out_var} TRUE PARENT_SCOPE)
+  else()
+    set(${out_var} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Usage:
 # _add_variant_c_compile_link_flags(
 #   SDK sdk
@@ -85,13 +99,8 @@ function(_add_variant_c_compile_link_flags)
     ${${CFLAGS_RESULT_VAR_NAME}}
     "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
 
-  if("${CFLAGS_SDK}" STREQUAL "OSX" OR
-     "${CFLAGS_SDK}" STREQUAL "TVOS" OR
-     "${CFLAGS_SDK}" STREQUAL "TVOS_SIMULATOR" OR
-     "${CFLAGS_SDK}" STREQUAL "IOS" OR
-     "${CFLAGS_SDK}" STREQUAL "IOS_SIMULATOR" OR
-     "${CFLAGS_SDK}" STREQUAL "WATCHOS" OR
-     "${CFLAGS_SDK}" STREQUAL "WATCHOS_SIMULATOR")
+  is_darwin_based_sdk("${CFLAGS_SDK}" IS_DARWIN)
+  if(IS_DARWIN)
     list(APPEND result "-isysroot" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
   else()
     if(NOT "${SWIFT_SDK_${CFLAGS_SDK}_PATH}" STREQUAL "/")
@@ -510,13 +519,8 @@ function(_add_swift_library_single target name)
   endif()
 
   if (SWIFT_COMPILER_VERSION)
-    if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "OSX" OR
-        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
-        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS_SIMULATOR" OR
-        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
-        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS_SIMULATOR" OR
-        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS" OR
-        "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS_SIMULATOR")
+    is_darwin_based_sdk("${SWIFTLIB_SINGLE_SDK}" IS_DARWIN)
+    if(IS_DARWIN)
       list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" "-Xlinker" "-compatibility_version" "-Xlinker" "1")
     endif()
   endif()
@@ -678,13 +682,8 @@ function(_add_swift_library_single target name)
     endforeach()
   endif()
 
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "OSX" OR
-     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
-     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS_SIMULATOR" OR
-     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
-     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS_SIMULATOR" OR
-     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS" OR
-     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS_SIMULATOR")
+  is_darwin_based_sdk("${SWIFTLIB_SINGLE_SDK}" IS_DARWIN)
+  if(IS_DARWIN)
     set(install_name_dir "@rpath")
 
     if(SWIFTLIB_SINGLE_IS_STDLIB)
