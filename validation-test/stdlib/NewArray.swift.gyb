@@ -428,8 +428,8 @@ func testIsEmptyFirstLast${A}() {
   print(${A}<Int>().isEmpty)          // CHECK-NEXT: true
   print(${A}(42...42).isEmpty)   // CHECK-NEXT: false
 
-  print("<\(${A}(3...42).first!)>")  // CHECK-NEXT: <3>
-  print("<\(${A}(3...42).last!)>")   // CHECK-NEXT: <42>
+  print("<\(${A}(3..<43).first!)>")  // CHECK-NEXT: <3>
+  print("<\(${A}(3..<43).last!)>")   // CHECK-NEXT: <42>
 
   print("<\(${A}<Int>().first)>")    // CHECK-NEXT: nil
   print("<\(${A}<Int>().last)>")     // CHECK-NEXT: nil
