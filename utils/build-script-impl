@@ -2176,6 +2176,8 @@ for host in "${ALL_HOSTS[@]}"; do
             libdispatch)
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                 SWIFT_BUILD_PATH="$(build_directory ${host} swift)"
+                SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+                LLVM_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
 
                 if [[ ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
                     # First time building; need to run autotools and configure
@@ -2183,7 +2185,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
                         call autoreconf -fvi
                     with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                        call "${LIBDISPATCH_SOURCE_DIR}"/configure --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})" --with-swift-toolchain="${SWIFT_BUILD_PATH}"
+                               call env CC="${LLVM_BIN}/clang" CCX="${LLVM_BIN}/clang" SWIFTC="${SWIFTC_BIN}" \
+                               "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
+                               --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
+
                 fi
                 with_pushd "${LIBDISPATCH_BUILD_DIR}" \
                     call make
