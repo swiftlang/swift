@@ -140,7 +140,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     ///
     /// - parameter buffer: A buffer pointer to copy. The size is calculated from `SourceType` and `buffer.count`.
     public init<SourceType>(buffer: UnsafeMutableBufferPointer<SourceType>) {
-        _wrapped = _SwiftNSData(immutableObject: NSData(bytes: UnsafePointer(buffer.baseAddress), length: strideof(SourceType) * buffer.count))
+        _wrapped = _SwiftNSData(immutableObject: NSData(bytes: UnsafePointer(buffer.baseAddress), length: strideof(SourceType.self) * buffer.count))
     }
 
     /// Initialize a `Data` with the contents of an Array.
@@ -482,7 +482,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     /// - parameter buffer: The replacement bytes.
     public mutating func replaceBytes<SourceType>(in range: Range<Index>, with buffer: UnsafeBufferPointer<SourceType>) {
         let nsRange = NSMakeRange(range.lowerBound, range.upperBound - range.lowerBound)
-        let bufferCount = buffer.count * strideof(SourceType)
+        let bufferCount = buffer.count * strideof(SourceType.self)
         
         _applyUnmanagedMutation {
             $0.replaceBytes(in: nsRange, withBytes: buffer.baseAddress, length: bufferCount)
