@@ -134,18 +134,24 @@ public func _log(_ message: @autoclosure () -> String) {
 //===--- Arithmetic -------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// Arithmetic protocol declares methods backing binary arithmetic operators,
-/// such as  `+`, `-` and `*`; and their mutating counterparts. These methods
-/// operate on arguments of the same type.
+/// Declares methods backing binary arithmetic operators, such as `+`, `-` and
+/// `*`; and their mutating counterparts.
 ///
-/// Both mutating and non-mutating operations are declared in the protocol, but
-/// only the mutating ones are required. Should conforming type omit
-/// non-mutating implementations, they will be provided by a protocol extension.
-/// Implementation in that case will copy `self`, perform a mutating operation
-/// on it and return the resulting value.
+/// It provides a suitable basis for arithmetic on scalars such as integers and
+/// floating point numbers.
+///
+/// Both mutating and non-mutating operations are declared in the protocol,
+/// however only the mutating ones are required, as non-mutating are provided
+/// by the protocol extension.
 public protocol Arithmetic : Equatable, IntegerLiteralConvertible {
-  /// Initialize to zero
-  init()
+  // Since `Arithmetic` extends `IntegerLiteralConvertible` it is logical for
+  // it to be initializable from instances of `Integer` as well as from integer
+  // literals. Failable exact initializers from other `Arithmetic` types should
+  // be defined on child protocols.
+
+  /// Initializes to the value of `source` if it is representable exactly,
+  /// returns `nil` otherwise.
+  init?<T : Integer>(exactly source: T)
 
 % for x in binaryArithmetic['Arithmetic']:
   // defaulted using an in-place counterpart, but can be used as an
@@ -155,6 +161,13 @@ public protocol Arithmetic : Equatable, IntegerLiteralConvertible {
   // implementation hook
   mutating func ${x.mutatingName}(${x.firstArg} rhs: Self)
 % end
+}
+
+extension Arithmetic {
+  @_transparent
+  public init() {
+    self = 0
+  }
 }
 
 % for Protocol in binaryArithmetic:
@@ -176,12 +189,16 @@ extension ${Protocol} {
 /// The only method of this protocol has the default implementation in an
 /// extension, that uses a parameterless initializer and subtraction.
 public protocol SignedArithmetic : Arithmetic {
-  func negate() -> Self
+  func negated() -> Self
+  mutating func negate()
 }
 
 extension SignedArithmetic {
-  public func negate() -> Self {
+  public func negated() -> Self {
     return Self() - self
+  }
+  public mutating func negate() {
+    self = negated()
   }
 }
 
@@ -202,7 +219,7 @@ public func ${x.operator}= <T: ${Protocol}>(lhs: inout T, rhs: T) {
 
 @_transparent
 public prefix func -<T: SignedArithmetic>(x: T) -> T {
-  return x.negate()
+  return x.negated()
 }
 
 //===----------------------------------------------------------------------===//
@@ -234,7 +251,7 @@ public typealias UWord = UInt${word_bits}
 ///     `Self` respectively
 public protocol Integer : ${IntegerBase} {
 
-  // FIXME(compiler limitation): Ideally, this constraint would just be :
+  // FIXME(ABI): Ideally, this constraint would just be :
   // Integer.  Until we get recursive protocol requirements, that isn't
   // possible.
 
@@ -262,6 +279,10 @@ public protocol Integer : ${IntegerBase} {
   // does having many operator overloads.
   func isEqual(to rhs: Self) -> Bool
   func isLess(than rhs: Self) -> Bool
+
+  /// Creates an instance of `Self` that has the exact value of `source`,
+  /// returns `nil` otherwise.
+  init?<T : FloatingPoint>(exactly source: T)
 
   /// Creates an instance of `Self` from the value of any other `Integer`,
   /// trapping if value of `source` cannot be represented by `Self`.
@@ -311,6 +332,10 @@ public protocol Integer : ${IntegerBase} {
 }
 
 extension Integer {
+  public init?<T : FloatingPoint>(exactly source: T) {
+    fatalError()
+  }
+
   public var countRepresentedWords: Word {
     return (self.bitWidth + ${word_bits} - 1) / ${word_bits}
   }
@@ -599,11 +624,6 @@ extension FixedWidthInteger {
 % end
 
   @_transparent
-  public init() {
-    self = 0
-  }
-
-  @_transparent
   public init<T : Integer>(extendingOrTruncating source: T) {
     if Self.bitWidth <= ${word_bits} {
       self = Self.init(_truncatingBits: source.nthWord(0))
@@ -690,6 +710,17 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   }
 
   @_transparent
+  public init?<T : Integer>(exactly source: T) {
+    _assertCond(
+      source >= 0, "negative value \(source) not representable by \(Self.self)")
+    let requiredBits = source.signBitIndex + 1
+    if requiredBits > Self.bitWidth {
+      return nil
+    }
+    self.init(extendingOrTruncating: source)
+  }
+
+  @_transparent
   public static var max: Self {
     return ~0
   }
@@ -727,6 +758,15 @@ extension SignedInteger where Self : FixedWidthInteger {
       requiredBits <= Self.bitWidth,
       "\(Self.self) cannot store all \(requiredBits) bits "
       + "needed for signed representation of \(source)")
+    self.init(extendingOrTruncating: source)
+  }
+
+  @_transparent
+  public init?<T : Integer>(exactly source: T) {
+    let requiredBits = source.signBitIndex + (source >= 0 ? 2 : 1)
+    if requiredBits > Self.bitWidth {
+      return nil
+    }
     self.init(extendingOrTruncating: source)
   }
 
@@ -974,6 +1014,10 @@ public struct DoubleWidth<
     fatalError()
   }
 
+  public init?<T : Arithmetic>(exactly source: T) {
+    fatalError()
+  }
+
   public init<T : Integer>(extendingOrTruncating source: T) {
     fatalError()
   }
@@ -1129,9 +1173,9 @@ public struct DoubleWidth<
 
 //===--- Int128/UInt128 ---------------------------------------------------===//
 
-% for Self in ['Int129', 'UInt129']:
+% for Self in ['Int128_', 'UInt128_']:
 %   signed = 'U' not in Self
-%   Half = Self[:-3] + '64'
+%   Half = Self[:-4] + '64'
 %   Unsigned = 'Signed' if signed else 'Unsigned'
 %   u = 's' if signed else 'u'
 %   U = 'U' if signed else ''
