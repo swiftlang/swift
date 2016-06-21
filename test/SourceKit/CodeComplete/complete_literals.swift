@@ -1,10 +1,23 @@
 ()
-// RUN: %sourcekitd-test -req=complete -pos=1:2 %s -- %s | FileCheck %s -check-prefix=KEYWORDS
-// RUN: %sourcekitd-test -req=complete.open -pos=1:2 %s -- %s | FileCheck %s -check-prefix=LITERALS
+let var1 = 1
+let var2: Int = 1
+// XFAIL: broken_std_regex
+// RUN: %sourcekitd-test -req=complete -pos=1:2 %s -- %s | FileCheck %s -check-prefix=COMPLETE_1
+// RUN: %sourcekitd-test -req=complete -pos=2:12 %s -- %s | FileCheck %s -check-prefix=COMPLETE_1
+// RUN: %sourcekitd-test -req=complete -pos=3:17 %s -- %s | FileCheck %s -check-prefix=COMPLETE_2
 
-// KEYWORDS-NOT: source.lang.swift.literal
-// KEYWORDS: key.name: "nil"
-// KEYWORDS-NOT: source.lang.swift.literal
+// COMPLETE_1-NOT: source.lang.swift.literal
+// COMPLETE_1: source.lang.swift.literal.color
+// COMPLETE_1: source.lang.swift.literal.image
+// COMPLETE_1-NOT: source.lang.swift.literal
+// COMPLETE_1: key.name: "nil"
+// COMPLETE_1-NOT: source.lang.swift.literal
+
+// COMPLETE_2-NOT: source.lang.swift.literal
+// COMPLETE_2: key.name: "nil"
+// COMPLETE_2-NOT: source.lang.swift.literal
+
+// RUN: %sourcekitd-test -req=complete.open -pos=1:2 %s -- %s | FileCheck %s -check-prefix=LITERALS
 // LITERALS: key.kind: source.lang.swift.literal.string
 // LITERALS: key.sourcetext: "\"<#{{.*}}#>\""
 // LITERALS: key.kind: source.lang.swift.literal.boolean
