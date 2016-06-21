@@ -397,18 +397,18 @@ class TestData : TestDataSuper {
     
     func testCopyBytes() {
         let c = 10
-        let underlyingBuffer = malloc(c * strideof(UInt16))!
+        let underlyingBuffer = malloc(c * strideof(UInt16.self))!
         let buffer = UnsafeMutableBufferPointer<UInt16>(start: UnsafeMutablePointer<UInt16>(underlyingBuffer), count: c)
         
         buffer[0] = 0
         buffer[1] = 0
         
-        var data = Data(capacity: c * strideof(UInt16))!
-        data.resetBytes(in: 0..<c * strideof(UInt16))
+        var data = Data(capacity: c * strideof(UInt16.self))!
+        data.resetBytes(in: 0..<c * strideof(UInt16.self))
         data[0] = 0xFF
         data[1] = 0xFF
         let copiedCount = data.copyBytes(to: buffer)
-        expectEqual(copiedCount, c * strideof(UInt16))
+        expectEqual(copiedCount, c * strideof(UInt16.self))
         
         expectEqual(buffer[0], 0xFFFF)
         free(underlyingBuffer)
@@ -419,7 +419,7 @@ class TestData : TestDataSuper {
         var data = a.withUnsafeBufferPointer {
             return Data(buffer: $0)
         }
-        let expectedSize = strideof(UInt8) * a.count
+        let expectedSize = strideof(UInt8.self) * a.count
         expectEqual(expectedSize, data.count)
         
         let underlyingBuffer = unsafeBitCast(malloc(expectedSize - 1)!, to: UnsafeMutablePointer<UInt8>.self)
@@ -443,7 +443,7 @@ class TestData : TestDataSuper {
         var data = a.withUnsafeBufferPointer {
             return Data(buffer: $0)
         }
-        let expectedSize = strideof(Int32) * a.count
+        let expectedSize = strideof(Int32.self) * a.count
         expectEqual(expectedSize, data.count)
         
         let underlyingBuffer = unsafeBitCast(malloc(expectedSize + 1)!, to: UnsafeMutablePointer<UInt8>.self)
@@ -606,14 +606,14 @@ class TestData : TestDataSuper {
             return Data(buffer: $0)
         }
         
-        var expectedSize = strideof(Int32) * a.count
+        var expectedSize = strideof(Int32.self) * a.count
         expectEqual(expectedSize, data.count)
         
         [false, true].withUnsafeBufferPointer {
             data.append($0)
         }
         
-        expectedSize += strideof(Bool) * 2
+        expectedSize += strideof(Bool.self) * 2
         expectEqual(expectedSize, data.count)
         
         let underlyingBuffer = unsafeBitCast(malloc(expectedSize)!, to: UnsafeMutablePointer<UInt8>.self)
@@ -716,7 +716,7 @@ class TestData : TestDataSuper {
             return Data(buffer: $0)
         }
         
-        expectEqual(data.count, strideof(MyStruct) * 3)
+        expectEqual(data.count, strideof(MyStruct.self) * 3)
         
         
         // append
@@ -724,40 +724,40 @@ class TestData : TestDataSuper {
             data.append($0)
         }
         
-        expectEqual(data.count, strideof(MyStruct) * 6)
+        expectEqual(data.count, strideof(MyStruct.self) * 6)
 
         // copyBytes
         do {
             // equal size
-            let underlyingBuffer = malloc(6 * strideof(MyStruct))!
+            let underlyingBuffer = malloc(6 * strideof(MyStruct.self))!
             defer { free(underlyingBuffer) }
             
             let buffer = UnsafeMutableBufferPointer<MyStruct>(start: UnsafeMutablePointer<MyStruct>(underlyingBuffer), count: 6)
             
             let byteCount = data.copyBytes(to: buffer)
-            expectEqual(6 * strideof(MyStruct), byteCount)
+            expectEqual(6 * strideof(MyStruct.self), byteCount)
         }
         
         do {
             // undersized
-            let underlyingBuffer = malloc(3 * strideof(MyStruct))!
+            let underlyingBuffer = malloc(3 * strideof(MyStruct.self))!
             defer { free(underlyingBuffer) }
             
             let buffer = UnsafeMutableBufferPointer<MyStruct>(start: UnsafeMutablePointer<MyStruct>(underlyingBuffer), count: 3)
             
             let byteCount = data.copyBytes(to: buffer)
-            expectEqual(3 * strideof(MyStruct), byteCount)
+            expectEqual(3 * strideof(MyStruct.self), byteCount)
         }
         
         do {
             // oversized
-            let underlyingBuffer = malloc(12 * strideof(MyStruct))!
+            let underlyingBuffer = malloc(12 * strideof(MyStruct.self))!
             defer { free(underlyingBuffer) }
             
             let buffer = UnsafeMutableBufferPointer<MyStruct>(start: UnsafeMutablePointer<MyStruct>(underlyingBuffer), count: 6)
             
             let byteCount = data.copyBytes(to: buffer)
-            expectEqual(6 * strideof(MyStruct), byteCount)
+            expectEqual(6 * strideof(MyStruct.self), byteCount)
         }
     }
     
