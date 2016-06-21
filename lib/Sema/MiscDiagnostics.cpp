@@ -2509,7 +2509,7 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
 /// Diagnose C style for loops.
 
 namespace {
-enum class OperatorKind {
+enum class OperatorKind : char {
   Greater,
   Smaller,
   NotEqual,
