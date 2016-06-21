@@ -324,6 +324,12 @@ func tuple_of_rvalues(_ a:Int, b:Int) -> Int {
 extension Int {
   func testLexingMethodAfterIntLiteral() {}
   func _0() {}
+  // Hex letters + non hex.
+  func describe() {}
+  // Hex letters + 'p'.
+  func eap() {}
+  // Hex letters + 'p' + non hex.
+  func fpValue() {}
 }
 
 123.testLexingMethodAfterIntLiteral()
@@ -335,6 +341,10 @@ extension Int {
 0b101._0()
 0o123._0()
 0x1FFF._0()
+
+0x1FFF.describe()
+0x1FFF.eap()
+0x1FFF.fpValue()
 
 var separator1: Int = 1_
 var separator2: Int = 1_000
