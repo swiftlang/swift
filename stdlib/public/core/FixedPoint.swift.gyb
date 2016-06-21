@@ -203,8 +203,15 @@ T : UnsignedInteger, U : _SignedInteger
 %   OtherSelf = self_ty.get_opposite_signedness().stdlib_name
 %   Article = 'An' if bits == 8 else 'A'
 
+% if self_ty.is_word:
+/// ${'An un' if sign == 'u' else 'A '}signed integer value type.
+///
+/// On 32-bit platforms, `${Self}` is the same size as `${Self}32`, and
+/// on 64-bit platforms, `${Self}` is the same size as `${Self}64`.
+% else:
 /// ${Article} ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
 /// type.
+% end
 @_fixed_layout
 public struct ${Self}
    : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'},
