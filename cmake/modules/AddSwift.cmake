@@ -76,6 +76,25 @@ function(is_darwin_based_sdk sdk_name out_var)
   endif()
 endfunction()
 
+function(is_windows_based_sdk sdk_name out_var)
+  if("${sdk_name}" STREQUAL "WINDOWS" OR
+     "${sdk_name}" STREQUAL "CYGWIN")
+   set(${out_var} TRUE PARENT_SCOPE)
+ else()
+   set(${out_var} FALSE PARENT_SCOPE)
+ endif()
+endfunction()
+
+function(is_elfish_sdk sdk_name out_var)
+  is_darwin_based_sdk("${sdk_name}" IS_DARWIN)
+  is_windows_based_sdk("${sdk_name}" IS_WINDOWS)
+  if(IS_DARWIN OR IS_WINDOWS)
+    set(${out_var} FALSE PARENT_SCOPE)
+  else()
+    set(${out_var} TRUE PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Usage:
 # _add_variant_c_compile_link_flags(
 #   SDK sdk
@@ -871,7 +890,8 @@ function(_add_swift_library_single target name)
     RESULT_VAR_NAME link_flags
       )
 
-  if(SWIFT_ENABLE_GOLD_LINKER)
+  is_elfish_sdk("${SWIFTLIB_SINGLE_SDK}" IS_ELFISH)
+  if(SWIFT_ENABLE_GOLD_LINKER AND IS_ELFISH)
     list(APPEND link_flags "-fuse-ld=gold")
   endif()
 
@@ -1512,9 +1532,8 @@ function(_add_swift_executable_single name)
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   endif()
 
-  if(SWIFT_ENABLE_GOLD_LINKER AND
-     ( "${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX" ) )
-    # Extend the link_flags for the gold linker.
+  is_elfish_sdk("${SWIFTLIB_SINGLE_SDK}" IS_ELFISH)
+  if(SWIFT_ENABLE_GOLD_LINKER AND IS_ELFISH)
     list(APPEND link_flags "-fuse-ld=gold")
   endif()
 
