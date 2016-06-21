@@ -21,6 +21,34 @@
 
 using namespace SourceKit;
 
+void *Semaphore::Impl::create(long count) {
+  return dispatch_semaphore_create(count);
+}
+
+void Semaphore::Impl::signal(Ty Obj) {
+  dispatch_semaphore_signal(dispatch_semaphore_t(Obj));
+}
+
+bool Semaphore::Impl::wait(Ty Obj) {
+  return dispatch_semaphore_wait(dispatch_semaphore_t(Obj), 
+                                 DISPATCH_TIME_FOREVER);
+}
+
+bool Semaphore::Impl::wait(Ty Obj, long milliseconds) {
+  dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 
+                                          milliseconds * NSEC_PER_MSEC);
+  return dispatch_semaphore_wait(dispatch_semaphore_t(Obj), timeout);
+}
+
+void Semaphore::Impl::retain(Ty Obj) {
+  dispatch_retain(dispatch_semaphore_t(Obj));
+}
+
+void Semaphore::Impl::release(Ty Obj) {
+  dispatch_release(dispatch_semaphore_t(Obj));
+}
+
+
 static dispatch_queue_priority_t toDispatchPriority(WorkQueue::Priority Prio) {
   switch (Prio) {
   case WorkQueue::Priority::High: return DISPATCH_QUEUE_PRIORITY_HIGH;
