@@ -3480,8 +3480,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   // When converting from T to [T] or UnsafePointer<T>, we can offer fixit to wrap
   // the expr with brackets.
   if (auto *contextDecl = contextualType->getAnyNominal()) {
-    if (contextDecl == CS->TC.Context.getArrayDecl() ||
-        contextDecl == CS->TC.Context.getUnsafePointerDecl()) {
+    if (contextDecl == CS->TC.Context.getArrayDecl()) {
       SmallVector<Type, 4> scratch;
       for (Type arg : contextualType->getAllGenericArgs(scratch)) {
         if (arg->isEqual(exprType)) {
@@ -3489,6 +3488,15 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
             fixItInsert(expr->getStartLoc(), "[").fixItInsert(
               Lexer::getLocForEndOfToken(CS->TC.Context.SourceMgr,
                                          expr->getEndLoc()), "]");
+          return true;
+        }
+      }
+    } else if (contextDecl == CS->TC.Context.getUnsafePointerDecl()) {
+      SmallVector<Type, 4> scratch;
+      for (Type arg : contextualType->getAllGenericArgs(scratch)) {
+        if (arg->isEqual(exprType)) {
+          diagnose(expr->getLoc(), diagID, exprType, contextualType).
+            fixItInsert(expr->getStartLoc(), "&");
           return true;
         }
       }
