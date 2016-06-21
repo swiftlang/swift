@@ -2508,7 +2508,14 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
 
 /// Diagnose C style for loops.
 
-static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
+enum OperatorKind {
+  Greater,
+  Smaller,
+  NEqual,
+};
+
+static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS,
+                                        VarDecl *loopVar, OperatorKind &OpKind) {
   auto *Cond = FS->getCond().getPtrOrNull();
   if (!Cond)
     return nullptr;
@@ -2527,8 +2534,15 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS, VarD
 
   // Verify that the condition is a simple != or < comparison to the loop variable.
   auto comparisonOpName = binaryFuncExpr->getDecl()->getNameStr();
-  if (comparisonOpName != "!=" && comparisonOpName != "<")
+  if (comparisonOpName == "!=")
+    OpKind = OperatorKind::NEqual;
+  else if (comparisonOpName == "<")
+    OpKind = OperatorKind::Smaller;
+  else if (comparisonOpName == ">")
+    OpKind = OperatorKind::Greater;
+  else
     return nullptr;
+
   auto args = binaryExpr->getArg()->getElements();
   auto loadExpr = dyn_cast<LoadExpr>(args[0]);
   if (!loadExpr)
@@ -2541,7 +2555,9 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS, VarD
   return args[1];
 }
 
-static bool unaryIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
+static bool unaryOperatorCheckForConvertingCStyleForLoop(const ForStmt *FS,
+                                                         VarDecl *loopVar,
+                                                         StringRef OpContent) {
   auto *Increment = FS->getIncrement().getPtrOrNull();
   if (!Increment)
     return false;
@@ -2552,19 +2568,33 @@ static bool unaryIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl 
     return false;
   auto inoutExpr = dyn_cast<InOutExpr>(unaryExpr->getArg());
   if (!inoutExpr)
-   return false;
+    return false;
   auto incrementDeclRefExpr = dyn_cast<DeclRefExpr>(inoutExpr->getSubExpr());
   if (!incrementDeclRefExpr)
     return false;
   auto unaryFuncExpr = dyn_cast<DeclRefExpr>(unaryExpr->getFn());
   if (!unaryFuncExpr)
     return false;
-  if (unaryFuncExpr->getDecl()->getNameStr() != "++")
+  if (unaryFuncExpr->getDecl()->getNameStr() != OpContent)
     return false;
-  return incrementDeclRefExpr->getDecl() == loopVar;    
+  return incrementDeclRefExpr->getDecl() == loopVar;
 }
 
-static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC, const ForStmt *FS, VarDecl *loopVar) {
+
+static bool unaryIncrementForConvertingCStyleForLoop(const ForStmt *FS,
+                                                     VarDecl *loopVar) {
+  return unaryOperatorCheckForConvertingCStyleForLoop(FS, loopVar, "++");
+}
+
+static bool unaryDecrementForConvertingCStyleForLoop(const ForStmt *FS,
+                                                     VarDecl *loopVar) {
+  return unaryOperatorCheckForConvertingCStyleForLoop(FS, loopVar, "--");
+}
+
+static bool binaryOperatorCheckForConvertingCStyleForLoop(TypeChecker &TC,
+                                                            const ForStmt *FS,
+                                                            VarDecl *loopVar,
+                                                            StringRef OpContent) {
   auto *Increment = FS->getIncrement().getPtrOrNull();
   if (!Increment)
     return false;
@@ -2574,7 +2604,7 @@ static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC, con
   auto binaryFuncExpr = dyn_cast<DeclRefExpr>(binaryExpr->getFn());
   if (!binaryFuncExpr)
     return false;
-  if (binaryFuncExpr->getDecl()->getNameStr() != "+=")
+  if (binaryFuncExpr->getDecl()->getNameStr() != OpContent)
     return false;
   auto argTupleExpr = dyn_cast<TupleExpr>(binaryExpr->getArg());
   if (!argTupleExpr)
@@ -2595,6 +2625,19 @@ static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC, con
   if (!declRefExpr)
     return false;
   return declRefExpr->getDecl() == loopVar;
+
+}
+
+static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC,
+                                                            const ForStmt *FS,
+                                                            VarDecl *loopVar) {
+  return binaryOperatorCheckForConvertingCStyleForLoop(TC, FS, loopVar, "+=");
+}
+
+static bool minusEqualOneDecrementForConvertingCStyleForLoop(TypeChecker &TC,
+                                                             const ForStmt *FS,
+                                                             VarDecl *loopVar) {
+  return binaryOperatorCheckForConvertingCStyleForLoop(TC, FS, loopVar, "-=");
 }
 
 static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
@@ -2616,13 +2659,18 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
 
   VarDecl *loopVar = dyn_cast<VarDecl>(initializers[1]);
   Expr *startValue = loopVarDecl->getInit(0);
-  Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar);
+  OperatorKind OpKind;
+  Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar, OpKind);
   bool strideByOne = unaryIncrementForConvertingCStyleForLoop(FS, loopVar) ||
                plusEqualOneIncrementForConvertingCStyleForLoop(TC, FS, loopVar);
+  bool strideBackByOne = unaryDecrementForConvertingCStyleForLoop(FS, loopVar) ||
+               minusEqualOneDecrementForConvertingCStyleForLoop(TC, FS, loopVar);
 
-  if (!loopVar || !startValue || !endValue || !strideByOne)
+  if (!loopVar || !startValue || !endValue || (!strideByOne && !strideBackByOne))
     return;
-    
+
+  assert(strideBackByOne != strideByOne && "cannot be both increment and decrement.");
+
   // Verify that the loop variable is invariant inside the body.
   VarDeclUsageChecker checker(TC, loopVar);
   checker.suppressDiagnostics();
@@ -2639,13 +2687,29 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   SourceLoc endOfIncrementLoc =
     Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                FS->getIncrement().getPtrOrNull()->getEndLoc());
-    
-  diagnostic
-   .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
-   .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
-   .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(),
-                      " ..< ")
-   .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
+
+  if (strideByOne && OpKind != OperatorKind::Greater) {
+    diagnostic
+    .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
+    .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
+    .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(),
+                       " ..< ")
+    .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
+    return;
+  } else if (strideBackByOne && OpKind != OperatorKind::Smaller) {
+    SourceLoc startValueEnd = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                         startValue->getEndLoc());
+
+    StringRef endValueStr = CharSourceRange(TC.Context.SourceMgr, endValue->getStartLoc(),
+      Lexer::getLocForEndOfToken(TC.Context.SourceMgr, endValue->getEndLoc())).str();
+
+    diagnostic
+    .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
+    .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
+    .fixItInsert(startValue->getStartLoc(), (llvm::Twine("((") + endValueStr + " + 1)...").str())
+    .fixItInsert(startValueEnd, ").reversed()")
+    .fixItRemoveChars(FS->getFirstSemicolonLoc(), endOfIncrementLoc);
+  }
 }
 
 
