@@ -280,6 +280,10 @@ Swift 3.0
     person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
     ```
 
+* Traps from force-unwrapping nil `Optional`s now show the source location
+  of the force unwrap operator.
+
+
 Swift 2.2
 ---------
 
