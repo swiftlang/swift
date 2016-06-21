@@ -11,7 +11,7 @@ endif()
 add_sourcekit_executable(sourcekitd-test
   sourcekitd-test.cpp
   TestOptions.cpp
-  DEPENDS ${SOURCEKITD_TEST_DEPEND}
+  DEPENDS ${SOURCEKITD_TEST_DEPEND} SourceKitSupport
     clangRewrite clangLex clangBasic
   COMPONENT_DEPENDS support option
 )
