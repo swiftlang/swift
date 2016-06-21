@@ -84,7 +84,7 @@ class HostSpecificConfiguration(object):
                 stdlib_targets_to_build = set(stdlib_targets_to_configure)
             else:
                 stdlib_targets_to_build = set(
-                    args.build_stdlib_deployment_targets).intersect(
+                    args.build_stdlib_deployment_targets).intersection(
                         set(args.stdlib_deployment_targets))
         else:
             # Otherwise, this is a host we are building as part of
