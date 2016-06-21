@@ -375,9 +375,8 @@ and the ``x`` and ``y`` properties have now disappeared. To avoid this, the bodi
 
 - They may not define any local types (other than typealiases).
 
-- They must not reference any ``private`` entities, except for those marked
-  ``@always_emit_into_client`` (see below). This includes local functions
-  defined within the inlineable function.
+- They must not reference any ``private`` or ``fileprivate`` entities, except
+  for those marked ``@always_emit_into_client`` (see below).
 
 - They must not reference any ``internal`` entities except for those that have
   been `versioned`_ and those declared ``@always_emit_into_client``. See below
@@ -717,10 +716,9 @@ Fixed-Contents Structs
 
 To opt out of this flexibility, a struct may be marked ``@fixed_contents``.
 This promises that no stored properties will be added to or removed from the
-struct, even ``private`` or ``internal`` ones. Additionally, all versioned
-instance stored properties in a ``@fixed_contents`` struct are implicitly
-declared ``@inlineable`` (as described above for top-level variables). In
-effect:
+struct, even non-public ones. Additionally, all versioned instance stored
+properties in a ``@fixed_contents`` struct are implicitly declared
+``@inlineable`` (as described above for top-level variables). In effect:
 
 - Reordering all members, including stored properties, is still permitted.
 - Adding new stored instance properties (public or non-public) is not permitted.
@@ -751,8 +749,8 @@ generic parameters and members of tuples.
 While adding or removing stored properties is forbidden, existing properties may
 still be modified in limited ways:
 
-- An existing non-versioned ``internal`` property may be made ``private``, or
-  vice versa.
+- An existing non-public, non-versioned property may change its access level to
+  any other non-public access level.
 - A non-versioned ``internal`` property may be versioned (see `Versioning
   Internal Declarations`_).
 - A versioned ``internal`` property may be made ``public`` (without changing
@@ -1281,11 +1279,11 @@ Non-public entities declared ``@always_emit_into_client`` may not be versioned.
     declare the minimum version of the library they can be used in, right?
     Syntax?
 
-Entities declared ``private`` may not be versioned; the mangled name of such an
-entity includes an identifier based on the containing file, which means moving
-the declaration to another file changes the entity's mangled name. This implies
-that a client would not be able to find the entity at run time if the source
-code is reorganized, which is unacceptable.
+Entities declared ``private`` or ``fileprivate`` may not be versioned; the
+mangled name of such an entity includes an identifier based on the containing
+file, which means moving the declaration to another file changes the entity's
+mangled name. This implies that a client would not be able to find the entity
+at run time if the source code is reorganized, which is unacceptable.
 
 .. note::
 
