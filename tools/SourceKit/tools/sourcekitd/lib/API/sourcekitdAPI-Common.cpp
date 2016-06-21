@@ -515,6 +515,47 @@ sourcekitd_response_description_copy(sourcekitd_response_t resp) {
   return strdup(Desc.c_str());
 }
 
+
+sourcekitd_uid_t
+sourcekitd_uid_get_from_cstr(const char *string) {
+  return SKDUIDFromUIdent(UIdent(string));
+}
+
+sourcekitd_uid_t
+sourcekitd_uid_get_from_buf(const char *buf, size_t length) {
+  return SKDUIDFromUIdent(UIdent(llvm::StringRef(buf, length)));
+}
+
+size_t
+sourcekitd_uid_get_length(sourcekitd_uid_t uid) {
+  UIdent UID = UIdentFromSKDUID(uid);
+  return UID.getName().size();
+}
+
+const char *
+sourcekitd_uid_get_string_ptr(sourcekitd_uid_t uid) {
+  UIdent UID = UIdentFromSKDUID(uid);
+  return UID.getName().begin();
+}
+
+void
+sourcekitd_request_description_dump(sourcekitd_object_t obj) {
+  // Avoid colors here, we don't properly detect that the debug window inside
+  // Xcode doesn't support colors.
+  llvm::SmallString<128> Desc;
+  llvm::raw_svector_ostream OS(Desc);
+  printRequestObject(obj, OS);
+  llvm::errs() << OS.str() << '\n';
+}
+
+char *
+sourcekitd_request_description_copy(sourcekitd_object_t obj) {
+  llvm::SmallString<128> Desc;
+  llvm::raw_svector_ostream OS(Desc);
+  printRequestObject(obj, OS);
+  return strdup(Desc.c_str());
+}
+
 //===----------------------------------------------------------------------===//
 // Variant API
 //===----------------------------------------------------------------------===//
