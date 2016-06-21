@@ -12,9 +12,9 @@
 
 import SwiftShims
 
-internal class _Box<T> {
-  internal var _value: T
-  internal init(_ value: T) { self._value = value }
+internal class _Box<Wrapped> {
+  internal var _value: Wrapped
+  internal init(_ value: Wrapped) { self._value = value }
 }
 
 /// Command-line arguments for the current process.
