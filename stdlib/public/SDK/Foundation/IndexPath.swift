@@ -161,7 +161,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         if count == 0 {
             _indexes = []
         } else {
-            var ptr = UnsafeMutablePointer<Element>(malloc(count * sizeof(Element)))
+            var ptr = UnsafeMutablePointer<Element>(malloc(count * sizeof(Element.self)))
             defer { free(ptr) }
             
             nsIndexPath.getIndexes(ptr!, range: NSMakeRange(0, count))

@@ -65,7 +65,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     public var hashValue: Int {
         var localValue = uuid
         return withUnsafeMutablePointer(&localValue) {
-            return Int(bitPattern: CFHashBytes(unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self), CFIndex(sizeof(uuid_t))))
+            return Int(bitPattern: CFHashBytes(unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self), CFIndex(sizeof(uuid_t.self))))
         }
     }
     
