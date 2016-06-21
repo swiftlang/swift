@@ -128,14 +128,29 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     public init(bytes: UnsafePointer<UInt8>, count: Int) {
         _wrapped = _SwiftNSData(immutableObject: NSData(bytes: bytes, length: count))
     }
-    
+
+    /// Initialize a `Data` with copied memory content.
+    ///
+    /// - parameter bytes: A pointer to the memory. It will be copied.
+    /// - parameter count: The number of bytes to copy.
+    public init(bytes: UnsafeMutablePointer<UInt8>, count: Int) {
+        _wrapped = _SwiftNSData(immutableObject: NSData(bytes: UnsafePointer(bytes), length: count))
+    }
+
     /// Initialize a `Data` with copied memory content.
     /// 
     /// - parameter buffer: A buffer pointer to copy. The size is calculated from `SourceType` and `buffer.count`.
     public init<SourceType>(buffer: UnsafeBufferPointer<SourceType>) {
         _wrapped = _SwiftNSData(immutableObject: NSData(bytes: buffer.baseAddress, length: strideof(SourceType) * buffer.count))
     }
-    
+
+    /// Initialize a `Data` with copied memory content.
+    ///
+    /// - parameter buffer: A buffer pointer to copy. The size is calculated from `SourceType` and `buffer.count`.
+    public init<SourceType>(buffer: UnsafeMutableBufferPointer<SourceType>) {
+        _wrapped = _SwiftNSData(immutableObject: NSData(bytes: UnsafePointer(buffer.baseAddress), length: strideof(SourceType) * buffer.count))
+    }
+
     /// Initialize a `Data` with the contents of an Array.
     ///
     /// - parameter bytes: An array of bytes to copy.
@@ -156,15 +171,33 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     
     /// Initialize a `Data` with the specified size.
     ///
+    /// This initializer doesn not necessarily allocate the requested memory right away. Mutable data allocates additional memory as needed, so `capacity` simply establishes the initial capacity. When it does allocate the initial memory, though, it allocates the specified amount.
+    ///
+    /// This method sets the `count` of the data to 0.
+    /// 
+    /// If the capacity specified in `capacity` is greater than four memory pages in size, this may round the amount of requested memory up to the nearest full page.
+    ///
     /// - parameter capacity: The size of the data.
     public init?(capacity: Int) {
         if let d = NSMutableData(capacity: capacity) {
-            _wrapped = _SwiftNSData(immutableObject: d)
+            _wrapped = _SwiftNSData(mutableObject: d)
         } else {
             return nil
         }
     }
     
+    /// Initialize a `Data` with the specified count of zeroed bytes.
+    ///
+    /// - parameter count: The number of bytes the data initially contains.
+    public init?(count: Int) {
+        if let d = NSMutableData(length: count) {
+            _wrapped = _SwiftNSData(mutableObject: d)
+        } else {
+            return nil
+        }
+    }
+
+
     /// Initialize an empty `Data`.
     public init() {
         _wrapped = _SwiftNSData(immutableObject: NSData(bytes: nil, length: 0))
@@ -217,9 +250,27 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
         }
     }
     
-    private init(_bridged data: NSData) {
-        // We must copy the input because it might be mutable; just like storing a value type in ObjC
-        _wrapped = _SwiftNSData(immutableObject: data.copy())
+    /// Initialize a `Data` by adopting a reference type.
+    ///
+    /// You can use this initializer to create a `struct Data` that wraps a `class NSData`. `struct Data` will use the `class NSData` for all operations. Other initializers (including casting using `as Data`) may choose to hold a reference or not, based on a what is the most efficient representation.
+    ///
+    /// If the resulting value is mutated, then `Data` will invoke the `mutableCopy()` function on the reference to copy the contents. You may customize the behavior of that function if you wish to return a specialized mutable subclass.
+    ///
+    /// - parameter reference: The instance of `NSData` that you wish to wrap. This instance will be copied by `struct Data`.
+    public init(reference: NSData) {
+        _wrapped = _SwiftNSData(immutableObject: reference.copy())
+    }
+    
+    /// Initialize a `Data` by adopting a mutable reference type.
+    ///
+    /// You can use this initializer to create a `struct Data` that wraps a `class NSMutableData`. `struct Data` will use the `class NSMutableData` for all operations. Other initializers (including casting using `as Data`) may choose to hold a reference or not, based on a what is the most efficient representation.
+    ///
+    /// If the resulting value is mutated, then `Data` will invoke the `mutableCopy()` function on the reference to copy the contents. You may customize the behavior of that function if you wish to return a specialized mutable subclass.
+    ///
+    /// - warning: For performance reasons, this method does not copy the reference on initialization. It assumes that the reference is uniquely held by the struct. If you continue to mutate the reference after invoking this initializer, you may invalidate the copy-on-write and value semantics of `struct Data`. It is recommended that you do not keep the reference after initializing a `Data` with it.
+    /// - parameter mutableReference: The instance of `NSMutableData` that you wish to wrap.
+    public init(mutableReference: NSMutableData) {
+        _wrapped = _SwiftNSData(mutableObject: mutableReference)
     }
     
     // -----------------------------------
@@ -428,6 +479,9 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     
     /// Replace a region of bytes in the data with new data.
     ///
+    /// This will resize the data if required, to fit the entire contents of `data`.
+    ///
+    /// - precondition: `range` must be within the range of the data.
     /// - parameter range: The range in the data to replace.
     /// - parameter data: The replacement data.
     public mutating func replaceBytes(in range: Range<Index>, with data: Data) {
@@ -439,7 +493,23 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
             $0.replaceBytes(in: nsRange, withBytes: bytes, length: cnt)
         }
     }
+    
+    /// Replace a region of bytes in the data with new bytes from a buffer.
+    ///
+    /// This will resize the data if required, to fit the entire contents of `buffer`.
+    ///
+    /// - precondition: `range` must be within the range of the data.
+    /// - parameter buffer: The replacement bytes.
+    public mutating func replaceBytes<SourceType>(in range: Range<Index>, with buffer: UnsafeBufferPointer<SourceType>) {
+        let nsRange = NSMakeRange(range.lowerBound, range.upperBound - range.lowerBound)
+        let bufferCount = buffer.count * strideof(SourceType)
+        
+        _applyUnmanagedMutation {
+            $0.replaceBytes(in: nsRange, withBytes: buffer.baseAddress, length: bufferCount)
+        }
 
+    }
+    
     /// Return a new copy of the data in a specified range.
     ///
     /// - parameter range: The range to copy.
@@ -506,7 +576,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
         }
     }
     
-    public subscript(bounds: Range<Int>) -> MutableRandomAccessSlice<Data> {
+    public subscript(bounds: Range<Index>) -> MutableRandomAccessSlice<Data> {
         get {
             return MutableRandomAccessSlice(base: self, bounds: bounds)
         }
@@ -568,11 +638,13 @@ extension Data : _ObjectiveCBridgeable {
     }
     
     public static func _forceBridgeFromObjectiveC(_ input: NSData, result: inout Data?) {
-        result = Data(_bridged: input)
+        // We must copy the input because it might be mutable; just like storing a value type in ObjC
+        result = Data(reference: input)
     }
     
     public static func _conditionallyBridgeFromObjectiveC(_ input: NSData, result: inout Data?) -> Bool {
-        result = Data(_bridged: input)
+        // We must copy the input because it might be mutable; just like storing a value type in ObjC
+        result = Data(reference: input)
         return true
     }
     
