@@ -3491,7 +3491,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
           return true;
         }
       }
-    } else if (contextDecl == CS->TC.Context.getUnsafePointerDecl()) {
+    } else if (contextDecl == CS->TC.Context.getUnsafePointerDecl() ||
+               contextDecl == CS->TC.Context.getUnsafeMutablePointerDecl()) {
       SmallVector<Type, 4> scratch;
       for (Type arg : contextualType->getAllGenericArgs(scratch)) {
         if (arg->isEqual(exprType)) {
