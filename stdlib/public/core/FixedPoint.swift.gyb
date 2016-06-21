@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 %{
 
-from SwiftIntTypes import *
+from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
 
 #
 # Utility code for later in this template
@@ -46,29 +46,29 @@ public typealias IntMax = ${IntMax}
 /// The largest native unsigned integer type.
 public typealias UIntMax = ${UIntMax}
 
-/// This protocol is an implementation detail of `IntegerType`; do
+/// This protocol is an implementation detail of `Integer`; do
 /// not use it directly.
-public protocol _IntegerType
+@_show_in_interface
+public protocol _Integer
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
     CustomStringConvertible,
     Hashable,
-    IntegerArithmeticType,
-    BitwiseOperationsType,
+    IntegerArithmetic,
+    BitwiseOperations,
     _Incrementable
 {
 }
 
 /// A set of common requirements for Swift's integer types.
-public protocol IntegerType : _IntegerType, RandomAccessIndexType {
-}
+public protocol Integer : _Integer, Strideable {}
 
-/// This protocol is an implementation detail of `SignedIntegerType`;
+/// This protocol is an implementation detail of `SignedInteger`;
 /// do not use it directly.
-public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
+@_show_in_interface
+public protocol _SignedInteger : _Integer, SignedNumber {
   /// Represent this number using Swift's widest native signed integer
   /// type.
-  @warn_unused_result
   func toIntMax() -> IntMax
 
   /// Convert from Swift's widest signed integer type, trapping on
@@ -77,7 +77,7 @@ public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
 }
 
 /// A set of common requirements for Swift's signed integer types.
-public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
+public protocol SignedInteger : _SignedInteger, Integer {
   /// Represent this number using Swift's widest native signed integer
   /// type.
   func toIntMax() -> IntMax
@@ -87,27 +87,54 @@ public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
   init(_: IntMax)
 }
 
-/// This protocol is an implementation detail of `UnsignedIntegerType`;
+extension SignedInteger {
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func distance(to other: Self) -> Int {
+    return numericCast((numericCast(other) as IntMax) - numericCast(self))
+  }
+
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func advanced(by n: Int) -> Self {
+    return numericCast((numericCast(self) as IntMax) + numericCast(n))
+  }
+}
+
+/// This protocol is an implementation detail of `UnsignedInteger`;
 /// do not use it directly.
-public protocol _DisallowMixedSignArithmetic : _IntegerType {
+@_show_in_interface
+public protocol _DisallowMixedSignArithmetic : _Integer {
   // Used to create a deliberate ambiguity in cases like UInt(1) +
   // Int(1), which would otherwise compile due to the arithmetic
   // operators defined for Strideable types (unsigned types are
   // Strideable).
-  typealias _DisallowMixedSignArithmetic : SignedIntegerType = Int
+  associatedtype _DisallowMixedSignArithmetic : SignedInteger = Int
 }
 
 /// A set of common requirements for Swift's unsigned integer types.
-public protocol UnsignedIntegerType : _DisallowMixedSignArithmetic, IntegerType {
-
+public protocol UnsignedInteger : _DisallowMixedSignArithmetic, Integer {
   /// Represent this number using Swift's widest native unsigned
   /// integer type.
-  @warn_unused_result
   func toUIntMax() -> UIntMax
 
   /// Convert from Swift's widest unsigned integer type, trapping on
   /// overflow.
   init(_: UIntMax)
+}
+
+extension UnsignedInteger {
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func distance(to other: Self) -> Int {
+    return numericCast((numericCast(other) as IntMax) - numericCast(self))
+  }
+
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func advanced(by n: Int) -> Self {
+    return numericCast((numericCast(self) as IntMax) + numericCast(n))
+  }
 }
 
 /// Convert `x` to type `U`, trapping on overflow in -Onone and -O
@@ -116,12 +143,11 @@ public protocol UnsignedIntegerType : _DisallowMixedSignArithmetic, IntegerType 
 /// Typically used to do conversion to any contextually-deduced
 /// integer type:
 ///
-///     func f(x: Int32) {}
-///     func g(x: Int64) { f(numericCast(x)) }
-@warn_unused_result
+///     func f(_ x: Int32) {}
+///     func g(_ x: Int64) { f(numericCast(x)) }
 public func numericCast<
-  T : _SignedIntegerType, U : _SignedIntegerType
->(x: T) -> U {
+  T : _SignedInteger, U : _SignedInteger
+>(_ x: T) -> U {
   return U(x.toIntMax())
 }
 
@@ -131,12 +157,11 @@ public func numericCast<
 /// Typically used to do conversion to any contextually-deduced
 /// integer type:
 ///
-///     func f(x: UInt32) {}
-///     func g(x: UInt64) { f(numericCast(x)) }
-@warn_unused_result
+///     func f(_ x: UInt32) {}
+///     func g(_ x: UInt64) { f(numericCast(x)) }
 public func numericCast<
-  T : UnsignedIntegerType, U : UnsignedIntegerType
->(x: T) -> U {
+  T : UnsignedInteger, U : UnsignedInteger
+>(_ x: T) -> U {
   return U(x.toUIntMax())
 }
 
@@ -146,12 +171,11 @@ public func numericCast<
 /// Typically used to do conversion to any contextually-deduced
 /// integer type:
 ///
-///     func f(x: UInt32) {}
-///     func g(x: Int64) { f(numericCast(x)) }
-@warn_unused_result
+///     func f(_ x: UInt32) {}
+///     func g(_ x: Int64) { f(numericCast(x)) }
 public func numericCast<
-  T : _SignedIntegerType, U : UnsignedIntegerType
->(x: T) -> U {
+  T : _SignedInteger, U : UnsignedInteger
+>(_ x: T) -> U {
   return U(UIntMax(x.toIntMax()))
 }
 
@@ -161,12 +185,11 @@ public func numericCast<
 /// Typically used to do conversion to any contextually-deduced
 /// integer type:
 ///
-///     func f(x: Int32) {}
-///     func g(x: UInt64) { f(numericCast(x)) }
-@warn_unused_result
+///     func f(_ x: Int32) {}
+///     func g(_ x: UInt64) { f(numericCast(x)) }
 public func numericCast<
-T : UnsignedIntegerType, U : _SignedIntegerType
->(x: T) -> U {
+T : UnsignedInteger, U : _SignedInteger
+>(_ x: T) -> U {
   return U(IntMax(x.toUIntMax()))
 }
 
@@ -178,11 +201,13 @@ T : UnsignedIntegerType, U : _SignedIntegerType
 %   Self = self_ty.stdlib_name
 %   BuiltinName = self_ty.builtin_name
 %   OtherSelf = self_ty.get_opposite_signedness().stdlib_name
+%   Article = 'An' if bits == 8 else 'A'
 
-/// A ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
+/// ${Article} ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
 /// type.
+@_fixed_layout
 public struct ${Self}
-   : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'},
+   : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'},
      Comparable, Equatable {
   public // @testable
   var _value: Builtin.${BuiltinName}
@@ -190,10 +215,6 @@ public struct ${Self}
   // FIXME: this declaration should be inferred.
   // <rdar://problem/18379938> Type checker refuses to use the default for
   // Int.Distance associated type
-
-  /// A type that can represent the number of steps between pairs of
-  /// values.
-  public typealias Distance = Int
 
   /// Create an instance initialized to zero.
   @_transparent public
@@ -216,11 +237,11 @@ public struct ${Self}
 % if self_ty.is_word:
   @_transparent
   public // @testable
-  init(_ v: Builtin.Word) {
+  init(_ _v: Builtin.Word) {
 % if BuiltinName == 'Int32':
-    self._value = Builtin.truncOrBitCast_Word_Int32(v)
+    self._value = Builtin.truncOrBitCast_Word_Int32(_v)
 % elif BuiltinName == 'Int64':
-    self._value = Builtin.zextOrBitCast_Word_Int64(v)
+    self._value = Builtin.zextOrBitCast_Word_Int64(_v)
 % end
   }
 
@@ -244,10 +265,10 @@ public struct ${Self}
   /// byte order if necessary.
   @_transparent public
   init(bigEndian value: ${Self}) {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
-    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
+#if _endian(big)
+    self = value
 #else
-    _UnsupportedArchitectureError()
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
 #endif
   }
 
@@ -255,10 +276,10 @@ public struct ${Self}
   /// byte order if necessary.
   @_transparent public
   init(littleEndian value: ${Self}) {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if _endian(little)
     self = value
 #else
-    _UnsupportedArchitectureError()
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
 #endif
   }
 %  end
@@ -278,19 +299,19 @@ public struct ${Self}
   /// Returns the big-endian representation of the integer, changing the
   /// byte order if necessary.
   public var bigEndian: ${Self} {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
-    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
+#if _endian(big)
+    return self
 #else
-    _UnsupportedArchitectureError()
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
 #endif
   }
   /// Returns the little-endian representation of the integer, changing the
   /// byte order if necessary.
   public var littleEndian: ${Self} {
-#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+#if _endian(little)
     return self
 #else
-    _UnsupportedArchitectureError()
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
 #endif
   }
 % end
@@ -321,20 +342,23 @@ extension ${Self} : Hashable {
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
+    @inline(__always)
+    get {
 % if bits <= word_bits and signed:
-    // Sign extend the value.
-    return Int(self)
+      // Sign extend the value.
+      return Int(self)
 % elif bits <= word_bits and not signed:
-    // Sign extend the value.
-    return Int(${OtherSelf}(bitPattern: self))
+      // Sign extend the value.
+      return Int(${OtherSelf}(bitPattern: self))
 % elif bits == word_bits * 2:
-    // We have twice as many bits as we need to return.
-    return
-      Int(truncatingBitPattern: self) ^
-      Int(truncatingBitPattern: self >> 32)
+      // We have twice as many bits as we need to return.
+      return
+        Int(truncatingBitPattern: self) ^
+        Int(truncatingBitPattern: self >> 32)
 % else:
-    _Unimplemented()
+      _Unimplemented()
 % end
+    }
   }
 }
 
@@ -349,67 +373,26 @@ extension ${Self} : CustomStringConvertible {
   }
 }
 
-// When ${Self} is used as an index, there are always bounds---more
-// restrictive than the full range of ${Self}---against which we're
-// not able to check.  Overflows are not useful indicators of
-// precondition violations in this context.  Therefore, we use masked
-// arithmetic in this conformance, and we need to be be sure that
-// generic implementations of the arithmetic operators for
-// RandomAccessIndexType's are all shadowed by more-specific
-// implementations that *do* check for overflows.
-@_transparent
-extension ${Self} : RandomAccessIndexType {
-  // HACK: Disable indexing and slicing Ranges of IntegerType types
-  // outside of a generic context.  See the implementation of Range
-  // for details of how this works.
-  public typealias _DisabledRangeIndex = ${Self}
-
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Requires: The next value is representable.
-  @_transparent public
-  func successor() -> ${Self} {
-    return self &+ 1
-  }
-  /// Returns the previous consecutive value before `self`.
-  ///
-  /// - Requires: The previous value is representable.
-  @_transparent public
-  func predecessor() -> ${Self} {
-    return self &- 1
-  }
-
-  @_transparent public
-  func distanceTo(other: ${Self}) -> ${Self}.Distance {
-    return numericCast((numericCast(other) as IntMax) &- numericCast(self))
-  }
-
-  @_transparent public
-  func advancedBy(n: ${Self}.Distance) -> ${Self} {
-    return numericCast((numericCast(self) as IntMax) &+ numericCast(n))
-  }
-}
-
 // Operations that return an overflow bit in addition to a partial result,
 // helpful for checking for overflow when you want to handle it.
 extension ${Self} {
-% for Method,op in [('add', 'add'), ('subtract', 'sub'), ('multiply', 'mul')]:
+% for Method, op in [('add', 'add'), ('subtract', 'sub'), ('multiply', 'mul')]:
   /// ${Method.capitalize()} `lhs` and `rhs`, returning a result and a
-  /// `Bool` that is true iff the operation caused an arithmetic
+  /// `Bool` that is `true` iff the operation caused an arithmetic
   /// overflow.
   @_transparent public
-  static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
+  static func ${Method}WithOverflow(_ lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
     let tmp = Builtin.${sign}${op}_with_overflow_${BuiltinName}(lhs._value, rhs._value, false._value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
 % end
 
-% for Method,op in [('divide', 'div'), ('remainder', 'rem')]:
+% for Method, op in [('divide', 'div'), ('remainder', 'rem')]:
   /// Divide `lhs` and `rhs`, returning
   /// ${'a result' if op == 'div' else 'the remainder'} and a `Bool`
-  /// that is true iff the operation caused an arithmetic overflow.
+  /// that is `true` iff the operation caused an arithmetic overflow.
   @_transparent public
-  static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
+  static func ${Method}WithOverflow(_ lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
     if rhs == 0 {
       return (0, true)
     }
@@ -443,10 +426,10 @@ extension ${Self} {
 
 % if signed:
 @_transparent
-extension ${Self} : SignedNumberType {}
+extension ${Self} : SignedNumber {}
 % end
 
-// construction from other integer types
+// Construction from other integer types
 @_transparent
 extension ${Self} {
 % for src_ty in all_integer_types(word_bits):
@@ -523,7 +506,7 @@ extension ${Self} {
 // FIXME: must use condfail in these operators, rather than
 // overflowChecked, pending <rdar://problem/16271923> so that we don't
 // foil static checking for numeric overflows.
-% for op,method in ('+','add'), ('*','mul'), ('-','sub'):
+% for op, method in ('+','add'), ('*','mul'), ('-','sub'):
 @_transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   let (result, error) = Builtin.${sign}${method}_with_overflow_${BuiltinName}(
@@ -534,7 +517,7 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 }
 % end
 
-% for op,inst in [('/', 'div'), ('%', 'rem')]:
+% for op, inst in [('/', 'div'), ('%', 'rem')]:
 @_transparent
 public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   Builtin.condfail((rhs == 0)._value)
@@ -549,16 +532,27 @@ public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 %end
 
 // Bitwise negate
+/// Returns the inverse of the bits set in the argument.
+///
+/// - SeeAlso: `BitwiseOperations`
 @_transparent
 public prefix func ~(rhs: ${Self}) -> ${Self} {
   let mask = ${Self}.subtractWithOverflow(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs._value, mask._value))
 }
 
-% for op, name in (
-%  ('==','eq'), ('!=','ne'),
-%  ('<',sign+'lt'), ('<=',sign+'le'),
-%  ('>',sign+'gt'), ('>=',sign+'ge')):
+% for op, name, comment in (
+%   ('==', 'eq', 'the two arguments have equal values'),
+%   ('!=', 'ne', 'the two arguments have unequal values'),
+%   ('<', sign + 'lt', 'the first argument is less than the second argument'),
+%   ('<=', sign + 'le', 'the first argument is less than or equal to the second argument'),
+%   ('>', sign + 'gt', 'the first argument is greater than the second argument'),
+%   ('>=', sign + 'ge', 'the first argument is greater than or equal to the second argument'),
+% ):
+/// Returns a Boolean value that indicates whether
+/// ${comment}.
+///
+/// - SeeAlso: `Equatable`, `Comparable`
 @_transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.cmp_${name}_${BuiltinName}(lhs._value, rhs._value))
@@ -579,53 +573,82 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 }
 % end
 
-% for op, name in (('&','and'), ('^','xor'), ('|','or')):
+% for op, name, comment in (
+%   ('&', 'and', 'intersection of bits set in'),
+%   ('^', 'xor', 'bits that are set in exactly one of'),
+%   ('|', 'or', 'union of bits set in'),
+% ):
+/// Returns the ${comment} the two arguments.
+///
+/// - SeeAlso: `BitwiseOperations`
 @_transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_${BuiltinName}(lhs._value, rhs._value))
 }
-% end
 
-// bitwise operations
+/// Calculates the ${comment} the two arguments
+/// and stores the result in the first argument.
+///
+/// - SeeAlso: `BitwiseOperations`
 @_transparent
-extension ${Self} : BitwiseOperationsType {
-  /// The empty bitset of type ${Self}.
-  public static var allZeros: ${Self} { return 0 }
-}
-
-// Compound assignments
-% for op in '+', '-', '*', '<<', '>>', '&', '|', '^':
-@_transparent
-public func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
+public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
 % end
 
+// Bitwise operations
+@_transparent
+extension ${Self} : BitwiseOperations {
+  /// The empty bitset of type `${Self}`.
+  public static var allZeros: ${Self} { return 0 }
+}
+
+// Compound assignments
+% for op in '+', '-', '*', '<<', '>>':
+@_transparent
+public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
+  lhs = lhs ${op} rhs
+}
+% end
+
+// Create an ambiguity when indexing or slicing
+// Range[OfStrideable]<${Self}> outside a generic context.  See
+// Range.swift for details.
+extension ${Self} {
+  public typealias _DisabledRangeIndex = ${Self}
+}
+
 // Prefix and postfix increment and decrement.
 
-// FIXME: After <rdar://problem/20226526> is fixed, we should be able
-//        to remove these.
 @_transparent
-public prefix func ++ (inout x: ${Self}) -> ${Self} {
+@available(*, unavailable, message: "it has been removed in Swift 3")
+@discardableResult
+public prefix func ++ (x: inout ${Self}) -> ${Self} {
   x = x + 1
   return x
 }
 
 @_transparent
-public postfix func ++ (inout x: ${Self}) -> ${Self} {
+@available(*, unavailable, message: "it has been removed in Swift 3")
+@discardableResult
+public postfix func ++ (x: inout ${Self}) -> ${Self} {
   let ret = x
   x = x + 1
   return ret
 }
 
 @_transparent
-public prefix func -- (inout x: ${Self}) -> ${Self} {
+@available(*, unavailable, message: "it has been removed in Swift 3")
+@discardableResult
+public prefix func -- (x: inout ${Self}) -> ${Self} {
   x = x - 1
   return x
 }
 
 @_transparent
-public postfix func -- (inout x: ${Self}) -> ${Self} {
+@available(*, unavailable, message: "it has been removed in Swift 3")
+@discardableResult
+public postfix func -- (x: inout ${Self}) -> ${Self} {
   let ret = x
   x = x - 1
   return ret
@@ -636,8 +659,7 @@ public postfix func -- (inout x: ${Self}) -> ${Self} {
 /// Returns the argument and specifies that the value is not negative.
 /// It has only an effect if the argument is a load or call.
 @_transparent
-@warn_unused_result
-public func _assumeNonNegative(x: ${Self}) -> ${Self} {
+public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
   _sanityCheck(x >= 0)
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
@@ -648,18 +670,45 @@ public func _assumeNonNegative(x: ${Self}) -> ${Self} {
 % fixedBitWidths = [2**x for x in range(3, 8) if 2**x <= 2 * word_bits]
 % for bits in fixedBitWidths:
 @_transparent
-public func _leadingZeros(x: Builtin.Int${bits}) -> Builtin.Int${bits} {
+public func _leadingZeros(_ x: Builtin.Int${bits}) -> Builtin.Int${bits} {
   return Builtin.int_ctlz_Int${bits}(x, true._value)
 }
 % end
 
 //===--- End loop over all integer types ----------------------------------===//
 
-@available(*, unavailable, renamed="Int")
-public typealias Word = Int
+internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
+#if INTERNAL_CHECKS_ENABLED
+  return lhs + rhs
+#else
+  return lhs &+ rhs
+#endif
+}
 
-@available(*, unavailable, renamed="UInt")
-public typealias UWord = UInt
+internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
+#if INTERNAL_CHECKS_ENABLED
+  return lhs - rhs
+#else
+  return lhs &- rhs
+#endif
+}
+
+internal func _unsafeMultiply(_ lhs: Int, _ rhs: Int) -> Int {
+#if INTERNAL_CHECKS_ENABLED
+  return lhs * rhs
+#else
+  return lhs &* rhs
+#endif
+}
+
+@available(*, unavailable, renamed: "Integer")
+public typealias IntegerType = Integer
+
+@available(*, unavailable, renamed: "SignedInteger")
+public typealias SignedIntegerType = SignedInteger
+
+@available(*, unavailable, renamed: "UnsignedInteger")
+public typealias UnsignedIntegerType = UnsignedInteger
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

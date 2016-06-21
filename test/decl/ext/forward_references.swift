@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %S/../../Inputs/forward_extension_reference.swift -primary-file %s -emit-ir -g -module-name fref
 
 struct Foo<T> {
-	func foo(t: T) -> T {
+	func foo(_ t: T) -> T {
 		return t
 	}
 
@@ -13,7 +13,7 @@ struct Foo<T> {
 	}
 }
 
-func goo<T>(f: Foo<T>) {
+func goo<T>(_ f: Foo<T>) {
 	var x = f.count
 }
 

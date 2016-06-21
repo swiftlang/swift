@@ -14,7 +14,7 @@ class A : P1 {
 
 func doFoo() {}
 
-func test_coercion(a: A, b: B) {
+func test_coercion(_ a: A, b: B) {
   // Coercion to a protocol type
   let x = a as P1
   x.foo()
@@ -28,7 +28,7 @@ class C : B { }
 class D : C { }
 
 
-func prefer_coercion(inout c: C) {
+func prefer_coercion(_ c: inout C) {
   let d = c as! D
   c = d
 }
@@ -39,7 +39,7 @@ var i8 = -1 as Int8
 
 // Coerce to a superclass with generic parameter inference
 class C1<T> { 
-  func f(x: T) { }
+  func f(_ x: T) { }
 }
 class C2<T> : C1<Int> { }
 
@@ -59,7 +59,7 @@ if let p = cc as? P {
 
 // Test that 'as?' coercion fails.
 let strImplicitOpt: String! = nil
-strImplicitOpt as? String // expected-warning{{conditional cast from 'String!' to 'String' always succeeds}}
+_ = strImplicitOpt as? String // expected-warning{{conditional cast from 'String!' to 'String' always succeeds}}
 
 class C3 {}
 class C4 : C3 {}
@@ -92,10 +92,10 @@ Double(1) as Double as String // expected-error{{cannot convert value of type 'D
 [(1, (1, 1))] as! [(Int, (String, Int))] // expected-error{{'[(Int, (Int, Int))]' is not convertible to '[(Int, (String, Int))]'}}
 
 // <rdar://problem/19495253> Incorrect diagnostic for explicitly casting to the same type
-"hello" as! String // expected-warning{{forced cast of 'String' to same type has no effect}} {{9-20=}}
+_ = "hello" as! String // expected-warning{{forced cast of 'String' to same type has no effect}} {{13-24=}}
 
 // <rdar://problem/19499340> QoI: Nimble as -> as! changes not covered by Fix-Its
-func f(x : String) {}
+func f(_ x : String) {}
 f("what" as Any as String) // expected-error{{'Any' (aka 'protocol<>') is not convertible to 'String'; did you mean to use 'as!' to force downcast?}} {{17-19=as!}}
 f(1 as String) // expected-error{{cannot convert value of type 'Int' to type 'String' in coercion}}
 

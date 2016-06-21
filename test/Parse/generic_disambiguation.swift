@@ -4,11 +4,11 @@ struct A<B> { // expected-note{{generic type 'A' declared here}}
   init(x:Int) {}
   static func c() {}
 
-  struct C<D> { // expected-error{{generic type 'C' nested in type}}
+  struct C<D> { // expected-error{{generic type 'C' cannot be nested in type 'A'}}
     static func e() {}
   }
 
-  struct F {} // expected-error{{nested in generic type}}
+  struct F {} // expected-error{{type 'F' cannot be nested in generic type 'A'}}
 }
 struct B {}
 struct D {}
@@ -16,21 +16,21 @@ struct D {}
 protocol Runcible {}
 protocol Fungible {}
 
-func meta<T>(m: T.Type) {}
-func meta2<T>(m: T.Type, _ x: Int) {}
+func meta<T>(_ m: T.Type) {}
+func meta2<T>(_ m: T.Type, _ x: Int) {}
 
-func generic<T>(x: T) {}
+func generic<T>(_ x: T) {}
 
 var a, b, c, d : Int
 
-a < b
-(a < b, c > d)
+_ = a < b
+_ = (a < b, c > d)
 // Parses as generic because of lparen after '>'
-(a < b, c > (d)) // expected-error{{use of undeclared type 'b'}} expected-note{{while parsing this '<' as a type parameter bracket}}
+(a < b, c > (d)) // expected-error{{use of undeclared type 'b'}}
 // Parses as generic because of lparen after '>'
-(a<b, c>(d)) // expected-error{{use of undeclared type 'b'}} expected-note{{while parsing this '<' as a type parameter bracket}}
-a>(b)
-a > (b)
+(a<b, c>(d)) // expected-error{{use of undeclared type 'b'}} 
+_ = a>(b)
+_ = a > (b)
 
 generic<Int>(0) // expected-error{{cannot explicitly specialize a generic function}} expected-note{{while parsing this '<' as a type parameter bracket}}
 
@@ -67,6 +67,6 @@ meta2(A<B>.C<D>.self, 0)
 A<B, D>.c() // expected-error{{generic type 'A' specialized with too many type parameters (got 2, but expected 1)}}
 
 A<B?>(x: 0) // parses as type // expected-warning{{unused}}
-a < b ? c : d
+_ = a < b ? c : d
 
-A<B throws -> D>(x: 0) // expected-warning{{unused}}
+A<(B) throws -> D>(x: 0) // expected-warning{{unused}}

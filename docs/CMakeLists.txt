@@ -82,7 +82,7 @@ if(LITRE_EXECUTABLE)
     VERBATIM
     )
 
-  # Only update the real top-level CMakeLists.txt if something  changed
+  # Only update the real top-level CMakeLists.txt if something changed
   add_custom_command(
     OUTPUT
       "litre-tests/CMakeLists.txt"

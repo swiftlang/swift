@@ -1,0 +1,18 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -dce %s | FileCheck %s
+import Swift
+
+// CHECK-LABEL: sil @unexpected_error : $@convention(thin) (ErrorProtocol) -> () {
+sil @unexpected_error : $@convention(thin) ErrorProtocol -> () {
+entry(%10 : $ErrorProtocol):
+  // CHECK: builtin "unexpectedError"
+  %11 = builtin "unexpectedError"(%10 : $ErrorProtocol) : $()
+  unreachable
+}
+
+// CHECK-LABEL: sil @error_in_main : $@convention(thin) (ErrorProtocol) -> () {
+sil @error_in_main : $@convention(thin) ErrorProtocol -> () {
+entry(%10 : $ErrorProtocol):
+  // CHECK: builtin "errorInMain"
+  %11 = builtin "errorInMain"(%10 : $ErrorProtocol) : $()
+  unreachable
+}

@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -verify %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -verify %s | FileCheck %s
 
 class MyClass { 
   func foo() { }
 }
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 func marker_1() {}
 func marker_2() {}
@@ -15,15 +15,15 @@ class DerivedClass : BaseClass {}
 
 var global_cond: Bool = false
 
-func bar(x: Int) {}
-func foo(x: Int, _ y: Bool) {}
+func bar(_ x: Int) {}
+func foo(_ x: Int, _ y: Bool) {}
 
 @noreturn
 func abort() { abort() }
 
 
 
-func assignment(x: Int, y: Int) {
+func assignment(_ x: Int, y: Int) {
   var x = x
   var y = y
   x = 42
@@ -39,7 +39,7 @@ func assignment(x: Int, y: Int) {
 // CHECK: integer_literal $Builtin.Int2048, 57
 // CHECK: assign
 
-func if_test(x: Int, y: Bool) {
+func if_test(_ x: Int, y: Bool) {
   if (y) {
    bar(x);
   }
@@ -48,7 +48,7 @@ func if_test(x: Int, y: Bool) {
 
 // CHECK-LABEL: sil hidden  @_TF10statements7if_test
 
-func if_else(x: Int, y: Bool) {
+func if_else(_ x: Int, y: Bool) {
   if (y) {
    bar(x);
   } else {
@@ -59,7 +59,7 @@ func if_else(x: Int, y: Bool) {
 
 // CHECK-LABEL: sil hidden  @_TF10statements7if_else
 
-func nested_if(x: Int, y: Bool, z: Bool) {
+func nested_if(_ x: Int, y: Bool, z: Bool) {
   if (y) {
     if (z) {
       bar(x);
@@ -74,7 +74,7 @@ func nested_if(x: Int, y: Bool, z: Bool) {
 
 // CHECK-LABEL: sil hidden  @_TF10statements9nested_if
 
-func nested_if_merge_noret(x: Int, y: Bool, z: Bool) {
+func nested_if_merge_noret(_ x: Int, y: Bool, z: Bool) {
   if (y) {
     if (z) {
       bar(x);
@@ -88,23 +88,23 @@ func nested_if_merge_noret(x: Int, y: Bool, z: Bool) {
 
 // CHECK-LABEL: sil hidden  @_TF10statements21nested_if_merge_noret
 
-func nested_if_merge_ret(x: Int, y: Bool, z: Bool) -> Int {
+func nested_if_merge_ret(_ x: Int, y: Bool, z: Bool) -> Int {
   if (y) {
     if (z) {
       bar(x);
     }
-    return 1;
+    return 1
   } else {
     if (z) {
       foo(x, y);
     }
   }
-  return 2;
+  return 2
 }
 
 // CHECK-LABEL: sil hidden  @_TF10statements19nested_if_merge_ret
 
-func else_break(x: Int, y: Bool, z: Bool) {
+func else_break(_ x: Int, y: Bool, z: Bool) {
   while z {
     if y {
     } else {
@@ -115,37 +115,37 @@ func else_break(x: Int, y: Bool, z: Bool) {
 
 // CHECK-LABEL: sil hidden  @_TF10statements10else_break
 
-func loop_with_break(x: Int, _ y: Bool, _ z: Bool) -> Int {
+func loop_with_break(_ x: Int, _ y: Bool, _ z: Bool) -> Int {
   while (x > 2) {
    if (y) {
      bar(x);
-     break;
+     break
    }
   }
 }
 
 // CHECK-LABEL: sil hidden  @_TF10statements15loop_with_break
 
-func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
+func loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
     if (y) {
      bar(x);
-     continue;
+     continue
     }
-    loop_with_break(x, y, z);
+    _ = loop_with_break(x, y, z);
   }
   bar(x);
 }
 
 // CHECK-LABEL: sil hidden  @_TF10statements18loop_with_continue
 
-func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
+func do_loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   repeat {
     if (x < 42) {
      bar(x);
-     continue;
+     continue
     }
-    loop_with_break(x, y, z);
+    _ = loop_with_break(x, y, z);
   }
   while (x > 2);
   bar(x);
@@ -155,30 +155,19 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
 
 
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops1
-func for_loops1(x: Int, c: Bool) {
-  var x = x
+func for_loops1(_ x: Int, c: Bool) {
   for i in 1..<100 {
     markUsed(i)
   }
-  
-  for ; x < 40;  {
-   markUsed(x)
-   ++x
-  }
-  
-  for var i = 0; i < 100; ++i {
-  }
-  
-  for let i = 0; i < 100; i {
-  }
+
 }
 
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops2
 func for_loops2() {
   // rdar://problem/19316670
-  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_TFVs17IndexingGenerator4next
+  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_TFVs16IndexingIterator4next
   // CHECK-NEXT: alloc_stack $Optional<MyClass>
-  // CHECK-NEXT: apply [[NEXT]]<Array<MyClass>,
+  // CHECK-NEXT: apply [[NEXT]]<[MyClass],
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
   let objects = [MyClass(), MyClass() ]
   for obj in objects {
@@ -208,7 +197,7 @@ func foo() {}
 
 // <rdar://problem/13549626>
 // CHECK-LABEL: sil hidden  @_TF10statements14return_from_if
-func return_from_if(a: Bool) -> Int {
+func return_from_if(_ a: Bool) -> Int {
   // CHECK: bb0(%0 : $Bool):
   // CHECK: cond_br {{.*}}, [[THEN:bb[0-9]+]], [[ELSE:bb[0-9]+]]
   if a {
@@ -228,9 +217,9 @@ func return_from_if(a: Bool) -> Int {
 
 class C {}
 
-func use(c: C) {}
+func use(_ c: C) {}
 
-func for_each_loop(x: [C]) {
+func for_each_loop(_ x: [C]) {
   for i in x {
     use(i)
   }
@@ -238,7 +227,7 @@ func for_each_loop(x: [C]) {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}test_break
-func test_break(i : Int) {
+func test_break(_ i : Int) {
   switch i {
   case (let x) where x != 17: 
     if x == 42 { break } 
@@ -252,9 +241,9 @@ func test_break(i : Int) {
 // <rdar://problem/19150249> Allow labeled "break" from an "if" statement
 
 // CHECK-LABEL: sil hidden @_TF10statements13test_if_breakFGSqCS_1C_T_
-func test_if_break(c : C?) {
+func test_if_break(_ c : C?) {
 label1:
-  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
 // CHECK: [[TRUE]]({{.*}} : $C):
 
@@ -272,9 +261,9 @@ label1:
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements18test_if_else_breakFGSqCS_1C_T_
-func test_if_else_break(c : C?) {
+func test_if_else_break(_ c : C?) {
 label2:
-  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
@@ -292,9 +281,9 @@ label2:
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements23test_if_else_then_breakFTSbGSqCS_1C__T_
-func test_if_else_then_break(a : Bool, _ c : C?) {
+func test_if_else_then_break(_ a : Bool, _ c : C?) {
   label3:
-  // CHECK: switch_enum %1 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum %1 : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
@@ -319,7 +308,7 @@ func test_if_else_then_break(a : Bool, _ c : C?) {
 
 
 // CHECK-LABEL: sil hidden @_TF10statements13test_if_breakFSbT_
-func test_if_break(a : Bool) {
+func test_if_break(_ a : Bool) {
   // CHECK: br [[LOOP:bb[0-9]+]]
   // CHECK: [[LOOP]]:
   // CHECK: function_ref @_TFSb21_getBuiltinLogicValue
@@ -463,7 +452,7 @@ func defer_test1() {
 // CHECK: function_ref @{{.*}}callee2FT_T_
 
 // CHECK-LABEL: sil hidden @_TF10statements11defer_test2FSbT_
-func defer_test2(cond : Bool) {
+func defer_test2(_ cond : Bool) {
   // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3FT_T_
   // CHECK: apply [[C3]]
   // CHECK: br [[LOOP:bb[0-9]+]]
@@ -498,7 +487,7 @@ func generic_callee_2<T>(_: T) {}
 func generic_callee_3<T>(_: T) {}
 
 // CHECK-LABEL: sil hidden @_TF10statements16defer_in_generic
-func defer_in_generic<T>(x: T) {
+func defer_in_generic<T>(_ x: T) {
   // CHECK: [[C3:%.*]] = function_ref @_TF10statements16generic_callee_3
   // CHECK: apply [[C3]]<T>
   // CHECK: [[C2:%.*]] = function_ref @_TFF10statements16defer_in_generic
@@ -511,19 +500,20 @@ func defer_in_generic<T>(x: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements13defer_mutableFSiT_
-func defer_mutable(x: Int) {
+func defer_mutable(_ x: Int) {
   var x = x
   // CHECK: [[BOX:%.*]] = alloc_box $Int
-  // CHECK-NOT: [[BOX]]#0
-  // CHECK: function_ref @_TFF10statements13defer_mutableFSiT_L_6$deferfT_T_ : $@convention(thin) (@inout Int) -> ()
-  // CHECK-NOT: [[BOX]]#0
-  // CHECK: strong_release [[BOX]]#0
+  // CHECK-NEXT: project_box [[BOX]]
+  // CHECK-NOT: [[BOX]]
+  // CHECK: function_ref @_TFF10statements13defer_mutableFSiT_L_6$deferfT_T_ : $@convention(thin) (@inout_aliasable Int) -> ()
+  // CHECK-NOT: [[BOX]]
+  // CHECK: strong_release [[BOX]]
   defer { _ = x }
 }
 
 protocol StaticFooProtocol { static func foo() }
 
-func testDeferOpenExistential(b: Bool, type: StaticFooProtocol.Type) {
+func testDeferOpenExistential(_ b: Bool, type: StaticFooProtocol.Type) {
   defer { type.foo() }
   if b { return }
   return
@@ -534,7 +524,7 @@ func testDeferOpenExistential(b: Bool, type: StaticFooProtocol.Type) {
 
 // CHECK-LABEL: sil hidden @_TF10statements22testRequireExprPatternFSiT_
 
-func testRequireExprPattern(a : Int) {
+func testRequireExprPattern(_ a : Int) {
   marker_1()
   // CHECK: [[M1:%[0-9]+]] = function_ref @_TF10statements8marker_1FT_T_ : $@convention(thin) () -> ()
   // CHECK-NEXT: apply [[M1]]() : $@convention(thin) () -> ()
@@ -564,12 +554,12 @@ func testRequireExprPattern(a : Int) {
 
 // CHECK-LABEL: sil hidden @_TF10statements20testRequireOptional1FGSqSi_Si
 // CHECK: bb0(%0 : $Optional<Int>):
-// CHECK-NEXT:   debug_value %0 : $Optional<Int>  // let a
-// CHECK-NEXT:   switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, default bb2
-func testRequireOptional1(a : Int?) -> Int {
+// CHECK-NEXT:   debug_value %0 : $Optional<Int>, let, name "a"
+// CHECK-NEXT:   switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: bb1, default bb2
+func testRequireOptional1(_ a : Int?) -> Int {
 
   // CHECK: bb1(%3 : $Int):
-  // CHECK-NEXT:   debug_value %3 : $Int  // let t
+  // CHECK-NEXT:   debug_value %3 : $Int, let, name "t"
   // CHECK-NEXT:   return %3 : $Int
   guard let t = a else { abort() }
 
@@ -583,14 +573,14 @@ func testRequireOptional1(a : Int?) -> Int {
 
 // CHECK-LABEL: sil hidden @_TF10statements20testRequireOptional2FGSqSS_SS
 // CHECK: bb0(%0 : $Optional<String>):
-// CHECK-NEXT:   debug_value %0 : $Optional<String>  // let a
+// CHECK-NEXT:   debug_value %0 : $Optional<String>, let, name "a"
 // CHECK-NEXT:   retain_value %0 : $Optional<String>
-// CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.Some!enumelt.1: bb1, default bb2
-func testRequireOptional2(a : String?) -> String {
+// CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.some!enumelt.1: bb1, default bb2
+func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
   // CHECK:  bb1(%4 : $String):
-  // CHECK-NEXT:   debug_value %4 : $String  // let t
+  // CHECK-NEXT:   debug_value %4 : $String, let, name "t"
   // CHECK-NEXT:   release_value %0 : $Optional<String>
   // CHECK-NEXT:   return %4 : $String
 
@@ -602,31 +592,32 @@ func testRequireOptional2(a : String?) -> String {
   return t
 }
 
-enum MyOpt<T> {
-  case None, Some(T)
+enum MyOptional<Wrapped> {
+  case none
+  case some(Wrapped)
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements28testAddressOnlyEnumInRequire
-// CHECK: bb0(%0 : $*T, %1 : $*MyOpt<T>):
-// CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>  // let a
-// CHECK-NEXT: %3 = alloc_stack $T  // let t
-// CHECK-NEXT: %4 = alloc_stack $MyOpt<T>
-// CHECK-NEXT: copy_addr %1 to [initialization] %4#1 : $*MyOpt<T>
-// CHECK-NEXT: switch_enum_addr %4#1 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
-func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
+// CHECK: bb0(%0 : $*T, %1 : $*MyOptional<T>):
+// CHECK-NEXT: debug_value_addr %1 : $*MyOptional<T>, let, name "a"
+// CHECK-NEXT: %3 = alloc_stack $T, let, name "t"
+// CHECK-NEXT: %4 = alloc_stack $MyOptional<T>
+// CHECK-NEXT: copy_addr %1 to [initialization] %4 : $*MyOptional<T>
+// CHECK-NEXT: switch_enum_addr %4 : $*MyOptional<T>, case #MyOptional.some!enumelt.1: bb2, default bb1
+func testAddressOnlyEnumInRequire<T>(_ a: MyOptional<T>) -> T {
   // CHECK:  bb1:
-  // CHECK-NEXT:   dealloc_stack %4#0
-  // CHECK-NEXT:   dealloc_stack %3#0
+  // CHECK-NEXT:   dealloc_stack %4
+  // CHECK-NEXT:   dealloc_stack %3
   // CHECK-NEXT:   br bb3
   guard let t = a else { abort() }
 
   // CHECK:    bb2:
-  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4#1 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
-  // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3#1 : $*T
-  // CHECK-NEXT:     dealloc_stack %4#0
-  // CHECK-NEXT:     copy_addr [take] %3#1 to [initialization] %0 : $*T
-  // CHECK-NEXT:     dealloc_stack %3#0
-  // CHECK-NEXT:     destroy_addr %1 : $*MyOpt<T>
+  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4 : $*MyOptional<T>, #MyOptional.some!enumelt.1
+  // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3 : $*T
+  // CHECK-NEXT:     dealloc_stack %4
+  // CHECK-NEXT:     copy_addr [take] %3 to [initialization] %0 : $*T
+  // CHECK-NEXT:     dealloc_stack %3
+  // CHECK-NEXT:     destroy_addr %1 : $*MyOptional<T>
   // CHECK-NEXT:     tuple ()
   // CHECK-NEXT:     return
 
@@ -644,7 +635,7 @@ func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
 // CHECK-LABEL: sil hidden @_TF10statements19testCleanupEmission
 // <rdar://problem/20563234> let-else problem: cleanups for bound patterns shouldn't be run in the else block
 protocol MyProtocol {}
-func testCleanupEmission<T>(x: T) {
+func testCleanupEmission<T>(_ x: T) {
   // SILGen shouldn't crash/verify abort on this example.
   guard let x2 = x as? MyProtocol else { return }
   _ = x2
@@ -652,7 +643,7 @@ func testCleanupEmission<T>(x: T) {
 
 
 // CHECK-LABEL: sil hidden @_TF10statements15test_is_patternFCS_9BaseClassT_
-func test_is_pattern(y : BaseClass) {
+func test_is_pattern(_ y : BaseClass) {
   // checked_cast_br %0 : $BaseClass to $DerivedClass
   guard case is DerivedClass = y else { marker_1(); return }
 
@@ -660,24 +651,24 @@ func test_is_pattern(y : BaseClass) {
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements15test_as_patternFCS_9BaseClassCS_12DerivedClass
-func test_as_pattern(y : BaseClass) -> DerivedClass {
+func test_as_pattern(_ y : BaseClass) -> DerivedClass {
   // checked_cast_br %0 : $BaseClass to $DerivedClass
   guard case let result as DerivedClass = y else {  }
   // CHECK: bb{{.*}}({{.*}} : $DerivedClass):
 
 
   // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : $DerivedClass):
-  // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass  // let result
+  // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass, let, name "result"
   // CHECK-NEXT: strong_release %0 : $BaseClass
   // CHECK-NEXT: return [[PTR]] : $DerivedClass
   return result
 }
 // CHECK-LABEL: sil hidden @_TF10statements22let_else_tuple_bindingFGSqTSiSi__Si
-func let_else_tuple_binding(a : (Int, Int)?) -> Int {
+func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
 
   // CHECK: bb0(%0 : $Optional<(Int, Int)>):
-  // CHECK-NEXT:   debug_value %0 : $Optional<(Int, Int)>  // let a
-  // CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.Some!enumelt.1: bb1, default bb2
+  // CHECK-NEXT:   debug_value %0 : $Optional<(Int, Int)>, let, name "a"
+  // CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.some!enumelt.1: bb1, default bb2
 
   guard let (x, y) = a else { }
   _ = y
@@ -685,9 +676,9 @@ func let_else_tuple_binding(a : (Int, Int)?) -> Int {
 
   // CHECK: bb1(%3 : $(Int, Int)):
   // CHECK-NEXT:   %4 = tuple_extract %3 : $(Int, Int), 0
-  // CHECK-NEXT:   debug_value %4 : $Int  // let x
+  // CHECK-NEXT:   debug_value %4 : $Int, let, name "x"
   // CHECK-NEXT:   %6 = tuple_extract %3 : $(Int, Int), 1
-  // CHECK-NEXT:   debug_value %6 : $Int  // let y
+  // CHECK-NEXT:   debug_value %6 : $Int, let, name "y"
   // CHECK-NEXT:   return %4 : $Int
 }
 

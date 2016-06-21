@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -32,7 +32,7 @@ SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class,
                          alignof(SILVTable));
   SILVTable *vt = ::new (buf) SILVTable(Class, Entries);
   M.vtables.push_back(vt);
-  M.VTableLookupTable[Class] = vt;
+  M.VTableMap[Class] = vt;
   return vt;
 }
 

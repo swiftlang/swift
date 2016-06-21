@@ -5,10 +5,10 @@ struct BadContainer1 {
 }
 
 func bad_containers_1(bc: BadContainer1) {
-  for e in bc { } // expected-error{{type 'BadContainer1' does not conform to protocol 'SequenceType'}}
+  for e in bc { } // expected-error{{type 'BadContainer1' does not conform to protocol 'Sequence'}}
 }
 
-struct BadContainer2 : SequenceType { // expected-error{{type 'BadContainer2' does not conform to protocol 'SequenceType'}}
+struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
   var generate : Int
 }
 
@@ -16,21 +16,19 @@ func bad_containers_2(bc: BadContainer2) {
   for e in bc { }
 }
 
-struct BadContainer3 : SequenceType { // expected-error{{type 'BadContainer3' does not conform to protocol 'SequenceType'}}
-  func generate() { } // expected-note{{inferred type '()' (by matching requirement 'generate()') is invalid: does not conform to 'GeneratorType'}}
+struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}}
+  func makeIterator() { } // expected-note{{inferred type '()' (by matching requirement 'makeIterator()') is invalid: does not conform to 'IteratorProtocol'}}
 }
 
 func bad_containers_3(bc: BadContainer3) {
   for e in bc { }
 }
 
-struct BadGeneratorType1 {
-  
-}
+struct BadIterator1 {}
 
-struct BadContainer4 : SequenceType { // expected-error{{type 'BadContainer4' does not conform to protocol 'SequenceType'}}
-  typealias Generator = BadGeneratorType1 // expected-note{{possibly intended match 'Generator' (aka 'BadGeneratorType1') does not conform to 'GeneratorType'}}
-  func generate() -> BadGeneratorType1 { }
+struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}}
+  typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
+  func makeIterator() -> BadIterator1 { }
 }
 
 func bad_containers_4(bc: BadContainer4) {
@@ -39,23 +37,23 @@ func bad_containers_4(bc: BadContainer4) {
 
 // Pattern type-checking
 
-struct GoodRange<Int> : SequenceType, GeneratorType {
+struct GoodRange<Int> : Sequence, IteratorProtocol {
   typealias Element = Int
   func next() -> Int? {}
 
-  typealias Generator = GoodRange<Int>
-  func generate() -> GoodRange<Int> { return self }
+  typealias Iterator = GoodRange<Int>
+  func makeIterator() -> GoodRange<Int> { return self }
 }
 
-struct GoodTupleGeneratorType : SequenceType, GeneratorType {
+struct GoodTupleIterator: Sequence, IteratorProtocol {
   typealias Element = (Int, Float)
   func next() -> (Int, Float)? {}
 
-  typealias Generator = GoodTupleGeneratorType
-  func generate() -> GoodTupleGeneratorType {}
+  typealias Iterator = GoodTupleIterator
+  func makeIterator() -> GoodTupleIterator {}
 }
 
-func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
+func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
   var sum : Int
   var sumf : Float
   for i : Int in gir { sum = sum + i }
@@ -67,7 +65,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
   for (i, f) in gtr {
     sum = sum + i
     sumf = sumf + f
-    sum = sum + f  // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+    sum = sum + f  // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Float'}} expected-note {{expected an argument list of type '(Int, Int)'}}
   }
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }
@@ -96,12 +94,12 @@ struct X<T> {
   var value: T
 }
 
-struct Gen<T> : GeneratorType {
+struct Gen<T> : IteratorProtocol {
   func next() -> T? { return nil }
 }
 
-struct Seq<T> : SequenceType {
-  func generate() -> Gen<T> { return Gen() }
+struct Seq<T> : Sequence {
+  func makeIterator() -> Gen<T> { return Gen() }
 }
 
 func getIntSeq() -> Seq<Int> { return Seq() }
@@ -153,7 +151,7 @@ func testForEachInference() {
 func testMatchingPatterns() {
   // <rdar://problem/21428712> for case parse failure
   let myArray : [Int?] = []
-  for case .Some(let x) in myArray {
+  for case .some(let x) in myArray {
     _ = x
   }
 
@@ -174,3 +172,9 @@ func testOptionalSequence() {
   }
 }
 
+// Crash with (invalid) for each over an existential
+func testExistentialSequence(s: Sequence) { // expected-error {{protocol 'Sequence' can only be used as a generic constraint because it has Self or associated type requirements}}
+  for x in s { // expected-error {{using 'Sequence' as a concrete type conforming to protocol 'Sequence' is not supported}}
+    _ = x
+  }
+}

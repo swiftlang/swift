@@ -13,7 +13,7 @@
 import Mixed
 
 let instance = SwiftClass(x: 42)
-instance.pureSwiftMethod(nil)
+_ = instance.pureSwiftMethod(nil)
 
 let clangStruct = PureClangType(x: 1, y: 2)
 instance.categoryMethod(clangStruct)
@@ -23,6 +23,15 @@ let x: BogusClass? = nil // expected-error {{'BogusClass' is unavailable: cannot
 _ = PureSwiftClass.verify()
 _ = Mixed.PureSwiftClass.verify()
 
-let _: CustomNameType = convertToProto(CustomNameClass())
+let _: CustomName = convertToProto(CustomNameClass())
 
-_ = SwiftClassWithCustomName() // expected-error {{use of unresolved identifier 'SwiftClassWithCustomName'}}
+_ = SwiftClassWithCustomName() // expected-error {{'SwiftClassWithCustomName' has been renamed to 'CustomNameClass'}}
+
+func testAnyObject(_ obj: AnyObject) {
+  obj.method()
+  _ = obj.integerProperty
+  obj.extensionMethod()
+  obj.categoryMethod(clangStruct)
+  obj.protoMethod()
+  _ = obj.protoProperty
+}

@@ -13,7 +13,7 @@ struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible 
 
   init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) { 
   }
@@ -22,7 +22,7 @@ struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible 
 
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1) { 
   }
 
@@ -36,7 +36,7 @@ struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralCo
 
   init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) { 
   }
@@ -45,13 +45,13 @@ struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralCo
 
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word,
+    utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) { }
 
   init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    numberOfCodeUnits: Builtin.Word
+    utf16CodeUnitCount: Builtin.Word
   ) { 
   }
 
@@ -70,8 +70,8 @@ func literals() {
 // CHECK: string_literal utf16 "foö"
 // CHECK: string_literal utf8 "foo"
 
-func bar(x: Int) {}
-func bar(x: Int, _ y: Int) {}
+func bar(_ x: Int) {}
+func bar(_ x: Int, _ y: Int) {}
 
 func call_one() {
   bar(42);
@@ -116,9 +116,9 @@ class C {
 
 // CHECK-LABEL: sil hidden @_TF11expressions7classesFT_T_
 func classes() {
-  // CHECK: function_ref @_TFC11expressions1CC{{.*}} : $@convention(thin) (@thick C.Type) -> @owned C
+  // CHECK: function_ref @_TFC11expressions1CC{{.*}} : $@convention(method) (@thick C.Type) -> @owned C
   var a = C()
-  // CHECK: function_ref @_TFC11expressions1CC{{.*}} : $@convention(thin) (Int, @thick C.Type) -> @owned C
+  // CHECK: function_ref @_TFC11expressions1CC{{.*}} : $@convention(method) (Int, @thick C.Type) -> @owned C
   var b = C(x: 0)
 }
 
@@ -134,14 +134,14 @@ struct S {
 
 // CHECK-LABEL: sil hidden @_TF11expressions7structsFT_T_
 func structs() {
-  // CHECK: function_ref @_TFV11expressions1SC{{.*}} : $@convention(thin) (@thin S.Type) -> S
+  // CHECK: function_ref @_TFV11expressions1SC{{.*}} : $@convention(method) (@thin S.Type) -> S
   var a = S()
-  // CHECK: function_ref @_TFV11expressions1SC{{.*}} : $@convention(thin) (Int, @thin S.Type) -> S
+  // CHECK: function_ref @_TFV11expressions1SC{{.*}} : $@convention(method) (Int, @thin S.Type) -> S
   var b = S(x: 0)
 }
 
 
-func inoutcallee(inout x: Int) {}
+func inoutcallee(_ x: inout Int) {}
 func address_of_expr() {
   var x: Int = 4
   inoutcallee(&x)
@@ -149,7 +149,7 @@ func address_of_expr() {
 
 
 
-func identity<T>(x: T) -> T {}
+func identity<T>(_ x: T) -> T {}
 
 struct SomeStruct {
  mutating
@@ -171,10 +171,10 @@ func module_path() -> Int {
   // CHECK-NEXT: apply [[x_GET]]()
 }
 
-func default_args(x: Int, y: Int = 219, z: Int = 20721) {}
+func default_args(_ x: Int, y: Int = 219, z: Int = 20721) {}
 
 // CHECK-LABEL: sil hidden @_TF11expressions19call_default_args_1
-func call_default_args_1(x: Int) {
+func call_default_args_1(_ x: Int) {
   default_args(x)
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF11expressions12default_args
   // CHECK: [[YFUNC:%[0-9]+]] = function_ref @_TIF11expressions12default_args
@@ -185,7 +185,7 @@ func call_default_args_1(x: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions19call_default_args_2
-func call_default_args_2(x: Int, z: Int) {
+func call_default_args_2(_ x: Int, z: Int) {
   default_args(x, z:z)
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF11expressions12default_args
   // CHECK: [[DEFFN:%[0-9]+]] = function_ref @_TIF11expressions12default_args
@@ -207,7 +207,7 @@ struct Generic<T> {
 
   // CHECK-LABEL: sil hidden @_TFV11expressions7Generic19copy_typevar_member
   mutating
-  func copy_typevar_member(x: Generic<T>) {
+  func copy_typevar_member(_ x: Generic<T>) {
     typevar_member = x.typevar_member
   }
 
@@ -216,7 +216,7 @@ struct Generic<T> {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions18generic_member_ref
-func generic_member_ref<T>(x: Generic<T>) -> Int {
+func generic_member_ref<T>(_ x: Generic<T>) -> Int {
   // CHECK: bb0([[XADDR:%[0-9]+]] : $*Generic<T>):
   return x.mono_member
   // CHECK: [[MEMBER_ADDR:%[0-9]+]] = struct_element_addr {{.*}}, #Generic.mono_member
@@ -224,7 +224,7 @@ func generic_member_ref<T>(x: Generic<T>) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions24bound_generic_member_ref
-func bound_generic_member_ref(x: Generic<UnicodeScalar>) -> Int {
+func bound_generic_member_ref(_ x: Generic<UnicodeScalar>) -> Int {
   var x = x
   // CHECK: bb0([[XADDR:%[0-9]+]] : $Generic<UnicodeScalar>):
   return x.mono_member
@@ -233,7 +233,7 @@ func bound_generic_member_ref(x: Generic<UnicodeScalar>) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions6coerce
-func coerce(x: Int32) -> Int64 {
+func coerce(_ x: Int32) -> Int64 {
   return 0
 }
 
@@ -244,26 +244,26 @@ class D : B {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions8downcast
-func downcast(x: B) -> D {
+func downcast(_ x: B) -> D {
   return x as! D
   // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to $D
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions6upcast
-func upcast(x: D) -> B {
+func upcast(_ x: D) -> B {
   return x
   // CHECK: upcast %{{[0-9]+}} : ${{.*}} to $B
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions14generic_upcast
-func generic_upcast<T : B>(x: T) -> B {
+func generic_upcast<T : B>(_ x: T) -> B {
   return x
   // CHECK: upcast %{{.*}} to $B
   // CHECK: return
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions16generic_downcast
-func generic_downcast<T : B>(x: T, y: B) -> T {
+func generic_downcast<T : B>(_ x: T, y: B) -> T {
   return y as! T
   // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to $T
   // CHECK: return
@@ -279,12 +279,12 @@ func metatype_upcast() -> B.Type {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions19interpolated_string
-func interpolated_string(x: Int, y: String) -> String {
+func interpolated_string(_ x: Int, y: String) -> String {
   return "The \(x) Million Dollar \(y)"
 }
 
 protocol Runcible {
-  typealias U
+  associatedtype U
   var free:Int { get }
   var associated:U { get }
 
@@ -303,14 +303,14 @@ protocol Bendable { }
 protocol Wibbleable { }
 
 // CHECK-LABEL: sil hidden @_TF11expressions20archetype_member_ref
-func archetype_member_ref<T : Runcible>(x: T) {
+func archetype_member_ref<T : Runcible>(_ x: T) {
   var x = x
   x.free_method()
   // CHECK: witness_method $T, #Runcible.free_method!1
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $T
-  // CHECK-NEXT: copy_addr [[X:%.*]] to [initialization] [[TEMP]]#1
+  // CHECK-NEXT: copy_addr [[X:%.*]] to [initialization] [[TEMP]]
   // CHECK-NEXT: apply
-  // CHECK-NEXT: destroy_addr [[TEMP]]#1
+  // CHECK-NEXT: destroy_addr [[TEMP]]
   var u = x.associated_method()
   // CHECK: witness_method $T, #Runcible.associated_method!1
   // CHECK-NEXT: apply
@@ -321,7 +321,7 @@ func archetype_member_ref<T : Runcible>(x: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions22existential_member_ref
-func existential_member_ref(x: Mincible) {
+func existential_member_ref(_ x: Mincible) {
   x.free_method()
   // CHECK: open_existential_addr
   // CHECK-NEXT: witness_method
@@ -329,13 +329,13 @@ func existential_member_ref(x: Mincible) {
 }
 
 /*TODO archetype and existential properties and subscripts
-func archetype_property_ref<T : Runcible>(x: T) -> (Int, T.U) {
+func archetype_property_ref<T : Runcible>(_ x: T) -> (Int, T.U) {
   x.free = x.free_method()
   x.associated = x.associated_method()
   return (x.free, x.associated)
 }
 
-func existential_property_ref<T : Runcible>(x: T) -> Int {
+func existential_property_ref<T : Runcible>(_ x: T) -> Int {
   x.free = x.free_method()
   return x.free
 }
@@ -372,7 +372,7 @@ struct Hat<T> : Runcible {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions7erasure
-func erasure(x: Spoon) -> Mincible {
+func erasure(_ x: Spoon) -> Mincible {
   return x
   // CHECK: init_existential_addr
   // CHECK: return
@@ -392,22 +392,23 @@ func declref_to_generic_metatype() -> Generic<UnicodeScalar>.Type {
   // CHECK: metatype $@thin Generic<UnicodeScalar>.Type
 }
 
-func int(x: Int) {}
-func float(x: Float) {}
+func int(_ x: Int) {}
+func float(_ x: Float) {}
 
 func tuple() -> (Int, Float) { return (1, 1.0) }
 
 // CHECK-LABEL: sil hidden @_TF11expressions13tuple_element
-func tuple_element(x: (Int, Float)) {
+func tuple_element(_ x: (Int, Float)) {
   var x = x
   // CHECK: [[XADDR:%.*]] = alloc_box $(Int, Float)
+  // CHECK: [[PB:%.*]] = project_box [[XADDR]]
 
   int(x.0)
-  // CHECK: tuple_element_addr [[XADDR]]#1 : {{.*}}, 0
+  // CHECK: tuple_element_addr [[PB]] : {{.*}}, 0
   // CHECK: apply
 
   float(x.1)
-  // CHECK: tuple_element_addr [[XADDR]]#1 : {{.*}}, 1
+  // CHECK: tuple_element_addr [[PB]] : {{.*}}, 1
   // CHECK: apply
 
   int(tuple().0)
@@ -425,7 +426,7 @@ func containers() -> ([Int], Dictionary<String, Int>) {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions7if_expr
-func if_expr(a: Bool, b: Bool, x: Int, y: Int, z : Int) -> Int {
+func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var a = a
   var b = b
   var x = x
@@ -433,31 +434,36 @@ func if_expr(a: Bool, b: Bool, x: Int, y: Int, z : Int) -> Int {
   var z = z
   // CHECK: bb0({{.*}}):
   // CHECK: [[AB:%[0-9]+]] = alloc_box $Bool
+  // CHECK: [[PBA:%.*]] = project_box [[AB]]
   // CHECK: [[BB:%[0-9]+]] = alloc_box $Bool
+  // CHECK: [[PBB:%.*]] = project_box [[BB]]
   // CHECK: [[XB:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[PBX:%.*]] = project_box [[XB]]
   // CHECK: [[YB:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[PBY:%.*]] = project_box [[YB]]
   // CHECK: [[ZB:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[PBZ:%.*]] = project_box [[ZB]]
 
   return a
     ? x
     : b
     ? y
     : z
-  // CHECK:   [[A:%[0-9]+]] = load [[AB]]#1
+  // CHECK:   [[A:%[0-9]+]] = load [[PBA]]
   // CHECK:   [[ACOND:%[0-9]+]] = apply {{.*}}([[A]])
   // CHECK:   cond_br [[ACOND]], [[IF_A:bb[0-9]+]], [[ELSE_A:bb[0-9]+]]
   // CHECK: [[IF_A]]:
-  // CHECK:   [[XVAL:%[0-9]+]] = load [[XB]]
+  // CHECK:   [[XVAL:%[0-9]+]] = load [[PBX]]
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[XVAL]] : $Int)
   // CHECK: [[ELSE_A]]:
-  // CHECK:   [[B:%[0-9]+]] = load [[BB]]#1
+  // CHECK:   [[B:%[0-9]+]] = load [[PBB]]
   // CHECK:   [[BCOND:%[0-9]+]] = apply {{.*}}([[B]])
   // CHECK:   cond_br [[BCOND]], [[IF_B:bb[0-9]+]], [[ELSE_B:bb[0-9]+]]
   // CHECK: [[IF_B]]:
-  // CHECK:   [[YVAL:%[0-9]+]] = load [[YB]]
+  // CHECK:   [[YVAL:%[0-9]+]] = load [[PBY]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[YVAL]] : $Int)
   // CHECK: [[ELSE_B]]:
-  // CHECK:   [[ZVAL:%[0-9]+]] = load [[ZB]]
+  // CHECK:   [[ZVAL:%[0-9]+]] = load [[PBZ]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[ZVAL]] : $Int)
   // CHECK: [[CONT_B]]([[B_RES:%[0-9]+]] : $Int):
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[B_RES]] : $Int)
@@ -466,17 +472,17 @@ func if_expr(a: Bool, b: Bool, x: Int, y: Int, z : Int) -> Int {
 }
 
 
-// Test that magic identifiers expand properly.  We test __COLUMN__ here because
+// Test that magic identifiers expand properly.  We test #column here because
 // it isn't affected as this testcase slides up and down the file over time.
-func magic_identifier_expansion(a: Int = __COLUMN__) {
+func magic_identifier_expansion(_ a: Int = #column) {
   // CHECK-LABEL: sil hidden @{{.*}}magic_identifier_expansion
   
   // This should expand to the column number of the first _.
-  var tmp = __COLUMN__
+  var tmp = #column
   // CHECK: integer_literal $Builtin.Int2048, 13
 
   // This should expand to the column number of the (, not to the column number
-  // of __COLUMN__ in the default argument list of this function.
+  // of #column in the default argument list of this function.
   // rdar://14315674
   magic_identifier_expansion()
   // CHECK: integer_literal $Builtin.Int2048, 29
@@ -509,7 +515,7 @@ func testDiscardLValue() {
 }
 
 
-func dynamicTypePlusZero(a : Super1) -> Super1.Type {
+func dynamicTypePlusZero(_ a : Super1) -> Super1.Type {
   return a.dynamicType
 }
 // CHECK-LABEL: dynamicTypePlusZero
@@ -519,7 +525,7 @@ func dynamicTypePlusZero(a : Super1) -> Super1.Type {
 
 struct NonTrivialStruct { var c : Super1 }
 
-func dontEmitIgnoredLoadExpr(a : NonTrivialStruct) -> NonTrivialStruct.Type {
+func dontEmitIgnoredLoadExpr(_ a : NonTrivialStruct) -> NonTrivialStruct.Type {
   return a.dynamicType
 }
 // CHECK-LABEL: dontEmitIgnoredLoadExpr
@@ -533,17 +539,16 @@ func dontEmitIgnoredLoadExpr(a : NonTrivialStruct) -> NonTrivialStruct.Type {
 // <rdar://problem/18851497> Swiftc fails to compile nested destructuring tuple binding
 // CHECK-LABEL: sil hidden @_TF11expressions21implodeRecursiveTupleFGSqTTSiSi_Si__T_
 // CHECK: bb0(%0 : $Optional<((Int, Int), Int)>):
-func implodeRecursiveTuple(expr: ((Int, Int), Int)?) {
+func implodeRecursiveTuple(_ expr: ((Int, Int), Int)?) {
 
-  // CHECK:      [[WHOLE:%[0-9]+]] = load {{.*}} : $*((Int, Int), Int)
-  // CHECK-NEXT: [[WHOLE0:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 0
-  // CHECK-NEXT: [[WHOLE00:%[0-9]+]] = tuple_extract [[WHOLE0]] : $(Int, Int), 0
-  // CHECK-NEXT: [[WHOLE01:%[0-9]+]] = tuple_extract [[WHOLE0]] : $(Int, Int), 1
-  // CHECK-NEXT: [[WHOLE1:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 1
-
-  // CHECK-NEXT: [[X:%[0-9]+]] = tuple ([[WHOLE00]] : $Int, [[WHOLE01]] : $Int)
-  // CHECK-NEXT: debug_value [[X]] : $(Int, Int)  // let x
-  // CHECK-NEXT: debug_value [[WHOLE1]] : $Int  // let y
+  // CHECK:      [[WHOLE:%[0-9]+]] = unchecked_enum_data {{.*}} : $Optional<((Int, Int), Int)>
+  // CHECK-NEXT: [[X:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 0
+  // CHECK-NEXT: [[X0:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 0
+  // CHECK-NEXT: [[X1:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 1
+  // CHECK-NEXT: [[Y:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 1
+  // CHECK-NEXT: [[X:%[0-9]+]] = tuple ([[X0]] : $Int, [[X1]] : $Int)
+  // CHECK-NEXT: debug_value [[X]] : $(Int, Int), let, name "x"
+  // CHECK-NEXT: debug_value [[Y]] : $Int, let, name "y"
 
   let (x, y) = expr!
 }
@@ -552,7 +557,7 @@ func test20087517() {
   class Color {
     static func greenColor() -> Color { return Color() }
   }
-  let x: (Color!, Int) = (.greenColor(), 1)
+  let x: (Color?, Int) = (.greenColor(), 1)
 }
 
 func test20596042() {

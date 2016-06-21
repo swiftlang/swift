@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,7 +15,7 @@
 // Check that the generic parameters are called 'Base' and 'Element'.
 protocol TestProtocol1 {}
 
-extension LazyMapGenerator where Base : TestProtocol1, Element : TestProtocol1 {
+extension LazyMapIterator where Base : TestProtocol1, Element : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -42,7 +42,7 @@ let a = Array((2..<8).lazy.map { $0 * 3 })
 print(a)
 
 // Test mapping a sequence
-let s = a.generate().lazy.map { $0 / 3 }
+let s = a.makeIterator().lazy.map { $0 / 3 }
 // CHECK-NEXT: <2, 3, 4, 5, 6, 7>
 print("<", terminator: "")
 var prefix = ""
@@ -52,20 +52,22 @@ for x in s {
 }
 print(">")
 
-//===--- Avoid creating gratutitously self-destructive sequences ----------===//
+//===--- Avoid creating gratuitously self-destructive sequences -----------===//
 
 // In a naive implementation, mapping over a non-self-destructive
-// SequenceType having a reference-semantics GeneratorType produces a
+// Sequence having a reference-semantics IteratorProtocol produces a
 // self-destructive mapped view.  This is technically correct because
 // Sequences are allowed to be self-destructive, and theoretically
-// every multi-pass SequenceType would be a CollectionType, but Sequences are
+// every multi-pass Sequence would be a Collection, but Sequences are
 // much easier to build than Collections and it would be extremely
 // surprising for users if their mappings were not stable.
 
-// A GeneratorType with reference semantics
-class Counter : GeneratorType {
+// An IteratorProtocol with reference semantics
+class Counter : IteratorProtocol {
   func next() -> Int? {
-    return n < end ? n++ : nil
+    if n >= end { return nil }
+    n += 1
+    return n-1
   }
 
   init(_ n: Int, _ end: Int) {
@@ -77,9 +79,9 @@ class Counter : GeneratorType {
   var end: Int
 }
 
-// A SequenceType with value semantics
-struct IntRange : SequenceType {
-  func generate() -> Counter {
+// A Sequence with value semantics
+struct IntRange : Sequence {
+  func makeIterator() -> Counter {
     return Counter(start, end)
   }
   

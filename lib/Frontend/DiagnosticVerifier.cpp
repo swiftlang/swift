@@ -1,8 +1,8 @@
-//===- DiagnosticVerifier.cpp - Diagnostic Verifier (-verify) -------------===//
+//===--- DiagnosticVerifier.cpp - Diagnostic Verifier (-verify) -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -39,6 +39,10 @@ namespace {
     // This is true if a '*' constraint is present to say that the diagnostic
     // may appear (or not) an uncounted number of times.
     bool mayAppear = false;
+      
+    // This is true if a '{{none}}' is present to mark that there should be no
+    // extra fixits.
+    bool noExtraFixitsMayAppear = false;
 
     // This is the raw input buffer for the message text, the part in the
     // {{...}}
@@ -358,6 +362,12 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       // Prepare for the next round of checks.
       ExtraChecks = ExtraChecks.substr(EndLoc+2).ltrim();
       
+      // Special case for specifying no fixits should appear.
+      if (FixItStr == "none") {
+        Expected.noExtraFixitsMayAppear = true;
+        continue;
+      }
+        
       // Parse the pieces of the fix-it.
       size_t MinusLoc = FixItStr.find('-');
       if (MinusLoc == StringRef::npos) {
@@ -449,38 +459,37 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       if (!checkForFixIt(fixit, FoundDiagnostic, InputFile))
         IncorrectFixit = fixit.StartLoc;
     }
+
+    bool matchedAllFixIts =
+      expected.Fixits.size() == FoundDiagnostic.getFixIts().size();
     
     // If we have any expected fixits that didn't get matched, then they are
     // wrong.  Replace the failed fixit with what actually happened.
     if (IncorrectFixit) {
       if (FoundDiagnostic.getFixIts().empty()) {
         addError(IncorrectFixit, "expected fix-it not seen");
-        continue;
+      } else {
+        // If we had an incorrect expected fixit, render it and produce a fixit
+        // of our own.
+        auto actual = renderFixits(FoundDiagnostic.getFixIts(), InputFile);
+        auto replStartLoc = SMLoc::getFromPointer(expected.Fixits[0].StartLoc);
+        auto replEndLoc = SMLoc::getFromPointer(expected.Fixits.back().EndLoc);
+        
+        llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
+        addError(IncorrectFixit,
+                 "expected fix-it not seen; actual fix-its: " + actual, fix);
       }
-      
-      // If we had an incorrect expected fixit, render it and produce a fixit
-      // of our own.
-      auto actual = renderFixits(FoundDiagnostic.getFixIts(), InputFile);
-      auto replStartLoc = SMLoc::getFromPointer(expected.Fixits[0].StartLoc);
-      auto replEndLoc = SMLoc::getFromPointer(expected.Fixits.back().EndLoc);
-      
-      llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
-      addError(IncorrectFixit,
-               "expected fix-it not seen; actual fix-its: " + actual, fix);
-#if 0 // TODO: There are still some bugs with this, and we don't have a
-      // policy of requiring a fixit specification on tests.
-    } else if (expected.Fixits.empty() &&
-               !FoundDiagnostic.getFixIts().empty() &&
-               !expected.mayAppear &&
-                              false) {
+    } else if (expected.noExtraFixitsMayAppear &&
+               !matchedAllFixIts &&
+               !expected.mayAppear) {
       // If there was no fixit specification, but some were produced, add a
       // fixit to add them in.
       auto actual = renderFixits(FoundDiagnostic.getFixIts(), InputFile);
-      
-      llvm::SMFixIt fix(SMLoc::getFromPointer(expected.ExpectedEnd),
-                        " " + actual);
-      addError(expected.ExpectedEnd, "expected fix-it not specified", fix);
-#endif
+      auto replStartLoc = SMLoc::getFromPointer(expected.ExpectedEnd - 8); // {{none}} length
+      auto replEndLoc = SMLoc::getFromPointer(expected.ExpectedEnd - 1);
+
+      llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
+      addError(replStartLoc.getPointer(), "expected no fix-its; actual fix-it seen: " + actual, fix);
     }
     
     // Actually remove the diagnostic from the list, so we don't match it
@@ -617,7 +626,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
 /// file and drop it back in place.
 void DiagnosticVerifier::autoApplyFixes(unsigned BufferID,
                                         ArrayRef<llvm::SMDiagnostic> diags) {
-  // Walk the list of diagnostics, pulling out any fixits into a array of just
+  // Walk the list of diagnostics, pulling out any fixits into an array of just
   // them.
   SmallVector<llvm::SMFixIt, 4> FixIts;
   for (auto &diag : diags)

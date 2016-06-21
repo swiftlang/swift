@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -126,6 +126,8 @@ MAP_STDLIB_TYPE("u_int64_t", UnsignedInt, 64, "UInt64", false, DoNothing)
 // stdarg.h types.
 // FIXME: why does this not catch va_list on x86_64?
 MAP_STDLIB_TYPE("va_list", VaList, 0, "CVaListPointer", false, DoNothing)
+MAP_STDLIB_TYPE("__gnuc_va_list", VaList, 0, "CVaListPointer", false, DoNothing)
+MAP_STDLIB_TYPE("__va_list", VaList, 0, "CVaListPointer", false, DoNothing)
 
 // libkern/OSTypes.h types.
 MAP_STDLIB_TYPE("UInt", UnsignedInt, 32, "CUnsignedInt", false, DoNothing)
@@ -140,11 +142,15 @@ MAP_TYPE("BOOL", ObjCBool, 8, "ObjectiveC", "ObjCBool", false, DoNothing)
 MAP_TYPE("SEL",  ObjCSel, 0, "ObjectiveC", "Selector", false, DoNothing)
 MAP_STDLIB_TYPE("id", ObjCId, 0, "AnyObject", false, DoNothing)
 MAP_STDLIB_TYPE("Class", ObjCClass, 0, "AnyClass", false, DoNothing)
-MAP_STDLIB_TYPE("NSInteger", SignedWord, 0, "Int", false, DefineOnly)
+MAP_STDLIB_TYPE(
+  Impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSInteger),
+  SignedWord, 0, "Int", false, DefineOnly)
 
 // Treat NSUInteger specially: exposing it as a typealias for "Int" would be
 // confusing.
-MAP_STDLIB_TYPE("NSUInteger", UnsignedWord, 0, "Int", false, DoNothing)
+MAP_STDLIB_TYPE(
+  Impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSUInteger),
+  UnsignedWord, 0, "Int", false, DoNothing)
 
 // CoreGraphics types.
 MAP_TYPE("CGFloat", CGFloat, 0, "CoreGraphics", "CGFloat", false, DoNothing)
@@ -155,7 +161,9 @@ MAP_STDLIB_TYPE("CFIndex", SignedWord, 0, "Int", false, DefineAndUse)
 
 // Foundation types.
 // FIXME: <rdar://problem/16074941> NSStringEncoding doesn't work on 32-bit
-MAP_STDLIB_TYPE("NSStringEncoding", UnsignedWord, 0, "UInt", false, DoNothing)
+MAP_STDLIB_TYPE(
+  Impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSStringEncoding),
+  UnsignedWord, 0, "UInt", false, DoNothing)
 
 #undef MAP_STDLIB_TYPE
 #undef MAP_TYPE

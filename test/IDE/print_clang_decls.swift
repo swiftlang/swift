@@ -77,31 +77,38 @@
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
+// Skip through unavailable typedefs when importing types.
+// TAG_DECLS_AND_TYPEDEFS: @available(*, unavailable, message: "use double")
+// TAG_DECLS_AND_TYPEDEFS-NEXT: typealias real_t = Double
+// TAG_DECLS_AND_TYPEDEFS-NEXT: func realSin(_ value: Double) -> Double
+
 // NEGATIVE-NOT: typealias FooStructTypedef2
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}class NSArray : NSObject {{{$}}
-// FOUNDATION-NEXT  func objectAtIndex(index: Int) -> AnyObject!
+// FOUNDATION-NEXT: subscript(idx: Int) -> AnyObject { get }
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}
+// FOUNDATION-NEXT: {{^}}enum RuncingMode : UInt {{{$}}
 // FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  case Mince{{$}}
-// FOUNDATION-NEXT: {{^}}  case Quince{{$}}
+// FOUNDATION-NEXT: {{^}}  case mince{{$}}
+// FOUNDATION-NEXT: {{^}}  case quince{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : OptionSetType {{{$}}
+// FOUNDATION-NEXT: {{^}}struct RuncingOptions : OptionSet {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
-// FOUNDATION-NEXT: {{^}}  static var EnableMince: NSRuncingOptions { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  static var EnableQuince: NSRuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  @available(*, unavailable, message: "use [] to construct an empty option set"){{$}}
+// FOUNDATION-NEXT: {{^}}  static var none: RuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  static var enableMince: RuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  static var enableQuince: RuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}
-// FOUNDATION-NEXT: @available(*, unavailable, message="Zone-based memory management is unavailable")
-// FOUNDATION-NEXT: NSSetZoneName(zone: NSZone, _ name: String)
+// FOUNDATION-NEXT: @available(*, unavailable, message: "Zone-based memory management is unavailable")
+// FOUNDATION-NEXT: NSSetZoneName(_ zone: NSZone, _ name: String)
 
 // CTYPESBITS-NOT: FooStruct1
 // CTYPESBITS: {{^}}typealias DWORD = Int32{{$}}
@@ -111,13 +118,13 @@
 // CHECK-NULLABILITY: func getId1() -> AnyObject?
 // CHECK-NULLABILITY: var global_id: AnyObject?
 // CHECK-NULLABILITY: class SomeClass {
-// CHECK-NULLABILITY:   class func methodA(obj: SomeClass?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodA(obj: SomeClass?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   class func methodB(block: ((Int32, Int32) -> Int32)?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodB(block: ((Int32, Int32) -> Int32)?) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   class func methodA(_ obj: SomeClass?) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   func methodA(_ obj: SomeClass?) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   class func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
+// CHECK-NULLABILITY:   func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
 // CHECK-NULLABILITY:   func methodC() -> AnyObject?
 // CHECK-NULLABILITY:   var property: AnyObject?
 // CHECK-NULLABILITY:   func stringMethod() -> String{{$}}
 // CHECK-NULLABILITY:   func optArrayMethod() -> [AnyObject]?
 // CHECK-NULLABILITY: }
-// CHECK-NULLABILITY: func compare_classes(sc1: SomeClass, _ sc2: SomeClass, _ sc3: SomeClass!)
+// CHECK-NULLABILITY: func compare_classes(_ sc1: SomeClass, _ sc2: SomeClass, _ sc3: SomeClass!)

@@ -15,8 +15,8 @@ extension Super {
     set { }
   }
 
-  // CHECK: @objc dynamic subscript (sup: Super) -> Super
-  subscript (sup: Super) -> Super {
+  // CHECK: @objc dynamic subscript(sup: Super) -> Super
+  subscript(sup: Super) -> Super {
     // CHECK: @objc dynamic get
     get { return sup }
     // CHECK: @objc dynamic set
@@ -40,8 +40,8 @@ extension Sub {
     set { }
   }
 
-  // CHECK: @objc override dynamic subscript (sup: Super) -> Super
-  override subscript (sup: Super) -> Super {
+  // CHECK: @objc override dynamic subscript(sup: Super) -> Super
+  override subscript(sup: Super) -> Super {
     // CHECK: @objc override dynamic get
     get { return sup }
     // CHECK: @objc override dynamic set

@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+#
+# utils/build-toolchain - documents process for building a toolchain
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+cd "$(dirname $0)/.." || exit
+SRC_DIR=$PWD
+
+DRY_RUN=
+if [[ "$1" == "-n" || "$1" == "--dry-run" ]] ; then
+    DRY_RUN="-n"
+    shift
+fi
+
+YEAR=$(date +"%Y")
+MONTH=$(date +"%m")
+DAY=$(date +"%d")
+TOOLCHAIN_VERSION="swift-LOCAL-${YEAR}-${MONTH}-${DAY}-a"
+ARCHIVE="${TOOLCHAIN_VERSION}-osx.tar.gz"
+SYM_ARCHIVE="${TOOLCHAIN_VERSION}-osx-symbols.tar.gz"
+BUNDLE_PREFIX=${1:?Please specify bundle prefix e.g. $0 local.swift}
+BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
+DISPLAY_NAME_SHORT="Local Swift Development Snapshot"
+DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
+TOOLCHAIN_NAME="${TOOLCHAIN_VERSION}"
+
+SWIFT_INSTALLABLE_PACKAGE="${SRC_DIR}/${ARCHIVE}"
+SWIFT_INSTALL_DIR="${SRC_DIR}/swift-nightly-install"
+SWIFT_INSTALL_SYMROOT="${SRC_DIR}/swift-nightly-symroot"
+SWIFT_TOOLCHAIN_DIR="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain"
+SYMBOLS_PACKAGE="${SRC_DIR}/${SYM_ARCHIVE}"
+
+if [[ "$(uname -s)" == "Darwin" ]] ; then
+    SWIFT_PACKAGE=buildbot_osx_package
+else
+    SWIFT_PACKAGE=buildbot_linux
+fi
+
+./utils/build-script ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
+        install_destdir="${SWIFT_INSTALL_DIR}" \
+        installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
+        install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \
+        install_symroot="${SWIFT_INSTALL_SYMROOT}" \
+        symbols_package="${SYMBOLS_PACKAGE}" \
+        darwin_toolchain_bundle_identifier="${BUNDLE_IDENTIFIER}" \
+        darwin_toolchain_display_name="${DISPLAY_NAME}" \
+        darwin_toolchain_display_name_short="${DISPLAY_NAME_SHORT}" \
+        darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
+        darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
+        darwin_toolchain_alias="Local"

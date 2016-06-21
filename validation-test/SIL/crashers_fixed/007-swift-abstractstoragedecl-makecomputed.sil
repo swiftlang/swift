@@ -1,0 +1,3 @@
+// RUN: not %target-sil-opt %s
+// REQUIRES: asserts
+protocol a{@sil_stored var e:a{get

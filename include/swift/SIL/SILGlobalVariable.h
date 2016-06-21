@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -143,6 +143,19 @@ public:
   static SILGlobalVariable *getVariableOfStaticInitializer(SILFunction *F);
   /// Return the value that is written into the global variable.
   SILInstruction *getValueOfStaticInitializer();
+
+  /// Return whether this variable corresponds to a Clang node.
+  bool hasClangNode() const {
+    return (VDecl ? VDecl->hasClangNode() : false);
+  }
+
+  /// Return the Clang node associated with this variable if it has one.
+  ClangNode getClangNode() const {
+    return (VDecl ? VDecl->getClangNode() : ClangNode());
+  }
+  const clang::Decl *getClangDecl() const {
+    return (VDecl ? VDecl->getClangDecl() : nullptr);
+  }
 
   //===--------------------------------------------------------------------===//
   // Miscellaneous

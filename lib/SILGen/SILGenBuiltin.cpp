@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -85,7 +85,7 @@ static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
   // The value was produced at +1, so to produce an unbalanced
   // release we need to leave the cleanup intact and then do a *second*
   // release.
-  gen.B.createReleaseValue(loc, args[0].getValue());
+  gen.B.createReleaseValue(loc, args[0].getValue(), Atomicity::Atomic);
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
 }
 
@@ -97,7 +97,7 @@ static ManagedValue emitBuiltinAutorelease(SILGenFunction &gen,
                                            SGFContext C) {
   // The value was produced at +1, so to produce an unbalanced
   // autorelease we need to leave the cleanup intact.
-  gen.B.createAutoreleaseValue(loc, args[0].getValue());
+  gen.B.createAutoreleaseValue(loc, args[0].getValue(), Atomicity::Atomic);
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
 }
 
@@ -128,7 +128,8 @@ static ManagedValue emitBuiltinTryPin(SILGenFunction &gen,
   // The value was produced at +1, but pinning is only a conditional
   // retain, so we have to leave the cleanup in place.  TODO: try to
   // emit the argument at +0.
-  SILValue result = gen.B.createStrongPin(loc, args[0].getValue());
+  SILValue result =
+      gen.B.createStrongPin(loc, args[0].getValue(), Atomicity::Atomic);
 
   // The handle, if non-null, is effectively +1.
   return gen.emitManagedRValueWithCleanup(result);
@@ -144,7 +145,7 @@ static ManagedValue emitBuiltinUnpin(SILGenFunction &gen,
 
   if (requireIsOptionalNativeObject(gen, loc, subs[0].getReplacement())) {
     // Unpinning takes responsibility for the +1 handle.
-    gen.B.createStrongUnpin(loc, args[0].forward(gen));
+    gen.B.createStrongUnpin(loc, args[0].forward(gen), Atomicity::Atomic);
   }
 
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
@@ -245,10 +246,9 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
                                                assignType.getAddressType());
   
   // Build the value to be assigned, reconstructing tuples if needed.
-  ManagedValue src = RValue(args.slice(0, args.size() - 1), assignFormalType)
-    .getAsSingleValue(gen, loc);
+  RValue src(args.slice(0, args.size() - 1), assignFormalType);
   
-  src.assignInto(gen, loc, addr);
+  std::move(src).assignInto(gen, loc, addr);
 
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
@@ -532,7 +532,7 @@ emitBuiltinCastReference(SILGenFunction &gen,
     // dest are RC identical, store the reference into the source temp without
     // a retain. The cast will load the reference from the source temp and
     // store it into a dest temp effectively forwarding the cleanup.
-    fromAddr = gen.emitTemporaryAllocation(loc, srcVal.getType());
+    fromAddr = gen.emitTemporaryAllocation(loc, srcVal->getType());
     gen.B.createStore(loc, srcVal, fromAddr);
   } else {
     // The cast loads directly from the source address.
@@ -570,7 +570,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
 
     // If the from value is loadable, move it to a buffer.
     if (fromTL.isLoadable()) {
-      fromAddr = gen.emitTemporaryAllocation(loc, args[0].getValue().getType());
+      fromAddr = gen.emitTemporaryAllocation(loc, args[0].getValue()->getType());
       gen.B.createStore(loc, args[0].getValue(), fromAddr);
     } else {
       fromAddr = args[0].getValue();
@@ -690,223 +690,6 @@ static ManagedValue emitBuiltinCastBitPatternFromBridgeObject(
   SILType wordType = SILType::getBuiltinWordType(gen.getASTContext());
   SILValue result = gen.B.createBridgeObjectToWord(loc, args[0].getValue(),
                                                    wordType);
-  return ManagedValue::forUnmanaged(result);
-}
-
-static ManagedValue emitBuiltinMarkDependence(SILGenFunction &gen,
-                                              SILLocation loc,
-                                              ArrayRef<Substitution> subs,
-                                              ArrayRef<ManagedValue> args,
-                                              CanFunctionType formalApplyType,
-                                              SGFContext C) {
-  assert(args.size() == 2 && "markDependence should have two value args");
-  assert(subs.size() == 2 && "markDependence should have two generic args");
-
-  SILValue result =
-    gen.B.createMarkDependence(loc, args[0].forward(gen), args[1].getValue());
-  return gen.emitManagedRValueWithCleanup(result);
-}
-
-
-using ValueBufferOperation =
-  llvm::function_ref<ManagedValue(SILValue bufferAddr,
-                                  SILType valueType)>;
-
-static ManagedValue
-emitValueBufferOperation(SILGenFunction &gen,
-                         SILLocation loc,
-                         ArrayRef<Substitution> subs,
-                         Expr *tupleArg,
-                         CanFunctionType formalApplyType,
-                         SGFContext C,
-                         const ValueBufferOperation &operation) {
-
-  assert(subs.size() == 1);
-  auto args = decomposeArguments(gen, tupleArg, 2);
-
-  // It's really not safe if we ever need to do writeback for this,
-  // but go ahead and satisfy the rules, and bound the cleanups while
-  // we're at it.
-  FullExpr fullExpr(gen.Cleanups, CleanupLocation::get(loc));
-  WritebackScope writebackScope(gen);
-
-  LValue bufferLV = gen.emitLValue(args[0], AccessKind::ReadWrite);
-
-  // Ignore the metatype argument.
-  gen.emitIgnoredExpr(args[1]);
-
-  ManagedValue bufferAddr =
-    gen.emitAddressOfLValue(args[0], std::move(bufferLV),
-                            AccessKind::ReadWrite);
-
-  // Like Builtin.load/initialize, we use the current abstraction level.
-  // (This is crucial, because we expect the result to be passed to
-  // those builtins!)
-  SILType valueTy = gen.getLoweredType(subs[0].getReplacement());
-
-  return operation(bufferAddr.getValue(), valueTy);
-}
-
-
-static ManagedValue
-emitBuiltinAllocValueBuffer(SILGenFunction &gen,
-                            SILLocation loc,
-                            ArrayRef<Substitution> subs,
-                            Expr *tupleArg,
-                            CanFunctionType formalApplyType,
-                            SGFContext C) {
-  return emitValueBufferOperation(gen, loc, subs, tupleArg, formalApplyType, C,
-    [&](SILValue bufferAddr, SILType valueTy)
-          -> ManagedValue {
-      SILValue result =
-        gen.B.createAllocValueBuffer(loc, valueTy, bufferAddr);
-      result = gen.B.createAddressToPointer(loc, result,
-                             SILType::getRawPointerType(gen.getASTContext()));
-      return ManagedValue::forUnmanaged(result);
-    });
-}
-
-static ManagedValue
-emitBuiltinProjectValueBuffer(SILGenFunction &gen,
-                              SILLocation loc,
-                              ArrayRef<Substitution> subs,
-                              Expr *tupleArg,
-                              CanFunctionType formalApplyType,
-                              SGFContext C) {
-  return emitValueBufferOperation(gen, loc, subs, tupleArg, formalApplyType, C,
-    [&](SILValue bufferAddr, SILType valueTy)
-          -> ManagedValue {
-      SILValue result =
-        gen.B.createProjectValueBuffer(loc, valueTy, bufferAddr);
-      result = gen.B.createAddressToPointer(loc, result,
-                             SILType::getRawPointerType(gen.getASTContext()));
-      return ManagedValue::forUnmanaged(result);
-    });
-}
-
-static ManagedValue
-emitBuiltinDeallocValueBuffer(SILGenFunction &gen,
-                              SILLocation loc,
-                              ArrayRef<Substitution> subs,
-                              Expr *tupleArg,
-                              CanFunctionType formalApplyType,
-                              SGFContext C) {
-  return emitValueBufferOperation(gen, loc, subs, tupleArg, formalApplyType, C,
-    [&](SILValue bufferAddr, SILType valueTy)
-          -> ManagedValue {
-      gen.B.createDeallocValueBuffer(loc, valueTy, bufferAddr);
-      return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
-    });
-}
-
-static CanType makeThick(CanMetatypeType oldMetatype) {
-  return CanMetatypeType::get(oldMetatype.getInstanceType(),
-                              MetatypeRepresentation::Thick);
-}
-
-static SILFunction *
-adjustMetatypeArgumentToThick(SILGenModule &SGM, SILFunction *fn) {
-  assert(fn->canBeDeleted() && "cannot adjust type of function with uses!");
-  auto oldLoweredType = fn->getLoweredFunctionType();
-
-  auto oldMetatypeParam = oldLoweredType->getParameters().back();
-  assert(oldMetatypeParam.getConvention()
-           == ParameterConvention::Direct_Unowned);
-  auto oldMetatypeType = cast<MetatypeType>(oldMetatypeParam.getType());
-
-  switch (oldMetatypeType->getRepresentation()) {
-  // If the metatype is already thick, we're fine.
-  case MetatypeRepresentation::Thick:
-    return fn;
-
-  // If it's thin, we need to rewrite it to be thick.
-  case MetatypeRepresentation::Thin:
-    break;
-
-  case MetatypeRepresentation::ObjC:
-    llvm_unreachable("unexpected objc metatype!");
-  }
-
-  SmallVector<SILParameterInfo, 4> newParamTypes;
-  newParamTypes.append(oldLoweredType->getParameters().begin(),
-                       oldLoweredType->getParameters().end());
-  newParamTypes.back() =
-    SILParameterInfo(makeThick(oldMetatypeType),
-                     ParameterConvention::Direct_Unowned);
-
-  // Unsafely replace the old lowered type.
-  CanSILFunctionType newLoweredType =
-    SILFunctionType::get(oldLoweredType->getGenericSignature(),
-                         oldLoweredType->getExtInfo(),
-                         oldLoweredType->getCalleeConvention(),
-                         newParamTypes,
-                         oldLoweredType->getResult(),
-                         oldLoweredType->getOptionalErrorResult(),
-                         SGM.getASTContext());
-  fn->rewriteLoweredTypeUnsafe(newLoweredType);
-
-  // Replace the old BB argument.
-  SILBasicBlock *entryBB = &fn->front();
-  auto argIndex = entryBB->bbarg_size() - 1;
-  SILArgument *oldArg = entryBB->getBBArg(argIndex);
-  SILType oldArgType = oldArg->getType();
-  const ValueDecl *oldArgDecl = oldArg->getDecl();
-  SILType newArgType = SILType::getPrimitiveObjectType(
-    makeThick(cast<MetatypeType>(oldArgType.getSwiftRValueType())));
-  // If we need a thin metatype anywhere, synthesize it.
-  if (!oldArg->use_empty()) {
-    SILLocation loc = const_cast<ValueDecl*>(oldArgDecl);
-    loc.markAsPrologue();
-
-    SILBuilder builder(entryBB, entryBB->begin());
-    auto newThinMetatype = builder.createMetatype(loc, oldArgType);
-    oldArg->replaceAllUsesWith(newThinMetatype);
-  }
-  entryBB->replaceBBArg(argIndex, newArgType, oldArgDecl);
-
-  return fn;
-}
-
-static ManagedValue
-emitBuiltinMakeMaterializeForSetCallback(SILGenFunction &gen,
-                                         SILLocation loc,
-                                         ArrayRef<Substitution> subs,
-                                         Expr *arg,
-                                         CanFunctionType formalApplyType,
-                                         SGFContext C) {
-  assert(subs.size() == 1);
-
-  // The argument must be a closure.  This should also catch the
-  // possibility of captures.
-  auto closure = dyn_cast<ClosureExpr>(arg->getSemanticsProvidingExpr());
-  if (!closure) {
-    gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
-      "argument to Builtin.makeMaterializeForSetCallback must be a closure.");
-    return gen.emitUndef(loc, gen.getLoweredType(arg->getType()));
-  }
-
-  // FIXME: just emit the closure with a specific abstraction pattern.
-  SILFunction *fn = gen.SGM.emitClosure(closure);
-  fn = adjustMetatypeArgumentToThick(gen.SGM, fn);
-
-  SILValue result = gen.B.createFunctionRef(loc, fn);
-
-  // If the closure is polymorphic, get a monomorphic value.
-  if (fn->getLoweredFunctionType()->isPolymorphic()) {
-    // FIXME: use some sort of partial_apply_thin_recoverable
-    // instruction that relies on there being a thick metatype
-    // argument instead of all these unsafe casts.
-
-    // Convert to Builtin.RawPointer.
-    result = gen.B.createThinFunctionToPointer(loc, result,
-                               SILType::getRawPointerType(gen.getASTContext()));
-
-    // Convert back to a partial-applied thin function type.
-    auto &resultTL = gen.getTypeLowering(formalApplyType.getResult());
-    result = gen.B.createPointerToThinFunction(loc, result,
-                                               resultTL.getLoweredType());
-  }
-
   return ManagedValue::forUnmanaged(result);
 }
 

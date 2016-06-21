@@ -1,9 +1,9 @@
 // RUN: %target-parse-verify-swift
 
-func foo() -> Int? { return .None }
+func foo() -> Int? { return .none }
 func nonOptional() -> Int { return 0 }
-func use(x: Int) {}
-func modify(inout x: Int) {}
+func use(_ x: Int) {}
+func modify(_ x: inout Int) {}
 
 if let x = foo() {
   use(x)
@@ -12,18 +12,17 @@ if let x = foo() {
 
 use(x) // expected-error{{unresolved identifier 'x'}}
 
-if let x = foo() {
+if var x = foo() {
   use(x)
-  var x2 = x
-  modify(&x2)
+  modify(&x)
 }
 
 use(x) // expected-error{{unresolved identifier 'x'}}
 
 if let x = nonOptional() { } // expected-error{{initializer for conditional binding must have Optional type, not 'Int'}}
 
-class B {}
-class D : B {}
+class B {} // expected-note * {{did you mean 'B'?}}
+class D : B {}// expected-note * {{did you mean 'D'?}}
 
 // TODO poor recovery in these cases
 if let {} // expected-error {{expected '{' after 'if' condition}}
@@ -37,7 +36,7 @@ if let x = foo() {
 
 if let x = foo() {
   use(x)
-} else if let y = foo() {
+} else if let y = foo() { // expected-note {{did you mean 'y'?}}
   use(x) // expected-error{{unresolved identifier 'x'}}
   use(y)
 } else {
@@ -45,9 +44,10 @@ if let x = foo() {
   use(y) // expected-error{{unresolved identifier 'y'}}
 }
 
-var opt: Int? = .None
+var opt: Int? = .none
 
 if let x = opt {}
+if var x = opt {}
 
 // <rdar://problem/20800015> Fix error message for invalid if-let
 let someInteger = 1
@@ -56,12 +56,12 @@ if case let y? = someInteger {}  // expected-error {{'?' pattern cannot match va
 
 // Test multiple clauses on "if let".
 if let x = opt, y = opt where x != y,
-   let a = opt, let b = opt {
+   let a = opt, var b = opt {
 }
 
 // Leading boolean conditional.
 if 1 != 2, let x = opt, y = opt where x != y,
-   let a = opt, let b = opt {
+   let a = opt, var b = opt {
 }
 
 // <rdar://problem/20457938> typed pattern is not allowed on if/let condition
@@ -82,7 +82,7 @@ if a == 0, where b == 0 {}  // expected-error {{expected 'let' or 'var' in condi
 
 
 
-func testIfCase(a : Int?) {
+func testIfCase(_ a : Int?) {
   if case nil = a where a != nil {}
   if case let (b?) = a where b != 42 {}
   
@@ -93,7 +93,7 @@ func testIfCase(a : Int?) {
   if let p? = a {_ = p}  // expected-error {{pattern matching in a condition implicitly unwraps optionals}} {{11-12=}}
   
   
-  if let .Some(x) = a {_ = x}  // expected-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
+  if let .some(x) = a {_ = x}  // expected-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
 
   if case _ = a {}  // expected-warning {{'if' condition is always true}}
   while case _ = a {}  // expected-warning {{'while' condition is always true}}
@@ -103,12 +103,12 @@ func testIfCase(a : Int?) {
 // <rdar://problem/20883147> Type annotation for 'let' condition still expected to be optional
 func testTypeAnnotations() {
   if let x: Int = Optional(1) {_ = x}
-  if let x: Int = .Some(1) {_ = x}
+  if let x: Int = .some(1) {_ = x}
 
   if case _ : Int8 = 19 {}  // expected-warning {{'if' condition is always true}}
 }
 
-func testShadowing(a: Int?, b: Int?, c: Int?, d: Int?) {
+func testShadowing(_ a: Int?, b: Int?, c: Int?, d: Int?) {
   guard let a = a, let b = a > 0 ? b : nil else { return }
   _ = b
 
@@ -117,9 +117,9 @@ func testShadowing(a: Int?, b: Int?, c: Int?, d: Int?) {
   }
 }
 
-func useInt(x: Int) {}
+func useInt(_ x: Int) {}
 
-func testWhileScoping(a: Int?) {
+func testWhileScoping(_ a: Int?) {// expected-note {{did you mean 'a'?}}
   while let x = a { }
   useInt(x) // expected-error{{use of unresolved identifier 'x'}}
 }

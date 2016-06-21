@@ -2,9 +2,9 @@
 
 import Builtin
 
-struct Huge { var x,y,z,w,a,b,c,d: Builtin.Int32 }
+struct Huge { var x, y, z, w, a, b, c, d: Builtin.Int32 }
 
-// CHECK-LABEL: define void @arguments_in_def(i32* nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), %V14argument_attrs4Huge* noalias nocapture dereferenceable(32), %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK-LABEL: define{{( protected)?}} void @arguments_in_def(i32* nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), %V14argument_attrs4Huge* noalias nocapture dereferenceable(32), %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 sil @arguments_in_def : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> () {
 entry(%1 : $*Builtin.Int32, %2 : $*Builtin.Int32, %3 : $*Builtin.Int32, %4 : $Huge, %5 : $*T, %6 : $*()):
   // CHECK: call void @arguments_in_decl(i32* nocapture dereferenceable(4) {{%.*}}, i32* noalias nocapture dereferenceable(4) {{%.*}}, i32* noalias nocapture dereferenceable(4) {{%.*}}, %V14argument_attrs4Huge* noalias nocapture dereferenceable(32) {{%.*}}, %swift.opaque* noalias nocapture {{%.*}}, %swift.opaque* noalias nocapture {{%.*}}, %swift.type* %T)
@@ -19,22 +19,22 @@ entry(%1 : $*Builtin.Int32, %2 : $*Builtin.Int32, %3 : $*Builtin.Int32, %4 : $Hu
 // CHECK-LABEL: declare void @arguments_in_decl(i32* nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), %V14argument_attrs4Huge* noalias nocapture dereferenceable(32), %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*)
 sil @arguments_in_decl : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> ()
 
-// CHECK-LABEL: define void @arguments_in_def_out(i32* noalias nocapture sret, i32* nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), %V14argument_attrs4Huge* noalias nocapture dereferenceable(32), %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
-sil @arguments_in_def_out : $@convention(thin) <T> (@out Builtin.Int32, @inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> () {
+// CHECK-LABEL: define{{( protected)?}} void @arguments_in_def_out(i32* noalias nocapture sret, i32* nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), %V14argument_attrs4Huge* noalias nocapture dereferenceable(32), %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
+sil @arguments_in_def_out : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> @out Builtin.Int32 {
 entry(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32, %2 : $*Builtin.Int32, %3 : $*Builtin.Int32, %4 : $Huge, %5 : $*T, %6 : $*()):
   // CHECK: call void @arguments_in_decl_out(i32* noalias nocapture sret {{%.*}}, i32* nocapture dereferenceable(4) {{%.*}}, i32* noalias nocapture dereferenceable(4) {{%.*}}, i32* noalias nocapture dereferenceable(4) {{%.*}}, %V14argument_attrs4Huge* noalias nocapture dereferenceable(32) {{%.*}}, %swift.opaque* noalias nocapture {{%.*}}, %swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}})
-  %f = function_ref @arguments_in_decl_out : $@convention(thin) <T> (@out Builtin.Int32, @inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> ()
-  %x = apply %f<T>(%0, %1, %2, %3, %4, %5, %6) : $@convention(thin) <T> (@out Builtin.Int32, @inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> ()
+  %f = function_ref @arguments_in_decl_out : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> @out Builtin.Int32
+  %x = apply %f<T>(%0, %1, %2, %3, %4, %5, %6) : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> @out Builtin.Int32
   // CHECK: call void @arguments_in_def_out(i32* noalias nocapture sret {{%.*}}, i32* nocapture dereferenceable(4) {{%.*}}, i32* noalias nocapture dereferenceable(4) {{%.*}}, i32* noalias nocapture dereferenceable(4) {{%.*}}, %V14argument_attrs4Huge* noalias nocapture dereferenceable(32) {{%.*}}, %swift.opaque* noalias nocapture {{%.*}}, %swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}})
-  %g = function_ref @arguments_in_def_out : $@convention(thin) <T> (@out Builtin.Int32, @inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> ()
-  %y = apply %g<T>(%0, %1, %2, %3, %4, %5, %6) : $@convention(thin) <T> (@out Builtin.Int32, @inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> ()
+  %g = function_ref @arguments_in_def_out : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> @out Builtin.Int32
+  %y = apply %g<T>(%0, %1, %2, %3, %4, %5, %6) : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> @out Builtin.Int32
   return undef : $()
 }
 
 // CHECK-LABEL: declare void @arguments_in_decl_out(i32* noalias nocapture sret, i32* nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), %V14argument_attrs4Huge* noalias nocapture dereferenceable(32), %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*)
-sil @arguments_in_decl_out : $@convention(thin) <T> (@out Builtin.Int32, @inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> ()
+sil @arguments_in_decl_out : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> @out Builtin.Int32
 
-// CHECK-LABEL: define void @arguments_in_def_huge_ret(%V14argument_attrs4Huge* noalias nocapture sret, i32* nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), %V14argument_attrs4Huge* noalias nocapture dereferenceable(32), %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK-LABEL: define{{( protected)?}} void @arguments_in_def_huge_ret(%V14argument_attrs4Huge* noalias nocapture sret, i32* nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), %V14argument_attrs4Huge* noalias nocapture dereferenceable(32), %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 sil @arguments_in_def_huge_ret : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> Huge {
 entry(%1 : $*Builtin.Int32, %2 : $*Builtin.Int32, %3 : $*Builtin.Int32, %4 : $Huge, %5 : $*T, %6 : $*()):
   %f = function_ref @arguments_in_decl_huge_ret : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> Huge
@@ -49,3 +49,11 @@ entry(%1 : $*Builtin.Int32, %2 : $*Builtin.Int32, %3 : $*Builtin.Int32, %4 : $Hu
 // CHECK-LABEL: declare void @arguments_in_decl_huge_ret(%V14argument_attrs4Huge* noalias nocapture sret, i32* nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), %V14argument_attrs4Huge* noalias nocapture dereferenceable(32), %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*)
 sil @arguments_in_decl_huge_ret : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> Huge
 
+
+// rdar://problem/24727411 - Incorrect 'sret' attribute applied to function with multiple indirect
+// returns, causing problems when calling runtime functions
+sil @multiple_out_params : $@convention(thin) <T, U> () -> (@out T, @out U) {
+bb0(%0 : $*T, %1 : $*U):
+  %result = tuple ()
+  return %result : $()
+}

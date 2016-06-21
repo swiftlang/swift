@@ -15,7 +15,7 @@
 // CHECK-NEXT: "someGlobal"
 // CHECK-NEXT: "ExtraFloatLiteralConvertible"
 // CHECK-NEXT: "~~~"
-// CHECK-NEXT: "ThreeTildeType"
+// CHECK-NEXT: "ThreeTilde"
 // CHECK-NEXT: "overloadedOnProto"
 // CHECK-NEXT: "overloadedOnProto"
 // CHECK-NEXT: "topLevelComputedProperty"
@@ -55,6 +55,13 @@ struct IntWrapper: Comparable {
   var value: Int
 
   struct InnerForNoReason {}
+
+  // CHECK-DAG: - "TypeReferencedOnlyBySubscript"
+  subscript(_: TypeReferencedOnlyBySubscript) -> Void { return () }
+
+  // CHECK-DAG: - "TypeReferencedOnlyByPrivateSubscript"
+  // FIXME: This should be marked "!private".
+  private subscript(_: TypeReferencedOnlyByPrivateSubscript) -> Void { return () }
 }
 
 // CHECK-DAG: "IntWrapper"
@@ -109,17 +116,17 @@ private protocol ExtraCharLiteralConvertible : UnicodeScalarLiteralConvertible {
 }
 
 prefix operator ~~~ {}
-protocol ThreeTildeType {
+protocol ThreeTilde {
   prefix func ~~~(lhs: Self)
 }
 
-private struct ThreeTildeTypeImpl : ThreeTildeType {
+private struct ThreeTildeTypeImpl : ThreeTilde {
 }
 
 func overloadedOnProto<T>(_: T) {}
-func overloadedOnProto<T: ThreeTildeType>(_: T) {}
+func overloadedOnProto<T: ThreeTilde>(_: T) {}
 
-// CHECK-DAG: !private "~~~"
+// CHECK-DAG: - "~~~"
 private prefix func ~~~(_: ThreeTildeTypeImpl) {}
 
 var topLevelComputedProperty: Bool {
@@ -146,7 +153,7 @@ func lookUpManyTopLevelNames() {
   // "CInt" is not used as a top-level name here.
   // CHECK-DAG: !private "StringLiteralType"
   // NEGATIVE-NOT: "CInt"
-  let CInt = "abc"
+  _ = "abc"
 
   // NEGATIVE-NOT: - "max"
   print(Int.max)
@@ -200,7 +207,7 @@ func lookUpManyTopLevelNames() {
     break
   }
   
-  for _: OtherFileEnumWrapper.Enum in EmptyGenerator<X>() {}
+  for _: OtherFileEnumWrapper.Enum in EmptyIterator<X>() {}
   
   // CHECK-DAG: !private "otherFileGetNonImpl"
   overloadedOnProto(otherFileGetNonImpl())
@@ -216,7 +223,7 @@ func lookUpMembers() {
   TopLevelForMemberLookup.m1()
   TopLevelForMemberLookup.m3()
 }
-public let publicUseOfMember = TopLevelForMemberLookup.m2()
+public let publicUseOfMember: () = TopLevelForMemberLookup.m2()
 
 struct Outer {
   struct Inner {
@@ -243,11 +250,11 @@ struct Use4 : TopLevelProto1 {
 }
 
 // CHECK-DAG: - "*"
-print(42 * 30)
+_ = 42 * 30
 
 // FIXME: Incorrectly marked non-private dependencies
 // CHECK-DAG: - "topLevel6"
-print(topLevel6())
+_ = topLevel6()
 // CHECK-DAG: - "topLevel7"
 private var use7 = topLevel7()
 // CHECK-DAG: - "topLevel8"
@@ -257,7 +264,7 @@ var use9 = { () -> Int in return topLevel9() }
 
 
 // CHECK-DAG: - "TopLevelTy1"
-func useTy1(x: TopLevelTy1) {}
+func useTy1(_ x: TopLevelTy1) {}
 // CHECK-DAG: - "TopLevelTy2"
 func useTy2() -> TopLevelTy2 {}
 // CHECK-DAG: - "TopLevelTy3"
@@ -282,7 +289,7 @@ struct StructForDeclaringProperties {
 }
 
 // CHECK-DAG: !private "privateTopLevel1"
-func private1(a: Int = privateTopLevel1()) {}
+func private1(_ a: Int = privateTopLevel1()) {}
 // CHECK-DAG: !private "privateTopLevel2"
 // CHECK-DAG: !private "PrivateProto1"
 private struct Private2 : PrivateProto1 {
@@ -290,7 +297,7 @@ private struct Private2 : PrivateProto1 {
 }
 // CHECK-DAG: !private "privateTopLevel3"
 func outerPrivate3() {
-  let private3 = { privateTopLevel3() }
+  let _ = { privateTopLevel3() }
 }
 
 // CHECK-DAG: !private "PrivateTopLevelTy1"
@@ -304,13 +311,13 @@ extension Private2 : PrivateProto2 {
 }
 // CHECK-DAG: !private "PrivateTopLevelTy3"
 func outerPrivateTy3() {
-  func inner(a: PrivateTopLevelTy3?) {}
+  func inner(_ a: PrivateTopLevelTy3?) {}
   inner(nil)
 }
 // CHECK-DAG: !private "PrivateTopLevelStruct3"
 private typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
 // CHECK-DAG: !private "PrivateTopLevelStruct4"
-private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelStruct4.ValueType {
+private func privateTy5(_ x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelStruct4.ValueType {
   return x
 }
 
@@ -318,6 +325,20 @@ private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelS
 private struct PrivateTy6 {}
 // CHECK-DAG: !private "PrivateProto3"
 extension PrivateTy6 : PrivateProto3 {}
+
+// CHECK-DAG: - "ProtoReferencedOnlyInGeneric"
+func genericTest<T: ProtoReferencedOnlyInGeneric>(_: T) {}
+// CHECK-DAG: !private "ProtoReferencedOnlyInPrivateGeneric"
+private func privateGenericTest<T: ProtoReferencedOnlyInPrivateGeneric>(_: T) {}
+
+struct PrivateStoredProperty {
+  // CHECK-DAG: - "TypeReferencedOnlyByPrivateVar"
+  private var value: TypeReferencedOnlyByPrivateVar
+}
+class PrivateStoredPropertyRef {
+  // CHECK-DAG: - "TypeReferencedOnlyByPrivateClassVar"
+  private var value: TypeReferencedOnlyByPrivateClassVar?
+}
 
 struct Sentinel1 {}
 
@@ -337,10 +358,6 @@ struct Sentinel2 {}
 // CHECK-DAG: - ["V4main10IntWrapper", "deinit"]
 // CHECK-DAG: - ["Ps10Comparable", ""]
 // CHECK-DAG: - ["C4main18ClassFromOtherFile", ""]
-// CHECK-DAG: - !private ["Si", "Distance"]
-// CHECK-DAG: - !private ["Si", "IntegerLiteralType"]
-// CHECK-DAG: - !private ["Si", "Stride"]
-// CHECK-DAG: - !private ["Si", "deinit"]
 // CHECK-DAG: - !private ["Si", "max"]
 // CHECK-DAG: - ["Ps23FloatLiteralConvertible", ""]
 // CHECK-DAG: - !private ["Ps31UnicodeScalarLiteralConvertible", ""]
@@ -351,7 +368,7 @@ struct Sentinel2 {}
 // CHECK-DAG: - ["Sb", "InnerToBool"]
 // CHECK-DAG: - !private ["Vs10Dictionary", "Key"]
 // CHECK-DAG: - !private ["Vs10Dictionary", "Value"]
-// CHECK-DAG: - !private ["V4main17OtherFileIntArray", "Generator"]
+// CHECK-DAG: - !private ["V4main17OtherFileIntArray", "Iterator"]
 // CHECK-DAG: - !private ["V4main17OtherFileIntArray", "deinit"]
 // CHECK-DAG: - !private ["V4main18OtherFileOuterType", "InnerType"]
 // CHECK-DAG: - !private ["VV4main18OtherFileOuterType9InnerType", "init"]
@@ -360,9 +377,9 @@ struct Sentinel2 {}
 // CHECK-DAG: - !private ["V4main25OtherFileProtoImplementor", "deinit"]
 // CHECK-DAG: - !private ["V4main26OtherFileProtoImplementor2", "deinit"]
 // CHECK-DAG: - !private ["V4main28OtherFileProtoNonImplementor", "deinit"]
-// CHECK-DAG: - !private ["Vs14EmptyGenerator", "Element"]
-// CHECK-DAG: - !private ["Vs14EmptyGenerator", "init"]
-// CHECK-DAG: - !private ["Vs17IndexingGenerator", "Element"]
+// CHECK-DAG: - !private ["Vs13EmptyIterator", "Element"]
+// CHECK-DAG: - !private ["Vs13EmptyIterator", "init"]
+// CHECK-DAG: - !private ["Vs16IndexingIterator", "Element"]
 // CHECK-DAG: - ["O4main13OtherFileEnum", "Value"]
 // CHECK-DAG: - !private ["V4main20OtherFileEnumWrapper", "Enum"]
 
@@ -400,8 +417,8 @@ struct Sentinel2 {}
 // CHECK-DAG: !private "V4main25OtherFileProtoImplementor"
 // CHECK-DAG: !private "V4main26OtherFileProtoImplementor2"
 // CHECK-DAG: !private "V4main28OtherFileProtoNonImplementor"
-// CHECK-DAG: !private "Vs14EmptyGenerator"
-// CHECK-DAG: !private "Vs17IndexingGenerator"
+// CHECK-DAG: !private "Vs13EmptyIterator"
+// CHECK-DAG: !private "Vs16IndexingIterator"
 // CHECK-DAG: - "O4main13OtherFileEnum"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -88,16 +88,16 @@ ValueDecl *deriveHashable(TypeChecker &tc,
                           NominalTypeDecl *type,
                           ValueDecl *requirement);
   
-/// Derive an ErrorType requirement for an enum type.
+/// Derive an ErrorProtocol requirement for an enum type.
 ///
 /// A unique string representation of the enum type will be used as the domain
 /// for members of the enum, and each case will have its own integer code.
 ///
 /// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveErrorType(TypeChecker &tc,
-                           Decl *parentDecl,
-                           NominalTypeDecl *type,
-                           ValueDecl *requirement);
+ValueDecl *deriveErrorProtocol(TypeChecker &tc,
+                               Decl *parentDecl,
+                               NominalTypeDecl *type,
+                               ValueDecl *requirement);
 
 /// Derive a _BridgedNSError requirement for an @objc enum type.
 ///
@@ -109,25 +109,14 @@ ValueDecl *deriveBridgedNSError(TypeChecker &tc,
 
 /// Insert an operator declaration associated with a declaration
 /// context. The operator declaration is added at global scope.
-void _insertOperatorDecl(ASTContext &C,
-                         IterableDeclContext *scope,
-                         Decl *member);
-  
-/// Insert an operator declaration associated with a declaration
-/// context. The operator declaration is added at global scope.
-template<typename SomeDecl>
-inline SomeDecl *insertOperatorDecl(ASTContext &C,
-                                    IterableDeclContext *scope,
-                                    SomeDecl *member) {
-  ::swift::DerivedConformance::_insertOperatorDecl(C, scope, member);
-  return member;
-}
+void insertOperatorDecl(ASTContext &C,
+                        IterableDeclContext *scope,
+                        Decl *member);
 
 /// Declare a getter for a derived property.
 FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
                                        Decl *parentDecl,
                                        NominalTypeDecl *typeDecl,
-                                       Type contextType,
                                        Type propertyInterfaceType,
                                        Type propertyContextType,
                                        bool isStatic = false);

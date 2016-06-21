@@ -1,35 +1,34 @@
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/UnsafePointer.swift
-// RUN: %S/../../utils/line-directive %t/UnsafePointer.swift -- %target-build-swift %t/UnsafePointer.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/UnsafePointer.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
 
+
 protocol TestProtocol1 {}
 
-// Check that the generic parameter is called 'Memory'.
+// Check that the generic parameter is called 'Pointee'.
 #if _runtime(_ObjC)
-extension AutoreleasingUnsafeMutablePointer where Memory : TestProtocol1 {
+extension AutoreleasingUnsafeMutablePointer where Pointee : TestProtocol1 {
   var _memoryIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 #endif
 
-extension UnsafePointer where Memory : TestProtocol1 {
+extension UnsafePointer where Pointee : TestProtocol1 {
   var _memoryIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension UnsafeMutablePointer where Memory : TestProtocol1 {
+extension UnsafeMutablePointer where Pointee : TestProtocol1 {
   var _memoryIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
 // Check that the generic parameter is called 'Element'.
-extension UnsafeBufferPointerGenerator where Element : TestProtocol1 {
+extension UnsafeBufferPointerIterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -49,59 +48,97 @@ extension UnsafeMutableBufferPointer where Element : TestProtocol1 {
 
 var UnsafePointerTestSuite = TestSuite("UnsafePointer")
 var UnsafeMutablePointerTestSuite = TestSuite("UnsafeMutablePointer")
-var COpaquePointerTestSuite = TestSuite("COpaquePointer")
+var OpaquePointerTestSuite = TestSuite("OpaquePointer")
 
 % for (SelfName, SelfType) in [
-%     ( 'UnsafePointer', 'UnsafePointer<Float>' ),
-%     ( 'UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
-%     ( 'COpaquePointer', 'COpaquePointer' ) ]:
+%         ('UnsafePointer', 'UnsafePointer<Float>'),
+%         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
+%         ('OpaquePointer', 'OpaquePointer')]:
 
 ${SelfName}TestSuite.test("convertFromNil") {
-  let ptr: ${SelfType} = nil
-  expectEqual(0, unsafeBitCast(ptr, Int.self))
+  let ptr: ${SelfType}? = nil
+  expectEqual(0, unsafeBitCast(ptr, to: Int.self))
 }
 
-${SelfName}TestSuite.test("initNoArgs") {
-  let ptr = ${SelfType}()
-  expectEqual(0, unsafeBitCast(ptr, Int.self))
-}
-
-${SelfName}TestSuite.test("initFromCOpaquePointer") {
-  let other = COpaquePointer(bitPattern: 0x12345678)
+${SelfName}TestSuite.test("initFromOpaquePointer") {
+  let other = OpaquePointer(bitPattern: 0x12345678)!
   let ptr = UnsafePointer<Float>(other)
-  expectEqual(0x12345678, unsafeBitCast(ptr, Int.self))
+  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
+
+  let optionalOther: Optional = other
+  let optionalPointer = UnsafePointer<Float>(optionalOther)
+  expectNotEmpty(optionalPointer)
+  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
+
+  let nilOther: Optional<OpaquePointer> = nil
+  let nilPointer = UnsafePointer<Float>(nilOther)
+  expectEmpty(nilPointer)
 }
 
 ${SelfName}TestSuite.test("initFromUnsafePointer") {
-  let other = UnsafePointer<Double>(bitPattern: 0x12345678)
+  let other = UnsafePointer<Double>(bitPattern: 0x12345678)!
   let ptr = ${SelfType}(other)
-  expectEqual(0x12345678, unsafeBitCast(ptr, Int.self))
+  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
+
+  let optionalOther: Optional = other
+  let optionalPointer = ${SelfType}(optionalOther)
+  expectNotEmpty(optionalPointer)
+  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
+
+  let nilOther: Optional<UnsafePointer<Double>> = nil
+  let nilPointer = ${SelfType}(nilOther)
+  expectEmpty(nilPointer)
 }
 
 ${SelfName}TestSuite.test("initFromUnsafeMutablePointer") {
-  let other = UnsafeMutablePointer<Double>(bitPattern: 0x12345678)
+  let other = UnsafeMutablePointer<Double>(bitPattern: 0x12345678)!
   let ptr = ${SelfType}(other)
-  expectEqual(0x12345678, unsafeBitCast(ptr, Int.self))
+  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
+
+  let optionalOther: Optional = other
+  let optionalPointer = ${SelfType}(optionalOther)
+  expectNotEmpty(optionalPointer)
+  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
+
+  let nilOther: Optional<UnsafeMutablePointer<Double>> = nil
+  let nilPointer = ${SelfType}(nilOther)
+  expectEmpty(nilPointer)
 }
 
 ${SelfName}TestSuite.test("initFromInteger") {
-  if true {
+  do {
     let word: Int = 0x12345678
     let ptr = ${SelfType}(bitPattern: word)
-    expectEqual(word, unsafeBitCast(ptr, Int.self))
+    expectNotEmpty(ptr)
+    expectEqual(word, unsafeBitCast(ptr, to: Int.self))
   }
-  if true {
+  do {
     let uword: UInt = 0x12345678
     let ptr = ${SelfType}(bitPattern: uword)
-    expectEqual(uword, unsafeBitCast(ptr, UInt.self))
+    expectNotEmpty(ptr)
+    expectEqual(uword, unsafeBitCast(ptr, to: UInt.self))
+  }
+}
+
+${SelfName}TestSuite.test("initFromNilBitPattern") {
+  do {
+    let word = unsafeBitCast(nil as ${SelfType}?, to: Int.self)
+    let ptr = ${SelfType}(bitPattern: word)
+    expectEmpty(ptr)
+    expectEqual(word, unsafeBitCast(ptr, to: Int.self))
+  }
+  do {
+    let uword = unsafeBitCast(nil as ${SelfType}?, to: UInt.self)
+    let ptr = ${SelfType}(bitPattern: uword)
+    expectEmpty(ptr)
+    expectEqual(uword, unsafeBitCast(ptr, to: UInt.self))
   }
 }
 
 ${SelfName}TestSuite.test("Hashable") {
   let ptrs = [
-    ${SelfType}(bitPattern: 0x0),
-    ${SelfType}(bitPattern: 0x12345678),
-    ${SelfType}(bitPattern: 0x87654321 as UInt),
+    ${SelfType}(bitPattern: 0x12345678)!,
+    ${SelfType}(bitPattern: 0x87654321 as UInt)!,
   ]
   for i in ptrs.indices {
     for j in ptrs.indices {
@@ -109,6 +146,27 @@ ${SelfName}TestSuite.test("Hashable") {
       var pj = ptrs[j]
       checkHashable(i == j, pi, pj, "i=\(i), j=\(j)")
     }
+  }
+}
+
+${SelfName}TestSuite.test("toInteger") {
+  do {
+    let word: Int = 0x12345678
+    let ptr = ${SelfType}(bitPattern: word)
+    expectEqual(word, Int(bitPattern: ptr))
+  }
+  do {
+    let ptr: ${SelfType}? = nil
+    expectEqual(Int(0), Int(bitPattern: ptr))
+  }
+  do {
+    let uword: UInt = 0x12345678
+    let ptr = ${SelfType}(bitPattern: uword)
+    expectEqual(uword, UInt(bitPattern: ptr))
+  }
+  do {
+    let ptr: ${SelfType}? = nil
+    expectEqual(UInt(0), UInt(bitPattern: ptr))
   }
 }
 
@@ -124,50 +182,50 @@ class Missile {
   static var missilesLaunched = 0
   let number: Int
   init(_ number: Int) { self.number = number }
-  deinit { Missile.missilesLaunched++ }
+  deinit { Missile.missilesLaunched += 1 }
 }
 
-func checkPointerCorrectness(check: Check,
+func checkPointerCorrectness(_ check: Check,
+  _ withMissiles: Bool = false,
   _ f: (UnsafeMutablePointer<Missile>) ->
-    (UnsafeMutablePointer<Missile>, count: Int) -> Void,
-  _ withMissiles: Bool = false) {
-  let ptr = UnsafeMutablePointer<Missile>.alloc(4)
+    (UnsafeMutablePointer<Missile>, count: Int) -> Void) {
+  let ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 4)
   switch check {
   case .RightOverlap:
-    ptr.initialize(Missile(1))
-    (ptr + 1).initialize(Missile(2))
+    ptr.initialize(with: Missile(1))
+    (ptr + 1).initialize(with: Missile(2))
     if withMissiles {
-      (ptr + 2).initialize(Missile(3))
+      (ptr + 2).initialize(with: Missile(3))
     }
     f(ptr + 1)(ptr, count: 2)
     expectEqual(1, ptr[1].number)
     expectEqual(2, ptr[2].number)
   case .LeftOverlap:
     if withMissiles {
-      ptr.initialize(Missile(1))
+      ptr.initialize(with: Missile(1))
     }
-    (ptr + 1).initialize(Missile(2))
-    (ptr + 2).initialize(Missile(3))
+    (ptr + 1).initialize(with: Missile(2))
+    (ptr + 2).initialize(with: Missile(3))
     f(ptr)(ptr + 1, count: 2)
     expectEqual(2, ptr[0].number)
     expectEqual(3, ptr[1].number)
   case .Disjoint:
     if withMissiles {
-      ptr.initialize(Missile(0))
-      (ptr + 1).initialize(Missile(1))
+      ptr.initialize(with: Missile(0))
+      (ptr + 1).initialize(with: Missile(1))
     }
-    (ptr + 2).initialize(Missile(2))
-    (ptr + 3).initialize(Missile(3))
+    (ptr + 2).initialize(with: Missile(2))
+    (ptr + 3).initialize(with: Missile(3))
     f(ptr)(ptr + 2, count: 2)
     expectEqual(2, ptr[0].number)
     expectEqual(3, ptr[1].number)
     // backwards
-    let ptr2 = UnsafeMutablePointer<Missile>.alloc(4)
-    ptr2.initialize(Missile(0))
-    (ptr2 + 1).initialize(Missile(1))
+    let ptr2 = UnsafeMutablePointer<Missile>(allocatingCapacity: 4)
+    ptr2.initialize(with: Missile(0))
+    (ptr2 + 1).initialize(with: Missile(1))
     if withMissiles {
-      (ptr2 + 2).initialize(Missile(2))
-      (ptr2 + 3).initialize(Missile(3))
+      (ptr2 + 2).initialize(with: Missile(2))
+      (ptr2 + 3).initialize(with: Missile(3))
     }
     f(ptr2 + 2)(ptr2, count: 2)
     expectEqual(0, ptr2[2].number)
@@ -175,9 +233,23 @@ func checkPointerCorrectness(check: Check,
   }
 }
 
-let checkPtr: ((UnsafeMutablePointer<Missile> ->
-  (UnsafeMutablePointer<Missile>, count: Int) -> Void), Bool) -> Check -> Void
-  = { (f, m) in return { checkPointerCorrectness($0, f, m) } }
+func checkPtr(
+  _ f: ((UnsafeMutablePointer<Missile>) -> (UnsafeMutablePointer<Missile>, count: Int) -> Void), 
+  _ m: Bool
+) -> (Check) -> Void {
+  return { checkPointerCorrectness($0, m, f) }
+}
+
+func checkPtr(
+  _ f: ((UnsafeMutablePointer<Missile>) -> (UnsafePointer<Missile>, count: Int) -> Void), 
+  _ m: Bool
+) -> (Check) -> Void {
+  return {
+    checkPointerCorrectness($0, m) { destPtr in 
+      return { f(destPtr)(UnsafeMutablePointer($0), count: $1) }
+    } 
+  }
+}
 
 UnsafeMutablePointerTestSuite.test("moveInitializeBackwardFrom") {
   let check = checkPtr(UnsafeMutablePointer.moveInitializeBackwardFrom, false)
@@ -262,5 +334,135 @@ UnsafeMutablePointerTestSuite.test("initializeFrom.Right") {
   }
 }
 
-runAllTests()
+UnsafeMutablePointerTestSuite.test("initializeFrom/immutable") {  
+  var ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 3)
+  defer {
+    ptr.deinitialize(count: 3)
+    ptr.deallocateCapacity(3)
+  }
+  let source = (0..<3).map(Missile.init)
+  source.withUnsafeBufferPointer { bufferPtr in
+    ptr.initializeFrom(bufferPtr.baseAddress!, count: 3)
+    expectEqual(0, ptr[0].number)
+    expectEqual(1, ptr[1].number)
+    expectEqual(2, ptr[2].number)
+  }
+}
 
+% for assign in ['assignFrom', 'assignBackwardFrom']:
+
+UnsafeMutablePointerTestSuite.test("${assign}/immutable") {  
+  var ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 2)
+  defer {
+    ptr.deinitialize(count: 2)
+    ptr.deallocateCapacity(2)
+  }
+  ptr.initialize(with: Missile(1))
+  (ptr + 1).initialize(with: Missile(2))
+  let source = (3..<5).map(Missile.init)
+  source.withUnsafeBufferPointer { bufferPtr in
+    ptr.${assign}(bufferPtr.baseAddress!, count: 2)
+    expectEqual(3, ptr[0].number)
+    expectEqual(4, ptr[1].number)
+  }
+}
+
+% end
+
+UnsafePointerTestSuite.test("customMirror") {
+  // Ensure that the custom mirror works properly, including when the raw value
+  // is greater than Int.max
+  let reallyBigInt: UInt = UInt(Int.max) + 1
+  let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)!
+  let mirror = ptr.customMirror
+  expectEqual(1, mirror.children.count)
+#if arch(i386) || arch(arm)
+  expectEqual("18446744071562067968", String(mirror.children.first!.1))
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+  expectEqual("9223372036854775808", String(mirror.children.first!.1))
+#else
+  fatalError("Unimplemented")
+#endif
+}
+
+UnsafePointerTestSuite.test("customPlaygroundQuickLook") {
+  // Ensure that the custom playground quicklook works properly, including when
+  // the raw value is greater than Int.max
+  let reallyBigInt: UInt = UInt(Int.max) + 1
+  let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)!
+  if case let .text(desc) = ptr.customPlaygroundQuickLook {
+#if arch(i386) || arch(arm)
+    expectEqual("UnsafePointer(0xFFFFFFFF80000000)", desc)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+    expectEqual("UnsafePointer(0x8000000000000000)", desc)
+#else
+    fatalError("Unimplemented")
+#endif
+  } else {
+    expectTrue(false)
+  }
+}
+
+UnsafeMutablePointerTestSuite.test("customMirror") {
+  let reallyBigInt: UInt = UInt(Int.max) + 1
+  let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)!
+  let mirror = ptr.customMirror
+  expectEqual(1, mirror.children.count)
+#if arch(i386) || arch(arm)
+  expectEqual("18446744071562067968", String(mirror.children.first!.1))
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+  expectEqual("9223372036854775808", String(mirror.children.first!.1))
+#else
+  fatalError("Unimplemented")
+#endif
+}
+
+UnsafeMutablePointerTestSuite.test("customPlaygroundQuickLook") {
+  let reallyBigInt: UInt = UInt(Int.max) + 1
+  let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)!
+  let isProperDisposition : Bool
+  if case let .text(desc) = ptr.customPlaygroundQuickLook {
+#if arch(i386) || arch(arm)
+    expectEqual("UnsafeMutablePointer(0xFFFFFFFF80000000)", desc)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+    expectEqual("UnsafeMutablePointer(0x8000000000000000)", desc)
+#else
+    fatalError("Unimplemented")
+#endif
+  } else {
+    expectTrue(false)
+  }
+}
+
+% for (SelfName, SelfType) in [
+%         ('UnsafePointer', 'UnsafePointer<Int>'),
+%         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Int>')]:
+
+${SelfName}TestSuite.test("Comparable") {
+  var addresses: [UInt] = [
+    0x00000001,
+    0xFF00FF00,
+    0x00001111,
+    0x00000002,
+    0xFFFFFFFF,
+    0x00001111
+  ]
+
+  #if arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+  addresses += [
+    0xFFFFFFFF80000000,
+    0x8000000000000000
+  ]
+  #endif
+
+  let instances = addresses.map { ($0, ${SelfType}(bitPattern: $0)!) }
+
+  func comparisonOracle(i: Int, j: Int) -> ExpectedComparisonResult {
+    return instances[i].0 <=> instances[j].0
+  }
+  checkComparable(instances.map { $0.1 }, oracle: comparisonOracle)
+}
+
+% end
+
+runAllTests()

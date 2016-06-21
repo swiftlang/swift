@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -31,13 +31,9 @@ using namespace swift;
 
 void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
   assert(this != RHS && "Cannot RAUW a value with itself");
-  assert(getNumTypes() == RHS->getNumTypes() &&
-         "An instruction and the value base that it is being replaced by "
-         "must have the same number of types");
-
   while (!use_empty()) {
     Operand *Op = *use_begin();
-    Op->set(SILValue(RHS, Op->get().getResultNumber()));
+    Op->set(RHS);
   }
 }
 
@@ -48,18 +44,6 @@ SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   if (Entry == nullptr)
     Entry = new (*M) SILUndef(Ty);
   return Entry;
-}
-
-static FormalLinkage
-getGenericClauseLinkage(ArrayRef<GenericTypeParamDecl *> params) {
-  FormalLinkage result = FormalLinkage::Top;
-  for (auto &param : params) {
-    for (auto proto : param->getConformingProtocols(nullptr))
-      result ^= getTypeLinkage(CanType(proto->getDeclaredType()));
-    if (auto superclass = param->getSuperclass())
-      result ^= getTypeLinkage(superclass->getCanonicalType());
-  }
-  return result;
 }
 
 FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
@@ -79,10 +63,12 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   case Accessibility::Public:
     return FormalLinkage::PublicUnique;
   case Accessibility::Internal:
-    // FIXME: This ought to be "hidden" as well, but that causes problems when
-    // inlining code from the standard library, which may reference internal
-    // declarations.
-    return FormalLinkage::PublicUnique;
+    // If we're serializing all function bodies, type metadata for internal
+    // types needs to be public too.
+    if (D->getDeclContext()->getParentModule()->getResilienceStrategy()
+        == ResilienceStrategy::Fragile)
+      return FormalLinkage::PublicUnique;
+    return FormalLinkage::HiddenUnique;
   case Accessibility::Private:
     // Why "hidden" instead of "private"? Because the debugger may need to
     // access these symbols.
@@ -98,15 +84,11 @@ FormalLinkage swift::getTypeLinkage(CanType type) {
     CanType type = CanType(_type);
 
     // For any nominal type reference, look at the type declaration.
-    if (auto nominal = type->getAnyNominal()) {
+    if (auto nominal = type->getAnyNominal())
       result ^= getDeclLinkage(nominal);
 
-    // For polymorphic function types, look at the generic parameters.
-    // FIXME: findIf should do this, once polymorphic function types can be
-    // canonicalized and re-formed properly.
-    } else if (auto polyFn = dyn_cast<PolymorphicFunctionType>(type)) {
-      result ^= getGenericClauseLinkage(polyFn->getGenericParameters());
-    }
+    assert(!isa<PolymorphicFunctionType>(type) &&
+           "Don't expect a polymorphic function type here");
 
     return false; // continue searching
   });
@@ -135,4 +117,40 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
     return SILLinkage::Private;
   }
   llvm_unreachable("bad formal linkage");
+}
+
+SILLinkage
+swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
+                                        ForDefinition_t definition) {
+  // Behavior conformances are always private.
+  if (C->isBehaviorConformance())
+    return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+
+  ModuleDecl *conformanceModule = C->getDeclContext()->getParentModule();
+
+  // If the conformance was synthesized by the ClangImporter, give it
+  // shared linkage.
+  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
+  auto typeUnit = typeDecl->getModuleScopeContext();
+  if (isa<ClangModuleUnit>(typeUnit)
+      && conformanceModule == typeUnit->getParentModule())
+    return SILLinkage::Shared;
+
+  // If we're building with -sil-serialize-all, give the conformance public
+  // linkage.
+  if (conformanceModule->getResilienceStrategy()
+      == ResilienceStrategy::Fragile)
+    return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
+
+  // FIXME: This should be using std::min(protocol's access, type's access).
+  switch (C->getProtocol()->getEffectiveAccess()) {
+    case Accessibility::Private:
+      return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+
+    case Accessibility::Internal:
+      return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
+
+    default:
+      return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
+  }
 }

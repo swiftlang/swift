@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -56,6 +56,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ExprHandle.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 using namespace swift;
 
@@ -117,10 +118,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     SetParentRAII SetParent(Walker, T);
     return inherited::visit(T);
   }
-
-  /***************************************************************************/
-  /********************************** Decls **********************************/
-  /***************************************************************************/
+  
+  bool visit(ParameterList *PL) {
+    return inherited::visit(PL);
+  }
+  
+  //===--------------------------------------------------------------------===//
+  //                                 Decls
+  //===--------------------------------------------------------------------===//
 
   bool visitImportDecl(ImportDecl *ID) {
     return false;
@@ -193,7 +198,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
-    if(auto GPS = NTD->getGenericParams()) {
+    if (auto GPS = NTD->getGenericParams()) {
       for (auto GP : GPS->getParams()) {
         if (doIt(GP))
           return true;
@@ -220,10 +225,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitSubscriptDecl(SubscriptDecl *SD) {
-    if (Pattern *NewPattern = doIt(SD->getIndices()))
-      SD->setIndices(NewPattern);
-    else
-      return true;
+    visit(SD->getIndices());
     return doIt(SD->getElementTypeLoc());
   }
 
@@ -231,14 +233,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
-    if (Walker.shouldWalkIntoFunctionGenericParams() &&
-        AFD->getGenericParams()) {
+    if (AFD->getGenericParams() &&
+        Walker.shouldWalkIntoFunctionGenericParams()) {
 
       // Visit generic params
       for (auto &P : AFD->getGenericParams()->getParams()) {
         if (doIt(P))
           return true;
-        for(auto Inherit : P->getInherited()) {
+        for (auto Inherit : P->getInherited()) {
           if (doIt(Inherit))
             return true;
         }
@@ -247,25 +249,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       // Visit param conformance
       for (auto &Req : AFD->getGenericParams()->getRequirements()) {
         switch (Req.getKind()) {
-        case RequirementKind::SameType:
+        case RequirementReprKind::SameType:
           if (doIt(Req.getFirstTypeLoc()) || doIt(Req.getSecondTypeLoc()))
             return true;
           break;
-        case RequirementKind::Conformance:
-          if (doIt(Req.getSubjectLoc()))
+        case RequirementReprKind::TypeConstraint:
+          if (doIt(Req.getSubjectLoc()) || doIt(Req.getConstraintLoc()))
             return true;
-          break;
-        case RequirementKind::WitnessMarker:
           break;
         }
       }
     }
 
-    for (auto &P : AFD->getBodyParamPatterns()) {
-      if (Pattern *NewPattern = doIt(P))
-        P = NewPattern;
-      else
-        return true;
+    for (auto PL : AFD->getParameterLists()) {
+      visit(PL);
     }
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD))
@@ -294,6 +291,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitEnumElementDecl(EnumElementDecl *ED) {
+    if (ED->hasArgumentType()) {
+      if (auto TR = ED->getArgumentTypeLoc().getTypeRepr()) {
+        if (doIt(TR)) {
+          return true;
+        }
+      }
+    }
+
     // The getRawValueExpr should remain the untouched original LiteralExpr for
     // serialization and validation purposes. We only traverse the type-checked
     // form, unless we haven't populated it yet.
@@ -312,9 +317,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
-  /***************************************************************************/
-  /********************************** Exprs **********************************/
-  /***************************************************************************/
+  //===--------------------------------------------------------------------===//
+  //                                  Exprs
+  //===--------------------------------------------------------------------===//
 
   // A macro for handling the "semantic expressions" that are common
   // on sugared expression nodes like string interpolation.  The
@@ -331,7 +336,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }                                                    \
       return NODE;                                         \
     }                                                      \
-  } while(false)
+  } while (false)
 
   Expr *visitErrorExpr(ErrorExpr *E) { return E; }
   Expr *visitCodeCompletionExpr(CodeCompletionExpr *E) { return E; }
@@ -347,15 +352,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitSuperRefExpr(SuperRefExpr *E) { return E; }
   Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
     return E;
-  }
-  
-  Expr *visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *E) {
-    if (auto sub = doIt(E->getSubExpr())) {
-      E->setSubExpr(sub);
-      return E;
-    }
-    
-    return nullptr;
   }
   
   Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) { return E; }
@@ -434,7 +430,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
-    
+
   Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *E) {
     if (Expr *Base = doIt(E->getBase())) {
       E->setBase(Base);
@@ -496,16 +492,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
-    if (!E->getBase())
-      return E;
-    
-    if (Expr *E2 = doIt(E->getBase())) {
-      E->setBase(E2);
-      return E;
-    }
-    return nullptr;
-  }
-  Expr *visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *E) {
     if (!E->getBase())
       return E;
     
@@ -631,10 +617,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitClosureExpr(ClosureExpr *expr) {
-    if (Pattern *Pat = doIt(expr->getParams()))
-      expr->setParams(Pat);
-    else
-      return nullptr;
+    visit(expr->getParameters());
 
     if (expr->hasExplicitResultType())
       if (doIt(expr->getExplicitResultTypeLoc()))
@@ -726,6 +709,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitArrowExpr(ArrowExpr *E) {
+    if (Expr *Args = E->getArgsExpr()) {
+      Args = doIt(Args);
+      if (!Args) return nullptr;
+      E->setArgsExpr(Args);
+    }
+    if (Expr *Result = E->getResultExpr()) {
+      Result = doIt(Result);
+      if (!Result) return nullptr;
+      E->setResultExpr(Result);
+    }
+    return E;
+  }
+
   Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
     Expr *Sub = doIt(E->getSubExpr());
     if (!Sub) return nullptr;
@@ -748,6 +745,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     
     return AE;
+  }
+  
+  Expr *visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
+    if (Expr *Sub = E->getSubExpr()) {
+      if (!(Sub = doIt(Sub)))
+        return nullptr;
+      E->setSubExpr(Sub);
+    }
+    
+    return E;
   }
   
   
@@ -824,12 +831,26 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
+    HANDLE_SEMANTIC_EXPR(E);
     return E;
   }
 
-  /***************************************************************************/
-  /***************************** Everything Else *****************************/
-  /***************************************************************************/
+  Expr *visitObjCSelectorExpr(ObjCSelectorExpr *E) {
+    Expr *sub = doIt(E->getSubExpr());
+    if (!sub) return nullptr;
+
+    E->setSubExpr(sub);
+    return E;
+  }
+
+  Expr *visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+    HANDLE_SEMANTIC_EXPR(E);
+    return E;
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                           Everything Else
+  //===--------------------------------------------------------------------===//
 
 #define STMT(Id, Parent) Stmt *visit##Id##Stmt(Id##Stmt *S);
 #include "swift/AST/StmtNodes.def"
@@ -839,7 +860,32 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
 #define TYPEREPR(Id, Parent) bool visit##Id##TypeRepr(Id##TypeRepr *T);
 #include "swift/AST/TypeReprNodes.def"
-
+  
+  bool visitParameterList(ParameterList *PL) {
+    if (!Walker.walkToParameterListPre(PL))
+      return false;
+    
+    for (auto P : *PL) {
+      // Walk each parameter's decl and typeloc and default value.
+      if (doIt(P))
+        return true;
+      
+      // Don't walk into the type if the decl is implicit, or if the type is
+      // implicit.
+      if (!P->isImplicit() && !P->isTypeLocImplicit() &&
+          doIt(P->getTypeLoc()))
+        return true;
+      
+      if (auto *E = P->getDefaultValue()) {
+        auto res = doIt(E->getExpr());
+        if (!res) return true;
+        E->setExpr(res, E->alreadyChecked());
+      }
+    }
+    
+    return Walker.walkToParameterListPost(PL);
+  }
+  
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 
@@ -1222,10 +1268,10 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  // The generator decl is built directly on top of the sequence
+  // The iterator decl is built directly on top of the sequence
   // expression, so don't visit both.
-  if (PatternBindingDecl *Generator = S->getGenerator()) {
-    if (doIt(Generator))
+  if (PatternBindingDecl *Iterator = S->getIterator()) {
+    if (doIt(Iterator))
       return nullptr;
 
   } else if (Expr *Sequence = S->getSequence()) {
@@ -1235,9 +1281,9 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (auto GeneratorNext = S->getGeneratorNext()) {
-    if ((GeneratorNext = doIt(GeneratorNext)))
-      S->setGeneratorNext(GeneratorNext);
+  if (auto IteratorNext = S->getIteratorNext()) {
+    if ((IteratorNext = doIt(IteratorNext)))
+      S->setIteratorNext(IteratorNext);
     else
       return nullptr;
   }
@@ -1306,14 +1352,6 @@ Pattern *Traversal::visitTuplePattern(TuplePattern *P) {
       element.setPattern(newField);
     else
       return nullptr;
-
-    if (auto handle = element.getInit()) {
-      if (auto init = doIt(handle->getExpr())) {
-        handle->setExpr(init, handle->alreadyChecked());
-      } else {
-        return nullptr;
-      }
-    }
   }
   return P;
 }

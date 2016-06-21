@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -13,7 +13,7 @@
 /// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  x: T, @noescape _ f: () throws -> Result
+  _ x: T, _ f: @noescape () throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try f()
@@ -22,7 +22,7 @@ public func withExtendedLifetime<T, Result>(
 /// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  x: T, @noescape _ f: T throws -> Result
+  _ x: T, _ f: @noescape (T) throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try f(x)
@@ -30,14 +30,21 @@ public func withExtendedLifetime<T, Result>(
 
 extension String {
 
-  /// Invoke `f` on the contents of this string, represented as
-  /// a nul-terminated array of char, ensuring that the array's
-  /// lifetime extends through the execution of `f`.
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of UTF-8 code units.
+  ///
+  /// The `withCString(_:)` method ensures that the sequence's lifetime extends
+  /// through the execution of `f`.
+  ///
+  /// - Parameter f: A closure that takes a pointer to the string's UTF-8 code
+  ///   unit sequence as its sole argument. If the closure has a return value,
+  ///   it is used as the return value of the `withCString(_:)` method.
+  /// - Returns: The return value of the `f` closure, if any.
   public func withCString<Result>(
-    @noescape f: UnsafePointer<Int8> throws -> Result
+    _ f: @noescape (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
     return try self.nulTerminatedUTF8.withUnsafeBufferPointer {
-      try f(UnsafePointer($0.baseAddress))
+      try f(UnsafePointer($0.baseAddress!))
     }
   }
 }
@@ -45,7 +52,7 @@ extension String {
 // Fix the lifetime of the given instruction so that the ARC optimizer does not
 // shorten the lifetime of x to be before this point.
 @_transparent
-public func _fixLifetime<T>(x: T) {
+public func _fixLifetime<T>(_ x: T) {
   Builtin.fixLifetime(x)
 }
 
@@ -53,8 +60,8 @@ public func _fixLifetime<T>(x: T) {
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafeMutablePointer<T, Result>(
-  inout arg: T,
-  @noescape _ body: UnsafeMutablePointer<T> throws -> Result
+  _ arg: inout T,
+  _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result
 ) rethrows -> Result
 {
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&arg)))
@@ -62,9 +69,9 @@ public func withUnsafeMutablePointer<T, Result>(
 
 /// Like `withUnsafeMutablePointer`, but passes pointers to `arg0` and `arg1`.
 public func withUnsafeMutablePointers<A0, A1, Result>(
-  inout arg0: A0,
-  inout _ arg1: A1,
-  @noescape _ body: (
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ body: @noescape (
     UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) throws -> Result
 ) rethrows -> Result {
   return try body(
@@ -75,10 +82,10 @@ public func withUnsafeMutablePointers<A0, A1, Result>(
 /// Like `withUnsafeMutablePointer`, but passes pointers to `arg0`, `arg1`,
 /// and `arg2`.
 public func withUnsafeMutablePointers<A0, A1, A2, Result>(
-  inout arg0: A0,
-  inout _ arg1: A1,
-  inout _ arg2: A2,
-  @noescape _ body: (
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ arg2: inout A2,
+  _ body: @noescape (
     UnsafeMutablePointer<A0>,
     UnsafeMutablePointer<A1>,
     UnsafeMutablePointer<A2>
@@ -94,8 +101,8 @@ public func withUnsafeMutablePointers<A0, A1, A2, Result>(
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafePointer<T, Result>(
-  inout arg: T,
-  @noescape _ body: UnsafePointer<T> throws -> Result
+  _ arg: inout T,
+  _ body: @noescape (UnsafePointer<T>) throws -> Result
 ) rethrows -> Result
 {
   return try body(UnsafePointer<T>(Builtin.addressof(&arg)))
@@ -103,9 +110,9 @@ public func withUnsafePointer<T, Result>(
 
 /// Like `withUnsafePointer`, but passes pointers to `arg0` and `arg1`.
 public func withUnsafePointers<A0, A1, Result>(
-  inout arg0: A0,
-  inout _ arg1: A1,
-  @noescape _ body: (UnsafePointer<A0>, UnsafePointer<A1>) throws -> Result
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ body: @noescape (UnsafePointer<A0>, UnsafePointer<A1>) throws -> Result
 ) rethrows -> Result {
   return try body(
     UnsafePointer<A0>(Builtin.addressof(&arg0)),
@@ -115,10 +122,10 @@ public func withUnsafePointers<A0, A1, Result>(
 /// Like `withUnsafePointer`, but passes pointers to `arg0`, `arg1`,
 /// and `arg2`.
 public func withUnsafePointers<A0, A1, A2, Result>(
-  inout arg0: A0,
-  inout _ arg1: A1,
-  inout _ arg2: A2,
-  @noescape _ body: (
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ arg2: inout A2,
+  _ body: @noescape (
     UnsafePointer<A0>,
     UnsafePointer<A1>,
     UnsafePointer<A2>

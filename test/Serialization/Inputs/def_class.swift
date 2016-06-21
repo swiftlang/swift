@@ -1,5 +1,6 @@
 public class Empty {}
 
+@swift3_migration(renamed: "DosInts", message: "because I can")
 public class TwoInts {
   public var x, y : Int
   
@@ -10,6 +11,7 @@ public class TwoInts {
 }
 
 public class ComputedProperty {
+  @swift3_migration(renamed: "theValue", message: "because I can")
   public var value : Int {
     get {
       var result = 0
@@ -20,6 +22,7 @@ public class ComputedProperty {
     }
   }
 
+  @swift3_migration(message: "something else")
   public var readOnly : Int {
     return 42
   }
@@ -42,7 +45,7 @@ public class Pair<A, B> {
 public class GenericCtor<U> {
   public init<T>(_ t : T) {}
   
-  public func doSomething<T>(t : T) {}
+  public func doSomething<T>(_ t : T) {}
 }
 
 
@@ -73,8 +76,8 @@ public typealias Cacheable = protocol<Resettable, Computable>
 public protocol SpecialResettable : Resettable, Computable {}
 
 public protocol PairLike {
-  typealias FirstType
-  typealias SecondType
+  associatedtype FirstType
+  associatedtype SecondType
   func getFirst() -> FirstType
   func getSecond() -> SecondType
 }
@@ -86,9 +89,9 @@ public extension PairLike where FirstType : Cacheable {
 public protocol ClassProto : class {}
 
 @objc public protocol ObjCProtoWithOptional {
-  optional func optionalMethod()
-  optional var optionalVar: Int { get }
-  optional subscript (i: Int) -> Int { get }
+  @objc optional func optionalMethod()
+  @objc optional var optionalVar: Int { get }
+  @objc optional subscript (i: Int) -> Int { get }
 }
 
 

@@ -2,18 +2,18 @@
 // REQUIRES: executable_test
 
 protocol A {
-  typealias B
+  associatedtype B
   func b(_: B)
 }
 
 struct X<Y> : A {
-  func b(b: X.Type) {
+  func b(_ b: X.Type) {
     let x: Any = b
     print(b as X.Type)
   }
 }
 
-func foo<T: A>(x: T, _ y: T.B) {
+func foo<T: A>(_ x: T, _ y: T.B) {
   x.b(y)
 }
 

@@ -1,15 +1,10 @@
-// RUN: rm -rf %t
-// RUN: mkdir %t
-
-// FIXME: BEGIN -enable-source-import hackaround
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
-// FIXME: END -enable-source-import hackaround
+// RUN: rm -rf %t && mkdir %t
+// RUN: %build-clang-importer-objc-overlays
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -I %S/Inputs/custom-modules %s -verify
 
 // REQUIRES: objc_interop
 
-import Foundation
 import ObjCSubscripts
 
 // rdar://problem/19772357

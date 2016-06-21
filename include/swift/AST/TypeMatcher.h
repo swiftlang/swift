@@ -1,8 +1,8 @@
-//===-- TypeMatcher.h - Recursive Type Matcher------- -----------*- C++ -*-===//
+//===--- TypeMatcher.h - Recursive Type Matcher -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -186,7 +186,7 @@ class TypeMatcher {
 
     template<typename FirstMetatypeType>
     bool handleAnyMetatypeType(CanTypeWrapper<FirstMetatypeType> firstMeta,
-                               Type secondType){
+                               Type secondType) {
       if (auto secondMeta = secondType->getAs<FirstMetatypeType>()) {
         if (firstMeta->getKind() != secondMeta->getKind())
           return mismatch(firstMeta.getPointer(), secondMeta);
@@ -230,6 +230,12 @@ class TypeMatcher {
     /// FIXME: Split this out into cases?
     bool visitAnyFunctionType(CanAnyFunctionType firstFunc, Type secondType) {
       if (auto secondFunc = secondType->getAs<AnyFunctionType>()) {
+        // FIXME: Compare throws()? Both existing subclasses would prefer
+        // to mismatch on (!firstFunc->throws() && secondFunc->throws()), but
+        // embedding that non-commutativity in this general matcher is icky.
+        if (firstFunc->isNoEscape() != secondFunc->isNoEscape())
+          return mismatch(firstFunc.getPointer(), secondFunc);
+        
         return this->visit(firstFunc.getInput(), secondFunc->getInput()) &&
                this->visit(firstFunc.getResult(), secondFunc->getResult());
       }

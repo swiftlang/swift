@@ -345,7 +345,7 @@ performed at runtime, with the actual subclass being determined via
 some external file that describes the user interface. The actual
 instantiation of the object would use a type value::
 
-  func createView(viewClass: View.Type, frame: Rect) -> View {
+  func createView(_ viewClass: View.Type, frame: Rect) -> View {
     return viewClass(frame: frame) // error: 'init frame:' is not 'required'
   }
 
@@ -361,7 +361,7 @@ particular initializer, use the ``required`` attribute as follows::
     }
   }
 
-  func createView(viewClass: View.Type, frame: Rect) -> View {
+  func createView(_ viewClass: View.Type, frame: Rect) -> View {
     return viewClass(frame: frame) // okay
   }
 
@@ -413,7 +413,7 @@ declaring conformance to the protocol will also have the initializer,
 so they too will conform to the protocol. This allows one to construct
 objects given type values of protocol type::
 
-  func createAnyDefInit(typeVal: DefaultInitializable.Type) -> DefaultInitializable {
+  func createAnyDefInit(_ typeVal: DefaultInitializable.Type) -> DefaultInitializable {
     return typeVal()
   }
 
@@ -456,7 +456,7 @@ return an object with the same dynamic type as ``self``. One of the
 primary uses of the ``Self`` return type is for factory methods::
 
   extension View {
-    class func createView(frame: Rect) -> Self {
+    class func createView(_ frame: Rect) -> Self {
       return self(frame: frame)
     }
   }
@@ -482,12 +482,12 @@ allow chaining of method calls by returning ``Self`` from each method,
 as in the builder pattern::
 
   class DialogBuilder {
-    func setTitle(title: String) -> Self {
+    func setTitle(_ title: String) -> Self {
       // set the title
       return self;
     }
 
-    func setBounds(frame: Rect) -> Self {
+    func setBounds(_ frame: Rect) -> Self {
       // set the bounds
       return self;
     }

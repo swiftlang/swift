@@ -1,14 +1,14 @@
-;===--- sil-mode.el --------------------------------------------------------===;
-;
-; This source file is part of the Swift.org open source project
-;
-; Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
-; Licensed under Apache License v2.0 with Runtime Library Exception
-;
-; See http://swift.org/LICENSE.txt for license information
-; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-;
-;===------------------------------------------------------------------------===;
+;;===--- sil-mode.el ------------------------------------------------------===;;
+;;
+;; This source file is part of the Swift.org open source project
+;;
+;; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+;; Licensed under Apache License v2.0 with Runtime Library Exception
+;;
+;; See http://swift.org/LICENSE.txt for license information
+;; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+;;
+;;===----------------------------------------------------------------------===;;
 
 ;; Create mode-specific tables.
 (defvar sil-mode-syntax-table nil
@@ -29,17 +29,14 @@
                     "import" "protocol" "static" "struct" "subscript"
                     "typealias" "enum" "var" "let" "where"  "sil_vtable"
                     "sil_global" "private" "public" "internal" "override"
-                    "sil_witness_table")
+                    "sil_witness_table" "sil_scope")
                   'words) . font-lock-keyword-face)
    ;; SIL Types
    '("\\b[$][*]?[A-Z][z-aA-Z_[0-9]*\\b" . font-lock-type-face)
 
-   ;; Statements
-   `(,(regexp-opt '("if" "in" "else" "for" "do" "repeat" "while" "return"
-                    "break" "continue" "switch" "case")
-                  'words) . font-lock-keyword-face)
    ;; SIL Stage
    '("sil_stage" . font-lock-keyword-face)
+
    ;; SIL Function
    `(,(regexp-opt '("sil" "internal" "thunk")
                   'words) . font-lock-keyword-face)
@@ -47,30 +44,41 @@
    `(,(regexp-opt '("public" "hidden" "private" "shared" "public_external"
                     "hidden_external" "shared_external" "private_external")
                   'words) . font-lock-keyword-face)
+
    ;; SIL Declaration
    `(,(regexp-opt '("getter" "setter" "allocator" "initializer" "enumelt"
                     "destroyer" "globalaccessor" "objc") 'words) .
-		    font-lock-keyword-face)
+                    font-lock-keyword-face)
+
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
-                    "dealloc_stack" "dealloc_box" "dealloc_ref")
-		  'words) . font-lock-keyword-face)
+                    "alloc_value_buffer" "alloc_global"
+                    "dealloc_stack" "dealloc_box" "project_box" "dealloc_ref"
+                    "dealloc_partial_ref" "dealloc_value_buffer"
+                    "project_value_buffer")
+                  'words) . font-lock-keyword-face)
+
    ;; SIL Instructions - Debug Information.
    `(,(regexp-opt '("debug_value" "debug_value_addr")
                   'words) . font-lock-keyword-face)
+
    ;; SIL Instructions - Accessing Memory.
    `(,(regexp-opt '("load" "store" "assign"  "mark_uninitialized"
                     "mark_function_escape" "copy_addr" "destroy_addr"
                     "index_addr" "index_raw_pointer" "to")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
+
    ;; SIL Instructions - Reference Counting.
-   `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased"
+   `(,(regexp-opt '("strong_retain"
                     "strong_release" "strong_retain_unowned"
                     "unowned_retain" "unowned_release"
-                    "ref_to_unmanaged" "unmanaged_to_ref"
-                    "load_weak" "store_weak" "fix_lifetime" "mark_dependence"
-                    "strong_unpin" "strong_pin")
-		  'words) . font-lock-keyword-face)
+                    "load_weak" "store_weak"
+                    "load_unowned" "store_unowned"
+                    "fix_lifetime" "mark_dependence"
+                    "is_unique" "is_unique_or_pinned"
+                    "copy_block"
+                    "strong_unpin" "strong_pin" "is_unique" "is_unique_or_pinned")
+                  'words) . font-lock-keyword-face)
    ;; Literals
    `(,(regexp-opt '("function_ref"
                     "integer_literal" "float_literal" "string_literal"
@@ -82,7 +90,7 @@
                   'words) . font-lock-keyword-face)
    ;; Function Application
    `(,(regexp-opt '("apply" "partial_apply" "builtin" "try_apply")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
    ;; Metatypes
    `(,(regexp-opt '("metatype" "value_metatype"
                     "existential_metatype" "init_existential_metatype")
@@ -104,7 +112,7 @@
                     "open_existential_addr"
                     "init_existential_ref"
                     "open_existential_ref")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
    ;; Unchecked Conversions
    `(,(regexp-opt '("upcast"
                     "address_to_pointer" "pointer_to_address"
@@ -125,26 +133,28 @@
                     "objc_existential_metatype_to_object"
                     "word_to_bridge_object"
                     "is_nonnull"
+
                     )
                   'words) . font-lock-keyword-face)
-   ;; Value Buffer
-   `(,(regexp-opt '("alloc_value_buffer" "dealloc_value_buffer"
-                    "project_value_buffer") 'words) . font-lock-keyword-face)
+
    ;; Checked Conversions
    `(,(regexp-opt '("unconditional_checked_cast" "unconditional_checked_cast_addr")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
    ;; Runtime Failures
    `(,(regexp-opt '("cond_fail")
-		  'words) . font-lock-keyword-face)
+                  'words) . font-lock-keyword-face)
    ;; Terminators
-   `(,(regexp-opt '("unreachable" "return" "autorelease_return" "br"
+   `(,(regexp-opt '("unreachable" "return" "br"
                     "cond_br" "switch_value" "switch_enum"
                     "switch_enum_addr" "dynamic_method_br"
-                    "checked_cast_br" "throw")
+                    "checked_cast_br" "throw" "checked_cast_addr_br" "case")
                   'words) . font-lock-keyword-face)
    ;; Blocks
    `(,(regexp-opt '("project_block_storage" "init_block_storage_header"
                     "copy_block")
+                  'words) . font-lock-keyword-face)
+   ;; Debug Info
+   `(,(regexp-opt '("loc" "scope" "parent" "inlined_at")
                   'words) . font-lock-keyword-face)
    ;; SIL Value
    '("\\b[%][A-Za-z_0-9]+\\([#][0-9]+\\)?\\b" . font-lock-variable-name-face)
@@ -162,7 +172,7 @@
 (unless sil-mode-syntax-table
     (progn
       (setq sil-mode-syntax-table (make-syntax-table))
-      (mapcar (function (lambda (n)
+      (mapc (function (lambda (n)
                           (modify-syntax-entry (aref n 0)
                                                (aref n 1)
                                                sil-mode-syntax-table)))

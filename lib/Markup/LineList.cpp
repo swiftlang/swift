@@ -1,8 +1,8 @@
-//===--- LineList.h - Data structures for Markup parsing ------------------===//
+//===--- LineList.cpp - Data structures for Markup parsing ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,12 +15,12 @@
 #include "swift/Markup/LineList.h"
 #include "swift/Markup/Markup.h"
 
-using namespace llvm;
+using namespace swift;
 using namespace markup;
 
 std::string LineList::str() const {
   std::string Result;
-  raw_string_ostream Stream(Result);
+  llvm::raw_string_ostream Stream(Result);
   if (Lines.empty())
     return "";
 
@@ -42,7 +42,7 @@ std::string LineList::str() const {
   return Result;
 }
 
-size_t llvm::markup::measureIndentation(StringRef Text) {
+size_t swift::markup::measureIndentation(StringRef Text) {
   size_t Col = 0;
   for (size_t i = 0, e = Text.size(); i != e; ++i) {
     if (Text[i] == ' ' || Text[i] == '\v' || Text[i] == '\f') {

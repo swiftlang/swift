@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,14 +12,14 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
-// XFAIL: interpret
 
 import StdlibUnittest
+
 
 // Check that the generic parameter is called 'Element'.
 protocol TestProtocol1 {}
 
-extension StrideToGenerator where Element : TestProtocol1 {
+extension StrideToIterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -31,7 +31,7 @@ extension StrideTo where Element : TestProtocol1 {
   }
 }
 
-extension StrideThroughGenerator where Element : TestProtocol1 {
+extension StrideThroughIterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -45,7 +45,7 @@ extension StrideThrough where Element : TestProtocol1 {
 
 var StrideTestSuite = TestSuite("Strideable")
 
-struct R : RandomAccessIndexType {
+struct R : Strideable {
   typealias Distance = Int
   var x: Int
 
@@ -53,30 +53,17 @@ struct R : RandomAccessIndexType {
     self.x = x
   }
 
-  func successor() -> R {
-    return R(x + 1)
-  }
-  func predecessor() -> R {
-    return R(x - 1)
-  }
-  func distanceTo(rhs: R) -> Int {
+  func distance(to rhs: R) -> Int {
     return rhs.x - x
   }
-  func advancedBy(n: Int) -> R {
+  func advanced(by n: Int) -> R {
     return R(x + n)
-  }
-  func advancedBy(n: Int, limit: R) -> R {
-    let d = distanceTo(limit)
-    if d == 0 || (d > 0 ? d <= n : d >= n) {
-      return limit
-    }
-    return self.advancedBy(n)
   }
 }
 
 StrideTestSuite.test("Double") {
   // Doubles are not yet ready for testing, since they still conform
-  // to RandomAccessIndexType
+  // to RandomAccessIndex
 }
 
 StrideTestSuite.test("HalfOpen") {
@@ -84,12 +71,12 @@ StrideTestSuite.test("HalfOpen") {
     // Work on Ints
     expectEqual(
       sum,
-      start.stride(to: end, by: stepSize).reduce(0, combine: +))
+      stride(from: start, to: end, by: stepSize).reduce(0, combine: +))
 
-    // Work on an arbitrary RandomAccessIndexType
+    // Work on an arbitrary RandomAccessIndex
     expectEqual(
       sum,
-      R(start).stride(to: R(end), by: stepSize).reduce(0) { $0 + $1.x })
+      stride(from: R(start), to: R(end), by: stepSize).reduce(0) { $0 + $1.x })
   }
   
   check(from: 1, to: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
@@ -109,12 +96,12 @@ StrideTestSuite.test("Closed") {
     // Work on Ints
     expectEqual(
       sum,
-      start.stride(through: end, by: stepSize).reduce(0, combine: +))
+      stride(from: start, through: end, by: stepSize).reduce(0, combine: +))
 
-    // Work on an arbitrary RandomAccessIndexType
+    // Work on an arbitrary RandomAccessIndex
     expectEqual(
       sum,
-      R(start).stride(through: R(end), by: stepSize).reduce(0) { $0 + $1.x })
+      stride(from: R(start), through: R(end), by: stepSize).reduce(0) { $0 + $1.x })
   }
   
   check(from: 1, through: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
@@ -134,38 +121,46 @@ StrideTestSuite.test("OperatorOverloads") {
   var r2 = R(70)
   var stride: Int = 5
 
-  if true {
+  do {
     var result = r1 + stride
     expectType(R.self, &result)
     expectEqual(55, result.x)
   }
-  if true {
+  do {
     var result = stride + r1
     expectType(R.self, &result)
     expectEqual(55, result.x)
   }
-  if true {
+  do {
     var result = r1 - stride
     expectType(R.self, &result)
     expectEqual(45, result.x)
   }
-  if true {
+  do {
     var result = r1 - r2
     expectType(Int.self, &result)
     expectEqual(-20, result)
   }
-  if true {
+  do {
     var result = r1
     result += stride
     expectType(R.self, &result)
     expectEqual(55, result.x)
   }
-  if true {
+  do {
     var result = r1
     result -= stride
     expectType(R.self, &result)
     expectEqual(45, result.x)
   }
+}
+
+StrideTestSuite.test("FloatingPointStride") {
+  var result = [Double]()
+  for i in stride(from: 1.4, through: 3.4, by: 1) {
+    result.append(i)
+  }
+  expectEqual([ 1.4, 2.4, 3.4 ], result)
 }
 
 runAllTests()

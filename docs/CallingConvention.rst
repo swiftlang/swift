@@ -18,7 +18,7 @@ translation of the type of that function will be correctly callable
 from C.  For example, this wouldn't be guaranteed to work::
 
   // In Swift:
-  func foo(x: Int, y: Double) -> MyClass { ... }
+  func foo(_ x: Int, y: Double) -> MyClass { ... }
 
   // In Objective-C:
   extern id _TF4main3fooFTSiSd_CS_7MyClass(intptr_t x, double y);
@@ -57,9 +57,11 @@ distinction that only really makes sense in languages with the concept
 of an l-value, but Swift does, so it's pertinent.
 
 In general, the terms "pass-by-X" and "call-by-X" are used
-interchangeably.  It's unfortunate.  We'll prefer "pass-by-X" for
-consistency and to emphasize that these conventions are
-argument-specific.
+interchangeably.  It's unfortunate, because these conventions are
+argument specific, and functions can be passed multiple arguments
+that are each handled in a different way.  As such, we'll prefer 
+"pass-by-X" for consistency and to emphasize that these conventions 
+are argument-specific.
 
 Pass-by-reference
 -----------------
@@ -596,7 +598,7 @@ indirectly.
 All of these cases except mutating instance methods on value types can
 be partially applied to create a function closure whose type is the
 formal type of the method.  That is, if class `A` has a method
-declared `func foo(x: Int) -> Double`, then `A.foo` yields a function
+declared `func foo(_ x: Int) -> Double`, then `A.foo` yields a function
 of type `(Int) -> Double`.  Assuming that we continue to feel that
 this is a useful language feature, it's worth considered how we could
 support it efficiently.  The expenses associated with a partial
@@ -641,13 +643,13 @@ extra return values.  Considerations:
 
     // foo() expects its argument to follow the conventions of a
     // function that's capable of throwing.
-    func foo(fn: () throws -> ()) throwsIf(fn)
+    func foo(_ fn: () throws -> ()) throwsIf(fn)
 
     // Here we're passing foo() a function that can't throw; this is
     // allowed by the subtyping rules of the language.  We'd like to be
     // able to do this without having to introduce a thunk that maps
     // between the conventions.
-    func bar(fn: () -> ()) {
+    func bar(_ fn: () -> ()) {
       foo(fn)
     }
 

@@ -44,7 +44,7 @@ Swift compiler itself need not be recompiled except in rare cases
 where the changes affect how the SDK overlays are built. To recompile
 API notes for a given module `$MODULE` and place them into their 
 
-### OSX
+### OS X
 ```
 xcrun swift -apinotes -yaml-to-binary -target x86_64-apple-macosx10.10 -o $SWIFT_EXEC/lib/swift/macosx/$MODULE.apinotesc $MODULE.apinotes
 ```
@@ -70,9 +70,8 @@ xcrun swift -apinotes -yaml-to-binary -target x64_64-apple-ios7.0 -o $SWIFT_EXEC
 ```
 
 To add API notes for a system module `$MODULE` that does not have them yet,
-create a new source file `$MODULE.apinotes`. Newly-added API notes will require
-re-running CMake. Updated API notes will be found by the build system during
-the next build.
+create a new source file `$MODULE.apinotes` and update CMakeLists.txt.
+Updated API notes will be found by the build system during the next build.
 
 Note that Swift provides decompilation of binary API notes files via
 the `-apinotes -binary-to-yaml` option, which allows one to inspect

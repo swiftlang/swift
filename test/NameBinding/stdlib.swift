@@ -1,5 +1,10 @@
 // RUN: %target-parse-verify-swift -parse-stdlib -module-name Swift
 
+enum Optional<T> {
+  case none
+  case some(T)
+}
+
 // <rdar://problem/15593704>
 struct X {
   // This is in parse-stdlib mode with no default literal type.
@@ -14,6 +19,6 @@ protocol _BuiltinFloatLiteralConvertible {
 }
 
 protocol FloatLiteralConvertible {
-  typealias FloatLiteralType : _BuiltinFloatLiteralConvertible
+  associatedtype FloatLiteralType : _BuiltinFloatLiteralConvertible
   static func convertFromFloatLiteral(value: FloatLiteralType) -> Self
 }

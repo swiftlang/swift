@@ -6,68 +6,13 @@
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
 // REQUIRES: executable_test
-//
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
 
 import StdlibUnittest
-import Foundation
-
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
-struct NotBridgedKeyTy : Equatable, Hashable {
-  init(_ value: Int) {
-    self.value = value
-  }
-  var hashValue: Int {
-    return value
-  }
-  var value: Int
-}
-
-func == (lhs: NotBridgedKeyTy, rhs: NotBridgedKeyTy) -> Bool {
-  return lhs.value == rhs.value
-}
-
-assert(!_isBridgedToObjectiveC(NotBridgedKeyTy.self))
-
-struct NotBridgedValueTy {}
-
-assert(!_isBridgedToObjectiveC(NotBridgedValueTy.self))
-
-class BridgedVerbatimRefTy : Equatable, Hashable {
-  init(_ value: Int) {
-    self.value = value
-  }
-  var hashValue: Int {
-    return value
-  }
-  var value: Int
-}
-
-func == (lhs: BridgedVerbatimRefTy, rhs: BridgedVerbatimRefTy) -> Bool {
-  return lhs.value == rhs.value
-}
-
-assert(_isBridgedToObjectiveC(BridgedVerbatimRefTy.self))
-assert(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
 
 var DictionaryTraps = TestSuite("DictionaryTraps")
 
-DictionaryTraps.test("sanity") {
-  // Sanity checks.  This code should not trap.
-  var d = Dictionary<BridgedVerbatimRefTy, BridgedVerbatimRefTy>()
-  var nsd = d as NSDictionary
-}
-
 DictionaryTraps.test("DuplicateKeys1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -78,7 +23,7 @@ DictionaryTraps.test("DuplicateKeys1")
 }
 
 DictionaryTraps.test("DuplicateKeys2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -89,7 +34,7 @@ DictionaryTraps.test("DuplicateKeys2")
 }
 
 DictionaryTraps.test("DuplicateKeys3")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -99,160 +44,49 @@ DictionaryTraps.test("DuplicateKeys3")
 }
 
 DictionaryTraps.test("RemoveInvalidIndex1")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var d = Dictionary<Int, Int>()
   let index = d.startIndex
   expectCrashLater()
-  d.removeAtIndex(index)
+  d.remove(at: index)
 }
 
 DictionaryTraps.test("RemoveInvalidIndex2")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var d = Dictionary<Int, Int>()
   let index = d.endIndex
   expectCrashLater()
-  d.removeAtIndex(index)
+  d.remove(at: index)
 }
 
 DictionaryTraps.test("RemoveInvalidIndex3")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var d = [ 10: 1010, 20: 1020, 30: 1030 ]
   let index = d.endIndex
   expectCrashLater()
-  d.removeAtIndex(index)
+  d.remove(at: index)
 }
 
 DictionaryTraps.test("RemoveInvalidIndex4")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var d = [ 10: 1010 ]
-  let index = d.indexForKey(10)!
-  d.removeAtIndex(index)
+  let index = d.index(forKey: 10)!
+  d.remove(at: index)
   expectEmpty(d[10])
   expectCrashLater()
-  d.removeAtIndex(index)
-}
-
-class TestObjCKeyTy : NSObject {
-  init(_ value: Int) {
-    self.value = value
-  }
-
-  override func isEqual(object: AnyObject!) -> Bool {
-    if let other = object {
-      if let otherObjcKey = other as? TestObjCKeyTy {
-        return self.value == otherObjcKey.value
-      }
-    }
-    return false
-  }
-
-  override var hash : Int {
-    return value
-  }
-
-  var value: Int
-}
-
-struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
-  init(_ value: Int) { self.value = value }
-
-  var hashValue: Int { return value }
-
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCKeyTy.self
-  }
-
-  func _bridgeToObjectiveC() -> TestObjCKeyTy {
-    return TestObjCKeyTy(value)
-  }
-
-  static func _forceBridgeFromObjectiveC(
-    x: TestObjCKeyTy,
-    inout result: TestBridgedKeyTy?
-  ) {
-    result = TestBridgedKeyTy(x.value)
-  }
-
-  static func _conditionallyBridgeFromObjectiveC(
-    x: TestObjCKeyTy,
-    inout result: TestBridgedKeyTy?
-  ) -> Bool {
-    result = TestBridgedKeyTy(x.value)
-    return true
-  }
-
-  var value: Int
-}
-
-func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {
-  return x.value == y.value
-}
-
-DictionaryTraps.test("BridgedKeyIsNotNSCopyable1")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("unrecognized selector sent to instance").code {
-  // This Dictionary is bridged in O(1).
-  var d = [ TestObjCKeyTy(10): NSObject() ]
-  var nsd = d as NSDictionary
-  expectCrashLater()
-  nsd.mutableCopy()
-}
-
-DictionaryTraps.test("BridgedKeyIsNotNSCopyable2")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .code {
-  // This Dictionary is bridged in O(1).
-  var d = [ TestObjCKeyTy(10): 10 ]
-  var nsd = d as NSDictionary
-  expectCrashLater()
-  nsd.mutableCopy()
-}
-
-DictionaryTraps.test("Downcast1") {
-  let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(),
-                                            NSObject() : NSObject() ]
-  let d2: Dictionary<TestObjCKeyTy, NSObject> = _dictionaryDownCast(d)
-  expectCrashLater()
-  let v1 = d2[TestObjCKeyTy(10)]
-  let v2 = d2[TestObjCKeyTy(20)]
-
-  // This triggers failure.
-  for (k, v) in d2 { }
-}
-
-DictionaryTraps.test("Downcast2")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .code {
-  let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(),
-                                            NSObject() : NSObject() ]
-
-  expectCrashLater()
-  let d2: Dictionary<TestBridgedKeyTy, NSObject>
-    = _dictionaryBridgeFromObjectiveC(d)
-  let v1 = d2[TestBridgedKeyTy(10)]
+  d.remove(at: index)
 }
 
 runAllTests()
-

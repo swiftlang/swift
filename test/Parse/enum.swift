@@ -68,7 +68,7 @@ enum SwitchEnvy {
   case X(Y) where true: // expected-error{{'case' label can only appear inside a 'switch' statement}}
   case 0: // expected-error{{'case' label can only appear inside a 'switch' statement}}
   case _: // expected-error{{'case' label can only appear inside a 'switch' statement}}
-  case (_, let x, 0): // expected-error{{'case' label can only appear inside a 'switch' statement}}
+  case (_, var x, 0): // expected-error{{'case' label can only appear inside a 'switch' statement}}
 }
 
 enum HasMethodsPropertiesAndCtors {
@@ -112,7 +112,7 @@ enum Recovery2 {
 enum Recovery3 {
   case UE2(): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
-enum Recovery4 {
+enum Recovery4 { // expected-note {{in declaration of 'Recovery4'}}
   case Self Self // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-error {{expected declaration}}
 }
 enum Recovery5 {
@@ -383,7 +383,7 @@ enum PlaygroundRepresentation : UInt8 {
 
   static func fromByte(byte : UInt8) -> PlaygroundRepresentation {
     let repr = PlaygroundRepresentation(rawValue: byte)
-    if repr == .None { return .Unknown } else { return repr! }
+    if repr == .none { return .Unknown } else { return repr! }
   }
 }
 
@@ -428,4 +428,8 @@ public protocol RawValueB
 
 enum RawValueBTest: Double, RawValueB {
   case A, B
+}
+
+enum foo : String {
+  case bar = nil // expected-error {{cannot convert nil to raw type 'String'}}
 }

@@ -1,8 +1,8 @@
-//===- FlaggedPointer.h - Explicit pointer tagging container ----*- C++ -*-===//
+//===--- FlaggedPointer.h - Explicit pointer tagging container --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-#ifndef SWIFT_RUNTIME_FLAGGEDPOINTER_H
-#define SWIFT_RUNTIME_FLAGGEDPOINTER_H
+#ifndef SWIFT_BASIC_FLAGGEDPOINTER_H
+#define SWIFT_BASIC_FLAGGEDPOINTER_H
 
 #include <cassert>
 
@@ -148,7 +148,7 @@ public:
   }
 };
 
-};
+} // end namespace swift
 
 // Teach SmallPtrSet that FlaggedPointer is "basically a pointer".
 template <typename PointerTy, unsigned BitPosition, typename PtrTraits>
@@ -175,4 +175,4 @@ public:
   };
 };
 
-#endif
+#endif // SWIFT_BASIC_FLAGGEDPOINTER_H

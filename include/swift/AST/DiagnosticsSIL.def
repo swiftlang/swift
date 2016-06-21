@@ -1,8 +1,8 @@
-//===- DiagnosticsSILAnalysis.def - Diagnostics Text ------------*- C++ -*-===//
+//===--- DiagnosticsSIL.def - Diagnostics Text ------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,230 +22,236 @@
 #endif
 
 #ifndef ERROR
-#  define ERROR(ID,Category,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#  define ERROR(ID,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Options,Text,Signature)
 #endif
 
 #ifndef WARNING
-#  define WARNING(ID,Category,Options,Text,Signature) \
-  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#  define WARNING(ID,Options,Text,Signature) \
+  DIAG(WARNING,ID,Options,Text,Signature)
 #endif
 
 #ifndef NOTE
-#  define NOTE(ID,Category,Options,Text,Signature) \
-  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#  define NOTE(ID,Options,Text,Signature) \
+  DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
 
 // SILGen issues.
-ERROR(bridging_module_missing,sil_gen,none,
+ERROR(bridging_module_missing,none,
       "unable to find module '%0' for implicit conversion function '%0.%1'",
       (StringRef, StringRef))
-ERROR(bridging_function_missing,sil_gen,none,
+ERROR(bridging_function_missing,none,
       "unable to find implicit conversion function '%0.%1'",
       (StringRef, StringRef))
-ERROR(bridging_function_overloaded,sil_gen,none,
+ERROR(bridging_function_overloaded,none,
       "multiple definitions of implicit conversion function '%0.%1'",
       (StringRef, StringRef))
-ERROR(bridging_function_not_function,sil_gen,none,
+ERROR(bridging_function_not_function,none,
       "definition of implicit conversion function '%0.%1' is not a function",
       (StringRef, StringRef))
-ERROR(bridging_function_not_correct_type,sil_gen,none,
+ERROR(bridging_function_not_correct_type,none,
       "definition of implicit conversion function '%0.%1' is not of the correct"
       " type",
       (StringRef, StringRef))
-ERROR(invalid_sil_builtin,sil_gen,none,
+ERROR(bridging_objcbridgeable_missing,none,
+      "cannot find definition of '_ObjectiveCBridgeable' protocol", ())
+ERROR(bridging_objcbridgeable_broken,none,
+      "broken definition of '_ObjectiveCBridgeable' protocol: missing %0",
+      (DeclName))
+
+ERROR(invalid_sil_builtin,none,
       "INTERNAL ERROR: invalid use of builtin: %0",
       (StringRef))
-ERROR(could_not_find_bridge_type,sil_gen,none,
+ERROR(could_not_find_bridge_type,none,
       "could not find Objective-C bridge type for type %0; "
       "did you forget to import Foundation?", (Type))
-ERROR(could_not_find_pointer_memory_property,sil_gen,none,
-      "could not find 'memory' property of pointer type %0", (Type))
+ERROR(could_not_find_pointer_pointee_property,none,
+      "could not find 'pointee' property of pointer type %0", (Type))
 
-ERROR(writeback_overlap_property,sil_gen,none,
+ERROR(writeback_overlap_property,none,
       "inout writeback to computed property %0 occurs in multiple arguments to"
       " call, introducing invalid aliasing", (Identifier))
-ERROR(writeback_overlap_subscript,sil_gen,none,
+ERROR(writeback_overlap_subscript,none,
       "inout writeback through subscript occurs in multiple arguments to call,"
       " introducing invalid aliasing",
       ())
-NOTE(writebackoverlap_note,sil_gen,none,
+NOTE(writebackoverlap_note,none,
       "concurrent writeback occurred here", ())
 
-ERROR(inout_argument_alias,sil_gen,none,
+ERROR(inout_argument_alias,none,
       "inout arguments are not allowed to alias each other", ())
-NOTE(previous_inout_alias,sil_gen,none,
+NOTE(previous_inout_alias,none,
       "previous aliasing argument", ())
 
-ERROR(unsupported_recursive_type,sil_gen,none,
-      "recursive value type %0 is not allowed", (Type))
-
-ERROR(recursive_enum_not_indirect,sil_gen,none,
-      "recursive enum %0 is not marked 'indirect'", (Type))
-
-ERROR(unsupported_c_function_pointer_conversion,sil_gen,none,
+ERROR(unsupported_c_function_pointer_conversion,none,
       "C function pointer signature %0 is not compatible with expected type %1",
       (Type, Type))
 
+ERROR(objc_selector_malformed,none,"the type ObjectiveC.Selector is malformed",
+      ())
+
 // Definite initialization diagnostics.
-NOTE(variable_defined_here,sil_analysis,none,
+NOTE(variable_defined_here,none,
      "%select{variable|constant}0 defined here", (bool))
-ERROR(variable_used_before_initialized,sil_analysis,none,
+ERROR(variable_used_before_initialized,none,
       "%select{variable|constant}1 '%0' used before being initialized",
       (StringRef, bool))
-ERROR(variable_inout_before_initialized,sil_analysis,none,
+ERROR(variable_inout_before_initialized,none,
       "%select{variable|constant}1 '%0' passed by reference before being"
       " initialized", (StringRef, bool))
-ERROR(variable_escape_before_initialized,sil_analysis,none,
+ERROR(variable_closure_use_uninit,none,
       "%select{variable|constant}1 '%0' captured by a closure before being"
       " initialized", (StringRef, bool))
+ERROR(self_closure_use_uninit,none,
+      "'self' captured by a closure before all members were initialized", ())
 
-ERROR(variable_addrtaken_before_initialized,sil_analysis,none,
+
+ERROR(variable_addrtaken_before_initialized,none,
       "address of %select{variable|constant}1 '%0' taken before it is"
       " initialized", (StringRef, bool))
-ERROR(ivar_not_initialized_at_superinit,sil_analysis,none,
+ERROR(ivar_not_initialized_at_superinit,none,
       "property '%0' not initialized at super.init call", (StringRef, bool))
-ERROR(ivar_not_initialized_at_implicit_superinit,sil_analysis,none,
+ERROR(ivar_not_initialized_at_implicit_superinit,none,
       "property '%0' not initialized at implicitly generated super.init call",
       (StringRef, bool))
 
-ERROR(self_use_before_fully_init,sil_analysis,none,
+ERROR(self_use_before_fully_init,none,
       "use of 'self' in %select{method call|property access}1 %0 before "
       "%select{all stored properties are initialized|"
       "super.init initializes self|"
       "self.init initializes self}2", (Identifier, bool, unsigned))
-ERROR(use_of_self_before_fully_init,sil_analysis,none,
+ERROR(use_of_self_before_fully_init,none,
       "'self' used before all stored properties are initialized", ())
-ERROR(use_of_self_before_fully_init_protocol,sil_analysis,none,
+ERROR(use_of_self_before_fully_init_protocol,none,
       "'self' used before chaining to another self.init requirement", ())
 
 
-NOTE(stored_property_not_initialized,sil_analysis,none,
+NOTE(stored_property_not_initialized,none,
      "'%0' not initialized", (StringRef))
 
-ERROR(selfinit_multiple_times,sil_analysis,none,
+ERROR(selfinit_multiple_times,none,
       "%select{super|self}0.init called multiple times in initializer",
       (unsigned))
-ERROR(superselfinit_not_called_before_return,sil_analysis,none,
+ERROR(superselfinit_not_called_before_return,none,
       "%select{super|self}0.init isn't called on all paths before returning "
       "from initializer", (unsigned))
-ERROR(self_before_superselfinit,sil_analysis,none,
+ERROR(self_before_superselfinit,none,
       "'self' used before %select{super|self}0.init call",
       (unsigned))
-ERROR(self_inside_catch_superselfinit,sil_analysis,none,
+ERROR(self_inside_catch_superselfinit,none,
       "'self' used inside 'catch' block reachable from "
       "%select{super|self}0.init call",
       (unsigned))
-ERROR(return_from_init_without_initing_self,sil_analysis,none,
+ERROR(return_from_init_without_initing_self,none,
       "return from enum initializer method without storing to 'self'", ())
-ERROR(return_from_protocol_init_without_initing_self,sil_analysis,none,
+ERROR(return_from_protocol_init_without_initing_self,none,
       "protocol extension initializer never chained to 'self.init'", ())
-ERROR(return_from_init_without_initing_stored_properties,sil_analysis,none,
+ERROR(return_from_init_without_initing_stored_properties,none,
       "return from initializer without initializing all"
       " stored properties", ())
 
-ERROR(global_variable_function_use_uninit,sil_analysis,none,
+ERROR(variable_function_use_uninit,none,
       "%select{variable|constant}1 '%0' used by function definition before"
       " being initialized",
       (StringRef, bool))
-ERROR(struct_not_fully_initialized,sil_analysis,none,
+ERROR(struct_not_fully_initialized,none,
       "struct '%0' must be completely initialized before a member is stored to",
       (StringRef, bool))
-ERROR(immutable_property_already_initialized,sil_analysis,none,
+ERROR(immutable_property_already_initialized,none,
       "immutable value '%0' may only be initialized once",
       (StringRef))
-NOTE(initial_value_provided_in_let_decl,sil_analysis,none,
+NOTE(initial_value_provided_in_let_decl,none,
      "initial value already provided in 'let' declaration", ())
-ERROR(mutating_method_called_on_immutable_value,sil_analysis,none,
+ERROR(mutating_method_called_on_immutable_value,none,
       "mutating %select{method|property access|subscript|operator}1 %0 may not"
       " be used on immutable value '%2'",
       (Identifier, unsigned, StringRef))
-ERROR(immutable_value_passed_inout,sil_analysis,none,
+ERROR(immutable_value_passed_inout,none,
       "immutable value '%0' may not be passed inout",
       (StringRef))
-ERROR(assignment_to_immutable_value,sil_analysis,none,
+ERROR(assignment_to_immutable_value,none,
       "immutable value '%0' may not be assigned to",
       (StringRef))
 
 
 // Control flow diagnostics.
-ERROR(missing_return,sil_analysis,none,
+ERROR(missing_return,none,
       "missing return in a %select{function|closure}1 expected to return %0",
       (Type, unsigned))
-ERROR(return_from_noreturn,sil_analysis,none, 
+ERROR(return_from_noreturn,none, 
       "return from a 'noreturn' function", ())
-ERROR(non_exhaustive_switch,sil_analysis,none, 
+ERROR(non_exhaustive_switch,none, 
       "switch must be exhaustive, consider adding a default clause", ())
-ERROR(guard_body_must_not_fallthrough,sil_analysis,none,
+ERROR(guard_body_must_not_fallthrough,none,
       "'guard' body may not fall through, consider using 'return' or 'break'"
       " to exit the scope", ())
-WARNING(unreachable_code,sil_analysis,none, "will never be executed", ())
-NOTE(unreachable_code_branch,sil_analysis,none,
+WARNING(unreachable_code,none, "will never be executed", ())
+NOTE(unreachable_code_branch,none,
      "condition always evaluates to %select{false|true}0", (bool))
-NOTE(call_to_noreturn_note,sil_analysis,none,
+NOTE(call_to_noreturn_note,none,
      "a call to a noreturn function", ())
-WARNING(unreachable_code_after_stmt,sil_analysis,none,
+WARNING(unreachable_code_after_stmt,none,
         "code after '%select{return|break|continue|throw}0' will never "
         "be executed", (unsigned))
-WARNING(unreachable_case,sil_analysis,none,
+WARNING(unreachable_case,none,
         "%select{case|default}0 will never be executed", (bool))
-WARNING(switch_on_a_constant,sil_analysis,none,
+WARNING(switch_on_a_constant,none,
         "switch condition evaluates to a constant", ())
-NOTE(unreachable_code_note,sil_analysis,none, "will never be executed", ())
+NOTE(unreachable_code_note,none, "will never be executed", ())
 
 // 'transparent' diagnostics
-ERROR(circular_transparent,sil_analysis,none,
+ERROR(circular_transparent,none,
       "inlining 'transparent' functions forms circular loop", ())
-NOTE(note_while_inlining,sil_analysis,none,
+NOTE(note_while_inlining,none,
      "while inlining here", ())
 
 // Arithmetic diagnostics.
-ERROR(integer_conversion_overflow,sil_analysis,none,
+ERROR(integer_conversion_overflow,none,
       "integer overflows when converted from %0 to %1",
       (Type, Type))
-ERROR(integer_conversion_overflow_builtin_types,sil_analysis,none,
+ERROR(integer_conversion_overflow_builtin_types,none,
       "integer overflows when converted from %select{unsigned|signed}0 "
       "%1 to %select{unsigned|signed}2 %3",
       (bool, Type, bool, Type))
-WARNING(integer_conversion_overflow_warn,sil_analysis,none,
+WARNING(integer_conversion_overflow_warn,none,
       "integer overflows when converted from %0 to %1",
       (Type, Type))
-ERROR(integer_conversion_sign_error,sil_analysis,none,
+ERROR(integer_conversion_sign_error,none,
       "negative integer cannot be converted to unsigned type %0",
       (Type))
-ERROR(negative_integer_literal_overflow_unsigned,sil_analysis,none,
+ERROR(negative_integer_literal_overflow_unsigned,none,
       "negative integer '%1' overflows when stored into unsigned type %0",
       (Type, StringRef))
 
-ERROR(integer_literal_overflow,sil_analysis,none,
+ERROR(integer_literal_overflow,none,
       "integer literal '%1' overflows when stored into %0",
       (Type, StringRef))
-ERROR(integer_literal_overflow_builtin_types,sil_analysis,none,
+ERROR(integer_literal_overflow_builtin_types,none,
       "integer literal '%2' overflows when stored into "
       "%select{unsigned|signed}0 %1", (bool, Type, StringRef))
-WARNING(integer_literal_overflow_warn,sil_analysis,none,
+WARNING(integer_literal_overflow_warn,none,
       "integer literal overflows when stored into %0",
       (Type))
-ERROR(arithmetic_operation_overflow,sil_analysis,none,
+ERROR(arithmetic_operation_overflow,none,
       "arithmetic operation '%0 %1 %2' (on type %3) results in an overflow",
       (StringRef, StringRef, StringRef, Type))
-ERROR(arithmetic_operation_overflow_generic_type,sil_analysis,none,
+ERROR(arithmetic_operation_overflow_generic_type,none,
       "arithmetic operation '%0 %1 %2' (on %select{unsigned|signed}3 "
       "%4-bit integer type) results in an overflow",
       (StringRef, StringRef, StringRef, bool, unsigned))
-ERROR(division_overflow,sil_analysis,none,
+ERROR(division_overflow,none,
       "division '%0 %1 %2' results in an overflow",
       (StringRef, StringRef, StringRef))
-ERROR(division_by_zero,sil_analysis,none, "division by zero", ())
-ERROR(wrong_non_negative_assumption,sil_analysis,none,
+ERROR(division_by_zero,none, "division by zero", ())
+ERROR(wrong_non_negative_assumption,none,
       "assumed non-negative value '%0' is negative", (StringRef))
-ERROR(shifting_all_significant_bits,sil_analysis,none,
+ERROR(shifting_all_significant_bits,none,
       "shift amount is greater than or equal to type size in bits", ())
 
 // FIXME: We won't need this as it will be replaced with user-generated strings.
 // staticReport diagnostics.
-ERROR(static_report_error, sil_analysis, none,
+ERROR(static_report_error, none,
       "static report error", ())
 
 

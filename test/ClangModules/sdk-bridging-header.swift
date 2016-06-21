@@ -10,15 +10,15 @@
 // CHECK-FATAL: failed to import bridging header
 
 // CHECK-INCLUDE: error: 'this-header-does-not-exist.h' file not found
-// CHECK-INCLUDE: error: use of unresolved identifier 'Predicate'
+// CHECK-INCLUDE: error: use of unresolved identifier 'MyPredicate'
 
 // REQUIRES: objc_interop
 
 import Foundation
 
-let `true` = Predicate.truePredicate()
-let not = Predicate.not()
-let and = Predicate.and([])
-let or = Predicate.or([not, and])
+let `true` = MyPredicate.`true`()
+let not = MyPredicate.not()
+let and = MyPredicate.and([])
+let or = MyPredicate.or([not, and])
 
-_ = Predicate.foobar() // expected-error{{type 'Predicate' has no member 'foobar'}}
+_ = MyPredicate.foobar() // expected-error{{type 'MyPredicate' has no member 'foobar'}}

@@ -1,11 +1,11 @@
 // RUN: %sourcekitd-test -req=expand-placeholder %s | FileCheck %s
 
-foo(x: <#T##()->Void#>)
+foo(x: <#T##() -> Void#>)
 // CHECK:      foo {
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
-foo(x: <#T##()->Void#>, y: <#T##Int#>)
+foo(x: <#T##() -> Void#>, y: <#T##Int#>)
 // CHECK:      foo(x: {
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }, y: Int)
@@ -49,3 +49,8 @@ func f() {
   store.requestAccessToEntityType(<#T##entityType: EKEntityType##EKEntityType#>, completion: nil)
 }
 // CHECK: store.requestAccessToEntityType(EKEntityType, completion: nil)
+
+func f1() {
+  bar(<#T##d: () -> ()##() -> ()#>)
+}
+// CHECK-NOT: bar { () -> () in

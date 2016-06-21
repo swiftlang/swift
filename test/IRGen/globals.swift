@@ -8,7 +8,7 @@ var g2 : (Void, Int, Int)
 var g3 : Bool
 
 // FIXME: enum IRgen
-// enum TY4 { case Some(Int, Int); case None }
+// enum TY4 { case some(Int, Int); case none }
 // var g4 : TY4
 
 // FIXME: enum IRgen
@@ -40,18 +40,18 @@ extension A {
 // CHECK-NOT: TY8
 // CHECK-NOT: TY9
 
-// CHECK: @_Tv7globals2g0Si = global [[INT]] zeroinitializer, align 8
-// CHECK: @_Tv7globals2g1TT_SiT__ = global <{ [[INT]] }> zeroinitializer, align 8
-// CHECK: @_Tv7globals2g2TT_SiSi_ = global <{ [[INT]], [[INT]] }> zeroinitializer, align 8
-// CHECK: @_Tv7globals2g3Sb = global [[BOOL]] zeroinitializer, align 1
-// CHECK: @_Tv7globals2g6Sd = global [[DOUBLE]] zeroinitializer, align 8
-// CHECK: @_Tv7globals2g7Sf = global [[FLOAT]] zeroinitializer, align 4
-// CHECK: @_TZvV7globals1A3fooSi = global [[INT]] zeroinitializer, align 8
+// CHECK: @_Tv7globals2g0Si = hidden global [[INT]] zeroinitializer, align 8
+// CHECK: @_Tv7globals2g1TT_SiT__ = hidden global <{ [[INT]] }> zeroinitializer, align 8
+// CHECK: @_Tv7globals2g2TT_SiSi_ = hidden global <{ [[INT]], [[INT]] }> zeroinitializer, align 8
+// CHECK: @_Tv7globals2g3Sb = hidden global [[BOOL]] zeroinitializer, align 1
+// CHECK: @_Tv7globals2g6Sd = hidden global [[DOUBLE]] zeroinitializer, align 8
+// CHECK: @_Tv7globals2g7Sf = hidden global [[FLOAT]] zeroinitializer, align 4
+// CHECK: @_TZvV7globals1A3fooSi = hidden global [[INT]] zeroinitializer, align 8
 
 // CHECK-NOT: g8
 // CHECK-NOT: g9
 
-// CHECK: define i32 @main(i32, i8**) {{.*}} {
+// CHECK: define{{( protected)?}} i32 @main(i32, i8**) {{.*}} {
 // CHECK:      store  i64 {{.*}}, i64* getelementptr inbounds ([[INT]], [[INT]]* @_Tv7globals2g0Si, i32 0, i32 0), align 8
 
 // FIXME: give these initializers a real mangled name

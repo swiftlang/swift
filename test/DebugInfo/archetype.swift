@@ -1,26 +1,26 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
-protocol IntegerArithmeticType {
-  static func uncheckedSubtract(lhs: Self, rhs: Self) -> (Self, Bool)
+protocol IntegerArithmetic {
+  static func uncheckedSubtract(_ lhs: Self, rhs: Self) -> (Self, Bool)
 }
 
-protocol RandomAccessIndexType : IntegerArithmeticType {
-  typealias Distance : IntegerArithmeticType
-  static func uncheckedSubtract(lhs: Self, rhs: Self) -> (Distance, Bool)
+protocol RandomAccessIndex : IntegerArithmetic {
+  associatedtype Distance : IntegerArithmetic
+  static func uncheckedSubtract(_ lhs: Self, rhs: Self) -> (Distance, Bool)
 }
 
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtTQQq_F9archetype16ExistentialTuple
-// CHECK-SAME:             identifier: [[TT:".+"]])
-// archetype.ExistentialTuple <A : RandomAccessIndexType, B>(x : A, y : A) -> B
+// archetype.ExistentialTuple <A : RandomAccessIndex, B>(x : A, y : A) -> B
 // CHECK: !DISubprogram(name: "ExistentialTuple", linkageName: "_TF9archetype16ExistentialTuple
 // CHECK-SAME:          line: [[@LINE+2]]
 // CHECK-SAME:          isDefinition: true
-func ExistentialTuple<T: RandomAccessIndexType>(x: T, y: T) -> T.Distance {
+func ExistentialTuple<T: RandomAccessIndex>(_ x: T, y: T) -> T.Distance {
   // (B, Swift.Bool)
   // CHECK: !DILocalVariable(name: "tmp"
   // CHECK-SAME:             line: [[@LINE+2]]
-  // CHECK-SAME:             type: ![[TT]]
+  // CHECK-SAME:             type: ![[TT:[0-9]+]]
   var tmp : (T.Distance, Bool) = T.uncheckedSubtract(x, rhs: y)
   return _overflowChecked((tmp.0, tmp.1))
 }
+// CHECK: ![[TT]] = !DICompositeType(tag: DW_TAG_structure_type,
+// CHECK-SAME:                       name: "_TtTQQq_F9archetype16ExistentialTuple
 

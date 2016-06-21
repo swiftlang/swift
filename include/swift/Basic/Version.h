@@ -1,8 +1,8 @@
-//===- Version.h - Swift Version Number -------------------------*- C++ -*-===//
+//===--- Version.h - Swift Version Number -----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -19,10 +19,12 @@
 #ifndef SWIFT_BASIC_VERSION_H
 #define SWIFT_BASIC_VERSION_H
 
-#include <string>
 
-#include "llvm/ADT/StringRef.h"
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
+#include <string>
 
 namespace swift {
 
@@ -49,7 +51,7 @@ namespace version {
 /// a: [0 - 999]
 /// b: [0 - 999]
 class Version {
-  llvm::SmallVector<uint64_t, 5> Components;
+  SmallVector<uint64_t, 5> Components;
 public:
   /// Create the empty compiler version - this always compares greater
   /// or equal to any other CompilerVersion, as in the case of building Swift
@@ -59,11 +61,7 @@ public:
   /// Create a version from a string in source code.
   ///
   /// Must include only groups of digits separated by a dot.
-  Version(const llvm::StringRef VersionString, SourceLoc Loc,
-                  DiagnosticEngine *Diags);
-
-  /// Return a printable string representation of the version.
-  std::string str() const;
+  Version(StringRef VersionString, SourceLoc Loc, DiagnosticEngine *Diags);
 
   /// Return a string to be used as an internal preprocessor define.
   ///
@@ -89,26 +87,32 @@ public:
     return Components.empty();
   }
 
-  /// Parse a _compiler_version build configuration from source code.
-  static Version parseCompilerVersionString(llvm::StringRef VersionString,
-                                                    SourceLoc Loc,
-                                                    DiagnosticEngine *Diags);
+  /// Parse a version in the form used by the _compiler_version \#if condition.
+  static Version parseCompilerVersionString(StringRef VersionString,
+                                            SourceLoc Loc,
+                                            DiagnosticEngine *Diags);
 
   /// Parse a generic version string of the format [0-9]+(.[0-9]+)*
   ///
   /// Version components can be any unsigned 64-bit number.
-  static Version parseVersionString(llvm::StringRef VersionString,
-                                            SourceLoc Loc,
-                                            DiagnosticEngine *Diags);
+  static Optional<Version> parseVersionString(StringRef VersionString,
+                                              SourceLoc Loc,
+                                              DiagnosticEngine *Diags);
 
   /// Returns a version from the currently defined SWIFT_COMPILER_VERSION.
   ///
   /// If SWIFT_COMPILER_VERSION is undefined, this will return the empty
   /// compiler version.
   static Version getCurrentCompilerVersion();
+
+  /// Returns a version from the currently defined SWIFT_VERSION_MAJOR and
+  /// SWIFT_VERSION_MINOR.
+  static Version getCurrentLanguageVersion();
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);
+
+raw_ostream &operator<<(raw_ostream &os, const Version &version);
 
 /// Retrieves the numeric {major, minor} Swift version.
 std::pair<unsigned, unsigned> getSwiftNumericVersion();
@@ -120,4 +124,4 @@ std::string getSwiftFullVersion();
 } // end namespace version
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_VERSION_H

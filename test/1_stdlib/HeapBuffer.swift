@@ -20,7 +20,7 @@ a.value.name = "DaveA"
 a.value.locations.append("Princeton")
 a.value.locations.append("San Jose")
 for x in 0..<10 {
-  (a.baseAddress + x).initialize(x)
+  (a.baseAddress + x).initialize(with: x)
 }
 
 print("buffer has storage: \(a.storage != nil)")
@@ -30,7 +30,7 @@ func testUnique() {
   print("buffer is unique: \(a.isUniquelyReferenced())")
   // CHECK-NEXT: buffer is unique: true
   
-  var addRef = [ a ]
+  var addRef = [a]
   print("copied buffer is unique: \(a.isUniquelyReferenced())")
   // CHECK-NEXT: copied buffer is unique: false
 }

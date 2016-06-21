@@ -1,0 +1,5 @@
+add_swift_library(swiftXPC ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+  XPC.swift
+  XPC.mm
+  TARGET_SDKS OSX
+  SWIFT_MODULE_DEPENDS ObjectiveC Dispatch)

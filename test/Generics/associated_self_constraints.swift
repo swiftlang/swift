@@ -1,17 +1,17 @@
 // RUN: %target-parse-verify-swift
 
 protocol Observer {
-    typealias Value
+    associatedtype Value
     
-    func onNext(item: Value) -> Void
+    func onNext(_ item: Value) -> Void
     func onCompleted() -> Void
-    func onError(error: String) -> Void
+    func onError(_ error: String) -> Void
 }
 
 protocol Observable {
-    typealias Value
+    associatedtype Value
 
-    func subscribe<O: Observer where O.Value == Value>(observer: O) -> Any
+    func subscribe<O: Observer where O.Value == Value>(_ observer: O) -> Any
 }
 
 class Subject<T>: Observer, Observable {
@@ -23,7 +23,7 @@ class Subject<T>: Observer, Observable {
     var onCompletedFunc: (() -> Void)? = nil
     var onErrorFunc: ((String) -> Void)? = nil
     
-    func onNext(item: T) -> Void {
+    func onNext(_ item: T) -> Void {
         onNextFunc?(item)
     }
     
@@ -31,14 +31,14 @@ class Subject<T>: Observer, Observable {
         onCompletedFunc?()
     }
     
-    func onError(error: String) -> Void {
+    func onError(_ error: String) -> Void {
         onErrorFunc?(error)
     }
     
     // Observable implementation
     
-    func subscribe<O: Observer where O.Value == T>(observer: O) -> Any {
-        self.onNextFunc = { (item: T) -> Void  in
+    func subscribe<O: Observer where O.Value == T>(_ observer: O) -> Any {
+        self.onNextFunc = { (item: T) -> Void in
             observer.onNext(item)
         }
         
@@ -50,33 +50,24 @@ class Subject<T>: Observer, Observable {
             observer.onError(error)
         }
         
-        return self;
+        return self
     }
-}
-
-struct X<T> {
-
-  mutating func replace<C: CollectionType where C.Generator.Element == T>(a: C) {
-    for i in a.startIndex..<a.endIndex {
-      _ = a[i] as T
-    }
-  }
 }
 
 protocol P {
-    typealias A
+    associatedtype A
     
-    func onNext(item: A) -> Void
+    func onNext(_ item: A) -> Void
 }
 
 struct IP<T> : P {
     typealias A = T
 
-    init<O:P where O.A == IP.A>(x:O) {
+    init<O:P>(x:O) where O.A == IP.A {
        _onNext = { (item: A) in x.onNext(item) }
     }
 
-    func onNext(item: A) { _onNext(item) }
+    func onNext(_ item: A) { _onNext(item) }
 
-    var _onNext: (A)->()
+    var _onNext: (A) -> ()
 }

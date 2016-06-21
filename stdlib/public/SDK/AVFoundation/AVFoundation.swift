@@ -2,6 +2,6 @@
 import Foundation
 
 extension AVError : _BridgedNSError {
-  public static var _NSErrorDomain: String { return AVFoundationErrorDomain }
+  public static var _nsErrorDomain: String { return AVFoundationErrorDomain }
 }
 

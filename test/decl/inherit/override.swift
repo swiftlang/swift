@@ -35,36 +35,36 @@ extension B {
   @objc override func f8() -> ObjCClassA { }
 }
 
-func callOverridden(b: B) {
+func callOverridden(_ b: B) {
   b.f3()
-  b.f4()
+  _ = b.f4()
   b.f7()
-  b.f8()
+  _ = b.f8()
 }
 
 @objc
 class Base {
-  func meth(x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
+  func meth(_ x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
 }
 @objc
 class Sub : Base {
-  func meth(x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
+  func meth(_ x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
 }
 
 // Objective-C method overriding
 
 @objc class ObjCSuper {
-  func method(x: Int, withInt y: Int) { }
+  func method(_ x: Int, withInt y: Int) { }
 
-  func method2(x: Sub, withInt y: Int) { }
+  func method2(_ x: Sub, withInt y: Int) { }
 
-  func method3(x: Base, withInt y: Int) { } // expected-note{{method 'method3(_:withInt:)' declared here}}
+  func method3(_ x: Base, withInt y: Int) { } // expected-note{{method 'method3(_:withInt:)' declared here}}
 }
 
 class ObjCSub : ObjCSuper {
-  override func method(x: Int, withInt y: Int) { } // okay, overrides exactly
+  override func method(_ x: Int, withInt y: Int) { } // okay, overrides exactly
 
-  override func method2(x: Base, withInt y: Int) { } // okay, overrides trivially
+  override func method2(_ x: Base, withInt y: Int) { } // okay, overrides trivially
 
-  func method3(x: Sub, withInt y: Int) { } // expected-error{{method3(_:withInt:)' with Objective-C selector 'method3:withInt:' conflicts with method 'method3(_:withInt:)' from superclass 'ObjCSuper' with the same Objective-C selector}}
+  func method3(_ x: Sub, withInt y: Int) { } // expected-error{{method3(_:withInt:)' with Objective-C selector 'method3:withInt:' conflicts with method 'method3(_:withInt:)' from superclass 'ObjCSuper' with the same Objective-C selector}}
 }

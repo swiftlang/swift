@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -286,6 +286,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     LEAF_LVALUE_EXPR(DiscardAssignment)
     LEAF_LVALUE_EXPR(DynamicLookup)
     LEAF_LVALUE_EXPR(OpaqueValue)
+    LEAF_LVALUE_EXPR(EditorPlaceholder)
 
     COMPLETE_PHYSICAL_LVALUE_EXPR(AnyTry, getSubExpr())
     PARTIAL_PHYSICAL_LVALUE_EXPR(BindOptional, getSubExpr())
@@ -313,6 +314,9 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(Assign)
     NON_LVALUE_EXPR(DefaultValue)
     NON_LVALUE_EXPR(CodeCompletion)
+    NON_LVALUE_EXPR(ObjCSelector)
+    NON_LVALUE_EXPR(ObjCKeyPath)
+    NON_LVALUE_EXPR(EnumIsCase)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
     NON_LVALUE_EXPR(KIND)
@@ -324,6 +328,145 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
   };
 
   PropagateAccessKind(allowOverwrite).visit(this, accessKind);
+}
+
+ConcreteDeclRef Expr::getReferencedDecl() const {
+  switch (getKind()) {
+  // No declaration reference.
+  #define NO_REFERENCE(Id) case ExprKind::Id: return ConcreteDeclRef()
+  #define SIMPLE_REFERENCE(Id, Getter)          \
+    case ExprKind::Id:                          \
+      return cast<Id##Expr>(this)->Getter()
+  #define PASS_THROUGH_REFERENCE(Id, GetSubExpr)                      \
+    case ExprKind::Id:                                                \
+      return cast<Id##Expr>(this)->GetSubExpr()->getReferencedDecl()
+
+  NO_REFERENCE(Error);
+  NO_REFERENCE(NilLiteral);
+  NO_REFERENCE(IntegerLiteral);
+  NO_REFERENCE(FloatLiteral);
+  NO_REFERENCE(BooleanLiteral);
+  NO_REFERENCE(StringLiteral);
+  NO_REFERENCE(InterpolatedStringLiteral);
+  NO_REFERENCE(ObjectLiteral);
+  NO_REFERENCE(MagicIdentifierLiteral);
+  NO_REFERENCE(DiscardAssignment);
+
+  SIMPLE_REFERENCE(DeclRef, getDecl);
+  SIMPLE_REFERENCE(SuperRef, getSelf);
+
+  case ExprKind::Type: {
+    auto typeRepr = cast<TypeExpr>(this)->getTypeRepr();
+    if (!typeRepr) return ConcreteDeclRef();
+    auto ident = dyn_cast<IdentTypeRepr>(typeRepr);
+    if (!ident) return ConcreteDeclRef();
+    return ident->getComponentRange().back()->getBoundDecl();
+  }
+
+  SIMPLE_REFERENCE(OtherConstructorDeclRef, getDecl);
+
+  PASS_THROUGH_REFERENCE(DotSyntaxBaseIgnored, getRHS);
+
+  // FIXME: Return multiple results?
+  case ExprKind::OverloadedDeclRef:
+  case ExprKind::OverloadedMemberRef:
+    return ConcreteDeclRef();
+
+  NO_REFERENCE(UnresolvedDeclRef);
+
+  SIMPLE_REFERENCE(MemberRef, getMember);
+  SIMPLE_REFERENCE(DynamicMemberRef, getMember);
+  SIMPLE_REFERENCE(DynamicSubscript, getMember);
+
+  PASS_THROUGH_REFERENCE(UnresolvedSpecialize, getSubExpr);
+
+  NO_REFERENCE(UnresolvedMember);
+  NO_REFERENCE(UnresolvedDot);
+  NO_REFERENCE(Sequence);
+  PASS_THROUGH_REFERENCE(Paren, getSubExpr);
+  PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
+  PASS_THROUGH_REFERENCE(Try, getSubExpr);
+  PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
+  PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
+
+  NO_REFERENCE(Tuple);
+  NO_REFERENCE(Array);
+  NO_REFERENCE(Dictionary);
+
+  case ExprKind::Subscript: {
+    auto subscript = cast<SubscriptExpr>(this);
+    if (subscript->hasDecl()) return subscript->getDecl();
+    return ConcreteDeclRef();
+  }
+
+  NO_REFERENCE(TupleElement);
+  NO_REFERENCE(CaptureList);
+  NO_REFERENCE(Closure);
+
+  PASS_THROUGH_REFERENCE(AutoClosure, getSingleExpressionBody);
+  PASS_THROUGH_REFERENCE(InOut, getSubExpr);
+
+  NO_REFERENCE(DynamicType);
+
+  PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
+
+  NO_REFERENCE(OpaqueValue);
+  PASS_THROUGH_REFERENCE(BindOptional, getSubExpr);
+  PASS_THROUGH_REFERENCE(OptionalEvaluation, getSubExpr);
+  PASS_THROUGH_REFERENCE(ForceValue, getSubExpr);
+  PASS_THROUGH_REFERENCE(OpenExistential, getSubExpr);
+
+  NO_REFERENCE(Call);
+  NO_REFERENCE(PrefixUnary);
+  NO_REFERENCE(PostfixUnary);
+  NO_REFERENCE(Binary);
+  NO_REFERENCE(DotSyntaxCall);
+  NO_REFERENCE(ConstructorRefCall);
+
+  PASS_THROUGH_REFERENCE(Load, getSubExpr);
+  NO_REFERENCE(TupleShuffle);
+  NO_REFERENCE(UnresolvedTypeConversion);
+  PASS_THROUGH_REFERENCE(FunctionConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(CovariantFunctionConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(CovariantReturnConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(MetatypeConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(CollectionUpcastConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(Erasure, getSubExpr);
+  PASS_THROUGH_REFERENCE(DerivedToBase, getSubExpr);
+  PASS_THROUGH_REFERENCE(ArchetypeToSuper, getSubExpr);
+  PASS_THROUGH_REFERENCE(InjectIntoOptional, getSubExpr);
+  PASS_THROUGH_REFERENCE(ClassMetatypeToObject, getSubExpr);
+  PASS_THROUGH_REFERENCE(ExistentialMetatypeToObject, getSubExpr);
+  PASS_THROUGH_REFERENCE(ProtocolMetatypeToObject, getSubExpr);
+  PASS_THROUGH_REFERENCE(InOutToPointer, getSubExpr);
+  PASS_THROUGH_REFERENCE(ArrayToPointer, getSubExpr);
+  PASS_THROUGH_REFERENCE(StringToPointer, getSubExpr);
+  PASS_THROUGH_REFERENCE(PointerToPointer, getSubExpr);
+  PASS_THROUGH_REFERENCE(LValueToPointer, getSubExpr);
+  PASS_THROUGH_REFERENCE(ForeignObjectConversion, getSubExpr);
+  PASS_THROUGH_REFERENCE(UnevaluatedInstance, getSubExpr);
+  NO_REFERENCE(Coerce);
+  NO_REFERENCE(ForcedCheckedCast);
+  NO_REFERENCE(ConditionalCheckedCast);
+  NO_REFERENCE(Is);
+
+  NO_REFERENCE(Arrow);
+  NO_REFERENCE(If);
+  NO_REFERENCE(EnumIsCase);
+  NO_REFERENCE(Assign);
+  NO_REFERENCE(DefaultValue);
+  NO_REFERENCE(CodeCompletion);
+  NO_REFERENCE(UnresolvedPattern);
+  NO_REFERENCE(EditorPlaceholder);
+  NO_REFERENCE(ObjCSelector);
+  NO_REFERENCE(ObjCKeyPath);
+
+#undef SIMPLE_REFERENCE
+#undef NO_REFERENCE
+#undef PASS_THROUGH_REFERENCE
+  }
+
+  return ConcreteDeclRef();
 }
 
 /// Enumerate each immediate child expression of this node, invoking the
@@ -486,6 +629,8 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::StringLiteral:
   case ExprKind::InterpolatedStringLiteral:
   case ExprKind::MagicIdentifierLiteral:
+  case ExprKind::ObjCSelector:
+  case ExprKind::ObjCKeyPath:
     return true;
 
   case ExprKind::ObjectLiteral:
@@ -501,7 +646,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::SuperRef:
   case ExprKind::Type:
   case ExprKind::OtherConstructorDeclRef:
-  case ExprKind::UnresolvedConstructor:
   case ExprKind::DotSyntaxBaseIgnored:
     return true;
 
@@ -524,7 +668,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::UnresolvedSpecialize:
   case ExprKind::UnresolvedMember:
   case ExprKind::UnresolvedDot:
-  case ExprKind::UnresolvedSelector:
     return true;
 
   case ExprKind::Sequence:
@@ -596,7 +739,12 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::PointerToPointer:
   case ExprKind::LValueToPointer:
   case ExprKind::ForeignObjectConversion:
-    return false;
+  case ExprKind::UnevaluatedInstance:
+  case ExprKind::EnumIsCase:
+    // Implicit conversion nodes have no syntax of their own; defer to the
+    // subexpression.
+    return cast<ImplicitConversionExpr>(this)->getSubExpr()
+      ->canAppendCallParentheses();
 
   case ExprKind::ForcedCheckedCast:
   case ExprKind::ConditionalCheckedCast:
@@ -604,6 +752,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::Coerce:
     return false;
 
+  case ExprKind::Arrow:
   case ExprKind::If:
   case ExprKind::Assign:
   case ExprKind::DefaultValue:
@@ -738,9 +887,8 @@ shallowCloneImpl(const MagicIdentifierLiteralExpr *E, ASTContext &Ctx) {
 
 static LiteralExpr *
 shallowCloneImpl(const ObjectLiteralExpr *E, ASTContext &Ctx) {
-  auto res = new (Ctx) ObjectLiteralExpr(E->getStartLoc(), E->getName(),
-                                         E->getNameLoc(), E->getArg(),
-                                         E->getEndLoc());
+  auto res = new (Ctx) ObjectLiteralExpr(E->getStartLoc(), E->getLiteralKind(),
+                                         E->getArg());
   res->setSemanticExpr(E->getSemanticExpr());
   return res;
 }
@@ -841,11 +989,20 @@ StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
       unicode::isSingleExtendedGraphemeCluster(Val);
 }
 
-void DeclRefExpr::setDeclRef(ConcreteDeclRef ref) {
-  if (auto spec = getSpecInfo())
-    spec->D = ref;
-  else
-    DOrSpecialized = ref;
+StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
+  switch (LitKind) {
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return #Name;
+#include "swift/Parse/Tokens.def"    
+  }
+  llvm_unreachable("unspecified literal");
+}
+
+StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
+  switch (LitKind) {
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return Desc;
+#include "swift/Parse/Tokens.def"    
+  }
+  llvm_unreachable("unspecified literal");
 }
 
 void DeclRefExpr::setSpecialized() {
@@ -872,10 +1029,10 @@ ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
 }
 
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
-                             ConcreteDeclRef member, SourceRange nameRange,
+                             ConcreteDeclRef member, DeclNameLoc nameLoc,
                              bool Implicit, AccessSemantics semantics)
   : Expr(ExprKind::MemberRef, Implicit), Base(base),
-    Member(member), DotLoc(dotLoc), NameRange(nameRange) {
+    Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
    
   MemberRefExprBits.Semantics = (unsigned) semantics;
   MemberRefExprBits.IsSuper = false;
@@ -899,6 +1056,7 @@ bool OverloadSetRefExpr::hasBaseObject() const {
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
+  assert(elements.size() & 1 && "even number of elements in sequence");
   void *Buffer = ctx.Allocate(sizeof(SequenceExpr) +
                               elements.size() * sizeof(Expr*),
                               alignof(SequenceExpr));
@@ -939,19 +1097,19 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
          ElementNames.size() == ElementNameLocs.size());
 
   // Copy elements.
-  memcpy(getElements().data(), SubExprs.data(), 
-         SubExprs.size() * sizeof(Expr *));
+  std::uninitialized_copy(SubExprs.begin(), SubExprs.end(),
+                          getTrailingObjects<Expr *>());
 
   // Copy element names, if provided.
   if (hasElementNames()) {
-    memcpy(getElementNamesBuffer().data(), ElementNames.data(),
-           ElementNames.size() * sizeof(Identifier));
+    std::uninitialized_copy(ElementNames.begin(), ElementNames.end(),
+                            getTrailingObjects<Identifier>());
   }
 
   // Copy element name locations, if provided.
   if (hasElementNameLocs()) {
-    memcpy(getElementNameLocsBuffer().data(), ElementNameLocs.data(),
-           ElementNameLocs.size() * sizeof(SourceLoc));
+    std::uninitialized_copy(ElementNameLocs.begin(), ElementNameLocs.end(),
+                            getTrailingObjects<SourceLoc>());
   }
 }
 
@@ -962,10 +1120,10 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
                              ArrayRef<SourceLoc> ElementNameLocs,
                              SourceLoc RParenLoc, bool HasTrailingClosure, 
                              bool Implicit, Type Ty) {
-  unsigned size = sizeof(TupleExpr);
-  size += SubExprs.size() * sizeof(Expr*);
-  size += ElementNames.size() * sizeof(Identifier);
-  size += ElementNameLocs.size() * sizeof(SourceLoc);
+  size_t size =
+      totalSizeToAlloc<Expr *, Identifier, SourceLoc>(SubExprs.size(),
+                                                      ElementNames.size(),
+                                                      ElementNameLocs.size());
   void *mem = ctx.Allocate(size, alignof(TupleExpr));
   return new (mem) TupleExpr(LParenLoc, SubExprs, ElementNames, ElementNameLocs,
                              RParenLoc, HasTrailingClosure, Implicit, Ty);
@@ -1016,6 +1174,25 @@ ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
 }
 
+Expr *CallExpr::getDirectCallee() const {
+  auto fn = getFn();
+  while (true) {
+    fn = fn->getSemanticsProvidingExpr();
+
+    if (auto force = dyn_cast<ForceValueExpr>(fn)) {
+      fn = force->getSubExpr();
+      continue;
+    }
+
+    if (auto bind = dyn_cast<BindOptionalExpr>(fn)) {
+      fn = bind->getSubExpr();
+      continue;
+    }
+
+    return fn;
+  }
+}
+
 RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
                                                          VarDecl *Self)
   : Expr(ExprKind::RebindSelfInConstructor, /*Implicit=*/true,
@@ -1064,14 +1241,11 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
   return otherCtorRef;
 }
 
-void AbstractClosureExpr::setParams(Pattern *P) {
-  ParamPattern = P;
+void AbstractClosureExpr::setParameterList(ParameterList *P) {
+  parameterList = P;
   // Change the DeclContext of any parameters to be this closure.
-  if (P) {
-    P->forEachVariable([&](VarDecl *VD) {
-      VD->setDeclContext(this);
-    });
-  }
+  if (P)
+    P->setDeclContextOfParamDecls(this);
 }
 
 
@@ -1146,33 +1320,6 @@ Expr *AutoClosureExpr::getSingleExpressionBody() const {
 
 FORWARD_SOURCE_LOCS_TO(UnresolvedPatternExpr, subPattern)
 
-UnresolvedSelectorExpr::UnresolvedSelectorExpr(Expr *subExpr, SourceLoc dotLoc,
-                                               DeclName name,
-                                               ArrayRef<ComponentLoc> components)
-  : Expr(ExprKind::UnresolvedSelector, /*implicit*/ false),
-    SubExpr(subExpr), DotLoc(dotLoc), Name(name)
-{
-  assert(name.getArgumentNames().size() + 1 == components.size() &&
-         "number of component locs does not match number of name components");
-  auto buf = getComponentsBuf();
-  std::uninitialized_copy(components.begin(), components.end(),
-                          buf.begin());
-}
-
-UnresolvedSelectorExpr *UnresolvedSelectorExpr::create(ASTContext &C,
-             Expr *subExpr, SourceLoc dotLoc,
-             DeclName name,
-             ArrayRef<ComponentLoc> components) {
-  assert(name.getArgumentNames().size() + 1 == components.size() &&
-         "number of component locs does not match number of name components");
-  
-  void *buf = C.Allocate(sizeof(UnresolvedSelectorExpr)
-                           + (name.getArgumentNames().size() + 1)
-                               * sizeof(ComponentLoc),
-                         alignof(UnresolvedSelectorExpr));
-  return ::new (buf) UnresolvedSelectorExpr(subExpr, dotLoc, name, components);
-}
-
 TypeExpr::TypeExpr(TypeLoc TyLoc)
   : Expr(ExprKind::Type, /*implicit*/false), Info(TyLoc) {
   Type Ty = TyLoc.getType();
@@ -1186,13 +1333,27 @@ TypeExpr::TypeExpr(Type Ty)
     setType(MetatypeType::get(Ty, Ty->getASTContext()));
 }
 
+// The type of a TypeExpr is always a metatype type.  Return the instance
+// type or null if not set yet.
+Type TypeExpr::getInstanceType() const {
+  if (!getType() || getType()->is<ErrorType>())
+    return Type();
+  
+  return getType()->castTo<MetatypeType>()->getInstanceType();
+}
+
+
 /// Return a TypeExpr for a simple identifier and the specified location.
-TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl) {
+TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
+                                  bool isImplicit) {
   ASTContext &C = Decl->getASTContext();
   assert(Loc.isValid());
   auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->getName());
   Repr->setValue(Decl);
-  return new (C) TypeExpr(TypeLoc(Repr, Type()));
+  auto result = new (C) TypeExpr(TypeLoc(Repr, Type()));
+  if (isImplicit)
+    result->setImplicit();
+  return result;
 }
 
 TypeExpr *TypeExpr::createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
@@ -1226,4 +1387,44 @@ ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   while (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
   return type->castTo<ArchetypeType>();
+}
+
+ObjCKeyPathExpr::ObjCKeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
+                         ArrayRef<Identifier> names,
+                         ArrayRef<SourceLoc> nameLocs,
+                         SourceLoc rParenLoc)
+  : Expr(ExprKind::ObjCKeyPath, /*Implicit=*/nameLocs.empty()),
+    KeywordLoc(keywordLoc), LParenLoc(lParenLoc), RParenLoc(rParenLoc)
+{
+  // Copy components (which are all names).
+  ObjCKeyPathExprBits.NumComponents = names.size();
+  for (auto idx : indices(names))
+    getComponentsMutable()[idx] = names[idx];
+
+  assert(nameLocs.empty() || nameLocs.size() == names.size());
+  ObjCKeyPathExprBits.HaveSourceLocations = !nameLocs.empty();
+  if (ObjCKeyPathExprBits.HaveSourceLocations) {
+    memcpy(getNameLocsMutable().data(), nameLocs.data(),
+           nameLocs.size() * sizeof(SourceLoc));
+  }
+}
+
+Identifier ObjCKeyPathExpr::getComponentName(unsigned i) const {
+  if (auto decl = getComponentDecl(i))
+    return decl->getFullName().getBaseName();
+
+  return getComponents()[i].get<Identifier>();
+}
+
+ObjCKeyPathExpr *ObjCKeyPathExpr::create(ASTContext &ctx,
+                                 SourceLoc keywordLoc, SourceLoc lParenLoc,
+                                 ArrayRef<Identifier> names,
+                                 ArrayRef<SourceLoc> nameLocs,
+                                 SourceLoc rParenLoc) {
+  unsigned size = sizeof(ObjCKeyPathExpr)
+    + names.size() * sizeof(Identifier)
+    + nameLocs.size() * sizeof(SourceLoc);
+  void *mem = ctx.Allocate(size, alignof(ObjCKeyPathExpr));
+  return new (mem) ObjCKeyPathExpr(keywordLoc, lParenLoc, names, nameLocs,
+                                   rParenLoc);
 }

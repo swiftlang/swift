@@ -1,0 +1,5 @@
+---
+Name: TVServices
+Functions:
+- Name: TVTopShelfImageSizeForShape
+  SwiftName: 'TVTopShelfImageSize(shape:style:)'

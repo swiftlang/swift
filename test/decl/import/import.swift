@@ -22,12 +22,12 @@ func f0() {
 }
 
 import func Swift.print
-func f1(a: Swift.Int) -> Swift.Void { print(a) }
+func f1(_ a: Swift.Int) -> Swift.Void { print(a) }
 
 import func Swift.print
 
 // rdar://14418336
-#import something_nonexistant // expected-error {{expected expression}} expected-error {{no such module 'something_nonexistant'}}
+#import something_nonexistent // expected-error {{expected expression}} expected-error {{no such module 'something_nonexistent'}}
 
 // Import specific decls
 import typealias Swift.Int
@@ -36,15 +36,19 @@ import typealias Swift.ManagedBuffer
 import class Swift.ManagedBuffer
 import typealias Swift.Bool
 import struct Swift.Bool
-import protocol Swift.GeneratorType
+import protocol Swift.IteratorProtocol
 import var import_builtin.x
 import func Swift.min
 
 import var x // expected-error {{expected module name}}
 import struct Swift.nonexistent // expected-error {{no such decl in module}}
 
-import Swift.import.abc // expected-error 2 {{expected identifier}}
+import Swift.import.abc // expected-error {{expected identifier in import declaration}}
+// expected-error @-1 {{keyword 'import' cannot be used as an identifier here}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}}
 import where Swift.Int // expected-error {{expected identifier}}
+// expected-error @-1 {{keyword 'where' cannot be used as an identifier here}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}}
 import 2 // expected-error {{expected identifier}}
 
 import really.nonexistent // expected-error {{no such module 'really.nonexistent'}}

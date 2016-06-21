@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -37,6 +37,17 @@ class IRBuilder : public IRBuilderBase {
   /// point was last cleared.  Used only for preserving block
   /// ordering.
   llvm::BasicBlock *ClearedIP;
+
+  // Set calling convention of the call instruction using
+  // the same calling convention as the callee function.
+  // This ensures that they are always compatible.
+  void setCallingConvUsingCallee(llvm::CallInst *Call) {
+    auto CalleeFn = Call->getCalledFunction();
+    if (CalleeFn) {
+      auto CC = CalleeFn->getCallingConv();
+      Call->setCallingConv(CC);
+    }
+  }
 
 public:
   IRBuilder(llvm::LLVMContext &Context)
@@ -166,12 +177,18 @@ public:
   llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr) = delete;
   
   using IRBuilderBase::CreateStructGEP;
-  Address CreateStructGEP(Address address, unsigned index, Size size,
+  Address CreateStructGEP(Address address, unsigned index, Size offset,
                           const llvm::Twine &name = "") {
     llvm::Value *addr = CreateStructGEP(
         address.getType()->getElementType(), address.getAddress(),
         index, name);
-    return Address(addr, address.getAlignment().alignmentAtOffset(size));
+    return Address(addr, address.getAlignment().alignmentAtOffset(offset));
+  }
+  Address CreateStructGEP(Address address, unsigned index,
+                          const llvm::StructLayout *layout,
+                          const llvm::Twine &name = "") {
+    Size offset = Size(layout->getElementOffset(index));
+    return CreateStructGEP(address, index, offset, name);
   }
 
   /// Given a pointer to an array element, GEP to the array element
@@ -200,6 +217,19 @@ public:
     return Address(addr, address.getAlignment());
   }
 
+  /// Cast the given address to be a pointer to the given element type,
+  /// preserving the original address space.
+  Address CreateElementBitCast(Address address, llvm::Type *type,
+                               const llvm::Twine &name = "") {
+    // Do nothing if the type doesn't change.
+    auto origPtrType = address.getType();
+    if (origPtrType->getElementType() == type) return address;
+
+    // Otherwise, cast to a pointer to the correct type.
+    auto ptrType = type->getPointerTo(origPtrType->getAddressSpace());
+    return CreateBitCast(address, ptrType, name);
+  }
+
   /// Insert the given basic block after the IP block and move the
   /// insertion point to it.  Only valid if the IP is valid.
   void emitBlock(llvm::BasicBlock *BB);
@@ -210,6 +240,46 @@ public:
                         size.getValue(),
                         std::min(dest.getAlignment(),
                                  src.getAlignment()).getValue());
+  }
+  
+  using IRBuilderBase::CreateLifetimeStart;
+  llvm::CallInst *CreateLifetimeStart(Address buf, Size size) {
+    return CreateLifetimeStart(buf.getAddress(),
+                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+  }
+  
+  using IRBuilderBase::CreateLifetimeEnd;
+  llvm::CallInst *CreateLifetimeEnd(Address buf, Size size) {
+    return CreateLifetimeEnd(buf.getAddress(),
+                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+  }
+
+  //using IRBuilderBase::CreateCall;
+
+  llvm::CallInst *CreateCall(llvm::Value *Callee, ArrayRef<llvm::Value *> Args,
+                             const Twine &Name = "",
+                             llvm::MDNode *FPMathTag = nullptr) {
+    auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
+    setCallingConvUsingCallee(Call);
+    return Call;
+  }
+
+  llvm::CallInst *CreateCall(llvm::FunctionType *FTy, llvm::Value *Callee,
+                             ArrayRef<llvm::Value *> Args,
+                             const Twine &Name = "",
+                             llvm::MDNode *FPMathTag = nullptr) {
+    auto Call = IRBuilderBase::CreateCall(FTy, Callee, Args, Name, FPMathTag);
+    setCallingConvUsingCallee(Call);
+    return Call;
+  }
+
+  llvm::CallInst *CreateCall(llvm::Function *Callee,
+                             ArrayRef<llvm::Value *> Args,
+                             const Twine &Name = "",
+                             llvm::MDNode *FPMathTag = nullptr) {
+    auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
+    setCallingConvUsingCallee(Call);
+    return Call;
   }
 };
 

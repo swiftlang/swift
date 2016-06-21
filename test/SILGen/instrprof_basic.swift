@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -profile-generate %s | FileCheck %s
 
 // CHECK: sil hidden @[[F_EMPTY:.*empty.*]] :
-// CHECK: %[[NAME:.*]] = string_literal utf8 "[[F_EMPTY]]"
+// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_basic.swift:[[F_EMPTY]]"
 // CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
 // CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 1
 // CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
@@ -11,7 +11,7 @@ func empty() {
 }
 
 // CHECK: sil hidden @[[F_BASIC:.*basic.*]] :
-// CHECK: %[[NAME:.*]] = string_literal utf8 "[[F_BASIC]]"
+// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_basic.swift:[[F_BASIC]]"
 // CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
 // CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 6
 // CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
@@ -32,7 +32,7 @@ func basic(a : Int32) {
   }
 
   // CHECK: builtin "int_instrprof_increment"
-  for var i: Int32 = 0; i < a; ++i {
+  for i in 0 ..< a {
   }
 
   // CHECK: builtin "int_instrprof_increment"
@@ -45,7 +45,7 @@ func basic(a : Int32) {
 // CHECK: sil hidden @[[F_THROWING_NOP:.*throwing_nop.*]] :
 func throwing_nop() throws {}
 // CHECK: sil hidden @[[F_EXCEPTIONS:.*exceptions.*]] :
-// CHECK: %[[NAME:.*]] = string_literal utf8 "[[F_EXCEPTIONS]]"
+// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_basic.swift:[[F_EXCEPTIONS]]"
 // CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
 // CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 3
 // CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0

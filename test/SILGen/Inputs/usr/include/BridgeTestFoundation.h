@@ -5,24 +5,24 @@
 
 @interface NSString : NSObject<NSCopying>
 
-- (__null_unspecified NSString*)uppercaseString;
-- (id) copyWithZone: (void*)zone;
+- (null_unspecified NSString*)uppercaseString;
+- (id) copyWithZone: (nullable void*)zone;
 
 @end
 
-@interface NSArray : NSObject
+@interface NSArray<ObjectType> : NSObject
 
-- (instancetype)initWithObjects:(const id *)objects count:(int)count;
-- (instancetype)initWithArray:(NSArray*)array;
+- (instancetype)initWithObjects:(const ObjectType *)objects count:(int)count;
+- (instancetype)initWithArray:(NSArray<ObjectType>*)array;
 
-- (id)objectAtIndexedSubscript:(NSInteger)i;
+- (nonnull ObjectType)objectAtIndexedSubscript:(NSInteger)i;
 
 @end
 
-@interface NSDictionary : NSObject
+@interface NSDictionary<KeyType, ValueType> : NSObject
 @end
 
-@interface NSSet : NSObject
+@interface NSSet<ObjectType> : NSObject
 @end
 
 @interface NSNumber : NSObject
@@ -87,5 +87,5 @@ void noescapeNonnullBlock(__attribute__((noescape)) void (^_Nonnull block)(void)
 void escapeNonnullBlock(void (^_Nonnull block)(void));
 
 void noescapeBlockAlias(__attribute__((noescape)) dispatch_block_t block);
-void noescapeNonnullBlockAlias(__attribute__((noescape)) _Nonnull dispatch_block_t  block);
-void escapeBlockAlias(dispatch_block_t  block);
+void noescapeNonnullBlockAlias(__attribute__((noescape)) _Nonnull dispatch_block_t block);
+void escapeBlockAlias(dispatch_block_t block);

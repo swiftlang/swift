@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-let _ = [##] // expected-error{{expected identifier after '[#' in object literal expression}} expected-error{{consecutive statements on a line must be separated by ';'}} {{11-11=;}} expected-error{{expected expression}}
-let _ = [#what#] // expected-error{{expected argument list in object literal}} expected-error{{consecutive statements on a line must be separated by ';'}} {{15-15=;}} expected-error{{expected expression}}
-let _ = [#what()#] // expected-error{{use of unknown object literal name 'what'}}
-let _ = [#Color( // expected-error{{expected ',' separator}} {{17-17=,}} expected-error@+1{{expected expression in list of expressions}}
+let _ = [##] // expected-error{{expected identifier after '#' in object literal expression}} expected-error{{object literal syntax no longer uses '[# ... #]'}} {{9-10=}} {{11-13=}}
+let _ = [#what#] // expected-error{{object literal syntax no longer uses '[# ... #]'}} {{9-10=}} {{15-17=}}
+let _ = [#what()#] // expected-error{{object literal syntax no longer uses '[# ... #]'}} {{9-10=}} {{17-19=}}
+let _ = [#colorLiteral( // expected-error{{expected ',' separator}} expected-error{{expected expression in list of expressions}}

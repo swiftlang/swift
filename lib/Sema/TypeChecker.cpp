@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -27,9 +27,10 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -154,18 +155,11 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
   }
 
   if (auto E = dyn_cast<ObjectLiteralExpr>(expr)) {
-    Identifier name = E->getName();
-    if (name.str().equals("Color")) {
-      return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ColorLiteralConvertible);
-    } else if (name.str().equals("Image")) {
-      return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ImageLiteralConvertible);
-    } else if (name.str().equals("FileReference")) {
-      return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::FileReferenceLiteralConvertible);
-    } else {
-      return nullptr;
+    switch (E->getLiteralKind()) {
+#define POUND_OBJECT_LITERAL(Name, Desc, Protocol)\
+    case ObjectLiteralExpr::Name:\
+      return getProtocol(expr->getLoc(), KnownProtocolKind::Protocol);
+#include "swift/Parse/Tokens.def"
     }
   }
 
@@ -173,22 +167,59 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 }
 
 DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
-  Identifier name = expr->getName();
-  if (name.str().equals("Color")) {
+  switch (expr->getLiteralKind()) {
+  case ObjectLiteralExpr::colorLiteral: {
     return DeclName(Context, Context.Id_init,
                     { Context.getIdentifier("colorLiteralRed"),
                       Context.getIdentifier("green"),
                       Context.getIdentifier("blue"),
                       Context.getIdentifier("alpha") });
-  } else if (name.str().equals("Image")) {
-    return DeclName(Context, Context.Id_init,
-                    { Context.getIdentifier("imageLiteral") });
-  } else if (name.str().equals("FileReference")) {
-    return DeclName(Context, Context.Id_init,
-                    { Context.getIdentifier("fileReferenceLiteral") });
-  } else {
-    return DeclName();
   }
+  case ObjectLiteralExpr::imageLiteral: {
+    return DeclName(Context, Context.Id_init,
+                    { Context.getIdentifier("imageLiteralResourceName") });
+  }
+  case ObjectLiteralExpr::fileLiteral: {
+    return DeclName(Context, Context.Id_init,
+            { Context.getIdentifier("fileReferenceLiteralResourceName") });
+  }
+  }
+  llvm_unreachable("unknown literal constructor");
+}
+
+/// Return an idealized form of the parameter type of the given
+/// object-literal initializer.  This removes references to the protocol
+/// name from the first argument label, which would be otherwise be
+/// redundant when writing out the object-literal syntax:
+///
+///   #fileLiteral(fileReferenceLiteralResourceName: "hello.jpg")
+///
+/// Doing this allows us to preserve a nicer (and source-compatible)
+/// literal syntax while still giving the initializer a semantically
+/// unambiguous name.
+Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
+                                                ConstructorDecl *ctor) {
+  Type argType = ctor->getArgumentType();
+  auto argTuple = argType->getAs<TupleType>();
+  if (!argTuple) return argType;
+
+  auto replace = [&](StringRef replacement) -> Type {
+    SmallVector<TupleTypeElt, 4> elements;
+    elements.append(argTuple->getElements().begin(),
+                    argTuple->getElements().end());
+    elements[0] = TupleTypeElt(elements[0].getType(),
+                               Context.getIdentifier(replacement));
+    return TupleType::get(elements, Context);
+  };
+
+  switch (expr->getLiteralKind()) {
+  case ObjectLiteralExpr::colorLiteral:
+    return replace("red");
+  case ObjectLiteralExpr::fileLiteral:
+  case ObjectLiteralExpr::imageLiteral:
+    return replace("resourceName");
+  }
+  llvm_unreachable("unknown literal constructor");
 }
 
 Module *TypeChecker::getStdlibModule(const DeclContext *dc) {
@@ -300,7 +331,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   }
 
   // Cannot extend a bound generic type.
-  if (extendedType->isSpecialized()) {
+  if (extendedType->isSpecialized() && extendedType->getAnyNominal()) {
     TC.diagnose(ED->getLoc(), diag::extension_specialization,
                 extendedType->getAnyNominal()->getName())
       .highlight(ED->getExtendedTypeLoc().getSourceRange());
@@ -387,6 +418,11 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
       
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
+        // HACK: don't type-check the same function body twice.  This is
+        // supposed to be handled by just not enqueuing things twice,
+        // but that gets tricky with synthesized function bodies.
+        if (AFD->isBodyTypeChecked()) continue;
+
         PrettyStackTraceDecl StackEntry("type-checking", AFD);
         TC.typeCheckAbstractFunctionBody(AFD);
         continue;
@@ -463,16 +499,11 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     }
     TC.UsedConformances.clear();
 
-    TC.definedFunctions.insert(TC.definedFunctions.end(),
-                               TC.implicitlyDefinedFunctions.begin(),
-                               TC.implicitlyDefinedFunctions.end());
-    TC.implicitlyDefinedFunctions.clear();
-
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            !TC.UsedConformances.empty());
 
-  // FIXME: Horrible hack. Store this somewhere more sane.
+  // FIXME: Horrible hack. Store this somewhere more appropriate.
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;
 
   // Compute captures for functions and closures we visited.
@@ -505,20 +536,26 @@ void swift::typeCheckExternalDefinitions(SourceFile &SF) {
 
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 OptionSet<TypeCheckingFlags> Options,
-                                unsigned StartElem) {
+                                unsigned StartElem,
+                                unsigned WarnLongFunctionBodies) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
   // Make sure that name binding has been completed before doing any type
   // checking.
-  performNameBinding(SF, StartElem);
+  {
+    SharedTimer timer("Name binding");
+    performNameBinding(SF, StartElem);
+  }
 
   auto &Ctx = SF.getASTContext();
   {
     // NOTE: The type checker is scoped to be torn down before AST
     // verification.
     TypeChecker TC(Ctx);
-    auto &DefinedFunctions = TC.definedFunctions;
+    SharedTimer timer("Type checking / Semantic analysis");
+
+    TC.setWarnLongFunctionBodies(WarnLongFunctionBodies);
     if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
       TC.enableDebugTimeFunctionBodies();
 
@@ -587,11 +624,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       TC.contextualizeTopLevelCode(TLC,
                              llvm::makeArrayRef(SF.Decls).slice(StartElem));
     }
-    
-    DefinedFunctions.insert(DefinedFunctions.end(),
-                            TC.implicitlyDefinedFunctions.begin(),
-                            TC.implicitlyDefinedFunctions.end());
-    TC.implicitlyDefinedFunctions.clear();
 
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.
@@ -609,16 +641,28 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
 
-  // Verify the SourceFile.
-  verify(SF);
+  {
+    SharedTimer timer("AST verification");
+    // Verify the SourceFile.
+    verify(SF);
 
-  // Verify imported modules.
+    // Verify imported modules.
 #ifndef NDEBUG
-  if (SF.Kind != SourceFileKind::REPL &&
-      !Ctx.LangOpts.DebuggerSupport) {
-    Ctx.verifyAllLoadedModules();
-  }
+    if (SF.Kind != SourceFileKind::REPL &&
+        !Ctx.LangOpts.DebuggerSupport) {
+      Ctx.verifyAllLoadedModules();
+    }
 #endif
+  }
+}
+
+void swift::finishTypeChecking(SourceFile &SF) {
+  auto &Ctx = SF.getASTContext();
+  TypeChecker TC(Ctx);
+
+  for (auto D : SF.Decls)
+    if (auto PD = dyn_cast<ProtocolDecl>(D))
+      TC.inferDefaultWitnesses(PD);
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
@@ -633,6 +677,9 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    bool isSILType, DeclContext *DC,
                                    bool ProduceDiagnostics) {
   TypeResolutionOptions options;
+
+  // Fine to have unbound generic types.
+  options |= TR_AllowUnboundGenerics;
   if (isSILType)
     options |= TR_SILType;
 
@@ -646,14 +693,10 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-/// We pass in a vector of nested GenericParamLists and a vector of
-/// ArchetypeBuilders with the innermost GenericParamList in the beginning
-/// of the vector.
-bool swift::handleSILGenericParams(ASTContext &Ctx,
-              SmallVectorImpl<GenericParamList *> &gps,
-              DeclContext *DC,
-              SmallVectorImpl<ArchetypeBuilder *> &builders) {
-  return TypeChecker(Ctx).handleSILGenericParams(builders, gps, DC);
+GenericSignature *swift::handleSILGenericParams(ASTContext &Ctx,
+                                                GenericParamList *genericParams,
+                                                DeclContext *DC) {
+  return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
 
 bool swift::typeCheckCompletionDecl(Decl *D) {
@@ -667,27 +710,61 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   return true;
 }
 
-bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext *DC) {
-  auto &Ctx = DC->getASTContext();
+bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext &DC) {
+  auto &Ctx = DC.getASTContext();
 
   // We try to reuse the type checker associated with the ast context first.
   if (Ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker*>(Ctx.getLazyResolver());
-    return TC->isConvertibleTo(Ty1, Ty2, DC);
+    return TC->isConvertibleTo(Ty1, Ty2, &DC);
   } else {
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    TypeChecker TC(Ctx, Diags);
-    return TC.isConvertibleTo(Ty1, Ty2, DC);
+    return (new TypeChecker(Ctx, Diags))->isConvertibleTo(Ty1, Ty2, &DC);
   }
 }
 
-static Optional<Type> getTypeOfCompletionContextExpr(TypeChecker &TC,
-                                                     DeclContext *DC,
-                                                     Expr *&parsedExpr) {
+Type swift::lookUpTypeInContext(DeclContext *DC, StringRef Name) {
+  auto &Ctx = DC->getASTContext();
+  auto ReturnResult = [](UnqualifiedLookup &Lookup) {
+    if (auto Result = Lookup.getSingleTypeResult())
+      return Result->getDeclaredType();
+    return Type();
+  };
+  if (Ctx.getLazyResolver()) {
+    UnqualifiedLookup Lookup(DeclName(Ctx.getIdentifier(Name)), DC,
+                             Ctx.getLazyResolver(), false, SourceLoc(), true);
+    return ReturnResult(Lookup);
+  } else {
+    DiagnosticEngine Diags(Ctx.SourceMgr);
+    LazyResolver *Resolver = new TypeChecker(Ctx, Diags);
+    UnqualifiedLookup Lookup(DeclName(Ctx.getIdentifier(Name)), DC,
+                             Resolver, false, SourceLoc(), true);
+    return ReturnResult(Lookup);
+  }
+}
+
+static Optional<Type> getTypeOfCompletionContextExpr(
+                        TypeChecker &TC,
+                        DeclContext *DC,
+                        CompletionTypeCheckKind kind,
+                        Expr *&parsedExpr,
+                        ConcreteDeclRef &referencedDecl) {
+  switch (kind) {
+  case CompletionTypeCheckKind::Normal:
+    // Handle below.
+    break;
+
+  case CompletionTypeCheckKind::ObjCKeyPath:
+    referencedDecl = nullptr;
+    if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(parsedExpr))
+      return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResulType=*/true);
+
+    return None;
+  }
 
   CanType originalType = parsedExpr->getType().getCanonicalTypeOrNull();
   if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
-                                   FreeTypeVariableBinding::GenericParameters))
+                 referencedDecl, FreeTypeVariableBinding::GenericParameters))
     return T;
 
   // Try to recover if we've made any progress.
@@ -702,19 +779,24 @@ static Optional<Type> getTypeOfCompletionContextExpr(TypeChecker &TC,
 
 /// \brief Return the type of an expression parsed during code completion, or
 /// a null \c Type on error.
-Optional<Type> swift::getTypeOfCompletionContextExpr(ASTContext &Ctx,
-                                                     DeclContext *DC,
-                                                     Expr *&parsedExpr) {
+Optional<Type> swift::getTypeOfCompletionContextExpr(
+                        ASTContext &Ctx,
+                        DeclContext *DC,
+                        CompletionTypeCheckKind kind,
+                        Expr *&parsedExpr,
+                        ConcreteDeclRef &referencedDecl) {
 
   if (Ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker *>(Ctx.getLazyResolver());
-    return ::getTypeOfCompletionContextExpr(*TC, DC, parsedExpr);
+    return ::getTypeOfCompletionContextExpr(*TC, DC, kind, parsedExpr,
+                                            referencedDecl);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine diags(Ctx.SourceMgr);
     TypeChecker TC(Ctx, diags);
     // Try to solve for the actual type of the expression.
-    return ::getTypeOfCompletionContextExpr(TC, DC, parsedExpr);
+    return ::getTypeOfCompletionContextExpr(TC, DC, kind, parsedExpr,
+                                            referencedDecl);
   }
 }
 
@@ -838,7 +920,7 @@ class TypeRefinementContextBuilder : private ASTWalker {
 
   /// A mapping from abstract storage declarations with accessors to
   /// to the type refinement contexts for those declarations. We refer to
-  /// this map to determine the appopriate parent TRC to use when
+  /// this map to determine the appropriate parent TRC to use when
   /// walking the accessor function.
   llvm::DenseMap<AbstractStorageDecl *, TypeRefinementContext *>
       StorageContexts;
@@ -934,13 +1016,13 @@ private:
     // The potential versions in the declaration are constrained by both
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
-    VersionRange DeclVersionRange =
+    AvailabilityContext DeclInfo =
         swift::AvailabilityInference::availableRange(D, TC.Context);
-    DeclVersionRange.intersectWith(getCurrentTRC()->getPotentialVersions());
-    
+    DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
+
     TypeRefinementContext *NewTRC =
         TypeRefinementContext::createForDecl(TC.Context, D, getCurrentTRC(),
-                                             DeclVersionRange,
+                                             DeclInfo,
                                              refinementSourceRangeForDecl(D));
     
     // Record the TRC for this storage declaration so that
@@ -988,9 +1070,17 @@ private:
     if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       // Use the declaration's availability for the context when checking
       // the bodies of its accessors.
-      if (storageDecl->hasAccessorFunctions()) {
+
+      // HACK: For synthesized trivial accessors we may have not a valid
+      // location for the end of the braces, so in that case we will fall back
+      // to using the range for the storage declaration. The right fix here is
+      // to update AbstractStorageDecl::addTrivialAccessors() to take brace
+      // locations and have callers of that method provide appropriate source
+      // locations.
+      SourceLoc BracesEnd = storageDecl->getBracesRange().End;
+      if (storageDecl->hasAccessorFunctions() && BracesEnd.isValid()) {
         return SourceRange(storageDecl->getStartLoc(),
-                           storageDecl->getBracesRange().End);
+                           BracesEnd);
       }
       
       // For a variable declaration (without accessors) we use the range of the
@@ -1042,8 +1132,8 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildIfStmtRefinementContext(IfStmt *IS) {
-    Optional<VersionRange> ThenRange;
-    Optional<VersionRange> ElseRange;
+    Optional<AvailabilityContext> ThenRange;
+    Optional<AvailabilityContext> ElseRange;
     std::tie(ThenRange, ElseRange) =
         buildStmtConditionRefinementContext(IS->getCond());
 
@@ -1088,7 +1178,7 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildWhileStmtRefinementContext(WhileStmt *WS) {
-    Optional<VersionRange> BodyRange =
+    Optional<AvailabilityContext> BodyRange =
         buildStmtConditionRefinementContext(WS->getCond()).first;
 
     if (BodyRange.hasValue()) {
@@ -1118,8 +1208,8 @@ private:
     // This is slightly tricky because, unlike our other control constructs,
     // the refined region is not lexically contained inside the construct
     // introducing the refinement context.
-    Optional<VersionRange> FallthroughRange;
-    Optional<VersionRange> ElseRange;
+    Optional<AvailabilityContext> FallthroughRange;
+    Optional<AvailabilityContext> ElseRange;
     std::tie(FallthroughRange, ElseRange) =
         buildStmtConditionRefinementContext(GS->getCond());
 
@@ -1152,7 +1242,7 @@ private:
   /// of optional version ranges, the first for the true branch and the second
   /// for the false branch. A value of None for a given branch indicates that
   /// the branch does not introduce a new refinement.
-  std::pair<Optional<VersionRange>, Optional<VersionRange>>
+  std::pair<Optional<AvailabilityContext>, Optional<AvailabilityContext>>
   buildStmtConditionRefinementContext(StmtCondition Cond) {
 
     // Any refinement contexts introduced in the statement condition
@@ -1165,13 +1255,13 @@ private:
     unsigned NestedCount = 0;
 
     // Tracks the potential version range when the condition is false.
-    VersionRange FalseFlow = VersionRange::empty();
+    auto FalseFlow = AvailabilityContext::neverAvailable();
 
     TypeRefinementContext *StartingTRC = getCurrentTRC();
 
     for (StmtConditionElement Element : Cond) {
       TypeRefinementContext *CurrentTRC = getCurrentTRC();
-      const VersionRange CurrentRange = CurrentTRC->getPotentialVersions();
+      AvailabilityContext CurrentInfo = CurrentTRC->getAvailabilityInfo();
 
       // If the element is not a condition, walk it in the current TRC.
       if (Element.getKind() != StmtConditionElement::CK_Availability) {
@@ -1180,7 +1270,7 @@ private:
         // potentially be false, so conservatively combine the version
         // range of the current context with the accumulated false flow
         // of all other conjuncts.
-        FalseFlow.unionWith(CurrentRange);
+        FalseFlow.unionWith(CurrentInfo);
 
         Element.walk(*this);
         continue;
@@ -1208,8 +1298,8 @@ private:
         continue;
       }
 
-      VersionRange Range = rangeForSpec(Spec);
-      Query->setAvailableRange(Range);
+      AvailabilityContext NewConstraint = contextForSpec(Spec);
+      Query->setAvailableRange(NewConstraint.getOSVersion());
 
       if (Spec->getKind() == AvailabilitySpecKind::OtherPlatform) {
         // The wildcard spec '*' represents the minimum deployment target, so
@@ -1224,7 +1314,7 @@ private:
       // If the version range for the current TRC is completely contained in
       // the range for the spec, then a version query can never be false, so the
       // spec is useless. If so, report this.
-      if (CurrentRange.isContainedIn(Range)) {
+      if (CurrentInfo.isContainedIn(NewConstraint)) {
         DiagnosticEngine &Diags = TC.Diags;
         if (CurrentTRC->getReason() == TypeRefinementContext::Reason::Root) {
           // Diagnose for checks that are useless because the minimum deployment
@@ -1256,27 +1346,27 @@ private:
       // context.
       // We could be more precise here if we enriched the lattice to include
       // ranges of the form [x, y).
-      FalseFlow.unionWith(CurrentRange);
+      FalseFlow.unionWith(CurrentInfo);
 
       auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
-          TC.Context, Query, LastElement, CurrentTRC, Range);
+          TC.Context, Query, LastElement, CurrentTRC, NewConstraint);
 
       pushContext(TRC, ParentTy());
       NestedCount++;
     }
 
 
-    Optional<VersionRange> FalseRefinement = None;
+    Optional<AvailabilityContext> FalseRefinement = None;
     // The version range for the false branch should never have any versions
     // that weren't possible when the condition started evaluating.
-    assert(FalseFlow.isContainedIn(StartingTRC->getPotentialVersions()));
+    assert(FalseFlow.isContainedIn(StartingTRC->getAvailabilityInfo()));
 
     // If the starting version range is not completely contained in the
     // false flow version range then it must be the case that false flow range
     // is strictly smaller than the starting range (because the false flow
     // range *is* contained in the starting range), so we should introduce a
     // new refinement for the false flow.
-    if (!StartingTRC->getPotentialVersions().isContainedIn(FalseFlow)) {
+    if (!StartingTRC->getAvailabilityInfo().isContainedIn(FalseFlow)) {
       FalseRefinement = FalseFlow;
     }
 
@@ -1289,7 +1379,7 @@ private:
 
     assert(getCurrentTRC() == StartingTRC);
 
-    return std::make_pair(NestedTRC->getPotentialVersions(), FalseRefinement);
+    return std::make_pair(NestedTRC->getAvailabilityInfo(), FalseRefinement);
   }
 
   /// Return the best active spec for the target platform or nullptr if no
@@ -1308,7 +1398,7 @@ private:
 
       // FIXME: This is not quite right: we want to handle AppExtensions
       // properly. For example, on the OSXApplicationExtension platform
-      // we want to chose the OSX spec unless there is an explicit
+      // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
       if (isPlatformActive(VersionSpec->getPlatform(), TC.getLangOpts())) {
         return VersionSpec;
@@ -1320,14 +1410,14 @@ private:
     return FoundOtherSpec;
   }
 
-  /// Return the version range for the given availability spec.
-  VersionRange rangeForSpec(AvailabilitySpec *Spec) {
+  /// Return the availability context for the given spec.
+  AvailabilityContext contextForSpec(AvailabilitySpec *Spec) {
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
-      return VersionRange::allGTE(TC.getLangOpts().getMinPlatformVersion());
+      return AvailabilityContext::alwaysAvailable();
     }
 
     auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
-    return VersionRange::allGTE(VersionSpec->getVersion());
+    return AvailabilityContext(VersionRange::allGTE(VersionSpec->getVersion()));
   }
 
   virtual Expr *walkToExprPost(Expr *E) override {
@@ -1355,9 +1445,9 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
     // The root type refinement context reflects the fact that all parts of
     // the source file are guaranteed to be executing on at least the minimum
     // platform version.
-    auto VersionRange =
-        VersionRange::allGTE(AC.LangOpts.getMinPlatformVersion());
-    RootTRC = TypeRefinementContext::createRoot(&SF, VersionRange);
+    AvailabilityContext MinPlatformReq{
+        VersionRange::allGTE(AC.LangOpts.getMinPlatformVersion())};
+    RootTRC = TypeRefinementContext::createRoot(&SF, MinPlatformReq);
     SF.setTypeRefinementContext(RootTRC);
   }
 
@@ -1380,13 +1470,13 @@ TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
   return TRC;
 }
 
-VersionRange
-TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
-                                                 const DeclContext *DC) {
+AvailabilityContext
+TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
+                                                   const DeclContext *DC) {
   SourceFile *SF = DC->getParentSourceFile();
 
   // If our source location is invalid (this may be synthesized code), climb
-  // the decl context hierarchy until until we find a location that is valid,
+  // the decl context hierarchy until we find a location that is valid,
   // collecting availability ranges on the way up.
   // We will combine the version ranges from these annotations
   // with the TRC for the valid location to overapproximate the running
@@ -1400,8 +1490,8 @@ TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
   // this will be a real problem.
 
   // We can assume we are running on at least the minimum deployment target.
-  VersionRange OverApproximateVersionRange =
-      VersionRange::allGTE(getLangOpts().getMinPlatformVersion());
+  AvailabilityContext OverApproximateContext{
+    VersionRange::allGTE(getLangOpts().getMinPlatformVersion())};
 
   while (DC && loc.isInvalid()) {
     const Decl *D = DC->getInnermostDeclarationDeclContext();
@@ -1410,11 +1500,11 @@ TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
 
     loc = D->getLoc();
 
-    Optional<VersionRange> Range =
+    Optional<AvailabilityContext> Info =
         AvailabilityInference::annotatedAvailableRange(D, Context);
 
-    if (Range.hasValue()) {
-      OverApproximateVersionRange.constrainWith(Range.getValue());
+    if (Info.hasValue()) {
+      OverApproximateContext.constrainWith(Info.getValue());
     }
 
     DC = D->getDeclContext();
@@ -1424,28 +1514,28 @@ TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
     TypeRefinementContext *rootTRC = getOrBuildTypeRefinementContext(SF);
     TypeRefinementContext *TRC =
         rootTRC->findMostRefinedSubContext(loc, Context.SourceMgr);
-    OverApproximateVersionRange.constrainWith(TRC->getPotentialVersions());
+    OverApproximateContext.constrainWith(TRC->getAvailabilityInfo());
   }
 
-  return OverApproximateVersionRange;
+  return OverApproximateContext;
 }
 
 bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
                                   const DeclContext *referenceDC,
-                                  VersionRange &OutAvailableRange) {
+                                  AvailabilityContext &OutAvailableInfo) {
 
-  VersionRange safeRangeUnderApprox =
-      AvailabilityInference::availableRange(D, Context);
-  VersionRange runningOSOverApprox = overApproximateOSVersionsAtLocation(
-      referenceLoc, referenceDC);
-  
+  AvailabilityContext safeRangeUnderApprox{
+      AvailabilityInference::availableRange(D, Context)};
+  AvailabilityContext runningOSOverApprox =
+      overApproximateAvailabilityAtLocation(referenceLoc, referenceDC);
+
   // The reference is safe if an over-approximation of the running OS
   // versions is fully contained within an under-approximation
   // of the versions on which the declaration is available. If this
   // containment cannot be guaranteed, we say the reference is
   // not available.
   if (!(runningOSOverApprox.isContainedIn(safeRangeUnderApprox))) {
-    OutAvailableRange = safeRangeUnderApprox;
+    OutAvailableInfo = safeRangeUnderApprox;
     return false;
   }
   
@@ -1465,13 +1555,14 @@ TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
     return None;
   }
 
-  VersionRange safeRangeUnderApprox = VersionRange::empty();
+  auto safeRangeUnderApprox = AvailabilityContext::neverAvailable();
   if (isDeclAvailable(D, referenceLoc, referenceDC, safeRangeUnderApprox)) {
     return None;
   }
 
   // safeRangeUnderApprox now holds the safe range.
-  return UnavailabilityReason::requiresVersionRange(safeRangeUnderApprox);
+  VersionRange version = safeRangeUnderApprox.getOSVersion();
+  return UnavailabilityReason::requiresVersionRange(version);
 }
 
 void TypeChecker::diagnosePotentialUnavailability(
@@ -1585,7 +1676,7 @@ public:
   }
 
   /// Once we have found the target node, look for the innermost ancestor
-  /// matching our criteria on the way back up the spine of of the tree.
+  /// matching our criteria on the way back up the spine of the tree.
   bool walkToNodePost(ASTNode Node) {
     if (!InnermostMatchingNode.hasValue() && Predicate(Node, Parent)) {
       assert(Node.getSourceRange().isInvalid() ||
@@ -1790,11 +1881,11 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 /// declaration context containing the reference, make a best effort find up to
 /// three locations for potential fixits.
 ///
-/// \param  FoundVersionCheckNode Returns a node that can be wrapped in a
+/// \param FoundVersionCheckNode Returns a node that can be wrapped in a
 /// if #available(...) { ... } version check to fix the unavailable reference,
-/// or None if such such a node cannot be found.
+/// or None if such a node cannot be found.
 ///
-/// \param FoundMemberLevelDecl Returns memember-level declaration (i.e., the
+/// \param FoundMemberLevelDecl Returns member-level declaration (i.e., the
 ///  child of a type DeclContext) for which an @available attribute would
 /// fix the unavailable reference.
 ///
@@ -2169,7 +2260,7 @@ static bool someEnclosingDeclMatches(SourceRange ReferenceRange,
 
 bool TypeChecker::isInsideImplicitFunction(SourceRange ReferenceRange,
                                            const DeclContext *DC) {
-  std::function<bool(const Decl *)> IsInsideImplicitFunc = [](const Decl *D) {
+  auto IsInsideImplicitFunc = [](const Decl *D) {
     auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
     return AFD && AFD->isImplicit();
   };
@@ -2181,7 +2272,7 @@ bool TypeChecker::isInsideImplicitFunction(SourceRange ReferenceRange,
 
 bool TypeChecker::isInsideUnavailableDeclaration(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
-  std::function<bool(const Decl *)> IsUnavailable = [](const Decl *D) {
+  auto IsUnavailable = [](const Decl *D) {
     return D->getAttrs().getUnavailable(D->getASTContext());
   };
 
@@ -2189,71 +2280,14 @@ bool TypeChecker::isInsideUnavailableDeclaration(
                                   IsUnavailable);
 }
 
-/// Returns true if the reference is lexically contained in a declaration
-/// that is deprecated on all deployment targets.
-static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
-                                          const DeclContext *ReferenceDC,
-                                          TypeChecker &TC) {
+bool TypeChecker::isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
+                                                const DeclContext *ReferenceDC){
   std::function<bool(const Decl *)> IsDeprecated = [](const Decl *D) {
     return D->getAttrs().getDeprecated(D->getASTContext());
   };
 
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, TC,
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
                                   IsDeprecated);
-}
-
-void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
-                                     const DeclContext *ReferenceDC,
-                                     const AvailableAttr *Attr,
-                                     DeclName Name) {
-  // We match the behavior of clang to not report deprecation warnigs
-  // inside declarations that are themselves deprecated on all deployment
-  // targets.
-  if (isInsideDeprecatedDeclaration(ReferenceRange, ReferenceDC, *this)) {
-    return;
-  }
-
-  if (!Context.LangOpts.DisableAvailabilityChecking) {
-    VersionRange RunningOSVersions =
-    overApproximateOSVersionsAtLocation(ReferenceRange.Start, ReferenceDC);
-    if (RunningOSVersions.isEmpty()) {
-      // Suppress a deprecation warning if the availability checking machinery
-      // thinks the reference program location will not execute on any
-      // deployment target for the current platform.
-      return;
-    }
-  }
-
-  StringRef Platform = Attr->prettyPlatformString();
-  clang::VersionTuple DeprecatedVersion;
-  if (Attr->Deprecated)
-    DeprecatedVersion = Attr->Deprecated.getValue();
-
-  if (Attr->Message.empty() && Attr->Rename.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion)
-      .highlight(Attr->getRange());
-    return;
-  }
-
-  if (Attr->Message.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion, Attr->Rename)
-      .highlight(Attr->getRange());
-  } else {
-    EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion, EncodedMessage.Message)
-      .highlight(Attr->getRange());
-  }
-
-  if (!Attr->Rename.empty()) {
-    diagnose(ReferenceRange.Start, diag::note_deprecated_rename, Attr->Rename)
-      .fixItReplace(ReferenceRange, Attr->Rename);
-  }
 }
 
 // checkForForbiddenPrefix is for testing purposes.
@@ -2269,7 +2303,7 @@ void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
 void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
   if (!hasEnabledForbiddenTypecheckPrefix())
     return;
-  checkForForbiddenPrefix(E->getName());
+  checkForForbiddenPrefix(E->getName().getBaseName());
 }
 
 void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {

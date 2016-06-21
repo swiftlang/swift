@@ -15,17 +15,17 @@ protocol Test {
   var major : Int { get }
   var minor : Int { get }
   var subminor : Int  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-  static var staticProperty: Int // expected-error{{static stored properties not yet supported in generic types}} expected-error{{property in protocol must have explicit { get } or { get set } specifier}}
+  static var staticProperty: Int // expected-error{{property in protocol must have explicit { get } or { get set } specifier}}
 }
 
 protocol Test2 {
   var property: Int { get }
 
   var title: String = "The Art of War" { get } // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-  static var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{static stored properties not yet supported in generic types}}
+  static var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
 
-  typealias mytype
-  typealias mybadtype = Int
+  associatedtype mytype
+  associatedtype mybadtype = Int
 }
 
 func test1() {
@@ -45,7 +45,7 @@ protocol CustomStringConvertible { func print() } // expected-note{{protocol req
 
 struct TestFormat { }
 protocol FormattedPrintable : CustomStringConvertible {
-  func print(format format: TestFormat)
+  func print(format: TestFormat)
 }
 
 struct X0 : Any, CustomStringConvertible {
@@ -71,7 +71,7 @@ class NotPrintableC : CustomStringConvertible, Any {} // expected-error{{type 'N
 enum NotPrintableO : Any, CustomStringConvertible {} // expected-error{{type 'NotPrintableO' does not conform to protocol 'CustomStringConvertible'}}
 
 struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'NotFormattedPrintable' does not conform to protocol 'CustomStringConvertible'}}
-  func print(format format: TestFormat) {} // expected-note{{candidate has non-matching type '(format: TestFormat) -> ()'}}
+  func print(format: TestFormat) {} // expected-note{{candidate has non-matching type '(format: TestFormat) -> ()'}}
 }
 
 // Circular protocols
@@ -90,7 +90,7 @@ struct Circle {
   func circle_end() {}
 }
 
-func testCircular(circle: Circle) {
+func testCircular(_ circle: Circle) {
   // FIXME: It would be nice if this failure were suppressed because the protocols
   // have circular definitions.
   _ = circle as CircleStart // expected-error{{'Circle' is not convertible to 'CircleStart'; did you mean to use 'as!' to force downcast?}} {{14-16=as!}}
@@ -102,19 +102,12 @@ protocol C : E { }
 protocol H : E { }
 protocol E { }
 
-struct disallownonglobal { protocol P {} } // expected-error {{declaration is only valid at file scope}}
-
-protocol disallownestp { protocol P {} } // expected-error {{type not allowed here}}
-protocol disallownests { struct S {} } // expected-error {{type not allowed here}}
-protocol disallownestc { class C {} } // expected-error {{type not allowed here}}
-protocol disallownesto { enum O {} } // expected-error {{type not allowed here}}
-
 //===----------------------------------------------------------------------===//
 // Associated types
 //===----------------------------------------------------------------------===//
 
 protocol SimpleAssoc {
-  typealias Associated // expected-note{{protocol requires nested type 'Associated'}}
+  associatedtype Associated // expected-note{{protocol requires nested type 'Associated'}}
 }
 
 struct IsSimpleAssoc : SimpleAssoc {
@@ -124,7 +117,7 @@ struct IsSimpleAssoc : SimpleAssoc {
 struct IsNotSimpleAssoc : SimpleAssoc {} // expected-error{{type 'IsNotSimpleAssoc' does not conform to protocol 'SimpleAssoc'}}
 
 protocol StreamWithAssoc {
-  typealias Element
+  associatedtype Element
   func get() -> Element // expected-note{{protocol requires function 'get()' with type '() -> Element'}}
 }
 
@@ -150,40 +143,40 @@ struct StreamTypeWithInferredAssociatedTypes : StreamWithAssoc {
 }
 
 protocol SequenceViaStream {
-  typealias SequenceStreamTypeType : GeneratorType // expected-note{{protocol requires nested type 'SequenceStreamTypeType'}}
-  func generate() -> SequenceStreamTypeType
+  associatedtype SequenceStreamTypeType : IteratorProtocol // expected-note{{protocol requires nested type 'SequenceStreamTypeType'}}
+  func makeIterator() -> SequenceStreamTypeType
 }
 
-struct IntGeneratorType : GeneratorType /*, SequenceType, ReplPrintable*/ {
+struct IntIterator : IteratorProtocol /*, Sequence, ReplPrintable*/ {
   typealias Element = Int
   var min : Int
   var max : Int
   var stride : Int
 
   mutating func next() -> Int? {
-    if min >= max { return .None }
+    if min >= max { return .none }
     let prev = min
     min += stride
     return prev
   }
 
-  typealias Generator = IntGeneratorType
-  func generate() -> IntGeneratorType {
+  typealias Generator = IntIterator
+  func makeIterator() -> IntIterator {
     return self
   }
 }
 
-extension IntGeneratorType : SequenceViaStream {
-  typealias SequenceStreamTypeType = IntGeneratorType
+extension IntIterator : SequenceViaStream {
+  typealias SequenceStreamTypeType = IntIterator
 }
 
 struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
-  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'GeneratorType'}}
-  func generate() -> Int {}
+  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
+  func makeIterator() -> Int {}
 }
 
 protocol GetATuple {
-  typealias Tuple
+  associatedtype Tuple
   func getATuple() -> Tuple
 }
 
@@ -197,7 +190,7 @@ struct IntStringGetter : GetATuple {
 //===----------------------------------------------------------------------===//
 // FIXME: Actually make use of default arguments, check substitutions, etc.
 protocol ProtoWithDefaultArg {
-  func increment(value: Int = 1) // expected-error{{default argument not permitted in a protocol method}}
+  func increment(_ value: Int = 1) // expected-error{{default argument not permitted in a protocol method}}
 }
 
 struct HasNoDefaultArg : ProtoWithDefaultArg {
@@ -208,55 +201,55 @@ struct HasNoDefaultArg : ProtoWithDefaultArg {
 // Variadic function requirements
 //===----------------------------------------------------------------------===//
 protocol IntMaxable {
-  func intmax(first first: Int, rest: Int...) -> Int // expected-note 2{{protocol requires function 'intmax(first:rest:)' with type '(first: Int, rest: Int...) -> Int'}}
+  func intmax(first: Int, rest: Int...) -> Int // expected-note 2{{protocol requires function 'intmax(first:rest:)' with type '(first: Int, rest: Int...) -> Int'}}
 }
 
 struct HasIntMax : IntMaxable {
-  func intmax(first first: Int, rest: Int...) -> Int {}
+  func intmax(first: Int, rest: Int...) -> Int {}
 }
 
 struct NotIntMax1 : IntMaxable  { // expected-error{{type 'NotIntMax1' does not conform to protocol 'IntMaxable'}}
-  func intmax(first first: Int, rest: [Int]) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: [Int]) -> Int'}}
+  func intmax(first: Int, rest: [Int]) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: [Int]) -> Int'}}
 }
 
 struct NotIntMax2 : IntMaxable { // expected-error{{type 'NotIntMax2' does not conform to protocol 'IntMaxable'}}
-  func intmax(first first: Int, rest: Int) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: Int) -> Int'}}
+  func intmax(first: Int, rest: Int) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: Int) -> Int'}}
 }
 
 //===----------------------------------------------------------------------===//
 // 'Self' type
 //===----------------------------------------------------------------------===//
 protocol IsEqualComparable {
-  func isEqual(other other: Self) -> Bool // expected-note{{protocol requires function 'isEqual(other:)' with type '(other: WrongIsEqual) -> Bool'}}
+  func isEqual(other: Self) -> Bool // expected-note{{protocol requires function 'isEqual(other:)' with type '(other: WrongIsEqual) -> Bool'}}
 }
 
 struct HasIsEqual : IsEqualComparable {
-  func isEqual(other other: HasIsEqual) -> Bool {}
+  func isEqual(other: HasIsEqual) -> Bool {}
 }
 
 struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual' does not conform to protocol 'IsEqualComparable'}}
-  func isEqual(other other: Int) -> Bool {}  // expected-note{{candidate has non-matching type '(other: Int) -> Bool'}}
+  func isEqual(other: Int) -> Bool {}  // expected-note{{candidate has non-matching type '(other: Int) -> Bool'}}
 }
 
 //===----------------------------------------------------------------------===//
 // Using values of existential type.
 //===----------------------------------------------------------------------===//
 
-func existentialSequence(e: SequenceType) { // expected-error{{has Self or associated type requirements}}
-  var x = e.generate() // expected-error{{type 'SequenceType' does not conform to protocol 'GeneratorType'}}
+func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
+  var x = e.makeIterator() // expected-error{{'Sequence' is not convertible to '<<error type>>'}}
   x.next()
   x.nonexistent()
 }
 
 protocol HasSequenceAndStream {
-  typealias R : GeneratorType, SequenceType
+  associatedtype R : IteratorProtocol, Sequence
   func getR() -> R
 }
 
-func existentialSequenceAndStreamType(h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
+func existentialSequenceAndStreamType(_ h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
   // FIXME: Crummy diagnostics.
   var x = h.getR() // expected-error{{member 'getR' cannot be used on value of protocol type 'HasSequenceAndStream'; use a generic constraint instead}}
-  x.generate()
+  x.makeIterator()
   x.next()
 
   x.nonexistent()
@@ -270,7 +263,7 @@ protocol IntIntSubscriptable {
 }
 
 protocol IntSubscriptable {
-  typealias Element
+  associatedtype Element
   subscript (i: Int) -> Element { get }
 }
 
@@ -282,7 +275,7 @@ struct DictionaryIntInt {
   }
 }
 
-func testSubscripting(iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
+func testSubscripting(_ iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
   var i: Int = iis[17] 
   var i2 = i_s[17] // expected-error{{member 'subscript' cannot be used on value of protocol type 'IntSubscriptable'; use a generic constraint instead}}
 }
@@ -328,7 +321,7 @@ prefix operator <> {}
 postfix operator <> {}
 
 protocol IndexValue {
-  prefix func <> (max: Self) -> Int
+  prefix func <> (_ max: Self) -> Int
   postfix func <> (min: Self) -> Int
 }
 
@@ -350,6 +343,7 @@ final class ClassNode : IntrusiveListNode {
 }
 
 struct StructNode : IntrusiveListNode { // expected-error{{non-class type 'StructNode' cannot conform to class protocol 'IntrusiveListNode'}}
+  // expected-error@-1{{value type 'StructNode' cannot have a stored property that references itself}}
   var next : StructNode
 }
 
@@ -379,6 +373,7 @@ final class GenericClassNode<T> : IntrusiveListNode {
 }
 
 struct GenericStructNode<T> : IntrusiveListNode { // expected-error{{non-class type 'GenericStructNode<T>' cannot conform to class protocol 'IntrusiveListNode'}}
+  // expected-error@-1{{value type 'GenericStructNode<T>' cannot have a stored property that references itself}}
   var next : GenericStructNode<T>
 }
 
@@ -394,6 +389,7 @@ final class ClassDNode : IntrusiveDListNode {
 
 struct StructDNode : IntrusiveDListNode { // expected-error{{non-class type 'StructDNode' cannot conform to class protocol 'IntrusiveDListNode'}}
   // expected-error@-1{{non-class type 'StructDNode' cannot conform to class protocol 'IntrusiveListNode'}}
+  // expected-error@-2{{value type 'StructDNode' cannot have a stored property that references itself}}
   var prev : StructDNode
   var next : StructDNode
 }
@@ -415,7 +411,7 @@ class DoesntConformToObjCProtocol : ObjCProtocol { // expected-error{{type 'Does
 
 // <rdar://problem/16079878>
 protocol P1 {
-  typealias Assoc // expected-note 2{{protocol requires nested type 'Assoc'}}
+  associatedtype Assoc // expected-note 2{{protocol requires nested type 'Assoc'}}
 }
 
 protocol P2 {
@@ -444,21 +440,31 @@ protocol FirstProtocol {
 }
 
 protocol SecondProtocol {
-    func aMethod(object : FirstProtocol)
+    func aMethod(_ object : FirstProtocol)
 }
 
 // <rdar://problem/19495341> Can't upcast to parent types of type constraints without forcing
 class C1 : P2 {}
-func f<T : C1>(x : T) {
-  x as P2
+func f<T : C1>(_ x : T) {
+  _ = x as P2
 }
 
 class C2 {}
-func g<T : C2>(x : T) {
+func g<T : C2>(_ x : T) {
   x as P2 // expected-error{{'T' is not convertible to 'P2'; did you mean to use 'as!' to force downcast?}} {{5-7=as!}}
 }
 
 class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}}
-func h<T : C3>(x : T) {
-  x as P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+func h<T : C3>(_ x : T) {
+  _ = x as P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+}
+
+
+
+protocol P4 {
+  associatedtype T // expected-note {{protocol requires nested type 'T'}}
+}
+
+class C4 : P4 { // expected-error {{type 'C4' does not conform to protocol 'P4'}}
+  associatedtype T = Int  // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}} {{3-17=typealias}}
 }

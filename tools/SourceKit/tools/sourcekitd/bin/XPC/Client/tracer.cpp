@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -38,9 +38,9 @@ using namespace sourcekitd;
 
 
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Generic
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 static std::string trace_root_dir;
 
@@ -150,9 +150,9 @@ struct llvm::yaml::MappingTraits<std::pair<U, V>> {
 
 
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // State
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 class State {
   typedef std::map<uint64_t, OperationInfo> OperationsType;
@@ -219,7 +219,7 @@ public:
     S->Operations.erase(OpId);
   }
 
-  static void persistAsync(bool WithActions) {
+  static void persistAsync() {
     llvm::sys::ScopedLock L(GlobalMutex);
     auto S = CurrentState;
     Queue.dispatch([S] {S->persist();});
@@ -307,9 +307,9 @@ void State::persist() {
 
 
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Init & trace
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 void initializeTracing() {
   const char *EnvOpt = ::getenv("SOURCEKIT_TRACE_ROOT");
@@ -380,7 +380,7 @@ void handleTraceMessageRequest(uint64_t Session, xpc_object_t Msg) {
 
 void persistTracingData() {
   if (isTracingEnabled()) {
-    State::persistAsync(true);
+    State::persistAsync();
   }
 }
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -37,6 +37,7 @@ class GenericSignature;
 class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
+class GenericTypeDecl;
 class NormalProtocolConformance;
 enum OptionalTypeKind : unsigned;
 class ProtocolDecl;
@@ -54,6 +55,12 @@ enum class SubstFlags {
   /// If a type cannot be produced because some member type is
   /// missing, return the identity type rather than a null type.
   IgnoreMissing = 0x01,
+  /// Allow substitutions to recurse into SILFunctionTypes.
+  /// Normally, SILType::subst() should be used for lowered
+  /// types, however in special cases where the substitution
+  /// is just changing between contextual and interface type
+  /// representations, using Type::subst() is allowed.
+  AllowLoweredTypes = 0x02,
 };
 
 /// Options for performing substitutions into a type.
@@ -62,6 +69,29 @@ typedef OptionSet<SubstFlags> SubstOptions;
 inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
   return SubstOptions(lhs) | rhs;
 }
+
+/// Enumeration describing foreign languages to which Swift may be
+/// bridged.
+enum class ForeignLanguage {
+  C,
+  ObjectiveC,
+};
+
+/// Describes how a particular type is representable in a foreign language.
+enum class ForeignRepresentableKind : uint8_t {
+  /// This type is not representable in the foreign language.
+  None,
+  /// This type is trivially representable in the foreign language.
+  Trivial,
+  /// This type is trivially representable as an object in the foreign
+  /// language.
+  Object,
+  /// This type is representable in the foreign language via bridging.
+  Bridged,
+  /// This type is representable in the foreign language via static
+  /// bridging code, only (which is not available at runtime).
+  StaticBridged,
+};
 
 /// Type - This is a simple value object that contains a pointer to a type
 /// class.  This is potentially sugared.  We use this throughout the codebase
@@ -96,7 +126,7 @@ public:
   ///
   /// \returns true if the predicate returns true for the given type or any of
   /// its children.
-  bool findIf(const std::function<bool(Type)> &pred) const;
+  bool findIf(llvm::function_ref<bool(Type)> pred) const;
 
   /// Transform the given type by applying the user-provided function to
   /// each type.
@@ -113,10 +143,10 @@ public:
   /// accepts a type and returns either a transformed type or a null type.
   ///
   /// \returns the result of transforming the type.
-  Type transform(const std::function<Type(Type)> &fn) const;
+  Type transform(llvm::function_ref<Type(Type)> fn) const;
 
   /// Look through the given type and its children and apply fn to them.
-  void visit(const std::function<void (Type)> &fn) const {
+  void visit(llvm::function_ref<void (Type)> fn) const {
     findIf([&fn](Type t) -> bool {
         fn(t);
         return false;
@@ -245,7 +275,9 @@ public:
   StructDecl *getStructOrBoundGenericStruct() const; // in Types.h
   EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
   NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
-  NominalTypeDecl *getAnyNominal() const; // in Types.h
+  CanType getNominalParent() const; // in Types.h
+  NominalTypeDecl *getAnyNominal() const;
+  GenericTypeDecl *getAnyGeneric() const;
 
   /// \brief Retrieve the most-specific class bound of this type,
   /// which is either a class, a bound-generic class, or a class-bounded
@@ -434,7 +466,7 @@ namespace llvm {
   template<> struct DenseMapInfo<swift::CanType>
     : public DenseMapInfo<swift::Type> {
     static swift::CanType getEmptyKey() {
-      return swift::CanType(0);
+      return swift::CanType(nullptr);
     }
     static swift::CanType getTombstoneKey() {
       return swift::CanType(llvm::DenseMapInfo<swift::

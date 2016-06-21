@@ -29,7 +29,7 @@ extension Int: Fooable {
   func foo() { print("Int") }
 }
 
-func fooify<T>(x: T) {
+func fooify<T>(_ x: T) {
   if let foo = x as? Fooable {
     foo.foo()
   } else {

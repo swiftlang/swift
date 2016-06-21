@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,7 +23,7 @@ static bool isSwiftPrefixed(const char *MangledName) {
   return (MangledName[0] == '_' && MangledName[1] == 'T');
 }
 
-size_t swift_demangle_getDemangledName_Options(const char *MangledName,
+static size_t swift_demangle_getDemangledName_Options(const char *MangledName,
     char *OutputBuffer, size_t Length,
     swift::Demangle::DemangleOptions DemangleOptions) {
   assert(MangledName != nullptr && "null input");

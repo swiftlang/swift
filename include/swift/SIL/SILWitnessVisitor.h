@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -37,6 +37,12 @@ namespace swift {
 /// variables, there should be separate callbacks for adding a
 /// getter/setter pair, for just adding a getter, and for adding a
 /// physical projection (if we decide to support that).
+///
+/// You must override the following methods:
+/// - addOutOfLineBaseProtocol()
+/// - addMethod()
+/// - addConstructor()
+/// - addAssociatedType()
 
 template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
   T &asDerived() { return *static_cast<T*>(this); }
@@ -93,6 +99,10 @@ public:
       protos.push_back(p);
     ProtocolType::canonicalizeProtocols(protos);
     asDerived().addAssociatedType(td, protos);
+  }
+    
+  void visitTypeAliasDecl(TypeAliasDecl *tad) {
+    // We don't care about these by themselves for witnesses.
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {

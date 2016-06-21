@@ -58,7 +58,7 @@ generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
 set(version_inc_files
   ${llvm_revision_inc} ${clang_revision_inc} ${swift_revision_inc})
 
-add_swift_library(swiftBasic
+add_swift_library(swiftBasic STATIC
   Cache.cpp
   ClusteredBitVector.cpp
   Demangle.cpp
@@ -70,8 +70,8 @@ add_swift_library(swiftBasic
   JSONSerialization.cpp
   LangOptions.cpp
   Platform.cpp
-  PrettyStackTrace.cpp
   PrefixMap.cpp
+  PrettyStackTrace.cpp
   PrimitiveParsing.cpp
   Program.cpp
   Punycode.cpp
@@ -82,6 +82,7 @@ add_swift_library(swiftBasic
   StringExtras.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp
+  Timer.cpp
   Unicode.cpp
   UUID.cpp
   Version.cpp

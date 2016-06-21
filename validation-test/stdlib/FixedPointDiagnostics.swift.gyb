@@ -1,5 +1,5 @@
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/main.swift
-// RUN: %S/../../utils/line-directive %t/main.swift -- %target-swift-frontend -parse -verify %t/main.swift
+// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-swift-frontend -parse -verify %t/main.swift
 
 func testUnaryMinusInUnsigned() {
   var a: UInt8 = -(1) // expected-error {{}} expected-note * {{}}
@@ -34,19 +34,22 @@ func test_truncatingBitPatternAPIIsStableAcrossPlatforms() {
   _ = UInt8(truncatingBitPattern: UInt(0))
   _ = UInt16(truncatingBitPattern: UInt(0))
   _ = UInt32(truncatingBitPattern: UInt(0))
-  UInt64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  UInt64(truncatingBitPattern: UInt(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
+// expected-note @-1 {{overloads for 'UInt64' exist with these partially matching parameter lists}}
   UInt(truncatingBitPattern: UInt(0))   // expected-error {{}} expected-note * {{}}
 
   _ = Int8(truncatingBitPattern: UInt(0))
   _ = Int16(truncatingBitPattern: UInt(0))
   _ = Int32(truncatingBitPattern: UInt(0))
-  Int64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  Int64(truncatingBitPattern: UInt(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
+// expected-note @-1 {{overloads for 'Int64' exist with}}
   Int(truncatingBitPattern: UInt(0))   // expected-error {{}} expected-note * {{}}
 
   _ = UInt8(truncatingBitPattern: Int(0))
   _ = UInt16(truncatingBitPattern: Int(0))
   _ = UInt32(truncatingBitPattern: Int(0))
-  UInt64(truncatingBitPattern: Int(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
+  UInt64(truncatingBitPattern: Int(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
+// expected-note @-1 {{overloads for 'UInt64' exist with these partially matching parameter lists}}
   UInt(truncatingBitPattern: Int(0))   // expected-error {{}} expected-note * {{}}
 
   _ = Int8(truncatingBitPattern: Int(0))
@@ -81,10 +84,10 @@ func testMixedSignArithmetic() {
   // allow mixed-sign arithmetic to compile.  We create a deliberate
   // ambiguity in these cases.
 % for T in "UInt UInt64 UInt32 UInt16 UInt8".split():
-  if true {
+  do {
     typealias Stride = ${T}.Stride
-    ${T}(1) + 0          // OK
-    0 + ${T}(1)         // OK
+    _ = ${T}(1) + 0     // OK
+    _ = 0 + ${T}(1)     // OK
     ${T}(1) + Stride(0) // expected-error {{}} // ambiguous use of operator '+'
     Stride(1) + ${T}(0) // expected-error {{}} // ambiguous use of operator '+'
     ${T}(1) - Stride(0) // expected-error {{}} // ambiguous use of operator '-'
@@ -100,18 +103,18 @@ func testMixedSignArithmetic() {
     // disabled by the ambiguity trick.
     //===------------------------------------------------------------------===//
 
-    (x + x) as Stride   // expected-error {{}} // not convertible to 'Stride'
+    (x + x) as Stride   // expected-error {{}} expected-note {{}} // not convertible to 'Stride'
     Stride(1) - ${T}(0) // expected-error {{}} expected-note {{}}
 
     // These tests are expected to start failing when we get improved diagnostics.
     var y: Stride = 0
-    y += ${T}(1)        // expected-error {{}}
-    y -= ${T}(1)        // expected-error {{}}
+    y += ${T}(1)        // expected-error {{}} expected-note {{}}
+    y -= ${T}(1)        // expected-error {{}} expected-note {{}}
   }
 % end
 }
 
-func testOps<T : IntegerArithmeticType>(x: T, _ y: T) -> T {
+func testOps<T : IntegerArithmetic>(_ x: T, _ y: T) -> T {
   let a = x + y
   let s = x - y
   let m = x * y
@@ -130,7 +133,4 @@ let s32_ops:  Int32 = testOps(5, 2)
 let u32_ops: UInt32 = testOps(5, 2)
 let s64_ops:  Int64 = testOps(5, 2)
 let u64_ops: UInt64 = testOps(5, 2)
-
-func useWord(w: Word) {} // expected-error {{'Word' has been renamed to 'Int'}}
-func useUWord(w: UWord) {} // expected-error {{'UWord' has been renamed to 'UInt'}}
 

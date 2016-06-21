@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -91,7 +91,7 @@ getLLVMIntrinsicIDForBuiltinWithOverflow(BuiltinValueKind ID);
 /// Returns null if the name does not identifier a known builtin value.
 ValueDecl *getBuiltinValueDecl(ASTContext &Context, Identifier Name);
   
-/// \brief Returns the name of a builtin declaration given an builtin ID.
+/// \brief Returns the name of a builtin declaration given a builtin ID.
 StringRef getBuiltinName(BuiltinValueKind ID);
   
 /// \brief The information identifying the builtin - its kind and types.

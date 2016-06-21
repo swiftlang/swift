@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
+// RUN: %target-swift-frontend -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
 // RUN: FileCheck -check-prefix=TABLE -check-prefix=TABLE-ALL %s < %t.sil
 // RUN: FileCheck -check-prefix=SYMBOL %s < %t.sil
 
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-testing > %t.testable.sil
+// RUN: %target-swift-frontend -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-testing > %t.testable.sil
 // RUN: FileCheck -check-prefix=TABLE-TESTABLE -check-prefix=TABLE-ALL %s < %t.testable.sil
 // RUN: FileCheck -check-prefix=SYMBOL-TESTABLE %s < %t.testable.sil
 
@@ -23,8 +23,8 @@ protocol ArchetypeReqt {
 }
 
 protocol AnyProtocol {
-  typealias AssocType
-  typealias AssocWithReqt: AssocReqt
+  associatedtype AssocType
+  associatedtype AssocWithReqt: AssocReqt
 
   func method(x x: Arg, y: Self)
   func generic<A: ArchetypeReqt>(x x: A, y: Self)
@@ -37,8 +37,8 @@ protocol AnyProtocol {
 }
 
 protocol ClassProtocol : class {
-  typealias AssocType
-  typealias AssocWithReqt: AssocReqt
+  associatedtype AssocType
+  associatedtype AssocWithReqt: AssocReqt
 
   func method(x x: Arg, y: Self)
   func generic<B: ArchetypeReqt>(x x: B, y: Self)
@@ -61,7 +61,7 @@ struct ConformingAssoc : AssocReqt {
   func requiredMethod() {}
 }
 // TABLE-LABEL: sil_witness_table hidden ConformingAssoc: AssocReqt module witness_tables {
-// TABLE-TESTABLE-LABEL: sil_witness_table ConformingAssoc: AssocReqt module witness_tables {
+// TABLE-TESTABLE-LABEL: sil_witness_table [fragile] ConformingAssoc: AssocReqt module witness_tables {
 // TABLE-ALL-NEXT:    method #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethod{{.*}}
 // TABLE-ALL-NEXT:  }
 // SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethod{{.*}} : $@convention(witness_method) (@in_guaranteed ConformingAssoc) -> ()
@@ -475,7 +475,7 @@ struct GenericAssocType<T> : AssocReqt {
 }
 
 protocol AssocTypeWithReqt {
-  typealias AssocType : AssocReqt
+  associatedtype AssocType : AssocReqt
 }
 
 struct ConformsWithDependentAssocType1<CC: AssocReqt> : AssocTypeWithReqt {
@@ -491,7 +491,7 @@ struct ConformsWithDependentAssocType2<DD> : AssocTypeWithReqt {
 }
 // TABLE-LABEL: sil_witness_table hidden <DD> ConformsWithDependentAssocType2<DD>: AssocTypeWithReqt module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: GenericAssocType<DD>
-// TABLE-NEXT:    associated_type_protocol (AssocType: AssocReqt): GenericAssocType<DD>: specialize <T = DD> (<T> GenericAssocType<T>: AssocReqt module witness_tables)
+// TABLE-NEXT:    associated_type_protocol (AssocType: AssocReqt): GenericAssocType<DD>: specialize <DD> (<T> GenericAssocType<T>: AssocReqt module witness_tables)
 // TABLE-NEXT:  }
 
 protocol InheritedFromObjC : ObjCProtocol {
@@ -508,7 +508,7 @@ class ConformsInheritedFromObjC : InheritedFromObjC {
 // TABLE-NEXT:  }
 
 protocol ObjCAssoc {
-  typealias AssocType : ObjCProtocol
+  associatedtype AssocType : ObjCProtocol
 }
 
 struct HasObjCAssoc : ObjCAssoc {
@@ -525,7 +525,7 @@ protocol Initializer {
 // TABLE-LABEL: sil_witness_table hidden HasInitializerStruct: Initializer module witness_tables {
 // TABLE-NEXT:  method #Initializer.init!allocator.1: @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}}
 // TABLE-NEXT: }
-// SYMBOL: sil hidden [transparent] [thunk] @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (@out HasInitializerStruct, Arg, @thick HasInitializerStruct.Type) -> ()
+// SYMBOL: sil hidden [transparent] [thunk] @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (Arg, @thick HasInitializerStruct.Type) -> @out HasInitializerStruct
 struct HasInitializerStruct : Initializer { 
   init(arg: Arg) { }
 }
@@ -533,7 +533,7 @@ struct HasInitializerStruct : Initializer {
 // TABLE-LABEL: sil_witness_table hidden HasInitializerClass: Initializer module witness_tables {
 // TABLE-NEXT:  method #Initializer.init!allocator.1: @_TTWC14witness_tables19HasInitializerClassS_11InitializerS_FS1_C{{.*}}
 // TABLE-NEXT: }
-// SYMBOL: sil hidden [transparent] [thunk] @_TTWC14witness_tables19HasInitializerClassS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (@out HasInitializerClass, Arg, @thick HasInitializerClass.Type) -> ()
+// SYMBOL: sil hidden [transparent] [thunk] @_TTWC14witness_tables19HasInitializerClassS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (Arg, @thick HasInitializerClass.Type) -> @out HasInitializerClass
 class HasInitializerClass : Initializer {
   required init(arg: Arg) { }
 }
@@ -541,7 +541,7 @@ class HasInitializerClass : Initializer {
 // TABLE-LABEL: sil_witness_table hidden HasInitializerEnum: Initializer module witness_tables {
 // TABLE-NEXT:  method #Initializer.init!allocator.1: @_TTWO14witness_tables18HasInitializerEnumS_11InitializerS_FS1_C{{.*}}
 // TABLE-NEXT: }
-// SYMBOL: sil hidden [transparent] [thunk] @_TTWO14witness_tables18HasInitializerEnumS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (@out HasInitializerEnum, Arg, @thick HasInitializerEnum.Type) -> ()
+// SYMBOL: sil hidden [transparent] [thunk] @_TTWO14witness_tables18HasInitializerEnumS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (Arg, @thick HasInitializerEnum.Type) -> @out HasInitializerEnum
 enum HasInitializerEnum : Initializer {
   case A
 

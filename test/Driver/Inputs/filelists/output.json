@@ -1,0 +1,17 @@
+{
+  "./a.swift": {
+    "object": "./a.o",
+    "swiftmodule": "./a.swiftmodule",
+    "llvm-bc": "./a.bc",
+  },
+  "./b.swift": {
+    "object": "./b.o",
+    "swiftmodule": "./b.swiftmodule",
+    "llvm-bc": "./b.bc",
+  },
+  "./c.swift": {
+    "object": "./c.o",
+    "swiftmodule": "./c.swiftmodule",
+    "llvm-bc": "./c.bc",
+  }
+}

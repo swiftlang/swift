@@ -2,7 +2,7 @@
 
 // LValues are direct values, too. They are reference types, though.
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 class Class {
   var ivar : Int64
@@ -23,16 +23,16 @@ struct Struct {
   init() { ivar = 4567 }
 }
 
-func foo(inout x: Class) {
+func foo(_ x: inout Class) {
 // CHECK: !DILocalVariable(name: "x", arg: 1{{.*}} line: [[@LINE-1]]
   markUsed(x.ivar)
-  x.ivar++ // Set breakpoint here
+  x.ivar += 1 // Set breakpoint here
 }
 
-func foo(inout x: Struct) {
+func foo(_ x: inout Struct) {
 // CHECK: !DILocalVariable(name: "x", arg: 1{{.*}} line: [[@LINE-1]]
   markUsed(x.ivar)
-  x.ivar++ // Set breakpoint here
+  x.ivar += 1 // Set breakpoint here
 }
 
 func main() {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -24,10 +24,14 @@ namespace swift {
 
 /// Describes the kind of a requirement that occurs within a requirements
 /// clause.
-enum class RequirementKind : unsigned int {
+enum class RequirementKind : unsigned {
   /// A conformance requirement T : P, where T is a type that depends
   /// on a generic parameter and P is a protocol to which T must conform.
   Conformance,
+  /// A superclass requirement T : C, where T is a type that depends
+  /// on a generic parameter and C is a concrete class type which T must
+  /// equal or be a subclass of.
+  Superclass,
   /// A same-type requirement T == U, where T and U are types that shall be
   /// equivalent.
   SameType,
@@ -51,7 +55,12 @@ class Requirement {
 public:
   /// Create a conformance or same-type requirement.
   Requirement(RequirementKind kind, Type first, Type second)
-    : FirstTypeAndKind(first, kind), SecondType(second) { }
+    : FirstTypeAndKind(first, kind), SecondType(second) {
+    if (kind != RequirementKind::WitnessMarker) {
+      assert(first);
+      assert(second);
+    }
+  }
 
   /// \brief Determine the kind of requirement.
   RequirementKind getKind() const { return FirstTypeAndKind.getInt(); }

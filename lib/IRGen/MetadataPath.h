@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file defines the MetadataPath type, which efficiently records the
-//  path to an metadata object.
+//  path to a metadata object.
 //
 //===----------------------------------------------------------------------===//
 
@@ -19,16 +19,20 @@
 #define SWIFT_IRGEN_METADATAPATH_H
 
 #include "swift/Basic/EncodedSequence.h"
+#include "swift/Reflection/MetadataSource.h"
 
 namespace llvm {
   class Value;
 }
 
 namespace swift {
+  class ProtocolDecl;
   class CanType;
+  class Decl;
 
 namespace irgen {
   class IRGenFunction;
+  class LocalTypeDataKey;
 
 /// A path from one source metadata --- either Swift type metadata or a Swift
 /// protocol conformance --- to another.
@@ -38,15 +42,14 @@ class MetadataPath {
     enum class Kind {
       // Some components carry indices.
       // P means the primary index.
-      // S means the secondary index.
 
-      /// Protocol conformance S of type argument P of a generic nominal type.
+      /// Base protocol P of a protocol.
+      InheritedProtocol,
+
+      /// Witness table at requirement index P of a generic nominal type.
       NominalTypeArgumentConformance,
-      LastWithSecondaryIndex = NominalTypeArgumentConformance,
 
-      // Everything past this point has at most one index.
-
-      /// Type argument P of a generic nominal type.
+      /// Type metadata at requirement index P of a generic nominal type.
       NominalTypeArgument,
       LastWithPrimaryIndex = NominalTypeArgument,
 
@@ -61,7 +64,6 @@ class MetadataPath {
 
   private:
     unsigned Primary;
-    unsigned Secondary;
     enum {
       KindMask = 0xF,
       IndexShift = 4,
@@ -69,38 +71,23 @@ class MetadataPath {
     static bool hasPrimaryIndex(Kind kind) {
       return kind <= Kind::LastWithPrimaryIndex;
     }
-    static bool hasSecondaryIndex(Kind kind) {
-      return kind <= Kind::LastWithSecondaryIndex;
-    }
 
-    explicit Component(unsigned primary, unsigned secondary)
-        : Primary(primary), Secondary(secondary) {}
+    explicit Component(unsigned primary)
+        : Primary(primary) {}
   public:
     explicit Component(Kind kind) 
-        : Primary(unsigned(kind)), Secondary(0) {
+        : Primary(unsigned(kind)) {
       assert(!hasPrimaryIndex(kind));
     }
     explicit Component(Kind kind, unsigned primaryIndex)
-        : Primary(unsigned(kind) | (primaryIndex << IndexShift)),
-          Secondary(0) {
+        : Primary(unsigned(kind) | (primaryIndex << IndexShift)) {
       assert(hasPrimaryIndex(kind));
-      assert(!hasSecondaryIndex(kind));
-    }
-    explicit Component(Kind kind, unsigned primaryIndex,
-                       unsigned secondaryIndex)
-        : Primary(unsigned(kind) | (primaryIndex << IndexShift)),
-          Secondary(secondaryIndex) {
-      assert(hasSecondaryIndex(kind));
     }
 
     Kind getKind() const { return Kind(Primary & KindMask); }
     unsigned getPrimaryIndex() const {
       assert(hasPrimaryIndex(getKind()));
       return (Primary >> IndexShift);
-    }
-    unsigned getSecondaryIndex() const {
-      assert(hasSecondaryIndex(getKind()));
-      return (Secondary);
     }
 
     /// Return an abstract measurement of the cost of this component.
@@ -114,22 +101,15 @@ class MetadataPath {
 
     static Component decode(const EncodedSequenceBase::Chunk *&ptr) {
       unsigned primary = EncodedSequenceBase::decodeIndex(ptr);
-      unsigned secondary =
-        (hasSecondaryIndex(Kind(primary & KindMask))
-            ? EncodedSequenceBase::decodeIndex(ptr) : 0);
-      return Component(primary, secondary);
+      return Component(primary);
     }
 
     void encode(EncodedSequenceBase::Chunk *&ptr) const {
       EncodedSequenceBase::encodeIndex(Primary, ptr);
-      if (hasSecondaryIndex(getKind()))
-        EncodedSequenceBase::encodeIndex(Secondary, ptr);
     }
 
     unsigned getEncodedSize() const {
       auto size = EncodedSequenceBase::getEncodedIndexSize(Primary);
-      if (hasSecondaryIndex(getKind()))
-        size += EncodedSequenceBase::getEncodedIndexSize(Secondary);
       return size;
     }
   };
@@ -154,18 +134,25 @@ public:
     Path.push_back(Component(Component::Kind::NominalParent));
   }
 
-  /// Add a step to this path which gets the nth type argument of a generic
-  /// type metadata.
+  /// Add a step to this path which gets the type metadata stored at
+  /// requirement index n in a generic type metadata.
   void addNominalTypeArgumentComponent(unsigned index) {
     Path.push_back(Component(Component::Kind::NominalTypeArgument, index));
   }
 
-  /// Add a step to this path which gets the kth protocol conformance of
-  /// the nth type argument of a generic type metadata.
-  void addNominalTypeArgumentConformanceComponent(unsigned argIndex,
-                                                  unsigned conformanceIndex) {
+  /// Add a step to this path which gets the protocol witness table
+  /// stored at requirement index n in a generic type metadata.
+  void addNominalTypeArgumentConformanceComponent(unsigned index) {
     Path.push_back(Component(Component::Kind::NominalTypeArgumentConformance,
-                             argIndex, conformanceIndex));
+                             index));
+  }
+
+  /// Add a step to this path which gets the kth inherited protocol from a
+  /// witness table.
+  ///
+  /// k is computed including protocols which do not have witness tables.
+  void addInheritedProtocolComponent(unsigned index) {
+    Path.push_back(Component(Component::Kind::InheritedProtocol, index));
   }
 
   /// Return an abstract measurement of the cost of this path.
@@ -184,22 +171,52 @@ public:
 
   /// Given a pointer to a protocol witness table, follow a path from it.
   llvm::Value *followFromWitnessTable(IRGenFunction &IGF,
-                                      ProtocolDecl *sourceDecl,
+                                      CanType conformingType,
+                                      ProtocolConformanceRef conformance,
                                       llvm::Value *source,
                                       Map<llvm::Value*> *cache) const;
 
+  template <typename Allocator>
+  const reflection::MetadataSource *
+  getMetadataSource(Allocator &A,
+                    const reflection::MetadataSource *Root) const {
+    if (Root == nullptr)
+      return nullptr;
+
+    for (auto C : Path) {
+      switch (C.getKind()) {
+      case Component::Kind::NominalParent:
+        Root = A.template createParent(Root);
+        continue;
+      case Component::Kind::NominalTypeArgument:
+        Root = A.template createGenericArgument(C.getPrimaryIndex(), Root);
+        continue;
+      default:
+        return nullptr;
+      }
+    }
+    return Root;
+  }
+
+  void dump() const;
+  void print(llvm::raw_ostream &out) const;
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
+                                       const MetadataPath &path) {
+    path.print(out);
+    return out;
+  }
+
 private:
   static llvm::Value *follow(IRGenFunction &IGF,
-                             CanType sourceType,
-                             Decl *sourceDecl,
+                             LocalTypeDataKey key,
                              llvm::Value *source,
                              MetadataPath::iterator begin,
                              MetadataPath::iterator end,
                              Map<llvm::Value*> *cache);
 
+  /// Follow a single component of a metadata path.
   static llvm::Value *followComponent(IRGenFunction &IGF,
-                                      CanType &sourceType,
-                                      Decl *&sourceDecl,
+                                      LocalTypeDataKey &key,
                                       llvm::Value *source,
                                       Component component);
 };

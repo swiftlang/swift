@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,12 +20,12 @@
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Decl.h"
 #include "swift/SIL/TypeLowering.h"
+#include "GenericRequirement.h"
 #include "GenProto.h"
+#include "IRGenModule.h"
 
 namespace swift {
 namespace irgen {
-
-class IRGenModule;
 
 /// A CRTP class for laying out type metadata.  Note that this does
 /// *not* handle the metadata template stuff.
@@ -54,36 +54,37 @@ public:
   /// fields.  e.g., if B<T> extends A<T>, the witness for T in A's
   /// section should be enough.
   template <class... T>
-  void addGenericFields(const GenericParamList &generics,
+  void addGenericFields(NominalTypeDecl *typeDecl, Type type,
                         T &&...args) {
     // The archetype order here needs to be consistent with
     // NominalTypeDescriptorBase::addGenericParams.
     
-    // Note that we intentionally don't forward the generic arguments.
+    // Note that we intentionally don't std::forward 'args'.
+    asImpl().noteStartOfGenericRequirements(args...);
 
-    // Add all the primary archetypes.
-    // TODO: only the *primary* archetypes.
-    // TODO: not archetypes from outer contexts.
-    for (auto archetype : generics.getAllArchetypes()) {
-      asImpl().addGenericArgument(archetype, args...);
-    }
+    GenericTypeRequirements requirements(IGM, typeDecl);
+    if (requirements.empty()) return;
 
-    // Add protocol witness tables for those archetypes.
-    for (auto archetype : generics.getAllArchetypes()) {
-      asImpl().beginGenericWitnessTables(archetype, args...);
-      for (auto protocol : archetype->getConformsTo()) {
-        if (Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-          asImpl().addGenericWitnessTable(archetype, protocol, args...);
+    auto subs = type->castTo<BoundGenericType>()
+                    ->gatherAllSubstitutions(IGM.getSwiftModule(), nullptr);
+    requirements.enumerateFulfillments(IGM, subs,
+                    [&](unsigned reqtIndex, CanType argType,
+                        Optional<ProtocolConformanceRef> conf) {
+      if (conf) {
+        asImpl().addGenericWitnessTable(argType, *conf, args...);
+      } else {
+        asImpl().addGenericArgument(argType, args...);
       }
-      asImpl().endGenericWitnessTables(archetype, args...);
-    }
+    });
+
+    asImpl().noteEndOfGenericRequirements(args...);
   }
 
   template <class... T>
-  void beginGenericWitnessTables(ArchetypeType *type, T &&...args) {}
+  void noteStartOfGenericRequirements(T &&...args) {}
 
   template <class... T>
-  void endGenericWitnessTables(ArchetypeType *type, T &&...args) {}
+  void noteEndOfGenericRequirements(T &&...args) {}
 };
 
 } // end namespace irgen

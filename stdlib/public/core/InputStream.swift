@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,15 +16,14 @@ import SwiftShims
 /// current line or until EOF is reached, or `nil` if EOF has already been
 /// reached.
 ///
-/// If `stripNewline` is `true`, newline characters and character
+/// If `strippingNewline` is `true`, newline characters and character
 /// combinations will be stripped from the result.  This is the default.
 ///
 /// Standard input is interpreted as `UTF-8`.  Invalid bytes
 /// will be replaced by Unicode [replacement characters](http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character).
-@warn_unused_result
-public func readLine(stripNewline stripNewline: Bool = true) -> String? {
-  var linePtr: UnsafeMutablePointer<CChar> = nil
-  var readBytes = swift_stdlib_readLine_stdin(&linePtr)
+public func readLine(strippingNewline: Bool = true) -> String? {
+  var linePtrVar: UnsafeMutablePointer<CChar>? = nil
+  var readBytes = swift_stdlib_readLine_stdin(&linePtrVar)
   if readBytes == -1 {
     return nil
   }
@@ -33,15 +32,17 @@ public func readLine(stripNewline stripNewline: Bool = true) -> String? {
   if readBytes == 0 {
     return ""
   }
-  if stripNewline {
+
+  let linePtr = linePtrVar!
+  if strippingNewline {
     // FIXME: Unicode conformance.  To fix this, we need to reimplement the
     // code we call above to get a line, since it will only stop on LF.
     //
     // <rdar://problem/20013999> Recognize Unicode newlines in readLine()
     //
     // Recognize only LF and CR+LF combinations for now.
-    let cr = CChar(_ascii8("\r"))
-    let lf = CChar(_ascii8("\n"))
+    let cr = CChar(UInt8(ascii: "\r"))
+    let lf = CChar(UInt8(ascii: "\n"))
     if readBytes == 1 && linePtr[0] == lf {
       return ""
     }
@@ -65,4 +66,3 @@ public func readLine(stripNewline stripNewline: Bool = true) -> String? {
   _swift_stdlib_free(linePtr)
   return result
 }
-

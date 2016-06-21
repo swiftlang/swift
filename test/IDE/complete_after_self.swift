@@ -36,7 +36,7 @@ class ThisBase1 {
   var baseInstanceVar: Int
 
   func baseFunc0() {}
-  func baseFunc1(a: Int) {}
+  func baseFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
     get {
@@ -96,7 +96,7 @@ class ThisDerived1 : ThisBase1 {
     }
   }
 
-  subscript(#s: String) -> Int {
+  subscript(s s: String) -> Int {
     get {
       return 0
     }

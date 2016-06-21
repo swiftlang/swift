@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -13,10 +13,12 @@
 import SwiftShims
 typealias _HeapObject = SwiftShims.HeapObject
 
-@warn_unused_result
 @_silgen_name("swift_bufferAllocate")
-func _swift_bufferAllocate(
-  bufferType: AnyClass, _ size: Int, _ alignMask: Int) -> AnyObject
+internal func _swift_bufferAllocate(
+  bufferType type: AnyClass,
+  size: Int,
+  alignmentMask: Int
+) -> AnyObject
 
 /// A class containing an ivar "value" of type Value, and
 /// containing storage for an array of Element whose size is
@@ -38,18 +40,17 @@ func _swift_bufferAllocate(
 /// either in a derived class, or it can be in some manager object
 /// that owns the _HeapBuffer.
 public // @testable (test/Prototypes/MutableIndexableDict.swift)
-class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
+class _HeapBufferStorage<Value, Element> : NonObjectiveCBase {
   public override init() {}
 
   /// The type used to actually manage instances of
-  /// `_HeapBufferStorage<Value,Element>`.
+  /// `_HeapBufferStorage<Value, Element>`.
   typealias Buffer = _HeapBuffer<Value, Element>
   deinit {
-    Buffer(self)._value.destroy()
+    Buffer(self)._value.deinitialize()
   }
 
-  @warn_unused_result
-  final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+  final func __getInstanceSizeAndAlignMask() -> (Int, Int) {
     return Buffer(self)._allocatedSizeAndAlignMask()
   }
 }
@@ -62,26 +63,26 @@ struct _HeapBuffer<Value, Element> : Equatable {
 
   // _storage is passed inout to _isUnique.  Although its value
   // is unchanged, it must appear mutable to the optimizer.
-  var _storage: Builtin.NativeObject?
+  internal var _storage: Builtin.NativeObject?
 
   public // @testable
   var storage: AnyObject? {
     return _storage.map { Builtin.castFromNativeObject($0) }
   }
 
-  @warn_unused_result
-  static func _valueOffset() -> Int {
-    return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
+  internal static func _valueOffset() -> Int {
+    return _roundUp(
+      sizeof(_HeapObject.self),
+      toAlignment: alignof(Value.self))
   }
 
-  @warn_unused_result
-  static func _elementOffset() -> Int {
-    return _roundUpToAlignment(_valueOffset() + sizeof(Value.self),
-        alignof(Element.self))
+  internal static func _elementOffset() -> Int {
+    return _roundUp(
+      _valueOffset() + sizeof(Value.self),
+      toAlignment: alignof(Element.self))
   }
 
-  @warn_unused_result
-  static func _requiredAlignMask() -> Int {
+  internal static func _requiredAlignMask() -> Int {
     // We can't use max here because it can allocate an array.
     let heapAlign = alignof(_HeapObject.self) &- 1
     let valueAlign = alignof(Value.self) &- 1
@@ -91,12 +92,12 @@ struct _HeapBuffer<Value, Element> : Equatable {
             : (heapAlign < elementAlign ? elementAlign : heapAlign))
   }
 
-  var _address: UnsafeMutablePointer<Int8> {
+  internal var _address: UnsafeMutablePointer<Int8> {
     return UnsafeMutablePointer(
       Builtin.bridgeToRawPointer(self._nativeObject))
   }
 
-  var _value: UnsafeMutablePointer<Value> {
+  internal var _value: UnsafeMutablePointer<Value> {
     return UnsafeMutablePointer(
       _HeapBuffer._valueOffset() + _address)
   }
@@ -106,38 +107,34 @@ struct _HeapBuffer<Value, Element> : Equatable {
     return UnsafeMutablePointer(_HeapBuffer._elementOffset() + _address)
   }
 
-  @warn_unused_result
-  func _allocatedSize() -> Int {
+  internal func _allocatedSize() -> Int {
     return _swift_stdlib_malloc_size(_address)
   }
 
-  @warn_unused_result
-  func _allocatedAlignMask() -> Int {
+  internal func _allocatedAlignMask() -> Int {
     return _HeapBuffer._requiredAlignMask()
   }
 
-  @warn_unused_result
-  func _allocatedSizeAndAlignMask() -> (Int, Int) {
+  internal func _allocatedSizeAndAlignMask() -> (Int, Int) {
     return (_allocatedSize(), _allocatedAlignMask())
   }
 
-  /// Return the actual number of `Elements` we can possibly store.
-  @warn_unused_result
-  func _capacity() -> Int {
+  /// Returns the actual number of `Elements` we can possibly store.
+  internal func _capacity() -> Int {
     return (_allocatedSize() - _HeapBuffer._elementOffset())
       / strideof(Element.self)
   }
 
-  init() {
-    self._storage = .None
+  internal init() {
+    self._storage = nil
   }
 
   public // @testable
-  init(_ storage: _HeapBufferStorage<Value,Element>) {
+  init(_ storage: _HeapBufferStorage<Value, Element>) {
     self._storage = Builtin.castToNativeObject(storage)
   }
 
-  init(_ storage: AnyObject) {
+  internal init(_ storage: AnyObject) {
     _sanityCheck(
       _usesNativeSwiftReferenceCounting(storage.dynamicType),
       "HeapBuffer manages only native objects"
@@ -145,11 +142,11 @@ struct _HeapBuffer<Value, Element> : Equatable {
     self._storage = Builtin.castToNativeObject(storage)
   }
 
-  init<T : AnyObject>(_ storage: T?) {
+  internal init<T : AnyObject>(_ storage: T?) {
     self = storage.map { _HeapBuffer($0) } ?? _HeapBuffer()
   }
 
-  init(nativeStorage: Builtin.NativeObject?) {
+  internal init(nativeStorage: Builtin.NativeObject?) {
     self._storage = nativeStorage
   }
 
@@ -171,13 +168,15 @@ struct _HeapBuffer<Value, Element> : Equatable {
     let alignMask = _HeapBuffer._requiredAlignMask()
 
     let object: AnyObject = _swift_bufferAllocate(
-      storageClass, totalSize, alignMask)
+      bufferType: storageClass,
+      size: totalSize,
+      alignmentMask: alignMask)
     self._storage = Builtin.castToNativeObject(object)
-    self._value.initialize(initializer)
+    self._value.initialize(with: initializer)
   }
 
   public // @testable
-  var value : Value {
+  var value: Value {
     unsafeAddress {
       return UnsafePointer(_value)
     }
@@ -187,11 +186,11 @@ struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   /// `true` if storage is non-`nil`.
-  var hasStorage: Bool {
+  internal var hasStorage: Bool {
     return _storage != nil
   }
 
-  subscript(i: Int) -> Element {
+  internal subscript(i: Int) -> Element {
     unsafeAddress {
       return UnsafePointer(baseAddress + i)
     }
@@ -200,22 +199,19 @@ struct _HeapBuffer<Value, Element> : Equatable {
     }
   }
 
-  var _nativeObject: Builtin.NativeObject {
+  internal var _nativeObject: Builtin.NativeObject {
     return _storage!
   }
 
-  @warn_unused_result
-  static func fromNativeObject(x: Builtin.NativeObject) -> _HeapBuffer {
+  internal static func fromNativeObject(_ x: Builtin.NativeObject) -> _HeapBuffer {
     return _HeapBuffer(nativeStorage: x)
   }
 
-  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferenced() -> Bool {
     return _isUnique(&_storage)
   }
 
-  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferencedOrPinned() -> Bool {
     return _isUniqueOrPinned(&_storage)
@@ -223,11 +219,9 @@ struct _HeapBuffer<Value, Element> : Equatable {
 }
 
 // HeapBuffers are equal when they reference the same buffer
-@warn_unused_result
 public // @testable
 func == <Value, Element> (
   lhs: _HeapBuffer<Value, Element>,
   rhs: _HeapBuffer<Value, Element>) -> Bool {
   return lhs._nativeObject == rhs._nativeObject
 }
-

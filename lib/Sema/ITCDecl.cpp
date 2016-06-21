@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,9 +22,9 @@
 #include <tuple>
 using namespace swift;
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Inheritance clause handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 static std::tuple<TypeResolutionOptions, DeclContext *,
                   MutableArrayRef<TypeLoc>>
 decomposeInheritedClauseDecl(
@@ -116,9 +116,9 @@ bool IterativeTypeChecker::breakCycleForResolveInheritedClauseEntry(
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Superclass handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isTypeCheckSuperclassSatisfied(ClassDecl *payload) {
   return payload->LazySemanticInfo.Superclass.getInt();
 }
@@ -162,9 +162,9 @@ bool IterativeTypeChecker::breakCycleForTypeCheckSuperclass(
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Raw type handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isTypeCheckRawTypeSatisfied(EnumDecl *payload) {
   return payload->LazySemanticInfo.RawType.getInt();
 }
@@ -205,9 +205,9 @@ bool IterativeTypeChecker::breakCycleForTypeCheckRawType(EnumDecl *enumDecl) {
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Inherited protocols
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isInheritedProtocolsSatisfied(ProtocolDecl *payload){
   return payload->isInheritedProtocolsValid();
 }
@@ -244,10 +244,6 @@ void IterativeTypeChecker::processInheritedProtocols(
   if (anyDependencies)
     return;
 
-  // FIXME: Hack to deal with recursion elsewhere.
-  if (protocol->isInheritedProtocolsValid())
-    return;
-
   // Check for circular inheritance.
   // FIXME: The diagnostics here should be improved... and this should probably
   // be handled by the normal cycle detection.
@@ -255,7 +251,8 @@ void IterativeTypeChecker::processInheritedProtocols(
   for (unsigned i = 0, n = allProtocols.size(); i != n; /*in loop*/) {
     if (allProtocols[i] == protocol ||
         allProtocols[i]->inheritsFrom(protocol)) {
-      if (!diagnosedCircularity) {
+      if (!diagnosedCircularity &&
+          !protocol->isInheritedProtocolsValid()) {
         diagnose(protocol,
                  diag::circular_protocol_def, protocol->getName().str());
         diagnosedCircularity = true;
@@ -269,6 +266,12 @@ void IterativeTypeChecker::processInheritedProtocols(
     ++i;
   }
 
+  // FIXME: Hack to deal with recursion elsewhere.
+  // We recurse through DeclContext::getLocalProtocols() -- this should be
+  // redone to use the IterativeDeclChecker also.
+  if (protocol->isInheritedProtocolsValid())
+    return;
+
   protocol->setInheritedProtocols(getASTContext().AllocateCopy(allProtocols));
 }
 
@@ -280,9 +283,9 @@ bool IterativeTypeChecker::breakCycleForInheritedProtocols(
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Resolve a type declaration
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     // If the underlying type was validated, we're done.
@@ -300,7 +303,7 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
 
   // Nominal types.
   auto nominal = cast<NominalTypeDecl>(typeDecl);
-  return !nominal->getDeclaredType().isNull();
+  return nominal->hasType();
 }
 
 void IterativeTypeChecker::processResolveTypeDecl(

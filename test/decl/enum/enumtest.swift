@@ -6,52 +6,52 @@
 
 
 public enum unionSearchFlags {
-  case None
-  case Backwards
-  case Anchored
+  case none
+  case backwards
+  case anchored
 
-  init() { self = .None }
+  init() { self = .none }
 }
 
 func test1() -> unionSearchFlags {
   let _ : unionSearchFlags
-  var b = unionSearchFlags.None
-  b = unionSearchFlags.Anchored
+  var b = unionSearchFlags.none
+  b = unionSearchFlags.anchored
   _ = b
 
-  return unionSearchFlags.Backwards
+  return unionSearchFlags.backwards
 }
 
 func test1a() -> unionSearchFlags {
   var _ : unionSearchFlags
-  var b : unionSearchFlags = .None
-  b = .Anchored
+  var b : unionSearchFlags = .none
+  b = .anchored
   _ = b
 
-  // ForwardIndexType use of MaybeInt.
-  _ = MaybeInt.None
+  // ForwardIndex use of MaybeInt.
+  _ = MaybeInt.none
 
-  return .Backwards
+  return .backwards
 }
 
-func test1b(b : Bool) {
+func test1b(_ b : Bool) {
   _ = 123
   _ = .description == 1 // expected-error{{type of expression is ambiguous without more context}} 
 }
 
 enum MaybeInt {
-  case None
-  case Some(Int)
+  case none
+  case some(Int)
 
-  init(_ i: Int) { self = MaybeInt.Some(i) }
+  init(_ i: Int) { self = MaybeInt.some(i) }
 }
 
-func test2(a: Int, _ b: Int, _ c: MaybeInt) {
-  _ = MaybeInt.Some(4)
-  _ = MaybeInt.Some
-  _ = MaybeInt.Some(b)
+func test2(_ a: Int, _ b: Int, _ c: MaybeInt) {
+  _ = MaybeInt.some(4)
+  _ = MaybeInt.some
+  _ = MaybeInt.some(b)
 
-  test2(1, 2, .None)
+  test2(1, 2, .none)
 }
 
 enum ZeroOneTwoThree {
@@ -66,19 +66,21 @@ enum ZeroOneTwoThree {
   init (_ i: MaybeInt, _ j: MaybeInt, _ k: MaybeInt) { self = .Unknown(i, j, k) }
 }
 
-func test3(a: ZeroOneTwoThree) {
+func test3(_ a: ZeroOneTwoThree) {
   _ = ZeroOneTwoThree.Three(1,2,3)
-  _ = ZeroOneTwoThree.Unknown(MaybeInt.None, MaybeInt.Some(4),
-                                  MaybeInt.Some(32))
-  _ = ZeroOneTwoThree(MaybeInt.None, MaybeInt(4), MaybeInt(32))
+  _ = ZeroOneTwoThree.Unknown(
+    MaybeInt.none, MaybeInt.some(4), MaybeInt.some(32))
+  _ = ZeroOneTwoThree(MaybeInt.none, MaybeInt(4), MaybeInt(32))
 
   var _ : Int =
      ZeroOneTwoThree.Zero // expected-error {{cannot convert value of type 'ZeroOneTwoThree' to specified type 'Int'}}
 
+  // expected-warning @+1 {{unused}}
   test3 ZeroOneTwoThree.Zero // expected-error {{expression resolves to an unused function}} expected-error{{consecutive statements}} {{8-8=;}}
   test3 (ZeroOneTwoThree.Zero)
   test3(ZeroOneTwoThree.Zero)
   test3 // expected-error {{expression resolves to an unused function}}
+  // expected-warning @+1 {{unused}}
   (ZeroOneTwoThree.Zero)
   
   var _ : ZeroOneTwoThree = .One(4)
@@ -87,25 +89,25 @@ func test3(a: ZeroOneTwoThree) {
   var _ : Int = .Two // expected-error{{type 'Int' has no member 'Two'}}
 }
 
-func test3a(a: ZeroOneTwoThree) {
+func test3a(_ a: ZeroOneTwoThree) {
   var e : ZeroOneTwoThree = (.Three(1, 2, 3))
-  var f = ZeroOneTwoThree.Unknown(.None, .Some(4), .Some(32))
+  var f = ZeroOneTwoThree.Unknown(.none, .some(4), .some(32))
 
-  var g = .None  // expected-error {{type of expression is ambiguous without more context}}
+  var g = .none  // expected-error {{reference to member 'none' cannot be resolved without a contextual type}}
 
   // Overload resolution can resolve this to the right constructor.
   var h = ZeroOneTwoThree(1)
 
   test3a;  // expected-error {{unused function}}
-  .Zero   // expected-error {{type of expression is ambiguous without more context}}
+  .Zero   // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}
   test3a   // expected-error {{unused function}}
-  (.Zero) // expected-error {{type of expression is ambiguous without more context}}
+  (.Zero) // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}
   test3a(.Zero)
 }
 
 
 struct CGPoint { var x : Int, y : Int }
-typealias OtherPoint = ( x : Int, y : Int)
+typealias OtherPoint = (x : Int, y : Int)
 
 func test4() {
   var a : CGPoint
@@ -141,20 +143,20 @@ struct CGRect {
   }
 }
 
-func area(r: CGRect) -> Int {
+func area(_ r: CGRect) -> Int {
   return r.size.area()
 }
 
 extension CGRect {
-  func search(x: Int) -> CGSize {}
+  func search(_ x: Int) -> CGSize {}
   func bad_search(_: Int) -> CGSize {}
 }
 
-func test5(myorigin: CGPoint) {
+func test5(_ myorigin: CGPoint) {
   let x1 = CGRect(origin: myorigin, size: CGSize(width: 42, height: 123))
   let x2 = x1
 
-  4+5
+  _ = 4+5
 
   // Dot syntax.
   _ = x2.origin.x
@@ -172,7 +174,7 @@ func test5(myorigin: CGPoint) {
   // var (CGSize(width, height)) = CGSize(1,2)
 
   // TODO: something like this, how do we get it in scope in the {} block?
-  //if (var Some(x) = somemaybeint) { ... }
+  //if (var some(x) = somemaybeint) { ... }
 
   
 }
@@ -216,7 +218,7 @@ func f() {
   var _ : (UnionTest1) -> () -> () = UnionTest1.bar
 }
 
-func union_error(a: ZeroOneTwoThree) {
+func union_error(_ a: ZeroOneTwoThree) {
   var _ : ZeroOneTwoThree = .Zero(1) // expected-error {{contextual member 'Zero' has no associated value}}
   var _ : ZeroOneTwoThree = .One // expected-error {{contextual member 'One' expects argument of type 'Int'}}
   var _ : ZeroOneTwoThree = .foo // expected-error {{type 'ZeroOneTwoThree' has no member 'foo'}}
@@ -236,12 +238,12 @@ struct distance { var v : Int }
 func - (lhs: distance, rhs: distance) -> distance {}
 
 extension Int {
-  func km() -> distance {}
-  func cm() -> distance {}
+  func km() -> enumtest.distance {}
+  func cm() -> enumtest.distance {}
 }
 
-func units(x: Int) -> distance {
-  x.km() - 4.cm() - 42.km()
+func units(_ x: Int) -> distance {
+  return x.km() - 4.cm() - 42.km()
 }
 
 
@@ -267,11 +269,11 @@ func testDirection() {
   switch dir {
   case .North(let x):
     i = x
-    break;
+    break
 
   case .NorthEast(let x):
     i = x.distanceEast
-    break;
+    break
   }
   _ = i
 }
@@ -287,8 +289,19 @@ enum SimpleEnum {
 func testSimpleEnum() {
   let _ : SimpleEnum = .X
   let _ : SimpleEnum = (.X)
-  let _ : SimpleEnum=.X    // expected-error {{postfix '=' is reserved}}
+  let _ : SimpleEnum=.X    // expected-error {{'=' must have consistent whitespace on both sides}}
+}
+
+enum SR510: String {
+    case Thing = "thing"
+    case Bob = {"test"} // expected-error {{raw value for enum case must be a literal}}
 }
 
 
+// <rdar://problem/21269142> Diagnostic should say why enum has no .rawValue member
+enum E21269142 {  // expected-note {{did you mean to specify a raw type on the enum declaration?}}
+  case Foo
+}
+
+print(E21269142.Foo.rawValue)  // expected-error {{value of type 'E21269142' has no member 'rawValue'}}
 

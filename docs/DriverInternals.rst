@@ -108,8 +108,8 @@ be run, the Compilation keeps track of a DependencyGraph. (If file A depends on
 file B and file B has changed, file A needs to be recompiled.) When a Job
 completes successfully, the Compilation will both re-attempt to schedule Jobs
 that were directly blocked on it, and check to see if any other Jobs now need
-to run based on the DependencyGraph. See the section on :doc:`Dependency
-Analysis` for more information.
+to run based on the DependencyGraph. See the section on :doc:`DependencyAnalysis`
+for more information.
 
 The Compilation's TaskQueue controls the low-level aspects of managing
 subprocesses. Multiple Jobs may execute simultaneously, but communication with

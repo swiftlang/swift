@@ -4,23 +4,23 @@
 
 @_exported import macros
 
-func circle_area(radius: CDouble) -> CDouble {
+func circle_area(_ radius: CDouble) -> CDouble {
   return M_PI * radius * radius
 }
 
-func circle_area2(radius: CDouble) -> CDouble {
+func circle_area2(_ radius: CDouble) -> CDouble {
   return A_PI * radius * radius
 }
 
-func circle_area3(radius: CFloat) -> CFloat {
+func circle_area3(_ radius: CFloat) -> CFloat {
   return M_PIf * radius * radius
 }
 
-func convertGLBool(b: CInt) -> Bool {
+func convertGLBool(_ b: CInt) -> Bool {
   return b != GL_FALSE
 }
 
-func pixelFormat(alpha: Bool) -> CInt {
+func pixelFormat(_ alpha: Bool) -> CInt {
   if alpha {
     return GL_RGBA
   } else {
@@ -28,19 +28,19 @@ func pixelFormat(alpha: Bool) -> CInt {
   }
 }
 
-func boundsCheckU32(x: CUnsignedInt) -> Bool {
+func boundsCheckU32(_ x: CUnsignedInt) -> Bool {
   return x >= 0 && x <= UINT32_MAX
 }
 
-func boundsCheckS64(x: CLongLong) -> Bool {
+func boundsCheckS64(_ x: CLongLong) -> Bool {
   return x <= INT64_MAX
 }
 
-func isEOF(c: CInt) -> Bool {
+func isEOF(_ c: CInt) -> Bool {
   return c == EOF
 }
 
-func subThree(x: CInt) -> CInt {
+func subThree(_ x: CInt) -> CInt {
   return x + MINUS_THREE
 }
 

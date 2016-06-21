@@ -1,8 +1,5 @@
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/CastTraps.swift
-// RUN: %S/../../utils/line-directive %t/CastTraps.swift -- %target-build-swift %t/CastTraps.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/CastTraps.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 // FIXME: Casting.cpp has dozens of places to fail a cast. This test does not 
@@ -11,6 +8,8 @@
 // XFAIL: linux
 
 import StdlibUnittest
+
+
 import Foundation
 
 
@@ -18,29 +17,29 @@ import Foundation
 % objectTypes = []
 % protocolTypes = []
 
-% types.append(['a.Class1', 'a.Class2'])
-% objectTypes.append(['a.Class1', 'a.Class2'])
+% types.append(['main.Class1', 'main.Class2'])
+% objectTypes.append(['main.Class1', 'main.Class2'])
 class Class1 { }
 class Class2 { }
 
-% types.append(['a.Struct1', 'a.Struct2'])
+% types.append(['main.Struct1', 'main.Struct2'])
 struct Struct1 { }
 struct Struct2 { }
 
-% types.append(['a.ObjCClass1', 'a.ObjCClass2'])
-% objectTypes.append(['a.ObjCClass1', 'a.ObjCClass2'])
+% types.append(['main.ObjCClass1', 'main.ObjCClass2'])
+% objectTypes.append(['main.ObjCClass1', 'main.ObjCClass2'])
 class ObjCClass1 : NSObject { }
 class ObjCClass2 : NSObject { }
 
-% types.append(['NSDateFormatter', 'NSNumberFormatter'])
-% objectTypes.append(['NSDateFormatter', 'NSNumberFormatter'])
+% types.append(['DateFormatter', 'NumberFormatter'])
+% objectTypes.append(['DateFormatter', 'NumberFormatter'])
 // non-Swift Objective-C class
 
-% protocolTypes.append('a.Proto1')
-% protocolTypes.append('a.Proto2')
+% protocolTypes.append('main.Proto1')
+% protocolTypes.append('main.Proto2')
 protocol Proto1 { }
 protocol Proto2 { }
-% protocolTypes.append('NSURLSessionDelegate')
+% protocolTypes.append('URLSessionDelegate')
 // non-Swift Objective-C protocol
 
 
@@ -53,11 +52,13 @@ var CastTrapsTestSuite = TestSuite("CastTraps")
 %   for (_, t2) in types:
 
 CastTrapsTestSuite.test("${t1}__${t2}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("Could not cast value of type '${t1}' ")
-  .crashOutputMatches(" to '${t2}'")
+  .crashOutputMatches("Could not cast value of type '")
+  .crashOutputMatches("${t1}' ")
+  .crashOutputMatches(" to '")
+  .crashOutputMatches("${t2}'")
   .code
 {
   let o = ${t1}() as Any
@@ -75,11 +76,13 @@ CastTrapsTestSuite.test("${t1}__${t2}")
 %   for (t2) in protocolTypes:
 
 CastTrapsTestSuite.test("${t1}__${t2}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("Could not cast value of type '${t1}' ")
-  .crashOutputMatches(" to '${t2}'")
+  .crashOutputMatches("Could not cast value of type '")
+  .crashOutputMatches("${t1}' ")
+  .crashOutputMatches(" to '")
+  .crashOutputMatches("${t2}'")
   .code
 {
   let o = ${t1}() as AnyObject

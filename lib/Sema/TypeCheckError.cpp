@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,7 +18,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/Attr.h"
 
 using namespace swift;
 
@@ -82,9 +81,6 @@ public:
   /// Whether the function is marked 'rethrows'.
   bool isBodyRethrows() const { return IsRethrows; }
 
-  /// The uncurry level that 'rethrows' applies to.
-  unsigned getNumBodyParameters() const { return ParamCount; }
-
   unsigned getNumArgumentsForFullApply() const {
     return (ParamCount - unsigned(IsProtocolMethod));
   }
@@ -140,6 +136,16 @@ public:
   static AbstractFunction decomposeFunction(Expr *fn) {
     assert(fn->getValueProvidingExpr() == fn);
 
+    // Look through Optional unwraps
+    while (true) {
+      if (auto conversion = dyn_cast<ForceValueExpr>(fn)) {
+        fn = conversion->getSubExpr()->getValueProvidingExpr();
+      } else if (auto conversion = dyn_cast<BindOptionalExpr>(fn)) {
+        fn = conversion->getSubExpr()->getValueProvidingExpr();
+      } else {
+        break;
+      }
+    }
     // Look through function conversions.
     while (auto conversion = dyn_cast<FunctionConversionExpr>(fn)) {
       fn = conversion->getSubExpr()->getValueProvidingExpr();
@@ -213,6 +219,8 @@ public:
       recurse = asImpl().checkDoCatch(doCatch);
     } else if (auto thr = dyn_cast<ThrowStmt>(S)) {
       recurse = asImpl().checkThrow(thr);
+    } else if (auto ic = dyn_cast<IfConfigStmt>(S)) {
+      recurse = asImpl().checkIfConfig(ic);
     } else {
       assert(!isa<CatchStmt>(S));
     }
@@ -220,13 +228,11 @@ public:
   }
 
   ShouldRecurse_t checkDoCatch(DoCatchStmt *S) {
-    if (S->isSyntacticallyExhaustive()) {
-      asImpl().checkExhaustiveDoBody(S);
-    } else {
-      asImpl().checkNonExhaustiveDoBody(S);
-    }
+    auto bodyResult = (S->isSyntacticallyExhaustive()
+        ? asImpl().checkExhaustiveDoBody(S)
+        : asImpl().checkNonExhaustiveDoBody(S));
     for (auto clause : S->getCatches()) {
-      asImpl().checkCatch(clause);
+      asImpl().checkCatch(clause, bodyResult);
     }
     return ShouldNotRecurse;
   }
@@ -303,7 +309,7 @@ enum class ThrowingKind {
   Throws,
 };
 
-/// A type expressing the result of classifying whether an call or function
+/// A type expressing the result of classifying whether a call or function
 /// throws.
 class Classification {
   ThrowingKind Result;
@@ -484,7 +490,7 @@ private:
 
   Classification classifyThrowingParameterBody(ParamDecl *param,
                                                PotentialReason reason) {
-    assert(param->getType()->castTo<AnyFunctionType>()->throws());
+    assert(param->getType()->lookThroughAllAnyOptionalTypes()->castTo<AnyFunctionType>()->throws());
 
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
@@ -572,12 +578,43 @@ private:
       Result = ThrowingKind::Throws;
       return ShouldRecurse;
     }
-    void checkExhaustiveDoBody(DoCatchStmt *S) {}
-    void checkNonExhaustiveDoBody(DoCatchStmt *S) {
-      S->getBody()->walk(*this);
+
+    ShouldRecurse_t checkIfConfig(IfConfigStmt *S) {
+      return ShouldRecurse;
     }
-    void checkCatch(CatchStmt *S) {
+
+    ThrowingKind checkExhaustiveDoBody(DoCatchStmt *S) {
+      // All errors thrown by the do body are caught, but any errors thrown
+      // by the catch bodies are bounded by the throwing kind of the do body.
+      auto savedResult = Result;
+      Result = ThrowingKind::None;
       S->getBody()->walk(*this);
+      auto doThrowingKind = Result;
+      Result = savedResult;
+      return doThrowingKind;
+    }
+
+    ThrowingKind checkNonExhaustiveDoBody(DoCatchStmt *S) {
+      S->getBody()->walk(*this);
+      // Because catch bodies can only be executed if the do body throws an
+      // error, and because the do is non-exhaustive, we can skip checking the
+      // catch bodies entirely.
+      return ThrowingKind::None;
+    }
+
+    void checkCatch(CatchStmt *S, ThrowingKind doThrowingKind) {
+      if (doThrowingKind != ThrowingKind::None) {
+        // This was an exhaustive do body, so bound our throwing kind by its
+        // throwing kind.
+        auto savedResult = Result;
+        Result = ThrowingKind::None;
+        S->getBody()->walk(*this);
+        auto boundedResult = std::min(doThrowingKind, Result);
+        Result = std::max(savedResult, boundedResult);
+      } else {
+        // We can skip the catch body, since bounding the result by None is
+        // guaranteed to give back None, which leaves our Result unchanged.
+      }
     }
   };
 
@@ -633,7 +670,7 @@ private:
 
     // Otherwise, if the original parameter type was not a throwing
     // function type, it does not contribute to 'rethrows'.
-    auto paramFnType = paramType->getAs<AnyFunctionType>();
+    auto paramFnType = paramType->lookThroughAllAnyOptionalTypes()->getAs<AnyFunctionType>();
     if (!paramFnType || !paramFnType->throws())
       return Classification();
 
@@ -1138,6 +1175,10 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
 
   ContextFlags Flags;
 
+  /// The maximum combined value of all throwing expressions in the current
+  /// context.
+  ThrowingKind MaxThrowingKind;
+
   void flagInvalidCode() {
     // Suppress warnings about useless try or catch.
     Flags.set(ContextFlags::HasAnyThrowSite);
@@ -1151,11 +1192,13 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
     Context OldContext;
     DeclContext *OldRethrowsDC;
     ContextFlags OldFlags;
+    ThrowingKind OldMaxThrowingKind;
   public:
     ContextScope(CheckErrorCoverage &self, Optional<Context> newContext)
       : Self(self), OldContext(self.CurContext),
         OldRethrowsDC(self.Classifier.RethrowsDC),
-        OldFlags(self.Flags) {
+        OldFlags(self.Flags),
+        OldMaxThrowingKind(self.MaxThrowingKind) {
       if (newContext) self.CurContext = *newContext;
     }
 
@@ -1178,10 +1221,12 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
 
     void resetCoverage() {
       Self.Flags.reset();
+      Self.MaxThrowingKind = ThrowingKind::None;
     }
 
     void resetCoverageForDoCatch() {
       Self.Flags.reset();
+      Self.MaxThrowingKind = ThrowingKind::None;
 
       // Suppress 'try' coverage checking within a single level of
       // do/catch in debugger functions.
@@ -1198,10 +1243,12 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
 
     void preserveCoverageFromNonExhaustiveCatch() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
+      OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
 
     void preserveCoverageFromTryOperand() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
+      OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
 
     bool wasTopLevelDebuggerFunction() const {
@@ -1212,12 +1259,14 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
       Self.CurContext = OldContext;
       Self.Classifier.RethrowsDC = OldRethrowsDC;
       Self.Flags = OldFlags;
+      Self.MaxThrowingKind = OldMaxThrowingKind;
     }
   };
 
 public:
   CheckErrorCoverage(TypeChecker &tc, Context initialContext)
-    : TC(tc), CurContext(initialContext) {
+    : TC(tc), CurContext(initialContext),
+      MaxThrowingKind(ThrowingKind::None) {
 
     if (auto rethrowsDC = initialContext.getRethrowsDC()) {
       Classifier.RethrowsDC = rethrowsDC;
@@ -1257,7 +1306,7 @@ private:
     return ShouldNotRecurse;
   }
 
-  void checkExhaustiveDoBody(DoCatchStmt *S) {
+  ThrowingKind checkExhaustiveDoBody(DoCatchStmt *S) {
     // This is a handled context.
     ContextScope scope(*this, Context::getHandled());
     assert(!Flags.has(ContextFlags::IsInTry) && "do/catch within try?");
@@ -1266,9 +1315,11 @@ private:
     S->getBody()->walk(*this);
 
     diagnoseNoThrowInDo(S, scope);
+
+    return MaxThrowingKind;
   }
 
-  void checkNonExhaustiveDoBody(DoCatchStmt *S) {
+  ThrowingKind checkNonExhaustiveDoBody(DoCatchStmt *S) {
     ContextScope scope(*this, None);
     assert(!Flags.has(ContextFlags::IsInTry) && "do/catch within try?");
     scope.resetCoverageForDoCatch();
@@ -1284,6 +1335,7 @@ private:
     diagnoseNoThrowInDo(S, scope);
 
     scope.preserveCoverageFromNonExhaustiveCatch();
+    return MaxThrowingKind;
   }
 
   void diagnoseNoThrowInDo(DoCatchStmt *S, ContextScope &scope) {
@@ -1296,7 +1348,7 @@ private:
     }
   }
 
-  void checkCatch(CatchStmt *S) {
+  void checkCatch(CatchStmt *S, ThrowingKind doThrowingKind) {
     // The pattern and guard aren't allowed to throw.
     {
       ContextScope scope(*this, Context::forCatchPattern(S));
@@ -1307,8 +1359,19 @@ private:
       guard->walk(*this);
     }
 
+    auto savedContext = CurContext;
+    if (doThrowingKind != ThrowingKind::Throws &&
+        CurContext.getKind() == Context::Kind::RethrowingFunction) {
+      // If this catch clause is reachable at all, it's because a function
+      // parameter throws. So let's temporarily set our context to Handled so
+      // the catch body is allowed to throw.
+      CurContext = Context::getHandled();
+    }
+
     // The catch body just happens in the enclosing context.
     S->getBody()->walk(*this);
+
+    CurContext = savedContext;
   }
 
   ShouldRecurse_t checkApply(ApplyExpr *E) {
@@ -1328,6 +1391,37 @@ private:
     return ShouldRecurse;
   }
 
+  ShouldRecurse_t checkIfConfig(IfConfigStmt *S) {
+    // Check the inactive regions of a #if block to disable warnings that may
+    // be due to platform specific code.
+    struct ConservativeThrowChecker : public ASTWalker {
+      CheckErrorCoverage &CEC;
+      ConservativeThrowChecker(CheckErrorCoverage &CEC) : CEC(CEC) {}
+      
+      Expr *walkToExprPost(Expr *E) override {
+        if (isa<TryExpr>(E))
+          CEC.Flags.set(ContextFlags::HasAnyThrowSite);
+        return E;
+      }
+      
+      Stmt *walkToStmtPost(Stmt *S) override {
+        if (isa<ThrowStmt>(S))
+          CEC.Flags.set(ContextFlags::HasAnyThrowSite);
+
+        return S;
+      }
+    };
+
+    for (auto &clause : S->getClauses()) {
+      // Active clauses are handled by the normal AST walk.
+      if (clause.isActive) continue;
+      
+      for (auto elt : clause.Elements)
+        elt.walk(ConservativeThrowChecker(*this));
+    }
+    return ShouldRecurse;
+  }
+
   ShouldRecurse_t checkThrow(ThrowStmt *S) {
     checkThrowSite(S, /*requiresTry*/ false,
                    Classification::forThrow(PotentialReason::forThrow()));
@@ -1336,6 +1430,8 @@ private:
 
   void checkThrowSite(ASTNode E, bool requiresTry,
                       const Classification &classification) {
+    MaxThrowingKind = std::max(MaxThrowingKind, classification.getResult());
+
     switch (classification.getResult()) {
     // Completely ignores sites that don't throw.
     case ThrowingKind::None:
@@ -1382,7 +1478,8 @@ private:
 
     // Warn about 'try' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
-      TC.diagnose(E->getTryLoc(), diag::no_throw_in_try);
+      if (!E->isImplicit())
+        TC.diagnose(E->getTryLoc(), diag::no_throw_in_try);
 
     // Diagnose all the call sites within a single unhandled 'try'
     // at the same time.

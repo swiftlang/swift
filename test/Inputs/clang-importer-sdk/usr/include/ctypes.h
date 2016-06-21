@@ -266,4 +266,8 @@ typedef struct ModRM {
 //===---
 void useArray(char x[4], char y[], char z[][8]);
 
+typedef double real_t __attribute__((availability(swift,unavailable,message="use double")));
+
+extern real_t realSin(real_t value);
+
 #endif

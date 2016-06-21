@@ -1,8 +1,8 @@
-//===--- SILSuccessor.cpp - Implementation of SILSuccessor.h ---------------==//
+//===--- SILSuccessor.cpp - Implementation of SILSuccessor.h --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -38,7 +38,7 @@ void SILSuccessor::operator=(SILBasicBlock *BB) {
   SuccessorBlock = BB;
 }
 
-// Derferencing the SuccIterator returns the predecessors SILBasicBlock.
+// Dereferencing the SuccIterator returns the predecessor's SILBasicBlock.
 SILBasicBlock *SILSuccessorIterator::operator*() {
   assert(Cur && "Can't deference end (or default constructed) iterator");
   return Cur->ContainingInst->getParent();

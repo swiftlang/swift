@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -137,9 +137,13 @@ public:
     Index = other.Index;
   }
 
-  void completeEmpty(IsPOD_t isPOD) {
+  void completeEmpty(IsPOD_t isPOD, Size byteOffset) {
     TheKind = unsigned(Kind::Empty);
     IsPOD = unsigned(isPOD);
+    // We still want to give empty fields an offset for use by things like
+    // ObjC ivar emission. We use the first field in a class layout as the
+    // instanceStart.
+    ByteOffset = byteOffset.getValue();
     Index = 0; // make a complete write of the bitfield
   }
 
@@ -187,7 +191,8 @@ public:
 
   /// Given that this element has a fixed offset, return that offset in bytes.
   Size getByteOffset() const {
-    assert(isCompleted() && getKind() == Kind::Fixed);
+    assert(isCompleted() &&
+           (getKind() == Kind::Fixed || getKind() == Kind::Empty));
     return Size(ByteOffset);
   }
 
@@ -384,6 +389,46 @@ Size getHeapHeaderSize(IRGenModule &IGM);
 
 void addHeapHeaderToLayout(IRGenModule &IGM, Size &size, Alignment &align,
                            SmallVectorImpl<llvm::Type*> &fieldTypes);
+
+/// Different policies for accessing a physical field.
+enum class FieldAccess : uint8_t {
+  /// Instance variable offsets are constant.
+  ConstantDirect,
+  
+  /// Instance variable offsets must be loaded from "direct offset"
+  /// global variables.
+  NonConstantDirect,
+  
+  /// Instance variable offsets are kept in fields in metadata, but
+  /// the offsets of those fields within the metadata are constant.
+  ConstantIndirect,
+  
+  /// Instance variable offsets are kept in fields in metadata, and
+  /// the offsets of those fields within the metadata must be loaded
+  /// from "indirect offset" global variables.
+  NonConstantIndirect
+};
+
+struct ClassLayout {
+  /// Lazily-initialized array of all fragile stored properties in the class
+  /// (including superclass stored properties).
+  ArrayRef<VarDecl*> AllStoredProperties;
+  /// Lazily-initialized array of all fragile stored properties inherited from
+  /// superclasses.
+  ArrayRef<VarDecl*> InheritedStoredProperties;
+  /// Lazily-initialized array of all field access methods.
+  ArrayRef<FieldAccess> AllFieldAccesses;
+  /// Does the class metadata require dynamic initialization.
+  bool MetadataRequiresDynamicInitialization;
+
+  unsigned getFieldIndex(VarDecl *field) const {
+    // FIXME: This is algorithmically terrible.
+    auto found = std::find(AllStoredProperties.begin(),
+                           AllStoredProperties.end(), field);
+    assert(found != AllStoredProperties.end() && "didn't find field in type?!");
+    return found - AllStoredProperties.begin();
+  }
+};
 
 } // end namespace irgen
 } // end namespace swift

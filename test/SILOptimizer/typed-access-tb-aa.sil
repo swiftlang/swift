@@ -1,0 +1,976 @@
+// RUN: %target-sil-opt %s -aa=typed-access-tb-aa -aa-dump -o /dev/null | FileCheck %s
+
+// REQUIRES: asserts
+
+import Builtin
+
+///////////////////////
+// Type Declarations //
+///////////////////////
+
+class foo {
+   deinit 
+  init()
+}
+
+class boo : foo {
+   deinit 
+  override init()
+}
+
+class baz : foo {
+   deinit 
+  override init()
+}
+
+class goo : boo {
+   deinit 
+  override init()
+}
+
+sil @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo
+sil @baz_init : $@convention(thin) (@thick baz.Type) -> @owned baz
+sil @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo 
+
+// CHECK-LABEL: no_parent_child_relation_reftype_tests
+// CHECK: PAIR #1.
+// CHECK-NEXT:   %0 = alloc_stack $boo
+// CHECK-NEXT:   %1 = alloc_stack $baz
+// CHECK-NEXT: NoAlias
+sil hidden @no_parent_child_relation_reftype_tests : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14 
+  %1 = alloc_stack $baz, var, name "b"                 // users: %9, %13 
+  %2 = function_ref @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo // user: %4
+  %3 = metatype $@thick boo.Type                  // user: %4
+  %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11 
+  store %4 to %0 : $*boo                        // id: %5
+  %6 = function_ref @baz_init : $@convention(thin) (@thick baz.Type) -> @owned baz // user: %8
+  %7 = metatype $@thick baz.Type                  // user: %8
+  %8 = apply %6(%7) : $@convention(thin) (@thick baz.Type) -> @owned baz // users: %9, %10 
+  store %8 to %1 : $*baz                        // id: %9
+  strong_release %8 : $baz                        // id: %10 
+  strong_release %4 : $boo                        // id: %11 
+  %12 = tuple ()                                  // user: %15 
+  dealloc_stack %1 : $*baz       // id: %13 
+  dealloc_stack %0 : $*boo       // id: %14 
+  return %12 : $()                                // id: %15 
+}
+
+// CHECK-LABEL: with_parent_child_relation_reftype_tests
+
+// CHECK: PAIR #33.
+// CHECK-NEXT:   %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo
+// CHECK-NEXT:   %8 = apply %6(%7) : $@convention(thin) (@thick goo.Type) -> @owned goo
+// CHECK-NEXT: MayAlias
+sil hidden @with_parent_child_relation_reftype_tests : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14 
+  %1 = alloc_stack $goo, var, name "b"                 // users: %9, %13 
+  %2 = function_ref @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo // user: %4
+  %3 = metatype $@thick boo.Type                  // user: %4
+  %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11 
+  store %4 to %0 : $*boo                        // id: %5
+  %6 = function_ref @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo // user: %8
+  %7 = metatype $@thick goo.Type                  // user: %8
+  %8 = apply %6(%7) : $@convention(thin) (@thick goo.Type) -> @owned goo // users: %9, %10 
+  store %8 to %1 : $*goo                        // id: %9
+  strong_release %8 : $goo                        // id: %10 
+  strong_release %4 : $boo                        // id: %11 
+  %12 = tuple ()                                  // user: %15 
+  dealloc_stack %1 : $*goo       // id: %13 
+  dealloc_stack %0 : $*boo       // id: %14 
+  return %12 : $()                                // id: %15 
+}
+
+// CHECK-LABEL: @builtin_test
+
+// Check that a raw pointer address may alias everything.
+// CHECK: PAIR #134.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #135.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #136.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #137.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %11 = project_box %4 : $@box Builtin.Int32
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #138.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #139.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %13 = project_box %6 : $@box Builtin.FPIEEE64
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #140.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %14 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #141.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %15 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #142.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %16 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #143.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %17 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #144.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %18 = project_box %4 : $@box Builtin.Int32
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #145.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %19 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #146.
+// CHECK-NEXT:   %7 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT:   %20 = project_box %6 : $@box Builtin.FPIEEE64
+// CHECK-NEXT: MayAlias
+
+// Now check that a native object address may:
+//
+// 1. May alias raw pointer addresses.
+// 2. Not alias an unknown object. Objective-C objects are allocated differently
+// than Swift objects and may not alias.
+// 3. Does not alias scalar addresses. This can only occur via inttoptr and the
+// like. Since we are using type oracles we are allowed to make the assumption
+// that this type of type punning can be ignored.
+// 4. May alias addresses to other Builtin.NativeObjects
+
+// CHECK: PAIR #149.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #150.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #151.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %11 = project_box %4 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #152.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #153.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %13 = project_box %6 : $@box Builtin.FPIEEE64
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #154.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %14 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #155.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %15 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #156.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %16 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #157.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %17 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #158.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %18 = project_box %4 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #159.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %19 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #160.
+// CHECK-NEXT:   %8 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT:   %20 = project_box %6 : $@box Builtin.FPIEEE64
+// CHECK-NEXT: NoAlias
+
+// Check that unknown object addresses may only alias raw pointer addresses and
+// other unknown object addresses. Anything else should be no alias.
+// CHECK: PAIR #163.
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #164.
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT:   %11 = project_box %4 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #165.
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #166.
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT:   %13 = project_box %6 : $@box Builtin.FPIEEE64
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #167.
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT:   %14 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #168.
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT:   %15 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #169.
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT:   %16 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #170.
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT:   %17 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #171.
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT:   %18 = project_box %4 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #172.
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT:   %19 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #173.
+// CHECK-NEXT:   %9 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT:   %20 = project_box %6 : $@box Builtin.FPIEEE64
+// CHECK-NEXT: NoAlias
+
+// Next check that Int8 addresses can only alias Int8 addresses and raw
+// pointers. This includes ensuring that Int8 cannot alias Int32 addresses.
+// CHECK: PAIR #176.
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT:   %11 = project_box %4 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #177.
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #178.
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT:   %13 = project_box %6 : $@box Builtin.FPIEEE64
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #179.
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT:   %14 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #180.
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT:   %15 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #181.
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT:   %16 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #182.
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT:   %17 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #183.
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT:   %18 = project_box %4 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #184.
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT:   %19 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #185.
+// CHECK-NEXT:   %10 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT:   %20 = project_box %6 : $@box Builtin.FPIEEE64
+// CHECK-NEXT: NoAlias
+
+// Finally conclude by checking that FPIEEE32 addresses only can alias raw
+// pointer addresses and other FPIEEE32 addresses. Again this includes proving
+// that FPIEEE64 addresses cannot alias FPIEEE32.
+// CHECK: PAIR #199.
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT:   %13 = project_box %6 : $@box Builtin.FPIEEE64
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #200.
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT:   %14 = project_box %0 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #201.
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT:   %15 = project_box %1 : $@box Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #202.
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT:   %16 = project_box %2 : $@box Builtin.UnknownObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #203.
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT:   %17 = project_box %3 : $@box Builtin.Int8
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #204.
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT:   %18 = project_box %4 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #205.
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT:   %19 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #206.
+// CHECK-NEXT:   %12 = project_box %5 : $@box Builtin.FPIEEE32
+// CHECK-NEXT:   %20 = project_box %6 : $@box Builtin.FPIEEE64
+// CHECK-NEXT: NoAlias
+
+sil @builtin_test : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box $Builtin.RawPointer
+  %1 = alloc_box $Builtin.NativeObject
+  %2 = alloc_box $Builtin.UnknownObject
+  %3 = alloc_box $Builtin.Int8
+  %4 = alloc_box $Builtin.Int32
+  %5 = alloc_box $Builtin.FPIEEE32
+  %6 = alloc_box $Builtin.FPIEEE64
+
+  %7 = project_box %0 : $@box Builtin.RawPointer
+  %8 = project_box %1 : $@box Builtin.NativeObject
+  %9 = project_box %2 : $@box Builtin.UnknownObject
+  %10 = project_box %3 : $@box Builtin.Int8
+  %11 = project_box %4 : $@box Builtin.Int32
+  %12 = project_box %5 : $@box Builtin.FPIEEE32
+  %13 = project_box %6 : $@box Builtin.FPIEEE64
+
+  // This second block ensures that we gain the benefits of not repeating
+  // already known values with being able to have associated with the output for
+  // each type each of the items we are trying to check aliasing against. This
+  // makes it simpler to write these tests.
+  %14 = project_box %0 : $@box Builtin.RawPointer
+  %15 = project_box %1 : $@box Builtin.NativeObject
+  %16 = project_box %2 : $@box Builtin.UnknownObject
+  %17 = project_box %3 : $@box Builtin.Int8
+  %18 = project_box %4 : $@box Builtin.Int32
+  %19 = project_box %5 : $@box Builtin.FPIEEE32
+  %20 = project_box %6 : $@box Builtin.FPIEEE64
+
+  %21 = tuple()
+  return %21 : $()
+}
+
+// Make sure that struct addresses:
+//
+// 1. Alias address types that they contain.
+// 2. Do not alias address types that they do not contain.
+// 3. Do not alias Builtin.ObjectPointers.
+// 4. Aliases raw pointers.
+
+// CHECK-LABEL: @struct_tests
+// CHECK: PAIR #339.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %14 = project_box %0 : $@box STest_S1
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #340.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %15 = project_box %1 : $@box STest_S2
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #341.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %16 = project_box %2 : $@box STest_E1
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #342.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %17 = project_box %3 : $@box STest_E2
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #343.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %18 = project_box %4 : $@box STest_C1
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #344.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %19 = project_box %5 : $@box STest_C2
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #345.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %20 = project_box %6 : $@box STest_S3
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #351.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %26 = project_box %21 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #352.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %27 = project_box %22 : $@box Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #353.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %28 = project_box %23 : $@box Builtin.UnknownObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #354.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %29 = project_box %24 : $@box Builtin.Int32
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #355.
+// CHECK-NEXT:   %13 = project_box %6 : $@box STest_S3
+// CHECK-NEXT:   %30 = project_box %25 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+
+struct STest_S1 {
+  var a : Builtin.Int32
+}
+struct STest_S2 {
+  var b : Builtin.Int34
+}
+enum STest_E1 {
+  case Yes(STest_S1)
+  case No
+}
+enum STest_E2 {
+  case Yes(STest_S2)
+  case No
+}
+class STest_C1 {
+  var a : Builtin.Int32
+
+  init()
+}
+class STest_C2 {
+  var a : Builtin.Int64
+
+  init()
+}
+struct STest_S3 {
+  var s : STest_S1
+  var e : STest_E1
+  var c : STest_C1
+}
+
+sil @struct_tests : $@convention(thin) () -> () {
+
+  %0 = alloc_box $STest_S1
+  %1 = alloc_box $STest_S2
+  %2 = alloc_box $STest_E1
+  %3 = alloc_box $STest_E2
+  %4 = alloc_box $STest_C1
+  %5 = alloc_box $STest_C2
+  %6 = alloc_box $STest_S3
+
+  %7 = project_box %0 : $@box STest_S1
+  %8 = project_box %1 : $@box STest_S2
+  %9 = project_box %2 : $@box STest_E1
+  %10 = project_box %3 : $@box STest_E2
+  %11 = project_box %4 : $@box STest_C1
+  %12 = project_box %5 : $@box STest_C2
+  %13 = project_box %6 : $@box STest_S3
+
+  %14 = project_box %0 : $@box STest_S1
+  %15 = project_box %1 : $@box STest_S2
+  %16 = project_box %2 : $@box STest_E1
+  %17 = project_box %3 : $@box STest_E2
+  %18 = project_box %4 : $@box STest_C1
+  %19 = project_box %5 : $@box STest_C2
+  %20 = project_box %6 : $@box STest_S3
+
+  %21 = alloc_box $Builtin.RawPointer
+  %22 = alloc_box $Builtin.NativeObject
+  %23 = alloc_box $Builtin.UnknownObject
+  %24 = alloc_box $Builtin.Int32
+  %25 = alloc_box $Builtin.FPIEEE32
+
+  %26 = project_box %21 : $@box Builtin.RawPointer
+  %27 = project_box %22 : $@box Builtin.NativeObject
+  %28 = project_box %23 : $@box Builtin.UnknownObject
+  %29 = project_box %24 : $@box Builtin.Int32
+  %30 = project_box %25 : $@box Builtin.FPIEEE32
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: @enum_tests
+// CHECK: PAIR #339.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %14 = project_box %0 : $@box ETest_S1
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #340.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %15 = project_box %1 : $@box ETest_S2
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #341.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %16 = project_box %2 : $@box ETest_E1
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #342.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %17 = project_box %3 : $@box ETest_E2
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #343.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %18 = project_box %4 : $@box ETest_C1
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #344.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %19 = project_box %5 : $@box ETest_C2
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #345.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %20 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #351.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %26 = project_box %21 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #352.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %27 = project_box %22 : $@box Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #353.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %28 = project_box %23 : $@box Builtin.UnknownObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #354.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %29 = project_box %24 : $@box Builtin.Int32
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #355.
+// CHECK-NEXT:   %13 = project_box %6 : $@box ETest_E3
+// CHECK-NEXT:   %30 = project_box %25 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+
+struct ETest_S1 {
+  var a : Builtin.Int32
+}
+struct ETest_S2 {
+  var b : Builtin.Int34
+}
+enum ETest_E1 {
+  case Yes(ETest_S1)
+  case No
+}
+enum ETest_E2 {
+  case Yes(ETest_S2)
+  case No
+}
+class ETest_C1 {
+  var a : Builtin.Int32
+
+  init()
+}
+class ETest_C2 {
+  var a : Builtin.Int64
+
+  init()
+}
+enum ETest_E3 {
+  case S(ETest_S1)
+  case E(ETest_E1)
+  case C(ETest_C1)
+  case Unknown
+}
+
+sil @enum_tests : $@convention(thin) () -> () {
+  %0 = alloc_box $ETest_S1
+  %1 = alloc_box $ETest_S2
+  %2 = alloc_box $ETest_E1
+  %3 = alloc_box $ETest_E2
+  %4 = alloc_box $ETest_C1
+  %5 = alloc_box $ETest_C2
+  %6 = alloc_box $ETest_E3
+
+  %7 = project_box %0 : $@box ETest_S1
+  %8 = project_box %1 : $@box ETest_S2
+  %9 = project_box %2 : $@box ETest_E1
+  %10 = project_box %3 : $@box ETest_E2
+  %11 = project_box %4 : $@box ETest_C1
+  %12 = project_box %5 : $@box ETest_C2
+  %13 = project_box %6 : $@box ETest_E3
+
+  %14 = project_box %0 : $@box ETest_S1
+  %15 = project_box %1 : $@box ETest_S2
+  %16 = project_box %2 : $@box ETest_E1
+  %17 = project_box %3 : $@box ETest_E2
+  %18 = project_box %4 : $@box ETest_C1
+  %19 = project_box %5 : $@box ETest_C2
+  %20 = project_box %6 : $@box ETest_E3
+
+  %21 = alloc_box $Builtin.RawPointer
+  %22 = alloc_box $Builtin.NativeObject
+  %23 = alloc_box $Builtin.UnknownObject
+  %24 = alloc_box $Builtin.Int32
+  %25 = alloc_box $Builtin.FPIEEE32
+
+  %26 = project_box %21 : $@box Builtin.RawPointer
+  %27 = project_box %22 : $@box Builtin.NativeObject
+  %28 = project_box %23 : $@box Builtin.UnknownObject
+  %29 = project_box %24 : $@box Builtin.Int32
+  %30 = project_box %25 : $@box Builtin.FPIEEE32
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: @class_tests
+
+// CHECK: PAIR #72.
+// CHECK-NEXT:   %3 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT:   %6 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #73.
+// CHECK-NEXT:   %3 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT:   %7 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #74.
+// CHECK-NEXT:   %3 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT:   %8 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #82.
+// CHECK-NEXT:   %3 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT:   %16 = project_box %9 : $@box AnyObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #83.
+// CHECK-NEXT:   %3 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT:   %17 = project_box %10 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #84.
+// CHECK-NEXT:   %3 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT:   %18 = project_box %11 : $@box Builtin.NativeObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #85.
+// CHECK-NEXT:   %3 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT:   %19 = project_box %12 : $@box Builtin.UnknownObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #86.
+// CHECK-NEXT:   %3 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT:   %20 = project_box %13 : $@box Builtin.Int8
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #87.
+// CHECK-NEXT:   %3 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT:   %21 = project_box %14 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #88.
+// CHECK-NEXT:   %3 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT:   %22 = project_box %15 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+
+// CHECK: PAIR #91.
+// CHECK-NEXT:   %4 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT:   %5 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #92.
+// CHECK-NEXT:   %4 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT:   %6 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #93.
+// CHECK-NEXT:   %4 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT:   %7 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #94.
+// CHECK-NEXT:   %4 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT:   %8 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #102.
+// CHECK-NEXT:   %4 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT:   %16 = project_box %9 : $@box AnyObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #103.
+// CHECK-NEXT:   %4 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT:   %17 = project_box %10 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #104.
+// CHECK-NEXT:   %4 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT:   %18 = project_box %11 : $@box Builtin.NativeObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #105.
+// CHECK-NEXT:   %4 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT:   %19 = project_box %12 : $@box Builtin.UnknownObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #106.
+// CHECK-NEXT:   %4 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT:   %20 = project_box %13 : $@box Builtin.Int8
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #107.
+// CHECK-NEXT:   %4 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT:   %21 = project_box %14 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #108.
+// CHECK-NEXT:   %4 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT:   %22 = project_box %15 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+
+// CHECK: PAIR #111.
+// CHECK-NEXT:   %5 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT:   %6 = project_box %0 : $@box CTest_C1
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #112.
+// CHECK-NEXT:   %5 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT:   %7 = project_box %1 : $@box CTest_C2
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #113.
+// CHECK-NEXT:   %5 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT:   %8 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #121.
+// CHECK-NEXT:   %5 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT:   %16 = project_box %9 : $@box AnyObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #122.
+// CHECK-NEXT:   %5 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT:   %17 = project_box %10 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #123.
+// CHECK-NEXT:   %5 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT:   %18 = project_box %11 : $@box Builtin.NativeObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #124.
+// CHECK-NEXT:   %5 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT:   %19 = project_box %12 : $@box Builtin.UnknownObject
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #125.
+// CHECK-NEXT:   %5 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT:   %20 = project_box %13 : $@box Builtin.Int8
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #126.
+// CHECK-NEXT:   %5 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT:   %21 = project_box %14 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #127.
+// CHECK-NEXT:   %5 = project_box %2 : $@box CTest_C3
+// CHECK-NEXT:   %22 = project_box %15 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+
+class CTest_C1 {
+  var x : Builtin.Int32
+
+  init()
+}
+
+class CTest_C2 {
+  var z : Builtin.FPIEEE32
+
+  init()
+}
+
+class CTest_C3 : CTest_C1 {
+  var y : Builtin.Int8
+
+  override init()
+}
+
+protocol AnyObject {}
+
+sil @class_tests : $@convention(thin) () -> () {
+  %0 = alloc_box $CTest_C1
+  %1 = alloc_box $CTest_C2
+  %2 = alloc_box $CTest_C3
+
+  %3 = project_box %0 : $@box CTest_C1
+  %4 = project_box %1 : $@box CTest_C2
+  %5 = project_box %2 : $@box CTest_C3
+
+  %6 = project_box %0 : $@box CTest_C1
+  %7 = project_box %1 : $@box CTest_C2
+  %8 = project_box %2 : $@box CTest_C3
+
+  %9 = alloc_box $AnyObject
+  %10 = alloc_box $Builtin.RawPointer
+  %11 = alloc_box $Builtin.NativeObject
+  %12 = alloc_box $Builtin.UnknownObject
+  %13 = alloc_box $Builtin.Int8
+  %14 = alloc_box $Builtin.Int32
+  %15 = alloc_box $Builtin.FPIEEE32
+
+  %16 = project_box %9 : $@box AnyObject
+  %17 = project_box %10 : $@box Builtin.RawPointer
+  %18 = project_box %11 : $@box Builtin.NativeObject
+  %19 = project_box %12 : $@box Builtin.UnknownObject
+  %20 = project_box %13 : $@box Builtin.Int8
+  %21 = project_box %14 : $@box Builtin.Int32
+  %22 = project_box %15 : $@box Builtin.FPIEEE32
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: @tuple_tests
+// CHECK: PAIR #66.
+// CHECK-NEXT:   %3 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:   %6 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #67.
+// CHECK-NEXT:   %3 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:   %7 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #68.
+// CHECK-NEXT:   %3 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:   %8 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #75.
+// CHECK-NEXT:   %3 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:   %15 = project_box %9 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #76.
+// CHECK-NEXT:   %3 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:   %16 = project_box %10 : $@box Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #77.
+// CHECK-NEXT:   %3 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:   %17 = project_box %11 : $@box Builtin.UnknownObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #78.
+// CHECK-NEXT:   %3 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:   %18 = project_box %12 : $@box Builtin.Int8
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #79.
+// CHECK-NEXT:   %3 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:   %19 = project_box %13 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #80.
+// CHECK-NEXT:   %3 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+// CHECK-NEXT:   %20 = project_box %14 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #85.
+// CHECK-NEXT:   %4 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+// CHECK-NEXT:   %7 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #86.
+// CHECK-NEXT:   %4 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+// CHECK-NEXT:   %8 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #93.
+// CHECK-NEXT:   %4 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+// CHECK-NEXT:   %15 = project_box %9 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #94.
+// CHECK-NEXT:   %4 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+// CHECK-NEXT:   %16 = project_box %10 : $@box Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #95.
+// CHECK-NEXT:   %4 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+// CHECK-NEXT:   %17 = project_box %11 : $@box Builtin.UnknownObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #96.
+// CHECK-NEXT:   %4 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+// CHECK-NEXT:   %18 = project_box %12 : $@box Builtin.Int8
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #97.
+// CHECK-NEXT:   %4 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+// CHECK-NEXT:   %19 = project_box %13 : $@box Builtin.Int32
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #98.
+// CHECK-NEXT:   %4 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+// CHECK-NEXT:   %20 = project_box %14 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #102.
+// CHECK-NEXT:   %5 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+// CHECK-NEXT:   %7 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #103.
+// CHECK-NEXT:   %5 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+// CHECK-NEXT:   %8 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #110.
+// CHECK-NEXT:   %5 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+// CHECK-NEXT:   %15 = project_box %9 : $@box Builtin.RawPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #111.
+// CHECK-NEXT:   %5 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+// CHECK-NEXT:   %16 = project_box %10 : $@box Builtin.NativeObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #112.
+// CHECK-NEXT:   %5 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+// CHECK-NEXT:   %17 = project_box %11 : $@box Builtin.UnknownObject
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #113.
+// CHECK-NEXT:   %5 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+// CHECK-NEXT:   %18 = project_box %12 : $@box Builtin.Int8
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #114.
+// CHECK-NEXT:   %5 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+// CHECK-NEXT:   %19 = project_box %13 : $@box Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #115.
+// CHECK-NEXT:   %5 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+// CHECK-NEXT:   %20 = project_box %14 : $@box Builtin.FPIEEE32
+// CHECK-NEXT: NoAlias
+
+struct TTest_S1 {
+  var x : Builtin.Int32
+}
+
+enum TTest_E1 {
+  case No
+  case Yes(Builtin.Int8)
+}
+
+sil @tuple_tests : $@convention(thin) () -> () {
+  %0 = alloc_box $(Builtin.RawPointer, Builtin.Int64)
+  %1 = alloc_box $(TTest_S1, Builtin.Int64)
+  %2 = alloc_box $(TTest_E1, Builtin.Int64)
+
+  %3 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+  %4 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+  %5 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+
+  %6 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64)
+  %7 = project_box %1 : $@box (TTest_S1, Builtin.Int64)
+  %8 = project_box %2 : $@box (TTest_E1, Builtin.Int64)
+
+  %9 = alloc_box $Builtin.RawPointer
+  %10 = alloc_box $Builtin.NativeObject
+  %11 = alloc_box $Builtin.UnknownObject
+  %12 = alloc_box $Builtin.Int8
+  %13 = alloc_box $Builtin.Int32
+  %14 = alloc_box $Builtin.FPIEEE32
+
+  %15 = project_box %9 : $@box Builtin.RawPointer
+  %16 = project_box %10 : $@box Builtin.NativeObject
+  %17 = project_box %11 : $@box Builtin.UnknownObject
+  %18 = project_box %12 : $@box Builtin.Int8
+  %19 = project_box %13 : $@box Builtin.Int32
+  %20 = project_box %14 : $@box Builtin.FPIEEE32
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Check that TBAA fails when the root is unchecked_addr_cast or
+// pointer_to_address.
+//
+// CHECK-LABEL: @tbaa_dump
+// CHECK:      PAIR #2.
+// CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.Int64
+// CHECK-NEXT:   %3 = unchecked_addr_cast %0 : $*Builtin.Int64 to $*Builtin.Int32
+// CHECK-NEXT: MayAlias
+// CHECK:      PAIR #5.
+// CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.Int64
+// CHECK-NEXT:   %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Builtin.Int32
+// FIXME: This should be MayAlias unless the pointer_to_address instruction
+//        comes with a "must not alias" flag.
+// CHECK-NEXT: NoAlias
+sil @tbaa_dump : $@convention(thin) (@in Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 42
+  store %1 to %0 : $*Builtin.Int64
+  %3 = unchecked_addr_cast %0 : $*Builtin.Int64 to $*Builtin.Int32
+  %4 = integer_literal $Builtin.Int32, 0
+  store %4 to %3 : $*Builtin.Int32
+  %6 = address_to_pointer %0 : $*Builtin.Int64 to $Builtin.RawPointer
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Builtin.Int32
+  store %4 to %7 : $*Builtin.Int32
+  %8 = load %0 : $*Builtin.Int64
+  return %8 : $Builtin.Int64
+}
+
+// CHECK-LABEL: @test_project_box
+// CHECK:      PAIR #10.
+// CHECK-NEXT:   %2 = project_box %0 : $@box Builtin.Int32
+// CHECK-NEXT:   %3 = project_box %1 : $@box Builtin.Int64
+// CHECK-NEXT: NoAlias
+sil @test_project_box : $@convention(thin) (@box Builtin.Int32, @box Builtin.Int64) -> () {
+bb0(%0 : $@box Builtin.Int32, %1 : $@box Builtin.Int64):
+  %2 = project_box %0 : $@box Builtin.Int32
+  %3 = project_box %1 : $@box Builtin.Int64
+
+  %r = tuple()
+  return %r : $()
+}

@@ -5,6 +5,7 @@
 
 import StdlibUnittest
 
+
 import ctypes
 
 var BitfieldTestSuite = TestSuite("Bitfields")

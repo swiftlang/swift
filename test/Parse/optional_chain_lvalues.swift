@@ -25,7 +25,7 @@ mutT?.mutateT()
 immT?.mutateT() // expected-error{{cannot use mutating member on immutable value: 'immT' is a 'let' constant}}
 mutT?.mutS?.mutateS()
 mutT?.immS?.mutateS() // expected-error{{cannot use mutating member on immutable value: 'immS' is a 'let' constant}}
-mutT?.mutS?.x++
+mutT?.mutS?.x += 1
 mutT?.mutS?.y++ // expected-error{{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 
 // Prefix operators don't chain

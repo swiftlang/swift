@@ -1,0 +1,1508 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -inline -function-signature-opts %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -inline -function-signature-opts %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
+
+import Builtin
+import Swift
+
+/////////////////////
+// Data Structures //
+/////////////////////
+
+class foo {
+  var a: Int
+   deinit 
+  init()
+}
+
+class bar {
+  var start: foo
+  var end: foo
+   deinit 
+  init()
+}
+
+struct baz {
+  var start: foo
+  var end: foo
+  init()
+}
+
+struct boo {
+  var tbaz = baz()
+  var a = 0
+  init()
+}
+
+struct lotsoffield {
+  var tbaz = baz()
+  var a = 0
+  var b = 0
+  var c = 0
+  var d = 0
+  init()
+}
+
+struct goo {
+  var left : foo
+  var right : foo
+  var top : foo
+  var bottom : foo
+}
+
+sil @use_Int : $@convention(thin) (Int) -> ()
+
+
+// CHECK-LABEL: sil [thunk] [always_inline] @argument_with_incomplete_epilogue_release
+// CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $goo, #goo.top
+// CHECK: function_ref @_TTSf4g_n___TTSf4s__argument_with_incomplete_epilogue_release : $@convention(thin) (@guaranteed foo, @owned foo) -> ()
+// CHECK: release_value [[IN2]]
+sil @argument_with_incomplete_epilogue_release : $@convention(thin) (@owned goo) -> () {
+bb0(%0 : $goo):
+  // make inline costs = 2
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+
+
+  %1 = struct_extract %0 : $goo, #goo.top
+  %2 = ref_element_addr %1 : $foo, #foo.a
+  %3 = load %2 : $*Int
+  %4 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %4(%3) : $@convention(thin) (Int) -> ()
+
+  %5 = struct_extract %0 : $goo, #goo.bottom
+  %6 = ref_element_addr %5 : $foo, #foo.a
+  %7 = load %6 : $*Int
+  apply %4(%7) : $@convention(thin) (Int) -> ()
+
+  release_value %1 : $foo
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// We do this check separately to ensure that this does not occur anywhere in
+// the output for the file. (Maybe this is an interesting enough feature to add to FileCheck?).
+
+// CHECK-NEGATIVE-NOT: sil [fragile] @_TTSfq4d_n__dead_arg_no_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-NEGATIVE-NOT: sil [fragile] @_TTSfq4g__owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+
+sil [fragile] @user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil [fragile] @create_object : $@convention(thin) () -> Builtin.NativeObject
+
+// Make sure argument is exploded and the baz part is not passed in as argument, as its only use
+// is a release.
+//
+// CHECK-LABEL: sil [thunk] [always_inline] @dead_argument_due_to_only_release_user
+// CHECK: [[IN:%.*]] = function_ref @_TTSf4gs__dead_argument_due_to_only_release_user
+// CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $boo, #boo.a
+// CHECK: apply [[IN]]([[IN2]]) 
+sil @dead_argument_due_to_only_release_user : $@convention(thin) (@owned boo) -> (Int, Int) {
+bb0(%0 : $boo):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %0 : $boo, #boo.a
+  release_value  %1 : $baz
+  %4 = tuple (%2  : $Int, %2 : $Int)
+  return %4 : $(Int, Int)
+}
+
+// Make sure argument is exploded and the baz part is not passed in as argument, as its only use
+// is a release.
+// CHECK-LABEL: sil [thunk] [always_inline] @dead_argument_due_to_only_release_user_but__exploded
+// CHECK: [[FN1:%.*]] = function_ref @_TTSf4gs__dead_argument_due_to_only_release_user_but__exploded
+// CHECK: [[IN1:%.*]] = struct_extract %0 : $lotsoffield, #lotsoffield.c
+// CHECK: [[IN2:%.*]] = struct_extract %0 : $lotsoffield, #lotsoffield.b
+// CHECK: [[IN3:%.*]] = struct_extract %0 : $lotsoffield, #lotsoffield.a
+// CHECK: apply [[FN1]]([[IN3]], [[IN2]], [[IN1]])
+sil @dead_argument_due_to_only_release_user_but__exploded : $@convention(thin) (@owned lotsoffield) -> (Int, Int, Int) {
+bb0(%0 : $lotsoffield):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = struct_extract %0 : $lotsoffield, #lotsoffield.tbaz
+  %2 = struct_extract %0 : $lotsoffield, #lotsoffield.a
+  %3 = struct_extract %0 : $lotsoffield, #lotsoffield.b
+  %4 = struct_extract %0 : $lotsoffield, #lotsoffield.c
+  release_value  %1 : $baz
+  %5 = tuple (%2  : $Int, %3 : $Int, %4 : $Int)
+  return %5 : $(Int, Int, Int)
+}
+
+// Make sure argument is exploded and the baz part is not passed in as argument, as its only use
+// is a release.
+// CHECK-LABEL: sil [thunk] [always_inline] @dead_argument_due_to_more_than_release_user
+// CHECK: [[FN1:%.*]] = function_ref @_TTSf4gs__dead_argument_due_to_more_than_release_user : $@convention(thin) (@guaranteed baz, Int) -> (Int, Int)
+sil @dead_argument_due_to_more_than_release_user : $@convention(thin) (@owned boo) -> (Int, Int) {
+bb0(%0 : $boo):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %0 : $boo, #boo.a
+  retain_value %1 : $baz
+  release_value %1 : $baz
+  %4 = tuple (%2  : $Int, %2 : $Int)
+  return %4 : $(Int, Int)
+}
+
+
+// CHECK-LABEL: sil [fragile] @dead_arg_no_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-NOT: function_ref @_TTSf4d_n__dead_arg_no_callsites
+sil [fragile] @dead_arg_no_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %4 = tuple()
+  return %4 : $()
+}
+
+// Make sure %0 is a dead argument.
+//
+// CHECK-LABEL: sil [thunk] [always_inline] @exploded_release_to_dead_argument
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4d__exploded_release_to_dead_argument
+// CHECK: apply [[IN1]]()
+// CHECK: release_value [[INPUT_ARG0]] 
+sil @exploded_release_to_dead_argument : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %1 : $baz, #baz.start
+  %3 = struct_extract %1 : $baz, #baz.end
+  release_value  %2 : $foo
+  release_value  %3 : $foo
+  %4 = tuple ()
+  return %4 : $()
+}
+
+
+// Make sure %0 is not a dead argument, but gets converted to a guaranteed arg.
+//
+// CHECK-LABEL: sil [thunk] [always_inline] @exploded_release_to_guaranteed_param
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4gs__exploded_release_to_guaranteed_param 
+// CHECK: release_value [[INPUT_ARG0]] 
+sil @exploded_release_to_guaranteed_param : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %1 : $baz, #baz.start
+  %3 = struct_extract %1 : $baz, #baz.end
+  %4 = struct_extract %0 : $boo, #boo.a
+  %5 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %5(%4) : $@convention(thin) (Int) -> ()
+  release_value  %2 : $foo
+  release_value  %3 : $foo
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [thunk] [always_inline] @single_owned_return_value
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4n_g_single_owned_return_value 
+// CHECK: [[IN2:%.*]] = apply [[IN1]]([[INPUT_ARG0]]
+// CHECK: retain_value [[IN2]] 
+sil @single_owned_return_value : $@convention(thin) (@owned boo) -> @owned boo {
+bb0(%0 : $boo):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  retain_value %0 : $boo
+  return %0 : $boo
+}
+
+
+// CHECK-LABEL: sil [thunk] [always_inline] @single_owned_return_value_with_self_recursion
+// CHECK: function_ref @_TTSf4n_g_single_owned_return_value
+// CHECK: [[RET:%.*]] = apply
+// CHECK: retain_value [[RET]]
+sil @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo {
+bb0(%0 : $boo):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  cond_br undef, bb1, bb2
+bb1:
+  retain_value %0 : $boo
+  br bb3(%0 : $boo)
+bb2:
+  %2 = function_ref @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo
+  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo
+  br bb3 (%3 : $boo)
+bb3(%4 : $boo):
+  return %4 : $boo
+}
+
+// CHECK-LABEL: sil [thunk] [always_inline] @single_owned_return_value_with_interfering_release
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4g_n_n___TTSf4s__single_owned_return_value_with_interfering_release
+// CHECK-NOT: retain_value
+// CHECK: return
+sil @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned boo) ->  boo {
+bb0(%0 : $boo):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  retain_value %0 : $boo
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %1 : $baz, #baz.start
+  release_value %2: $foo
+  return %0 : $boo
+}
+
+// Make sure we do not move the retain_value in the throw block.
+//
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol) {
+// CHECK: function_ref @_TTSfq4n_g_owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (boo, @error ErrorProtocol)
+// CHECK: bb1
+// CHECK-NOT retain_value
+// CHECK: bb2
+sil [fragile] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol) {
+bb0(%0 : $boo):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  retain_value %0 : $boo
+  return %0 : $boo
+
+bb2:
+  retain_value %0 : $boo
+  throw undef : $ErrorProtocol
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @_TTSfq4d_n__dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: return
+sil [fragile] @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  debug_value %0 : $Builtin.NativeObject // debug_value of a dead arg should also be deleted.
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-NOT: sil hidden [fragile] @private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+sil private [fragile] @private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @dead_arg_callsite_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @_TTSfq4d_n__dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT: apply [[OPT_FUN]](
+// CHECK: [[PRIV_OPT_FUN:%[0-9]+]] = function_ref @_TTSfq4d_n__private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT: apply [[PRIV_OPT_FUN]]
+sil [fragile] @dead_arg_callsite_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %4 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+
+  // This ensures that %0 is not dead in this function. We don't want to specialize this.
+  apply %4(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %5 = function_ref @private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %6 = apply %5(%0, %1) : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %7 = tuple()
+  return %7 : $()
+}
+
+// This test makes sure we can look up an already specialized callee instead of regenerating one.
+// CHECK-LABEL: sil [fragile] @dead_arg_callsite_2 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @_TTSfq4d_n__dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT: apply [[OPT_FUN]](
+sil [fragile] @dead_arg_callsite_2 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %4 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  // This ensures that %0 is not dead in this function. We don't want to specialize this.
+  apply %4(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
+// DISABLED for now. Inliner does not look through thin_to_thick_function.
+//
+// This test case verifies we can specialize functions called through thin_to_thick_function.
+// DISABLECHECK-LABEL: sil [fragile] @dead_arg_obfuscated_callsite : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// DISABLECHECK: [[OPT_FUN:%[0-9]+]] = function_ref @_TTSf4d_n__dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> ()
+// DISABLECHECK-NEXT: apply [[OPT_FUN]](
+sil [fragile] @dead_arg_obfuscated_callsite : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () to $@callee_owned (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %4 = apply %3(%0, %1) : $@callee_owned (Builtin.NativeObject, Builtin.NativeObject) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
+sil [fragile] @exploded_release_to_guaranteed_param_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %2 = function_ref @exploded_release_to_guaranteed_param : $@convention(thin) (@owned boo) -> ()
+  retain_value %0 : $boo
+  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
+// Make sure we pull out the retain_value from the callee.
+//
+// The retain and release can be got rid of easily by arc this way.
+//
+// CHECK-LABEL: sil @single_owned_return_value_with_self_recursion_callsite
+// CHECK: [[RET:%.*]] = apply
+// CHECK: retain_value [[RET]]
+// CHECK: release_value [[RET]]
+sil @single_owned_return_value_with_self_recursion_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %2 = function_ref @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo 
+  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo 
+  release_value %4 : $boo
+  %5 = tuple()
+  return %5 : $()
+}
+
+sil [fragile] @exploded_release_to_dead_param_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %2 = function_ref @exploded_release_to_dead_argument : $@convention(thin) (@owned boo) -> ()
+  retain_value %0 : $boo
+  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
+
+sil [fragile] @single_owned_return_value_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @single_owned_return_value : $@convention(thin) (@owned boo) -> @owned boo 
+  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo 
+  %4 = tuple()
+  return %4 : $()
+}
+
+sil [fragile] @single_owned_return_value_with_interfering_release_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned boo) -> boo 
+  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> boo 
+  %4 = tuple()
+  return %4 : $()
+}
+
+sil [fragile] @owned_to_unowned_retval_with_error_result_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = function_ref @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol)
+  try_apply %2(%0) : $@convention(thin) (@owned boo) -> (@owned boo, @error ErrorProtocol), normal bb4, error bb5
+
+bb4(%99 : $boo):
+  %4 = tuple()
+  return %4 : $()
+
+bb5(%100 : $ErrorProtocol):
+  unreachable
+}
+
+sil [fragile] @dead_argument_due_to_only_release_user_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %2 = function_ref @dead_argument_due_to_only_release_user : $@convention(thin) (@owned boo) -> (Int, Int)
+  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> (Int, Int)
+  %5 = tuple()
+  return %5 : $()
+}
+
+sil [fragile] @dead_argument_due_to_only_release_user_but__exploded_callsite : $@convention(thin) (@owned lotsoffield) -> () {
+bb0(%0 : $lotsoffield):
+  %2 = function_ref @dead_argument_due_to_only_release_user_but__exploded : $@convention(thin) (@owned lotsoffield) -> (Int, Int, Int)
+  %4 = apply %2(%0) : $@convention(thin) (@owned lotsoffield) -> (Int, Int, Int)
+  %5 = tuple()
+  return %5 : $()
+}
+
+sil [fragile] @dead_argument_due_to_more_than_release_user_callsite : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %2 = function_ref @dead_argument_due_to_more_than_release_user : $@convention(thin) (@owned boo) -> (Int, Int)
+  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> (Int, Int)
+  %5 = tuple()
+  return %5 : $()
+}
+
+sil [fragile] @argument_with_incomplete_epilogue_release_callsite : $@convention(thin) (@owned goo) -> () {
+bb0(%0 : $goo):
+  %2 = function_ref @argument_with_incomplete_epilogue_release : $@convention(thin) (@owned goo) -> ()
+  %4 = apply %2(%0) : $@convention(thin) (@owned goo) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
+
+//========================================
+// @owned => @guaranteed with error result
+
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol) {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSfq4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
+// CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
+// CHECK-NEXT: release_value
+// CHECK-NEXT: return [[NORMRET]]
+// CHECK: bb2([[THROW:%[0-9]+]] : $ErrorProtocol):
+// CHECK-NEXT: release_value
+// CHECK-NEXT: throw [[THROW]]
+sil [fragile] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol) {
+bb0(%0 : $Builtin.NativeObject, %1 : $Int):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %f1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %f1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  release_value %0 : $Builtin.NativeObject
+  return %1 : $Int
+
+bb2:
+  release_value %0 : $Builtin.NativeObject
+  throw undef : $ErrorProtocol
+}
+
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol) {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSfq4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
+// CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
+// CHECK-NEXT: release_value
+// CHECK: bb2([[THROW:%[0-9]+]] : $ErrorProtocol):
+// CHECK-NEXT: release_value
+sil [fragile] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol) {
+bb0(%0 : $Builtin.NativeObject, %1 : $Int):
+  %f1 = function_ref @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol)
+  try_apply %f1(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol), normal bb1, error bb2
+
+bb1(%a1 : $Int):
+  return %a1 : $Int
+
+bb2(%a2 : $ErrorProtocol):
+  throw %a2 : $ErrorProtocol
+}
+
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_with_nothrow_caller : $@convention(thin) (Builtin.NativeObject, Int) -> Int {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSfq4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
+// CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
+// CHECK-NEXT: release_value
+// CHECK: bb2([[THROW:%[0-9]+]] : $ErrorProtocol):
+// CHECK-NEXT: release_value
+sil [fragile] @owned_to_guaranteed_with_nothrow_caller : $@convention(thin) (Builtin.NativeObject, Int) -> Int {
+bb0(%0 : $Builtin.NativeObject, %1 : $Int):
+  %f1 = function_ref @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol)
+  %r1 = apply [nothrow] %f1(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol)
+  return %r1 : $Int
+}
+
+//======================
+// @owned => @guaranteed
+
+// We should optimize this call.
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSfq4g__owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[FUNC_REF]]
+// CHECK-NOT: fix_lifetime
+// CHECK: release_value
+sil [fragile] @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  release_value %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// Callee to make sure we handle multiple callees properly.
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_caller1 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-NOT: fix_lifetime
+// CHECK: release_value
+sil [fragile] @owned_to_guaranteed_simple_singlebb_caller1 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = function_ref @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_caller2 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-NOT: fix_lifetime
+// CHECK: release_value
+sil [fragile] @owned_to_guaranteed_simple_singlebb_caller2 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = function_ref @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+// We should not optimize this call due to the user.
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_sideeffectblock_singlebb_callee
+// CHECK-NOT: @guaranteed
+// CHECK: return
+sil [fragile] @owned_to_guaranteed_sideeffectblock_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  release_value %0 : $Builtin.NativeObject
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+// We should be able to optimize this callee since the release is in the exit
+// BB. Additionally this test makes sure that we delete dead parameters before
+// invalidating the owned argument -> release map.
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject) -> () {
+// CHECK-NOT: fix_lifetime
+// CHECK: release_value %1 : $Builtin.NativeObject
+sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+
+bb2:
+  strong_release %1 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// In this case the release is not in the exit, so we cannot specialize.
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: @guaranteed
+// CHECK: return
+sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  strong_release %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+
+bb2:
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
+sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.NativeObject, %2 : $Builtin.Int1):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+  %c23 = builtin "assert_configuration"() : $Builtin.Int32
+  %c24 = builtin "assert_configuration"() : $Builtin.Int32
+  %c25 = builtin "assert_configuration"() : $Builtin.Int32
+  %c26 = builtin "assert_configuration"() : $Builtin.Int32
+  %c27 = builtin "assert_configuration"() : $Builtin.Int32
+  %c28 = builtin "assert_configuration"() : $Builtin.Int32
+  %c29 = builtin "assert_configuration"() : $Builtin.Int32
+  %c30 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  cond_br %0, bb1, bb2
+
+bb1:
+  cond_br %2, bb2, bb3
+
+bb2:
+  br bb3
+
+bb3:
+  release_value %1 : $Builtin.NativeObject
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[INPUT_PTR1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR2:%.*]] : $Builtin.NativeObject):
+// CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
+// CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
+sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+
+bb2:
+  strong_release %1 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[INPUT_PTR1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR2:%.*]] : $Builtin.NativeObject):
+// CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
+// CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
+sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %2 = function_ref @create_object : $@convention(thin) () -> Builtin.NativeObject
+  %3 = apply %2() : $@convention(thin) () -> Builtin.NativeObject
+  cond_br undef, bb1(%3 : $Builtin.NativeObject), bb2(%3 : $Builtin.NativeObject)
+
+bb1(%4 : $Builtin.NativeObject):
+  br bb2(%4 : $Builtin.NativeObject)
+
+bb2(%5 : $Builtin.NativeObject):
+  strong_release %5 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %1 : $Builtin.NativeObject
+  %6 = tuple()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: bb0([[INPUT_PTR_1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR_2:%.*]] : $Builtin.NativeObject):
+// CHECK: [[SINGLEBB_MULTIPLEARG_CALLEE:%.*]] = function_ref @_TTSfq4n_g_n__owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@convention(thin) (Builtin.Int1, @guaranteed Builtin.NativeObject, Builtin.Int1) -> ()
+// CHECK: apply [[SINGLEBB_MULTIPLEARG_CALLEE]]({{%.*}}, [[INPUT_PTR_1]], {{%.*}})
+// CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: [[MULTIBB_RELEASENOTINEXIT_CALLEE:%.*]] = function_ref @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASENOTINEXIT_CALLEE]]([[INPUT_PTR_1]])
+// CHECK: [[MULTIBB_RELEASEINEXIT_CALLEE:%.*]] = function_ref @_TTSfq4d_g__owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASEINEXIT_CALLEE]]([[INPUT_PTR_1]])
+// CHECK-NEXT: release_value [[INPUT_PTR_1]] : $Builtin.NativeObject
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
+// CHECK: release_value [[INPUT_PTR_2]]
+// CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
+// CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: release_value [[INPUT_PTR_2]]
+
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
+// CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: release_value [[INPUT_PTR_2]]
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
+// CHECK: release_value [[INPUT_PTR_2]]
+// CHECK: release_value [[INPUT_PTR_1]]
+
+sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> ()
+  %3 = integer_literal $Builtin.Int1, 0
+  %4 = integer_literal $Builtin.Int1, 0
+  apply %2(%3, %0, %4) : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> ()
+  %5 = function_ref @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %5(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %6 = integer_literal $Builtin.Int1, 0
+  %7 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject) -> ()
+  apply %7(%6, %0) : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject) -> ()
+  %8 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %8(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %8(%1, %0) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  %9 = function_ref @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %9(%1, %0) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %9(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We should remove the array semantic from specialized calls.
+
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] [_semantics "array.foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSfq4g__array_semantic : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[FUNC_REF]]
+// CHECK: release_value
+sil [fragile] [_semantics "array.foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  release_value %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @array_semantic_caller : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSfq4g__array_semantic : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: apply [[FUNC_REF]]
+// CHECK: release_value
+sil [fragile] @array_semantic_caller : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(method) (@owned Builtin.NativeObject) -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+// Make sure that we are processing in bottom up order. This test
+// works since the default order in which the SIL Parser places
+// SILFunctions into the SILModule is the order in which the function
+// is parsed. Thus if we are just processing in that order, s3 will
+// call s2 instead of s2 with the dead argument.
+//
+// CHECK-LABEL: sil [fragile] @s3 : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: [[FUN:%.*]] = function_ref @_TTSfq4d__s2
+// CHECK: apply [[FUN]](
+sil [fragile] @s3 : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = function_ref @s2 : $@convention(thin) (Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @s2 : $@convention(thin) (Builtin.Int32) -> () {
+sil [fragile] @s2 : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = function_ref @s1 : $@convention(thin) (Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @s1 : $@convention(thin) (Builtin.Int32) -> () {
+sil [fragile] @s1 : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @_TTSf4gs__exploded_release_to_guaranteed_param
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Int):
+// CHECK-NOT: strong_release
+// CHECK: return
+
+// CHECK-LABEL: sil @_TTSf4n_g_single_owned_return_value : $@convention(thin) (@owned boo) -> boo
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK-NOT: retain_value
+// CHECK: return
+
+// There should not be a single retain in this function.
+//
+// CHECK-LABEL: sil @_TTSf4n_g_single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> boo
+// CHECK: bb0
+// CHECK-NOT: retain_value
+// CHECK: return
+
+// CHECK-LABEL: @_TTSfq4n_g_owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (boo, @error ErrorProtocol) {
+// CHECK: bb2
+// CHECK: retain_value
+// CHECK: throw
+
+// Check that we specialized this function by removing the dead argument and
+// copied everything appropriately.
+
+// CHECK-LABEL: sil [fragile] @_TTSfq4d_n__dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0([[INPUT_ARG:%[0-9]+]] : $Builtin.NativeObject):
+// CHECK: cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: br bb3
+// CHECK: bb3:
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @user
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+
+// CHECK-LABEL: sil private [fragile] @_TTSfq4d_n__private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0(
+
+// CHECK-LABEL: sil [fragile] @_TTSfq4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error ErrorProtocol) {
+// CHECK-NOT: release
+// CHECK: throw
+
+// CHECK-LABEL: sil [fragile] @_TTSfq4g__owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+
+// CHECK-LABEL: sil [fragile] @_TTSfq4d_g__owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK:  function_ref user
+// CHECK:  function_ref @user
+// CHECK:  apply
+// CHECK:  cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK-NEXT:  br bb2
+// CHECK: bb2:
+// CHECK-NEXT:  tuple
+// CHECK-NEXT:  return
+
+
+// Check that we have remove the array semantic attribute from the specialized
+// function.
+// Also make sure we have change the calling convention to freestanding from
+// method because we have changed the self argument.
+
+// CHECK-LABEL: sil [fragile] @_TTSfq4g__array_semantic : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0(%0 : $Builtin.NativeObject)
+// CHECK:  function_ref user
+// CHECK:  function_ref @user
+// CHECK:  apply
+// CHECK:  tuple
+// CHECK:  return
+

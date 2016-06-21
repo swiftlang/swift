@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -91,7 +91,6 @@ template <class T> static SourceRange getSourceRangeImpl(const T *S) {
                 "or getStartLoc()/getEndLoc()");
   return Dispatch<isOverriddenFromStmt(&T::getSourceRange)>::getSourceRange(S);
 }
-
 SourceRange Stmt::getSourceRange() const {
   switch (getKind()) {
 #define STMT(ID, PARENT)                                           \
@@ -133,8 +132,8 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
   : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
     NumElements(elts.size()), LBLoc(lbloc), RBLoc(rbloc)
 {
-  memcpy(getElementsStorage(), elts.data(),
-         elts.size() * sizeof(ASTNode));
+  std::uninitialized_copy(elts.begin(), elts.end(),
+                          getTrailingObjects<ASTNode>());
 }
 
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
@@ -143,8 +142,7 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   assert(std::none_of(elts.begin(), elts.end(),
                       [](ASTNode node) -> bool { return node.isNull(); }) &&
          "null element in BraceStmt");
-  void *Buffer = ctx.Allocate(sizeof(BraceStmt)
-                                + elts.size() * sizeof(ASTNode),
+  void *Buffer = ctx.Allocate(totalSizeToAlloc<ASTNode>(elts.size()),
                               alignof(BraceStmt));
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
 }
@@ -155,7 +153,9 @@ SourceLoc ReturnStmt::getStartLoc() const {
   return ReturnLoc;
 }
 SourceLoc ReturnStmt::getEndLoc() const {
-  return (Result ? Result->getEndLoc() : ReturnLoc);
+  if (Result && Result->getEndLoc().isValid())
+    return Result->getEndLoc();
+  return ReturnLoc;
 }
 
 SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
@@ -165,7 +165,7 @@ SourceLoc DeferStmt::getEndLoc() const {
   return tempDecl->getBody()->getEndLoc();
 }
 
-/// Dig the original users's body of the defer out for AST fidelity.
+/// Dig the original user's body of the defer out for AST fidelity.
 BraceStmt *DeferStmt::getBodyAsWritten() const {
   return tempDecl->getBody();
 }
@@ -233,8 +233,7 @@ DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, Stmt *body,
                                  ArrayRef<CatchStmt*> catches,
                                  Optional<bool> implicit) {
-  void *mem = ctx.Allocate(sizeof(DoCatchStmt) +
-                           catches.size() * sizeof(catches[0]),
+  void *mem = ctx.Allocate(totalSizeToAlloc<CatchStmt*>(catches.size()),
                            alignof(DoCatchStmt));
   return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
 }
@@ -248,7 +247,7 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
 }
 
 void LabeledConditionalStmt::setCond(StmtCondition e) {
-  // When set set a condition into a Conditional Statement, inform each of the
+  // When set a condition into a Conditional Statement, inform each of the
   // variables bound in any patterns that this is the owning statement for the
   // pattern.
   for (auto &elt : e)
@@ -269,9 +268,7 @@ PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
                                                SourceLoc PoundLoc,
                                        ArrayRef<AvailabilitySpec *> queries,
                                                      SourceLoc RParenLoc) {
-  unsigned size = sizeof(PoundAvailableInfo) +
-                  queries.size() * sizeof(AvailabilitySpec *);
-  
+  unsigned size = totalSizeToAlloc<AvailabilitySpec *>(queries.size());
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
   return ::new (Buffer) PoundAvailableInfo(PoundLoc, queries, RParenLoc);
 }
@@ -288,7 +285,7 @@ SourceLoc PoundAvailableInfo::getEndLoc() const {
 
 void PoundAvailableInfo::
 getPlatformKeywordRanges(SmallVectorImpl<CharSourceRange> &PlatformRanges) {
-  for (unsigned int i = 0; i < NumQueries; i ++) {
+  for (unsigned i = 0; i < NumQueries; i++) {
     auto *VersionSpec =
       dyn_cast<VersionConstraintAvailabilitySpec>(getQueries()[i]);
     if (!VersionSpec)
@@ -394,7 +391,7 @@ CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
       BodyAndHasBoundDecls(Body, HasBoundDecls),
       NumPatterns(CaseLabelItems.size()) {
   assert(NumPatterns > 0 && "case block must have at least one pattern");
-  MutableArrayRef<CaseLabelItem> Items{ getCaseLabelItemsBuffer(),
+  MutableArrayRef<CaseLabelItem> Items{ getTrailingObjects<CaseLabelItem>(),
                                         NumPatterns };
 
   for (unsigned i = 0; i < NumPatterns; ++i) {
@@ -407,8 +404,7 @@ CaseStmt *CaseStmt::create(ASTContext &C, SourceLoc CaseLoc,
                            ArrayRef<CaseLabelItem> CaseLabelItems,
                            bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
                            Optional<bool> Implicit) {
-  void *Mem = C.Allocate(sizeof(CaseStmt) +
-                             CaseLabelItems.size() * sizeof(CaseLabelItem),
+  void *Mem = C.Allocate(totalSizeToAlloc<CaseLabelItem>(CaseLabelItems.size()),
                          alignof(CaseStmt));
   return ::new (Mem) CaseStmt(CaseLoc, CaseLabelItems, HasBoundDecls, ColonLoc,
                               Body, Implicit);
@@ -420,12 +416,12 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                ArrayRef<CaseStmt *> Cases,
                                SourceLoc RBraceLoc,
                                ASTContext &C) {
-  void *p = C.Allocate(sizeof(SwitchStmt) + Cases.size() * sizeof(SwitchStmt*),
+  void *p = C.Allocate(totalSizeToAlloc<CaseStmt *>(Cases.size()),
                        alignof(SwitchStmt));
   SwitchStmt *theSwitch = ::new (p) SwitchStmt(LabelInfo, SwitchLoc,
                                                SubjectExpr, LBraceLoc,
                                                Cases.size(), RBraceLoc);
-  memcpy(theSwitch->getCaseBuffer(),
-         Cases.data(), Cases.size() * sizeof(CaseStmt*));
+  std::uninitialized_copy(Cases.begin(), Cases.end(),
+                          theSwitch->getTrailingObjects<CaseStmt *>());
   return theSwitch;
 }

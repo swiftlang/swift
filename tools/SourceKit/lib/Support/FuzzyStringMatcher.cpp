@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -35,7 +35,7 @@ FuzzyStringMatcher::FuzzyStringMatcher(StringRef pattern_)
   assert(pattern.size() == lowercasePattern.size());
 
   // FIXME: pull out the magic constants.
-  // This depends on the inner details of the matching algorithm and  will need
+  // This depends on the inner details of the matching algorithm and will need
   // to be updated if we substantially alter it.
   if (pattern.size() == 1) {
     maxScore = 3.0 +  // uppercase match
@@ -46,7 +46,7 @@ FuzzyStringMatcher::FuzzyStringMatcher(StringRef pattern_)
                pattern.size() * pattern.size(); // max run length score
     if (upperCharCount)                         // max uppercase match score
       maxScore += (upperCharCount + 1) * (upperCharCount + 1);
-    maxScore *= 1.1; // exact match bonus
+    maxScore *= 1.1 * 2.5; // exact prefix match bonus
   }
 }
 
@@ -154,7 +154,7 @@ struct CandidateSpecificMatcher {
   /// Calculates the candidate's score, matching the candidate from
   /// \p firstPatternPos or later.
   ///
-  /// This drives drives scoreCandidateTrial by trying the possible matches.
+  /// This drives scoreCandidateTrial by trying the possible matches.
   double scoreCandidate(unsigned firstPatternPos);
 
   /// Calculates the candidate's score, matching the candidate from
@@ -500,6 +500,10 @@ CandidateSpecificMatcher::scoreCandidateTrial(unsigned firstPatternPos) {
       runs[0].location == 0) {
     trialScore *= 1.1;
   }
+
+  // Exact prefix matches are the best.
+  if (!runs.empty() && runs[0].location == 0 && runs[0].length == patternLength)
+    trialScore *= 2.5;
 
   // FIXME: popular/unpopular API.
 

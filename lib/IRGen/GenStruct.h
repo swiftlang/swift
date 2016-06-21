@@ -1,8 +1,8 @@
-//===--- GenStruct.h - Swift IR generation for structs ------------*- C++ -*-===//
+//===--- GenStruct.h - Swift IR generation for structs ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -31,6 +31,7 @@ namespace irgen {
   class Explosion;
   class IRGenFunction;
   class IRGenModule;
+  class MemberAccessStrategy;
   
   Address projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                              Address base,
@@ -47,6 +48,13 @@ namespace irgen {
   llvm::Constant *emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
                                                       SILType baseType,
                                                       VarDecl *field);
+
+  /// Return a strategy for accessing the given stored struct property.
+  ///
+  /// This API is used by RemoteAST.
+  MemberAccessStrategy
+  getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
+                                        SILType baseType, VarDecl *field);
 
 } // end namespace irgen
 } // end namespace swift

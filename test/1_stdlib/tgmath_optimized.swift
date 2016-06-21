@@ -3,18 +3,13 @@
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
-import Darwin
+#if os(Linux) || os(FreeBSD) || os(Android)
+  import Glibc
+#else
+  import Darwin
+#endif
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var TGMathTestSuite = TestSuite("tgmath")
 
@@ -32,10 +27,10 @@ func minusOneFloatFunction() -> Float {
 }
 
 TGMathTestSuite.test("sqrt") {
-  expectTrue(isnan(sqrt(minusOneFloat)))
-  expectTrue(isnan(sqrt(minusOneFloatFunction())))
-  expectTrue(isnan(sqrt(minusOneDouble)))
-  expectTrue(isnan(sqrt(minusOneDoubleFunction())))
+  expectTrue(sqrt(minusOneFloat).isNaN)
+  expectTrue(sqrt(minusOneFloatFunction()).isNaN)
+  expectTrue(sqrt(minusOneDouble).isNaN)
+  expectTrue(sqrt(minusOneDoubleFunction()).isNaN)
 }
 
 runAllTests()

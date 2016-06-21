@@ -27,7 +27,7 @@ class ObjCClass : ObjCClassBase {
   }
 }
 
-func printState(x : ObjCClassBase?) {
+func printState(_ x : ObjCClassBase?) {
   print((x != nil) ? "is present" : "is nil")
 }
 

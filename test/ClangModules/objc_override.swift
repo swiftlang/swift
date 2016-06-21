@@ -6,20 +6,20 @@ import Foundation
 import ObjCParseExtras
 
 class MyArray : DummyClass {
-  func setBoolProperty(x: Bool) { } // expected-error{{method 'setBoolProperty' with Objective-C selector 'setBoolProperty:' conflicts with setter for 'boolProperty' from superclass 'DummyClass' with the same Objective-C selector}}
+  func setBoolProperty(_ x: Bool) { } // expected-error{{method 'setBoolProperty' with Objective-C selector 'setBoolProperty:' conflicts with setter for 'boolProperty' from superclass 'DummyClass' with the same Objective-C selector}}
 
   @objc(objectAtIndexedSubscript:)
-  func getObjectAt(i: Int) { } // expected-error{{method 'getObjectAt' with Objective-C selector 'objectAtIndexedSubscript:' conflicts with method 'objectAtIndexedSubscript' from superclass 'DummyClass' with the same Objective-C selector}}
+  func getObjectAt(_ i: Int) { } // expected-error{{method 'getObjectAt' with Objective-C selector 'objectAtIndexedSubscript:' conflicts with method 'objectAtIndexedSubscript' from superclass 'DummyClass' with the same Objective-C selector}}
 }
 
 class SomeCellSub1 : SomeCell {
   init(string: String) { super.init(string: string) } // expected-error{{overriding declaration requires an 'override' keyword}}{{3-3=override }}
 
   // okay: should not conflict
-  func initWithString(string: String) { }
+  func initWithString(_ string: String) { }
 
-  var enabled: Bool { // expected-error{{overriding declaration requires an 'override' keyword}}
-    get { return super.enabled }
+  var isEnabled: Bool { // expected-error{{overriding declaration requires an 'override' keyword}}
+    get { return super.isEnabled }
   }
 
   @objc(enabled)
@@ -30,10 +30,10 @@ class SomeCellSub2 : SomeCell {
   override init(string: String) { super.init(string: string) }
 
   // okay: should not conflict
-  func initWithString(string: String) { }
+  func initWithString(_ string: String) { }
 
-  override var enabled: Bool {
-    get { return super.enabled }
+  override var isEnabled: Bool {
+    get { return super.isEnabled }
   }
 
   @objc(enabled)
@@ -45,10 +45,10 @@ class SomeCellSub3 : SomeCell {
   override init(string: String) { super.init(string: string) }
 
   // okay: should not conflict
-  func initWithString(string: String) { }
+  func initWithString(_ string: String) { }
 
-  override var enabled: Bool {
-    @objc(isEnabled) get { return super.enabled }
+  override var isEnabled: Bool {
+    @objc(isEnabled) get { return super.isEnabled }
   }
 
   @objc(enabled)
@@ -60,10 +60,10 @@ class SomeCellSub4 : SomeCell {
   override init(string: String) { super.init(string: string) }
 
   // okay: should not conflict
-  func initWithString(string: String) { }
+  func initWithString(_ string: String) { }
 
-  override var enabled: Bool {
-    @objc get { return super.enabled }
+  override var isEnabled: Bool {
+    @objc get { return super.isEnabled }
   }
 
   @objc(enabled)
@@ -74,8 +74,8 @@ class SomeCellSub5 : SomeCell {
   @objc(initWithString:) // expected-error{{Objective-C method has a different selector from the method it overrides ('initWithString:' vs. 'initString:')}}{{9-24=initString:}}
   override init(string: String) { super.init(string: string) }
 
-  override var enabled: Bool {
-    @objc(wasEnabled) get { return super.enabled }
+  override var isEnabled: Bool {
+    @objc(wasEnabled) get { return super.isEnabled }
     // expected-error@-1{{Objective-C method has a different selector from the method it overrides ('wasEnabled' vs. 'isEnabled')}}{{11-21=isEnabled}}
   }
 

@@ -1,8 +1,8 @@
-//===--- Algorithm.h - -------------------------------------------*- C++ -*-==//
+//===--- Algorithm.h - ------------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,9 +21,15 @@
 namespace swift {
   /// Returns the minimum of `a` and `b`, or `a` if they are equivalent.
   template <typename T>
-  constexpr const T& min(const T &a, const T &b) {
+  constexpr const T &min(const T &a, const T &b) {
     return !(b < a) ? a : b;
   }
-} // namespace swift
+  
+  /// Returns the maximum of `a` and `b`, or `a` if they are equivalent.
+  template <typename T>
+  constexpr const T &max(const T &a, const T &b) {
+    return (a < b) ? b : a;
+  }
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_ALGORITHM_H

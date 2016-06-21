@@ -1,8 +1,8 @@
-//===--- ManagedBuffer.swift - variable-sized buffer of aligned memory ---===//
+//===--- ManagedBuffer.swift - variable-sized buffer of aligned memory ----===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,7 +20,7 @@ public class NonObjectiveCBase {
   public init() {}
 }
 
-/// A base class of `ManagedBuffer<Value,Element>`, used during
+/// A base class of `ManagedBuffer<Value, Element>`, used during
 /// instance creation.
 ///
 /// During instance creation, in particular during
@@ -34,9 +34,9 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "value" area when
   /// an instance is created.
-  public final var allocatedElementCount: Int {
-    let p = ManagedBufferPointer<Value,Element>(self)
-    return p.allocatedElementCount
+  public final var capacity: Int {
+    let p = ManagedBufferPointer<Value, Element>(self)
+    return p.capacity
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
@@ -45,7 +45,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointerToValue<R>(
-    body: (UnsafeMutablePointer<Value>)->R
+    _ body: (UnsafeMutablePointer<Value>) -> R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
@@ -56,7 +56,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<Element>)->R
+    _ body: (UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
   }
@@ -67,7 +67,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointers<R>(
-    body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
+    _ body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return ManagedBufferPointer(self).withUnsafeMutablePointers(body)
   }
@@ -99,20 +99,23 @@ public class ManagedBuffer<Value, Element>
   /// generate an initial `Value`.
   public final class func create(
     minimumCapacity: Int,
-    initialValue: (ManagedProtoBuffer<Value,Element>)->Value
-  ) -> ManagedBuffer<Value,Element> {
+    initialValue: (ManagedProtoBuffer<Value, Element>) -> Value
+  ) -> ManagedBuffer<Value, Element> {
 
-    let p = ManagedBufferPointer<Value,Element>(
+    let p = ManagedBufferPointer<Value, Element>(
       bufferClass: self,
       minimumCapacity: minimumCapacity,
-      initialValue: { buffer, _ in initialValue(unsafeDowncast(buffer)) })
+      initialValue: { buffer, _ in
+        initialValue(
+          unsafeDowncast(buffer, to: ManagedProtoBuffer<Value, Element>.self))
+      })
 
-    return unsafeDowncast(p.buffer)
+    return unsafeDowncast(p.buffer, to: ManagedBuffer<Value, Element>.self)
   }
 
   /// Destroy the stored Value.
   deinit {
-    ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0.destroy() }
+    ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0.deinitialize() }
   }
 
   /// The stored `Value` instance.
@@ -143,12 +146,12 @@ public class ManagedBuffer<Value, Element>
 /// --------------------
 ///
 ///      class MyBuffer<Element> { // non-@objc
-///        typealias Manager = ManagedBufferPointer<(Int,String), Element>
+///        typealias Manager = ManagedBufferPointer<(Int, String), Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
-///            (pointerToValue, pointerToElements)->Void in
-///            pointerToElements.destroy(self.count)
-///            pointerToValue.destroy()
+///            (pointerToValue, pointerToElements) -> Void in
+///            pointerToElements.deinitialize(count: self.count)
+///            pointerToValue.deinitialize()
 ///          }
 ///        }
 ///
@@ -161,6 +164,7 @@ public class ManagedBuffer<Value, Element>
 ///        }
 ///      }
 ///
+@_fixed_layout
 public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Create with new storage containing an initial `Value` and space
@@ -174,24 +178,24 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   ///   object and a function that can be called on it to get the actual
   ///   number of allocated elements.
   ///
-  /// - Requires: `minimumCapacity >= 0`, and the type indicated by
+  /// - Precondition: `minimumCapacity >= 0`, and the type indicated by
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
   ///   stored `Value` and any constructed `Element`s.
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
-    initialValue: (buffer: AnyObject, allocatedCount: (AnyObject)->Int)->Value
+    initialValue: (buffer: AnyObject, capacity: (AnyObject) -> Int) -> Value
   ) {
     self = ManagedBufferPointer(bufferClass: bufferClass, minimumCapacity: minimumCapacity)
 
     // initialize the value field
     withUnsafeMutablePointerToValue {
-      $0.initialize(
+      $0.initialize(with: 
         initialValue(
           buffer: self.buffer,
-          allocatedCount: {
-            ManagedBufferPointer(unsafeBufferObject: $0).allocatedElementCount
+          capacity: {
+            ManagedBufferPointer(unsafeBufferObject: $0).capacity
           }))
     }
     // FIXME: workaround for <rdar://problem/18619176>.  If we don't
@@ -201,9 +205,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Manage the given `buffer`.
   ///
-  /// - Requires: `buffer` is an instance of a non-`@objc` class whose
-  ///   `deinit` destroys its stored `Value` and any constructed
-  ///   `Element`s.
+  /// - Precondition: `buffer` is an instance of a non-`@objc` class whose
+  ///   `deinit` destroys its stored `Value` and any constructed `Element`s.
   public init(unsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._checkValidBufferClass(buffer.dynamicType)
 
@@ -218,6 +221,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// _debugPreconditions in _checkValidBufferClass for any array. Since we know
   /// for the _ContiguousArrayBuffer that this check must always succeed we omit
   /// it in this specialized constructor.
+  @_versioned
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._sanityCheckValidBufferClass(buffer.dynamicType)
     self._nativeBuffer = Builtin.castToNativeObject(buffer)
@@ -233,7 +237,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     }
   }
 
-  /// Return the object instance being used for storage.
+  /// Returns the object instance being used for storage.
   public var buffer: AnyObject {
     return Builtin.castFromNativeObject(_nativeBuffer)
   }
@@ -243,8 +247,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// This value may be nontrivial to compute; it is usually a good
   /// idea to store this information in the "value" area when
   /// an instance is created.
-  public var allocatedElementCount: Int {
-    return (_allocatedByteCount &- _My._elementOffset) / strideof(Element)
+  public var capacity: Int {
+    return (_capacityInBytes &- _My._elementOffset) / strideof(Element.self)
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
@@ -253,7 +257,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: This pointer is only valid
   ///   for the duration of the call to `body`.
   public func withUnsafeMutablePointerToValue<R>(
-    body: (UnsafeMutablePointer<Value>)->R
+    _ body: @noescape (UnsafeMutablePointer<Value>) -> R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
@@ -264,7 +268,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<Element>)->R
+    _ body: (UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
   }
@@ -275,21 +279,21 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointers<R>(
-    body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
+    _ body: @noescape (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
   ) -> R {
     let result = body(_valuePointer, _elementPointer)
     _fixLifetime(_nativeBuffer)
     return result
   }
 
-  /// Returns true iff `self` holds the only strong reference to its buffer.
+  /// Returns `true` iff `self` holds the only strong reference to its buffer.
   ///
   /// See `isUniquelyReferenced` for details.
   public mutating func holdsUniqueReference() -> Bool {
     return _isUnique(&_nativeBuffer)
   }
 
-  /// Returns true iff either `self` holds the only strong reference
+  /// Returns `true` iff either `self` holds the only strong reference
   /// to its buffer or the pinned has been 'pinned'.
   ///
   /// See `isUniquelyReferenced` for details.
@@ -306,7 +310,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - parameter minimumCapacity: The minimum number of `Element`s that
   ///   must be able to be stored in the new buffer.
   ///
-  /// - Requires: `minimumCapacity >= 0`, and the type indicated by
+  /// - Precondition: `minimumCapacity >= 0`, and the type indicated by
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
   ///   stored `Value` and any constructed `Element`s.
@@ -325,6 +329,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Internal version for use by _ContiguousArrayBuffer.init where we know that
   /// we have a valid buffer class and that the capacity is >= 0.
+  @_versioned
   internal init(
     _uncheckedBufferClass: AnyClass,
     minimumCapacity: Int
@@ -338,7 +343,9 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
       +  minimumCapacity * strideof(Element.self)
 
     let newBuffer: AnyObject = _swift_bufferAllocate(
-      _uncheckedBufferClass, totalSize, _My._alignmentMask)
+      bufferType: _uncheckedBufferClass,
+      size: totalSize,
+      alignmentMask: _My._alignmentMask)
 
     self._nativeBuffer = Builtin.castToNativeObject(newBuffer)
   }
@@ -354,7 +361,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   internal typealias _My = ManagedBufferPointer
 
   internal static func _checkValidBufferClass(
-    bufferClass: AnyClass, creating: Bool = false
+    _ bufferClass: AnyClass, creating: Bool = false
   ) {
     _debugPrecondition(
       _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
@@ -371,7 +378,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   }
 
   internal static func _sanityCheckValidBufferClass(
-    bufferClass: AnyClass, creating: Bool = false
+    _ bufferClass: AnyClass, creating: Bool = false
   ) {
     _sanityCheck(
       _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
@@ -395,7 +402,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   }
 
   /// The actual number of bytes allocated for this object.
-  internal var _allocatedByteCount: Int {
+  internal var _capacityInBytes: Int {
     return _swift_stdlib_malloc_size(_address)
   }
 
@@ -406,13 +413,17 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Offset from the allocated storage for `self` to the stored `Value`
   internal static var _valueOffset: Int {
-    return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
+    _onFastPath()
+    return _roundUp(
+      sizeof(_HeapObject.self),
+      toAlignment: alignof(Value.self))
   }
 
   /// An **unmanaged** pointer to the storage for the `Value`
   /// instance.  Not safe to use without _fixLifetime calls to
   /// guarantee it doesn't dangle
   internal var _valuePointer: UnsafeMutablePointer<Value> {
+    _onFastPath()
     return UnsafeMutablePointer(_address + _My._valueOffset)
   }
 
@@ -420,13 +431,16 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// safe to use without _fixLifetime calls to guarantee it doesn't
   /// dangle.
   internal var _elementPointer: UnsafeMutablePointer<Element> {
+    _onFastPath()
     return UnsafeMutablePointer(_address + _My._elementOffset)
   }
 
   /// Offset from the allocated storage for `self` to the `Element` storage
   internal static var _elementOffset: Int {
-    return _roundUpToAlignment(
-      _valueOffset + sizeof(Value.self), alignof(Element.self))
+    _onFastPath()
+    return _roundUp(
+      _valueOffset + sizeof(Value.self),
+      toAlignment: alignof(Element.self))
   }
 
   internal var _nativeBuffer: Builtin.NativeObject
@@ -453,7 +467,7 @@ public func == <Value, Element>(
 /// Useful for implementing the copy-on-write optimization for the
 /// deep storage of value types:
 ///
-///     mutating func modifyMe(arg: X) {
+///     mutating func modifyMe(_ arg: X) {
 ///       if isUniquelyReferencedNonObjC(&myStorage) {
 ///         myStorage.modifyInPlace(arg)
 ///       }
@@ -465,12 +479,12 @@ public func == <Value, Element>(
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
-public func isUniquelyReferencedNonObjC<T : AnyObject>(inout object: T) -> Bool
+public func isUniquelyReferencedNonObjC<T : AnyObject>(_ object: inout T) -> Bool
 {
   return _isUnique(&object)
 }
 
-internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T) -> Bool {
+internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(_ object: inout T) -> Bool {
   return _isUniqueOrPinned(&object)
 }
 
@@ -484,7 +498,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T
 /// Useful for implementing the copy-on-write optimization for the
 /// deep storage of value types:
 ///
-///     mutating func modifyMe(arg: X) {
+///     mutating func modifyMe(_ arg: X) {
 ///       if isUniquelyReferenced(&myStorage) {
 ///         myStorage.modifyInPlace(arg)
 ///       }
@@ -497,7 +511,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
 public func isUniquelyReferenced<T : NonObjectiveCBase>(
-  inout object: T
+  _ object: inout T
 ) -> Bool {
   return _isUnique(&object)
 }
@@ -513,7 +527,7 @@ public func isUniquelyReferenced<T : NonObjectiveCBase>(
 /// Useful for implementing the copy-on-write optimization for the
 /// deep storage of value types:
 ///
-///     mutating func modifyMe(arg: X) {
+///     mutating func modifyMe(_ arg: X) {
 ///       if isUniquelyReferencedNonObjC(&myStorage) {
 ///         myStorage.modifyInPlace(arg)
 ///       }
@@ -526,7 +540,14 @@ public func isUniquelyReferenced<T : NonObjectiveCBase>(
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
 public func isUniquelyReferencedNonObjC<T : AnyObject>(
-  inout object: T?
+  _ object: inout T?
 ) -> Bool {
   return _isUnique(&object)
+}
+
+extension ManagedBufferPointer {
+  @available(*, unavailable, renamed: "capacity")
+  public var allocatedElementCount: Int {
+    Builtin.unreachable()
+  }
 }

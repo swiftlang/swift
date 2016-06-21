@@ -78,7 +78,7 @@ private enum TestEnum {
 }
 
 private protocol TestProtocol {
-  private typealias Foo // expected-error {{'private' modifier cannot be applied to this declaration}} {{3-11=}}
+  private associatedtype Foo // expected-error {{'private' modifier cannot be applied to this declaration}} {{3-11=}}
   internal var Bar: Int { get } // expected-error {{'internal' modifier cannot be used in protocols}} {{3-12=}}
   public func baz() // expected-error {{'public' modifier cannot be used in protocols}} {{3-10=}}
 }
@@ -148,7 +148,7 @@ internal struct InternalStruct {} // expected-note * {{declared here}}
 private struct PrivateStruct {} // expected-note * {{declared here}}
 
 protocol InternalProto { // expected-note * {{declared here}}
-  typealias Assoc // expected-note {{type declared here}}
+  associatedtype Assoc // expected-note {{type declared here}}
 }
 public extension InternalProto {} // expected-error {{extension of internal protocol cannot be declared public}} {{1-8=}}
 internal extension InternalProto where Assoc == PublicStruct {}
@@ -159,7 +159,7 @@ private extension InternalProto where Assoc == InternalStruct {}
 private extension InternalProto where Assoc == PrivateStruct {}
 
 public protocol PublicProto {
-  typealias Assoc // expected-note * {{type declared here}}
+  associatedtype Assoc // expected-note * {{type declared here}}
 }
 public extension PublicProto {}
 public extension PublicProto where Assoc == PublicStruct {}
@@ -190,7 +190,7 @@ extension GenericStruct where Param: InternalProto {
 
 
 public protocol ProtoWithReqs {
-  typealias Assoc
+  associatedtype Assoc
   func foo()
 }
 

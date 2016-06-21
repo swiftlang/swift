@@ -7,7 +7,7 @@ struct NotClass {}
 
 class SomeClass {}
 
-func nsobject_as_class_cast<T>(x: NSObject, _: T) {
+func nsobject_as_class_cast<T>(_ x: NSObject, _: T) {
   let _ = x is AnyObject.Type
   let _ = x as! AnyObject.Type
   let _ = x as? AnyObject.Type
@@ -31,7 +31,7 @@ func nsobject_as_class_cast<T>(x: NSObject, _: T) {
 
 
 // <rdar://problem/20294245> QoI: Error message mentions value rather than key for subscript
-func test(a : CFString!, b : CFString) {
+func test(_ a : CFString!, b : CFString) {
   var dict = NSMutableDictionary()
   let object = NSObject()
   dict[a] = object // expected-error {{argument type 'CFString!' does not conform to expected type 'NSCopying'}}
@@ -42,6 +42,6 @@ func test(a : CFString!, b : CFString) {
 
 
 // <rdar://problem/22507759> QoI: poor error message for invalid unsafeDowncast()
-let r22507759: NSObject! = "test"
+let r22507759: NSObject! = "test" as NSString
 let _: NSString! = unsafeDowncast(r22507759)  // expected-error {{generic parameter 'T' could not be inferred}}
 

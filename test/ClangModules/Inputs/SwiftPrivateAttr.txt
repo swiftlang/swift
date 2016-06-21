@@ -4,28 +4,29 @@ protocol __PrivProto {
 }
 class Foo : NSObject, __PrivProto {
   var __privValue: AnyObject!
+  class var __privClassValue: AnyObject!
   func __noArgs()
-  func __oneArg(arg: Int32)
-  func __twoArgs(arg: Int32, other arg2: Int32)
+  func __oneArg(_ arg: Int32)
+  func __twoArgs(_ arg: Int32, other arg2: Int32)
   class func __foo() -> Self!
-  class func __fooWithNoArgs() -> Self!
+  class func __withNoArgs() -> Self!
   convenience init!(__oneArg arg: Int32)
-  @available(*, unavailable, message="use object construction 'Foo(__oneArg:)'")
-  class func __fooWithOneArg(arg: Int32) -> Self!
+  @available(*, unavailable, message: "use object construction 'Foo(__oneArg:)'")
+  class func __withOneArg(_ arg: Int32) -> Self!
   convenience init!(__twoArgs arg: Int32, other arg2: Int32)
-  @available(*, unavailable, message="use object construction 'Foo(__twoArgs:other:)'")
-  class func __fooWithTwoArgs(arg: Int32, other arg2: Int32) -> Self!
+  @available(*, unavailable, message: "use object construction 'Foo(__twoArgs:other:)'")
+  class func __withTwoArgs(_ arg: Int32, other arg2: Int32) -> Self!
   convenience init!(__ arg: Int32)
-  @available(*, unavailable, message="use object construction 'Foo(__:)'")
-  class func __foo(arg: Int32) -> Self!
-  func objectForKeyedSubscript(index: AnyObject!) -> AnyObject!
-  func __setObject(object: AnyObject!, forKeyedSubscript index: AnyObject!)
-  func __objectAtIndexedSubscript(index: Int32) -> AnyObject!
-  func setObject(object: AnyObject!, atIndexedSubscript index: Int32)
+  @available(*, unavailable, message: "use object construction 'Foo(__:)'")
+  class func __foo(_ arg: Int32) -> Self!
+  func objectForKeyedSubscript(_ index: AnyObject!) -> AnyObject!
+  func __setObject(_ object: AnyObject!, forKeyedSubscript index: AnyObject!)
+  func __objectAtIndexedSubscript(_ index: Int32) -> AnyObject!
+  func setObject(_ object: AnyObject!, atIndexedSubscript index: Int32)
   init()
 }
 class Bar : NSObject {
-  init!(__: ())
+  init!()
   init!(__noArgs: ())
   init!(__oneArg arg: Int32)
   init!(__twoArgs arg: Int32, other arg2: Int32)
@@ -80,20 +81,21 @@ enum __PrivNSEnum : Int {
 enum NSEnum : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
-  case __PrivA
+  case __privA
   case B
 }
-struct __PrivNSOptions : OptionSetType {
+struct __PrivNSOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
   static var A: __PrivNSOptions { get }
 }
-struct NSOptions : OptionSetType {
+struct NSOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
-  static var __PrivA: NSOptions { get }
+  static var __privA: NSOptions { get }
   static var B: NSOptions { get }
 }
-typealias __PrivCFTypeRef = __PrivCFType
-typealias __PrivCFSubRef = __PrivCFSub
+class __PrivCFType {
+}
+typealias __PrivCFSub = __PrivCFType
 typealias __PrivInt = Int32

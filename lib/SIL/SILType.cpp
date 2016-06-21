@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -317,13 +317,6 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }
 
-bool SILType::hasFixedLayout(SILModule &M) const {
-  if (auto *NTD = getNominalOrBoundGenericNominal())
-    return NTD->hasFixedLayout(M.getSwiftModule());
-
-  llvm_unreachable("hasFixedLayout on non-nominal types not implemented");
-}
-
 /// True if the type, or the referenced type of an address type, is
 /// address-only. For example, it could be a resilient struct or something of
 /// unknown size.
@@ -416,7 +409,7 @@ bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
       for (VarDecl *Var : S->getStoredProperties())
         Worklist.push_back(Ty.getFieldType(Var, Mod));
 
-    // If we have a class address, it is a pointer so it can not contain other
+    // If we have a class address, it is a pointer so it cannot contain other
     // types.
 
     // If we reached this point, then this type has no subrecords. Since it does
@@ -443,13 +436,8 @@ OptionalTypeKind SILType::getOptionalTypeKind() const {
 SILType SILType::getAnyOptionalObjectType(SILModule &M,
                                           OptionalTypeKind &OTK) const {
   if (auto objectTy = getSwiftRValueType()->getAnyOptionalObjectType(OTK)) {
-    // Lower the payload type at the abstraction level of Optional's generic
-    // parameter.
-    auto archetype = getNominalOrBoundGenericNominal()->getGenericParams()
-      ->getPrimaryArchetypes()[0];
-    
     auto loweredTy
-      = M.Types.getLoweredType(AbstractionPattern(archetype), objectTy);
+      = M.Types.getLoweredType(AbstractionPattern::getOpaque(), objectTy);
     
     return SILType(loweredTy.getSwiftRValueType(), getCategory());
   }
@@ -460,7 +448,7 @@ SILType SILType::getAnyOptionalObjectType(SILModule &M,
 
 /// True if the given type value is nonnull, and the represented type is NSError
 /// or CFError, the error classes for which we support "toll-free" bridging to
-/// ErrorType existentials.
+/// ErrorProtocol existentials.
 static bool isBridgedErrorClass(SILModule &M,
                                 Type t) {
   if (!t)
@@ -478,9 +466,9 @@ static bool isBridgedErrorClass(SILModule &M,
   return false;
 }
 
-static bool isErrorTypeExistential(ArrayRef<ProtocolDecl*> protocols) {
+static bool isErrorProtocolExistential(ArrayRef<ProtocolDecl*> protocols) {
   return protocols.size() == 1
-    && protocols[0]->isSpecificProtocol(KnownProtocolKind::ErrorType);
+    && protocols[0]->isSpecificProtocol(KnownProtocolKind::ErrorProtocol);
 }
 
 ExistentialRepresentation
@@ -497,9 +485,9 @@ SILType::getPreferredExistentialRepresentation(SILModule &M,
   if (!getSwiftRValueType()->isAnyExistentialType(protocols))
     return ExistentialRepresentation::None;
   
-  // The (uncomposed) ErrorType existential uses a special boxed representation.
-  if (isErrorTypeExistential(protocols)) {
-    // NSError or CFError references can be adopted directly as ErrorType
+  // The (uncomposed) ErrorProtocol existential uses a special boxed representation.
+  if (isErrorProtocolExistential(protocols)) {
+    // NSError or CFError references can be adopted directly as ErrorProtocol
     // existentials.
     if (isBridgedErrorClass(M, containedType)) {
       return ExistentialRepresentation::Class;
@@ -533,10 +521,10 @@ SILType::canUseExistentialRepresentation(SILModule &M,
     SmallVector<ProtocolDecl *, 4> protocols;
     if (!getSwiftRValueType()->isAnyExistentialType(protocols))
       return false;
-    // The (uncomposed) ErrorType existential uses a special boxed
+    // The (uncomposed) ErrorProtocol existential uses a special boxed
     // representation. It can also adopt class references of bridged error types
     // directly.
-    if (isErrorTypeExistential(protocols))
+    if (isErrorProtocolExistential(protocols))
       return repr == ExistentialRepresentation::Boxed
         || (repr == ExistentialRepresentation::Class
             && isBridgedErrorClass(M, containedType));

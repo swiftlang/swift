@@ -1,7 +1,7 @@
 // RUN: not %target-swift-frontend %s -parse
 
 /// Abstraction of numeric types that approximate real numbers
-protocol ApproximateRealType {
+protocol ApproximateReal {
   init() // zero
   func * (Self,Self) -> Self
   func + (Self,Self) -> Self
@@ -11,23 +11,23 @@ protocol ApproximateRealType {
   prefix func - (Self) -> Self
 }
 
-extension Double : ApproximateRealType {}
-extension Float : ApproximateRealType {}
+extension Double : ApproximateReal {}
+extension Float : ApproximateReal {}
 
 // Abstraction of a mathematical vector
-protocol VectorType {
+protocol Vector {
   init()
-  typealias Element : ApproximateRealType
+  associatedtype Element : ApproximateReal
   func dotProduct(Self) -> Element
 
 
   // Extras
   var count: Int {get}
   subscript(Int) -> Element {get set}
-  typealias Tail
+  associatedtype Tail
 }
 
-struct EmptyVector<T: ApproximateRealType> : VectorType {
+struct EmptyVector<T: ApproximateReal> : Vector {
   init() {}
   typealias Element = T
   func dotProduct(other: EmptyVector) -> Element {
@@ -41,7 +41,7 @@ struct EmptyVector<T: ApproximateRealType> : VectorType {
   }
 }
 
-struct Vector<Tail: VectorType> : VectorType {
+struct Vector<Tail: Vector> : Vector {
   typealias Element = Tail.Element
   
   init(head: Element, tail: Tail) {
@@ -75,7 +75,7 @@ struct Vector<Tail: VectorType> : VectorType {
   }
 }
 
-extension VectorType where Tail == EmptyVector<Element> {
+extension Vector where Tail == EmptyVector<Element> {
   init(_ scalar: Element) {
     self.init()
     self[0] = scalar
@@ -89,10 +89,10 @@ infix operator ⋮ {
   precedence 1
 }
 
-func ⋮ <T: ApproximateRealType> (lhs: T, rhs: T) -> Vector<Vector<EmptyVector<T> > > {
+func ⋮ <T: ApproximateReal> (lhs: T, rhs: T) -> Vector<Vector<EmptyVector<T> > > {
   return Vector(head: lhs, tail: Vector(head: rhs, tail: EmptyVector()))
 }
-func ⋮ <T: ApproximateRealType, U where U.Element == T> (lhs: T, rhs: Vector<U>) -> Vector<Vector<U> > {
+func ⋮ <T: ApproximateReal, U where U.Element == T> (lhs: T, rhs: Vector<U>) -> Vector<Vector<U> > {
   return Vector(head: lhs, tail: rhs)
 }
 

@@ -4,7 +4,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
@@ -45,7 +44,7 @@ Optional<std::pair<unsigned, unsigned>> swift::ide::parseLineCol(StringRef LineC
 }
 
 void XMLEscapingPrinter::printText(StringRef Text) {
-  llvm::markup::appendWithXMLEscaping(OS, Text);
+  swift::markup::appendWithXMLEscaping(OS, Text);
 }
 
 void XMLEscapingPrinter::printXML(StringRef Text) {

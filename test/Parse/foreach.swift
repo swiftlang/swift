@@ -1,18 +1,18 @@
 // RUN: %target-parse-verify-swift
 
-struct IntRange<Int> : SequenceType, GeneratorType {
+struct IntRange<Int> : Sequence, IteratorProtocol {
   typealias Element = (Int, Int)
   func next() -> (Int, Int)? {}
 
-  typealias Generator = IntRange<Int>
-  func generate() -> IntRange<Int> { return self }
+  typealias Iterator = IntRange<Int>
+  func makeIterator() -> IntRange<Int> { return self }
 }
 
-func for_each(r: Range<Int>, iir: IntRange<Int>) {
+func for_each(r: Range<Int>, iir: IntRange<Int>) { // expected-note 2 {{did you mean 'r'?}}
   var sum = 0
 
   // Simple foreach loop, using the variable in the body
-  for i in r {
+  for i in CountableRange(r) {
     sum = sum + i
   }
   // Check scoping of variable introduced with foreach loop
@@ -30,12 +30,7 @@ func for_each(r: Range<Int>, iir: IntRange<Int>) {
   }
 
   // Parse errors
-  for i r { // expected-error 2{{expected ';' in 'for' statement}} expected-error {{use of unresolved identifier 'i'}}
+  for i r { // expected-error 2{{expected ';' in 'for' statement}} expected-error {{use of unresolved identifier 'i'}} expected-error {{type 'Range<Int>' does not conform to protocol 'Boolean'}}
   }
-  for i in r sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
-  for let x in 0..<10 {} // expected-error {{'let' pattern is already in an immutable context}} {{7-11=}}
-
-  // FIXME: rdar://problem/23378003
-  // This will eventually become an error.
-  for var x in 0..<10 {} // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{7-11=}}
+  for i in CountableRange(r) sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
 }

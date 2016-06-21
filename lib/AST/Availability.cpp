@@ -1,8 +1,8 @@
-//===--- Availability.cpp - Swift Availability Structures -------*- C++ -*-===//
+//===--- Availability.cpp - Swift Availability Structures -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -121,19 +121,19 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   }
 }
 
-Optional<VersionRange>
+Optional<AvailabilityContext>
 AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
-  Optional<VersionRange> AnnotatedRange;
+  Optional<AvailabilityContext> AnnotatedRange;
 
   for (auto Attr : D->getAttrs()) {
     auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
-    if (AvailAttr == NULL || !AvailAttr->Introduced.hasValue() ||
+    if (AvailAttr == nullptr || !AvailAttr->Introduced.hasValue() ||
         !AvailAttr->isActivePlatform(Ctx)) {
       continue;
     }
 
-    VersionRange AttrRange =
-        VersionRange::allGTE(AvailAttr->Introduced.getValue());
+    AvailabilityContext AttrRange{
+        VersionRange::allGTE(AvailAttr->Introduced.getValue())};
 
     // If we have multiple introduction versions, we will conservatively
     // assume the worst case scenario. We may want to be more precise here
@@ -149,9 +149,10 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
   return AnnotatedRange;
 }
 
-VersionRange AvailabilityInference::availableRange(const Decl *D,
-                                                   ASTContext &Ctx) {
-  Optional<VersionRange> AnnotatedRange = annotatedAvailableRange(D, Ctx);
+AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
+                                                          ASTContext &Ctx) {
+  Optional<AvailabilityContext> AnnotatedRange =
+      annotatedAvailableRange(D, Ctx);
   if (AnnotatedRange.hasValue()) {
     return AnnotatedRange.getValue();
   }
@@ -173,7 +174,7 @@ VersionRange AvailabilityInference::availableRange(const Decl *D,
   }
 
   // Treat unannotated declarations as always available.
-  return VersionRange::all();
+  return AvailabilityContext::alwaysAvailable();
 }
 
 namespace {
@@ -181,13 +182,13 @@ namespace {
 class AvailabilityInferenceTypeWalker : public TypeWalker {
 public:
   ASTContext &AC;
-  VersionRange AvailableRange = VersionRange::all();
+  AvailabilityContext AvailabilityInfo = AvailabilityContext::alwaysAvailable();
 
   AvailabilityInferenceTypeWalker(ASTContext &AC) : AC(AC) {}
 
   virtual Action walkToTypePre(Type ty) {
     if (auto *nominalDecl = ty.getCanonicalTypeOrNull().getAnyNominal()) {
-      AvailableRange.intersectWith(
+      AvailabilityInfo.intersectWith(
           AvailabilityInference::availableRange(nominalDecl, AC));
     }
 
@@ -197,8 +198,8 @@ public:
 };
 
 
-VersionRange AvailabilityInference::inferForType(Type t) {
+AvailabilityContext AvailabilityInference::inferForType(Type t) {
   AvailabilityInferenceTypeWalker walker(t->getASTContext());
   t.walk(walker);
-  return walker.AvailableRange;
+  return walker.AvailabilityInfo;
 }

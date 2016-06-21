@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+
+import sys
+import textwrap
+
+
+def get_arguments():
+    import argparse
+
+    parser = argparse.ArgumentParser(textwrap.dedent("""
+    This is a simple script that takes input from stdin and prints out any
+    lines that are greater than 80+ characters. In such a case, it will print
+    out the line number, the length of the line, and the line with whitespace
+    stripped. The reason why we print out the line with whitespace stripped is
+    that in the case where there is a lot of redundant whitespace, the output
+    becomes hard to read and no value is provided in terms of finding the line
+    in question.
+
+    Exits with 1 if it finds any violating lines, 0 otherwise."""))
+
+    parser.add_argument('infile', nargs='?', type=argparse.FileType('r'),
+                        default=sys.stdin,
+                        help=textwrap.dedent("""The file to read input from. If
+                        no file is provided, stdin is used."""))
+    parser.add_argument('-o', '--output', type=argparse.FileType('w'),
+                        default=sys.stdout,
+                        help=textwrap.dedent("""The file to print to. If no
+                             file is provided, stdout is used"""),
+                        dest='outfile')
+    parser.add_argument('--max-length', type=int, default=80, metavar='LENGTH',
+                        help=textwrap.dedent("""Maximum line length that the
+                                                script should check for"""))
+    parser.add_argument('--count-newline', action='store_false',
+                        help=textwrap.dedent("""Should we include the newline
+                                                in our line length count"""))
+    return parser.parse_args()
+
+args = get_arguments()
+
+found_violation = False
+
+for lineno, line in enumerate(args.infile, start=1):
+    # sys.stdin.readlines() includes a newline. So we subtract 1 from our
+    # length to get the "true" line length.
+    length = len(line) - int(args.count_newline)
+    if length > args.max_length:
+        found_violation = True
+        print("line: {}. length: {}: {}".format(lineno, length, line.strip()),
+              file=args.outfile)
+
+sys.exit(found_violation)

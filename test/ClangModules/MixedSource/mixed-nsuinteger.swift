@@ -9,16 +9,16 @@ import user
 
 var ui: UInt = 5
 var i: Int = 56
-var p: UnsafeMutablePointer<NSFastEnumerationState> = nil
-var pp: AutoreleasingUnsafeMutablePointer<AnyObject?> = nil
+var p: UnsafeMutablePointer<NSFastEnumerationState>? = nil
+var pp: AutoreleasingUnsafeMutablePointer<AnyObject?>? = nil
 
 var userTypedObj = NSUIntTest()
 
 // Check that the NSUInteger comes across as UInt from user Obj C modules. 
-var ur: UInt = userTypedObj.myCustomMethodThatOperatesOnNSUIntegers(ui)
+var ur: UInt = userTypedObj.myCustomMethodThatOperates(onNSUIntegers: ui)
 
-userTypedObj.IntProp = ui
-userTypedObj.TypedefProp = ui
+userTypedObj.intProp = ui
+userTypedObj.typedefProp = ui
 ur = testFunction(ui)
 testFunctionInsideMacro(ui)
 
@@ -31,18 +31,18 @@ ur = testFunctionWithPointerParam(pui)
 // The types are treated as system types when working with objects having
 // protocol type.
 var a: [NSFastEnumeration] = [NSUIntTest(), NSUIntTest()]
-var r: Int = a[0].countByEnumeratingWithState(p, objects: pp, count: i)
+var r: Int = a[0].countByEnumerating(with: p!, objects: pp!, count: i)
 
 // When working with instances typed as user-defined, NSUInteger comes
 // across as UInt.
-var rr: UInt = userTypedObj.countByEnumeratingWithState(p, objects: pp, count: ui)
+var rr: UInt = userTypedObj.countByEnumerating(with: p!, objects: pp!, count: ui)
 
 // Check exercising protocol conformance.
-func gen<T:NSFastEnumeration>(t:T) {
+func gen<T:NSFastEnumeration>(_ t:T) {
   let i: Int = 56
-  let p: UnsafeMutablePointer<NSFastEnumerationState> = nil
-  let pp: AutoreleasingUnsafeMutablePointer<AnyObject?> = nil
-  t.countByEnumeratingWithState(p, objects: pp, count: i)
+  let p: UnsafeMutablePointer<NSFastEnumerationState>? = nil
+  let pp: AutoreleasingUnsafeMutablePointer<AnyObject?>? = nil
+  t.countByEnumerating(with: p!, objects: pp!, count: i)
 }
 
 gen(userTypedObj)

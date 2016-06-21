@@ -1,8 +1,8 @@
-//===- DiagnosticsCommon.def - Diagnostics Text -----------------*- C++ -*-===//
+//===--- DiagnosticsCommon.def - Diagnostics Text ---------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,69 +22,65 @@
 #endif
 
 #ifndef ERROR
-#  define ERROR(ID,Category,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#  define ERROR(ID,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Options,Text,Signature)
 #endif
 
 #ifndef WARNING
-#  define WARNING(ID,Category,Options,Text,Signature) \
-  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#  define WARNING(ID,Options,Text,Signature) \
+  DIAG(WARNING,ID,Options,Text,Signature)
 #endif
 
 #ifndef NOTE
-#  define NOTE(ID,Category,Options,Text,Signature) \
-  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#  define NOTE(ID,Options,Text,Signature) \
+  DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
-ERROR(invalid_diagnostic,common,none,
+ERROR(invalid_diagnostic,none,
       "INTERNAL ERROR: this diagnostic should not be produced", ())
 
-ERROR(not_implemented,TODO,none,
+ERROR(not_implemented,none,
       "INTERNAL ERROR: feature not implemented: %0", (StringRef))
 
-ERROR(error_opening_output,common,none,
+ERROR(error_opening_output,none,
       "error opening '%0' for output: %1", (StringRef, StringRef))
 
+ERROR(error_no_group_info,none,
+      "no group info found for file: '%0'", (StringRef))
 
-NOTE(previous_decldef,common,none,
+NOTE(previous_decldef,none,
      "previous %select{declaration|definition}0 of %1 is here", 
      (bool, Identifier))
 
 
 // Generic disambiguation
-NOTE(while_parsing_as_left_angle_bracket,common,none,
+NOTE(while_parsing_as_left_angle_bracket,none,
      "while parsing this '<' as a type parameter bracket", ())
-NOTE(while_parsing_as_less_operator,common,none,
+NOTE(while_parsing_as_less_operator,none,
      "while parsing this '<' as an operator", ())
 
 
 // FIXME: This is used both as a parse error (a literal "super" outside a
 // method) and a type-checker error ("super" in a method of a non-class type).
-ERROR(super_not_in_class_method,common,none,
+ERROR(super_not_in_class_method,none,
       "'super' cannot be used outside of class members", ())
 
-ERROR(class_func_not_in_class,common,none,
+ERROR(class_func_not_in_class,none,
       "class methods are only allowed within classes; "
       "use 'static' to declare a static method", ())
-ERROR(class_var_not_in_class,common,none,
+ERROR(class_var_not_in_class,none,
       "class properties are only allowed within classes; "
       "use 'static' to declare a static property", ())
 
 // FIXME: Used by both the parser and the type-checker.
-ERROR(func_decl_without_brace,decl_parsing,PointsToFirstBadToken,
+ERROR(func_decl_without_brace,PointsToFirstBadToken,
       "expected '{' in body of function declaration", ())
-ERROR(unsupported_fixed_length_array,type_parsing,none,
-      "fixed-length arrays are not yet supported", ())
 
-ERROR(new_array_syntax,type_parsing,none,
-      "array types are now written with the brackets around the element type",
-      ())
-
-NOTE(convert_let_to_var,sema,none,
+NOTE(convert_let_to_var,none,
      "change 'let' to 'var' to make it mutable", ())
-NOTE(change_let_to_var_param,sema,none,
+NOTE(change_let_to_var_param,none,
      "change 'let' parameter to 'var' to make it mutable", ())
-NOTE(mark_param_var,sema,none,
+NOTE(mark_param_var,none,
      "mark parameter with 'var' to make it mutable", ())
 
 

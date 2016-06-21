@@ -10,7 +10,7 @@ import Foundation
 // Protocol methods require extended method type encodings to capture block
 // signatures and parameter object types.
 @objc protocol Fooable {
-  func block(_: Int -> Int)
+  func block(_: (Int) -> Int)
   func block2(_: (Int,Int) -> Int)
 
   func takesString(_: String) -> String
@@ -23,13 +23,13 @@ class Foo: Fooable {
   func bar() {}
   @objc func baz() {}
   @IBAction func garply(_: AnyObject?) {}
-  @objc func block(_: Int -> Int) {}
+  @objc func block(_: (Int) -> Int) {}
   @objc func block2(_: (Int,Int) -> Int) {}
 
-  @objc func takesString(x: String) -> String { return x }
-  @objc func takesArray(x: [AnyObject]) -> [AnyObject] { return x }
-  @objc func takesDict(x: [NSObject: AnyObject]) -> [NSObject: AnyObject] { return x }
-  @objc func takesSet(x: Set<NSObject>) -> Set<NSObject> { return x }
+  @objc func takesString(_ x: String) -> String { return x }
+  @objc func takesArray(_ x: [AnyObject]) -> [AnyObject] { return x }
+  @objc func takesDict(_ x: [NSObject: AnyObject]) -> [NSObject: AnyObject] { return x }
+  @objc func takesSet(_ x: Set<NSObject>) -> Set<NSObject> { return x }
 
   @objc func fail() throws {}
 }

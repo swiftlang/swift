@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
 #include <map>
 #include <set>
@@ -117,7 +118,7 @@ public:
     dump("Constructing Normal");
     llvm::outs() << "\n";
     EXPECT_TRUE(ConstructedTesters->insert(this));
-    assert(!isIgnoreableTester());
+    assert(!isIgnorableTester());
     assert(isLive());
     fflush(stdout);
   }
@@ -126,7 +127,7 @@ public:
     dump("Constructing Normal");
     llvm::outs() << "\n";
     EXPECT_TRUE(ConstructedTesters->insert(this));
-    assert(!isIgnoreableTester());
+    assert(!isIgnorableTester());
     assert(isLive());
     fflush(stdout);
   }
@@ -135,7 +136,7 @@ public:
     dump("CopyConstructing");
     Arg.dump("   From");
     llvm::outs() << "\n";
-    if (!Arg.isIgnoreableTester()) {
+    if (!Arg.isIgnorableTester()) {
       EXPECT_TRUE(ConstructedTesters->insert(this));
       fflush(stdout);
     }
@@ -147,8 +148,8 @@ public:
     llvm::outs() << "\n";
     assert(Value);
     assert(Arg.Value);
-    // If Arg is not ignoreable, it will be now and we will not be.
-    if (!Arg.isIgnoreableTester()) {
+    // If Arg is not ignorable, it will be now and we will not be.
+    if (!Arg.isIgnorableTester()) {
       EXPECT_TRUE(ConstructedTesters->insert(this));
       EXPECT_EQ(1u, ConstructedTesters->erase(&Arg));
     }
@@ -163,9 +164,9 @@ public:
     assert(Value);
     assert(Arg.Value);
 
-    // If arg is not an ignoreable tester, but we are an ignoreable tester, we
+    // If arg is not an ignorable tester, but we are an ignorable tester, we
     // need to be inserted into the constructed testers set.
-    if (!Arg.isIgnoreableTester() && isIgnoreableTester()) {
+    if (!Arg.isIgnorableTester() && isIgnorableTester()) {
       EXPECT_TRUE(ConstructedTesters->insert(this));
     }
     *Value.get() = Arg.getValue();
@@ -179,10 +180,10 @@ public:
     llvm::outs() << "\n";
     assert(Value);
     assert(Arg.Value);
-    if (!Arg.isIgnoreableTester() && isIgnoreableTester()) {
+    if (!Arg.isIgnorableTester() && isIgnorableTester()) {
       EXPECT_EQ(1u, ConstructedTesters->erase(&Arg));
       EXPECT_TRUE(ConstructedTesters->insert(this));
-    } else if (Arg.isIgnoreableTester() && !isIgnoreableTester()) {
+    } else if (Arg.isIgnorableTester() && !isIgnorableTester()) {
       EXPECT_EQ(1u, ConstructedTesters->erase(this));
       EXPECT_TRUE(ConstructedTesters->insert(&Arg));
     }
@@ -193,13 +194,13 @@ public:
   }
 
   ~CtorTester() {
-    bool IsIgnoreable = isIgnoreableTester();
+    bool IsIgnorable = isIgnorableTester();
     dump("Destroying");
     llvm::outs() << "\n";
     delete Value.get();
     Value = nullptr;
     fflush(stdout);
-    if (ConstructedTesters->isClearing() || IsIgnoreable)
+    if (ConstructedTesters->isClearing() || IsIgnorable)
       return;
     EXPECT_EQ(1u, ConstructedTesters->erase(this));
   }
@@ -212,7 +213,7 @@ public:
     return *Value.get() == *RHS.Value.get();
   }
 
-  bool isIgnoreableTester() const {
+  bool isIgnorableTester() const {
     return *Value.get() >= -3 && *Value.get() < 0;
   }
 
@@ -230,7 +231,7 @@ private:
 
 void CtorTesterSet::dumpLiveTesters() const {
   for (auto *Tester : Constructed) {
-    if (Tester->isIgnoreableTester())
+    if (Tester->isIgnorableTester())
       continue;
     llvm::SmallString<64> Hex;
     std::string Addr = llvm::utohexstr(uintptr_t(Tester));
@@ -248,16 +249,15 @@ bool CtorTesterSet::hasLiveTesters() const {
   return std::any_of(Constructed.begin(), Constructed.end(),
                      [](CtorTester *T) -> bool {
                        assert(T);
-                       return !T->isIgnoreableTester();
+                       return !T->isIgnorableTester();
                      });
 }
 
 bool CtorTesterSet::numLiveTesters() const {
-  return std::count_if(Constructed.begin(), Constructed.end(),
-                       [](CtorTester *T) -> bool {
-                         assert(T);
-                         return !T->isIgnoreableTester();
-                       });
+  return count_if(Constructed, [](CtorTester *T) -> bool {
+    assert(T);
+    return !T->isIgnorableTester();
+  });
 }
 
 void CtorTesterSet::clearTesters() {

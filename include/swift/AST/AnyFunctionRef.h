@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -61,10 +61,10 @@ public:
     getCaptureInfo().getLocalCaptures(Result);
   }
 
-  ArrayRef<Pattern *> getBodyParamPatterns() const {
+  ArrayRef<ParameterList *> getParameterLists() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getBodyParamPatterns();
-    return TheFunction.get<AbstractClosureExpr *>()->getParamPatterns();
+      return AFD->getParameterLists();
+    return TheFunction.get<AbstractClosureExpr *>()->getParameterLists();
   }
   
   bool hasType() const {
@@ -137,6 +137,37 @@ public:
     return CE->getType()->castTo<FunctionType>()->isNoEscape();
   }
 
+  bool isObjC() const {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->isObjC();
+    }
+    if (TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      // Closures are never @objc.
+      return false;
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
+  
+  SourceLoc getLoc() const {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->getLoc();
+    }
+    if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      return ce->getLoc();
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
+  
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger") {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->dump();
+    }
+    if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      return ce->dump();
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
 };
 
 } // namespace swift

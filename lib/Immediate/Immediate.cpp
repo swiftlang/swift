@@ -1,8 +1,8 @@
-//===-- Immediate.cpp - the swift immediate mode --------------------------===//
+//===--- Immediate.cpp - the swift immediate mode -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,12 +25,13 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/DiagnosticPrinter.h"
+#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Transforms/IPO.h"
@@ -145,13 +146,7 @@ bool swift::immediate::tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                      [](bool Value) { return Value; });
 }
 
-static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
-                                    void *Context) {
-  // This assert self documents our precondition that Context is always
-  // nullptr. It seems that parts of LLVM are using the flexibility of having a
-  // context. We don't really care about this.
-  assert(Context == nullptr && "We assume Context is always a nullptr");
-
+static void linkerDiagnosticHandlerNoCtx(const llvm::DiagnosticInfo &DI) {
   if (DI.getSeverity() != llvm::DS_Error)
     return;
 
@@ -165,8 +160,20 @@ static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
   llvm::errs() << MsgStorage << "\n";
 }
 
+
+
+static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
+                                    void *Context) {
+  // This assert self documents our precondition that Context is always
+  // nullptr. It seems that parts of LLVM are using the flexibility of having a
+  // context. We don't really care about this.
+  assert(Context == nullptr && "We assume Context is always a nullptr");
+
+  return linkerDiagnosticHandlerNoCtx(DI);
+}
+
 bool swift::immediate::linkLLVMModules(llvm::Module *Module,
-                                       llvm::Module *SubModule
+                                       std::unique_ptr<llvm::Module> SubModule
                             // TODO: reactivate the linker mode if it is
                             // supported in llvm again. Otherwise remove the
                             // commented code completely.
@@ -176,10 +183,7 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
   auto OldHandler = Ctx.getDiagnosticHandler();
   void *OldDiagnosticContext = Ctx.getDiagnosticContext();
   Ctx.setDiagnosticHandler(linkerDiagnosticHandler, nullptr);
-                              // TODO: reactivate the linker mode if it is
-                              // supported in llvm again. Otherwise remove the
-                              // commented code completely.
-  bool Failed = llvm::Linker::LinkModules(Module, SubModule /*, LinkerMode*/);
+  bool Failed = llvm::Linker::linkModules(*Module, std::move(SubModule));
   Ctx.setDiagnosticHandler(OldHandler, OldDiagnosticContext);
 
   return !Failed;
@@ -252,7 +256,7 @@ bool swift::immediate::IRGenImportedModules(
       break;
     }
 
-    if (!linkLLVMModules(&Module, SubModule.get()
+    if (!linkLLVMModules(&Module, std::move(SubModule)
                          // TODO: reactivate the linker mode if it is
                          // supported in llvm again. Otherwise remove the
                          // commented code completely.

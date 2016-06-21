@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -91,18 +91,22 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Accessing memory
   INST(LoadInst, SILInstruction, MayRead, DoesNotRelease)
+  INST(LoadUnownedInst, SILInstruction, MayRead, DoesNotRelease)
   INST(LoadWeakInst, SILInstruction, MayRead, DoesNotRelease)
   INST(StoreInst, SILInstruction, MayWrite, DoesNotRelease)
   INST(AssignInst, SILInstruction, MayWrite, DoesNotRelease)
   INST(MarkUninitializedInst, SILInstruction, None, DoesNotRelease)
+  INST(MarkUninitializedBehaviorInst, SILInstruction, None, DoesNotRelease)
   INST(MarkFunctionEscapeInst, SILInstruction, None, DoesNotRelease)
   INST(DebugValueInst, SILInstruction, None, DoesNotRelease)
   INST(DebugValueAddrInst, SILInstruction, None, DoesNotRelease)
+  INST(StoreUnownedInst, SILInstruction, MayWrite, DoesNotRelease)
   INST(StoreWeakInst, SILInstruction, MayWrite, DoesNotRelease)
   INST(CopyAddrInst, SILInstruction, MayHaveSideEffects, MayRelease)
   INST(DestroyAddrInst, SILInstruction, MayHaveSideEffects, MayRelease)
   INST(ProjectValueBufferInst, SILInstruction, MayRead, DoesNotRelease)
-  INST(ProjectBoxInst, SILInstruction, MayRead, DoesNotRelease)
+  INST(ProjectBoxInst, SILInstruction, None, DoesNotRelease)
+  INST(ProjectExistentialBoxInst, SILInstruction, None, DoesNotRelease)
   ABSTRACT_VALUE(IndexingInst, SILInstruction)
     INST(IndexAddrInst, IndexingInst, None, DoesNotRelease)
     INST(IndexRawPointerInst, IndexingInst, None, DoesNotRelease)
@@ -111,16 +115,18 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Reference Counting
   ABSTRACT_VALUE(RefCountingInst, SILInstruction)
     INST(StrongRetainInst, RefCountingInst, MayHaveSideEffects, DoesNotRelease)
-    INST(StrongRetainAutoreleasedInst, RefCountingInst, MayHaveSideEffects,
-         DoesNotRelease)
     INST(StrongReleaseInst, RefCountingInst, MayHaveSideEffects, MayRelease)
     INST(StrongRetainUnownedInst, RefCountingInst, MayHaveSideEffects,
          DoesNotRelease)
+    INST(StrongPinInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
+    INST(StrongUnpinInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
     INST(UnownedRetainInst, RefCountingInst, MayHaveSideEffects, DoesNotRelease)
     INST(UnownedReleaseInst, RefCountingInst, MayHaveSideEffects,
          MayRelease)
     INST(RetainValueInst, RefCountingInst, MayHaveSideEffects, DoesNotRelease)
     INST(ReleaseValueInst, RefCountingInst, MayHaveSideEffects, MayRelease)
+    INST(SetDeallocatingInst, RefCountingInst, MayHaveSideEffects,
+         DoesNotRelease)
     INST(AutoreleaseValueInst, RefCountingInst, MayHaveSideEffects,
          DoesNotRelease)
     VALUE_RANGE(RefCountingInst, StrongRetainInst, AutoreleaseValueInst)
@@ -128,8 +134,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(FixLifetimeInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
   INST(MarkDependenceInst, SILInstruction, None, DoesNotRelease)
   INST(CopyBlockInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
-  INST(StrongPinInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
-  INST(StrongUnpinInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
   // IsUnique does not actually write to memory but should be modeled
   // as such. Its operand is a pointer to an object reference. The
@@ -137,6 +141,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // the isUnique instruction. It appears to write a new object reference.
   INST(IsUniqueInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
   INST(IsUniqueOrPinnedInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
+
+  INST(AllocGlobalInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
   // Literals
   ABSTRACT_VALUE(LiteralInst, SILInstruction)
@@ -243,7 +249,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   ABSTRACT_VALUE(TermInst, SILInstruction)
     TERMINATOR(UnreachableInst, TermInst, None, DoesNotRelease)
     TERMINATOR(ReturnInst, TermInst, None, DoesNotRelease)
-    TERMINATOR(AutoreleaseReturnInst, TermInst, None, DoesNotRelease)
     TERMINATOR(ThrowInst, TermInst, None, DoesNotRelease)
     TERMINATOR(TryApplyInst, TermInst, MayHaveSideEffects, MayRelease)
     TERMINATOR(BranchInst, TermInst, None, DoesNotRelease)

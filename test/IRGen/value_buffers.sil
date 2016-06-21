@@ -18,7 +18,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $Int):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @alloc_small([24 x i8]* nocapture dereferenceable({{.*}}), i64)
+// CHECK-LABEL: define{{( protected)?}} void @alloc_small([24 x i8]* nocapture dereferenceable({{.*}}), i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %Si*
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
@@ -32,7 +32,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $Int):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @project_small([24 x i8]* nocapture dereferenceable({{.*}}), i64)
+// CHECK-LABEL: define{{( protected)?}} void @project_small([24 x i8]* nocapture dereferenceable({{.*}}), i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %Si*
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
@@ -45,7 +45,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @dealloc_small([24 x i8]* nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( protected)?}} void @dealloc_small([24 x i8]* nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret void
 
@@ -56,13 +56,13 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @alloc_big([24 x i8]* nocapture dereferenceable({{.*}}), %V13value_buffers9BigStruct* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( protected)?}} void @alloc_big([24 x i8]* nocapture dereferenceable({{.*}}), %V13value_buffers9BigStruct* noalias nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK: [[SLOT0:%.*]] = load i64
 // CHECK: [[SLOT1:%.*]] = load i64
 // CHECK: [[SLOT2:%.*]] = load i64
 // CHECK: [[SLOT3:%.*]] = load i64
-// CHECK-NEXT: [[T0:%.*]] = call noalias i8* @swift_slowAlloc(i64 32, i64 7)
+// CHECK-NEXT: [[T0:%.*]] = call noalias i8* @rt_swift_slowAlloc(i64 32, i64 7)
 // CHECK-NEXT: [[T1:%.*]] = bitcast [24 x i8]* %0 to i8**
 // CHECK-NEXT: store i8* [[T0]], i8** [[T1]], align 8
 // CHECK-NEXT: [[ADDR:%.*]] = bitcast i8* [[T0]] to %V13value_buffers9BigStruct*
@@ -87,7 +87,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @project_big([24 x i8]* nocapture dereferenceable({{.*}}), %V13value_buffers9BigStruct* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( protected)?}} void @project_big([24 x i8]* nocapture dereferenceable({{.*}}), %V13value_buffers9BigStruct* noalias nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK: [[SLOT0:%.*]] = load i64
 // CHECK: [[SLOT1:%.*]] = load i64
@@ -115,9 +115,9 @@ entry(%b : $*Builtin.UnsafeValueBuffer):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @dealloc_big([24 x i8]* nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( protected)?}} void @dealloc_big([24 x i8]* nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to i8**
 // CHECK-NEXT: [[ADDR:%.*]] = load i8*, i8** [[T0]], align 8
-// CHECK-NEXT: call void @swift_slowDealloc(i8* [[ADDR]], i64 32, i64 7)
+// CHECK-NEXT: call void @rt_swift_slowDealloc(i8* [[ADDR]], i64 32, i64 7)
 // CHECK-NEXT: ret void

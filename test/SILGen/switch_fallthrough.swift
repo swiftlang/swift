@@ -107,8 +107,9 @@ func test3() {
 // Fallthrough should clean up nested pattern variables from the exited scope.
 func test4() {
   switch (foo(), bar()) {
+  // CHECK:   [[A:%.*]] = alloc_box $(Int, Int)
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], {{bb[0-9]+}}
-  case let a where runced():
+  case var a where runced():
   // CHECK: [[CASE1]]:
   // CHECK:   br [[CASE2:bb[0-9]+]]
     fallthrough
@@ -117,8 +118,10 @@ func test4() {
   // CHECK:   br [[CONT:bb[0-9]+]]
     ()
 
+  // CHECK:   [[B:%.*]] = alloc_box $Int
+  // CHECK:   [[C:%.*]] = alloc_box $Int
   // CHECK:   cond_br {{%.*}}, [[CASE4:bb[0-9]+]],
-  case (let b, let c) where ansed():
+  case (var b, var c) where ansed():
   // CHECK: [[CASE4]]:
   // CHECK:   br [[CASE5:bb[0-9]+]]
     fallthrough

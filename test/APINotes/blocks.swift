@@ -7,10 +7,10 @@ import UIKit
 
 class MyView: UIView {
   func foo() {
-    UIView.animateWithDuration(1, delay: 1, options: UIViewAnimationOptions.LayoutSubviews,
+    UIView.animate(withDuration: 1, delay: 1, options: UIViewAnimationOptions.layoutSubviews,
       animations: { print("animating") },
       completion: { (finished: Bool) -> Void in print("here we are") });
-    UIView.animateWithDuration(1, delay: 1, options: UIViewAnimationOptions.LayoutSubviews,
+    UIView.animate(withDuration: 1, delay: 1, options: UIViewAnimationOptions.layoutSubviews,
       animations: { print("animating") },
       completion: nil);
   }

@@ -1,0 +1,386 @@
+// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | FileCheck %s
+// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import resilient_protocol
+
+// Witness table for conformance with resilient associated type
+
+// CHECK: @_TWPV19protocol_resilience26ConformsWithResilientAssocS_17HasResilientAssocS_ = {{(protected )?}}constant [2 x i8*] [
+// CHECK-SAME:   i8* bitcast (%swift.type* ()* @_TMaV19protocol_resilience23ResilientConformingType to i8*),
+// CHECK-SAME:   i8* bitcast (i8** ()* @_TWaV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_ to i8*)
+// CHECK-SAME: ]
+
+
+// Protocol is public -- needs resilient witness table
+
+// CHECK: @_TMp19protocol_resilience17ResilientProtocol = {{(protected )?}}constant <{{.*}}> <{
+// CHECK-SAME:   i32 1031,
+// CHECK-SAME:   i16 4,
+// CHECK-SAME:   i16 4,
+// CHECK-SAME:   i32 0,
+// CHECK-SAME:   void (%swift.opaque*, %swift.type*, i8**)* @defaultC,
+// CHECK-SAME:   void (%swift.opaque*, %swift.type*, i8**)* @defaultD
+// CHECK-SAME: }>
+
+
+public protocol ResilientProtocol {
+  associatedtype T : OtherResilientProtocol
+
+  func noDefaultA()
+  func noDefaultB()
+  func defaultC()
+  func defaultD()
+  static func defaultE()
+  static func defaultF()
+}
+
+
+// Protocol is not public -- doesn't need default witness table
+
+// CHECK: @_TMp19protocol_resilience16InternalProtocol = hidden constant %swift.protocol {
+// CHECK-SAME:   i32 7,
+// CHECK-SAME:   i16 0,
+// CHECK-SAME:   i16 0,
+// CHECK-SAME:   i32 0
+// CHECK-SAME: }
+
+protocol InternalProtocol {
+  func f()
+}
+
+
+// CHECK-LABEL: define{{( protected)?}} void @defaultC(%swift.opaque* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-NEXT:  entry:
+
+sil @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  // CHECK-NEXT: ret void
+  %result = tuple ()
+  return %result : $()
+}
+
+
+// CHECK-LABEL: define{{( protected)?}} void @defaultD(%swift.opaque* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-NEXT:  entry:
+
+sil @defaultD : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+
+  // Make sure we can emit direct references to other default implementations
+
+  // CHECK-NEXT: call void @defaultC(%swift.opaque* noalias nocapture %0, %swift.type* %Self, i8** %SelfWitnessTable)
+  %fn1 = function_ref @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %ignore1 = apply %fn1<Self, Self.T>(%0) : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+
+  // Make sure we can do dynamic dispatch to other protocol requirements
+  // from a default implementation
+
+  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 4
+  // CHECK-NEXT: [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
+  // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.opaque*, %swift.type*, i8**)*
+  // CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias nocapture %0, %swift.type* %Self, i8** %SelfWitnessTable)
+  %fn2 = witness_method $Self, #ResilientProtocol.defaultC!1 : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %ignore2 = apply %fn2<Self, Self.T>(%0) : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+
+  // Make sure we can partially apply a static reference to a default
+  // implementation
+
+  // CHECK-NEXT: [[WTABLE:%.*]] = bitcast i8** %SelfWitnessTable to i8*
+  // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject({{.*}})
+  // CHECK-NEXT: [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, [{{4|8}} x i8], i8* }>*
+  // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{4|8}} x i8], i8* }>, <{ %swift.refcounted, [{{4|8}} x i8], i8* }>* [[LAYOUT]], i32 0, i32 2
+  // CHECK-NEXT: store i8* [[WTABLE]], i8** [[WTABLE_ADDR]]
+
+  %fn3 = function_ref @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %ignore3 = partial_apply %fn3<Self, Self.T>() : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+
+  // CHECK-NEXT: ret void
+  %result = tuple ()
+  return %result : $()
+}
+
+
+// CHECK-LABEL: define{{( protected)?}} void @defaultE(%swift.type*, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-NEXT:  entry:
+
+sil @defaultE : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
+bb0(%0 : $@thick Self.Type):
+
+  // Make sure we can emit direct references to other default implementations
+
+  // CHECK-NEXT: call void @defaultF(%swift.type* %0, %swift.type* %Self, i8** %SelfWitnessTable)
+  %fn1 = function_ref @defaultF : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+  %ignore1 = apply %fn1<Self, Self.T>(%0) : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+
+  // Make sure we can do dynamic dispatch to other protocol requirements
+  // from a default implementation
+
+  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 7
+  // CHECK-NEXT: [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
+  // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.type*, %swift.type*, i8**)*
+  // CHECK-NEXT: call void [[WITNESS]](%swift.type* %0, %swift.type* %Self, i8** %SelfWitnessTable)
+  %fn2 = witness_method $Self, #ResilientProtocol.defaultF!1 : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+  %ignore2 = apply %fn2<Self, Self.T>(%0) : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+
+  // Make sure we can partially apply a static reference to a default
+  // implementation
+
+  // CHECK-NEXT: [[WTABLE:%.*]] = bitcast i8** %SelfWitnessTable to i8*
+  // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject({{.*}})
+  // CHECK-NEXT: [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, [{{4|8}} x i8], i8* }>*
+  // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{4|8}} x i8], i8* }>, <{ %swift.refcounted, [{{4|8}} x i8], i8* }>* [[LAYOUT]], i32 0, i32 2
+  // CHECK-NEXT: store i8* [[WTABLE]], i8** [[WTABLE_ADDR]]
+
+  %fn3 = function_ref @defaultF : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+  %ignore3 = partial_apply %fn3<Self, Self.T>() : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+
+  // CHECK-NEXT: ret void
+  %result = tuple ()
+  return %result : $()
+}
+
+
+// CHECK-LABEL: define{{( protected)?}} void @defaultF(%swift.type*, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-NEXT:  entry:
+
+sil @defaultF : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
+bb0(%0 : $@thick Self.Type):
+
+  // CHECK-NEXT: ret void
+  %result = tuple ()
+  return %result : $()
+}
+
+
+sil_default_witness_table ResilientProtocol {
+  no_default
+  no_default
+  no_default
+  no_default
+  method #ResilientProtocol.defaultC!1: @defaultC
+  method #ResilientProtocol.defaultD!1: @defaultD
+  method #ResilientProtocol.defaultE!1: @defaultE
+  method #ResilientProtocol.defaultF!1: @defaultF
+}
+
+public struct ResilientConformingType : OtherResilientProtocol {}
+
+sil_witness_table ResilientConformingType : OtherResilientProtocol module protocol_resilience {}
+
+
+struct ConformingStruct : ResilientProtocol {
+  typealias T = ResilientConformingType
+  func noDefaultA()
+  func noDefaultB()
+  func defaultC()
+  func defaultD()
+  static func defaultE()
+  static func defaultF()
+}
+
+// CHECK-LABEL: define{{( protected)?}} void @noDefaultA(%V19protocol_resilience16ConformingStruct* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-NEXT:  entry:
+
+sil @noDefaultA : $@convention(witness_method) (@in_guaranteed ConformingStruct) -> () {
+bb0(%0 : $*ConformingStruct):
+
+  // Make sure we can emit direct references to default implementations with a
+  // concrete Self type.
+
+  // CHECK-NEXT: [[SELF:%.*]] = bitcast %V19protocol_resilience16ConformingStruct* %0 to %swift.opaque*
+  // CHECK-NEXT: call void @defaultC(%swift.opaque* noalias nocapture [[SELF]], %swift.type* bitcast ({{i32|i64}}* {{.*}}) to %swift.type*), i8** getelementptr inbounds ([8 x i8*], [8 x i8*]* @_TWPV19protocol_resilience16ConformingStructS_17ResilientProtocolS_, i32 0, i32 0))
+  %fn1 = function_ref @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %ignore1 = apply %fn1<ConformingStruct, ResilientConformingType>(%0) : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+
+  // CHECK-NEXT: ret void
+  %result = tuple ()
+  return %result : $()
+}
+
+
+// CHECK-LABEL: define{{( protected)?}} void @noDefaultB(%V19protocol_resilience16ConformingStruct* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-NEXT:  entry:
+
+sil @noDefaultB : $@convention(witness_method) (@in_guaranteed ConformingStruct) -> () {
+bb0(%0 : $*ConformingStruct):
+
+  // Make sure we can partially apply direct references to default implementations
+
+  // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject({{.*}})
+  // CHECK-NEXT: [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, i8* }>*
+  // CHECK-NEXT: [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, i8* }>, <{ %swift.refcounted, i8* }>* [[LAYOUT]], i32 0, i32 1
+  // CHECK-NEXT: store i8* bitcast ([8 x i8*]* @_TWPV19protocol_resilience16ConformingStructS_17ResilientProtocolS_ to i8*), i8** [[WTABLE]]
+
+  %fn1 = function_ref @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %ignore1 = partial_apply %fn1<ConformingStruct, ResilientConformingType>() : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+
+  // CHECK-NEXT: ret void
+  %result = tuple ()
+  return %result : $()
+}
+
+sil_witness_table ConformingStruct : ResilientProtocol module protocol_resilience {
+  associated_type T: ResilientConformingType
+  associated_type_protocol (T: OtherResilientProtocol): ResilientConformingType: OtherResilientProtocol module protocol_resilience
+
+  method #ResilientProtocol.noDefaultA!1: @noDefaultA
+  method #ResilientProtocol.noDefaultB!1: @noDefaultB
+  method #ResilientProtocol.defaultC!1: @defaultC
+  method #ResilientProtocol.defaultD!1: @defaultD
+  method #ResilientProtocol.defaultE!1: @defaultE
+  method #ResilientProtocol.defaultF!1: @defaultF
+}
+
+
+//
+// Make sure resilient conformances are accessed with an accessor function
+//
+
+// CHECK-LABEL: define{{( protected)?}} void @doSomething(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.OtherResilientProtocol)
+sil @doSomething : $@convention(thin) <T : OtherResilientProtocol> (@in T) -> () {
+bb0(%0 : $*T):
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: define{{( protected)?}} void @passConformingType(%V19protocol_resilience23ResilientConformingType* noalias nocapture)
+sil @passConformingType : $@convention(thin) (@in ResilientConformingType) -> () {
+bb0(%0 : $*ResilientConformingType):
+
+  // CHECK-NEXT: entry:
+  // CHECK-NEXT: [[ARG:%.*]] = bitcast %V19protocol_resilience23ResilientConformingType* %0 to %swift.opaque*
+  // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @_TWlV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_()
+  // CHECK-NEXT: call void @doSomething(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @_TMfV19protocol_resilience23ResilientConformingType, i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
+
+  %fn = function_ref @doSomething : $@convention(thin) <T : OtherResilientProtocol> (@in T) -> ()
+  %ignore = apply %fn<ResilientConformingType>(%0) : $@convention(thin) <T : OtherResilientProtocol> (@in T) -> ()
+
+  // CHECK-NEXT: ret void
+  %result = tuple ()
+  return %result : $()
+}
+
+// Caching witness table accessor
+
+// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden i8** @_TWlV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_()
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[CACHE:%.*]] = load i8**, i8*** @_TWLV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_
+// CHECK-NEXT:    [[COND:%.*]] = icmp eq i8** [[CACHE]], null
+// CHECK-NEXT:    br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK:       cacheIsNull:
+// CHECK:         [[WTABLE:%.*]] = call i8** @_TWaV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_()
+// CHECK-NEXT:    store atomic i8** [[WTABLE]], i8*** @_TWLV19protocol_resilience23ResilientConformingTypeS0_18resilient_protocol22OtherResilientProtocolS_ release
+// CHECK-NEXT:    br label %cont
+
+// CHECK:       cont:
+// CHECK-NEXT:    [[RESULT:%.*]] = phi i8** [ [[CCHE:%.*]], %entry ], [ [[WTABLE:%.*]], %cacheIsNull ]
+// CHECK-NEXT:    ret i8** [[RESULT]]
+
+// Resilient conformance -- must call a runtime function
+
+// CHECK-LABEL: define{{( protected)?}} i8** @_TWaV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_()
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_TWGV19protocol_resilience23ResilientConformingType18resilient_protocol22OtherResilientProtocolS_, %swift.type* null, i8** null)
+// CHECK-NEXT:    ret i8** [[WTABLE]]
+
+
+//
+// If a protocol refines a resilient protocol, any conformances are
+// resilient too
+//
+
+protocol RefinesOtherResilientProtocol : OtherResilientProtocol {}
+
+struct AnotherConformingStruct : RefinesOtherResilientProtocol {}
+
+sil_witness_table AnotherConformingStruct : RefinesOtherResilientProtocol module protocol_resilience {
+  base_protocol OtherResilientProtocol: AnotherConformingStruct: OtherResilientProtocol module protocol_resilience
+}
+
+sil_witness_table hidden AnotherConformingStruct: OtherResilientProtocol module protocol_resilience {
+}
+
+// CHECK-LABEL: define{{( protected)?}} void @doSomethingRefined(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.RefinesOtherResilientProtocol)
+sil @doSomethingRefined : $@convention(thin) <T : RefinesOtherResilientProtocol> (@in T) -> () {
+bb0(%0 : $*T):
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: define{{( protected)?}} void @passConformingTypeRefined(%V19protocol_resilience23AnotherConformingStruct* noalias nocapture)
+sil @passConformingTypeRefined : $@convention(thin) (@in AnotherConformingStruct) -> () {
+bb0(%0 : $*AnotherConformingStruct):
+
+  // CHECK-NEXT: entry:
+  // CHECK-NEXT: [[ARG:%.*]] = bitcast %V19protocol_resilience23AnotherConformingStruct* %0 to %swift.opaque*
+  // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @_TWlV19protocol_resilience23AnotherConformingStructS0_S_29RefinesOtherResilientProtocolS_()
+  // CHECK-NEXT: call void @doSomethingRefined(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @_TMfV19protocol_resilience23AnotherConformingStruct, i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
+
+  %fn = function_ref @doSomethingRefined : $@convention(thin) <T : RefinesOtherResilientProtocol> (@in T) -> ()
+  %ignore = apply %fn<AnotherConformingStruct>(%0) : $@convention(thin) <T : RefinesOtherResilientProtocol> (@in T) -> ()
+
+  // CHECK-NEXT: ret void
+  %result = tuple ()
+  return %result : $()
+}
+
+
+//
+// If an associated type conformance is resilient, the overall
+// conformance is not necessarily resilient, because we access
+// the associated type conformance lazily.
+//
+
+protocol HasResilientAssoc {
+  associatedtype T : OtherResilientProtocol
+}
+
+struct ConformsWithResilientAssoc : HasResilientAssoc {
+  typealias T = ResilientConformingType
+}
+
+sil_witness_table ConformsWithResilientAssoc : HasResilientAssoc module protocol_resilience {
+  associated_type T: ResilientConformingType
+  associated_type_protocol (T: OtherResilientProtocol): ResilientConformingType: OtherResilientProtocol module protocol_resilience
+}
+
+// CHECK-LABEL: define{{( protected)?}} void @doSomethingAssoc(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.HasResilientAssoc)
+sil @doSomethingAssoc : $@convention(thin) <T : HasResilientAssoc> (@in T) -> () {
+bb0(%0 : $*T):
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: define{{( protected)?}} void @passConformingTypeAssoc(%V19protocol_resilience26ConformsWithResilientAssoc* noalias nocapture)
+sil @passConformingTypeAssoc : $@convention(thin) (@in ConformsWithResilientAssoc) -> () {
+bb0(%0 : $*ConformsWithResilientAssoc):
+
+  // CHECK-NEXT: entry:
+  // CHECK-NEXT: [[ARG:%.*]] = bitcast %V19protocol_resilience26ConformsWithResilientAssoc* %0 to %swift.opaque*
+  // CHECK-NEXT: call void @doSomethingAssoc(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @_TMfV19protocol_resilience26ConformsWithResilientAssoc, i32 0, i32 1) to %swift.type*), i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @_TWPV19protocol_resilience26ConformsWithResilientAssocS_17HasResilientAssocS_, i32 0, i32 0))
+
+  %fn = function_ref @doSomethingAssoc : $@convention(thin) <T : HasResilientAssoc> (@in T) -> ()
+  %ignore = apply %fn<ConformsWithResilientAssoc, ResilientConformingType>(%0) : $@convention(thin) <T : HasResilientAssoc> (@in T) -> ()
+
+  // CHECK-NEXT: ret void
+  %result = tuple ()
+  return %result : $()
+}
+
+
+//
+// Witness table accessors for fragile conformances are emitted last
+//
+
+// Fragile conformance -- no runtime calls needed
+
+// CHECK-LABEL: define{{( protected)?}} i8** @_TWaV19protocol_resilience16ConformingStructS_17ResilientProtocolS_()
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    ret i8** getelementptr inbounds ([8 x i8*], [8 x i8*]* @_TWPV19protocol_resilience16ConformingStructS_17ResilientProtocolS_, i32 0, i32 0)

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,6 +20,8 @@
 #define SWIFT_DECLCONTEXT_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/LookupKinds.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -52,6 +54,7 @@ namespace swift {
   class SourceFile;
   class Type;
   class ModuleDecl;
+  class GenericTypeDecl;
   class NominalTypeDecl;
   class ProtocolConformance;
   class ValueDecl;
@@ -66,13 +69,14 @@ enum class DeclContextKind : uint8_t {
   AbstractClosureExpr,
   Initializer,
   TopLevelCodeDecl,
+  SubscriptDecl,
   AbstractFunctionDecl,
   SerializedLocal,
   Last_LocalDeclContextKind = SerializedLocal,
 
   Module,
   FileUnit,
-  NominalTypeDecl,
+  GenericTypeDecl,
   ExtensionDecl,
   Last_DeclContextKind = ExtensionDecl
 };
@@ -228,7 +232,7 @@ public:
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
   bool isTypeContext() const {
-    return getContextKind() == DeclContextKind::NominalTypeDecl ||
+    return getContextKind() == DeclContextKind::GenericTypeDecl ||
            getContextKind() == DeclContextKind::ExtensionDecl;
   }
 
@@ -237,29 +241,33 @@ public:
     return getContextKind() == DeclContextKind::ExtensionDecl;
   }
 
-  /// If this DeclContext is a nominal type declaration or an
-  /// extension thereof, return the nominal type declaration.
-  NominalTypeDecl *isNominalTypeOrNominalTypeExtensionContext() const;
+  /// If this DeclContext is a GenericType declaration or an
+  /// extension thereof, return the GenericTypeDecl.
+  GenericTypeDecl *getAsGenericTypeOrGenericTypeExtensionContext() const;
+
+  /// If this DeclContext is a NominalType declaration or an
+  /// extension thereof, return the NominalTypeDecl.
+  NominalTypeDecl *getAsNominalTypeOrNominalTypeExtensionContext() const;
 
   /// If this DeclContext is a class, or an extension on a class, return the
   /// ClassDecl, otherwise return null.
-  ClassDecl *isClassOrClassExtensionContext() const;
+  ClassDecl *getAsClassOrClassExtensionContext() const;
 
-  /// If this DeclContext is a enum, or an extension on a enum, return the
+  /// If this DeclContext is an enum, or an extension on an enum, return the
   /// EnumDecl, otherwise return null.
-  EnumDecl *isEnumOrEnumExtensionContext() const;
+  EnumDecl *getAsEnumOrEnumExtensionContext() const;
 
   /// If this DeclContext is a protocol, or an extension on a
   /// protocol, return the ProtocolDecl, otherwise return null.
-  ProtocolDecl *isProtocolOrProtocolExtensionContext() const;
+  ProtocolDecl *getAsProtocolOrProtocolExtensionContext() const;
 
   /// If this DeclContext is a protocol extension, return the extended protocol.
-  ProtocolDecl *isProtocolExtensionContext() const;
+  ProtocolDecl *getAsProtocolExtensionContext() const;
 
   /// \brief Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.
   ///
-  /// Only valid if \c isProtocolOrProtocolExtensionContext().
+  /// Only valid if \c getAsProtocolOrProtocolExtensionContext().
   GenericTypeParamDecl *getProtocolSelf() const;
 
   /// getDeclaredTypeOfContext - For a type context, retrieves the declared
@@ -360,6 +368,12 @@ public:
   /// Determine whether the innermost context is generic.
   bool isInnermostContextGeneric() const;
 
+  /// Get the most optimal resilience expansion for code in this context.
+  /// If the body is able to be inlined into functions in other resilience
+  /// domains, this ensures that only sufficiently-conservative access patterns
+  /// are used.
+  ResilienceExpansion getResilienceExpansion() const;
+
   /// Returns true if lookups within this context could affect downstream files.
   ///
   /// \param functionsAreNonCascading If true, functions are considered non-
@@ -391,9 +405,15 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(Type type, DeclName member, unsigned options,
+  bool lookupQualified(Type type, DeclName member, NLOptions options,
                        LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
+
+  /// Look up all Objective-C methods with the given selector visible
+  /// in the enclosing module.
+  void lookupAllObjCMethods(
+         ObjCSelector selector,
+         SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
   /// Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.
@@ -447,6 +467,13 @@ public:
 
   void dumpContext() const;
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0) const;
+  
+  /// Get the type of `self` in this declaration context, if there is a
+  /// `self`.
+  Type getSelfTypeInContext() const;
+  /// Get the interface type of `self` in this declaration context, if there is
+  /// a `self`.
+  Type getSelfInterfaceType() const;
   
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,

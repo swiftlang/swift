@@ -15,7 +15,8 @@ class Foo : Bar {
 class Foo2 {}
 
 class Foo3 {
-    @IBInspectable var testInspectable : Int
+    @IBInspectable var testIBInspectable : Int
+    @GKInspectable var testGKInspectable : Int
 }
 
 protocol MyProt {}
@@ -74,9 +75,9 @@ var (sd2: Qtys)
 
 for i in 0...5 {}
 for var i = 0, i2 = 1; i == 0; ++i {}
-while let v = o, z = o where v > z {}
+while var v = o, z = o where v > z {}
 repeat {} while v == 0
-if let v = o, z = o where v > z {}
+if var v = o, z = o where v > z {}
 switch v {
   case 1: break;
   case 2, 3: break;

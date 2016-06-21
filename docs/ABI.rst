@@ -410,7 +410,7 @@ contain the following fields:
   not factored into tuple metadata uniquing.
 
 - The **element vector** begins at **offset 3** and consists of a vector of
-  type–offset pairs. The metadata for the *n*\ th element's type is a pointer
+  type-offset pairs. The metadata for the *n*\ th element's type is a pointer
   at **offset 3+2*n**. The offset in bytes from the beginning of the tuple to
   the beginning of the *n*\ th element is at **offset 3+2*n+1**.
 
@@ -743,15 +743,17 @@ Globals
   global ::= 'PA' .*                     // partial application forwarder
   global ::= 'PAo' .*                    // ObjC partial application forwarder
   global ::= 'w' value-witness-kind type // value witness
-  global ::= 'WV' type                   // value witness table
-  global ::= 'Wo' entity                 // witness table offset
-  global ::= 'Wv' directness entity      // field offset
-  global ::= 'WP' protocol-conformance   // protocol witness table
   global ::= 'Wa' protocol-conformance   // protocol witness table accessor
+  global ::= 'WG' protocol-conformance   // generic protocol witness table
+  global ::= 'WI' protocol-conformance   // generic protocol witness table instantiation function
   global ::= 'Wl' type protocol-conformance // lazy protocol witness table accessor
   global ::= 'WL' protocol-conformance   // lazy protocol witness table cache variable
-  global ::= 'WD' protocol-conformance   // dependent proto witness table generator
-  global ::= 'Wd' protocol-conformance   // dependent proto witness table template
+  global ::= 'Wo' entity                 // witness table offset
+  global ::= 'WP' protocol-conformance   // protocol witness table
+  global ::= 'Wt' protocol-conformance identifier // associated type metadata accessor
+  global ::= 'WT' protocol-conformance identifier nominal-type // associated type witness table accessor
+  global ::= 'Wv' directness entity      // field offset
+  global ::= 'WV' type                   // value witness table
   global ::= entity                      // some identifiable thing
   global ::= 'TO' global                 // ObjC-as-swift thunk
   global ::= 'To' global                 // swift-as-ObjC thunk
@@ -770,6 +772,7 @@ Globals
   funcsigspecializationarginfo ::= 'd'                                           // Dead argument
   funcsigspecializationarginfo ::= 'g' 's'?                                      // Owned => Guaranteed and Exploded if 's' present.
   funcsigspecializationarginfo ::= 's'                                           // Exploded
+  funcsigspecializationarginfo ::= 'k'                                           // Exploded
   funcsigspecializationconstantpropinfo ::= 'fr' mangled-name
   funcsigspecializationconstantpropinfo ::= 'g' mangled-name
   funcsigspecializationconstantpropinfo ::= 'i' 64-bit-integer
@@ -779,6 +782,11 @@ Globals
   global ::= 'TV' global                 // vtable override thunk
   global ::= 'TW' protocol-conformance entity
                                          // protocol witness thunk
+  global ::= 'TB' identifier context identifier
+                                         // property behavior initializer thunk
+  global ::= 'Tb' identifier context identifier
+                                         // property behavior setter thunk
+
   entity ::= nominal-type                // named type declaration
   entity ::= static? entity-kind context entity-name
   entity-kind ::= 'F'                    // function (ctor, accessor, etc.)
@@ -904,8 +912,8 @@ Types
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer
   type ::= 'Bf' natural '_'                  // Builtin.Float<n>
   type ::= 'Bi' natural '_'                  // Builtin.Int<n>
-  type ::= 'BO'                              // Builtin.ObjCPointer
-  type ::= 'Bo'                              // Builtin.ObjectPointer
+  type ::= 'BO'                              // Builtin.UnknownObject
+  type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= 'Bv' natural type                 // Builtin.Vec<n>x<type>
   type ::= 'Bw'                              // Builtin.Word
@@ -932,12 +940,14 @@ Types
   type ::= 'Xw' type                         // @weak type
   type ::= 'XF' impl-function-type           // function implementation type
   type ::= 'Xf' type type                    // @thin function type
+  type ::= 'Xb' type                         // SIL @box type
   nominal-type ::= known-nominal-type
   nominal-type ::= substitution
   nominal-type ::= nominal-type-kind declaration-name
   nominal-type-kind ::= 'C'                  // class
   nominal-type-kind ::= 'O'                  // enum
   nominal-type-kind ::= 'V'                  // struct
+  declaration-name ::= context decl-name
   archetype ::= 'Q' index                    // archetype with depth=0, idx=N
   archetype ::= 'Qd' index index             // archetype with depth=M+1, idx=N
   archetype ::= associated-type
@@ -1011,6 +1021,7 @@ mangled in to disambiguate.
   impl-function-attribute ::= 'Cw'            // compatible with protocol witness
   impl-function-attribute ::= 'N'             // noreturn
   impl-function-attribute ::= 'G'             // generic
+  impl-function-attribute ::= 'g'             // pseudogeneric
   impl-parameter ::= impl-convention type
   impl-result ::= impl-convention type
 
@@ -1020,7 +1031,8 @@ implementation details of a function type.
 
 Any ``<impl-function-attribute>`` productions must appear in the order
 in which they are specified above: e.g. a noreturn C function is
-mangled with ``CcN``.
+mangled with ``CcN``.  ``g`` and ``G`` are exclusive and mark the presence
+of a generic signature immediately following.
 
 Note that the convention and function-attribute productions do not
 need to be disambiguated from the start of a ``<type>``.
@@ -1035,6 +1047,14 @@ Generics
 ``<protocol-conformance>`` refers to a type's conformance to a protocol. The
 named module is the one containing the extension or type declaration that
 declared the conformance.
+
+::
+
+  // Property behavior conformance
+  protocol-conformance ::= ('u' generic-signature)?
+                           'b' identifier context identifier protocol
+
+Property behaviors are implemented using private protocol conformances.
 
 ::
 
@@ -1088,6 +1108,7 @@ TODO: document these
   value-witness-kind ::= 'tT'           // initializeArrayWithTakeBackToFront
   value-witness-kind ::= 'ug'           // getEnumTag
   value-witness-kind ::= 'up'           // destructiveProjectEnumData
+  value-witness-kind ::= 'ui'           // destructiveInjectEnumTag
 
 ``<value-witness-kind>`` differentiates the kinds of value
 witness functions for a type.
@@ -1164,7 +1185,7 @@ associated substitution index. Otherwise, the entity is mangled normally, and
 it is then added to the substitution map and associated with the next
 available substitution index.
 
-For example,  in mangling a function type
+For example, in mangling a function type
 ``(zim.zang.zung, zim.zang.zung, zim.zippity) -> zim.zang.zoo`` (with module
 ``zim`` and class ``zim.zang``),
 the recurring contexts ``zim``, ``zim.zang``, and ``zim.zang.zung``
@@ -1173,12 +1194,12 @@ for the first time. The first argument type will mangle in long form,
 ``CC3zim4zang4zung``, and in doing so, ``zim`` will acquire substitution ``S_``,
 ``zim.zang`` will acquire substitution ``S0_``, and ``zim.zang.zung`` will
 acquire ``S1_``. The second argument is the same as the first and will mangle
-using its substitution, ``CS1_``. The
+using its substitution, ``S1_``. The
 third argument type will mangle using the substitution for ``zim``,
 ``CS_7zippity``. (It also acquires substitution ``S2_`` which would be used
 if it mangled again.) The result type will mangle using the substitution for
-``zim.zang``, ``CS0_zoo`` (and acquire substitution ``S3_``). The full
-function type thus mangles as ``fTCC3zim4zang4zungCS1_CS_7zippity_CS0_zoo``.
+``zim.zang``, ``CS0_3zoo`` (and acquire substitution ``S3_``). The full
+function type thus mangles as ``fTCC3zim4zang4zungS1_CS_7zippity_CS0_3zoo``.
 
 ::
 

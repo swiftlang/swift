@@ -19,16 +19,17 @@ class A {
 // CHECK-NEXT: cond_br [[T2]]
 //   Something branch: project value, translate, inject into result.
 // CHECK:      [[STR:%.*]] = unchecked_enum_data [[T1]]
-// CHECK:      [[T0:%.*]] = function_ref @swift_StringToNSString
+// CHECK:      [[T0:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[STR]])
-// CHECK-NEXT: enum $Optional<NSString>, #Optional.Some!enumelt.1, [[T1]]
+// CHECK-NEXT: enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]]
+// CHECK-NEXT: release_value [[STR]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
-// CHECK:      enum $Optional<NSString>, #Optional.None!enumelt
+// CHECK:      enum $Optional<NSString>, #Optional.none!enumelt
 // CHECK-NEXT: br
 //   Continuation.
 // CHECK:      bb3([[T0:%.*]] : $Optional<NSString>):
-// CHECK-NEXT: autorelease_return [[T0]]
+// CHECK-NEXT: return [[T0]]
 
   @objc func bar(x x : String?) {}
 // CHECK-LABEL:    sil hidden [thunk] @_TToFC8optional1A3barfT1xGSqSS__T_ : $@convention(objc_method) (Optional<NSString>, A) -> ()
@@ -36,14 +37,15 @@ class A {
 // CHECK-NEXT: cond_br [[T1]]
 //   Something branch: project value, translate, inject into result.
 // CHECK:      [[NSSTR:%.*]] = unchecked_enum_data %0
-// CHECK:      [[T0:%.*]] = function_ref @swift_NSStringToString
+// CHECK:      [[T0:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
 //   Make a temporary initialized string that we're going to clobber as part of the conversion process (?).
-// CHECK-NEXT: [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[NSSTR]] : $NSString
-// CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[NSSTR_BOX]])
-// CHECK-NEXT: enum $Optional<String>, #Optional.Some!enumelt.1, [[T1]]
+// CHECK-NEXT: [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR]] : $NSString
+// CHECK-NEXT: [[STRING_META:%.*]] = metatype $@thin String.Type
+// CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[NSSTR_BOX]], [[STRING_META]])
+// CHECK-NEXT: enum $Optional<String>, #Optional.some!enumelt.1, [[T1]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
-// CHECK:      enum $Optional<String>, #Optional.None!enumelt
+// CHECK:      enum $Optional<String>, #Optional.none!enumelt
 // CHECK-NEXT: br
 //   Continuation.
 // CHECK:      bb3([[T0:%.*]] : $Optional<String>):

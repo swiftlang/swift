@@ -1,8 +1,8 @@
-//===--- Mirrors.swift.gyb - Common _MirrorType implementations -*- swift -*-==//
+//===--- Mirrors.swift.gyb - Common _Mirror implementations ---*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,38 +12,41 @@
 
 %{
 
-from SwiftIntTypes import *
+from SwiftIntTypes import all_integer_types
 
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 Types = [
-    ('Float', '.Float', '$0'),
-    ('Double', '.Double', '$0'),
-    ('Bool', '.Logical', '$0'),
-    ('String', '.Text', '$0'),
-    ('Character', '.Text', 'String($0)'),
-    ('UnicodeScalar', '.UInt', 'UInt64($0)'),
+    ('Float', '.float', 'self'),
+    ('Double', '.double', 'self'),
+    ('Bool', '.bool', 'self'),
+    ('String', '.text', 'self'),
+    ('Character', '.text', 'String(self)'),
+    ('UnicodeScalar', '.uInt', 'UInt64(self)'),
 ]
 
 for self_ty in all_integer_types(word_bits):
   Self = self_ty.stdlib_name
   if self_ty.is_signed:
-    Types.append( (Self, '.Int', 'Int64($0)') )
+    Types.append( (Self, '.int', 'Int64(self)') )
   else:
-    Types.append( (Self, '.UInt', 'UInt64($0)') )
+    Types.append( (Self, '.uInt', 'UInt64(self)') )
 
 }%
 
-internal func _toString<T>(x: T) -> String {
-  return String(x)
+%for Type in Types:
+
+extension ${Type[0]} : CustomReflectable {
+  /// A mirror that reflects the `${Type[0]}` instance.
+  public var customMirror: Mirror {
+    return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
+  }
 }
 
-% for Type in Types:
-extension ${Type[0]} : _Reflectable {
-  /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
-    return _LeafMirror(self, _toString, { .Some(${Type[1]}(${Type[2]})) })
+extension ${Type[0]} : CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return ${Type[1]}(${Type[2]})
   }
 }
 % end

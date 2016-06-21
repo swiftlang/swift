@@ -91,9 +91,7 @@ class F: D {
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuo
 // CHECK:         [[WRAP_X:%.*]] = enum $Optional<B>
-// CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
-// CHECK:         apply [[FORCE_UNWRAP_FN]]<B>([[UNWRAP_Y_ADDR:%.*]]#1,
-// CHECK:         [[UNWRAP_Y:%.*]] = load [[UNWRAP_Y_ADDR]]
+// CHECK:         [[UNWRAP_Y:%.*]] = unchecked_enum_data
 // CHECK:         [[RES:%.*]] = apply {{%.*}}([[WRAP_X]], [[UNWRAP_Y]], %2, %3)
 // CHECK:         [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]
 // CHECK:         return [[WRAP_RES]]
@@ -104,9 +102,9 @@ class F: D {
 // CHECK:         copy_addr [take] {{%.*}} to [initialization] [[WRAPPED_X_ADDR]]
 // CHECK:         inject_enum_addr [[WRAP_X_ADDR]]
 // CHECK:         [[RES_ADDR:%.*]] = alloc_stack
-// CHECK:         apply {{%.*}}([[RES_ADDR]]#1, [[WRAP_X_ADDR]], %2, %3)
+// CHECK:         apply {{%.*}}([[RES_ADDR]], [[WRAP_X_ADDR]], %2, %3)
 // CHECK:         [[DEST_ADDR:%.*]] = init_enum_data_addr %0
-// CHECK:         copy_addr [take] [[RES_ADDR]]#1 to [initialization] [[DEST_ADDR]]
+// CHECK:         copy_addr [take] [[RES_ADDR]] to [initialization] [[DEST_ADDR]]
 // CHECK:         inject_enum_addr %0
 
 class ThrowVariance {
@@ -131,11 +129,11 @@ class Y: X<D> {
 // optional.
 
 class Foo {
-  func foo(x: Int -> Int) -> (Int -> Int)? {}
+  func foo(x: (Int) -> Int) -> ((Int) -> Int)? {}
 }
 
 class Bar: Foo {
-  override func foo(x: (Int -> Int)?) -> Int -> Int {}
+  override func foo(x: ((Int) -> Int)?) -> (Int) -> Int {}
 }
 
 // rdar://problem/21364764
@@ -151,7 +149,7 @@ class Aap {
 
   func flip() -> (() -> S?) {}
 
-  func map() -> S -> () -> Aap? {}
+  func map() -> (S) -> () -> Aap? {}
 }
 
 class Noot : Aap {
@@ -163,7 +161,7 @@ class Noot : Aap {
 
   override func flip() -> (() -> S) {}
 
-  override func map() -> S? -> () -> Noot {}
+  override func map() -> (S?) -> () -> Noot {}
 }
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks3Bar3foo{{.*}} : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<Int -> Int>
@@ -181,7 +179,7 @@ class Noot : Aap {
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dV13vtable_thunks1S_XFo__dGSqS0___
 // CHECK:         [[INNER:%.*]] = apply %0()
-// CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, %1 : $S
+// CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %1 : $S
 // CHECK:         return [[OUTER]] : $Optional<S>
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks4Noot3map{{.*}}
@@ -192,7 +190,7 @@ class Noot : Aap {
 // CHECK:         return [[OUTER]]
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqV13vtable_thunks1S__oXFo__oCS_4Noot__XFo_dS0__oXFo__oGSqCS_3Aap___
-// CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, %0
+// CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %0
 // CHECK:         [[INNER:%.*]] = apply %1(%2)
 // CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_owned () -> @owned Noot to $@callee_owned () -> @owned Optional<Aap>
 // CHECK:         return [[OUTER]]

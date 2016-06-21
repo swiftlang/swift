@@ -5,11 +5,11 @@
 import Foundation
 
 class Butt: NSObject {
-  dynamic func butt(b: Int -> Int) {}
+  dynamic func butt(_ b: (Int) -> Int) {}
 }
 
 class Tubb<GenericParamName>: Butt {
-  override func butt(b: Int -> Int) {
+  override func butt(_ b: (Int) -> Int) {
     super.butt(b)
   }
 }

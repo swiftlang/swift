@@ -20,29 +20,24 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - -disable-sil-linking | FileCheck %s --check-prefix=CHECK-NOSIL
 // --------------------------------------------------------------------
 //
+// CHECK: foo
 // CHECK-DAG: ret{{.*}}, !dbg ![[RET:[0-9]+]]
-// CHECK: define i64 @_TF5basic3fooFTVs5Int64S0__S0_
+// CHECK-DAG: ![[FOO:[0-9]+]] = distinct !DISubprogram(name: "foo",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[FOOTYPE:[0-9]+]]
 public
-func foo(a: Int64, _ b: Int64) -> Int64 {
+func foo(_ a: Int64, _ b: Int64) -> Int64 {
      var a = a
      var b = b
-     // CHECK: [[A:%.*]] = alloca %Vs5Int64, align {{(4|8)}}
-     // CHECK: [[B:%.*]] = alloca %Vs5Int64, align {{(4|8)}}
-     // CHECK: [[C:%.*]] = alloca %Vs5Int64, align {{(4|8)}}
-     // CHECK: [[AADDR:[%].*]] = alloca i64, align {{(4|8)}}
-     // CHECK: [[BADDR:[%].*]] = alloca i64, align {{(4|8)}}
-     // CHECK: call void @llvm.dbg.declare(metadata %Vs5Int64* [[A]], metadata [[ADI:![0-9]+]], metadata !{{[0-9]+}})
-     // CHECK: call void @llvm.dbg.declare(metadata %Vs5Int64* [[B]], metadata [[BDI:![0-9]+]], metadata !{{[0-9]+}})
-     // CHECK: call void @llvm.dbg.declare(metadata %Vs5Int64* [[C]], metadata [[CDI:![0-9]+]], metadata !{{[0-9]+}})
-     // CHECK: store i64 %0, i64* [[AADDR]], align {{(4|8)}}
-     // CHECK: call void @llvm.dbg.declare(metadata i64* [[AADDR]], metadata [[AARGDI:![0-9]+]], metadata !{{[0-9]+}})
-     // CHECK: store i64 %1, i64* [[BADDR]], align {{(4|8)}}
-     // CHECK: call void @llvm.dbg.declare(metadata i64* [[BADDR]], metadata [[BARGDI:![0-9]+]], metadata !{{[0-9]+}})
-     // CHECK: [[AVAL:%.*]] = getelementptr inbounds %Vs5Int64, %Vs5Int64* [[A]], i32 0, i32 0
-     // CHECK: store i64 %0, i64* [[AVAL]], align {{(4|8)}}
-     // CHECK: [[BVAL:%.*]] = getelementptr inbounds %Vs5Int64, %Vs5Int64* [[B]], i32 0, i32 0
-     // CHECK: store i64 %1, i64* [[BVAL]], align {{(4|8)}}
-
+     // CHECK-DAG: !DILexicalBlock(scope: ![[FOO]],{{.*}} line: [[@LINE-3]], column: 43)
+     // CHECK-DAG: ![[ASCOPE:.*]] = !DILocation(line: [[@LINE-4]], column: 10, scope: ![[FOO]])
+     // Check that a is the first and b is the second argument.
+     // CHECK-DAG: store i64 %0, i64* [[AADDR:.*]], align
+     // CHECK-DAG: store i64 %1, i64* [[BADDR:.*]], align
+     // CHECK-DAG: [[AVAL:%.*]] = getelementptr inbounds {{.*}}, [[AMEM:.*]], i32 0, i32 0
+     // CHECK-DAG: [[BVAL:%.*]] = getelementptr inbounds {{.*}}, [[BMEM:.*]], i32 0, i32 0
+     // CHECK-DAG: call void @llvm.dbg.declare(metadata i64* [[AADDR]], metadata ![[AARG:.*]], metadata !{{[0-9]+}}), !dbg ![[ASCOPE]]
+     // CHECK-DAG: call void @llvm.dbg.declare(metadata i64* [[BADDR]], metadata ![[BARG:.*]], metadata !{{[0-9]+}})
+     // CHECK-DAG: ![[AARG]] = !DILocalVariable(name: "a", arg: 1
+     // CHECK-DAG: ![[BARG]] = !DILocalVariable(name: "b", arg: 2
      if b != 0 {
        // CHECK-DAG: !DILexicalBlock({{.*}} line: [[@LINE-1]]
        // Transparent inlined multiply:
@@ -65,13 +60,6 @@ func foo(a: Int64, _ b: Int64) -> Int64 {
      }
 }
 
-// CHECK-DAG: ![[FOO:[0-9]+]] = distinct !DISubprogram(name: "foo",{{.*}} line: 26,{{.*}} type: ![[FOOTYPE:[0-9]+]]
-// CHECK-DAG: [[ADI]] = !DILocalVariable(name: "a", scope
-// CHECK-DAG: [[BDI]] = !DILocalVariable(name: "b", scope
-// CHECK-DAG: [[CDI]] = !DILocalVariable(name: "c", scope
-// CHECK-DAG: [[AARGDI:![0-9]+]] = !DILocalVariable(name: "a", arg: 1
-// CHECK-DAG: [[BARGDI:![0-9]+]] = !DILocalVariable(name: "b", arg: 2
-
 // CHECK-DAG: ![[FILE_CWD:[0-9]+]] = !DIFile(filename: "{{.*}}DebugInfo/basic.swift", directory: "{{.*}}")
 // CHECK-DAG: ![[MAINFILE:[0-9]+]] = !DIFile(filename: "basic.swift", directory: "{{.*}}DebugInfo")
 // CHECK-DAG: !DICompileUnit(language: DW_LANG_Swift, file: ![[FILE_CWD]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}} flags: "{{[^"]*}}-emit-ir
@@ -79,7 +67,8 @@ func foo(a: Int64, _ b: Int64) -> Int64 {
 
 // Function type for foo.
 // CHECK-DAG: ![[FOOTYPE]] = !DISubroutineType(types: ![[PARAMTYPES:[0-9]+]])
-// CHECK-DAG: ![[PARAMTYPES]] = !{!"_TtVs5Int64", !"_TtVs5Int64", !"_TtVs5Int64"}
+// CHECK-DAG: ![[INT64:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int64", {{.*}}, identifier: "_TtVs5Int64")
+// CHECK-DAG: ![[PARAMTYPES]] = !{![[INT64]], ![[INT64]], ![[INT64]]}
 // Import of the main module with the implicit name.
 // CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[MAINFILE]], entity: ![[MAINMODULE:[0-9]+]], line: 1)
 // CHECK-DAG: ![[MAINMODULE]] = !DIModule({{.*}}, name: "basic"
@@ -89,4 +78,3 @@ func foo(a: Int64, _ b: Int64) -> Int64 {
 
 // Debug Info Version
 // CHECK-DAG:  i32 2, !"Debug Info Version", i32
-

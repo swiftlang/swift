@@ -2,6 +2,16 @@
 
 // REQUIRES: objc_interop
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 class A {
   var x = 0
 }
@@ -11,20 +21,17 @@ struct B : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return A.self
-  }
   func _bridgeToObjectiveC() -> A {
     return A()
   }
   static func _forceBridgeFromObjectiveC(
-    x: A,
-    inout result: B?
+    _ x: A,
+    result: inout B?
   ){
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: A,
-    inout result: B?
+    _ x: A,
+    result: inout B?
   ) -> Bool {
     return true
   }
@@ -55,20 +62,17 @@ struct F : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return E.self
-  }
   func _bridgeToObjectiveC() -> E {
     return E()
   }
   static func _forceBridgeFromObjectiveC(
-    x: E,
-    inout result: F?
+    _ x: E,
+    result: inout F?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: E,
-    inout result: F?
+    _ x: E,
+    result: inout F?
   ) -> Bool {
     return true
   }
@@ -85,20 +89,17 @@ class G {
 }
 
 struct H : _ObjectiveCBridgeable {
-  static func _getObjectiveCType() -> Any.Type {
-    return G.self
-  }
   func _bridgeToObjectiveC() -> G {
     return G()
   }
   static func _forceBridgeFromObjectiveC(
-    x: G,
-    inout result: H?
+    _ x: G,
+    result: inout H?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: G,
-    inout result: H?
+    _ x: G,
+    result: inout H?
   ) -> Bool {
     return true
   }
@@ -118,20 +119,17 @@ struct I : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return A.self
-  }
   func _bridgeToObjectiveC() -> AnyObject {
     return A()
   }
   static func _forceBridgeFromObjectiveC(
-    x: AnyObject,
-    inout result: I?
+    _ x: AnyObject,
+    result: inout I?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: AnyObject,
-    inout result: I?
+    _ x: AnyObject,
+    result: inout I?
   ) -> Bool {
     return true
   }

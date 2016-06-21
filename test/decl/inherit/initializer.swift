@@ -58,7 +58,8 @@ class NotInherited1 : D {
 
 func testNotInherited1() {
   var n1 = NotInherited1(int: 5)
-  var n2 = NotInherited1(double: 2.71828) // expected-error{{incorrect argument label in call (have 'double:', expected 'float:')}} {{26-32=float}}
+  var n2 = NotInherited1(double: 2.71828) // expected-error{{argument labels '(double:)' do not match any available overloads}}
+  // expected-note @-1 {{overloads for 'NotInherited1' exist with these partially matching parameter lists: (int: Int), (float: Float)}}
 }
 
 class NotInherited1Sub : NotInherited1 {
@@ -70,7 +71,8 @@ class NotInherited1Sub : NotInherited1 {
 func testNotInherited1Sub() {
   var n1 = NotInherited1Sub(int: 5)
   var n2 = NotInherited1Sub(float: 3.14159)
-  var n3 = NotInherited1Sub(double: 2.71828) // expected-error{{incorrect argument label in call (have 'double:', expected 'float:')}} {{29-35=float}}
+  var n3 = NotInherited1Sub(double: 2.71828) // expected-error{{argument labels '(double:)' do not match any available overloads}}
+  // expected-note @-1 {{overloads for 'NotInherited1Sub' exist with these partially matching parameter lists: (int: Int), (float: Float)}}
 }
 
 // Having a stored property without an initial value prevents
@@ -101,11 +103,32 @@ class SuperUnnamed {
 
 class SubUnnamed : SuperUnnamed { }
 
-func testSubUnnamed(i: Int, d: Double, s: String, f: Float) {
+func testSubUnnamed(_ i: Int, d: Double, s: String, f: Float) {
   _ = SubUnnamed(int: i)
   _ = SubUnnamed(d)
   _ = SubUnnamed(string: s)
   _ = SubUnnamed(f)
+}
+
+// rdar://problem/17960407 - Inheritance of generic initializers
+class ConcreteBase {
+  required init(i: Int) {}
+}
+
+class GenericDerived<T> : ConcreteBase {}
+
+class GenericBase<T> {
+  required init(t: T) {}
+}
+
+class GenericDerived2<U> : GenericBase<(U, U)> {}
+
+class ConcreteDerived : GenericBase<Int> {}
+
+func testGenericInheritance() {
+  _ = GenericDerived<Int>(i: 10)
+  _ = GenericDerived2<Int>(t: (10, 100))
+  _ = ConcreteDerived(t: 1000)
 }
 
 // FIXME: <rdar://problem/16331406> Implement inheritance of variadic designated initializers

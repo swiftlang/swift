@@ -1,0 +1,150 @@
+%{
+# This is a template of validation-test/stdlib/Collection/*.swift
+#
+# cd validation-test/stdlib/Collection
+# ../../../utils/gyb --line-directive="" Inputs/Template.swift.gyb | ../../../utils/split_file.py
+
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName
+)
+
+import itertools
+
+class TestParameters(object):
+  name = ''
+  base = ''
+  traversal = ''
+  mutable = False
+  range_replaceable = False
+  base_kind = ''
+
+def all_tests():
+  for traversal, base_kind, mutable, range_replaceable in itertools.product(
+      TRAVERSALS,
+      ['Defaulted', 'Minimal'],
+      [False, True],
+      [False, True]):
+    test = TestParameters()
+    test.traversal = traversal
+    test.base_kind = base_kind
+    test.mutable = mutable
+    test.range_replaceable = range_replaceable
+    test.base = base_kind + sliceTypeName(
+      traversal=traversal,
+      mutable=mutable,
+      rangeReplaceable=range_replaceable).replace('Slice', 'Collection')
+    test.name = test.base + '.swift'
+    yield test
+
+def test_methods(test):
+  traversal = test.traversal
+  mutable = test.mutable
+  range_replaceable = test.range_replaceable
+  name = collectionForTraversal(traversal)
+  result = []
+  if range_replaceable:
+    result.append('RangeReplaceable' + name)
+
+  if mutable:
+    result.append('Mutable' + name)
+
+  if not range_replaceable and not mutable:
+    result.append(name)
+
+  return result
+
+}%
+
+% for test in all_tests():
+// BEGIN ${test.name}
+// -*- swift -*-
+
+//===----------------------------------------------------------------------===//
+// Automatically Generated From validation-test/stdlib/Collection/Inputs/Template.swift.gyb
+// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+
+// RUN: %target-run-simple-swift
+// REQUIRES: executable_test
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+var CollectionTests = TestSuite("Collection")
+
+// Test collections using value types as elements.
+do {
+  var resiliencyChecks = CollectionMisuseResiliencyChecks.all
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
+
+% for method in test_methods(test):
+  CollectionTests.add${method}Tests(
+    makeCollection: { (elements: [OpaqueValue<Int>]) in
+      return ${test.base}(elements: elements)
+    },
+    wrapValue: identity,
+    extractValue: identity,
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      return ${test.base}(elements: elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+%   if 'Mutable' in method:
+    makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
+      return ${test.base}(elements: elements)
+    },
+    wrapValueIntoComparable: identityComp,
+    extractValueFromComparable: identityComp,
+%   end
+    resiliencyChecks: resiliencyChecks
+%   if 'Mutable' in method:
+    , withUnsafeMutableBufferPointerIsSupported: false,
+    isFixedLengthCollection: true
+%   end
+  )
+% end
+}
+
+// Test collections using a reference type as element.
+do {
+  var resiliencyChecks = CollectionMisuseResiliencyChecks.all
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
+
+% for method in test_methods(test):
+  CollectionTests.add${method}Tests(
+    makeCollection: { (elements: [LifetimeTracked]) in
+      return ${test.base}(elements: elements)
+    },
+    wrapValue: { (element: OpaqueValue<Int>) in
+      LifetimeTracked(element.value, identity: element.identity)
+    },
+    extractValue: { (element: LifetimeTracked) in
+      OpaqueValue(element.value, identity: element.identity)
+    },
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      // FIXME: use LifetimeTracked.
+      return ${test.base}(elements: elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+%   if 'Mutable' in method:
+    makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
+      // FIXME: use LifetimeTracked.
+      return ${test.base}(elements: elements)
+    },
+    wrapValueIntoComparable: identityComp,
+    extractValueFromComparable: identityComp,
+%   end
+    resiliencyChecks: resiliencyChecks
+%   if 'Mutable' in method:
+    , withUnsafeMutableBufferPointerIsSupported: false,
+    isFixedLengthCollection: true
+%   end
+  )
+% end
+}
+
+runAllTests()
+% end

@@ -1,7 +1,9 @@
 #!/usr/bin/perl -w
+
+use strict;
 use English;
 
-sub translateAvailability($) {
+sub translateAvailability {
   my $version = shift;
   $version =~ s/^\s+|\s+$//g;
   if ($version eq "NA") { return "unavailable"; }
@@ -9,12 +11,12 @@ sub translateAvailability($) {
   return "introduced=$1.$2";
 }
 
-$prefixLength = 2;
+my $prefixLength = 2;
 my %minimumValues = ();
 my %maximumValues = ();
 my %rangeAvailability = ();
 my $prev_had_availability = 0;
-foreach $line (<STDIN>) {
+foreach my $line (<STDIN>) {
   chomp $line;
   if ($line =~ /([A-Za-z_][A-Za-z_0-9]+).*=[^0-9A-Za-z_-]*([A-Za-z0-9_-]+)/) {
     my $fullname = $1;
@@ -25,8 +27,8 @@ foreach $line (<STDIN>) {
 #    if ($line =~ /AVAILABLE\s*[(](([0-9]+_[0-9]+)|(NA))[ ]*,[ ]*(([0-9]+_[0-9]+)|(NA))[)]/) {
     if ($line =~ /AVAILABLE[ ]*[(]([^),]*),([^)]*)[)]/) {
       $has_availability = 1;
-      $osx = $1;
-      $ios = $2;
+      my $osx = $1;
+      my $ios = $2;
       $osx = translateAvailability($osx);
       $ios = translateAvailability($ios);
       $availability = "  \@available(OSX, $osx) \@available(iOS, $ios)\n";
@@ -49,7 +51,7 @@ foreach $line (<STDIN>) {
         }
         print("$availability");
       }
-      $casename = substr $fullname, $prefixLength;
+      my $casename = substr $fullname, $prefixLength;
       print("  case $casename = $value\n");
 
       if ($availability ne "") {
@@ -63,7 +65,7 @@ foreach $line (<STDIN>) {
 }
 
 # Print properties for the ranges.
-foreach $key (sort keys(%minimumValues)) {
+foreach my $key (sort keys(%minimumValues)) {
   my $minimum = $minimumValues{$key};
   my $maximum = $maximumValues{$key};
   my $availability = $rangeAvailability{$key};

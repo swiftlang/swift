@@ -4,17 +4,19 @@
 // REQUIRES: objc_interop
 
 import StdlibUnittest
+
+
 import Foundation
 
 var NSArrayAPI = TestSuite("NSArrayAPI")
 
 NSArrayAPI.test("mixed types with AnyObject") {
-  if true {
+  do {
     let result: AnyObject = [1, "two"]
     let expect: NSArray = [1, "two"]
     expectEqual(expect, result as! NSArray)
   }
-  if true {
+  do {
     let result: AnyObject = [1, 2]
     let expect: NSArray = [1, 2]
     expectEqual(expect, result as! NSArray)

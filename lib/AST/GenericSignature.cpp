@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -255,6 +255,21 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       depTypes.push_back(depTy);
       return;
     }
+
+    case RequirementKind::Superclass: {
+      assert(std::find(depTypes.begin(), depTypes.end(),
+                       depTy) != depTypes.end()
+             && "didn't see witness marker first?");
+      // Organize conformance constraints, sifting out the base class
+      // requirement.
+      auto &depConstraints = constraints[depTy];
+
+      auto constraintType = type.get<Type>()->getCanonicalType();
+      assert(depConstraints.baseClass.isNull()
+              && "multiple base class constraints?!");
+      depConstraints.baseClass = constraintType;
+      return;
+    }
       
     case RequirementKind::Conformance: {
       assert(std::find(depTypes.begin(), depTypes.end(),
@@ -265,14 +280,8 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       auto &depConstraints = constraints[depTy];
       
       auto constraintType = type.get<Type>()->getCanonicalType();
-      if (constraintType->isExistentialType()) {
-        depConstraints.protocols.push_back(constraintType);
-      } else {
-        assert(depConstraints.baseClass.isNull()
-               && "multiple base class constraints?!");
-        depConstraints.baseClass = constraintType;
-      }
-        
+      assert(constraintType->isExistentialType());
+      depConstraints.protocols.push_back(constraintType);
       return;
     }
     
@@ -315,7 +324,7 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
       const auto &depConstraints = foundConstraints->second;
       
       if (depConstraints.baseClass)
-        minimalRequirements.push_back(Requirement(RequirementKind::Conformance,
+        minimalRequirements.push_back(Requirement(RequirementKind::Superclass,
                                                   depTy,
                                                   depConstraints.baseClass));
       
@@ -389,19 +398,15 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
   }
   
   // Seed the type map with pre-existing substitutions.
-  for (auto sub : args) {
-    subs[sub.getArchetype()] = sub.getReplacement();
-  }
-  
   for (auto depTy : getAllDependentTypes()) {
     auto replacement = args.front().getReplacement();
     args = args.slice(1);
     
     if (auto subTy = depTy->getAs<SubstitutableType>()) {
-      subs[subTy] = replacement;
+      subs[subTy->getCanonicalType().getPointer()] = replacement;
     }
     else if (auto dTy = depTy->getAs<DependentMemberType>()) {
-      subs[dTy] = replacement;
+      subs[dTy->getCanonicalType().getPointer()] = replacement;
     }
   }
   
@@ -480,12 +485,58 @@ SmallVector<ProtocolDecl *, 2> GenericSignature::getConformsTo(Type type,
 
 /// Determine whether the given dependent type is equal to a concrete type.
 bool GenericSignature::isConcreteType(Type type, ModuleDecl &mod) {
-  if (!type->isTypeParameter()) return true;
+  return bool(getConcreteType(type, mod));
+}
+
+/// Return the concrete type that the given dependent type is constrained to,
+/// or the null Type if it is not the subject of a concrete same-type
+/// constraint.
+Type GenericSignature::getConcreteType(Type type, ModuleDecl &mod) {
+  if (!type->isTypeParameter()) return Type();
 
   auto &builder = *getArchetypeBuilder(mod);
   auto pa = builder.resolveArchetype(type);
-  if (!pa) return true;
+  if (!pa) return Type();
 
   pa = pa->getRepresentative();
-  return pa->isConcreteType();
+  if (!pa->isConcreteType()) return Type();
+
+  return pa->getConcreteType();
+}
+
+Type GenericSignature::getRepresentative(Type type, ModuleDecl &mod) {
+  assert(type->isTypeParameter());
+  auto &builder = *getArchetypeBuilder(mod);
+  auto pa = builder.resolveArchetype(type);
+  assert(pa && "not a valid dependent type of this signature?");
+  auto rep = pa->getRepresentative();
+  if (rep->isConcreteType()) return rep->getConcreteType();
+  if (pa == rep) {
+    assert(rep->getDependentType(builder, /*allowUnresolved*/ false)
+              ->getCanonicalType() == type->getCanonicalType());
+    return type;
+  }
+  return rep->getDependentType(builder, /*allowUnresolved*/ false);
+}
+
+bool GenericSignature::areSameTypeParameterInContext(Type type1, Type type2,
+                                                     ModuleDecl &mod) {
+  assert(type1->isTypeParameter());
+  assert(type2->isTypeParameter());
+
+  if (type1.getPointer() == type2.getPointer())
+    return true;
+
+  auto &builder = *getArchetypeBuilder(mod);
+  auto pa1 = builder.resolveArchetype(type1);
+  assert(pa1 && "not a valid dependent type of this signature?");
+  pa1 = pa1->getRepresentative();
+  assert(!pa1->isConcreteType());
+
+  auto pa2 = builder.resolveArchetype(type2);
+  assert(pa2 && "not a valid dependent type of this signature?");
+  pa2 = pa2->getRepresentative();
+  assert(!pa2->isConcreteType());
+
+  return pa1 == pa2;
 }

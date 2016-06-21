@@ -1,8 +1,8 @@
-//===--- EnumMetadataLayout.h - CRTP for enum metadata ------*- C++ -*-===//
+//===--- EnumMetadataLayout.h - CRTP for enum metadata ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -60,8 +60,7 @@ public:
       asImpl().addPayloadSize();
     
     // Add fields for generic cases.
-    if (auto generics = Target->getGenericParamsOfContext())
-      asImpl().addGenericFields(*generics);
+    asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
   }
 };
 
@@ -82,9 +81,8 @@ public:
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
   void addParentMetadataRef() { addPointer(); }
-  void addGenericArgument(ArchetypeType *argument) { addPointer(); }
-  void addGenericWitnessTable(ArchetypeType *argument,
-                              ProtocolDecl *protocol) {
+  void addGenericArgument(CanType argument) { addPointer(); }
+  void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf) {
     addPointer();
   }
   void addPayloadSize() { addPointer(); }

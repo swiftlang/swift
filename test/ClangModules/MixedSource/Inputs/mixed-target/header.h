@@ -48,3 +48,24 @@ typedef NS_ENUM(short, AALevel) {
   BBB = 2
 };
 
+
+@interface ConflictingName1
+@end
+@protocol ConflictingName1
+@end
+@protocol ConflictingName2
+@end
+@interface ConflictingName2
+@end
+
+@interface WrapperInterface
+typedef int NameInInterface;
+@end
+
+@protocol WrapperProto
+typedef int NameInProtocol;
+@end
+
+@interface WrapperInterface (Category)
+typedef int NameInCategory;
+@end

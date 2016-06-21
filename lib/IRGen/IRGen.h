@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_IRGEN_H
 
 #include "llvm/Support/DataTypes.h"
+#include "clang/AST/CharUnits.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include <cassert>
@@ -73,6 +74,57 @@ inline IsBitwiseTakable_t &operator&=(IsBitwiseTakable_t &l, IsBitwiseTakable_t 
   return (l = (l & r));
 }
 
+/// The kind of reference counting implementation a heap object uses.
+enum class ReferenceCounting : unsigned char {
+  /// The object uses native Swift reference counting.
+  Native,
+  
+  /// The object uses ObjC reference counting.
+  ///
+  /// When ObjC interop is enabled, native Swift class objects are also ObjC
+  /// reference counting compatible. Swift non-class heap objects are never
+  /// ObjC reference counting compatible.
+  ///
+  /// Blocks are always ObjC reference counting compatible.
+  ObjC,
+  
+  /// The object uses _Block_copy/_Block_release reference counting.
+  ///
+  /// This is a strict subset of ObjC; all blocks are also ObjC reference
+  /// counting compatible. The block is assumed to have already been moved to
+  /// the heap so that _Block_copy returns the same object back.
+  Block,
+  
+  /// The object has an unknown reference counting implementation.
+  ///
+  /// This uses maximally-compatible reference counting entry points in the
+  /// runtime.
+  Unknown,
+  
+  /// Cases prior to this one are binary-compatible with Unknown reference
+  /// counting.
+  LastUnknownCompatible = Unknown,
+
+  /// The object has an unknown reference counting implementation and
+  /// the reference value may contain extra bits that need to be masked.
+  ///
+  /// This uses maximally-compatible reference counting entry points in the
+  /// runtime, with a masking layer on top. A bit inside the pointer is used
+  /// to signal native Swift refcounting.
+  Bridge,
+  
+  /// The object uses ErrorType's reference counting entry points.
+  Error,
+};
+
+/// The atomicity of a reference counting operation to be used.
+enum class Atomicity : bool {
+  /// Atomic reference counting operations should be used.
+  Atomic,
+  /// Non-atomic reference counting operations can be used.
+  NonAtomic,
+};
+
 /// Whether or not an object should be emitted on the heap.
 enum OnHeap_t : unsigned char {
   NotOnHeap,
@@ -93,27 +145,60 @@ enum class ExtraData : unsigned char {
   Last_ExtraData = Block
 };
 
-/// ResilienceScope - The compiler is often able to pursue
-/// optimizations based on its knowledge of the implementation of some
-/// language structure.  However, optimizations which affect
-/// cross-component interfaces are not necessarily sound in the face
-/// of differing compiler versions and API changes that make types
-/// fragile.  The "resilience scope" is the breadth of the code
-/// affected by the answer to a question being asked.
-///
-/// TODO: maybe deployment versions should factor in here.  If a
-/// question is being asked vis-a-vis the implementation of a subject
-/// structure that is unavailable in any revision for which the object
-/// structure is resilient, is there any reason not to answer as if
-/// the subject structure were universally fragile?
-enum class ResilienceScope {
-  /// Component scope means the decision has to be consistent within
-  /// the current component only.
-  Component,
+/// Given that we have metadata for a type, is it for exactly the
+/// specified type, or might it be a subtype?
+enum IsExact_t : bool {
+  IsInexact = false,
+  IsExact = true
+};
 
-  /// Universal scope means that the decision has to be consistent
-  /// across all possible clients who could see this declaration.
-  Universal
+/// Ways in which an object can be referenced.
+///
+/// See the comment in RelativePointer.h.
+
+enum class SymbolReferenceKind : unsigned char {
+  /// An absolute reference to the object, i.e. an ordinary pointer.
+  ///
+  /// Generally well-suited for when C compatibility is a must, dynamic
+  /// initialization is the dominant case, or the runtime performance
+  /// of accesses is an overriding concern.
+  Absolute,
+
+  /// A direct relative reference to the object, i.e. the offset of the
+  /// object from the address at which the relative reference is stored.
+  ///
+  /// Generally well-suited for when the reference is always statically
+  /// initialized and will always refer to another object within the
+  /// same linkage unit.
+  Relative_Direct,
+
+  /// A direct relative reference that is guaranteed to be as wide as a
+  /// pointer.
+  ///
+  /// Generally well-suited for when the reference may be dynamically
+  /// initialized, but will only refer to objects within the linkage unit
+  /// when statically initialized.
+  Far_Relative_Direct,
+
+  /// A relative reference that may be indirect: the direct reference is
+  /// either directly to the object or to a variable holding an absolute
+  /// reference to the object.
+  ///
+  /// The low bit of the target offset is used to mark an indirect reference,
+  /// and so the low bit of the target address must be zero.  This means that,
+  /// in general, it is not possible to form this kind of reference to a
+  /// function (due to the THUMB bit) or unaligned data (such as a C string).
+  ///
+  /// Generally well-suited for when the reference is always statically
+  /// initialized but may refer to something outside of the linkage unit.
+  Relative_Indirectable,
+
+  /// An indirectable reference to the object; guaranteed to be as wide
+  /// as a pointer.
+  ///
+  /// Generally well-suited for when the reference may be dynamically
+  /// initialized but may also statically refer outside of the linkage unit.
+  Far_Relative_Indirectable,
 };
 
 /// Destructor variants.
@@ -239,6 +324,10 @@ public:
 
   unsigned log2() const {
     return llvm::Log2_64(Value);
+  }
+
+  clang::CharUnits asCharUnits() const {
+    return clang::CharUnits::fromQuantity(getValue());
   }
 
   friend bool operator< (Size L, Size R) { return L.Value <  R.Value; }

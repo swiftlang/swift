@@ -1,0 +1,1283 @@
+//===--- Lazy.swift - Tests for LazySequence and LazyCollection -----------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+
+% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
+
+var LazyTestSuite = TestSuite("Lazy")
+
+protocol TestProtocol1 {}
+
+//===----------------------------------------------------------------------===//
+// Repeated
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Element'.
+extension Repeated where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+LazyTestSuite.test("Repeated") {
+  checkRandomAccessCollection(
+    [] as Array<OpaqueValue<Int>>,
+    repeatElement(OpaqueValue(42), count: 0))
+    { $0.value == $1.value }
+
+  checkRandomAccessCollection(
+    [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
+    repeatElement(OpaqueValue(42), count: 1))
+    { $0.value == $1.value }
+
+  checkRandomAccessCollection(
+    [ OpaqueValue(42), OpaqueValue(42), OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
+    repeatElement(OpaqueValue(42), count: 3))
+    { $0.value == $1.value }
+}
+
+// FIXME: trap tests.
+
+//===----------------------------------------------------------------------===//
+// IteratorOverOne
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Element'.
+extension IteratorOverOne where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+LazyTestSuite.test("IteratorOverOne") {
+  checkIterator(
+    [] as Array<OpaqueValue<Int>>,
+    IteratorOverOne(_elements: nil as Optional<OpaqueValue<Int>>))
+  { $0.value == $1.value }
+
+  checkIterator(
+    [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
+    IteratorOverOne(_elements: OpaqueValue(42)))
+  { $0.value == $1.value }
+}
+
+//===----------------------------------------------------------------------===//
+// CollectionOfOne
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Element'.
+extension CollectionOfOne where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+LazyTestSuite.test("CollectionOfOne") {
+  let c = CollectionOfOne(OpaqueValue(42))
+  expectEqual(0, c.startIndex)
+  expectEqual(1, c.endIndex)
+  expectEqual(0..<1, c.indices)
+
+  checkRandomAccessCollection(
+    [ OpaqueValue(42) ], c) { $0.value == $1.value }
+}
+
+LazyTestSuite.test("CollectionOfOne/AssociatedTypes") {
+  typealias Subject = CollectionOfOne<OpaqueValue<Int>>
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: IteratorOverOne<OpaqueValue<Int>>.self,
+    subSequenceType: MutableRandomAccessSlice<Subject>.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
+
+% for (name, operation, indices) in [
+%   ('index(after:)', '_ = c.index(after: i)', '-2, -1, 1, 2'),
+%   ('index(before:)', '_ = c.index(before: i)', '-1, 0, 2'),
+%   ('subscript(Index)/Get', '_ = c[i]', '-2, -1, 1, 2'),
+%   ('subscript(Index)/Set', 'c[i] = OpaqueValue(42)', '-2, -1, 1, 2'),
+% ]:
+LazyTestSuite.test("CollectionOfOne/${name}")
+  .forEach(in: [${indices}]) {
+  i in
+
+  var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  expectCrashLater()
+  ${operation}
+}
+% end
+
+LazyTestSuite.test("CollectionOfOne/index(after:), index(before:)") {
+  let c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  expectEqual(1, c.index(after: 0))
+  expectEqual(0, c.index(before: 1))
+}
+
+LazyTestSuite.test("CollectionOfOne/subscript(Index)/Get/Set/NoTrap") {
+  var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  c[0] = OpaqueValue(4242)
+  expectEqual(4242, c[0].value)
+  expectEqualSequence([OpaqueValue(4242)], c) { $0.value == $1.value }
+}
+
+% for (name, operation) in [
+%   ('subscript(Range<Index>)/Get', '_ = c[r]'),
+%   ('subscript(Range<Index>)/Set', 'c[r] = slice'),
+% ]:
+LazyTestSuite.test("CollectionOfOne/${name}/Trap")
+  .forEach(in: [
+    -1 ..< -1, -1..<0, -1..<1, 1..<2, 2..<2,
+  ] as [Range<Int>]) {
+  r in
+  var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  let slice = r.count == 0 ? c[0..<0] : c[0..<1]
+  expectCrashLater()
+  ${operation}
+}
+% end
+
+LazyTestSuite.test("CollectionOfOne/subscript(Range<Index>)/Set/DifferentLength/Trap")
+  .forEach(in: [ 0..<0, 0..<1, 1..<1 ] as [Range<Int>]) {
+  r in
+  var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  let slice = r.count == 0 ? c[0..<1] : c[0..<0]
+  expectCrashLater()
+  c[r] = slice
+}
+
+LazyTestSuite.test("CollectionOfOne/subscript(Range<Index>)/Get/Set/Empty/NoTrap") {
+  var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  let slice0 = c[0..<0]
+  let slice1 = c[1..<1]
+  checkRandomAccessCollection([], slice0) { $0.value == $1.value }
+  checkRandomAccessCollection([], slice1) { $0.value == $1.value }
+  c[0..<0] = slice0
+  c[0..<0] = slice1
+  c[1..<1] = slice0
+  c[1..<1] = slice1
+  expectEqualSequence([OpaqueValue(42)], c) { $0.value == $1.value }
+}
+
+LazyTestSuite.test("CollectionOfOne/{CustomDebugStringConvertible,CustomReflectable}") {
+  let c = CollectionOfOne(CustomPrintableValue(42))
+  expectPrinted("CollectionOfOne((value: 42).debugDescription)", c)
+  expectDebugPrinted("CollectionOfOne((value: 42).debugDescription)", c)
+  expectDumped(
+    "▿ CollectionOfOne((value: 42).debugDescription)\n" +
+    "  ▿ element: (value: 42).debugDescription\n" +
+    "    - value: 42\n" +
+    "    - identity: 0\n",
+    c)
+}
+
+//===----------------------------------------------------------------------===//
+// EmptyCollection
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Element'.
+extension EmptyCollection where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+LazyTestSuite.test("EmptyCollection") {
+  let c = EmptyCollection<OpaqueValue<Int>>()
+  expectEqual(0, c.startIndex)
+  expectEqual(0, c.endIndex)
+  expectEqual(0..<0, c.indices)
+
+  checkRandomAccessCollection([], c) { $0.value == $1.value }
+}
+
+LazyTestSuite.test("EmptyCollection/CustomReflectable") {
+  let c = EmptyCollection<OpaqueValue<Int>>()
+  expectPrinted("EmptyCollection<OpaqueValue<Int>>()", c)
+  expectDebugPrinted("Swift.EmptyCollection<StdlibUnittest.OpaqueValue<Swift.Int>>()", c)
+  expectDumped(
+    "- Swift.EmptyCollection<StdlibUnittest.OpaqueValue<Swift.Int>>\n",
+    c)
+}
+
+LazyTestSuite.test("EmptyCollection/Equatable") {
+  let instances = [ EmptyCollection<OpaqueValue<Int>>() ]
+  checkEquatable(instances, oracle: { $0 == $1 })
+}
+
+LazyTestSuite.test("EmptyCollection/AssociatedTypes") {
+  typealias Subject = EmptyCollection<OpaqueValue<Int>>
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: EmptyIterator<OpaqueValue<Int>>.self,
+    subSequenceType: Subject.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
+
+% for (name, operation) in [
+%   ('index(after:)', '_ = c.index(after: i)'),
+%   ('index(before:)', '_ = c.index(before: i)'),
+%   ('subscript(Index)/Get', '_ = c[i]'),
+%   ('subscript(Index)/Set', 'c[i] = OpaqueValue(42)'),
+% ]:
+LazyTestSuite.test("EmptyCollection/${name}")
+  .forEach(in: [-1, 0, 1]) {
+  i in
+
+  var c = EmptyCollection<OpaqueValue<Int>>()
+  expectCrashLater()
+  ${operation}
+}
+% end
+
+% for (name, operation) in [
+%   ('subscript(Range<Index>)/Get', '_ = c[r]'),
+%   ('subscript(Range<Index>)/Set', 'c[r] = c'),
+% ]:
+LazyTestSuite.test("EmptyCollection/${name}/Trap")
+  .forEach(in: [-1 ..< -1, -1..<0, -1..<1, 0..<1, 1..<1] as [Range<Int>]) {
+  r in
+  var c = EmptyCollection<OpaqueValue<Int>>()
+  expectCrashLater()
+  ${operation}
+}
+
+LazyTestSuite.test("EmptyCollection/${name}/NoTrap") {
+  var c = EmptyCollection<OpaqueValue<Int>>()
+  let r: Range<Int> = 0..<0
+  ${operation}
+  expectEqualSequence([], c[0..<0]) { $0.value == $1.value }
+}
+% end
+
+LazyTestSuite.test("EmptyCollection/index(_:offsetBy:)/Trap")
+  .forEach(in: [
+    (-1, -1), (-1, 0), (-1, 1),
+    (0, 1), (0, -1),
+    (1, -1), (1, 0), (1, 1),
+  ]) {
+  (i, offset) in
+  let c = EmptyCollection<OpaqueValue<Int>>()
+  expectCrashLater()
+  _ = c.index(i, offsetBy: offset)
+}
+
+LazyTestSuite.test("EmptyCollection/index(_:offsetBy:)/NoTrap") {
+  let c = EmptyCollection<OpaqueValue<Int>>()
+  expectEqual(c.startIndex, c.index(c.startIndex, offsetBy: 0))
+}
+
+LazyTestSuite.test("EmptyCollection/index(_:offsetBy:limitedBy:)/Trap")
+  .forEach(in: [
+    (-1, 0, 0), (-1, 1, 0),
+    (0, 0, -1), (0, 0, 1),
+    (1, -1, 0), (1, 0, 0), (1, 0, 1),
+  ]) {
+  (i, offset, limit) in
+  let c = EmptyCollection<OpaqueValue<Int>>()
+  expectCrashLater()
+  _ = c.index(i, offsetBy: offset, limitedBy: limit)
+}
+
+LazyTestSuite.test("EmptyCollection/index(_:offsetBy:limitedBy:)/NoTrap")
+  .forEach(in: [
+    -10, -1, 0, 1, 10,
+  ]) {
+  offset in
+  let c = EmptyCollection<OpaqueValue<Int>>()
+  let result =
+    c.index(c.startIndex, offsetBy: offset, limitedBy: c.startIndex)
+  if offset == 0 {
+    expectOptionalEqual(c.startIndex, result)
+  } else {
+    expectEmpty(result)
+  }
+}
+
+LazyTestSuite.test("EmptyCollection/distance(from:to:)/Trap")
+  .forEach(in: [
+    (-1, -1), (-1, 0), (-1, 1),
+    (0, 1), (0, -1),
+    (1, -1), (1, 0), (1, 1),
+  ]) {
+  (start, end) in
+  let c = EmptyCollection<OpaqueValue<Int>>()
+  expectCrashLater()
+  _ = c.distance(from: start, to: end)
+}
+
+LazyTestSuite.test("EmptyCollection/distance(from:to:)/NoTrap") {
+  let c = EmptyCollection<OpaqueValue<Int>>()
+  expectEqual(0, c.distance(from: 0, to: 0))
+}
+
+LazyTestSuite.test("EmptyCollection/_failEarlyRangeCheck/NoTrap") {
+  let c = EmptyCollection<OpaqueValue<Int>>()
+  c._failEarlyRangeCheck(0, bounds: 0..<0)
+  c._failEarlyRangeCheck(0..<0, bounds: 0..<0)
+}
+
+//===----------------------------------------------------------------------===//
+// EmptyIterator
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Element'.
+extension EmptyIterator where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+LazyTestSuite.test("EmptyIterator") {
+  checkIterator(
+    [] as Array<OpaqueValue<Int>>,
+    EmptyIterator<OpaqueValue<Int>>())
+    { $0.value == $1.value }
+}
+
+// FIXME: trap tests.
+
+//===----------------------------------------------------------------------===//
+// lazy
+//===----------------------------------------------------------------------===//
+
+LazyTestSuite.test("isEmpty") {
+  expectTrue((0..<0).lazy.isEmpty)
+  expectFalse((0...0).lazy.isEmpty)
+}
+
+LazyTestSuite.test("first") {
+  expectOptionalEqual(7, (7..<42).lazy.first)
+}
+
+LazyTestSuite.test("first empty") {
+  expectEmpty((7..<7).lazy.first)
+}
+
+LazyTestSuite.test("last") {
+  expectOptionalEqual(41, (7..<42).lazy.last)
+}
+
+LazyTestSuite.test("last empty") {
+  expectEmpty((7..<7).lazy.last)
+}
+
+//===----------------------------------------------------------------------===//
+// LazySequence
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Base'.
+extension LazySequence where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+LazyTestSuite.test("LazySequence<Sequence>/underestimatedCount") {
+  let s = MinimalSequence(
+    elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
+    underestimatedCount: .value(42))
+  var lazySeq = s.lazy
+  expectType(LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &lazySeq)
+  expectEqual(42, lazySeq.underestimatedCount)
+}
+
+% for Traversal in TRAVERSALS:
+%   TraversalCollection = collectionForTraversal(Traversal)
+
+LazyTestSuite.test("LazySequence<${TraversalCollection}>/underestimatedCount") {
+  let s = Minimal${TraversalCollection}(
+    elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
+    underestimatedCount: .value(42))
+  var lazySeq = s.lazy
+  expectType(
+    Lazy${TraversalCollection}<
+      Minimal${TraversalCollection}<OpaqueValue<Int>>
+    >.self,
+    &lazySeq)
+  expectEqual(42, lazySeq.underestimatedCount)
+}
+
+% end
+
+//===----------------------------------------------------------------------===//
+// MapSequence
+//===----------------------------------------------------------------------===//
+
+LazyTestSuite.test("MapSequence<Sequence>/underestimatedCount") {
+  let s = MinimalSequence(
+    elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
+    underestimatedCount: .value(42))
+  var lazyMap = s.lazy.map { OpaqueValue(Int32($0.value)) }
+  expectType(
+    LazyMapSequence<MinimalSequence<OpaqueValue<Int>>, OpaqueValue<Int32>>.self,
+    &lazyMap)
+  expectEqual(42, lazyMap.underestimatedCount)
+}
+
+struct SequenceWithCustomUnderestimatedCount : Sequence {
+  init(_ data: [Int]) {
+    self._data = MinimalSequence(elements: data.map(OpaqueValue.init))
+  }
+
+  func makeIterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
+    return _data.makeIterator()
+  }
+
+  var underestimatedCount: Int {
+    SequenceWithCustomUnderestimatedCount.timesUnderestimatedCountWasCalled += 1
+    return _data.underestimatedCount
+  }
+
+  static var timesUnderestimatedCountWasCalled: Int = 0
+
+  let _data: MinimalSequence<OpaqueValue<Int>>
+}
+
+LazyTestSuite.test("LazySequence.array") {
+  SequenceWithCustomUnderestimatedCount.timesUnderestimatedCountWasCalled = 0
+
+  let base = SequenceWithCustomUnderestimatedCount([ 0, 30, 10, 90 ])
+
+  expectEqual([ 0, 30, 10, 90 ], base.lazy.map { $0.value })
+
+  // Lazy sequences should use underestimated count to preallocate array
+  // storage.
+  expectEqual(1, SequenceWithCustomUnderestimatedCount.timesUnderestimatedCountWasCalled)
+
+  expectEqualSequence(
+    [], Array(base).map { $0.value }, "sequence should be consumed")
+}
+
+% for Traversal in TRAVERSALS:
+%   TraversalCollection = collectionForTraversal(Traversal)
+
+LazyTestSuite.test("MapCollection<${TraversalCollection}>/underestimatedCount") {
+  let s = Minimal${TraversalCollection}(
+    elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
+    underestimatedCount: .value(42))
+  var lazyMap = s.lazy.map {
+    (input: OpaqueValue<Int>) -> OpaqueValue<Int32> in
+    OpaqueValue(Int32(input.value))
+  }
+  expectType(
+    LazyMap${TraversalCollection}<
+      Minimal${TraversalCollection}<OpaqueValue<Int>>, OpaqueValue<Int32>
+    >.self,
+    &lazyMap)
+  expectEqual(42, lazyMap.underestimatedCount)
+}
+
+% end
+
+//===----------------------------------------------------------------------===//
+// LazyCollection
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Base'.
+extension LazyCollection where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+%for (Traversal, ReversedType) in [
+%    ('Forward', None),
+%    ('Bidirectional', 'ReversedCollection'),
+%    ('RandomAccess', 'ReversedRandomAccessCollection')
+%]:
+%  TraversalCollection = collectionForTraversal(Traversal)
+
+LazyTestSuite.test("Lazy${TraversalCollection}.array") {
+  let base = Minimal${TraversalCollection}(
+    elements: [ 0, 30, 10, 90 ], underestimatedCount: .value(42))
+  let arrayFromLazy = Array(base.lazy)
+
+  expectEqual([ 0, 30, 10, 90 ], arrayFromLazy)
+
+  // Lazy collections should not use underestimated count to preallocate array
+  // storage, since they have access to real count instead.
+  expectLE(4, arrayFromLazy.capacity)
+  expectGE(40, arrayFromLazy.capacity)
+}
+
+%  if ReversedType is not None:
+
+LazyTestSuite.test("Lazy${TraversalCollection}.reversed") {
+  let base = Minimal${TraversalCollection}(
+    elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
+    underestimatedCount: .value(42))
+  var reversed = base.lazy.reversed()
+  expectType(
+    Lazy${TraversalCollection}<
+      ${ReversedType}<Minimal${TraversalCollection}<OpaqueValue<Int>>>
+    >.self, &reversed)
+
+  let expected: [OpaqueValue<Int>] = [ 90, 10, 30, 0 ].map(OpaqueValue.init)
+  check${Traversal}Collection(expected, reversed) { $0.value == $1.value }
+
+  var reversedTwice = reversed.reversed()
+  expectType(
+    Lazy${TraversalCollection}<
+      ${ReversedType}<${ReversedType}<
+        Minimal${TraversalCollection}<OpaqueValue<Int>>
+      >>>.self, &reversedTwice)
+
+  check${Traversal}Collection(
+    [ 0, 30, 10, 90 ].map(OpaqueValue.init) as [OpaqueValue<Int>],
+    reversedTwice) { $0.value == $1.value }
+}
+
+%  end
+
+%end
+
+//===----------------------------------------------------------------------===//
+// ReversedCollection
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Base'.
+extension ReversedCollection where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// ReversedIndex
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Base'.
+extension ReversedIndex where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// RandomAccessReversedCollection
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Base'.
+extension ReversedRandomAccessCollection where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// ReversedRandomAccessIndex
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Base'.
+extension ReversedRandomAccessIndex where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+var tests = TestSuite("NewLazy")
+
+tests.test("LazySequence/Sequence") {
+  let expected = (0..<100).map(OpaqueValue.init)
+  var actual = MinimalSequence(elements: expected).lazy
+
+  expectType(
+    LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &actual)
+
+  // Asking for .lazy again doesn't re-wrap the type
+  var again = actual.lazy
+  expectType(
+    LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &again)
+
+  var elements = actual.elements
+
+  // Expect .elements to strip a lazy wrapper
+  expectType(MinimalSequence<OpaqueValue<Int>>.self, &elements)
+
+  checkSequence(expected, actual, resiliencyChecks: .none) {
+    $0.value == $1.value
+  }
+}
+
+func expectSequencePassthrough<
+  S : Sequence,
+  Base : Sequence
+  where
+  S : LazySequenceProtocol, Base : LoggingType,
+  Base.Iterator.Element == S.Iterator.Element
+>(_ s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int) {
+  let baseType = base.dynamicType
+
+  SequenceLog.makeIterator.expectIncrement(baseType) { _ = s.makeIterator() }
+  SequenceLog.underestimatedCount.expectIncrement(baseType) {
+    _ = s.underestimatedCount
+  }
+  SequenceLog._customContainsEquatableElement.expectIncrement(baseType) {
+    _ = s._customContainsEquatableElement(arbitraryElement)
+  }
+  SequenceLog._copyToNativeArrayBuffer.expectIncrement(baseType) {
+    _ = s._copyToNativeArrayBuffer()
+  }
+
+  SequenceLog._copyContents.expectIncrement(baseType) { () -> Void in
+    let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
+  
+    let end = s._copyContents(initializing: buf)
+    expectTrue(end <= buf + count)
+    buf.deinitialize(count: end - buf)
+    buf.deallocateCapacity(count)
+  }
+}
+
+tests.test("LazySequence/Passthrough") {
+  // Test that operations that might be optimized are passed
+  // through to the underlying sequence.
+  let a = (0..<100).map(OpaqueValue.init)
+  let base = LoggingSequence(wrapping: a)
+
+  expectSequencePassthrough(
+    base.lazy,
+    base: base, arbitraryElement: OpaqueValue(0), count: a.count)
+}
+
+% for Traversal in TRAVERSALS:
+%   TraversalCollection = collectionForTraversal(Traversal)
+
+tests.test("Lazy${TraversalCollection}/Collection") {
+  let expected = (0..<100).map(OpaqueValue.init)
+  let base = Minimal${TraversalCollection}(elements: expected)
+  var actual = base.lazy
+
+  expectType(Lazy${TraversalCollection}<
+    Minimal${TraversalCollection}<OpaqueValue<Int>>
+  >.self, &actual)
+
+  // Asking for .lazy again doesn't re-wrap the type
+  var again = actual.lazy
+  expectType(Lazy${TraversalCollection}<
+    Minimal${TraversalCollection}<OpaqueValue<Int>>
+  >.self, &again)
+
+  check${Traversal}Collection(
+    expected, base.lazy, resiliencyChecks: .none
+  ) { $0.value == $1.value }
+
+  var elements = base.lazy.elements
+  expectType(Minimal${TraversalCollection}<OpaqueValue<Int>>.self, &elements)
+}
+
+% end
+
+tests.test("LazyCollection/Passthrough") {
+  let expected = (0..<100).map(OpaqueValue.init)
+  let base = LoggingCollection(wrapping: expected)
+
+  expectSequencePassthrough(
+    base.lazy,
+    base: base.lazy._base,
+    arbitraryElement: OpaqueValue(0),
+    count: Int(expected.count))
+
+  let s = base.lazy
+  let baseType = base.dynamicType
+  let startIndex = CollectionLog.startIndex.expectIncrement(baseType) {
+    s.startIndex
+  }
+
+  let endIndex = CollectionLog.endIndex.expectIncrement(baseType) {
+    s.endIndex
+  }
+
+  CollectionLog.subscriptIndex.expectIncrement(baseType) { _ = s[startIndex] }
+  CollectionLog.subscriptRange.expectUnchanged(baseType) {
+    _ = s[startIndex..<endIndex]
+  }
+  CollectionLog.isEmpty.expectIncrement(baseType) { _ = s.isEmpty }
+  CollectionLog.count.expectIncrement(baseType) { _ = s.count }
+  CollectionLog._customIndexOfEquatableElement.expectIncrement(baseType) {
+    _ = s._customIndexOfEquatableElement(OpaqueValue(0))
+  }
+  CollectionLog.first.expectIncrement(baseType) { _ = s.first }
+}
+
+//===--- Map --------------------------------------------------------------===//
+
+tests.test("LazyMapSequence") {
+  let base = MinimalSequence(
+    elements: [2, 3, 5, 7, 11].map(OpaqueValue.init)).lazy
+
+  var calls = 0
+  var mapped = base.map {
+    (x: OpaqueValue<Int>) -> OpaqueValue<Double> in
+    calls += 1
+    return OpaqueValue(Double(x.value) / 2.0)
+  }
+
+  expectEqual(0, calls)
+
+  expectType(
+    LazyMapSequence<
+      MinimalSequence<OpaqueValue<Int>>,
+      OpaqueValue<Double>>.self,
+    &mapped)
+
+  let expected = [ 1.0, 1.5, 2.5, 3.5, 5.5 ].map(OpaqueValue.init)
+
+  checkSequence(expected, mapped, resiliencyChecks: .none) {
+    $0.value == $1.value
+  }
+
+  expectEqual(expected.count, calls)
+}
+
+tests.test("MapSequence/Passthrough") {
+  let expected = (0..<100).map(OpaqueValue.init)
+  let base = LoggingSequence(wrapping: expected)
+  let mapped = base.lazy.map { OpaqueValue(Double($0.value) / 2.0) }
+  CollectionLog.underestimatedCount.expectIncrement(base.dynamicType) {
+    _ = mapped.underestimatedCount
+  }
+  // Not exactly passthrough because we wrap the result
+  CollectionLog.makeIterator.expectIncrement(base.dynamicType) {
+    _ = mapped.makeIterator()
+  }
+}
+
+% for Traversal in TRAVERSALS:
+%   TraversalCollection = collectionForTraversal(Traversal)
+
+tests.test("LazyMap${TraversalCollection}/Collection") {
+  let base = Minimal${TraversalCollection}(
+    elements: [2, 3, 5, 7, 11].map(OpaqueValue.init)).lazy
+
+  var calls = 0
+  var mapped = base.map {
+    (x: OpaqueValue<Int>) -> OpaqueValue<Double> in
+    calls += 1
+    return OpaqueValue(Double(x.value) / 2.0)
+  }
+  expectEqual(0, calls)
+
+  expectType(
+    LazyMap${TraversalCollection}<
+      Minimal${TraversalCollection}<OpaqueValue<Int>>,
+      OpaqueValue<Double>>.self,
+    &mapped)
+
+  let expected = [ 1.0, 1.5, 2.5, 3.5, 5.5 ].map(OpaqueValue.init)
+
+  check${Traversal}Collection(expected, mapped, resiliencyChecks: .none) {
+    $0.value == $1.value
+  }
+
+  // check${Traversal}Collection makes multiple passes over the input,
+  // so we test that each element was transformed *at least* once.
+  expectLE(expected.count, calls)
+}
+
+%end
+
+tests.test("LazyMapCollection/Passthrough") {
+  let expected = (0..<100).map(OpaqueValue.init)
+  let base = LoggingCollection(wrapping: expected)
+  let mapped = base.lazy.map { OpaqueValue(Double($0.value) / 2.0) }
+
+  let startIndex = CollectionLog.startIndex.expectIncrement(base.dynamicType) {
+    mapped.startIndex
+  }
+  let endIndex = CollectionLog.endIndex.expectIncrement(base.dynamicType) {
+    mapped.endIndex
+  }
+  // Not exactly passthrough, because mapping transforms the result
+  CollectionLog.subscriptIndex.expectIncrement(base.dynamicType) {
+    _ = mapped[startIndex]
+  }
+  CollectionLog.isEmpty.expectIncrement(base.dynamicType) {
+    _ = mapped.isEmpty
+  }
+  CollectionLog.first.expectIncrement(base.dynamicType) {
+    _ = mapped.first
+  }
+  CollectionLog.underestimatedCount.expectIncrement(base.dynamicType) {
+    _ = mapped.underestimatedCount
+  }
+  // Not exactly passthrough because we wrap the result
+  CollectionLog.makeIterator.expectIncrement(base.dynamicType) {
+    _ = mapped.makeIterator()
+  }
+}
+
+tests.test("LazyMapSequence/AssociatedTypes") {
+  typealias Base = MinimalSequence<OpaqueValue<Int>>
+  typealias Subject = LazyMapSequence<Base, OpaqueValue<Int32>>
+  expectSequenceAssociatedTypes(
+    sequenceType: Subject.self,
+    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    subSequenceType: AnySequence<OpaqueValue<Int32>>.self)
+}
+
+tests.test("LazyMapCollection/AssociatedTypes") {
+  typealias Base = MinimalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyMapCollection<Base, OpaqueValue<Int32>>
+  expectCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    // FIXME(ABI): SubSequence should be `LazyMapCollection<Base.Slice>`.
+    subSequenceType: Slice<Subject>.self,
+    indexType: Base.Index.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: Base.Indices.self)
+}
+
+tests.test("LazyMapBidirectionalCollection/AssociatedTypes") {
+  typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyMapBidirectionalCollection<Base, OpaqueValue<Int32>>
+  expectBidirectionalCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    // FIXME(ABI): SubSequence should be `LazyMapBidirectionalCollection<Base.Slice>`.
+    subSequenceType: BidirectionalSlice<Subject>.self,
+    indexType: Base.Index.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: Base.Indices.self)
+}
+
+tests.test("LazyMapRandomAccessCollection/AssociatedTypes") {
+  typealias Base = MinimalRandomAccessCollection<OpaqueValue<Int>>
+  typealias Subject = LazyMapRandomAccessCollection<Base, OpaqueValue<Int32>>
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    // FIXME(ABI): SubSequence should be `LazyMapRandomAccessCollection<Base.Slice>`.
+    subSequenceType: RandomAccessSlice<Subject>.self,
+    indexType: Base.Index.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: Base.Indices.self)
+}
+
+tests.test("lazy.mapped/TypeInference") {
+  let baseArray: [OpaqueValue<Int>] = (0..<10).map(OpaqueValue.init)
+  do {
+    var mapped = MinimalSequence(elements: baseArray)
+      .lazy.map { _ in OpaqueValue<Int8>(0) }
+    expectType(
+      LazyMapSequence<
+        MinimalSequence<OpaqueValue<Int>>,
+        OpaqueValue<Int8>
+      >.self,
+      &mapped)
+  }
+  do {
+    var mapped = MinimalCollection(elements: baseArray)
+      .lazy.map { _ in OpaqueValue<Int8>(0) }
+    expectType(
+      LazyMapCollection<
+        MinimalCollection<OpaqueValue<Int>>,
+        OpaqueValue<Int8>
+      >.self,
+      &mapped)
+  }
+  do {
+    var mapped = MinimalBidirectionalCollection(elements: baseArray)
+      .lazy.map { _ in OpaqueValue<Int8>(0) }
+    expectType(
+      LazyMapBidirectionalCollection<
+        MinimalBidirectionalCollection<OpaqueValue<Int>>,
+        OpaqueValue<Int8>
+      >.self,
+      &mapped)
+  }
+  do {
+    var mapped = MinimalRandomAccessCollection(elements: baseArray)
+      .lazy.map { _ in OpaqueValue<Int8>(0) }
+    expectType(
+      LazyMapRandomAccessCollection<
+        MinimalRandomAccessCollection<OpaqueValue<Int>>,
+        OpaqueValue<Int8>
+      >.self,
+      &mapped)
+  }
+}
+
+//===--- Reverse ----------------------------------------------------------===//
+tests.test("ReversedCollection") {
+  let expected = Array(stride(from: 11, through: 0, by: -1))
+  let r = 0..<12
+  checkRandomAccessCollection(
+    expected,
+    r.reversed())
+
+  // Check that the reverse collection is still eager
+  do {
+    var calls = 0
+    _ = r.reversed().map { _ in calls += 1 }
+    expectEqual(r.count, calls)
+  }
+
+  checkBidirectionalCollection(
+    "raboof".characters,
+    "foobar".characters.reversed())
+
+  // Check that the reverse collection is still eager
+  do {
+    var calls = 0
+    _ = "foobar".characters.reversed().map { _ in calls += 1 }
+    expectEqual("foobar".characters.count, calls)
+  }
+}
+
+enum _Void {}
+struct ExpectType<T> {
+  static func test(_: T){ print("T") }
+  static func test(_: Any) { fatalError() }
+  static func test(_: Any) -> _Void { fatalError() }
+}
+
+tests.test("ReversedCollection/Lazy") {
+  // Check that reversing a lazy collection, or lazy-ing a reverse
+  // collection, produces the same lazy reverse collection.
+  do {
+    
+    let base = Array(stride(from: 11, through: 0, by: -1)).lazy.map { $0 }
+    
+    typealias Base = LazyMapRandomAccessCollection<[Int], Int>
+    ExpectType<Base>.test(base)
+
+    typealias LazyReversedBase = LazyRandomAccessCollection<
+      ReversedRandomAccessCollection<Base>>
+
+    let reversed = base.reversed()
+    ExpectType<LazyReversedBase>.test(reversed)
+
+    var calls = 0
+    let reversedAndMapped = reversed.map { (x) -> Int in calls += 1; return x }
+    expectEqual(0, calls)
+    checkRandomAccessCollection(0...11, reversedAndMapped)
+    expectNotEqual(0, calls)
+  }
+
+  do {
+    typealias Expected = LazyBidirectionalCollection<
+      ReversedCollection<String.CharacterView>
+    >
+
+    let base = "foobar".characters.lazy.map { $0 }
+    typealias Base = LazyMapBidirectionalCollection<
+      String.CharacterView, Character>
+    ExpectType<Base>.test(base)
+
+    typealias LazyReversedBase = LazyBidirectionalCollection<
+      ReversedCollection<Base>>
+
+    let reversed = base.reversed()
+    ExpectType<LazyReversedBase>.test(reversed)
+
+    var calls = 0
+    let reversedAndMapped = reversed.map { (x) -> Character in calls += 1; return x }
+    expectEqual(0, calls)
+    checkBidirectionalCollection("raboof".characters, reversedAndMapped)
+    expectNotEqual(0, calls)
+  }
+}
+
+// Given a couple of sequences backed by FilterGenerator's, check that
+// the first selects even numbers and the second selects odd numbers,
+// both from an underlying sequence of whole numbers.
+func checkFilterIteratorBase<
+  S : Sequence, I : IteratorProtocol
+  where
+  S.Iterator == LazyFilterIterator<I>,
+  I.Element == OpaqueValue<Int>
+>(_ s1: S, _ s2: S) {
+  var iter1 = s1.makeIterator()
+  expectEqual(0, iter1.next()!.value)
+  expectEqual(2, iter1.next()!.value)
+  expectEqual(4, iter1.next()!.value)
+  var h1 = iter1.base
+  expectEqual(5, h1.next()!.value)
+  expectEqual(6, h1.next()!.value)
+  expectEqual(7, h1.next()!.value)
+
+  var iter2 = s2.makeIterator()
+  expectEqual(1, iter2.next()!.value)
+  expectEqual(3, iter2.next()!.value)
+  expectEqual(5, iter2.next()!.value)
+  var h2 = iter2.base
+  expectEqual(6, h2.next()!.value)
+  expectEqual(7, h2.next()!.value)
+  expectEqual(8, h2.next()!.value)
+}
+
+tests.test("LazyFilterSequence") {
+  let base = (0..<100).map(OpaqueValue.init)
+
+  var calls = 0
+  var filtered = MinimalSequence(elements: base).lazy.filter {
+    x in calls += 1;
+    return x.value % 2 == 0
+  }
+  expectEqual(calls, 0, "filtering was eager!")
+
+  ExpectType<
+    LazyFilterSequence<MinimalSequence<OpaqueValue<Int>>>
+  >.test(filtered)
+
+  let evens = stride(from: 0, to: 100, by: 2).map(OpaqueValue.init)
+  checkSequence(evens, filtered, resiliencyChecks: .none) {
+    $0.value == $1.value
+  }
+  expectEqual(100, calls)
+
+  // Check that it works when the first element doesn't satisfy the predicate
+  let odds = stride(from: 1, to: 100, by: 2).map(OpaqueValue.init)
+  filtered =
+    MinimalSequence(elements: base).lazy.filter { $0.value % 2 != 0 }
+  checkSequence(odds, filtered, resiliencyChecks: .none) {
+    $0.value == $1.value
+  }
+
+  // Try again using explicit construction
+  filtered = LazyFilterSequence(
+    _base: MinimalSequence(elements: base),
+    whereElementsSatisfy: { x in calls += 1; return x.value % 2 == 0})
+
+  expectEqual(100, calls)
+
+  // Check that it constructs the same sequence
+  checkSequence(evens, filtered, resiliencyChecks: .none) {
+    $0.value == $1.value
+  }
+
+  expectEqual(200, calls)
+
+  checkFilterIteratorBase(
+    MinimalSequence(elements: base).lazy.filter { $0.value % 2 == 0 },
+    MinimalSequence(elements: base).lazy.filter { $0.value % 2 != 0 })
+}
+
+tests.test("LazyFilterIndex/base") {
+  let base = MinimalCollection(elements: (0..<100).map(OpaqueValue.init))
+  let evens = base.lazy.filter { $0.value % 2 == 0 }
+  let odds = base.lazy.filter { $0.value % 2 != 0 }
+
+  expectEqual(base.startIndex, evens.startIndex.base)
+  expectEqual(base.index(after: base.startIndex), odds.startIndex.base)
+
+  expectEqual(
+    base.index(after: base.index(after: base.startIndex)),
+    evens.index(after: evens.startIndex).base)
+
+  expectEqual(
+    base.index(after: base.index(after: base.index(after: base.startIndex))),
+    odds.index(after: odds.startIndex).base)
+}
+
+tests.test("LazyFilterCollection") {
+  let base = MinimalCollection(elements: (0..<100).map(OpaqueValue.init))
+
+  var calls = 0
+  let filtered = base.lazy.filter {
+    x in calls += 1;
+    return x.value % 2 == 0
+  }
+  expectEqual(calls, 0, "filtering was eager!")
+
+  ExpectType<
+    LazyFilterCollection<MinimalCollection<OpaqueValue<Int>>>
+  >.test(filtered)
+
+  checkForwardCollection(
+    stride(from: 0, to: 100, by: 2).map(OpaqueValue.init), filtered,
+    resiliencyChecks: .none
+  ) {
+    $0.value == $1.value
+  }
+
+  expectGE(calls, 100)
+  let oldCalls = calls
+  _ = filtered.first
+  expectLT(oldCalls, calls)
+  expectGE(oldCalls + 2, calls)
+
+  checkFilterIteratorBase(
+    base.lazy.filter { $0.value % 2 == 0 },
+    base.lazy.filter { $0.value % 2 != 0 })
+}
+
+tests.test("LazyFilterSequence/AssociatedTypes") {
+  typealias Base = MinimalSequence<OpaqueValue<Int>>
+  typealias Subject = LazyFilterSequence<Base>
+  expectSequenceAssociatedTypes(
+    sequenceType: Subject.self,
+    iteratorType: LazyFilterIterator<Base.Iterator>.self,
+    subSequenceType: AnySequence<OpaqueValue<Int>>.self)
+}
+
+tests.test("LazyFilterCollection/AssociatedTypes") {
+  typealias Base = MinimalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyFilterCollection<Base>
+  expectCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyFilterIterator<Base.Iterator>.self,
+    // FIXME(ABI): SubSequence should be `LazyFilterCollection<Base.Slice>`.
+    subSequenceType: Slice<Subject>.self,
+    indexType: LazyFilterIndex<Base>.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: DefaultIndices<Subject>.self)
+}
+
+tests.test("LazyFilterBidirectionalCollection/AssociatedTypes") {
+  typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyFilterBidirectionalCollection<Base>
+  expectBidirectionalCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyFilterIterator<Base.Iterator>.self,
+    // FIXME(ABI): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
+    subSequenceType: BidirectionalSlice<Subject>.self,
+    indexType: LazyFilterIndex<Base>.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: DefaultBidirectionalIndices<Subject>.self)
+}
+
+tests.test("lazy.filter/TypeInference") {
+  let baseArray: [OpaqueValue<Int>] = (0..<10).map(OpaqueValue.init)
+  do {
+    var filtered = MinimalSequence(elements: baseArray)
+      .lazy.filter { _ in true }
+    expectType(
+      LazyFilterSequence<MinimalSequence<OpaqueValue<Int>>>.self,
+      &filtered)
+  }
+  do {
+    var filtered = MinimalCollection(elements: baseArray)
+      .lazy.filter { _ in true }
+    expectType(
+      LazyFilterCollection<MinimalCollection<OpaqueValue<Int>>>.self,
+      &filtered)
+  }
+  do {
+    var filtered = MinimalBidirectionalCollection(elements: baseArray)
+      .lazy.filter { _ in true }
+    expectType(
+      LazyFilterBidirectionalCollection<
+        MinimalBidirectionalCollection<OpaqueValue<Int>>
+      >.self,
+      &filtered)
+  }
+  do {
+    var filtered = MinimalRandomAccessCollection(elements: baseArray)
+      .lazy.filter { _ in true }
+    expectType(
+      LazyFilterBidirectionalCollection<
+        MinimalRandomAccessCollection<OpaqueValue<Int>>
+      >.self,
+      &filtered)
+  }
+}
+
+do {
+  struct Sample {
+    var expected: CountableRange<Int>
+    var data: [CountableRange<Int>]
+  }
+
+  let flattenSamples: [Sample] = [
+    Sample(
+      expected: 0..<8, data: [ 1..<1, 0..<5, 7..<7, 5..<7, 7..<8 ]),
+    Sample(expected: 0..<8, data: [ 0..<5, 7..<7, 5..<7, 7..<8 ]),
+    Sample(
+      expected: 0..<8, data: [ 1..<1, 0..<5, 7..<7, 5..<7, 7..<8, 11..<11 ]),
+    Sample(
+      expected: 0..<16, data: [ 0..<10, 14..<14, 10..<14, 14..<16, 22..<22 ]),
+    Sample(expected: 0..<0, data: [ 11..<11 ]),
+    Sample(expected: 0..<0, data: [ 3..<3, 11..<11 ]),
+    Sample(expected: 0..<0, data: []),
+  ]
+
+  for sample in flattenSamples {
+    let expected = sample.expected
+    let data = sample.data
+
+    tests.test("FlattenSequence/\(data)") {
+      var base = MinimalSequence(
+        elements: data.map { MinimalSequence(elements: $0) })
+      checkSequence(expected, base.flatten(), resiliencyChecks: .none)
+
+      // Checking that flatten doesn't introduce laziness
+
+      // checkSequence consumed base, so reassign
+      base = MinimalSequence(
+        elements: data.map { MinimalSequence(elements: $0) })
+      let flattened = base.flatten()
+      var calls = 0
+      _ = flattened.map { _ in calls += 1 }
+      expectEqual(
+        expected.count, calls,
+        "unexpected laziness in \(flattened.dynamicType)")
+    }
+
+    tests.test("FlattenSequence/Lazy/\(data)") {
+      // Checking that flatten doesn't remove laziness
+      let base = MinimalSequence(
+        elements: data.map { MinimalSequence(elements: $0) }
+      ).lazy.map { $0 }
+
+      let flattened = base.flatten()
+      var calls = 0
+      _ = flattened.map { _ in calls += 1 }
+      expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
+    }
+
+  % for Traversal in 'Forward', 'Bidirectional':
+  %   TraversalCollection = collectionForTraversal(Traversal)
+    tests.test("Flatten${TraversalCollection}/\(data)") {
+      let base = Minimal${TraversalCollection}(
+        elements: data.map { Minimal${TraversalCollection}(elements: $0) })
+
+      let flattened = base.flatten()
+      check${Traversal}Collection(expected, flattened, resiliencyChecks: .none)
+
+      // Checking that flatten doesn't introduce laziness
+      var calls = 0
+      _ = flattened.map { _ in calls += 1 }
+      expectLE(
+        expected.count, calls,
+        "unexpected laziness in \(flattened.dynamicType)")
+    }
+
+    tests.test("Flatten${TraversalCollection}/Lazy\(data)") {
+      // Checking that flatten doesn't remove laziness
+      let base = Minimal${TraversalCollection}(
+        elements: data.map { Minimal${TraversalCollection}(elements: $0) }
+      ).lazy.map { $0 }
+
+      let flattened = base.flatten()
+
+      var calls = 0
+      _ = flattened.map { _ in calls += 1 }
+      expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
+    }
+  % end
+  }
+}
+
+runAllTests()
+

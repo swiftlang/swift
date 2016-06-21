@@ -46,6 +46,20 @@ extension S1 {} // no-error
 extension S1.Type {} // expected-error {{cannot extend a metatype 'S1.Type'}}
 extension S1.NestedStruct {} // no-error
 
+struct S1_2 {
+  // expected-error @+4 {{type member may not be named 'Type', since it would conflict with the 'foo.Type' expression}}
+  // expected-error @+3 {{type member may not be named 'Type', since it would conflict with the 'foo.Type' expression}}
+  // expected-note @+2 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
+  // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
+  enum Type {}
+}
+struct S1_3 {
+  enum `Type` {} // no-error
+}
+
+extension S1_2.Type {} // expected-error {{cannot extend a metatype 'S1_2.Type'}}
+extension S1_3.`Type` {} // no-error
+
 typealias TA_S1 = S1
 extension TA_S1 {} // no-error
 
@@ -86,7 +100,7 @@ var x = c.p1
 c.p1 = 1
 
 protocol P3 {
-  typealias Assoc
+  associatedtype Assoc
   func foo() -> Assoc
 }
 

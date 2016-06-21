@@ -1,22 +1,14 @@
 // RUN: %target-parse-verify-swift
 
-protocol P1 { typealias AssocType }
+protocol P1 { associatedtype AssocType }
 protocol P2 : P1 { }
 protocol P3 { }
 
 struct X<T : P1, U : P2, V> { 
-  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' nested in type}}
+  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' cannot be nested in type 'X'}}
 
   struct NonGenericInner { } // expected-error{{nested in generic type}}
 }
-
-struct Y {
-  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' nested in type}}
-
-  struct NonGenericInner { } 
-}
-
-struct Z<T : P1 where T.AssocType : P3> { }
 
 extension Int : P1 {
   typealias AssocType = Int
@@ -43,14 +35,14 @@ extension LValueCheck {
 struct MemberTypeCheckA<T> { }
 
 protocol MemberTypeProto {
-  typealias AssocType
+  associatedtype AssocType
 
-  func foo(a: AssocType)
+  func foo(_ a: AssocType)
   init(_ assoc: MemberTypeCheckA<AssocType>)
 }
 
 struct MemberTypeCheckB<T> : MemberTypeProto {
-  func foo(a: T) {}
+  func foo(_ a: T) {}
 
   typealias Element = T
   var t1: T
@@ -111,29 +103,31 @@ extension Array where Element : Hashable {
   }
 }
 
-func notHashableArray<T>(x: [T]) {
+func notHashableArray<T>(_ x: [T]) {
   x.worseHashEver // expected-error{{type 'T' does not conform to protocol 'Hashable'}}
 }
 
-func hashableArray<T : Hashable>(x: [T]) {
+func hashableArray<T : Hashable>(_ x: [T]) {
+  // expected-warning @+1 {{unused}}
   x.worseHashEver // okay
 }
 
-func intArray(x: [Int]) {
+func intArray(_ x: [Int]) {
+  // expected-warning @+1 {{unused}}
   x.worseHashEver
 }
 
 class GenericClass<T> { }
 
 extension GenericClass where T : Equatable {
-  func foo(x: T, y: T) -> Bool { return x == y }
+  func foo(_ x: T, y: T) -> Bool { return x == y }
 }
 
-func genericClassEquatable<T : Equatable>(gc: GenericClass<T>, x: T, y: T) {
-  gc.foo(x, y: y)
+func genericClassEquatable<T : Equatable>(_ gc: GenericClass<T>, x: T, y: T) {
+  _ = gc.foo(x, y: y)
 }
 
-func genericClassNotEquatable<T>(gc: GenericClass<T>, x: T, y: T) {
+func genericClassNotEquatable<T>(_ gc: GenericClass<T>, x: T, y: T) {
   gc.foo(x, y: y) // expected-error{{type 'T' does not conform to protocol 'Equatable'}}
 }
 
@@ -148,7 +142,7 @@ extension GenericClass where Self : P3 { }
 // expected-error@-2{{type 'GenericClass' in conformance requirement does not refer to a generic parameter or associated type}}
 
 protocol P4 {
-  typealias T
+  associatedtype T
   init(_: T)
 }
 
@@ -158,4 +152,4 @@ struct S4<Q>: P4 {
   init(_: Q) { }
 }
 
-extension S4 where T : P5 {} // expected-error{{type 'T' in conformance requirement does not refer to a generic parameter or associated type}}
+extension S4 where T : P5 {} // expected-FIXME-error{{type 'T' in conformance requirement does not refer to a generic parameter or associated type}}

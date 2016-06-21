@@ -5,6 +5,8 @@
 // UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
+
+
 import GameplayKit
 
 // GameplayKit is only available on iOS 9.0 and above, OS X 10.11 and above, and
@@ -24,7 +26,7 @@ GamePlayKitTests.test("GKEntity.componentForClass()") {
   let entity = GKEntity()
   entity.addComponent(TestComponent())
 
-  if true {
+  do {
     var componentForTestComponent =
       entity.componentForClass(TestComponent.self)
     var componentForOtherTestComponent_nil =
@@ -36,10 +38,10 @@ GamePlayKitTests.test("GKEntity.componentForClass()") {
     expectEmpty(componentForOtherTestComponent_nil)
   }
 
-  entity.removeComponentForClass(TestComponent.self)
+  entity.removeComponent(for: TestComponent.self)
   entity.addComponent(OtherTestComponent())
 
-  if true {
+  do {
     var componentForOtherTestComponent =
       entity.componentForClass(OtherTestComponent.self)
     var componentForTestComponent_nil =
@@ -53,7 +55,7 @@ GamePlayKitTests.test("GKEntity.componentForClass()") {
 }
 
 GamePlayKitTests.test("GKStateMachine.stateForClass()") {
-  if true {
+  do {
     // Construct a state machine with a custom subclass as the only state.
     let stateMachine = GKStateMachine(
       states: [TestState1()])
@@ -69,7 +71,7 @@ GamePlayKitTests.test("GKStateMachine.stateForClass()") {
     expectEmpty(stateForTestState2_nil)
   }
 
-  if true {
+  do {
     // Construct a state machine with a custom subclass as the only state.
     let stateMachine = GKStateMachine(
       states: [TestState2()])

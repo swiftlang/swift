@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -93,6 +93,17 @@ public:
   }
 };
 
+/// A scope that only exists in the debug info.
+class LLVM_LIBRARY_VISIBILITY DebugScope {
+  SILGenFunction &SGF;
+
+public:
+  explicit DebugScope(SILGenFunction &SGF, CleanupLocation Loc) : SGF(SGF) {
+    SGF.enterDebugScope(Loc);
+  }
+
+  ~DebugScope() { SGF.leaveDebugScope(); }
+};
 
 } // end namespace Lowering
 } // end namespace swift

@@ -1,15 +1,15 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func inoutWithDefaults(inout x: Int, y: Int = 0, z: Int = 0) {}
-func inoutWithCallerSideDefaults(inout x: Int, y: Int = __LINE__) {}
+func inoutWithDefaults(_ x: inout Int, y: Int = 0, z: Int = 0) {}
+func inoutWithCallerSideDefaults(_ x: inout Int, y: Int = #line) {}
 
-func scalarWithDefaults(x: Int, y: Int = 0, z: Int = 0) {}
-func scalarWithCallerSideDefaults(x: Int, y: Int = __LINE__) {}
+func scalarWithDefaults(_ x: Int, y: Int = 0, z: Int = 0) {}
+func scalarWithCallerSideDefaults(_ x: Int, y: Int = #line) {}
 
 func tupleWithDefaults(x x: (Int, Int), y: Int = 0, z: Int = 0) {}
 
-func variadicFirst(x: Int...) {}
-func variadicSecond(x: Int, _ y: Int...) {}
+func variadicFirst(_ x: Int...) {}
+func variadicSecond(_ x: Int, _ y: Int...) {}
 
 var x = 0
 // CHECK: [[X_ADDR:%.*]] = global_addr @_Tv20scalar_to_tuple_args1xSi : $*Int
@@ -48,7 +48,7 @@ scalarWithCallerSideDefaults(x)
 tupleWithDefaults(x: (x,x))
 
 // CHECK: [[VARIADIC_FIRST:%.*]] = function_ref @_TF20scalar_to_tuple_args13variadicFirstFtGSaSi__T_
-// CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [[ARRAY:%.*]] = tuple_extract [[ALLOC_ARRAY]] {{.*}}, 0
 // CHECK: [[MEMORY:%.*]] = tuple_extract [[ALLOC_ARRAY]] {{.*}}, 1
 // CHECK: [[ADDR:%.*]] = pointer_to_address [[MEMORY]]
@@ -58,7 +58,7 @@ tupleWithDefaults(x: (x,x))
 variadicFirst(x)
 
 // CHECK: [[VARIADIC_SECOND:%.*]] = function_ref @_TF20scalar_to_tuple_args14variadicSecondFtSiGSaSi__T_
-// CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [[ARRAY:%.*]] = tuple_extract [[ALLOC_ARRAY]] {{.*}}, 0
 // CHECK: [[X:%.*]] = load [[X_ADDR]]
 // CHECK: apply [[VARIADIC_SECOND]]([[X]], [[ARRAY]])

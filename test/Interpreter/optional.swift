@@ -8,70 +8,72 @@ class B : A {
   override func printA() { print("B", terminator: "") }
 }
 
-func printA(v: A) { v.printA() }
-func printOpt<T>(subprint: T->())(x: T?) {
-  switch (x) {
-  case .Some(let y): print(".Some(", terminator: ""); subprint(y); print(")", terminator: "")
-  case .None: print(".None", terminator: "")
+func printA(_ v: A) { v.printA() }
+func printOpt<T>(_ subprint: (T) -> ()) -> (T?) -> () {
+  return { x in
+    switch (x) {
+    case .some(let y): print(".some(", terminator: ""); subprint(y); print(")", terminator: "")
+    case .none: print(".none", terminator: "")
+    }
   }
 }
 
-func test(v: A????, _ cast: (A????) -> B?) {
-  printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
+func test(_ v: A????, _ cast: (A????) -> B?) {
+  printOpt(printOpt(printOpt(printOpt(printA))))(v)
   print(" as? B: ", terminator: "")
-  printOpt(printA)(x: cast(v))
+  printOpt(printA)(cast(v))
   print("\n", terminator: "")
 }
-test(.Some(.Some(.Some(.Some(A())))), { $0 as? B })
-test(.Some(.Some(.Some(.Some(B())))), { $0 as? B })
-test(.Some(.Some(.Some(.None))), { $0 as? B })
-test(.Some(.Some(.None)), { $0 as? B })
-test(.Some(.None), { $0 as? B })
-test(.None, { $0 as? B })
-// CHECK: .Some(.Some(.Some(.Some(A)))) as? B: .None
-// CHECK: .Some(.Some(.Some(.Some(B)))) as? B: .Some(B)
-// CHECK: .Some(.Some(.Some(.None))) as? B: .None
-// CHECK: .Some(.Some(.None)) as? B: .None
-// CHECK: .Some(.None) as? B: .None
-// CHECK: .None as? B: .None
+test(.some(.some(.some(.some(A())))), { $0 as? B })
+test(.some(.some(.some(.some(B())))), { $0 as? B })
+test(.some(.some(.some(.none))), { $0 as? B })
+test(.some(.some(.none)), { $0 as? B })
+test(.some(.none), { $0 as? B })
+test(.none, { $0 as? B })
+// CHECK: .some(.some(.some(.some(A)))) as? B: .none
+// CHECK: .some(.some(.some(.some(B)))) as? B: .some(B)
+// CHECK: .some(.some(.some(.none))) as? B: .none
+// CHECK: .some(.some(.none)) as? B: .none
+// CHECK: .some(.none) as? B: .none
+// CHECK: .none as? B: .none
 
-func test(v: A????, _ cast: (A????) -> B??) {
-  printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
+func test(_ v: A????, _ cast: (A????) -> B??) {
+  printOpt(printOpt(printOpt(printOpt(printA))))(v)
   print(" as? B?: ", terminator: "")
-  printOpt(printOpt(printA))(x: cast(v))
+  printOpt(printOpt(printA))(cast(v))
   print("\n", terminator: "")
 }
-test(.Some(.Some(.Some(.Some(A())))), { $0 as? B? })
-test(.Some(.Some(.Some(.Some(B())))), { $0 as? B? })
-test(.Some(.Some(.Some(.None))), { $0 as? B? })
-test(.Some(.Some(.None)), { $0 as? B? })
-test(.Some(.None), { $0 as? B? })
-test(.None, { $0 as? B? })
-// CHECK: .Some(.Some(.Some(.Some(A)))) as? B?: .None
-// CHECK: .Some(.Some(.Some(.Some(B)))) as? B?: .Some(.Some(B))
-// CHECK: .Some(.Some(.Some(.None))) as? B?: .Some(.None)
-// CHECK: .Some(.Some(.None)) as? B?: .None
-// CHECK: .Some(.None) as? B?: .None
-// CHECK: .None as? B?: .None
+test(.some(.some(.some(.some(A())))), { $0 as? B? })
+test(.some(.some(.some(.some(B())))), { $0 as? B? })
+test(.some(.some(.some(.none))), { $0 as? B? })
+test(.some(.some(.none)), { $0 as? B? })
+test(.some(.none), { $0 as? B? })
+test(.none, { $0 as? B? })
+// CHECK: .some(.some(.some(.some(A)))) as? B?: .none
+// CHECK: .some(.some(.some(.some(B)))) as? B?: .some(.some(B))
+// CHECK: .some(.some(.some(.none))) as? B?: .some(.none)
+// CHECK: .some(.some(.none)) as? B?: .none
+// CHECK: .some(.none) as? B?: .none
+// CHECK: .none as? B?: .none
 
-func test(v: A????, _ cast: (A????) -> B???) {
-  printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
+func test(_ v: A????, _ cast: (A????) -> B???) {
+  printOpt(printOpt(printOpt(printOpt(printA))))(v)
   print(" as? B??: ", terminator: "")
-  printOpt(printOpt(printOpt(printA)))(x: cast(v))
+  printOpt(printOpt(printOpt(printA)))(cast(v))
   print("\n", terminator: "")
 }
-test(.Some(.Some(.Some(.Some(A())))), { $0 as? B?? })
-test(.Some(.Some(.Some(.Some(B())))), { $0 as? B?? })
-test(.Some(.Some(.Some(.None))), { $0 as? B?? })
-test(.Some(.Some(.None)), { $0 as? B?? })
-test(.Some(.None), { $0 as? B?? })
-test(.None, { $0 as? B?? })
-// CHECK: .Some(.Some(.Some(.Some(A)))) as? B??: .None
-// CHECK: .Some(.Some(.Some(.Some(B)))) as? B??: .Some(.Some(.Some(B)))
-// CHECK: .Some(.Some(.Some(.None))) as? B??: .Some(.Some(.None))
-// CHECK: .Some(.Some(.None)) as? B??: .Some(.None)
-// CHECK: .Some(.None) as? B??: .None
-// CHECK: .None as? B??: .None
+test(.some(.some(.some(.some(A())))), { $0 as? B?? })
+test(.some(.some(.some(.some(B())))), { $0 as? B?? })
+test(.some(.some(.some(.none))), { $0 as? B?? })
+test(.some(.some(.none)), { $0 as? B?? })
+test(.some(.none), { $0 as? B?? })
+test(.none, { $0 as? B?? })
+// CHECK: .some(.some(.some(.some(A)))) as? B??: .none
+// CHECK: .some(.some(.some(.some(B)))) as? B??: .some(.some(.some(B)))
+// CHECK: .some(.some(.some(.none))) as? B??: .some(.some(.none))
+// CHECK: .some(.some(.none)) as? B??: .some(.none)
+// CHECK: .some(.none) as? B??: .none
+// CHECK: .none as? B??: .none
 
 class Foo : Equatable {
 }
@@ -104,15 +106,15 @@ var z : Int?? = nil
 
 switch y {
   case nil:  print("y is nil")
-  case .Some(nil): print("y is .Some(nil)")
-  case .Some(let v): print("y is .Some(\(v))")
+  case .some(nil): print("y is .some(nil)")
+  case .some(let v): print("y is .some(\(v))")
 }
-// CHECK: y is .Some(nil)
+// CHECK: y is .some(nil)
 
 switch z {
   case nil:  print("z is nil")
-  case .Some(nil): print("z is .Some(nil)")
-  case .Some(let v): print("z is .Some(\(v))")
+  case .some(nil): print("z is .some(nil)")
+  case .some(let v): print("z is .some(\(v))")
 }
 // CHECK: z is nil
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -136,7 +136,7 @@ inline match_combine_and<LTy, RTy> m_CombineAnd(const LTy &L, const RTy &R) {
 
 /// Helper class to track the return type of vararg m_CombineOr matcher.
 template <typename ...Arguments>
-struct  OneOf_match;
+struct OneOf_match;
 
 template <typename T0>
 struct OneOf_match<T0> {
@@ -370,7 +370,6 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(DeinitExistentialAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ProjectBlockStorageInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongReleaseInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainAutoreleasedInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainUnownedInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedRetainInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedReleaseInst)
@@ -383,7 +382,6 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocBoxInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(DestroyAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(CondFailInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ReturnInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(AutoreleaseReturnInst)
 #undef UNARY_OP_MATCH_WITH_ARG_MATCHER
 
 //===----------------------------------------------------------------------===//
@@ -406,8 +404,8 @@ struct BinaryOp_match {
     if (!I || I->getNumOperands() != 2)
       return false;
 
-    return L.match(I->getOperand(0).getDef()) &&
-           R.match(I->getOperand(1).getDef());
+    return L.match((ValueBase *)I->getOperand(0)) &&
+           R.match((ValueBase *)I->getOperand(1));
   }
 };
 
@@ -433,7 +431,7 @@ struct tupleextract_ty {
     if (!TEI)
       return false;
 
-    return TEI->getFieldNo() == index && L.match(TEI->getOperand().getDef());
+    return TEI->getFieldNo() == index && L.match((ValueBase *)TEI->getOperand());
   }
 };
 
@@ -465,7 +463,7 @@ struct Callee_match<SILFunction &> {
     if (!AI)
       return false;
 
-    return AI->getCalleeFunction() == &Fun;
+    return AI->getReferencedFunction() == &Fun;
   }
 };
 
@@ -524,10 +522,10 @@ struct Argument_match {
   template <typename ITy>
   bool match(ITy *V) {
     if (auto *Apply = dyn_cast<ApplyInst>(V)) {
-      return Val.match(Apply->getArgument(OpI).getDef());
+      return Val.match((ValueBase *)Apply->getArgument(OpI));
     }
     if (auto *Builtin = dyn_cast<BuiltinInst>(V)) {
-      return Val.match(Builtin->getArguments()[OpI].getDef());
+      return Val.match((ValueBase *)Builtin->getArguments()[OpI]);
     }
     return false;
   }
@@ -693,7 +691,7 @@ using BuiltinApplyTy = typename Apply_match<BuiltinValueKind, Tys...>::Ty;
 /// Matcher for any of the builtin checked conversions.
 template <typename T0>
 inline typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
-m_CheckedConversion(const T0 &Op0)  {
+m_CheckedConversion(const T0 &Op0) {
   return m_USCheckedConversion(Op0) || m_SUCheckedConversion(Op0);
 }
 
@@ -713,8 +711,8 @@ m_Ext(const T0 &Op0) {
 
 /// Matcher for any of the builtin CheckedTrunc instructions.
 template <typename T0>
-inline  typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>,
-                             BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
+inline typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>,
+                            BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
 m_CheckedTrunc(const T0 &Op0) {
   return m_UToSCheckedTrunc(Op0) || m_SToUCheckedTrunc(Op0) ||
          m_UToUCheckedTrunc(Op0) || m_SToSCheckedTrunc(Op0);

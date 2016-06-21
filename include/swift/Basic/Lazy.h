@@ -1,8 +1,8 @@
-//===--- Lazy.h - A lazily-initialized object -----------------------------===//
+//===--- Lazy.h - A lazily-initialized object -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -27,6 +27,14 @@ namespace swift {
   using OnceToken_t = dispatch_once_t;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
   ::dispatch_once_f(&TOKEN, CONTEXT, FUNC)
+#elif defined(__CYGWIN__)
+  // _swift_once_f() is declared in Private.h.
+  // This prototype is copied instead including the header file.
+  void _swift_once_f(uintptr_t *predicate, void *context,
+                     void (*function)(void *));
+  using OnceToken_t = unsigned long;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  _swift_once_f(&TOKEN, CONTEXT, FUNC)
 #else
   using OnceToken_t = std::once_flag;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
@@ -71,7 +79,7 @@ template <typename T> inline T &Lazy<T>::get(void (*initCallback)(void*)) {
   return unsafeGetAlreadyInitialized();
 }
 
-} // namespace swift
+} // end namespace swift
 
 #define SWIFT_LAZY_CONSTANT(INITIAL_VALUE) \
   ([]{ \

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,7 +25,6 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -199,7 +198,9 @@ public:
       : Value(), Offset(offset), IsFullyDeserialized(0) {}
 
     /*implicit*/ PartiallySerialized(RawBitOffset offset)
-      : Value(), Offset(offset), IsFullyDeserialized(0) {}
+      : Value(), Offset(static_cast<unsigned>(offset)), IsFullyDeserialized(0) {
+      assert(Offset == offset && "offset is too large");
+    }
 
     bool isDeserialized() const {
       return Value != T();
@@ -257,7 +258,9 @@ private:
 
     template <typename IntTy>
     /*implicit*/ SerializedIdentifier(IntTy rawOffset)
-      : Offset(rawOffset) {}
+      : Offset(static_cast<unsigned>(rawOffset)) {
+      assert(Offset == rawOffset && "not enough bits");
+    }
   };
 
   /// Identifiers referenced by this module.
@@ -296,6 +299,9 @@ private:
   using SerializedDeclCommentTable =
       llvm::OnDiskIterableChainedHashTable<DeclCommentTableInfo>;
 
+  using GroupNameTable = llvm::DenseMap<unsigned, StringRef>;
+
+  std::unique_ptr<GroupNameTable> GroupNamesMap;
   std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
 
   struct {
@@ -341,10 +347,11 @@ private:
   template <typename T, typename ...Args>
   T *createDecl(Args &&... args);
 
-  /// Constructs an new module and validates it.
+  /// Constructs a new module and validates it.
   ModuleFile(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
              std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-             bool isFramework, serialization::ExtendedValidationInfo *extInfo);
+             bool isFramework, serialization::ValidationInfo &info,
+             serialization::ExtendedValidationInfo *extInfo);
 
 public:
   /// Change the status of the current module. Default argument marks the module
@@ -398,6 +405,9 @@ private:
   std::unique_ptr<SerializedDeclCommentTable>
   readDeclCommentTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
+  std::unique_ptr<GroupNameTable>
+  readGroupTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
   /// Reads the comment block, which contains USR to comment mappings.
   ///
   /// Returns false if there was an error.
@@ -408,6 +418,8 @@ private:
   /// If the record at the cursor is not a pattern, returns null.
   Pattern *maybeReadPattern();
 
+  ParameterList *readParameterList();
+  
   GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
                                                 DeclContext *DC,
                                                 llvm::BitstreamCursor &Cursor);
@@ -423,6 +435,15 @@ private:
   /// because it reads from the cursor, it is not possible to reset the cursor
   /// after reading. Nothing should ever follow a MEMBERS record.
   bool readMembers(SmallVectorImpl<Decl *> &Members);
+
+  /// Populates the protocol's default witness table.
+  ///
+  /// Returns true if there is an error.
+  ///
+  /// Note: this destroys the cursor's position in the stream. Furthermore,
+  /// because it reads from the cursor, it is not possible to reset the cursor
+  /// after reading. Nothing should ever follow a DEFAULT_WITNESS_TABLE record.
+  bool readDefaultWitnessTable(ProtocolDecl *proto);
 
   /// Resolves a cross-reference, starting from the given module.
   ///
@@ -459,15 +480,16 @@ public:
   /// \param[out] extInfo Optionally, extra info serialized about the module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
-  static Status
+  static serialization::ValidationInfo
   load(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        bool isFramework, std::unique_ptr<ModuleFile> &theModule,
        serialization::ExtendedValidationInfo *extInfo = nullptr) {
+    serialization::ValidationInfo info;
     theModule.reset(new ModuleFile(std::move(moduleInputBuffer),
                                    std::move(moduleDocInputBuffer),
-                                   isFramework, extInfo));
-    return theModule->getStatus();
+                                   isFramework, info, extInfo));
+    return info;
   }
 
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
@@ -519,7 +541,7 @@ public:
   /// Note that this may cause other decls to load as well.
   void loadExtensions(NominalTypeDecl *nominal);
 
-  /// \brief Load the methods within the given class that that produce
+  /// \brief Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.
   ///
   /// \param classDecl The class in which we are searching for @objc methods.
@@ -551,6 +573,11 @@ public:
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results);
 
+  /// Find all Objective-C methods with the given selector.
+  void lookupObjCMethods(
+         ObjCSelector selector,
+         SmallVectorImpl<AbstractFunctionDecl *> &results);
+
   /// Reports all link-time dependencies.
   void collectLinkLibraries(Module::LinkLibraryCallback callback) const;
 
@@ -572,29 +599,17 @@ public:
     return ModuleInputBuffer->getBufferIdentifier();
   }
 
-  /// Returns the module name as stored in the serialized data.
-  StringRef getModuleName() const {
-    return Name;
-  }
-
-  /// Returns the target triple the module was compiled for,
-  /// as stored in the serialized data.
-  StringRef getTargetTriple() const {
-    return TargetTriple;
-  }
-
   /// AST-verify imported decls.
   ///
   /// Has no effect in NDEBUG builds.
   void verify() const;
 
   virtual void loadAllMembers(Decl *D,
-                              uint64_t contextData,
-                              bool *ignored) override;
+                              uint64_t contextData) override;
 
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,
-                      SmallVectorImpl<ProtocolConformance*> &Conforms) override;
+                    SmallVectorImpl<ProtocolConformance*> &Conforms) override;
 
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                             uint64_t contextData) override;
@@ -602,8 +617,15 @@ public:
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
-  Optional<BriefAndRawComment> getCommentForDecl(const Decl *D);
-  Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
+  Optional<StringRef> getGroupNameById(unsigned Id) const;
+  Optional<StringRef> getSourceFileNameById(unsigned Id) const;
+  Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
+  Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const;
+  Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
+  void collectAllGroups(std::vector<StringRef> &Names) const;
+  Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
+  Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
+  Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
 
@@ -652,9 +674,7 @@ public:
   Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor);
 
   /// Recursively reads a protocol conformance from the given cursor.
-  ///
-  /// Note that a null conformance is valid for archetypes.
-  ProtocolConformance *readConformance(llvm::BitstreamCursor &Cursor);
+  ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor);
 
   /// Read the given normal conformance from the current module file.
   NormalProtocolConformance *

@@ -26,7 +26,7 @@ func testNSInterestingDesignated() {
 
 extension URLDocument {
   convenience init(string: String) {
-    self.init(URL: string)
+    self.init(url: string)
   }
 }
 
@@ -38,7 +38,7 @@ class MyDocument1 : URLDocument {
 
 func createMyDocument1() {
   var md = MyDocument1()
-  md = MyDocument1(URL: "http://llvm.org")
+  md = MyDocument1(url: "http://llvm.org")
 
   // Inherited convenience init.
   md = MyDocument1(string: "http://llvm.org")
@@ -46,8 +46,8 @@ func createMyDocument1() {
 }
 
 class MyDocument2 : URLDocument {
-  init(URL url: String) {
-    super.init(URL: url) // expected-error{{must call a designated initializer of the superclass 'URLDocument'}}
+  init(url: String) {
+    super.init(url: url) // expected-error{{must call a designated initializer of the superclass 'URLDocument'}}
   }
 }
 
@@ -57,9 +57,9 @@ class MyDocument3 : NSAwesomeDocument {
   }
 }
 
-func createMyDocument3(URL: NSURL) {
+func createMyDocument3(_ url: NSURL) {
   var md = MyDocument3()
-  md = try! MyDocument3(contentsOfURL: URL, ofType:"")
+  md = try! MyDocument3(contentsOf: url as URL, ofType:"")
   _ = md
 }
 
@@ -74,10 +74,10 @@ class MyInterestingDesignated : NSInterestingDesignatedSub {
 }
 
 func createMyInterestingDesignated() {
-  _ = MyInterestingDesignated(URL: "http://llvm.org")
+  _ = MyInterestingDesignated(url: "http://llvm.org")
 }
 
-func testNoReturn(a : NSAwesomeDocument) -> Int {
+func testNoReturn(_ a : NSAwesomeDocument) -> Int {
   a.noReturnMethod(42)
   return 17    // TODO: In principle, we should produce an unreachable code diagnostic here.
 }
@@ -98,13 +98,13 @@ class MyTableViewController : NSTableViewController {
 }
 
 class MyOtherTableViewController : NSTableViewController {
-  override init(int i: Int)  {
+  override init(int i: Int) {
     super.init(int: i)
   }
 } // expected-error{{'required' initializer 'init(coder:)' must be provided by subclass of 'NSTableViewController'}}
 
 class MyThirdTableViewController : NSTableViewController {
-  override init(int i: Int)  {
+  override init(int i: Int) {
     super.init(int: i)
   }
 
@@ -113,7 +113,7 @@ class MyThirdTableViewController : NSTableViewController {
   }
 }
 
-func checkInitWithCoder(coder: NSCoder) {
+func checkInitWithCoder(_ coder: NSCoder) {
   NSViewController(coder: coder) // expected-warning{{unused}}
   NSTableViewController(coder: coder) // expected-warning{{unused}}
   MyViewController(coder: coder) // expected-warning{{unused}}
@@ -142,7 +142,7 @@ class MyString : NSString {
 
 // <rdar://problem/17281900>
 class View: NSView {
-  override func addSubview(aView: NSView) {
+  override func addSubview(_ aView: NSView) {
     _ = MyViewController.init()
   }
 }

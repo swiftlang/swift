@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -39,7 +39,7 @@ infix operator ∘ {
 ///
 /// - Returns: a function that applies ``g`` to the result of applying ``f``
 ///   to the argument of the new function.
-public func ∘<T, U, V>(g: U -> V, f: T -> U) -> (T -> V) {
+public func ∘<T, U, V>(g: (U) -> V, f: (T) -> U) -> ((T) -> V) {
   return { g(f($0)) }
 }
 
@@ -63,59 +63,52 @@ infix operator ⊇ { associativity left precedence 130 }
 infix operator ⊉ { associativity left precedence 130 }
 
 /// - Returns: The relative complement of `lhs` with respect to `rhs`.
-public func ∖ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Set<T> {
-  return lhs.subtract(rhs)
+public func ∖ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Set<T>
+  where S.Iterator.Element == T {
+  return lhs.subtracting(rhs)
 }
 
 /// Assigns the relative complement between `lhs` and `rhs` to `lhs`.
-public func ∖= <
-  T, S: SequenceType where S.Generator.Element == T
-  >(inout lhs: Set<T>, rhs: S) {
-  lhs.subtractInPlace(rhs)
+public func ∖= <T, S: Sequence>(lhs: inout Set<T>, rhs: S)
+  where S.Iterator.Element == T {
+  lhs.subtract(rhs)
 }
 
 /// - Returns: The union of `lhs` and `rhs`.
-public func ∪ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Set<T> {
+public func ∪ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Set<T>
+  where S.Iterator.Element == T {
   return lhs.union(rhs)
 }
 
 /// Assigns the union of `lhs` and `rhs` to `lhs`.
-public func ∪= <
-  T, S: SequenceType where S.Generator.Element == T
-  >(inout lhs: Set<T>, rhs: S) {
-  lhs.unionInPlace(rhs)
+public func ∪= <T, S: Sequence>(lhs: inout Set<T>, rhs: S)
+  where S.Iterator.Element == T {
+  lhs.formUnion(rhs)
 }
 
 /// - Returns: The intersection of `lhs` and `rhs`.
-public func ∩ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Set<T> {
-  return lhs.intersect(rhs)
+public func ∩ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Set<T>
+  where S.Iterator.Element == T {
+  return lhs.intersection(rhs)
 }
 
 /// Assigns the intersection of `lhs` and `rhs` to `lhs`.
-public func ∩= <
-  T, S: SequenceType where S.Generator.Element == T
-  >(inout lhs: Set<T>, rhs: S) {
-  lhs.intersectInPlace(rhs)
+public func ∩= <T, S: Sequence>(lhs: inout Set<T>, rhs: S)
+  where S.Iterator.Element == T {
+  lhs.formIntersection(rhs)
 }
 
 /// - Returns: A set with elements in `lhs` or `rhs` but not in both.
-public func ⨁ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Set<T> {
-  return lhs.exclusiveOr(rhs)
+public func ⨁ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Set<T>
+  where S.Iterator.Element == T {
+  return lhs.symmetricDifference(rhs)
 }
 
 /// Assigns to `lhs` the set with elements in `lhs` or `rhs` but not in both.
 public func ⨁= <
-  T, S: SequenceType where S.Generator.Element == T
-  >(inout lhs: Set<T>, rhs: S) {
-  lhs.exclusiveOrInPlace(rhs)
+  T, S: Sequence where S.Iterator.Element == T
+  >(lhs: inout Set<T>, rhs: S) {
+  lhs.formSymmetricDifference(rhs)
 }
 
 /// - Returns: True if `x` is in the set.
@@ -129,58 +122,49 @@ public func ∉ <T>(x: T, rhs: Set<T>) -> Bool {
 }
 
 /// - Returns: True if `lhs` is a strict subset of `rhs`.
-public func ⊂ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
-  return lhs.isStrictSubsetOf(rhs)
+public func ⊂ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
+  return lhs.isStrictSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a strict subset of `rhs`.
-public func ⊄ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
-  return !lhs.isStrictSubsetOf(rhs)
+public func ⊄ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
+  return !lhs.isStrictSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is a subset of `rhs`.
-public func ⊆ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
-  return lhs.isSubsetOf(rhs)
+public func ⊆ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
+  return lhs.isSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a subset of `rhs`.
-public func ⊈ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
-  return !lhs.isSubsetOf(rhs)
+public func ⊈ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
+  return !lhs.isSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is a strict superset of `rhs`.
-public func ⊃ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
-  return lhs.isStrictSupersetOf(rhs)
+public func ⊃ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
+  return lhs.isStrictSuperset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a strict superset of `rhs`.
-public func ⊅ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
-  return !lhs.isStrictSupersetOf(rhs)
+public func ⊅ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
+  return !lhs.isStrictSuperset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is a superset of `rhs`.
-public func ⊇ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
-  return lhs.isSupersetOf(rhs)
+public func ⊇ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
+  return lhs.isSuperset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a superset of `rhs`.
-public func ⊉ <
-  T, S: SequenceType where S.Generator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
-  return !lhs.isSupersetOf(rhs)
+public func ⊉ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
+  return !lhs.isSuperset(of: rhs)
 }
-

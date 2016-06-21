@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -59,9 +59,9 @@ namespace swift {
     /// The top-level of a file, when in parse-as-library mode.
     TopLevelLibrary,
     /// The body of the inactive clause of an #if/#else/#endif block
-    InactiveConfigBlock,
+    InactiveConditionalBlock,
     /// The body of the active clause of an #if/#else/#endif block
-    ActiveConfigBlock
+    ActiveConditionalBlock
   };
 
   
@@ -71,6 +71,7 @@ class Parser {
 
   bool IsInputIncomplete = false;
   SourceLoc DelayedDeclEnd;
+  std::vector<Token> SplitTokens;
 
 public:
   SourceManager &SourceMgr;
@@ -83,7 +84,7 @@ public:
   DeclContext *CurDeclContext;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
-  std::vector<std::pair<SourceLoc, std::vector<VarDecl*>>> AnonClosureVars;
+  std::vector<std::pair<SourceLoc, std::vector<ParamDecl*>>> AnonClosureVars;
 
   bool IsParsingInterfaceTokens = false;
   
@@ -106,13 +107,8 @@ public:
     
     /// InVarOrLetPattern has this value when parsing a pattern in which bound
     /// variables are implicitly immutable, but allowed to be marked mutable by
-    /// using a 'var' pattern.
+    /// using a 'var' pattern.  This happens in for-each loop patterns.
     IVOLP_ImplicitlyImmutable,
-
-    /// InVarOrLetPattern has this value when parsing a pattern where variables
-    /// must always be immutable, so you cannot mark a pattern as mutable with
-    /// 'var'. This happens in for-each patterns.
-    IVOLP_AlwaysImmutable,
     
     /// When InVarOrLetPattern has this value, bound variables are mutable, and
     /// nested let/var patterns are not permitted. This happens when parsing a
@@ -154,6 +150,10 @@ public:
   bool allowTopLevelCode() const {
     return SF.isScriptMode();
   }
+
+  const std::vector<Token> &getSplitTokens() { return SplitTokens; }
+
+  void markSplitToken(tok Kind, StringRef Txt);
 
   /// Returns true if the parser reached EOF with incomplete source input, due
   /// for example, a missing right brace.
@@ -373,13 +373,17 @@ public:
   class BacktrackingScope {
     Parser &P;
     ParserPosition PP;
+    bool Backtrack = true;
 
   public:
     BacktrackingScope(Parser &P) : P(P), PP(P.getParserPosition()) {}
 
     ~BacktrackingScope() {
-      P.backtrackToPosition(PP);
+      if (Backtrack)
+        P.backtrackToPosition(PP);
     }
+
+    void cancelBacktrack() { Backtrack = false; }
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -448,10 +452,11 @@ public:
   void skipUntil(tok T1, tok T2 = tok::unknown);
   void skipUntilAnyOperator();
 
-  /// \brief Skip until a token that starts with '>'.  Applies heuristics that
-  /// are suitable when trying to find the end of a list of generic parameters,
-  /// generic arguments, or list of types in a protocol composition.
-  void skipUntilGreaterInTypeList(bool protocolComposition=false);
+  /// \brief Skip until a token that starts with '>', and consume it if found.
+  /// Applies heuristics that are suitable when trying to find the end of a list
+  /// of generic parameters, generic arguments, or list of types in a protocol
+  /// composition.
+  SourceLoc skipUntilGreaterInTypeList(bool protocolComposition = false);
 
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
   void skipUntilDeclRBrace();
@@ -473,10 +478,10 @@ public:
   void skipSingle();
 
   /// \brief Skip until the next '#else', '#endif' or until eof.
-  void skipUntilConfigBlockClose();
+  void skipUntilConditionalBlockClose();
 
   /// Parse an #endif.
-  bool parseConfigEndIf(SourceLoc &Loc);
+  bool parseEndIfDirective(SourceLoc &Loc);
 
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
@@ -536,7 +541,7 @@ public:
     getScopeInfo().addToScope(D, *this);
   }
 
-  ValueDecl *lookupInScope(Identifier Name) {
+  ValueDecl *lookupInScope(DeclName Name) {
     return getScopeInfo().lookupValueName(Name);
   }
 
@@ -548,6 +553,11 @@ public:
   ///
   /// \returns false on success, true on error.
   bool parseIdentifier(Identifier &Result, SourceLoc &Loc, const Diagnostic &D);
+  
+  /// Consume an identifier with a specific expected name.  This is useful for
+  /// contextually sensitive keywords that must always be present.
+  bool parseSpecificIdentifier(StringRef expected, SourceLoc &Loc,
+                               const Diagnostic &D);
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseIdentifier(Identifier &Result, Diag<DiagArgTypes...> ID,
@@ -562,6 +572,12 @@ public:
     return parseIdentifier(Result, L, Diagnostic(ID, Args...));
   }
   
+  template<typename ...DiagArgTypes, typename ...ArgTypes>
+  bool parseSpecificIdentifier(StringRef expected,
+                               Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+    SourceLoc L;
+    return parseSpecificIdentifier(expected, L, Diagnostic(ID, Args...));
+  }
 
   /// \brief Consume an identifier or operator if present and return its name
   /// in \p Result.  Otherwise, emit an error and return true.
@@ -616,7 +632,7 @@ public:
   ParserStatus parseBraceItems(SmallVectorImpl<ASTNode> &Decls,
                                BraceItemListKind Kind =
                                    BraceItemListKind::Brace,
-                               BraceItemListKind ConfigKind =
+                               BraceItemListKind ConditionalBlockKind =
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
@@ -639,17 +655,15 @@ public:
     PD_Default              = 0,
     PD_AllowTopLevel        = 1 << 1,
     PD_HasContainerType     = 1 << 2,
-    PD_DisallowNominalTypes = 1 << 3,
-    PD_DisallowInit         = 1 << 4,
-    PD_DisallowTypeAliasDef = 1 << 5,
-    PD_AllowDestructor      = 1 << 6,
-    PD_AllowEnumElement     = 1 << 7,
-    PD_InProtocol           = 1 << 8,
-    PD_InClass              = 1 << 9,
-    PD_InExtension          = 1 << 10,
-    PD_InStruct             = 1 << 11,
-    PD_InEnum               = 1 << 12,
-    PD_InLoop               = 1 << 13
+    PD_DisallowInit         = 1 << 3,
+    PD_AllowDestructor      = 1 << 4,
+    PD_AllowEnumElement     = 1 << 5,
+    PD_InProtocol           = 1 << 6,
+    PD_InClass              = 1 << 7,
+    PD_InExtension          = 1 << 8,
+    PD_InStruct             = 1 << 9,
+    PD_InEnum               = 1 << 10,
+    PD_InLoop               = 1 << 11
   };
 
   /// Options that control the parsing of declarations.
@@ -682,16 +696,21 @@ public:
     return AlreadyHandledDecls.erase(D);
   }
 
-  ParserStatus parseDecl(SmallVectorImpl<Decl*> &Entries, ParseDeclOptions Flags);
+  ParserStatus parseDecl(ParseDeclOptions Flags,
+                         llvm::function_ref<void(Decl*)> Handler);
+
   void parseDeclDelayed();
 
-  ParserResult<TypeDecl> parseDeclTypeAlias(bool WantDefinition,
-                                            bool isAssociatedType,
+  ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
                                             DeclAttributes &Attributes);
+
+  ParserResult<TypeDecl> parseDeclAssociatedType(ParseDeclOptions Flags,
+                                                 DeclAttributes &Attributes);
   
   ParserResult<IfConfigDecl> parseDeclIfConfig(ParseDeclOptions Flags);
-  /// Parse a #line directive.
-  ParserStatus parseLineDirective();
+  /// Parse a #line/#setline directive.
+  /// 'isLine = true' indicates parsing #line instead of #setline
+  ParserStatus parseLineDirective(bool isLine = false);
 
   void setLocalDiscriminator(ValueDecl *D);
 
@@ -706,7 +725,7 @@ public:
 
   bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                              DeclAttrKind DK);
-  
+
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.
   bool parseVersionTuple(clang::VersionTuple &Version, SourceRange &Range,
@@ -732,9 +751,9 @@ public:
                                        DeclAttributes &Attributes);
   ParserStatus parseDeclEnumCase(ParseDeclOptions Flags, DeclAttributes &Attributes,
                                  SmallVectorImpl<Decl *> &decls);
-  bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
-                               SourceLoc LBLoc, SourceLoc &RBLoc,
-                               Diag<> ErrorDiag, ParseDeclOptions flags);
+  bool parseNominalDeclMembers(SourceLoc LBLoc, SourceLoc &RBLoc,
+                               Diag<> ErrorDiag, ParseDeclOptions flags,
+                               llvm::function_ref<void(Decl*)> handler);
   ParserResult<StructDecl>
   parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<ClassDecl>
@@ -760,18 +779,18 @@ public:
     void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
                 ParseDeclOptions flags, SourceLoc staticLoc,
                 const DeclAttributes &attrs,
-                TypeLoc elementTy, Pattern *indices,
+                TypeLoc elementTy, ParameterList *indices,
                 SmallVectorImpl<Decl *> &decls);
   };
 
   bool parseGetSetImpl(ParseDeclOptions Flags,
-                       Pattern *Indices, TypeLoc ElementTy,
+                       ParameterList *Indices, TypeLoc ElementTy,
                        ParsedAccessors &accessors,
                        SourceLoc &LastValidLoc,
                        SourceLoc StaticLoc, SourceLoc VarLBLoc,
                        SmallVectorImpl<Decl *> &Decls);
   bool parseGetSet(ParseDeclOptions Flags,
-                   Pattern *Indices, TypeLoc ElementTy,
+                   ParameterList *Indices, TypeLoc ElementTy,
                    ParsedAccessors &accessors,
                    SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
@@ -803,6 +822,7 @@ public:
   parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes);
 
   void addPatternVariablesToScope(ArrayRef<Pattern *> Patterns);
+  void addParametersToScope(ParameterList *PL);
 
   ParserResult<OperatorDecl> parseDeclOperator(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
@@ -827,7 +847,9 @@ public:
   bool parseSILVTable();
   bool parseSILGlobal();
   bool parseSILWitnessTable();
+  bool parseSILDefaultWitnessTable();
   bool parseSILCoverageMap();
+  bool parseSILScope();
 
   //===--------------------------------------------------------------------===//
   // Type Parsing
@@ -859,7 +881,7 @@ public:
 
   ParserResult<ProtocolCompositionTypeRepr> parseTypeComposition();
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
-  ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);
+  ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
 
   /// Parse a collection type.
   ///   type-simple:
@@ -900,8 +922,8 @@ public:
     /// function.
     void setFunctionContext(DeclContext *DC);
     
-    DefaultArgumentInfo() {
-      NextIndex = 0;
+    DefaultArgumentInfo(bool inTypeContext) {
+      NextIndex = inTypeContext ? 1 : 0;
       HasDefaultArgument = false;
     }
   };
@@ -912,7 +934,6 @@ public:
     DeclAttributes Attrs;
 
     /// The location of the 'let', 'var', or 'inout' keyword, if present.
-    ///
     SourceLoc LetVarInOutLoc;
 
     enum SpecifierKindTy {
@@ -921,10 +942,6 @@ public:
       InOut
     };
     SpecifierKindTy SpecifierKind = Let; // Defaults to let.
-
-    
-    /// The location of the back-tick preceding the first name, if any.
-    SourceLoc PoundLoc;
 
     /// The location of the first name.
     ///
@@ -936,16 +953,8 @@ public:
     /// \p SecondName is the name.
     SourceLoc SecondNameLoc;
 
-    /// The location of the ':', if present, indicating that a type is
-    /// provided.
-    SourceLoc ColonLoc;
-
     /// The location of the '...', if present.
     SourceLoc EllipsisLoc;
-
-    /// The location of the '=', if present, indicating that a default argument
-    /// is provided.
-    SourceLoc EqualLoc;
 
     /// The first name.
     Identifier FirstName;
@@ -958,6 +967,9 @@ public:
 
     /// The default argument for this parameter.
     ExprHandle *DefaultArg = nullptr;
+    
+    /// True if we emitted a parse error about this parameter.
+    bool isInvalid = false;
   };
 
   /// Describes the context in which the given parameter is being parsed.
@@ -997,23 +1009,23 @@ public:
                                     DefaultArgumentInfo *defaultArgs,
                                     ParameterContextKind paramContext);
 
-  ParserResult<Pattern> parseSingleParameterClause(
+  ParserResult<ParameterList> parseSingleParameterClause(
                           ParameterContextKind paramContext,
                           SmallVectorImpl<Identifier> *namePieces = nullptr);
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
-                                      SmallVectorImpl<Pattern*> &BodyPatterns,
+                                    SmallVectorImpl<ParameterList*> &BodyParams,
                                       ParameterContextKind paramContext,
                                       DefaultArgumentInfo &defaultArgs);
   ParserStatus parseFunctionSignature(Identifier functionName,
                                       DeclName &fullName,
-                                      SmallVectorImpl<Pattern *> &bodyPatterns,
+                              SmallVectorImpl<ParameterList *> &bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &throws,
                                       bool &rethrows,
                                       TypeRepr *&retType);
   ParserStatus parseConstructorArguments(DeclName &FullName,
-                                         Pattern *&BodyPattern,
+                                         ParameterList *&BodyParams,
                                          DefaultArgumentInfo &defaultArgs);
 
   //===--------------------------------------------------------------------===//
@@ -1088,17 +1100,37 @@ public:
   ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic = false);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
+  ParserResult<Expr> parseExprArrow();
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
-                                       bool isConfigCondition = false);
+                                       bool isForConditionalDirective = false);
   ParserResult<Expr> parseExprSequenceElement(Diag<> ID,
                                               bool isExprBasic);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprKeyPath();
+  ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
   ParserResult<Expr> parseExprConfiguration();
-  Expr *parseExprStringLiteral();
-  
+  ParserResult<Expr> parseExprStringLiteral();
+
+  /// If the token is an escaped identifier being used as an argument
+  /// label, but doesn't need to be, diagnose it.
+  void diagnoseEscapedArgumentLabel(const Token &tok);
+
+  /// Parse an unqualified-decl-name.
+  ///
+  ///   unqualified-decl-name:
+  ///     identifier
+  ///     identifier '(' ((identifier | '_') ':') + ')'
+  ///
+  /// \param afterDot Whether this identifier is coming after a period, which
+  /// enables '.init' and '.default' like expressions.
+  /// \param loc Will be populated with the location of the name.
+  /// \param diag The diagnostic to emit if this is not a name.
+  DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
+                                    const Diagnostic &diag);
+
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
@@ -1137,7 +1169,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool parseClosureSignatureIfPresent(
                                 SmallVectorImpl<CaptureListEntry> &captureList,
-                                      Pattern *&params,
+                                      ParameterList *&params,
                                       SourceLoc &throwsLoc,
                                       SourceLoc &arrowLoc,
                                       TypeRepr *&explicitResultType,
@@ -1145,13 +1177,23 @@ public:
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
-  ParserResult<Expr> parseExprObjectLiteral();
+
+  // NOTE: used only for legacy support for old object literal syntax.
+  // Will be removed in the future.
+  bool isCollectionLiteralStartingWithLSquareLit();
+
+  /// Parse an object literal.
+  ///
+  /// \param LK The literal kind as determined by the first token.
+  /// \param NewName New name for a legacy literal.
+  ParserResult<Expr> parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LK,
+                                            StringRef NewName = StringRef());
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          Identifier firstSelectorPiece
                                            = Identifier(),
                                          SourceLoc firstSelectorPieceLoc
                                            = SourceLoc());
-  ParserResult<Expr> parseExprCollection();
+  ParserResult<Expr> parseExprCollection(SourceLoc LSquareLoc = SourceLoc());
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc, Expr *FirstExpr);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc, Expr *FirstKey);
 
@@ -1187,17 +1229,31 @@ public:
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserResult<CaseStmt> parseStmtCase();
 
-  /// Evaluate the conditional configuration expression of an #if statement
-  ConfigParserState evaluateConfigConditionExpr(Expr *configExpr);
+  /// Evaluate the condition of an #if directive.
+  ConditionalCompilationExprState
+  evaluateConditionalCompilationExpr(Expr *condition);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing
 
-  GenericParamList *parseGenericParameters();
-  GenericParamList *parseGenericParameters(SourceLoc LAngleLoc);
-  GenericParamList *maybeParseGenericParams();
-  bool parseGenericWhereClause(SourceLoc &WhereLoc,
-                               SmallVectorImpl<RequirementRepr> &Requirements);
+  ParserResult<GenericParamList> parseGenericParameters();
+  ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
+  ParserResult<GenericParamList> maybeParseGenericParams();
+
+  enum class WhereClauseKind : unsigned {
+    Declaration,
+    Protocol,
+    AssociatedType
+  };
+  ParserStatus
+  parseFreestandingGenericWhereClause(GenericParamList *&GPList,
+                             WhereClauseKind kind=WhereClauseKind::Declaration);
+  
+  ParserStatus parseGenericWhereClause(SourceLoc &WhereLoc,
+                               SmallVectorImpl<RequirementRepr> &Requirements,
+                                       bool &FirstTypeInComplete);
+  
+
 
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing
@@ -1209,6 +1265,73 @@ public:
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
 };
+
+/// Describes a parsed declaration name.
+struct ParsedDeclName {
+  /// The name of the context of which the corresponding entity should
+  /// become a member.
+  StringRef ContextName;
+
+  /// The base name of the declaration.
+  StringRef BaseName;
+
+  /// The argument labels for a function declaration.
+  SmallVector<StringRef, 4> ArgumentLabels;
+
+  /// Whether this is a function name (vs. a value name).
+  bool IsFunctionName = false;
+
+  /// Whether this is a getter for the named property.
+  bool IsGetter = false;
+
+  /// Whether this is a setter for the named property.
+  bool IsSetter = false;
+
+  /// For a declaration name that makes the declaration into an
+  /// instance member, the index of the "Self" parameter.
+  Optional<unsigned> SelfIndex;
+
+  /// Determine whether this is a valid name.
+  explicit operator bool() const { return !BaseName.empty(); }
+
+  /// Whether this declaration name turns the declaration into a
+  /// member of some named context.
+  bool isMember() const { return !ContextName.empty(); }
+
+  /// Whether the result is translated into an instance member.
+  bool isInstanceMember() const {
+    return isMember() && static_cast<bool>(SelfIndex);
+  }
+
+  /// Whether the result is translated into a static/class member.
+  bool isClassMember() const {
+    return isMember() && !static_cast<bool>(SelfIndex);
+  }
+
+  /// Whether this is a property accessor.
+  bool isPropertyAccessor() const { return IsGetter || IsSetter; }
+
+  /// Whether this is an operator.
+  bool isOperator() const {
+    return Lexer::isOperator(BaseName);
+  }
+
+  /// Form a declaration name from this parsed declaration name.
+  DeclName formDeclName(ASTContext &ctx) const;
+};
+
+/// Parse a stringified Swift declaration name,
+/// e.g. "Foo.translateBy(self:x:y:)".
+ParsedDeclName parseDeclName(StringRef name) LLVM_READONLY;
+
+/// Form a Swift declaration name from its constituent parts.
+DeclName formDeclName(ASTContext &ctx,
+                      StringRef baseName,
+                      ArrayRef<StringRef> argumentLabels,
+                      bool isFunctionName);
+
+/// Parse a stringified Swift declaration name, e.g. "init(frame:)".
+DeclName parseDeclName(ASTContext &ctx, StringRef name);
 
 } // end namespace swift
 

@@ -29,29 +29,29 @@ func testInheritedFactory() throws {
 
 // Resolve a conflict between -foo and -foo: by just not
 // importing the latter as throwing.
-func testConflict1(obj: ErrorProne) throws {
+func testConflict1(_ obj: ErrorProne) throws {
   try obj.conflict1() // expected-warning {{no calls to throwing functions occur within 'try'}}
 }
-func testConflict1_error(obj: ErrorProne) throws {
+func testConflict1_error(_ obj: ErrorProne) throws {
   var error: NSError?
   obj.conflict1(&error)
 }
 
 // Resolve a conflict between -foo and -fooAndReturnError:
 // by not changing the name of the latter.
-func testConflict2(obj: ErrorProne) throws {
+func testConflict2(_ obj: ErrorProne) throws {
   try obj.conflict2() // expected-warning {{no calls to throwing functions occur within 'try'}}
 }
-func testConflict2_error(obj: ErrorProne) throws {
+func testConflict2_error(_ obj: ErrorProne) throws {
   try obj.conflict2AndReturnError()
 }
 
 // Resolve a conflict between -foo: and -foo:error: by not
 // changing the name of the latter.
-func testConflict3(obj: ErrorProne) throws {
+func testConflict3(_ obj: ErrorProne) throws {
   try obj.conflict3(nil) // expected-warning {{no calls to throwing functions occur within 'try'}}
 }
-func testConflict3_error(obj: ErrorProne) throws {
+func testConflict3_error(_ obj: ErrorProne) throws {
   try obj.conflict3(nil, error: ())
 }
 
@@ -73,7 +73,7 @@ func testBlockFinal() throws {
 
 func testNonBlockFinal() throws {
   ErrorProne.runWithError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
-  ErrorProne.runWithAnError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
+  ErrorProne.run(count: 0) // expected-error {{incorrect argument label in call (have 'count:', expected 'callback:')}}
 }
 
 class VeryErrorProne : ErrorProne {
@@ -98,13 +98,13 @@ func testSwiftError() throws {
 }
 
 // rdar://21074857
-func needsNonThrowing(fn: () -> ()) {}
+func needsNonThrowing(_ fn: () -> Void) {}
 func testNSErrorExhaustive() {
   needsNonThrowing {
     do {
       try ErrorProne.fail()
     } catch let e as NSError {
-      e
+      e // expected-warning {{expression of type 'NSError' is unused}}
     }
   }
 }

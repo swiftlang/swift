@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -64,7 +64,6 @@ EXPR(DeclRef, Expr)
 EXPR(SuperRef, Expr)
 EXPR(Type, Expr)
 EXPR(OtherConstructorDeclRef, Expr)
-UNCHECKED_EXPR(UnresolvedConstructor, Expr)
 EXPR(DotSyntaxBaseIgnored, Expr)
 ABSTRACT_EXPR(OverloadSetRef, Expr)
   UNCHECKED_EXPR(OverloadedDeclRef, OverloadSetRefExpr)
@@ -79,7 +78,6 @@ ABSTRACT_EXPR(DynamicLookup, Expr)
 UNCHECKED_EXPR(UnresolvedSpecialize, Expr)
 UNCHECKED_EXPR(UnresolvedMember, Expr)
 UNCHECKED_EXPR(UnresolvedDot, Expr)
-UNCHECKED_EXPR(UnresolvedSelector, Expr)
 UNCHECKED_EXPR(Sequence, Expr)
 ABSTRACT_EXPR(Identity, Expr)
   EXPR(Paren, IdentityExpr)
@@ -142,7 +140,8 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR(PointerToPointer, ImplicitConversionExpr)
   EXPR(LValueToPointer, ImplicitConversionExpr)
   EXPR(ForeignObjectConversion, ImplicitConversionExpr)
-  EXPR_RANGE(ImplicitConversion, Load, ForeignObjectConversion)
+  EXPR(UnevaluatedInstance, ImplicitConversionExpr)
+  EXPR_RANGE(ImplicitConversion, Load, UnevaluatedInstance)
 ABSTRACT_EXPR(ExplicitCast, Expr)
   ABSTRACT_EXPR(CheckedCast, ExplicitCastExpr)
     EXPR(ForcedCheckedCast, CheckedCastExpr)
@@ -151,12 +150,16 @@ ABSTRACT_EXPR(ExplicitCast, Expr)
     EXPR_RANGE(CheckedCast, ForcedCheckedCast, Is)
   EXPR(Coerce, ExplicitCastExpr)
   EXPR_RANGE(ExplicitCast, ForcedCheckedCast, Coerce)
+UNCHECKED_EXPR(Arrow, Expr)
 EXPR(If, Expr)
+EXPR(EnumIsCase, Expr)
 EXPR(Assign, Expr)
 EXPR(DefaultValue, Expr)
 EXPR(CodeCompletion, Expr)
 UNCHECKED_EXPR(UnresolvedPattern, Expr)
-UNCHECKED_EXPR(EditorPlaceholder, Expr)
+EXPR(EditorPlaceholder, Expr)
+EXPR(ObjCSelector, Expr)
+EXPR(ObjCKeyPath, Expr)
 
 #undef EXPR_RANGE
 #undef UNCHECKED_EXPR

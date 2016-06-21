@@ -10,4 +10,4 @@
 import Foundation
 
 // CHECK: {{^}}ABCDEF{{$}}
-print(("ABC" as NSString).stringByAppendingString("DEF"))
+print(("ABC" as NSString).appending("DEF"))

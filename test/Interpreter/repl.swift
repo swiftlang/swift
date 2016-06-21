@@ -72,7 +72,7 @@ f1 +
 -1.75
 // CHECK: Double = -1.75{{$}}
 
-func r13792487(x: Float64) -> Float64 { return x }
+func r13792487(_ x: Float64) -> Float64 { return x }
 r13792487(1234.0)
 // CHECK: Float64 = 1234.0{{$}}
 r13792487(1234)
@@ -195,13 +195,13 @@ pr.foo()
 
 var _ : ([Int]).Type = [4].dynamicType
 // CHECK: : ([Int]).Type
-var _ : (Int -> Int)? = .None
-// CHECK: : (Int -> Int)?
-func chained(f f: Int -> ()) -> Int { return 0 }
+var _ : ((Int) -> Int)? = .none
+// CHECK: : ((Int) -> Int)?
+func chained(f f: (Int) -> ()) -> Int { return 0 }
 chained
-// CHECK: : (f: Int -> ()) -> Int
+// CHECK: : (f: (Int) -> ()) -> Int
 [chained]
-// CHECK: : [(f: Int -> ()) -> Int]
+// CHECK: : [(f: (Int) -> ()) -> Int]
 
 ({97210}())
 // CHECK: = 97210

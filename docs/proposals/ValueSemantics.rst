@@ -25,7 +25,7 @@ Value Semantics
 ---------------
 
 For a type with value semantics, variable initialization, assignment,
-and argument-passing (hereafter, “the big three operations”) each
+and argument-passing (hereafter, "the big three operations") each
 create an *independently modifiable copy* of the source value that is
 *interchangeable with the source*. [#interchange]_
 
@@ -64,7 +64,7 @@ If ``T`` has value semantics, the ``f``\ s below are all equivalent::
      return x   // without affecting x
   }
 
-  func g(x : T) { x.mutate() }
+  func g(_ x : T) { x.mutate() }
 
   func f4() -> T {
      var x : T
@@ -94,27 +94,27 @@ the others.
 If ``T`` has reference semantics, the ``f``\ s below are all
 equivalent::
 
-  func f1(T x) {
+  func f1(_ x: T) {
      x.mutate()
      return x
   }
 
-  func f2(T x) -> T {
+  func f2(_ x: T) -> T {
      var y = x
      y.mutate()  // mutation through a copy of x
      return x    // is visible through x
   }
 
-  func f2a(T x) -> T {
+  func f2a(_ x: T) -> T {
      var y : T
      y = x
      y.mutate()  // mutation through a copy of x
      return x    // is visible through x
   }
 
-  func g(x : T) { x.mutate() }
+  func g(_ x : T) { x.mutate() }
 
-  func f3(T x) -> T {
+  func f3(_ x: T) -> T {
      g(x)        // when x is passed to a function, mutation
      return x    // through the parameter is visible through x
   }
@@ -151,13 +151,13 @@ The Problem With Generics
 
 The classic Liskov principle says the semantics of operations on
 ``Duck``\ 's subtypes need to be consistent with those on ``Duck`` itself,
-so that functions operating on ``Duck``\ s still “work” when passed a
+so that functions operating on ``Duck``\ s still "work" when passed a
 ``Mallard``.  More generally, for a function to make meaningful
 guarantees, the semantics of its sub-operations need to be consistent
 regardless of the actual argument types passed.
 
 The type of an argument passed by-value to an ordinary function is
-fully constrained, so the “big three” have knowable semantics.  The
+fully constrained, so the "big three" have knowable semantics.  The
 type of an ordinary argument passed by-reference is constrained by
 subtype polymorphism, where a (usually implicit) contract between
 base- and sub-types can dictate consistency.
@@ -175,11 +175,11 @@ pseudo-random number generator).  It needs to make one copy and do
 in-place mutation of the state, rather than wholesale value
 replacement via assignment, which might be expensive.
 
-Here’s a version of cycle_length that works when state is a mutable
+Here's a version of cycle_length that works when state is a mutable
 value type::
 
  func cycle_length<State>(
-   s : State, mutate : ( [inout] State )->() 
+   _ s : State, mutate : ([inout] State) -> ()
  ) -> Int
    requires State : EqualityComparable
  {
@@ -196,7 +196,7 @@ value type::
 The reason the above breaks when the state is in a class instance is
 that the intended copy in line 1 instead creates a new reference to
 the same state, and the comparison in line 2 (regardless of whether we
-decide ``!=`` does “identity” or “value” comparison) always succeeds.
+decide ``!=`` does "identity" or "value" comparison) always succeeds.
 
 You can write a different implementation that only works on clonable
 classes:
@@ -211,7 +211,7 @@ classes:
  }
 
  func cycle_length<State>(
-   s : State, mutate : ( [inout] State )->() 
+   _ s : State, mutate : ([inout] State) -> ()
  ) -> Int
    requires State : EqualityComparable, **Clonable**
  {
@@ -232,9 +232,9 @@ clonable classes:
 .. parsed-literal::
 
  func cycle_length<State>(
-   s : State, 
-   **next : (x : State)->State,**
-   **equal : ([inout] x : State, [inout] y : State)->Bool**
+   _ s : State,
+   **next : (x : State) -> State,**
+   **equal : (x : [inout] State, y : [inout] State) -> Bool**
  ) -> Int
    requires State : EqualityComparable
  {
@@ -264,7 +264,7 @@ linked list::
      constructor(Int) { next = this; prev = this }
      
      // link two circular lists into one big cycle.
-     func join(otherNode : Node) -> () { ... }
+     func join(_ otherNode : Node) -> () { ... }
 
      var next : WeakRef<Node> // identity of next node
      var prev : WeakRef<Node> // identity of previous node
@@ -272,7 +272,7 @@ linked list::
 
 We can measure the length of a cycle in these nodes as follows::
 
- cycle_length( someNode, (x: [inout] Node){ x = x.next } )
+ cycle_length(someNode, (x: [inout] Node){ x = x.next })
 
 This is why so many generic algorithms seem to work on both 
 ``class``\ es and non-``class``\ es: ``class`` *identities* 
@@ -295,7 +295,7 @@ to observe a difference in behavior:
 Take, for example, ``swap``, which uses variable initialization and
 assignment to exchange two values::
 
-  func swap<T>(lhs : [inout] T, rhs : [inout] T)
+  func swap<T>(_ lhs : [inout] T, rhs : [inout] T)
   {
       var tmp = lhs   // big 3: initialization - ref copy in tmp
       lhs = rhs       // big 3: assignment     - ref copy in lhs

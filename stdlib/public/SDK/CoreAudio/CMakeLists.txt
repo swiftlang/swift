@@ -1,8 +1,10 @@
-add_swift_library(swiftCoreAudio IS_SDK_OVERLAY
+add_swift_library(swiftCoreAudio ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   CoreAudio.swift
+  ../../../public/core/WriteBackMutableSlice.swift
 
-  TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
+  TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR WATCHOS
   SWIFT_MODULE_DEPENDS Dispatch
-  # Also depends on: CoreFoundation IOKit
+  SWIFT_MODULE_DEPENDS_OSX IOKit
+  # Also depends on: CoreFoundation
   FRAMEWORK_DEPENDS CoreAudio)
 

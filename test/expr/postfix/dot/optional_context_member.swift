@@ -38,9 +38,9 @@ func optContext() -> Foo? {
   case ():
     return .someOptFunc()
   case ():
-    return .Some(.someVar)
+    return .some(.someVar)
   case ():
-    return .None
+    return .none
   }
 }
 
@@ -55,15 +55,15 @@ func iuoContext() -> Foo! {
   case ():
     return .someOptFunc()
   case ():
-    return .Some(.someVar)
+    return .some(.someVar)
   case ():
-    return .None
+    return .none
   }
 }
 
 // Favor the outermost type if the member appears at multiple levels of
 // unwrapping.
-func nestedOptContext() -> Foo!? {
-  return .None
+func nestedOptContext() -> Foo?? {
+  return .none
 }
 

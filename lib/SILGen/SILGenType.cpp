@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -33,13 +33,16 @@ using namespace Lowering;
 SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
                                            SILConstantInfo constantInfo) {
   // Mangle the constant with a _TTD header.
-  llvm::SmallString<32> name;
-  constant.mangle(name, "_TTD");
+  auto name = constant.mangle("_TTD");
 
+  IsFragile_t isFragile = IsNotFragile;
+  if (makeModuleFragile)
+    isFragile = IsFragile;
+  if (constant.isFragile())
+    isFragile = IsFragile;
   auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
                             constantInfo.getSILType().castTo<SILFunctionType>(),
-                            IsBare, IsTransparent,
-                            makeModuleFragile ? IsFragile : IsNotFragile);
+                            IsBare, IsTransparent, isFragile, IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
@@ -59,24 +62,11 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   if (derived == base)
     return getFunction(derived, NotForDefinition);
 
-  // Generate the thunk name.
-  // TODO: If we allocated a new vtable slot for the derived method, then
-  // further derived methods would potentially need multiple thunks, and we
-  // would need to mangle the base method into the symbol as well.
-  llvm::SmallString<32> name;
-  derived.mangle(name, "_TTV");
-
-  // If we already emitted this thunk, reuse it.
-  // TODO: Allocating new vtable slots for derived methods with different ABIs
-  // would invalidate the assumption that the same thunk is correct, as above.
-  if (auto existingThunk = M.lookUpFunction(name))
-    return existingThunk;
-
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
   auto baseInfo = Types.getConstantInfo(base);
   auto derivedInfo = Types.getConstantInfo(derived);
-  auto basePattern = AbstractionPattern(baseInfo.LoweredType);
+  auto basePattern = AbstractionPattern(baseInfo.LoweredInterfaceType);
   
   auto overrideInfo = M.Types.getConstantOverrideInfo(derived, base);
 
@@ -86,17 +76,31 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   if (overrideInfo == derivedInfo)
     return getFunction(derived, NotForDefinition);
 
+  // Generate the thunk name.
+  // TODO: If we allocated a new vtable slot for the derived method, then
+  // further derived methods would potentially need multiple thunks, and we
+  // would need to mangle the base method into the symbol as well.
+  auto name = derived.mangle("_TTV");
+
+  // If we already emitted this thunk, reuse it.
+  // TODO: Allocating new vtable slots for derived methods with different ABIs
+  // would invalidate the assumption that the same thunk is correct, as above.
+  if (auto existingThunk = M.lookUpFunction(name))
+    return existingThunk;
+
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);
-  auto thunk = SILFunction::create(M, SILLinkage::Private, name,
-                                   overrideInfo.SILFnType,
-                                   derivedDecl->getGenericParams(),
-                                   loc, IsBare, IsNotTransparent, IsNotFragile);
-  thunk->setDebugScope(new (M) SILDebugScope(loc, *thunk));
+  auto thunk =
+      M.createFunction(SILLinkage::Private,
+                       name, overrideInfo.SILFnType,
+                       derivedDecl->getGenericParams(), loc, IsBare,
+                       IsNotTransparent, IsNotFragile);
+  thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   SILGenFunction(*this, *thunk)
     .emitVTableThunk(derived, basePattern,
-                     overrideInfo.LoweredType, derivedInfo.LoweredType);
+                     overrideInfo.LoweredInterfaceType,
+                     derivedInfo.LoweredInterfaceType);
 
   return thunk;
 }
@@ -134,47 +138,6 @@ bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
 
 bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
   return constructor->isObjC();
-}
-
-bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
-  // Final functions never require ObjC dispatch.
-  if (vd->isFinal())
-    return false;
-
-  // If the decl is an @objc protocol requirement, then the only witness is
-  // objc.
-  if (auto *proto = dyn_cast<ProtocolDecl>(vd->getDeclContext()))
-    if (proto->isObjC())
-      return true;
-
-  if (auto *fd = dyn_cast<FuncDecl>(vd)) {
-    // If a function has an associated Clang node, it's foreign and only has
-    // an ObjC entry point.
-    if (vd->hasClangNode())
-      return true;
-
-    // Property accessors should be generated alongside the property.
-    if (fd->isGetterOrSetter())
-      return requiresObjCDispatch(fd->getAccessorStorageDecl());
-
-    return fd->getAttrs().hasAttribute<DynamicAttr>();
-  }
-  if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
-    // If a function has an associated Clang node, it's foreign and only has
-    // an ObjC entry point.
-    if (vd->hasClangNode())
-      return true;
-    
-    return cd->getAttrs().hasAttribute<DynamicAttr>();
-  }
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
-    return asd->requiresObjCGetterAndSetter();
-
-  return vd->getAttrs().hasAttribute<DynamicAttr>();
-}
-
-bool SILGenModule::requiresObjCSuperDispatch(ValueDecl *vd) {
-  return requiresObjCDispatch(vd);
 }
 
 namespace {
@@ -232,7 +195,7 @@ public:
     // Try to find an overridden entry.
     // NB: Mutates vtableEntries in-place
     // FIXME: O(n^2)
-    if (auto overridden = member.getOverriddenVTableEntry()) {
+    if (auto overridden = member.getNextOverriddenVTableEntry()) {
       for (SILVTable::Pair &entry : vtableEntries) {
         SILDeclRef ref = overridden;
 
@@ -278,8 +241,9 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    // Stub constructors don't get an entry.
-    if (cd->hasStubImplementation())
+    // Stub constructors don't get an entry, unless they were synthesized to
+    // override a non-required designated initializer in the superclass.
+    if (cd->hasStubImplementation() && !cd->getOverriddenDecl())
       return;
 
     // Required constructors (or overrides thereof) have their allocating entry
@@ -308,7 +272,7 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *dd) {
-    if (dd->getParent()->isClassOrClassExtensionContext() == theClass) {
+    if (dd->getParent()->getAsClassOrClassExtensionContext() == theClass) {
       // Add the deallocating destructor to the vtable just for the purpose
       // that it is referenced and cannot be eliminated by dead function removal.
       // In reality, the deallocating destructor is referenced directly from
@@ -331,7 +295,7 @@ static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
                                          NominalTypeDecl *theType,
                                          VarDecl *var) {
   assert(!generics && "generic static properties not implemented");
-  if (var->getDeclContext()->isClassOrClassExtensionContext()) {
+  if (var->getDeclContext()->getAsClassOrClassExtensionContext()) {
     assert(var->isFinal() && "only 'static' ('class final') stored properties are implemented in classes");
   }
 
@@ -352,6 +316,11 @@ public:
 
   /// Emit SIL functions for all the members of the type.
   void emitType() {
+    // Force type lowering to lower the type, so that we have a chance to
+    // check for infinite value types even if there are no other references
+    // to this type.
+    SGM.Types.getTypeLowering(theType->getDeclaredTypeInContext());
+
     // Start building a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType))
       genVTable.emplace(SGM, theClass);
@@ -367,11 +336,14 @@ public:
       SGM.visit(member);
     }
 
+    if (auto protocol = dyn_cast<ProtocolDecl>(theType)) {
+      if (!protocol->isObjC())
+        SGM.emitDefaultWitnessTable(protocol);
+      return;
+    }
+
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.
-    if (isa<ProtocolDecl>(theType))
-      return;
-
     for (auto *conformance : theType->getLocalConformances(
                                ConformanceLookupKind::All,
                                nullptr, /*sorted=*/true)) {
@@ -413,10 +385,7 @@ public:
   }
 
   void visitEnumCaseDecl(EnumCaseDecl *ecd) {}
-  void visitEnumElementDecl(EnumElementDecl *ued) {
-    assert(isa<EnumDecl>(theType));
-    SGM.emitEnumConstructor(ued);
-  }
+  void visitEnumElementDecl(EnumElementDecl *ued) {}
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
@@ -428,6 +397,9 @@ public:
   }
 
   void visitVarDecl(VarDecl *vd) {
+    if (vd->hasBehavior())
+      SGM.emitPropertyBehavior(vd);
+
     // Collect global variables for static properties.
     // FIXME: We can't statically emit a global variable for generic properties.
     if (vd->isStatic() && vd->hasStorage()) {
@@ -519,6 +491,8 @@ public:
   }
 
   void visitVarDecl(VarDecl *vd) {
+    if (vd->hasBehavior())
+      SGM.emitPropertyBehavior(vd);
     if (vd->isStatic() && vd->hasStorage()) {
       ExtensionDecl *ext = cast<ExtensionDecl>(vd->getDeclContext());
       NominalTypeDecl *theType = ext->getExtendedType()->getAnyNominal();
@@ -542,4 +516,3 @@ public:
 void SILGenModule::visitExtensionDecl(ExtensionDecl *ed) {
   SILGenExtension(*this).emitExtension(ed);
 }
-

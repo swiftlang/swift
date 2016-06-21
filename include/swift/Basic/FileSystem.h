@@ -1,8 +1,8 @@
-//===--- FileSystem.cpp - Extra helpers for manipulating files --*- C++ -*-===//
+//===--- FileSystem.h - Extra helpers for manipulating files ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -24,6 +24,6 @@ namespace swift {
   /// the file at \p source will still be present at \p source.
   std::error_code moveFileIfDifferent(const llvm::Twine &source,
                                       const llvm::Twine &destination);
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_FILESYSTEM_H

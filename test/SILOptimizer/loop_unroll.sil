@@ -1,0 +1,72 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -loop-unroll %s | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: sil @loop_unroll_1
+// CHECK: bb0
+// CHECK:  br bb1
+// CHECK: bb1
+// CHECK:  builtin "sadd_with_overflow_Int64
+// CHECK:  cond_br {{.*}}, bb2, bb3
+// CHECK: bb2:
+// CHECK:  return
+// CHECK: bb3
+// CHECK:  builtin "sadd_with_overflow_Int64
+// CHECK:  br bb2
+
+sil @loop_unroll_1 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb2, bb1(%6 : $Builtin.Int64)
+
+bb2:
+ %8 = tuple()
+ return %8 : $()
+}
+
+// CHECK-LABEL: sil @loop_unroll_2
+// CHECK: bb0:
+// CHECK:  br bb1
+// CHECK: bb1
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  cond_br {{.*}}, bb3, bb2
+// CHECK: bb2:
+// CHECK:  br bb4
+// CHECK: bb3:
+// CHECK:  return
+// CHECK: bb4
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  br bb3
+
+sil @loop_unroll_2 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+ %8 = tuple()
+ return %8 : $()
+}

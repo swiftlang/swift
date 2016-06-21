@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -287,6 +287,10 @@ public:
   /// Verify the invariants of the graph.
   void verify();
 
+  /// Optimize the constraint graph by eliminating simple transitive
+  /// connections between nodes.
+  void optimize();
+
 private:
   /// Remove the node corresponding to the given type variable.
   ///
@@ -303,6 +307,15 @@ private:
   /// Note that this change is not recorded and cannot be undone. Use with
   /// caution.
   void unbindTypeVariable(TypeVariableType *typeVar, Type fixedType);
+
+
+  /// Perform edge contraction on the constraint graph, merging equivalence
+  /// classes until a fixed point is reached.
+  bool contractEdges();
+
+  /// To support edge contraction, remove a constraint from both the constraint
+  /// graph and its enclosing constraint system.
+  void removeEdge(Constraint *constraint);
 
   /// The constraint system.
   ConstraintSystem &CS;

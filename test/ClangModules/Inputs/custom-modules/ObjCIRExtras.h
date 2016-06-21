@@ -30,6 +30,7 @@
 - (void)methodInt:(NSInteger)value SWIFT_NAME(theMethod(number:));
 
 @property (readonly) int someProp SWIFT_NAME(renamedSomeProp);
+@property (readonly, class) int classProp SWIFT_NAME(renamedClassProp);
 @end
 
 @interface SwiftNameTestError : NSObject

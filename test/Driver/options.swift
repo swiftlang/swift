@@ -39,23 +39,20 @@
 // RUN: %swift_driver -assert-config Debug -### | FileCheck -check-prefix=ASSERTCONFIG %s
 // ASSERTCONFIG: -assert-config Debug
 
-// RUN: %swiftc_driver -assert-config Debug -### %s | FileCheck -check-prefix=ASSERTCONFIG2 %s
-// ASSERTCONFIG2: -assert-config Debug
+// RUN: %swiftc_driver -assert-config Release -### %s | FileCheck -check-prefix=ASSERTCONFIG_RELEASE %s
+// RUN: %swift_driver -assert-config Release -### %s | FileCheck -check-prefix=ASSERTCONFIG_RELEASE %s
+// ASSERTCONFIG_RELEASE: -assert-config Release
 
-// RUN: %swiftc_driver -assert-config Release -### %s | FileCheck -check-prefix=ASSERTCONFIG3 %s
-// ASSERTCONFIG3: -assert-config Release
+// RUN: %swiftc_driver -assert-config Unchecked -### %s | FileCheck -check-prefix=ASSERTCONFIG_UNCHECKED %s
+// RUN: %swift_driver -assert-config Unchecked -### %s | FileCheck -check-prefix=ASSERTCONFIG_UNCHECKED %s
+// ASSERTCONFIG_UNCHECKED: -assert-config Unchecked
 
-// RUN: %swiftc_driver -assert-config Release -### %s | FileCheck -check-prefix=ASSERTCONFIG4 %s
-// ASSERTCONFIG4: -assert-config Release
-
-// RUN: %swiftc_driver -assert-config DisableReplacement -### %s | FileCheck -check-prefix=ASSERTCONFIG5 %s
-// ASSERTCONFIG5: -assert-config DisableReplacement
-
-// RUN: %swiftc_driver -assert-config DisableReplacement -### %s | FileCheck -check-prefix=ASSERTCONFIG6 %s
-// ASSERTCONFIG6: -assert-config DisableReplacement
+// RUN: %swiftc_driver -assert-config DisableReplacement -### %s | FileCheck -check-prefix=ASSERTCONFIG_DISABLEREPLACEMENT %s
+// RUN: %swift_driver -assert-config DisableReplacement -### %s | FileCheck -check-prefix=ASSERTCONFIG_DISABLEREPLACEMENT %s
+// ASSERTCONFIG_DISABLEREPLACEMENT: -assert-config DisableReplacement
 
 // RUN: not %swiftc_driver -import-objc-header fake.h -import-underlying-module -c %s 2>&1 | FileCheck -check-prefix=FRAMEWORK_BRIDGING_HEADER %s
-// FRAMEWORK_BRIDGING_HEADER: error: using bridging headers with framework targets is unsupported
+// FRAMEWORK_BRIDGING_HEADER: error: using bridging headers with framework targets is unsupported
 
 // RUN: %swift_driver -### | FileCheck -check-prefix=DEFAULT_REPL %s
 // DEFAULT_REPL: -repl

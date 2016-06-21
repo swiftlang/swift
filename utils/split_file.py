@@ -1,49 +1,46 @@
 #!/usr/bin/env python
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-"""
-split_file.py [-o <dir>] <path>
+import argparse
+import os
+import re
+import sys
 
+parser = argparse.ArgumentParser(
+    description="""
 Take the file at <path> and write it to multiple files, switching to a new file
 every time an annotation of the form "// BEGIN file1.swift" is encountered. If
 <dir> is specified, place the files in <dir>; otherwise, put them in the
 current directory.
-"""
-
-import os
-import sys
-import re
-import getopt
-
-def usage():
-    sys.stderr.write(__doc__.strip() + "\n")
-    sys.exit(1)
+""")
+parser.add_argument(
+    "-o", dest="out_dir", default=".", metavar="<dir>",
+    help="directory path where the output files are placed in. "
+         "(defaults to current directory)")
+parser.add_argument(
+    "input", type=argparse.FileType("r"), nargs="?", default=sys.stdin,
+    metavar="<path>",
+    help="input file. (defaults to stdin)")
+args = parser.parse_args()
 
 fp_out = None
-dest_dir = '.'
 
-try:
-    opts, args = getopt.getopt(sys.argv[1:], 'o:h')
-    for (opt, arg) in opts:
-        if opt == '-o':
-            dest_dir = arg
-        elif opt == '-h':
-            usage()
-except getopt.GetoptError:
-    usage()
-
-if len(args) != 1:
-    usage()
-fp_in = open(args[0], 'r')
-
-for line in fp_in:
+for line in args.input:
     m = re.match(r'^//\s*BEGIN\s+([^\s]+)\s*$', line)
     if m:
         if fp_out:
             fp_out.close()
-        fp_out = open(os.path.join(dest_dir, m.group(1)), 'w')
+        fp_out = open(os.path.join(args.out_dir, m.group(1)), 'w')
     elif fp_out:
         fp_out.write(line)
 
-fp_in.close()
+args.input.close()
 if fp_out:
     fp_out.close()

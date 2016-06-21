@@ -3,10 +3,10 @@
 var t = true
 var f = false
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
-markUsed(t != nil) // expected-error {{value of type 'Bool' can never be nil, comparison isn't allowed}}
-markUsed(f != nil) // expected-error {{value of type 'Bool' can never be nil, comparison isn't allowed}}
+markUsed(t != nil) // expected-error {{type 'Bool' is not optional, value can never be nil}}
+markUsed(f != nil) // expected-error {{type 'Bool' is not optional, value can never be nil}}
 
 class C : Equatable {}
 
@@ -14,8 +14,8 @@ func == (lhs: C, rhs: C) -> Bool {
   return true
 }
 
-func test(c: C) {
-  if c == nil {} // expected-error {{value of type 'C' can never be nil, comparison isn't allowed}}
+func test(_ c: C) {
+  if c == nil {} // expected-error {{type 'C' is not optional, value can never be nil}}
 }
 
 class D {}
@@ -24,6 +24,6 @@ var d = D()
 var dopt: D? = nil
 var diuopt: D! = nil
 
-_ = d == nil // expected-error{{value of type 'D' can never be nil, comparison isn't allowed}}
+_ = d == nil // expected-error{{type 'D' is not optional, value can never be nil}}
 _ = dopt == nil
 _ = diuopt == nil

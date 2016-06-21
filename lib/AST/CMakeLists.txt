@@ -1,9 +1,10 @@
-add_swift_library(swiftAST
+add_swift_library(swiftAST STATIC
   ArchetypeBuilder.cpp
   ASTContext.cpp
   ASTDumper.cpp
   ASTNode.cpp
   ASTPrinter.cpp
+  ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp
   Availability.cpp
@@ -14,8 +15,10 @@ add_swift_library(swiftAST
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
-  DiagnosticList.cpp
+  DeclNameLoc.cpp
+  DefaultArgumentKind.cpp
   DiagnosticEngine.cpp
+  DiagnosticList.cpp
   DocComment.cpp
   Expr.cpp
   GenericSignature.cpp
@@ -25,19 +28,20 @@ add_swift_library(swiftAST
   Module.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp
+  Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   RawComment.cpp
   Stmt.cpp
+  SourceEntityWalker.cpp
   Substitution.cpp
   Type.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp
   TypeWalker.cpp
   USRGeneration.cpp
-  Verifier.cpp
   LINK_LIBRARIES
     swiftMarkup
     swiftBasic
@@ -70,7 +74,8 @@ add_swift_library(swiftAST
   )
 
 if(NOT SWIFT_BUILT_STANDALONE)
-  add_dependencies(swiftAST intrinsics_gen)
+  get_property(CLANG_TABLEGEN_TARGETS GLOBAL PROPERTY CLANG_TABLEGEN_TARGETS)
+  add_dependencies(swiftAST intrinsics_gen ${CLANG_TABLEGEN_TARGETS})
 endif()
 
 set(swift_ast_verifier_flag)

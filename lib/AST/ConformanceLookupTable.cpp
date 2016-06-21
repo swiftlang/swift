@@ -1,8 +1,8 @@
-//===--- ConformanceLookupTable - Conformance Lookup Table ------*- C++ -*-===//
+//===--- ConformanceLookupTable - Conformance Lookup Table ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -141,15 +141,16 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
                                             ExtensionFunc extensionFunc) {
   assert(static_cast<unsigned>(stage) < NumConformanceStages &&
          "NumConformanceStages has not been updated");
-  LastProcessedEntry &lastProcessed
-    = LastProcessed[static_cast<unsigned>(stage)];
 
+  LastProcessedEntry &lastProcessed
+    = LastProcessed[nominal][static_cast<unsigned>(stage)];
+  
   // Handle the nominal type.
   if (!lastProcessed.getInt()) {
     lastProcessed.setInt(true);
 
     // If we have conformances we can load, do so.
-    // FIXME: This could be more lazy.
+    // FIXME: This could be lazier.
     auto loader = nominal->takeConformanceLoader();
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
@@ -179,7 +180,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     lastProcessed.setPointer(next);
 
     // If we have conformances we can load, do so.
-    // FIXME: This could be more lazy.
+    // FIXME: This could be lazier.
     auto loader = next->takeConformanceLoader();
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
@@ -300,23 +301,26 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
       if (resolver)
         resolver->resolveSuperclass(classDecl);
 
-      if (Type superclass = classDecl->getSuperclass()) {
-        if (auto superclassDecl 
-              = superclass->getClassOrBoundGenericClass()) {
-          // Break infinite recursion when visiting ill-formed classes
-          // with circular inheritance.
-          if (VisitingSuperclass)
-            return;
-          llvm::SaveAndRestore<bool> visiting(VisitingSuperclass, true);
+      if (auto superclassDecl = classDecl->getSuperclassDecl()) {
+        // Break infinite recursion when visiting ill-formed classes
+        // with circular inheritance.
+        if (VisitingSuperclass)
+          return;
+        llvm::SaveAndRestore<bool> visiting(VisitingSuperclass, true);
 
-          // Resolve the conformances of the superclass.
-          superclassDecl->prepareConformanceTable();
-          superclassDecl->ConformanceTable->updateLookupTable(
-            superclassDecl,
-            ConformanceStage::Resolved,
-            resolver);
-          
-          // Expand inherited conformances.
+        // Resolve the conformances of the superclass.
+        superclassDecl->prepareConformanceTable();
+        superclassDecl->ConformanceTable->updateLookupTable(
+          superclassDecl,
+          ConformanceStage::Resolved,
+          resolver);
+        
+        // Expand inherited conformances from all superclasses.
+        // We may have circular inheritance in ill-formed classes, so keep an
+        // eye out for that.
+        auto circularSuperclass = superclassDecl->getSuperclassDecl();
+        
+        do {
           forEachInStage(stage, superclassDecl, resolver,
                          [&](NominalTypeDecl *superclass) {
                            inheritConformances(classDecl, superclassDecl,
@@ -326,7 +330,12 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
                            inheritConformances(classDecl, superclassDecl, ext,
                                                resolver);
                          });
-        }
+          superclassDecl = superclassDecl->getSuperclassDecl();
+          if (circularSuperclass)
+            circularSuperclass = circularSuperclass->getSuperclassDecl();
+          if (circularSuperclass)
+            circularSuperclass = circularSuperclass->getSuperclassDecl();
+        } while (superclassDecl != circularSuperclass);
       }
     }
     break;    
@@ -487,10 +496,14 @@ void ConformanceLookupTable::addProtocols(NominalTypeDecl *nominal,
 void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
                                                        DeclContext *dc, 
                                                        LazyResolver *resolver) {
-  // Note: recursive type-checking implies that that AllConformances
+  // Note: recursive type-checking implies that AllConformances
   // may be reallocated during this traversal, so pay the lookup cost
   // during each iteration.
   for (unsigned i = 0; i != AllConformances[dc].size(); ++i) {
+    /// FIXME: Avoid the possibility of an infinite loop by fixing the root
+    ///        cause instead (incomplete circularity detection).
+    assert(i <= 16384 &&
+           "Infinite loop due to circular protocol inheritance?");
     ConformanceEntry *conformanceEntry = AllConformances[dc][i];
     ProtocolDecl *conformingProtocol = conformanceEntry->getProtocol();
 
@@ -503,10 +516,10 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
         resolver->resolveInheritanceClause(cast<ExtensionDecl>(dc));
     }
 
-    // An @objc enum that explicitly conforms to the ErrorType protocol also
-    // implicitly conforms to _ObjectiveCBridgeableErrorType, via the known
-    // protocol _BridgedNSError.
-    if (conformingProtocol->isSpecificProtocol(KnownProtocolKind::ErrorType) &&
+    // An @objc enum that explicitly conforms to the ErrorProtocol protocol
+    // also implicitly conforms to _ObjectiveCBridgeableErrorProtocol, via the
+    // known protocol _BridgedNSError.
+    if (conformingProtocol->isSpecificProtocol(KnownProtocolKind::ErrorProtocol) &&
         isa<EnumDecl>(nominal) && nominal->isObjC() &&
         cast<EnumDecl>(nominal)->hasOnlyCasesWithoutAssociatedValues()) {
       ASTContext &ctx = nominal->getASTContext();
@@ -543,7 +556,7 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
                                    bool &diagnoseSuperseded) {
   // If one entry is fixed and the other is not, we have our answer.
   if (lhs->isFixed() != rhs->isFixed()) {
-    // If the non-fixed conformance is not replacable, we have a failure to
+    // If the non-fixed conformance is not replaceable, we have a failure to
     // diagnose.
     diagnoseSuperseded = (lhs->isFixed() &&
                           !isReplaceable(rhs->getRankingKind())) ||
@@ -738,11 +751,11 @@ DeclContext *ConformanceLookupTable::getConformingContext(
       return nullptr;
 
     // If we had a circular dependency, the superclass may not exist.
-    if (!classDecl->getSuperclass())
-      return nullptr;
-        
     auto superclassDecl
-      = classDecl->getSuperclass()->getClassOrBoundGenericClass();
+      = classDecl->getSuperclassDecl();
+    
+    if (!superclassDecl)
+      return nullptr;
 
     if (!classDecl->ConformanceTable->VisitingSuperclass) {
       llvm::SaveAndRestore<bool> visiting(
@@ -784,8 +797,9 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
   if (!conformingDC)
     return nullptr;
 
-  NominalTypeDecl *conformingNominal
-    = conformingDC->isNominalTypeOrNominalTypeExtensionContext();
+  auto *conformingNominal =
+    cast<NominalTypeDecl>(conformingDC->
+                          getAsGenericTypeOrGenericTypeExtensionContext());
 
   // Form the conformance.
   Type type = entry->getDeclContext()->getDeclaredTypeInContext();
@@ -810,7 +824,9 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
                                   .getPointer();
 
     // Form the inherited conformance.
-    conformance = ctx.getInheritedConformance(type, inheritedConformance);
+    conformance = ctx.getInheritedConformance(
+                    type,
+                    inheritedConformance->getConcrete());
   } else {
     // Create or find the normal conformance.
     Type conformingType = conformingDC->getDeclaredTypeInContext();
@@ -839,7 +855,7 @@ void ConformanceLookupTable::registerProtocolConformance(
        ProtocolConformance *conformance) {
   auto protocol = conformance->getProtocol();
   auto dc = conformance->getDeclContext();
-  auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
 
   // If there is an entry to update, do so.
   auto &dcConformances = AllConformances[dc];

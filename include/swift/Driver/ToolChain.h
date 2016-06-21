@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -50,12 +50,39 @@ protected:
   constexpr static const char * const SWIFT_EXECUTABLE_NAME = "swift";
 
   /// Packs together the supplementary information about the job being created.
-  struct JobContext {
+  class JobContext {
+  private:
+    Compilation &C;
+
+  public:
     ArrayRef<const Job *> Inputs;
-    const CommandOutput &Output;
     ArrayRef<const Action *> InputActions;
-    const llvm::opt::ArgList &Args;
+    const CommandOutput &Output;
     const OutputInfo &OI;
+
+    /// The arguments to the driver. Can also be used to create new strings with
+    /// the same lifetime.
+    ///
+    /// This just caches C.getArgs().
+    const llvm::opt::ArgList &Args;
+
+  public:
+    JobContext(Compilation &C, ArrayRef<const Job *> Inputs,
+               ArrayRef<const Action *> InputActions,
+               const CommandOutput &Output, const OutputInfo &OI);
+
+    /// Forwards to Compilation::getInputFiles.
+    ArrayRef<InputPair> getTopLevelInputFiles() const;
+
+    /// Forwards to Compilation::getAllSourcesPath.
+    const char *getAllSourcesPath() const;
+
+    /// Creates a new temporary file for use by a job.
+    ///
+    /// The returned string already has its lifetime extended to match other
+    /// arguments.
+    const char *getTemporaryFilePath(const llvm::Twine &name,
+                                     StringRef suffix = "") const;
   };
 
   /// Packs together information chosen by toolchains to create jobs.
@@ -63,10 +90,12 @@ protected:
     const char *ExecutableName;
     llvm::opt::ArgStringList Arguments;
     std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
+    FilelistInfo FilelistInfo;
 
-    InvocationInfo(const char *name, llvm::opt::ArgStringList args,
+    InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
                    decltype(ExtraEnvironment) extraEnv = {})
-      : ExecutableName(name), Arguments(args), ExtraEnvironment(extraEnv) {}
+      : ExecutableName(name), Arguments(std::move(args)),
+        ExtraEnvironment(std::move(extraEnv)) {}
   };
 
   virtual InvocationInfo
@@ -125,13 +154,13 @@ public:
   /// This method dispatches to the various \c constructInvocation methods,
   /// which may be overridden by platform-specific subclasses.
   std::unique_ptr<Job> constructJob(const JobAction &JA,
+                                    Compilation &C,
                                     SmallVectorImpl<const Job *> &&inputs,
-                                    std::unique_ptr<CommandOutput> output,
                                     const ActionList &inputActions,
-                                    const llvm::opt::ArgList &args,
+                                    std::unique_ptr<CommandOutput> output,
                                     const OutputInfo &OI) const;
 
-  /// Return the default langauge type to use for the given extension.
+  /// Return the default language type to use for the given extension.
   virtual types::ID lookupTypeForExtension(StringRef Ext) const;
 };
 } // end namespace driver

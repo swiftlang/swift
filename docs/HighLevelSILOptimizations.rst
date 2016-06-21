@@ -85,18 +85,18 @@ getElement instruction::
       return getElement(index)
      }
 
-  @_semantics("array.check_subscript") func checkSubscript(index: Int) {
+  @_semantics("array.check_subscript") func checkSubscript(_ index: Int) {
     ...
   }
 
-  @_semantics("array.get_element") func getElement(index: Int) -> Element {
+  @_semantics("array.get_element") func getElement(_ index: Int) -> Element {
     return _buffer[index]
   }
 
 
 Swift optimizations
 -------------------
-The swift optimizer can access the information that is provided by the
+The Swift optimizer can access the information that is provided by the
 ``@_semantics`` attribute to perform high-level optimizations. In the early
 stages of the optimization pipeline the optimizer does not inline functions
 with special semantics in order to allow the early high-level optimization
@@ -132,7 +132,8 @@ Array
 The following semantic tags describe Array operations. The operations
 are first described in terms of the Array "state". Relations between the
 operations are formally defined below. 'Array' refers to the standard library
-Array<T>, ContigousArray<T>, and ArraySlice<T> data-structures.
+Array<Element>, ContiguousArray<Element>, and ArraySlice<Element>
+data-structures.
 
 We consider the array state to consist of a set of disjoint elements
 and a storage descriptor that encapsulates nonelement data such as the
@@ -156,7 +157,7 @@ array.init
   may act as a guard to other potentially mutating operations, such as
   ``get_element_address``.
 
-array.uninitialized(count: Builtin.Word) -> (Array<T>, Builtin.RawPointer)
+array.uninitialized(count: Builtin.Word) -> (Array<Element>, Builtin.RawPointer)
 
   Creates an array with the specified number of elements. It initializes
   the storage descriptor but not the array elements. The returned tuple
@@ -166,9 +167,9 @@ array.uninitialized(count: Builtin.Word) -> (Array<T>, Builtin.RawPointer)
 array.props.isCocoa/needsElementTypeCheck -> Bool
   Reads storage descriptors properties (isCocoa, needsElementTypeCheck).
   This is not control dependent or guarded. The optimizer has
-  semantic knowledge of the state transfer those properties can not make:
-  An array that is not ``isCocoa`` can not transfer to ``isCocoa``.
-  An array that is not ``needsElementTypeCheck`` can not transfer to
+  semantic knowledge of the state transfer those properties cannot make:
+  An array that is not ``isCocoa`` cannot transfer to ``isCocoa``.
+  An array that is not ``needsElementTypeCheck`` cannot transfer to
   ``needsElementTypeCheck``.
 
 array.get_element(index: Int) -> Element
@@ -248,7 +249,7 @@ interferes-with
 guards
 
   If ``OpA`` guards ``OpB``, then the sequence of operations
-  ``OpA,OpB`` must be preserved on any control flow path on which the
+  ``OpA, OpB`` must be preserved on any control flow path on which the
   sequence originally appears.
 
 An operation can only interfere-with or guard another if they may operate on the same Array.
@@ -262,7 +263,7 @@ check_subscript  guards          get_element, get_element_address
 make_mutable     interferes-with props.isCocoa/needsElementTypeCheck
 get_elt_addr     interferes-with get_element, get_element_address,
                                  props.isCocoa/needsElementTypeCheck
-mutate_unknown   itereferes-with get_element, check_subscript, get_count,
+mutate_unknown   interferes-with get_element, check_subscript, get_count,
                                  get_capacity, get_element_address,
                                  props.isCocoa/needsElementTypeCheck
 ================ =============== ==========================================
@@ -287,12 +288,12 @@ string.concat(lhs: String, rhs: String) -> String
   This operation can be optimized away in case of both operands
   being string literals. In this case, it can be replaced by
   a string literal representing a concatenation of both operands.
-
-string.makeUTF8(start: RawPointer, byteSize: Word, isASCII: Int1) -> String
-
+  
+string.makeUTF8(start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1) -> String
+  
   Converts a built-in UTF8-encoded string literal into a string.
 
-string.makeUTF16(start: RawPointer, numberOfCodeUnits: Word) -> String
+string.makeUTF16(start: RawPointer, utf16CodeUnitCount: Word) -> String
 
   Converts a built-in UTF16-encoded string literal into a string.
 

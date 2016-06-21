@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -44,6 +44,7 @@ namespace swift {
   class DiagnosticEngine;
   class FileUnit;
   class GenericParamList;
+  class GenericSignature;
   class IRGenOptions;
   class LangOptions;
   class ModuleDecl;
@@ -77,7 +78,7 @@ namespace swift {
   /// compilation.
   bool shouldVerify(const Decl *D, const ASTContext &Context);
 
-  /// \brief Check that the source file is well formed, aborting and spewing
+  /// \brief Check that the source file is well-formed, aborting and spewing
   /// errors if not.
   ///
   /// "Well-formed" here means following the invariants of the AST, not that the
@@ -123,7 +124,8 @@ namespace swift {
                               const SourceManager &SM, unsigned BufferID,
                               unsigned Offset = 0, unsigned EndOffset = 0,
                               bool KeepComments = true,
-                              bool TokenizeInterpolatedString = true);
+                              bool TokenizeInterpolatedString = true,
+                              ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.
@@ -158,10 +160,18 @@ namespace swift {
   /// types and diagnose problems therein.
   ///
   /// \param StartElem Where to start for incremental type-checking in the main
-  ///                  source file.
+  /// source file.
+  ///
+  /// \param WarnLongFunctionBodies If non-zero, warn when a function body takes
+  /// longer than this many milliseconds to type-check
   void performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                            OptionSet<TypeCheckingFlags> Options,
-                           unsigned StartElem = 0);
+                           unsigned StartElem = 0,
+                           unsigned WarnLongFunctionBodies = 0);
+
+  /// Once type checking is complete, this walks protocol requirements
+  /// to resolve default witnesses.
+  void finishTypeChecking(SourceFile &SF);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method
@@ -186,13 +196,9 @@ namespace swift {
                               bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  /// We pass in a vector of nested GenericParamLists and a vector of
-  /// ArchetypeBuilders with the innermost GenericParamList in the beginning
-  /// of the vector.
-  bool handleSILGenericParams(ASTContext &Ctx,
-                              SmallVectorImpl<GenericParamList *> &gps,
-                              DeclContext *DC,
-                              SmallVectorImpl<ArchetypeBuilder *> &builders);
+  GenericSignature *handleSILGenericParams(ASTContext &Ctx,
+                                           GenericParamList *genericParams,
+                                           DeclContext *DC);
 
   /// Turn the given module into SIL IR.
   ///
@@ -230,28 +236,24 @@ namespace swift {
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
-  std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
-                                                    ModuleDecl *M,
-                                                    SILModule *SILMod,
-                                                    StringRef ModuleName,
-                                                llvm::LLVMContext &LLVMContext);
+  std::unique_ptr<llvm::Module>
+  performIRGeneration(IRGenOptions &Opts, ModuleDecl *M, SILModule *SILMod,
+                      StringRef ModuleName, llvm::LLVMContext &LLVMContext);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
-  std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
-                                                    SourceFile &SF,
-                                                    SILModule *SILMod,
-                                                    StringRef ModuleName,
-                                                 llvm::LLVMContext &LLVMContext,
-                                                    unsigned StartElem = 0);
+  std::unique_ptr<llvm::Module>
+  performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
+                      StringRef ModuleName, llvm::LLVMContext &LLVMContext,
+                      unsigned StartElem = 0);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This does not cause the module to be
-  /// printed. Only optimized.
+  /// printed, only to be optimized.
   void performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                                 llvm::TargetMachine *TargetMachine);
 
-  /// Wrap a serialized module inside a swift ast section in an object file.
+  /// Wrap a serialized module inside a swift AST section in an object file.
   void createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
                                    StringRef OutputPath);
 
@@ -282,4 +284,4 @@ namespace swift {
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_SUBSYSTEMS_H

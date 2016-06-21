@@ -1,3 +1,5 @@
+// XFAIL: broken_std_regex
+
 struct A {}
 struct B {
   let a: A
@@ -23,6 +25,7 @@ func test001() {
 // TOP_LEVEL_0_ALL-NEXT: if
 // TOP_LEVEL_0_ALL-NEXT: for
 // TOP_LEVEL_0_ALL-NEXT: while
+// TOP_LEVEL_0_ALL-NEXT: return
 // TOP_LEVEL_0_ALL-NEXT: func
 // TOP_LEVEL_0_ALL-NEXT: x
 // TOP_LEVEL_0_ALL-NEXT: y

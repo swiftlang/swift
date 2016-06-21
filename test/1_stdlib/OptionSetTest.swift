@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-struct PackagingOptions : OptionSetType {
+struct PackagingOptions : OptionSet {
   let rawValue: Int
   init(rawValue: Int) { self.rawValue = rawValue }
 
@@ -30,6 +30,7 @@ struct PackagingOptions : OptionSetType {
 
 import StdlibUnittest
 
+
 var tests = TestSuite("OptionSet")
 
 tests.test("basics") {
@@ -40,46 +41,49 @@ tests.test("basics") {
   expectNotEqual(P.Box, .Carton)
   expectNotEqual(P.Box, .BoxOrBag)
 
-  expectEqual(.Box, P.Box.intersect(.BoxOrBag))
-  expectEqual(.Bag, P.Bag.intersect(.BoxOrBag))
-  expectEqual(P(), P.Bag.intersect(.Box))
-  expectEqual(P(), P.Box.intersect(.Satchel))
+  expectEqual(.Box, P.Box.intersection(.BoxOrBag))
+  expectEqual(.Bag, P.Bag.intersection(.BoxOrBag))
+  expectEqual(P(), P.Bag.intersection(.Box))
+  expectEqual(P(), P.Box.intersection(.Satchel))
   expectEqual(.BoxOrBag, P.Bag.union(.Box))
   expectEqual(.BoxOrBag, P.Box.union(.Bag))
   expectEqual(.BoxOrCartonOrBag, P.BoxOrBag.union(.Carton))
-  expectEqual([.Satchel, .Box], P.SatchelOrBag.exclusiveOr(.BoxOrBag))
+  expectEqual([.Satchel, .Box], P.SatchelOrBag.symmetricDifference(.BoxOrBag))
 
   var p = P.Box
-  p.intersectInPlace(.BoxOrBag)
+  p.formIntersection(.BoxOrBag)
   expectEqual(.Box, p)
   
   p = .Bag
-  p.intersectInPlace(.BoxOrBag)
+  p.formIntersection(.BoxOrBag)
   expectEqual(.Bag, p)
   
   p = .Bag
-  p.intersectInPlace(.Box)
+  p.formIntersection(.Box)
   expectEqual(P(), p)
   
   p = .Box
-  p.intersectInPlace(.Satchel)
+  p.formIntersection(.Satchel)
   expectEqual(P(), p)
   
   p = .Bag
-  p.unionInPlace(.Box)
+  p.formUnion(.Box)
   expectEqual(.BoxOrBag, p)
   
   p = .Box
-  p.unionInPlace(.Bag)
+  p.formUnion(.Bag)
   expectEqual(.BoxOrBag, p)
   
   p = .BoxOrBag
-  p.unionInPlace(.Carton)
+  p.formUnion(.Carton)
   expectEqual(.BoxOrCartonOrBag, p)
 
   p = .SatchelOrBag
-  p.exclusiveOrInPlace(.BoxOrBag)
+  p.formSymmetricDifference(.BoxOrBag)
   expectEqual([.Satchel, .Box], p)
 }
+
+// FIXME: add tests for all of SetAlgebra, in particular
+// insert/remove/replace.
 
 runAllTests()

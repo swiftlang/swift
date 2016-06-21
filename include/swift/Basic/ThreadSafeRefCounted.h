@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -13,7 +13,7 @@
 #ifndef SWIFT_BASIC_THREADSAFEREFCOUNTED_H
 #define SWIFT_BASIC_THREADSAFEREFCOUNTED_H
 
-#include "llvm/Support/Atomic.h"
+#include <atomic>
 #include <cassert>
 
 namespace swift {
@@ -28,18 +28,19 @@ namespace swift {
 /// FIXME: This should eventually move to llvm.
 template <class Derived>
 class ThreadSafeRefCountedBase {
-  mutable llvm::sys::cas_flag ref_cnt;
+  mutable std::atomic<unsigned> ref_cnt;
 
 protected:
   ThreadSafeRefCountedBase() : ref_cnt(0) {}
 
 public:
   void Retain() const {
-    llvm::sys::AtomicIncrement(&ref_cnt);
+    ref_cnt.fetch_add(1, std::memory_order_acq_rel);
   }
 
   void Release() const {
-    int refCount = static_cast<int>(llvm::sys::AtomicDecrement(&ref_cnt));
+    int refCount =
+        static_cast<int>(ref_cnt.fetch_sub(1, std::memory_order_acq_rel));
     assert(refCount >= 0 && "Reference count was already zero.");
     if (refCount == 0) delete static_cast<const Derived*>(this);
   }
@@ -52,7 +53,7 @@ public:
 /// already have virtual methods to enforce dynamic allocation via 'new'.
 /// FIXME: This should eventually move to llvm.
 class ThreadSafeRefCountedBaseVPTR {
-  mutable llvm::sys::cas_flag ref_cnt;
+  mutable std::atomic<unsigned> ref_cnt;
   virtual void anchor();
 
 protected:
@@ -61,16 +62,17 @@ protected:
 
 public:
   void Retain() const {
-    llvm::sys::AtomicIncrement(&ref_cnt);
+    ref_cnt.fetch_add(1, std::memory_order_acq_rel);
   }
 
   void Release() const {
-    int refCount = static_cast<int>(llvm::sys::AtomicDecrement(&ref_cnt));
+    int refCount =
+        static_cast<int>(ref_cnt.fetch_sub(1, std::memory_order_acq_rel));
     assert(refCount >= 0 && "Reference count was already zero.");
     if (refCount == 0) delete this;
   }
 };
 
-} // end namespace swift.
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_THREADSAFEREFCOUNTED_H

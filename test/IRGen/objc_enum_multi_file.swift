@@ -9,7 +9,7 @@ import objc_enum_multi_file_helper
 #endif
 
 // CHECK-LABEL: define hidden i32 @_TF4main6useFooFO{{S_|27objc_enum_multi_file_helper}}3FooVs5Int32(i32) {{.*}} {
-func useFoo(x: Foo) -> Int32 {
+func useFoo(_ x: Foo) -> Int32 {
   // CHECK: switch i32 %0, label %[[DEFAULT:.+]] [
   // CHECK-DAG: i32 1, label %[[CASE_B:.+]]
   // CHECK-DAG: i32 2, label %[[CASE_C:.+]]
@@ -42,7 +42,7 @@ func useFoo(x: Foo) -> Int32 {
 }
 
 // CHECK-LABEL: define hidden i32 @_TF4main6useBarFO{{S_|27objc_enum_multi_file_helper}}3BarVs5Int32(i32) {{.*}} {
-func useBar(x: Bar) -> Int32 {
+func useBar(_ x: Bar) -> Int32 {
   // CHECK: switch i32 %0, label %[[DEFAULT:.+]] [
   // CHECK-DAG: i32 6, label %[[CASE_B:.+]]
   // CHECK-DAG: i32 7, label %[[CASE_C:.+]]

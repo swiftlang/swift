@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,7 +20,9 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/NullablePtr.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
   class ASTContext;
@@ -42,7 +44,7 @@ enum class StmtKind {
 /// Stmt - Base class for all statements in swift.
 class alignas(8) Stmt {
   Stmt(const Stmt&) = delete;
-  void operator=(const Stmt&) = delete;
+  Stmt& operator=(const Stmt&) = delete;
 
   /// Kind - The subclass of Stmt that this is.
   unsigned Kind : 31;
@@ -104,8 +106,10 @@ public:
 
 /// BraceStmt - A brace enclosed sequence of expressions, stmts, or decls, like
 /// { var x = 10; print(10) }.
-class BraceStmt : public Stmt {
-private:
+class BraceStmt final : public Stmt,
+    private llvm::TrailingObjects<BraceStmt, ASTNode> {
+  friend TrailingObjects;
+
   unsigned NumElements;
   
   SourceLoc LBLoc;
@@ -113,9 +117,6 @@ private:
 
   BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elements,SourceLoc rbloc,
             Optional<bool> implicit);
-  ASTNode *getElementsStorage() {
-    return reinterpret_cast<ASTNode*>(this + 1);
-  }
 
 public:
   static BraceStmt *create(ASTContext &ctx, SourceLoc lbloc,
@@ -135,12 +136,12 @@ public:
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
-    return MutableArrayRef<ASTNode>(getElementsStorage(), NumElements);
+    return {getTrailingObjects<ASTNode>(), NumElements};
   }
 
   /// The elements contained within the BraceStmt (const version).
   ArrayRef<ASTNode> getElements() const {
-    return const_cast<BraceStmt*>(this)->getElements();
+    return {getTrailingObjects<ASTNode>(), NumElements};
   }
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
@@ -217,7 +218,7 @@ public:
   Expr *getCallExpr() const { return callExpr; }
   void setCallExpr(Expr *E) { callExpr = E; }
 
-  /// Dig the original users's body of the defer out for AST fidelity.
+  /// Dig the original user's body of the defer out for AST fidelity.
   BraceStmt *getBodyAsWritten() const;
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Defer; }
@@ -227,7 +228,10 @@ public:
 /// \brief An expression that guards execution based on whether the run-time
 /// configuration supports a given API, e.g.,
 /// #available(OSX >= 10.9, iOS >= 7.0).
-class alignas(8) PoundAvailableInfo {
+class alignas(8) PoundAvailableInfo final :
+    private llvm::TrailingObjects<PoundAvailableInfo, AvailabilitySpec *> {
+  friend TrailingObjects;
+
   SourceLoc PoundLoc;
   SourceLoc RParenLoc;
 
@@ -242,8 +246,8 @@ class alignas(8) PoundAvailableInfo {
                      SourceLoc RParenLoc)
    : PoundLoc(PoundLoc), RParenLoc(RParenLoc), NumQueries(queries.size()),
      AvailableRange(VersionRange::empty()) {
-    memcpy((void*)getQueries().data(), queries.data(),
-           queries.size() * sizeof(AvailabilitySpec *));
+    std::uninitialized_copy(queries.begin(), queries.end(),
+                            getTrailingObjects<AvailabilitySpec *>());
   }
   
 public:
@@ -252,8 +256,8 @@ public:
                                     SourceLoc RParenLoc);
   
   ArrayRef<AvailabilitySpec *> getQueries() const {
-    auto buf = reinterpret_cast<AvailabilitySpec *const*>(this + 1);
-    return ArrayRef<AvailabilitySpec *>(buf, NumQueries);
+    return llvm::makeArrayRef(getTrailingObjects<AvailabilitySpec *>(),
+                              NumQueries);
   }
   
   SourceLoc getStartLoc() const { return PoundLoc; }
@@ -499,26 +503,22 @@ public:
 };
 
 /// DoCatchStmt - do statement with trailing 'catch' clauses.
-class DoCatchStmt : public LabeledStmt {
+class DoCatchStmt final : public LabeledStmt,
+    private llvm::TrailingObjects<DoCatchStmt, CatchStmt *> {
+  friend TrailingObjects;
+
   SourceLoc DoLoc;
   Stmt *Body;
   unsigned NumCatches;
 
-  CatchStmt **getCatchesBuffer() {
-    return reinterpret_cast<CatchStmt **>(this+1);
-  }
-  CatchStmt * const *getCatchesBuffer() const {
-    return reinterpret_cast<CatchStmt * const *>(this+1);
-  }
-  
   DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc,
               Stmt *body, ArrayRef<CatchStmt*> catches,
               Optional<bool> implicit)
     : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
                   labelInfo),
       DoLoc(doLoc), Body(body), NumCatches(catches.size()) {
-    memcpy(getCatchesBuffer(), catches.data(),
-           catches.size() * sizeof(catches[0]));
+    std::uninitialized_copy(catches.begin(), catches.end(),
+                            getTrailingObjects<CatchStmt *>());
   }
 
 public:
@@ -536,10 +536,10 @@ public:
   void setBody(Stmt *s) { Body = s; }
 
   ArrayRef<CatchStmt*> getCatches() const {
-    return ArrayRef<CatchStmt*>(getCatchesBuffer(), NumCatches);
+    return {getTrailingObjects<CatchStmt*>(), NumCatches};
   }
   MutableArrayRef<CatchStmt*> getMutableCatches() {
-    return MutableArrayRef<CatchStmt*>(getCatchesBuffer(), NumCatches);
+    return {getTrailingObjects<CatchStmt*>(), NumCatches};
   }
 
   /// Does this statement contain a syntactically exhaustive catch
@@ -800,6 +800,9 @@ public:
   
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(ForLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
+
+  SourceLoc getFirstSemicolonLoc() const { return Semi1Loc; }
+  SourceLoc getSecondSemicolonLoc() const { return Semi2Loc; }
   
   NullablePtr<Expr> getInitializer() const { return Initializer; }
   void setInitializer(Expr *V) { Initializer = V; }
@@ -836,11 +839,11 @@ class ForEachStmt : public LabeledStmt {
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
   
-  /// The generator variable along with its initializer.
-  PatternBindingDecl *Generator = nullptr;
-  /// The expression that advances the generator and returns an Optional with
+  /// The iterator variable along with its initializer.
+  PatternBindingDecl *Iterator = nullptr;
+  /// The expression that advances the iterator and returns an Optional with
   /// the next value or None to signal end-of-stream.
-  Expr *GeneratorNext = nullptr;
+  Expr *IteratorNext = nullptr;
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, Pattern *Pat,
@@ -874,14 +877,14 @@ public:
   Expr *getSequence() const { return Sequence; }
   void setSequence(Expr *S) { Sequence = S; }
   
-  /// Retrieve the pattern binding that contains the (implicit) generator
+  /// Retrieve the pattern binding that contains the (implicit) iterator
   /// variable and its initialization from the container.
-  PatternBindingDecl *getGenerator() const { return Generator; }
-  void setGenerator(PatternBindingDecl *G) { Generator = G; }
+  PatternBindingDecl *getIterator() const { return Iterator; }
+  void setIterator(PatternBindingDecl *It) { Iterator = It; }
   
-  /// Retrieve the expression that advances the generator.
-  Expr *getGeneratorNext() const { return GeneratorNext; }
-  void setGeneratorNext(Expr *E) { GeneratorNext = E; }
+  /// Retrieve the expression that advances the iterator.
+  Expr *getIteratorNext() const { return IteratorNext; }
+  void setIteratorNext(Expr *E) { IteratorNext = E; }
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
@@ -944,19 +947,15 @@ public:
 ///   default:
 /// \endcode
 ///
-class CaseStmt : public Stmt {
+class CaseStmt final : public Stmt,
+    private llvm::TrailingObjects<CaseStmt, CaseLabelItem> {
+  friend TrailingObjects;
+
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;
 
   llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
   unsigned NumPatterns;
-
-  const CaseLabelItem *getCaseLabelItemsBuffer() const {
-    return reinterpret_cast<const CaseLabelItem *>(this + 1);
-  }
-  CaseLabelItem *getCaseLabelItemsBuffer() {
-    return reinterpret_cast<CaseLabelItem *>(this + 1);
-  }
 
   CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
            bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
@@ -969,10 +968,10 @@ public:
                           Optional<bool> Implicit = None);
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
-    return { getCaseLabelItemsBuffer(), NumPatterns };
+    return {getTrailingObjects<CaseLabelItem>(), NumPatterns};
   }
   MutableArrayRef<CaseLabelItem> getMutableCaseLabelItems() {
-    return { getCaseLabelItemsBuffer(), NumPatterns };
+    return {getTrailingObjects<CaseLabelItem>(), NumPatterns};
   }
 
   Stmt *getBody() const { return BodyAndHasBoundDecls.getPointer(); }
@@ -986,6 +985,9 @@ public:
 
   SourceLoc getStartLoc() const { return getLoc(); }
   SourceLoc getEndLoc() const { return getBody()->getEndLoc(); }
+  SourceRange getLabelItemsRange() const {
+    return ColonLoc.isValid() ? SourceRange(getLoc(), ColonLoc) : getSourceRange();
+  }
 
   bool isDefault() { return getCaseLabelItems()[0].isDefault(); }
 
@@ -993,19 +995,14 @@ public:
 };
 
 /// Switch statement.
-class SwitchStmt : public LabeledStmt {
+class SwitchStmt final : public LabeledStmt,
+    private llvm::TrailingObjects<SwitchStmt, CaseStmt *> {
+  friend TrailingObjects;
+
   SourceLoc SwitchLoc, LBraceLoc, RBraceLoc;
   Expr *SubjectExpr;
   unsigned CaseCount;
-  
-  CaseStmt * const *getCaseBuffer() const {
-    return reinterpret_cast<CaseStmt * const *>(this + 1);
-  }
 
-  CaseStmt **getCaseBuffer() {
-    return reinterpret_cast<CaseStmt **>(this + 1);
-  }
-  
   SwitchStmt(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc, Expr *SubjectExpr,
              SourceLoc LBraceLoc, unsigned CaseCount, SourceLoc RBraceLoc,
              Optional<bool> implicit = None)
@@ -1042,7 +1039,7 @@ public:
   
   /// Get the list of case clauses.
   ArrayRef<CaseStmt*> getCases() const {
-    return {getCaseBuffer(), CaseCount};
+    return {getTrailingObjects<CaseStmt*>(), CaseCount};
   }
   
   static bool classof(const Stmt *S) {
@@ -1199,7 +1196,7 @@ public:
     return S->getKind() == StmtKind::Throw;
   }
 };
-  
+
 } // end namespace swift
 
-#endif
+#endif // SWIFT_AST_STMT_H

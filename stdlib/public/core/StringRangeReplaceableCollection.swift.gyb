@@ -1,0 +1,315 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// `String` does not conform to `RangeReplaceableCollection`, but provides a
+// similar API.
+
+extension String {
+  /// The index type for subscripting a string.
+  public typealias Index = CharacterView.Index
+
+  /// A type used to represent the number of steps between two `String.Index`
+  /// values, where one value is reachable from the other.
+  ///
+  /// In Swift, *reachability* refers to the ability to produce one value from
+  /// the other through zero or more applications of `index(after:)`.
+  public typealias IndexDistance = CharacterView.IndexDistance
+
+  /// The position of the first character in a nonempty string.
+  ///
+  /// In an empty string, `startIndex` is equal to `endIndex`.
+  public var startIndex: Index { return characters.startIndex }
+
+  /// A string's "past the end" position---that is, the position one greater
+  /// than the last valid subscript argument.
+  ///
+  /// In an empty string, `endIndex` is equal to `startIndex`.
+  public var endIndex: Index { return characters.endIndex }
+
+    // TODO: swift-3-indexing-model - add docs
+  public func index(after i: Index) -> Index {
+    return characters.index(after: i)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func index(before i: Index) -> Index {
+    return characters.index(before: i)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    return characters.index(i, offsetBy: n)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    return characters.index(i, offsetBy: n, limitedBy: limit)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return characters.distance(from: start, to: end)
+  }
+
+  /// Accesses the character at the given position.
+  ///
+  /// Indices for a subscripting a string are shared with the string's
+  /// `characters` view. For example:
+  ///
+  ///     let greeting = "Hello, friend!"
+  ///     if let i = greeting.characters.index(where: { $0 >= "A" && $0 <= "Z" }) {
+  ///         print("First capital letter: \(greeting[i])")
+  ///     }
+  ///     // Prints "First capital letter: H"
+  ///
+  /// - Parameter i: A valid index of the string. `i` must be less than the
+  ///   string's end index.
+  public subscript(i: Index) -> Character { return characters[i] }
+
+  /// Accesses the text in the given range.
+  ///
+  /// - Complexity: O(*n*) if the underlying string is bridged from
+  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
+  public subscript(bounds: Range<Index>) -> String {
+    return String(characters[bounds])
+  }
+
+  /// Accesses the text in the given range.
+  ///
+  /// - Complexity: O(*n*) if the underlying string is bridged from
+  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
+  public subscript(bounds: ClosedRange<Index>) -> String {
+    return String(characters[bounds])
+  }
+}
+
+public func == (lhs: String.Index, rhs: String.Index) -> Bool {
+  return lhs._base == rhs._base
+}
+
+public func < (lhs: String.Index, rhs: String.Index) -> Bool {
+  return lhs._base < rhs._base
+}
+
+extension String {
+  /// Creates a new string containing the characters in the given sequence.
+  ///
+  /// You can use this initializer to create a new string from the result of
+  /// one or more operations on a string's `characters` view. For example:
+  ///
+  ///     let str = "The rain in Spain stays mainly in the plain."
+  ///
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     let disemvoweled = String(str.characters.lazy.filter { !vowels.contains($0) })
+  ///
+  ///     print(disemvoweled)
+  ///     // Prints "Th rn n Spn stys mnly n th pln."
+  ///
+  /// - Parameter characters: A sequence of characters.
+  public init<S : Sequence>(_ characters: S)
+    where S.Iterator.Element == Character {
+    self._core = CharacterView(characters)._core
+  }
+
+  /// Reserves enough space in the string's underlying storage to store the
+  /// specified number of ASCII characters.
+  ///
+  /// Because each character in a string can require more than a single ASCII
+  /// character's worth of storage, additional allocation may be necessary
+  /// when adding characters to a string after a call to
+  /// `reserveCapacity(_:)`.
+  ///
+  /// - Parameter n: The minimum number of ASCII character's worth of storage
+  ///   to allocate.
+  ///
+  /// - Complexity: O(*n*)
+  public mutating func reserveCapacity(_ n: Int) {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.reserveCapacity(n)
+    }
+  }
+
+  /// Appends the given character to the string.
+  ///
+  /// The following example adds an emoji globe to the end of a string.
+  ///
+  ///     var globe = "Globe "
+  ///     globe.append("🌍")
+  ///     print(globe)
+  ///     // Prints "Globe 🌍"
+  ///
+  /// - Parameter c: The character to append to the string.
+  public mutating func append(_ c: Character) {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.append(c)
+    }
+  }
+
+  /// Appends the characters in the given sequence to the string.
+  /// 
+  /// - Parameter newElements: A sequence of characters.
+  public mutating func append<S : Sequence>(contentsOf newElements: S)
+    where S.Iterator.Element == Character {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.append(contentsOf: newElements)
+    }
+  }
+
+% for Range in ['Range', 'ClosedRange']:
+  /// Replaces the text within the specified bounds with the given characters.
+  ///
+  /// Calling this method invalidates any existing indices for use with this
+  /// string.
+  ///
+  /// - Parameters:
+  ///   - bounds: The range of text to replace. The bounds of the range must be
+  ///     valid indices of the string.
+  ///   - newElements: The new characters to add to the string.
+  ///
+  /// - Complexity: O(*m*), where *m* is the combined length of the string and
+  ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
+  ///   removes text at the end of the string, the complexity is O(*n*), where
+  ///   *n* is equal to `bounds.count`.
+  public mutating func replaceSubrange<C>(
+    _ bounds: ${Range}<Index>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == Character {
+    withMutableCharacters {
+      (v: inout CharacterView)
+      in v.replaceSubrange(bounds, with: newElements)
+    }
+  }
+
+  /// Replaces the text within the specified bounds with the given string.
+  ///
+  /// Calling this method invalidates any existing indices for use with this
+  /// string.
+  ///
+  /// - Parameters:
+  ///   - bounds: The range of text to replace. The bounds of the range must be
+  ///     valid indices of the string.
+  ///   - newElements: The new text to add to the string.
+  ///
+  /// - Complexity: O(*m*), where *m* is the combined length of the string and
+  ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
+  ///   removes text at the end of the string, the complexity is O(*n*), where
+  ///   *n* is equal to `bounds.count`.
+  public mutating func replaceSubrange(
+    _ bounds: ${Range}<Index>, with newElements: String
+  ) {
+    replaceSubrange(bounds, with: newElements.characters)
+  }
+% end
+
+  /// Inserts a new character at the specified position.
+  ///
+  /// Calling this method invalidates any existing indices for use with this
+  /// string.
+  ///
+  /// - Parameters:
+  ///   - newElement: The new character to insert into the string.
+  ///   - i: A valid index of the string. If `i` is equal to the string's end
+  ///     index, this methods appends `newElement` to the string.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the string.
+  public mutating func insert(_ newElement: Character, at i: Index) {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.insert(newElement, at: i)
+    }
+  }
+
+  /// Inserts a collection of characters at the specified position.
+  ///
+  /// Calling this method invalidates any existing indices for use with this
+  /// string.
+  ///
+  /// - Parameters:
+  ///   - newElements: A collection of `Character` elements to insert into the
+  ///     string.
+  ///   - i: A valid index of the string. If `i` is equal to the string's end
+  ///     index, this methods appends the contents of `newElements` to the
+  ///     string.
+  ///
+  /// - Complexity: O(*n*), where *n* is the combined length of the string and
+  ///   `newElements`.
+  public mutating func insert<S : Collection>(
+    contentsOf newElements: S, at i: Index
+  ) where S.Iterator.Element == Character {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.insert(contentsOf: newElements, at: i)
+    }
+  }
+
+  /// Removes and returns the character at the specified position.
+  ///
+  /// All the elements following `i` are moved to close the gap. This example
+  /// removes the hyphen from the middle of a string.
+  ///
+  ///     var nonempty = "non-empty"
+  ///     if let i = nonempty.characters.index(of: "-") {
+  ///         nonempty.remove(at: i)
+  ///     }
+  ///     print(nonempty)
+  ///     // Prints "nonempty"
+  ///
+  /// Calling this method invalidates any existing indices for use with this
+  /// string.
+  ///
+  /// - Parameter i: The position of the character to remove. `i` must be a
+  ///   valid index of the string that is not equal to the string's end index.
+  /// - Returns: The character that was removed.
+  @discardableResult
+  public mutating func remove(at i: Index) -> Character {
+    return withMutableCharacters {
+      (v: inout CharacterView) in v.remove(at: i)
+    }
+  }
+
+% for Range in ['Range', 'ClosedRange']:
+  /// Removes the characters in the given range.
+  ///
+  /// Calling this method invalidates any existing indices for use with this
+  /// string.
+  ///
+% if Range == 'ClosedRange':
+  /// - Parameter bounds: The range of the elements to remove. The upper and
+  ///   lower bounds of `bounds` must be valid indices of the string and not
+  ///   equal to the string's end index.
+% else:
+  /// - Parameter bounds: The range of the elements to remove. The upper and
+  ///   lower bounds of `bounds` must be valid indices of the string.
+% end
+  public mutating func removeSubrange(_ bounds: ${Range}<Index>) {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.removeSubrange(bounds)
+    }
+  }
+% end
+
+  /// Replaces this string with the empty string.
+  ///
+  /// Calling this method invalidates any existing indices for use with this
+  /// string.
+  ///
+  /// - Parameter keepCapacity: Pass `true` to prevent the release of the
+  ///   string's allocated storage. Retaining the storage can be a useful
+  ///   optimization when you're planning to grow the string again. The
+  ///   default value is `false`.
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
+    }
+  }
+}
+

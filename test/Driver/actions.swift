@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
-// XFAIL: linux
+// XFAIL: freebsd, linux
 
 // RUN: %swiftc_driver -driver-print-actions %s 2>&1 | FileCheck %s -check-prefix=BASIC
 // BASIC: 0: input, "{{.*}}actions.swift", swift
@@ -99,6 +99,13 @@
 // DEBUG-LINK-ONLY: 4: merge-module, {2, 3}, swiftmodule
 // DEBUG-LINK-ONLY: 5: link, {0, 1, 4}, image
 // DEBUG-LINK-ONLY: 6: generate-dSYM, {5}, dSYM
+
+// RUN: touch %t/a.o %t/b.o
+// RUN: %swiftc_driver -driver-print-actions %t/a.o %s -o main 2>&1 | FileCheck %s -check-prefix=COMPILE-PLUS-OBJECT
+// COMPILE-PLUS-OBJECT: 0: input, "{{.*}}/a.o", object
+// COMPILE-PLUS-OBJECT: 1: input, "{{.*}}actions.swift", swift
+// COMPILE-PLUS-OBJECT: 2: compile, {1}, object
+// COMPILE-PLUS-OBJECT: 3: link, {0, 2}, image
 
 
 // RUN: %swiftc_driver -driver-print-actions %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions -force-single-frontend-invocation 2>&1 | FileCheck %s -check-prefix=WHOLE-MODULE

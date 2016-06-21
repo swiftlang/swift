@@ -1,8 +1,9 @@
 
-func test(b : Base) {
+func test(_ b : Base) {
   b.doIt(0);
 }
 
+// REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=cursor -pos=3:7 %s -- %s %mcp_opt -F %S/Inputs -module-name Mixed -import-underlying-module | FileCheck %s
 
 // CHECK: source.lang.swift.ref.function.method.instance ({{.*}}Mixed.framework/Headers/Mixed.h:5:9-5:23)
@@ -10,4 +11,4 @@ func test(b : Base) {
 // CHECK: c:objc(cs)Base(im)doIt:
 // CHECK: Base -> (Int32) -> Void
 // CHECK: Mixed
-// CHECK: <Declaration>func doIt(arg: <Type usr="s:Vs5Int32">Int32</Type>)</Declaration>
+// CHECK: <Declaration>func doIt(_ arg: <Type usr="s:Vs5Int32">Int32</Type>)</Declaration>

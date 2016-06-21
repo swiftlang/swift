@@ -14,6 +14,7 @@
 // This is specifically testing autolinking for immediate mode. Please do not
 // change it to use %target-build/%target-run
 // REQUIRES: swift_interpreter
+// REQUIRES: OS=macosx
 
 
 import Darwin
@@ -35,7 +36,7 @@ if global() != 42 {
 
 let RTLD_DEFAULT = UnsafeMutablePointer<Void>(bitPattern: -2)
 if dlsym(RTLD_DEFAULT, "global") == nil {
-  print(String.fromCString(dlerror())!)
+  print(String(cString: dlerror()))
   exit(EXIT_FAILURE)
 }
 #endif

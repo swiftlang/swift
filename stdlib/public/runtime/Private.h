@@ -1,8 +1,8 @@
-//===--- Private.h - Private runtime declarations --------------*- C++ -*--===//
+//===--- Private.h - Private runtime declarations ---------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,24 +17,28 @@
 #ifndef SWIFT_RUNTIME_PRIVATE_H
 #define SWIFT_RUNTIME_PRIVATE_H
 
+#include "swift/Basic/Demangle.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 #include "llvm/Support/Compiler.h"
 
+// Opaque ISAs need to use object_getClass which is in runtime.h
+#if SWIFT_HAS_OPAQUE_ISAS
+#include <objc/runtime.h>
+#endif
+
 namespace swift {
-  struct ProtocolDescriptor;
 
 #if SWIFT_HAS_ISA_MASKING
+  SWIFT_RUNTIME_EXPORT
   extern "C" uintptr_t swift_isaMask;
 #endif
 
 #if SWIFT_OBJC_INTEROP
-  extern "C" LLVM_LIBRARY_VISIBILITY
-  bool _swift_objectConformsToObjCProtocol(const void *theObject,
+  bool objectConformsToObjCProtocol(const void *theObject,
                                     const ProtocolDescriptor *theProtocol);
   
-  extern "C" LLVM_LIBRARY_VISIBILITY
-  bool _swift_classConformsToObjCProtocol(const void *theClass,
+  bool classConformsToObjCProtocol(const void *theClass,
                                     const ProtocolDescriptor *theProtocol);
 #endif
 
@@ -51,21 +55,6 @@ namespace swift {
     return (mask & (mask + 1)) == 0;
   }
 
-  /// Return the class of an object which is known to be an allocated
-  /// heap object.
-  static inline const ClassMetadata *_swift_getClassOfAllocated(const void *object) {
-    // Load the isa field.
-    uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
-
-#if SWIFT_HAS_ISA_MASKING
-    // Apply the mask.
-    bits &= swift_isaMask;
-#endif
-
-    // The result is a class pointer.
-    return reinterpret_cast<const ClassMetadata *>(bits);
-  }
-
   /// Is the given value an Objective-C tagged pointer?
   static inline bool isObjCTaggedPointer(const void *object) {
 #if SWIFT_OBJC_INTEROP
@@ -79,6 +68,53 @@ namespace swift {
   static inline bool isObjCTaggedPointerOrNull(const void *object) {
     return object == nullptr || isObjCTaggedPointer(object);
   }
+
+  /// Return the class of an object which is known to be an allocated
+  /// heap object.
+  /// Note, in this case, the object may or may not have a non-pointer ISA.
+  /// Masking, or otherwise, may be required to get a class pointer.
+  static inline const ClassMetadata *_swift_getClassOfAllocated(const void *object) {
+#if SWIFT_HAS_OPAQUE_ISAS
+    // The ISA is opaque so masking it will not return a pointer.  We instead
+    // need to call the objc runtime to get the class.
+    return reinterpret_cast<const ClassMetadata*>(object_getClass((id)object));
+#else
+    // Load the isa field.
+    uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
+
+#if SWIFT_HAS_ISA_MASKING
+    // Apply the mask.
+    bits &= swift_isaMask;
+#endif
+
+    // The result is a class pointer.
+    return reinterpret_cast<const ClassMetadata *>(bits);
+#endif
+  }
+
+  /// Return the class of an object which is known to be an allocated
+  /// heap object.
+  /// Note, in this case, the object is known to have a pointer ISA, and no
+  /// masking is required to convert from non-pointer to pointer ISA.
+  static inline const ClassMetadata *
+  _swift_getClassOfAllocatedFromPointer(const void *object) {
+    // Load the isa field.
+    uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
+
+    // The result is a class pointer.
+    return reinterpret_cast<const ClassMetadata *>(bits);
+  }
+
+#if SWIFT_OBJC_INTEROP && SWIFT_HAS_OPAQUE_ISAS
+  /// Return whether this object is of a class which uses non-pointer ISAs.
+  static inline bool _swift_isNonPointerIsaObjCClass(const void *object) {
+    // Load the isa field.
+    uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
+    // If the low bit is set, then we are definitely an objc object.
+    // FIXME: Use a variable for this.
+    return bits & 1;
+  }
+#endif
 
   LLVM_LIBRARY_VISIBILITY
   const ClassMetadata *_swift_getClass(const void *object);
@@ -95,7 +131,13 @@ namespace swift {
   /// Note that this function may return a nullptr on non-objc platforms,
   /// where there is no common root class. rdar://problem/18987058
   const ClassMetadata *getRootSuperclass();
-  
+
+  /// Check if a class has a formal superclass in the AST.
+  static inline
+  bool classHasSuperclass(const ClassMetadata *c) {
+    return (c->SuperClass && c->SuperClass != getRootSuperclass());
+  }
+
   /// Replace entries of a freshly-instantiated value witness table with more
   /// efficient common implementations where applicable.
   ///
@@ -106,6 +148,46 @@ namespace swift {
   /// Returns true if common value witnesses were used, false otherwise.
   void installCommonValueWitnesses(ValueWitnessTable *vwtable);
 
+  const Metadata *
+  _matchMetadataByMangledTypeName(const llvm::StringRef metadataNameRef,
+                                  const Metadata *metadata,
+                                  const NominalTypeDescriptor *ntd);
+
+  const Metadata *
+  _searchConformancesByMangledTypeName(const llvm::StringRef typeName);
+
+#if SWIFT_OBJC_INTEROP
+  Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type);
+#endif
+
+  /// A helper function which avoids performing a store if the destination
+  /// address already contains the source value.  This is useful when
+  /// "initializing" memory that might have been initialized to the correct
+  /// value statically.  In such a case, the compiler might have gone so far
+  /// as to map the entire object readonly, or we might just want to avoid
+  /// dirtying memory unnecessarily.
+  template <class T>
+  static void assignUnlessEqual(T &dest, T newValue) {
+    if (dest != newValue)
+      dest = newValue;
+  }
+
+#if defined(__CYGWIN__) || defined(_MSC_VER)
+  struct dl_phdr_info {
+    void *dlpi_addr;
+    const char *dlpi_name;
+  };
+
+  int _swift_dl_iterate_phdr(int (*Callback)(struct dl_phdr_info *info,
+                                             size_t size, void *data),
+                             void *data);
+  uint8_t *_swift_getSectionDataPE(void *handle, const char *sectionName,
+                                   unsigned long *sectionSize);
+#endif
+#if defined(__CYGWIN__)
+  void _swift_once_f(uintptr_t *predicate, void *context,
+                     void (*function)(void *));
+#endif
 
 } // end namespace swift
 

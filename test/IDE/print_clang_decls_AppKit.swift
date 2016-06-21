@@ -7,10 +7,10 @@
 
 // REQUIRES: OS=macosx
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=AppKit -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
@@ -19,10 +19,10 @@
 
 // APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding, NSAccessibility {{{$}}
 // APPKIT-NEXT: init?(coder aDecoder: NSCoder)
-// APPKIT-NEXT: func isDescendantOf(aView: NSView) -> Bool
-// APPKIT-NEXT: func ancestorSharedWithView(aView: NSView) -> NSView?
-// APPKIT-NEXT: func addSubview(aView: NSView)
-// APPKIT-NEXT: func addSubview(aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
+// APPKIT-NEXT: func isDescendant(of aView: NSView) -> Bool
+// APPKIT-NEXT: func ancestorShared(with aView: NSView) -> NSView?
+// APPKIT-NEXT: func addSubview(_ aView: NSView)
+// APPKIT-NEXT: func addSubview(_ aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
 // APPKIT-NEXT: unowned(unsafe) var superview: @sil_unmanaged NSView? { get }
 // APPKIT-NEXT: var layer: CALayer?
 // APPKIT-NEXT: var trackingAreas: [AnyObject] { get }
@@ -37,7 +37,8 @@
 // APPKIT-NEXT: weak var target: @sil_weak AnyObject
 // APPKIT-NEXT: var action: Selector
 // APPKIT: {{^}}}{{$}}
-// APPKIT: let NSViewFrameDidChangeNotification: String
-// APPKIT: let NSViewFocusDidChangeNotification: String
-
+// APPKIT: extension NSNotification.Name {
+// APPKIT:   static let NSViewFrameDidChange: NSNotification.Name
+// APPKIT:   static let NSViewFocusDidChange: NSNotification.Name
+// APPKIT: }
 

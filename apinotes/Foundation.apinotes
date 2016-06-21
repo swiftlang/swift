@@ -1,26 +1,1832 @@
 ---
 Name: Foundation
 Classes:
+- Name: NSAffineTransform
+  SwiftBridge: AffineTransform
+- Name: NSArray
+  SwiftBridge: Swift.Array
+  Methods:
+  - Selector: 'pathsMatchingExtensions:'
+    SwiftName: pathsMatchingExtensions(_:)
+    MethodKind: Instance
+  - Selector: 'filteredArrayUsingPredicate:'
+    SwiftName: filtered(using:)
+    MethodKind: Instance
+- Name: NSCharacterSet
+  SwiftName: NSCharacterSet
+  SwiftBridge: CharacterSet
+  Methods:
+  - Selector: controlCharacterSet
+    SwiftName: controlCharacters()
+    MethodKind: Class
+  - Selector: whitespaceCharacterSet
+    SwiftName: whitespaces()
+    MethodKind: Class
+  - Selector: whitespaceAndNewlineCharacterSet
+    SwiftName: whitespacesAndNewlines()
+    MethodKind: Class
+  - Selector: decimalDigitCharacterSet
+    SwiftName: decimalDigits()
+    MethodKind: Class
+  - Selector: letterCharacterSet
+    SwiftName: letters()
+    MethodKind: Class
+  - Selector: lowercaseLetterCharacterSet
+    SwiftName: lowercaseLetters()
+    MethodKind: Class
+  - Selector: uppercaseLetterCharacterSet
+    SwiftName: uppercaseLetters()
+    MethodKind: Class
+  - Selector: nonBaseCharacterSet
+    SwiftName: nonBaseCharacters()
+    MethodKind: Class
+  - Selector: alphanumericCharacterSet
+    SwiftName: alphanumerics()
+    MethodKind: Class
+  - Selector: decomposableCharacterSet
+    SwiftName: decomposables()
+    MethodKind: Class
+  - Selector: illegalCharacterSet
+    SwiftName: illegalCharacters()
+    MethodKind: Class
+  - Selector: capitalizedLetterCharacterSet
+    SwiftName: capitalizedLetters()
+    MethodKind: Class
+  - Selector: symbolCharacterSet
+    SwiftName: symbols()
+    MethodKind: Class
+  - Selector: newlineCharacterSet
+    SwiftName: newlines()
+    MethodKind: Class
+  - Selector: 'hasMemberInPlane:'
+    SwiftName: hasMemberInPlane(_:)
+    MethodKind: Instance
+- Name: NSData
+  SwiftName: NSData
+  SwiftBridge: Data
+  Methods:
+  - Selector: 'enumerateByteRangesUsingBlock:'
+    SwiftName: enumerateBytes(_:)
+    MethodKind: Instance
+  - Selector: 'rangeOfData:options:range:'
+    SwiftName: range(of:options:in:)
+    MethodKind: Instance
+  - Selector: 'initWithBase64EncodedString:options:'
+    SwiftName: init(base64Encoded:options:)
+    MethodKind: Instance
+  - Selector: 'initWithBase64EncodedData:options:'
+    SwiftName: init(base64Encoded:options:)
+    MethodKind: Instance
+  - Selector: 'dataWithContentsOfMappedFile:'
+    SwiftName: dataWithContentsOfMappedFile(_:)
+    MethodKind: Class
+- Name: NSCountedSet
+  SwiftName: CountedSet
+- Name: NSDate
+  SwiftName: NSDate
+  SwiftBridge: Date
+  Properties:
+  - Name: NSTimeIntervalSince1970
+    SwiftName: timeIntervalBetween1970AndReferenceDate
+  Methods:
+  - Selector: 'timeIntervalSinceDate:'
+    SwiftName: timeIntervalSince(_:)
+    MethodKind: Instance
+  - Selector: 'descriptionWithLocale:'
+    SwiftName: description(with:)
+    MethodKind: Instance
+- Name: NSDateComponents
+  SwiftName: NSDateComponents
+  SwiftBridge: DateComponents
+- Name: NSDateInterval
+  SwiftName: NSDateInterval
+  SwiftBridge: DateInterval
+- Name: NSError
+  SwiftName: NSError
+  Methods:
+  - Selector: 'setUserInfoValueProviderForDomain:provider:'
+    SwiftName: setUserInfoValueProvider(forDomain:provider:)
+    MethodKind: Class
+- Name: NSDictionary
+  SwiftBridge: Swift.Dictionary
+- Name: NSSet
+  SwiftBridge: Swift.Set
+  Methods:
+  - Selector: 'filteredSetUsingPredicate:'
+    SwiftName: filtered(using:)
+    MethodKind: Instance
+- Name: NSString
+  SwiftBridge: Swift.String
+  Methods:
+  - Selector: 'uppercaseStringWithLocale:'
+    SwiftName: uppercased(with:)
+    MethodKind: Instance
+  - Selector: 'lowercaseStringWithLocale:'
+    SwiftName: lowercased(with:)
+    MethodKind: Instance
+  - Selector: 'capitalizedStringWithLocale:'
+    SwiftName: capitalized(with:)
+    MethodKind: Instance
+  - Selector: 'dataUsingEncoding:allowLossyConversion:'
+    SwiftName: data(using:allowLossyConversion:)
+    MethodKind: Instance
+  - Selector: 'dataUsingEncoding:'
+    SwiftName: data(using:)
+    MethodKind: Instance
+  - Selector: 'canBeConvertedToEncoding:'
+    SwiftName: canBeConverted(to:)
+    MethodKind: Instance
+  - Selector: 'cStringUsingEncoding:'
+    SwiftName: cString(using:)
+    MethodKind: Instance
+  - Selector: 'maximumLengthOfBytesUsingEncoding:'
+    SwiftName: maximumLengthOfBytes(using:)
+    MethodKind: Instance
+  - Selector: 'lengthOfBytesUsingEncoding:'
+    SwiftName: lengthOfBytes(using:)
+    MethodKind: Instance
+  - Selector: 'localizedNameOfStringEncoding:'
+    SwiftName: localizedName(of:)
+    MethodKind: Class
+  - Selector: 'componentsSeparatedByString:'
+    SwiftName: components(separatedBy:)
+    MethodKind: Instance
+  - Selector: 'componentsSeparatedByCharactersInSet:'
+    SwiftName: components(separatedBy:)
+    MethodKind: Instance
+  - Selector: 'stringByPaddingToLength:withString:startingAtIndex:'
+    SwiftName: padding(toLength:withPad:startingAt:)
+    MethodKind: Instance
+  - Selector: 'stringByAddingPercentEscapesUsingEncoding:'
+    SwiftName: addingPercentEscapes(using:)
+    MethodKind: Instance
+  - Selector: 'stringByReplacingPercentEscapesUsingEncoding:'
+    SwiftName: replacingPercentEscapes(using:)
+    MethodKind: Instance
+  Properties:
+  - Name: uppercaseString
+    SwiftName: uppercased
+  - Name: lowercaseString
+    SwiftName: lowercased
 - Name: NSDistributedNotificationCenter
   Methods:
   - Selector: 'notificationCenterForType:'
     MethodKind: Class
     FactoryAsInit: C
 - Name: NSCoder
+  SwiftName: NSCoder
   Methods:
   - Selector: 'decodeObjectOfClass:forKey:'
     MethodKind: Instance
-    Availability: none
+    Availability: nonswift
     AvailabilityMsg: use generic 'decodeObjectOfClass(_:forKey:)'
-- Name: NSError
-  Methods:
-  - Selector: 'init'
+  - Selector: 'encodeInt:forKey:'
+    Availability: nonswift
     MethodKind: Instance
-    Availability: none
-    AvailabilityMsg: use 'init(domain:code:userInfo:)'
+  - Selector: 'decodeIntForKey:'
+    Availability: nonswift
+    MethodKind: Instance
+- Name: NSNotification
+  SwiftName: NSNotification
+  SwiftBridge: Notification
+- Name: NSPersonNameComponents
+  SwiftName: NSPersonNameComponents
+  SwiftBridge: PersonNameComponents
 - Name: NSProcessInfo
   Methods:
   - Selector: processInfo
     MethodKind: Class
     NullabilityOfRet: N
     FactoryAsInit: C
+  - Selector: 'isOperatingSystemAtLeastVersion:'
+    SwiftName: isOperatingSystemAtLeast(_:)
+    MethodKind: Instance
+- Name: NSURL
+  SwiftName: NSURL
+  SwiftBridge: URL
+  Methods:
+  - Selector: fileReferenceURL
+    SwiftName: fileReferenceURL()
+    MethodKind: Instance
+  - Selector: 'initByResolvingBookmarkData:options:relativeToURL:bookmarkDataIsStale:error:'
+    SwiftName: init(resolvingBookmarkData:options:relativeTo:bookmarkDataIsStale:)
+    MethodKind: Instance
+  - Selector: 'URLByResolvingBookmarkData:options:relativeToURL:bookmarkDataIsStale:error:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'URLByResolvingAliasFileAtURL:options:error:'
+    SwiftName: init(resolvingAliasFileAt:options:)
+    MethodKind: Class
+  Properties:
+  - Name: baseURL
+    SwiftName: baseURL
+  - Name: absoluteURL
+    SwiftName: absoluteURL
+  - Name: filePathURL
+    SwiftName: filePathURL
+- Name: NSURLComponents
+  SwiftName: NSURLComponents
+  SwiftBridge: URLComponents
+  Methods:
+  - Selector: 'URLRelativeToURL:'
+    SwiftName: url(relativeTo:)
+    MethodKind: Instance
+- Name: NSURLSessionConfiguration
+  Methods:
+  - Selector: 'backgroundSessionConfigurationWithIdentifier:'
+    SwiftName: background(withIdentifier:)
+    MethodKind: Class
+- Name: NSURLRequest
+  SwiftBridge: URLRequest
+- Name: NSURLQueryItem
+  SwiftName: NSURLQueryItem
+  SwiftBridge: URLQueryItem
+- Name: NSUUID
+  SwiftName: NSUUID
+  SwiftBridge: UUID
+- Name: NSIndexSet
+  SwiftName: NSIndexSet
+  SwiftBridge: IndexSet
+- Name: NSIndexPath
+  SwiftName: NSIndexPath
+  SwiftBridge: IndexPath
+- Name: NSBackgroundActivityScheduler
+  SwiftName: NSBackgroundActivityScheduler
+- Name: NSEnumerator
+  SwiftName: NSEnumerator
+- Name: NSExpression
+  SwiftName: NSExpression
+  Methods:
+  - Selector: expressionForEvaluatedObject
+    SwiftName: expressionForEvaluatedObject()
+    MethodKind: Class
+  - Selector: expressionForAnyKey
+    SwiftName: expressionForAnyKey()
+    MethodKind: Class
+  - Selector: 'expressionForBlock:arguments:'
+    SwiftName: init(block:arguments:)
+    MethodKind: Class
+- Name: NSMetadataItem
+  SwiftName: NSMetadataItem
+- Name: NSMetadataQuery
+  SwiftName: NSMetadataQuery
+- Name: NSMetadataQueryAttributeValueTuple
+  SwiftName: NSMetadataQueryAttributeValueTuple
+- Name: NSMetadataQueryResultGroup
+  SwiftName: NSMetadataQueryResultGroup
+- Name: NSAppleEventDescriptor
+  SwiftName: NSAppleEventDescriptor
+- Name: NSAppleEventManager
+  SwiftName: NSAppleEventManager
+- Name: NSAssertionHandler
+  SwiftName: NSAssertionHandler
+- Name: NSClassDescription
+  SwiftName: NSClassDescription
+- Name: NSCloneCommand
+  SwiftName: NSCloneCommand
+- Name: NSCloseCommand
+  SwiftName: NSCloseCommand
+- Name: NSConstantString
+  SwiftName: NSConstantString
+- Name: NSCountCommand
+  SwiftName: NSCountCommand
+- Name: NSCreateCommand
+  SwiftName: NSCreateCommand
+- Name: NSDecimalNumber
+  SwiftName: NSDecimalNumber
+  SwiftBridge: Decimal
+  Methods:
+  - Selector: notANumber
+    SwiftName: notANumber()
+    MethodKind: Class
+- Name: NSDecimalNumberHandler
+  SwiftName: NSDecimalNumberHandler
+- Name: NSDeleteCommand
+  SwiftName: NSDeleteCommand
+- Name: NSException
+  SwiftName: NSException
+- Name: NSExistsCommand
+  SwiftName: NSExistsCommand
+- Name: NSExtensionContext
+  SwiftName: NSExtensionContext
+  Methods:
+  - Selector: 'completeRequestReturningItems:completionHandler:'
+    SwiftName: completeRequest(returningItems:completionHandler:)
+    MethodKind: Instance
+  - Selector: 'cancelRequestWithError:'
+    SwiftName: cancelRequest(withError:)
+    MethodKind: Instance
+- Name: NSExtensionItem
+  SwiftName: NSExtensionItem
+- Name: NSGetCommand
+  SwiftName: NSGetCommand
+- Name: NSIndexSpecifier
+  SwiftName: NSIndexSpecifier
+- Name: NSItemProvider
+  SwiftName: NSItemProvider
+  Methods:
+  - Selector: 'hasItemConformingToTypeIdentifier:'
+    SwiftName: hasItemConformingToTypeIdentifier(_:)
+    MethodKind: Instance
+- Name: NSLogicalTest
+  SwiftName: NSLogicalTest
+- Name: NSMeasurement
+  SwiftName: NSMeasurement
+  SwiftBridge: Measurement
+- Name: NSMiddleSpecifier
+  SwiftName: NSMiddleSpecifier
+- Name: NSMoveCommand
+  SwiftName: NSMoveCommand
+- Name: NSMutableArray
+  SwiftName: NSMutableArray
+  Methods:
+  - Selector: 'removeObjectIdenticalTo:inRange:'
+    SwiftName: removeObject(identicalTo:in:)
+    MethodKind: Instance
+  - Selector: 'removeObjectIdenticalTo:'
+    SwiftName: removeObject(identicalTo:)
+    MethodKind: Instance
+- Name: NSMutableAttributedString
+  SwiftName: NSMutableAttributedString
+- Name: NSMutableCharacterSet
+  SwiftName: NSMutableCharacterSet
+- Name: NSMutableData
+  SwiftName: NSMutableData
+  Methods:
+  - Selector: 'appendBytes:length:'
+    SwiftName: append(_:length:)
+    MethodKind: Instance
+- Name: NSMutableDictionary
+  SwiftName: NSMutableDictionary
+- Name: NSMutableIndexSet
+  SwiftName: NSMutableIndexSet
+- Name: NSMutableOrderedSet
+  SwiftName: NSMutableOrderedSet
+- Name: NSMutableSet
+  SwiftName: NSMutableSet
+- Name: NSMutableString
+  SwiftName: NSMutableString
+- Name: NSNameSpecifier
+  SwiftName: NSNameSpecifier
+- Name: NSNull
+  SwiftName: NSNull
+- Name: NSNumber
+  SwiftName: NSNumber
+  Methods:
+  - Selector: 'initWithChar:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedChar:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithShort:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedShort:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithInt:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedInt:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithLong:'
+    Availability: nonswift
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedLong:'
+    Availability: nonswift
+    MethodKind: Instance
+  - Selector: 'initWithLongLong:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedLongLong:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithFloat:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithDouble:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithBool:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithInteger:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'initWithUnsignedInteger:'
+    SwiftName: init(value:)
+    MethodKind: Instance
+  - Selector: 'numberWithChar:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedChar:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithShort:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedShort:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithInt:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedInt:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithLongLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedLongLong:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithFloat:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithDouble:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithBool:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithInteger:'
+    Availability: nonswift
+    MethodKind: Class
+  - Selector: 'numberWithUnsignedInteger:'
+    Availability: nonswift
+    MethodKind: Class
+  Properties:
+  - Name: charValue
+    SwiftName: int8Value
+  - Name: unsignedCharValue
+    SwiftName: uint8Value
+  - Name: shortValue
+    SwiftName: int16Value
+  - Name: unsignedShortValue
+    SwiftName: uint16Value
+  - Name: intValue
+    SwiftName: int32Value
+  - Name: unsignedIntValue
+    SwiftName: uint32Value
+  - Name: longValue
+    Availability: nonswift
+  - Name: unsignedLongValue
+    Availability: nonswift
+    AvailabilityMsg: use 'uintValue'
+  - Name: longLongValue
+    SwiftName: int64Value
+  - Name: unsignedLongLongValue
+    SwiftName: uint64Value
+  - Name: integerValue
+    SwiftName: intValue
+  - Name: unsignedIntegerValue
+    SwiftName: uintValue
+- Name: NSOrderedSet
+  Methods:
+  - Selector: 'enumerateObjectsWithOptions:usingBlock:'
+    SwiftName: enumerateObjects(options:using:)
+    MethodKind: Instance
+  - Selector: 'filteredOrderedSetUsingPredicate:'
+    SwiftName: filtered(using:)
+    MethodKind: Instance
+  - Selector: 'indexesOfObjectsAtIndexes:options:passingTest:'
+    SwiftName: indexes(ofObjectsAt:options:passingTest:)
+    MethodKind: Instance
+  - Selector: 'indexesOfObjectsPassingTest:'
+    SwiftName: indexes(ofObjectsPassingTest:)
+    MethodKind: Instance
+  - Selector: 'indexesOfObjectsWithOptions:passingTest:'
+    SwiftName: indexes(options:ofObjectsPassingTest:)
+    MethodKind: Instance
+  - Selector: 'indexOfObjectAtIndexes:options:passingTest:'
+    SwiftName: index(ofObjectAt:options:passingTest:)
+    MethodKind: Instance
+  - Selector: 'indexOfObjectPassingTest:'
+    SwiftName: index(ofObjectPassingTest:)
+    MethodKind: Instance
+  - Selector: 'indexOfObjectWithOptions:passingTest:'
+    SwiftName: index(_:ofObjectPassingTest:)
+    MethodKind: Instance
+- Name: NSPositionalSpecifier
+  SwiftName: NSPositionalSpecifier
+- Name: NSPropertySpecifier
+  SwiftName: NSPropertySpecifier
+- Name: NSProtocolChecker
+  SwiftName: NSProtocolChecker
+- Name: NSProxy
+  SwiftName: NSProxy
+- Name: NSQuitCommand
+  SwiftName: NSQuitCommand
+- Name: NSRandomSpecifier
+  SwiftName: NSRandomSpecifier
+- Name: NSRangeSpecifier
+  SwiftName: NSRangeSpecifier
+- Name: NSRelativeSpecifier
+  SwiftName: NSRelativeSpecifier
+- Name: NSScriptClassDescription
+  SwiftName: NSScriptClassDescription
+- Name: NSScriptCoercionHandler
+  SwiftName: NSScriptCoercionHandler
+- Name: NSScriptCommand
+  SwiftName: NSScriptCommand
+- Name: NSScriptCommandDescription
+  SwiftName: NSScriptCommandDescription
+- Name: NSScriptExecutionContext
+  SwiftName: NSScriptExecutionContext
+- Name: NSScriptObjectSpecifier
+  SwiftName: NSScriptObjectSpecifier
+- Name: NSScriptSuiteRegistry
+  SwiftName: NSScriptSuiteRegistry
+- Name: NSScriptWhoseTest
+  SwiftName: NSScriptWhoseTest
+- Name: NSSetCommand
+  SwiftName: NSSetCommand
+- Name: NSSimpleCString
+  SwiftName: NSSimpleCString
+- Name: NSSpecifierTest
+  SwiftName: NSSpecifierTest
+- Name: NSSpellServer
+  SwiftName: NSSpellServer
+- Name: NSArchiver
+  SwiftName: NSArchiver
+- Name: NSUnarchiver
+  SwiftName: NSUnarchiver
+- Name: NSKeyedArchiver
+  SwiftName: NSKeyedArchiver
+- Name: NSKeyedUnarchiver
+  SwiftName: NSKeyedUnarchiver
+- Name: NSUniqueIDSpecifier
+  SwiftName: NSUniqueIDSpecifier
+- Name: NSUserActivity
+  SwiftName: NSUserActivity
+- Name: NSUserAppleScriptTask
+  SwiftName: NSUserAppleScriptTask
+- Name: NSUserAutomatorTask
+  SwiftName: NSUserAutomatorTask
+- Name: NSUserNotification
+  SwiftName: NSUserNotification
+- Name: NSUserNotificationAction
+  SwiftName: NSUserNotificationAction
+- Name: NSUserNotificationCenter
+  SwiftName: NSUserNotificationCenter
+- Name: NSUserScriptTask
+  SwiftName: NSUserScriptTask
+- Name: NSUserUnixTask
+  SwiftName: NSUserUnixTask
+- Name: NSValue
+  SwiftName: NSValue
+- Name: NSWhoseSpecifier
+  SwiftName: NSWhoseSpecifier
+- Name: NSXPCConnection
+  SwiftName: NSXPCConnection
+- Name: NSXPCInterface
+  SwiftName: NSXPCInterface
+- Name: NSXPCListener
+  SwiftName: NSXPCListener
+- Name: NSXPCListenerEndpoint
+  SwiftName: NSXPCListenerEndpoint
+- Name: NSAppleScript
+  SwiftName: NSAppleScript
+- Name: NSBundle
+  Methods:
+  - Selector: 'URLForAuxiliaryExecutable:'
+    SwiftName: urlForAuxiliaryExecutable(_:)
+    MethodKind: Instance
+  - Selector: 'pathForAuxiliaryExecutable:'
+    SwiftName: pathForAuxiliaryExecutable(_:)
+    MethodKind: Instance
+  - Selector: 'URLForResource:withExtension:subdirectory:inBundleWithURL:'
+    SwiftName: urlForResource(_:withExtension:subdirectory:inBundleWith:)
+    MethodKind: Class
+  - Selector: 'URLForResource:withExtension:'
+    SwiftName: urlForResource(_:withExtension:)
+    MethodKind: Instance
+  - Selector: 'URLForResource:withExtension:subdirectory:'
+    SwiftName: urlForResource(_:withExtension:subdirectory:)
+    MethodKind: Instance
+  - Selector: 'URLForResource:withExtension:subdirectory:localization:'
+    SwiftName: urlForResource(_:withExtension:subdirectory:localization:)
+    MethodKind: Instance
+  - Selector: 'pathForResource:ofType:inDirectory:'
+    SwiftName: pathForResource(_:ofType:inDirectory:)
+    MethodKind: Class
+  - Selector: 'pathForResource:ofType:'
+    SwiftName: pathForResource(_:ofType:)
+    MethodKind: Instance
+  - Selector: 'pathForResource:ofType:inDirectory:'
+    SwiftName: pathForResource(_:ofType:inDirectory:)
+    MethodKind: Instance
+  - Selector: 'pathForResource:ofType:inDirectory:forLocalization:'
+    SwiftName: pathForResource(_:ofType:inDirectory:forLocalization:)
+    MethodKind: Instance
+  - Selector: 'objectForInfoDictionaryKey:'
+    SwiftName: objectForInfoDictionaryKey(_:)
+    MethodKind: Instance
+- Name: NSByteCountFormatter
+  Methods:
+  - Selector: 'stringFromByteCount:'
+    SwiftName: stringFromByteCount(_:)
+    MethodKind: Instance
+- Name: NSCalendar
+  Methods:
+  - Selector: 'dateWithEra:year:month:day:hour:minute:second:nanosecond:'
+    SwiftName: date(era:year:month:day:hour:minute:second:nanosecond:)
+    MethodKind: Instance
+  - Selector: 'dateWithEra:yearForWeekOfYear:weekOfYear:weekday:hour:minute:second:nanosecond:'
+    SwiftName: date(era:yearForWeekOfYear:weekOfYear:weekday:hour:minute:second:nanosecond:)
+    MethodKind: Instance
+  - Selector: 'enumerateDatesStartingAfterDate:matchingComponents:options:usingBlock:'
+    SwiftName: enumerateDates(startingAfter:matching:options:using:)
+    MethodKind: Instance
+  - Selector: 'isDateInToday:'
+    SwiftName: isDateInToday(_:)
+    MethodKind: Instance
+  - Selector: 'isDateInYesterday:'
+    SwiftName: isDateInYesterday(_:)
+    MethodKind: Instance
+  - Selector: 'isDateInTomorrow:'
+    SwiftName: isDateInTomorrow(_:)
+    MethodKind: Instance
+  - Selector: 'isDateInWeekend:'
+    SwiftName: isDateInWeekend(_:)
+    MethodKind: Instance
+- Name: NSDateComponentsFormatter
+  Methods:
+  - Selector: 'stringFromTimeInterval:'
+    SwiftName: string(from:)
+    MethodKind: Instance
+- Name: NSDateFormatter
+  Methods:
+  - Selector: 'localizedStringFromDate:dateStyle:timeStyle:'
+    SwiftName: localizedString(from:dateStyle:timeStyle:)
+    MethodKind: Class
+- Name: NSObject
+  Methods:
+  - Selector: 'attemptRecoveryFromError:optionIndex:delegate:didRecoverSelector:contextInfo:'
+    SwiftName: attemptRecovery(fromError:optionIndex:delegate:didRecoverSelector:contextInfo:)
+    MethodKind: Class
+  - Selector: 'attemptRecoveryFromError:optionIndex:delegate:didRecoverSelector:contextInfo:'
+    SwiftName: attemptRecovery(fromError:optionIndex:delegate:didRecoverSelector:contextInfo:)
+    MethodKind: Instance
+  - Selector: 'setValuesForKeysWithDictionary:'
+    SwiftName: setValuesForKeys(_:)
+    MethodKind: Class
+  - Selector: 'setValuesForKeysWithDictionary:'
+    SwiftName: setValuesForKeys(_:)
+    MethodKind: Instance
+- Name: NSFileCoordinator
+  SwiftName: NSFileCoordinator
+  Methods:
+  - Selector: 'coordinateAccessWithIntents:queue:byAccessor:'
+    SwiftName: coordinate(with:queue:byAccessor:)
+    MethodKind: Instance
+  - Selector: 'coordinateReadingItemAtURL:options:error:byAccessor:'
+    SwiftName: coordinate(readingItemAt:options:error:byAccessor:)
+    MethodKind: Instance
+  - Selector: 'coordinateWritingItemAtURL:options:error:byAccessor:'
+    SwiftName: coordinate(writingItemAt:options:error:byAccessor:)
+    MethodKind: Instance
+  - Selector: 'coordinateReadingItemAtURL:options:writingItemAtURL:options:error:byAccessor:'
+    SwiftName: coordinate(readingItemAt:options:writingItemAt:options:error:byAccessor:)
+    MethodKind: Instance
+  - Selector: 'coordinateWritingItemAtURL:options:writingItemAtURL:options:error:byAccessor:'
+    SwiftName: coordinate(writingItemAt:options:writingItemAt:options:error:byAccessor:)
+    MethodKind: Instance
+  - Selector: 'prepareForReadingItemsAtURLs:options:writingItemsAtURLs:options:error:byAccessor:'
+    SwiftName: prepare(forReadingItemsAt:options:writingItemsAt:options:error:byAccessor:)
+    MethodKind: Instance
+- Name: NSFileHandle
+  Methods:
+  - Selector: fileHandleWithStandardInput
+    SwiftName: standardInput()
+    MethodKind: Class
+  - Selector: fileHandleWithStandardOutput
+    SwiftName: standardOutput()
+    MethodKind: Class
+  - Selector: fileHandleWithStandardError
+    SwiftName: standardError()
+    MethodKind: Class
+  - Selector: fileHandleWithNullDevice
+    SwiftName: nullDevice()
+    MethodKind: Class
+- Name: NSFileManager
+  Methods:
+  - Selector: 'mountedVolumeURLsIncludingResourceValuesForKeys:options:'
+    SwiftName: mountedVolumeURLs(includingResourceValuesForKeys:options:)
+    MethodKind: Instance
+  - Selector: 'URLsForDirectory:inDomains:'
+    SwiftName: urlsForDirectory(_:inDomains:)
+    MethodKind: Instance
+  - Selector: 'URLForDirectory:inDomain:appropriateForURL:create:error:'
+    SwiftName: urlForDirectory(_:in:appropriateFor:create:)
+    MethodKind: Instance
+  - Selector: 'URLForUbiquityContainerIdentifier:'
+    SwiftName: urlForUbiquityContainerIdentifier(_:)
+    MethodKind: Instance
+  - Selector: 'containerURLForSecurityApplicationGroupIdentifier:'
+    SwiftName: containerURLForSecurityApplicationGroupIdentifier(_:)
+    MethodKind: Instance
+- Name: NSFileVersion
+  SwiftName: NSFileVersion
+  Methods:
+  - Selector: 'versionOfItemAtURL:forPersistentIdentifier:'
+    SwiftName: version(itemAt:forPersistentIdentifier:)
+    MethodKind: Class
+- Name: NSFileWrapper
+  Methods:
+  - Selector: 'keyForFileWrapper:'
+    SwiftName: keyForChildFileWrapper(_:)
+    MethodKind: Instance
+- Name: NSFormatter
+  Methods:
+  - Selector: 'isPartialStringValid:newEditingString:errorDescription:'
+    SwiftName: isPartialStringValid(_:newEditingString:errorDescription:)
+    MethodKind: Instance
+- Name: NSConditionLock
+  Methods:
+  - Selector: 'tryLockWhenCondition:'
+    SwiftName: tryLock(whenCondition:)
+    MethodKind: Instance
+- Name: NSNotificationCenter
+  Methods:
+  - Selector: 'postNotificationName:object:'
+    SwiftName: post(name:object:)
+    MethodKind: Instance
+  - Selector: 'postNotificationName:object:userInfo:'
+    SwiftName: post(name:object:userInfo:)
+    MethodKind: Instance
+- Name: NSProgress
+  Methods:
+  - Selector: 'discreteProgressWithTotalUnitCount:'
+    SwiftName: discreteProgress(totalUnitCount:)
+    MethodKind: Class
+- Name: NSPropertyListSerialization
+  Methods:
+  - Selector: 'dataWithPropertyList:format:options:error:'
+    SwiftName: data(fromPropertyList:format:options:)
+    MethodKind: Class
+  - Selector: 'propertyListWithData:options:format:error:'
+    SwiftName: propertyList(from:options:format:)
+    MethodKind: Class
+  - Selector: 'dataFromPropertyList:format:errorDescription:'
+    SwiftName: dataFromPropertyList(_:format:errorDescription:)
+    MethodKind: Class
+  - Selector: 'propertyListFromData:mutabilityOption:format:errorDescription:'
+    SwiftName: propertyListFromData(_:mutabilityOption:format:errorDescription:)
+    MethodKind: Class
+- Name: NSRunLoop
+  Methods:
+  - Selector: 'runMode:beforeDate:'
+    SwiftName: run(mode:before:)
+    MethodKind: Instance
+- Name: NSScanner
+  Methods:
+  - Selector: 'scanInt:'
+    SwiftName: scanInt32(_:)
+    MethodKind: Instance
+  - Selector: 'scanInteger:'
+    SwiftName: scanInt(_:)
+    MethodKind: Instance
+  - Selector: 'scanLongLong:'
+    SwiftName: scanInt64(_:)
+    MethodKind: Instance
+  - Selector: 'scanHexInt:'
+    SwiftName: scanHexInt32(_:)
+    MethodKind: Instance
+  - Selector: 'scanHexLongLong:'
+    SwiftName: scanHexInt64(_:)
+    MethodKind: Instance
+  - Selector: 'scanUpToString:intoString:'
+    SwiftName: scanUpTo(_:into:)
+    MethodKind: Instance
+- Name: NSTextCheckingResult
+  Methods:
+  - Selector: 'resultByAdjustingRangesWithOffset:'
+    SwiftName: resultByAdjustingRangesWithOffset(_:)
+    MethodKind: Instance
+  - Selector: 'orthographyCheckingResultWithRange:orthography:'
+    SwiftName: orthographyCheckingResult(range:orthography:)
+    MethodKind: Class
+  - Selector: 'spellCheckingResultWithRange:'
+    SwiftName: spellCheckingResult(range:)
+    MethodKind: Class
+  - Selector: 'grammarCheckingResultWithRange:details:'
+    SwiftName: grammarCheckingResult(range:details:)
+    MethodKind: Class
+  - Selector: 'dateCheckingResultWithRange:date:'
+    SwiftName: dateCheckingResult(range:date:)
+    MethodKind: Class
+  - Selector: 'dateCheckingResultWithRange:date:timeZone:duration:'
+    SwiftName: dateCheckingResult(range:date:timeZone:duration:)
+    MethodKind: Class
+  - Selector: 'addressCheckingResultWithRange:components:'
+    SwiftName: addressCheckingResult(range:components:)
+    MethodKind: Class
+  - Selector: 'linkCheckingResultWithRange:URL:'
+    SwiftName: linkCheckingResult(range:url:)
+    MethodKind: Class
+  - Selector: 'quoteCheckingResultWithRange:replacementString:'
+    SwiftName: quoteCheckingResult(range:replacementString:)
+    MethodKind: Class
+  - Selector: 'dashCheckingResultWithRange:replacementString:'
+    SwiftName: dashCheckingResult(range:replacementString:)
+    MethodKind: Class
+  - Selector: 'replacementCheckingResultWithRange:replacementString:'
+    SwiftName: replacementCheckingResult(range:replacementString:)
+    MethodKind: Class
+  - Selector: 'correctionCheckingResultWithRange:replacementString:'
+    SwiftName: correctionCheckingResult(range:replacementString:)
+    MethodKind: Class
+  - Selector: 'correctionCheckingResultWithRange:replacementString:alternativeStrings:'
+    SwiftName: correctionCheckingResult(range:replacementString:alternativeStrings:)
+    MethodKind: Class
+  - Selector: 'regularExpressionCheckingResultWithRanges:count:regularExpression:'
+    SwiftName: regularExpressionCheckingResult(ranges:count:regularExpression:)
+    MethodKind: Class
+  - Selector: 'phoneNumberCheckingResultWithRange:phoneNumber:'
+    SwiftName: phoneNumberCheckingResult(range:phoneNumber:)
+    MethodKind: Class
+  - Selector: 'transitInformationCheckingResultWithRange:components:'
+    SwiftName: transitInformationCheckingResult(range:components:)
+    MethodKind: Class
+- Name: NSTimer
+  Methods:
+  - Selector: 'scheduledTimerWithTimeInterval:invocation:repeats:'
+    SwiftName: scheduledTimer(timeInterval:invocation:repeats:)
+    MethodKind: Class
+  - Selector: 'scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:'
+    SwiftName: scheduledTimer(timeInterval:target:selector:userInfo:repeats:)
+    MethodKind: Class
+  - Selector: 'initWithFireDate:interval:target:selector:userInfo:repeats:'
+    SwiftName: init(fireAt:interval:target:selector:userInfo:repeats:)
+    MethodKind: Instance
+- Name: NSURLCredential
+  Methods:
+  - Selector: 'credentialForTrust:'
+    SwiftName: init(trust:)
+    MethodKind: Class
+- Name: NSURLCredentialStorage
+  Methods:
+  - Selector: 'setCredential:forProtectionSpace:'
+    SwiftName: set(_:for:)
+    MethodKind: Instance
+  - Selector: 'getCredentialsForProtectionSpace:task:completionHandler:'
+    SwiftName: getCredentials(for:task:completionHandler:)
+    MethodKind: Instance
+  - Selector: 'setCredential:forProtectionSpace:task:'
+    SwiftName: set(_:for:task:)
+    MethodKind: Instance
+- Name: NSUbiquitousKeyValueStore
+  SwiftName: NSUbiquitousKeyValueStore
+  Methods:
+  - Selector: 'setObject:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setString:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setData:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setArray:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setDictionary:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setLongLong:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setDouble:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setBool:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+- Name: NSUndoManager
+  Methods:
+  - Selector: 'registerUndoWithTarget:handler:'
+    SwiftName: __registerUndoWithTarget(_:handler:)
+    MethodKind: Instance
+- Name: NSUserDefaults
+  Methods:
+  - Selector: 'setObject:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setInteger:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setFloat:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setDouble:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setBool:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'addSuiteNamed:'
+    SwiftName: addSuite(named:)
+    MethodKind: Instance
+  - Selector: 'removeSuiteNamed:'
+    SwiftName: removeSuite(named:)
+    MethodKind: Instance
+- Name: NSDataDetector
+  SwiftName: NSDataDetector
+- Name: NSDirectoryEnumerator
+  SwiftName: FileManager.DirectoryEnumerator
+- Name: NSFileAccessIntent
+  SwiftName: NSFileAccessIntent
+- Name: NSFileSecurity
+  SwiftName: NSFileSecurity
+- Name: NSLinguisticTagger
+  SwiftName: NSLinguisticTagger
+- Name: NSOrthography
+  SwiftName: NSOrthography
+- Name: NSURLConnection
+  SwiftName: NSURLConnection
+- Name: NSURLDownload
+  SwiftName: NSURLDownload
+- Name: NSURLHandle
+  SwiftName: NSURLHandle
+- Name: NSMachPort
+  SwiftName: NSMachPort
+- Name: NSOutputStream
+  SwiftName: NSOutputStream
+Protocols:
+- Name: NSMetadataQueryDelegate
+  SwiftName: NSMetadataQueryDelegate
+- Name: NSCopying
+  SwiftName: NSCopying
+- Name: NSCoding
+  SwiftName: NSCoding
+- Name: NSSecureCoding
+  SwiftName: NSSecureCoding
+- Name: NSDecimalNumberBehaviors
+  SwiftName: NSDecimalNumberBehaviors
+- Name: NSFastEnumeration
+  SwiftName: NSFastEnumeration
+- Name: NSExtensionRequestHandling
+  SwiftName: NSExtensionRequestHandling
+- Name: NSSpellServerDelegate
+  SwiftName: NSSpellServerDelegate
+- Name: NSUserActivityDelegate
+  SwiftName: NSUserActivityDelegate
+- Name: NSUserNotificationCenterDelegate
+  SwiftName: NSUserNotificationCenterDelegate
+- Name: NSXPCListenerDelegate
+  SwiftName: NSXPCListenerDelegate
+- Name: NSXPCProxyCreating
+  SwiftName: NSXPCProxyCreating
+- Name: NSMutableCopying
+  SwiftName: NSMutableCopying
+- Name: NSFilePresenter
+  SwiftName: NSFilePresenter
+  Methods:
+  - Selector: 'presentedItemDidGainVersion:'
+    SwiftName: presentedItemDidGain(_:)
+    MethodKind: Instance
+  - Selector: 'presentedItemDidResolveConflictVersion:'
+    SwiftName: presentedItemDidResolveConflict(_:)
+    MethodKind: Instance
+  - Selector: 'presentedSubitemAtURL:didGainVersion:'
+    SwiftName: presentedSubitem(at:didGain:)
+    MethodKind: Instance
+  - Selector: 'presentedSubitemAtURL:didResolveConflictVersion:'
+    SwiftName: presentedSubitem(at:didResolve:)
+    MethodKind: Instance
+- Name: NSDiscardableContent
+  Methods:
+  - Selector: beginContentAccess
+    SwiftName: beginContentAccess()
+    MethodKind: Instance
+  - Selector: endContentAccess
+    SwiftName: endContentAccess()
+    MethodKind: Instance
+- Name: NSURLConnectionDataDelegate
+  SwiftName: NSURLConnectionDataDelegate
+- Name: NSURLConnectionDelegate
+  SwiftName: NSURLConnectionDelegate
+- Name: NSURLConnectionDownloadDelegate
+  SwiftName: NSURLConnectionDownloadDelegate
+- Name: NSURLDownloadDelegate
+  SwiftName: NSURLDownloadDelegate
+- Name: NSURLHandleClient
+  SwiftName: NSURLHandleClient
+- Name: NSMachPortDelegate
+  SwiftName: NSMachPortDelegate
+Tags:
+- Name: NSActivityOptions
+  SwiftName: ProcessInfo.ActivityOptions
+- Name: NSBackgroundActivityResult
+  SwiftName: NSBackgroundActivityScheduler.Result
+- Name: NSExpressionType
+  SwiftName: NSExpression.ExpressionType
+- Name: NSKeyValueChange
+  SwiftName: NSKeyValueChange
+- Name: NSKeyValueObservingOptions
+  SwiftName: NSKeyValueObservingOptions
+- Name: NSKeyValueSetMutationKind
+  SwiftName: NSKeyValueSetMutationKind
+- Name: NSInsertionPosition
+  SwiftName: NSPositionalSpecifier.InsertionPosition
+- Name: NSRectEdge
+  SwiftName: NSRectEdge
+- Name: NSRelativePosition
+  SwiftName: NSRelativeSpecifier.RelativePosition
+- Name: NSTestComparisonOperation
+  SwiftName: NSSpecifierTest.TestComparisonOperation
+- Name: NSXPCConnectionOptions
+  SwiftName: NSXPCConnection.Options
+- Name: NSWhoseSubelementIdentifier
+  SwiftName: NSWhoseSpecifier.SubelementIdentifier
+- Name: NSSaveOptions
+  SwiftName: NSSaveOptions
+- Name: NSAppleEventSendOptions
+  SwiftName: NSAppleEventDescriptor.SendOptions
+- Name: NSByteCountFormatterUnits
+  SwiftName: ByteCountFormatter.Units
+- Name: NSByteCountFormatterCountStyle
+  SwiftName: ByteCountFormatter.CountStyle
+- Name: NSCalendarUnit
+  SwiftName: Calendar.Unit
+- Name: NSCalendarOptions
+  SwiftName: Calendar.Options
+- Name: NSDecodingFailurePolicy
+  SwiftName: NSCoder.DecodingFailurePolicy
+- Name: NSComparisonPredicateOptions
+  SwiftName: ComparisonPredicate.Options
+- Name: NSComparisonPredicateModifier
+  SwiftName: ComparisonPredicate.Modifier
+- Name: NSPredicateOperatorType
+  SwiftName: ComparisonPredicate.Operator
+- Name: NSCompoundPredicateType
+  SwiftName: CompoundPredicate.LogicalType
+- Name: NSDateFormatterStyle
+  SwiftName: DateFormatter.Style
+- Name: NSDateFormatterBehavior
+  SwiftName: DateFormatter.Behavior
+- Name: NSDateIntervalFormatterStyle
+  SwiftName: DateIntervalFormatter.Style
+- Name: NSNotificationSuspensionBehavior
+  SwiftName: DistributedNotificationCenter.SuspensionBehavior
+- Name: NSDistributedNotificationOptions
+  SwiftName: DistributedNotificationCenter.Options
+- Name: NSEnergyFormatterUnit
+  SwiftName: EnergyFormatter.Unit
+- Name: NSFileCoordinatorReadingOptions
+  SwiftName: NSFileCoordinator.ReadingOptions
+- Name: NSFileCoordinatorWritingOptions
+  SwiftName: NSFileCoordinator.WritingOptions
+- Name: NSVolumeEnumerationOptions
+  SwiftName: FileManager.VolumeEnumerationOptions
+- Name: NSDirectoryEnumerationOptions
+  SwiftName: FileManager.DirectoryEnumerationOptions
+- Name: NSFileManagerItemReplacementOptions
+  SwiftName: FileManager.ItemReplacementOptions
+- Name: NSURLRelationship
+  SwiftName: FileManager.URLRelationship
+- Name: NSFileManagerUnmountOptions
+  SwiftName: FileManager.UnmountOptions
+- Name: NSFileVersionAddingOptions
+  SwiftName: NSFileVersion.AddingOptions
+- Name: NSFileVersionReplacingOptions
+  SwiftName: NSFileVersion.ReplacingOptions
+- Name: NSFileWrapperReadingOptions
+  SwiftName: FileWrapper.ReadingOptions
+- Name: NSFileWrapperWritingOptions
+  SwiftName: FileWrapper.WritingOptions
+- Name: NSFormattingContext
+  SwiftName: Formatter.Context
+- Name: NSFormattingUnitStyle
+  SwiftName: Formatter.UnitStyle
+- Name: NSHTTPCookieAcceptPolicy
+  SwiftName: HTTPCookie.AcceptPolicy
+- Name: NSISO8601DateFormatOptions
+  SwiftName: ISO8601DateFormatter.Options
+- Name: NSItemProviderErrorCode
+  SwiftName: NSItemProvider.ErrorCode
+- Name: NSJSONReadingOptions
+  SwiftName: JSONSerialization.ReadingOptions
+- Name: NSJSONWritingOptions
+  SwiftName: JSONSerialization.WritingOptions
+- Name: NSLengthFormatterUnit
+  SwiftName: LengthFormatter.Unit
+- Name: NSLinguisticTaggerOptions
+  SwiftName: NSLinguisticTagger.Options
+- Name: NSMassFormatterUnit
+  SwiftName: MassFormatter.Unit
+- Name: NSMeasurementFormatterUnitOptions
+  SwiftName: MeasurementFormatter.UnitOptions
+- Name: NSNetServicesError
+  SwiftName: NSNetService.ErrorCode
+- Name: NSPostingStyle
+  SwiftName: NotificationQueue.PostingStyle
+- Name: NSNotificationCoalescing
+  SwiftName: NotificationQueue.NotificationCoalescing
+- Name: NSNumberFormatterBehavior
+  SwiftName: NumberFormatter.Behavior
+- Name: NSNumberFormatterStyle
+  SwiftName: NumberFormatter.Style
+- Name: NSNumberFormatterPadPosition
+  SwiftName: NumberFormatter.PadPosition
+- Name: NSNumberFormatterRoundingMode
+  SwiftName: NumberFormatter.RoundingMode
+- Name: NSOperationQueuePriority
+  SwiftName: Operation.QueuePriority
+- Name: NSPersonNameComponentsFormatterStyle
+  SwiftName: PersonNameComponentsFormatter.Style
+- Name: NSPersonNameComponentsFormatterOptions
+  SwiftName: PersonNameComponentsFormatter.Options
+- Name: NSMachPortOptions
+  SwiftName: NSMachPort.Options
+- Name: NSProcessInfoThermalState
+  SwiftName: ProcessInfo.ThermalState
+- Name: NSPropertyListMutabilityOptions
+  SwiftName: PropertyListSerialization.MutabilityOptions
+- Name: NSPropertyListFormat
+  SwiftName: PropertyListSerialization.PropertyListFormat
+- Name: NSRegularExpressionOptions
+  SwiftName: RegularExpression.Options
+- Name: NSMatchingOptions
+  SwiftName: RegularExpression.MatchingOptions
+- Name: NSMatchingFlags
+  SwiftName: RegularExpression.MatchingFlags
+- Name: NSStreamStatus
+  SwiftName: Stream.Status
+- Name: NSStreamEvent
+  SwiftName: Stream.Event
+- Name: NSTaskTerminationReason
+  SwiftName: Task.TerminationReason
+- Name: NSTextCheckingType
+  SwiftName: TextCheckingResult.CheckingType
+- Name: NSTextCheckingTypes
+  SwiftName: TextCheckingResult.CheckingTypes
+- Name: NSTimeZoneNameStyle
+  SwiftName: TimeZone.NameStyle
+- Name: NSURLCacheStoragePolicy
+  SwiftName: URLCache.StoragePolicy
+- Name: NSURLCredentialPersistence
+  SwiftName: URLCredential.Persistence
+- Name: NSURLRequestCachePolicy
+  SwiftName: NSURLRequest.CachePolicy
+- Name: NSURLRequestNetworkServiceType
+  SwiftName: NSURLRequest.NetworkServiceType
+- Name: NSURLSessionTaskState
+  SwiftName: URLSessionTask.State
+- Name: NSURLSessionAuthChallengeDisposition
+  SwiftName: URLSession.AuthChallengeDisposition
+- Name: NSURLSessionResponseDisposition
+  SwiftName: URLSession.ResponseDisposition
+- Name: NSUserNotificationActivationType
+  SwiftName: NSUserNotification.ActivationType
+- Name: NSXMLDocumentContentKind
+  SwiftName: XMLDocument.ContentKind
+- Name: NSXMLDTDNodeKind
+  SwiftName: XMLDTDNode.Kind
+- Name: NSXMLNodeKind
+  SwiftName: XMLNode.Kind
+- Name: NSXMLParserError
+  SwiftName: XMLParser.ErrorCode
+- Name: NSXMLParserExternalEntityResolvingPolicy
+  SwiftName: XMLParser.ExternalEntityResolvingPolicy
+- Name: NSDataReadingOptions
+  SwiftName: NSData.ReadingOptions
+- Name: NSDataWritingOptions
+  SwiftName: NSData.WritingOptions
+- Name: NSDataSearchOptions
+  SwiftName: NSData.SearchOptions
+- Name: NSDataBase64EncodingOptions
+  SwiftName: NSData.Base64EncodingOptions
+- Name: NSDataBase64DecodingOptions
+  SwiftName: NSData.Base64DecodingOptions
+- Name: NSRoundingMode
+  SwiftName: NSDecimalNumber.RoundingMode
+- Name: NSCalculationError
+  SwiftName: NSDecimalNumber.CalculationError
+- Name: NSAttributedStringEnumerationOptions
+  SwiftName: AttributedString.EnumerationOptions
+- Name: NSDateComponentsFormatterUnitsStyle
+  SwiftName: DateComponentsFormatter.UnitsStyle
+- Name: NSDateComponentsFormatterZeroFormattingBehavior
+  SwiftName: DateComponentsFormatter.ZeroFormattingBehavior
+- Name: NSLocaleLanguageDirection
+  SwiftName: Locale.LanguageDirection
+- Name: NSNetServiceOptions
+  SwiftName: NSNetService.Options
+- Name: NSPointerFunctionsOptions
+  SwiftName: PointerFunctions.Options
+- Name: NSSearchPathDirectory
+  SwiftName: FileManager.SearchPathDirectory
+- Name: NSSearchPathDomainMask
+  SwiftName: FileManager.SearchPathDomainMask
+- Name: NSStringCompareOptions
+  SwiftName: NSString.CompareOptions
+- Name: NSStringEncoding
+  SwiftName: NSString.Encoding
+- Name: NSStringEncodingConversionOptions
+  SwiftName: NSString.EncodingConversionOptions
+- Name: NSStringEnumerationOptions
+  SwiftName: NSString.EnumerationOptions
+- Name: NSURLBookmarkCreationOptions
+  SwiftName: NSURL.BookmarkCreationOptions
+- Name: NSURLBookmarkFileCreationOptions
+  SwiftName: NSURL.BookmarkFileCreationOptions
+- Name: NSURLBookmarkResolutionOptions
+  SwiftName: NSURL.BookmarkResolutionOptions
+- Name: NSURLHandleStatus
+  SwiftName: NSURLHandle.Status
+Typedefs:
+- Name: NSAffineTransformStruct
+  SwiftName: AffineTransform
+- Name: NSKeyValueChangeKey
+  SwiftName: NSKeyValueChangeKey
+- Name: NSPoint
+  SwiftName: NSPoint
+- Name: NSPointArray
+  SwiftName: NSPointArray
+- Name: NSPointPointer
+  SwiftName: NSPointPointer
+- Name: NSRangePointer
+  SwiftName: NSRangePointer
+- Name: NSRectArray
+  SwiftName: NSRectArray
+- Name: NSRectPointer
+  SwiftName: NSRectPointer
+- Name: NSSizeArray
+  SwiftName: NSSizeArray
+- Name: NSSizePointer
+  SwiftName: NSSizePointer
+- Name: NSAppleEventManagerSuspensionID
+  SwiftName: NSAppleEventManager.SuspensionID
+- Name: NSEdgeInsets
+  SwiftName: NSEdgeInsets
+- Name: NSExceptionName
+  SwiftName: NSExceptionName
+- Name: NSFastEnumerationState
+  SwiftName: NSFastEnumerationState
+- Name: NSRange
+  SwiftName: NSRange
+- Name: NSRect
+  SwiftName: NSRect
+- Name: NSSize
+  SwiftName: NSSize
+- Name: NSSwappedDouble
+  SwiftName: NSSwappedDouble
+- Name: NSSwappedFloat
+  SwiftName: NSSwappedFloat
+- Name: NSUncaughtExceptionHandler
+  SwiftName: NSUncaughtExceptionHandler
+- Name: NSBackgroundActivityCompletionHandler
+  SwiftName: NSBackgroundActivityScheduler.CompletionHandler
+- Name: NSCalendarIdentifier
+  SwiftName: Calendar.Identifier
+- Name: NSItemProviderCompletionHandler
+  SwiftName: NSItemProvider.CompletionHandler
+- Name: NSItemProviderLoadHandler
+  SwiftName: NSItemProvider.LoadHandler
+- Name: NSLocaleKey
+  SwiftName: Locale.Key
+- Name: NSNotificationName
+  SwiftName: NSNotification.Name
+- Name: NSProgressFileOperationKind
+  SwiftName: Progress.FileOperationKind
+- Name: NSProgressUnpublishingHandler
+  SwiftName: Progress.UnpublishingHandler
+- Name: NSProgressPublishingHandler
+  SwiftName: Progress.PublishingHandler
+- Name: NSProgressKey
+  SwiftName: Progress.Key
+- Name: NSPropertyListReadOptions
+  SwiftName: PropertyListSerialization.ReadOptions
+- Name: NSPropertyListWriteOptions
+  SwiftName: PropertyListSerialization.WriteOptions
+- Name: NSStreamPropertyKey
+  SwiftName: Stream.PropertyKey
+- Name: NSUserScriptTaskCompletionHandler
+  SwiftName: NSUserScriptTask.CompletionHandler
+- Name: NSUserUnixTaskCompletionHandler
+  SwiftName: NSUserUnixTask.CompletionHandler
+- Name: NSUserAppleScriptTaskCompletionHandler
+  SwiftName: NSUserAppleScriptTask.CompletionHandler
+- Name: NSUserAutomatorTaskCompletionHandler
+  SwiftName: NSUserAutomatorTask.CompletionHandler
+- Name: NSHashEnumerator
+  SwiftName: NSHashEnumerator
+- Name: NSHashTableCallBacks
+  SwiftName: NSHashTableCallBacks
+- Name: NSMapEnumerator
+  SwiftName: NSMapEnumerator
+- Name: NSMapTableKeyCallBacks
+  SwiftName: NSMapTableKeyCallBacks
+- Name: NSHashTableOptions
+  SwiftName: NSHashTableOptions
+- Name: NSMapTableOptions
+  SwiftName: NSMapTableOptions
+- Name: NSDistributedNotificationCenterType
+  SwiftName: DistributedNotificationCenter.CenterType
+- Name: NSURLFileProtectionType
+  SwiftName: URLFileProtection
+Globals:
+- Name: NSAppleScriptErrorMessage
+  SwiftName: NSAppleScript.errorMessage
+- Name: NSAppleScriptErrorNumber
+  SwiftName: NSAppleScript.errorNumber
+- Name: NSAppleScriptErrorAppName
+  SwiftName: NSAppleScript.errorAppName
+- Name: NSAppleScriptErrorBriefMessage
+  SwiftName: NSAppleScript.errorBriefMessage
+- Name: NSAppleScriptErrorRange
+  SwiftName: NSAppleScript.errorRange
+- Name: NSBundleDidLoadNotification
+  SwiftName: Bundle.didLoadNotification
+- Name: NSFileHandleReadCompletionNotification
+  SwiftName: FileHandle.readCompletionNotification
+- Name: NSItemProviderErrorDomain
+  SwiftName: NSItemProvider.errorDomain
+- Name: NSCurrentLocaleDidChangeNotification
+  SwiftName: Locale.currentLocaleDidChangeNotification
+- Name: NSNetServicesErrorDomain
+  SwiftName: NSNetService.errorDomain
+- Name: NSNetServicesErrorCode
+  SwiftName: NSNetService.errorCode
+- Name: NSOperationQueueDefaultMaxConcurrentOperationCount
+  SwiftName: OperationQueue.defaultMaxConcurrentOperationCount
+- Name: NSPortDidBecomeInvalidNotification
+  SwiftName: Port.didBecomeInvalidNotification
+- Name: NSProcessInfoThermalStateDidChangeNotification
+  SwiftName: ProcessInfo.thermalStateDidChangeNotification
+- Name: NSTaskDidTerminateNotification
+  SwiftName: Task.didTerminateNotification
+- Name: NSTextCheckingAllSystemTypes
+  SwiftName: TextCheckingResult.CheckingType.allSystemTypes
+- Name: NSTextCheckingAllCustomTypes
+  SwiftName: TextCheckingResult.CheckingType.allCustomTypes
+- Name: NSTextCheckingAllTypes
+  SwiftName: TextCheckingResult.CheckingType.allTypes
+- Name: NSUbiquitousKeyValueStoreDidChangeExternallyNotification
+  SwiftName: NSUbiquitousKeyValueStore.didChangeExternallyNotification
+- Name: NSURLSessionTaskPriorityDefault
+  SwiftName: URLSessionTask.defaultPriority
+- Name: NSURLSessionTaskPriorityLow
+  SwiftName: URLSessionTask.lowPriority
+- Name: NSURLSessionTaskPriorityHigh
+  SwiftName: URLSessionTask.highPriority
+- Name: NSGlobalDomain
+  SwiftName: UserDefaults.globalDomain
+- Name: NSArgumentDomain
+  SwiftName: UserDefaults.argumentDomain
+- Name: NSRegistrationDomain
+  SwiftName: UserDefaults.registrationDomain
+- Name: NSUserDefaultsSizeLimitExceededNotification
+  SwiftName: UserDefaults.sizeLimitExceededNotification
+- Name: NSUbiquitousUserDefaultsNoCloudAccountNotification
+  SwiftName: UserDefaults.noCloudAccountNotification
+- Name: NSUbiquitousUserDefaultsDidChangeAccountsNotification
+  SwiftName: UserDefaults.didChangeCloudAccountsNotification
+- Name: NSUbiquitousUserDefaultsCompletedInitialSyncNotification
+  SwiftName: UserDefaults.completedInitialCloudSyncNotification
+- Name: NSUserDefaultsDidChangeNotification
+  SwiftName: UserDefaults.didChangeNotification
+- Name: NSXMLParserErrorDomain
+  SwiftName: XMLParser.errorDomain
+- Name: NSIntegerHashCallBacks
+  SwiftName: NSIntegerHashCallBacks
+- Name: NSNonOwnedPointerHashCallBacks
+  SwiftName: NSNonOwnedPointerHashCallBacks
+- Name: NSNonRetainedObjectHashCallBacks
+  SwiftName: NSNonRetainedObjectHashCallBacks
+- Name: NSObjectHashCallBacks
+  SwiftName: NSObjectHashCallBacks
+- Name: NSOwnedObjectIdentityHashCallBacks
+  SwiftName: NSOwnedObjectIdentityHashCallBacks
+- Name: NSOwnedPointerHashCallBacks
+  SwiftName: NSOwnedPointerHashCallBacks
+- Name: NSPointerToStructHashCallBacks
+  SwiftName: NSPointerToStructHashCallBacks
+- Name: NSNonOwnedPointerMapKeyCallBacks
+  SwiftName: NSNonOwnedPointerMapKeyCallBacks
+- Name: NSNonOwnedPointerOrNullMapKeyCallBacks
+  SwiftName: NSNonOwnedPointerOrNullMapKeyCallBacks
+- Name: NSNonRetainedObjectMapKeyCallBacks
+  SwiftName: NSNonRetainedObjectMapKeyCallBacks
+- Name: NSObjectMapKeyCallBacks
+  SwiftName: NSObjectMapKeyCallBacks
+- Name: NSOwnedPointerMapKeyCallBacks
+  SwiftName: NSOwnedPointerMapKeyCallBacks
+- Name: NSNonOwnedPointerMapValueCallBacks
+  SwiftName: NSNonOwnedPointerMapValueCallBacks
+- Name: NSObjectMapValueCallBacks
+  SwiftName: NSObjectMapValueCallBacks
+- Name: NSNonRetainedObjectMapValueCallBacks
+  SwiftName: NSNonRetainedObjectMapValueCallBacks
+- Name: NSOwnedPointerMapValueCallBacks
+  SwiftName: NSOwnedPointerMapValueCallBacks
+Enumerators:
+- Name: NSConstantValueExpressionType
+  SwiftName: constantValue
+- Name: NSEvaluatedObjectExpressionType
+  SwiftName: evaluatedObject
+- Name: NSVariableExpressionType
+  SwiftName: variable
+- Name: NSKeyPathExpressionType
+  SwiftName: keyPath
+- Name: NSFunctionExpressionType
+  SwiftName: function
+- Name: NSUnionSetExpressionType
+  SwiftName: unionSet
+- Name: NSIntersectSetExpressionType
+  SwiftName: intersectSet
+- Name: NSMinusSetExpressionType
+  SwiftName: minusSet
+- Name: NSSubqueryExpressionType
+  SwiftName: subquery
+- Name: NSAggregateExpressionType
+  SwiftName: aggregate
+- Name: NSAnyKeyExpressionType
+  SwiftName: anyKey
+- Name: NSBlockExpressionType
+  SwiftName: block
+- Name: NSConditionalExpressionType
+  SwiftName: conditional
+- Name: NSCaseInsensitivePredicateOption
+  SwiftName: caseInsensitive
+- Name: NSDiacriticInsensitivePredicateOption
+  SwiftName: diacriticInsensitive
+- Name: NSNormalizedPredicateOption
+  SwiftName: normalized
+- Name: NSDirectPredicateModifier
+  SwiftName: direct
+- Name: NSAllPredicateModifier
+  SwiftName: all
+- Name: NSAnyPredicateModifier
+  SwiftName: any
+- Name: NSLessThanPredicateOperatorType
+  SwiftName: lessThan
+- Name: NSLessThanOrEqualToPredicateOperatorType
+  SwiftName: lessThanOrEqualTo
+- Name: NSGreaterThanPredicateOperatorType
+  SwiftName: greaterThan
+- Name: NSGreaterThanOrEqualToPredicateOperatorType
+  SwiftName: greaterThanOrEqualTo
+- Name: NSEqualToPredicateOperatorType
+  SwiftName: equalTo
+- Name: NSNotEqualToPredicateOperatorType
+  SwiftName: notEqualTo
+- Name: NSMatchesPredicateOperatorType
+  SwiftName: matches
+- Name: NSLikePredicateOperatorType
+  SwiftName: like
+- Name: NSBeginsWithPredicateOperatorType
+  SwiftName: beginsWith
+- Name: NSEndsWithPredicateOperatorType
+  SwiftName: endsWith
+- Name: NSInPredicateOperatorType
+  SwiftName: in
+- Name: NSCustomSelectorPredicateOperatorType
+  SwiftName: customSelector
+- Name: NSContainsPredicateOperatorType
+  SwiftName: contains
+- Name: NSBetweenPredicateOperatorType
+  SwiftName: between
+- Name: NSNotPredicateType
+  SwiftName: not
+- Name: NSAndPredicateType
+  SwiftName: and
+- Name: NSOrPredicateType
+  SwiftName: or
+- Name: NSDateIntervalFormatterNoStyle
+  SwiftName: none
+- Name: NSDateIntervalFormatterShortStyle
+  SwiftName: short
+- Name: NSDateIntervalFormatterMediumStyle
+  SwiftName: medium
+- Name: NSDateIntervalFormatterLongStyle
+  SwiftName: long
+- Name: NSDateIntervalFormatterFullStyle
+  SwiftName: full
+- Name: NSNumberFormatterNoStyle
+  SwiftName: none
+- Name: NSNumberFormatterDecimalStyle
+  SwiftName: decimal
+- Name: NSNumberFormatterCurrencyStyle
+  SwiftName: currency
+- Name: NSNumberFormatterPercentStyle
+  SwiftName: percent
+- Name: NSNumberFormatterScientificStyle
+  SwiftName: scientific
+- Name: NSNumberFormatterSpellOutStyle
+  SwiftName: spellOut
+- Name: NSNumberFormatterOrdinalStyle
+  SwiftName: ordinal
+- Name: NSNumberFormatterCurrencyISOCodeStyle
+  SwiftName: currencyISOCode
+- Name: NSNumberFormatterCurrencyPluralStyle
+  SwiftName: currencyPlural
+- Name: NSNumberFormatterCurrencyAccountingStyle
+  SwiftName: currencyAccounting
+- Name: NSXMLDocumentXMLKind
+  SwiftName: xml
+- Name: NSXMLDocumentXHTMLKind
+  SwiftName: xhtml
+- Name: NSXMLDocumentHTMLKind
+  SwiftName: html
+- Name: NSXMLDocumentTextKind
+  SwiftName: text
+- Name: NSXMLAttributeCDATAKind
+  SwiftName: cdataAttribute
+- Name: NSXMLAttributeIDKind
+  SwiftName: idAttribute
+- Name: NSXMLAttributeIDRefKind
+  SwiftName: idRefAttribute
+- Name: NSXMLAttributeIDRefsKind
+  SwiftName: idRefsAttribute
+- Name: NSXMLAttributeEntityKind
+  SwiftName: entityAttribute
+- Name: NSXMLAttributeEntitiesKind
+  SwiftName: entitiesAttribute
+- Name: NSXMLAttributeNMTokenKind
+  SwiftName: nmTokenAttribute
+- Name: NSXMLAttributeNMTokensKind
+  SwiftName: nmTokensAttribute
+- Name: NSXMLAttributeEnumerationKind
+  SwiftName: enumerationAttribute
+- Name: NSXMLAttributeNotationKind
+  SwiftName: notationAttribute
+- Name: NSXMLInvalidKind
+  SwiftName: invalid
+- Name: NSXMLDocumentKind
+  SwiftName: document
+- Name: NSXMLElementKind
+  SwiftName: element
+- Name: NSXMLAttributeKind
+  SwiftName: attribute
+- Name: NSXMLNamespaceKind
+  SwiftName: namespace
+- Name: NSXMLProcessingInstructionKind
+  SwiftName: processingInstruction
+- Name: NSXMLCommentKind
+  SwiftName: comment
+- Name: NSXMLTextKind
+  SwiftName: text
+- Name: NSXMLDTDKind
+  SwiftName: dtd
+- Name: NSXMLEntityDeclarationKind
+  SwiftName: entityDeclaration
+- Name: NSXMLAttributeDeclarationKind
+  SwiftName: attributeDeclaration
+- Name: NSXMLElementDeclarationKind
+  SwiftName: elementDeclaration
+- Name: NSXMLNotationDeclarationKind
+  SwiftName: notationDeclaration
+- Name: NSDateFormatterNoStyle
+  SwiftName: none
+- Name: NSDateFormatterShortStyle
+  SwiftName: short
+- Name: NSDateFormatterMediumStyle
+  SwiftName: medium
+- Name: NSDateFormatterLongStyle
+  SwiftName: long
+- Name: NSDateFormatterFullStyle
+  SwiftName: full
+- Name: NSDateFormatterBehaviorDefault
+  SwiftName: default
+- Name: NSRoundPlain
+  SwiftName: plain
+- Name: NSRoundDown
+  SwiftName: down
+- Name: NSRoundUp
+  SwiftName: up
+- Name: NSRoundBankers
+  SwiftName: bankers
+- Name: NSKeyValueUnionSetMutation
+  SwiftName: union
+- Name: NSKeyValueMinusSetMutation
+  SwiftName: minus
+- Name: NSKeyValueIntersectSetMutation
+  SwiftName: intersect
+- Name: NSKeyValueSetSetMutation
+  SwiftName: set
+- Name: NSPostWhenIdle
+  SwiftName: whenIdle
+- Name: NSPostASAP
+  SwiftName: asap
+- Name: NSPostNow
+  SwiftName: now
+- Name: NSNumberFormatterBehaviorDefault
+  SwiftName: default
+- Name: NSNumberFormatterRoundCeiling
+  SwiftName: ceiling
+- Name: NSNumberFormatterRoundFloor
+  SwiftName: floor
+- Name: NSNumberFormatterRoundDown
+  SwiftName: down
+- Name: NSNumberFormatterRoundUp
+  SwiftName: up
+- Name: NSNumberFormatterRoundHalfEven
+  SwiftName: halfEven
+- Name: NSNumberFormatterRoundHalfDown
+  SwiftName: halfDown
+- Name: NSNumberFormatterRoundHalfUp
+  SwiftName: halfUp
+- Name: NSPropertyListOpenStepFormat
+  SwiftName: openStep
+- Name: NSPropertyListXMLFormat_v1_0
+  SwiftName: xml
+- Name: NSPropertyListBinaryFormat_v1_0
+  SwiftName: binary
+- Name: NSPositionAfter
+  SwiftName: after
+- Name: NSPositionBefore
+  SwiftName: before
+- Name: NSPositionBeginning
+  SwiftName: beginning
+- Name: NSPositionEnd
+  SwiftName: end
+- Name: NSPositionReplace
+  SwiftName: replace
+- Name: NSEqualToComparison
+  SwiftName: equal
+- Name: NSLessThanOrEqualToComparison
+  SwiftName: lessThanOrEqual
+- Name: NSLessThanComparison
+  SwiftName: lessThan
+- Name: NSGreaterThanOrEqualToComparison
+  SwiftName: greaterThanOrEqual
+- Name: NSGreaterThanComparison
+  SwiftName: greaterThan
+- Name: NSBeginsWithComparison
+  SwiftName: beginsWith
+- Name: NSEndsWithComparison
+  SwiftName: endsWith
+- Name: NSContainsComparison
+  SwiftName: contains
+- Name: NSURLNetworkServiceTypeDefault
+  SwiftName: default
+- Name: NSURLNetworkServiceTypeVoIP
+  SwiftName: voip
+- Name: NSURLNetworkServiceTypeVideo
+  SwiftName: video
+- Name: NSURLNetworkServiceTypeBackground
+  SwiftName: background
+- Name: NSURLNetworkServiceTypeVoice
+  SwiftName: voice
+- Name: NSXMLEntityGeneralKind
+  SwiftName: general
+- Name: NSXMLEntityParsedKind
+  SwiftName: parsed
+- Name: NSXMLEntityUnparsedKind
+  SwiftName: unparsed
+- Name: NSXMLEntityParameterKind
+  SwiftName: parameter
+- Name: NSXMLEntityPredefined
+  SwiftName: predefined
+- Name: NSXMLElementDeclarationUndefinedKind
+  SwiftName: undefinedDeclaration
+- Name: NSXMLElementDeclarationEmptyKind
+  SwiftName: emptyDeclaration
+- Name: NSXMLElementDeclarationAnyKind
+  SwiftName: anyDeclaration
+- Name: NSXMLElementDeclarationMixedKind
+  SwiftName: mixedDeclaration
+- Name: NSXMLElementDeclarationElementKind
+  SwiftName: elementDeclaration
+- Name: NSXMLParserResolveExternalEntitiesNever
+  SwiftName: never
+- Name: NSXMLParserResolveExternalEntitiesNoNetwork
+  SwiftName: noNetwork
+- Name: NSXMLParserResolveExternalEntitiesSameOriginOnly
+  SwiftName: sameOriginOnly
+- Name: NSXMLParserResolveExternalEntitiesAlways
+  SwiftName: always
+- Name: NSDataReadingMappedIfSafe
+  SwiftName: mappedIfSafe
+- Name: NSDataReadingUncached
+  SwiftName: uncached
+- Name: NSDataReadingMappedAlways
+  SwiftName: alwaysMapped
+- Name: NSDataWritingAtomic
+  SwiftName: atomic
+- Name: NSDataWritingWithoutOverwriting
+  SwiftName: withoutOverwriting
+- Name: NSDataWritingFileProtectionNone
+  SwiftName: noFileProtection
+- Name: NSDataWritingFileProtectionComplete
+  SwiftName: completeFileProtection
+- Name: NSDataWritingFileProtectionCompleteUnlessOpen
+  SwiftName: completeFileProtectionUnlessOpen
+- Name: NSDataWritingFileProtectionCompleteUntilFirstUserAuthentication
+  SwiftName: completeFileProtectionUntilFirstUserAuthentication
+- Name: NSDataWritingFileProtectionMask
+  SwiftName: fileProtectionMask
+- Name: NSDataBase64Encoding64CharacterLineLength
+  SwiftName: lineLength64Characters
+- Name: NSDataBase64Encoding76CharacterLineLength
+  SwiftName: lineLength76Characters
+- Name: NSDataBase64EncodingEndLineWithCarriageReturn
+  SwiftName: endLineWithCarriageReturn
+- Name: NSDataBase64EncodingEndLineWithLineFeed
+  SwiftName: endLineWithLineFeed
+- Name: NSNotificationNoCoalescing
+  SwiftName: none
+- Name: NSNotificationCoalescingOnName
+  SwiftName: onName
+- Name: NSNotificationCoalescingOnSender
+  SwiftName: onSender
+- Name: NSCaseInsensitiveSearch
+  SwiftName: caseInsensitive
+- Name: NSLiteralSearch
+  SwiftName: literal
+- Name: NSBackwardsSearch
+  SwiftName: backwards
+- Name: NSAnchoredSearch
+  SwiftName: anchored
+- Name: NSNumericSearch
+  SwiftName: numeric
+- Name: NSDiacriticInsensitiveSearch
+  SwiftName: diacriticInsensitive
+- Name: NSWidthInsensitiveSearch
+  SwiftName: widthInsensitive
+- Name: NSForcedOrderingSearch
+  SwiftName: forcedOrdering
+- Name: NSRegularExpressionSearch
+  SwiftName: regularExpression
+- Name: NSStringEnumerationByLines
+  SwiftName: byLines
+Functions:
+- Name: NSFreeHashTable
+  SwiftName: NSFreeHashTable
+- Name: NSResetHashTable
+  SwiftName: NSResetHashTable
+- Name: NSCompareHashTables
+  SwiftName: NSCompareHashTables
+- Name: NSCopyHashTableWithZone
+  SwiftName: NSCopyHashTableWithZone
+- Name: NSHashGet
+  SwiftName: NSHashGet
+- Name: NSHashInsert
+  SwiftName: NSHashInsert
+- Name: NSHashInsertKnownAbsent
+  SwiftName: NSHashInsertKnownAbsent
+- Name: NSHashInsertIfAbsent
+  SwiftName: NSHashInsertIfAbsent
+- Name: NSHashRemove
+  SwiftName: NSHashRemove
+- Name: NSEnumerateHashTable
+  SwiftName: NSEnumerateHashTable
+- Name: NSNextHashEnumeratorItem
+  SwiftName: NSNextHashEnumeratorItem
+- Name: NSEndHashTableEnumeration
+  SwiftName: NSEndHashTableEnumeration
+- Name: NSCountHashTable
+  SwiftName: NSCountHashTable
+- Name: NSStringFromHashTable
+  SwiftName: NSStringFromHashTable
+- Name: NSAllHashTableObjects
+  SwiftName: NSAllHashTableObjects
+- Name: NSFreeMapTable
+  SwiftName: NSFreeMapTable
+- Name: NSResetMapTable
+  SwiftName: NSResetMapTable
+- Name: NSCompareMapTables
+  SwiftName: NSCompareMapTables
+- Name: NSCopyMapTableWithZone
+  SwiftName: NSCopyMapTableWithZone
+- Name: NSMapMember
+  SwiftName: NSMapMember
+- Name: NSMapGet
+  SwiftName: NSMapGet
+- Name: NSMapInsert
+  SwiftName: NSMapInsert
+- Name: NSMapInsertKnownAbsent
+  SwiftName: NSMapInsertKnownAbsent
+- Name: NSMapInsertIfAbsent
+  SwiftName: NSMapInsertIfAbsent
+- Name: NSMapRemove
+  SwiftName: NSMapRemove
+- Name: NSEnumerateMapTable
+  SwiftName: NSEnumerateMapTable
+- Name: NSNextMapEnumeratorPair
+  SwiftName: NSNextMapEnumeratorPair
+- Name: NSEndMapTableEnumeration
+  SwiftName: NSEndMapTableEnumeration
+- Name: NSCountMapTable
+  SwiftName: NSCountMapTable
+- Name: NSStringFromMapTable
+  SwiftName: NSStringFromMapTable
+- Name: NSAllMapTableKeys
+  SwiftName: NSAllMapTableKeys
+- Name: NSAllMapTableValues
+  SwiftName: NSAllMapTableValues
+- Name: NSCreateMapTableWithZone
+  SwiftName: NSCreateMapTableWithZone
+- Name: NSCreateMapTable
+  SwiftName: NSCreateMapTable

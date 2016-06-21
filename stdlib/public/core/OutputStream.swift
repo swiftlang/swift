@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,65 +16,205 @@ import SwiftShims
 // Input/Output interfaces
 //===----------------------------------------------------------------------===//
 
-/// A target of text streaming operations.
-public protocol OutputStreamType {
+/// A type that can be the target of text-streaming operations.
+///
+/// You can send the output of the standard library's `print(_:to:)` and
+/// `dump(_:to:)` functions to an instance of a type that conforms to the
+/// `OutputStream` protocol instead of to standard output. Swift's `String`
+/// type conforms to `OutputStream` already, so you can capture the output
+/// from `print(_:to:)` and `dump(_:to:)` in a string instead of logging it to
+/// standard output.
+///
+///     var s = ""
+///     for n in 1 ... 5 {
+///         print(n, terminator: "", to: &s)
+///     }
+///     // s == "12345"
+///
+/// Conforming to the OutputStream Protocol
+/// =======================================
+///
+/// To make your custom type conform to the `OutputStream` protocol, implement
+/// the required `write(_:)` method. Functions that use an `OutputStream`
+/// target may call `write(_:)` multiple times per writing operation.
+///
+/// As an example, here's an implementation of an output stream that converts
+/// any input to its plain ASCII representation before sending it to standard
+/// output.
+///
+///     struct ASCIILogger: OutputStream {
+///         mutating func write(_ string: String) {
+///             let ascii = string.unicodeScalars.lazy.map { scalar in
+///                 scalar == "\n"
+///                   ? "\n"
+///                   : scalar.escaped(asASCII: true)
+///             }
+///             print(ascii.joined(separator: ""), terminator: "")
+///         }
+///     }
+///
+/// The `ASCIILogger` type's `write(_:)` method processes its string input by
+/// escaping each Unicode scalar, with the exception of `"\n"` line returns.
+/// By sending the output of the `print(_:to:)` function to an instance of
+/// `ASCIILogger`, you invoke its `write(_:)` method.
+///
+///     let s = "Hearts ♡ and Diamonds ♢"
+///     print(s)
+///     // Prints "Hearts ♡ and Diamonds ♢"
+///
+///     var asciiLogger = ASCIILogger()
+///     print(s, to: &asciiLogger)
+///     // Prints "Hearts \u{2661} and Diamonds \u{2662}"
+public protocol OutputStream {
   mutating func _lock()
   mutating func _unlock()
 
-  /// Append the given `string` to this stream.
-  mutating func write(string: String)
+  /// Appends the given string to the stream.
+  mutating func write(_ string: String)
 }
 
-extension OutputStreamType {
+extension OutputStream {
   public mutating func _lock() {}
   public mutating func _unlock() {}
 }
 
-/// A source of text streaming operations.  `Streamable` instances can
-/// be written to any *output stream*.
+/// A source of text-streaming operations.
 ///
-/// For example: `String`, `Character`, `UnicodeScalar`.
+/// Instances of types that conform to the `Streamable` protocol can write
+/// their value to instances of any type that conforms to the `OutputStream`
+/// protocol. The Swift standard library's text-related types, `String`,
+/// `Character`, and `UnicodeScalar`, all conform to `Streamable`.
+///
+/// Conforming to the Streamable Protocol
+/// =====================================
+///
+/// To add `Streamable` conformance to a custom type, implement the required
+/// `write(to:)` method. Call the given output stream's `write(_:)` method in
+/// your implementation.
 public protocol Streamable {
-  /// Write a textual representation of `self` into `target`.
-  func writeTo<Target : OutputStreamType>(inout target: Target)
+  /// Writes a textual representation of this instance into the given output
+  /// stream.
+  func write<Target : OutputStream>(to target: inout Target)
 }
 
 /// A type with a customized textual representation.
 ///
-/// This textual representation is used when values are written to an
-/// *output stream*, for example, by `print`.
+/// Types that conform to the `CustomStringConvertible` protocol can provide
+/// their own representation to be used when converting an instance to a
+/// string. The `String(_:)` initializer is the preferred way to convert an
+/// instance of *any* type to a string. If the passed instance conforms to
+/// `CustomStringConvertible`, the `String(_:)` initializer and the
+/// `print(_:)` function use the instance's custom `description` property.
 ///
-/// - Note: `String(instance)` will work for an `instance` of *any*
-///   type, returning its `description` if the `instance` happens to be
-///   `CustomStringConvertible`.  Using `CustomStringConvertible` as a
-///   generic constraint, or accessing a conforming type's `description`
-///   directly, is therefore discouraged.
+/// Accessing a type's `description` property directly or using
+/// `CustomStringConvertible` as a generic constraint is discouraged.
+///
+/// Conforming to the CustomStringConvertible Protocol
+/// ==================================================
+///
+/// Add `CustomStringConvertible` conformance to your custom types by defining
+/// a `description` property.
+///
+/// For example, this custom `Point` struct uses the default representation
+/// supplied by the standard library:
+///
+///     struct Point {
+///         let x: Int, y: Int
+///     }
+///
+///     let p = Point(x: 21, y: 30)
+///     print(p)
+///     // Prints "Point(x: 21, y: 30)"
+///
+/// After implementing the `description` property and declaring
+/// `CustomStringConvertible` conformance, the `Point` type provides its own
+/// custom representation.
+///
+///     extension Point: CustomStringConvertible {
+///         var description: String {
+///             return "(\(x), \(y))"
+///         }
+///     }
+///
+///     print(p)
+///     // Prints "(21, 30)"
 ///
 /// - SeeAlso: `String.init<T>(T)`, `CustomDebugStringConvertible`
 public protocol CustomStringConvertible {
-  /// A textual representation of `self`.
+  /// A textual representation of this instance.
+  ///
+  /// Instead of accessing this property directly, convert an instance of any
+  /// type to a string by using the `String(_:)` initializer. For example:
+  ///
+  ///     struct Point: CustomStringConvertible {
+  ///         let x: Int, y: Int
+  ///
+  ///         var description: String {
+  ///             return "(\(x), \(y))"
+  ///         }
+  ///     }
+  ///
+  ///     let p = Point(x: 21, y: 30)
+  ///     let s = String(p)
+  ///     print(s)
+  ///     // Prints "(21, 30)"
+  ///
+  /// The conversion of `p` to a string in the assignment to `s` uses the
+  /// `Point` type's `description` property.
   var description: String { get }
 }
 
-/// A type with a customized textual representation suitable for
-/// debugging purposes.
+/// A type with a customized textual representation suitable for debugging
+/// purposes.
 ///
-/// This textual representation is used when values are written to an
-/// *output stream* by `debugPrint`, and is
-/// typically more verbose than the text provided by a
-/// `CustomStringConvertible`'s `description` property.
+/// Swift provides a default debugging textual representation for any type.
+/// That default representation is used by the `String(reflecting:)`
+/// initializer and the `debugPrint(_:)` function for types that don't provide
+/// their own. To customize that representation, make your type conform to the
+/// `CustomDebugStringConvertible` protocol.
 ///
-/// - Note: `String(reflecting: instance)` will work for an `instance`
-///   of *any* type, returning its `debugDescription` if the `instance`
-///   happens to be `CustomDebugStringConvertible`.  Using
-/// `CustomDebugStringConvertible` as a generic constraint, or
-/// accessing a conforming type's `debugDescription` directly, is
-/// therefore discouraged.
+/// Because the `String(reflecting:)` initializer works for instances of *any*
+/// type, returning an instance's `debugDescription` if the value passed
+/// conforms to `CustomDebugStringConvertible`, accessing a type's
+/// `debugDescription` property directly or using
+/// `CustomDebugStringConvertible` as a generic constraint is discouraged.
 ///
-/// - SeeAlso: `String.init<T>(reflecting: T)`,
-///   `CustomStringConvertible`
+/// Conforming to the CustomDebugStringConvertible Protocol
+/// =======================================================
+///
+/// Add `CustomDebugStringConvertible` conformance to your custom types by
+/// defining a `debugDescription` property.
+///
+/// For example, this custom `Point` struct uses the default representation
+/// supplied by the standard library:
+///
+///     struct Point {
+///         let x: Int, y: Int
+///     }
+///
+///     let p = Point(x: 21, y: 30)
+///     print(String(reflecting: p))
+///     // Prints "p: Point = {
+///     //           x = 21
+///     //           y = 30
+///     //         }"
+///
+/// After adding `CustomDebugStringConvertible` conformance by implementing the
+/// `debugDescription` property, `Point` provides its own custom debugging
+/// representation.
+///
+///     extension Point: CustomDebugStringConvertible {
+///         var debugDescription: String {
+///             return "Point(x: \(x), y: \(y))"
+///         }
+///     }
+///
+///     print(String(reflecting: p))
+///     // Prints "Point(x: 21, y: 30)"
+///
+/// - SeeAlso: `String.init<T>(reflecting: T)`, `CustomStringConvertible`
 public protocol CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
+  /// A textual representation of this instance, suitable for debugging.
   var debugDescription: String { get }
 }
 
@@ -82,105 +222,130 @@ public protocol CustomDebugStringConvertible {
 // Default (ad-hoc) printing
 //===----------------------------------------------------------------------===//
 
+@_silgen_name("swift_EnumCaseName")
+func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
+
+@_silgen_name("swift_OpaqueSummary")
+func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
+
 /// Do our best to print a value that cannot be printed directly.
-internal func _adHocPrint<T, TargetStream : OutputStreamType>(
-    value: T, inout _ target: TargetStream, isDebugPrint: Bool
+internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
+    _ value: T, _ mirror: Mirror, _ target: inout TargetStream,
+    isDebugPrint: Bool
 ) {
-  func printTypeName(type: Any.Type) {
+  func printTypeName(_ type: Any.Type) {
     // Print type names without qualification, unless we're debugPrint'ing.
     target.write(_typeName(type, qualified: isDebugPrint))
   }
 
-  let mirror = _reflect(value)
-  switch mirror {
-  // Checking the mirror kind is not a good way to implement this, but we don't
-  // have a more expressive reflection API now.
-  case is _TupleMirror:
-    target.write("(")
-    var first = true
-    for i in 0..<mirror.count {
-      if first {
-        first = false
-      } else {
-        target.write(", ")
-      }
-      let (_, elementMirror) = mirror[i]
-      let elt = elementMirror.value
-      debugPrint(elt, terminator: "", toStream: &target)
+  if let displayStyle = mirror.displayStyle {
+    switch displayStyle {
+      case .optional:
+        if let child = mirror.children.first {
+          _debugPrint_unlocked(child.1, &target)
+        } else {
+          _debugPrint_unlocked("nil", &target)
+        }
+      case .tuple:
+        target.write("(")
+        var first = true
+        for (_, value) in mirror.children {
+          if first {
+            first = false
+          } else {
+            target.write(", ")
+          }
+          _debugPrint_unlocked(value, &target)
+        }
+        target.write(")")
+      case .`struct`:
+        printTypeName(mirror.subjectType)
+        target.write("(")
+        var first = true
+        for (label, value) in mirror.children {
+          if let label = label {
+            if first {
+              first = false
+            } else {
+              target.write(", ")
+            }
+            target.write(label)
+            target.write(": ")
+            _debugPrint_unlocked(value, &target)
+          }
+        }
+        target.write(")")
+      case .`enum`:
+        if let cString = _getEnumCaseName(value),
+            let caseName = String(validatingUTF8: cString) {
+          // Write the qualified type name in debugPrint.
+          if isDebugPrint {
+            printTypeName(mirror.subjectType)
+            target.write(".")
+          }
+          target.write(caseName)
+        } else {
+          // If the case name is garbage, just print the type name.
+          printTypeName(mirror.subjectType)
+        }
+        if let (_, value) = mirror.children.first {
+          if (Mirror(reflecting: value).displayStyle == .tuple) {
+            _debugPrint_unlocked(value, &target)
+          } else {
+            target.write("(")
+            _debugPrint_unlocked(value, &target)
+            target.write(")")
+          }
+        }
+      default:
+        target.write(_typeName(mirror.subjectType))
     }
-    target.write(")")
-
-  case is _StructMirror:
-    printTypeName(mirror.valueType)
-    target.write("(")
-    var first = true
-    for i in 0..<mirror.count {
-      if first {
-        first = false
-      } else {
-        target.write(", ")
-      }
-      let (label, elementMirror) = mirror[i]
-      print(label, terminator: "", toStream: &target)
-      target.write(": ")
-      debugPrint(elementMirror.value, terminator: "", toStream: &target)
-    }
-    target.write(")")
-
-  case let enumMirror as _EnumMirror:
-    if let caseName = String.fromCString(enumMirror.caseName) {
-      // Write the qualified type name in debugPrint.
-      if isDebugPrint {
-        target.write(_typeName(mirror.valueType))
-        target.write(".")
-      }
-      target.write(caseName)
+  } else if let metatypeValue = value as? Any.Type {
+    // Metatype
+    printTypeName(metatypeValue)
+  } else {
+    // Fall back to the type or an opaque summary of the kind
+    if let cString = _opaqueSummary(mirror.subjectType),
+        let opaqueSummary = String(validatingUTF8: cString) {
+      target.write(opaqueSummary)
     } else {
-      // If the case name is garbage, just print the type name.
-      printTypeName(mirror.valueType)
+      target.write(_typeName(mirror.subjectType, qualified: true))
     }
-
-    if mirror.count == 0 {
-      return
-    }
-    let (_, payload) = mirror[0]
-    if payload is _TupleMirror {
-      debugPrint(payload.value, terminator: "", toStream: &target)
-      return
-    }
-    target.write("(")
-    debugPrint(payload.value, terminator: "", toStream: &target)
-    target.write(")")
-
-  case is _MetatypeMirror:
-    printTypeName(mirror.value as! Any.Type)
-
-  default:
-    print(mirror.summary, terminator: "", toStream: &target)
   }
 }
 
 @inline(never)
 @_semantics("stdlib_binary_only")
-internal func _print_unlocked<T, TargetStream : OutputStreamType>(
-  value: T, inout _ target: TargetStream
+internal func _print_unlocked<T, TargetStream : OutputStream>(
+  _ value: T, _ target: inout TargetStream
 ) {
+  // Optional has no representation suitable for display; therefore,
+  // values of optional type should be printed as a debug
+  // string. Check for Optional first, before checking protocol
+  // conformance below, because an Optional value is convertible to a
+  // protocol if its wrapped type conforms to that protocol.
+  if _isOptional(value.dynamicType) {
+    let debugPrintable = value as! CustomDebugStringConvertible
+    debugPrintable.debugDescription.write(to: &target)
+    return
+  }
   if case let streamableObject as Streamable = value {
-    streamableObject.writeTo(&target)
+    streamableObject.write(to: &target)
     return
   }
 
   if case let printableObject as CustomStringConvertible = value {
-    printableObject.description.writeTo(&target)
+    printableObject.description.write(to: &target)
     return
   }
 
   if case let debugPrintableObject as CustomDebugStringConvertible = value {
-    debugPrintableObject.debugDescription.writeTo(&target)
+    debugPrintableObject.debugDescription.write(to: &target)
     return
   }
 
-  _adHocPrint(value, &target, isDebugPrint: false)
+  let mirror = Mirror(reflecting: value)
+  _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: false)
 }
 
 /// Returns the result of `print`'ing `x` into a `String`.
@@ -191,14 +356,14 @@ internal func _print_unlocked<T, TargetStream : OutputStreamType>(
 /// This function is forbidden from being inlined because when building the
 /// standard library inlining makes us drop the special semantics.
 @inline(never) @effects(readonly)
-func _toStringReadOnlyStreamable<T : Streamable>(x: T) -> String {
+func _toStringReadOnlyStreamable<T : Streamable>(_ x: T) -> String {
   var result = ""
-  x.writeTo(&result)
+  x.write(to: &result)
   return result
 }
 
 @inline(never) @effects(readonly)
-func _toStringReadOnlyPrintable<T : CustomStringConvertible>(x: T) -> String {
+func _toStringReadOnlyPrintable<T : CustomStringConvertible>(_ x: T) -> String {
   return x.description
 }
 
@@ -207,32 +372,98 @@ func _toStringReadOnlyPrintable<T : CustomStringConvertible>(x: T) -> String {
 //===----------------------------------------------------------------------===//
 
 @inline(never)
-public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
-    value: T, inout _ target: TargetStream
+public func _debugPrint_unlocked<T, TargetStream : OutputStream>(
+    _ value: T, _ target: inout TargetStream
 ) {
   if let debugPrintableObject = value as? CustomDebugStringConvertible {
-    debugPrintableObject.debugDescription.writeTo(&target)
+    debugPrintableObject.debugDescription.write(to: &target)
     return
   }
 
   if let printableObject = value as? CustomStringConvertible {
-    printableObject.description.writeTo(&target)
+    printableObject.description.write(to: &target)
     return
   }
 
   if let streamableObject = value as? Streamable {
-    streamableObject.writeTo(&target)
+    streamableObject.write(to: &target)
     return
   }
 
-  _adHocPrint(value, &target, isDebugPrint: true)
+  let mirror = Mirror(reflecting: value)
+  _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: true)
+}
+
+internal func _dumpPrint_unlocked<T, TargetStream : OutputStream>(
+    _ value: T, _ mirror: Mirror, _ target: inout TargetStream
+) {
+  if let displayStyle = mirror.displayStyle {
+    // Containers and tuples are always displayed in terms of their element count
+    switch displayStyle {
+    case .tuple:
+      let count = mirror.children.count
+      target.write(count == 1 ? "(1 element)" : "(\(count) elements)")
+      return
+    case .collection:
+      let count = mirror.children.count
+      target.write(count == 1 ? "1 element" : "\(count) elements")
+      return
+    case .dictionary:
+      let count = mirror.children.count
+      target.write(count == 1 ? "1 key/value pair" : "\(count) key/value pairs")
+      return
+    case .`set`:
+      let count = mirror.children.count
+      target.write(count == 1 ? "1 member" : "\(count) members")
+      return
+    default:
+      break
+    }
+  }
+
+  if let debugPrintableObject = value as? CustomDebugStringConvertible {
+    debugPrintableObject.debugDescription.write(to: &target)
+    return
+  }
+
+  if let printableObject = value as? CustomStringConvertible {
+    printableObject.description.write(to: &target)
+    return
+  }
+
+  if let streamableObject = value as? Streamable {
+    streamableObject.write(to: &target)
+    return
+  }
+
+  if let displayStyle = mirror.displayStyle {
+    switch displayStyle {
+    case .`class`, .`struct`:
+      // Classes and structs without custom representations are displayed as
+      // their fully qualified type name
+      target.write(_typeName(mirror.subjectType, qualified: true))
+      return
+    case .`enum`:
+      target.write(_typeName(mirror.subjectType, qualified: true))
+      if let cString = _getEnumCaseName(value),
+          let caseName = String(validatingUTF8: cString) {
+        target.write(".")
+        target.write(caseName)
+      }
+      return
+    default:
+      break
+    }
+  }
+
+  _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: true)
 }
 
 //===----------------------------------------------------------------------===//
 // OutputStreams
 //===----------------------------------------------------------------------===//
 
-internal struct _Stdout : OutputStreamType {
+internal struct _Stdout : OutputStream {
   mutating func _lock() {
     _swift_stdlib_flockfile_stdout()
   }
@@ -241,19 +472,28 @@ internal struct _Stdout : OutputStreamType {
     _swift_stdlib_funlockfile_stdout()
   }
 
-  mutating func write(string: String) {
-    // FIXME: buffering?
-    // It is important that we use stdio routines in order to correctly
-    // interoperate with stdio buffering.
+  mutating func write(_ string: String) {
+    if string.isEmpty { return }
+
+    if string._core.isASCII {
+      defer { _fixLifetime(string) }
+
+      _swift_stdlib_fwrite_stdout(UnsafePointer(string._core.startASCII),
+                                  string._core.count, 1)
+      return
+    }
+
     for c in string.utf8 {
-      _swift_stdlib_putchar(Int32(c))
+      _swift_stdlib_putchar_unlocked(Int32(c))
     }
   }
 }
 
-extension String : OutputStreamType {
-  /// Append `other` to this stream.
-  public mutating func write(other: String) {
+extension String : OutputStream {
+  /// Appends the given string to this string.
+  /// 
+  /// - Parameter other: A string to append.
+  public mutating func write(_ other: String) {
     self += other
   }
 }
@@ -263,90 +503,57 @@ extension String : OutputStreamType {
 //===----------------------------------------------------------------------===//
 
 extension String : Streamable {
-  /// Write a textual representation of `self` into `target`.
-  public func writeTo<Target : OutputStreamType>(inout target: Target) {
+  /// Writes the string into the given output stream.
+  /// 
+  /// - Parameter target: An output stream.
+  public func write<Target : OutputStream>(to target: inout Target) {
     target.write(self)
   }
 }
 
 extension Character : Streamable {
-  /// Write a textual representation of `self` into `target`.
-  public func writeTo<Target : OutputStreamType>(inout target: Target) {
+  /// Writes the character into the given output stream.
+  ///
+  /// - Parameter target: An output stream.
+  public func write<Target : OutputStream>(to target: inout Target) {
     target.write(String(self))
   }
 }
 
 extension UnicodeScalar : Streamable {
-  /// Write a textual representation of `self` into `target`.
-  public func writeTo<Target : OutputStreamType>(inout target: Target) {
+  /// Writes the textual representation of the Unicode scalar into the given
+  /// output stream.
+  ///
+  /// - Parameter target: An output stream.
+  public func write<Target : OutputStream>(to target: inout Target) {
     target.write(String(Character(self)))
   }
 }
 
-//===----------------------------------------------------------------------===//
-// Unavailable APIs
-//===----------------------------------------------------------------------===//
-
-@available(*, unavailable, renamed="CustomDebugStringConvertible")
-public typealias DebugPrintable = CustomDebugStringConvertible
-@available(*, unavailable, renamed="CustomStringConvertible")
-public typealias Printable = CustomStringConvertible
-
-@available(*, unavailable, renamed="print")
-public func println<T, TargetStream : OutputStreamType>(
-    value: T, inout _ target: TargetStream
-) {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="print")
-public func println<T>(value: T) {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, message="use print(\"\")")
-public func println() {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="String")
-public func toString<T>(x: T) -> String {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, message="use debugPrint()")
-public func debugPrintln<T, TargetStream : OutputStreamType>(
-    x: T, inout _ target: TargetStream
-) {
-  fatalError("unavailable function can't be called")
-}
-
-@available(*, unavailable, renamed="debugPrint")
-public func debugPrintln<T>(x: T) {
-  fatalError("unavailable function can't be called")
-}
-
-/// Returns the result of `debugPrint`'ing `x` into a `String`.
-@available(*, unavailable, message="use String(reflecting:)")
-public func toDebugString<T>(x: T) -> String {
-  fatalError("unavailable function can't be called")
-}
-
 /// A hook for playgrounds to print through.
-public var _playgroundPrintHook : ((String)->Void)? = {_ in () }
+public var _playgroundPrintHook : ((String) -> Void)? = {_ in () }
 
 internal struct _TeeStream<
-  L : OutputStreamType, 
-  R : OutputStreamType
-> : OutputStreamType {
+  L : OutputStream, 
+  R : OutputStream
+> : OutputStream {
   var left: L
   var right: R
   
   /// Append the given `string` to this stream.
-  mutating func write(string: String)
+  mutating func write(_ string: String)
   { left.write(string); right.write(string) }
 
   mutating func _lock() { left._lock(); right._lock() }
-  mutating func _unlock() { left._unlock(); right._unlock() }
+  mutating func _unlock() { right._unlock(); left._unlock() }
 }
 
+@available(*, unavailable, renamed: "OutputStream")
+public typealias OutputStreamType = OutputStream
+
+extension Streamable {
+  @available(*, unavailable, renamed: "write(to:)")
+  public func writeTo<Target : OutputStream>(target: inout Target) {
+    Builtin.unreachable()
+  }
+}

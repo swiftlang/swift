@@ -8,7 +8,7 @@ enum binary {
   init() { self = .Zero }
 }
 
-func f5(inout x: binary) {}
+func f5(x: inout binary) {}
 
 //===---
 //===--- IB attributes
@@ -33,23 +33,24 @@ class IBDesignableClassExtensionTy {}
 extension IBDesignableClassExtensionTy {}
 
 class Inspect {
-  @IBInspectable var value : Int = 0
+  @IBInspectable var value : Int = 0 // okay
+  @GKInspectable var value2: Int = 0 // okay
+
   @IBInspectable func foo() {} // expected-error {{@IBInspectable may only be used on 'var' declarations}} {{3-18=}}
+  @GKInspectable func foo2() {} // expected-error {{@GKInspectable may only be used on 'var' declarations}} {{3-18=}}
 
   @IBInspectable class var cval: Int { return 0 } // expected-error {{only instance properties can be declared @IBInspectable}} {{3-18=}}
+  @GKInspectable class var cval2: Int { return 0 } // expected-error {{only instance properties can be declared @GKInspectable}} {{3-18=}}
 }
 @IBInspectable var ibinspectable_global : Int // expected-error {{only instance properties can be declared @IBInspectable}} {{1-16=}}
+@GKInspectable var gkinspectable_global : Int // expected-error {{only instance properties can be declared @GKInspectable}} {{1-16=}}
 
 
-@objc_block  // expected-error {{attribute can only be applied to types, not declarations}}
-func foo() {}
-func foo(x: @convention(block) Int) {} // expected-error {{attribute only applies to syntactic function types}}
+func foo(x: @convention(block) Int) {} // expected-error {{@convention attribute only applies to function types}}
 func foo(x: @convention(block) (Int) -> Int) {}
 
 @_transparent
 func zim() {}
-@_transparent
-func zang()() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 @_transparent
 func zung<T>(_: T) {}
 @_transparent // expected-error{{@_transparent cannot be applied to stored properties}} {{1-15=}}
@@ -159,14 +160,14 @@ weak
 var weak8 : Class? = Ty0()
 unowned var weak9 : Class = Ty0()
 weak
-var weak10 : NonClass = Ty0() // expected-error {{'weak' may not be applied to non-class-bound protocol 'NonClass'; consider adding a class bound}}
+var weak10 : NonClass = Ty0() // expected-error {{'weak' may not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
 unowned
-var weak11 : NonClass = Ty0() // expected-error {{'unowned' may not be applied to non-class-bound protocol 'NonClass'; consider adding a class bound}}
+var weak11 : NonClass = Ty0() // expected-error {{'unowned' may not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
 
 unowned
-var weak12 : NonClass = Ty0() // expected-error {{'unowned' may not be applied to non-class-bound protocol 'NonClass'; consider adding a class bound}}
+var weak12 : NonClass = Ty0() // expected-error {{'unowned' may not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
 unowned
-var weak13 : NonClass = Ty0() // expected-error {{'unowned' may not be applied to non-class-bound protocol 'NonClass'; consider adding a class bound}}
+var weak13 : NonClass = Ty0() // expected-error {{'unowned' may not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
 
 weak
 var weak14 : Ty0 // expected-error {{'weak' variable should have optional type 'Ty0?'}}
@@ -228,3 +229,6 @@ class B {
 class SILStored {
   @sil_stored var x : Int = 42  // expected-error {{'sil_stored' only allowed in SIL modules}}
 }
+
+@_show_in_interface protocol _underscored {}
+@_show_in_interface class _notapplicable {} // expected-error {{may only be used on 'protocol' declarations}}

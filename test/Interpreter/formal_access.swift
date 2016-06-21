@@ -15,7 +15,7 @@ print("1. global[0] == \(global[0])")
 // CHECK:      Begin
 // CHECK-NEXT: 1. global[0] == 1
 
-func doit(inout local: C) {
+func doit(_ local: inout C) {
   print("2. local == \(local)")
   print("2. global[0] == \(global[0])")
   // CHECK-NEXT: 2. local == 1
@@ -44,7 +44,7 @@ func doit(inout local: C) {
   // CHECK-NEXT: 5. global[0] == 2
 
   // This assignment structurally changes 'global' while a
-  // simultaneous modification is occuring to it.  This is
+  // simultaneous modification is occurring to it.  This is
   // allowed to have unspecified behavior but not to crash.
   global.append(C(3))
   print("6. local == \(local)")

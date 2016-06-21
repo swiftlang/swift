@@ -1,6 +1,13 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -import-objc-header %S/Inputs/bridging-header.h -parse -emit-objc-header-path %t/pragma-clang.h
+
+// FIXME: BEGIN -enable-source-import hackaround
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
+// FIXME: END -enable-source-import hackaround
+
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) %s -import-objc-header %S/Inputs/bridging-header.h -parse -emit-objc-header-path %t/pragma-clang.h
 // RUN: %check-in-clang -fsyntax-only -Werror %t/pragma-clang.h
 // RUN: FileCheck %s < %t/pragma-clang.h
 

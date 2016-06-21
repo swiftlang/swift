@@ -2,6 +2,8 @@ import Foo
 
 var x: FooClassBase
 
+// REQUIRES: objc_interop
+
 // RUN: rm -rf %t.overlays
 // RUN: mkdir %t.overlays
 //
@@ -25,7 +27,7 @@ var x: FooClassBase
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         %mcp_opt %clang-importer-sdk \
-// RUN:      == -req=cursor -pos=176:36 | FileCheck -check-prefix=CHECK1 %s
+// RUN:      == -req=cursor -pos=203:69 | FileCheck -check-prefix=CHECK1 %s
 // The cursor points to 'FooClassBase' inside the list of base classes, see 'gen_clang_module.swift.response'
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
@@ -41,7 +43,7 @@ var x: FooClassBase
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         %mcp_opt %clang-importer-sdk \
-// RUN:      == -req=cursor -pos=186:20 | FileCheck -check-prefix=CHECK2 %s
+// RUN:      == -req=cursor -pos=230:20 | FileCheck -check-prefix=CHECK2 %s
 // The cursor points inside the interface, see 'gen_clang_module.swift.response'
 
 // CHECK2: source.lang.swift.decl.function.method.instance ({{.*}}Foo.framework/Headers/Foo.h:169:10-169:27)
@@ -55,7 +57,7 @@ var x: FooClassBase
 // RUN:      == -req=find-usr -usr "c:objc(cs)FooClassDerived(im)fooInstanceFunc0" | FileCheck -check-prefix=CHECK-USR %s
 // The returned line:col points inside the interface, see 'gen_clang_module.swift.response'
 
-// CHECK-USR: (186:17-186:35)
+// CHECK-USR: (230:17-230:35)
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         %mcp_opt %clang-importer-sdk \

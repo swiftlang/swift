@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -24,6 +24,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
 
@@ -138,7 +139,7 @@ enum class ConstraintClassification : char {
   /// it a reference type.
   Member,
 
-  /// \brief An property of a single type, such as whether it is an archetype.
+  /// \brief A property of a single type, such as whether it is an archetype.
   TypeProperty,
 
   /// \brief A disjunction constraint.
@@ -233,36 +234,18 @@ enum class FixKind : uint8_t {
 
   /// Introduce a '!' to force an optional unwrap.
   ForceOptional,
+    
+  /// Introduce a '?.' to begin optional chaining.
+  OptionalChaining,
 
   /// Append 'as! T' to force a downcast to the specified type.
   ForceDowncast,
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
-
-  /// Remove a no-argument call to something that is not a function.
-  RemoveNullaryCall,
-
-  /// Relabel a tuple due to a tuple-to-scalar conversion.
-  TupleToScalar,
-
-  /// Relabel a tuple due to a scalar-to-tuple conversion.
-  ScalarToTuple,
-
-  /// Relabel a tuple due to a call
-  RelabelCallTuple,
   
   /// Introduce a '!= nil' to convert an Optional to a Boolean expression.
   OptionalToBoolean,
-
-  /// Replace a use of 'fromRaw' with an initializer requirement.
-  FromRawToInit,
-
-  /// Replace a call of 'toRaw' with a reference to 'rawValue'.
-  ToRawToRawValue,
-
-  /// Replace a call of 'X.allZeros' with a reference to 'X()'.
-  AllZerosToInit,
   
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
@@ -283,32 +266,14 @@ public:
   Fix() : Kind(FixKind::None), Data(0) { }
   
   Fix(FixKind kind) : Kind(kind), Data(0) { 
-    assert(!isRelabelTuple() && "Use getRelabelTuple()");
     assert(kind != FixKind::ForceDowncast && "Use getForceDowncast()");
   }
-
-  /// Produce a new fix that relabels a tuple.
-  static Fix getRelabelTuple(ConstraintSystem &cs, FixKind kind,
-                             ArrayRef<Identifier> names);
 
   /// Produce a new fix that performs a forced downcast to the given type.
   static Fix getForcedDowncast(ConstraintSystem &cs, Type toType);
 
   /// Retrieve the kind of fix.
   FixKind getKind() const { return Kind; }
-
-  /// Whether the fix is a tuple-relabelling fix.
-  bool isRelabelTuple() const { return isRelabelTupleKind(getKind()); }
-
-  /// Whether the fix kind is a tuple-relabelling fix.
-  static bool isRelabelTupleKind(FixKind kind) { 
-    return kind == FixKind::TupleToScalar ||
-           kind == FixKind::ScalarToTuple ||
-           kind == FixKind::RelabelCallTuple;
-  }
-
-  /// For a relabel-tuple fix, retrieve the new names.
-  ArrayRef<Identifier> getRelabelTupleNames(ConstraintSystem &cs) const;
 
   /// If this fix has a type argument, retrieve it.
   Type getTypeArgument(ConstraintSystem &cs) const;
@@ -325,7 +290,10 @@ public:
 
 
 /// \brief A constraint between two type variables.
-class Constraint : public llvm::ilist_node<Constraint> {
+class Constraint final : public llvm::ilist_node<Constraint>,
+    private llvm::TrailingObjects<Constraint, TypeVariableType *> {
+  friend TrailingObjects;
+
   /// \brief The kind of constraint.
   ConstraintKind Kind : 8;
 
@@ -417,7 +385,7 @@ class Constraint : public llvm::ilist_node<Constraint> {
 
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
-    return { reinterpret_cast<TypeVariableType **>(this + 1), NumTypeVariables };
+    return { getTrailingObjects<TypeVariableType *>(), NumTypeVariables };
   }
 
 public:
@@ -485,8 +453,7 @@ public:
 
   /// Retrieve the set of type variables referenced by this constraint.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
-    return { reinterpret_cast<TypeVariableType * const *>(this + 1), 
-             NumTypeVariables };
+    return {getTrailingObjects<TypeVariableType*>(), NumTypeVariables};
   }
 
   /// \brief Determine the classification of this constraint, providing

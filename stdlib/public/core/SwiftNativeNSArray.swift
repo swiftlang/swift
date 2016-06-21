@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  _ContiguousArrayStorageBase supplies the implementation of the
-//  _NSArrayCoreType API (and thus, NSArray the API) for our
+//  _NSArrayCore API (and thus, NSArray the API) for our
 //  _ContiguousArrayStorage<T>.  We can't put this implementation
 //  directly on _ContiguousArrayStorage because generic classes can't
 //  override Objective-C selectors.
@@ -24,25 +24,25 @@ import SwiftShims
 /// Returns `true` iff the given `index` is valid as a position, i.e. `0
 /// ≤ index ≤ count`.
 @_transparent
-internal func _isValidArrayIndex(index: Int, _ count: Int) -> Bool {
+internal func _isValidArrayIndex(_ index: Int, count: Int) -> Bool {
   return (index >= 0) && (index <= count)
 }
 
 /// Returns `true` iff the given `index` is valid for subscripting, i.e.
 /// `0 ≤ index < count`.
 @_transparent
-internal func _isValidArraySubscript(index: Int, _ count: Int) -> Bool {
+internal func _isValidArraySubscript(_ index: Int, count: Int) -> Bool {
   return (index >= 0) && (index < count)
 }
 
 /// An `NSArray` with Swift-native reference counting and contiguous
 /// storage.
-class _SwiftNativeNSArrayWithContiguousStorage
-  : _SwiftNativeNSArray { // provides NSArray inheritance and native refcounting
+internal class _SwiftNativeNSArrayWithContiguousStorage
+  : _SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
 
   // Operate on our contiguous storage
   internal func withUnsafeBufferOfObjects<R>(
-    @noescape body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
     _sanityCheckFailure(
       "Must override withUnsafeBufferOfObjects in derived classes")
@@ -50,48 +50,52 @@ class _SwiftNativeNSArrayWithContiguousStorage
 }
 
 // Implement the APIs required by NSArray 
-extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
+extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
   }
 
-  @objc internal func objectAtIndex(index: Int) -> AnyObject {
+  @objc(objectAtIndex:)
+  internal func objectAt(_ index: Int) -> AnyObject {
     return withUnsafeBufferOfObjects {
       objects in
       _precondition(
-        _isValidArraySubscript(index, objects.count),
+        _isValidArraySubscript(index, count: objects.count),
         "Array index out of range")
       return objects[index]
     }
   }
 
   @objc internal func getObjects(
-    aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
+    _ aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
   ) {
     return withUnsafeBufferOfObjects {
       objects in
       _precondition(
-        _isValidArrayIndex(range.location, objects.count),
+        _isValidArrayIndex(range.location, count: objects.count),
         "Array index out of range")
 
       _precondition(
         _isValidArrayIndex(
-          range.location + range.length, objects.count),
+          range.location + range.length, count: objects.count),
         "Array index out of range")
+
+      if objects.isEmpty { return }
 
       // These objects are "returned" at +0, so treat them as values to
       // avoid retains.
       UnsafeMutablePointer<Int>(aBuffer).initializeFrom(
-        UnsafeMutablePointer(objects.baseAddress + range.location),
+        UnsafeMutablePointer(objects.baseAddress! + range.location),
         count: range.length)
     }
   }
 
-  @objc internal func countByEnumeratingWithState(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int {
-    var enumerationState = state.memory
+    var enumerationState = state.pointee
 
     if enumerationState.state != 0 {
       return 0
@@ -100,16 +104,16 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     return withUnsafeBufferOfObjects {
       objects in
       enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      enumerationState.itemsPtr = unsafeBitCast(
-        objects.baseAddress,
-        AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
+      enumerationState.itemsPtr =
+        AutoreleasingUnsafeMutablePointer(objects.baseAddress)
       enumerationState.state = 1
-      state.memory = enumerationState
+      state.pointee = enumerationState
       return objects.count
     }
   }
 
-  @objc internal func copyWithZone(_: _SwiftNSZone) -> AnyObject {
+  @objc(copyWithZone:)
+  internal func copy(with _: _SwiftNSZone?) -> AnyObject {
     return self
   }
 }
@@ -141,7 +145,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   internal var _heapBufferBridged: HeapBufferStorage? {
     if let ref =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-      return unsafeBitCast(ref, HeapBufferStorage.self)
+      return unsafeBitCast(ref, to: HeapBufferStorage.self)
     }
     return nil
   }
@@ -150,11 +154,11 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     self._nativeStorage = _nativeStorage
   }
 
-  internal func _destroyBridgedStorage(hb: HeapBufferStorage?) {
+  internal func _destroyBridgedStorage(_ hb: HeapBufferStorage?) {
     if let bridgedStorage = hb {
       let heapBuffer = _HeapBuffer(bridgedStorage)
       let count = heapBuffer.value
-      heapBuffer.baseAddress.destroy(count)
+      heapBuffer.baseAddress.deinitialize(count: count)
     }
   }
 
@@ -163,7 +167,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   }
 
   internal override func withUnsafeBufferOfObjects<R>(
-    @noescape body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
     repeat {
       var buffer: UnsafeBufferPointer<AnyObject>
@@ -190,11 +194,11 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
         if !_stdlib_atomicInitializeARCRef(
           object: _heapBufferBridgedPtr, desired: objects.storage!) {
 
-          // Another thread won the race.  Throw out our buffer
-          let storage: HeapBufferStorage = unsafeDowncast(objects.storage!)
-          _destroyBridgedStorage(storage)
+          // Another thread won the race.  Throw out our buffer.
+          _destroyBridgedStorage(
+            unsafeDowncast(objects.storage!, to: HeapBufferStorage.self))
         }
-        continue // try again
+        continue // Try again
       }
       
       defer { _fixLifetime(self) }
@@ -229,7 +233,7 @@ internal class _ContiguousArrayStorageBase
 
 #if _runtime(_ObjC)
   internal override func withUnsafeBufferOfObjects<R>(
-    @noescape body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
     if let result = try _withVerbatimBridgedUnsafeBuffer(body) {
       return result
@@ -242,27 +246,27 @@ internal class _ContiguousArrayStorageBase
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
   internal func _withVerbatimBridgedUnsafeBuffer<R>(
-    @noescape body: UnsafeBufferPointer<AnyObject> throws -> R
+    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
     _sanityCheckFailure(
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")
   }
 
-  internal func _getNonVerbatimBridgedCount(dummy: Void) -> Int {
+  internal func _getNonVerbatimBridgedCount(_ dummy: Void) -> Int {
     _sanityCheckFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgedCount")
   }
 
-  internal func _getNonVerbatimBridgedHeapBuffer(dummy: Void) ->
+  internal func _getNonVerbatimBridgedHeapBuffer(_ dummy: Void) ->
     _HeapBuffer<Int, AnyObject> {
     _sanityCheckFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgedHeapBuffer")
   }
 #endif
 
-  func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
+  func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
     _sanityCheckFailure(
-      "Concrete subclasses must implement canStoreElementsOfDynamicType")
+      "Concrete subclasses must implement canStoreElements(ofDynamicType:)")
   }
 
   /// A type that every element in the array is.

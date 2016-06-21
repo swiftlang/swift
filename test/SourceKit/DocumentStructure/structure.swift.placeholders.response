@@ -76,14 +76,8 @@
       key.name: "myArray",
       key.offset: 225,
       key.length: 36,
-      key.typename: "myArray",
       key.nameoffset: 229,
-      key.namelength: 7,
-      key.attributes: [
-        {
-          key.attribute: source.decl.attribute.__raw_doc_comment
-        }
-      ]
+      key.namelength: 7
     },
     {
       key.kind: source.lang.swift.expr.array,

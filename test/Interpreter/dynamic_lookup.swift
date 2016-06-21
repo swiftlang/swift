@@ -30,7 +30,7 @@ extension Z {
 }
 
 
-func test_dynamic_lookup_f(obj: AnyObject) {
+func test_dynamic_lookup_f(_ obj: AnyObject) {
   var of = obj.f
   if of != nil {
     of!()
@@ -39,7 +39,7 @@ func test_dynamic_lookup_f(obj: AnyObject) {
   }
 }
 
-func test_dynamic_lookup_g(obj: AnyObject) {
+func test_dynamic_lookup_g(_ obj: AnyObject) {
   var og = obj.dynamicType.g
   if og != nil {
     og!()
@@ -48,7 +48,7 @@ func test_dynamic_lookup_g(obj: AnyObject) {
   }
 }
 
-func test_dynamic_lookup_myValue(obj: AnyObject) {
+func test_dynamic_lookup_myValue(_ obj: AnyObject) {
   var ov = obj.myValue
   if ov != nil {
     print("myValue = \(ov!)")
@@ -79,8 +79,8 @@ test_dynamic_lookup_myValue(Y())
 // <rdar://problem/16554056> __FUNCTION__ in deinit for NSObject subclasses crashes the compiler
 // Test __FUNCTION__
 class FUNCTION_NAME_TEST : NSObject {
-  override init() { super.init() ; print(__FUNCTION__) }
-  deinit { print(__FUNCTION__) }
+  override init() { super.init() ; print(#function) }
+  deinit { print(#function) }
 }
 
 FUNCTION_NAME_TEST()

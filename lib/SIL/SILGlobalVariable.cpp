@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,7 +25,7 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
   // allow the name to have an empty string.
   llvm::StringMapEntry<SILGlobalVariable*> *entry = nullptr;
   if (!name.empty()) {
-    entry = &*M.GlobalVariableTable.insert(std::make_pair(name, nullptr)).first;
+    entry = &*M.GlobalVariableMap.insert(std::make_pair(name, nullptr)).first;
     assert(!entry->getValue() && "global variable already exists");
     name = entry->getKey();
   }
@@ -48,7 +48,7 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
     Location(Loc),
     Linkage(unsigned(Linkage)),
     Fragile(IsFragile),
-	VDecl(Decl) {
+    VDecl(Decl) {
   IsDeclaration = isAvailableExternally(Linkage);
   setLet(Decl ? Decl->isLet() : false);
   InitializerF = nullptr;
@@ -64,8 +64,10 @@ void SILGlobalVariable::setInitializer(SILFunction *InitF) {
 }
 
 SILGlobalVariable::~SILGlobalVariable() {
-  getModule().GlobalVariableTable.erase(Name);
+  getModule().GlobalVariableMap.erase(Name);
 }
+
+// FIXME
 
 static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
                                      SILGlobalVariable *&GVar) {
@@ -81,16 +83,18 @@ static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
   for (auto &I : *BB) {
     // Make sure we have a single GlobalAddrInst and a single StoreInst.
     // And the StoreInst writes to the GlobalAddrInst.
-    if (auto *sga = dyn_cast<GlobalAddrInst>(&I)) {
+    if (isa<AllocGlobalInst>(&I)) {
+      continue;
+    } else if (auto *sga = dyn_cast<GlobalAddrInst>(&I)) {
       if (SGA)
         return false;
       SGA = sga;
       GVar = SGA->getReferencedGlobal();
     } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-      if (HasStore || SI->getDest().getDef() != SGA)
+      if (HasStore || SI->getDest() != SGA)
         return false;
       HasStore = true;
-      Val = dyn_cast<SILInstruction>(SI->getSrc().getDef());
+      Val = dyn_cast<SILInstruction>(SI->getSrc());
 
       // We only handle StructInst and TupleInst being stored to a
       // global variable for now.
@@ -109,12 +113,25 @@ static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
         }
       }
 
+      // Objective-C selector string literals cannot be used in static
+      // initializers.
+      if (auto *stringLit = dyn_cast<StringLiteralInst>(&I)) {
+        switch (stringLit->getEncoding()) {
+        case StringLiteralInst::Encoding::UTF8:
+        case StringLiteralInst::Encoding::UTF16:
+          continue;
+
+        case StringLiteralInst::Encoding::ObjCSelector:
+          return false;
+        }
+      }
+
       if (I.getKind() != ValueKind::ReturnInst &&
           I.getKind() != ValueKind::StructInst &&
           I.getKind() != ValueKind::TupleInst &&
+          I.getKind() != ValueKind::DebugValueInst &&
           I.getKind() != ValueKind::IntegerLiteralInst &&
-          I.getKind() != ValueKind::FloatLiteralInst &&
-          I.getKind() != ValueKind::StringLiteralInst)
+          I.getKind() != ValueKind::FloatLiteralInst)
         return false;
     }
   }
@@ -133,7 +150,7 @@ SILGlobalVariable *SILGlobalVariable::getVariableOfStaticInitializer(
                      SILFunction *F) {
   SILInstruction *dummySI;
   SILGlobalVariable *GV;
-  if(analyzeStaticInitializer(F, dummySI, GV))
+  if (analyzeStaticInitializer(F, dummySI, GV))
     return GV;
   return nullptr;
 }
@@ -145,7 +162,7 @@ SILInstruction *SILGlobalVariable::getValueOfStaticInitializer() {
 
   SILInstruction *SI;
   SILGlobalVariable *dummyGV;
-  if(analyzeStaticInitializer(InitializerF, SI, dummyGV))
+  if (analyzeStaticInitializer(InitializerF, SI, dummyGV))
     return SI;
   return nullptr;
 }

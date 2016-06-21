@@ -7,6 +7,6 @@
 func testOverloaded() {
   // CHECK: call void @_Z10overloadedv()
   overloaded()
-  // CHECK: call void @_Z10overloadedi(i32 42)
+  // CHECK: call void @_Z10overloadedi(i32{{( signext)?}} 42)
   overloaded(42)
 } // CHECK: {{^}$}}

@@ -2,20 +2,21 @@
 // RUN: mkdir -p %t
 
 // RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSArray -function-definitions=false > %t/Foundation.NSArray.printed.txt
-// RUN: FileCheck -input-file %t/Foundation.NSArray.printed.txt -check-prefix=CHECK1 %s
-
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSArray -function-definitions=false > %t/Foundation.NSArray-failable-inits.printed.txt
-// RUN: FileCheck -input-file %t/Foundation.NSArray-failable-inits.printed.txt -check-prefix=CHECK1-FAILABLE-INITS %s
+// RUN: FileCheck -input-file %t/Foundation.NSArray.printed.txt -check-prefix=CHECK_NSARRAY %s
 
 // REQUIRES: objc_interop
 
-// CHECK1: class NSMutableArray : NSArray
-// CHECK1:   func setArray(otherArray: [AnyObject])
+// CHECK_NSARRAY: class NSArray
+// CHECK_NSARRAY: init()
 
-// CHECK1-FAILABLE-INITS: class NSArray
-// init()CHECK1-FAILABLE-INITS: init()
-// init()CHECK1-FAILABLE-INITS: convenience init?(contentsOfFile path: String)
-// init()CHECK1-FAILABLE-INITS: convenience init?(contentsOfURL url: NSURL)
+// CHECK_NSARRAY: {{^}}  var sortedArrayHint: Data { get }
+
+// CHECK_NSARRAY: convenience init?(contentsOfFile path: String)
+// CHECK_NSARRAY: convenience init?(contentsOf url: URL)
+
+
+// CHECK_NSARRAY: class NSMutableArray : NSArray
+// CHECK_NSARRAY:   func setArray(_ otherArray: [AnyObject])
 
 // RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSKeyValueCoding -function-definitions=false -print-regular-comments > %t/Foundation.NSKeyValueCoding.printed.txt
 // RUN: FileCheck -input-file %t/Foundation.NSKeyValueCoding.printed.txt -check-prefix=CHECK2 %s
@@ -36,3 +37,20 @@
 
 // CHECK_DUP: import CoreFoundation{{$}}
 // CHECK_DUP-NOT: import CoreFoundation{{$}}
+
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSTimeZone -function-definitions=false > %t/Foundation.NSTimeZone.printed.txt
+// RUN:  FileCheck -input-file %t/Foundation.NSTimeZone.printed.txt -check-prefix=CHECK_NSTIMEZONE %s
+
+// CHECK_NSTIMEZONE: func secondsFromGMT(for aDate: Date) -> Int
+// CHECK_NSTIMEZONE: func abbreviation(for aDate: Date) -> String?
+// CHECK_NSTIMEZONE: var nextDaylightSavingTimeTransition: Date? { get }
+
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSCalendar -function-definitions=false > %t/Foundation.NSCalendar.printed.txt
+// RUN:  FileCheck -input-file %t/Foundation.NSCalendar.printed.txt -check-prefix=CHECK_NSCALENDAR %s
+
+// CHECK_NSCALENDAR: func date(from comps: DateComponents) -> Date?
+
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSDateInterval -function-definitions=false > %t/Foundation.NSDateInterval.printed.txt
+// RUN:  FileCheck -input-file %t/Foundation.NSDateInterval.printed.txt -check-prefix=CHECK_NSDATEINTERVAL %s
+
+// CHECK_NSDATEINTERVAL: func intersection(with dateInterval: DateInterval) -> DateInterval?

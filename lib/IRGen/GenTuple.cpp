@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file implements IR generation for tuple types in Swift.  This
-//  includes creating the IR type as  well as emitting the primitive access
+//  includes creating the IR type as well as emitting the primitive access
 //  operations.
 //
 //  It is assumed in several places in IR-generation that the
@@ -27,7 +27,7 @@
 #include "llvm/IR/DerivedTypes.h"
 
 #include "GenHeap.h"
-#include "GenSequential.h"
+#include "GenRecord.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -43,10 +43,10 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-  class TupleFieldInfo : public SequentialField<TupleFieldInfo> {
+  class TupleFieldInfo : public RecordField<TupleFieldInfo> {
   public:
     TupleFieldInfo(unsigned index, StringRef name, const TypeInfo &type)
-      : SequentialField(type), Index(index), Name(name)
+      : RecordField(type), Index(index), Name(name)
     {}
 
     /// The field index.
@@ -71,8 +71,8 @@ namespace {
   /// Adapter for tuple types.
   template <class Impl, class Base>
   class TupleTypeInfoBase
-      : public SequentialTypeInfo<Impl, Base, TupleFieldInfo> {
-    typedef SequentialTypeInfo<Impl, Base, TupleFieldInfo> super;
+      : public RecordTypeInfo<Impl, Base, TupleFieldInfo> {
+    typedef RecordTypeInfo<Impl, Base, TupleFieldInfo> super;
 
   protected:
     template <class... As>
@@ -113,6 +113,22 @@ namespace {
       return field.projectAddress(IGF, tuple, offsets);
     }
 
+    /// Return the statically-known offset of the given element.
+    Optional<Size> getFixedElementOffset(IRGenModule &IGM,
+                                         unsigned fieldNo) const {
+      const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
+      switch (field.getKind()) {
+      case ElementLayout::Kind::Empty:
+      case ElementLayout::Kind::Fixed:
+        return field.getFixedByteOffset();
+      case ElementLayout::Kind::InitialNonFixedSize:
+        return Size(0);
+      case ElementLayout::Kind::NonFixed:
+        return None;
+      }
+      llvm_unreachable("bad element layout kind");
+    }
+
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address src, SILType T) const override {
       llvm_unreachable("unexploded tuple as argument?");
@@ -149,7 +165,7 @@ namespace {
         = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
       auto size = asImpl().getFixedSize().getValueInBits();
       
-      if (fieldTI.isKnownEmpty())
+      if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
         return APInt(size, 0);
       
       APInt firstMask = fieldTI.getFixedExtraInhabitantMask(IGM);
@@ -179,7 +195,7 @@ namespace {
   };
 
   /// Type implementation for loadable tuples.
-  class LoadableTupleTypeInfo :
+  class LoadableTupleTypeInfo final :
       public TupleTypeInfoBase<LoadableTupleTypeInfo, LoadableTypeInfo> {
   public:
     // FIXME: Spare bits between tuple elements.
@@ -194,6 +210,15 @@ namespace {
                           alwaysFixedSize)
       {}
 
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      for (auto &field : getFields()) {
+        auto fieldOffset = offset + field.getFixedByteOffset();
+        cast<LoadableTypeInfo>(field.getTypeInfo())
+          .addToAggLowering(IGM, lowering, fieldOffset);
+      }
+    }
+
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
       return None;
     }
@@ -203,7 +228,7 @@ namespace {
   };
 
   /// Type implementation for fixed-size but non-loadable tuples.
-  class FixedTupleTypeInfo :
+  class FixedTupleTypeInfo final :
       public TupleTypeInfoBase<FixedTupleTypeInfo,
                                IndirectTypeInfo<FixedTupleTypeInfo,
                                                 FixedTypeInfo>>
@@ -257,7 +282,7 @@ namespace {
   };
 
   /// Type implementation for non-fixed-size tuples.
-  class NonFixedTupleTypeInfo :
+  class NonFixedTupleTypeInfo final :
       public TupleTypeInfoBase<NonFixedTupleTypeInfo,
                                WitnessSizedTypeInfo<NonFixedTupleTypeInfo>>
   {
@@ -283,13 +308,13 @@ namespace {
   };
 
   class TupleTypeBuilder :
-      public SequentialTypeBuilder<TupleTypeBuilder, TupleFieldInfo,
-                                   TupleTypeElt> {
+      public RecordTypeBuilder<TupleTypeBuilder, TupleFieldInfo,
+                               TupleTypeElt> {
     SILType TheTuple;
 
   public:
     TupleTypeBuilder(IRGenModule &IGM, SILType theTuple)
-      : SequentialTypeBuilder(IGM), TheTuple(theTuple) {}
+      : RecordTypeBuilder(IGM), TheTuple(theTuple) {}
 
     FixedTupleTypeInfo *createFixed(ArrayRef<TupleFieldInfo> fields,
                                     StructLayout &&layout) {
@@ -356,7 +381,7 @@ const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
   } else {                                                           \
     return tupleTI.as<NonFixedTupleTypeInfo>().op(IGF, __VA_ARGS__); \
   }                                                                  \
-} while(0)
+} while (0)
 
 void irgen::projectTupleElementFromExplosion(IRGenFunction &IGF,
                                              SILType tupleType,
@@ -373,4 +398,11 @@ Address irgen::projectTupleElementAddress(IRGenFunction &IGF,
                                           unsigned fieldNo) {
   FOR_TUPLE_IMPL(IGF, tupleType, projectElementAddress, tuple,
                  tupleType, fieldNo);
+}
+
+Optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,
+                                                 SILType tupleType,
+                                                 unsigned fieldNo) {
+  // Macro happens to work with IGM, too.
+  FOR_TUPLE_IMPL(IGM, tupleType, getFixedElementOffset, fieldNo);
 }

@@ -7,11 +7,11 @@
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 // CHECK: [[TYPE:%swift.type]] = type
 
-//   CHECK: @_TMfC14ivar_destroyer17NonTrivialDerived = internal global { {{.*}} } {
+//   CHECK: @_TMfC14ivar_destroyer17NonTrivialDerived = internal global <{ {{.*}} }> <{
 // \ CHECK:   i8* null, 
 // \ CHECK:   i8** @_TWVBo,
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC14ivar_destroyer17NonTrivialDerived to i64),
-// \ CHECK:   [[TYPE]]* bitcast (i64* getelementptr inbounds ({ {{.*}} }, { {{.*}} }* @_TMfC14ivar_destroyer11TrivialBase, i32 0, i32 2) to [[TYPE]]*),
+// \ CHECK:   [[TYPE]]* bitcast (i64* getelementptr inbounds (<{ {{.*}} }>, <{ {{.*}} }>* @_TMfC14ivar_destroyer11TrivialBase, i32 0, i32 2) to [[TYPE]]*),
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // \ CHECK:   [[OPAQUE]]* null,
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC14ivar_destroyer17NonTrivialDerived to i64), i64 1),
@@ -22,12 +22,12 @@
 // \ CHECK:   i16 0,
 // \ CHECK:   i32 120,
 // \ CHECK:   i32 16,
-// \ CHECK:   { {{.*}} }* @_TMnC14ivar_destroyer17NonTrivialDerived,
+// \ CHECK:   <{ {{.*}} }>* @_TMnC14ivar_destroyer17NonTrivialDerived
 // \ CHECK:   void (%C14ivar_destroyer17NonTrivialDerived*)* @_TFC14ivar_destroyer17NonTrivialDerivedE,
-// \ CHECK:   i8* bitcast (void ()* @swift_reportMissingMethod to i8*),
+// \ CHECK:   i8* bitcast (void ()* @swift_deletedMethodError to i8*),
 // \ CHECK:   %C14ivar_destroyer17NonTrivialDerived* ([[TYPE]]*)* @alloc_NonTrivialDerived,
 // \ CHECK:   i64 16
-// \ CHECK: }
+// \ CHECK: }>
 
 class Pachyderm {}
 sil_vtable Pachyderm {}
@@ -47,7 +47,7 @@ class NonTrivialDerived : TrivialBase {
 }
 
 sil public_external @init_NonTrivialDerived : $@convention(method) (@owned NonTrivialDerived) -> @owned NonTrivialDerived
-sil public_external @alloc_NonTrivialDerived : $@convention(thin) (@thick NonTrivialDerived.Type) -> @owned NonTrivialDerived
+sil public_external @alloc_NonTrivialDerived : $@convention(method) (@thick NonTrivialDerived.Type) -> @owned NonTrivialDerived
 sil public_external @_TFC14ivar_destroyer17NonTrivialDerivedE : $@convention(method) (@guaranteed NonTrivialDerived) -> ()
 
 sil_vtable NonTrivialDerived {

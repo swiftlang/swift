@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -140,7 +140,7 @@ enum class DeclVisibilityKind {
   MemberOfOutsideNominal,
 
   /// Declaration is visible at the top level because it is declared in this
-  /// module or in a imported module.
+  /// module or in an imported module.
   VisibleAtTopLevel,
 
   /// Declaration was found via \c AnyObject or \c AnyObject.Type.
@@ -157,6 +157,22 @@ public:
   /// This method is called by findVisibleDecls() every time it finds a decl.
   virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) = 0;
 };
+
+/// An implementation of VisibleDeclConsumer that's built from a lambda.
+template <class Fn>
+class LambdaDeclConsumer : public VisibleDeclConsumer {
+  Fn Callback;
+public:
+  LambdaDeclConsumer(Fn &&callback) : Callback(std::move(callback)) {}
+
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason) {
+    Callback(VD, reason);
+  }
+};
+template <class Fn>
+LambdaDeclConsumer<Fn> makeDeclConsumer(Fn &&callback) {
+  return LambdaDeclConsumer<Fn>(std::move(callback));
+}
 
 /// A consumer that inserts found decls into an externally-owned SmallVector.
 class VectorDeclConsumer : public VisibleDeclConsumer {
@@ -178,11 +194,18 @@ class NamedDeclConsumer : public VisibleDeclConsumer {
 public:
   DeclName name;
   SmallVectorImpl<UnqualifiedLookupResult> &results;
+  bool isTypeLookup;
+
   NamedDeclConsumer(DeclName name,
-                    SmallVectorImpl<UnqualifiedLookupResult> &results)
-    : name(name), results(results) {}
+                    SmallVectorImpl<UnqualifiedLookupResult> &results,
+                    bool isTypeLookup)
+    : name(name), results(results), isTypeLookup(isTypeLookup) {}
 
   virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    // Give clients an opportunity to filter out non-type declarations early,
+    // to avoid circular validation.
+    if (isTypeLookup && !isa<TypeDecl>(VD))
+      return;
     if (VD->getFullName().matchesRef(name))
       results.push_back(UnqualifiedLookupResult(VD));
   }
@@ -238,7 +261,8 @@ void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               Type BaseTy,
                               const DeclContext *CurrDC,
-                              LazyResolver *typeResolver);
+                              LazyResolver *typeResolver,
+                              bool includeInstanceMembers);
 
 namespace namelookup {
 enum class ResolutionKind {

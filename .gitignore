@@ -13,10 +13,10 @@
 *~
 # Merge files created by git.
 *.orig
-# Byte compiled python modules.
+# Byte compiled Python modules.
 *.pyc
 # vim swap files
-.*.swp
+.*.sw[a-z]
 .sw?
 
 #==============================================================================#
@@ -28,9 +28,6 @@ cscope.out
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
 #==============================================================================#
-# Swift performance test suite.
-benchmark/PerfTestSuite
-
 # Generated docs
 docs/_build
 
@@ -42,3 +39,4 @@ docs/_build
 #==============================================================================#
 CMakeCache.txt
 CMakeFiles
+.atom-build.json

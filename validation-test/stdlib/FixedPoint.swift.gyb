@@ -1,9 +1,8 @@
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/FixedPoint.swift
-// RUN: %S/../../utils/line-directive %t/FixedPoint.swift -- %target-build-swift %t/FixedPoint.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/FixedPoint.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
+
 
 var FixedPoint = TestSuite("FixedPoint")
 
@@ -68,29 +67,26 @@ def get_fixed_point_hash(bit_pattern, src_bits, word_bits):
 
 %{
 
-truncating_bit_pattern_test_template = gyb.parseTemplate("truncating_bit_pattern",
+truncating_bit_pattern_test_template = gyb.parse_template("truncating_bit_pattern",
 """
-% from SwiftIntTypes import *
+% from SwiftIntTypes import all_integer_types, should_define_truncating_bit_pattern_init
 
 % for dst_ty in all_integer_types(word_bits):
 %   Dst = dst_ty.stdlib_name
-
-FixedPoint.test("${Dst}(truncatingBitPattern:)") {
-
 %   for src_ty in all_integer_types(word_bits):
 %     Src = src_ty.stdlib_name
 %     if should_define_truncating_bit_pattern_init(src_ty=src_ty, dst_ty=dst_ty):
 %
 %       for bit_pattern in test_bit_patterns:
 
-  if true {
+FixedPoint.test("${Dst}(truncatingBitPattern:) from ${Src}(${bit_pattern})") {
 %       input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
-    let input = get${Src}(${input})
+  let input = get${Src}(${input})
 %       input = prepare_bit_pattern(input, src_ty.bits, False)
-    let output = get${Dst}(${Dst}(truncatingBitPattern: input))
-    let expected = get${Dst}(${prepare_bit_pattern(input, dst_ty.bits, dst_ty.is_signed)})
-    expectEqual(expected, output)
-  }
+  let output = get${Dst}(${Dst}(truncatingBitPattern: input))
+  let expected = get${Dst}(${prepare_bit_pattern(input, dst_ty.bits, dst_ty.is_signed)})
+  expectEqual(expected, output)
+}
 
 %       end
 
@@ -104,7 +100,8 @@ FixedPoint.test("${Dst}(truncatingBitPattern:)") {
 
 %   end
 
-}
+// This comment prevents gyb from miscompiling this file.
+// <rdar://problem/17548877> gyb miscompiles a certain for loop
 
 % end
 """)
@@ -113,15 +110,15 @@ FixedPoint.test("${Dst}(truncatingBitPattern:)") {
 
 #if arch(i386) || arch(arm)
 
-  ${gyb.executeTemplate(
+  ${gyb.execute_template(
       truncating_bit_pattern_test_template,
       prepare_bit_pattern=prepare_bit_pattern,
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
 
-  ${gyb.executeTemplate(
+  ${gyb.execute_template(
       truncating_bit_pattern_test_template,
       prepare_bit_pattern=prepare_bit_pattern,
       test_bit_patterns=test_bit_patterns,
@@ -139,9 +136,9 @@ _UnimplementedError()
 
 %{
 
-bit_pattern_test_template = gyb.parseTemplate("bit_pattern",
+bit_pattern_test_template = gyb.parse_template("bit_pattern",
 """
-% from SwiftIntTypes import *
+% from SwiftIntTypes import all_integer_types
 
 % for dst_ty in all_integer_types(word_bits):
 %   Dst = dst_ty.stdlib_name
@@ -149,12 +146,10 @@ bit_pattern_test_template = gyb.parseTemplate("bit_pattern",
 %   # Source is the same as destination, but of different signedness.
 %   src_ty = dst_ty.get_opposite_signedness()
 %   Src = src_ty.stdlib_name
-
-FixedPoint.test("${Dst}(bitPattern: ${Src})") {
-
 %   for bit_pattern in test_bit_patterns:
 
-  if true {
+FixedPoint.test("${Dst}(bitPattern:) from ${Src}(${bit_pattern})") {
+  do {
 %     input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
     let input = get${Src}(${input})
 %     input = prepare_bit_pattern(input, src_ty.bits, False)
@@ -163,7 +158,7 @@ FixedPoint.test("${Dst}(bitPattern: ${Src})") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
 %     input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
     let input = get${Src}(${input})
 
@@ -176,11 +171,9 @@ FixedPoint.test("${Dst}(bitPattern: ${Src})") {
     expectEqual(expected, literalOutput)
     expectEqual(expected, output)
   }
-
-%   end
-
 }
 
+%   end
 % end
 
 """)
@@ -189,15 +182,15 @@ FixedPoint.test("${Dst}(bitPattern: ${Src})") {
 
 #if arch(i386) || arch(arm)
 
-  ${gyb.executeTemplate(
+  ${gyb.execute_template(
       bit_pattern_test_template,
       prepare_bit_pattern=prepare_bit_pattern,
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
 
-  ${gyb.executeTemplate(
+  ${gyb.execute_template(
       bit_pattern_test_template,
       prepare_bit_pattern=prepare_bit_pattern,
       test_bit_patterns=test_bit_patterns,
@@ -215,9 +208,9 @@ _UnimplementedError()
 
 %{
 
-hash_value_test_template = gyb.parseTemplate("hash_value",
+hash_value_test_template = gyb.parse_template("hash_value",
 """
-% from SwiftIntTypes import *
+% from SwiftIntTypes import all_integer_types
 
 % for self_ty in all_integer_types(word_bits):
 %   Self = self_ty.stdlib_name
@@ -226,7 +219,7 @@ FixedPoint.test("${Self}.hashValue") {
 
 %   for bit_pattern in test_bit_patterns:
 
-  if true {
+  do {
 %     input = prepare_bit_pattern(bit_pattern, self_ty.bits, self_ty.is_signed)
     let input = get${Self}(${input})
     let output = getInt(input.hashValue)
@@ -246,16 +239,16 @@ FixedPoint.test("${Self}.hashValue") {
 
 #if arch(i386) || arch(arm)
 
-  ${gyb.executeTemplate(
+  ${gyb.execute_template(
       hash_value_test_template,
       prepare_bit_pattern=prepare_bit_pattern,
       get_fixed_point_hash=get_fixed_point_hash,
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
 
-  ${gyb.executeTemplate(
+  ${gyb.execute_template(
       hash_value_test_template,
       prepare_bit_pattern=prepare_bit_pattern,
       get_fixed_point_hash=get_fixed_point_hash,
@@ -272,7 +265,7 @@ _UnimplementedError()
 // Misc tests that should be expanded to cover all types (FIXME)
 //===----------------------------------------------------------------------===//
 
-func testBitwiseOperationsImpl<T : UnsignedIntegerType>(_: T.Type) {
+func testBitwiseOperationsImpl<T : UnsignedInteger>(_: T.Type) {
   var x = numericCast(0b11_1010_00) as T
   var y = numericCast(0b10_1100_10) as T
 
@@ -312,10 +305,17 @@ FixedPoint.test("OverflowCheck") {
 
 FixedPoint.test("String.init") {
   let x: UInt32 = 0xdeadbeef
+#if _endian(little)
   expectEqual("efbeadde", String(x.bigEndian, radix: 16))
 
   let y = UInt32(bigEndian: 0xdeadbeef)
   expectEqual("deadbeef", String(y.bigEndian, radix: 16))
+#else
+  expectEqual("efbeadde", String(x.littleEndian, radix: 16))
+
+  let y = UInt32(littleEndian: 0xdeadbeef)
+  expectEqual("deadbeef", String(y.littleEndian, radix: 16))
+#endif
 }
 
 FixedPoint.test("byteSwapped") {
@@ -329,11 +329,11 @@ FixedPoint.test("byteSwapped") {
 var BoolTestSuite = TestSuite("Bool")
 
 BoolTestSuite.test("literals") {
-  if true {
+  do {
     var v = false
     expectType(Bool.self, &v)
   }
-  if true {
+  do {
     var v = true
     expectType(Bool.self, &v)
   }
@@ -344,39 +344,39 @@ BoolTestSuite.test("init()") {
   expectFalse(v)
 }
 
-struct Booleanish : BooleanType {
+struct Booleanish : Boolean {
   let boolValue: Bool
 }
 
-BoolTestSuite.test("init<T : BooleanType>(_:)") {
-  if true {
+BoolTestSuite.test("init<T : Boolean>(_:)") {
+  do {
     let v = Bool(Booleanish(boolValue: false))
     expectFalse(v)
   }
-  if true {
+  do {
     let v = Bool(Booleanish(boolValue: true))
     expectTrue(v)
   }
 }
 
-BoolTestSuite.test("BooleanType") {
-  if true {
+BoolTestSuite.test("Boolean") {
+  do {
     var v: Bool = false
     expectIsBooleanType(&v)
     expectFalse(v.boolValue)
   }
-  if true {
+  do {
     var v: Bool = true
     expectTrue(v.boolValue)
   }
 }
 
 BoolTestSuite.test("CustomStringConvertible") {
-  if true {
+  do {
     let v: Bool = false
     expectEqual("false", String(v))
   }
-  if true {
+  do {
     let v: Bool = true
     expectEqual("true", String(v))
   }
@@ -391,13 +391,13 @@ BoolTestSuite.test("Equatable,Hashable") {
 }
 
 BoolTestSuite.test("!") {
-  if true {
+  do {
     let v: Bool = false
     var r = !v
     expectType(Bool.self, &r)
     expectTrue(r)
   }
-  if true {
+  do {
     let v: Bool = true
     var r = !v
     expectType(Bool.self, &r)
@@ -407,11 +407,11 @@ BoolTestSuite.test("!") {
 
 BoolTestSuite.test("==,!=") {
   let v: Bool = false
-  if true {
+  do {
     var r = (v == v)
     expectType(Bool.self, &r)
   }
-  if true {
+  do {
     var r = (v != v)
     expectType(Bool.self, &r)
   }
@@ -432,4 +432,3 @@ BoolTestSuite.test("||") {
 }
 
 runAllTests()
-

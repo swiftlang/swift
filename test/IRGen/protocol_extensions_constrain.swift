@@ -3,11 +3,11 @@
 // rdar://20532214 -- Wrong code for witness method lookup lets executable crash
 
 public protocol P1 {
-  func foo(rhs: Self) -> Bool
+  func foo(_ rhs: Self) -> Bool
 }
 
 public protocol P2 {
-  typealias Index : P1
+  associatedtype Index : P1
 
   var startIndex: Index {get}
 }
@@ -15,7 +15,7 @@ public protocol P2 {
 public protocol P3 : P1 {}
 
 public struct C3 : P3 {
-  public func foo(rhs: C3) -> Bool {
+  public func foo(_ rhs: C3) -> Bool {
     return true
   }
 }

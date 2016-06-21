@@ -6,7 +6,7 @@ public struct stuffStruct {
 }
 
 public func f() {
-    var thing: stuffStruct = stuffStruct()
+    var _: stuffStruct = stuffStruct()
 }
 
 // In the constructor, self has a type of "inout stuffStruct", but it
@@ -16,9 +16,8 @@ public func f() {
 // CHECK: define {{.*}} @_TFV4self11stuffStructCfT_S0_(
 // CHECK-NEXT: entry:
 // CHECK-NEXT: %[[ALLOCA:.*]] = alloca %V4self11stuffStruct, align {{(4|8)}}
-// CHECK: call void @llvm.dbg.declare(metadata %V4self11stuffStruct* %[[ALLOCA]], metadata ![[SELF:.*]], metadata !{{[0-9]+}}), !dbg
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "stuffStruct",
-// CHECK-SAME:             identifier: [[STUFFSTRUCT:"[^"]+"]]
+// CHECK: call void @llvm.dbg.declare(metadata %V4self11stuffStruct* %[[ALLOCA]], metadata ![[SELF:.*]], metadata !{{[0-9]+}}), !db
+// CHECK: ![[STUFFSTRUCT:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "stuffStruct",{{.*}}identifier
 // CHECK: ![[SELF]] = !DILocalVariable(name: "self", arg: 1,
 // CHECK-SAME:                         type: ![[STUFFSTRUCT]]
 

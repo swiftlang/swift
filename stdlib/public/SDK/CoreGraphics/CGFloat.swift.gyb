@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 %{
 
-from SwiftIntTypes import *
+from SwiftIntTypes import all_integer_types
 
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
@@ -22,6 +22,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 @_exported import CoreGraphics
 import Darwin
 
+@_fixed_layout
 public struct CGFloat {
 #if arch(i386) || arch(arm)
   /// The native type used to store the CGFloat, which is Float on
@@ -45,43 +46,187 @@ public struct CGFloat {
     self.native = NativeType(value)
   }
 
-  /// The native value.
-  public var native: NativeType
-}
-
-@_transparent extension CGFloat : FloatingPointType {
-  public typealias _BitsType = UInt
-
-  public static func _fromBitPattern(bits: UInt) -> CGFloat {
-    return CGFloat(NativeType._fromBitPattern(NativeType._BitsType(bits)))
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+  @_transparent public init(_ value: Float80) {
+    self.native = NativeType(value)
   }
+#endif
 
-  public func _toBitPattern() -> UInt {
-    return UInt(native._toBitPattern())
+  @_transparent public init(_ value: CGFloat) {
+    self.native = value.native
   }
 
 % for src_ty in all_integer_types(word_bits):
-
   @_transparent public init(_ value: ${src_ty.stdlib_name}) {
     self.native = NativeType(value)
   }
 
 % end
 
+  /// The native value.
+  public var native: NativeType
+}
+
+@_transparent extension CGFloat : BinaryFloatingPoint {
+
+  public typealias RawSignificand = UInt
+  public typealias Exponent = Int
+
+  public static var exponentBitCount: Int {
+    return NativeType.exponentBitCount
+  }
+
+  public static var significandBitCount: Int {
+    return NativeType.significandBitCount
+  }
+
+  //  Conversions to/from integer encoding.  These are not part of the
+  //  BinaryFloatingPoint prototype because there's no guarantee that an
+  //  integer type of the same size actually exists (e.g. Float80).
+  public var bitPattern: UInt {
+    return UInt(native.bitPattern)
+  }
+
+  public init(bitPattern: UInt) {
+    native = NativeType(bitPattern: UInt${word_bits}(bitPattern))
+  }
+
+  public var sign: FloatingPointSign {
+    return native.sign
+  }
+
+  public var exponentBitPattern: UInt {
+    return native.exponentBitPattern
+  }
+
+  public var significandBitPattern: UInt {
+    return UInt(native.significandBitPattern)
+  }
+
+  public init(sign: FloatingPointSign,
+              exponentBitPattern: UInt,
+              significandBitPattern: UInt) {
+    native = NativeType(sign: sign,
+      exponentBitPattern: exponentBitPattern,
+      significandBitPattern: NativeType.RawSignificand(significandBitPattern))
+  }
+
+  public init(nan payload: RawSignificand, signaling: Bool) {
+    native = NativeType(nan: NativeType.RawSignificand(payload),
+                        signaling: signaling)
+  }
+
   public static var infinity: CGFloat {
     return CGFloat(NativeType.infinity)
   }
 
-  public static var NaN: CGFloat {
-    return CGFloat(NativeType.NaN)
+  public static var nan: CGFloat {
+    return CGFloat(NativeType.nan)
   }
 
+  public static var signalingNaN: CGFloat {
+    return CGFloat(NativeType.signalingNaN)
+  }
+  
+  @available(*, unavailable, renamed: "nan")
   public static var quietNaN: CGFloat {
-    return CGFloat(NativeType.quietNaN)
+    fatalError("unavailable")
   }
 
-  public var isSignMinus: Bool {
-    return native.isSignMinus
+  public static var greatestFiniteMagnitude: CGFloat {
+    return CGFloat(NativeType.greatestFiniteMagnitude)
+  }
+
+  public static var pi: CGFloat {
+    return CGFloat(NativeType.pi)
+  }
+
+  public var ulp: CGFloat {
+    return CGFloat(native.ulp)
+  }
+
+  public static var leastNormalMagnitude: CGFloat {
+    return CGFloat(NativeType.leastNormalMagnitude)
+  }
+
+  public static var leastNonzeroMagnitude: CGFloat {
+    return CGFloat(NativeType.leastNonzeroMagnitude)
+  }
+
+  public var exponent: Int {
+    return native.exponent
+  }
+
+  public var significand: CGFloat {
+    return CGFloat(native.significand)
+  }
+
+  public init(sign: FloatingPointSign, exponent: Int, significand: CGFloat) {
+    native = NativeType(sign: sign,
+      exponent: exponent, significand: significand.native)
+  }
+
+  public var nextUp: CGFloat {
+    return CGFloat(native.nextUp)
+  }
+
+  public var nextDown: CGFloat {
+    return CGFloat(native.nextDown)
+  }
+
+  public static func abs(_ x: CGFloat) -> CGFloat {
+    return CGFloat(NativeType.abs(x.native))
+  }
+
+  public mutating func negate() {
+    native.negate()
+  }
+
+  public mutating func add(_ other: CGFloat) {
+    native.add(other.native)
+  }
+
+  public mutating func subtract(_ other: CGFloat) {
+    native.subtract(other.native)
+  }
+
+  public mutating func multiply(by other: CGFloat) {
+    native.multiply(by: other.native)
+  }
+
+  public mutating func divide(by other: CGFloat) {
+    native.divide(by: other.native)
+  }
+
+  public mutating func formTruncatingRemainder(dividingBy other: CGFloat) {
+    native.formTruncatingRemainder(dividingBy: other.native)
+  }
+
+  /*  TODO: Need to call C sqrt and fma or llvm sqrt and fma intrinsics
+   *  for these to be implemented on the underlying types.
+  public mutating func formRemainder(dividingBy other: CGFloat) {
+    native.formRemainder(dividingBy: other.native)
+  }
+
+  public mutating func formSquareRoot( ) {
+    native.formSquareRoot( )
+  }
+
+  public mutating func addProduct(_ lhs: CGFloat, _ rhs: CGFloat) {
+    native.addProduct(lhs.native, rhs.native)
+  }
+  */
+
+  public func isEqual(to other: CGFloat) -> Bool {
+    return self.native.isEqual(to: other.native)
+  }
+
+  public func isLess(than other: CGFloat) -> Bool {
+    return self.native.isLess(than: other.native)
+  }
+
+  public func isLessThanOrEqualTo(_ other: CGFloat) -> Bool {
+    return self.native.isLessThanOrEqualTo(other.native)
   }
 
   public var isNormal:  Bool {
@@ -108,47 +253,68 @@ public struct CGFloat {
     return native.isNaN
   }
 
+  public var isSignalingNaN: Bool {
+    return native.isSignalingNaN
+  }
+
+  @available(*, unavailable, renamed: "isSignalingNaN")
   public var isSignaling: Bool {
-    return native.isSignaling
+    fatalError("unavailable")
+  }
+
+  public var isCanonical: Bool {
+    return true
   }
 
   public var floatingPointClass: FloatingPointClassification {
     return native.floatingPointClass
   }
+
+  public var binade: CGFloat {
+    return CGFloat(native.binade)
+  }
+
+  public var significandWidth: Int {
+    return native.significandWidth
+  }
+
+  /// Create an instance initialized to `value`.
+  public init(floatLiteral value: NativeType) {
+    native = value
+  }
+
+  /// Create an instance initialized to `value`.
+  public init(integerLiteral value: Int) {
+    native = NativeType(value)
+  }
 }
 
 extension CGFloat {
-  @_transparent public static var min: CGFloat {
-#if arch(i386) || arch(arm)
-   return CGFloat(FLT_MIN)
-#else
-   return CGFloat(DBL_MIN)
-#endif
+  @available(*, unavailable, renamed: "leastNormalMagnitude")
+  public static var min: CGFloat {
+    fatalError("unavailable")
   }
 
-  @_transparent public static var max: CGFloat {
-#if arch(i386) || arch(arm)
-   return CGFloat(FLT_MAX)
-#else
-   return CGFloat(DBL_MAX)
-#endif
+  @available(*, unavailable, renamed: "greatestFiniteMagnitude")
+  public static var max: CGFloat {
+    fatalError("unavailable")
   }
 }
 
-@available(*,unavailable,message="use CGFloat.min")
+@available(*, unavailable, renamed: "CGFloat.leastNormalMagnitude")
 public var CGFLOAT_MIN: CGFloat {
-  fatalError("can't retrieve unavailable property")
+  fatalError("unavailable")
 }
 
-@available(*,unavailable,message="use CGFloat.max")
+@available(*, unavailable, renamed: "CGFloat.greatestFiniteMagnitude")
 public var CGFLOAT_MAX: CGFloat {
-  fatalError("can't retrieve unavailable property")
+  fatalError("unavailable")
 }
 
-extension CGFloat : _Reflectable {
+extension CGFloat : CustomReflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
-    return _reflect(native)
+  public var customMirror: Mirror {
+    return Mirror(reflecting: native)
   }
 }
 
@@ -169,29 +335,6 @@ extension CGFloat : _Reflectable {
   ///   hash value across program runs.
   public var hashValue: Int {
     return native.hashValue
-  }
-}
-
-@_transparent extension CGFloat : FloatLiteralConvertible {
-  /// Create an instance initialized to `value`.
-  public init(floatLiteral value: NativeType) {
-    self = CGFloat(value)
-  }
-}
-
-@_transparent extension CGFloat : IntegerLiteralConvertible {
-  /// Create an instance initialized to `value`.
-  public init(integerLiteral value: Int) {
-    self = CGFloat(value)
-  }
-}
-
-@_transparent extension CGFloat : AbsoluteValuable {
-  /// Returns the absolute value of `x`
-  @_transparent
-  @warn_unused_result
-  public static func abs(x: CGFloat) -> CGFloat {
-    return CGFloat(NativeType.abs(x.native))
   }
 }
 
@@ -218,520 +361,440 @@ extension CGFloat : _Reflectable {
   }
 }
 
-// Comparisons.
-@_transparent extension CGFloat : Equatable { }
+//===----------------------------------------------------------------------===//
+// Standard Operator Table
+//===----------------------------------------------------------------------===//
+
+//  TODO: These should not be necessary, since they're already provided by
+//  <T: FloatingPoint>, but in practice they are currently needed to
+//  disambiguate overloads.  We should find a way to remove them, either by
+//  tweaking the overload resolution rules, or by removing the other
+//  definitions in the standard lib, or both.
 
 @_transparent
-@warn_unused_result
-public func ==(lhs: CGFloat, rhs: CGFloat) -> Bool {
-  return lhs.native == rhs.native
+public func +(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+  return lhs.adding(rhs)
 }
-
-@_transparent extension CGFloat : Comparable { }
 
 @_transparent
-@warn_unused_result
-public func <(lhs: CGFloat, rhs: CGFloat) -> Bool {
-  return lhs.native < rhs.native
+public func -(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+  return lhs.subtracting(rhs)
 }
+
+@_transparent
+public func *(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+  return lhs.multiplied(by: rhs)
+}
+
+@_transparent
+public func /(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+  return lhs.divided(by: rhs)
+}
+
+@_transparent
+public func +=(lhs: inout CGFloat, rhs: CGFloat) {
+  lhs.add(rhs)
+}
+
+@_transparent
+public func -=(lhs: inout CGFloat, rhs: CGFloat) {
+  lhs.subtract(rhs)
+}
+
+@_transparent
+public func *=(lhs: inout CGFloat, rhs: CGFloat) {
+  lhs.multiply(by: rhs)
+}
+
+@_transparent
+public func /=(lhs: inout CGFloat, rhs: CGFloat) {
+  lhs.divide(by: rhs)
+}
+
+//===----------------------------------------------------------------------===//
+// Strideable Conformance
+//===----------------------------------------------------------------------===//
 
 @_transparent extension CGFloat : Strideable {
-  /// Returns a stride `x` such that `self.advancedBy(x)` approximates
+  /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
   ///
   /// - Complexity: O(1).
-  @_transparent public
-  func distanceTo(other: CGFloat) -> CGFloat {
+  @_transparent
+  public func distance(to other: CGFloat) -> CGFloat {
     return CGFloat(other.native - self.native)
   }
 
-  /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
+  /// Returns a `Self` `x` such that `self.distance(to: x)` approximates
   /// `n`.
   ///
   /// - Complexity: O(1).
-  @_transparent public
-  func advancedBy(amount: CGFloat) -> CGFloat {
+  @_transparent
+  public func advanced(by amount: CGFloat) -> CGFloat {
     return CGFloat(self.native + amount.native)
   }
 }
 
-// CGFloat unary operators
-@_transparent
-@warn_unused_result
-public prefix func + (x: CGFloat) -> CGFloat { return x }
+//===----------------------------------------------------------------------===//
+// Deprecated operators
+//===----------------------------------------------------------------------===//
 
 @_transparent
-@warn_unused_result
-public prefix func - (x: CGFloat) -> CGFloat { return CGFloat(-x.native) }
-
-@_transparent
-public prefix func ++ (inout x: CGFloat) -> CGFloat {
-  x.native += 1.0
-  return x
+@available(*, unavailable, message: "use += 1")
+@discardableResult
+public prefix func ++(rhs: inout CGFloat) -> CGFloat {
+  fatalError("++ is not available")
 }
 
 @_transparent
-public prefix func -- (inout x: CGFloat) -> CGFloat {
-  x.native -= 1.0
-  return x
+@available(*, unavailable, message: "use -= 1")
+@discardableResult
+public prefix func --(rhs: inout CGFloat) -> CGFloat {
+  fatalError("-- is not available")
 }
 
 @_transparent
-public postfix func ++ (inout x: CGFloat) -> CGFloat {
-  let tmp = x
-  x.native += 1.0
-  return tmp 
+@available(*, unavailable, message: "use += 1")
+@discardableResult
+public postfix func ++(lhs: inout CGFloat) -> CGFloat {
+  fatalError("++ is not available")
 }
 
 @_transparent
-public postfix func -- (inout x: CGFloat) -> CGFloat {
-  let tmp = x
-  x.native -= 1.0
-  return tmp 
-}
-
-// CGFloat arithmetic
-@_transparent
-@warn_unused_result
-public func +(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-  return CGFloat(lhs.native + rhs.native)
+@available(*, unavailable, message: "use -= 1")
+@discardableResult
+public postfix func --(lhs: inout CGFloat) -> CGFloat {
+  fatalError("-- is not available")
 }
 
 @_transparent
-@warn_unused_result
-public func -(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-  return CGFloat(lhs.native - rhs.native)
-}
-
-@_transparent
-@warn_unused_result
-public func *(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-  return CGFloat(lhs.native * rhs.native)
-}
-
-@_transparent
-@warn_unused_result
-public func /(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-  return CGFloat(lhs.native / rhs.native)
-}
-
-@_transparent
-@warn_unused_result
+@available(*, unavailable, message: "Use truncatingRemainder instead")
 public func %(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-  return CGFloat(lhs.native % rhs.native)
-}
-
-// CGFloat assignment operators.
-@_transparent
-public func +=(inout lhs: CGFloat, rhs: CGFloat) {
-  lhs.native = lhs.native + rhs.native
+  fatalError("% is not available.")
 }
 
 @_transparent
-public func -=(inout lhs: CGFloat, rhs: CGFloat) {
-  lhs.native = lhs.native - rhs.native
+@available(*, unavailable, message: "Use formTruncatingRemainder instead")
+public func %=(lhs: inout CGFloat, rhs: CGFloat) {
+  fatalError("%= is not available.")
 }
 
-@_transparent
-public func *=(inout lhs: CGFloat, rhs: CGFloat) {
-  lhs.native = lhs.native * rhs.native
-}
+//===----------------------------------------------------------------------===//
+// tgmath
+//===----------------------------------------------------------------------===//
 
 @_transparent
-public func /=(inout lhs: CGFloat, rhs: CGFloat) {
-  lhs.native = lhs.native / rhs.native
-}
-
-@_transparent
-public func %=(inout lhs: CGFloat, rhs: CGFloat) {
-  lhs.native = lhs.native % rhs.native
-}
-
-// CGFloat tgmath.
-@_transparent
-@warn_unused_result
-public func acos(x: CGFloat) -> CGFloat {
+public func acos(_ x: CGFloat) -> CGFloat {
   return CGFloat(acos(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func cos(x: CGFloat) -> CGFloat {
+public func cos(_ x: CGFloat) -> CGFloat {
   return CGFloat(cos(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func sin(x: CGFloat) -> CGFloat {
+public func sin(_ x: CGFloat) -> CGFloat {
   return CGFloat(sin(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func asin(x: CGFloat) -> CGFloat {
+public func asin(_ x: CGFloat) -> CGFloat {
   return CGFloat(asin(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func atan(x: CGFloat) -> CGFloat {
+public func atan(_ x: CGFloat) -> CGFloat {
   return CGFloat(atan(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func tan(x: CGFloat) -> CGFloat {
+public func tan(_ x: CGFloat) -> CGFloat {
   return CGFloat(tan(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func acosh(x: CGFloat) -> CGFloat {
+public func acosh(_ x: CGFloat) -> CGFloat {
   return CGFloat(acosh(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func asinh(x: CGFloat) -> CGFloat {
+public func asinh(_ x: CGFloat) -> CGFloat {
   return CGFloat(asinh(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func atanh(x: CGFloat) -> CGFloat {
+public func atanh(_ x: CGFloat) -> CGFloat {
   return CGFloat(atanh(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func cosh(x: CGFloat) -> CGFloat {
+public func cosh(_ x: CGFloat) -> CGFloat {
   return CGFloat(cosh(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func sinh(x: CGFloat) -> CGFloat {
+public func sinh(_ x: CGFloat) -> CGFloat {
   return CGFloat(sinh(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func tanh(x: CGFloat) -> CGFloat {
+public func tanh(_ x: CGFloat) -> CGFloat {
   return CGFloat(tanh(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func exp(x: CGFloat) -> CGFloat {
+public func exp(_ x: CGFloat) -> CGFloat {
   return CGFloat(exp(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func exp2(x: CGFloat) -> CGFloat {
+public func exp2(_ x: CGFloat) -> CGFloat {
   return CGFloat(exp2(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func expm1(x: CGFloat) -> CGFloat {
+public func expm1(_ x: CGFloat) -> CGFloat {
   return CGFloat(expm1(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func log(x: CGFloat) -> CGFloat {
+public func log(_ x: CGFloat) -> CGFloat {
   return CGFloat(log(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func log10(x: CGFloat) -> CGFloat {
+public func log10(_ x: CGFloat) -> CGFloat {
   return CGFloat(log10(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func log2(x: CGFloat) -> CGFloat {
+public func log2(_ x: CGFloat) -> CGFloat {
   return CGFloat(log2(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func log1p(x: CGFloat) -> CGFloat {
+public func log1p(_ x: CGFloat) -> CGFloat {
   return CGFloat(log1p(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func logb(x: CGFloat) -> CGFloat {
+public func logb(_ x: CGFloat) -> CGFloat {
   return CGFloat(logb(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func cbrt(x: CGFloat) -> CGFloat {
+public func cbrt(_ x: CGFloat) -> CGFloat {
   return CGFloat(cbrt(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func erf(x: CGFloat) -> CGFloat {
+public func erf(_ x: CGFloat) -> CGFloat {
   return CGFloat(erf(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func erfc(x: CGFloat) -> CGFloat {
+public func erfc(_ x: CGFloat) -> CGFloat {
   return CGFloat(erfc(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func tgamma(x: CGFloat) -> CGFloat {
+public func tgamma(_ x: CGFloat) -> CGFloat {
   return CGFloat(tgamma(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func fabs(x: CGFloat) -> CGFloat {
+public func fabs(_ x: CGFloat) -> CGFloat {
   return CGFloat(fabs(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func sqrt(x: CGFloat) -> CGFloat {
+public func sqrt(_ x: CGFloat) -> CGFloat {
   return CGFloat(sqrt(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func ceil(x: CGFloat) -> CGFloat {
+public func ceil(_ x: CGFloat) -> CGFloat {
   return CGFloat(ceil(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func floor(x: CGFloat) -> CGFloat {
+public func floor(_ x: CGFloat) -> CGFloat {
   return CGFloat(floor(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func nearbyint(x: CGFloat) -> CGFloat {
+public func nearbyint(_ x: CGFloat) -> CGFloat {
   return CGFloat(nearbyint(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func rint(x: CGFloat) -> CGFloat {
+public func rint(_ x: CGFloat) -> CGFloat {
   return CGFloat(rint(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func round(x: CGFloat) -> CGFloat {
+public func round(_ x: CGFloat) -> CGFloat {
   return CGFloat(round(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func trunc(x: CGFloat) -> CGFloat {
+public func trunc(_ x: CGFloat) -> CGFloat {
   return CGFloat(trunc(x.native))
 }
 
 @_transparent
-@warn_unused_result
-public func atan2(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
+public func atan2(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(atan2(lhs.native, rhs.native))
 }
 
 @_transparent
-@warn_unused_result
-public func hypot(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
+public func hypot(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(hypot(lhs.native, rhs.native))
 }
 
 @_transparent
-@warn_unused_result
-public func pow(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
+public func pow(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(pow(lhs.native, rhs.native))
 }
 
 @_transparent
-@warn_unused_result
-public func fmod(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
+public func fmod(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(fmod(lhs.native, rhs.native))
 }
 
 @_transparent
-@warn_unused_result
-public func remainder(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
+public func remainder(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(remainder(lhs.native, rhs.native))
 }
 
 @_transparent
-@warn_unused_result
-public func copysign(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
+public func copysign(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(copysign(lhs.native, rhs.native))
 }
 
 @_transparent
-@warn_unused_result
-public func nextafter(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
+public func nextafter(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(nextafter(lhs.native, rhs.native))
 }
 
 @_transparent
-@warn_unused_result
-public func fdim(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
+public func fdim(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(fdim(lhs.native, rhs.native))
 }
 
 @_transparent
-@warn_unused_result
-public func fmax(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
+public func fmax(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(fmax(lhs.native, rhs.native))
 }
 
 @_transparent
-@warn_unused_result
-public func fmin(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
+public func fmin(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(fmin(lhs.native, rhs.native))
 }
 
 @_transparent
-@warn_unused_result
-public func fpclassify(x: CGFloat) -> Int {
-  return fpclassify(x.native)
+@available(*, unavailable, message: "use the floatingPointClass property.")
+public func fpclassify(_ x: CGFloat) -> Int {
+  fatalError("unavailable")
 }
 
-@_transparent
-@warn_unused_result
-public func isnormal(x: CGFloat) -> Bool {
-  return isnormal(x.native)
-}
+@available(*, unavailable, message: "use the isNormal property.")
+public func isnormal(_ value: CGFloat) -> Bool { return value.isNormal }
+
+@available(*, unavailable, message: "use the isFinite property.")
+public func isfinite(_ value: CGFloat) -> Bool { return value.isFinite }
+
+@available(*, unavailable, message: "use the isInfinite property.")
+public func isinf(_ value: CGFloat) -> Bool { return value.isInfinite }
+
+@available(*, unavailable, message: "use the isNaN property.")
+public func isnan(_ value: CGFloat) -> Bool { return value.isNaN }
+
+@available(*, unavailable, message: "use the sign property.")
+public func signbit(_ value: CGFloat) -> Int { return value.sign.rawValue }
 
 @_transparent
-@warn_unused_result
-public func isfinite(x: CGFloat) -> Bool {
-  return isfinite(x.native)
-}
-
-@_transparent
-@warn_unused_result
-public func isinf(x: CGFloat) -> Bool {
-  return isinf(x.native)
-}
-
-@_transparent
-@warn_unused_result
-public func isnan(x: CGFloat) -> Bool {
-  return isnan(x.native)
-}
-
-@_transparent
-@warn_unused_result
-public func signbit(x: CGFloat) -> Int {
-  return signbit(x.native)
-}
-
-@_transparent
-@warn_unused_result
-public func modf(x: CGFloat) -> (CGFloat, CGFloat) {
+public func modf(_ x: CGFloat) -> (CGFloat, CGFloat) {
   let (ipart, fpart) = modf(x.native)
   return (CGFloat(ipart), CGFloat(fpart))
 }
 
 @_transparent
-@warn_unused_result
-public func ldexp(x: CGFloat, _ n: Int) -> CGFloat {
+public func ldexp(_ x: CGFloat, _ n: Int) -> CGFloat {
   return CGFloat(ldexp(x.native, n))
 }
 
 @_transparent
-@warn_unused_result
-public func frexp(x: CGFloat) -> (CGFloat, Int) {
+public func frexp(_ x: CGFloat) -> (CGFloat, Int) {
   let (frac, exp) = frexp(x.native)
   return (CGFloat(frac), exp)
 }
 
 @_transparent
-@warn_unused_result
-public func ilogb(x: CGFloat) -> Int {
+public func ilogb(_ x: CGFloat) -> Int {
   return ilogb(x.native)
 }
 
 @_transparent
-@warn_unused_result
-public func scalbn(x: CGFloat, _ n: Int) -> CGFloat {
+public func scalbn(_ x: CGFloat, _ n: Int) -> CGFloat {
   return CGFloat(scalbn(x.native, n))
 }
 
 @_transparent
-@warn_unused_result
-public func lgamma(x: CGFloat) -> (CGFloat, Int) {
+public func lgamma(_ x: CGFloat) -> (CGFloat, Int) {
   let (value, sign) = lgamma(x.native)
   return (CGFloat(value), sign)
 }
 
 @_transparent
-@warn_unused_result
-public func remquo(x: CGFloat, _ y: CGFloat) -> (CGFloat, Int) {
+public func remquo(_ x: CGFloat, _ y: CGFloat) -> (CGFloat, Int) {
   let (rem, quo) = remquo(x.native, y.native)
   return (CGFloat(rem), quo)
 }
 
 @_transparent
-@warn_unused_result
-public func nan(tag: String) -> CGFloat {
+public func nan(_ tag: String) -> CGFloat {
   return CGFloat(nan(tag) as CGFloat.NativeType)
 }
 
 @_transparent
-@warn_unused_result
-public func fma(x: CGFloat, _ y: CGFloat, _ z: CGFloat) -> CGFloat {
+public func fma(_ x: CGFloat, _ y: CGFloat, _ z: CGFloat) -> CGFloat {
   return CGFloat(fma(x.native, y.native, z.native))
 }
 
 @_transparent
-@warn_unused_result
-public func j0(x: CGFloat) -> CGFloat {
+public func j0(_ x: CGFloat) -> CGFloat {
   return CGFloat(j0(Double(x.native)))
 }
 
 @_transparent
-@warn_unused_result
-public func j1(x: CGFloat) -> CGFloat {
+public func j1(_ x: CGFloat) -> CGFloat {
   return CGFloat(j1(Double(x.native)))
 }
 
 @_transparent
-@warn_unused_result
-public func jn(n: Int, _ x: CGFloat) -> CGFloat {
+public func jn(_ n: Int, _ x: CGFloat) -> CGFloat {
   return CGFloat(jn(n, Double(x.native)))
 }
 
 @_transparent
-@warn_unused_result
-public func y0(x: CGFloat) -> CGFloat {
+public func y0(_ x: CGFloat) -> CGFloat {
   return CGFloat(y0(Double(x.native)))
 }
 
 @_transparent
-@warn_unused_result
-public func y1(x: CGFloat) -> CGFloat {
+public func y1(_ x: CGFloat) -> CGFloat {
   return CGFloat(y1(Double(x.native)))
 }
 
 @_transparent
-@warn_unused_result
-public func yn(n: Int, _ x: CGFloat) -> CGFloat {
+public func yn(_ n: Int, _ x: CGFloat) -> CGFloat {
   return CGFloat(yn(n, Double(x.native)))
 }
 
 @_transparent
-extension CGFloat : _CVarArgPassedAsDouble, _CVarArgAlignedType {
+extension CGFloat : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
   public var _cVarArgEncoding: [Int] {

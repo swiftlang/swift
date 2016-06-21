@@ -81,6 +81,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=NESTED_NOMINAL < %t.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE_1 -code-completion-keywords=false | FileCheck %s -check-prefix=NESTED_CLOSURE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE_2 -code-completion-keywords=false | FileCheck %s -check-prefix=NESTED_CLOSURE_2
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD1 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=OMIT_KEYWORD1< %t.txt
 
@@ -91,8 +94,17 @@
 // RUN: FileCheck %s -check-prefix=OMIT_KEYWORD3< %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD4 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD5 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD6 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD7 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD8 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD9 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD10 -code-completion-keywords=false | FileCheck %s -check-prefix=WITH_PA_NO_PROTOFUNCA
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAS_THROWING -code-completion-keywords=false | FileCheck %s -check-prefix=HAS_THROWING
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_TYPE1 -code-completion-keywords=false | FileCheck %s -check-prefix=ASSOC_TYPE1
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 -code-completion-keywords=false | FileCheck %s -check-prefix=DEPRECATED_1
 
 @objc
 class TagPA {}
@@ -101,7 +113,7 @@ protocol ProtocolA {
   init(fromProtocolA: Int)
 
   func protoAFunc()
-  optional func protoAFuncOptional()
+  @objc optional func protoAFuncOptional()
 
   @noreturn
   func protoAFuncWithAttr()
@@ -119,6 +131,14 @@ protocol ProtocolA {
 // WITH_PA-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: Int{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: Int{{; name=.+$}}
 // WITH_PA: End completions
+
+// WITH_PA_NO_PROTOFUNCA: Begin completions
+// WITH_PA_NO_PROTOFUNCA-DAG: Decl[Constructor]/Super:    init(fromProtocolA: Int) {|}{{; name=.+$}}
+// WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional() {|}{{; name=.+$}}
+// WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceMethod]/Super: @noreturn func protoAFuncWithAttr() {|}{{; name=.+$}}
+// WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: Int{{; name=.+$}}
+// WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: Int{{; name=.+$}}
+// WITH_PA_NO_PROTOFUNCA: End completions
 
 struct TagPB {}
 protocol ProtocolB : ProtocolA {
@@ -308,7 +328,7 @@ extension TestClass_BA_PA_Ext : ProtocolA {
 class TestClass_BA_PB : BaseA, ProtocolB {
   #^CLASS_BA_PB^#
 }
-// CLASS_BA_PB: Begin completions, 16 items
+// CLASS_BA_PB: Begin completions, 17 items
 
 class TestClass_BB : BaseB {
   #^CLASS_BB^#
@@ -350,49 +370,102 @@ class OuterNominal : ProtocolA {
 // NESTED_NOMINAL: found code completion token
 // NESTED_NOMINAL-NOT: Begin completions
 
+class OuterNominal2: ProtocolA {
+  var f = { #^NESTED_CLOSURE_1^# }()
+}
+// NESTED_CLOSURE_1-NOT: Decl{{.*}}/Super
+// NESTED_CLOSURE_1-NOT: {|}
+
+class OuterNominal3: ProtocolA {
+  var f = { static #^NESTED_CLOSURE_2^# }()
+}
+// NESTED_CLOSURE_2-NOT: Decl{{.*}}/Super
+// NESTED_CLOSURE_2-NOT: {|}
+
 class OmitKW1 : ProtocolA {
   override#^OMIT_KEYWORD1^#
 }
 
 //OMIT_KEYWORD1:         Begin completions
-//OMIT_KEYWORD1-DAG:     Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int){{$}}
+// OMIT_KEYWORD1-NOT:    Decl[Constructor]
 //OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc(){{$}}
 //OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
 //OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         @noreturn func protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
 // OMIT_KEYWORD1-DAG:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD1-NOT:    Decl[Constructor]
 // OMIT_KEYWORD1: End completions
 
 class OmitKW2 : ProtocolA {
   override func#^OMIT_KEYWORD2^#
 }
 
-//OMIT_KEYWORD2:         Begin completions
-//OMIT_KEYWORD2-DAG:     Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int){{$}}
-//OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
-//OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
-//OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+// OMIT_KEYWORD2:        Begin completions
 // OMIT_KEYWORD2-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD2-NOT:    Decl[Constructor]
+// OMIT_KEYWORD2-DAG:    Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
+// OMIT_KEYWORD2-DAG:    Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
+// OMIT_KEYWORD2-DAG:    Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+// OMIT_KEYWORD2-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD2-NOT:    Decl[Constructor]
 // OMIT_KEYWORD2: End completions
 
 class OmitKW3 : ProtocolA {
   func#^OMIT_KEYWORD3^#
 }
 
-//OMIT_KEYWORD3:         Begin completions
-//OMIT_KEYWORD3-DAG:     Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int){{$}}
-//OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
-//OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
-//OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+// OMIT_KEYWORD3:        Begin completions
+// FIXME: missing 'override'
 // OMIT_KEYWORD3-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD3-NOT:    Decl[Constructor]
+// OMIT_KEYWORD3-DAG:    Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
+// OMIT_KEYWORD3-DAG:    Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
+// OMIT_KEYWORD3-DAG:    Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+// OMIT_KEYWORD3-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD3-NOT:    Decl[Constructor]
 // OMIT_KEYWORD3: End completions
 
 class OmitKW4: ProtocolA {
   var #^OMIT_KEYWORD4^#
 }
 
+// OMIT_KEYWORD4-NOT:    Decl[Constructor]
 // OMIT_KEYWORD4-NOT:    Decl[InstanceMethod]
 // OMIT_KEYWORD4:        Decl[InstanceVar]/Super: protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD4-NOT:    Decl[InstanceMethod]
+// OMIT_KEYWORD4-NOT:    Decl[Constructor]
+
+class OmitKW5: ProtocolA {
+  override
+  #^OMIT_KEYWORD5^#
+// Same as OMIT_KEYWORD1
+}
+class OmitKW6: ProtocolA {
+  override
+  func
+  #^OMIT_KEYWORD6^#
+// Same as OMIT_KEYWORD2
+}
+class OmitKW7: ProtocolA {
+  func
+  #^OMIT_KEYWORD7^#
+// Same as OMIT_KEYWORD3
+}
+
+class OmitKW8: ProtocolA {
+  var
+  #^OMIT_KEYWORD8^#
+// Same as OMIT_KEYWORD4
+}
+class OmitKW9: ProtocolA {
+  override
+  var
+  #^OMIT_KEYWORD9^#
+// Same as OMIT_KEYWORD4
+}
+class OmitKW10: ProtocolA {
+  override func protoAFunc() {}; #^OMIT_KEYWORD10^#
+// WITH_PA
+}
 
 protocol HasThrowingProtocol {
   func foo() throws
@@ -412,3 +485,26 @@ class TestClassWithThrows : HasThrowing, HasThrowingProtocol {
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func baz(x: () throws -> ()) rethrows {|}; name=baz(x: () throws -> ()) rethrows
 // HAS_THROWING-DAG: Decl[Constructor]/Super:            init() throws {|}; name=init() throws
 // HAS_THROWING: End completions
+
+protocol P1 {
+  associatedtype T1 = Int
+  associatedtype T2
+  associatedtype T3
+}
+class C1 : P1 {
+  #^ASSOC_TYPE1^#
+}
+
+// ASSOC_TYPE1: Begin completions, 2 items
+// ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T2 = {#(Type)#}; name=T2 = Type
+// ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T3 = {#(Type)#}; name=T3 = Type
+
+class Deprecated1 {
+  @available(*, deprecated)
+  func deprecated() {}
+}
+
+class Deprecated2 : Deprecated1 {
+  override func #^DEPRECATED_1^#
+}
+// DEPRECATED_1: Decl[InstanceMethod]/Super/NotRecommended: deprecated() {|};

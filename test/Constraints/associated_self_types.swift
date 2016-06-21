@@ -1,39 +1,57 @@
 // RUN: %target-parse-verify-swift
 
-protocol P : CollectionType {
+protocol MyIteratorProtocol {
+  associatedtype Element
+  func next() -> Element?
+}
+
+protocol MySequence {
+  associatedtype Iterator : MyIteratorProtocol
+}
+
+protocol MyCollection : MySequence {
+  var startIndex: Iterator { get }
+}
+
+protocol P : MyCollection {
   init()
 }
 postfix operator ~>> {}
 
-postfix func ~>> <_Self: SequenceType, A: P where _Self.Generator.Element == A.Generator.Element>(_:_Self) -> A {
+postfix func ~>> <_Self : MySequence, A : P where _Self.Iterator.Element == A.Iterator.Element>(_:_Self) -> A {
   return A()
 }
 
-protocol _ExtendedSequence : SequenceType {
-  //typealias Generator = RangeGenerator<T>
-  postfix func ~>> <A: P where Self.Generator.Element == A.Generator.Element>(s: Self) -> A
+protocol _ExtendedSequence : MySequence {
+  postfix func ~>> <A : P where Self.Iterator.Element == A.Iterator.Element>(s: Self) -> A
 }
 
-extension Range : _ExtendedSequence {
+struct MyRangeIterator<T> : MyIteratorProtocol {
+  func next() -> T? { return nil }
 }
 
-protocol Q : SequenceType {
-  func f<QS: SequenceType where QS.Generator.Element == Self.Generator.Element>(x: QS)
+struct MyRange<T> : _ExtendedSequence {
+  typealias Element = T
+  typealias Iterator = MyRangeIterator<T>
 }
 
-struct No<NT> : GeneratorType {
+protocol Q : MySequence {
+  func f<QS : MySequence where QS.Iterator.Element == Self.Iterator.Element>(_ x: QS)
+}
+
+struct No<NT> : MyIteratorProtocol {
   func next() -> NT? {
-    return .None
+    return .none
   }
 }
 
 class X<XT> : Q {
-  typealias Generator = No<XT>
+  typealias Iterator = No<XT>
   
-  func f<SX: SequenceType where SX.Generator.Element == X.Generator.Element>(x: SX) {
+  func f<SX : MySequence where SX.Iterator.Element == X.Iterator.Element>(_ x: SX) {
   }
   
-  func generate() -> No<XT> {
+  func makeIterator() -> No<XT> {
     return No<XT>()
   }
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -78,7 +78,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
   auto parentDC = toRawDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto enumDecl = parentDC->isEnumOrEnumExtensionContext();
+  auto enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
@@ -130,11 +130,8 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   auto rawInterfaceType = enumDecl->getRawType();
   auto rawType = ArchetypeBuilder::mapTypeIntoContext(parentDC,
                                                       rawInterfaceType);
-  Type enumType = parentDC->getDeclaredTypeInContext();
-  
   // Define the getter.
   auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, enumDecl,
-                                                 enumType,
                                                  rawInterfaceType,
                                                  rawType);
   getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
@@ -176,7 +173,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
   auto parentDC = initDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto nominalTypeDecl = parentDC->isNominalTypeOrNominalTypeExtensionContext();
+  auto nominalTypeDecl = parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
   auto enumDecl = cast<EnumDecl>(nominalTypeDecl);
 
   Type rawTy = enumDecl->getRawType();
@@ -204,11 +201,12 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
     auto labelItem =
       CaseLabelItem(/*IsDefault=*/false, litPat, SourceLoc(), nullptr);
 
-    auto eltRef = new (C) DeclRefExpr(elt, SourceLoc(), /*implicit*/true);
+    auto eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto metaTyRef = TypeExpr::createImplicit(enumType, C);
     auto valueExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
     
-    auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true,
+    auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit*/true,
                                        AccessSemantics::DirectToStorage);
 
     auto assignment = new (C) AssignExpr(selfRef, SourceLoc(), valueExpr,
@@ -234,10 +232,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
                                    /*HasBoundDecls=*/false, SourceLoc(),
                                    dfltBody));
 
-  Pattern *args = initDecl->getBodyParamPatterns().back();
-  auto rawArgPattern = cast<NamedPattern>(args->getSemanticsProvidingPattern());
-  auto rawDecl = rawArgPattern->getDecl();
-  auto rawRef = new (C) DeclRefExpr(rawDecl, SourceLoc(), /*implicit*/true);
+  auto rawDecl = initDecl->getParameterList(1)->get(0);
+  auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), rawRef,
                                        SourceLoc(), cases, SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
@@ -270,55 +266,31 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   }
 
   Type enumType = parentDC->getDeclaredTypeInContext();
-  VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/false,
-                                        SourceLoc(),
-                                        Identifier(),
-                                        SourceLoc(),
-                                        C.Id_self,
-                                        enumType,
-                                        parentDC);
-  selfDecl->setImplicit();
-  Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  selfParam->setType(enumType);
-  selfParam = new (C) TypedPattern(selfParam,
-                                   TypeLoc::withoutLoc(enumType));
-  selfParam->setType(enumType);
-  selfParam->setImplicit();
+  auto *selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC,
+                                         /*static*/false, /*inout*/true);
 
-  VarDecl *rawDecl = new (C) ParamDecl(/*IsVal*/true,
-                                       SourceLoc(),
-                                       C.Id_rawValue,
-                                       SourceLoc(),
-                                       C.Id_rawValue,
-                                       rawType,
-                                       parentDC);
+  auto *rawDecl = new (C) ParamDecl(/*IsLet*/true, SourceLoc(), SourceLoc(),
+                                    C.Id_rawValue, SourceLoc(),
+                                    C.Id_rawValue, rawType, parentDC);
   rawDecl->setImplicit();
-  Pattern *rawParam = new (C) NamedPattern(rawDecl, /*implicit*/ true);
-  rawParam->setType(rawType);
-  rawParam = new (C) TypedPattern(rawParam, TypeLoc::withoutLoc(rawType));
-  rawParam->setType(rawType);
-  rawParam->setImplicit();
-  rawParam = new (C) ParenPattern(SourceLoc(), rawParam, SourceLoc());
-  rawParam->setType(rawType);
-  rawParam->setImplicit();
+  auto paramList = ParameterList::createWithoutLoc(rawDecl);
   
   auto retTy = OptionalType::get(enumType);
-  DeclName name(C, C.Id_init, { C.Id_rawValue });
+  DeclName name(C, C.Id_init, paramList);
   
-  auto initDecl = new (C) ConstructorDecl(name, SourceLoc(),
-                                          /*failability*/ OTK_Optional,
-                                          SourceLoc(),
-                                          selfParam,
-                                          rawParam,
-                                          nullptr,
-                                          SourceLoc(),
-                                          parentDC);
+  auto initDecl =
+    new (C) ConstructorDecl(name, SourceLoc(),
+                            /*Failability=*/ OTK_Optional,
+                            /*FailabilityLoc=*/SourceLoc(),
+                            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                            selfDecl, paramList,
+                            /*GenericParams=*/nullptr, parentDC);
   
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
   // Compute the type of the initializer.
-  GenericParamList *genericParams = nullptr;
+  GenericParamList *genericParams = initDecl->getGenericParamsOfContext();
   
   TupleTypeElt element(rawType, C.Id_rawValue);
   auto argType = TupleType::get(element, C);
@@ -326,7 +298,9 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   auto interfaceArgType = TupleType::get(interfaceElement, C);
   
   Type type = FunctionType::get(argType, retTy);
-  Type selfType = initDecl->computeSelfType(&genericParams);
+
+  Type selfType = initDecl->computeSelfType();
+  selfDecl->overwriteType(selfType);
   Type selfMetatype = MetatypeType::get(selfType->getInOutObjectType());
   
   Type allocType;
@@ -352,6 +326,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   Type allocIfaceType;
   Type initIfaceType;
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
+    initDecl->setGenericSignature(sig);
+
     allocIfaceType = GenericFunctionType::get(sig, selfInterfaceType,
                                               interfaceType,
                                               FunctionType::ExtInfo());
@@ -359,15 +335,18 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
                                              interfaceType,
                                              FunctionType::ExtInfo());
   } else {
-    allocIfaceType = allocType;
-    initIfaceType = initType;
+    allocIfaceType = FunctionType::get(selfMetatype, type);
+    initIfaceType = FunctionType::get(selfType, type);
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->setAccessibility(enumDecl->getFormalAccess());
 
+  // If the enum was not imported, the derived conformance is either from the
+  // enum itself or an extension, in which case we will emit the declaration
+  // normally.
   if (enumDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(initDecl);
+    tc.Context.addExternalDecl(initDecl);
 
   cast<IterableDeclContext>(parentDecl)->addMember(initDecl);
   return initDecl;

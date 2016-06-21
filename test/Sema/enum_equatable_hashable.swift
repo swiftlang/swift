@@ -12,9 +12,10 @@ var aHash: Int = Foo.A.hashValue
 enum Generic<T> {
   case A, B
 
-  func method() -> Int {
+  static func method() -> Int {
+    // Test synthesis of == without any member lookup being done
     if A == B { }
-    return A.hashValue
+    return Generic.A.hashValue
   }
 }
 
@@ -85,7 +86,8 @@ enum Complex {
   case B
 }
 
-if Complex.A(1) == .B { } // expected-error{{type of expression is ambiguous without more context}}
+if Complex.A(1) == .B { } // expected-error{{binary operator '==' cannot be applied to operands of type 'Complex' and '_'}}
+// expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: }}
 
 
 // rdar://19773050

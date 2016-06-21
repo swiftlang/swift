@@ -1,8 +1,8 @@
-//===--- BridgeStorage.swift.gyb ------------------------------------------===//
+//===--- BridgeStorage.swift.gyb ------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,9 +15,7 @@
 //  distinguish these cases efficiently.
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/out.swift
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -28,8 +26,8 @@ import Swift
 import SwiftShims
 
 protocol BridgeStorage {
-  typealias Native : AnyObject
-  typealias ObjC : AnyObject
+  associatedtype Native : AnyObject
+  associatedtype ObjC : AnyObject
 
   init(native: Native, bits: Int)
   init(native: Native)
@@ -48,79 +46,6 @@ protocol BridgeStorage {
 extension _BridgeStorage : BridgeStorage {}
 
 
-struct BridgeObject<NativeType : AnyObject, ObjCType : AnyObject>
-  : BridgeStorage {
-  
-  typealias Native = NativeType
-  typealias ObjC = ObjCType
-
-  init(native: Native, bits: Int) {
-    _sanityCheck(
-      bits >= 0 && bits < 2,
-      "BridgeObject can't store bits outside the range 0-1")
-    
-    self.object = native
-    self.bits = UInt8(truncatingBitPattern: bits)
-  }
-  
-  init(native: Native) {
-    self.object = native
-    self.bits = 0
-  }
-  
-  init(objC: ObjC) {
-    self.object = objC
-    self.bits = 0
-  }
-
-  mutating func isUniquelyReferencedNative() -> Bool {
-    return _getBool(Builtin.isUnique(&object))
-  }
-
-  var isNative: Bool {
-    return _swift_usesNativeSwiftReferenceCounting_nonNull(
-      UnsafePointer(rawObject))
-  }
-
-  var isObjC: Bool {
-    return !isNative
-  }
-  
-  var nativeInstance: Native {
-    precondition(isNative)
-    return Builtin.bridgeFromRawPointer(rawObject)
-  }
-    
-  var nativeInstance_noSpareBits: Native {
-    precondition(isNative)
-    precondition(spareBits == 0)
-    return Builtin.bridgeFromRawPointer(rawObject)
-  }
-    
-  mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
-    precondition(isNative)
-    precondition(spareBits == 0)
-    return _isUnique_native(&object)
-  }
-
-  var objCInstance: ObjC {
-    precondition(isObjC)
-    return Builtin.bridgeFromRawPointer(rawObject)
-  }
-    
-  var spareBits: Int {
-    return Int(bits)
-  }
-  
-  var rawObject: Builtin.RawPointer {
-    return Builtin.bridgeToRawPointer(object)
-  }
-
-  // object declared mutable to be passed to isUnique.
-  var object: AnyObject
-  let bits: UInt8
-}
-
 //===----------------------------------------------------------------------===//
 //===--- Testing code -----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -134,20 +59,19 @@ class C {
 }
 import Foundation
 
-func isOSAtLeast(major: Int, _ minor: Int, patch: Int = 0) -> Bool {
-  let vers = (majorVersion: major, minorVersion: minor, patchVersion: patch)
+func isOSAtLeast(_ major: Int, _ minor: Int, patch: Int = 0) -> Bool {
   // isOperatingSystemAtLeastVersion() is unavailable on some OS versions.
   if #available(iOS 8.0, OSX 10.10, *) {
-    let procInfo: AnyObject = NSProcessInfo.processInfo()
-    return procInfo.isOperatingSystemAtLeastVersion(
-                    NSOperatingSystemVersion(vers)
-                    )
+    let procInfo: AnyObject = ProcessInfo.processInfo()
+    return procInfo.isOperatingSystemAtLeast(
+             OperatingSystemVersion(majorVersion: major, minorVersion: minor,
+                                    patchVersion: patch))
   }
 
   return false
 }
 
-func expectTagged(s: NSString, _ expected: Bool) -> NSString {
+func expectTagged(_ s: NSString, _ expected: Bool) -> NSString {
 #if arch(x86_64)
   let mask: UInt = 0x8000000000000001
 #elseif arch(arm64)
@@ -170,7 +94,7 @@ func expectTagged(s: NSString, _ expected: Bool) -> NSString {
 
   let taggedStringsSupported = osSupportsTaggedStrings && mask != 0
 
-  let tagged = unsafeBitCast(s, UInt.self) & mask != 0
+  let tagged = unsafeBitCast(s, to: UInt.self) & mask != 0
 
   if taggedStringsSupported  &&  expected == tagged {
     // okay
@@ -192,15 +116,15 @@ var unTaggedNSString : NSString {
   return expectTagged("fûtbōl" as NSString, false)
 }
 
-% for Self in '_BridgeStorage', 'BridgeObject':
+% for Self in ['_BridgeStorage']:
 allTests.test("${Self}") {
-  typealias B = ${Self}<C,NSString>
+  typealias B = ${Self}<C, NSString>
   
   let oy: NSString = "oy"
   expectTrue(B(objC: oy).objCInstance == oy)
   
   for i in 0..<2 {
-    if true {
+    do {
       var b = B(native: C(), bits: i)
       expectFalse(b.isObjC)
       expectTrue(b.isNative)
@@ -211,7 +135,7 @@ allTests.test("${Self}") {
       expectEqual(i, b.spareBits)
     }
     
-    if true {
+    do {
       let c = C()
       var b = B(native: c, bits: i)
       expectFalse(b.isObjC)

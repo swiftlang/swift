@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,9 +21,18 @@
 
 #include "FixedTypeInfo.h"
 
+namespace clang {
+namespace CodeGen {
+namespace swiftcall {
+  class SwiftAggLowering;
+}
+}
+}
+
 namespace swift {
 namespace irgen {
   class EnumPayload;
+  using clang::CodeGen::swiftcall::SwiftAggLowering;
 
 struct LoadedRef {
   llvm::PointerIntPair<llvm::Value*, 1> ValAndNonNull;
@@ -107,13 +116,14 @@ public:
   /// Shift values from the source explosion to the target explosion
   /// as if by copy-initialization.
   virtual void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
-                    Explosion &targetExplosion) const = 0;
+                    Explosion &targetExplosion, Atomicity atomicity) const = 0;
   
   /// Release reference counts or other resources owned by the explosion.
-  virtual void consume(IRGenFunction &IGF, Explosion &explosion) const = 0;
+  virtual void consume(IRGenFunction &IGF, Explosion &explosion,
+                       Atomicity atomicity) const = 0;
 
   /// Fix the lifetime of the source explosion by creating opaque calls to
-  /// swift_keepAlive for all reference types in the explosion.
+  /// swift_fixLifetime for all reference types in the explosion.
   virtual void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const = 0;
   
   /// Pack the source explosion into an enum payload.
@@ -129,10 +139,19 @@ public:
                                      Explosion &targetExplosion,
                                      unsigned offset) const = 0;
 
-  /// Load a a reference counted pointer from an address.
+  /// Load a reference counted pointer from an address.
   /// Return the loaded pointer value.
   virtual LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                       Address addr) const;
+
+  /// Add this type to the given aggregate lowering.
+  virtual void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                                Size offset) const = 0;
+
+  static void addScalarToAggLowering(IRGenModule &IGM,
+                                     SwiftAggLowering &lowering,
+                                     llvm::Type *type, Size offset,
+                                     Size storageSize);
 
   static bool classof(const LoadableTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isLoadable(); }

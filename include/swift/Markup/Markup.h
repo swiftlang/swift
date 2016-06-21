@@ -1,8 +1,8 @@
-//===--- Markup.h - Markup ------------------------------------------------===//
+//===--- Markup.h - Markup --------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_MARKUP_MARKUP_H
-#define LLVM_MARKUP_MARKUP_H
+#ifndef SWIFT_MARKUP_MARKUP_H
+#define SWIFT_MARKUP_MARKUP_H
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Allocator.h"
@@ -20,12 +20,10 @@
 #include "swift/Markup/AST.h"
 #include "swift/Markup/LineList.h"
 
-
 namespace swift {
-  struct RawComment;
-}
 
-namespace llvm {
+struct RawComment;
+
 namespace markup {
 
 class LineList;
@@ -65,6 +63,6 @@ public:
 Document *parseDocument(MarkupContext &MC, LineList &LL);
 
 } // namespace markup
-} // namespace llvm
+} // namespace swift
 
-#endif // LLVM_MARKUP_MARKUP_H
+#endif // SWIFT_MARKUP_MARKUP_H

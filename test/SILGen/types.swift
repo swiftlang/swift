@@ -21,16 +21,18 @@ class C {
 struct S {
   var member: Int
 
-  // CHECK-LABEL: sil hidden  @{{.*}}foo{{.*}} : $@convention(method) (Int, @inout S) -> ()
+  // CHECK-LABEL: sil hidden  @{{.*}}1S3foo{{.*}} : $@convention(method) (Int, @inout S) -> ()
   mutating
   func foo(x x: Int) {
     var x = x
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
-    // CHECK: [[THIS_LOCAL:%[0-9]+]] = alloc_box $S
+    // CHECK: [[THIS_LOCAL_ADDR:%[0-9]+]] = alloc_box $S
+    // CHECK: [[THIS_LOCAL:%[0-9]+]] = project_box [[THIS_LOCAL_ADDR]]
     // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
-    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS_LOCAL]]#1 : $*S, #S.member
-    // CHECK: copy_addr [[XADDR]]#1 to [[MEMBER]]
+    // CHECK: [[X:%[0-9]+]] = project_box [[XADDR]]
+    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS_LOCAL]] : $*S, #S.member
+    // CHECK: copy_addr [[X]] to [[MEMBER]]
   }
 
   class SC {
@@ -61,13 +63,13 @@ func g(b b : Bool) {
 }
 
 struct ReferencedFromFunctionStruct {
-  let f: ReferencedFromFunctionStruct -> () = {x in ()}
-  let g: ReferencedFromFunctionEnum -> () = {x in ()}
+  let f: (ReferencedFromFunctionStruct) -> () = {x in ()}
+  let g: (ReferencedFromFunctionEnum) -> () = {x in ()}
 }
 
 enum ReferencedFromFunctionEnum {
-  case f(ReferencedFromFunctionEnum -> ())
-  case g(ReferencedFromFunctionStruct -> ())
+  case f((ReferencedFromFunctionEnum) -> ())
+  case g((ReferencedFromFunctionStruct) -> ())
 }
 
 // CHECK-LABEL: sil hidden @_TF5types34referencedFromFunctionStructFieldsFVS_28ReferencedFromFunctionStructTFS0_T_FOS_26ReferencedFromFunctionEnumT__
@@ -75,18 +77,18 @@ enum ReferencedFromFunctionEnum {
 // CHECK:         [[F]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()
 // CHECK:         [[G:%.*]] = struct_extract [[X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.g
 // CHECK:         [[G]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()
-func referencedFromFunctionStructFields(x: ReferencedFromFunctionStruct)
-    -> (ReferencedFromFunctionStruct -> (), ReferencedFromFunctionEnum -> ()) {
+func referencedFromFunctionStructFields(_ x: ReferencedFromFunctionStruct)
+    -> ((ReferencedFromFunctionStruct) -> (), (ReferencedFromFunctionEnum) -> ()) {
   return (x.f, x.g)
 }
 
 // CHECK-LABEL: sil hidden @_TF5types32referencedFromFunctionEnumFieldsFOS_26ReferencedFromFunctionEnumTGSqFS0_T__GSqFVS_28ReferencedFromFunctionStructT___
 // CHECK:       bb{{[0-9]+}}([[F:%.*]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()):
 // CHECK:       bb{{[0-9]+}}([[G:%.*]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()):
-func referencedFromFunctionEnumFields(x: ReferencedFromFunctionEnum)
+func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
     -> (
-      (ReferencedFromFunctionEnum -> ())?,
-      (ReferencedFromFunctionStruct -> ())?
+      ((ReferencedFromFunctionEnum) -> ())?,
+      ((ReferencedFromFunctionStruct) -> ())?
     ) {
   switch x {
   case .f(let f):

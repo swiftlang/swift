@@ -7,8 +7,10 @@ func getInt() -> Int { return zero }
 
 // CHECK-LABEL: sil hidden @_TF21copy_lvalue_peepholes20init_var_from_lvalue
 // CHECK:   [[X:%.*]] = alloc_box $Builtin.Int64
+// CHECK:   [[PBX:%.*]] = project_box [[X]]
 // CHECK:   [[Y:%.*]] = alloc_box $Builtin.Int64
-// CHECK:   copy_addr [[X]]#1 to [initialization] [[Y]]#1 : $*Builtin.Int64
+// CHECK:   [[PBY:%.*]] = project_box [[Y]]
+// CHECK:   copy_addr [[PBX]] to [initialization] [[PBY]] : $*Builtin.Int64
 func init_var_from_lvalue(x: Int) {
   var x = x
   var y = x
@@ -16,9 +18,11 @@ func init_var_from_lvalue(x: Int) {
 
 // CHECK-LABEL: sil hidden @_TF21copy_lvalue_peepholes22assign_var_from_lvalue
 // CHECK:   [[X:%.*]] = alloc_box $Builtin.Int64
+// CHECK:   [[PBX:%.*]] = project_box [[X]]
 // CHECK:   [[Y:%.*]] = alloc_box $Builtin.Int64
-// CHECK:   copy_addr [[Y]]#1 to [[X]]#1
-func assign_var_from_lvalue(inout x: Int, y: Int) {
+// CHECK:   [[PBY:%.*]] = project_box [[Y]]
+// CHECK:   copy_addr [[PBY]] to [[PBX]]
+func assign_var_from_lvalue(x: inout Int, y: Int) {
   var y = y
   x = y
 }
@@ -42,7 +46,8 @@ func init_var_from_computed_lvalue() {
 
 // CHECK-LABEL: sil hidden @_TF21copy_lvalue_peepholes27assign_computed_from_lvalue
 // CHECK:   [[Y:%.*]] = alloc_box
-// CHECK:   [[Y_VAL:%.*]] = load [[Y]]#1
+// CHECK:   [[PBY:%.*]] = project_box [[Y]]
+// CHECK:   [[Y_VAL:%.*]] = load [[PBY]]
 // CHECK:   [[SETTER:%.*]] = function_ref @_TF21copy_lvalue_peepholess8computedBi64_
 // CHECK:   apply [[SETTER]]([[Y_VAL]])
 func assign_computed_from_lvalue(y: Int) {
@@ -52,7 +57,8 @@ func assign_computed_from_lvalue(y: Int) {
 
 // CHECK-LABEL: sil hidden @_TF21copy_lvalue_peepholes24assign_var_from_computed
 // CHECK:   [[X:%.*]] = alloc_box
-// CHECK:   assign {{%.*}} to [[X]]#1
-func assign_var_from_computed(inout x: Int) {
+// CHECK:   [[PBX:%.*]] = project_box [[X]]
+// CHECK:   assign {{%.*}} to [[PBX]]
+func assign_var_from_computed(x: inout Int) {
   x = computed
 }

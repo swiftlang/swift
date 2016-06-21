@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -38,16 +38,11 @@ enum class tok {
   floating_literal,
   string_literal,
   sil_local_name,      // %42 in SIL mode.
-  pound_if,
-  pound_else,
-  pound_elseif,
-  pound_endif,
-  pound_line,
-  pound_available,
   comment,
   
 #define KEYWORD(X) kw_ ## X,
 #define PUNCTUATOR(X, Y) X,
+#define POUND_KEYWORD(X) pound_ ## X,
 #include "swift/Parse/Tokens.def"
   
   NUM_TOKENS
@@ -190,6 +185,22 @@ public:
     return isAnyOperator() && Text == ContextPunc;
   }
 
+  /// Determine whether the token can be an argument label.
+  ///
+  /// This covers all identifiers and keywords except those keywords
+  /// used
+  bool canBeArgumentLabel() const {
+    // Identifiers, escaped identifiers, and '_' can be argument labels.
+    if (is(tok::identifier) || isEscapedIdentifier() || is(tok::kw__))
+      return true;
+
+    // 'let', 'var', and 'inout' cannot be argument labels.
+    if (isAny(tok::kw_let, tok::kw_var, tok::kw_inout)) return false;
+
+    // All other keywords can be argument labels.
+    return isKeyword();
+  }
+
   /// True if the token is an identifier or '_'.
   bool isIdentifierOrUnderscore() const {
     return isAny(tok::identifier, tok::kw__);
@@ -245,6 +256,9 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(trimComment().begin()));
   }
 
+  StringRef getRawText() const {
+    return Text;
+  }
 
   StringRef getText() const {
     if (EscapedIdentifier) {

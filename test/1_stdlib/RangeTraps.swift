@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,58 +20,42 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var RangeTraps = TestSuite("RangeTraps")
 
 RangeTraps.test("HalfOpen")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var range = 1..<1
-  expectType(Range<Int>.self, &range)
+  expectType(CountableRange<Int>.self, &range)
   
   expectCrashLater()
-  1..<0
+  _ = 1..<0
 }
 
 RangeTraps.test("Closed")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var range = 1...1
-  expectType(Range<Int>.self, &range)
+  expectType(CountableClosedRange<Int>.self, &range)
 
   expectCrashLater()
-  1...0
+  _ = 1...0
 }
 
 RangeTraps.test("OutOfRange")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-  0..<Int.max // This is a Range
+  _ = 0..<Int.max // This is a CountableRange
 
-  // This works for Intervals, but...
-  expectTrue(ClosedInterval(0...Int.max).contains(Int.max))
-
-  // ...no support yet for Ranges containing the maximum representable value
-  expectCrashLater()
-#if arch(i386)  ||  arch(arm)
-  // FIXME <rdar://17670791> Range<Int> bounds checking not enforced in optimized 32-bit
-  1...0  // crash some other way
-#else
-  0...Int.max
-#endif
+  // This works for Ranges now!
+  expectTrue((0...Int.max).contains(Int.max))
 }
 
 runAllTests()

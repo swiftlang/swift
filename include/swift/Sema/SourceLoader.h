@@ -1,8 +1,8 @@
-//===--- SourceLoader.h - Import .swift files as modules --------*- c++ -*-===//
+//===--- SourceLoader.h - Import .swift files as modules --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,16 +25,21 @@ class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
   bool SkipBodies;
+  bool EnableResilience;
 
-  explicit SourceLoader(ASTContext &ctx, bool skipBodies, DependencyTracker *tracker)
-    : ModuleLoader(tracker), Ctx(ctx), SkipBodies(skipBodies) {}
+  explicit SourceLoader(ASTContext &ctx,
+                        bool skipBodies,
+                        bool enableResilience,
+                        DependencyTracker *tracker)
+    : ModuleLoader(tracker), Ctx(ctx),
+      SkipBodies(skipBodies), EnableResilience(enableResilience) {}
 
 public:
   static std::unique_ptr<SourceLoader>
-  create(ASTContext &ctx, bool skipBodies,
+  create(ASTContext &ctx, bool skipBodies, bool enableResilience,
          DependencyTracker *tracker = nullptr) {
     return std::unique_ptr<SourceLoader>{
-      new SourceLoader(ctx, skipBodies, tracker)
+      new SourceLoader(ctx, skipBodies, enableResilience, tracker)
     };
   }
 

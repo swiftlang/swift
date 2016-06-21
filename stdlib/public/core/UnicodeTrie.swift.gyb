@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A custom trie implementation to quickly retrive Unicode property values.
+// A custom trie implementation to quickly retrieve Unicode property values.
 //
 //===----------------------------------------------------------------------===//
 
@@ -44,8 +44,10 @@ SuppDataBytesOffset = 12817
 
 import SwiftShims
 
+// These case names must be kept in sync with the 'GraphemeClusterBreakProperty'
+// enum in C++ and with the names in the GYBUnicodeDataUtils script.
 public // @testable
-enum _GraphemeClusterBreakPropertyValue : Int, CustomStringConvertible {
+enum _GraphemeClusterBreakPropertyValue : Int {
   case Other = 0
   case CR = 1
   case LF = 2
@@ -59,39 +61,6 @@ enum _GraphemeClusterBreakPropertyValue : Int, CustomStringConvertible {
   case T = 10
   case LV = 11
   case LVT = 12
-
-  /// A textual representation of `self`.
-  public // @testable
-  var description: String {
-    switch self {
-    case Other:
-      return "Other"
-    case CR:
-      return "CR"
-    case LF:
-      return "LF"
-    case Control:
-      return "Control"
-    case Extend:
-      return "Extend"
-    case Regional_Indicator:
-      return "Regional_Indicator"
-    case Prepend:
-      return "Prepend"
-    case SpacingMark:
-      return "SpacingMark"
-    case L:
-      return "L"
-    case V:
-      return "V"
-    case T:
-      return "T"
-    case LV:
-      return "LV"
-    case LVT:
-      return "LVT"
-    }
-  }
 }
 
 // It is expensive to convert a raw enum value to an enum, so we use this type
@@ -140,31 +109,31 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
   let _trieData: UnsafePointer<UInt8>
 
 % if BMPLookupBytesPerEntry == 1:
-  @_transparent var _BMPLookup: UnsafePointer<UInt8> {
+  @_transparent var _bmpLookup: UnsafePointer<UInt8> {
     return _trieData + ${BMPLookupBytesOffset}
   }
 % end
 
 % if BMPDataBytesPerEntry == 1:
-  @_transparent var _BMPData: UnsafePointer<UInt8> {
+  @_transparent var _bmpData: UnsafePointer<UInt8> {
     return _trieData + ${BMPDataBytesOffset}
   }
 % end
 
 % if SuppLookup1BytesPerEntry == 1:
-  @_transparent var _SuppLookup1: UnsafePointer<UInt8> {
+  @_transparent var _suppLookup1: UnsafePointer<UInt8> {
     return _trieData + ${SuppLookup1BytesOffset}
   }
 % end
 
 % if SuppLookup2BytesPerEntry == 1:
-  @_transparent var _SuppLookup2: UnsafePointer<UInt8> {
+  @_transparent var _suppLookup2: UnsafePointer<UInt8> {
     return _trieData + ${SuppLookup2BytesOffset}
   }
 % end
 
 % if SuppDataBytesPerEntry == 1:
-  @_transparent var _SuppData: UnsafePointer<UInt8> {
+  @_transparent var _suppData: UnsafePointer<UInt8> {
     return _trieData + ${SuppDataBytesOffset}
   }
 % end
@@ -176,39 +145,33 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
   }
 
   @_transparent
-  @warn_unused_result
-  func _getBMPFirstLevelIndex(cp: UInt32) -> Int {
+  func _getBMPFirstLevelIndex(_ cp: UInt32) -> Int {
     return Int(cp >> ${BMPFirstLevelIndexBits})
   }
 
   @_transparent
-  @warn_unused_result
-  func _getBMPDataOffset(cp: UInt32) -> Int {
+  func _getBMPDataOffset(_ cp: UInt32) -> Int {
     return Int(cp & ((1 << ${BMPDataOffsetBits}) - 1))
   }
 
   @_transparent
-  @warn_unused_result
-  func _getSuppFirstLevelIndex(cp: UInt32) -> Int {
+  func _getSuppFirstLevelIndex(_ cp: UInt32) -> Int {
     return Int(cp >> (${SuppSecondLevelIndexBits} + ${SuppDataOffsetBits}))
   }
 
   @_transparent
-  @warn_unused_result
-  func _getSuppSecondLevelIndex(cp: UInt32) -> Int {
+  func _getSuppSecondLevelIndex(_ cp: UInt32) -> Int {
     return Int((cp >> ${SuppDataOffsetBits}) &
         ((1 << ${SuppSecondLevelIndexBits}) - 1))
   }
 
   @_transparent
-  @warn_unused_result
-  func _getSuppDataOffset(cp: UInt32) -> Int {
+  func _getSuppDataOffset(_ cp: UInt32) -> Int {
     return Int(cp & ((1 << ${SuppDataOffsetBits}) - 1))
   }
 
-  @warn_unused_result
   func getPropertyRawValue(
-      codePoint: UInt32
+      _ codePoint: UInt32
   ) -> _GraphemeClusterBreakPropertyRawValue {
     // Note: for optimization, the code below uses '&+' instead of '+' to avoid
     // a few branches.  There is no possibility of overflow here.
@@ -217,28 +180,27 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
     // if '+' is used.
 
     if _fastPath(codePoint <= 0xffff) {
-      let dataBlockIndex = Int(_BMPLookup[_getBMPFirstLevelIndex(codePoint)])
+      let dataBlockIndex = Int(_bmpLookup[_getBMPFirstLevelIndex(codePoint)])
       return _GraphemeClusterBreakPropertyRawValue(
-          _BMPData[
+          _bmpData[
               (dataBlockIndex << ${BMPDataOffsetBits}) &+
               _getBMPDataOffset(codePoint)])
     } else {
       _precondition(codePoint <= 0x10ffff)
-      let secondLookupIndex = Int(_SuppLookup1[_getSuppFirstLevelIndex(codePoint)])
-      let dataBlockIndex = Int(_SuppLookup2[
+      let secondLookupIndex = Int(_suppLookup1[_getSuppFirstLevelIndex(codePoint)])
+      let dataBlockIndex = Int(_suppLookup2[
           (secondLookupIndex << ${SuppSecondLevelIndexBits}) &+
           _getSuppSecondLevelIndex(codePoint)])
       return _GraphemeClusterBreakPropertyRawValue(
-          _SuppData[
+          _suppData[
               (dataBlockIndex << ${SuppDataOffsetBits}) &+
               _getSuppDataOffset(codePoint)])
     }
   }
 
-  @warn_unused_result
   public // @testable
   func getPropertyValue(
-      codePoint: UInt32
+      _ codePoint: UInt32
   ) -> _GraphemeClusterBreakPropertyValue {
     return getPropertyRawValue(codePoint).cookedValue
   }
@@ -254,17 +216,15 @@ internal struct _UnicodeExtendedGraphemeClusterSegmenter {
 
   /// Returns `true` if there is always a grapheme cluster break after a code
   /// point with a given `Grapheme_Cluster_Break` property value.
-  @warn_unused_result
-  func isBoundaryAfter(gcb: _GraphemeClusterBreakPropertyRawValue) -> Bool {
+  func isBoundaryAfter(_ gcb: _GraphemeClusterBreakPropertyRawValue) -> Bool {
     let ruleRow = _noBoundaryRulesMatrix[Int(gcb.rawValue)]
     return ruleRow == 0
   }
 
   /// Returns `true` if there is a grapheme cluster break between code points
   /// with given `Grapheme_Cluster_Break` property values.
-  @warn_unused_result
   func isBoundary(
-      gcb1: _GraphemeClusterBreakPropertyRawValue,
+      _ gcb1: _GraphemeClusterBreakPropertyRawValue,
       _ gcb2: _GraphemeClusterBreakPropertyRawValue
   ) -> Bool {
     let ruleRow = _noBoundaryRulesMatrix[Int(gcb1.rawValue)]

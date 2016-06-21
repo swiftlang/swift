@@ -16,15 +16,15 @@
 import basic
 import typealias Swift.Optional
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 markUsed(basic.foo(1, 2))
 
 // DWARF: .debug_info
 // DWARF: DW_TAG_module
-// DWARF:   DW_AT_name {{.*}}"Swift"
+// DWARF:   DW_AT_name {{.*}}"Foo"
 // DWARF:   DW_AT_LLVM_include_path
 // DWARF: DW_TAG_module
-// DWARF:   DW_AT_name {{.*}}"Foo"
+// DWARF:   DW_AT_name {{.*}}"Swift"
 // DWARF:   DW_AT_LLVM_include_path
 // DWARF: DW_TAG_module
 // DWARF:   DW_AT_name {{.*}}"basic"

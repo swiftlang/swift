@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -g -emit-ir %s | FileCheck %s
 
-func yieldValues() -> Int64? { return .None }
+func yieldValues() -> Int64? { return .none }
 
 // Verify that variables bound in the while statements are in distinct scopes.
 while let val = yieldValues() {

@@ -1,7 +1,9 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// XFAIL: linux
+import StdlibUnittest
+
+let TypeNameTests = TestSuite("TypeName")
 
 class C {}
 struct S {}
@@ -10,9 +12,9 @@ enum E {}
 protocol P {}
 protocol P2 {}
 protocol AssociatedTypes {
-  typealias A
-  typealias B
-  typealias C
+  associatedtype A
+  associatedtype B
+  associatedtype C
 }
 
 class Model : AssociatedTypes {
@@ -32,99 +34,124 @@ struct GS<T : AssociatedTypes> {}
 enum GE<T : AssociatedTypes> {}
 class GC2<T : AssociatedTypes, U : AssociatedTypes> {}
 
-func printTypeName(t: Any.Type) { print(_typeName(t)) }
+TypeNameTests.test("Prints") {
+  expectEqual("Swift.Int", _typeName(Int.self))
+  expectEqual("main.C", _typeName(C.self))
+  expectEqual("main.S", _typeName(S.self))
+  expectEqual("main.E", _typeName(E.self))
+  expectEqual("main.GC<main.Model>",
+    _typeName(GC<Model>.self))
+  expectEqual("main.GS<main.Model>",
+    _typeName(GS<Model>.self))
+  expectEqual("main.GE<main.Model>",
+    _typeName(GE<Model>.self))
+  expectEqual("main.GC2<main.Model, main.Model2>",
+    _typeName(GC2<Model, Model2>.self))
+  
+  expectEqual("main.P", _typeName(P.self))
+  typealias PP2 = protocol<P, P2>
+  expectEqual("protocol<main.P, main.P2>",
+    _typeName(PP2.self))
+  expectEqual("protocol<>", _typeName(Any.self))
 
-printTypeName(Int.self) // CHECK: Swift.Int
-printTypeName(C.self) // CHECK-NEXT: [[THIS:.*]].C
-printTypeName(S.self) // CHECK-NEXT: [[THIS]].S
-printTypeName(E.self) // CHECK-NEXT: [[THIS]].E
-printTypeName(GC<Model>.self) // CHECK-NEXT: [[THIS]].GC<[[THIS]].Model>
-printTypeName(GS<Model>.self) // CHECK-NEXT: [[THIS]].GS<[[THIS]].Model>
-printTypeName(GE<Model>.self) // CHECK-NEXT: [[THIS]].GE<[[THIS]].Model>
-printTypeName(GC2<Model, Model2>.self) // CHECK-NEXT: [[THIS]].GC2<[[THIS]].Model, [[THIS]].Model2>
+  typealias F = () -> ()
+  typealias F2 = () -> () -> ()
+  typealias F3 = (() -> ()) -> ()
 
-printTypeName(P.self) // CHECK-NEXT: [[THIS]].P
-typealias PP2 = protocol<P, P2>
-printTypeName(PP2.self) // CHECK-NEXT: protocol<[[THIS]].P, [[THIS]].P2>
-printTypeName(Any.self) // CHECK-NEXT: protocol<>
+  expectEqual("(()) -> ()", _typeName(F.self))
+  expectEqual("(()) -> (()) -> ()", _typeName(F2.self))
+  expectEqual("(((()) -> ())) -> ()", _typeName(F3.self))
 
-typealias F = () -> ()
-typealias F2 = () -> () -> ()
-typealias F3 = (() -> ()) -> ()
+  #if _runtime(_ObjC)
+  typealias B = @convention(block) () -> ()
+  typealias B2 = () -> @convention(block) () -> ()
+  typealias B3 = (@convention(block) () -> ()) -> ()
+  expectEqual("@convention(block) (()) -> ()", _typeName(B.self))
+  expectEqual("(()) -> @convention(block) (()) -> ()",
+    _typeName(B2.self))
+  expectEqual("((@convention(block) (()) -> ())) -> ()",
+    _typeName(B3.self))
+  #endif
 
-printTypeName(F.self) // CHECK-NEXT: () -> ()
-printTypeName(F2.self) // CHECK-NEXT: () -> () -> ()
-printTypeName(F3.self) // CHECK-NEXT: (() -> ()) -> ()
+  expectEqual("((()) -> ()).Type", _typeName(F.Type.self))
+  expectEqual("main.C.Type", _typeName(C.Type.self))
+  expectEqual("main.C.Type.Type", _typeName(C.Type.Type.self))
+  expectEqual("protocol<>.Type", _typeName(Any.Type.self))
+  expectEqual("protocol<>.Protocol", _typeName(Any.Protocol.self))
+  expectEqual("Swift.AnyObject", _typeName(AnyObject.self))
+  expectEqual("Swift.AnyObject.Type", _typeName(AnyClass.self))
+  expectEqual("Swift.Optional<Swift.AnyObject>",
+    _typeName((AnyObject?).self))
+  expectEqual("()", _typeName(Void.self))
 
-typealias B = @convention(block) () -> ()
-typealias B2 = () -> @convention(block) () -> ()
-typealias B3 = (@convention(block) () -> ()) -> ()
 
-printTypeName(B.self) // CHECK-NEXT: @convention(block) () -> ()
-printTypeName(B2.self) // CHECK-NEXT: () -> @convention(block) () -> ()
-printTypeName(B3.self) // CHECK-NEXT: (@convention(block) () -> ()) -> ()
-
-printTypeName(F.Type.self) // CHECK-NEXT: (() -> ()).Type
-printTypeName(C.Type.self) // CHECK-NEXT: [[THIS]].C.Type
-printTypeName(C.Type.Type.self) // CHECK-NEXT: [[THIS]].C.Type.Type
-printTypeName(Any.Type.self) // CHECK-NEXT: protocol<>.Type
-printTypeName(Any.Protocol.self) // CHECK-NEXT: protocol<>.Protocol
-printTypeName(AnyObject.self) // CHECK-NEXT: {{^}}Swift.AnyObject{{$}}
-printTypeName(AnyClass.self) // CHECK-NEXT: {{^}}Swift.AnyObject.Type{{$}}
-printTypeName((AnyObject?).self) // CHECK-NEXT: {{^}}Swift.Optional<Swift.AnyObject>{{$}}
-
-printTypeName(Void.self) // CHECK-NEXT: ()
-typealias Tup = (Any, F, C)
-printTypeName(Tup.self) // CHECK-NEXT: (protocol<>, () -> (), [[THIS]].C)
-
-typealias IF = inout Int -> ()
-typealias IF2 = inout Int -> inout Int -> ()
-typealias IF3 = (inout Int -> ()) -> ()
-typealias IF3a = (inout (Int -> ())) -> ()
-typealias IF3b = inout (Int -> ()) -> ()
-typealias IF3c = ((inout Int) -> ()) -> ()
-typealias IF4 = inout (() -> ()) -> ()
-typealias IF5 = (inout Int, Any) -> ()
-
-printTypeName(IF.self) // CHECK-NEXT: inout Swift.Int -> ()
-printTypeName(IF2.self) // CHECK-NEXT: inout Swift.Int -> inout Swift.Int -> ()
-printTypeName(IF3.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
-printTypeName(IF3a.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
-printTypeName(IF3b.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
-printTypeName(IF3c.self) // CHECK-NEXT: (inout Swift.Int -> ()) -> ()
-printTypeName(IF4.self) // CHECK-NEXT: inout (() -> ()) -> ()
-printTypeName(IF5.self) // CHECK-NEXT: (inout Swift.Int, protocol<>) -> ()
-
-func curry1() {
-
+  typealias Tup = (Any, F, C)
+  expectEqual("(protocol<>, (()) -> (), main.C)",
+    _typeName(Tup.self))
 }
 
-func curry1Throws() throws {
+TypeNameTests.test("Inout") {
+  typealias IF = (inout Int) -> ()
+  typealias IF2 = (inout Int) -> (inout Int) -> ()
+  typealias IF3 = ((inout Int) -> ()) -> ()
+  typealias IF3a = (inout ((Int) -> ())) -> ()
+  typealias IF3b = (inout ((Int) -> ())) -> ()
+  typealias IF3c = ((inout Int) -> ()) -> ()
+  typealias IF4 = (inout (() -> ())) -> ()
+  typealias IF5 = (inout Int, Any) -> ()
 
+  expectEqual("(inout Swift.Int) -> ()", _typeName(IF.self))
+  expectEqual("(inout Swift.Int) -> (inout Swift.Int) -> ()",
+    _typeName(IF2.self))
+  expectEqual("(((inout Swift.Int) -> ())) -> ()",
+    _typeName(IF3.self))
+  expectEqual("(inout ((Swift.Int) -> ())) -> ()",
+    _typeName(IF3a.self))
+  expectEqual("(inout ((Swift.Int) -> ())) -> ()",
+    _typeName(IF3b.self))
+  expectEqual("(((inout Swift.Int) -> ())) -> ()",
+    _typeName(IF3c.self))
+  expectEqual("(inout ((()) -> ())) -> ()",
+    _typeName(IF4.self))
+  expectEqual("(inout Swift.Int, protocol<>) -> ()",
+    _typeName(IF5.self))
 }
 
-func curry2() -> () -> () {
-	return curry1
+TypeNameTests.test("Functions") {
+  func curry1() {
+
+  }
+
+  func curry1Throws() throws {
+
+  }
+
+  func curry2() -> () -> () {
+    return curry1
+  }
+
+  func curry2Throws() throws -> () -> () {
+    return curry1
+  }
+
+  func curry3() -> () throws -> () {
+    return curry1Throws
+  }
+
+  func curry3Throws() throws -> () throws -> () {
+    return curry1Throws
+  }
+
+  expectEqual("(()) -> ()",
+    _typeName(curry1.dynamicType))
+  expectEqual("(()) -> (()) -> ()",
+    _typeName(curry2.dynamicType))
+  expectEqual("(()) throws -> (()) -> ()",
+    _typeName(curry2Throws.dynamicType))
+  expectEqual("(()) -> (()) throws -> ()",
+    _typeName(curry3.dynamicType))
+  expectEqual("(()) throws -> (()) throws -> ()",
+    _typeName(curry3Throws.dynamicType))
 }
 
-func curry2Throws() throws -> () -> () {
-	return curry1
-}
-
-func curry3() -> () throws -> () {
-	return curry1Throws
-}
-
-func curry3Throws() throws -> () throws -> () {
-	return curry1Throws
-}
-
-printTypeName(curry1.dynamicType) // CHECK-NEXT: () -> ()
-
-printTypeName(curry2.dynamicType) // CHECK-NEXT: () -> () -> ()
-
-printTypeName(curry2Throws.dynamicType) // CHECK-NEXT: () throws -> () -> ()
-
-printTypeName(curry3.dynamicType) // CHECK-NEXT: () -> () throws -> ()
-
-printTypeName(curry3Throws.dynamicType) // CHECK-NEXT: () throws -> () throws -> ()
+runAllTests()

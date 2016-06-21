@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,7 +17,6 @@
 #include "swift/SIL/Mangle.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/Module.h"
@@ -46,23 +45,32 @@ using namespace Mangle;
 //===----------------------------------------------------------------------===//
 
 static void mangleSubstitution(Mangler &M, Substitution Sub) {
-  M.mangleType(Sub.getReplacement()->getCanonicalType(),
-               ResilienceExpansion::Minimal, 0);
+  M.mangleType(Sub.getReplacement()->getCanonicalType(), 0);
   for (auto C : Sub.getConformances()) {
-    if (!C)
+    if (C.isAbstract())
       return;
-    M.mangleProtocolConformance(C);
+    M.mangleProtocolConformance(C.getConcrete());
   }
 }
 
 void GenericSpecializationMangler::mangleSpecialization() {
   Mangler &M = getMangler();
-  llvm::raw_ostream &Buf = getBuffer();
 
-  for (auto &Sub : Subs) {
-    mangleSubstitution(M, Sub);
-    Buf << '_';
+  SILFunctionType *FTy = Function->getLoweredFunctionType();
+  CanGenericSignature Sig = FTy->getGenericSignature();
+
+  unsigned idx = 0;
+  for (Type DepType : Sig->getAllDependentTypes()) {
+    // It is sufficient to only mangle the substitutions of the "primary"
+    // dependent types. As all other dependent types are just derived from the
+    // primary types, this will give us unique symbol names.
+    if (DepType->is<GenericTypeParamType>()) {
+      mangleSubstitution(M, Subs[idx]);
+      M.append('_');
+    }
+    ++idx;
   }
+  assert(idx == Subs.size() && "subs not parallel to dependent types");
 }
 
 //===----------------------------------------------------------------------===//
@@ -71,18 +79,20 @@ void GenericSpecializationMangler::mangleSpecialization() {
 
 FunctionSignatureSpecializationMangler::
 FunctionSignatureSpecializationMangler(SpecializationPass P, Mangler &M,
-                                       SILFunction *F)
-  : SpecializationMangler(SpecializationKind::FunctionSignature, P, M, F) {
-  for (unsigned i : indices(F->getLoweredFunctionType()->getParameters())) {
+                                       IsFragile_t Fragile, SILFunction *F)
+  : SpecializationMangler(SpecializationKind::FunctionSignature, P, M, Fragile, F) {
+  for (unsigned i = 0, e = F->getLoweredFunctionType()->getNumSILArguments();
+       i != e; ++i) {
     (void)i;
     Args.push_back({ArgumentModifierIntBase(ArgumentModifier::Unmodified), nullptr});
   }
+  ReturnValue = ReturnValueModifierIntBase(ReturnValueModifier::Unmodified);
 }
 
 void
 FunctionSignatureSpecializationMangler::
 setArgumentDead(unsigned ArgNo) {
-  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::Dead);
+  Args[ArgNo].first |= ArgumentModifierIntBase(ArgumentModifier::Dead);
 }
 
 void
@@ -123,17 +133,28 @@ setArgumentSROA(unsigned ArgNo) {
 
 void
 FunctionSignatureSpecializationMangler::
-setArgumentInOutToValue(unsigned ArgNo) {
-  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::InOutToValue);
+setArgumentBoxToValue(unsigned ArgNo) {
+  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::BoxToValue);
+}
+
+void
+FunctionSignatureSpecializationMangler::
+setArgumentBoxToStack(unsigned ArgNo) {
+  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::BoxToStack);
+}
+
+void
+FunctionSignatureSpecializationMangler::
+setReturnValueOwnedToUnowned() {
+  ReturnValue |= ReturnValueModifierIntBase(ReturnValueModifier::OwnedToUnowned);
 }
 
 void
 FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
   Mangler &M = getMangler();
-  llvm::raw_ostream &os = getBuffer();
 
   // Append the prefix for constant propagation 'cp'.
-  os << "cp";
+  M.append("cp");
 
   // Then append the unique identifier of our literal.
   switch (LI->getKind()) {
@@ -141,36 +162,40 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
     llvm_unreachable("unknown literal");
   case ValueKind::FunctionRefInst: {
     SILFunction *F = cast<FunctionRefInst>(LI)->getReferencedFunction();
-    os << "fr";
-    M.mangleIdentifier(F->getName());
+    M.append("fr");
+    M.mangleIdentifierSymbol(F->getName());
     break;
   }
   case ValueKind::GlobalAddrInst: {
     SILGlobalVariable *G = cast<GlobalAddrInst>(LI)->getReferencedGlobal();
-    os << "g";
-    M.mangleIdentifier(G->getName());
+    M.append("g");
+    M.mangleIdentifierSymbol(G->getName());
     break;
   }
   case ValueKind::IntegerLiteralInst: {
     APInt apint = cast<IntegerLiteralInst>(LI)->getValue();
-    os << "i" << apint;
+    M.append("i");
+    M.mangleNatural(apint);
     break;
   }
   case ValueKind::FloatLiteralInst: {
     APInt apint = cast<FloatLiteralInst>(LI)->getBits();
-    os << "fl" << apint;
+    M.append("fl");
+    M.mangleNatural(apint);
     break;
   }
   case ValueKind::StringLiteralInst: {
     StringLiteralInst *SLI = cast<StringLiteralInst>(LI);
     StringRef V = SLI->getValue();
 
-    assert(V.size() <= 32 && "Can not encode string of length > 32");
+    assert(V.size() <= 32 && "Cannot encode string of length > 32");
 
     llvm::SmallString<33> Str;
     Str += "u";
     Str += V;
-    os << "se" << unsigned(SLI->getEncoding()) << "v";
+    M.append("se");
+    M.mangleNatural(APInt(32, unsigned(SLI->getEncoding())));
+    M.append("v");
     M.mangleIdentifier(Str);
     break;
   }
@@ -181,38 +206,34 @@ void
 FunctionSignatureSpecializationMangler::
 mangleClosureProp(PartialApplyInst *PAI) {
   Mangler &M = getMangler();
-  llvm::raw_ostream &os = getBuffer();
-
-  os << "cl";
+  M.append("cl");
 
   // Add in the partial applies function name if we can find one. Assert
   // otherwise. The reason why this is ok to do is currently we only perform
   // closure specialization if we know the function_ref in question. When this
   // restriction is removed, the assert here will fire.
   auto *FRI = cast<FunctionRefInst>(PAI->getCallee());
-  M.mangleIdentifier(FRI->getReferencedFunction()->getName());
+  M.mangleIdentifierSymbol(FRI->getReferencedFunction()->getName());
 
   // Then we mangle the types of the arguments that the partial apply is
   // specializing.
   for (auto &Op : PAI->getArgumentOperands()) {
-    SILType Ty = Op.get().getType();
-    M.mangleType(Ty.getSwiftRValueType(), ResilienceExpansion::Minimal, 0);
+    SILType Ty = Op.get()->getType();
+    M.mangleType(Ty.getSwiftRValueType(), 0);
   }
 }
 
 void FunctionSignatureSpecializationMangler::mangleClosureProp(
     ThinToThickFunctionInst *TTTFI) {
   Mangler &M = getMangler();
-  llvm::raw_ostream &os = getBuffer();
-
-  os << "cl";
+  M.append("cl");
 
   // Add in the partial applies function name if we can find one. Assert
   // otherwise. The reason why this is ok to do is currently we only perform
   // closure specialization if we know the function_ref in question. When this
   // restriction is removed, the assert here will fire.
   auto *FRI = cast<FunctionRefInst>(TTTFI->getCallee());
-  M.mangleIdentifier(FRI->getReferencedFunction()->getName());
+  M.mangleIdentifierSymbol(FRI->getReferencedFunction()->getName());
 }
 
 void FunctionSignatureSpecializationMangler::mangleArgument(
@@ -233,44 +254,63 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
     return;
   }
 
-  llvm::raw_ostream &os = getBuffer();
-
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::Unmodified)) {
-    os << "n";
+    M.append("n");
     return;
   }
 
-  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::InOutToValue)) {
-    os << "i";
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToValue)) {
+    M.append("i");
+    return;
+  }
+
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToStack)) {
+    M.append("k");
     return;
   }
 
   bool hasSomeMod = false;
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::Dead)) {
-    os << "d";
+    M.append("d");
     hasSomeMod = true;
   }
 
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::OwnedToGuaranteed)) {
-    os << "g";
+    M.append("g");
     hasSomeMod = true;
   }
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::SROA)) {
-    os << "s";
+    M.append("s");
     hasSomeMod = true;
   }
 
   assert(hasSomeMod && "Unknown modifier");
 }
 
+void FunctionSignatureSpecializationMangler::
+mangleReturnValue(ReturnValueModifierIntBase RetMod) {
+  if (RetMod == ReturnValueModifierIntBase(ReturnValueModifier::Unmodified)) {
+    return;
+  }
+
+  if (RetMod & ReturnValueModifierIntBase(ReturnValueModifier::Dead)) {
+    M.append("d");
+  }
+
+  if (RetMod & ReturnValueModifierIntBase(ReturnValueModifier::OwnedToUnowned)) {
+    M.append("g");
+  }
+}
+
 void FunctionSignatureSpecializationMangler::mangleSpecialization() {
-  llvm::raw_ostream &os = getBuffer();
 
   for (unsigned i : indices(Args)) {
     ArgumentModifierIntBase ArgMod;
     NullablePtr<SILInstruction> Inst;
     std::tie(ArgMod, Inst) = Args[i];
     mangleArgument(ArgMod, Inst);
-    os << "_";
+    M.append("_");
   }
+
+  mangleReturnValue(ReturnValue);
 }

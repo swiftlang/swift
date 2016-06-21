@@ -149,7 +149,7 @@ struct decl_struct_1 {
   /// NestedEnum Aaa.
   enum NestedEnum {}
 
-  // Can not declare a nested protocol.
+  // Cannot declare a nested protocol.
   // protocol NestedProtocol {}
 
   /// NestedTypealias Aaa.
@@ -184,7 +184,7 @@ class decl_class_1 {
 /// decl_protocol_1 Aaa.
 protocol decl_protocol_1 {
   /// NestedTypealias Aaa.
-  typealias NestedTypealias
+  associatedtype NestedTypealias
 
   /// instanceFunc1 Aaa.
   func instanceFunc1()
@@ -277,7 +277,7 @@ func unterminatedBlockDocComment() {}
 // CHECK-NEXT: comment_attach.swift:135:8: Func/decl_struct_1.instanceFunc4 RawComment=[/// instanceFunc4 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:138:3: Constructor/decl_struct_1.init RawComment=[/// init().  Aaa.\n] BriefComment=[init().  Aaa.]
 // CHECK-NEXT: comment_attach.swift:141:3: Subscript/decl_struct_1.subscript RawComment=[/// subscript Aaa.\n]
-// CHECK-NEXT: comment_attach.swift:141:13: Param/decl_struct_1.i RawComment=none
+// CHECK-NEXT: comment_attach.swift:141:13: Param/i RawComment=none
 // CHECK-NEXT: comment_attach.swift:141:31: Func/decl_struct_1.<getter for decl_struct_1.subscript> RawComment=none
 // CHECK-NEXT: comment_attach.swift:144:10: Struct/decl_struct_1.NestedStruct RawComment=[/// NestedStruct Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:147:9: Class/decl_struct_1.NestedClass RawComment=[/// NestedClass Aaa.\n]
@@ -293,13 +293,14 @@ func unterminatedBlockDocComment() {}
 // CHECK-NEXT: comment_attach.swift:177:15: EnumElement/decl_enum_1.Case5 RawComment=[/// Case4 Case5 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:181:7: Class/decl_class_1 RawComment=[/// decl_class_1 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:185:10: Protocol/decl_protocol_1 RawComment=[/// decl_protocol_1 Aaa.\n]
-// CHECK-NEXT: comment_attach.swift:187:13: AssociatedType/decl_protocol_1.NestedTypealias RawComment=[/// NestedTypealias Aaa.\n]
+// CHECK-NEXT: comment_attach.swift:187:18: AssociatedType/decl_protocol_1.NestedTypealias RawComment=[/// NestedTypealias Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:190:8: Func/decl_protocol_1.instanceFunc1 RawComment=[/// instanceFunc1 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:193:7: Var/decl_protocol_1.propertyWithGet RawComment=[/// propertyWithGet Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:193:30: Func/decl_protocol_1.<getter for decl_protocol_1.propertyWithGet> RawComment=none
 // CHECK-NEXT: comment_attach.swift:196:7: Var/decl_protocol_1.propertyWithGetSet RawComment=[/// propertyWithGetSet Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:196:33: Func/decl_protocol_1.<getter for decl_protocol_1.propertyWithGetSet> RawComment=none
 // CHECK-NEXT: comment_attach.swift:196:37: Func/decl_protocol_1.<setter for decl_protocol_1.propertyWithGetSet> RawComment=none
+// CHECK-NEXT: comment_attach.swift:203:1: Extension/ RawComment=[/// decl_extension_1 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:207:6: Func/emptyBlockDocComment RawComment=[/***/]
 // CHECK-NEXT: comment_attach.swift:210:6: Func/weirdBlockDocComment RawComment=[/**/]
 // CHECK-NEXT: comment_attach.swift:217:6: Func/docCommentWithGybLineNumber RawComment=[/// docCommentWithGybLineNumber Aaa.\n/// Bbb.\n/// Ccc.\n]

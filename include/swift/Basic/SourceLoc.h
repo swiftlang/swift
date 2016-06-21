@@ -1,8 +1,8 @@
-//===- SourceLoc.h - Source Locations and Ranges ----------------*- C++ -*-===//
+//===--- SourceLoc.h - Source Locations and Ranges --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SOURCELOC_H
-#define SWIFT_SOURCELOC_H
+#ifndef SWIFT_BASIC_SOURCELOC_H
+#define SWIFT_BASIC_SOURCELOC_H
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
@@ -41,10 +41,10 @@ public:
   explicit SourceLoc(llvm::SMLoc Value) : Value(Value) {}
   
   bool isValid() const { return Value.isValid(); }
-  bool isInvalid() const { return !Value.isValid(); }
+  bool isInvalid() const { return !isValid(); }
   
   bool operator==(const SourceLoc &RHS) const { return RHS.Value == Value; }
-  bool operator!=(const SourceLoc &RHS) const { return RHS.Value != Value; }
+  bool operator!=(const SourceLoc &RHS) const { return !operator==(RHS); }
   
   /// Return a source location advanced a specified number of bytes.
   SourceLoc getAdvancedLoc(int ByteOffset) const {
@@ -87,14 +87,19 @@ public:
   SourceLoc Start, End;
 
   SourceRange() {}
-  SourceRange(SourceLoc Loc) : Start(Loc), End(Loc) { }
+  SourceRange(SourceLoc Loc) : Start(Loc), End(Loc) {}
   SourceRange(SourceLoc Start, SourceLoc End) : Start(Start), End(End) {
     assert(Start.isValid() == End.isValid() &&
            "Start and end should either both be valid or both be invalid!");
   }
   
   bool isValid() const { return Start.isValid(); }
-  bool isInvalid() const { return Start.isInvalid(); }
+  bool isInvalid() const { return !isValid(); }
+
+  bool operator==(const SourceRange &other) const {
+    return Start == other.Start && End == other.End;
+  }
+  bool operator!=(const SourceRange &other) const { return !operator==(other); }
 
   /// Print out the SourceRange.  If the locations are in the same buffer
   /// as specified by LastBufferID, then we don't print the filename.  If not,
@@ -122,7 +127,7 @@ public:
   CharSourceRange() {}
 
   CharSourceRange(SourceLoc Start, unsigned ByteLength)
-    : Start(Start), ByteLength(ByteLength) { }
+    : Start(Start), ByteLength(ByteLength) {}
 
   /// \brief Constructs a character range which starts and ends at the
   /// specified character locations.
@@ -132,15 +137,17 @@ public:
   CharSourceRange(const SourceManager &SM, SourceRange Range) = delete;
 
   bool isValid() const { return Start.isValid(); }
-  bool isInvalid() const { return Start.isInvalid(); }
+  bool isInvalid() const { return !isValid(); }
+
+  bool operator==(const CharSourceRange &other) const {
+    return Start == other.Start && ByteLength == other.ByteLength;
+  }
+  bool operator!=(const CharSourceRange &other) const {
+    return !operator==(other);
+  }
 
   SourceLoc getStart() const { return Start; }
-  SourceLoc getEnd() const {
-    if (Start.isValid())
-      return Start.getAdvancedLoc(ByteLength);
-    else
-      return SourceLoc();
-  }
+  SourceLoc getEnd() const { return Start.getAdvancedLocOrInvalid(ByteLength); }
 
   /// Returns true if the given source location is contained in the range.
   bool contains(SourceLoc loc) const {
@@ -202,4 +209,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_SOURCELOC_H

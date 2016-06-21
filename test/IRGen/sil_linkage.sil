@@ -2,23 +2,35 @@
 
 sil_stage canonical
 
-// CHECK: define void @public_fragile_function_test() {{.*}} {
-// CHECK: define void @hidden_fragile_function_test() {{.*}} {
+// CHECK: define{{( protected)?}} void @public_fragile_function_test() {{.*}} {
+// CHECK: define{{( protected)?}} internal void @public_transparent_fragile_function_test() {{.*}} {
+// CHECK: define{{( protected)?}} void @public_transparent_function_test() {{.*}} {
+// CHECK: define{{( protected)?}} void @hidden_fragile_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden void @shared_fragile_function_test() {{.*}} {
-// CHECK: define void @private_fragile_function_test() {{.*}} {
+// CHECK: define{{( protected)?}} void @private_fragile_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden void @public_external_fragile_function_def_test() {{.*}} {
-// CHECK: define available_externally void @hidden_external_fragile_function_def_test() {{.*}} {
+// CHECK: define{{( protected)?}} available_externally void @hidden_external_fragile_function_def_test() {{.*}} {
 // CHECK: define linkonce_odr hidden void @shared_external_fragile_function_def_test() {{.*}} {
-// CHECK: define available_externally void @private_external_fragile_function_def_test() {{.*}} {
-// CHECK: define void @public_resilient_function_test() {{.*}} {
+// CHECK: define{{( protected)?}} available_externally void @private_external_fragile_function_def_test() {{.*}} {
+// CHECK: define{{( protected)?}} void @public_resilient_function_test() {{.*}} {
 // CHECK: define hidden void @hidden_resilient_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden void @shared_resilient_function_test() {{.*}} {
 // CHECK: define internal void @private_resilient_function_test() {{.*}}{
 // CHECK: define linkonce_odr hidden void @public_external_resilient_function_def_test() {{.*}} {
-// CHECK: define available_externally hidden void @hidden_external_resilient_function_def_test() {{.*}} {
+// CHECK: define{{( protected)?}} available_externally hidden void @hidden_external_resilient_function_def_test() {{.*}} {
 // CHECK: define linkonce_odr hidden void @shared_external_resilient_function_def_test() {{.*}} {
 
 sil public [fragile] @public_fragile_function_test : $@convention(thin) () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+sil public [transparent] [fragile] @public_transparent_fragile_function_test : $@convention(thin) () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+sil public [transparent] @public_transparent_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
@@ -122,6 +134,8 @@ sil hidden_external @hidden_external_resilient_function_decl_test : $@convention
 
 sil public @use_all_symbols : $@convention(thin) () -> () {
   %0 = function_ref @public_fragile_function_test : $@convention(thin) () -> ()
+  %t0 = function_ref @public_transparent_fragile_function_test : $@convention(thin) () -> ()
+  %t1 = function_ref @public_transparent_function_test : $@convention(thin) () -> ()
   %1 = function_ref @hidden_fragile_function_test : $@convention(thin) () -> ()
   %2 = function_ref @shared_fragile_function_test : $@convention(thin) () -> ()
   %3 = function_ref @private_fragile_function_test : $@convention(thin) () -> ()

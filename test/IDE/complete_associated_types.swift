@@ -23,28 +23,28 @@
 // FIXME: extensions that introduce conformances?
 
 protocol FooBaseProtocolWithAssociatedTypes {
-  typealias DefaultedTypeCommonA = Int
-  typealias DefaultedTypeCommonB = Int
-  typealias DefaultedTypeCommonC = Int
-  typealias DefaultedTypeCommonD = Int
+  associatedtype DefaultedTypeCommonA = Int
+  associatedtype DefaultedTypeCommonB = Int
+  associatedtype DefaultedTypeCommonC = Int
+  associatedtype DefaultedTypeCommonD = Int
 
-  typealias FooBaseDefaultedTypeA = Int
-  typealias FooBaseDefaultedTypeB = Int
-  typealias FooBaseDefaultedTypeC = Int
+  associatedtype FooBaseDefaultedTypeA = Int
+  associatedtype FooBaseDefaultedTypeB = Int
+  associatedtype FooBaseDefaultedTypeC = Int
 
-  typealias DeducedTypeCommonA
-  typealias DeducedTypeCommonB
-  typealias DeducedTypeCommonC
-  typealias DeducedTypeCommonD
+  associatedtype DeducedTypeCommonA
+  associatedtype DeducedTypeCommonB
+  associatedtype DeducedTypeCommonC
+  associatedtype DeducedTypeCommonD
   func deduceCommonA() -> DeducedTypeCommonA
   func deduceCommonB() -> DeducedTypeCommonB
   func deduceCommonC() -> DeducedTypeCommonC
   func deduceCommonD() -> DeducedTypeCommonD
 
-  typealias FooBaseDeducedTypeA
-  typealias FooBaseDeducedTypeB
-  typealias FooBaseDeducedTypeC
-  typealias FooBaseDeducedTypeD
+  associatedtype FooBaseDeducedTypeA
+  associatedtype FooBaseDeducedTypeB
+  associatedtype FooBaseDeducedTypeC
+  associatedtype FooBaseDeducedTypeD
   func deduceFooBaseA() -> FooBaseDeducedTypeA
   func deduceFooBaseB() -> FooBaseDeducedTypeB
   func deduceFooBaseC() -> FooBaseDeducedTypeC
@@ -52,35 +52,35 @@ protocol FooBaseProtocolWithAssociatedTypes {
 }
 protocol FooProtocolWithAssociatedTypes : FooBaseProtocolWithAssociatedTypes {
   // From FooBase.
-  typealias DefaultedTypeCommonA = Int
-  typealias DefaultedTypeCommonB = Int
+  associatedtype DefaultedTypeCommonA = Int
+  associatedtype DefaultedTypeCommonB = Int
 
-  typealias FooBaseDefaultedTypeB = Double
+  associatedtype FooBaseDefaultedTypeB = Double
 
-  typealias DeducedTypeCommonA
-  typealias DeducedTypeCommonB
+  associatedtype DeducedTypeCommonA
+  associatedtype DeducedTypeCommonB
   func deduceCommonA() -> DeducedTypeCommonA
   func deduceCommonB() -> DeducedTypeCommonB
 
   func deduceFooBaseB() -> Int
 
   // New decls.
-  typealias FooDefaultedType = Int
+  associatedtype FooDefaultedType = Int
 
-  typealias FooDeducedTypeB
-  typealias FooDeducedTypeC
-  typealias FooDeducedTypeD
+  associatedtype FooDeducedTypeB
+  associatedtype FooDeducedTypeC
+  associatedtype FooDeducedTypeD
   func deduceFooB() -> FooDeducedTypeB
   func deduceFooC() -> FooDeducedTypeC
   func deduceFooD() -> FooDeducedTypeD
 }
 protocol BarBaseProtocolWithAssociatedTypes {
   // From FooBase.
-  typealias DefaultedTypeCommonA = Int
-  typealias DefaultedTypeCommonC = Int
+  associatedtype DefaultedTypeCommonA = Int
+  associatedtype DefaultedTypeCommonC = Int
 
-  typealias DeducedTypeCommonA
-  typealias DeducedTypeCommonC
+  associatedtype DeducedTypeCommonA
+  associatedtype DeducedTypeCommonC
   func deduceCommonA() -> DeducedTypeCommonA
   func deduceCommonC() -> DeducedTypeCommonC
 
@@ -90,20 +90,20 @@ protocol BarBaseProtocolWithAssociatedTypes {
   func deduceFooC() -> Int
 
   // New decls.
-  typealias BarBaseDefaultedType = Int
+  associatedtype BarBaseDefaultedType = Int
 
-  typealias BarBaseDeducedTypeC
-  typealias BarBaseDeducedTypeD
+  associatedtype BarBaseDeducedTypeC
+  associatedtype BarBaseDeducedTypeD
   func deduceBarBaseC() -> BarBaseDeducedTypeC
   func deduceBarBaseD() -> BarBaseDeducedTypeD
 }
 protocol BarProtocolWithAssociatedTypes : BarBaseProtocolWithAssociatedTypes {
   // From FooBase.
-  typealias DefaultedTypeCommonA = Int
-  typealias DefaultedTypeCommonD = Int
+  associatedtype DefaultedTypeCommonA = Int
+  associatedtype DefaultedTypeCommonD = Int
 
-  typealias DeducedTypeCommonA
-  typealias DeducedTypeCommonD
+  associatedtype DeducedTypeCommonA
+  associatedtype DeducedTypeCommonD
   func deduceCommonA() -> DeducedTypeCommonA
   func deduceCommonD() -> DeducedTypeCommonD
 
@@ -116,9 +116,9 @@ protocol BarProtocolWithAssociatedTypes : BarBaseProtocolWithAssociatedTypes {
   func deduceBarBaseD() -> Int
 
   // New decls.
-  typealias BarDefaultedTypeA = Int
+  associatedtype BarDefaultedTypeA = Int
 
-  typealias BarDeducedTypeD
+  associatedtype BarDeducedTypeD
   func deduceBarD() -> BarDeducedTypeD
 }
 
@@ -209,7 +209,7 @@ func testStruct3(a: StructWithAssociatedTypes) {
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .BarBaseDeducedTypeC[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .BarBaseDeducedTypeD[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DefaultedTypeCommonB[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-FIXME-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeB[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeB[#Double#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DeducedTypeCommonB[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooDefaultedType[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooDeducedTypeB[#Int#]{{; name=.+$}}
@@ -220,7 +220,7 @@ func testStruct3(a: StructWithAssociatedTypes) {
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeB[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeC[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeD[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal: .FooBaseDefaultedTypeC[#Double#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeC[#Double#]{{; name=.+$}}
 // STRUCT_TYPES: End completions
 
 class DerivedFromClassWithAssociatedTypes : ClassWithAssociatedTypes {
@@ -246,14 +246,14 @@ class MoreDerivedFromClassWithAssociatedTypes : DerivedFromClassWithAssociatedTy
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: BarBaseDeducedTypeC[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: BarBaseDeducedTypeD[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DefaultedTypeCommonB[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG-FIXME: Decl[TypeAlias]/Super: FooBaseDefaultedTypeB[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeB[#Double#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DeducedTypeCommonB[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDefaultedType[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDeducedTypeB[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDeducedTypeC[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDeducedTypeD[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeA[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeC[#Double#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeB[#Double#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeA[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeB[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeC[#Int#]{{; name=.+$}}
@@ -266,7 +266,7 @@ struct StructWithBrokenConformance : FooProtocolWithAssociatedTypes {
 func testBrokenConformances1() {
   StructWithBrokenConformance.#^BROKEN_CONFORMANCE_1^#
 }
-// BROKEN_CONFORMANCE_1: Begin completions, 53 items
+// BROKEN_CONFORMANCE_1: Begin completions, 34 items
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonA[#DefaultedTypeCommonA#]; name=DefaultedTypeCommonA
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonB[#DefaultedTypeCommonB#]; name=DefaultedTypeCommonB
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDefaultedTypeB[#FooBaseDefaultedTypeB#]; name=FooBaseDefaultedTypeB

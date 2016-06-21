@@ -10,6 +10,7 @@ set(sources
   SwiftStddef.h
   SwiftStdint.h
   UnicodeShims.h
+  Visibility.h
   module.map
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
@@ -55,7 +56,6 @@ if(SWIFT_BUILT_STANDALONE)
 
   set(clang_headers_location)
   foreach(loc ${clang_headers_locations})
-  message(WARNING "go: ${loc}")
     if(EXISTS "${loc}")
       set(clang_headers_location "${loc}")
       break()

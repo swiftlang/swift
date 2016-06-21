@@ -1,8 +1,8 @@
-//===--- IRGenFunction.h - IR Generation for Swift Functions ---*- C++ -*-===//
+//===--- IRGenFunction.h - IR Generation for Swift Functions ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,7 +25,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/CallingConv.h"
 #include "IRBuilder.h"
-
+#include "LocalTypeDataKind.h"
+#include "DominancePoint.h"
 
 namespace llvm {
   class AllocaInst;
@@ -36,6 +37,7 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeType;
+  class AssociatedTypeDecl;
   class ClassDecl;
   class ConstructorDecl;
   class Decl;
@@ -52,6 +54,10 @@ namespace swift {
   class Substitution;
   class ValueDecl;
   class VarDecl;
+
+namespace Lowering {
+  class TypeConverter;
+}
   
 namespace irgen {
   class Explosion;
@@ -60,52 +66,11 @@ namespace irgen {
   class HeapNonFixedOffsets;
   class IRGenModule;
   class LinkEntity;
+  class LocalTypeDataCache;
   class Scope;
   class TypeInfo;
   enum class ValueWitness : unsigned;
   enum class ReferenceCounting : unsigned char;
-
-/// A nonce value for storing some sort of locally-known information about a type.
-class LocalTypeData {
-  unsigned Value;
-  
-  explicit LocalTypeData(unsigned Value) : Value(Value) {}
-  
-  /// Magic values for special kinds of index.
-  enum : unsigned {
-    Metatype = ~0U,
-    ValueWitnessTable = ~1U,
-
-    ValueWitnessBase = 0xFFFFFF00U,
-  };
-  
-public:
-  LocalTypeData() = default;
-  
-  // The magic values are all in the "negative" range and so do
-  // not collide with reasonable index values.
-  
-  /// A reference to the type metadata.
-  static LocalTypeData forMetatype() { return LocalTypeData(Metatype); }
-  /// A reference to the value witness table.
-  static LocalTypeData forValueWitnessTable() {
-    return LocalTypeData(ValueWitnessTable);
-  }
-
-  /// A reference to a specific value witness.
-  static LocalTypeData forValueWitness(ValueWitness witness) {
-    return LocalTypeData((unsigned)witness + ValueWitnessBase);
-  }
-  
-  /// A reference to a protocol witness table for an archetype.
-  static LocalTypeData forArchetypeProtocolWitness(unsigned index) {
-    return LocalTypeData(index);
-  }
-  
-  unsigned getValue() const {
-    return Value;
-  }
-};
 
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
@@ -115,6 +80,9 @@ public:
   IRBuilder Builder;
 
   llvm::Function *CurFn;
+  ModuleDecl *getSwiftModule() const;
+  SILModule &getSILModule() const;
+  Lowering::TypeConverter &getSILTypes() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
                 const SILDebugScope *DbgScope = nullptr,
@@ -178,6 +146,16 @@ public:
   Address emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
                             const TypeInfo &type,
                             const llvm::Twine &name = "");
+
+  void emitStoreOfRelativeIndirectablePointer(llvm::Value *value,
+                                              Address addr,
+                                              bool isFar);
+
+  llvm::Value *
+  emitLoadOfRelativeIndirectablePointer(Address addr, bool isFar,
+                                        llvm::PointerType *expectedType,
+                                        const llvm::Twine &name = "");
+
 
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
                                    llvm::Value *alignMask,
@@ -252,6 +230,7 @@ private:
 public:
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name,
+                                  llvm::Constant *captureDescriptor,
                                   const HeapNonFixedOffsets *offsets = 0);
 
   // Functions that don't care about the reference-counting style.
@@ -259,8 +238,11 @@ public:
 
   // Routines that are generic over the reference-counting style:
   //   - strong references
-  void emitStrongRetain(llvm::Value *value, ReferenceCounting refcounting);
-  void emitStrongRelease(llvm::Value *value, ReferenceCounting refcounting);
+  void emitStrongRetain(llvm::Value *value, ReferenceCounting refcounting,
+                        Atomicity atomicity);
+  void emitStrongRelease(llvm::Value *value, ReferenceCounting refcounting,
+                         Atomicity atomicity);
+  llvm::Value *emitLoadRefcountedPtr(Address addr, ReferenceCounting style);
 
   //   - unowned references
   void emitUnownedRetain(llvm::Value *value, ReferenceCounting style);
@@ -284,6 +266,10 @@ public:
   llvm::Value *emitUnownedTakeStrong(Address src, llvm::Type *resultType,
                                      ReferenceCounting style);
   void emitUnownedDestroy(Address addr, ReferenceCounting style);
+  llvm::Value *getUnownedExtraInhabitantIndex(Address src,
+                                              ReferenceCounting style);
+  void storeUnownedExtraInhabitant(llvm::Value *index, Address dest,
+                                   ReferenceCounting style);
 
   //   - weak references
   void emitWeakInit(llvm::Value *ref, Address dest, ReferenceCounting style);
@@ -306,8 +292,11 @@ public:
   //   - strong references
   void emitNativeStrongAssign(llvm::Value *value, Address addr);
   void emitNativeStrongInit(llvm::Value *value, Address addr);
-  void emitNativeStrongRetain(llvm::Value *value);
-  void emitNativeStrongRelease(llvm::Value *value);
+  void emitNativeStrongRetain(llvm::Value *value,
+                              Atomicity atomicity = Atomicity::Atomic);
+  void emitNativeStrongRelease(llvm::Value *value,
+                               Atomicity atomicity = Atomicity::Atomic);
+  void emitNativeSetDeallocating(llvm::Value *value);
   //   - unowned references
   void emitNativeUnownedRetain(llvm::Value *value);
   void emitNativeUnownedRelease(llvm::Value *value);
@@ -322,6 +311,7 @@ public:
   llvm::Value *emitNativeUnownedLoadStrong(Address src, llvm::Type *resultType);
   llvm::Value *emitNativeUnownedTakeStrong(Address src, llvm::Type *resultType);
   void emitNativeUnownedDestroy(Address addr);
+
   //   - weak references
   void emitNativeWeakInit(llvm::Value *value, Address dest);
   void emitNativeWeakAssign(llvm::Value *value, Address dest);
@@ -333,8 +323,8 @@ public:
   void emitNativeWeakCopyAssign(Address destAddr, Address srcAddr);
   void emitNativeWeakTakeAssign(Address destAddr, Address srcAddr);
   //   - other operations
-  llvm::Value *emitNativeTryPin(llvm::Value *object);
-  void emitNativeUnpin(llvm::Value *handle);
+  llvm::Value *emitNativeTryPin(llvm::Value *object, Atomicity atomicity);
+  void emitNativeUnpin(llvm::Value *handle, Atomicity atomicity);
 
   // Routines for the ObjC reference-counting style.
   void emitObjCStrongRetain(llvm::Value *value);
@@ -348,13 +338,11 @@ public:
   // Routines for an unknown reference-counting style (meaning,
   // dynamically something compatible with either the ObjC or Swift styles).
   //   - strong references
-  void emitUnknownStrongRetain(llvm::Value *value);
-  void emitUnknownStrongRelease(llvm::Value *value);
+  void emitUnknownStrongRetain(llvm::Value *value,
+                               Atomicity atomicity = Atomicity::Atomic);
+  void emitUnknownStrongRelease(llvm::Value *valuei,
+                                Atomicity atomicity = Atomicity::Atomic);
   //   - unowned references
-  void emitUnknownUnownedRetain(llvm::Value *value);
-  void emitUnknownUnownedRelease(llvm::Value *value);
-  void emitUnknownStrongRetainUnowned(llvm::Value *value);
-  void emitUnknownStrongRetainAndUnownedRelease(llvm::Value *value);
   void emitUnknownUnownedInit(llvm::Value *val, Address dest);
   void emitUnknownUnownedAssign(llvm::Value *value, Address dest);
   void emitUnknownUnownedCopyInit(Address destAddr, Address srcAddr);
@@ -376,16 +364,13 @@ public:
   llvm::Value *emitUnknownWeakTakeStrong(Address src, llvm::Type *type);
 
   // Routines for the Builtin.NativeObject reference-counting style.
-  void emitBridgeStrongRetain(llvm::Value *value);
-  void emitBridgeStrongRelease(llvm::Value *value);
+  void emitBridgeStrongRetain(llvm::Value *value, Atomicity atomicity);
+  void emitBridgeStrongRelease(llvm::Value *value, Atomicity atomicity);
 
   // Routines for the ErrorType reference-counting style.
   void emitErrorStrongRetain(llvm::Value *value);
   void emitErrorStrongRelease(llvm::Value *value);
 
-  llvm::Value *emitLoadNativeRefcountedPtr(Address addr);
-  llvm::Value *emitLoadUnknownRefcountedPtr(Address addr);
-  llvm::Value *emitLoadBridgeRefcountedPtr(Address addr);
   llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
                                 bool isNonNull, bool checkPinned);
 
@@ -400,58 +385,163 @@ public:
                      llvm::Value *metadata,
                      ArrayRef<llvm::Value*> wtables);
 
+  struct ArchetypeAccessPath {
+    CanArchetypeType BaseType;
+    AssociatedTypeDecl *Association;
+  };
+
+  /// Register an additional access path to the given archetype besides
+  /// (if applicable) just drilling down from its parent.
+  ///
+  /// This is necessary when an archetype gains conformances from an
+  /// associated type that it's been constrained to be equal to
+  /// but which is not simply its parent.
+  void addArchetypeAccessPath(CanArchetypeType targetArchetype,
+                              ArchetypeAccessPath accessPath);
+
+  ArrayRef<ArchetypeAccessPath>
+  getArchetypeAccessPaths(CanArchetypeType targetArchetype);
+
 //--- Type emission ------------------------------------------------------------
 public:
-  /// Look for a mapping for a local type-metadata reference.
-  /// The lookup is done for the current block which is the Builder's
-  /// insert-block.
-  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeData index) {
-    return lookupTypeDataMap(type, index, ScopedTypeDataMap);
+  /// Look up a local type data reference, returning null if no entry was
+  /// found.  This will emit code to materialize the reference if an
+  /// "abstract" entry is present.
+  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeDataKind kind) {
+    return tryGetLocalTypeData(LocalTypeDataKey{type, kind});
   }
+  llvm::Value *tryGetLocalTypeData(LocalTypeDataKey key);
+
+  /// Look up a local type data reference, returning null if no entry was
+  /// found or if the only viable entries are abstract.  This will never
+  /// emit code.
+  llvm::Value *tryGetConcreteLocalTypeData(LocalTypeDataKey key);
+
+  /// Retrieve a local type data reference which is known to exist.
+  llvm::Value *getLocalTypeData(CanType type, LocalTypeDataKind kind);
+
+  /// Add a local type-metadata reference at a point which definitely
+  /// dominates all of its uses.
+  void setUnscopedLocalTypeData(CanType type, LocalTypeDataKind kind,
+                                llvm::Value *data) {
+    setUnscopedLocalTypeData(LocalTypeDataKey{type, kind}, data);
+  }
+  void setUnscopedLocalTypeData(LocalTypeDataKey key, llvm::Value *data);
+  
+  /// Add a local type-metadata reference, valid at the current insertion
+  /// point.
+  void setScopedLocalTypeData(CanType type, LocalTypeDataKind kind,
+                              llvm::Value *data) {
+    setScopedLocalTypeData(LocalTypeDataKey{type, kind}, data);
+  }
+  void setScopedLocalTypeData(LocalTypeDataKey key, llvm::Value *data);
 
   /// The same as tryGetLocalTypeData, just for the Layout metadata.
-  llvm::Value *tryGetLocalTypeDataForLayout(SILType type, LocalTypeData index) {
-    return lookupTypeDataMap(type.getSwiftRValueType(), index,
-                             ScopedTypeDataMapForLayout);
-  }
-
-  /// Retrieve a local type-metadata reference which is known to exist.
-  llvm::Value *getLocalTypeData(CanType type, LocalTypeData index) {
-    auto key = getLocalTypeDataKey(type, index);
-    assert(LocalTypeDataMap.count(key) && "no mapping for local type data");
-    return LocalTypeDataMap.find(key)->second;
-  }
-
-  /// Add a local type-metadata reference at a point which dominates
-  /// the entire function.
-  void setUnscopedLocalTypeData(CanType type, LocalTypeData index,
-                                llvm::Value *data) {
-    assert(data && "setting a null value for type data!");
-
-    auto key = getLocalTypeDataKey(type, index);
-    assert(!LocalTypeDataMap.count(key) &&
-           "existing mapping for local type data");
-    LocalTypeDataMap.insert({key, data});
-  }
-  
-  /// Add a local type-metadata reference, which is valid for the containing
-  /// block.
-  void setScopedLocalTypeData(CanType type, LocalTypeData index,
-                              llvm::Value *data) {
-    assert(_isValidScopedLocalTypeData(data) &&
-           "metadata instruction not inserted into the Builder's insert-block");
-    ScopedTypeDataMap[getLocalTypeDataKey(type, index)] = data;
+  ///
+  /// We use a separate function name for this to clarify that you should
+  /// only ever be looking type metadata for a lowered SILType for the
+  /// purposes of local layout (e.g. of a tuple).
+  llvm::Value *tryGetLocalTypeDataForLayout(SILType type,
+                                            LocalTypeDataKind kind) {
+    return tryGetLocalTypeData(type.getSwiftRValueType(), kind);
   }
 
   /// Add a local type-metadata reference, which is valid for the containing
   /// block.
-  void setScopedLocalTypeDataForLayout(SILType type, LocalTypeData index,
+  void setScopedLocalTypeDataForLayout(SILType type, LocalTypeDataKind kind,
                                        llvm::Value *data) {
-    assert(_isValidScopedLocalTypeData(data) &&
-           "metadata instruction not inserted into the Builder's insert-block");
-    ScopedTypeDataMapForLayout[
-                  getLocalTypeDataKey(type.getSwiftRValueType(), index)] = data;
+    setScopedLocalTypeData(type.getSwiftRValueType(), kind, data);
   }
+
+  /// Given a concrete type metadata node, add all the local type data
+  /// that we can reach from it.
+  void bindLocalTypeDataFromTypeMetadata(CanType type, IsExact_t isExact,
+                                         llvm::Value *metadata);
+
+  void setDominanceResolver(DominanceResolverFunction resolver) {
+    assert(DominanceResolver == nullptr);
+    DominanceResolver = resolver;
+  }
+
+  bool isActiveDominancePointDominatedBy(DominancePoint point) {
+    // If the point is universal, it dominates.
+    if (point.isUniversal()) return true;
+
+    assert(!ActiveDominancePoint.isUniversal() &&
+           "active dominance point is universal but there exists a"
+           "non-universal point?");
+
+    // If we don't have a resolver, we're emitting a simple helper
+    // function; just assume dominance.
+    if (!DominanceResolver) return true;
+
+    // Otherwise, ask the resolver.
+    return DominanceResolver(*this, ActiveDominancePoint, point);
+  }
+
+  /// Is the current dominance point conditional in some way not
+  /// tracked by the active dominance point?
+  ///
+  /// This should only be used by the local type data cache code.
+  bool isConditionalDominancePoint() const {
+    return ConditionalDominance != nullptr;
+  }
+
+  void registerConditionalLocalTypeDataKey(LocalTypeDataKey key) {
+    assert(ConditionalDominance != nullptr &&
+           "not in a conditional dominance scope");
+    ConditionalDominance->registerConditionalLocalTypeDataKey(key);
+  }
+
+  /// Return the currently-active dominance point.
+  DominancePoint getActiveDominancePoint() const {
+    return ActiveDominancePoint;
+  }
+
+  /// A RAII object for temporarily changing the dominance of the active
+  /// definition point.
+  class DominanceScope {
+    IRGenFunction &IGF;
+    DominancePoint OldDominancePoint;
+  public:
+    explicit DominanceScope(IRGenFunction &IGF, DominancePoint newPoint)
+        : IGF(IGF), OldDominancePoint(IGF.ActiveDominancePoint) {
+      IGF.ActiveDominancePoint = newPoint;
+      assert(!newPoint.isOrdinary() || IGF.DominanceResolver);
+    }
+
+    DominanceScope(const DominanceScope &other) = delete;
+    DominanceScope &operator=(const DominanceScope &other) = delete;
+
+    ~DominanceScope() {
+      IGF.ActiveDominancePoint = OldDominancePoint;
+    }
+  };
+
+  /// A RAII object for temporarily suppressing type-data caching at the
+  /// active definition point.  Do this if you're adding local control flow
+  /// that isn't modeled by the dominance system.
+  class ConditionalDominanceScope {
+    IRGenFunction &IGF;
+    ConditionalDominanceScope *OldScope;
+    SmallVector<LocalTypeDataKey, 2> RegisteredKeys;
+
+  public:
+    explicit ConditionalDominanceScope(IRGenFunction &IGF)
+        : IGF(IGF), OldScope(IGF.ConditionalDominance) {
+      IGF.ConditionalDominance = this;
+    }
+
+    ConditionalDominanceScope(const ConditionalDominanceScope &other) = delete;
+    ConditionalDominanceScope &operator=(const ConditionalDominanceScope &other)
+      = delete;
+
+    void registerConditionalLocalTypeDataKey(LocalTypeDataKey key) {
+      RegisteredKeys.push_back(key);
+    }
+
+    ~ConditionalDominanceScope();
+  };
 
   /// The kind of value LocalSelf is.
   enum LocalSelfKind {
@@ -467,41 +557,27 @@ public:
   void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
   
 private:
-#ifndef NDEBUG
-  bool _isValidScopedLocalTypeData(llvm::Value *v) {
-    // Constants are valid anywhere.
-    if (isa<llvm::Constant>(v))
-      return true;
-    // Instructions are valid only in the current insert block.
-    if (auto inst = dyn_cast<llvm::Instruction>(v))
-      return inst->getParent() == Builder.GetInsertBlock();
-    // TODO: Other kinds of value?
-    return false;
-  }
-#endif
+  LocalTypeDataCache &getOrCreateLocalTypeData();
+  void destroyLocalTypeData();
 
-  typedef unsigned LocalTypeDataDepth;
-  typedef std::pair<TypeBase*,unsigned> LocalTypeDataPair;
-  LocalTypeDataPair getLocalTypeDataKey(CanType type, LocalTypeData index) {
-    return LocalTypeDataPair(type.getPointer(), index.getValue());
-  }
+  LocalTypeDataCache *LocalTypeData = nullptr;
 
-  typedef llvm::DenseMap<LocalTypeDataPair, llvm::Value*> TypeDataMap;
-
-  llvm::Value *lookupTypeDataMap(CanType type, LocalTypeData index,
-                                 const TypeDataMap &scopedMap);
-
-  TypeDataMap LocalTypeDataMap;
-
-  TypeDataMap ScopedTypeDataMap;
-
-  TypeDataMap ScopedTypeDataMapForLayout;
+  /// The dominance resolver.  This can be set at most once; when it's not
+  /// set, this emission must never have a non-null active definition point.
+  DominanceResolverFunction DominanceResolver = nullptr;
+  DominancePoint ActiveDominancePoint = DominancePoint::universal();
+  ConditionalDominanceScope *ConditionalDominance = nullptr;
   
   /// The value that satisfies metadata lookups for dynamic Self.
   llvm::Value *LocalSelf = nullptr;
   
   LocalSelfKind SelfKind;
+
+  llvm::DenseMap<CanType, std::vector<ArchetypeAccessPath>>
+  ArchetypeAccessPaths;
 };
+
+using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;
 
 } // end namespace irgen
 } // end namespace swift

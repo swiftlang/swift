@@ -1,8 +1,8 @@
-//===-- Platform.cpp - Implement platform-related helpers -------*- C++ -*-===//
+//===--- Platform.cpp - Implement platform-related helpers ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -39,27 +39,57 @@ bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
       tripleIsAppleTVSimulator(triple);
 }
 
-StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
+DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
   if (triple.isiOS()) {
     if (triple.isTvOS()) {
       if (tripleIsAppleTVSimulator(triple))
-        return "appletvsimulator";
-      return "appletvos";
+        return DarwinPlatformKind::TvOSSimulator;
+      return DarwinPlatformKind::TvOS;
     }
 
     if (tripleIsiOSSimulator(triple))
-      return "iphonesimulator";
-    return "iphoneos";
+      return DarwinPlatformKind::IPhoneOSSimulator;
+    return DarwinPlatformKind::IPhoneOS;
   }
 
   if (triple.isWatchOS()) {
     if (tripleIsWatchSimulator(triple))
-        return "watchsimulator";
-    return "watchos";
+      return DarwinPlatformKind::WatchOSSimulator;
+    return DarwinPlatformKind::WatchOS;
   }
 
   if (triple.isMacOSX())
+    return DarwinPlatformKind::MacOS;
+
+  llvm_unreachable("Unsupported Darwin platform");
+}
+
+static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
+  switch (platform) {
+  case DarwinPlatformKind::MacOS:
     return "macosx";
+  case DarwinPlatformKind::IPhoneOS:
+    return "iphoneos";
+  case DarwinPlatformKind::IPhoneOSSimulator:
+    return "iphonesimulator";
+  case DarwinPlatformKind::TvOS:
+    return "appletvos";
+  case DarwinPlatformKind::TvOSSimulator:
+    return "appletvsimulator";
+  case DarwinPlatformKind::WatchOS:
+    return "watchos";
+  case DarwinPlatformKind::WatchOSSimulator:
+    return "watchsimulator";
+  }
+  llvm_unreachable("Unsupported Darwin platform");
+}
+
+StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
+  if (triple.isOSDarwin())
+    return getPlatformNameForDarwin(getDarwinPlatformKind(triple));
+
+  if (triple.isAndroid())
+    return "android";
 
   if (triple.isOSLinux())
     return "linux";
@@ -67,5 +97,26 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   if (triple.isOSFreeBSD())
     return "freebsd";
 
+  if (triple.isOSWindows())
+    return  "windows";
+
   return "";
+}
+
+StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
+  if (Triple.isOSLinux()) {
+    switch(Triple.getSubArch()) {
+    default:
+      return Triple.getArchName();
+      break;
+    case llvm::Triple::SubArchType::ARMSubArch_v7:
+      return "armv7";
+      break;
+    case llvm::Triple::SubArchType::ARMSubArch_v6:
+      return "armv6";
+      break;
+    }
+  } else {
+    return Triple.getArchName();
+  }
 }

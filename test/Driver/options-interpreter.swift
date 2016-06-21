@@ -1,7 +1,3 @@
-// FIXME: This is failing on some of Apple's internal CI.
-// FIXME: <rdar://problem/23771412> Fix test/Driver/{environment.swift,options-interpreter.swift}
-// REQUIRES: disabled
-
 // RUN: not %swift_driver -deprecated-integrated-repl -emit-module 2>&1 | FileCheck -check-prefix=IMMEDIATE_NO_MODULE %s
 // RUN: not %swift_driver -emit-module 2>&1 | FileCheck -check-prefix=IMMEDIATE_NO_MODULE %s
 // REQUIRES: swift_interpreter
@@ -30,11 +26,11 @@
 // RUN: %swift_driver -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s | FileCheck -check-prefix=CHECK-L2 %s
 // CHECK-L2: # DYLD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/macosx$}}
 
-// RUN: env DYLD_LIBRARY_PATH=/abc/ %swift_driver -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s | FileCheck -check-prefix=CHECK-L2-ENV %s
+// RUN: env DYLD_LIBRARY_PATH=/abc/ %swift_driver_plain -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s | FileCheck -check-prefix=CHECK-L2-ENV %s
 // CHECK-L2-ENV: # DYLD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/macosx:/abc/$}}
 
 // RUN: %swift_driver -### -target x86_64-apple-macosx10.9 %s | FileCheck -check-prefix=CHECK-NO-FRAMEWORKS %s
-// RUN: env DYLD_FRAMEWORK_PATH=/abc/ %swift_driver -### -target x86_64-apple-macosx10.9 %s | FileCheck -check-prefix=CHECK-NO-FRAMEWORKS %s
+// RUN: env DYLD_FRAMEWORK_PATH=/abc/ %swift_driver_plain -### -target x86_64-apple-macosx10.9 %s | FileCheck -check-prefix=CHECK-NO-FRAMEWORKS %s
 // CHECK-NO-FRAMEWORKS-NOT: DYLD_FRAMEWORK_PATH
 
 // RUN: %swift_driver -### -target x86_64-apple-macosx10.9 -F/foo/ %s | FileCheck -check-prefix=CHECK-F %s
@@ -48,13 +44,13 @@
 // CHECK-F2: #
 // CHECK-F2: DYLD_FRAMEWORK_PATH=/foo/:/bar/{{$}}
 
-// RUN: env DYLD_FRAMEWORK_PATH=/abc/ %swift_driver -### -target x86_64-apple-macosx10.9 -F/foo/ -F/bar/ %s | FileCheck -check-prefix=CHECK-F2-ENV %s
+// RUN: env DYLD_FRAMEWORK_PATH=/abc/ %swift_driver_plain -### -target x86_64-apple-macosx10.9 -F/foo/ -F/bar/ %s | FileCheck -check-prefix=CHECK-F2-ENV %s
 // CHECK-F2-ENV: -F /foo/
 // CHECK-F2-ENV: -F /bar/
 // CHECK-F2-ENV: #
 // CHECK-F2-ENV: DYLD_FRAMEWORK_PATH=/foo/:/bar/:/abc/{{$}}
 
-// RUN: env DYLD_FRAMEWORK_PATH=/abc/ %swift_driver -### -target x86_64-apple-macosx10.9 -F/foo/ -F/bar/ -L/foo2/ -L/bar2/ %s | FileCheck -check-prefix=CHECK-COMPLEX %s
+// RUN: env DYLD_FRAMEWORK_PATH=/abc/ %swift_driver_plain -### -target x86_64-apple-macosx10.9 -F/foo/ -F/bar/ -L/foo2/ -L/bar2/ %s | FileCheck -check-prefix=CHECK-COMPLEX %s
 // CHECK-COMPLEX: -F /foo/
 // CHECK-COMPLEX: -F /bar/
 // CHECK-COMPLEX: #
@@ -64,5 +60,5 @@
 // RUN: %swift_driver -### -target x86_64-unknown-linux-gnu -L/foo/ %s | FileCheck -check-prefix=CHECK-L-LINUX %s
 // CHECK-L-LINUX: # LD_LIBRARY_PATH={{/foo/:[^:]+/lib/swift/linux$}}
 
-// RUN: env LD_LIBRARY_PATH=/abc/ %swift_driver -### -target x86_64-unknown-linux-gnu -L/foo/ -L/bar/ %s | FileCheck -check-prefix=CHECK-LINUX-COMPLEX %s
+// RUN: env LD_LIBRARY_PATH=/abc/ %swift_driver_plain -### -target x86_64-unknown-linux-gnu -L/foo/ -L/bar/ %s | FileCheck -check-prefix=CHECK-LINUX-COMPLEX %s
 // CHECK-LINUX-COMPLEX: # LD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/linux:/abc/$}}

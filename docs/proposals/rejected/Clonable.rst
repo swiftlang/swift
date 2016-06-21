@@ -15,7 +15,7 @@
   language-level copying mechanism for classes.
 
 **Abstract:** to better support the creation of value types, we
-propose a “magic” ``Clonable`` protocol and an annotation for describing
+propose a "magic" ``Clonable`` protocol and an annotation for describing
 which instance variables should be cloned when a type is copied.  This
 proposal **augments revision 1** of the Clonable proposal with our
 rationale for dropping our support for ``val`` and ``ref``, a
@@ -39,7 +39,7 @@ one has to engage in some kind of wrapping and forwarding::
        value = new MyClass(x, y)
     }
 
-    func someFunction(z : C) -> D {
+    func someFunction(_ z : C) -> D {
       return value.someFunction(z)
     }
 
@@ -65,7 +65,7 @@ automatic, if we add that feature) forwarding.
 
 By dropping ``val`` we also lose some terseness aggregating ``class``
 contents into ``struct``\ s.  However, since ``ref`` is being dropped
-there's less call for a symmetric ``val``.  The extra “cruft” that
+there's less call for a symmetric ``val``.  The extra "cruft" that
 ``[clone]`` adds actually seems appropriate when viewed as a special
 bridge for ``class`` types, and less like a penalty against value
 types.
@@ -125,7 +125,7 @@ variables marked ``[clone]``::
       var somethingIJustReferTo : Bar
   }
 
-When a ``Baz`` is copied by any of the “big three” operations (variable
+When a ``Baz`` is copied by any of the "big three" operations (variable
 initialization, assignment, or function argument passing), even as
 part of a larger ``struct``, its ``[clone]`` member is ``clone()``\ d.
 Because ``Foo`` itself has a ``[clone]`` member, that is ``clone()``\ d

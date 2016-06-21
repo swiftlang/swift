@@ -7,18 +7,18 @@ import Swift
 ////
 
 struct X {
-  func f0(i: Int) -> X { }
+  func f0(_ i: Int) -> X { }
 
-  func f1(i: Int) { }
+  func f1(_ i: Int) { }
 
-  mutating func f1(f: Float) { }
+  mutating func f1(_ f: Float) { }
 
-  func f2<T>(x: T) -> T { }
+  func f2<T>(_ x: T) -> T { }
 }
 
 struct Y<T> {
   func f0(_: T) -> T {}
-  func f1<U>(x: U, y: T) -> (T, U) {}
+  func f1<U>(_ x: U, y: T) -> (T, U) {}
 }
 
 var i : Int
@@ -27,13 +27,13 @@ var yf : Y<Float>
 
 func g0(_: (inout X) -> (Float) -> ()) {}
 
-x.f0(i)
+_ = x.f0(i)
 x.f0(i).f1(i)
 g0(X.f1)
-x.f0(x.f2(1))
-x.f0(1).f2(i)
-yf.f0(1)
-yf.f1(i, y: 1)
+_ = x.f0(x.f2(1))
+_ = x.f0(1).f2(i)
+_ = yf.f0(1)
+_ = yf.f1(i, y: 1)
 
 // Members referenced from inside the struct
 struct Z {
@@ -41,7 +41,7 @@ struct Z {
   func getI() -> Int { return i }
   mutating func incI() {}
 
-  func curried(x: Int)(y: Int) -> Int { return x + y } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+  func curried(_ x: Int) -> (Int) -> Int { return { y in x + y } }
 
   subscript (k : Int) -> Int {
     get {
@@ -58,7 +58,7 @@ struct GZ<T> {
   var i : T
   func getI() -> T { return i }
 
-  func f1<U>(a: T, b: U) -> (T, U) { 
+  func f1<U>(_ a: T, b: U) -> (T, U) { 
     return (a, b)
   }
   
@@ -78,7 +78,7 @@ var incI = z.incI // expected-error{{partial application of 'mutating'}}
 var zi = z.getI()
 var zcurried1 = z.curried
 var zcurried2 = z.curried(0)
-var zcurriedFull = z.curried(0)(y: 1)
+var zcurriedFull = z.curried(0)(1)
 
 ////
 // Members of modules
@@ -88,7 +88,7 @@ var zcurriedFull = z.curried(0)(y: 1)
 Swift.print(3, terminator: "")
 
 var format : String
-format._splitFirstIf({ $0.isASCII() })
+_ = format._splitFirstIf({ $0.isASCII })
 
 ////
 // Unqualified references
@@ -109,8 +109,8 @@ var tmp = "foo".debugDescription
 enum W {
   case Omega
 
-  func foo(x: Int) {}
-  func curried(x: Int)(y: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+  func foo(_ x: Int) {}
+  func curried(_ x: Int) -> (Int) -> () {}
 }
 
 var w = W.Omega
@@ -118,11 +118,11 @@ var foo = w.foo
 var fooFull : () = w.foo(0)
 var wcurried1 = w.curried
 var wcurried2 = w.curried(0)
-var wcurriedFull : () = w.curried(0)(y: 1)
+var wcurriedFull : () = w.curried(0)(1)
 
 // Member of enum Type
-func enumMetatypeMember(opt: Int?) {
-  opt.None // expected-error{{static member 'None' cannot be used on instance of type 'Int?'}}
+func enumMetatypeMember(_ opt: Int?) {
+  opt.none // expected-error{{static member 'none' cannot be used on instance of type 'Int?'}}
 }
 
 ////
@@ -144,16 +144,16 @@ func goo() {
 // Members of archetypes
 ////
 
-func id<T>(t: T) -> T { return t }
+func id<T>(_ t: T) -> T { return t }
 
-func doGetLogicValue<T : BooleanType>(t: T) {
-  t.boolValue
+func doGetLogicValue<T : Boolean>(_ t: T) {
+  t.boolValue  // expected-warning {{expression of type 'Bool' is unused}}
 }
 
 protocol P {
   init()
-  func bar(x: Int)
-  mutating func mut(x: Int)
+  func bar(_ x: Int)
+  mutating func mut(_ x: Int)
   static func tum()
 }
 
@@ -162,11 +162,11 @@ extension P {
     return self
   }
 
-  func returnSelfOptionalInstance(b: Bool) -> Self? {
+  func returnSelfOptionalInstance(_ b: Bool) -> Self? {
     return b ? self : nil
   }
 
-  func returnSelfIUOInstance(b: Bool) -> Self! {
+  func returnSelfIUOInstance(_ b: Bool) -> Self! {
     return b ? self : nil
   }
 
@@ -174,76 +174,76 @@ extension P {
     return Self()
   }
 
-  static func returnSelfOptionalStatic(b: Bool) -> Self? {
+  static func returnSelfOptionalStatic(_ b: Bool) -> Self? {
     return b ? Self() : nil
   }
 
-  static func returnSelfIUOStatic(b: Bool) -> Self! {
+  static func returnSelfIUOStatic(_ b: Bool) -> Self! {
     return b ? Self() : nil
   }
 }
 
 protocol ClassP : class {
-  func bas(x: Int)
+  func bas(_ x: Int)
 }
 
-func generic<T: P>(t: T) {
+func generic<T: P>(_ t: T) {
   var t = t
   // Instance member of archetype
-  let _: Int -> () = id(t.bar)
+  let _: (Int) -> () = id(t.bar)
   let _: () = id(t.bar(0))
 
   // Static member of archetype metatype
   let _: () -> () = id(T.tum)
 
   // Instance member of archetype metatype
-  let _: T -> Int -> () = id(T.bar)
-  let _: Int -> () = id(T.bar(t))
+  let _: (T) -> (Int) -> () = id(T.bar)
+  let _: (Int) -> () = id(T.bar(t))
 
   _ = t.mut // expected-error{{partial application of 'mutating' method is not allowed}}
   _ = t.tum // expected-error{{static member 'tum' cannot be used on instance of type 'T'}}
 
   // Instance member of extension returning Self)
-  let _: T -> () -> T = id(T.returnSelfInstance)
+  let _: (T) -> () -> T = id(T.returnSelfInstance)
   let _: () -> T = id(T.returnSelfInstance(t))
   let _: T = id(T.returnSelfInstance(t)())
 
   let _: () -> T = id(t.returnSelfInstance)
   let _: T = id(t.returnSelfInstance())
 
-  let _: T -> Bool -> T? = id(T.returnSelfOptionalInstance)
-  let _: Bool -> T? = id(T.returnSelfOptionalInstance(t))
+  let _: (T) -> (Bool) -> T? = id(T.returnSelfOptionalInstance)
+  let _: (Bool) -> T? = id(T.returnSelfOptionalInstance(t))
   let _: T? = id(T.returnSelfOptionalInstance(t)(false))
 
-  let _: Bool -> T? = id(t.returnSelfOptionalInstance)
+  let _: (Bool) -> T? = id(t.returnSelfOptionalInstance)
   let _: T? = id(t.returnSelfOptionalInstance(true))
 
-  let _: T -> Bool -> T! = id(T.returnSelfIUOInstance)
-  let _: Bool -> T! = id(T.returnSelfIUOInstance(t))
+  let _: (T) -> (Bool) -> T! = id(T.returnSelfIUOInstance)
+  let _: (Bool) -> T! = id(T.returnSelfIUOInstance(t))
   let _: T! = id(T.returnSelfIUOInstance(t)(true))
 
-  let _: Bool -> T! = id(t.returnSelfIUOInstance)
+  let _: (Bool) -> T! = id(t.returnSelfIUOInstance)
   let _: T! = id(t.returnSelfIUOInstance(true))
 
   // Static member of extension returning Self)
   let _: () -> T = id(T.returnSelfStatic)
   let _: T = id(T.returnSelfStatic())
 
-  let _: Bool -> T? = id(T.returnSelfOptionalStatic)
+  let _: (Bool) -> T? = id(T.returnSelfOptionalStatic)
   let _: T? = id(T.returnSelfOptionalStatic(false))
 
-  let _: Bool -> T! = id(T.returnSelfIUOStatic)
+  let _: (Bool) -> T! = id(T.returnSelfIUOStatic)
   let _: T! = id(T.returnSelfIUOStatic(true))
 }
 
-func genericClassP<T: ClassP>(t: T) {
+func genericClassP<T: ClassP>(_ t: T) {
   // Instance member of archetype)
-  let _: Int -> () = id(t.bas)
+  let _: (Int) -> () = id(t.bas)
   let _: () = id(t.bas(0))
 
   // Instance member of archetype metatype)
-  let _: T -> Int -> () = id(T.bas)
-  let _: Int -> () = id(T.bas(t))
+  let _: (T) -> (Int) -> () = id(T.bas)
+  let _: (Int) -> () = id(T.bas(t))
   let _: () = id(T.bas(t)(1))
 }
 
@@ -251,14 +251,14 @@ func genericClassP<T: ClassP>(t: T) {
 // Members of existentials
 ////
 
-func existential(p: P) {
+func existential(_ p: P) {
   var p = p
   // Fully applied mutating method
   p.mut(1)
   _ = p.mut // expected-error{{partial application of 'mutating' method is not allowed}}
 
   // Instance member of existential)
-  let _: Int -> () = id(p.bar)
+  let _: (Int) -> () = id(p.bar)
   let _: () = id(p.bar(0))
 
   // Static member of existential metatype)
@@ -271,19 +271,19 @@ func existential(p: P) {
   let _: P! = id(p.returnSelfIUOInstance(true))
 }
 
-func staticExistential(p: P.Type, pp: P.Protocol) {
+func staticExistential(_ p: P.Type, pp: P.Protocol) {
   let ppp: P = p.init()
   _ = pp.init() // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
   _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
 
   // Instance member of metatype
-  let _: P -> Int -> () = P.bar
-  let _: Int -> () = P.bar(ppp)
+  let _: (P) -> (Int) -> () = P.bar
+  let _: (Int) -> () = P.bar(ppp)
   P.bar(ppp)(5)
 
   // Instance member of metatype value
-  let _: P -> Int -> () = pp.bar
-  let _: Int -> () = pp.bar(ppp)
+  let _: (P) -> (Int) -> () = pp.bar
+  let _: (Int) -> () = pp.bar(ppp)
   pp.bar(ppp)(5)
 
   // Static member of existential metatype value
@@ -294,51 +294,51 @@ func staticExistential(p: P.Type, pp: P.Protocol) {
   _ = p.mut // expected-error{{instance member 'mut' cannot be used on type 'P'}}
 
   // Static member of metatype -- not allowed
-  _ = pp.tum // expected-error{{static member 'tum' cannot be used on instance of type 'P.Protocol'}}
-  _ = P.tum // expected-error{{static member 'tum' cannot be used on instance of type 'P.Protocol'}}
+  _ = pp.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
+  _ = P.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
 
   // Static member of extension returning Self)
   let _: () -> P = id(p.returnSelfStatic)
   let _: P = id(p.returnSelfStatic())
 
-  let _: Bool -> P? = id(p.returnSelfOptionalStatic)
+  let _: (Bool) -> P? = id(p.returnSelfOptionalStatic)
   let _: P? = id(p.returnSelfOptionalStatic(false))
 
-  let _: Bool -> P! = id(p.returnSelfIUOStatic)
+  let _: (Bool) -> P! = id(p.returnSelfIUOStatic)
   let _: P! = id(p.returnSelfIUOStatic(true))
 }
 
-func existentialClassP(p: ClassP) {
+func existentialClassP(_ p: ClassP) {
   // Instance member of existential)
-  let _: Int -> () = id(p.bas)
+  let _: (Int) -> () = id(p.bas)
   let _: () = id(p.bas(0))
 
   // Instance member of existential metatype)
-  let _: ClassP -> Int -> () = id(ClassP.bas)
-  let _: Int -> () = id(ClassP.bas(p))
+  let _: (ClassP) -> (Int) -> () = id(ClassP.bas)
+  let _: (Int) -> () = id(ClassP.bas(p))
   let _: () = id(ClassP.bas(p)(1))
 }
 
 // Partial application of curried protocol methods
 protocol Scalar {}
 protocol Vector {
-  func scale(c: Scalar) -> Self
+  func scale(_ c: Scalar) -> Self
 }
 protocol Functional {
-  func apply(v: Vector) -> Scalar
+  func apply(_ v: Vector) -> Scalar
 }
 protocol Coalgebra {
-  func coproduct(f: Functional)(v1: Vector, v2: Vector) -> Scalar // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+  func coproduct(_ f: Functional) -> (v1: Vector, v2: Vector) -> Scalar
 }
 
 // Make sure existential is closed early when we partially apply
-func wrap<T>(t: T) -> T {
+func wrap<T>(_ t: T) -> T {
   return t
 }
 
-func exercise(c: Coalgebra, f: Functional, v: Vector) {
+func exercise(_ c: Coalgebra, f: Functional, v: Vector) {
   let _: (Vector, Vector) -> Scalar = wrap(c.coproduct(f))
-  let _: Scalar -> Vector = v.scale
+  let _: (Scalar) -> Vector = v.scale
 }
 
 // Make sure existential isn't closed too late
@@ -346,7 +346,7 @@ protocol Copyable {
   func copy() -> Self
 }
 
-func copyTwice(c: Copyable) -> Copyable {
+func copyTwice(_ c: Copyable) -> Copyable {
   return c.copy().copy()
 }
 
@@ -356,7 +356,7 @@ func copyTwice(c: Copyable) -> Copyable {
 
 // <rdar://problem/15537772>
 struct DefaultArgs {
-  static func f(a: Int = 0) -> DefaultArgs {
+  static func f(_ a: Int = 0) -> DefaultArgs {
     return DefaultArgs()
   }
   init() {
@@ -366,10 +366,10 @@ struct DefaultArgs {
 
 class InstanceOrClassMethod {
   func method() -> Bool { return true }
-  class func method(other: InstanceOrClassMethod) -> Bool { return false }
+  class func method(_ other: InstanceOrClassMethod) -> Bool { return false }
 }
 
-func testPreferClassMethodToCurriedInstanceMethod(obj: InstanceOrClassMethod) {
+func testPreferClassMethodToCurriedInstanceMethod(_ obj: InstanceOrClassMethod) {
   let result = InstanceOrClassMethod.method(obj)
   let _: Bool = result // no-warning
   let _: () -> Bool = InstanceOrClassMethod.method(obj)
@@ -379,9 +379,9 @@ protocol Numeric {
   func +(x: Self, y: Self) -> Self
 }
 
-func acceptBinaryFunc<T>(x: T, _ fn: (T, T) -> T) { }
+func acceptBinaryFunc<T>(_ x: T, _ fn: (T, T) -> T) { }
 
-func testNumeric<T : Numeric>(x: T) {
+func testNumeric<T : Numeric>(_ x: T) {
   acceptBinaryFunc(x, +)
 }
 
@@ -392,11 +392,11 @@ class PropertyOrMethod {
   func member() -> Int { return 0 }
   let member = false
 
-  class func methodOnClass(obj: PropertyOrMethod) -> Int { return 0 }
+  class func methodOnClass(_ obj: PropertyOrMethod) -> Int { return 0 }
   let methodOnClass = false
 }
 
-func testPreferPropertyToMethod(obj: PropertyOrMethod) {
+func testPreferPropertyToMethod(_ obj: PropertyOrMethod) {
   let result = obj.member
   let resultChecked: Bool = result
   let called = obj.member()
@@ -430,7 +430,7 @@ extension ExtendedWithMutatingMethods {
 class ClassExtendedWithMutatingMethods: ExtendedWithMutatingMethods {}
 class SubclassExtendedWithMutatingMethods: ClassExtendedWithMutatingMethods {}
 
-func testClassExtendedWithMutatingMethods(c: ClassExtendedWithMutatingMethods, // expected-note* {{}}
+func testClassExtendedWithMutatingMethods(_ c: ClassExtendedWithMutatingMethods, // expected-note* {{}}
                                      sub: SubclassExtendedWithMutatingMethods) { // expected-note* {{}}
   c.mutatingMethod() // expected-error{{cannot use mutating member on immutable value: 'c' is a 'let' constant}}
   c.mutableProperty = Foo(foo: 0) // expected-error{{cannot assign to property}}
@@ -506,7 +506,7 @@ extension LedModules {
 class r15117741S {
   static func g() {}
 }
-func test15117741(s: r15117741S) {
+func test15117741(_ s: r15117741S) {
   s.g() // expected-error {{static member 'g' cannot be used on instance of type 'r15117741S'}}
 }
 
@@ -521,18 +521,35 @@ let _ : [UnavailMember] = [.XYZ] // expected-error {{'XYZ' is unavailable}}
 let _ : [UnavailMember] = [.ABC] // expected-error {{type 'UnavailMember' has no member 'ABC'}}
 
 
-// <rdar://problem/22490787> QoI: Poor error message iterating over property with non-sequence type that defines a Generator type alias
+// <rdar://problem/22490787> QoI: Poor error message iterating over property with non-sequence type that defines an Iterator type alias
 struct S22490787 {
-  typealias Generator = AnyGenerator<Int>
+  typealias Iterator = AnyIterator<Int>
 }
 
 func f22490787() {
   var path: S22490787 = S22490787()
   
-  for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'SequenceType'}}
+  for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'Sequence'}}
   }
 }
 
+// <rdar://problem/23942743> [QoI] Bad diagnostic when errors inside enum constructor
+enum r23942743 {
+  case Tomato(cloud: String)
+}
+let _ = .Tomato(cloud: .none)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
 
 
+
+// SR-650: REGRESSION: Assertion failed: (baseTy && "Couldn't find appropriate context"), function getMemberSubstitutions
+enum SomeErrorType {
+  case StandaloneError
+  case UnderlyingError(String)
+
+  static func someErrorFromString(_ str: String) -> SomeErrorType? {
+    if str == "standalone" { return .StandaloneError }
+    if str == "underlying" { return .UnderlyingError }  // expected-error {{contextual member 'UnderlyingError' expects argument of type 'String'}}
+    return nil
+  }
+}
 

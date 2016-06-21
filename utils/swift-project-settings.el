@@ -2,7 +2,7 @@
 ;
 ; This source file is part of the Swift.org open source project
 ;
-; Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 ; Licensed under Apache License v2.0 with Runtime Library Exception
 ;
 ; See http://swift.org/LICENSE.txt for license information
@@ -156,7 +156,7 @@ Swift header should look like.
 "//
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -198,7 +198,7 @@ Swift header should look like.
   ;; is non-empty, v1 all over again
   '(setq v2
          (replace-regexp-in-string "\\` +" ""
-          (if (and comment-end (> (length comment-end) 0)) comment-end  v1)))
+          (if (and comment-end (> (length comment-end) 0)) comment-end v1)))
   
   v1 "===--- "
   str & " " | -1
@@ -240,17 +240,17 @@ takes precedence for files in the Swift project"
     ad-do-it))
 
 (push 'swift-stdlibunittest-possibly-expected-assertion compilation-error-regexp-alist)
-(push `(swift-stdlibunittest-possibly-expected-assertion "^\\(\\(?:out\\|err\\)>>> *\\).*\\(?:failed\\(?: at\\|.*file\\)\\|.*: file\\) \\([^,]*\\), line \\([0-9]+\\)$"
+(push `(swift-stdlibunittest-possibly-expected-assertion "^\\(\\(?:stdout\\|stderr\\)>>> *\\)?.*\\(?:failed\\(?: at\\|.*file\\)\\|.*: file\\) \\([^,]*\\), line \\([0-9]+\\)$"
               2 3 ,(not :column) 0)
       compilation-error-regexp-alist-alist)
 
 (push 'swift-stdlibunittest-stackframe compilation-error-regexp-alist)
-(push `(swift-stdlibunittest-stackframe "^\\(?:\\(?:out\\|err\\)>>> *\\)#[0-9]+: \\(.+\\):\\([0-9]+\\)\\(?: +.*\\)?$"
+(push `(swift-stdlibunittest-stackframe "^\\(?:\\(?:stdout\\|stderr\\)>>> *\\)?#[0-9]+: \\(.+\\):\\([0-9]+\\)\\(?: +.*\\)?$"
               1 2 ,(not :column) ,(not :just-a-warning))
       compilation-error-regexp-alist-alist)
     
 (push 'swift-stdlibunittest-failure compilation-error-regexp-alist)
-(push `(swift-stdlibunittest-failure "^\\(?:out\\|err\\)>>> check failed at \\([^,]*\\), line \\([0-9]+\\)$"
+(push `(swift-stdlibunittest-failure "^\\(?:\\(?:stdout\\|stderr\\)>>> *\\)?check failed at \\([^,]*\\), line \\([0-9]+\\)$"
               1 2 ,(not :column) ,(not :just-a-warning))
       compilation-error-regexp-alist-alist)
 

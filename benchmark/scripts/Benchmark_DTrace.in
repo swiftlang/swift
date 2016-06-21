@@ -1,0 +1,132 @@
+#!/usr/bin/env python
+
+# ===--- Benchmark_DTrace.in ---------------------------------------------===//
+#
+#  This source file is part of the Swift.org open source project
+#
+#  Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+#  Licensed under Apache License v2.0 with Runtime Library Exception
+#
+#  See http://swift.org/LICENSE.txt for license information
+#  See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ===---------------------------------------------------------------------===//
+
+import argparse
+import os
+import subprocess
+import sys
+
+DRIVER_LIBRARY_PATH = "@PATH_TO_DRIVER_LIBRARY@"
+sys.path.append(DRIVER_LIBRARY_PATH)
+DTRACE_PATH = os.path.join(DRIVER_LIBRARY_PATH, 'swift_stats.d')
+
+import perf_test_driver  # noqa (E402 module level import not at top of file)
+
+# Regexes for the XFAIL_LIST. Matches against '([Onone|O|Ounchecked],TestName)'
+XFAIL_LIST = [
+]
+
+
+class DTraceResult(perf_test_driver.Result):
+
+    def __init__(self, name, status, output, csv_output):
+        perf_test_driver.Result.__init__(
+            self, name, status, output, XFAIL_LIST)
+        self.csv_output = csv_output
+
+    @classmethod
+    def data_headers(cls):
+        return [
+            'Name', 'Result', 'strong_retain', 'strong_retain/iter',
+            'strong_release', 'strong_release/iter']
+
+    @classmethod
+    def data_format(cls, max_test_len):
+        non_name_headers = DTraceResult.data_headers()[1:]
+        fmt = ('{:<%d}' % (max_test_len + 5)) + \
+            ''.join(['{:<%d}' % (len(h) + 2) for h in non_name_headers])
+        return fmt
+
+    @classmethod
+    def print_data_header(cls, max_test_len, csv_output):
+        headers = cls.data_headers()
+        if csv_output:
+            print(','.join(headers))
+            return
+        print(cls.data_format(max_test_len).format(*headers))
+
+    def print_data(self, max_test_len):
+        result = [self.get_name(), self.get_result()] + map(str, self.output)
+        if self.csv_output:
+            print(','.join(result))
+            return
+
+        print(DTraceResult.data_format(max_test_len).format(*result))
+
+
+class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
+
+    def __init__(self, binary, xfail_list, csv_output):
+        perf_test_driver.BenchmarkDriver.__init__(
+            self, binary, xfail_list,
+            enable_parallel=False,
+            opt_levels=['O'])
+        self.csv_output = csv_output
+
+    def print_data_header(self, max_test_len):
+        DTraceResult.print_data_header(max_test_len, self.csv_output)
+
+    def prepare_input(self, name):
+        return {}
+
+    def process_input(self, data):
+        test_name = '({}_{})'.format(data['opt'], data['test_name'])
+        print("Running {}...".format(test_name))
+        sys.stdout.flush()
+
+        def get_results_with_iters(iters):
+            p = subprocess.Popen([
+                'sudo', 'dtrace', '-s', DTRACE_PATH,
+                '-c', '%s %s %s' % (data['path'], data['test_name'],
+                                    '--num-iters=%d' % iters)
+            ], stdout=subprocess.PIPE, stderr=open('/dev/null', 'w'))
+            results = [x for x in p.communicate()[0].split("\n") if len(x) > 0]
+            return [
+                x.split(',')[1] for x in
+                results[results.index('DTRACE RESULTS') + 1:]]
+        iter_2_results = get_results_with_iters(2)
+        iter_3_results = get_results_with_iters(3)
+
+        results = []
+        for x in zip(iter_2_results, iter_3_results):
+            results.append(x[1])
+            results.append(int(x[1]) - int(x[0]))
+
+        return DTraceResult(test_name, 0, results, self.csv_output)
+
+SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-filter',
+        type=str,
+        default=None,
+        help='Filter out any test that does not match the given regex')
+    parser.add_argument(
+        '-csv',
+        default=False,
+        action='store_true',
+        help="Emit csv output",
+        dest='csv_output')
+    return parser.parse_args()
+
+if __name__ == "__main__":
+    args = parse_args()
+    g = DTraceBenchmarkDriver(SWIFT_BIN_DIR, XFAIL_LIST, args.csv_output)
+    if g.run(args.filter):
+        sys.exit(0)
+    else:
+        sys.exit(-1)

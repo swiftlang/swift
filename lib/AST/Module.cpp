@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -76,10 +76,10 @@ void BuiltinUnit::LookupCache::lookupValue(
   ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (!Entry) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
-      TypeAliasDecl *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name,
-                                                   SourceLoc(),
-                                                   TypeLoc::withoutLoc(Ty),
-                                                   const_cast<BuiltinUnit*>(&M));
+      auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
+                                          TypeLoc::withoutLoc(Ty),
+                                          /*genericparams*/nullptr,
+                                          const_cast<BuiltinUnit*>(&M));
       TAD->computeType();
       TAD->setAccessibility(Accessibility::Public);
       Entry = TAD;
@@ -119,7 +119,7 @@ class SourceFile::LookupCache {
       Members.shrink_and_clear();
     }
 
-    decltype(Members)::const_iterator begin() const  { return Members.begin(); }
+    decltype(Members)::const_iterator begin() const { return Members.begin(); }
     decltype(Members)::const_iterator end() const { return Members.end(); }
     decltype(Members)::const_iterator find(DeclName Name) const {
       return Members.find(Name);
@@ -338,7 +338,8 @@ void SourceLookupCache::invalidate() {
 
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   : TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }),
-    DeclContext(DeclContextKind::Module, nullptr) {
+    DeclContext(DeclContextKind::Module, nullptr),
+    Flags({0, 0, 0}), DSOHandle(nullptr) {
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setType(ModuleType::get(this));
@@ -399,8 +400,8 @@ DerivedFileUnit &Module::getDerivedFileUnit() const {
 }
 
 VarDecl *Module::getDSOHandle() {
-  if (DSOHandleAndFlags.getPointer())
-    return DSOHandleAndFlags.getPointer();
+  if (DSOHandle)
+    return DSOHandle;
 
   auto unsafeMutablePtr = getASTContext().getUnsafeMutablePointerDecl();
   if (!unsafeMutablePtr)
@@ -423,7 +424,7 @@ VarDecl *Module::getDSOHandle() {
   handleVar->getAttrs().add(
     new (ctx) SILGenNameAttr("__dso_handle", /*Implicit=*/true));
   handleVar->setAccessibility(Accessibility::Internal);
-  DSOHandleAndFlags.setPointer(handleVar);
+  DSOHandle = handleVar;
   return handleVar;
 }
 
@@ -458,6 +459,7 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
     llvm_unreachable("This context does not support lookup.");
 
   case DeclContextKind::FileUnit:
@@ -472,8 +474,10 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
     break;
   }
 
-  case DeclContextKind::NominalTypeDecl: {
-    auto nominal = cast<NominalTypeDecl>(container);
+  case DeclContextKind::GenericTypeDecl: {
+    auto nominal = dyn_cast<NominalTypeDecl>(container);
+    if (!nominal) break;
+    
     auto lookupResults = nominal->lookupDirect(name);
 
     // Filter out declarations from other modules.
@@ -518,10 +522,22 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   }
 }
 
+void Module::lookupObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) const {
+  FORWARD(lookupObjCMethods, (selector, results));
+}
+
 void BuiltinUnit::lookupValue(Module::AccessPathTy accessPath, DeclName name,
                               NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
   getCache().lookupValue(name.getBaseName(), lookupKind, *this, result);
+}
+
+void BuiltinUnit::lookupObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) const {
+  // No @objc methods in the Builtin module.
 }
 
 DerivedFileUnit::DerivedFileUnit(Module &M)
@@ -557,6 +573,17 @@ void DerivedFileUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
   for (auto D : DerivedDecls) {
     if (Id.empty() || D->getName() == Id)
       consumer.foundDecl(D, DeclVisibilityKind::VisibleAtTopLevel);
+  }
+}
+
+void DerivedFileUnit::lookupObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) const {
+  for (auto D : DerivedDecls) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (func->isObjC() && func->getObjCSelector() == selector)
+        results.push_back(func);
+    }
   }
 }
 
@@ -605,6 +632,15 @@ void SourceFile::lookupClassMember(Module::AccessPathTy accessPath,
   getCache().lookupClassMember(accessPath, name, results, *this);
 }
 
+void SourceFile::lookupObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) const {
+  // FIXME: Make sure this table is complete, somehow.
+  auto known = ObjCMethods.find(selector);
+  if (known == ObjCMethods.end()) return;
+  results.append(known->second.begin(), known->second.end());
+}
+
 void Module::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
   FORWARD(getLocalTypeDecls, (Results));
 }
@@ -626,48 +662,75 @@ void Module::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getDisplayDecls, (Results));
 }
 
-DeclContext *BoundGenericType::getGenericParamContext(
-               DeclContext *gpContext) const {
-  // If no context was provided, use the declaration itself.
-  if (!gpContext)
-    return getDecl();
-
-  assert(gpContext->getDeclaredTypeOfContext()->getAnyNominal() == getDecl() &&
-         "not a valid context");
-  return gpContext;
-}
-
-ArrayRef<Substitution> BoundGenericType::getSubstitutions(
-                                           Module *module,
-                                           LazyResolver *resolver,
-                                           DeclContext *gpContext) {
+ArrayRef<Substitution>
+TypeBase::gatherAllSubstitutions(Module *module,
+                                 LazyResolver *resolver,
+                                 DeclContext *gpContext) {
   // FIXME: If there is no module, infer one. This is a hack for callers that
   // don't have access to the module. It will have to go away once we're
   // properly differentiating bound generic types based on the protocol
   // conformances visible from a given module.
   if (!module) {
-    module = getDecl()->getParentModule();
+    module = getAnyNominal()->getParentModule();
   }
 
   // Check the context, introducing the default if needed.
-  gpContext = getGenericParamContext(gpContext);
+  if (!gpContext)
+    gpContext = getAnyNominal();
+
+  assert(gpContext->getAsNominalTypeOrNominalTypeExtensionContext()
+         == getAnyNominal() && "not a valid context");
+
+  auto *genericParams = gpContext->getGenericParamsOfContext();
+  if (!genericParams)
+    return { };
 
   // If we already have a cached copy of the substitutions, return them.
-  auto *canon = getCanonicalType()->castTo<BoundGenericType>();
+  auto *canon = getCanonicalType().getPointer();
   const ASTContext &ctx = canon->getASTContext();
   if (auto known = ctx.getSubstitutions(canon, gpContext))
     return *known;
 
   // Compute the set of substitutions.
-  llvm::SmallPtrSet<ArchetypeType *, 8> knownArchetypes;
-  SmallVector<ArchetypeType *, 8> archetypeStack;
   TypeSubstitutionMap substitutions;
-  auto genericParams = gpContext->getGenericParamsOfContext();
-  unsigned index = 0;
-  for (Type arg : canon->getGenericArgs()) {
-    auto gp = genericParams->getParams()[index++];
-    auto archetype = gp->getArchetype();
-    substitutions[archetype] = arg;
+
+  // The type itself contains substitutions up to the innermost
+  // non-type context.
+  CanType parent(canon);
+  auto *parentDC = gpContext;
+  while (parent) {
+    if (auto boundGeneric = dyn_cast<BoundGenericType>(parent)) {
+      auto genericParams = parentDC->getGenericParamsOfContext();
+      unsigned index = 0;
+
+      assert(boundGeneric->getGenericArgs().size() ==
+             genericParams->getParams().size());
+
+      for (Type arg : boundGeneric->getGenericArgs()) {
+        auto gp = genericParams->getParams()[index++];
+        auto archetype = gp->getArchetype();
+        substitutions[archetype] = arg;
+      }
+
+      parent = CanType(boundGeneric->getParent());
+      parentDC = parentDC->getParent();
+      continue;
+    }
+
+    if (auto nominal = dyn_cast<NominalType>(parent)) {
+      parent = CanType(nominal->getParent());
+      parentDC = parentDC->getParent();
+      continue;
+    }
+
+    llvm_unreachable("Not a nominal or bound generic type");
+  }
+
+  // Add forwarding substitutions from the outer context if we have
+  // a type nested inside a generic function.
+  if (auto *outerGenericParams = parentDC->getGenericParamsOfContext()) {
+    for (auto archetype : outerGenericParams->getAllNestedArchetypes())
+      substitutions[archetype] = archetype;
   }
 
   // Collect all of the archetypes.
@@ -693,7 +756,7 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
   bool hasTypeVariables = canon->hasTypeVariable();
   SmallVector<Substitution, 4> resultSubstitutions;
   resultSubstitutions.resize(allArchetypes.size());
-  index = 0;
+  unsigned index = 0;
   for (auto archetype : allArchetypes) {
     // Substitute into the type.
     SubstOptions options;
@@ -703,33 +766,24 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
     if (!type)
       type = ErrorType::get(module->getASTContext());
 
-    SmallVector<ProtocolConformance *, 4> conformances;
-    if (type->is<TypeVariableType>() || type->isTypeParameter()) {
-      // If the type is a type variable or is dependent, just fill in null
-      // conformances. FIXME: It seems like we should record these as
-      // requirements (?).
-      conformances.assign(archetype->getConformsTo().size(), nullptr);
-    } else {
-      // Find the conformances.
-      for (auto proto : archetype->getConformsTo()) {
-        auto conforms = module->lookupConformance(type, proto, resolver);
-        switch (conforms.getInt()) {
-        case ConformanceKind::Conforms:
-          conformances.push_back(conforms.getPointer());
-          break;
-        case ConformanceKind::UncheckedConforms:
-          conformances.push_back(nullptr);
-          break;
-        case ConformanceKind::DoesNotConform:
-          conformances.push_back(nullptr);
-          break;
-        }
+    SmallVector<ProtocolConformanceRef, 4> conformances;
+    for (auto proto : archetype->getConformsTo()) {
+      // If the type is a type variable or is dependent, just fill in empty
+      // conformances.
+      if (type->is<TypeVariableType>() || type->isTypeParameter()) {
+        conformances.push_back(ProtocolConformanceRef(proto));
+
+      // Otherwise, find the conformances.
+      } else {
+        if (auto conforms = module->lookupConformance(type, proto, resolver))
+          conformances.push_back(*conforms);
+        else
+          conformances.push_back(ProtocolConformanceRef(proto));
       }
     }
 
     // Record this substitution.
-    resultSubstitutions[index] = {archetype, type,
-                                  ctx.AllocateCopy(conformances)};
+    resultSubstitutions[index] = {type, ctx.AllocateCopy(conformances)};
     ++index;
   }
 
@@ -747,9 +801,9 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
   return permanentSubs;
 }
 
-LookupConformanceResult Module::lookupConformance(Type type,
-                                                  ProtocolDecl *protocol,
-                                                  LazyResolver *resolver) {
+Optional<ProtocolConformanceRef>
+Module::lookupConformance(Type type, ProtocolDecl *protocol,
+                          LazyResolver *resolver) {
   ASTContext &ctx = getASTContext();
 
   // An archetype conforms to a protocol if the protocol is listed in the
@@ -757,18 +811,18 @@ LookupConformanceResult Module::lookupConformance(Type type,
   if (auto archetype = type->getAs<ArchetypeType>()) {
     if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       if (archetype->requiresClass())
-        return { nullptr, ConformanceKind::Conforms };
-      return { nullptr, ConformanceKind::DoesNotConform };
+        return ProtocolConformanceRef(protocol);
+
+      return None;
     }
 
     for (auto ap : archetype->getConformsTo()) {
       if (ap == protocol || ap->inheritsFrom(protocol))
-        return { nullptr, ConformanceKind::Conforms };
+        return ProtocolConformanceRef(protocol);
     }
 
-    if (!archetype->getSuperclass()) {
-      return { nullptr, ConformanceKind::DoesNotConform };
-    }
+    if (!archetype->getSuperclass())
+      return None;
   }
 
   // An existential conforms to a protocol if the protocol is listed in the
@@ -784,48 +838,46 @@ LookupConformanceResult Module::lookupConformance(Type type,
     for (auto proto : protocols) {
       if (!proto->isObjC() &&
           !proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-        return { nullptr, ConformanceKind::DoesNotConform };
+        return None;
     }
 
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
     if (!protocol->existentialConformsToSelf() ||
         !protocol->existentialTypeSupported(resolver))
-      return { nullptr, ConformanceKind::DoesNotConform };
+      return None;
 
     // Special-case AnyObject, which may not be in the list of conformances.
     if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      return { nullptr, type->isClassExistentialType()
-                          ? ConformanceKind::Conforms
-                          : ConformanceKind::DoesNotConform };
+      if (type->isClassExistentialType())
+        return ProtocolConformanceRef(protocol);
+
+      return None;
     }
 
     // Look for this protocol within the existential's list of conformances.
     for (auto proto : protocols) {
-      if (proto == protocol || proto->inheritsFrom(protocol)) {
-        return { nullptr, ConformanceKind::Conforms };
-      }
+      if (proto == protocol || proto->inheritsFrom(protocol))
+        return ProtocolConformanceRef(protocol);
     }
 
     // We didn't find our protocol in the existential's list; it doesn't
     // conform.
-    return { nullptr, ConformanceKind::DoesNotConform };
+    return None;
   }
 
   // Check for protocol conformance of archetype via superclass requirement.
   if (auto archetype = type->getAs<ArchetypeType>()) {
     if (auto super = archetype->getSuperclass()) {
-      auto inheritedConformance = lookupConformance(super, protocol, resolver);
-      switch (inheritedConformance.getInt()) {
-      case ConformanceKind::DoesNotConform:
-        return { nullptr, ConformanceKind::DoesNotConform };
-      case ConformanceKind::UncheckedConforms:
-        return inheritedConformance;
-      case ConformanceKind::Conforms:
-        auto result =
-          ctx.getInheritedConformance(type, inheritedConformance.getPointer());
-        return { result, ConformanceKind::Conforms };
+      if (auto inheritedConformance = lookupConformance(super, protocol,
+                                                        resolver)) {
+        return ProtocolConformanceRef(
+                 ctx.getInheritedConformance(
+                   type,
+                   inheritedConformance->getConcrete()));
       }
+
+      return None;
     }
   }
 
@@ -833,27 +885,21 @@ LookupConformanceResult Module::lookupConformance(Type type,
   // diagnostics.  We consider it to conform to all protocols, since the
   // intended type might have.
   if (type->is<UnresolvedType>()) {
-    return {
-      ctx.getConformance(type, protocol, protocol->getLoc(), this,
-                         ProtocolConformanceState::Complete),
-      ConformanceKind::Conforms
-    };
+    return ProtocolConformanceRef(
+             ctx.getConformance(type, protocol, protocol->getLoc(), this,
+                                ProtocolConformanceState::Complete));
   }
   
   
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
-  // FIXME: We may have implicit conformances for some cases. Handle those
-  // here.
-  if (!nominal) {
-    return { nullptr, ConformanceKind::DoesNotConform };
-  }
+  if (!nominal) return None;
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
   if (!nominal->lookupConformance(this, protocol, conformances))
-    return { nullptr, ConformanceKind::DoesNotConform };
+    return None;
 
   // FIXME: Ambiguity resolution.
   auto conformance = conformances.front();
@@ -876,22 +922,13 @@ LookupConformanceResult Module::lookupConformance(Type type,
     // Compute the conformance for the inherited type.
     auto inheritedConformance = lookupConformance(superclassTy, protocol,
                                                   resolver);
-    switch (inheritedConformance.getInt()) {
-    case ConformanceKind::DoesNotConform:
-      llvm_unreachable("We already found the inherited conformance");
-
-    case ConformanceKind::UncheckedConforms:
-      return inheritedConformance;
-
-    case ConformanceKind::Conforms:
-      // Create inherited conformance below.
-      break;
-    }
+    assert(inheritedConformance &&
+           "We already found the inherited conformance");
 
     // Create the inherited conformance entry.
     conformance
-      = ctx.getInheritedConformance(type, inheritedConformance.getPointer());
-    return { conformance, ConformanceKind::Conforms };
+      = ctx.getInheritedConformance(type, inheritedConformance->getConcrete());
+    return ProtocolConformanceRef(conformance);
   }
 
   // If the type is specialized, find the conformance for the generic type.
@@ -905,20 +942,23 @@ LookupConformanceResult Module::lookupConformance(Type type,
     if (!explicitConformanceType->isEqual(type)) {
       // Gather the substitutions we need to map the generic conformance to
       // the specialized conformance.
-      SmallVector<Substitution, 4> substitutionsVec;
-      auto substitutions = type->gatherAllSubstitutions(this, substitutionsVec,
-                                                        resolver,
+      auto substitutions = type->gatherAllSubstitutions(this, resolver,
                                                         explicitConformanceDC);
+      
+      for (auto sub : substitutions) {
+        if (sub.getReplacement()->is<ErrorType>())
+          return None;
+      }
 
       // Create the specialized conformance entry.
       auto result = ctx.getSpecializedConformance(type, conformance,
                                                   substitutions);
-      return { result, ConformanceKind::Conforms };
+      return ProtocolConformanceRef(result);
     }
   }
 
   // Record and return the simple conformance.
-  return { conformance, ConformanceKind::Conforms };
+  return ProtocolConformanceRef(conformance);
 }
 
 namespace {
@@ -1404,7 +1444,7 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
     // For a major decl, we print an empty line before it.
     if (MajorDeclKinds.find(decl->getKind()) != MajorDeclKinds.end())
       Printer << "\n";
-    if(decl->print(Printer, PO))
+    if (decl->print(Printer, PO))
       Printer << "\n";
   }
 }
@@ -1530,7 +1570,7 @@ bool SourceFile::walk(ASTWalker &walker) {
   return false;
 }
 
-StringRef SourceFile::getFilename() const  {
+StringRef SourceFile::getFilename() const {
   if (BufferID == -1)
     return "";
   SourceManager &SM = getASTContext().SourceMgr;
@@ -1546,11 +1586,12 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
 
   StringRef name = getFilename();
   if (name.empty()) {
-    assert(1 == std::count_if(getParentModule()->getFiles().begin(),
-                              getParentModule()->getFiles().end(),
-                              [](const FileUnit *FU) -> bool {
-      return isa<SourceFile>(FU) && cast<SourceFile>(FU)->getFilename().empty();
-    }) && "can't promise uniqueness if multiple source files are nameless");
+    assert(1 == count_if(getParentModule()->getFiles(),
+                         [](const FileUnit *FU) -> bool {
+                           return isa<SourceFile>(FU) &&
+                                  cast<SourceFile>(FU)->getFilename().empty();
+                         }) &&
+           "can't promise uniqueness if multiple source files are nameless");
 
     // We still need a discriminator, so keep going.
   }
@@ -1603,25 +1644,30 @@ StringRef LoadedFile::getFilename() const {
   return "";
 }
 
+static const clang::Module *
+getClangModule(llvm::PointerUnion<const Module *, const void *> Union) {
+  return static_cast<const clang::Module *>(Union.get<const void *>());
+}
+
 StringRef ModuleEntity::getName() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const Module*>())
     return SwiftMod->getName().str();
-  return Mod.get<const clang::Module*>()->Name;
+  return getClangModule(Mod)->Name;
 }
 
 std::string ModuleEntity::getFullName() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const Module*>())
     return SwiftMod->getName().str();
-  return Mod.get<const clang::Module*>()->getFullModuleName();
+  return getClangModule(Mod)->getFullModuleName();
 }
 
 bool ModuleEntity::isSystemModule() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const Module*>())
     return SwiftMod->isSystemModule();
-  return Mod.get<const clang::Module*>()->IsSystem;
+  return getClangModule(Mod)->IsSystem;
 }
 
 bool ModuleEntity::isBuiltinModule() const {
@@ -1629,4 +1675,11 @@ bool ModuleEntity::isBuiltinModule() const {
   if (auto SwiftMod = Mod.dyn_cast<const Module*>())
     return SwiftMod->isBuiltinModule();
   return false;
+}
+
+const ModuleDecl* ModuleEntity::getAsSwiftModule() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod;
+  return nullptr;
 }

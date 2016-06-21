@@ -2,6 +2,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL2 | FileCheck %s -check-prefix=LITERAL2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL3 | FileCheck %s -check-prefix=LITERAL3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL4 | FileCheck %s -check-prefix=LITERAL4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL5 | FileCheck %s -check-prefix=LITERAL5
 
 {
   1.#^LITERAL1^#
@@ -16,7 +17,6 @@
   1.1.#^LITERAL2^#
 }
 // LITERAL2:         Begin completions
-// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isSignMinus[#Bool#]; name=isSignMinus{{$}}
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isNormal[#Bool#]; name=isNormal{{$}}
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isFinite[#Bool#]; name=isFinite{{$}}
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isZero[#Bool#]; name=isZero{{$}}
@@ -37,14 +37,25 @@
 }
 
 // LITERAL4:         Begin completions
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   withCString({#(f): UnsafePointer<Int8> throws -> Result##UnsafePointer<Int8> throws -> Result#})[' rethrows'][#Result#]; name=withCString(f: UnsafePointer<Int8> throws -> Result) rethrows{{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   withCString({#(f): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(f: (UnsafePointer<Int8>) throws -> Result) rethrows{{$}}
 
 // FIXME: we should show the qualified String.Index type.
 // rdar://problem/20788802
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      startIndex[#Index#]; name=startIndex{{$}}
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#Index#]; name=endIndex{{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#(c): Character#})[#Void#]; name=append(c: Character){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   appendContentsOf({#(newElements): S#})[#Void#]; name=appendContentsOf(newElements: S){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   insertContentsOf({#(newElements): S#}, {#at: Index#})[#Void#]; name=insertContentsOf(newElements: S, at: Index){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   removeAtIndex({#(i): Index#})[#Character#]; name=removeAtIndex(i: Index){{$}}
-// LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      lowercaseString[#String#]; name=lowercaseString{{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#contentsOf: S#})[#Void#]; name=append(contentsOf: S){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   insert({#contentsOf: S#}, {#at: Index#})[#Void#]; name=insert(contentsOf: S, at: Index){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   remove({#at: Index#})[#Character#]; name=remove(at: Index){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:      lowercased()[#String#]; name=lowercased(){{$}}
+
+func giveMeAString() -> Int {
+  // rdar://22637799
+  return "Here's a string".#^LITERAL5^# // try .characters.count here
+}
+
+// LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#Index#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#contentsOf: S#})[#Void#]{{; name=.+$}}

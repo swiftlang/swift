@@ -1,14 +1,21 @@
-add_swift_library(swiftSIL
+add_swift_library(swiftSIL STATIC
   AbstractionPattern.cpp
   Bridging.cpp
   Dominance.cpp
   DynamicCasts.cpp
+  InstructionUtils.cpp
+  Linker.cpp
+  LoopInfo.cpp
+  Mangle.cpp
   PrettyStackTrace.cpp
+  Projection.cpp
   SIL.cpp
   SILArgument.cpp
   SILBasicBlock.cpp
   SILBuilder.cpp
   SILCoverageMap.cpp
+  SILDeclRef.cpp
+  SILDefaultWitnessTable.cpp
   SILFunction.cpp
   SILFunctionType.cpp
   SILGlobalVariable.cpp
@@ -18,18 +25,12 @@ add_swift_library(swiftSIL
   SILModule.cpp
   SILPrinter.cpp
   SILSuccessor.cpp
+  SILType.cpp
+  SILValue.cpp
+  SILVerifier.cpp
   SILVTable.cpp
   SILWitnessTable.cpp
   TypeLowering.cpp
-  Verifier.cpp
-  SILType.cpp
-  SILValue.cpp
-  SILDeclRef.cpp
-  LoopInfo.cpp
-  Projection.cpp
-  MemLocation.cpp
-  Mangle.cpp
-  Linker.cpp
   LINK_LIBRARIES
     swiftSerialization
     swiftSema)

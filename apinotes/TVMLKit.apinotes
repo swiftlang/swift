@@ -1,0 +1,87 @@
+---
+Name: TVMLKit
+Classes:
+- Name: TVElementFactory
+  Methods:
+  - Selector: 'registerViewElementClass:forElementName:'
+    SwiftName: 'registerViewElementClass(_:elementName:)'
+    MethodKind: Class
+- Name: TVInterfaceFactory
+  Methods:
+  - Selector: 'imageForResource:'
+    SwiftName: 'resourceImage(name:)'
+    MethodKind: Instance
+  - Selector: 'viewForElement:existingView:'
+    SwiftName: 'makeView(element:existingView:)'
+    MethodKind: Instance
+  - Selector: 'viewControllerForElement:existingViewController:'
+    SwiftName: 'makeViewController(element:existingViewController:)'
+    MethodKind: Instance
+  - Selector: 'URLForResource:'
+    SwiftName: 'resourceURL(name:)'
+    MethodKind: Instance
+- Name: TVStyleFactory
+  Methods:
+  - Selector: 'registerStyle:withType:inherited:'
+    SwiftName: 'registerStyleName(_:type:inherited:)'
+    MethodKind: Class
+- Name: TVTextElement
+  Properties:
+  - Name: attributedText
+    SwiftName: attributedString
+  Methods:
+  - Selector: 'attributedStringWithFont:'
+    SwiftName: 'makeAttributedString(font:)'
+    MethodKind: Instance
+  - Selector: 'attributedStringWithFont:foregroundColor:textAlignment:'
+    SwiftName: 'makeAttributedString(font:foregroundColor:textAlignment:)'
+    MethodKind: Instance
+- Name: TVViewElement
+  Properties:
+  - Name: elementIdentifier
+    SwiftName: identifier
+  - Name: elementName
+    SwiftName: name
+  - Name: childViewElements
+    SwiftName: children
+  Methods:
+  - Selector: 'dispatchEventOfType:canBubble:cancellable:extraInfo:completion:'
+    SwiftName: 'dispatchEvent(type:canBubble:cancellable:extraInfo:completion:)'
+    MethodKind: Instance
+  - Selector: 'dispatchEventWithName:canBubble:cancellable:extraInfo:completion:'
+    SwiftName: 'dispatchEvent(name:canBubble:cancellable:extraInfo:completion:)'
+    MethodKind: Instance
+- Name: TVViewElementStyle
+  Methods:
+  - Selector: 'valueForStyleProperty:'
+    SwiftName: 'value(propertyName:)'
+    MethodKind: Instance
+Protocols:
+- Name: TVApplicationControllerDelegate
+  Methods:
+  - Selector: 'appController:didFinishLaunchingWithOptions:'
+    SwiftName: 'appController(_:didFinishLaunching:)'
+    MethodKind: Instance
+  - Selector: 'appController:didFailWithError:'
+    SwiftName: 'appController(_:didFail:)'
+    MethodKind: Instance
+  - Selector: 'appController:didStopWithOptions:'
+    SwiftName: 'appController(_:didStop:)'
+    MethodKind: Instance
+- Name: TVInterfaceCreating
+  Methods:
+  - Selector: 'imageForResource:'
+    SwiftName: 'resourceImage(name:)'
+    MethodKind: Instance
+  - Selector: 'viewForElement:existingView:'
+    SwiftName: 'makeView(element:existingView:)'
+    MethodKind: Instance
+  - Selector: 'viewControllerForElement:existingViewController:'
+    SwiftName: 'makeViewController(element:existingViewController:)'
+    MethodKind: Instance
+  - Selector: 'URLForResource:'
+    SwiftName: 'resourceURL(name:)'
+    MethodKind: Instance
+Enumerators:
+- Name: TVElementUpdateTypeSelf
+  SwiftName: node

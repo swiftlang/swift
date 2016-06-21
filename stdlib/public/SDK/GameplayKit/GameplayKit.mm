@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,7 +12,9 @@
 
 #import <GameplayKit/GameplayKit.h>
 
-extern "C" NS_RETURNS_RETAINED GKComponent * __nullable
+#include "swift/Runtime/Config.h"
+
+extern "C" SWIFT_CC(swift) NS_RETURNS_RETAINED GKComponent * __nullable
 GK_Swift_GKEntity_componentForClass(
     id NS_RELEASES_ARGUMENT __nonnull self_,
     Class __nonnull componentClass) {
@@ -22,7 +24,7 @@ GK_Swift_GKEntity_componentForClass(
   return component;
 }
 
-extern "C" NS_RETURNS_RETAINED GKState * __nullable
+extern "C" SWIFT_CC(swift) NS_RETURNS_RETAINED GKState * __nullable
 GK_Swift_GKStateMachine_stateForClass(
     id NS_RELEASES_ARGUMENT __nonnull self_,
     Class __nonnull stateClass) {

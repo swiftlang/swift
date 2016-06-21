@@ -1,24 +1,23 @@
 // RUN: %target-parse-verify-swift
 
 // Single extraneous keyword argument (tuple-to-scalar)
-func f1(a: Int) { }
+func f1(_ a: Int) { }
 f1(a: 5) // expected-error{{extraneous argument label 'a:' in call}}{{4-7=}}
 
 struct X1 {
   init(_ a: Int) { }
-  func f1(a: Int) {}
+  func f1(_ a: Int) {}
 }
 X1(a: 5).f1(b: 5) // expected-error{{extraneous argument label 'a:' in call}}{{4-7=}}
-// expected-error@-1{{extraneous argument label 'b:' in call}}{{13-16=}}
 
 // <rdar://problem/16801056>
 enum Policy {
   case Head(Int)
 }
 
-func extra2(x x: Int, y: Int) { }
+func extra2(x: Int, y: Int) { }
 
-func testExtra2(policy : Policy) {
+func testExtra2(_ policy : Policy) {
   switch (policy)
   {
     case .Head(let count):
@@ -27,22 +26,21 @@ func testExtra2(policy : Policy) {
 }
 
 // Single missing keyword argument (scalar-to-tuple)
-func f2(a a: Int) { }
+func f2(a: Int) { }
 f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
 
 struct X2 {
   init(a: Int) { }
-  func f2(b b: Int) { }
+  func f2(b: Int) { }
 }
 X2(5).f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
-// expected-error @-1{{missing argument label 'b:' in call}}{{10-10=b: }}
 
 
 // -------------------------------------------
 // Missing keywords
 // -------------------------------------------
 
-func allkeywords1(x x: Int, y: Int) { }
+func allkeywords1(x: Int, y: Int) { }
 
 // Missing keywords.
 allkeywords1(1, 2) // expected-error{{missing argument labels}} {{14-14=x: }} {{17-17=y: }}
@@ -50,11 +48,11 @@ allkeywords1(x: 1, 2) // expected-error{{missing argument label 'y:' in call}} {
 allkeywords1(1, y: 2) // expected-error{{missing argument label 'x:' in call}} {{14-14=x: }}
 
 // If keyword is reserved, make sure to quote it. rdar://problem/21392294
-func reservedLabel(x: Int, `repeat`: Bool) {}
-reservedLabel(1, true) // expected-error{{missing argument label 'repeat:' in call}}{{18-18=`repeat`: }}
+func reservedLabel(_ x: Int, `repeat`: Bool) {}
+reservedLabel(1, true) // expected-error{{missing argument label 'repeat:' in call}}{{18-18=repeat: }}
 
 // Insert missing keyword before initial backtick. rdar://problem/21392294 part 2
-func reservedExpr(x: Int, y: Int) {}
+func reservedExpr(_ x: Int, y: Int) {}
 let `do` = 2
 reservedExpr(1, `do`) // expected-error{{missing argument label 'y:' in call}}{{17-17=y: }}
 reservedExpr(1, y: `do`)
@@ -67,14 +65,14 @@ GenericCtor<Int>()  // expected-error{{missing argument for parameter 't' in cal
 // -------------------------------------------
 // Extraneous keywords
 // -------------------------------------------
-func nokeywords1(x: Int, _ y: Int) { }
+func nokeywords1(_ x: Int, _ y: Int) { }
 
 nokeywords1(x: 1, y: 1) // expected-error{{extraneous argument labels 'x:y:' in call}}{{13-16=}}{{19-22=}}
 
 // -------------------------------------------
 // Some missing, some extraneous keywords
 // -------------------------------------------
-func somekeywords1(x: Int, y: Int, z: Int) { }
+func somekeywords1(_ x: Int, y: Int, z: Int) { }
 
 somekeywords1(x: 1, y: 2, z: 3) // expected-error{{extraneous argument label 'x:' in call}}{{15-18=}}
 somekeywords1(1, 2, 3) // expected-error{{missing argument labels 'y:z:' in call}}{{18-18=y: }}{{21-21=z: }}
@@ -90,7 +88,7 @@ allkeywords1(y: 1, x: 2) // expected-error{{argument 'x' must precede argument '
 // Default arguments
 // -------------------------------------------
 
-func defargs1(x x: Int = 1, y: Int = 2, z: Int = 3) {}
+func defargs1(x: Int = 1, y: Int = 2, z: Int = 3) {}
 
 // Using defaults (in-order)
 defargs1() 
@@ -109,7 +107,7 @@ defargs1(x: 1, z: 3, y: 2)
 defargs1(y: 2, x: 1)
 
 // Default arguments "boxed in".
-func defargs2(first first: Int, x: Int = 1, y: Int = 2, z: Int = 3, last: Int) { }
+func defargs2(first: Int, x: Int = 1, y: Int = 2, z: Int = 3, last: Int) { }
 
 // Using defaults in the middle (in-order, some missing)
 defargs2(first: 1, x: 1, z: 3, last: 4)
@@ -128,7 +126,7 @@ defargs2(first: 1, last: 4, x: 1) // expected-error{{argument 'x' must precede a
 // -------------------------------------------
 // Variadics
 // -------------------------------------------
-func variadics1(x x: Int, y: Int, _ z: Int...) { }
+func variadics1(x: Int, y: Int, _ z: Int...) { }
 
 // Using variadics (in-order, complete)
 variadics1(x: 1, y: 2)
@@ -139,7 +137,7 @@ variadics1(x: 1, y: 2, 1, 2, 3)
 // Using various (out-of-order)
 variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{argument 'x' must precede unnamed parameter #0}}
 
-func variadics2(x x: Int, y: Int = 2, z: Int...) { }
+func variadics2(x: Int, y: Int = 2, z: Int...) { }
 
 // Using variadics (in-order, complete)
 variadics2(x: 1, y: 2, z: 1)
@@ -154,7 +152,7 @@ variadics2(x: 1)
 variadics2(z: 1, 2, 3, y: 2) // expected-error{{missing argument for parameter 'x' in call}}
 variadics2(z: 1, 2, 3, x: 1) // expected-error{{argument 'x' must precede argument 'z'}}
 
-func variadics3(x: Int..., y: Int = 2, z: Int = 3) { }
+func variadics3(_ x: Int..., y: Int = 2, z: Int = 3) { }
 
 // Using variadics (in-order, complete)
 variadics3(1, 2, 3, y: 0, z: 1)
@@ -175,10 +173,10 @@ variadics3(1)
 variadics3()
 
 // Using variadics (out-of-order)
-variadics3(y: 0, 1, 2, 3) // expected-error{{missing argument label 'z:' in call}} {{18-18=z: }}
+variadics3(y: 0, 1, 2, 3) // FIXME: error here
 variadics3(z: 1, 1) // FIXME: error here?
 
-func variadics4(x x: Int..., y: Int = 2, z: Int = 3) { }
+func variadics4(x: Int..., y: Int = 2, z: Int = 3) { }
 
 // Using variadics (in-order, complete)
 variadics4(x: 1, 2, 3, y: 0, z: 1)
@@ -202,7 +200,7 @@ variadics4()
 variadics4(y: 0, x: 1, 2, 3) // expected-error{{extra argument in call}}
 variadics4(z: 1, x: 1) // FIXME: error
 
-func variadics5(x: Int, y: Int, _ z: Int...) { }
+func variadics5(_ x: Int, y: Int, _ z: Int...) { }
 
 // Using variadics (in-order, complete)
 variadics5(1, y: 2)
@@ -214,7 +212,7 @@ variadics5(1, y: 2, 1, 2, 3)
 variadics5(1, 2, 3, 4, 5, 6, y: 7) // expected-error{{argument 'y' must precede unnamed parameter #1}}
 variadics5(y: 1, 2, 3, 4, 5, 6, 7) // expected-error{{missing argument for parameter #1 in call}}
 
-func outOfOrder(a : Int, b: Int) {
+func outOfOrder(_ a : Int, b: Int) {
   outOfOrder(b: 42, 52)  // expected-error {{argument '_' must precede argument 'b'}}
 }
 
@@ -223,11 +221,11 @@ func outOfOrder(a : Int, b: Int) {
 // -------------------------------------------
 // FIXME: Diagnostics could be improved with all missing names, or
 // simply # of arguments required.
-func missingargs1(x x: Int, y: Int, z: Int) {}
+func missingargs1(x: Int, y: Int, z: Int) {}
 
 missingargs1(x: 1, y: 2) // expected-error{{missing argument for parameter 'z' in call}}
 
-func missingargs2(x x: Int, y: Int, _ z: Int) {}
+func missingargs2(x: Int, y: Int, _ z: Int) {}
 missingargs2(x: 1, y: 2) // expected-error{{missing argument for parameter #3 in call}}
 
 // -------------------------------------------
@@ -235,7 +233,7 @@ missingargs2(x: 1, y: 2) // expected-error{{missing argument for parameter #3 in
 // -------------------------------------------
 // FIXME: Diagnostics could be improved with all extra arguments and
 // note pointing to the declaration being called.
-func extraargs1(x x: Int) {}
+func extraargs1(x: Int) {}
 
 extraargs1(x: 1, y: 2) // expected-error{{extra argument 'y' in call}}
 extraargs1(x: 1, 2, 3) // expected-error{{extra argument in call}}
@@ -244,7 +242,7 @@ extraargs1(x: 1, 2, 3) // expected-error{{extra argument in call}}
 // Argument name mismatch
 // -------------------------------------------
 
-func mismatch1(thisFoo thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { }
+func mismatch1(thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { }
 
 mismatch1(foo: 5) // expected-error{{incorrect argument label in call (have 'foo:', expected 'thisFoo:')}} {{11-14=thisFoo}}
 mismatch1(baz: 1, wobble: 2) // expected-error{{incorrect argument labels in call (have 'baz:wobble:', expected 'bar:wibble:')}} {{11-14=bar}} {{19-25=wibble}}
@@ -273,67 +271,68 @@ struct Sub2 {
 
 var sub2 = Sub2()
 var d: Double = 0.0
-d = sub2[d] // expected-error{{missing argument label 'd:' in subscript}} {{10-10=d: }}
+d = sub2[d] // expected-error{{missing argument label 'd:' in subscript}} {{9-9=d: }}
 d = sub2[d: d]
 d = sub2[f: d] // expected-error{{incorrect argument label in subscript (have 'f:', expected 'd:')}} {{10-11=d}}
 
 // -------------------------------------------
 // Closures
 // -------------------------------------------
-func intToInt(i: Int) -> Int { return i }
+func intToInt(_ i: Int) -> Int { return i }
 
 func testClosures() {
   let c0 = { (x: Int, y: Int) in x + y }
-  c0(1, 2)
+  _ = c0(1, 2)
 
   let c1 = { x, y in intToInt(x + y) }
-  c1(1, 2)
+  _ = c1(1, 2)
 
   let c2 = { intToInt($0 + $1) }
-  c2(1, 2)
+  _ = c2(1, 2)
 }
 
-func acceptAutoclosure(@autoclosure f f: () -> Int) { }
+func acceptAutoclosure(f: @autoclosure () -> Int) { }
 func produceInt() -> Int { }
 acceptAutoclosure(f: produceInt) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{32-32=()}}
 
 // -------------------------------------------
 // Trailing closures
 // -------------------------------------------
-func trailingclosure1(x x: Int, f: () -> Int) {}
+func trailingclosure1(x: Int, f: () -> Int) {}
 
 trailingclosure1(x: 1) { return 5 }
 trailingclosure1(1) { return 5 } // expected-error{{missing argument label 'x:' in call}}{{18-18=x: }}
 
 trailingclosure1(x: 1, { return 5 }) // expected-error{{missing argument label 'f:' in call}} {{24-24=f: }}
 
-func trailingclosure2(x x: Int, f: (() -> Int)!...) {}
+func trailingclosure2(x: Int, f: (() -> Int)!...) {}
 trailingclosure2(x: 5) { return 5 }
 
-func trailingclosure3(x x: Int, f: (() -> Int)!) {
+func trailingclosure3(x: Int, f: (() -> Int)!) {
   var f = f
-  _ = f
   f = nil
+  _ = f
 }
+
 trailingclosure3(x: 5) { return 5 }
 
-func trailingclosure4(f f: () -> Int) {}
+func trailingclosure4(f: () -> Int) {}
 trailingclosure4 { 5 }
 
-func trailingClosure5<T>(file: String = __FILE__, line: UInt = __LINE__, expression: () -> T?) { }
-func trailingClosure6<T>(value value: Int, expression: () -> T?) { }
+func trailingClosure5<T>(_ file: String = #file, line: UInt = #line, expression: () -> T?) { }
+func trailingClosure6<T>(value: Int, expression: () -> T?) { }
 
 trailingClosure5(file: "hello", line: 17) { return Optional.Some(5) } // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}
 trailingClosure6(5) { return Optional.Some(5) } // expected-error{{missing argument label 'value:' in call}}{{18-18=value: }}
 
 class MismatchOverloaded1 {
-  func method1(x: Int!, arg: ((Int) -> Int)!) { }
-  func method1(x: Int!, secondArg: ((Int) -> Int)!) { }
+  func method1(_ x: Int!, arg: ((Int) -> Int)!) { }
+  func method1(_ x: Int!, secondArg: ((Int) -> Int)!) { }
 
   @available(*, unavailable)
-  func method2(x: Int!, arg: ((Int) -> Int)!) { }
+  func method2(_ x: Int!, arg: ((Int) -> Int)!) { }
 
-  func method2(x: Int!, secondArg: ((Int) -> Int)!) { }
+  func method2(_ x: Int!, secondArg: ((Int) -> Int)!) { }
 }
 
 var mismatchOverloaded1 = MismatchOverloaded1()
@@ -346,7 +345,7 @@ mismatchOverloaded1.method2(5) { $0 }
 // -------------------------------------------
 // Values of function type
 // -------------------------------------------
-func testValuesOfFunctionType(f1: (_: Int, arg: Int) -> () ) {
+func testValuesOfFunctionType(_ f1: (_: Int, arg: Int) -> () ) {
   f1(3, arg: 5)
   f1(x: 3, 5) // expected-error{{incorrect argument labels in call (have 'x:_:', expected '_:arg:')}} {{6-9=}} {{12-12=arg: }}
   f1(3, 5) // expected-error{{missing argument label 'arg:' in call}} {{9-9=arg: }}
@@ -356,13 +355,13 @@ func testValuesOfFunctionType(f1: (_: Int, arg: Int) -> () ) {
 // -------------------------------------------
 // Literals
 // -------------------------------------------
-func string_literals1(x x: String) { }
+func string_literals1(x: String) { }
 string_literals1(x: "hello")
 
-func int_literals1(x x: Int) { }
+func int_literals1(x: Int) { }
 int_literals1(x: 1)
 
-func float_literals1(x x: Double) { }
+func float_literals1(x: Double) { }
 float_literals1(x: 5)
 
 // -------------------------------------------
@@ -370,16 +369,16 @@ float_literals1(x: 5)
 // -------------------------------------------
 func produceTuple1() -> (Int, Bool) { return (1, true) }
 
-func acceptTuple1<T>(x: (T, Bool)) { }
+func acceptTuple1<T>(_ x: (T, Bool)) { }
 
 acceptTuple1(produceTuple1())
 acceptTuple1((1, false))
 // FIXME: QoI is awful here.
 acceptTuple1(1, false) // expected-error{{extra argument in call}}
 
-func acceptTuple2<T>(input : T) -> T { return input }
+func acceptTuple2<T>(_ input : T) -> T { return input }
 var tuple1 = (1, "hello")
-acceptTuple2(tuple1)
-acceptTuple2((1, "hello", 3.14159))
+_ = acceptTuple2(tuple1)
+_ = acceptTuple2((1, "hello", 3.14159))
 
 

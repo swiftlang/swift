@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -73,6 +73,10 @@ const ValueWitnessTable swift::_TWVXwGSqBo_ =
 /// The value-witness table for pointer-aligned unmanaged pointer types.
 const ExtraInhabitantsValueWitnessTable swift::_TWVMBo =
   ValueWitnessTableForBox<PointerPointerBox>::table;
+
+/// The value-witness table for raw pointers.
+const ExtraInhabitantsValueWitnessTable swift::_TWVBp =
+  ValueWitnessTableForBox<RawPointerBox>::table;
 
 /// The value-witness table for BridgeObject.
 const ExtraInhabitantsValueWitnessTable swift::_TWVBb =
@@ -153,6 +157,7 @@ OPAQUE_METADATA(Bi128_)
 OPAQUE_METADATA(Bi256_)
 OPAQUE_METADATA(Bo)
 OPAQUE_METADATA(Bb)
+OPAQUE_METADATA(Bp)
 OPAQUE_METADATA(BB)
 #if SWIFT_OBJC_INTEROP
 OPAQUE_METADATA(BO)

@@ -1,0 +1,255 @@
+//===--- Map.swift.gyb - Lazily map over a Sequence -----------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName
+)
+}%
+
+/// The `IteratorProtocol` used by `MapSequence` and `MapCollection`.
+/// Produces each element by passing the output of the `Base`
+/// `IteratorProtocol` through a transform function returning `Element`.
+public struct LazyMapIterator<
+  Base : IteratorProtocol, Element
+> : IteratorProtocol, Sequence {
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
+  ///
+  /// - Precondition: `next()` has not been applied to a copy of `self`
+  ///   since the copy was made.
+  public mutating func next() -> Element? {
+    return _base.next().map(_transform)
+  }
+
+  public var base: Base { return _base }
+
+  internal var _base: Base
+  internal let _transform: (Base.Element) -> Element
+}
+
+/// A `Sequence` whose elements consist of those in a `Base`
+/// `Sequence` passed through a transform function returning `Element`.
+/// These elements are computed lazily, each time they're read, by
+/// calling the transform function on a base element.
+public struct LazyMapSequence<Base : Sequence, Element>
+  : LazySequenceProtocol {
+
+  public typealias Elements = LazyMapSequence
+
+  /// Returns an iterator over the elements of this sequence.
+  ///
+  /// - Complexity: O(1).
+  public func makeIterator() -> LazyMapIterator<Base.Iterator, Element> {
+    return LazyMapIterator(_base: _base.makeIterator(), _transform: _transform)
+  }
+
+  /// Returns a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// - Complexity: O(N).
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
+  }
+
+  /// Create an instance with elements `transform(x)` for each element
+  /// `x` of base.
+  internal init(_base: Base, transform: (Base.Iterator.Element) -> Element) {
+    self._base = _base
+    self._transform = transform
+  }
+
+  internal var _base: Base
+  internal let _transform: (Base.Iterator.Element) -> Element
+}
+
+//===--- Collections ------------------------------------------------------===//
+
+// FIXME(ABI)(compiler limitation): `LazyMap*Collection` types should be
+// collapsed into one `LazyMapCollection` using conditional conformances.
+// Maybe even combined with `LazyMapSequence`.
+
+% for Traversal in TRAVERSALS:
+%   Self = "LazyMap" + collectionForTraversal(Traversal)
+%   Slice = sliceTypeName(traversal=Traversal, mutable=False, rangeReplaceable=False)
+
+/// A `Collection` whose elements consist of those in a `Base`
+/// `Collection` passed through a transform function returning `Element`.
+/// These elements are computed lazily, each time they're read, by
+/// calling the transform function on a base element.
+public struct ${Self}<
+  Base : ${collectionForTraversal(Traversal)}, Element
+> : LazyCollectionProtocol, ${collectionForTraversal(Traversal)} {
+
+  // FIXME(compiler limitation): should be inferrable.
+  public typealias Index = Base.Index
+
+  public var startIndex: Base.Index { return _base.startIndex }
+  public var endIndex: Base.Index { return _base.endIndex }
+
+  public func index(after i: Index) -> Index { return _base.index(after: i) }
+
+  public func formIndex(after i: inout Index) {
+    _base.formIndex(after: &i)
+  }
+
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  public func index(before i: Index) -> Index { return _base.index(before: i) }
+
+  public func formIndex(before i: inout Index) {
+    _base.formIndex(before: &i)
+  }
+%   end
+
+  /// Access the element at `position`.
+  ///
+  /// - Precondition: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
+  public subscript(position: Base.Index) -> Element {
+    return _transform(_base[position])
+  }
+
+  public subscript(bounds: Range<Base.Index>) -> ${Slice}<${Self}> {
+    return ${Slice}(base: self, bounds: bounds)
+  }
+
+  // FIXME(ABI)(compiler limitation): we actually want to add:
+  //
+  //   typealias SubSequence = ${Self}<Base.SubSequence, Element>
+  //
+  // so that all slicing optimizations of the base collection can kick in.
+  //
+  // We can't do that right now though, because that would force a lot of
+  // constraints on `Base.SubSequence`, limiting the possible contexts where
+  // the `.lazy.map` API can be used.
+
+  public typealias IndexDistance = Base.IndexDistance
+
+  public typealias Indices = Base.Indices
+
+  public var indices: Indices {
+    return _base.indices
+  }
+
+  /// Returns `true` iff `self` is empty.
+  public var isEmpty: Bool { return _base.isEmpty }
+
+  /// Returns the number of elements.
+  ///
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
+  ///   O(N) otherwise.
+  public var count: Base.IndexDistance {
+    return _base.count
+  }
+
+  public var first: Element? { return _base.first.map(_transform) }
+
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  public var last: Element? { return _base.last.map(_transform) }
+%   end
+
+  public func index(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
+    return _base.index(i, offsetBy: n)
+  }
+
+  public func index(
+    _ i: Index, offsetBy n: Base.IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    return _base.index(i, offsetBy: n, limitedBy: limit)
+  }
+
+  public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
+    return _base.distance(from: start, to: end)
+  }
+
+  /// Returns an iterator over the elements of this sequence.
+  ///
+  /// - Complexity: O(1).
+  public func makeIterator() -> LazyMapIterator<Base.Iterator, Element> {
+    return LazyMapIterator(_base: _base.makeIterator(), _transform: _transform)
+  }
+
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
+  }
+
+  /// Create an instance with elements `transform(x)` for each element
+  /// `x` of base.
+  internal init(_base: Base, transform: (Base.Iterator.Element) -> Element) {
+    self._base = _base
+    self._transform = transform
+  }
+
+  internal var _base: Base
+  internal let _transform: (Base.Iterator.Element) -> Element
+}
+
+% end
+
+//===--- Support for s.lazy -----------------------------------------------===//
+
+extension LazySequenceProtocol {
+  /// Returns a `LazyMapSequence` over this `Sequence`.  The elements of
+  /// the result are computed lazily, each time they are read, by
+  /// calling `transform` function on a base element.
+  public func map<U>(
+    _ transform: (Elements.Iterator.Element) -> U
+  ) -> LazyMapSequence<Self.Elements, U> {
+    return LazyMapSequence(_base: self.elements, transform: transform)
+  }
+}
+
+% for Traversal in TRAVERSALS:
+
+extension LazyCollectionProtocol
+  where
+  Self : ${collectionForTraversal(Traversal)},
+  Elements : ${collectionForTraversal(Traversal)}
+{
+  /// Returns a `LazyMapCollection` over this `Collection`.  The elements of
+  /// the result are computed lazily, each time they are read, by
+  /// calling `transform` function on a base element.
+  public func map<U>(
+    _ transform: (Elements.Iterator.Element) -> U
+  ) -> LazyMap${collectionForTraversal(Traversal)}<Self.Elements, U> {
+    return LazyMap${collectionForTraversal(Traversal)}(
+      _base: self.elements,
+      transform: transform)
+  }
+}
+
+% end
+
+@available(*, unavailable, renamed: "LazyMapIterator")
+public struct LazyMapGenerator<Base : IteratorProtocol, Element> {}
+
+extension LazyMapSequence {
+  @available(*, unavailable, message: "use '.lazy.map' on the sequence")
+  public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
+    Builtin.unreachable()
+  }
+}
+
+extension LazyMapCollection {
+  @available(*, unavailable, message: "use '.lazy.map' on the collection")
+  public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
+    Builtin.unreachable()
+  }
+}
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

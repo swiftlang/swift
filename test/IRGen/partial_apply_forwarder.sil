@@ -1,0 +1,26 @@
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | FileCheck %s
+sil_stage canonical
+
+public protocol P {}
+public class C : P {}
+public class D<T : P> {}
+class E {}
+
+// CHECK-LABEL: define internal %GC23partial_apply_forwarder1DCS_1C_* @_TPA_unspecialized_uncurried(%swift.refcounted*
+// CHECK: [[TYPE:%.*]] = call %swift.type* @_TMaC23partial_apply_forwarder1C()
+// CHECK: [[CAST:%.*]] = bitcast %swift.refcounted* %0 to %C23partial_apply_forwarder1E*
+// CHECK: [[CALL:%.*]] = call %C23partial_apply_forwarder1D* @unspecialized_uncurried(%swift.type* [[TYPE]], i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @_TWPC23partial_apply_forwarder1CS_1PS_, i32 0, i32 0), %C23partial_apply_forwarder1E* [[CAST]])
+
+sil hidden @specialized_curried : $@convention(thin) (@owned E) -> @owned @callee_owned () -> @owned D<C> {
+bb0(%0 : $E):
+  %1 = function_ref @unspecialized_uncurried : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0>
+  %2 = partial_apply %1<C>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0>
+  return %2 : $@callee_owned () -> @owned D<C>
+}
+
+sil hidden_external @unspecialized_uncurried : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0>
+
+sil_vtable C {}
+sil_vtable D {}
+sil_vtable E {}
+sil_witness_table C: P module main {}

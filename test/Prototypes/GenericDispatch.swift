@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,7 +25,7 @@ print("testing...")
 //===--- Think of this code as being "in the library" ---------------------===//
 //===----------------------------------------------------------------------===//
 
-//===--- F "base" protocol (like ForwardIndexType) ------------------------===//
+//===--- F "base" protocol (like ForwardIndex) ----------------------------===//
 
 protocol F {
   func successor() -> Self
@@ -46,7 +46,7 @@ protocol F {
 struct _Distance {}
 
 // This function cleans up the syntax of invocations
-func _distance<I>(other: I) -> (_Distance, (I)) {
+func _distance<I>(_ other: I) -> (_Distance, (I)) {
   return (_Distance(), (other))
 }
 
@@ -61,15 +61,15 @@ func ~> <I: F>(self_:I, _: (_Distance, (I))) -> Int {
 
 // This generic function is for user consumption; it dispatches to the
 // appropriate implementation for T.
-func distance<T: F>(x: T, _ y: T) -> Int {
+func distance<T: F>(_ x: T, _ y: T) -> Int {
   return x~>_distance(y)
 }
 
-//===--- R refined protocol (like RandomAccessIndexType) ------------------===//
+//===--- R refined protocol (like RandomAccessIndex) ----------------------===//
 protocol R : F {
   // Non-defaulted requirements of R go here, e.g. something to
   // measure the distance in O(1)
-  static func sub(x: Self, y: Self)
+  static func sub(_ x: Self, y: Self)
 }
 
 // R has its own default implementation of distance, which is O(1).
@@ -84,7 +84,7 @@ func ~> <I: R>(x: I, args: (_Distance, (I))) -> Int {
 //===--- D refined protocol (like R, but with a custom distance) ----------===//
 // Users who want to provide a custom distance function will use this protocol
 protocol D : R {
-  func distance(y: Self) -> Int
+  func distance(_ y: Self) -> Int
 }
 
 // Dispatch to D's distance() requirement
@@ -106,24 +106,24 @@ struct SlowIndex : F {
 // This model of R automatically gets R's default implementation of distance
 struct FastIndex : R {
   func successor() -> FastIndex { return self }
-  static func sub(x: FastIndex, y: FastIndex) {}
+  static func sub(_ x: FastIndex, y: FastIndex) {}
 }
 
 struct X : D {
   // Customized distance implementation
-  func distance(y: X) -> Int {
+  func distance(_ y: X) -> Int {
     print("X")
     return 3
   }
   // Inherited requirements
   func successor() -> X { return self }
-  static func sub(x: X, y: X) {}
+  static func sub(_ x: X, y: X) {}
 }
 
 // Here's a generic function that uses our dispatching distance
-func sort<T: F>(x: T) {
+func sort<T: F>(_ x: T) {
   // In here, we don't know whether T is an R or just a plain F, or
-  // whether it has its own specialized impelementation of
+  // whether it has its own specialized implementation of
   distance(x, x)
 }
 // CHECK-NEXT: F

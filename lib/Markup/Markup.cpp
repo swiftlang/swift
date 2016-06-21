@@ -1,8 +1,8 @@
-//===--- Markup.h - Markup ------------------------------------------------===//
+//===--- Markup.cpp - Markup ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,8 +17,9 @@
 #include "swift/Markup/Markup.h"
 #include "cmark.h"
 
-using namespace llvm;
+using namespace swift;
 using namespace markup;
+
 struct ParseState {
   cmark_iter *Iter = nullptr;
   cmark_event_type Event = CMARK_EVENT_NONE;
@@ -108,7 +109,16 @@ ParseResult<CodeBlock> parseCodeBlock(MarkupContext &MC, LineList &LL,
                                       ParseState State) {
   assert(cmark_node_get_type(State.Node) == CMARK_NODE_CODE_BLOCK
       && State.Event == CMARK_EVENT_ENTER);
-  return { CodeBlock::create(MC, getLiteralContent(MC, LL, State.Node)),
+
+  StringRef Language("swift");
+
+  if (auto FenceInfo = cmark_node_get_fence_info(State.Node)) {
+    StringRef FenceInfoStr(FenceInfo);
+    if (!FenceInfoStr.empty())
+      Language = MC.allocateCopy(FenceInfoStr);
+  }
+  return { CodeBlock::create(MC, getLiteralContent(MC, LL, State.Node),
+                             Language),
            State.next() };
 }
 
@@ -308,10 +318,10 @@ parseElement(MarkupContext &MC, LineList &LL, ParseState State) {
   }
 }
 
-Document *llvm::markup::parseDocument(MarkupContext &MC, LineList &LL) {
+Document *swift::markup::parseDocument(MarkupContext &MC, LineList &LL) {
   auto Comment = LL.str();
   auto CMarkDoc = cmark_parse_document(Comment.c_str(), Comment.size(),
-                                       CMARK_OPT_DEFAULT);
+                                       CMARK_OPT_SMART);
 
   if (CMarkDoc == nullptr)
     return nullptr;

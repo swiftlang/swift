@@ -20,11 +20,11 @@ var test : Int
 // RUN: FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "class Foo {"
-// CHECK: key.sourcetext: "	"
-// CHECK: key.sourcetext: "	var test : Int"
-// CHECK: key.sourcetext: "	"
-// CHECK: key.sourcetext: "	func foo() {"
-// CHECK: key.sourcetext: "		test = 1"
-// CHECK: key.sourcetext: "	}"
-// CHECK: key.sourcetext: "	"
+// CHECK: key.sourcetext: "\t"
+// CHECK: key.sourcetext: "\tvar test : Int"
+// CHECK: key.sourcetext: "\t"
+// CHECK: key.sourcetext: "\tfunc foo() {"
+// CHECK: key.sourcetext: "\t\ttest = 1"
+// CHECK: key.sourcetext: "\t}"
+// CHECK: key.sourcetext: "\t"
 // CHECK: key.sourcetext: "}"

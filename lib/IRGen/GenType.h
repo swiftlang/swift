@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -86,6 +86,7 @@ private:
   const LoadableTypeInfo *NativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
+  const LoadableTypeInfo *RawPointerTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
   const LoadableTypeInfo *TypeMetadataPtrTI = nullptr;
   const LoadableTypeInfo *ObjCClassPtrTI = nullptr;
@@ -116,7 +117,7 @@ private:
   TypeCacheEntry convertType(CanType T);
   TypeCacheEntry convertAnyNominalType(CanType T, NominalTypeDecl *D);
   const TypeInfo *convertTupleType(TupleType *T);
-  const TypeInfo *convertClassType(ClassDecl *D);
+  const TypeInfo *convertClassType(CanType type, ClassDecl *D);
   const TypeInfo *convertEnumType(TypeBase *key, CanType type, EnumDecl *D);
   const TypeInfo *convertStructType(TypeBase *key, CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(SILFunctionType *T);
@@ -144,10 +145,10 @@ public:
   TypeCacheEntry getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
   const TypeInfo *tryGetCompleteTypeInfo(CanType type);
-  const TypeInfo &getTypeInfo(ClassDecl *D);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
+  const LoadableTypeInfo &getRawPointerTypeInfo();
   const LoadableTypeInfo &getTypeMetadataPtrTypeInfo();
   const LoadableTypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
@@ -158,10 +159,10 @@ public:
                                                    Alignment storageAlign);
   const LoadableTypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);
 
-  const WeakTypeInfo *createSwiftWeakStorageType(llvm::Type *valueType);
-  const UnownedTypeInfo *createSwiftUnownedStorageType(llvm::Type *valueType);
-  const WeakTypeInfo *createUnknownWeakStorageType(llvm::Type *valueType);
-  const UnownedTypeInfo *createUnknownUnownedStorageType(llvm::Type *valueType);
+  const WeakTypeInfo *createWeakStorageType(llvm::Type *valueType,
+                                            ReferenceCounting style);
+  const TypeInfo *createUnownedStorageType(llvm::Type *valueType,
+                                           ReferenceCounting style);
   const LoadableTypeInfo *createUnmanagedStorageType(llvm::Type *valueType);
 
   /// Enter a generic context for lowering the parameters of a generic function
@@ -204,8 +205,8 @@ private:
     friend void TypeConverter::popGenericContext(CanGenericSignature signature);
     
 #ifndef NDEBUG
-    friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *) const;
-    friend bool TypeConverter::isExemplarArchetype(ArchetypeType *) const;
+    friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const;
+    friend bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const;
 #endif
   };
   Types_t Types;
@@ -236,30 +237,12 @@ public:
 void emitTypeLayoutVerifier(IRGenFunction &IGF,
                             ArrayRef<CanType> formalTypes);
 
-/// Build a value witness that initializes an array front-to-back.
-void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
-                                    const TypeInfo &type,
-                                    Address destArray,
-                                    Address srcArray,
-                                    llvm::Value *count,
-                                    SILType T,
-                                    IsTake_t take);
-
-/// Build a value witness that initializes an array back-to-front.
-void emitInitializeArrayBackToFront(IRGenFunction &IGF,
-                                    const TypeInfo &type,
-                                    Address destArray,
-                                    Address srcArray,
-                                    llvm::Value *count,
-                                    SILType T,
-                                    IsTake_t take);
-
 /// If a type is visibly a singleton aggregate (a tuple with one element, a
 /// struct with one field, or an enum with a single payload case), return the
 /// type of its field, which it is guaranteed to have identical layout to.
 SILType getSingletonAggregateFieldType(IRGenModule &IGM,
                                        SILType t,
-                                       ResilienceScope scope);
+                                       ResilienceExpansion expansion);
 
 } // end namespace irgen
 } // end namespace swift

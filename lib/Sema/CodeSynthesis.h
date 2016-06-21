@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -47,13 +47,10 @@ void markAsObjC(TypeChecker &TC, ValueDecl *D,
                 Optional<ObjCReason> isObjC,
                 Optional<ForeignErrorConvention> errorConvention = None);
 Type configureImplicitSelf(TypeChecker &tc,
-                           AbstractFunctionDecl *func,
-                           GenericParamList *&outerGenericParams);
+                           AbstractFunctionDecl *func);
 void configureConstructorType(ConstructorDecl *ctor,
-                              GenericParamList *outerGenericParams,
                               Type selfType,
-                              Type argType,
-                              bool throws);
+                              Type argType);
 bool checkOverrides(TypeChecker &TC, ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.

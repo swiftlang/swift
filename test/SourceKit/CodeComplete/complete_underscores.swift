@@ -32,6 +32,7 @@ enum Norf {
 func test001() {
   #^TOP_LEVEL_0,,_^#
 }
+// XFAIL: broken_std_regex
 // RUN: %complete-test %s -hide-none -tok=TOP_LEVEL_0  -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=TOP_LEVEL_0
 // TOP_LEVEL_0-LABEL: Results for filterText: [
 // TOP_LEVEL_0-DAG: Foo
@@ -40,8 +41,6 @@ func test001() {
 // TOP_LEVEL_0-DAG: Baz
 // TOP_LEVEL_0-DAG: quux
 // TOP_LEVEL_0-DAG: _quux
-// TOP_LEVEL_0-DAG-NOT: _internalTopLevelFunc()
-// TOP_LEVEL_0-DAG-NOT: _InternalStruct
 // TOP_LEVEL_0: ]
 // TOP_LEVEL_0-LABEL: Results for filterText: _ [
 // TOP_LEVEL_0-DAG: _Bar
@@ -49,6 +48,11 @@ func test001() {
 // TOP_LEVEL_0-DAG: _internalTopLevelFunc()
 // TOP_LEVEL_0-DAG: _InternalStruct
 // TOP_LEVEL_0: ]
+// RUN: %complete-test %s -hide-none -tok=TOP_LEVEL_0  -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=NEGATIVE_TOP_LEVEL_0
+// NEGATIVE_TOP_LEVEL_0-LABEL: Results for filterText: [
+// NEGATIVE_TOP_LEVEL_0-NOT: _internalTopLevelFunc()
+// NEGATIVE_TOP_LEVEL_0-NOT: _InternalStruct
+// NEGATIVE_TOP_LEVEL_0: ]
 
 func test002(x: Foo) {
   x.#^FOO_QUALIFIED_0,,^#
@@ -69,15 +73,18 @@ func test003(x: _Bar) {
 // BAR_QUALIFIED_0-DAG:   bar()
 // BAR_QUALIFIED_0-DAG:   _bar()
 // BAR_QUALIFIED_0-DAG:   foo()
-// BAR_QUALIFIED_0-DAG-NOT:   _foo()
 // BAR_QUALIFIED_0-DAG:   extFoo()
-// BAR_QUALIFIED_0-DAG-NOT:   _extFoo()
 // BAR_QUALIFIED_0: ]
 // BAR_QUALIFIED_0: Results for filterText: _ [
 // BAR_QUALIFIED_0-DAG:   _bar()
 // BAR_QUALIFIED_0-DAG:   _foo()
 // BAR_QUALIFIED_0-DAG:   _extFoo()
 // BAR_QUALIFIED_0: ]
+// RUN: %complete-test %s -tok=BAR_QUALIFIED_0  -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=NEGATIVE_BAR_QUALIFIED_0
+// NEGATIVE_BAR_QUALIFIED_0: Results for filterText: [
+// NEGATIVE_BAR_QUALIFIED_0-NOT:   _foo()
+// NEGATIVE_BAR_QUALIFIED_0-NOT:   _extFoo()
+// NEGATIVE_BAR_QUALIFIED_0: ]
 
 func test004(x: Baz) {
   x.#^BAZ_QUALIFIED_0,,^#
@@ -94,8 +101,11 @@ func test005(x: SBaz) {
 // RUN: %complete-test %s -tok=BAZ_QUALIFIED_1  -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=BAZ_QUALIFIED_1
 // BAZ_QUALIFIED_1: Results for filterText: [
 // BAZ_QUALIFIED_1-DAG:   baz()
-// BAZ_QUALIFIED_1-DAG-NOT:   _baz()
 // BAZ_QUALIFIED_1: ]
+// RUN: %complete-test %s -tok=BAZ_QUALIFIED_1  -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=NEGATIVE_BAZ_QUALIFIED_1
+// NEGATIVE_BAZ_QUALIFIED_1: Results for filterText: [
+// NEGATIVE_BAZ_QUALIFIED_1-NOT:   _baz()
+// NEGATIVE_BAZ_QUALIFIED_1: ]
 
 func test006() {
   Norf.#^NORF_QUALIFIED_0,,^#

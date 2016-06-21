@@ -1,0 +1,200 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import Foundation
+
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> Self
+}
+
+class AnNSArray {
+}
+
+struct AnArray<T> : _ObjectiveCBridgeable {
+  @sil_stored var Buffer : Builtin.NativeObject
+
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  func _bridgeToObjectiveC() -> AnNSArray {
+    return AnNSArray()
+  }
+  static func _forceBridgeFromObjectiveC(
+    _ x: AnNSArray,
+    result: inout AnArray?
+  ) {
+    _preconditionFailure("implement")
+  }
+  static func _conditionallyBridgeFromObjectiveC(
+    _ x: AnNSArray,
+    result: inout AnArray?
+  ) -> Bool {
+    _preconditionFailure("implement")
+  }
+}
+
+sil [_semantics "convertFromObjectiveC"] @bridgeFromObjectiveC :
+  $@convention(thin) <τ_0_0> (@owned AnNSArray) -> @owned AnArray<τ_0_0>
+
+sil [_semantics "convertToObjectiveC"] @bridgeToObjectiveC:
+  $@convention(method) <τ_0_0> (@owned AnArray<τ_0_0>) -> @owned AnNSArray
+
+// CHECK-LABEL: sil @bridge_from_to_owned
+// CHECK-NOT: apply
+// CHECK: strong_retain
+// CHECK-NOT: apply
+// CHECK: strong_release
+// CHECK-NOT: apply
+// CHECK: return
+
+sil @bridge_from_to_owned : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : $AnNSArray):
+  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %2 = apply %1<AnyObject>(%0) : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  retain_value %2 : $AnArray<AnyObject>
+  release_value %2 : $AnArray<AnyObject>
+  %3 = function_ref @bridgeToObjectiveC : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  %4 = apply %3<AnyObject>(%2) : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  return %4 : $AnNSArray
+}
+
+// CHECK-LABEL: sil @bridge_to_from_owned
+// CHECK-NOT: apply
+// CHECK: retain_value
+// CHECK-NOT: apply
+// CHECK: release_value
+// CHECK-NOT: apply
+// CHECK: return
+
+sil @bridge_to_from_owned : $@convention(thin) (@owned AnArray<AnyObject>) -> @owned AnArray<AnyObject>{
+bb0(%0 : $AnArray<AnyObject>):
+  %1 = function_ref @bridgeToObjectiveC : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  %2 = apply %1<AnyObject>(%0) : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  debug_value %2 : $AnNSArray    // should not prevent the optimization
+  strong_retain %2 : $AnNSArray
+  strong_release %2 : $AnNSArray
+  %3 = function_ref @bridgeFromObjectiveC : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %4 = apply %3<AnyObject>(%2) : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  return %4 : $AnArray<AnyObject>
+}
+
+sil [_semantics "convertFromObjectiveC"] @bridgeFromObjectiveCGuaranteed :
+  $@convention(thin) <τ_0_0> (@guaranteed AnNSArray) -> @owned AnArray<τ_0_0>
+
+sil [_semantics "convertToObjectiveC"] @bridgeToObjectiveCGuaranteed:
+  $@convention(method) <τ_0_0> (@guaranteed AnArray<τ_0_0>) -> @owned AnNSArray
+
+// CHECK-LABEL: sil @bridge_from_to_guaranteed
+// CHECK-NOT: apply
+// CHECK: strong_retain
+// CHECK-NOT: apply
+// CHECK: strong_release
+// CHECK-NOT: apply
+// CHECK: return
+
+sil @bridge_from_to_guaranteed : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : $AnNSArray):
+  %1 = function_ref @bridgeFromObjectiveCGuaranteed : $@convention(thin) <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  %2 = apply %1<AnyObject>(%0) : $@convention(thin) <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  release_value %0 : $AnNSArray
+  %3 = function_ref @bridgeToObjectiveCGuaranteed : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  %4 = apply %3<AnyObject>(%2) : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  release_value %2 : $AnArray<AnyObject>
+  return %4 : $AnNSArray
+}
+
+// CHECK-LABEL: sil @bridge_to_from_guaranteed
+// CHECK-NOT: apply
+// CHECK: retain_value
+// CHECK-NOT: apply
+// CHECK: release_value
+// CHECK-NOT: apply
+// CHECK: return
+
+sil @bridge_to_from_guaranteed : $@convention(thin) (@owned AnArray<AnyObject>) -> @owned AnArray<AnyObject>{
+bb0(%0 : $AnArray<AnyObject>):
+  %1 = function_ref @bridgeToObjectiveCGuaranteed : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  %2 = apply %1<AnyObject>(%0) : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  release_value %0 : $AnArray<AnyObject>
+  %3 = function_ref @bridgeFromObjectiveCGuaranteed : $@convention(thin) <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  %4 = apply %3<AnyObject>(%2) : $@convention(thin) <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  release_value %2 : $AnNSArray
+  return %4 : $AnArray<AnyObject>
+}
+
+struct Unbridged {
+}
+
+// CHECK-LABEL: sil @failing_bridge_from_to_owned
+// CHECK: apply
+// CHECK: apply
+// CHECK: return
+sil @failing_bridge_from_to_owned : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : $AnNSArray):
+  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <Unbridged> (@owned AnNSArray) -> @owned AnArray<Unbridged>
+  %2 = apply %1<Unbridged>(%0) : $@convention(thin) <Unbridged> (@owned AnNSArray) -> @owned AnArray<Unbridged>
+  retain_value %2 : $AnArray<Unbridged>
+  release_value %2 : $AnArray<Unbridged>
+  %3 = function_ref @bridgeToObjectiveC : $@convention(method) <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
+  %4 = apply %3<Unbridged>(%2) : $@convention(method) <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
+  return %4 : $AnNSArray
+}
+
+// CHECK-LABEL: sil @failing_bridge_from_to_owned_generic
+// CHECK: apply
+// CHECK: apply
+// CHECK: return
+
+sil @failing_bridge_from_to_owned_generic : $@convention(thin) <T>(@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : $AnNSArray):
+  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <T2> (@owned AnNSArray) -> @owned AnArray<T2>
+  %2 = apply %1<T>(%0) : $@convention(thin) <T2> (@owned AnNSArray) -> @owned AnArray<T2>
+  retain_value %2 : $AnArray<T>
+  release_value %2 : $AnArray<T>
+  %3 = function_ref @bridgeToObjectiveC : $@convention(method) <T2> (@owned AnArray<T2>) -> @owned AnNSArray
+  %4 = apply %3<T>(%2) : $@convention(method) <T> (@owned AnArray<T>) -> @owned AnNSArray
+  return %4 : $AnNSArray
+}
+
+// CHECK-LABEL: sil @failing_bridge_from_to_owned_recursive_type
+// CHECK: apply
+// CHECK: apply
+// CHECK: return
+
+sil @failing_bridge_from_to_owned_recursive_type : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : $AnNSArray):
+  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <T> (@owned AnNSArray) -> @owned AnArray<T>
+  %2 = apply %1<AnArray<Unbridged>>(%0) : $@convention(thin) <T> (@owned AnNSArray) -> @owned AnArray<T>
+  retain_value %2 : $AnArray<AnArray<Unbridged>>
+  release_value %2 : $AnArray<AnArray<Unbridged>>
+  %3 = function_ref @bridgeToObjectiveC : $@convention(method) <T> (@owned AnArray<T>) -> @owned AnNSArray
+  %4 = apply %3<AnArray<Unbridged>>(%2) : $@convention(method) <T> (@owned AnArray<T>) -> @owned AnNSArray
+  return %4 : $AnNSArray
+}
+
+// CHECK-LABEL: sil shared @bridge_from_swift_array_to_NSObject_cast
+// CHECK: function_ref @_TFE10FoundationSa19_bridgeToObjectiveC
+// CHECK: retain_value
+// CHECK: apply
+// CHECK: release_value
+// CHECK: upcast %{{.*}} : $NSArray to $NSObject
+// CHECK: store
+// CHECK: return
+sil shared @bridge_from_swift_array_to_NSObject_cast: $@convention(thin) (@in Array<String>) -> @out NSObject {
+bb0(%0 : $*NSObject, %1 : $*Array<String>):
+  %2 = alloc_stack $Array<String>
+  copy_addr %1 to [initialization] %2 : $*Array<String>
+  unconditional_checked_cast_addr take_always Array<String> in %2 : $*Array<String> to NSObject in %0 : $*NSObject
+  dealloc_stack %2 : $*Array<String>
+  destroy_addr %1 : $*Array<String>
+  %7 = tuple ()
+  return %7 : $()
+}
+

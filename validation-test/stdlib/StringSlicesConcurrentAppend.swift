@@ -9,11 +9,12 @@ import Darwin
 import Glibc
 #endif
 
+
 var StringTestSuite = TestSuite("String")
 
 extension String {
   var bufferID: UInt {
-    return unsafeBitCast(_core._owner, UInt.self)
+    return unsafeBitCast(_core._owner, to: UInt.self)
   }
   var capacityInBytes: Int {
     return _core.nativeBuffer!.capacity
@@ -29,22 +30,22 @@ enum ThreadID {
   case Secondary
 }
 
-var barrierVar: UnsafeMutablePointer<_stdlib_pthread_barrier_t> = nil
+var barrierVar: UnsafeMutablePointer<_stdlib_pthread_barrier_t>? = nil
 var sharedString: String = ""
 var secondaryString: String = ""
 
 func barrier() {
-  var ret = _stdlib_pthread_barrier_wait(barrierVar)
+  var ret = _stdlib_pthread_barrier_wait(barrierVar!)
   expectTrue(ret == 0 || ret == _stdlib_PTHREAD_BARRIER_SERIAL_THREAD)
 }
 
-func sliceConcurrentAppendThread(tid: ThreadID) {
+func sliceConcurrentAppendThread(_ tid: ThreadID) {
   for i in 0..<100 {
     barrier()
     if tid == .Primary {
       // Get a fresh buffer.
       sharedString = ""
-      sharedString.appendContentsOf("abc")
+      sharedString.append("abc")
       sharedString.reserveCapacity(16)
       expectLE(16, sharedString.capacityInBytes)
     }
@@ -58,9 +59,9 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
 
     // Append to the private string.
     if tid == .Primary {
-      privateString.appendContentsOf("def")
+      privateString.append("def")
     } else {
-      privateString.appendContentsOf("ghi")
+      privateString.append("ghi")
     }
 
     barrier()
@@ -87,9 +88,9 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
 }
 
 StringTestSuite.test("SliceConcurrentAppend") {
-  barrierVar = UnsafeMutablePointer.alloc(1)
-  barrierVar.initialize(_stdlib_pthread_barrier_t())
-  var ret = _stdlib_pthread_barrier_init(barrierVar, nil, 2)
+  barrierVar = UnsafeMutablePointer(allocatingCapacity: 1)
+  barrierVar!.initialize(with: _stdlib_pthread_barrier_t())
+  var ret = _stdlib_pthread_barrier_init(barrierVar!, nil, 2)
   expectEqual(0, ret)
 
   let (createRet1, tid1) = _stdlib_pthread_create_block(
@@ -106,11 +107,11 @@ StringTestSuite.test("SliceConcurrentAppend") {
   expectEqual(0, joinRet1)
   expectEqual(0, joinRet2)
 
-  ret = _stdlib_pthread_barrier_destroy(barrierVar)
+  ret = _stdlib_pthread_barrier_destroy(barrierVar!)
   expectEqual(0, ret)
 
-  barrierVar.destroy()
-  barrierVar.dealloc(1)
+  barrierVar!.deinitialize()
+  barrierVar!.deallocateCapacity(1)
 }
 
 runAllTests()

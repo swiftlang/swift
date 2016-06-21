@@ -1,7 +1,10 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -parse %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -emit-ir %s -D IRGEN | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -print-module -source-filename="%s" -module-to-print SwiftPrivateAttr > %t.txt
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir %s -D IRGEN | FileCheck %s
+
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -print-module -source-filename="%s" -module-to-print SwiftPrivateAttr > %t.txt
 // RUN: FileCheck -check-prefix=GENERATED-NEGATIVE %s < %t.txt
 // RUN: diff -U3 %S/Inputs/SwiftPrivateAttr.txt %t.txt
 
@@ -16,19 +19,23 @@ import SwiftPrivateAttr
 // half of a module, or from an overlay. At that point we should test that these
 // are available in that case and /not/ in the normal import case.
 
-// CHECK-LABEL: define void @{{.+}}12testProperty
-public func testProperty(foo: Foo) {
+// CHECK-LABEL: define{{( protected)?}} void @{{.+}}12testProperty
+public func testProperty(_ foo: Foo) {
   // CHECK: @"\01L_selector(setPrivValue:)"
   _ = foo.__privValue
   foo.__privValue = foo
+
+  // CHECK: @"\01L_selector(setPrivClassValue:)"
+  _ = Foo.__privClassValue
+  Foo.__privClassValue = foo
   
 #if !IRGEN
   _ = foo.privValue // expected-error {{value of type 'Foo' has no member 'privValue'}}
 #endif
 }
 
-// CHECK-LABEL: define void @{{.+}}11testMethods
-public func testMethods(foo: Foo) {
+// CHECK-LABEL: define{{( protected)?}} void @{{.+}}11testMethods
+public func testMethods(_ foo: Foo) {
   // CHECK: @"\01L_selector(noArgs)"
   foo.__noArgs()
   // CHECK: @"\01L_selector(oneArg:)"
@@ -37,7 +44,7 @@ public func testMethods(foo: Foo) {
   foo.__twoArgs(1, other: 2)
 }
 
-// CHECK-LABEL: define void @{{.+}}16testInitializers
+// CHECK-LABEL: define{{( protected)?}} void @{{.+}}16testInitializers
 public func testInitializers() {
   // Checked below; look for "CSo3Bar".
   _ = Bar(__noArgs: ())
@@ -46,7 +53,7 @@ public func testInitializers() {
   _ = Bar(__: 1)
 }
 
-// CHECK-LABEL: define void @{{.+}}18testFactoryMethods
+// CHECK-LABEL: define{{( protected)?}} void @{{.+}}18testFactoryMethods
 public func testFactoryMethods() {
   // CHECK: @"\01L_selector(fooWithOneArg:)"
   _ = Foo(__oneArg: 1)
@@ -57,20 +64,20 @@ public func testFactoryMethods() {
 }
 
 #if !IRGEN
-public func testSubscript(foo: Foo) {
+public func testSubscript(_ foo: Foo) {
   _ = foo[foo] // expected-error {{type 'Foo' has no subscript members}}
   _ = foo[1] // expected-error {{type 'Foo' has no subscript members}}
 }
 #endif
 
-// CHECK-LABEL: define void @{{.+}}12testTopLevel
+// CHECK-LABEL: define{{( protected)?}} void @{{.+}}12testTopLevel
 public func testTopLevel() {
   // Checked below; look for "PrivFooSub".
   let foo = __PrivFooSub()
   _ = foo as __PrivProto
 
   // CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$_PrivProto"
-  foo.conformsToProtocol(__PrivProto.self)
+  foo.conforms(to: __PrivProto.self)
 
   // CHECK: call void @privTest()
   __privTest()
@@ -85,7 +92,7 @@ public func testTopLevel() {
 }
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaCSo12__PrivFooSub{{.*}} {
-// CHECK: %objc_class* @"OBJC_CLASS_$_PrivFooSub"
+// CHECK: %objc_class** @"OBJC_CLASS_REF_$_PrivFooSub"
 // CHECK: }
 
 // CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfT2__Vs5Int32_GSQS__
@@ -100,13 +107,21 @@ public func testTopLevel() {
 _ = __PrivAnonymousA
 _ = __E0PrivA
 _ = __PrivE1A as __PrivE1
-_ = NSEnum.__PrivA
+_ = NSEnum.__privA
 _ = NSEnum.B
-_ = NSOptions.__PrivA
+_ = NSOptions.__privA
 _ = NSOptions.B
 
 func makeSureAnyObject(_: AnyObject) {}
-func testCF(a: __PrivCFTypeRef, b: __PrivCFSubRef, c: __PrivInt) {
+
+#if !IRGEN
+func testUnavailableRefs() {
+  var x: __PrivCFTypeRef // expected-error {{'__PrivCFTypeRef' has been renamed to '__PrivCFType'}}
+  var y: __PrivCFSubRef // expected-error {{'__PrivCFSubRef' has been renamed to '__PrivCFSub'}}
+}
+#endif
+
+func testCF(_ a: __PrivCFType, b: __PrivCFSub, c: __PrivInt) {
   makeSureAnyObject(a)
   makeSureAnyObject(b)
 #if !IRGEN

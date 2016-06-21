@@ -1,0 +1,798 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+extension Range {
+  static var _isHalfOpen: Bool { return true }
+}
+extension CountableRange {
+  static var _isHalfOpen: Bool { return true }
+}
+extension ClosedRange {
+  static var _isHalfOpen: Bool { return false }
+}
+extension CountableClosedRange {
+  static var _isHalfOpen: Bool { return false }
+}
+
+protocol TestProtocol1 {}
+
+struct ContainsTest {
+  let lowerBound: Int
+  let upperBound: Int
+  let value: Int
+  let loc: SourceLoc
+
+  var containedInHalfOpen: Bool {
+    return lowerBound <= value && value < upperBound
+  }
+
+  var containedInClosed: Bool {
+    return lowerBound <= value && value <= upperBound
+  }
+
+  init(
+    lowerBound: Int,
+    upperBound: Int,
+    value: Int,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.lowerBound = lowerBound
+    self.upperBound = upperBound
+    self.value = value
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+func generateContainsTests() -> [ContainsTest] {
+  let bounds = [ Int.min, -30, -10, 0, 10, 20, Int.max ]
+  var result: [ContainsTest] = []
+  for lowerBound in bounds {
+    for upperBound in bounds {
+      if lowerBound > upperBound { continue }
+      for value in bounds {
+        result.append(
+          ContainsTest(
+            lowerBound: lowerBound, upperBound: upperBound,
+            value: value))
+      }
+    }
+  }
+  return result
+}
+
+let containsTests: [ContainsTest] = generateContainsTests()
+
+infix operator ..<* { associativity none precedence 135 }
+infix operator ...* { associativity none precedence 135 }
+
+enum VariantRange {
+  case halfOpen(lowerBound: Int, upperBound: Int)
+  case closed(lowerBound: Int, upperBound: Int)
+
+  var isHalfOpen: Bool {
+    switch self {
+    case .halfOpen:
+      return true
+    case .closed:
+      return false
+    }
+  }
+
+  var lowerBound: Int {
+    switch self {
+    case .halfOpen(let result, _):
+      return result
+    case .closed(let result, _):
+      return result
+    }
+  }
+
+  var upperBound: Int {
+    switch self {
+    case .halfOpen(_, let result):
+      return result
+    case .closed(_, let result):
+      return result
+    }
+  }
+}
+
+func ..<* (lhs: Int, rhs: Int) -> VariantRange {
+  return .halfOpen(lowerBound: lhs, upperBound: rhs)
+}
+
+func ...* (lhs: Int, rhs: Int) -> VariantRange {
+  return .closed(lowerBound: lhs, upperBound: rhs)
+}
+
+struct OverlapsTest {
+  let expected: Bool
+  let lhs: VariantRange
+  let rhs: VariantRange
+  let loc: SourceLoc
+
+  init(
+    expected: Bool,
+    lhs: VariantRange,
+    rhs: VariantRange,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.expected = expected
+    self.lhs = lhs
+    self.rhs = rhs
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let overlapsTests: [OverlapsTest] = [
+  // 0-4, 5-10
+  OverlapsTest(expected: false, lhs: 0..<*4, rhs: 5..<*10),
+  OverlapsTest(expected: false, lhs: 0..<*4, rhs: 5...*10),
+  OverlapsTest(expected: false, lhs: 0...*4, rhs: 5..<*10),
+  OverlapsTest(expected: false, lhs: 0...*4, rhs: 5...*10),
+
+  // 0-5, 5-10
+  OverlapsTest(expected: false, lhs: 0..<*5, rhs: 5..<*10),
+  OverlapsTest(expected: false, lhs: 0..<*5, rhs: 5...*10),
+  OverlapsTest(expected: true, lhs: 0...*5, rhs: 5..<*10),
+  OverlapsTest(expected: true, lhs: 0...*5, rhs: 5...*10),
+
+  // 0-6, 5-10
+  OverlapsTest(expected: true, lhs: 0..<*6, rhs: 5..<*10),
+  OverlapsTest(expected: true, lhs: 0..<*6, rhs: 5...*10),
+  OverlapsTest(expected: true, lhs: 0...*6, rhs: 5..<*10),
+  OverlapsTest(expected: true, lhs: 0...*6, rhs: 5...*10),
+
+  // 0-20, 5-10
+  OverlapsTest(expected: true, lhs: 0..<*20, rhs: 5..<*10),
+  OverlapsTest(expected: true, lhs: 0..<*20, rhs: 5...*10),
+  OverlapsTest(expected: true, lhs: 0...*20, rhs: 5..<*10),
+  OverlapsTest(expected: true, lhs: 0...*20, rhs: 5...*10),
+
+  // 0-0, 0-5
+  OverlapsTest(expected: false, lhs: 0..<*0, rhs: 0..<*5),
+  OverlapsTest(expected: false, lhs: 0..<*0, rhs: 0...*5),
+]
+
+struct ClampedTest {
+  let expected: Range<Int>
+  let subject: Range<Int>
+  let limits: Range<Int>
+  let loc: SourceLoc
+
+  init(
+    expected: Range<Int>,
+    subject: Range<Int>,
+    limits: Range<Int>,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.expected = expected
+    self.subject = subject
+    self.limits = limits
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let clampedTests: [ClampedTest] = [
+  ClampedTest(expected: 5..<5,   subject: 0..<3,   limits: 5..<10),
+  ClampedTest(expected: 5..<9,   subject: 0..<9,   limits: 5..<10),
+  ClampedTest(expected: 5..<10,  subject: 0..<13,  limits: 5..<10),
+  ClampedTest(expected: 7..<9,   subject: 7..<9,   limits: 5..<10),
+  ClampedTest(expected: 7..<10,  subject: 7..<13,  limits: 5..<10),
+  ClampedTest(expected: 10..<10, subject: 13..<15, limits: 5..<10),
+]
+
+struct OffsetByTest {
+  static let start: Int = 10
+  static let end: Int = 20
+  let advanceBy: Int
+
+  /// Instead of advancing from `startIndex`, advance from `endIndex`.
+  let advanceFromEnd: Bool
+
+  // `nil` if the test should fail for open ranges.
+  let newOpenIndex: Int?
+  // `nil` if the test should fail for closed ranges.
+  let newClosedIndex: Int?
+
+  let loc: SourceLoc
+
+  init(
+    advanceBy: Int, newOpenIndex: Int? = nil, newClosedIndex: Int? = nil,
+    advanceFromEnd: Bool = false, file: String = #file, line: UInt = #line
+  ) {
+    self.advanceBy = advanceBy
+    self.newOpenIndex = newOpenIndex
+    self.newClosedIndex = newClosedIndex
+    self.advanceFromEnd = advanceFromEnd
+    self.loc = SourceLoc(file, line, comment: "index(_:offsetBy:) tests for countable ranges")
+  }
+}
+
+let offsetByTests: [OffsetByTest] = [
+  // Move forward, valid.
+  OffsetByTest(advanceBy: 4, newOpenIndex: 14, newClosedIndex: 14),
+  OffsetByTest(advanceBy: 0, newOpenIndex: 10, newClosedIndex: 10),
+  OffsetByTest(advanceBy: 10, newOpenIndex: 20, newClosedIndex: 20),
+  OffsetByTest(advanceBy: 11, newClosedIndex: 21),
+
+  // Move forward, invalid.
+  OffsetByTest(advanceBy: 12),
+  OffsetByTest(advanceBy: 25600),
+
+  // Move backward, valid.
+  OffsetByTest(advanceBy: -9, newOpenIndex: 11, newClosedIndex: 12,
+    advanceFromEnd: true),
+  OffsetByTest(advanceBy: -10, newOpenIndex: 10, newClosedIndex: 11,
+    advanceFromEnd: true),
+  OffsetByTest(advanceBy: -11, newClosedIndex: 10, 
+    advanceFromEnd: true),
+  OffsetByTest(advanceBy: 0, newOpenIndex: 20, newClosedIndex: 21,
+    advanceFromEnd: true),
+
+  // Move backward, invalid.
+  OffsetByTest(advanceBy: -12, advanceFromEnd: true),
+  OffsetByTest(advanceBy: -2885, advanceFromEnd: true),
+]
+
+struct IndexDistanceTest {
+  static let start: Int = 10
+  static let end: Int = 30
+
+  // Leave either of these `nil` to use the 'right edge index', which differs
+  // between open and closed ranges.
+  let leftIndex: Int?
+  let rightIndex: Int?
+  
+  let loc: SourceLoc
+  let openDistance: Int
+  let closedDistance: Int
+
+  /// Return the index `leftIndex` steps away from `start`, or the collection's
+  /// `endIndex` if `leftIndex` is `nil`.
+  func leftIndex<C: RandomAccessCollection>(of c: C) -> C.Index {
+    guard let leftIndex = leftIndex else {
+      return c.endIndex
+    }
+    let iterations = leftIndex - IndexDistanceTest.start
+    var idx = c.startIndex
+    for _ in 0..<iterations {
+      idx = c.index(after: idx)
+    }
+    return idx
+  }
+
+  /// Return the index `rightIndex` steps away from `start`, or the
+  /// collection's `endIndex` if `rightIndex` is `nil`.
+  func rightIndex<C: RandomAccessCollection>(of c: C) -> C.Index {
+    guard let rightIndex = rightIndex else {
+      return c.endIndex
+    }
+    let iterations = rightIndex - IndexDistanceTest.start
+    _precondition(iterations >= 0)
+    var idx = c.startIndex
+    for _ in 0..<iterations {
+      idx = c.index(after: idx)
+    }
+    return idx
+  }
+
+  init(
+    leftIndex: Int? = nil, rightIndex: Int? = nil,
+    distance: Int, closedDistance: Int? = nil,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.leftIndex = leftIndex
+    self.rightIndex = rightIndex
+    self.openDistance = distance
+    // Only set closedDistance if testing against someRange.endIndex.
+    if closedDistance != nil {
+      _precondition(leftIndex == nil || rightIndex == nil)
+    }
+    self.closedDistance = closedDistance ?? distance
+    self.loc = SourceLoc(file, line, comment: "distance(from:to:) tests for countable ranges")
+  }
+}
+
+let indexDistanceTests: [IndexDistanceTest] = [
+  // Forward, inside bounds.
+  IndexDistanceTest(leftIndex: 10, rightIndex: 29, distance: 19),
+  IndexDistanceTest(leftIndex: 15, rightIndex: 15, distance: 0),
+  IndexDistanceTest(leftIndex: 16, rightIndex: 29, distance: 13),
+  // Forward, at edge.
+  IndexDistanceTest(leftIndex: 10, distance: 20, closedDistance: 21),
+  IndexDistanceTest(leftIndex: 21, distance: 9, closedDistance: 10),
+  IndexDistanceTest(leftIndex: IndexDistanceTest.end, distance: 0, closedDistance: 1),
+  // Backwards, inside bounds.
+  IndexDistanceTest(leftIndex: 27, rightIndex: 16, distance: -11),
+  IndexDistanceTest(leftIndex: 15, rightIndex: 14, distance: -1),
+  // Backwards, at edge.
+  IndexDistanceTest(rightIndex: 18, distance: -12, closedDistance: -13),
+  IndexDistanceTest(rightIndex: 10, distance: -20, closedDistance: -21),
+  IndexDistanceTest(rightIndex: IndexDistanceTest.end, distance: 0, closedDistance: -1),
+  // Completely at edge.
+  IndexDistanceTest(distance: 0),
+]
+
+%{
+all_range_types = [
+   ('Range',                '..<', 'MinimalComparableValue'),
+   ('CountableRange',       '..<', 'MinimalStrideableValue'),
+   ('ClosedRange',          '...', 'MinimalComparableValue'),
+   ('CountableClosedRange', '...', 'MinimalStrideableValue'),
+]
+}%
+
+% for (Self, op, Bound) in all_range_types:
+%   TestSuite = Self + 'TestSuite'
+
+// Check that the generic parameter is called 'Bound'.
+extension ${Self} where Bound : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+var ${TestSuite} = TestSuite("${Self}")
+
+${TestSuite}.test("init(uncheckedBounds:)")
+  .forEach(in: [(1, 2), (1, 1), (2, 1)]) {
+  (lowerInt, upperInt) in
+
+  // Check that 'init(uncheckedBounds:)' does not perform precondition checks,
+  // allowing to create ranges that break invariants.
+  let r = ${Self}(
+    uncheckedBounds: (lower: ${Bound}(lowerInt), upper: ${Bound}(upperInt)))
+  expectEqual(lowerInt, r.lowerBound.value)
+  expectEqual(upperInt, r.upperBound.value)
+}
+
+%   for (DestinationSelf, _, _) in all_range_types:
+${TestSuite}.test("init(${DestinationSelf})/whereBoundIsStrideable")
+  .forEach(in: [(0, 0), (1, 2), (10, 20), (Int.min, Int.max)]) {
+  (lowerInt, upperInt) in
+
+  let lower = MinimalStrideableValue(lowerInt)
+  let upper = MinimalStrideableValue(upperInt)
+  let source: ${Self}<MinimalStrideableValue> = lower${op}upper
+
+  let isSourceHalfOpen = ${Self}<MinimalStrideableValue>._isHalfOpen
+  let isDestinationHalfOpen =
+    ${DestinationSelf}<MinimalStrideableValue>._isHalfOpen
+
+  let shouldTrap =
+    (source.isEmpty && !isDestinationHalfOpen) ||
+    (upperInt == Int.max && !isSourceHalfOpen && isDestinationHalfOpen)
+  if shouldTrap {
+    expectCrashLater()
+  }
+
+  let converted = ${DestinationSelf}(source)
+
+  if !shouldTrap {
+    expectEqual(lower.value, converted.lowerBound.value)
+    expectEqual(
+      upper.value + ((isSourceHalfOpen ? 0 : 1) - (isDestinationHalfOpen ? 0 : 1)),
+      converted.upperBound.value)
+  }
+}
+%   end
+
+${TestSuite}.test("lowerBound, upperBound") {
+  let _1 = ${Bound}(1, identity: 1010)
+  let _2 = ${Bound}(2, identity: 2020)
+  let range: ${Self}<${Bound}> = _1${op}_2
+  expectEqual(1,    range.lowerBound.value)
+  expectEqual(1010, range.lowerBound.identity)
+  expectEqual(2,    range.upperBound.value)
+  expectEqual(2020, range.upperBound.identity)
+}
+
+${TestSuite}.test("Equatable") {
+  let _1 = ${Bound}(1)
+  let _2 = ${Bound}(2)
+
+  let instances: [${Self}<${Bound}>] = [
+    _1${op}_1,
+    _1${op}_2,
+    _2${op}_2,
+  ]
+  checkEquatable(instances, oracle: { $0 == $1 })
+}
+
+${TestSuite}.test("'${op}' traps when upperBound < lowerBound")
+  .crashOutputMatches(_isDebugAssertConfiguration() ?
+    "Can't form Range with upperBound < lowerBound" : "")
+  .code {
+  let _1 = ${Bound}(1)
+  let _2 = ${Bound}(2)
+  expectCrashLater()
+  let range: ${Self}<${Bound}> = _2${op}_1
+  _blackHole(range)
+}
+
+${TestSuite}.test("contains(_:)/staticDispatch") {
+  let start = ${Bound}(10)
+  let end = ${Bound}(20)
+  let range: ${Self}<${Bound}> = start${op}end
+  expectEqual(1, ${Bound}.timesLessWasCalled.value)
+  for test in 0..<30 {
+%   if 'Closed' in Self:
+    let expected = test >= start.value && test <= end.value
+%   else:
+    let expected = test >= start.value && test < end.value
+%   end
+    expectEqual(
+      expected, range.contains(${Bound}(test)),
+      "test=\(test)")
+  }
+  expectEqual(51, ${Bound}.timesLessWasCalled.value)
+}
+
+${TestSuite}.test("~=/staticDispatch") {
+  let start = ${Bound}(10)
+  let end = ${Bound}(20)
+  let range: ${Self}<${Bound}> = start${op}end
+  expectEqual(1, ${Bound}.timesLessWasCalled.value)
+  for test in 0..<30 {
+%   if 'Closed' in Self:
+    let expected = test >= start.value && test <= end.value
+%   else:
+    let expected = test >= start.value && test < end.value
+%   end
+    expectEqual(
+      expected, range ~= ${Bound}(test),
+      "test=\(test)")
+  }
+  expectEqual(51, ${Bound}.timesLessWasCalled.value)
+}
+
+%   if 'Countable' in Self:
+${TestSuite}.test("contains(_:)/dynamicDispatch") {
+  let start = ${Bound}(10)
+  let end = ${Bound}(20)
+  let range: ${Self}<${Bound}> = start${op}end
+  let loggingRange = LoggingCollection(wrapping: range)
+  expectEqual(1, ${Bound}.timesLessWasCalled.value)
+  for test in 0..<30 {
+%     if 'Closed' in Self:
+    let expected = test >= start.value && test <= end.value
+%     else:
+    let expected = test >= start.value && test < end.value
+%     end
+    expectEqual(
+      expected, loggingRange.contains(${Bound}(test)),
+      "test=\(test)")
+  }
+  expectEqual(51, MinimalStrideableValue.timesLessWasCalled.value)
+}
+%   end
+
+${TestSuite}.test("contains(_:)/semantics, ~=/semantics")
+  .forEach(in: containsTests) {
+  (test) in
+
+  // Check both static and dynamic dispatch.
+  let range: ${Self}<${Bound}> = ${Bound}(test.lowerBound)${op}${Bound}(test.upperBound)
+%   if 'Countable' in Self:
+  let loggingRange = LoggingCollection(wrapping: range)
+%   else:
+  let loggingRange = range
+%   end
+
+  let value = ${Bound}(test.value)
+  let expected =
+    ${Self}<${Bound}>._isHalfOpen
+    ? test.containedInHalfOpen
+    : test.containedInClosed
+  expectEqual(expected, range.contains(value))
+  expectEqual(expected, loggingRange.contains(value))
+  expectEqual(expected, range ~= value)
+}
+
+%   for (OtherSelf, other_op, OtherBound) in all_range_types:
+${TestSuite}.test("overlaps(${OtherSelf})/semantics")
+  .forEach(in: overlapsTests) {
+  (test) in
+
+  if test.lhs.isHalfOpen != ${Self}<${Bound}>._isHalfOpen ||
+     test.rhs.isHalfOpen != ${OtherSelf}<${OtherBound}>._isHalfOpen {
+    return
+  }
+
+  let lhs: ${Self}<${Bound}>
+    = ${Bound}(test.lhs.lowerBound)${op}${Bound}(test.lhs.upperBound)
+  let rhs: ${Self}<${Bound}>
+    = ${Bound}(test.rhs.lowerBound)${op}${Bound}(test.rhs.upperBound)
+
+  expectEqual(test.expected, lhs.overlaps(rhs))
+  expectEqual(test.expected, rhs.overlaps(lhs))
+
+  expectEqual(!lhs.isEmpty, lhs.overlaps(lhs))
+  expectEqual(!rhs.isEmpty, rhs.overlaps(rhs))
+}
+%   end
+
+${TestSuite}.test("clamped(to:)/semantics")
+  .forEach(in: clampedTests) {
+  (test) in
+
+  let subject: ${Self}<${Bound}>
+    = ${Bound}(test.subject.lowerBound)${op}${Bound}(test.subject.upperBound)
+  let limits: ${Self}<${Bound}>
+    = ${Bound}(test.limits.lowerBound)${op}${Bound}(test.limits.upperBound)
+
+  expectEqual(
+    ${Bound}(test.expected.lowerBound)${op}${Bound}(test.expected.upperBound),
+    subject.clamped(to: limits))
+}
+
+${TestSuite}.test("count/whereBoundIsStrideable") {
+  typealias Bound = MinimalStrideableValue
+  let start = Bound(10)
+  let end = Bound(20)
+  let range1: ${Self}<Bound> = start${op}start
+  let range2: ${Self}<Bound> = start${op}end
+  expectEqual(0, Bound.timesEqualEqualWasCalled.value)
+  expectEqual(2, Bound.timesLessWasCalled.value)
+  expectEqual(0, Bound.timesDistanceWasCalled.value)
+  expectEqual(0, Bound.timesAdvancedWasCalled.value)
+  expectEqual( 0 + (${Self}<Bound>._isHalfOpen ? 0 : 1), range1.count)
+  expectEqual(10 + (${Self}<Bound>._isHalfOpen ? 0 : 1), range2.count)
+  expectEqual(0, Bound.timesEqualEqualWasCalled.value)
+  expectEqual(2, Bound.timesLessWasCalled.value)
+  expectEqual(2, Bound.timesDistanceWasCalled.value)
+  expectEqual(0, Bound.timesAdvancedWasCalled.value)
+}
+
+%   if 'Countable' in Self:
+${TestSuite}.test("index(after:)/semantics").forEach(in: [3, 5, 10, 12, 86]) {
+  (endValue) in
+  let start = ${Bound}(0)
+  let end = ${Bound}(endValue)
+  let range: ${Self}<${Bound}> = start${op}end
+  var idx = range.startIndex
+  var previousValue: Int? = nil
+
+  for _ in 0${op}(endValue - 1) {
+    // Advance the index to the last in-range position.
+    idx = range.index(after: idx)
+    if let previousValue = previousValue {
+      expectEqual(range[idx].value, previousValue + 1)
+    }
+    previousValue = range[idx].value
+  }
+  // Iterate once more to get to the 'after end' position.
+  idx = range.index(after: idx)
+  expectEqual(idx, range.endIndex)
+  // Now, iterate once more and expect a crash.
+  expectCrashLater()
+  _ = range.index(after: idx)
+}
+
+${TestSuite}.test("index(after:)/semantics/smallestRange") {
+  let range: ${Self}<${Bound}> = ${Bound}(0)${op}${Bound}(0)
+  var idx = range.startIndex
+
+%     if 'Closed' in Self:
+  // Should be able to advance the index once.
+  idx = range.index(after: idx)
+%     end
+
+  expectCrashLater()
+  _ = range.index(after: idx)
+}
+
+${TestSuite}.test("index(before:)/semantics").forEach(in: [3, 5, 10, 12, 86]) {
+  (endValue) in
+  let start = ${Bound}(0)
+  let end = ${Bound}(endValue)
+  let range: ${Self}<${Bound}> = start${op}end
+  var idx = range.endIndex
+  var previousValue: Int? = nil
+
+  for _ in 0${op}(endValue) {
+    // Advance the index backwards until we reach `startIndex`.
+    // Precondition: for a..<b, advance endIndex (b - a) times to reach startIndex.
+    // Precondition: for a...b, advance endIndex (b - a) + 1 times to reach startIndex.
+    idx = range.index(before: idx)
+    if let previousValue = previousValue {
+      expectEqual(range[idx].value, previousValue - 1)
+    }
+    previousValue = range[idx].value
+  }
+  // At this point, we should be at `startIndex`.
+  expectEqual(idx, range.startIndex)
+  // Now, iterate once more and expect a crash.
+  expectCrashLater()
+  _ = range.index(before: idx)
+}
+
+${TestSuite}.test("index(before:)/semantics/smallestRange") {
+  let range: ${Self}<${Bound}> = ${Bound}(0)${op}${Bound}(0)
+  var idx = range.endIndex
+
+%     if 'Closed' in Self:
+  // Should be able to advance the index once.
+  idx = range.index(before: idx)
+%     end
+
+  expectCrashLater()
+  _ = range.index(before: idx)
+}
+
+${TestSuite}.test("index(offsetBy:)/semantics").forEach(in: offsetByTests) {
+  (test) in
+  let start = ${Bound}(OffsetByTest.start)
+  let end = ${Bound}(OffsetByTest.end)
+  let range: ${Self}<${Bound}> = start${op}end
+  let initialIdx = test.advanceFromEnd ? range.endIndex : range.startIndex
+
+%     if 'Closed' in Self:
+  if let newIndex = test.newClosedIndex {
+%     else:
+  if let newIndex = test.newOpenIndex {
+%     end
+    let idx = range.index(initialIdx, offsetBy: test.advanceBy)
+    if idx != range.endIndex {
+      expectEqual(newIndex, range[idx].value, stackTrace: SourceLocStack().with(test.loc))
+    }
+  } else {
+    expectCrashLater()
+    _ = range.index(initialIdx, offsetBy: test.advanceBy)
+  }
+}
+
+${TestSuite}.test("index(offsetBy:)/semantics/smallestRange/forward") {
+  let range: ${Self}<${Bound}> = ${Bound}(0)${op}${Bound}(0)
+  var idx = range.startIndex
+
+  // This should work.
+  _ = range.index(idx, offsetBy: 0)
+
+%     if 'Closed' in Self:
+  // Can advance once more.
+  _ = range.index(idx, offsetBy: 1)
+  expectCrashLater()
+  _ = range.index(idx, offsetBy: 2)
+%     else:
+  expectCrashLater()
+  _ = range.index(idx, offsetBy: 1)
+%     end
+}
+
+${TestSuite}.test("index(offsetBy:)/semantics/smallestRange/backward") {
+  let range: ${Self}<${Bound}> = ${Bound}(0)${op}${Bound}(0)
+  var idx = range.endIndex
+
+  // This should work.
+  _ = range.index(idx, offsetBy: 0)
+
+%     if 'Closed' in Self:
+  // Can advance once more.
+  _ = range.index(idx, offsetBy: -1)
+  expectCrashLater()
+  _ = range.index(idx, offsetBy: -2)
+%     else:
+  expectCrashLater()
+  _ = range.index(idx, offsetBy: -1)
+%     end
+}
+
+${TestSuite}.test("distance(from:to:)/semantics") {
+  for test in indexDistanceTests {
+    let start = ${Bound}(IndexDistanceTest.start)
+    let end = ${Bound}(IndexDistanceTest.end)
+    let range: ${Self}<${Bound}> = start${op}end
+    let leftIdx = test.leftIndex(of: range)
+    let rightIdx = test.rightIndex(of: range)
+
+    let distance = range.distance(from: leftIdx, to: rightIdx)
+%     if 'Closed' in Self:
+    expectEqual(test.closedDistance, distance, stackTrace: SourceLocStack().with(test.loc))
+%     else:
+    expectEqual(test.openDistance, distance, stackTrace: SourceLocStack().with(test.loc))
+%     end
+  }
+}
+
+${TestSuite}.test("distance(from:to:)/semantics/smallestRange") {
+  let range: ${Self}<${Bound}> = ${Bound}(0)${op}${Bound}(0)
+  var idx = range.endIndex
+
+%     if 'Closed' in Self:
+  expectEqual(1, range.distance(from: range.startIndex, to: range.endIndex))
+%     else:
+  expectEqual(0, range.distance(from: range.startIndex, to: range.endIndex))
+%     end
+}
+
+%   end
+
+${TestSuite}.test("isEmpty") {
+  let start = ${Bound}(10)
+  let end = ${Bound}(20)
+  let range1: ${Self}<${Bound}> = start${op}start
+  let range2: ${Self}<${Bound}> = start${op}end
+  expectEqual(0, ${Bound}.timesEqualEqualWasCalled.value)
+  expectEqual(2, ${Bound}.timesLessWasCalled.value)
+  expectEqual(${Self}<${Bound}>._isHalfOpen, range1.isEmpty)
+  expectFalse(range2.isEmpty)
+  expectEqual(
+    ${Self}<${Bound}>._isHalfOpen ? 2 : 0,
+    ${Bound}.timesEqualEqualWasCalled.value)
+  expectEqual(2, ${Bound}.timesLessWasCalled.value)
+%   if Bound == 'MinimalStrideableValue':
+  expectEqual(0, ${Bound}.timesDistanceWasCalled.value)
+  expectEqual(0, ${Bound}.timesAdvancedWasCalled.value)
+%   end
+}
+
+${TestSuite}.test("CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable") {
+  var r: ${Self}<CustomPrintableValue> =
+    CustomPrintableValue(1)${op}CustomPrintableValue(2)
+  expectPrinted("(value: 1).description${op}(value: 2).description", r)
+  expectDebugPrinted(
+    "${Self}(" +
+      "(value: 1).debugDescription${op}(value: 2).debugDescription" +
+    ")",
+    r)
+  expectDumped(
+    "▿ ${Self}((value: 1).debugDescription${op}(value: 2).debugDescription)\n" +
+    "  ▿ lowerBound: (value: 1).debugDescription\n" +
+    "    - value: 1\n" +
+    "    - identity: 0\n" +
+    "  ▿ upperBound: (value: 2).debugDescription\n" +
+    "    - value: 2\n" +
+    "    - identity: 0\n",
+    r)
+}
+
+% end
+
+CountableRangeTestSuite.test("AssociatedTypes") {
+  typealias Collection = CountableRange<MinimalStrideableValue>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: IndexingIterator<Collection>.self,
+    subSequenceType: Collection.self,
+    indexType: MinimalStrideableValue.self,
+    indexDistanceType: MinimalStrideableValue.Stride.self,
+    indicesType: Collection.self)
+}
+
+CountableClosedRangeTestSuite.test("AssociatedTypes") {
+  typealias Collection = CountableClosedRange<MinimalStrideableValue>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: ClosedRangeIterator<MinimalStrideableValue>.self,
+    subSequenceType: RandomAccessSlice<Collection>.self,
+    indexType: ClosedRangeIndex<MinimalStrideableValue>.self,
+    indexDistanceType: MinimalStrideableValue.Stride.self,
+    indicesType: DefaultRandomAccessIndices<Collection>.self)
+}
+
+var MiscTestSuite = TestSuite("Misc")
+
+MiscTestSuite.test("map()") {
+  // <rdar://problem/17054014> map method should exist on ranges
+  var result = (1..<4).map { $0*2 }
+  expectType(Array<Int>.self, &result)
+  expectEqualSequence([ 2, 4, 6 ], result)
+}
+
+MiscTestSuite.test("reversed()") {
+  var result = (0..<10).lazy.reversed()
+  typealias Expected = LazyRandomAccessCollection<
+    ReversedRandomAccessCollection<CountableRange<Int>>>
+    expectType(Expected.self, &result)
+  expectEqualSequence(
+    [ 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 ],
+    result)
+}
+
+runAllTests()
+

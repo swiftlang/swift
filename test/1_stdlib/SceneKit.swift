@@ -5,6 +5,8 @@
 // UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
+
+
 import SceneKit
 
 // SceneKit is only available on iOS 8.0 and above and on OS X 10.8 and above.
@@ -29,7 +31,7 @@ if #available(iOS 8.0, OSX 10.10, *) {
     expectEqual(scn_float_from_d, 2.0)
 
     let cg = CGFloat(3.0)
-    let scn_float_from_cg = SCNFloat(cg)
+    let scn_float_from_cg = SCNFloat(cg as NSNumber)
     expectEqual(scn_float_from_cg, 3.0)
 
     let node = SCNNode()
@@ -38,8 +40,8 @@ if #available(iOS 8.0, OSX 10.10, *) {
     node.position.z = scn_float_from_cg
     expectTrue(SCNVector3EqualToVector3(node.position, scn_vec3_ref))
 
-    let f1: SCNFloat = scn_vec3_ref.x;
-    let f2: SCNFloat = scn_vec4_ref.y;
+    let f1: SCNFloat = scn_vec3_ref.x
+    let f2: SCNFloat = scn_vec4_ref.y
     expectEqual(f1, 1.0);
     expectEqual(f2, 2.0);
   }

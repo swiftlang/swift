@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -13,13 +13,15 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import StdlibCollectionUnittest
+
 
 var ConcatenateTests = TestSuite("ConcatenateTests")
 
 // Help the type checker (<rdar://problem/17897413> Slow type deduction)
-typealias X = ContiguousArray<Range<Int>>
+typealias X = ContiguousArray<CountableRange<Int>>
 
-let samples: ContiguousArray<(Range<Int>, X)> = [
+let samples: ContiguousArray<(CountableRange<Int>, X)> = [
   (0..<8, [ 1..<1, 0..<5, 7..<7, 5..<7, 7..<8 ] as X),
   (0..<8, [ 0..<5, 7..<7, 5..<7, 7..<8 ] as X),
   (0..<8, [ 1..<1, 0..<5, 7..<7, 5..<7, 7..<8, 11..<11 ] as X),
@@ -29,8 +31,6 @@ let samples: ContiguousArray<(Range<Int>, X)> = [
   (0..<0, [] as X),
 ]
 
-let expected = ContiguousArray(0..<8)
-
 for (expected, source) in samples {
   ConcatenateTests.test("forward-\(source)") {
     checkBidirectionalCollection(expected, source.flatten())
@@ -39,8 +39,8 @@ for (expected, source) in samples {
   ConcatenateTests.test("reverse-\(source)") {
     // FIXME: separate 'expected' and 'reversed' variables are a workaround
     // for: <rdar://problem/20789500>
-    let expected = ContiguousArray(expected.lazy.reverse())
-    let reversed = source.flatten().reverse()
+    let expected = ContiguousArray(expected.lazy.reversed())
+    let reversed = source.flatten().reversed()
     checkBidirectionalCollection(expected, reversed)
   }
 

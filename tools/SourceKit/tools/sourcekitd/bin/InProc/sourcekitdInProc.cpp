@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,6 +23,8 @@
 #include <dispatch/dispatch.h>
 
 #ifdef LLVM_ON_WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #else
 #include <dlfcn.h>
@@ -79,7 +81,7 @@ UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t uid) {
 }
 
 std::string sourcekitd::getRuntimeLibPath() {
-  // FIXME: Move to a llvm API. Note that libclang does the same thing.
+  // FIXME: Move to an LLVM API. Note that libclang does the same thing.
 #ifdef LLVM_ON_WIN32
 #error Not implemented
 #else
@@ -97,9 +99,9 @@ void sourcekitd::set_interrupted_connection_handler(
                           sourcekitd_interrupted_connection_handler_t handler) {
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // sourcekitd_request_sync
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 sourcekitd_response_t sourcekitd_send_request_sync(sourcekitd_object_t req) {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);

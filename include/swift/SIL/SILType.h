@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -74,13 +74,6 @@ enum class SILValueCategory {
   /// An address is a pointer to an allocated variable of the type
   /// (possibly uninitialized).
   Address,
-
-  /// Local storage is the container for a local allocation.  For
-  /// statically-sized types, this is just the allocation itself.
-  /// However, for dynamically-sized types (like archetypes or
-  /// resilient structs), it may be some sort of fixed-size buffer,
-  /// stack depth, or the like.
-  LocalStorage
 };
 
 /// SILType - A Swift type that has been lowered to a SIL representation type.
@@ -133,13 +126,6 @@ public:
     return SILType(T, SILValueCategory::Address);
   }
 
-  /// Form the type for the backing storage of a locally-allocated
-  /// object, given a Swift type that either does not require any
-  /// special handling or has already been appropriately lowered.
-  static SILType getPrimitiveLocalStorageType(CanType T) {
-    return SILType(T, SILValueCategory::LocalStorage);
-  }
-
   ///  Apply a substitution to the type to produce another lowered SIL type.
   static SILType substType(SILModule &silModule, ModuleDecl *astModule,
                            TypeSubstitutionMap &subs, SILType SrcTy);
@@ -157,7 +143,17 @@ public:
   SILValueCategory getCategory() const {
     return SILValueCategory(value.getInt());
   }
-  
+
+  /// Returns the \p Category variant of this type.
+  SILType getCategoryType(SILValueCategory Category) const {
+    return SILType(getSwiftRValueType(), Category);
+  }
+
+  /// Returns the variant of this type that matches \p Ty.getCategory()
+  SILType copyCategory(SILType Ty) const {
+    return getCategoryType(Ty.getCategory());
+  }
+
   /// Returns the address variant of this type.  Instructions which
   /// manipulate memory will generally work with object addresses.
   SILType getAddressType() const {
@@ -168,13 +164,6 @@ public:
   /// types are not legal to manipulate directly as objects in SIL.
   SILType getObjectType() const {
     return SILType(getSwiftRValueType(), SILValueCategory::Object);
-  }
-
-  /// Returns the local storage variant of this type.  Local
-  /// allocations of dynamically-sized types generally require some
-  /// sort of buffer.
-  SILType getLocalStorageType() const {
-    return SILType(getSwiftRValueType(), SILValueCategory::LocalStorage);
   }
 
   /// Returns the Swift type referenced by this SIL type.
@@ -194,16 +183,9 @@ public:
   /// Returns the Swift return type of a function type.
   /// The SILType must refer to a function type.
   SILType getFunctionInterfaceResultType() const {
-    return castTo<SILFunctionType>()->getSemanticResultSILType();
+    return castTo<SILFunctionType>()->getSILResult();
   }
 
-  /// Returns true if this function type has an indirect argument.
-  ///
-  /// The SILType must refer to a function type.
-  bool isFunctionTypeWithIndirectResult() const {
-    return castTo<SILFunctionType>()->hasIndirectResult();
-  }
-  
   /// Returns the AbstractCC of a function type.
   /// The SILType must refer to a function type.
   SILFunctionTypeRepresentation getFunctionRepresentation() const {
@@ -258,41 +240,36 @@ public:
   /// True if the type is an object type.
   bool isObject() const { return getCategory() == SILValueCategory::Object; }
 
-  /// True if the type is a local-storage type.
-  bool isLocalStorage() const {
-    return getCategory() == SILValueCategory::LocalStorage;
-  }
-
   /// isAddressOnly - True if the type, or the referenced type of an address
   /// type, is address-only.  For example, it could be a resilient struct or
   /// something of unknown size.
   ///
   /// This is equivalent to, but possibly faster than, calling
   /// M.Types.getTypeLowering(type).isAddressOnly().
-  static bool isAddressOnly(CanType T, SILModule &M);
+  static bool isAddressOnly(CanType T, SILModule &M,
+                            CanGenericSignature Sig,
+                            ResilienceExpansion Expansion);
 
   /// Return true if this type must be returned indirectly.
   ///
   /// This is equivalent to, but possibly faster than, calling
   /// M.Types.getTypeLowering(type).isReturnedIndirectly().
-  static bool isReturnedIndirectly(CanType type, SILModule &M) {
-    return isAddressOnly(type, M);
+  static bool isReturnedIndirectly(CanType type, SILModule &M,
+                                   CanGenericSignature Sig,
+                                   ResilienceExpansion Expansion) {
+    return isAddressOnly(type, M, Sig, Expansion);
   }
 
   /// Return true if this type must be passed indirectly.
   ///
   /// This is equivalent to, but possibly faster than, calling
   /// M.Types.getTypeLowering(type).isPassedIndirectly().
-  static bool isPassedIndirectly(CanType type, SILModule &M) {
-    return isAddressOnly(type, M);
+  static bool isPassedIndirectly(CanType type, SILModule &M,
+                                 CanGenericSignature Sig,
+                                 ResilienceExpansion Expansion) {
+    return isAddressOnly(type, M, Sig, Expansion);
   }
 
-  /// Returns true if this type exposes a fixed layout to the given module's
-  /// resilience domain.
-  ///
-  /// This is currently only implemented for nominal types.
-  bool hasFixedLayout(SILModule &M) const;
-  
   /// True if the type, or the referenced type of an address type, is loadable.
   /// This is the opposite of isAddressOnly.
   bool isLoadable(SILModule &M) const {
@@ -312,6 +289,12 @@ public:
   /// Returns true if the referenced type has reference semantics.
   bool hasReferenceSemantics() const {
     return getSwiftRValueType().hasReferenceSemantics();
+  }
+
+  /// Returns true if the referenced type is any sort of class-reference type,
+  /// meaning anything with reference semantics that is not a function type.
+  bool isAnyClassReferenceType() const {
+    return getSwiftRValueType().isAnyClassReferenceType();
   }
   
   /// Returns true if the referenced type is guaranteed to have a
@@ -441,10 +424,19 @@ public:
     return SILType::getPrimitiveObjectType(superclass->getCanonicalType());
   }
 
-  /// Return true if Ty is a subtype of this SILType, or null otherwise.
-  bool isSuperclassOf(SILType Ty) const {
-    return getSwiftRValueType()->isSuperclassOf(Ty.getSwiftRValueType(),
-                                                nullptr);
+  /// Return true if Ty is a subtype of this exact SILType, or false otherwise.
+  bool isExactSuperclassOf(SILType Ty) const {
+    return getSwiftRValueType()->isExactSuperclassOf(Ty.getSwiftRValueType(),
+                                                     nullptr);
+  }
+
+  /// Return true if Ty is a subtype of this SILType, or if this SILType
+  /// contains archetypes that can be found to form a supertype of Ty, or false
+  /// otherwise.
+  bool isBindableToSuperclassOf(SILType Ty) const {
+    return getSwiftRValueType()->isBindableToSuperclassOf(
+                                                        Ty.getSwiftRValueType(),
+                                                        nullptr);
   }
 
   /// Transform the function type SILType by replacing all of its interface
@@ -564,7 +556,6 @@ NON_SIL_TYPE(LValue)
 
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                         Lowering::AbstractionPattern orig,
-                        CanAnyFunctionType subst,
                         CanAnyFunctionType substInterface,
                         SILDeclRef::Kind kind = SILDeclRef::Kind::Func);
 
@@ -586,19 +577,22 @@ SILFunctionType::getParameterSILType(const SILParameterInfo &param) {
   return param.getSILType();
 }
 
-inline SILType SILFunctionType::getSILResult() const {
-  return getResult().getSILType();
-}
-
 inline SILType SILResultInfo::getSILType() const {
-  return SILType::getPrimitiveObjectType(getType());
+  if (isIndirect()) {
+    return SILType::getPrimitiveAddressType(getType());
+  } else {
+    return SILType::getPrimitiveObjectType(getType());    
+  }
 }
 
-inline SILType SILFunctionType::getSemanticResultSILType() const {
-  return (hasIndirectResult() ? getIndirectResult().getSILType()
-                              : getResult().getSILType());
-}  
-  
+inline SILType SILFunctionType::getSILArgumentType(unsigned index) const {
+  if (index < getNumIndirectResults()) {
+    return getIndirectResults()[index].getSILType();
+  } else {
+    return getParameters()[index - getNumIndirectResults()].getSILType();
+  }
+}
+
 inline SILType SILBlockStorageType::getCaptureAddressType() const {
   return SILType::getPrimitiveAddressType(getCaptureType());
 }

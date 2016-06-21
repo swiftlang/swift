@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,13 +21,17 @@
 
 //===--- Layout-compatible clones of Foundation structs -------------------===//
 // Ideally we would declare the same names as Foundation does, but
-// swift's module importer is not yet tolerant of the same struct
+// Swift's module importer is not yet tolerant of the same struct
 // coming in from two different Clang modules
 // (rdar://problem/16294674).  Instead, we copy the definitions here
 // and then do horrible unsafeBitCast trix to make them usable where required.
 //===----------------------------------------------------------------------===//
 
 #include "SwiftStdint.h"
+
+#ifdef __cplusplus
+namespace swift { extern "C" {
+#endif
 
 typedef struct {
   __swift_intptr_t location;
@@ -37,8 +41,8 @@ typedef struct {
 #ifdef __OBJC2__
 typedef struct {
     unsigned long state;
-    id __unsafe_unretained *itemsPtr;
-    unsigned long *mutationsPtr;
+    id __unsafe_unretained _Nullable * _Nullable itemsPtr;
+    unsigned long * _Nullable mutationsPtr;
     unsigned long extra[5];
 } _SwiftNSFastEnumerationState;
 #endif
@@ -50,7 +54,12 @@ typedef struct {
   __swift_intptr_t patchVersion;
 } _SwiftNSOperatingSystemVersion;
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 _SwiftNSOperatingSystemVersion _swift_stdlib_operatingSystemVersion();
+
+#ifdef __cplusplus
+}} // extern "C", namespace swift
+#endif
 
 #endif // SWIFT_STDLIB_SHIMS_FOUNDATIONSHIMS_H
 

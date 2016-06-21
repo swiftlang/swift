@@ -3,7 +3,7 @@
 var func5 : (fn : (Int,Int) -> ()) -> () 
 
 // Default arguments for functions.
-func foo3(a a: Int = 2, b: Int = 3) {}
+func foo3(a: Int = 2, b: Int = 3) {}
 func functionCall() {
   foo3(a: 4)
   foo3()
@@ -13,7 +13,7 @@ func functionCall() {
 }
 
 func g() {}
-func h(x: () -> () = g) { x() }
+func h(_ x: () -> () = g) { x() }
 
 // Tuple types cannot have default values, but recover well here.
 func tupleTypes() {
@@ -27,13 +27,7 @@ func returnWithDefault() -> (a: Int, b: Int = 42) { // expected-error{{default a
   return 5 // expected-error{{cannot convert return expression of type 'Int' to return type '(a: Int, b: Int)'}}
 }
 
-// Only the first parameter list of a curried function can have a
-// default argument.
-func curried(i: Int = 1) // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-     (f : Float = 2) { // expected-error{{default argument is only permitted for a non-curried function parameter}}{{17-20=}}
-}
-
-func selectorStyle(i: Int = 1, withFloat f: Float = 2) { }
+func selectorStyle(_ i: Int = 1, withFloat f: Float = 2) { }
 
 // Default arguments of constructors.
 struct Ctor {
@@ -46,11 +40,11 @@ Ctor(f:12.5) // expected-warning{{unused}}
 
 // Default arguments for nested constructors/functions.
 struct Outer<T> {
-  struct Inner { // expected-error{{type 'Inner' nested in generic type}}
-    struct VeryInner {// expected-error{{type 'VeryInner' nested in generic type}}
+  struct Inner { // expected-error{{type 'Inner' cannot be nested in generic type 'Outer'}}
+    struct VeryInner {// expected-error{{type 'VeryInner' cannot be nested in generic type 'Inner'}}
       init (i : Int = 17, f : Float = 1.5) { }
-      static func f(i i: Int = 17, f: Float = 1.5) { }
-      func g(i i: Int = 17, f: Float = 1.5) { }
+      static func f(i: Int = 17, f: Float = 1.5) { }
+      func g(i: Int = 17, f: Float = 1.5) { }
     }
   }
 }
@@ -67,7 +61,7 @@ vi.g(i: 12)
 vi.g(f:12.5)
 
 // <rdar://problem/14564964> crash on invalid
-func foo(x: WonkaWibble = 17) { } // expected-error{{use of undeclared type 'WonkaWibble'}}
+func foo(_ x: WonkaWibble = 17) { } // expected-error{{use of undeclared type 'WonkaWibble'}}
 
 // Default arguments for initializers.
 class SomeClass2 { 
@@ -79,7 +73,7 @@ class SomeDerivedClass2 : SomeClass2 {
   }
 }
 
-func shouldNotCrash(a : UndefinedType, bar b : Bool = true) { // expected-error {{use of undeclared type 'UndefinedType'}}
+func shouldNotCrash(_ a : UndefinedType, bar b : Bool = true) { // expected-error {{use of undeclared type 'UndefinedType'}}
 }
 
 // <rdar://problem/20749423> Compiler crashed while building simple subclass
@@ -91,8 +85,8 @@ class SomeDerivedClass3 : SomeClass3 {}
 _ = SomeDerivedClass3()
 
 // Tuple types with default arguments are not materializable
-func identity<T>(t: T) -> T { return t }
-func defaultArgTuplesNotMaterializable(x: Int, y: Int = 0) {}
+func identity<T>(_ t: T) -> T { return t }
+func defaultArgTuplesNotMaterializable(_ x: Int, y: Int = 0) {}
 
 defaultArgTuplesNotMaterializable(identity(5))
 
@@ -102,14 +96,14 @@ defaultArgTuplesNotMaterializable(identity((5, y: 10)))
 
 
 // rdar://problem/21799331
-func foo<T>(x: T, y: Bool = true) {}
+func foo<T>(_ x: T, y: Bool = true) {}
 
 foo(true ? "foo" : "bar")
 
-func foo2<T>(x: T, y: Bool = true) {}
+func foo2<T>(_ x: T, y: Bool = true) {}
 
 extension Array {
-  func bar(x: Element -> Bool) -> Int? { return 0 }
+  func bar(_ x: (Element) -> Bool) -> Int? { return 0 }
 }
 
 foo2([].bar { $0 == "c" }!)
@@ -117,3 +111,14 @@ foo2([].bar { $0 == "c" }!)
 // rdar://problem/21643052
 let a = ["1", "2"].map { Int($0) }
 
+// Default arguments for static members used via ".foo"
+struct X<T> {
+  static func foo(i: Int, j: Int = 0) -> X {
+    return X()
+  }
+
+  static var bar: X { return X() }
+}
+
+let testXa: X<Int> = .foo(i: 0)
+let testXb: X<Int> = .bar

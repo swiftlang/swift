@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftPrivate
-import SwiftPrivateDarwinExtras
+import SwiftPrivateLibcExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(FreeBSD) || os(Android)
 import Glibc
 #endif
 
@@ -27,12 +27,12 @@ import Foundation
 // useful in tests, and stdlib does not have such facilities yet.
 //
 
-func findSubstring(string: String, _ substring: String) -> String.Index? {
+func findSubstring(_ string: String, _ substring: String) -> String.Index? {
   if substring.isEmpty {
     return string.startIndex
   }
 #if _runtime(_ObjC)
-  return string.rangeOfString(substring)?.startIndex
+  return string.range(of: substring)?.lowerBound
 #else
   // FIXME(performance): This is a very non-optimal algorithm, with a worst
   // case of O((n-m)*m). When non-objc String has a match function that's better,
@@ -48,7 +48,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
     while true {
       if needleIndex == needle.endIndex {
         // if we hit the end of the search string, we found the needle
-        return matchStartIndex.samePositionIn(string)
+        return matchStartIndex.samePosition(in: string)
       }
       if matchIndex == haystack.endIndex {
         // if we hit the end of the string before finding the end of the needle,
@@ -57,8 +57,8 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
       }
       if needle[needleIndex] == haystack[matchIndex] {
         // keep advancing through both the string and search string on match
-        ++matchIndex
-        ++needleIndex
+        matchIndex = haystack.index(after: matchIndex)
+        needleIndex = haystack.index(after: needleIndex)
       } else {
         // no match, go back to finding a starting match in the string.
         break
@@ -70,11 +70,11 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
 }
 
 public func createTemporaryFile(
-  fileNamePrefix: String, _ fileNameSuffix: String, _ contents: String
+  _ fileNamePrefix: String, _ fileNameSuffix: String, _ contents: String
 ) -> String {
 #if _runtime(_ObjC)
-  let tempDir: NSString = NSTemporaryDirectory()
-  var fileName = tempDir.stringByAppendingPathComponent(
+  let tempDir: NSString = NSTemporaryDirectory() as NSString
+  var fileName = tempDir.appendingPathComponent(
     fileNamePrefix + "XXXXXX" + fileNameSuffix)
 #else
   var fileName = fileNamePrefix + "XXXXXX" + fileNameSuffix
@@ -101,8 +101,8 @@ infix operator <=> {}
 
 public func <=> <T: Comparable>(lhs: T, rhs: T) -> ExpectedComparisonResult {
   return lhs < rhs
-    ? .LT
-    : lhs > rhs ? .GT : .EQ
+    ? .lt
+    : lhs > rhs ? .gt : .eq
 }
 
 public struct TypeIdentifier : Hashable, Comparable {
@@ -135,8 +135,8 @@ extension TypeIdentifier
 }
 
 func _forAllPermutationsImpl(
-  index: Int, _ size: Int,
-  inout _ perm: [Int], inout _ visited: [Bool],
+  _ index: Int, _ size: Int,
+  _ perm: inout [Int], _ visited: inout [Bool],
   _ body: ([Int]) -> Void
 ) {
   if index == size {
@@ -156,19 +156,19 @@ func _forAllPermutationsImpl(
 }
 
 /// Generate all permutations.
-public func forAllPermutations(size: Int, body: ([Int]) -> Void) {
+public func forAllPermutations(_ size: Int, body: ([Int]) -> Void) {
   if size == 0 {
     return
   }
 
-  var permutation = [Int](count: size, repeatedValue: 0)
-  var visited = [Bool](count: size, repeatedValue: false)
+  var permutation = [Int](repeating: 0, count: size)
+  var visited = [Bool](repeating: false, count: size)
   _forAllPermutationsImpl(0, size, &permutation, &visited, body)
 }
 
 /// Generate all permutations.
-public func forAllPermutations<S : SequenceType>(
-  sequence: S, body: ([S.Generator.Element]) -> Void
+public func forAllPermutations<S : Sequence>(
+  _ sequence: S, body: ([S.Iterator.Element]) -> Void
 ) {
   let data = Array(sequence)
   forAllPermutations(data.count) {
@@ -177,4 +177,3 @@ public func forAllPermutations<S : SequenceType>(
     return ()
   }
 }
-

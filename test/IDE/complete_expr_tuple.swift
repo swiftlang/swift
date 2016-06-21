@@ -27,27 +27,48 @@ func testTupleNoDot1() {
   var t = (1, 2.0)
   t#^TUPLE_NO_DOT_1^#
 }
-// TUPLE_NO_DOT_1: Begin completions, 2 items
-// TUPLE_NO_DOT_1-NEXT: Pattern/CurrNominal: .0[#Int#]{{; name=.+$}}
-// TUPLE_NO_DOT_1-NEXT: Pattern/CurrNominal: .1[#Double#]{{; name=.+$}}
+// TUPLE_NO_DOT_1: Begin completions, 9 items
+// TUPLE_NO_DOT_1-DAG: Pattern/CurrNominal: .0[#Int#]{{; name=.+$}}
+// TUPLE_NO_DOT_1-DAG: Pattern/CurrNominal: .1[#Double#]{{; name=.+$}}
+// TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: == {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: <= {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: >= {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: < {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: != {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: > {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_1-DAG: BuiltinOperator/None:                                   = {#(Int, Double)#}[#Void#]{{; name=.+$}}
 // TUPLE_NO_DOT_1-NEXT: End completions
 
 func testTupleNoDot2() {
   var t = (foo: 1, bar: 2.0)
   t#^TUPLE_NO_DOT_2^#
 }
-// TUPLE_NO_DOT_2: Begin completions, 2 items
-// TUPLE_NO_DOT_2-NEXT: Pattern/CurrNominal: .foo[#Int#]{{; name=.+$}}
-// TUPLE_NO_DOT_2-NEXT: Pattern/CurrNominal: .bar[#Double#]{{; name=.+$}}
+// TUPLE_NO_DOT_2: Begin completions, 9 items
+// TUPLE_NO_DOT_2-DAG: Pattern/CurrNominal: .foo[#Int#]{{; name=.+$}}
+// TUPLE_NO_DOT_2-DAG: Pattern/CurrNominal: .bar[#Double#]{{; name=.+$}}
+// TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: == {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: <= {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: >= {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: < {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: != {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: > {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_2-DAG: BuiltinOperator/None:                                   = {#(foo: Int, bar: Double)#}[#Void#]{{; name=.+$}}
 // TUPLE_NO_DOT_2-NEXT: End completions
 
 func testTupleNoDot3() {
   var t = (foo: 1, 2.0)
   t#^TUPLE_NO_DOT_3^#
 }
-// TUPLE_NO_DOT_3: Begin completions, 2 items
-// TUPLE_NO_DOT_3-NEXT: Pattern/CurrNominal: .foo[#Int#]{{; name=.+$}}
-// TUPLE_NO_DOT_3-NEXT: Pattern/CurrNominal: .1[#Double#]{{; name=.+$}}
+// TUPLE_NO_DOT_3: Begin completions, 9 items
+// TUPLE_NO_DOT_3-DAG: Pattern/CurrNominal: .foo[#Int#]{{; name=.+$}}
+// TUPLE_NO_DOT_3-DAG: Pattern/CurrNominal: .1[#Double#]{{; name=.+$}}
+// TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: == {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: <= {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: >= {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: < {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: != {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: > {#(Int, Double)#}[#Bool#]{{; name=.+$}}
+// TUPLE_NO_DOT_3-DAG: BuiltinOperator/None:                                   = {#(foo: Int, Double)#}[#Void#]{{; name=.+$}}
 // TUPLE_NO_DOT_3-NEXT: End completions
 
 func testTupleDot1() {

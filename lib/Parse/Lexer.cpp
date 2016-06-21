@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -177,7 +177,15 @@ Lexer::Lexer(const LangOptions &Options,
   StringRef contents = SM.extractText(SM.getRangeForBuffer(BufferID));
   BufferStart = contents.data();
   BufferEnd = contents.data() + contents.size();
-  CurPtr = BufferStart;
+
+  // Check for Unicode BOM at start of file (Only UTF-8 BOM supported now).
+  size_t BOMLength = llvm::StringSwitch<size_t>(contents)
+    .StartsWith("\xEF\xBB\xBF", 3)
+    .Default(0);
+
+  // Since the UTF-8 BOM doesn't carry information (UTF-8 has no dependency
+  // on byte order), throw it away.
+  CurPtr = BufferStart + BOMLength;
 
   // Initialize code completion.
   if (BufferID == SM.getCodeCompletionBufferID()) {
@@ -523,6 +531,18 @@ bool Lexer::isIdentifier(StringRef string) {
   return p == end;
 }
 
+/// \brief Determines if the given string is a valid operator identifier,
+/// without escaping characters.
+bool Lexer::isOperator(StringRef string) {
+  if (string.empty()) return false;
+  char const *p = string.data(), *end = string.end();
+  if (!advanceIfValidStartOfOperator(p, end))
+    return false;
+  while (p < end && advanceIfValidContinuationOfOperator(p, end));
+  return p == end;
+}
+
+
 tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
   tok Kind = llvm::StringSwitch<tok>(Str)
 #define KEYWORD(kw) \
@@ -533,8 +553,8 @@ tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
   // These keywords are only active in SIL mode.
   if ((Kind == tok::kw_sil || Kind == tok::kw_sil_stage ||
        Kind == tok::kw_sil_vtable || Kind == tok::kw_sil_global ||
-       Kind == tok::kw_sil_witness_table || Kind == tok::kw_sil_coverage_map ||
-       Kind == tok::kw_undef) &&
+       Kind == tok::kw_sil_witness_table || Kind == tok::kw_sil_default_witness_table ||
+       Kind == tok::kw_sil_coverage_map || Kind == tok::kw_undef) &&
       !InSILMode)
     Kind = tok::identifier;
   return Kind;
@@ -555,6 +575,50 @@ void Lexer::lexIdentifier() {
   return formToken(Kind, TokStart);
 }
 
+/// lexHash - Handle #], #! for shebangs, and the family of #identifiers.
+void Lexer::lexHash() {
+  const char *TokStart = CurPtr-1;
+
+  // NOTE: legacy punctuator.  Remove in the future.
+  if (*CurPtr == ']') { // #]
+     CurPtr++;
+     return formToken(tok::r_square_lit, TokStart);
+  }
+  
+  // Allow a hashbang #! line at the beginning of the file.
+  if (CurPtr - 1 == BufferStart && *CurPtr == '!') {
+    CurPtr--;
+    if (BufferID != SourceMgr.getHashbangBufferID())
+      diagnose(CurPtr, diag::lex_hashbang_not_allowed);
+    skipHashbang();
+    return lexImpl();
+  }
+
+  // Scan for [a-zA-Z]+ to see what we match.
+  const char *tmpPtr = CurPtr;
+  while (clang::isLetter(*tmpPtr))
+    ++tmpPtr;
+
+  // Map the character sequence onto
+  tok Kind = llvm::StringSwitch<tok>(StringRef(CurPtr, tmpPtr-CurPtr))
+#define KEYWORD(kw)
+#define POUND_KEYWORD(id) \
+  .Case(#id, tok::pound_##id)
+#include "swift/Parse/Tokens.def"
+  .Default(tok::pound);
+
+  // If we didn't find a match, then just return tok::pound.  This is highly
+  // dubious in terms of error recovery, but is useful for code completion and
+  // SIL parsing.
+  if (Kind == tok::pound)
+    return formToken(tok::pound, TokStart);
+
+  // If we found something specific, return it.
+  CurPtr = tmpPtr;
+  return formToken(Kind, TokStart);
+}
+
+
 /// Is the operator beginning at the given character "left-bound"?
 static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
   // The first character in the file is not left-bound.
@@ -567,6 +631,12 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
   case '\0':                                 // whitespace / last char in file
     return false;
 
+  case '/':
+    if (tokBegin - 1 != bufferBegin && tokBegin[-2] == '*')
+      return false; // End of a slash-star comment, so whitespace.
+    else
+      return true;
+
   default:
     return true;
   }
@@ -574,18 +644,32 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
 
 /// Is the operator ending at the given character (actually one past the end)
 /// "right-bound"?
-static bool isRightBound(const char *tokEnd, bool isLeftBound) {
+///
+/// The code-completion point is considered right-bound.
+static bool isRightBound(const char *tokEnd, bool isLeftBound,
+                         const char *codeCompletionPtr) {
   switch (*tokEnd) {
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case ')': case ']': case '}':              // closing delimiters
   case ',': case ';': case ':':              // expression separators
-  case '\0':                                 // whitespace / last char in file
     return false;
+
+  case '\0':
+    if (tokEnd == codeCompletionPtr)         // code-completion
+      return true;
+    return false;                            // whitespace / last char in file
 
   case '.':
     // Prefer the '^' in "x^.y" to be a postfix op, not binary, but the '^' in
     // "^.y" to be a prefix op, not binary.
     return !isLeftBound;
+
+  case '/':
+    // A following comment counts as whitespace, so this token is not right bound.
+    if (tokEnd[1] == '/' || tokEnd[1] == '*')
+      return false;
+    else
+      return true;
 
   default:
     return true;
@@ -595,44 +679,36 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound) {
 /// lexOperatorIdentifier - Match identifiers formed out of punctuation.
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
+  CurPtr = TokStart;
+  bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
+  assert(didStart && "unexpected operator start");
+  (void) didStart;
+  
+  do {
+    if (CurPtr != BufferEnd && InSILBody &&
+        (*CurPtr == '!' || *CurPtr == '?'))
+      // When parsing SIL body, '!' and '?' are special token and can't be
+      // in the middle of an operator.
+      break;
 
-  // We only allow '.' in a series.
-  if (*TokStart == '.') {
-    while (*CurPtr == '.')
-      ++CurPtr;
-    
-    // Lex ..< as an identifier.
-    if (*CurPtr == '<' && CurPtr-TokStart == 2)
-      ++CurPtr;
-    
-  } else {
-    CurPtr = TokStart;
-    bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
-    assert(didStart && "unexpected operator start");
-    (void) didStart;
-    
-    do {
-      if (CurPtr != BufferEnd && InSILBody &&
-          (*CurPtr == '!' || *CurPtr == '?'))
-        // When parsing SIL body, '!' and '?' are special token and can't be
-        // in the middle of an operator.
-        break;
-    } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
-  }
+    // '.' cannot appear in the middle of an operator unless the operator
+    // started with a '.'.
+    if (*CurPtr == '.' && *TokStart != '.')
+      break;
+  } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
   // Decide between the binary, prefix, and postfix cases.
   // It's binary if either both sides are bound or both sides are not bound.
   // Otherwise, it's postfix if left-bound and prefix if right-bound.
   bool leftBound = isLeftBound(TokStart, BufferStart);
-  bool rightBound = isRightBound(CurPtr, leftBound);
+  bool rightBound = isRightBound(CurPtr, leftBound, CodeCompletionPtr);
 
   // Match various reserved words.
   if (CurPtr-TokStart == 1) {
     switch (TokStart[0]) {
     case '=':
       if (leftBound != rightBound) {
-        auto d = diagnose(TokStart, diag::lex_unary_equal_is_reserved,
-                          leftBound);
+        auto d = diagnose(TokStart, diag::lex_unary_equal);
         if (leftBound)
           d.fixItInsert(getSourceLoc(TokStart), " ");
         else
@@ -644,14 +720,44 @@ void Lexer::lexOperatorIdentifier() {
       if (leftBound == rightBound || leftBound)
         break;
       return formToken(tok::amp_prefix, TokStart);
-    case '.':
+    case '.': {
       if (leftBound == rightBound)
         return formToken(tok::period, TokStart);
       if (rightBound)
         return formToken(tok::period_prefix, TokStart);
-      diagnose(TokStart, diag::lex_unary_postfix_dot_is_reserved);
-      // always emit 'tok::period' to avoid trickle down parse errors
-      return formToken(tok::period, TokStart);
+      
+      // If left bound but not right bound, handle some likely situations.
+      
+      // If there is just some horizontal whitespace before the next token, its
+      // addition is probably incorrect.
+      const char *AfterHorzWhitespace = CurPtr;
+      while (*AfterHorzWhitespace == ' ' || *AfterHorzWhitespace == '\t')
+        ++AfterHorzWhitespace;
+
+      // First, when we are code completing "x. <ESC>", then make sure to return
+      // a tok::period, since that is what the user is wanting to know about.
+      if (*AfterHorzWhitespace == '\0' &&
+          AfterHorzWhitespace == CodeCompletionPtr) {
+        diagnose(TokStart, diag::expected_member_name);
+        return formToken(tok::period, TokStart);
+      }
+
+      if (isRightBound(AfterHorzWhitespace, leftBound, CodeCompletionPtr) &&
+          // Don't consider comments to be this.  A leading slash is probably
+          // either // or /* and most likely occurs just in our testsuite for
+          // expected-error lines.
+          *AfterHorzWhitespace != '/') {
+        diagnose(TokStart, diag::extra_whitespace_period)
+          .fixItRemoveChars(getSourceLoc(CurPtr),
+                            getSourceLoc(AfterHorzWhitespace));
+        return formToken(tok::period, TokStart);
+      }
+
+      // Otherwise, it is probably a missing member.
+      diagnose(TokStart, diag::expected_member_name);
+      //return formToken(tok::unknown, TokStart);
+      return lexImpl();
+    }
     case '?':
       if (leftBound)
         return formToken(tok::question_postfix, TokStart);
@@ -669,14 +775,20 @@ void Lexer::lexOperatorIdentifier() {
     // If there is a "//" in the middle of an identifier token, it starts
     // a single-line comment.
     auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
-    if (Pos != StringRef::npos)
+    if (Pos != StringRef::npos) {
       CurPtr = TokStart+Pos;
+      // Next token is a comment, which counts as whitespace.
+      rightBound = false;
+    }
 
     // If there is a "/*" in the middle of an identifier token, it starts
     // a multi-line comment.
     Pos = StringRef(TokStart, CurPtr-TokStart).find("/*");
-    if (Pos != StringRef::npos)
+    if (Pos != StringRef::npos) {
       CurPtr = TokStart+Pos;
+      // Next token is a comment, which counts as whitespace.
+      rightBound = false;
+    }
 
     // Verify there is no "*/" in the middle of the identifier token, we reject
     // it as potentially ending a block comment.
@@ -746,11 +858,6 @@ void Lexer::lexHexNumber() {
     
   while (isHexDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
-  if (CurPtr - TokStart == 2) {
-    diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
-    while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
-    return formToken(tok::unknown, TokStart);
-  }
   
   if (*CurPtr != '.' && *CurPtr != 'p' && *CurPtr != 'P')
     return formToken(tok::integer_literal, TokStart);
@@ -823,8 +930,6 @@ void Lexer::lexNumber() {
       
     while ((*CurPtr >= '0' && *CurPtr <= '7') || *CurPtr == '_')
       ++CurPtr;
-    if (CurPtr - TokStart == 2)
-      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     return formToken(tok::integer_literal, TokStart);
   }
   
@@ -835,8 +940,6 @@ void Lexer::lexNumber() {
       return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     while (*CurPtr == '0' || *CurPtr == '1' || *CurPtr == '_')
       ++CurPtr;
-    if (CurPtr - TokStart == 2)
-      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     return formToken(tok::integer_literal, TokStart);
   }
 
@@ -1164,11 +1267,31 @@ void Lexer::lexStringLiteral() {
       if (*TokStart == '\'') {
         // Complain about single-quote string and suggest replacement with
         // double-quoted equivalent.
-        // FIXME: Fixit should replace ['"'] with ["\""] (radar 22709931)
         StringRef orig(TokStart, CurPtr - TokStart);
         llvm::SmallString<32> replacement;
         replacement += '"';
-        replacement += orig.slice(1, orig.size() - 1);
+        std::string str = orig.slice(1, orig.size() - 1).str();
+        std::string quot = "\"";
+        size_t pos = 0;
+        while (pos != str.length()) {
+          if (str.at(pos) == '\\') {
+            if (str.at(pos + 1) == '\'') {
+                // Un-escape escaped single quotes.
+                str.replace(pos, 2, "'");
+                ++pos;
+            } else {
+                // Skip over escaped characters.
+                pos += 2;
+            }
+          } else if (str.at(pos) == '"') {
+            str.replace(pos, 1, "\\\"");
+            // Advance past the newly added ["\""].
+            pos += 2;
+          } else {
+            ++pos;
+          }
+        }
+        replacement += StringRef(str);
         replacement += '"';
         diagnose(TokStart, diag::lex_single_quote_string)
           .fixItReplaceChars(getSourceLoc(TokStart), getSourceLoc(CurPtr),
@@ -1250,6 +1373,61 @@ void Lexer::lexEscapedIdentifier() {
   formToken(tok::backtick, Quote);
 }
 
+/// Find the end of a version control conflict marker.
+static const char *findConflictEnd(const char *CurPtr, const char *BufferEnd,
+                                   ConflictMarkerKind CMK) {
+  StringRef terminator = CMK == ConflictMarkerKind::Perforce ? "<<<<\n"
+                                                             : ">>>>>>> ";
+  size_t termLen = terminator.size();
+  
+  // Get a reference to the rest of the buffer minus the length of the start
+  // of the conflict marker.
+  auto restOfBuffer = StringRef(CurPtr, BufferEnd - CurPtr).substr(termLen);
+  size_t endPos = restOfBuffer.find(terminator);
+  while (endPos != StringRef::npos) {
+    // Must occur at start of line.
+    if (endPos != 0 &&
+        (restOfBuffer[endPos - 1] == '\r' || restOfBuffer[endPos - 1] == '\n'))
+    {
+      return restOfBuffer.data() + endPos;
+    }
+    restOfBuffer = restOfBuffer.substr(endPos + termLen);
+    endPos = restOfBuffer.find(terminator);
+  }
+  return nullptr;
+}
+
+bool Lexer::tryLexConflictMarker() {
+  const char *Ptr = CurPtr - 1;
+
+  // Only a conflict marker if it starts at the beginning of a line.
+  if (Ptr != BufferStart && Ptr[-1] != '\n' && Ptr[-1] != '\r')
+    return false;
+  
+  // Check to see if we have <<<<<<< or >>>>.
+  StringRef restOfBuffer(Ptr, BufferEnd - Ptr);
+  if (!restOfBuffer.startswith("<<<<<<< ") && !restOfBuffer.startswith(">>>> "))
+    return false;
+  
+  ConflictMarkerKind Kind = *Ptr == '<' ? ConflictMarkerKind::Normal
+                                        : ConflictMarkerKind::Perforce;
+  if (const char *End = findConflictEnd(Ptr, BufferEnd, Kind)) {
+    // Diagnose at the conflict marker, then jump ahead to the end.
+    diagnose(CurPtr, diag::lex_conflict_marker_in_file);
+    CurPtr = End;
+    
+    // Skip ahead to the end of the marker.
+    if (CurPtr != BufferEnd)
+      skipToEndOfLine();
+    
+    return true;
+  }
+  
+  // No end of conflict marker found.
+  return false;
+}
+
+
 void Lexer::tryLexEditorPlaceholder() {
   assert(CurPtr[-1] == '<' && CurPtr[0] == '#');
   const char *TokStart = CurPtr-1;
@@ -1259,9 +1437,13 @@ void Lexer::tryLexEditorPlaceholder() {
     if (Ptr[0] == '<' && Ptr[1] == '#')
       break;
     if (Ptr[0] == '#' && Ptr[1] == '>') {
-      // Found it. Flag it as error for the rest of the compiler pipeline and
-      // lex it as an identifier.
-      diagnose(TokStart, diag::lex_editor_placeholder);
+      // Found it. Flag it as error (or warning, if in playground mode) for the
+      // rest of the compiler pipeline and lex it as an identifier.
+      if (LangOpts.Playground) {
+        diagnose(TokStart, diag::lex_editor_placeholder_in_playground);
+      } else {
+        diagnose(TokStart, diag::lex_editor_placeholder);
+      }
       CurPtr = Ptr+2;
       formToken(tok::identifier, TokStart);
       return;
@@ -1405,7 +1587,7 @@ Restart:
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
   
-  switch (*CurPtr++) {
+  switch ((signed char)*CurPtr++) {
   default: {
     char const *tmp = CurPtr-1;
     if (advanceIfValidStartOfIdentifier(tmp, BufferEnd))
@@ -1495,76 +1677,31 @@ Restart:
   case '@': return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
   case '[': {
-    if (*CurPtr == '#') { // [#
-      CurPtr++;
-      return formToken(tok::l_square_lit, TokStart);
-    }
-    return formToken(tok::l_square, TokStart);
+     // NOTE: Legacy punctuator for old object literal syntax.
+     // Remove in the future.
+     if (*CurPtr == '#') { // [#
+       // NOTE: Do NOT include the '#' in the token, unlike in earlier
+       // versions of Swift that supported the old object literal syntax
+       // directly.  The '#' will be lexed as part of the object literal
+       // keyword token itself.
+       return formToken(tok::l_square_lit, TokStart);
+     }
+     return formToken(tok::l_square, TokStart);
   }
   case '(': return formToken(tok::l_paren, TokStart);
-  case '}': return formToken(tok::r_brace,  TokStart);
+  case '}': return formToken(tok::r_brace, TokStart);
   case ']': return formToken(tok::r_square, TokStart);
   case ')':
-    return formToken(tok::r_paren,  TokStart);
+    return formToken(tok::r_paren, TokStart);
 
-  case ',': return formToken(tok::comma,    TokStart);
-  case ';': return formToken(tok::semi,     TokStart);
-  case ':': return formToken(tok::colon,    TokStart);
+  case ',': return formToken(tok::comma, TokStart);
+  case ';': return formToken(tok::semi, TokStart);
+  case ':': return formToken(tok::colon, TokStart);
 
-  case '#': {
-    if (*CurPtr == ']') { // #]
-      CurPtr++;
-      return formToken(tok::r_square_lit, TokStart);
-    }
+  case '#':
+    return lexHash();
 
-    if (getSubstring(TokStart + 1, 2).equals("if") &&
-        isWhitespace(CurPtr[2])) {
-      CurPtr += 2;
-      return formToken(tok::pound_if, TokStart);
-    }
-    
-    if (getSubstring(TokStart + 1, 4).equals("else") &&
-        isWhitespace(CurPtr[4])) {
-      CurPtr += 4;
-      return formToken(tok::pound_else, TokStart);
-    }
-    
-    if (getSubstring(TokStart + 1, 6).equals("elseif") &&
-        isWhitespace(CurPtr[6])) {
-      CurPtr += 6;
-      return formToken(tok::pound_elseif, TokStart);
-    }
-
-    if (getSubstring(TokStart + 1, 5).equals("endif") &&
-        (isWhitespace(CurPtr[5]) || CurPtr[5] == '\0')) {
-      CurPtr += 5;
-      return formToken(tok::pound_endif, TokStart);
-    }
-
-    if (getSubstring(TokStart + 1, 4).equals("line") &&
-        isWhitespace(CurPtr[4])) {
-      CurPtr += 4;
-      return formToken(tok::pound_line, TokStart);
-    }
-    
-    if (getSubstring(TokStart + 1, 9).equals("available")) {
-      CurPtr += 9;
-      return formToken(tok::pound_available, TokStart);
-    }
-
-    // Allow a hashbang #! line at the beginning of the file.
-    if (CurPtr - 1 == BufferStart && *CurPtr == '!') {
-      CurPtr--;
-      if (BufferID != SourceMgr.getHashbangBufferID())
-        diagnose(CurPtr, diag::lex_hashbang_not_allowed);
-      skipHashbang();
-      goto Restart;
-    }
-
-    return formToken(tok::pound, TokStart);
-  }
-
-  // Operator characters.
+      // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
       skipSlashSlashComment();
@@ -1607,10 +1744,17 @@ Restart:
   case '<':
     if (CurPtr[0] == '#')
       return tryLexEditorPlaceholder();
-    SWIFT_FALLTHROUGH;
+    else if (CurPtr[0] == '<' && tryLexConflictMarker())
+      goto Restart;
+    return lexOperatorIdentifier();
 
-  case '=': case '-': case '+': case '*': case '>':
-  case '&': case '|': case '^': case '~': case '.':
+  case '>':
+    if (CurPtr[0] == '>' && tryLexConflictMarker())
+      goto Restart;
+    return lexOperatorIdentifier();
+ 
+  case '=': case '-': case '+': case '*':
+  case '&': case '|':  case '^': case '~': case '.':
     return lexOperatorIdentifier();
 
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
@@ -1640,15 +1784,15 @@ Restart:
   }
 }
 
-SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
+Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // Don't try to do anything with an invalid location.
   if (!Loc.isValid())
-    return Loc;
+    return Token();
 
   // Figure out which buffer contains this location.
   int BufferID = SM.findBufferContainingLoc(Loc);
   if (BufferID < 0)
-    return SourceLoc();
+    return Token();
   
   // Use fake language options; language options only affect validity
   // and the exact token produced.
@@ -1661,9 +1805,13 @@ SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
   L.restoreState(State(Loc));
-  unsigned Length = L.peekNextToken().getLength();
-  return Loc.getAdvancedLoc(Length);
+  return L.peekNextToken();
 }
+
+SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
+  return Loc.getAdvancedLocOrInvalid(getTokenAtLocation(SM, Loc).getLength());
+}
+
 
 static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
                                             unsigned BufferID,
@@ -1827,6 +1975,3 @@ StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc) {
 
   return StringRef(StartOfLine, EndOfIndentation - StartOfLine);
 }
-
-
-

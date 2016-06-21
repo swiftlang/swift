@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-clang-importer-objc-overlays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -11,28 +13,28 @@ import objc_ext
 import TestProtocols
 import ObjCIRExtras
 
-// CHECK: @"\01L_selector_data(method:withFloat:)" = internal constant [18 x i8] c"method:withFloat:\00"
-// CHECK: @"\01L_selector_data(method:withDouble:)" = internal constant [19 x i8] c"method:withDouble:\00"
-// CHECK: @"\01L_selector_data(method:separateExtMethod:)" = internal constant [26 x i8] c"method:separateExtMethod:\00", section "__TEXT,__objc_methname,cstring_literals"
+// CHECK: @"\01L_selector_data(method:withFloat:)" = private global [18 x i8] c"method:withFloat:\00"
+// CHECK: @"\01L_selector_data(method:withDouble:)" = private global [19 x i8] c"method:withDouble:\00"
+// CHECK: @"\01L_selector_data(method:separateExtMethod:)" = private global [26 x i8] c"method:separateExtMethod:\00", section "__TEXT,__objc_methname,cstring_literals"
 
 // Instance method invocation
 // CHECK: define hidden void @_TF7objc_ir15instanceMethodsFCSo1BT_([[B]]*
-func instanceMethods(b: B) {
+func instanceMethods(_ b: B) {
   // CHECK: load i8*, i8** @"\01L_selector(method:withFloat:)"
   // CHECK: call i32 bitcast (void ()* @objc_msgSend to i32
-  var i = b.method(1, withFloat:2.5)
+  var i = b.method(1, with: 2.5 as Float)
   // CHECK: load i8*, i8** @"\01L_selector(method:withDouble:)"
   // CHECK: call i32 bitcast (void ()* @objc_msgSend to i32
-  i = i + b.method(1, withDouble:2.5)
+  i = i + b.method(1, with: 2.5 as Double)
 }
 
 // CHECK: define hidden void @_TF7objc_ir16extensionMethodsFT1bCSo1B_T_
 func extensionMethods(b b: B) {
-  // CHECK: load i8*, i8** @"\01L_selector(method:separateExtMethod:)", align 8
-  // CHECK: [[T0:%.*]] = call i8* bitcast (void ()* @objc_msgSend to i8*
-  // CHECK: [[T1:%.*]] = ptrtoint i8* [[T0]] to i64
-  // CHECK: [[T2:%.*]] = inttoptr i64 [[T1]] to i8*
-  // CHECK: call i8* @objc_retainAutoreleasedReturnValue(i8* [[T2]])
+  // CHECK:      load i8*, i8** @"\01L_selector(method:separateExtMethod:)", align 8
+  // CHECK:      [[T0:%.*]] = call i8* bitcast (void ()* @objc_msgSend to i8*
+  // CHECK-NEXT: [[T1:%.*]] = call i8* @objc_retainAutoreleasedReturnValue(i8* [[T0]])
+  // CHECK-NOT:  [[T0]]
+  // CHECK:      [[T1]]
   b.method(1, separateExtMethod:1.5)
 }
 
@@ -70,11 +72,18 @@ func propertyAccess(b b: B) {
    // CHECK: load i8*, i8** @"\01L_selector(counter)"
    // CHECK: load i8*, i8** @"\01L_selector(setCounter:)"
    b.counter = b.counter + 1
+
+   // CHECK: call %swift.type* @_TMaCSo1B()
+   // CHECK: bitcast %swift.type* {{%.+}} to %objc_class*
+   // CHECK: load i8*, i8** @"\01L_selector(sharedCounter)"
+   // CHECK: load i8*, i8** @"\01L_selector(setSharedCounter:)"
+   B.sharedCounter = B.sharedCounter + 1
 }
 
 // CHECK: define hidden [[B]]* @_TF7objc_ir8downcastFT1aCSo1A_CSo1B(
 func downcast(a a: A) -> B {
-  // CHECK: [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_B")
+  // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
+  // CHECK: [[T0:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* [[CLASS]])
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
   // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]]) [[NOUNWIND:#[0-9]+]]
   return a as! B
@@ -88,7 +97,7 @@ func almostSubscriptable(as1 as1: AlmostSubscriptable, a: A) {
 // CHECK: define hidden void @_TF7objc_ir13protocolTypesFT1aCSo7NSMince1bPSo9NSRuncing__T_(%CSo7NSMince*, %objc_object*) {{.*}} {
 func protocolTypes(a a: NSMince, b: NSRuncing) {
   // - (void)eatWith:(id <NSRuncing>)runcer;
-  a.eatWith(b)
+  a.eat(with: b)
   // CHECK: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(eatWith:)", align 8
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE:%.*]]*, i8*, i8*)*)([[OPAQUE:%.*]]* {{%.*}}, i8* [[SEL]], i8* {{%.*}})
 }
@@ -102,13 +111,13 @@ func getset(p p: FooProto) {
 }
 
 // CHECK-LABEL: define hidden void @_TF7objc_ir17pointerPropertiesFCSo14PointerWrapperT_(%CSo14PointerWrapper*) {{.*}} {
-func pointerProperties(obj: PointerWrapper) {
+func pointerProperties(_ obj: PointerWrapper) {
   // CHECK: load i8*, i8** @"\01L_selector(setVoidPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIntPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIdPtr:)"
-  obj.voidPtr = UnsafeMutablePointer()
-  obj.intPtr = UnsafeMutablePointer()
-  obj.idPtr = AutoreleasingUnsafeMutablePointer()
+  obj.voidPtr = nil as UnsafeMutablePointer?
+  obj.intPtr = nil as UnsafeMutablePointer?
+  obj.idPtr = nil as AutoreleasingUnsafeMutablePointer?
 }
 
 // CHECK-LABEL: define hidden void @_TF7objc_ir20customFactoryMethodsFT_T_() {{.*}} {

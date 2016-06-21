@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,11 +15,10 @@
 // RUN: %target-run %t/Builtins
 // REQUIRES: executable_test
 
-// XFAIL: interpret
-
 import Swift
 import SwiftShims
 import StdlibUnittest
+
 
 #if _runtime(_ObjC)
 import Foundation
@@ -51,45 +50,45 @@ tests.test("_isUniquelyReferenced/OptionalNativeObject") {
 class XObjC : NSObject {}
 
 tests.test("_isUnique_native/SpareBitTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
   // Fake an ObjC pointer.
   var b = _makeObjCBridgeObject(X())
   expectCrashLater()
-  _isUnique_native(&b)
+  _ = _isUnique_native(&b)
 }
 
 tests.test("_isUniqueOrPinned_native/SpareBitTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
   // Fake an ObjC pointer.
   var b = _makeObjCBridgeObject(X())
   expectCrashLater()
-  _isUniqueOrPinned_native(&b)
+  _ = _isUniqueOrPinned_native(&b)
 }
 
 tests.test("_isUnique_native/NonNativeTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
   var x = XObjC()
   expectCrashLater()
-  _isUnique_native(&x)
+  _ = _isUnique_native(&x)
 }
 
 tests.test("_isUniqueOrPinned_native/NonNativeTrap")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .code {
   var x = XObjC()
   expectCrashLater()
-  _isUniqueOrPinned_native(&x)
+  _ = _isUniqueOrPinned_native(&x)
 }
 #endif // _ObjC
 
@@ -105,22 +104,14 @@ tests.test("_assumeNonNegative") {
   expectEqual(r, 27)
 }
 
-tests.test("unsafeUnwrap") {
-  let empty: Int? = nil
-  let nonEmpty: Int? = 3
-  expectEqual(3, unsafeUnwrap(nonEmpty))
-  expectCrashLater()
-  unsafeUnwrap(empty)
-}
-
 var NoisyLifeCount = 0
 var NoisyDeathCount = 0
 
 protocol P {}
 
 class Noisy : P {
-  init() { ++NoisyLifeCount }
-  deinit { ++NoisyDeathCount }
+  init() { NoisyLifeCount += 1 }
+  deinit { NoisyDeathCount += 1}
 }
 
 struct Large : P {
@@ -136,18 +127,18 @@ struct Large : P {
 
 struct ContainsP { var p: P }
 
-func exerciseArrayValueWitnesses<T>(value: T) {
-  let buf = UnsafeMutablePointer<T>.alloc(5)
+func exerciseArrayValueWitnesses<T>(_ value: T) {
+  let buf = UnsafeMutablePointer<T>(allocatingCapacity: 5)
 
-  (buf + 0).initialize(value)
-  (buf + 1).initialize(value)
+  (buf + 0).initialize(with: value)
+  (buf + 1).initialize(with: value)
   
   Builtin.copyArray(T.self, (buf + 2)._rawValue, buf._rawValue, 2._builtinWordValue)
   Builtin.takeArrayBackToFront(T.self, (buf + 1)._rawValue, buf._rawValue, 4._builtinWordValue)
   Builtin.takeArrayFrontToBack(T.self, buf._rawValue, (buf + 1)._rawValue, 4._builtinWordValue)
   Builtin.destroyArray(T.self, buf._rawValue, 4._builtinWordValue)
 
-  buf.dealloc(5)
+  buf.deallocateCapacity(5)
 }
 
 tests.test("array value witnesses") {
@@ -275,6 +266,16 @@ tests.test("_isPOD") {
   expectTrue(_isPOD(Int.self))
   expectFalse(_isPOD(X.self))
   expectFalse(_isPOD(P.self))
+}
+
+tests.test("_isOptional") {
+  expectTrue(_isOptional(Optional<Int>.self))
+  expectTrue(_isOptional(Optional<X>.self))
+  expectTrue(_isOptional(Optional<P>.self))
+  expectTrue(_isOptional(ImplicitlyUnwrappedOptional<P>.self))
+  expectFalse(_isOptional(Int.self))
+  expectFalse(_isOptional(X.self))
+  expectFalse(_isOptional(P.self))
 }
 
 runAllTests()

@@ -1,43 +1,42 @@
 // RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
 
 // REQUIRES: CPU=x86_64
-// XFAIL: linux
 
 import Swift
 
-// CHECK-LABEL: @_TMnV18field_type_vectors3Foo = constant 
-// CHECK:         %swift.type** (%swift.type*)* [[FOO_TYPES_ACCESSOR:@[^,]*]],
+// CHECK-LABEL: @_TMnV18field_type_vectors3Foo = hidden constant 
+// CHECK:         %swift.type** (%swift.type*)* [[FOO_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 struct Foo {
   var x: Int
 }
 
-// CHECK-LABEL: @_TMnV18field_type_vectors3Bar = constant
-// CHECK:         %swift.type** (%swift.type*)* [[BAR_TYPES_ACCESSOR:@[^,]*]],
-// CHECK-LABEL: @_TMPV18field_type_vectors3Bar = global
+// CHECK-LABEL: @_TMnV18field_type_vectors3Bar = hidden constant
+// CHECK:         %swift.type** (%swift.type*)* [[BAR_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
+// CHECK-LABEL: @_TMPV18field_type_vectors3Bar = hidden global
 // -- There should be 5 words between the address point and the field type
 //    vector slot, with type %swift.type**
-// CHECK:         i64, { {{[^}]*}} }*, %swift.type*, i64, %swift.type*, %swift.type**
+// CHECK:         i64, i64, i64, i64, %swift.type*, %swift.type**
 struct Bar<T> {
   var y: Int
 }
 
-// CHECK-LABEL: @_TMnV18field_type_vectors3Bas = constant
-// CHECK:         %swift.type** (%swift.type*)* [[BAS_TYPES_ACCESSOR:@[^,]*]],
-// CHECK-LABEL: @_TMPV18field_type_vectors3Bas = global
+// CHECK-LABEL: @_TMnV18field_type_vectors3Bas = hidden constant
+// CHECK:         %swift.type** (%swift.type*)* [[BAS_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
+// CHECK-LABEL: @_TMPV18field_type_vectors3Bas = hidden global
 // -- There should be 7 words between the address point and the field type
 //    vector slot, with type %swift.type**
-// CHECK:         i64, { {{[^}]*}} }*, %swift.type*, i64, i64, %swift.type*, %swift.type*, %swift.type**
+// CHECK:         i64, i64, i64, i64, i64, %swift.type*, %swift.type*, %swift.type**
 struct Bas<T, U> {
   var foo: Foo
   var bar: Bar<T>
 }
 
-// CHECK-LABEL: @_TMnC18field_type_vectors3Zim = constant
-// CHECK:         %swift.type** (%swift.type*)* [[ZIM_TYPES_ACCESSOR:@[^,]*]],
-// CHECK-LABEL: @_TMPC18field_type_vectors3Zim = global
+// CHECK-LABEL: @_TMnC18field_type_vectors3Zim = hidden constant
+// CHECK:         %swift.type** (%swift.type*)* [[ZIM_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
+// CHECK-LABEL: @_TMPC18field_type_vectors3Zim = hidden global
 // -- There should be 14 words between the address point and the field type
 //    vector slot, with type %swift.type**
-// CHECK:         i64, %objc_class*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, { {{[^}]*}} }*, i8*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type**
+// CHECK:         i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, i64, i8*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type**
 class Zim<T, U> {
   var foo: Foo? = nil
   var bar: Bar<T>? = nil
@@ -47,12 +46,12 @@ sil_vtable Zim {}
 
 sil @_TFC18field_type_vectors3ZimcU___fMGS0_Q_Q0__FT_GS0_Q_Q0__ : $@convention(method) <T, U> (@owned Zim<T, U>) -> @owned Zim<T, U>
 
-// CHECK-LABEL: @_TMnC18field_type_vectors4Zang = constant
-// CHECK:         %swift.type** (%swift.type*)* [[ZANG_TYPES_ACCESSOR:@[^,]*]],
-// CHECK-LABEL: @_TMPC18field_type_vectors4Zang = global
+// CHECK-LABEL: @_TMnC18field_type_vectors4Zang = hidden constant
+// CHECK:         %swift.type** (%swift.type*)* [[ZANG_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
+// CHECK-LABEL: @_TMPC18field_type_vectors4Zang = hidden global
 // -- There should be 16 words between the address point and the field type
 //    vector slot, with type %swift.type**
-// CHECK:         i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, { {{[^}]*}} }*, i8*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type*, i64, %swift.type**
+// CHECK:         i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, i32, i16, i16, i32, i32, i64, i8*, %swift.type*, %swift.type*, i8*, i64, i64, i64, %swift.type*, i64, %swift.type**
 class Zang<V>: Zim<V, V> {
   var zung: Int = 0
 }
@@ -74,7 +73,7 @@ sil_vtable StorageQualified {}
 
 // CHECK:       [[FOO_TYPE_VECTOR_SLOT:@.*Foo.*]] = private global %swift.type** null
 
-// CHECK: define private %swift.type** [[FOO_TYPES_ACCESSOR]](%swift.type*)
+// CHECK: define{{( protected)?}} private %swift.type** [[FOO_TYPES_ACCESSOR]](%swift.type* %Foo)
 // CHECK:   [[EXISTING:%.*]] = load %swift.type**, %swift.type*** [[FOO_TYPE_VECTOR_SLOT]]
 // CHECK:   [[IS_NULL:%.*]] = icmp eq %swift.type** [[EXISTING]], null
 // CHECK:   br i1 [[IS_NULL]], label %[[BUILD_FIELD_TYPES:.*]], label %[[DONE:.*]]
@@ -82,33 +81,33 @@ sil_vtable StorageQualified {}
 // CHECK:   store {{.*}} @_TMSi
 // CHECK:   cmpxchg {{.*}} [[FOO_TYPE_VECTOR_SLOT]]
 
-// CHECK: define private %swift.type** [[BAR_TYPES_ACCESSOR]](%swift.type*)
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
+// CHECK: define{{( protected)?}} private %swift.type** [[BAR_TYPES_ACCESSOR]](%swift.type* %"Bar<T>")
+// CHECK:   [[T0:%.*]] = bitcast %swift.type* %"Bar<T>" to %swift.type***
 // -- 5 words between the address point and the slot
 // CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type**, %swift.type*** [[T0]], i32 5
 // CHECK:   load %swift.type**, %swift.type*** [[SLOT]], align 8
 // CHECK:   br
+// CHECK-NOT: load %swift.type*,
 // CHECK:   store {{.*}} @_TMSi
 
 
-// CHECK: define private %swift.type** [[BAS_TYPES_ACCESSOR]](%swift.type*)
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
+// CHECK: define{{( protected)?}} private %swift.type** [[BAS_TYPES_ACCESSOR]](%swift.type* %"Bas<T, U>")
+// CHECK:   [[T0:%.*]] = bitcast %swift.type* %"Bas<T, U>" to %swift.type***
 // -- 7 words between the address point and the slot
 // CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type**, %swift.type*** [[T0]], i32 7
 // CHECK:   load %swift.type**, %swift.type*** [[SLOT]], align 8
 // CHECK:   br
 // CHECK:   store {{.*}} @_TMfV18field_type_vectors3Foo
-// CHECK:   [[T:%.*]] = bitcast %swift.type* %T to i8*
-// CHECK:   call %swift.type* @swift_getGenericMetadata1({{.*}} @_TMPV18field_type_vectors3Bar {{.*}}, i8* [[T]])
+// CHECK:   call %swift.type* @_TMaV18field_type_vectors3Bar(%swift.type* %T)
 
-// CHECK: define private %swift.type** [[ZIM_TYPES_ACCESSOR]](%swift.type*)
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
+// CHECK: define{{( protected)?}} private %swift.type** [[ZIM_TYPES_ACCESSOR]](%swift.type* %"Zim<T, U>")
+// CHECK:   [[T0:%.*]] = bitcast %swift.type* %"Zim<T, U>" to %swift.type***
 // -- 14 words between the address point and the slot
 // CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type**, %swift.type*** [[T0]], i32 16
 // CHECK:   load %swift.type**, %swift.type*** [[SLOT]], align 8
 
-// CHECK: define private %swift.type** [[ZANG_TYPES_ACCESSOR]](%swift.type*)
-// CHECK:   [[T0:%.*]] = bitcast %swift.type* %0 to %swift.type***
+// CHECK: define{{( protected)?}} private %swift.type** [[ZANG_TYPES_ACCESSOR]](%swift.type* %"Zang<V>")
+// CHECK:   [[T0:%.*]] = bitcast %swift.type* %"Zang<V>" to %swift.type***
 // -- 16 words between the address point and the slot
 // CHECK:   [[SLOT:%.*]] = getelementptr inbounds %swift.type**, %swift.type*** [[T0]], i32 18
 // CHECK:   load %swift.type**, %swift.type*** [[SLOT]], align 8

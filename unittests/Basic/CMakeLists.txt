@@ -7,19 +7,20 @@ handle_gyb_sources(
 
 add_swift_unittest(SwiftBasicTests
   ADTTests.cpp
+  BlotMapVectorTest.cpp
   ClusteredBitVectorTest.cpp
   Demangle.cpp
   EditorPlaceholderTest.cpp
   EncodedSequenceTest.cpp
   FileSystemTests.cpp
-  SourceManager.cpp
-  TreeScopedHashTableTests.cpp
+  ImmutablePointerSetTests.cpp
+  PointerIntEnumTest.cpp
   PrefixMapTest.cpp
+  SourceManager.cpp
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
+  TreeScopedHashTableTests.cpp
   Unicode.cpp
-  BlotMapVectorTest.cpp
-
   ${generated_tests}
   )
 

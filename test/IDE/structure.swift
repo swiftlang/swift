@@ -9,20 +9,20 @@ class MyCls : OtherClass {
   var anotherBar : Int = 42
   class var cbar : Int = 0
 
-  // CHECK:   <ifunc>func <name>foo(<param>arg1</param>: Int, <param><name>name</name></param>: String, <param><name>param</name> par</param>: String)</name> {
+  // CHECK:   <ifunc>func <name>foo(<param>_ arg1: Int</param>, <param><name>name</name>: String</param>, <param><name>param</name> par: String</param>)</name> {
   // CHECK:     var abc
   // CHECK:     <if>if <elem-condexpr>1</elem-condexpr> <brace>{
   // CHECK:       <call><name>foo</name>(<param>1</param>, <param><name>name</name>:"test"</param>, <param><name>param</name>:"test2"</param>)</call>
   // CHECK:     }</brace>
   // CHECK:   }</ifunc>
-  func foo(arg1: Int, name: String, param par: String) {
+  func foo(_ arg1: Int, name: String, param par: String) {
     var abc
     if 1 {
       foo(1, name:"test", param:"test2")
     }
   }
 
-  // CHECK:   <ifunc><name>init (<param><name>x</name></param>: Int)</name></ifunc>
+  // CHECK:   <ifunc><name>init (<param><name>x</name>: Int</param>)</name></ifunc>
   init (x: Int)
 
   // CHECK:   <cfunc>class func <name>cfoo()</name></cfunc>
@@ -84,14 +84,14 @@ if var v = o, z = o where v > z {}
 // CHECK: <switch>switch <elem-expr>v</elem-expr> {
 // CHECK:   <case>case <elem-pattern>1</elem-pattern>: break;</case>
 // CHECK:   <case>case <elem-pattern>2</elem-pattern>, <elem-pattern>3</elem-pattern>: break;</case>
-// CHECK:   <case>case <elem-pattern><call><name>Foo</name>(<param>let x</param>, <param>let y</param>)</call> where x < y</elem-pattern>: break;</case>
+// CHECK:   <case>case <elem-pattern><call><name>Foo</name>(<param>var x</param>, <param>var y</param>)</call> where x < y</elem-pattern>: break;</case>
 // CHECK:   <case>case <elem-pattern>2 where <call><name>foo</name>()</call></elem-pattern>, <elem-pattern>3 where <call><name>bar</name>()</call></elem-pattern>: break;</case>
 // CHECK:   <case><elem-pattern>default</elem-pattern>: break;</case>
 // CHECK: }</switch>
 switch v {
   case 1: break;
   case 2, 3: break;
-  case Foo(let x, let y) where x < y: break;
+  case Foo(var x, var y) where x < y: break;
   case 2 where foo(), 3 where bar(): break;
   default: break;
 }
@@ -152,8 +152,8 @@ enum Rawness : Int {
   case Two = 2, Three = 3
 }
 
-// CHECK: <ffunc>func <name>rethrowFunc(<param>f</param>: () throws -> ())</name> rethrows {}</ffunc>
-func rethrowFunc(f: () throws -> ()) rethrows {}
+// CHECK: <ffunc>func <name>rethrowFunc(<param>_ f: () throws -> ()</param>)</name> rethrows {}</ffunc>
+func rethrowFunc(_ f: () throws -> ()) rethrows {}
 
 class NestedPoundIf{
     func foo1() {
@@ -180,7 +180,7 @@ class NestedPoundIf{
 // CHECK: <ifunc>func <name>foo3()</name> {}</ifunc>
 
 class A {
-  func foo(i : Int, animations: () -> ()) {}
+  func foo(_ i : Int, animations: () -> ()) {}
   func perform() {foo(5, animations: {})}
 // CHECK: <ifunc>func <name>perform()</name> {<call><name>foo</name>(<param>5</param>, <param><name>animations</name>: <brace>{}</brace></param>)</call>}</ifunc>
 }

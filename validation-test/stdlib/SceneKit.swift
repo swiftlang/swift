@@ -5,25 +5,33 @@
 // UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
+
+
 import SceneKit
 
 // SceneKit is only available on iOS 8.0 and above and on OS X 10.8 and above.
 
 var SceneKitTests = TestSuite("SceneKit")
 
-func bytesFromNSData(data: NSData) -> [UInt8] {
+func bytesFromNSData(_ data: NSData) -> [UInt8] {
   return Array(UnsafeBufferPointer(
     start: UnsafePointer<UInt8>(data.bytes),
     count: data.length))
+}
+
+func floatsFromNSData(_ data: NSData) -> [Float] {
+  return Array(UnsafeBufferPointer(
+    start: UnsafePointer<Float>(data.bytes),
+    count: data.length / sizeof(Float)))
 }
 
 if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Int") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, Int.max, 4, 5, 6 ],
-      primitiveType: .Triangles)
+      primitiveType: .triangles)
 
-    expectEqual(.Triangles, element.primitiveType)
+    expectEqual(.triangles, element.primitiveType)
     expectEqual(2, element.primitiveCount)
   #if arch(i386) || arch(arm)
     expectEqual(
@@ -35,7 +43,7 @@ if #available(iOS 8.0, *) {
         5,0,0,0,
         6,0,0,0,
       ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(4, element.bytesPerIndex)
   #elseif arch(x86_64) || arch(arm64)
     expectEqual(
@@ -47,7 +55,7 @@ if #available(iOS 8.0, *) {
         5,0,0,0, 0,0,0,0,
         6,0,0,0, 0,0,0,0,
       ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(8, element.bytesPerIndex)
   #else
     _portThisCode()
@@ -57,9 +65,9 @@ if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Int16") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, Int16.max, Int16.max/2, 5, 6 ] as [Int16],
-      primitiveType: .Triangles)
+      primitiveType: .triangles)
 
-    expectEqual(.Triangles, element.primitiveType)
+    expectEqual(.triangles, element.primitiveType)
     expectEqual(2, element.primitiveCount)
     expectEqual(
       [
@@ -70,67 +78,108 @@ if #available(iOS 8.0, *) {
         5, 0,
         6, 0
       ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(2, element.bytesPerIndex)
   }
 
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Triangles") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, UInt8.max, UInt8.max/2, 5, 6 ] as [UInt8],
-      primitiveType: .Triangles)
+      primitiveType: .triangles)
 
-    expectEqual(.Triangles, element.primitiveType)
+    expectEqual(.triangles, element.primitiveType)
     expectEqual(2, element.primitiveCount)
     expectEqual(
       [ 1, 2, UInt8.max, UInt8.max/2, 5, 6 ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(1, element.bytesPerIndex)
   }
 
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/TriangleStrip") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, 3, 4, 5, 6 ] as [UInt8],
-      primitiveType: .TriangleStrip)
+      primitiveType: .triangleStrip)
 
-    expectEqual(.TriangleStrip, element.primitiveType)
+    expectEqual(.triangleStrip, element.primitiveType)
     expectEqual(4, element.primitiveCount)
     expectEqual(
       [ 1, 2, 3, 4, 5, 6 ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(1, element.bytesPerIndex)
   }
 
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Line") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, 3, 4, 5, 6 ] as [UInt8],
-      primitiveType: .Line)
+      primitiveType: .line)
 
-    expectEqual(.Line, element.primitiveType)
+    expectEqual(.line, element.primitiveType)
     expectEqual(3, element.primitiveCount)
     expectEqual(
       [ 1, 2, 3, 4, 5, 6 ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(1, element.bytesPerIndex)
   }
 
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Point") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, 3, 4, 5, 6 ] as [UInt8],
-      primitiveType: .Point)
+      primitiveType: .point)
 
-    expectEqual(.Point, element.primitiveType)
+    expectEqual(.point, element.primitiveType)
     expectEqual(6, element.primitiveCount)
     expectEqual(
       [ 1, 2, 3, 4, 5, 6 ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(1, element.bytesPerIndex)
+  }
+
+  SceneKitTests.test("SCNGeometrySource.init(vertices:)") {
+    let source = SCNGeometrySource(vertices: [SCNVector3(1, 2, 3),
+                                              SCNVector3(4, 5, 6)])
+
+    expectEqual(source.semantic, SCNGeometrySourceSemanticVertex)
+    expectEqual(source.vectorCount, 2)
+    expectEqual(source.componentsPerVector, 3)
+
+    expectEqual(source.bytesPerComponent, sizeof(Float))
+    let positions = floatsFromNSData(source.data as NSData)
+    expectEqual(positions[2], 3)
+    expectEqual(positions[4], 5)
+  }
+
+  SceneKitTests.test("SCNGeometrySource.init(normals:)") {
+    let source = SCNGeometrySource(normals: [SCNVector3(1, 2, 3),
+                                             SCNVector3(4, 5, 6)])
+
+    expectEqual(source.semantic, SCNGeometrySourceSemanticNormal)
+    expectEqual(source.vectorCount, 2)
+    expectEqual(source.componentsPerVector, 3)
+
+    expectEqual(source.bytesPerComponent, sizeof(Float))
+    let normals = floatsFromNSData(source.data as NSData)
+    expectEqual(normals[2], 3)
+    expectEqual(normals[4], 5)
+  }
+
+  SceneKitTests.test("SCNGeometrySource.init(textureCoordinates:)") {
+    let source = SCNGeometrySource(textureCoordinates: [CGPoint(x: 1, y: 2),
+                                                        CGPoint(x: 4, y: 5)])
+
+    expectEqual(source.semantic, SCNGeometrySourceSemanticTexcoord)
+    expectEqual(source.vectorCount, 2)
+    expectEqual(source.componentsPerVector, 2)
+
+    let uvs = floatsFromNSData(source.data as NSData)
+    expectEqual(uvs[1], 2)
+    expectEqual(uvs[3], 5)
   }
 
   SceneKitTests.test("SCNSceneSource.entryWithIdentifier(uid:withClass:)")
     .skip(.iOSAny("does not support COLLADA files"))
     .skip(.iOSSimulatorAny("does not support COLLADA files"))
-    .skip(.TVOSAny("does not support COLLADA files"))
-    .skip(.TVOSSimulatorAny("does not support COLLADA files"))
+    .skip(.tvOSAny("does not support COLLADA files"))
+    .skip(.tvOSSimulatorAny("does not support COLLADA files"))
     .skip(.watchOSAny("does not support COLLADA files"))
     .skip(.watchOSSimulatorAny("does not support COLLADA files"))
     .code {
@@ -296,12 +345,12 @@ if #available(iOS 8.0, *) {
       " </scene>" +
       "</COLLADA>"
 
-    let sceneData = sceneDescription.dataUsingEncoding(
-      NSUTF8StringEncoding,
+    let sceneData = sceneDescription.data(
+      using: .utf8,
       allowLossyConversion: true)!
-    let sceneSource = SCNSceneSource(data: sceneData, options: nil)!
+    let sceneSource = SCNSceneSource(data: sceneData as Data, options: nil)!
 
-    if true {
+    do {
       var unarchivedPlaneGeometry =
         sceneSource.entryWithIdentifier("plane", withClass: SCNGeometry.self)
       var unarchivedPlaneNode_nil =
@@ -313,7 +362,7 @@ if #available(iOS 8.0, *) {
       expectEmpty(unarchivedPlaneNode_nil)
     }
 
-    if true {
+    do {
       var unarchivedBoxGeometry =
         sceneSource.entryWithIdentifier("box", withClass: SCNGeometry.self)
       var unarchivedBoxGeometry_nil =
@@ -325,7 +374,7 @@ if #available(iOS 8.0, *) {
       expectEmpty(unarchivedBoxGeometry_nil)
     }
 
-    if true {
+    do {
       var unarchivedBoxNode =
         sceneSource.entryWithIdentifier("box-node", withClass: SCNNode.self)
       var unarchivedBoxNode_nil =
@@ -335,6 +384,45 @@ if #available(iOS 8.0, *) {
       expectType(Optional<SCNNode>.self, &unarchivedBoxNode)
 
       expectEmpty(unarchivedBoxNode_nil)
+    }
+  }
+
+  if #available(OSX 10.10, *) {
+    SceneKitTests.test("SCNBoundingVolume.boundingBox/getter") {
+      let box = SCNBox(width: 42, height: 0.5, length: 1337, chamferRadius: 0)
+      let boundingBox = box.boundingBox
+
+      expectEqual(boundingBox.max.x, 21)
+      expectEqual(boundingBox.max.x, -boundingBox.min.x)
+      expectEqual(boundingBox.max.y, 0.25)
+      expectEqual(boundingBox.max.y, -boundingBox.min.y)
+      expectEqual(boundingBox.max.z, 668.5)
+      expectEqual(boundingBox.max.z, -boundingBox.min.z)
+    }
+
+    SceneKitTests.test("SCNBoundingVolume.boundingBox/setter") {
+      let max = SCNVector3(42, 0.414, 1337)
+      let min = SCNVector3(-42, -0.414, -1337)
+      let box = SCNBox(width: 1, height: 2, length: 3, chamferRadius: 0)
+      let boxNode = SCNNode(geometry: box)
+
+      boxNode.boundingBox = (min, max)
+      let nodeBoundingBox = boxNode.boundingBox
+
+      expectEqual(nodeBoundingBox.max.x, max.x)
+      expectEqual(nodeBoundingBox.min.x, -max.x)
+      expectEqual(nodeBoundingBox.max.y, max.y)
+      expectEqual(nodeBoundingBox.min.y, -max.y)
+      expectEqual(nodeBoundingBox.max.z, max.z)
+      expectEqual(nodeBoundingBox.min.z, -max.z)
+    }
+
+    SceneKitTests.test("SCNBoundingVolume.boundingSphere/getter") {
+      let box = SCNBox(width: 2 * 2, height: 3 * 2, length: 6 * 2, chamferRadius: 0)
+      let boundingSphere = box.boundingSphere
+
+      // 2^2 + 3^2 + 6^2 = 7^2
+      expectEqual(boundingSphere.radius, 7.0)
     }
   }
 }

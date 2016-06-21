@@ -8,27 +8,27 @@ enum Medal {
 struct Steroids {}
 
 protocol Gymnast {
-  func backflip(angle: Double) -> Self
-  func compete() -> Medal -> Self
-  func scandal()(s: Steroids) -> ()
+  func backflip(_ angle: Double) -> Self
+  func compete() -> (Medal) -> Self
+  func scandal() -> (Steroids) -> ()
   static func currentYear() -> Int
 }
 
 final class Archimedes : Gymnast {
-  func backflip(angle: Double) -> Self {
+  func backflip(_ angle: Double) -> Self {
     print(angle >= 360 ? "Not in a thousand years" : "Ok")
     return self
   }
 
-  func compete() -> Medal -> Archimedes {
+  func compete() -> (Medal) -> Archimedes {
     return { (m: Medal) in
       print(m == .Gold ? "We won gold!" : "Try again next time")
       return Archimedes()
     }
   }
 
-  func scandal()(s: Steroids) -> () {
-    print("Archimedes don't do that")
+  func scandal() -> (Steroids) -> () {
+    return { s in print("Archimedes don't do that") }
   }
 
   static func currentYear() -> Int {
@@ -40,30 +40,30 @@ final class Archimedes : Gymnast {
 // Protocol-constrained archetype
 ////
 
-func genericOlympicGames<T: Gymnast>(g1: T) -> T {
-  let f1: T -> Double -> T = T.backflip
-  let f2: Double -> T = f1(g1)
+func genericOlympicGames<T: Gymnast>(_ g1: T) -> T {
+  let f1: (T) -> (Double) -> T = T.backflip
+  let f2: (Double) -> T = f1(g1)
   let g2: T = f2(180)
 
-  let f3: Double -> T = g2.backflip
+  let f3: (Double) -> T = g2.backflip
   let g3: T = f3(360)
 
-  let f4: T -> () -> Medal -> T = T.compete
-  let f5: () -> Medal -> T = f4(g3)
-  let f6: Medal -> T = f5()
+  let f4: (T) -> () -> (Medal) -> T = T.compete
+  let f5: () -> (Medal) -> T = f4(g3)
+  let f6: (Medal) -> T = f5()
   let g4: T = f6(Medal.Silver)
 
-  let f7: () -> Medal -> T = g4.compete
-  let f8: Medal -> T = f7()
+  let f7: () -> (Medal) -> T = g4.compete
+  let f8: (Medal) -> T = f7()
   let g5: T = f8(Medal.Gold)
 
-  let f9: T -> () -> Steroids -> () = T.scandal
-  let f10: () -> Steroids -> () = f9(g5)
-  let f11: Steroids -> () = f10()
+  let f9: (T) -> () -> (Steroids) -> () = T.scandal
+  let f10: () -> (Steroids) -> () = f9(g5)
+  let f11: (Steroids) -> () = f10()
   f11(Steroids())
 
-  let f12: () -> Steroids -> () = g5.scandal
-  let f13: Steroids -> () = f12()
+  let f12: () -> (Steroids) -> () = g5.scandal
+  let f13: (Steroids) -> () = f12()
   f13(Steroids())
 
   let f14: () -> Int = T.currentYear
@@ -91,7 +91,7 @@ genericOlympicGames(Archimedes())
 // Existential
 ////
 
-func olympicGames(g1: Gymnast) -> Gymnast {
+func olympicGames(_ g1: Gymnast) -> Gymnast {
   // FIXME -- <rdar://problem/21391055>
 #if false
   let f1: Double -> Gymnast = g1.backflip
@@ -101,8 +101,8 @@ func olympicGames(g1: Gymnast) -> Gymnast {
   let g4: Gymnast = f2()(Medal.Gold)
 #endif
 
-  let f3: () -> Steroids -> () = g1.scandal
-  let f4: Steroids -> () = f3()
+  let f3: () -> (Steroids) -> () = g1.scandal
+  let f4: (Steroids) -> () = f3()
   f4(Steroids())
 
   let f5: () -> Int = g1.dynamicType.currentYear

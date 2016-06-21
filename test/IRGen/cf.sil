@@ -9,9 +9,9 @@
 
 // CHECK: [[REFRIGERATOR_NAME:@.*]] = private unnamed_addr constant [20 x i8] c"CSo14CCRefrigerator\00"
 
-// CHECK-32: @_TMCSo14CCRefrigerator = linkonce_odr hidden global { {{.*}} } { i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i32 0, i32 0), [[TYPE]]* null, i32 0, i8** @_TWVBO, i32 16, [[TYPE]]* null, i8* null, i8* null, i8* null }
+// CHECK-32: @_TMCSo14CCRefrigerator = linkonce_odr hidden global <{ {{.*}} }> <{ i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i32 0, i32 0), [[TYPE]]* null, i32 0, i8** @_TWVBO, i32 16, [[TYPE]]* null, i8* null, i8* null, i8* null }>
 
-// CHECK-64: @_TMCSo14CCRefrigerator = linkonce_odr hidden global { {{.*}} } { i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i64 0, i64 0), [[TYPE]]* null, i64 0, i8** @_TWVBO, i64 16, [[TYPE]]* null, i8* null, i8* null, i8* null }
+// CHECK-64: @_TMCSo14CCRefrigerator = linkonce_odr hidden global <{ {{.*}} }> <{ i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i64 0, i64 0), [[TYPE]]* null, i64 0, i8** @_TWVBO, i64 16, [[TYPE]]* null, i8* null, i8* null, i8* null }>
 
 sil_stage canonical
 
@@ -23,12 +23,12 @@ sil public_external @generic_function : $@convention(thin) <T where T : AnyObjec
 sil @call_generic : $@convention(thin) (@owned CCRefrigerator) -> () {
 bb0(%0 : $CCRefrigerator):
   %1 = function_ref @generic_function : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
-  %2 = apply %1<CCRefrigeratorRef>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
+  %2 = apply %1<CCRefrigerator>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
   %3 = tuple ()
   return %3 : $()
 }
 
-// CHECK:    define void @call_generic([[REFRIGERATOR]]*) {{.*}} {
+// CHECK:    define{{( protected)?}} void @call_generic([[REFRIGERATOR]]*) {{.*}} {
 // CHECK:      [[T0:%.*]] = bitcast [[REFRIGERATOR]]* %0 to [[OBJC]]*
 // CHECK-NEXT: [[T1:%.*]] = call [[TYPE]]* @_TMaCSo14CCRefrigerator()
 // CHECK-NEXT: call void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T1]])

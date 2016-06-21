@@ -1,8 +1,8 @@
-//===- Logging.h - Logging Interface ----------------------------*- C++ -*-===//
+//===--- Logging.h - Logging Interface --------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -87,7 +87,7 @@ public:
   Logger &operator<<(const char *Str) { if (Str) LogOS << Str; return *this; }
   Logger &operator<<(unsigned long N) { LogOS << N; return *this; }
   Logger &operator<<(long N) { LogOS << N ; return *this; }
-  Logger &operator<<(unsigned int N) { LogOS << N; return *this; }
+  Logger &operator<<(unsigned N) { LogOS << N; return *this; }
   Logger &operator<<(int N) { LogOS << N; return *this; }
   Logger &operator<<(char C) { LogOS << C; return *this; }
   Logger &operator<<(unsigned char C) { LogOS << C; return *this; }
@@ -109,9 +109,9 @@ public:
 #define LOG_FUNC_SECTION_WARN LOG_FUNC_SECTION(Warning)
 
 #define LOG(NAME, LEVEL, msg) LOG_SECTION(NAME, LEVEL) \
-  do { *Log << msg; } while(0)
+  do { *Log << msg; } while (0)
 #define LOG_FUNC(LEVEL, msg) LOG_FUNC_SECTION(LEVEL) \
-  do { *Log << msg; } while(0)
+  do { *Log << msg; } while (0)
 #define LOG_WARN(NAME, msg) LOG(NAME, Warning, msg)
 #define LOG_WARN_FUNC(msg) LOG_FUNC(Warning, msg)
 #define LOG_INFO_FUNC(PRIO, msg) LOG_FUNC(Info##PRIO##Prio, msg)

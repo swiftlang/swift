@@ -1,47 +1,39 @@
-// RUN: %target-swift-frontend -verify -parse %s
+// RUN: %target-swift-frontend -parse %s
 
 // REQUIRES: objc_interop
 
 import Dispatch
 
-func getAnyValue<T>(opt: T?) -> T { return opt! }
+func getAnyValue<T>(_ opt: T?) -> T { return opt! }
 
 // dispatch/io.h
-_ = dispatch_io_create(DISPATCH_IO_STREAM, 0, getAnyValue(nil), getAnyValue(nil))
-dispatch_io_close(getAnyValue(nil), DISPATCH_IO_STOP)
-dispatch_io_set_interval(getAnyValue(nil), 0, DISPATCH_IO_STRICT_INTERVAL)
+let io = DispatchIO(type: .stream, fileDescriptor: 0, queue: DispatchQueue.main, cleanupHandler: { (error: Int32) -> () in fatalError() })
+io.close(flags: .stop)
+io.setInterval(interval: 0, flags: .strictInterval)
 
 // dispatch/queue.h
-_ = dispatch_queue_create("", DISPATCH_QUEUE_SERIAL)
-_ = dispatch_queue_create("", DISPATCH_QUEUE_CONCURRENT)
-dispatch_set_target_queue(getAnyValue(nil), DISPATCH_TARGET_QUEUE_DEFAULT)
-_ = dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL)
-_ = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0)
-_ = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0)
-
-// QOS_CLASS_DEFAULT is not always available
-if #available(iOS 8.0, OSX 10.10, *) {
-  _ = dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0)
+let q = DispatchQueue(label: "", attributes: .serial)
+_ = DispatchQueue(label: "", attributes: .concurrent)
+_ = q.label
+if #available(OSX 10.10, iOS 8.0, *) {
+	_ = DispatchQueue.global(attributes: .qosUserInteractive)
+	_ = DispatchQueue.global(attributes: .qosBackground)
+	_ = DispatchQueue.global(attributes: .qosDefault)	
 }
 
 // dispatch/source.h
-dispatch_source_merge_data(getAnyValue(nil), DISPATCH_MACH_SEND_DEAD)
-dispatch_source_merge_data(getAnyValue(nil), DISPATCH_MEMORYPRESSURE_NORMAL)
-dispatch_source_merge_data(getAnyValue(nil), DISPATCH_PROC_EXIT)
-dispatch_source_merge_data(getAnyValue(nil), DISPATCH_PROC_SIGNAL)
-dispatch_source_merge_data(getAnyValue(nil), DISPATCH_VNODE_DELETE)
-dispatch_source_merge_data(getAnyValue(nil), DISPATCH_TIMER_STRICT)
-_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_ADD, 0, 0, getAnyValue(nil))
-_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_OR, 0, 0, getAnyValue(nil))
-_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_MACH_SEND, 0, 0, getAnyValue(nil))
-_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_MACH_RECV, 0, 0, getAnyValue(nil))
-_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_MEMORYPRESSURE, 0, 0, getAnyValue(nil))
-_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_PROC, 0, 0, getAnyValue(nil))
-_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, 0, 0, getAnyValue(nil))
-_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_SIGNAL, 0, 0, getAnyValue(nil))
-_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, getAnyValue(nil))
-_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_VNODE, 0, 0, getAnyValue(nil))
-_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_WRITE, 0, 0, getAnyValue(nil))
+_ = DispatchSource.userDataAdd()
+_ = DispatchSource.userDataOr()
+_ = DispatchSource.machSend(port: mach_port_t(0), eventMask: [])
+_ = DispatchSource.machReceive(port: mach_port_t(0))
+_ = DispatchSource.memoryPressure(eventMask: [])
+_ = DispatchSource.process(identifier: 0, eventMask: [])
+_ = DispatchSource.read(fileDescriptor: 0)
+_ = DispatchSource.signal(signal: SIGINT)
+_ = DispatchSource.timer()
+_ = DispatchSource.fileSystemObject(fileDescriptor: 0, eventMask: [])
+_ = DispatchSource.write(fileDescriptor: 0)
 
 // dispatch/time.h
-_ = dispatch_time(DISPATCH_TIME_FOREVER, 0)
+_ = DispatchTime.now()
+_ = DispatchTime.distantFuture

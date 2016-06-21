@@ -10,11 +10,11 @@ class B : A {
   override func j() -> Int { return 0 }
   func j() -> Float { return 0.0 }
   func k() -> Float { return 0.0 }
-  override func l(l: Int) {}
-  override func l(l: Float) {}
-  override func m(x: Int) {}
-  func m(x: Float) {} // not an override of anything
-  func n(x: Float) {}
+  override func l(_ l: Int) {}
+  override func l(_ l: Float) {}
+  override func m(_ x: Int) {}
+  func m(_ x: Float) {} // not an override of anything
+  func n(_ x: Float) {}
   override subscript(i : Int) -> Int {
     get {}
     set {}
@@ -28,11 +28,11 @@ class A {
   func h() -> (A, A) { return (B(), B()) }
   func j() -> Int { return 0 }
   func k() -> Int { return 0 }
-  func l(l: Int) {}
-  func l(l: Float) {}
-  func m(x: Int) {}
-  func m(y y: Int) {}
-  func n(x: Int) {}
+  func l(_ l: Int) {}
+  func l(_ l: Float) {}
+  func m(_ x: Int) {}
+  func m(y: Int) {}
+  func n(_ x: Int) {}
   subscript(i : Int) -> Int {
     get {}
     set {}
@@ -49,11 +49,11 @@ func f() {
 
 class C<T> {
   init() { }
-  func f(v: T) -> T { return v }
+  func f(_ v: T) -> T { return v }
 }
 class D : C<Int> {
   override init() { super.init() }
-  override func f(v: Int) -> Int { return v+1 }
+  override func f(_ v: Int) -> Int { return v+1 }
 }
 func f2() {
   let x = D()
@@ -61,15 +61,15 @@ func f2() {
 }
 
 class E<T> {
-  func f(v: T) -> T { return v }
+  func f(_ v: T) -> T { return v }
 }
 class F : E<Int> {}
 class G : F {
-    override func f(v: Int) -> Int { return v+1 }
+    override func f(_ v: Int) -> Int { return v+1 }
 }
 
 // Explicit downcasting
-func test_explicit_downcasting(f: F, ei: E<Int>) {
+func test_explicit_downcasting(_ f: F, ei: E<Int>) {
   var g = f as! G
   g = ei as! G
   _ = g
@@ -77,16 +77,11 @@ func test_explicit_downcasting(f: F, ei: E<Int>) {
 
 // Type and instance functions with the same name
 class H {
-  func f(x: Int) { }
-  class func f(x: Int) { }
+  func f(_ x: Int) { }
+  class func f(_ x: Int) { }
 }
 
 class HDerived : H {
-  override func f(x: Int) { }
-  override class func f(x: Int) { }
-}
-
-// Generic class locally defined in non-generic function (rdar://problem/20116710)
-func f3() {
-  class B<T> {}
+  override func f(_ x: Int) { }
+  override class func f(_ x: Int) { }
 }

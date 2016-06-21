@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb -DunicodeGraphemeBreakPropertyFile=%S/../../utils/UnicodeData/GraphemeBreakProperty.txt -DunicodeGraphemeBreakTestFile=%S/../../utils/UnicodeData/GraphemeBreakTest.txt %s -o %t/UnicodeTrie.swift
-// RUN: %S/../../utils/line-directive %t/UnicodeTrie.swift -- %target-build-swift %t/UnicodeTrie.swift -o %t/a.out -g -Xfrontend -disable-access-control
-// RUN: %S/../../utils/line-directive %t/UnicodeTrie.swift -- %target-run %t/a.out
+// RUN: rm -rf %t && mkdir -p %t && %gyb -DunicodeGraphemeBreakPropertyFile=%utils/UnicodeData/GraphemeBreakProperty.txt -DunicodeGraphemeBreakTestFile=%utils/UnicodeData/GraphemeBreakTest.txt %s -o %t/UnicodeTrie.swift
+// RUN: %line-directive %t/UnicodeTrie.swift -- %target-build-swift %t/UnicodeTrie.swift -o %t/a.out -g -Xfrontend -disable-access-control
+// RUN: %line-directive %t/UnicodeTrie.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
@@ -29,13 +29,14 @@ grapheme_cluster_break_property_table = \
 
 import SwiftPrivate
 import StdlibUnittest
+import StdlibCollectionUnittest
 import Darwin
 import Foundation
 
 var graphemeBreakPropertyTable = [
 // 'as Int' annotations are needed to help prevent the type-checker from
 // blowing the stack. <rdar://problem/17539704>
-% for start_code_point,end_code_point,value in grapheme_cluster_break_property_table.property_value_ranges:
+% for start_code_point, end_code_point, value in grapheme_cluster_break_property_table.property_value_ranges:
   (${start_code_point} as Int, ${end_code_point} as Int, _GraphemeClusterBreakPropertyValue.${value}),
 % end
 ]
@@ -48,8 +49,9 @@ UnicodeTrie.test("_UnicodeGraphemeClusterBreakPropertyTrie") {
 
   var trie = _UnicodeGraphemeClusterBreakPropertyTrie()
 
-  var expected = [_GraphemeClusterBreakPropertyValue](count: 0x110000,
-      repeatedValue: _GraphemeClusterBreakPropertyValue.Other)
+  var expected = [_GraphemeClusterBreakPropertyValue](
+    repeating: _GraphemeClusterBreakPropertyValue.Other,
+    count: 0x110000)
   for (startCodePoint, endCodePoint, value) in graphemeBreakPropertyTable {
     for cp in startCodePoint...endCodePoint {
       expected[cp] = value
@@ -92,15 +94,20 @@ class NonContiguousNSString : NSString {
 
   convenience init(_ scalars: [UInt32]) {
     var encoded: [UInt16] = []
-    var g = scalars.generate()
+    let iter = scalars.makeIterator()
     let output: (UInt16) -> Void = { encoded.append($0) }
-    let hadError =
-      transcode(UTF32.self, UTF16.self, g, output, stopOnError: true)
+    let hadError = transcode(
+      iter,
+      from: UTF32.self,
+      to: UTF16.self,
+      stoppingOnError: true,
+      sendingOutputTo: output)
     expectFalse(hadError)
     self.init(encoded)
   }
 
-  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+  @objc(copyWithZone:)
+  override func copy(with zone: NSZone?) -> AnyObject {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -110,7 +117,7 @@ class NonContiguousNSString : NSString {
     return _value.count
   }
 
-  @objc override func characterAtIndex(index: Int) -> unichar {
+  @objc override func character(at index: Int) -> unichar {
     return _value[index]
   }
 
@@ -120,14 +127,14 @@ class NonContiguousNSString : NSString {
 /// Verify that extended grapheme cluster boundaries in `subject` occur at
 /// positions specified in `expectedBoundaries`.
 func checkGraphemeClusterSegmentation(
-    expectedBoundaries: [Int], _ subject: String, _ stackTrace: SourceLocStack
+    _ expectedBoundaries: [Int], _ subject: String, _ stackTrace: SourceLocStack
 ) {
   var actualBoundaries: [Int] = [ 0 ]
   var unicodeScalarCount = 0
   for c in subject.characters {
     let currentClusterSize = String(c).unicodeScalars.count
     unicodeScalarCount += currentClusterSize
-    actualBoundaries += [ unicodeScalarCount ]
+    actualBoundaries += [unicodeScalarCount]
   }
   expectEqual(
     expectedBoundaries, actualBoundaries,
@@ -139,7 +146,7 @@ func checkGraphemeClusterSegmentation(
 }
 
 func checkGraphemeClusterSegmentation(
-    expectedBoundaries: [Int], scalars: [UInt32], _ stackTrace: SourceLocStack
+    _ expectedBoundaries: [Int], scalars: [UInt32], _ stackTrace: SourceLocStack
 ) {
   let subject = NonContiguousNSString(scalars) as String
   checkGraphemeClusterSegmentation(expectedBoundaries, subject,
@@ -147,7 +154,7 @@ func checkGraphemeClusterSegmentation(
 }
 
 func checkGraphemeClusterSegmentation(
-    expectedBoundaries: [Int], codeUnits: [UInt16], _ stackTrace: SourceLocStack
+    _ expectedBoundaries: [Int], codeUnits: [UInt16], _ stackTrace: SourceLocStack
 ) {
   let subject = NonContiguousNSString(codeUnits) as String
   checkGraphemeClusterSegmentation(expectedBoundaries, subject,
@@ -158,12 +165,12 @@ UnicodeTrie.test("GraphemeClusterSegmentation/UnicodeSpec") {
   // Test segmentation algorithm using test data from the Unicode
   // specification.
 
-% for code_points,expected_boundaries in grapheme_cluster_break_tests:
-  if true {
+% for code_points, expected_boundaries in grapheme_cluster_break_tests:
+  do {
     let scalars: [UInt32] =
-        [ ${", ".join([ str(cp) for cp in code_points ])} ]
+        [ ${", ".join([str(cp) for cp in code_points])} ]
     let expectedBoundaries: [Int] =
-        [ ${", ".join([ str(x) for x in expected_boundaries ])} ]
+        [ ${", ".join([str(x) for x in expected_boundaries])} ]
     checkGraphemeClusterSegmentation(expectedBoundaries, scalars: scalars,
         SourceLocStack().withCurrentLoc())
   }

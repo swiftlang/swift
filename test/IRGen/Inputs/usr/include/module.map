@@ -11,3 +11,7 @@ module CoreCooling {
 module Foundation { 
   header "BridgeTestFoundation.h" 
 }
+
+module CoreFoundation {
+  header "BridgeTestCoreFoundation.h"
+}

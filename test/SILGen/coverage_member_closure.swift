@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-sil -module-name coverage_member_closure %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sil -module-name coverage_member_closure %s | FileCheck %s
 
 class C {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_member_closure.C.__allocating_init
@@ -10,6 +10,6 @@ class C {
 
   // Closures in members show up at the end of the constructor's map.
   // CHECK-NOT: sil_coverage_map
-  // CHECK: [[@LINE+1]]:55 -> [[@LINE+1]]:77 : 2
-  var completionHandler: (String, [String]) -> Void = {(foo, bar) in return}
+  // CHECK: [[@LINE+1]]:55 -> [[@LINE+1]]:79 : 2
+  var completionHandler: (String, [String]) -> Void = { (foo, bar) in return }
 }

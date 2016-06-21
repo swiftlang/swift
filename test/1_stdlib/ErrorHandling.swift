@@ -7,13 +7,14 @@
 
 import StdlibUnittest
 
+
 var NoisyCount = 0
 
 class Noisy {
-  init() { NoisyCount++ }
-  deinit { NoisyCount-- }
+  init() { NoisyCount += 1 }
+  deinit { NoisyCount -= 1 }
 }
-enum SillyError: ErrorType { case JazzHands }
+enum SillyError : ErrorProtocol { case JazzHands }
 
 var ErrorHandlingTests = TestSuite("ErrorHandling")
 
@@ -72,7 +73,7 @@ ErrorHandlingTests.test("ErrorHandling/Optional.map and .flatMap") {
   do {
     let y: String? = try x.flatMap {(n: Int) -> String? in
       throw SillyError.JazzHands
-      return .Some("\(n)")
+      return .some("\(n)")
     }
     expectUnreachable()
   } catch {}
@@ -94,9 +95,9 @@ ErrorHandlingTests.test("ErrorHandling/withCString extends lifetime") {
   // TODO: Some way to check string was deallocated?
 }
 
-ErrorHandlingTests.test("ErrorHandling/indexOf") {
+ErrorHandlingTests.test("ErrorHandling/index(where:)") {
   do {
-    let _: Int? = try [1, 2, 3].indexOf {
+    let _: Int? = try [1, 2, 3].index {
       throw SillyError.JazzHands
       return $0 == $0
     }
@@ -127,7 +128,7 @@ ErrorHandlingTests.test("ErrorHandling/forEach") {
   var loopCount = 0
   do {
     try [1, 2, 3].forEach {
-      ++loopCount
+      loopCount += 1
       if $0 == 2 {
         throw SillyError.JazzHands
       }
@@ -143,11 +144,11 @@ ErrorHandlingTests.test("ErrorHandling/Optional flatMap") {
   var loopCount = 0
   do {
     let _: [Int] = try [1, 2, 3].flatMap {
-      ++loopCount
+      loopCount += 1
       if $0 == 2 {
         throw SillyError.JazzHands
       }
-      return .Some($0)
+      return .some($0)
     }
     expectUnreachable()
   } catch {}
@@ -159,11 +160,11 @@ ErrorHandlingTests.test("ErrorHandling/Array flatMap") {
   var loopCount = 0
   do {
     let _: [Int] = try [1, 2, 3].flatMap {(x) -> [Int] in
-      ++loopCount
+      loopCount += 1
       if x == 2 {
         throw SillyError.JazzHands
       }
-      return Array(count: x, repeatedValue: x)
+      return Array(repeating: x, count: x)
     }
     expectUnreachable()
   } catch {}
@@ -171,9 +172,9 @@ ErrorHandlingTests.test("ErrorHandling/Array flatMap") {
   expectEqual(loopCount, 2)
 }
 
-ErrorHandlingTests.test("ErrorHandling/minElement") {
+ErrorHandlingTests.test("ErrorHandling/min") {
   do {
-    let _: Int? = try [1, 2, 3].minElement { _, _ in
+    let _: Int? = try [1, 2, 3].min { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -181,7 +182,7 @@ ErrorHandlingTests.test("ErrorHandling/minElement") {
   } catch {}
 
   do {
-    let _: Int? = try [1, 2, 3].maxElement { _, _ in
+    let _: Int? = try [1, 2, 3].max { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -189,9 +190,9 @@ ErrorHandlingTests.test("ErrorHandling/minElement") {
   } catch {}
 }
 
-ErrorHandlingTests.test("ErrorHandling/startsWith") {
+ErrorHandlingTests.test("ErrorHandling/starts(with:)") {
   do {
-    let x: Bool = try [1, 2, 3].startsWith([1, 2]) { _, _ in
+    let x: Bool = try [1, 2, 3].starts(with: [1, 2]) { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -209,9 +210,9 @@ ErrorHandlingTests.test("ErrorHandling/elementsEqual") {
   } catch {}
 }
 
-ErrorHandlingTests.test("ErrorHandling/lexicographicalCompare") {
+ErrorHandlingTests.test("ErrorHandling/lexicographicallyPrecedes(_:)") {
   do {
-    let x: Bool = try [1, 2, 3].lexicographicalCompare([0, 2, 3]) { _, _ in
+    let x: Bool = try [1, 2, 3].lexicographicallyPrecedes([0, 2, 3]) { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -235,7 +236,7 @@ ErrorHandlingTests.test("ErrorHandling/reduce") {
     let x: Int = try [1, 2, 3, 4, 5].reduce(0, combine: {
       (x: Int, y: Int) -> Int
     in
-      ++loopCount
+      loopCount += 1
       var total = x + y
       if total > 5 {
         throw SillyError.JazzHands
@@ -287,7 +288,7 @@ ErrorHandlingTests.test("ErrorHandling/Sequence map") {
         if loopCount == throwAtCount {
           throw SillyError.JazzHands
         }
-        ++loopCount
+        loopCount += 1
         return Noisy()
       }
       expectEqual(NoisyCount, initialCount + 3)
@@ -308,7 +309,7 @@ ErrorHandlingTests.test("ErrorHandling/Sequence filter") {
           if loopCount == throwAtCount {
             throw SillyError.JazzHands
           }
-          ++loopCount
+          loopCount += 1
           return condition
         }
         expectEqual(NoisyCount, initialCount + sequence.count)
@@ -329,7 +330,7 @@ ErrorHandlingTests.test("ErrorHandling/Collection map") {
         if loopCount == throwAtCount {
           throw SillyError.JazzHands
         }
-        ++loopCount
+        loopCount += 1
         return Noisy()
       }
       expectEqual(NoisyCount, initialCount + 3)

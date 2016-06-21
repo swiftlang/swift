@@ -1,8 +1,8 @@
-//===--- LineList.h - Data structures for Markup parsing ------------------===//
+//===--- LineList.h - Data structures for Markup parsing --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_MARKUP_LINELIST_H
-#define LLVM_MARKUP_LINELIST_H
+#ifndef SWIFT_MARKUP_LINELIST_H
+#define SWIFT_MARKUP_LINELIST_H
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/SourceLoc.h"
 
-namespace llvm {
+namespace swift {
 namespace markup {
 
 class MarkupContext;
@@ -76,6 +76,6 @@ public:
 };
 
 } // namespace markup
-} // namespace llvm
+} // namespace swift
 
-#endif // LLVM_MARKUP_LINELIST_H
+#endif // SWIFT_MARKUP_LINELIST_H

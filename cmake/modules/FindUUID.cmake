@@ -8,7 +8,7 @@ find_path(UUID_INCLUDE_DIR uuid/uuid.h
     HINTS ${PC_UUID_INCLUDEDIR} ${PC_UUID_INCLUDE_DIRS})
 set(UUID_INCLUDE_DIRS ${UUID_INCLUDE_DIR})
 
-# On OSX we don't need the library
+# On OS X we don't need the library
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(UUID_REQUIRED UUID_INCLUDE_DIR)
 else()

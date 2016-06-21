@@ -11,7 +11,7 @@ sil_vtable C {}
 
 @objc protocol ObjC {}
 
-// X86_64-LABEL: define void @retain_release_bridge_object
+// X86_64-LABEL: define{{( protected)?}} void @retain_release_bridge_object
 // X86_64:         call [[BRIDGE:%swift.bridge\*]] @swift_bridgeObjectRetain
 // X86_64:         call void @swift_bridgeObjectRelease
 sil @retain_release_bridge_object : $(Builtin.BridgeObject) -> () {
@@ -21,7 +21,7 @@ entry(%b : $Builtin.BridgeObject):
   return undef : $()
 }
 
-// X86_64-LABEL: define %swift.bridge* @convert_to_bridge_object
+// X86_64-LABEL: define{{( protected)?}} %swift.bridge* @convert_to_bridge_object
 // X86_64:         [[REFBITS:%.*]] = ptrtoint [[C:%C13bridge_object1C\*]] %0 to i64
 // X86_64:         [[OR:%.*]] = or i64 [[REFBITS]], %1
 // X86_64:         inttoptr i64 [[OR]] to [[BRIDGE]]
@@ -31,7 +31,7 @@ entry(%c : $C, %w : $Builtin.Word):
   return %b : $Builtin.BridgeObject
 }
 
-// X86_64-LABEL: define { %objc_object*, i64 } @convert_from_bridge_object
+// X86_64-LABEL: define{{( protected)?}} { %objc_object*, i64 } @convert_from_bridge_object
 // X86_64:         [[BOBITS:%.*]] = ptrtoint [[BRIDGE]] %0 to i64
 // --                                                     0x8000_0000_0000_0001
 // X86_64:         [[TAGBITS:%.*]] = and i64 [[BOBITS]], -9223372036854775807
@@ -48,7 +48,7 @@ entry(%c : $C, %w : $Builtin.Word):
 // X86_64:      tagged-cont:
 // X86_64:         phi [[C]] [ [[TAGGED_RESULT]], %tagged-pointer ], [ [[MASKED_RESULT]], %not-tagged-pointer ]
 
-// ARM64-LABEL: define { %objc_object*, i64 } @convert_from_bridge_object
+// ARM64-LABEL: define{{( protected)?}} { %objc_object*, i64 } @convert_from_bridge_object
 // ARM64:         [[BOBITS:%.*]] = ptrtoint [[BRIDGE:%swift.bridge\*]] %0 to i64
 // --                                                     0x8000_0000_0000_0000
 // ARM64:         [[TAGBITS:%.*]] = and i64 [[BOBITS]], -9223372036854775808
@@ -65,7 +65,7 @@ entry(%c : $C, %w : $Builtin.Word):
 // ARM64:      tagged-cont:
 // ARM64:         phi [[C]] [ [[TAGGED_RESULT]], %tagged-pointer ], [ [[MASKED_RESULT]], %not-tagged-pointer ]
 
-// ARMV7-LABEL: define { %objc_object*, i32 } @convert_from_bridge_object
+// ARMV7-LABEL: define{{( protected)?}} { %objc_object*, i32 } @convert_from_bridge_object
 // ARMV7:         [[BOBITS:%.*]] = ptrtoint [[BRIDGE:%swift.bridge\*]] %0 to i32
 // ARMV7:         [[MASKED_BITS:%.*]] = and i32 [[BOBITS]], -4
 // ARMV7:         inttoptr i32 [[MASKED_BITS]] to [[C:%objc_object\*]]
@@ -77,7 +77,7 @@ entry(%b : $Builtin.BridgeObject):
   return %t : $(ObjC, Builtin.Word)
 }
 
-// X86_64-LABEL: define %C13bridge_object1C* @convert_from_native_bridge_object
+// X86_64-LABEL: define{{( protected)?}} %C13bridge_object1C* @convert_from_native_bridge_object
 // X86_64:         [[BOBITS:%.*]] = ptrtoint %swift.bridge* %0 to i64
 // X86_64:         [[MASKED_BITS:%.*]] = and i64 [[BOBITS]], 72057594037927928
 // X86_64:         [[RESULT:%.*]] = inttoptr i64 [[MASKED_BITS]] to [[C:%C13bridge_object1C\*]]

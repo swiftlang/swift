@@ -1,8 +1,8 @@
-//===--- ModuleFile.cpp - Loading a serialized module -----------*- C++ -*-===//
+//===--- ModuleFile.cpp - Loading a serialized module ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -109,6 +109,11 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::IS_TESTABLE:
       extendedInfo.setIsTestable(true);
       break;
+    case options_block::RESILIENCE_STRATEGY:
+      unsigned Strategy;
+      options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
+      extendedInfo.setResilienceStrategy(ResilienceStrategy(Strategy));
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -183,6 +188,11 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
           else
             result.status = Status::FormatTooNew;
         }
+      }
+
+      // This field was added later; be resilient against its absence.
+      if (scratch.size() > 2) {
+        result.shortVersion = blobData.slice(0, scratch[2]);
       }
 
       versionSeen = true;
@@ -352,7 +362,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, sizeof(DeclID) + sizeof(unsigned) };
+    return { keyLength, sizeof(uint32_t) + sizeof(unsigned) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -361,7 +371,7 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    auto declID = endian::readNext<DeclID, little, unaligned>(data);
+    auto declID = endian::readNext<uint32_t, little, unaligned>(data);
     auto discriminator = endian::readNext<unsigned, little, unaligned>(data);
     return { declID, discriminator };
   }
@@ -429,7 +439,7 @@ public:
       bool isInstanceMethod = *data++ != 0;
       DeclID methodID = endian::readNext<uint32_t, little, unaligned>(data);
       result.push_back(std::make_tuple(typeID, isInstanceMethod, methodID));
-      length -= sizeof(TypeID) + 1 + sizeof(DeclID);
+      length -= sizeof(uint32_t) + 1 + sizeof(uint32_t);
     }
 
     return result;
@@ -540,7 +550,7 @@ class ModuleFile::DeclCommentTableInfo {
 public:
   using internal_key_type = StringRef;
   using external_key_type = StringRef;
-  using data_type = BriefAndRawComment;
+  using data_type = CommentInfo;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -593,6 +603,8 @@ public:
       new (&Comments[i]) SingleRawComment(RawText, StartColumn);
     }
     result.Raw = RawComment(Comments);
+    result.Group = endian::readNext<uint32_t, little, unaligned>(data);
+    result.SourceOrder = endian::readNext<uint32_t, little, unaligned>(data);
     return result;
   }
 };
@@ -608,6 +620,21 @@ ModuleFile::readDeclCommentTable(ArrayRef<uint64_t> fields,
     SerializedDeclCommentTable::Create(base + tableOffset,
                                        base + sizeof(uint32_t), base,
                                        DeclCommentTableInfo(*this)));
+}
+
+std::unique_ptr<ModuleFile::GroupNameTable>
+ModuleFile::readGroupTable(ArrayRef<uint64_t> Fields, StringRef BlobData) {
+  std::unique_ptr<ModuleFile::GroupNameTable> pMap(
+    new ModuleFile::GroupNameTable);
+  auto Data = reinterpret_cast<const uint8_t *>(BlobData.data());
+  unsigned GroupCount = endian::readNext<uint32_t, little, unaligned>(Data);
+  for (unsigned I = 0; I < GroupCount; I++) {
+    auto RawSize = endian::readNext<uint32_t, little, unaligned>(Data);
+    auto RawText = StringRef(reinterpret_cast<const char *>(Data), RawSize);
+    Data += RawSize;
+    (*pMap)[I] = RawText;
+  }
+  return pMap;
 }
 
 bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
@@ -638,6 +665,9 @@ bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
       switch (kind) {
       case comment_block::DECL_COMMENTS:
         DeclCommentTable = readDeclCommentTable(scratch, blobData);
+        break;
+      case comment_block::GROUP_NAMES:
+        GroupNamesMap = readGroupTable(scratch, blobData);
         break;
       default:
         // Unknown index kind, which this version of the compiler won't use.
@@ -718,7 +748,7 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
 ModuleFile::ModuleFile(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-    bool isFramework,
+    bool isFramework, serialization::ValidationInfo &info,
     serialization::ExtendedValidationInfo *extInfo)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
@@ -750,7 +780,7 @@ ModuleFile::ModuleFile(
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      auto info = validateControlBlock(cursor, scratch, extInfo);
+      info = validateControlBlock(cursor, scratch, extInfo);
       if (info.status != Status::Valid) {
         error(info.status);
         return;
@@ -1197,19 +1227,21 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isHeader())
         continue;
 
-      StringRef ModulePath, ScopePath;
-      std::tie(ModulePath, ScopePath) = Dep.RawPath.split('\0');
+      StringRef ModulePathStr = Dep.RawPath;
+      StringRef ScopePath;
+      if (Dep.isScoped())
+        std::tie(ModulePathStr, ScopePath) = ModulePathStr.rsplit('\0');
 
-      auto ModuleID = Ctx.getIdentifier(ModulePath);
-      assert(!ModuleID.empty() &&
-             "invalid module name (submodules not yet supported)");
+      SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1> AccessPath;
+      while (!ModulePathStr.empty()) {
+        StringRef NextComponent;
+        std::tie(NextComponent, ModulePathStr) = ModulePathStr.split('\0');
+        AccessPath.push_back({Ctx.getIdentifier(NextComponent), SourceLoc()});
+      }
 
-      if (ModuleID == Ctx.StdlibModuleName)
+      if (AccessPath.size() == 1 && AccessPath[0].first == Ctx.StdlibModuleName)
         continue;
 
-      SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 1>
-          AccessPath;
-      AccessPath.push_back({ ModuleID, SourceLoc() });
       Module *M = Ctx.getModule(AccessPath);
 
       auto Kind = ImportKind::Module;
@@ -1220,16 +1252,21 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
 
         if (!M) {
           // The dependency module could not be loaded.  Just make a guess
-          // about the import kind, we can not do better.
+          // about the import kind, we cannot do better.
           Kind = ImportKind::Func;
         } else {
+          // Lookup the decl in the top-level module.
+          Module *TopLevelModule = M;
+          if (AccessPath.size() > 1)
+            TopLevelModule = Ctx.getLoadedModule(AccessPath.front().first);
+
           SmallVector<ValueDecl *, 8> Decls;
-          M->lookupQualified(ModuleType::get(M), ScopeID,
-                             NL_QualifiedDefault | NL_KnownNoDependency,
-                             nullptr, Decls);
+          TopLevelModule->lookupQualified(
+              ModuleType::get(TopLevelModule), ScopeID,
+              NL_QualifiedDefault | NL_KnownNoDependency, nullptr, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&
-                 "deserialized imports should not be ambigous");
+                 "deserialized imports should not be ambiguous");
           Kind = *FoundKind;
         }
 
@@ -1348,7 +1385,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
+        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
           if (nominal->getName() == accessPath.front().first)
             results.push_back(vd);
       }
@@ -1361,7 +1398,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
+        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
           if (nominal->getName() == accessPath.front().first)
             results.push_back(vd);
       }
@@ -1390,7 +1427,7 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
+        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
           if (nominal->getName() == accessPath.front().first)
             consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
       }
@@ -1402,6 +1439,25 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
     for (auto item : list)
       consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
                          DeclVisibilityKind::DynamicLookup);
+  }
+}
+
+void ModuleFile::lookupObjCMethods(
+       ObjCSelector selector,
+       SmallVectorImpl<AbstractFunctionDecl *> &results) {
+  // If we don't have an Objective-C method table, there's nothing to do.
+  if (!ObjCMethods) return;
+
+  // Look for all methods in the module file with this selector.
+  auto known = ObjCMethods->find(selector);
+  if (known == ObjCMethods->end()) return;
+
+  auto found = *known;
+  for (const auto &result : found) {
+    // Deserialize the method and add it to the list.
+    if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(
+                      getDecl(std::get<2>(result))))
+      results.push_back(func);
   }
 }
 
@@ -1460,13 +1516,13 @@ void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
   getTopLevelDecls(results);
 }
 
-Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
+Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   assert(D);
 
   // Keep these as assertions instead of early exits to ensure that we are not
   // doing extra work.  These cases should be handled by clients of this API.
   assert(!D->hasClangNode() &&
-         "can not find comments for Clang decls in Swift modules");
+         "cannot find comments for Clang decls in Swift modules");
   assert(D->getDeclContext()->getModuleScopeContext() == FileContext &&
          "Decl is from a different serialized file");
 
@@ -1475,6 +1531,17 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
 
   if (D->isImplicit())
     return None;
+
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    // Compute the USR.
+    llvm::SmallString<128> USRBuffer;
+    {
+      llvm::raw_svector_ostream OS(USRBuffer);
+      if (ide::printExtensionUSR(ED, OS))
+        return None;
+    }
+     return getCommentForDeclByUSR(USRBuffer.str());
+  }
 
   auto *VD = dyn_cast<ValueDecl>(D);
   if (!VD)
@@ -1491,7 +1558,78 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
   return getCommentForDeclByUSR(USRBuffer.str());
 }
 
-Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {
+const static StringRef Separator = "/";
+
+Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
+  if (!GroupNamesMap || GroupNamesMap->count(Id) == 0)
+    return None;
+  auto Original = (*GroupNamesMap)[Id];
+  if (Original.empty())
+    return None;
+  auto SepPos = Original.find_last_of(Separator);
+  assert(SepPos != StringRef::npos && "Cannot find Separator.");
+  return StringRef(Original.data(), SepPos);
+}
+
+Optional<StringRef> ModuleFile::getSourceFileNameById(unsigned Id) const {
+  if (!GroupNamesMap || GroupNamesMap->count(Id) == 0)
+    return None;
+  auto Original = (*GroupNamesMap)[Id];
+  if (Original.empty())
+    return None;
+  auto SepPos = Original.find_last_of(Separator);
+  assert(SepPos != StringRef::npos && "Cannot find Separator.");
+  auto Start = Original.data() + SepPos + 1;
+  auto Len = Original.size() - SepPos - 1;
+  return StringRef(Start, Len);
+}
+
+Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
+  auto Triple = getCommentForDecl(D);
+  if (!Triple.hasValue()) {
+    return None;
+  }
+  return getGroupNameById(Triple.getValue().Group);
+}
+
+
+Optional<StringRef>
+ModuleFile::getSourceFileNameForDecl(const Decl *D) const {
+  auto Triple = getCommentForDecl(D);
+  if (!Triple.hasValue()) {
+    return None;
+  }
+  return getSourceFileNameById(Triple.getValue().Group);
+}
+
+Optional<unsigned>
+ModuleFile::getSourceOrderForDecl(const Decl *D) const {
+  auto Triple = getCommentForDecl(D);
+  if (!Triple.hasValue()) {
+    return None;
+  }
+  return Triple.getValue().SourceOrder;
+}
+
+void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) const {
+  if (!GroupNamesMap)
+    return;
+  for (auto It = GroupNamesMap->begin(); It != GroupNamesMap->end(); ++ It) {
+    StringRef FullGroupName = It->getSecond();
+    if (FullGroupName.empty())
+      continue;
+    auto Sep = FullGroupName.find_last_of(Separator);
+    assert(Sep != StringRef::npos);
+    auto Group = FullGroupName.substr(0, Sep);
+    auto Found = std::find(Names.begin(), Names.end(), Group);
+    if (Found != Names.end())
+      continue;
+    Names.push_back(Group);
+  }
+}
+
+Optional<CommentInfo>
+ModuleFile::getCommentForDeclByUSR(StringRef USR) const {
   if (!DeclCommentTable)
     return None;
 
@@ -1500,6 +1638,14 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {
     return None;
 
   return *I;
+}
+
+Optional<StringRef>
+ModuleFile::getGroupNameByUSR(StringRef USR) const {
+  if (auto Comment = getCommentForDeclByUSR(USR)) {
+    return getGroupNameById(Comment.getValue().Group);
+  }
+  return None;
 }
 
 Identifier ModuleFile::getDiscriminatorForPrivateValue(const ValueDecl *D) {

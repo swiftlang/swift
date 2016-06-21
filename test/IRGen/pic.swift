@@ -26,6 +26,13 @@ public func use_global() -> Int {
 // armv7:         add r0, pc, r0
 // armv7:         ldr r0, [r0]
 
+// armv7s-LABEL: __TF4main10use_globalFT_Si:
+// armv7s:         movw r0, :lower16:(__Tv4main6globalSi-([[PIC_0:L.*]]+8))
+// armv7s:         movt r0, :upper16:(__Tv4main6globalSi-([[PIC_0]]+8))
+// armv7s:       [[PIC_0]]:{{$}}
+// armv7s:         add r0, pc, r0
+// armv7s:         ldr r0, [r0]
+
 // armv7k-LABEL: __TF4main10use_globalFT_Si:
 // armv7k:        movw r0, :lower16:(__Tv4main6globalSi-([[PIC_0:L.*]]+8))
 // armv7k:        movt r0, :upper16:(__Tv4main6globalSi-([[PIC_0]]+8))

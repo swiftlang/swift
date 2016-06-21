@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -55,16 +55,6 @@ public:
                                     CanFunctionType formalApplyType,
                                     SGFContext);
 
-  /// A special function for emitting a call after the arguments
-  /// have already been emitted.
-  using LatePartialSuperEmitter = ManagedValue (SILGenFunction &,
-                                                SILDeclRef,
-                                                SILLocation,
-                                                ArrayRef<Substitution>,
-                                                ArrayRef<ManagedValue>,
-                                                CanFunctionType formalApplyType,
-                                                SGFContext);
-
   enum class Kind {
     /// This is a builtin function that will be specially handled
     /// downstream, but doesn't require special treatment at the
@@ -80,9 +70,6 @@ public:
     /// handled in SILGen, but which can be passed normally-emitted
     /// arguments.
     LateEmitter,
-
-    /// This is a partial application to a super method.
-    LatePartialSuperEmitter,
   };
 
 private:
@@ -90,7 +77,6 @@ private:
   union {
     EarlyEmitter *TheEarlyEmitter;
     LateEmitter *TheLateEmitter;
-    LatePartialSuperEmitter *TheLatePartialSuperEmitter;
     Identifier TheBuiltinName;
   };
 
@@ -103,10 +89,6 @@ public:
 
   /*implicit*/ SpecializedEmitter(LateEmitter *emitter)
     : TheKind(Kind::LateEmitter), TheLateEmitter(emitter) {}
-
-  /*implicit*/ SpecializedEmitter(LatePartialSuperEmitter *emitter)
-    : TheKind(Kind::LatePartialSuperEmitter),
-      TheLatePartialSuperEmitter(emitter) {}
 
   /// Try to find an appropriate emitter for the given declaration.
   static Optional<SpecializedEmitter>
@@ -122,14 +104,6 @@ public:
   LateEmitter *getLateEmitter() const {
     assert(isLateEmitter());
     return TheLateEmitter;
-  }
-
-  bool isLatePartialSuperEmitter() const {
-    return TheKind == Kind::LatePartialSuperEmitter;
-  }
-  LatePartialSuperEmitter *getLatePartialSuperEmitter() const {
-    assert(isLatePartialSuperEmitter());
-    return TheLatePartialSuperEmitter;
   }
 
   bool isNamedBuiltin() const { return TheKind == Kind::NamedBuiltin; }

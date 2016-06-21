@@ -15,19 +15,23 @@
 //===--- Verify that Foundation isn't loaded ------------------------------===//
 struct No {}
 struct Yes {}
-func isRandomAccessIndex<T : ForwardIndexType>(_: T) -> No { return No() }
-func isRandomAccessIndex<T : RandomAccessIndexType>(_: T) -> Yes { return Yes() }
-let no = isRandomAccessIndex("".utf16.startIndex)
+func isRandomAccessCollection<T : Collection>(_: T) -> No {
+  return No()
+}
+func isRandomAccessCollection<T : RandomAccessCollection>(_: T) -> Yes {
+  return Yes()
+}
+let no = isRandomAccessCollection("".utf16)
 let _: No = no
 
 //===--- Tests ------------------------------------------------------------===//
 
 import ObjectiveC
 
-func expectIsHashable<T : Hashable>(inout value: T) {}
-func expectIsCVarArgType<T : CVarArgType>(inout value: T) {}
+func expectIsHashable<T : Hashable>(_ value: inout T) {}
+func expectIsCVarArg<T : CVarArg>(_ value: inout T) {}
 
 var anNSObject = NSObject()
 expectIsHashable(&anNSObject)
-expectIsCVarArgType(&anNSObject)
+expectIsCVarArg(&anNSObject)
 

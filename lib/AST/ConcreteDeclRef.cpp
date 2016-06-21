@@ -1,8 +1,8 @@
-//===--- ConcreteDeclRef.cpp - Reference to a concrete decl -----*- C++ -*-===//
+//===--- ConcreteDeclRef.cpp - Reference to a concrete decl ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,8 +25,7 @@ ConcreteDeclRef::SpecializedDeclRef *
 ConcreteDeclRef::SpecializedDeclRef::create(
                                        ASTContext &ctx, ValueDecl *decl,
                                        ArrayRef<Substitution> substitutions) {
-  unsigned size = sizeof(SpecializedDeclRef)
-  + sizeof(Substitution) * substitutions.size();
+  size_t size = totalSizeToAlloc<Substitution>(substitutions.size());
   void *memory = ctx.Allocate(size, alignof(SpecializedDeclRef));
   return new (memory) SpecializedDeclRef(decl, substitutions);
 }
@@ -50,23 +49,22 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
         os << ", ";
       }
 
-      os << sub.getArchetype()->getFullName()
-         << "=" << sub.getReplacement().getString();
+      os << sub.getReplacement().getString();
 
       if (sub.getConformances().size()) {
         os << '[';
         bool isFirst = true;
-        for (const auto *c : sub.getConformances()) {
+        for (auto &c : sub.getConformances()) {
           if (isFirst) {
             isFirst = false;
           } else {
             os << ", ";
           }
 
-          if (c) {
-            c->printName(os);
+          if (c.isConcrete()) {
+            c.getConcrete()->printName(os);
           } else {
-            os << "nullptr";
+            os << "abstract:" << c.getAbstract()->getName();
           }
         }
         os << ']';

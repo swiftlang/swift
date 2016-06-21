@@ -109,13 +109,13 @@ IR.
   functions. Then it rewrites all specialized usages of the generic
   to a direct call of the appropriate specialized function.
 - **Witness and VTable Devirtualization** for a given type looks up
-  the associated method from a class's vtable or a types witness table
+  the associated method from a class's vtable or a type witness table
   and replaces the indirect virtual call with a call to the mapped
   function.
 - **Performance Inlining**
 - **Reference Counting Optimizations**
 - **Memory Promotion/Optimizations**
-- **High-level domain specific optimizations** The swift compiler implements
+- **High-level domain specific optimizations** The Swift compiler implements
   high-level optimizations on basic Swift containers such as Array or String.
   Domain specific optimizations require a defined interface between
   the standard library and the optimizer. More details can be found here:
@@ -152,7 +152,7 @@ Here is an example of a ``.sil`` file::
   }
 
   // Declare a Swift function. The body is ignored by SIL.
-  func taxicabNorm(a:Point) -> Double {
+  func taxicabNorm(_ a:Point) -> Double {
     return a.x + a.y
   }
 
@@ -253,7 +253,7 @@ Consider a generic function like this:
 
 ::
 
-  func generateArray<T>(n : Int, generator : () -> T) -> T[]
+  func generateArray<T>(n : Int, generator : () -> T) -> [T]
 
 The function ``generator`` will be expected to store its result
 indirectly into an address passed in an implicit parameter.  There's
@@ -299,27 +299,27 @@ formal type.  For example, consider the following generic type:
 would normally lower to the type ``@callee_owned () -> Int``, i.e.
 returning its result directly.  But if that type is properly lowered
 with the pattern of its unsubstituted type ``() -> T``, it becomes
-``@callee_owned (@out Int) -> ()``.
+``@callee_owned () -> @out Int``.
 
 When a type is lowered using the abstraction pattern of an
 unrestricted type, it is lowered as if the pattern were replaced with
 a type sharing the same structure but replacing all materializable
 types with fresh type variables.
 
-For example, if ``g`` has type ``Generator<(Int,Int) -> Float>``, ``g.fn`` is
-lowered using the pattern ``() -> T``, which eventually causes ``(Int,Int)
+For example, if ``g`` has type ``Generator<(Int, Int) -> Float>``, ``g.fn`` is
+lowered using the pattern ``() -> T``, which eventually causes ``(Int, Int)
 -> Float`` to be lowered using the pattern ``T``, which is the same as
 lowering it with the pattern ``U -> V``; the result is that ``g.fn``
 has the following lowered type::
 
-  @callee_owned () -> @owned @callee_owned (@out Float, @in (Int,Int)) -> ()``.
+  @callee_owned () -> @owned @callee_owned (@in (Int, Int)) -> @out Float.
 
 As another example, suppose that ``h`` has type
-``Generator<(Int, @inout Int) -> Float>``.  Neither ``(Int, @inout Int)``
-nor ``@inout Int`` are potential results of substitution because they
+``Generator<(Int, inout Int) -> Float>``.  Neither ``(Int, inout Int)``
+nor ``inout Int`` are potential results of substitution because they
 aren't materializable, so ``h.fn`` has the following lowered type::
 
-  @callee_owned () -> @owned @callee_owned (@out Float, @in Int, @inout Int)
+  @callee_owned () -> @owned @callee_owned (@in Int, @inout Int) -> @out Float
 
 This system has the property that abstraction patterns are preserved
 through repeated substitutions.  That is, you can consider a lowered
@@ -340,8 +340,6 @@ The type of a value in SIL shall be:
 - a loadable legal SIL type, ``$T``,
 
 - the address of a legal SIL type, ``$*T``, or
-
-- the address of local storage of a legal SIL type, ``$*@local_storage T``.
 
 A type ``T`` is a *legal SIL type* if:
 
@@ -386,22 +384,6 @@ type. Values of address type thus cannot be allocated, loaded, or stored
 Addresses can be passed as arguments to functions if the corresponding
 parameter is indirect.  They cannot be returned.
 
-Local Storage Types
-```````````````````
-
-The *address of local storage for T* ``$*@local_storage T`` is a
-handle to a stack allocation of a variable of type ``$T``.
-
-For many types, the handle for a stack allocation is simply the
-allocated address itself.  However, if a type is runtime-sized, the
-compiler must emit code to potentially dynamically allocate memory.
-SIL abstracts over such differences by using values of local-storage
-type as the first result of ``alloc_stack`` and the operand of
-``dealloc_stack``.
-
-Local-storage address types are not *first-class* in the same sense
-that address types are not first-class.
-
 Box Types
 `````````
 
@@ -424,7 +406,7 @@ number of ways:
 - A SIL function type declares its conventional treatment of its
   context value:
 
-  - If it is ``@thin``, the function requires no context value.
+  - If it is ``@convention(thin)``, the function requires no context value.
 
   - If it is ``@callee_owned``, the context value is treated as an
     owned direct parameter.
@@ -435,11 +417,10 @@ number of ways:
   - Otherwise, the context value is treated as an unowned direct
     parameter.
 
-- A SIL function type declares the conventions for its parameters,
-  including any implicit out-parameters.  The parameters are written
-  as an unlabelled tuple; the elements of that tuple must be legal SIL
-  types, optionally decorated with one of the following convention
-  attributes.
+- A SIL function type declares the conventions for its parameters.
+  The parameters are written as an unlabelled tuple; the elements of that
+  tuple must be legal SIL types, optionally decorated with one of the
+  following convention attributes.
 
   The value of an indirect parameter has type ``*T``; the value of a
   direct parameter has type ``T``.
@@ -449,13 +430,24 @@ number of ways:
     the value held there.
 
   - An ``@inout`` parameter is indirect.  The address must be of an
-    initialized object, and the function must leave an initialized
-    object there upon exit.
+    initialized object. The memory must remain initialized for the duration
+    of the call until the function returns. The function may mutate the
+    pointee, and furthermore may weakly assume that there are no aliasing
+    reads from or writes to the argument, though must preserve a valid
+    value at the argument so that well-ordered aliasing violations do not
+    compromise memory safety. This allows for optimizations such as local
+    load and store propagation, introduction or elimination of temporary
+    copies, and promotion of the ``@inout`` parameter to an ``@owned`` direct
+    parameter and result pair, but does not admit "take" optimization out
+    of the parameter or other optimization that would leave memory in an
+    uninitialized state.
 
-  - An ``@out`` parameter is indirect.  The address must be of an
-    uninitialized object; the function is responsible for initializing
-    a value there.  If there is an ``@out`` parameter, it must be
-    the first parameter, and the direct result must be ``()``.
+  - An ``@inout_aliasable`` parameter is indirect. The address must be of an
+    initialized object. The memory must remain initialized for the duration
+    of the call until the function returns. The function may mutate the
+    pointee, and must assume that other aliases may mutate it as well. These
+    aliases however can be assumed to be well-typed and well-ordered; ill-typed
+    accesses and data races to the parameter are still undefined.
 
   - An ``@owned`` parameter is an owned direct parameter.
 
@@ -467,12 +459,35 @@ number of ways:
 
   - Otherwise, the parameter is an unowned direct parameter.
 
-- A SIL function type declares the convention for its direct result.
-  The result must be a legal SIL type.
+- A SIL function type declares the conventions for its results.
+  The results are written as an unlabelled tuple; the elements of that
+  tuple must be legal SIL types, optionally decorated with one of the
+  following convention attributes.  Indirect and direct results may
+  be interleaved.
+
+  Indirect results correspond to implicit arguments of type ``*T`` in
+  function entry blocks and in the arguments to ``apply`` and ``try_apply``
+  instructions.  These arguments appear in the order in which they appear
+  in the result list, always before any parameters.
+
+  Direct results correspond to direct return values of type ``T``.  A 
+  SIL function type has a ``return type`` derived from its direct results
+  in the following way: when there is a single direct result, the return
+  type is the type of that result; otherwise, it is the tuple type of the
+  types of all the direct results, in the order they appear in the results
+  list.  The return type is the type of the operand of ``return``
+  instructions, the type of ``apply`` instructions, and the type of
+  the normal result of ``try_apply`` instructions.
+
+  - An ``@out`` result is indirect.  The address must be of an
+    uninitialized object.  The function is required to leave an
+    initialized value there unless it terminates with a ``throw``
+    instruction or it has a non-Swift calling convention.
 
   - An ``@owned`` result is an owned direct result.
 
   - An ``@autoreleased`` result is an autoreleased direct result.
+    If there is an autoreleased result, it must be the only direct result.
 
   - Otherwise, the parameter is an unowned direct result.
 
@@ -495,9 +510,19 @@ throughout the execution of the call. This means that any
 argument can be eliminated.
 
 An autoreleased direct result must have a type with a retainable
-pointer representation.  It may have been autoreleased, and the caller
-should take action to reclaim that autorelease with
-``strong_retain_autoreleased``.
+pointer representation.  Autoreleased results are nominally transferred
+at +0, but the runtime takes steps to ensure that a +1 can be safely
+transferred, and those steps require precise code-layout control.
+Accordingly, the SIL pattern for an autoreleased convention looks exactly
+like the SIL pattern for an owned convention, and the extra runtime
+instrumentation is inserted on both sides when the SIL is lowered into
+LLVM IR.  An autoreleased ``apply`` of a function that is defined with
+an autoreleased result has the effect of a +1 transfer of the result.
+An autoreleased ``apply`` of a function that is not defined with
+an autoreleased result has the effect of performing a strong retain in
+the caller.  A non-autoreleased ``apply`` of a function that is defined
+with an autoreleased result has the effect of performing an
+autorelease in the callee.
 
 - The @noescape declaration attribute on Swift parameters (which is valid only
   on parameters of function type, and is implied by the @autoclosure attribute)
@@ -568,7 +593,7 @@ generic constraints:
   * Non-class protocol types
   * @weak types
 
-  Values of address-only type (“address-only values”) must reside in
+  Values of address-only type ("address-only values") must reside in
   memory and can only be referenced in SIL by address. Addresses of
   address-only values cannot be loaded from or stored to. SIL provides
   special instructions for indirectly manipulating address-only
@@ -578,7 +603,7 @@ Some additional meaningful categories of type:
 
 - A *heap object reference* type is a type whose representation consists of a
   single strong-reference-counted pointer. This includes all class types,
-  the ``Builtin.ObjectPointer`` and ``Builtin.ObjCPointer`` types, and
+  the ``Builtin.NativeObject`` and ``Builtin.UnknownObject`` types, and
   archetypes that conform to one or more class protocols.
 - A *reference type* is more general in that its low-level representation may
   include additional global pointers alongside a strong-reference-counted
@@ -635,7 +660,7 @@ types. Function types are transformed in order to encode additional attributes:
 
 - The **fully uncurried representation** of the function type, with
   all of the curried argument clauses flattened into a single argument
-  clause. For instance, a curried function ``func foo(x:A)(y:B) -> C``
+  clause. For instance, a curried function ``func foo(_ x:A)(y:B) -> C``
   might be emitted as a function of type ``((y:B), (x:A)) -> C``.  The
   exact representation depends on the function's `calling
   convention`_, which determines the exact ordering of currying
@@ -695,7 +720,7 @@ Values and Operands
 
   sil-identifier ::= [A-Za-z_0-9]+
   sil-value-name ::= '%' sil-identifier
-  sil-value ::= sil-value-name ('#' [0-9]+)?
+  sil-value ::= sil-value-name
   sil-value ::= 'undef'
   sil-operand ::= sil-value ':' sil-type
 
@@ -703,17 +728,6 @@ SIL values are introduced with the ``%`` sigil and named by an
 alphanumeric identifier, which references the instruction or basic block
 argument that produces the value.  SIL values may also refer to the keyword
 'undef', which is a value of undefined contents.
-In SIL, a single instruction may produce multiple values. Operands that refer
-to multiple-value instructions choose the value by following the ``%name`` with
-``#`` and the index of the value. For example::
-
-  // alloc_box produces two values--the refcounted pointer %box#0, and the
-  // value address %box#1
-  %box = alloc_box $Int64
-  // Refer to the refcounted pointer
-  strong_retain %box#0 : $@box Int64
-  // Refer to the address
-  store %value to %box#1 : $*Int64
 
 Unlike LLVM IR, SIL instructions that take value operands *only* accept
 value operands. References to literal constants, functions, global variables, or
@@ -746,6 +760,7 @@ Basic Blocks
   sil-argument ::= sil-value-name ':' sil-type
 
   sil-instruction-def ::= (sil-value-name '=')? sil-instruction
+                          (',' sil-loc)? (',' sil-scope-ref)?
 
 A function body consists of one or more basic blocks that correspond
 to the nodes of the function's control flow graph. Each basic block
@@ -773,7 +788,7 @@ are bound by the function's caller::
 
   sil @foo : $(Int) -> Int {
   bb0(%x : $Int):
-    %1 = return %x : $Int
+    return %x : $Int
   }
 
   sil @bar : $(Int, Int) -> () {
@@ -782,8 +797,32 @@ are bound by the function's caller::
     %1 = apply %foo(%x) : $(Int) -> Int
     %2 = apply %foo(%y) : $(Int) -> Int
     %3 = tuple ()
-    %4 = return %3 : $()
+    return %3 : $()
   }
+
+
+Debug Information
+~~~~~~~~~~~~~~~~~
+::
+
+  sil-scope-ref ::= 'scope' [0-9]+
+  sil-scope ::= 'sil_scope' [0-9]+ '{'
+                   sil-loc
+                   'parent' scope-parent
+                   ('inlined_at' sil-scope-ref)?
+                '}'
+  scope-parent ::= sil-function-name ':' sil-type
+  scope-parent ::= sil-scope-ref
+  sil-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
+
+Each instruction may have a debug location and a SIL scope reference
+at the end.  Debug locations consist of a filename, a line number, and
+a column number.  If the debug location is omitted, it defaults to the
+location in the SIL source file.  SIL scopes describe the position
+inside the lexical scope structure that the Swift expression a SIL
+instruction was generated from had originally. SIL scopes also hold
+inlining information.
+
 
 Declaration References
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -826,28 +865,29 @@ entity discriminators:
 - ``ivarinitializer``: a class's ivar initializer
 - ``defaultarg.``\ *n*: the default argument-generating function for
   the *n*\ -th argument of a Swift ``func``
-- ``foreign``: a specific entry point for C/objective-C interoperability
+- ``foreign``: a specific entry point for C/Objective-C interoperability
 
 Methods and curried function definitions in Swift also have multiple
 "uncurry levels" in SIL, representing the function at each possible
 partial application level. For a curried function declaration::
 
   // Module example
-  func foo(x:A)(y:B)(z:C) -> D
+  func foo(_ x:A)(y:B)(z:C) -> D
 
 The declaration references and types for the different uncurry levels are as
 follows::
 
-  #example.foo!0 : $@thin (x:A) -> (y:B) -> (z:C) -> D
-  #example.foo!1 : $@thin ((y:B), (x:A)) -> (z:C) -> D
-  #example.foo!2 : $@thin ((z:C), (y:B), (x:A)) -> D
+  #example.foo!0 : $@convention(thin) (x:A) -> (y:B) -> (z:C) -> D
+  #example.foo!1 : $@convention(thin) ((y:B), (x:A)) -> (z:C) -> D
+  #example.foo!2 : $@convention(thin) ((z:C), (y:B), (x:A)) -> D
 
 The deepest uncurry level is referred to as the **natural uncurry level**. In
 this specific example, the reference at the natural uncurry level is
 ``#example.foo!2``.  Note that the uncurried argument clauses are composed
 right-to-left, as specified in the `calling convention`_. For uncurry levels
-less than the uncurry level, the entry point itself is ``@thin`` but returns a
-thick function value carrying the partially applied arguments for its context.
+less than the uncurry level, the entry point itself is ``@convention(thin)`` but
+returns a thick function value carrying the partially applied arguments for its
+context.
 
 `Dynamic dispatch`_ instructions such as ``class method`` require their method
 declaration reference to be uncurried to at least uncurry level 1 (which applies
@@ -981,9 +1021,9 @@ implements the method for that class::
     func bas()
   }
 
-  sil @A_foo : $@thin (@owned A) -> ()
-  sil @A_bar : $@thin (@owned A) -> ()
-  sil @A_bas : $@thin (@owned A) -> ()
+  sil @A_foo : $@convention(thin) (@owned A) -> ()
+  sil @A_bar : $@convention(thin) (@owned A) -> ()
+  sil @A_bas : $@convention(thin) (@owned A) -> ()
 
   sil_vtable A {
     #A.foo!1: @A_foo
@@ -995,7 +1035,7 @@ implements the method for that class::
     func bar()
   }
 
-  sil @B_bar : $@thin (@owned B) -> ()
+  sil @B_bar : $@convention(thin) (@owned B) -> ()
 
   sil_vtable B {
     #A.foo!1: @A_foo
@@ -1007,7 +1047,7 @@ implements the method for that class::
     func bas()
   }
 
-  sil @C_bas : $@thin (@owned C) -> ()
+  sil @C_bas : $@convention(thin) (@owned C) -> ()
 
   sil_vtable C {
     #A.foo!1: @A_foo
@@ -1049,11 +1089,10 @@ instances. Derived classes inherit the witness tables of their base class.
 Witness tables are keyed by *protocol conformance*, which is a unique identifier
 for a concrete type's conformance to a protocol.
 
-- A *normal protocol conformance*
-  names a (potentially unbound generic) type, the protocol it conforms to, and
-  the module in which the type or extension declaration that provides the
-  conformance appears. These correspond 1:1 to protocol conformance declarations
-  in the source code.
+- A *normal protocol conformance* names a (potentially unbound generic) type,
+  the protocol it conforms to, and the module in which the type or extension
+  declaration that provides the conformance appears. These correspond 1:1 to
+  protocol conformance declarations in the source code.
 - If a derived class conforms to a protocol through inheritance from its base
   class, this is represented by an *inherited protocol conformance*, which
   simply references the protocol conformance for the base class.
@@ -1089,6 +1128,55 @@ Witness tables consist of the following entries:
   type to the protocol conformance that satisfies that requirement for the
   associated type.
 
+Default Witness Tables
+~~~~~~~~~~~~~~~~~~~~~~
+::
+
+  decl ::= sil-default-witness-table
+  sil-default-witness-table ::= 'sil_default_witness_table'
+                                identifier minimum-witness-table-size
+                                '{' sil-default-witness-entry* '}'
+  minimum-witness-table-size ::= integer
+
+SIL encodes requirements with resilient default implementations in a default
+witness table. We say a requirement has a resilient default implementation if
+the following conditions hold:
+
+- The requirement has a default implementation
+- The requirement is either the last requirement in the protocol, or all
+  subsequent requirements also have resilient default implementations
+
+The set of requirements with resilient default implementations is stored in
+protocol metadata.
+
+The minimum witness table size is the size of the witness table, in words,
+not including any requirements with resilient default implementations.
+
+Any conforming witness table must have a size between the minimum size, and
+the maximum size, which is equal to the minimum size plus the number of
+default requirements.
+
+At load time, if the runtime encounters a witness table with fewer than the
+maximum number of witnesses, the witness table is copied, with default
+witnesses copied in. This ensures that callers can always expect to find
+the correct number of requirements in each witness table, and new
+requirements can be added by the framework author, without breaking client
+code, as long as the new requirements have resilient default implementations.
+
+Default witness tables are keyed by the protocol itself. Only protocols with
+public visibility need a default witness table; private and internal protocols
+are never seen outside the module, therefore there are no resilience issues
+with adding new requirements.
+
+::
+
+  sil-default-witness-entry ::= 'method' sil-decl-ref ':' sil-function-name
+
+Default witness tables currently contain only one type of entry:
+
+- *Method entries* map a method requirement of the protocol to a SIL function
+  that implements that method in a manner suitable for all witness types.
+
 Global Variables
 ~~~~~~~~~~~~~~~~
 ::
@@ -1098,7 +1186,12 @@ Global Variables
 
 SIL representation of a global variable.
 
-FIXME: to be written.
+Global variable access is performed by the ``alloc_global`` and ``global_addr``
+SIL instructions. Prior to performing any access on the global, the
+``alloc_global`` instruction must be performed to initialize the storage.
+
+Once a global's storage has been initialized, ``global_addr`` is used to
+project the value.
 
 Dataflow Errors
 ---------------
@@ -1166,8 +1259,8 @@ Calling Convention
 
 This section describes how Swift functions are emitted in SIL.
 
-Swift Calling Convention @cc(swift)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Swift Calling Convention @convention(swift)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Swift calling convention is the one used by default for native Swift
 functions.
@@ -1176,14 +1269,14 @@ Tuples in the input type of the function are recursively destructured into
 separate arguments, both in the entry point basic block of the callee, and
 in the ``apply`` instructions used by callers::
 
-  func foo(x:Int, y:Int)
+  func foo(_ x:Int, y:Int)
   
   sil @foo : $(x:Int, y:Int) -> () {
   entry(%x : $Int, %y : $Int):
     ...
   }
 
-  func bar(x:Int, y:(Int, Int))
+  func bar(_ x:Int, y:(Int, Int))
 
   sil @bar : $(x:Int, y:(Int, Int)) -> () {
   entry(%x : $Int, %y0 : $Int, %y1 : $Int):
@@ -1208,7 +1301,7 @@ in the ``apply`` instructions used by callers::
 Calling a function with trivial value types as inputs and outputs
 simply passes the arguments by value. This Swift function::
 
-  func foo(x:Int, y:Float) -> UnicodeScalar
+  func foo(_ x:Int, y:Float) -> UnicodeScalar
 
   foo(x, y)
 
@@ -1233,7 +1326,7 @@ same way. This Swift function::
 
   class A {}
 
-  func bar(x:A) -> (Int, A) { ... }
+  func bar(_ x:A) -> (Int, A) { ... }
 
   bar(x)
 
@@ -1262,7 +1355,7 @@ returning. This Swift function::
 
    @API struct A {}
 
-  func bas(x:A, y:Int) -> A { return x }
+  func bas(_ x:A, y:Int) -> A { return x }
 
   var z = bas(x, y)
   // ... use z ...
@@ -1288,7 +1381,7 @@ individually according to the above convention. This Swift function::
 
   @API struct A {}
 
-  func zim(x:Int, y:A, (z:Int, w:(A, Int)))
+  func zim(_ x:Int, y:A, (z:Int, w:(A, Int)))
 
   zim(x, y, (z, w))
 
@@ -1312,7 +1405,7 @@ Variadic Arguments
 Variadic arguments and tuple elements are packaged into an array and passed as
 a single array argument. This Swift function::
 
-  func zang(x:Int, (y:Int, z:Int...), v:Int, w:Int...)
+  func zang(_ x:Int, (y:Int, z:Int...), v:Int, w:Int...)
 
   zang(x, (y, z0, z1), v, w0, w1, w2)
 
@@ -1331,7 +1424,7 @@ each "uncurry level" of the function. When a function is uncurried, its
 outermost argument clauses are combined into a tuple in right-to-left order.
 For the following declaration::
 
-  func curried(x:A)(y:B)(z:C)(w:D) -> Int {}
+  func curried(_ x:A)(y:B)(z:C)(w:D) -> Int {}
 
 The types of the SIL entry points are as follows::
 
@@ -1354,7 +1447,7 @@ getter prior to calling the function and to write back to the property
 on return by loading from the buffer and invoking the setter with the final
 value. This Swift function::
 
-  func inout(x:@inout Int) {
+  func inout(_ x: inout Int) {
     x = 1
   }
 
@@ -1362,13 +1455,13 @@ gets lowered to SIL as::
 
   sil @inout : $(@inout Int) -> () {
   entry(%x : $*Int):
-    %1 = integer_literal 1 : $Int
+    %1 = integer_literal $Int, 1
     store %1 to %x
     return
   }
 
-Swift Method Calling Convention @cc(method)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Swift Method Calling Convention @convention(method)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The method calling convention is currently identical to the freestanding
 function convention. Methods are considered to be curried functions, taking
@@ -1377,13 +1470,13 @@ as the inner argument clause(s). When uncurried, the "self" argument is thus
 passed last::
 
   struct Foo {
-    func method(x:Int) -> Int {}
+    func method(_ x:Int) -> Int {}
   }
 
   sil @Foo_method_1 : $((x : Int), @inout Foo) -> Int { ... }
 
-Witness Method Calling Convention @cc(witness_method)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Witness Method Calling Convention @convention(witness_method)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The witness method calling convention is used by protocol witness methods in
 `witness tables`_. It is identical to the ``method`` calling convention
@@ -1394,8 +1487,8 @@ witnesses must be polymorphically dispatchable on their ``Self`` type,
 the ``Self``-related metadata for a witness must be passed in a maximally
 abstracted manner.
 
-C Calling Convention @cc(cdecl)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C Calling Convention @convention(c)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In Swift's C module importer, C types are always mapped to Swift types
 considered trivial by SIL. SIL does not concern itself with platform
@@ -1405,8 +1498,8 @@ platform calling convention.
 
 SIL (and therefore Swift) cannot currently invoke variadic C functions.
 
-Objective-C Calling Convention @cc(objc_method)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Objective-C Calling Convention @convention(objc_method)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Reference Counts
 ````````````````
@@ -1497,7 +1590,7 @@ return a class reference::
 
   bb0(%0 : $MyClass):
     %1 = class_method %0 : $MyClass, #MyClass.foo!1
-    %2 = apply %1(%0) : $@cc(method) @thin (@guaranteed MyClass) -> @owned MyOtherClass
+    %2 = apply %1(%0) : $@convention(method) (@guaranteed MyClass) -> @owned MyOtherClass
     // use of %2 goes here; no use of %1
     strong_release %2 : $MyOtherClass
     strong_release %1 : $MyClass
@@ -1532,8 +1625,8 @@ A value ``%1`` is said to be *value-dependent* on a value ``%0`` if:
 - ``%1`` is the result of ``mark_dependence`` and ``%0`` is either of
   the operands.
 
-- ``%1`` is the value address of an allocation instruction of which
-  ``%0`` is the local storage token or box reference.
+- ``%1`` is the value address of a box allocation instruction of which
+  ``%0`` is the box reference.
 
 - ``%1`` is the result of a ``struct``, ``tuple``, or ``enum``
   instruction and ``%0`` is an operand.
@@ -1604,16 +1697,18 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' sil-type
+  sil-instruction ::= 'alloc_stack' sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
-  // %1#0 has type $*@local_storage T
-  // %1#1 has type $*T
+  // %1 has type $*T
 
 Allocates uninitialized memory that is sufficiently aligned on the stack
-to contain a value of type ``T``. The first result of the instruction
-is a local-storage handle suitable for passing to ``dealloc_stack``.
-The second result of the instruction is the address of the allocated memory.
+to contain a value of type ``T``. The result of the instruction is the address
+of the allocated memory.
+
+If a type is runtime-sized, the compiler must emit code to potentially
+dynamically allocate memory. So there is no guarantee that the allocated
+memory is really located on the stack. 
 
 ``alloc_stack`` marks the start of the lifetime of the value; the
 allocation must be balanced with a ``dealloc_stack`` instruction to
@@ -1671,18 +1766,16 @@ alloc_box
 `````````
 ::
   
-  sil-instruction ::= 'alloc_box' sil-type
+  sil-instruction ::= 'alloc_box' sil-type (',' debug-var-attr)*
 
   %1 = alloc_box $T
-  // %1 has two values:
-  //   %1#0 has type $@box T
-  //   %1#1 has type $*T
+  //   %1 has type $@box T
 
 Allocates a reference-counted ``@box`` on the heap large enough to hold a value
 of type ``T``, along with a retain count and any other metadata required by the
-runtime.  The result of the instruction is a two-value operand; the first value
-is the reference-counted ``@box`` reference that owns the box, and the second
-value is the address of the value inside the box.
+runtime.  The result of the instruction is the reference-counted ``@box``
+reference that owns the box. The ``project_box`` instruction is used to retrieve
+the address of the value inside the box.
 
 The box will be initialized with a retain count of 1; the storage will be
 uninitialized. The box owns the contained value, and releasing it to a retain
@@ -1708,22 +1801,36 @@ behavior if the value buffer is currently allocated.
 
 The type operand must be a lowered object type.
 
+alloc_global
+````````````
+
+::
+
+   sil-instruction ::= 'alloc_global' sil-global-name
+
+   alloc_global @foo
+
+Initialize the storage for a global variable. This instruction has
+undefined behavior if the global variable has already been initialized.
+
+The type operand must be a lowered object type.
+
 dealloc_stack
 `````````````
 ::
 
   sil-instruction ::= 'dealloc_stack' sil-operand
 
-  dealloc_stack %0 : $*@local_storage T
-  // %0 must be of a local-storage $*@local_storage T type
+  dealloc_stack %0 : $*T
+  // %0 must be of $*T type
 
 Deallocates memory previously allocated by ``alloc_stack``. The
 allocated value in memory must be uninitialized or destroyed prior to
 being deallocated. This instruction marks the end of the lifetime for
 the value created by the corresponding ``alloc_stack`` instruction. The operand
-must be the ``@local_storage`` of the shallowest live ``alloc_stack``
-allocation preceding the deallocation. In other words, deallocations must be
-in last-in, first-out stack order.
+must be the shallowest live ``alloc_stack`` allocation preceding the
+deallocation. In other words, deallocations must be in last-in, first-out
+stack order.
 
 dealloc_box
 ```````````
@@ -1860,7 +1967,7 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value sil-operand
+  sil-instruction ::= debug_value sil-operand (',' debug-var-attr)*
   
   debug_value %1 : $Int
   
@@ -1870,12 +1977,24 @@ the SILLocation attached to the debug_value instruction.
 
 The operand must have loadable type.
 
+::
+
+   debug-var-attr ::= 'var'
+   debug-var-attr ::= 'let'
+   debug-var-attr ::= 'name' string-literal
+   debug-var-attr ::= 'argno' integer-literal
+
+There are a number of attributes that provide details about the source
+variable that is being described, including the name of the
+variable. For function and closure arguments ``argno`` is the number
+of the function argument starting with 1.
+
 debug_value_addr
 ````````````````
 
 ::
 
-  sil-instruction ::= debug_value_addr sil-operand
+  sil-instruction ::= debug_value_addr sil-operand (',' debug-var-attr)*
   
   debug_value_addr %7 : $*SomeProtocol
   
@@ -2168,23 +2287,6 @@ strong_retain
 
 Increases the strong retain count of the heap object referenced by ``%0``.
 
-strong_retain_autoreleased
-``````````````````````````
-::
-
-  sil-instruction ::= 'strong_retain_autoreleased' sil-operand
-
-  strong_retain_autoreleased %0 : $T
-  // $T must have a retainable pointer representation
-
-Retains the heap object referenced by ``%0`` using the Objective-C ARC
-"autoreleased return value" optimization. The operand must be the result of an
-``apply`` instruction with an Objective-C method callee, and the
-``strong_retain_autoreleased`` instruction must be first use of the value after
-the defining ``apply`` instruction.
-
-TODO: Specify all the other strong_retain_autoreleased constraints here.
-
 strong_release
 ``````````````
 ::
@@ -2197,6 +2299,21 @@ If the release operation brings the strong reference count of the object to
 zero, the object is destroyed and ``@weak`` references are cleared.  When both
 its strong and unowned reference counts reach zero, the object's memory is
 deallocated.
+
+set_deallocating
+````````````````
+::
+
+  set_deallocating %0 : $T
+  // $T must be a reference type.
+
+Explicitly sets the state of the object referenced by ``%0`` to deallocated.
+This is the same operation what's done by a strong_release immediately before
+it calls the deallocator of the object.
+
+It is expected that the strong reference count of the object is one.
+Furthermore, no other thread may increment the strong reference count during
+execution of this instruction.
 
 strong_retain_unowned
 `````````````````````
@@ -2273,6 +2390,16 @@ This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
 ``store_weak`` or ``load_weak`` operations on the same address.
 
+load_unowned
+````````````
+
+TODO: Fill this in
+
+store_unowned
+`````````````
+
+TODO: Fill this in
+
 fix_lifetime
 ````````````
 
@@ -2313,6 +2440,16 @@ the same.  Transformations should be somewhat forgiving here.
 The second operand may have either object or address type.  In the
 latter case, the dependency is on the current value stored in the
 address.
+
+strong_pin
+``````````
+
+TODO: Fill me in!
+
+strong_unpin
+````````````
+
+TODO: Fill me in!
 
 is_unique
 `````````
@@ -2360,6 +2497,36 @@ Performs a copy of an Objective-C block. Unlike retains of other
 reference-counted types, this can produce a different value from the operand
 if the block is copied from the stack to the heap.
 
+builtin "unsafeGuaranteed"
+``````````````````````````
+
+::
+
+  sil-instruction := 'builtin' '"unsafeGuaranteed"' '<' sil-type '>' '(' sil-operand')' ':' sil-type
+
+  %1 = builtin "unsafeGuaranteed"<T>(%0 : $T) : ($T, Builtin.Int1)
+  // $T must be of AnyObject type.
+
+Asserts that there exists another reference of the value ``%0`` for the scope
+delineated by the call of this builtin up to the first call of a ``builtin
+"unsafeGuaranteedEnd"`` instruction that uses the second element ``%1.1`` of the
+returned value. If no such instruction can be found nothing can be assumed. This
+assertions holds for uses of the first tuple element of the returned value
+``%1.0`` within this scope. The returned reference value equals the input
+``%0``.
+
+builtin "unsafeGuaranteedEnd"
+`````````````````````````````
+
+::
+
+  sil-instruction := 'builtin' '"unsafeGuaranteedEnd"' '(' sil-operand')'
+
+  %1 = builtin "unsafeGuaranteedEnd"(%0 : $Builtin.Int1)
+  // $T must be of AnyObject type.
+
+Ends the scope for the ``builtin "unsafeGuaranteed"`` instruction.
+
 Literals
 ~~~~~~~~
 
@@ -2371,14 +2538,14 @@ function_ref
 
   sil-instruction ::= 'function_ref' sil-function-name ':' sil-type
 
-  %1 = function_ref @function : $@thin T -> U
-  // $@thin T -> U must be a thin function type
+  %1 = function_ref @function : $@convention(thin) T -> U
+  // $@convention(thin) T -> U must be a thin function type
   // %1 has type $T -> U
 
 Creates a reference to a SIL function.
 
 global_addr
-```````````````
+```````````
 
 ::
 
@@ -2386,7 +2553,10 @@ global_addr
 
   %1 = global_addr @foo : $*Builtin.Word
 
-Creates a reference to the address of a global variable.
+Creates a reference to the address of a global variable which has been
+previously initialized by ``alloc_global``. It is undefined behavior to
+perform this operation on a global variable which has not been
+initialized.
 
 integer_literal
 ```````````````
@@ -2424,6 +2594,7 @@ string_literal
   sil-instruction ::= 'string_literal' encoding string-literal
   encoding ::= 'utf8'
   encoding ::= 'utf16'
+  encoding ::= 'objc_selector'
 
   %1 = string_literal "asdf"
   // %1 has type $Builtin.RawPointer
@@ -2431,7 +2602,10 @@ string_literal
 Creates a reference to a string in the global string table. The result
 is a pointer to the data.  The referenced string is always null-terminated. The
 string literal value is specified using Swift's string
-literal syntax (though ``\()`` interpolations are not allowed).
+literal syntax (though ``\()`` interpolations are not allowed). When
+the encoding is ``objc_selector``, the string literal produces a
+reference to a UTF-8-encoded Objective-C selector in the Objective-C
+method name segment.
 
 Dynamic Dispatch
 ~~~~~~~~~~~~~~~~
@@ -2462,7 +2636,7 @@ class_method
   sil-instruction ::= 'class_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = class_method %0 : $T, #T.method!1 : $@thin U -> V
+  %1 = class_method %0 : $T, #T.method!1 : $@convention(thin) U -> V
   // %0 must be of a class type or class metatype $T
   // #T.method!1 must be a reference to a dynamically-dispatched method of T or
   // of one of its superclasses, at uncurry level >= 1
@@ -2491,11 +2665,11 @@ super_method
   sil-instruction ::= 'super_method' sil-method-attributes?
                         sil-operand ',' sil-decl-ref ':' sil-type
   
-  %1 = super_method %0 : $T, #Super.method!1.foreign : $@thin U -> V
+  %1 = super_method %0 : $T, #Super.method!1.foreign : $@convention(thin) U -> V
   // %0 must be of a non-root class type or class metatype $T
   // #Super.method!1.foreign must be a reference to an ObjC method of T's
   // superclass or of one of its ancestor classes, at uncurry level >= 1
-  // %1 will be of type $@thin U -> V
+  // %1 will be of type $@convention(thin) U -> V
 
 Looks up a method in the superclass of a class or class metatype instance.
 Note that for native Swift methods, ``super.method`` calls are statically
@@ -2511,13 +2685,13 @@ witness_method
                         sil-type ',' sil-decl-ref ':' sil-type
 
   %1 = witness_method $T, #Proto.method!1 \
-    : $@thin @cc(witness_method) <Self: Proto> U -> V
+    : $@convention(witness_method) <Self: Proto> U -> V
   // $T must be an archetype
   // #Proto.method!1 must be a reference to a method of one of the protocol
   //   constraints on T
   // <Self: Proto> U -> V must be the type of the referenced method,
   //   generic on Self
-  // %1 will be of type $@thin <Self: Proto> U -> V
+  // %1 will be of type $@convention(thin) <Self: Proto> U -> V
 
 Looks up the implementation of a protocol method for a generic type variable
 constrained by that protocol. The result will be generic on the ``Self``
@@ -2532,20 +2706,20 @@ dynamic_method
   sil-instruction ::= 'dynamic_method' sil-method-attributes?
                       sil-operand ',' sil-decl-ref ':' sil-type
 
-  %1 = dynamic_method %0 : $P, #X.method!1 : $@thin U -> V
+  %1 = dynamic_method %0 : $P, #X.method!1 : $@convention(thin) U -> V
   // %0 must be of a protocol or protocol composition type $P,
   // where $P contains the Swift.DynamicLookup protocol
   // #X.method!1 must be a reference to an @objc method of any class
   // or protocol type
   //
-  // The "self" argument of the method type $@thin U -> V must be 
-  //   Builtin.ObjCPointer
+  // The "self" argument of the method type $@convention(thin) U -> V must be 
+  //   Builtin.UnknownObject
 
 Looks up the implementation of an Objective-C method with the same
 selector as the named method for the dynamic type of the
 value inside an existential container. The "self" operand of the result
 function value is represented using an opaque type, the value for which must
-be projected out as a value of type ``Builtin.ObjCPointer``.
+be projected out as a value of type ``Builtin.UnknownObject``.
 
 It is undefined behavior if the dynamic type of the operand does not
 have an implementation for the Objective-C method with the selector to
@@ -2584,7 +2758,7 @@ apply
   // %1, %2, etc. must be of the argument types $A, $B, etc.
   // %r will be of the return type $R
 
-  %r = apply %0<T = A, U = B>(%1, %2, ...) : $<T, U>(T, U, ...) -> R
+  %r = apply %0<A, B>(%1, %2, ...) : $<T, U>(T, U, ...) -> R
   // %0 must be of a polymorphic function type $<T, U>(T, U, ...) -> R
   // %1, %2, etc. must be of the argument types after substitution $A, $B, etc.
   // %r will be of the substituted return type $R'
@@ -2628,7 +2802,7 @@ partial_apply
   //   of the tail part of the argument tuple of %0
   // %c will be of the partially-applied thick function type (Z...) -> R
 
-  %c = partial_apply %0<T = A, U = B>(%1, %2, ...) : $(Z..., T, U, ...) -> R
+  %c = partial_apply %0<A, B>(%1, %2, ...) : $(Z..., T, U, ...) -> R
   // %0 must be of a polymorphic function type $<T, U>(T, U, ...) -> R
   // %1, %2, etc. must be of the argument types after substitution $A, $B, etc.
   //   of the tail part of the argument tuple of %0
@@ -2659,33 +2833,35 @@ to register arguments. This should be fixed.
 This instruction is used to implement both curry thunks and closures. A
 curried function in Swift::
 
-  func foo(a:A)(b:B)(c:C)(d:D) -> E { /* body of foo */ }
+  func foo(_ a:A)(b:B)(c:C)(d:D) -> E { /* body of foo */ }
 
 emits curry thunks in SIL as follows (retains and releases omitted for
 clarity)::
 
-  func @foo : $@thin A -> B -> C -> D -> E {
+  func @foo : $@convention(thin) A -> B -> C -> D -> E {
   entry(%a : $A):
-    %foo_1 = function_ref @foo_1 : $@thin (B, A) -> C -> D -> E
-    %thunk = partial_apply %foo_1(%a) : $@thin (B, A) -> C -> D -> E
+    %foo_1 = function_ref @foo_1 : $@convention(thin) (B, A) -> C -> D -> E
+    %thunk = partial_apply %foo_1(%a) : $@convention(thin) (B, A) -> C -> D -> E
     return %thunk : $B -> C -> D -> E
   }
 
-  func @foo_1 : $@thin (B, A) -> C -> D -> E {
+  func @foo_1 : $@convention(thin) (B, A) -> C -> D -> E {
   entry(%b : $B, %a : $A):
-    %foo_2 = function_ref @foo_2 : $@thin (C, B, A) -> D -> E
-    %thunk = partial_apply %foo_2(%b, %a) : $@thin (C, B, A) -> D -> E
+    %foo_2 = function_ref @foo_2 : $@convention(thin) (C, B, A) -> D -> E
+    %thunk = partial_apply %foo_2(%b, %a) \
+      : $@convention(thin) (C, B, A) -> D -> E
     return %thunk : $(B, A) -> C -> D -> E
   }
 
-  func @foo_2 : $@thin (C, B, A) -> D -> E {
+  func @foo_2 : $@convention(thin) (C, B, A) -> D -> E {
   entry(%c : $C, %b : $B, %a : $A):
-    %foo_3 = function_ref @foo_3 : $@thin (D, C, B, A) -> E
-    %thunk = partial_apply %foo_3(%c, %b, %a) : $@thin (D, C, B, A) -> E
+    %foo_3 = function_ref @foo_3 : $@convention(thin) (D, C, B, A) -> E
+    %thunk = partial_apply %foo_3(%c, %b, %a) \
+      : $@convention(thin) (D, C, B, A) -> E
     return %thunk : $(C, B, A) -> D -> E
   }
 
-  func @foo_3 : $@thin (D, C, B, A) -> E {
+  func @foo_3 : $@convention(thin) (D, C, B, A) -> E {
   entry(%d : $D, %c : $C, %b : $B, %a : $A):
     // ... body of foo ...
   }
@@ -2693,8 +2869,8 @@ clarity)::
 A local function in Swift that captures context, such as ``bar`` in the
 following example::
 
-  func foo(x:Int) -> Int {
-    func bar(y:Int) -> Int {
+  func foo(_ x:Int) -> Int {
+    func bar(_ y:Int) -> Int {
       return x + y
     }
     return bar(1)
@@ -2702,21 +2878,22 @@ following example::
 
 lowers to an uncurried entry point and is curried in the enclosing function::
   
-  func @bar : $@thin (Int, @box Int, *Int) -> Int {
+  func @bar : $@convention(thin) (Int, @box Int, *Int) -> Int {
   entry(%y : $Int, %x_box : $@box Int, %x_address : $*Int):
     // ... body of bar ...
   }
 
-  func @foo : $@thin Int -> Int {
+  func @foo : $@convention(thin) Int -> Int {
   entry(%x : $Int):
     // Create a box for the 'x' variable
     %x_box = alloc_box $Int
-    store %x to %x_box#1 : $*Int
+    %x_addr = project_box %x_box : $@box Int
+    store %x to %x_addr : $*Int
 
     // Create the bar closure
     %bar_uncurried = function_ref @bar : $(Int, Int) -> Int
-    %bar = partial_apply %bar_uncurried(%x_box#0, %x_box#1) \
-      : $(Int, Builtin.ObjectPointer, *Int) -> Int
+    %bar = partial_apply %bar_uncurried(%x_box, %x_addr) \
+      : $(Int, Builtin.NativeObject, *Int) -> Int
 
     // Apply it
     %1 = integer_literal $Int, 1
@@ -2754,8 +2931,8 @@ metatype
 
   sil-instruction ::= 'metatype' sil-type
 
-  %1 = metatype $T.metatype
-  // %1 has type $T.metatype
+  %1 = metatype $T.Type
+  // %1 has type $T.Type
 
 Creates a reference to the metatype object for type ``T``.
 
@@ -2765,9 +2942,9 @@ value_metatype
 
   sil-instruction ::= 'value_metatype' sil-type ',' sil-operand
 
-  %1 = value_metatype $T.metatype, %0 : $T
+  %1 = value_metatype $T.Type, %0 : $T
   // %0 must be a value or address of type $T
-  // %1 will be of type $T.metatype
+  // %1 will be of type $T.Type
 
 Obtains a reference to the dynamic metatype of the value ``%0``.
 
@@ -2777,10 +2954,10 @@ existential_metatype
 
   sil-instruction ::= 'existential_metatype' sil-type ',' sil-operand
 
-  %1 = existential_metatype $P.metatype, %0 : $P
+  %1 = existential_metatype $P.Type, %0 : $P
   // %0 must be a value of class protocol or protocol composition
   //   type $P, or an address of address-only protocol type $*P
-  // %1 will be a $P.metatype value referencing the metatype of the
+  // %1 will be a $P.Type value referencing the metatype of the
   //   concrete value inside %0
 
 Obtains the metatype of the concrete value
@@ -2980,16 +3157,16 @@ the enum is injected with an `inject_enum_addr`_ instruction::
   sil @init_with_data : $(AddressOnlyType) -> AddressOnlyEnum {
   entry(%0 : $*AddressOnlyEnum, %1 : $*AddressOnlyType):
     // Store the data argument for the case.
-    %2 = init_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData
+    %2 = init_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt.1
     copy_addr [take] %2 to [initialization] %1 : $*AddressOnlyType
     // Inject the tag.
-    inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData
+    inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt.1
     return
   }
 
   sil @init_without_data : $() -> AddressOnlyEnum {
     // No data. We only need to inject the tag.
-    inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.NoData
+    inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.NoData!enumelt
     return
   }
 
@@ -3000,7 +3177,7 @@ discriminator and is done with the `switch_enum`_ terminator::
 
   sil @switch_foo : $(Foo) -> () {
   entry(%foo : $Foo):
-    switch_enum %foo : $Foo, case #Foo.A: a_dest, case #Foo.B: b_dest
+    switch_enum %foo : $Foo, case #Foo.A!enumelt.1: a_dest, case #Foo.B!enumelt.1: b_dest
     
   a_dest(%a : $Int):
     /* use %a */
@@ -3017,14 +3194,15 @@ projecting the enum value with `unchecked_take_enum_data_addr`_::
 
   sil @switch_foo : $<T> (Foo<T>) -> () {
   entry(%foo : $*Foo<T>):
-    switch_enum_addr %foo : $*Foo<T>, case #Foo.A: a_dest, case #Foo.B: b_dest
+    switch_enum_addr %foo : $*Foo<T>, case #Foo.A!enumelt.1: a_dest, \
+      case #Foo.B!enumelt.1: b_dest
     
   a_dest:
-    %a = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.A
+    %a = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.A!enumelt.1
     /* use %a */
   
   b_dest:
-    %b = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.B
+    %b = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.B!enumelt.1
     /* use %b */
   }
 
@@ -3034,8 +3212,8 @@ enum
 
   sil-instruction ::= 'enum' sil-type ',' sil-decl-ref (',' sil-operand)?
 
-  %1 = enum $U, #U.EmptyCase
-  %1 = enum $U, #U.DataCase, %0 : $T
+  %1 = enum $U, #U.EmptyCase!enumelt
+  %1 = enum $U, #U.DataCase!enumelt.1, %0 : $T
   // $U must be an enum type
   // #U.DataCase or #U.EmptyCase must be a case of enum $U
   // If #U.Case has a data type $T, %0 must be a value of type $T
@@ -3051,7 +3229,7 @@ unchecked_enum_data
 
   sil-instruction ::= 'unchecked_enum_data' sil-operand ',' sil-decl-ref
 
-  %1 = unchecked_enum_data %0 : $U, #U.DataCase
+  %1 = unchecked_enum_data %0 : $U, #U.DataCase!enumelt.1
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of object type $T for the data type of case U.DataCase
@@ -3066,7 +3244,7 @@ init_enum_data_addr
 
   sil-instruction ::= 'init_enum_data_addr' sil-operand ',' sil-decl-ref
 
-  %1 = init_enum_data_addr %0 : $*U, #U.DataCase
+  %1 = init_enum_data_addr %0 : $*U, #U.DataCase!enumelt.1
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
@@ -3088,7 +3266,7 @@ inject_enum_addr
 
   sil-instruction ::= 'inject_enum_addr' sil-operand ',' sil-decl-ref
 
-  inject_enum_addr %0 : $*U, #U.Case
+  inject_enum_addr %0 : $*U, #U.Case!enumelt
   // $U must be an enum type
   // #U.Case must be a case of enum $U
   // %0 will be overlaid with the tag for #U.Case
@@ -3108,7 +3286,7 @@ unchecked_take_enum_data_addr
 
   sil-instruction ::= 'unchecked_take_enum_data_addr' sil-operand ',' sil-decl-ref
 
-  %1 = unchecked_take_enum_data_addr %0 : $*U, #U.DataCase
+  %1 = unchecked_take_enum_data_addr %0 : $*U, #U.DataCase!enumelt.1
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
@@ -3135,8 +3313,8 @@ select_enum
                       ':' sil-type
 
   %n = select_enum %0 : $U,      \
-    case #U.Case1: %1,           \
-    case #U.Case2: %2, /* ... */ \
+    case #U.Case1!enumelt: %1,           \
+    case #U.Case2!enumelt: %2, /* ... */ \
     default %3 : $T
 
   // $U must be an enum type
@@ -3149,8 +3327,8 @@ enum value. This is equivalent to a trivial `switch_enum`_ branch sequence::
 
   entry:
     switch_enum %0 : $U,            \
-      case #U.Case1: bb1,           \
-      case #U.Case2: bb2, /* ... */ \
+      case #U.Case1!enumelt: bb1,           \
+      case #U.Case2!enumelt: bb2, /* ... */ \
       default bb_default
   bb1:
     br cont(%1 : $T) // value for #U.Case1
@@ -3174,8 +3352,8 @@ select_enum_addr
                       ':' sil-type
 
   %n = select_enum_addr %0 : $*U,      \
-    case #U.Case1: %1,           \
-    case #U.Case2: %2, /* ... */ \
+    case #U.Case1!enumelt: %1,           \
+    case #U.Case2!enumelt: %2, /* ... */ \
     default %3 : $T
 
   // %0 must be the address of an enum type $*U
@@ -3237,33 +3415,35 @@ container may use one of several representations:
   * `init_existential_metatype`_
   * `open_existential_metatype`_
 
-- **Boxed existential containers**: The standard library ``ErrorType`` protocol
+- **Boxed existential containers**: The standard library ``ErrorProtocol`` protocol
   uses a size-optimized reference-counted container, which indirectly stores
   the conforming value. Boxed existential containers can be ``retain``-ed
   and ``release``-d. The following instructions manipulate boxed existential
   containers:
 
   * `alloc_existential_box`_
+  * `project_existential_box`_
   * `open_existential_box`_
   * `dealloc_existential_box`_
 
 Some existential types may additionally support specialized representations
 when they contain certain known concrete types. For example, when Objective-C
-interop is available, the ``ErrorType`` protocol existential supports
+interop is available, the ``ErrorProtocol`` protocol existential supports
 a class existential container representation for ``NSError`` objects, so it
 can be initialized from one using ``init_existential_ref`` instead of the
 more expensive ``alloc_existential_box``::
 
   bb(%nserror: $NSError):
-    // The slow general way to form an ErrorType, allocating a box and
+    // The slow general way to form an ErrorProtocol, allocating a box and
     // storing to its value buffer:
-    %error1 = alloc_existential_box $ErrorType, $NSError
+    %error1 = alloc_existential_box $ErrorProtocol, $NSError
+    %addr = project_existential_box $NSError in %error1 : $ErrorProtocol
     strong_retain %nserror: $NSError
-    store %nserror to %error1#1 : $NSError
+    store %nserror to %addr : $NSError
 
     // The fast path supported for NSError:
     strong_retain %nserror: $NSError
-    %error2 = init_existential_ref %nserror: $NSError, $ErrorType
+    %error2 = init_existential_ref %nserror: $NSError, $ErrorProtocol
 
 init_existential_addr
 `````````````````````
@@ -3401,7 +3581,7 @@ alloc_existential_box
   // $P must be a protocol or protocol composition type with boxed
   //   representation
   // $T must be an AST type that conforms to P
-  // %1#0 will be of type $P
+  // %1 will be of type $P
   // %1#1 will be of type $*T', where T' is the most abstracted lowering of T
 
 Allocates a boxed existential container of type ``$P`` with space to hold a
@@ -3409,8 +3589,25 @@ value of type ``$T'``. The box is not fully initialized until a valid value
 has been stored into the box. If the box must be deallocated before it is
 fully initialized, ``dealloc_existential_box`` must be used. A fully
 initialized box can be ``retain``-ed and ``release``-d like any
-reference-counted type.  The address ``%0#1`` is dependent on the lifetime of
-the owner reference ``%0#0``.
+reference-counted type.  The ``project_existential_box`` instruction is used
+to retrieve the address of the value inside the container.
+
+project_existential_box
+```````````````````````
+::
+
+  sil-instruction ::= 'project_existential_box' sil-type 'in' sil-operand
+
+  %1 = project_existential_box $T in %0 : $P
+  // %0 must be a value of boxed protocol or protocol composition type $P
+  // $T must be the most abstracted lowering of the AST type for which the box
+  // was allocated
+  // %1 will be of type $*T
+
+Projects the address of the value inside a boxed existential container.
+The address is dependent on the lifetime of the owner reference ``%0``.
+It is undefined behavior if the concrete type ``$T`` is not the same type for
+which the box was allocated with ``alloc_existential_box``.
 
 open_existential_box
 ````````````````````
@@ -3568,7 +3765,7 @@ unchecked_addr_cast
 
 Converts an address to a different address type. Using the resulting
 address is undefined unless ``B`` is layout compatible with ``A``. The
-layout of ``A`` may be smaller than that of ``B`` as long as the lower
+layout of ``B`` may be smaller than that of ``A`` as long as the lower
 order bytes have identical layout.
 
 unchecked_trivial_bit_cast
@@ -3605,7 +3802,7 @@ ref_to_raw_pointer
   sil-instruction ::= 'ref_to_raw_pointer' sil-operand 'to' sil-type
 
   %1 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
-  // $C must be a class type, or Builtin.ObjectPointer, or Builtin.ObjCPointer
+  // $C must be a class type, or Builtin.NativeObject, or Builtin.UnknownObject
   // %1 will be of type $Builtin.RawPointer
 
 Converts a heap object reference to a ``Builtin.RawPointer``. The ``RawPointer``
@@ -3620,7 +3817,7 @@ raw_pointer_to_ref
   sil-instruction ::= 'raw_pointer_to_ref' sil-operand 'to' sil-type
 
   %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
-  // $C must be a class type, or Builtin.ObjectPointer, or Builtin.ObjCPointer
+  // $C must be a class type, or Builtin.NativeObject, or Builtin.UnknownObject
   // %1 will be of type $C
 
 Converts a ``Builtin.RawPointer`` back to a heap object reference. Casting
@@ -3787,10 +3984,10 @@ thick_to_objc_metatype
 
   sil-instruction ::= 'thick_to_objc_metatype' sil-operand 'to' sil-type
 
-  %1 = thick_to_objc_metatype %0 : $@thick T.metatype to $@objc_metatype T.metatype
-  // %0 must be of a thick metatype type $@thick T.metatype
+  %1 = thick_to_objc_metatype %0 : $@thick T.Type to $@objc_metatype T.Type
+  // %0 must be of a thick metatype type $@thick T.Type
   // The destination type must be the corresponding Objective-C metatype type
-  // %1 will be of type $@objc_metatype T.metatype
+  // %1 will be of type $@objc_metatype T.Type
 
 Converts a thick metatype to an Objective-C class metatype. ``T`` must
 be of class, class protocol, or class protocol composition type.
@@ -3801,10 +3998,10 @@ objc_to_thick_metatype
 
   sil-instruction ::= 'objc_to_thick_metatype' sil-operand 'to' sil-type
 
-  %1 = objc_to_thick_metatype %0 : $@objc_metatype T.metatype to $@thick T.metatype
-  // %0 must be of an Objective-C metatype type $@objc_metatype T.metatype
+  %1 = objc_to_thick_metatype %0 : $@objc_metatype T.Type to $@thick T.Type
+  // %0 must be of an Objective-C metatype type $@objc_metatype T.Type
   // The destination type must be the corresponding thick metatype type
-  // %1 will be of type $@thick T.metatype
+  // %1 will be of type $@thick T.Type
 
 Converts an Objective-C class metatype to a thick metatype. ``T`` must
 be of class, class protocol, or class protocol composition type.
@@ -3936,23 +4133,6 @@ will be the operand of this ``return`` instruction.
 
 A function must not contain more than one ``return`` instruction.
 
-autorelease_return
-``````````````````
-::
-
-  sil-terminator ::= 'autorelease_return' sil-operand
-
-  autorelease_return %0 : $T
-  // $T must be the return type of the current function, which must be of
-  //   class type
-
-Exits the current function and returns control to the calling function. The
-result of the ``apply`` instruction that invoked the current function will be
-the operand of this ``return`` instruction. The return value is autoreleased
-into the active Objective-C autorelease pool using the "autoreleased return
-value" optimization. The current function must use the ``@cc(objc_method)``
-calling convention.
-
 throw
 `````
 ::
@@ -4041,7 +4221,7 @@ select_value
   sil-instruction ::= 'select_value' sil-operand sil-select-value-case*
                       (',' 'default' sil-value)?
                       ':' sil-type
-  sil-selct-value-case ::= 'case' sil-value ':' sil-value
+  sil-select-value-case ::= 'case' sil-value ':' sil-value
 
 
   %n = select_value %0 : $U, \
@@ -4054,7 +4234,7 @@ select_value
   // %r1, %r2, %r3, etc. must have type $T
   // %n has type $T
 
-Selects one of the "case" or "default" operands based on the case of an
+Selects one of the "case" or "default" operands based on the case of a
 value. This is equivalent to a trivial `switch_value`_ branch sequence::
 
   entry:
@@ -4082,8 +4262,8 @@ switch_enum
                        (',' sil-switch-default)?
   sil-switch-enum-case ::= 'case' sil-decl-ref ':' sil-identifier
 
-  switch_enum %0 : $U, case #U.Foo: label1, \
-                        case #U.Bar: label2, \
+  switch_enum %0 : $U, case #U.Foo!enumelt: label1, \
+                        case #U.Bar!enumelt: label2, \
                         ...,                 \
                         default labelN
 
@@ -4117,12 +4297,12 @@ original enum value.  For example::
   sil @sum_of_foo : $Foo -> Int {
   entry(%x : $Foo):
     switch_enum %x : $Foo,       \
-      case #Foo.Nothing: nothing, \
-      case #Foo.OneInt:  one_int, \
-      case #Foo.TwoInts: two_ints
+      case #Foo.Nothing!enumelt: nothing, \
+      case #Foo.OneInt!enumelt.1:  one_int, \
+      case #Foo.TwoInts!enumelt.1: two_ints
 
   nothing:
-    %zero = integer_literal 0 : $Int
+    %zero = integer_literal $Int, 0
     return %zero : $Int
 
   one_int(%y : $Int):
@@ -4158,8 +4338,8 @@ switch_enum_addr
                        (',' sil-switch-enum-case)*
                        (',' sil-switch-default)?
 
-  switch_enum_addr %0 : $*U, case #U.Foo: label1, \
-                                          case #U.Bar: label2, \
+  switch_enum_addr %0 : $*U, case #U.Foo!enumelt: label1, \
+                                          case #U.Bar!enumelt: label2, \
                                           ...,                 \
                                           default labelN
 
@@ -4316,10 +4496,10 @@ constant replacement but leave the function application to be serialized to
 sil).
 
 The compiler flag that influences the value of the ``assert_configuration``
-funtion application is the optimization flag: at ``-Onone` the application will
+function application is the optimization flag: at ``-Onone` the application will
 be replaced by ``Debug`` at higher optimization levels the instruction will be
 replaced by ``Release``. Optionally, the value to use for replacement can be
-specified with the ``-AssertConf`` flag which overwrites the value selected by
+specified with the ``-assert-config`` flag which overwrites the value selected by
 the optimization flag (possible values are ``Debug``, ``Release``,
 ``DisableReplacement``).
 

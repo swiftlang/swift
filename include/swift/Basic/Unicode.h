@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -83,8 +83,7 @@ unsigned extractFirstUnicodeScalar(StringRef S);
 /// Returns the number of code units in UTF16 representation
 uint64_t getUTF16Length(StringRef Str);
 
-} // namespace unicode
-} // namespace swift
+} // end namespace unicode
+} // end namespace swift
 
-#endif
-
+#endif // SWIFT_BASIC_UNICODE_H

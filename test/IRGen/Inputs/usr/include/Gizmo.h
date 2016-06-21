@@ -40,6 +40,10 @@ typedef long NSInteger;
 + (void) runce;
 @end
 
+@interface BaseClassForMethodFamilies : NSObject
+- (BaseClassForMethodFamilies *)fakeInitFamily __attribute__((objc_method_family(init)));
+@end
+
 static inline int innerZero(void) { return 0; }
 static inline int zero(void) { return innerZero(); }
 static inline int wrappedZero(void) { return zero(); }
