@@ -2508,10 +2508,11 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
 
 /// Diagnose C style for loops.
 
-enum OperatorKind {
+namespace {
+enum class OperatorKind {
   Greater,
   Smaller,
-  NEqual,
+  NotEqual,
 };
 
 static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS,
@@ -2535,7 +2536,7 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS,
   // Verify that the condition is a simple != or < comparison to the loop variable.
   auto comparisonOpName = binaryFuncExpr->getDecl()->getNameStr();
   if (comparisonOpName == "!=")
-    OpKind = OperatorKind::NEqual;
+    OpKind = OperatorKind::NotEqual;
   else if (comparisonOpName == "<")
     OpKind = OperatorKind::Smaller;
   else if (comparisonOpName == ">")
@@ -2557,7 +2558,7 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS,
 
 static bool unaryOperatorCheckForConvertingCStyleForLoop(const ForStmt *FS,
                                                          VarDecl *loopVar,
-                                                         StringRef OpContent) {
+                                                         StringRef OpName) {
   auto *Increment = FS->getIncrement().getPtrOrNull();
   if (!Increment)
     return false;
@@ -2575,7 +2576,7 @@ static bool unaryOperatorCheckForConvertingCStyleForLoop(const ForStmt *FS,
   auto unaryFuncExpr = dyn_cast<DeclRefExpr>(unaryExpr->getFn());
   if (!unaryFuncExpr)
     return false;
-  if (unaryFuncExpr->getDecl()->getNameStr() != OpContent)
+  if (unaryFuncExpr->getDecl()->getNameStr() != OpName)
     return false;
   return incrementDeclRefExpr->getDecl() == loopVar;
 }
@@ -2594,7 +2595,7 @@ static bool unaryDecrementForConvertingCStyleForLoop(const ForStmt *FS,
 static bool binaryOperatorCheckForConvertingCStyleForLoop(TypeChecker &TC,
                                                             const ForStmt *FS,
                                                             VarDecl *loopVar,
-                                                            StringRef OpContent) {
+                                                            StringRef OpName) {
   auto *Increment = FS->getIncrement().getPtrOrNull();
   if (!Increment)
     return false;
@@ -2604,7 +2605,7 @@ static bool binaryOperatorCheckForConvertingCStyleForLoop(TypeChecker &TC,
   auto binaryFuncExpr = dyn_cast<DeclRefExpr>(binaryExpr->getFn());
   if (!binaryFuncExpr)
     return false;
-  if (binaryFuncExpr->getDecl()->getNameStr() != OpContent)
+  if (binaryFuncExpr->getDecl()->getNameStr() != OpName)
     return false;
   auto argTupleExpr = dyn_cast<TupleExpr>(binaryExpr->getArg());
   if (!argTupleExpr)
@@ -2690,11 +2691,11 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
 
   if (strideByOne && OpKind != OperatorKind::Greater) {
     diagnostic
-    .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
-    .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
-    .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(),
+      .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
+      .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
+      .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(),
                        " ..< ")
-    .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
+      .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
     return;
   } else if (strideBackByOne && OpKind != OperatorKind::Smaller) {
     SourceLoc startValueEnd = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
@@ -2704,14 +2705,14 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
       Lexer::getLocForEndOfToken(TC.Context.SourceMgr, endValue->getEndLoc())).str();
 
     diagnostic
-    .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
-    .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
-    .fixItInsert(startValue->getStartLoc(), (llvm::Twine("((") + endValueStr + " + 1)...").str())
-    .fixItInsert(startValueEnd, ").reversed()")
-    .fixItRemoveChars(FS->getFirstSemicolonLoc(), endOfIncrementLoc);
+      .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
+      .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
+      .fixItInsert(startValue->getStartLoc(), (llvm::Twine("((") + endValueStr + " + 1)...").str())
+      .fixItInsert(startValueEnd, ").reversed()")
+      .fixItRemoveChars(FS->getFirstSemicolonLoc(), endOfIncrementLoc);
   }
 }
-
+}// Anonymous namespace end.
 
 // Perform MiscDiagnostics on Switch Statements.
 static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
