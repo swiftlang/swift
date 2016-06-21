@@ -13,8 +13,8 @@
 import SwiftShims
 
 internal class _Box<T> {
-  var value = [String]()
-  init(_ value : [String]) { self.value = value }
+  internal var _value: T
+  internal init(_ value: T) { self._value = value }
 }
 
 /// Command-line arguments for the current process.
@@ -64,13 +64,13 @@ public enum Process {
 
     // Check whether argument has been initialized.
     if let arguments = _stdlib_atomicLoadARCRef(object: argumentsPtr) {
-      return (arguments as! _Box<[String]>).value
+      return (arguments as! _Box<[String]>)._value
     }
 
     let arguments = _Box<[String]>(_computeArguments())
     _stdlib_atomicInitializeARCRef(object: argumentsPtr, desired: arguments)
 
-    return arguments.value
+    return arguments._value
   } 
 }
 
