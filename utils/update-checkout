@@ -122,7 +122,7 @@ def obtain_additional_swift_sources(
                 shell.call(['git', '--git-dir', src_path, '--work-tree',
                             os.path.join(SWIFT_SOURCE_ROOT, repo_name),
                             'checkout', repo_branch], echo=False)
-    with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, dir_name),
+    with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
                          dry_run=False, echo=False):
         shell.call(["git", "submodule", "update", "--recursive"],
                              echo=False)
