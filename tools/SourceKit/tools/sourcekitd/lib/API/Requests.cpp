@@ -21,6 +21,7 @@
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
+#include "SourceKit/SwiftLang/Factory.h"
 
 #include "swift/Basic/DemangleWrappers.h"
 
@@ -132,7 +133,8 @@ static void onDocumentUpdateNotification(StringRef DocumentName) {
 static SourceKit::Context *GlobalCtx = nullptr;
 
 void sourcekitd::initialize() {
-  GlobalCtx = new SourceKit::Context(sourcekitd::getRuntimeLibPath());
+  GlobalCtx = new SourceKit::Context(sourcekitd::getRuntimeLibPath(),
+                                     SourceKit::createSwiftLangSupport);
   GlobalCtx->getNotificationCenter().addDocumentUpdateNotificationReceiver(
     onDocumentUpdateNotification);
 }
