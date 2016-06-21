@@ -1043,7 +1043,7 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     
     bool mismatch(SubstitutableType *paramType, TypeBase *argType) {
       Type type = paramType;
-      if (dc && type->isTypeParameter())
+      if (dc && dc->getGenericParamsOfContext() && type->isTypeParameter())
         type = ArchetypeBuilder::mapTypeIntoContext(dc, paramType);
       
       if (auto archetype = type->getAs<ArchetypeType>()) {
@@ -1062,7 +1062,7 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
   paramType.findIf([&](Type type) -> bool {
     if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
       Type original = substitution->getOriginal();
-      if (dc && original->isTypeParameter())
+      if (dc && dc->getGenericParamsOfContext() && original->isTypeParameter())
         original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
       
       Type replacement = substitution->getReplacementType();
