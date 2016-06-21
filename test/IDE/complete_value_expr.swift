@@ -171,6 +171,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_2 | FileCheck %s -check-prefix=GENERIC_TYPEALIAS_2
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 | FileCheck %s -check-prefix=DEPRECATED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DOT_EXPR_NON_NOMINAL_1 | FileCheck %s -check-prefix=DOT_EXPR_NON_NOMINAL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DOT_EXPR_NON_NOMINAL_2 | FileCheck %s -check-prefix=DOT_EXPR_NON_NOMINAL_2
 
 // Test code completion of expressions that produce a value.
 
@@ -1890,3 +1892,26 @@ struct Deprecated {
   }
 }
 // DEPRECATED_1: Decl[InstanceMethod]/CurrNominal/NotRecommended: deprecated({#x: Deprecated#})[#Void#];
+
+struct Person {
+  var firstName: String
+}
+class Other { var nameFromOther: Int = 1 }
+class TestDotExprWithNonNominal {
+  var other: Other
+
+  func test1() {
+    let person = Person(firstName: other.#^DOT_EXPR_NON_NOMINAL_1^#)
+// DOT_EXPR_NON_NOMINAL_1-NOT: Instance
+// DOT_EXPR_NON_NOMINAL_1: Decl[InstanceVar]/CurrNominal:      nameFromOther[#Int#];
+// DOT_EXPR_NON_NOMINAL_1-NOT: Instance
+  }
+  func test2() {
+    let person = Person(firstName: 1.#^DOT_EXPR_NON_NOMINAL_2^#)
+// DOT_EXPR_NON_NOMINAL_2-NOT: other
+// DOT_EXPR_NON_NOMINAL_2-NOT: firstName
+// DOT_EXPR_NON_NOMINAL_2: Decl[InstanceVar]/CurrNominal:      hashValue[#Int#];
+// DOT_EXPR_NON_NOMINAL_2-NOT: other
+// DOT_EXPR_NON_NOMINAL_2-NOT: firstName
+  }
+}

@@ -4887,37 +4887,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::DotExpr: {
     Lookup.setHaveDot(DotLoc);
-    Type OriginalType = *ExprType;
-    Type ExprType = OriginalType;
 
-    // If there is no nominal type in the expr, try to find nominal types
-    // in the ancestors of the expr.
-    if (!OriginalType->getAnyNominal()) {
-      ExprParentFinder Walker(ParsedExpr, [&](ASTNode Node) {
-        if (auto E = Node.dyn_cast<Expr *>()) {
-          return E->getType() && E->getType()->getAnyNominal();
-        } else {
-          return false;
-        }
-      });
-      CurDeclContext->walkContext(Walker);
-      if (auto PCE = Walker.ParentClosest.dyn_cast<Expr *>()) {
-        ExprType = PCE->getType();
-      } else {
-        ExprType = OriginalType;
-      }
-    }
-
-    if (isDynamicLookup(ExprType))
+    if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
-    Lookup.initializeArchetypeTransformer(CurDeclContext, ExprType);
+    Lookup.initializeArchetypeTransformer(CurDeclContext, *ExprType);
 
     CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext, ParsedExpr);
     llvm::SmallVector<Type, 2> PossibleTypes;
     if (TypeAnalyzer.Analyze(PossibleTypes)) {
       Lookup.setExpectedTypes(PossibleTypes);
     }
-    Lookup.getValueExprCompletions(ExprType, ReferencedDecl.getDecl());
+    Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     break;
   }
 
