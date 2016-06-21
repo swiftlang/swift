@@ -349,7 +349,8 @@ private:
     CounterExpr *JumpsToLabel = nullptr;
     Stmt *ParentStmt = Parent.getAsStmt();
     if (ParentStmt) {
-      if (isa<DoCatchStmt>(ParentStmt) || isa<CatchStmt>(ParentStmt))
+      if (isa<DoStmt>(ParentStmt) || isa<DoCatchStmt>(ParentStmt) ||
+          isa<CatchStmt>(ParentStmt))
         return;
       if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
         JumpsToLabel = &getCounter(LS);
@@ -529,6 +530,10 @@ public:
 
     } else if (isa<CaseStmt>(S)) {
       pushRegion(S);
+
+    } else if (auto *DS = dyn_cast<DoStmt>(S)) {
+      assignCounter(DS->getBody(), CounterExpr::Ref(getCurrentCounter()));
+      assignCounter(DS);
 
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
       assignCounter(DCS->getBody(), CounterExpr::Ref(getCurrentCounter()));
