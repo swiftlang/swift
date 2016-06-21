@@ -190,7 +190,7 @@ class TestData : TestDataSuper {
     
     func testCustomData() {
         let length = 5
-        let allOnesData = AllOnesData(length: length) as Data
+        let allOnesData = Data(reference: AllOnesData(length: length))
         expectEqual(1, allOnesData[0], "First byte of all 1s data should be 1")
         
         // Double the length
@@ -246,7 +246,7 @@ class TestData : TestDataSuper {
         let allOnes = AllOnesData(length: 64)
         
         // Type-erased
-        let data = allOnes as Data
+        let data = Data(reference: allOnes)
         
         // Create a home for our test data
         let dirPath = (NSTemporaryDirectory() as NSString).appendingPathComponent(NSUUID().uuidString)
@@ -291,7 +291,7 @@ class TestData : TestDataSuper {
         expectEqual(s.count, 2, "Expected only two entries in the Set")
     }
     
-    func testSubsequences() {
+    func testReplaceBytes() {
         var hello = dataFrom("Hello")
         let world = dataFrom("World")
         
@@ -306,7 +306,7 @@ class TestData : TestDataSuper {
         expectEqual(goodbyeWorld, expected)
     }
     
-    func testSubsequences2() {
+    func testReplaceBytes2() {
         let hello = dataFrom("Hello")
         let world = dataFrom(" World")
         let goodbye = dataFrom("Goodbye")
@@ -320,8 +320,29 @@ class TestData : TestDataSuper {
         }
         expectEqual(mutateMe, expected)
     }
+    
+    func testReplaceBytes3() {
+        // The expected result
+        let expectedBytes : [UInt8] = [1, 2, 9, 10, 11, 12, 13]
+        let expected = expectedBytes.withUnsafeBufferPointer {
+            return Data(buffer: $0)
+        }
+        
+        // The data we'll mutate
+        let someBytes : [UInt8] = [1, 2, 3, 4, 5]
+        var a = someBytes.withUnsafeBufferPointer {
+            return Data(buffer: $0)
+        }
+        
+        // The bytes we'll insert
+        let b : [UInt8] = [9, 10, 11, 12, 13]
+        b.withUnsafeBufferPointer {
+            a.replaceBytes(in: 2..<5, with: $0)
+        }
+        expectEqual(expected, a)
+    }
 
-    func testSubsequences3() {
+    func testRange() {
         let helloWorld = dataFrom("Hello World")
         let goodbye = dataFrom("Goodbye")
         let hello = dataFrom("Hello")
@@ -774,9 +795,10 @@ DataTests.test("testBridgingMutable") { TestData().testBridgingMutable() }
 DataTests.test("testBridgingCustom") { TestData().testBridgingCustom() }
 DataTests.test("testEquality") { TestData().testEquality() }
 DataTests.test("testDataInSet") { TestData().testDataInSet() }
-DataTests.test("testSubsequences") { TestData().testSubsequences() }
-DataTests.test("testSubsequences2") { TestData().testSubsequences2() }
-DataTests.test("testSubsequences3") { TestData().testSubsequences3() }
+DataTests.test("testReplaceBytes") { TestData().testReplaceBytes() }
+DataTests.test("testReplaceBytes2") { TestData().testReplaceBytes2() }
+DataTests.test("testReplaceBytes3") { TestData().testReplaceBytes3() }
+DataTests.test("testRange") { TestData().testRange() }
 DataTests.test("testInsertData") { TestData().testInsertData() }
 DataTests.test("testLoops") { TestData().testLoops() }
 DataTests.test("testGenericAlgorithms") { TestData().testGenericAlgorithms() }
@@ -809,6 +831,26 @@ DataTests.test("bounding failure replace") {
     var data = "Hello World".data(using: .utf8)!
     expectCrashLater()
     data.replaceBytes(in: 5..<200, with: Data())
+}
+
+DataTests.test("bounding failure replace2") {
+    var data = "a".data(using: .utf8)!
+    var bytes : [UInt8] = [1, 2, 3]
+    expectCrashLater()
+    bytes.withUnsafeBufferPointer {
+        // lowerBound ok, upperBound after end of data
+        data.replaceBytes(in: 0..<2, with: $0)
+    }
+}
+
+DataTests.test("bounding failure replace3") {
+    var data = "a".data(using: .utf8)!
+    var bytes : [UInt8] = [1, 2, 3]
+    expectCrashLater()
+    bytes.withUnsafeBufferPointer {
+        // lowerBound is > length
+        data.replaceBytes(in: 2..<4, with: $0)
+    }
 }
 
 DataTests.test("bounding failure reset range") {
