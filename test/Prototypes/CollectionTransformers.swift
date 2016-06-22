@@ -853,7 +853,7 @@ internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
   typealias PipelineInputElement = PipelineInputElement_
   typealias OutputElement = OutputElement_
 
-  func map<U>(_ elementTransform: (OutputElement) -> U)
+  func map<U>(_ transform: (OutputElement) -> U)
     -> _CollectionTransformerStep<PipelineInputElement, U> {
 
     fatalError("abstract method")
