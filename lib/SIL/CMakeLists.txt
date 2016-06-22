@@ -23,6 +23,7 @@ add_swift_library(swiftSIL
   SILInstructions.cpp
   SILLocation.cpp
   SILModule.cpp
+  SILOpenedArchetypesTracker.cpp
   SILPrinter.cpp
   SILSuccessor.cpp
   SILType.cpp
