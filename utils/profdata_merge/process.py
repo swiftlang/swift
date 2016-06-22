@@ -15,6 +15,8 @@ import logging
 import os
 import pipes
 import sys
+import time
+from datetime import timedelta
 
 from multiprocessing import Process
 
@@ -64,16 +66,26 @@ class ProfdataMergerProcess(Process):
             llvm_cmd.append("-sparse")
         llvm_cmd += cleaned_files
         self.report(llvm_cmd)
-
         try:
+            start = time.time()
             shell.call(llvm_cmd, echo=False)
+            end = time.time()
+            self.report("elapsed time for llvm-profdata: %s"
+                        % timedelta(seconds=(end-start)))
         except SystemExit as e:
             self.report("llvm profdata command failed: %s" % e,
                         level=logging.ERROR)
         if self.config.remove_files:
             for f in self.filename_buffer:
                 if os.path.exists(f):
+                    self.report("removing '%s'" % f)
                     os.remove(f)
+                else:
+                    self.report("not removing '%s' because it does not exist"
+                                % f)
+        else:
+            self.report("not removing %d files because --no-remove is set"
+                        % len(self.filename_buffer))
         self.filename_buffer = []
 
     def run(self):
