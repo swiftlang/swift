@@ -27,7 +27,6 @@ namespace llvm {
   class MemoryBuffer;
 }
 namespace SourceKit {
-  class Context;
 
 struct EntityInfo {
   UIdent Kind;
@@ -472,9 +471,6 @@ public:
                           StringRef ModuleName,
                           ArrayRef<const char *> Args,
                           DocInfoConsumer &Consumer) = 0;
-
-  static std::unique_ptr<LangSupport> createSwiftLangSupport(
-                                                     SourceKit::Context &SKCtx);
 };
 
 } // namespace SourceKit
