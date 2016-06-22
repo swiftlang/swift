@@ -35,6 +35,7 @@
 // DONT_CHECK-NOT: {{([^I]|$)([^n]|$)([^d]|$)([^e]|$)([^x]|$)([^a]|$)([^b]|$)([^l]|$)([^e]|$)}}
 // CHECK-NOT: buffer: _ArrayBuffer
 // CHECK-NOT: func ~>
+// CHECK-NOT: _builtin
 // CHECK-NOT: Builtin.
 // CHECK-NOT: RawPointer
 // CHECK-NOT: extension [
