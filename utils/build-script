@@ -834,6 +834,11 @@ def main_preset():
         help="'name=value' pairs that are substituted in the preset",
         nargs="*",
         metavar="SUBSTITUTION")
+    parser.add_argument(
+        "--expand-build-script-invocation",
+        help="Print the expanded build-script invocation generated "
+             "by the preset, but do not run the preset",
+        action=arguments.action.optional_bool)
     args = parser.parse_args()
 
     if len(args.preset_file_names) == 0:
@@ -872,8 +877,10 @@ def main_preset():
         "using preset '" + args.preset + "', which expands to \n\n" +
         shell.quote_command(build_script_args) + "\n")
 
-    call_without_sleeping(build_script_args)
+    if args.expand_build_script_invocation:
+        return 0
 
+    call_without_sleeping(build_script_args)
     return 0
 
 
