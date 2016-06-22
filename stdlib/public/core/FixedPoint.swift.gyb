@@ -433,24 +433,24 @@ import gyb
 fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_function",
 """
 %
-  let srcNotWord = value._value
+  let src = value._value
   let result: (value: Builtin.${BuiltinName}, error: Builtin.Int1)
 %
 %       if srcBits == bits and srcSign == sign: # Exact same size/signedness.
-  result = (srcNotWord, false._value)
+  result = (src, false._value)
 %
 %       elif srcBits == bits:  # Same size, switching signs.
-  result = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(srcNotWord)
+  result = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(src)
 %
 %       elif srcBits > bits:  # Larger input, check for truncation.
-  result = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(srcNotWord)
+  result = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(src)
 %
 %       elif srcSigned and not signed: # Smaller size input, signed going to unsigned.
-  let (tmp, signError) = Builtin.s_to_u_checked_conversion_Int${srcBits}(srcNotWord)
+  let (tmp, signError) = Builtin.s_to_u_checked_conversion_Int${srcBits}(src)
   result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp), signError)
 %
 %       else: # Smaller size input, unsigned to signed or unsigned to unsigned.
-  result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord), false._value)
+  result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(src), false._value)
 %       end
 % 
 % if not safelyConvertable:
@@ -501,12 +501,12 @@ extension ${Self} {
   @_transparent
   public init(truncatingBitPattern: ${Src}) {
 %
-    let srcNotWord = truncatingBitPattern._value
+    let src = truncatingBitPattern._value
 %
 %       if self_ty.bits == src_ty.bits:
-    let dstNotWord = srcNotWord
+    let dstNotWord = src
 %       else:
-    let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(srcNotWord)
+    let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(src)
 %       end
 %
     self._value = dstNotWord
