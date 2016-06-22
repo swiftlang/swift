@@ -1836,10 +1836,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DLLVM_TOOLS_BINARY_DIR:PATH=$(build_directory ${host} llvm)/bin
-                        -DLLVM_LIBRARY_DIR:PATH=$(build_directory ${host} llvm)/lib
-                        -DLLVM_MAIN_INCLUDE_DIR:PATH=$(build_directory ${host} llvm)/include
-                        -DLLVM_BINARY_DIR:PATH=$(build_directory ${host} llvm)
-                        -DLLVM_MAIN_SRC_DIR:PATH="${LLVM_SOURCE_DIR}"
                     )
                 else
                     build_perf_testsuite_this_time=$(true_false "$(not ${SKIP_BUILD_BENCHMARKS})")
@@ -1862,10 +1858,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DLLVM_TOOLS_BINARY_DIR:PATH=/tmp/dummy
-                        -DLLVM_LIBRARY_DIR:PATH="${build_dir}"
-                        -DLLVM_MAIN_INCLUDE_DIR:PATH=/tmp/dummy
-                        -DLLVM_BINARY_DIR:PATH=$(build_directory ${host} llvm)
-                        -DLLVM_MAIN_SRC_DIR:PATH="${LLVM_SOURCE_DIR}"
                     )
                 fi
 

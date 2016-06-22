@@ -117,10 +117,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   if(${is_cross_compiling})
     # Can't run llvm-config from the cross-compiled LLVM.
     set(LLVM_TOOLS_BINARY_DIR "" CACHE PATH "Path to llvm/bin")
-    set(LLVM_LIBRARY_DIR "" CACHE PATH "Path to llvm/lib")
-    set(LLVM_MAIN_INCLUDE_DIR "" CACHE PATH "Path to llvm/include")
-    set(LLVM_BINARY_DIR "" CACHE PATH "Path to LLVM build tree")
-    set(LLVM_MAIN_SRC_DIR "" CACHE PATH "Path to LLVM source tree")
   else()
     # Rely on llvm-config.
     _swift_llvm_config_info(
@@ -138,10 +134,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
     mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
 
     set(LLVM_TOOLS_BINARY_DIR "${llvm_config_tools_binary_dir}" CACHE PATH "Path to llvm/bin")
-    set(LLVM_LIBRARY_DIR "${llvm_config_library_dir}" CACHE PATH "Path to llvm/lib")
-    set(LLVM_MAIN_INCLUDE_DIR "${llvm_config_include_dir}" CACHE PATH "Path to llvm/include")
-    set(LLVM_BINARY_DIR "${llvm_config_obj_root}" CACHE PATH "Path to LLVM build tree")
-    set(LLVM_MAIN_SRC_DIR "${llvm_config_src_dir}" CACHE PATH "Path to LLVM source tree")
 
     set(${product}_NATIVE_LLVM_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
     set(${product}_NATIVE_CLANG_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
@@ -174,6 +166,11 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   include(${LLVMCONFIG_FILE})
   set(LLVM_TOOLS_BINARY_DIR "${LLVM_TOOLS_BINARY_DIR_saved}")
   set(LLVM_ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS_saved}")
+
+  precondition_translate_flag(LLVM_BUILD_LIBRARY_DIR LLVM_LIBRARY_DIR)
+  precondition_translate_flag(LLVM_BUILD_MAIN_INCLUDE_DIR LLVM_MAIN_INCLUDE_DIR)
+  precondition_translate_flag(LLVM_BUILD_BINARY_DIR LLVM_BINARY_DIR)
+  precondition_translate_flag(LLVM_BUILD_MAIN_SRC_DIR LLVM_MAIN_SRC_DIR)
 
   # Clang
   set(${product}_PATH_TO_CLANG_SOURCE "${PATH_TO_LLVM_SOURCE}/tools/clang"
