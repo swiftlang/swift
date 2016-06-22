@@ -6487,6 +6487,11 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       }
     }
 
+    // No sense diagnosing type errors for an invalid protocol.
+    if (proto->isInvalid()) {
+      return;
+    }
+
     // If the protocol is @objc, it may only refine other @objc protocols.
     // FIXME: Revisit this restriction.
     if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
