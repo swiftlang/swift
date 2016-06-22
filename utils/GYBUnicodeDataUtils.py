@@ -63,6 +63,11 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
         'T': 10,
         'LV': 11,
         'LVT': 12,
+        'E_Base_GAZ': 13,
+        'E_Base': 14,
+        'E_Modifier': 15,
+        'Glue_After_Zwj': 16,
+        'ZWJ': 17 
     }
 
     def __init__(self, grapheme_break_property_file_name):
@@ -495,8 +500,10 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_table):
         (['L'], 'no_boundary', ['L', 'V', 'LV', 'LVT']),
         (['LV', 'V'], 'no_boundary', ['V', 'T']),
         (['LVT', 'T'], 'no_boundary', ['T']),
+        (any_value, 'no_boundary', ['ZWJ', 'Extend']),
+        (['E_Base', 'E_Base_GAZ'], 'no_boundary', ['E_Modifier']),
+        (['ZWJ'], 'no_boundary', ['Glue_After_Zwj', 'E_Base_GAZ']),
         (['Regional_Indicator'], 'no_boundary', ['Regional_Indicator']),
-        (any_value, 'no_boundary', ['Extend']),
         (any_value, 'no_boundary', ['SpacingMark']),
         (['Prepend'], 'no_boundary', any_value),
         (any_value, 'boundary', any_value),
