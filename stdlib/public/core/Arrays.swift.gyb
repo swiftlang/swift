@@ -884,16 +884,17 @@ public struct ${Self}<Element>
 
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
-  public init(_buffer: _Buffer) {
+  public // @testable
+  init(_buffer: _Buffer) {
     self._buffer = _buffer
   }
 
 %if Self == 'ArraySlice':
-  // FIXME(ABI): SR-1873 this shim allows the below init(arrayLiteral:) to
-  // compile, but it goes through a general collection initializer instead of
-  // the expected efficient one for _SliceBuffer<Element> above.
-  public init(_buffer: _ContiguousArrayBuffer<Element>) {
-    self.init(_buffer)
+  /// Initialization from an existing buffer does not have "array.init"
+  /// semantics because the caller may retain an alias to buffer.
+  public // @testable
+  init(_buffer: _ContiguousArrayBuffer<Element>) {
+    self.init(_buffer: _Buffer(_buffer, shiftedToStartIndex: 0))
   }
 %end
 
