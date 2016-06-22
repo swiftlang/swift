@@ -64,10 +64,11 @@ class ProfdataMergerProcess(Process):
             llvm_cmd.append("-sparse")
         llvm_cmd += cleaned_files
         self.report(llvm_cmd)
-        ret = shell.call(llvm_cmd, echo=False)
-        if ret != 0:
-            self.report("llvm profdata command failed -- Exited with code %d"
-                        % ret, level=logging.ERROR)
+
+        try:
+            shell.call(llvm_cmd, echo=False)
+        except SystemExit as e:
+            self.report("llvm profdata command failed: %s" % e, level=logging.ERROR)
         if self.config.remove_files:
             for f in self.filename_buffer:
                 if os.path.exists(f):
