@@ -257,7 +257,30 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
         break;
     }
   }
-}}}
+}
+} // end namespace markup
+} // end namespace swift
+
+static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
+  // Hide private stdlib declarations.
+  if (D->isPrivateStdlibDecl(/*whitelistProtocols*/false))
+    return true;
+
+  if (AvailableAttr::isUnavailable(D))
+    return true;
+
+  if (auto *ClangD = D->getClangDecl()) {
+    if (ClangD->hasAttr<clang::SwiftPrivateAttr>())
+      return true;
+  }
+
+  // Hide editor placeholders.
+  if (D->getName().isEditorPlaceholder())
+    return true;
+
+  return false;
+}
+
 typedef llvm::function_ref<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
 DeclFilter DefaultFilter = [] (ValueDecl* VD, DeclVisibilityKind Kind) {return true;};
 
@@ -1792,9 +1815,10 @@ public:
   }
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
-    if (!VD->hasName())
-      return;
-    if (!VD->isUserAccessible())
+    if (!VD->hasName() ||
+        !VD->isUserAccessible() ||
+        (VD->hasAccessibility() && !VD->isAccessibleFrom(CurrDeclContext)) ||
+        shouldHideDeclFromCompletionResults(VD))
       return;
 
     StringRef Name = VD->getName().get();
@@ -2273,8 +2297,7 @@ public:
     if (CurrDeclContext->lookupQualified(type, Ctx.Id_init, NL_QualifiedDefault,
                                          TypeResolver.get(), initializers)) {
       for (auto *init : initializers) {
-        if (init->isPrivateStdlibDecl(/*whitelistProtocols*/ false) ||
-            AvailableAttr::isUnavailable(init))
+        if (shouldHideDeclFromCompletionResults(init))
           continue;
         addConstructorCall(cast<ConstructorDecl>(init), Reason, None, name);
       }
@@ -2367,7 +2390,9 @@ public:
   void addEnumElementRef(const EnumElementDecl *EED,
                          DeclVisibilityKind Reason,
                          bool HasTypeContext) {
-    if (!EED->hasName())
+    if (!EED->hasName() ||
+        (EED->hasAccessibility() && !EED->isAccessibleFrom(CurrDeclContext)) ||
+        shouldHideDeclFromCompletionResults(EED))
       return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
@@ -2469,14 +2494,7 @@ public:
 
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
-    // Hide private stdlib declarations.
-    if (D->isPrivateStdlibDecl(/*whitelistProtocols*/false))
-      return;
-    if (AvailableAttr::isUnavailable(D))
-      return;
-
-    // Hide editor placeholders.
-    if (D->getName().isEditorPlaceholder())
+    if (shouldHideDeclFromCompletionResults(D))
       return;
 
     if (!D->hasType())
@@ -3755,6 +3773,9 @@ public:
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
+      return;
+
+    if (shouldHideDeclFromCompletionResults(D))
       return;
 
     if (D->getAttrs().hasAttribute<FinalAttr>())

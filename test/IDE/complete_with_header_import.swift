@@ -5,6 +5,7 @@
 
 func foo() {
   #^TOP^#
+  // CHECK-TOP-NOT: function_as_swift_private
   // CHECK-TOP: Decl[FreeFunction]/OtherModule[__ObjC]:     doSomethingInHead({#(arg): Int32#})[#Void#]{{; name=.+$}}
 }
 
