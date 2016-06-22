@@ -1,16 +1,15 @@
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // REQUIRES: OS=linux-gnu
 
-import Swift
 import StdlibUnittest
-
-
 import CUUID
 
+/// Make sure that the module map for the uuid.h header works
 var CUUIDTestSuite = TestSuite("CUUID")
 
+/// Generates a random UUID
 CUUIDTestSuite.test("uuid") {
   var uuid: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
   withUnsafeMutablePointer(&uuid) {
