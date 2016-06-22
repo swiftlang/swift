@@ -252,6 +252,11 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     return _core.elementWidth == 2 ? _core.startUTF16 : nil
   }
 
+  @objc
+  func _fastCStringContents() -> UnsafeMutablePointer<Int8>? {
+    return _core.elementWidth == 1 ? _core.startASCII : nil
+  }
+ 
   //
   // Implement sub-slicing without adding layers of wrapping
   //
