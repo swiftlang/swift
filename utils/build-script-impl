@@ -1745,7 +1745,7 @@ for host in "${ALL_HOSTS[@]}"; do
             cmark)
                 cmake_options=(
                   "${cmake_options[@]}"
-                  -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
+                  -DCMAKE_BUILD_TYPE:STRING="${CMARK_BUILD_TYPE}"
                   "${cmark_cmake_options[@]}"
                 )
                 skip_build=${SKIP_BUILD_CMARK}
