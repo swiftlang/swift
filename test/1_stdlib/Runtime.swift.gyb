@@ -1,6 +1,7 @@
 // RUN: rm -rf %t  &&  mkdir %t
 //
-// RUN: %target-build-swift -parse-stdlib -module-name a %s -o %t.out
+// RUN: %gyb %s -o %t/Runtime.swift
+// RUN: %target-build-swift -parse-stdlib -module-name a %t/Runtime.swift -o %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 
@@ -356,11 +357,12 @@ Runtime.test("demangleName") {
   expectEqual("Foobar", _stdlib_demangleName("_TtC13__lldb_expr_46Foobar"))
 }
 
+% for optionality in ['', '?']:
 Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
   typealias IntPtr = UnsafeMutablePointer<Int>
-  var origP1 = IntPtr(bitPattern: 0x10101010)!
-  var origP2 = IntPtr(bitPattern: 0x20202020)!
-  var origP3 = IntPtr(bitPattern: 0x30303030)!
+  var origP1: IntPtr${optionality} = IntPtr(bitPattern: 0x10101010)!
+  var origP2: IntPtr${optionality} = IntPtr(bitPattern: 0x20202020)!
+  var origP3: IntPtr${optionality} = IntPtr(bitPattern: 0x30303030)!
 
   do {
     var object = origP1
@@ -383,17 +385,17 @@ Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
 
   struct FooStruct {
     var i: Int
-    var object: IntPtr
-    var expected: IntPtr
+    var object: IntPtr${optionality}
+    var expected: IntPtr${optionality}
 
-    init(_ object: IntPtr, _ expected: IntPtr) {
+    init(object: IntPtr${optionality}, expected: IntPtr${optionality}) {
       self.i = 0
       self.object = object
       self.expected = expected
     }
   }
   do {
-    var foo = FooStruct(origP1, origP1)
+    var foo = FooStruct(object: origP1, expected: origP1)
     let r = _stdlib_atomicCompareExchangeStrongPtr(
       object: &foo.object, expected: &foo.expected, desired: origP2)
     expectTrue(r)
@@ -401,7 +403,7 @@ Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
     expectEqual(origP1, foo.expected)
   }
   do {
-    var foo = FooStruct(origP1, origP2)
+    var foo = FooStruct(object: origP1, expected: origP2)
     let r = _stdlib_atomicCompareExchangeStrongPtr(
       object: &foo.object, expected: &foo.expected, desired: origP3)
     expectFalse(r)
@@ -409,6 +411,7 @@ Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
     expectEqual(origP1, foo.expected)
   }
 }
+% end
 
 Runtime.test("casting AnyObject to class metatypes") {
   do {
