@@ -372,7 +372,7 @@ static void getResultStructure(
       if (!param.range().empty())
         parameters.push_back(std::move(param));
 
-      if (chunks[i].hasText())
+      if (i < chunks.size() && chunks[i].hasText())
         textSize += chunks[i].getText().size();
     }
 
