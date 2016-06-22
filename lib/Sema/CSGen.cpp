@@ -2553,9 +2553,14 @@ namespace {
                       Diag<> diag_no_base_class) {
       DeclContext *typeContext = selfDecl->getDeclContext()->getParent();
       assert(typeContext && "constructor without parent context?!");
+
+      // A DC can fail to have a declared type in context when it's invalid.
+      Type declaredType = typeContext->getDeclaredTypeInContext();
+      if (!declaredType)
+        return Type();
+
       auto &tc = CS.getTypeChecker();
-      ClassDecl *classDecl = typeContext->getDeclaredTypeInContext()
-                               ->getClassOrBoundGenericClass();
+      ClassDecl *classDecl = declaredType->getClassOrBoundGenericClass();
       if (!classDecl) {
         tc.diagnose(diagLoc, diag_not_in_class);
         return Type();
@@ -2565,8 +2570,7 @@ namespace {
         return Type();
       }
 
-      Type superclassTy = typeContext->getDeclaredTypeInContext()
-                            ->getSuperclass(&tc);
+      Type superclassTy = declaredType->getSuperclass(&tc);
       if (selfDecl->hasType() && selfDecl->getType()->is<AnyMetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
       return superclassTy;
