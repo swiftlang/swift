@@ -1,0 +1,5 @@
+function(precondition var)
+  if (NOT ${var})
+    message(FATAL_ERROR "Error! Variable ${var} is false or not set!")
+  endif()
+endfunction()
