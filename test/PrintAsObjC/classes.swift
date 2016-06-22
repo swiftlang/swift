@@ -437,6 +437,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: - (BOOL)initGetter SWIFT_METHOD_FAMILY(none);
 // CHECK-NEXT: @property (nonatomic, setter=initSetter:) BOOL setterIsInit;
 // CHECK-NEXT: - (void)initSetter:(BOOL)newValue SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: @property (nonatomic, copy) NSURL * _Nullable customValueTypeProp;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -542,6 +543,8 @@ public class NonObjCClass { }
     get { return true }
     @objc(initSetter:) set {}
   }
+
+  var customValueTypeProp: URL?
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden

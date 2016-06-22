@@ -112,7 +112,8 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
   friend ASTVisitor;
   friend TypeVisitor;
 
-  llvm::DenseMap<std::pair<Identifier, Identifier>, std::pair<StringRef, bool>>
+  using NameAndOptional = std::pair<StringRef, bool>;
+  llvm::DenseMap<std::pair<Identifier, Identifier>, NameAndOptional>
     specialNames;
   Identifier ID_CFTypeRef;
 
@@ -628,7 +629,9 @@ private:
         if (nominal == ctx.getArrayDecl() ||
             nominal == ctx.getDictionaryDecl() ||
             nominal == ctx.getSetDecl() ||
-            nominal == ctx.getStringDecl()) {
+            nominal == ctx.getStringDecl() ||
+            (!getKnownTypeInfo(nominal) && getObjCBridgedClass(nominal))) {
+          // We fast-path the most common cases in the condition above.
           os << ", copy";
         } else if (nominal == ctx.getUnmanagedDecl()) {
           os << ", unsafe_unretained";
@@ -798,25 +801,25 @@ private:
     return true;
   }
 
-  /// If the nominal type is bridged to Objective-C (via a conformance
-  /// to _ObjectiveCBridgeable), print the bridged type.
-  bool printIfObjCBridgeable(const NominalTypeDecl *nominal,
-                             ArrayRef<Type> typeArgs,
-                             Optional<OptionalTypeKind> optionalKind) {
+  /// If \p nominal is bridged to an Objective-C class (via a conformance to
+  /// _ObjectiveCBridgeable), return that class.
+  ///
+  /// Otherwise returns null.
+  const ClassDecl *getObjCBridgedClass(const NominalTypeDecl *nominal) {
     // Print imported bridgeable decls as their unbridged type.
     if (nominal->hasClangNode())
-      return false;
+      return nullptr;
 
     auto &ctx = nominal->getASTContext();
 
     // Dig out the ObjectiveCBridgeable protocol.
     auto proto = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
-    if (!proto) return false;
+    if (!proto) return nullptr;
 
     // Determine whether this nominal type is _ObjectiveCBridgeable.
     SmallVector<ProtocolConformance *, 2> conformances;
     if (!nominal->lookupConformance(&M, proto, conformances))
-      return false;
+      return nullptr;
 
     // Dig out the Objective-C type.
     auto conformance = conformances.front();
@@ -825,15 +828,20 @@ private:
                       conformance,
                       ctx.Id_ObjectiveCType,
                       nullptr);
-    if (!objcType) return false;
+    if (!objcType) return nullptr;
 
     // Dig out the Objective-C class.
-    auto classDecl = objcType->getClassOrBoundGenericClass();
-    if (!classDecl) return false;
+    return objcType->getClassOrBoundGenericClass();
+  }
 
-    // Determine the Objective-C name of the class.
-    SmallString<32> objcNameScratch;
-    StringRef objcName = classDecl->getObjCRuntimeName(objcNameScratch);
+  /// If the nominal type is bridged to Objective-C (via a conformance
+  /// to _ObjectiveCBridgeable), print the bridged type.
+  void printObjCBridgeableType(const NominalTypeDecl *swiftNominal,
+                               const ClassDecl *objcClass,
+                               ArrayRef<Type> typeArgs,
+                               Optional<OptionalTypeKind> optionalKind) {
+    auto &ctx = swiftNominal->getASTContext();
+    assert(objcClass);
 
     // Detect when the type arguments correspond to the unspecialized
     // type, and clear them out. There is some type-specific hackery
@@ -843,15 +851,17 @@ private:
     //   NSDictionary<NSObject *, id> --> NSDictionary
     //   NSSet<id> --> NSSet
     if (!typeArgs.empty() &&
-        (!hasGenericObjCType(classDecl) ||
-         (objcName == "NSArray" && typeArgs[0]->isAnyObject()) ||
-         (objcName == "NSDictionary" && isNSObject(ctx, typeArgs[0]) &&
-          typeArgs[1]->isAnyObject()) ||
-         (objcName == "NSSet" && isNSObject(ctx, typeArgs[0]))))
+        (!hasGenericObjCType(objcClass) ||
+         (swiftNominal == ctx.getArrayDecl() && typeArgs[0]->isAnyObject()) ||
+         (swiftNominal == ctx.getDictionaryDecl() &&
+          isNSObject(ctx, typeArgs[0]) && typeArgs[1]->isAnyObject()) ||
+         (swiftNominal == ctx.getSetDecl() && isNSObject(ctx, typeArgs[0])))) {
       typeArgs = {};
+    }
 
     // Print the class type.
-    os << objcName;
+    SmallString<32> objcNameScratch;
+    os << objcClass->getObjCRuntimeName(objcNameScratch);
 
     // Print the type arguments, if present.
     if (!typeArgs.empty()) {
@@ -866,17 +876,29 @@ private:
 
     os << " *";
     printNullability(optionalKind);
-    return true;
   }
 
-  /// If "name" is one of the standard library types used to map in Clang
-  /// primitives and basic types, print out the appropriate spelling and
-  /// return true.
+  /// If the nominal type is bridged to Objective-C (via a conformance to
+  /// _ObjectiveCBridgeable), print the bridged type. Otherwise, nothing is
+  /// printed.
   ///
-  /// This handles typealiases and structs provided by the standard library
-  /// for interfacing with C and Objective-C.
-  bool printIfKnownTypeName(Identifier moduleName, Identifier name,
-                            Optional<OptionalTypeKind> optionalKind) {
+  /// \returns true iff printed something.
+  bool printIfObjCBridgeable(const NominalTypeDecl *nominal,
+                             ArrayRef<Type> typeArgs,
+                             Optional<OptionalTypeKind> optionalKind) {
+    if (const ClassDecl *objcClass = getObjCBridgedClass(nominal)) {
+      printObjCBridgeableType(nominal, objcClass, typeArgs, optionalKind);
+      return true;
+    }
+    return false;
+  }
+
+  /// If \p typeDecl is one of the standard library types used to map in Clang
+  /// primitives and basic types, return the address of the info in
+  /// \c specialNames containing the Clang name and whether it can be optional.
+  ///
+  /// Returns null if the name is not one of these known types.
+  const NameAndOptional *getKnownTypeInfo(const TypeDecl *typeDecl) {
     if (specialNames.empty()) {
       ASTContext &ctx = M.getASTContext();
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                       \
@@ -956,12 +978,27 @@ private:
                     "SIMD elements is changed");
     }
 
+    Identifier moduleName = typeDecl->getModuleContext()->getName();
+    Identifier name = typeDecl->getName();
     auto iter = specialNames.find({moduleName, name});
     if (iter == specialNames.end())
-      return false;
+      return nullptr;
+    return &iter->second;
+  }
 
-    os << iter->second.first;
-    if (iter->second.second)
+  /// If \p typeDecl is one of the standard library types used to map in Clang
+  /// primitives and basic types, print out the appropriate spelling and
+  /// return true.
+  ///
+  /// This handles typealiases and structs provided by the standard library
+  /// for interfacing with C and Objective-C.
+  bool printIfKnownSimpleType(const TypeDecl *typeDecl,
+                              Optional<OptionalTypeKind> optionalKind) {
+    auto *knownTypeInfo = getKnownTypeInfo(typeDecl);
+    if (!knownTypeInfo)
+      return false;
+    os << knownTypeInfo->first;
+    if (knownTypeInfo->second)
       printNullability(optionalKind);
     return true;
   }
@@ -984,9 +1021,7 @@ private:
   void visitNameAliasType(NameAliasType *aliasTy,
                           Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
-    if (printIfKnownTypeName(alias->getModuleContext()->getName(),
-                             alias->getName(),
-                             optionalKind))
+    if (printIfKnownSimpleType(alias, optionalKind))
       return;
 
     if (alias->hasClangNode()) {
@@ -1032,8 +1067,7 @@ private:
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
 
     // Handle known type names.
-    if (printIfKnownTypeName(SD->getModuleContext()->getName(), SD->getName(),
-                             optionalKind))
+    if (printIfKnownSimpleType(SD, optionalKind))
       return;
 
     // Handle bridged types.
