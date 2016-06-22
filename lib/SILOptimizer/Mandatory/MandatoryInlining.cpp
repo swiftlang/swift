@@ -305,6 +305,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
   SmallVector<SILValue, 16> CaptureArgs;
   SmallVector<SILValue, 32> FullArgs;
+
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     for (auto I = FI->begin(), E = FI->end(); I != E; ++I) {
       FullApplySite InnerAI = FullApplySite::isa(&*I);
@@ -397,9 +398,16 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       ContextSubs.copyFrom(CalleeFunction->getContextGenericParams()
                                          ->getSubstitutionMap(ApplySubs));
 
+      SILOpenedArchetypesTracker OpenedArchetypesTracker(*F);
+      F->getModule().registerDeleteNotificationHandler(
+          &OpenedArchetypesTracker);
+      // The callee only needs to know about opened archetypes used in
+      // the substitution list.
+      OpenedArchetypesTracker.registerUsedOpenedArchetypes(InnerAI.getInstruction());
+
       SILInliner Inliner(*F, *CalleeFunction,
-                         SILInliner::InlineKind::MandatoryInline,
-                         ContextSubs, ApplySubs);
+                         SILInliner::InlineKind::MandatoryInline, ContextSubs,
+                         ApplySubs, OpenedArchetypesTracker);
       if (!Inliner.inlineFunction(InnerAI, FullArgs)) {
         I = InnerAI.getInstruction()->getIterator();
         continue;
