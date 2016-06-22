@@ -82,26 +82,37 @@ add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   C_COMPILE_FLAGS ${swift_runtime_compile_flags}
   INSTALL_IN_COMPONENT never_install)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-  add_swift_library(section_magic_begin STATIC IS_STDLIB IS_STDLIB_CORE
+set(ELFISH_SDKS)
+foreach(sdk ${SWIFT_CONFIGURED_SDKS})
+  is_elfish_sdk("${sdk}" IS_EFLISH)
+  if(IS_ELFISH)
+    list(APPEND EFLISH_SDKS "${sdk}")
+  endif()
+endforeach()
+
+add_swift_library(section_magic_begin OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
     C_COMPILE_FLAGS ${swift_runtime_compile_flags} "-DSWIFT_BEGIN"
+    TARGET_SDKS "${ELFISH_SDKS}"
     INSTALL_IN_COMPONENT never_install)
-  add_swift_library(section_magic_end STATIC IS_STDLIB IS_STDLIB_CORE
+add_swift_library(section_magic_end OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
     C_COMPILE_FLAGS ${swift_runtime_compile_flags} "-DSWIFT_END"
+    TARGET_SDKS "${ELFISH_SDKS}"
     INSTALL_IN_COMPONENT never_install)
-endif()
 
 set(object_target_list)
 foreach(sdk ${SWIFT_CONFIGURED_SDKS})
-  if("${sdk}" STREQUAL "LINUX" OR "${sdk}" STREQUAL "FREEBSD" OR "${sdk}" STREQUAL "ANDROID")
+  is_elfish_sdk("${sdk}" IS_ELFISH)
+  if(IS_ELFISH)
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
       set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
+      set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
 
-      set(section_magic_begin_name "section_magic_begin-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-      set(section_magic_end_name "section_magic_end-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-      add_custom_command_target(section_magic_o
+      set(section_magic_begin_name "section_magic_begin-${arch_suffix}")
+      set(section_magic_end_name "section_magic_end-${arch_suffix}")
+
+      add_custom_command_target(section_magic_${arch_suffix}_objects
         COMMAND
             "${CMAKE_COMMAND}" -E copy
             "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_begin_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}"
@@ -117,12 +128,11 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
             ${section_magic_begin_name}
             ${section_magic_end_name})
 
-      list(APPEND object_target_list "${section_magic_o}")
+      list(APPEND object_target_list "${section_magic_${arch_suffix}_objects}")
 
       swift_install_in_component(stdlib
           FILES "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o" "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
           DESTINATION "lib/swift/${arch_subdir}")
-
     endforeach()
   endif()
 endforeach()
