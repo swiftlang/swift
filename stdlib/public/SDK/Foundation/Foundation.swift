@@ -1217,7 +1217,14 @@ extension NSCoder {
 
   @nonobjc
   public func decodeObjectOfClasses(_ classes: NSSet?, forKey key: String) -> AnyObject? {
-    return NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classes, key as AnyObject, nil)
+    var classesAsNSObjects: Set<NSObject>? = nil
+    if let theClasses = classes {
+      classesAsNSObjects =
+        Set(IteratorSequence(NSFastEnumerationIterator(theClasses)).map {
+          unsafeBitCast($0, to: NSObject.self)
+        })
+    }
+    return self.__decodeObject(ofClasses: classesAsNSObjects, forKey: key)
   }
 
   @available(OSX 10.11, iOS 9.0, *)
