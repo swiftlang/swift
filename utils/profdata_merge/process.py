@@ -68,7 +68,8 @@ class ProfdataMergerProcess(Process):
         try:
             shell.call(llvm_cmd, echo=False)
         except SystemExit as e:
-            self.report("llvm profdata command failed: %s" % e, level=logging.ERROR)
+            self.report("llvm profdata command failed: %s" % e,
+                        level=logging.ERROR)
         if self.config.remove_files:
             for f in self.filename_buffer:
                 if os.path.exists(f):

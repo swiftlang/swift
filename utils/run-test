@@ -125,9 +125,9 @@ def main():
                         type=arguments.type.shell_split,
                         action=arguments.action.concat,
                         default=[],
-                        help="key=value parameters they are directly passed to "
-                             "lit command in addition to `mode` and `subset`. "
-                             "Accept multiple.")
+                        help="key=value parameters they are directly passed "
+                             "to lit command in addition to `mode` and "
+                             "`subset`. Accept multiple.")
     parser.add_argument("--result-dir", type=os.path.realpath, metavar="PATH",
                         help="directory to store test results (default: none)")
     parser.add_argument("--merge-coverage",
