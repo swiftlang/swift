@@ -263,9 +263,6 @@ public struct ${Self}
   }
 % end
 
-  /// Create an instance initialized to `value`.
-  @_transparent public
-  init(_ value: ${Self}) { self = value }
 
 %  if bits > 8:
   /// Creates an integer from its big-endian representation, changing the
@@ -436,44 +433,72 @@ extension ${Self} {
 extension ${Self} : SignedNumber {}
 % end
 
-// Construction from other integer types
-@_transparent
-extension ${Self} {
+
+%{
+import gyb
+
+fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_function",
+"""
+%
+  let src = value._value
+  let result: (value: Builtin.${BuiltinName}, error: Builtin.Int1)
+%
+%       if srcBits == bits and srcSign == sign: # Exact same size/signedness.
+  result = (src, false._value)
+%
+%       elif srcBits == bits:  # Same size, switching signs.
+  result = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(src)
+%
+%       elif srcBits > bits:  # Larger input, check for truncation.
+  result = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(src)
+%
+%       elif srcSigned and not signed: # Smaller size input, signed going to unsigned.
+  let (tmp, signError) = Builtin.s_to_u_checked_conversion_Int${srcBits}(src)
+  result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp), signError)
+%
+%       else: # Smaller size input, unsigned to signed or unsigned to unsigned.
+  result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(src), false._value)
+%       end
+% 
+% if not safelyConvertable:
+  ${error_check}
+% end
+  self._value = result.value
+""")
+}%
+
 % for src_ty in all_integer_types(word_bits):
 %    srcBits = src_ty.bits
 %    srcSigned = src_ty.is_signed
 %    Src = src_ty.stdlib_name
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
-%    if Self != Src:
-  public init(_ v: ${Src}) {
-%
-    let srcNotWord = v._value
-%
-%       if srcBits == bits and srcSign == sign:
-    let dstNotWord = srcNotWord
-%
-%       elif srcBits == bits:
-    let tmp = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = tmp.0
-%
-%       elif srcBits > bits:
-    let tmp = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = tmp.0
-%
-%       elif srcSigned and not signed:
-    let tmp = Builtin.s_to_u_checked_conversion_Int${srcBits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp.0)
-%
-%       else:
-    let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord)
-%       end
-%
-    self._value = dstNotWord
+%    safelyConvertable = (srcBits < bits and (srcSign == sign or signed)) or (srcBits == bits and srcSign == sign)
+
+@_transparent
+extension ${Self} {
+
+  @_transparent
+  public init(_ value: ${Src}) {
+    ${gyb.execute_template(
+        fixed_fixed_conversion_function,
+        error_check="Builtin.condfail(result.error)",
+        **locals()
+        )
+    }
   }
-%    end
+    
+% if safelyConvertable: 
+  @available(*, message: "Converting ${Src} to ${Self} will always succeed.")
+% end
+  @_transparent 
+  public init?(exactly value: ${Src}) {
+    ${gyb.execute_template(
+        fixed_fixed_conversion_function,
+        error_check="if Bool(result.error) == true { return nil }",
+        **locals()
+        )
+    }
+  }
 
 %    if should_define_truncating_bit_pattern_init(src_ty=src_ty, dst_ty=self_ty):
   /// Construct a `${Self}` having the same bitwise representation as
@@ -483,20 +508,22 @@ extension ${Self} {
   @_transparent
   public init(truncatingBitPattern: ${Src}) {
 %
-    let srcNotWord = truncatingBitPattern._value
+    let src = truncatingBitPattern._value
 %
 %       if self_ty.bits == src_ty.bits:
-    let dstNotWord = srcNotWord
+    let dstNotWord = src
 %       else:
-    let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(srcNotWord)
+    let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(src)
 %       end
 %
     self._value = dstNotWord
   }
 
 %    end
+}
 % end
 
+extension ${Self} {
   /// Construct a `${Self}` having the same memory representation as
   /// the `${OtherSelf}` `bitPattern`.  No range or overflow checking
   /// occurs, and the resulting `${Self}` may not have the same numeric
