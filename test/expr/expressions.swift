@@ -324,6 +324,8 @@ func tuple_of_rvalues(_ a:Int, b:Int) -> Int {
 extension Int {
   func testLexingMethodAfterIntLiteral() {}
   func _0() {}
+  // Hex letters
+  func ffa() {}
   // Hex letters + non hex.
   func describe() {}
   // Hex letters + 'p'.
@@ -342,6 +344,7 @@ extension Int {
 0o123._0()
 0x1FFF._0()
 
+0x1fff.ffa()
 0x1FFF.describe()
 0x1FFF.eap()
 0x1FFF.fpValue()
@@ -375,6 +378,10 @@ var fl_l: Float = 0x1.0 // expected-error {{hexadecimal floating point literal m
 var fl_m: Float = 0x1.FFFFFEP-2
 var fl_n: Float = 0x1.fffffep+2
 var fl_o: Float = 0x1.fffffep+ // expected-error {{expected a digit in floating point exponent}}
+var fl_p: Float = 0x1p // expected-error {{expected a digit in floating point exponent}}
+var fl_q: Float = 0x1p+ // expected-error {{expected a digit in floating point exponent}}
+var fl_r: Float = 0x1.0fp // expected-error {{expected a digit in floating point exponent}}
+var fl_s: Float = 0x1.0fp+ // expected-error {{expected a digit in floating point exponent}}
 
 var if1: Double = 1.0 + 4  // integer literal ok as double.
 var if2: Float = 1.0 + 4  // integer literal ok as float.
