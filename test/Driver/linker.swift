@@ -35,8 +35,18 @@
 // RUN: FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | FileCheck -check-prefix DEBUG %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.10   %s | FileCheck -check-prefix NO_ARCLITE %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios8.0        %s | FileCheck -check-prefix NO_ARCLITE %s
+
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.10   %s > %t.simple-macosx10.10.txt
+// RUN: FileCheck %s < %t.simple-macosx10.10.txt
+// RUN: FileCheck -check-prefix SIMPLE %s < %t.simple-macosx10.10.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios8.0        %s > %t.simple-ios8.txt
+// RUN: FileCheck -check-prefix IOS_ARCLITE %s < %t.simple-ios8.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.11   %s | FileCheck -check-prefix NO_ARCLITE %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios9.0        %s | FileCheck -check-prefix NO_ARCLITE %s
+// RUN: %swiftc_driver -driver-print-jobs -target arm64-apple-tvos9.0        %s | FileCheck -check-prefix NO_ARCLITE %s
+// RUN: %swiftc_driver -driver-print-jobs -target armv7k-apple-watchos2.0    %s | FileCheck -check-prefix NO_ARCLITE %s
 
 // RUN: rm -rf %t && mkdir %t
 // RUN: touch %t/a.o
@@ -224,6 +234,12 @@
 // DEBUG-NEXT: bin/dsymutil
 // DEBUG: linker
 // DEBUG: -o linker.dSYM
+
+
+
+// IOS_ARCLITE: bin/ld{{"? }}
+// IOS_ARCLITE: -force_load {{[^ ]+/lib/arc/libarclite_iphonesimulator.a}}
+// IOS_ARCLITE: -o {{[^ ]+}}
 
 // NO_ARCLITE: bin/ld{{"? }}
 // NO_ARCLITE-NOT: arclite

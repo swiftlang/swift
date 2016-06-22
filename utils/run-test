@@ -78,7 +78,7 @@ def is_subpath(path, d):
     return path.startswith(d)
 
 
-# Convert test path in source directory to correspoding path in build
+# Convert test path in source directory to corresponding path in build
 # directory. If the path is not sub path of test directories in source,
 # return the path as is.
 def normalize_test_path(path, build_dir, variant):
@@ -125,9 +125,9 @@ def main():
                         type=arguments.type.shell_split,
                         action=arguments.action.concat,
                         default=[],
-                        help="key=value paramters they are directly passed to "
-                             "lit command in addition to `mode` and `subset`. "
-                             "Accept multiple.")
+                        help="key=value parameters they are directly passed "
+                             "to lit command in addition to `mode` and "
+                             "`subset`. Accept multiple.")
     parser.add_argument("--result-dir", type=os.path.realpath, metavar="PATH",
                         help="directory to store test results (default: none)")
     parser.add_argument("--merge-coverage",
@@ -151,7 +151,7 @@ def main():
 
     build_dir = args.build_dir
     if build_dir is not None:
-        # Fixup build direcotry.
+        # Fixup build directory.
         # build_dir can be:
         #   build-root/  # assuming we are to test host deployment target.
         #   build-root/swift-{tool-deployment_target}/
@@ -192,7 +192,7 @@ def main():
                     break
                 d = os.path.dirname(d)
             else:
-                error_exit("Can't infer swift build direcory")
+                error_exit("Can't infer swift build directory")
 
     # Ensure we have up to date test dependency
     if args.build != 'skip' and is_build_dir_xcode(build_dir):

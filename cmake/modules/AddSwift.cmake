@@ -85,16 +85,6 @@ function(is_windows_based_sdk sdk_name out_var)
  endif()
 endfunction()
 
-function(is_elfish_sdk sdk_name out_var)
-  is_darwin_based_sdk("${sdk_name}" IS_DARWIN)
-  is_windows_based_sdk("${sdk_name}" IS_WINDOWS)
-  if(IS_DARWIN OR IS_WINDOWS)
-    set(${out_var} FALSE PARENT_SCOPE)
-  else()
-    set(${out_var} TRUE PARENT_SCOPE)
-  endif()
-endfunction()
-
 # Usage:
 # _add_variant_c_compile_link_flags(
 #   SDK sdk
@@ -300,7 +290,7 @@ function(_add_variant_link_flags)
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND result
         "-ldl"
-        "-L${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/${SWIFT_ANDROID_NDK_GCC_VERSION}"
+        "-L${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/${SWIFT_ANDROID_NDK_GCC_VERSION}.x"
         "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so"
         "-L${SWIFT_ANDROID_ICU_UC}" "-L${SWIFT_ANDROID_ICU_I18N}")
   else()
@@ -890,8 +880,8 @@ function(_add_swift_library_single target name)
     RESULT_VAR_NAME link_flags
       )
 
-  is_elfish_sdk("${SWIFTLIB_SINGLE_SDK}" IS_ELFISH)
-  if(SWIFT_ENABLE_GOLD_LINKER AND IS_ELFISH)
+  if(SWIFT_ENABLE_GOLD_LINKER AND
+     "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     list(APPEND link_flags "-fuse-ld=gold")
   endif()
 
@@ -1532,8 +1522,8 @@ function(_add_swift_executable_single name)
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   endif()
 
-  is_elfish_sdk("${SWIFTLIB_SINGLE_SDK}" IS_ELFISH)
-  if(SWIFT_ENABLE_GOLD_LINKER AND IS_ELFISH)
+  if(SWIFT_ENABLE_GOLD_LINKER AND
+     "${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     list(APPEND link_flags "-fuse-ld=gold")
   endif()
 

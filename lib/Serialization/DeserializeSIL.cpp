@@ -555,6 +555,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   LocalValues.clear();
   ForwardLocalValues.clear();
 
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(*fn);
+  SILBuilder Builder(*fn);
+  // Track the archetypes just like SILGen. This
+  // is required for adding typedef operands to instrucitons.
+  Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
+
   // Another SIL_FUNCTION record means the end of this SILFunction.
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
   // of this SILFunction.
@@ -572,7 +578,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         return fn;
 
       // Handle a SILInstruction record.
-      if (readSILInstruction(fn, CurrentBB, kind, scratch)) {
+      if (readSILInstruction(fn, CurrentBB, Builder, kind, scratch)) {
         DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
         MF->error();
         return fn;
@@ -653,13 +659,14 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
 }
 
 bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
+                                         SILBuilder &Builder,
                                          unsigned RecordKind,
                                          SmallVectorImpl<uint64_t> &scratch) {
   // Return error if Basic Block is null.
   if (!BB)
     return true;
 
-  SILBuilder Builder(BB);
+  Builder.setInsertionPoint(BB);
   Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned OpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            Attr = 0, NumSubs = 0, NumConformances = 0, IsNonThrowingApply = 0;
@@ -1680,7 +1687,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         ExistentialOperand = getLocalValue(ValID3, ExistentialOperandTy);
     }
     ResultVal = Builder.createWitnessMethod(
-        Loc, Ty, Conformance, DRef, OperandTy, ExistentialOperand, Attr);
+        Loc, Ty, Conformance, DRef, OperandTy, Attr);
     break;
   }
   case ValueKind::DynamicMethodBranchInst: {

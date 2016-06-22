@@ -196,11 +196,9 @@ public class TestPublicED : ProtocolEPublic, ProtocolDPrivate {
   #^TEST_PUBLIC_ED^#
 }
 
-// FIXME: there should be no duplicates in the results below.
-
 // TEST_PRIVATE_ED: Begin completions, 2 items
-// TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 // TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
+// TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 // TEST_INTERNAL_ED: Begin completions, 2 items
 // TEST_INTERNAL_ED-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}

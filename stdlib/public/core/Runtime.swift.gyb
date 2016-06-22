@@ -36,6 +36,7 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
   return Bool(won)
 }
 
+% for optional in ['', '?']:
 /// Atomic compare and exchange of `UnsafeMutablePointer<T>` with sequentially
 /// consistent memory ordering.  Precise semantics are defined in C++11 or C11.
 ///
@@ -66,14 +67,15 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
 @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr<T>(
-  object target: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
-  expected: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
-  desired: UnsafeMutablePointer<T>) -> Bool {
+  object target: UnsafeMutablePointer<UnsafeMutablePointer<T>${optional}>,
+  expected: UnsafeMutablePointer<UnsafeMutablePointer<T>${optional}>,
+  desired: UnsafeMutablePointer<T>${optional}) -> Bool {
   return _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
     desired: UnsafeMutablePointer(desired))
 }
+% end
 
 @_transparent
 @discardableResult

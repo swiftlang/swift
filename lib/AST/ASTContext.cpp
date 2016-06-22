@@ -3050,14 +3050,23 @@ GenericFunctionType::get(GenericSignature *sig,
   // Do we already have this generic function type?
   void *insertPos;
   if (auto result
-        = ctx.Impl.GenericFunctionTypes.FindNodeOrInsertPos(id, insertPos))
+        = ctx.Impl.GenericFunctionTypes.FindNodeOrInsertPos(id, insertPos)) {
     return result;
+  }
 
   // We have to construct this generic function type. Determine whether
-  // it's canonical.
+  // it's canonical.  Unfortunately, isCanonicalTypeInContext can cause
+  // new GenericFunctionTypes to be created and thus invalidate our insertion
+  // point.
+  auto &moduleForCanonicality = *ctx.TheBuiltinModule;
   bool isCanonical = sig->isCanonical()
-    && input->isCanonical()
-    && output->isCanonical();
+    && sig->isCanonicalTypeInContext(input, moduleForCanonicality)
+    && sig->isCanonicalTypeInContext(output, moduleForCanonicality);
+
+  if (auto result
+        = ctx.Impl.GenericFunctionTypes.FindNodeOrInsertPos(id, insertPos)) {
+    return result;
+  }
 
   // Allocate storage for the object.
   void *mem = ctx.Allocate(sizeof(GenericFunctionType),
@@ -3067,6 +3076,7 @@ GenericFunctionType::get(GenericSignature *sig,
   auto result = new (mem) GenericFunctionType(sig, input, output, info,
                                               isCanonical ? &ctx : nullptr,
                                               properties);
+
   ctx.Impl.GenericFunctionTypes.InsertNode(result, insertPos);
   return result;
 }

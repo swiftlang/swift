@@ -130,14 +130,6 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     }
 
     /// Initialize a `Data` with copied memory content.
-    ///
-    /// - parameter bytes: A pointer to the memory. It will be copied.
-    /// - parameter count: The number of bytes to copy.
-    public init(bytes: UnsafeMutablePointer<UInt8>, count: Int) {
-        _wrapped = _SwiftNSData(immutableObject: NSData(bytes: UnsafePointer(bytes), length: count))
-    }
-
-    /// Initialize a `Data` with copied memory content.
     /// 
     /// - parameter buffer: A buffer pointer to copy. The size is calculated from `SourceType` and `buffer.count`.
     public init<SourceType>(buffer: UnsafeBufferPointer<SourceType>) {
@@ -148,7 +140,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     ///
     /// - parameter buffer: A buffer pointer to copy. The size is calculated from `SourceType` and `buffer.count`.
     public init<SourceType>(buffer: UnsafeMutableBufferPointer<SourceType>) {
-        _wrapped = _SwiftNSData(immutableObject: NSData(bytes: UnsafePointer(buffer.baseAddress), length: strideof(SourceType) * buffer.count))
+        _wrapped = _SwiftNSData(immutableObject: NSData(bytes: UnsafePointer(buffer.baseAddress), length: strideof(SourceType.self) * buffer.count))
     }
 
     /// Initialize a `Data` with the contents of an Array.
@@ -260,19 +252,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     public init(reference: NSData) {
         _wrapped = _SwiftNSData(immutableObject: reference.copy())
     }
-    
-    /// Initialize a `Data` by adopting a mutable reference type.
-    ///
-    /// You can use this initializer to create a `struct Data` that wraps a `class NSMutableData`. `struct Data` will use the `class NSMutableData` for all operations. Other initializers (including casting using `as Data`) may choose to hold a reference or not, based on a what is the most efficient representation.
-    ///
-    /// If the resulting value is mutated, then `Data` will invoke the `mutableCopy()` function on the reference to copy the contents. You may customize the behavior of that function if you wish to return a specialized mutable subclass.
-    ///
-    /// - warning: For performance reasons, this method does not copy the reference on initialization. It assumes that the reference is uniquely held by the struct. If you continue to mutate the reference after invoking this initializer, you may invalidate the copy-on-write and value semantics of `struct Data`. It is recommended that you do not keep the reference after initializing a `Data` with it.
-    /// - parameter mutableReference: The instance of `NSMutableData` that you wish to wrap.
-    public init(mutableReference: NSMutableData) {
-        _wrapped = _SwiftNSData(mutableObject: mutableReference)
-    }
-    
+        
     // -----------------------------------
     // MARK: - Properties and Functions
     
@@ -502,7 +482,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     /// - parameter buffer: The replacement bytes.
     public mutating func replaceBytes<SourceType>(in range: Range<Index>, with buffer: UnsafeBufferPointer<SourceType>) {
         let nsRange = NSMakeRange(range.lowerBound, range.upperBound - range.lowerBound)
-        let bufferCount = buffer.count * strideof(SourceType)
+        let bufferCount = buffer.count * strideof(SourceType.self)
         
         _applyUnmanagedMutation {
             $0.replaceBytes(in: nsRange, withBytes: buffer.baseAddress, length: bufferCount)

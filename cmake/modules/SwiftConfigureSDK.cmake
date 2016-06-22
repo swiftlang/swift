@@ -16,6 +16,7 @@ function(_report_sdk prefix)
   message(STATUS "  Version min name: ${SWIFT_SDK_${prefix}_VERSION_MIN_NAME}")
   message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
   message(STATUS "  Architectures: ${SWIFT_SDK_${prefix}_ARCHITECTURES}")
+  message(STATUS "  Object Format: ${SWIFT_SDK_${prefix}_OBJECT_FORMAT}")
 
   foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
     message(STATUS
@@ -96,6 +97,7 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "${version_min_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
+  set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
 
   foreach(arch ${architectures})
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
@@ -122,6 +124,11 @@ macro(configure_sdk_unix
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${arch}")
+  if("${prefix}" STREQUAL "CYGWIN")
+    set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
+  else()
+    set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "ELF")
+  endif()
 
   set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "${triple}")
 

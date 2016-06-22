@@ -21,7 +21,7 @@
 // FIXME: Portability ?
 #include <Block.h>
 
-#ifdef LLVM_ON_WIN32
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -81,7 +81,7 @@ UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t uid) {
 
 std::string sourcekitd::getRuntimeLibPath() {
   // FIXME: Move to an LLVM API. Note that libclang does the same thing.
-#ifdef LLVM_ON_WIN32
+#if defined(_WIN32)
 #error Not implemented
 #else
   // This silly cast below avoids a C++ warning.

@@ -55,6 +55,7 @@ namespace SourceKit {
   typedef RefPtr<ImmutableTextSnapshot> ImmutableTextSnapshotRef;
   class SwiftASTManager;
   class SwiftLangSupport;
+  class Context;
 
 class SwiftEditorDocument :
     public ThreadSafeRefCountedBase<SwiftEditorDocument> {

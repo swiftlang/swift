@@ -72,7 +72,7 @@ internal func _splitRandomAccessIndexRange<
 public protocol CollectionBuilder {
   associatedtype Destination : Collection
     
-  typealias Element = Destination.Iterator.Element
+  associatedtype Element = Destination.Iterator.Element
 
   init()
 
@@ -474,7 +474,7 @@ final class _ForkJoinWorkerThread {
     }
     assert(_workDeque.isEmpty)
     assert(_submissionQueue.isEmpty)
-    _pool._totalThreads.fetchAndAdd(-1)
+    _ = _pool._totalThreads.fetchAndAdd(-1)
     print("_ForkJoinWorkerThread end")
   }
 
@@ -697,7 +697,7 @@ final public class ForkJoinPool {
       _pool: self, submissionQueue: submissionQueue, workDeque: workDeque)
     thread.startAsync()
     blockingBody()
-    _totalThreads.fetchAndAdd(1)
+    _ = _totalThreads.fetchAndAdd(1)
   }
 
   internal func _tryCreateThread(
@@ -720,7 +720,7 @@ final public class ForkJoinPool {
         _pool: self, submissionQueue: submissionQueue, workDeque: workDeque)
       thread.startAsync()
     } else {
-      _totalThreads.fetchAndAdd(-1)
+      _ = _totalThreads.fetchAndAdd(-1)
     }
     return true
   }

@@ -947,7 +947,7 @@ SequenceTypeTests.test("forEach/dispatch") {
 
 SequenceTypeTests.test("first/dispatch") {
   let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.first { $0.value == 1 }
+  _ = tester.first { $0.value == 1 }
   expectCustomizable(tester, tester.log.first)
 }
 
@@ -957,7 +957,7 @@ SequenceTypeTests.test("first/dispatch") {
 
 SequenceTypeTests.test("dropFirst/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.dropFirst(1)
+  _ = tester.dropFirst(1)
   expectCustomizable(tester, tester.log.dropFirst)
 }
 
@@ -967,7 +967,7 @@ SequenceTypeTests.test("dropFirst/dispatch") {
 
 SequenceTypeTests.test("dropLast/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.dropLast(1)
+  _ = tester.dropLast(1)
   expectCustomizable(tester, tester.log.dropLast)
 }
 
@@ -977,7 +977,7 @@ SequenceTypeTests.test("dropLast/dispatch") {
 
 SequenceTypeTests.test("prefix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.prefix(1)
+  _ = tester.prefix(1)
   expectCustomizable(tester, tester.log.prefixMaxLength)
 }
 
@@ -987,7 +987,7 @@ SequenceTypeTests.test("prefix/dispatch") {
 
 SequenceTypeTests.test("suffix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.suffix(1)
+  _ = tester.suffix(1)
   expectCustomizable(tester, tester.log.suffixMaxLength)
 }
 
@@ -997,7 +997,7 @@ SequenceTypeTests.test("suffix/dispatch") {
 
 SequenceTypeTests.test("Sequence/split/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.split { $0.value == 1 }
+  _ = tester.split { $0.value == 1 }
   expectCustomizable(tester, tester.log.split)
 }
 

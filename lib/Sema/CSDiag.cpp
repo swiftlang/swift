@@ -1043,7 +1043,7 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     
     bool mismatch(SubstitutableType *paramType, TypeBase *argType) {
       Type type = paramType;
-      if (dc && type->isTypeParameter())
+      if (dc && dc->getGenericParamsOfContext() && type->isTypeParameter())
         type = ArchetypeBuilder::mapTypeIntoContext(dc, paramType);
       
       if (auto archetype = type->getAs<ArchetypeType>()) {
@@ -1062,7 +1062,7 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
   paramType.findIf([&](Type type) -> bool {
     if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
       Type original = substitution->getOriginal();
-      if (dc && original->isTypeParameter())
+      if (dc && dc->getGenericParamsOfContext() && original->isTypeParameter())
         original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
       
       Type replacement = substitution->getReplacementType();
@@ -3475,6 +3475,33 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
       .highlight(expr->getSourceRange());
     diagnose(expr->getLoc(), diag::string_index_not_integer_note);
     return true;
+  }
+
+  // When converting from T to [T] or UnsafePointer<T>, we can offer fixit to wrap
+  // the expr with brackets.
+  if (auto *contextDecl = contextualType->getAnyNominal()) {
+    if (contextDecl == CS->TC.Context.getArrayDecl()) {
+      SmallVector<Type, 4> scratch;
+      for (Type arg : contextualType->getAllGenericArgs(scratch)) {
+        if (arg->isEqual(exprType)) {
+          diagnose(expr->getLoc(), diagID, exprType, contextualType).
+            fixItInsert(expr->getStartLoc(), "[").fixItInsert(
+              Lexer::getLocForEndOfToken(CS->TC.Context.SourceMgr,
+                                         expr->getEndLoc()), "]");
+          return true;
+        }
+      }
+    } else if (contextDecl == CS->TC.Context.getUnsafePointerDecl() ||
+               contextDecl == CS->TC.Context.getUnsafeMutablePointerDecl()) {
+      SmallVector<Type, 4> scratch;
+      for (Type arg : contextualType->getAllGenericArgs(scratch)) {
+        if (arg->isEqual(exprType) && expr->getType()->isLValueType()) {
+          diagnose(expr->getLoc(), diagID, exprType, contextualType).
+            fixItInsert(expr->getStartLoc(), "&");
+          return true;
+        }
+      }
+    }
   }
 
   // When complaining about conversion to a protocol type, complain about
