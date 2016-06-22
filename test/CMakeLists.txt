@@ -14,7 +14,7 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
     set(LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
   endif ()
 
-  configure_lit_site_cfg("${source_path}" "${destination_path}")
+  configure_file("${source_path}" "${destination_path}" @ONLY)
 
   if(NOT "${installed_name}" STREQUAL "")
     swift_install_in_component(testsuite-tools
