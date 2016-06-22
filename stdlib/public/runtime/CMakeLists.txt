@@ -84,9 +84,8 @@ add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
 
 set(ELFISH_SDKS)
 foreach(sdk ${SWIFT_CONFIGURED_SDKS})
-  is_elfish_sdk("${sdk}" IS_EFLISH)
-  if(IS_ELFISH)
-    list(APPEND EFLISH_SDKS "${sdk}")
+  if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF")
+    list(APPEND ELFISH_SDKS "${sdk}")
   endif()
 endforeach()
 
@@ -102,39 +101,36 @@ add_swift_library(section_magic_end OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     INSTALL_IN_COMPONENT never_install)
 
 set(object_target_list)
-foreach(sdk ${SWIFT_CONFIGURED_SDKS})
-  is_elfish_sdk("${sdk}" IS_ELFISH)
-  if(IS_ELFISH)
-    foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-      set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
-      set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+foreach(sdk ${ELFISH_SDKS})
+  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+    set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
+    set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
 
-      set(section_magic_begin_name "section_magic_begin-${arch_suffix}")
-      set(section_magic_end_name "section_magic_end-${arch_suffix}")
+    set(section_magic_begin_name "section_magic_begin-${arch_suffix}")
+    set(section_magic_end_name "section_magic_end-${arch_suffix}")
 
-      add_custom_command_target(section_magic_${arch_suffix}_objects
-        COMMAND
-            "${CMAKE_COMMAND}" -E copy
-            "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_begin_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}"
-            "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
-        COMMAND
-            "${CMAKE_COMMAND}" -E copy
-            "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_end_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}"
-            "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-        OUTPUT
-            "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
-            "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-        DEPENDS
-            ${section_magic_begin_name}
-            ${section_magic_end_name})
+    add_custom_command_target(section_magic_${arch_suffix}_objects
+      COMMAND
+          "${CMAKE_COMMAND}" -E copy
+          "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_begin_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}"
+          "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
+      COMMAND
+          "${CMAKE_COMMAND}" -E copy
+          "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_end_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}"
+          "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
+      OUTPUT
+          "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
+          "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
+      DEPENDS
+          ${section_magic_begin_name}
+          ${section_magic_end_name})
 
-      list(APPEND object_target_list "${section_magic_${arch_suffix}_objects}")
+    list(APPEND object_target_list "${section_magic_${arch_suffix}_objects}")
 
-      swift_install_in_component(stdlib
-          FILES "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o" "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-          DESTINATION "lib/swift/${arch_subdir}")
-    endforeach()
-  endif()
+    swift_install_in_component(stdlib
+        FILES "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o" "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
+        DESTINATION "lib/swift/${arch_subdir}")
+  endforeach()
 endforeach()
 
 add_custom_target(section_magic ALL DEPENDS ${object_target_list})
