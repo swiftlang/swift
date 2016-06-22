@@ -3495,7 +3495,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
                contextDecl == CS->TC.Context.getUnsafeMutablePointerDecl()) {
       SmallVector<Type, 4> scratch;
       for (Type arg : contextualType->getAllGenericArgs(scratch)) {
-        if (arg->isEqual(exprType)) {
+        if (arg->isEqual(exprType) && expr->getType()->isLValueType()) {
           diagnose(expr->getLoc(), diagID, exprType, contextualType).
             fixItInsert(expr->getStartLoc(), "&");
           return true;
