@@ -56,10 +56,10 @@ public func _arrayForceCast<SourceElement, TargetElement>(
       if _fastPath(native!.storesOnlyElementsOfType(TargetElement.self)) {
         // A native buffer that is known to store only elements of the
         // TargetElement can be used directly
-        return Array(source._buffer.cast(toBufferOf: TargetElement.self))
+        return Array(_buffer: source._buffer.cast(toBufferOf: TargetElement.self))
       }
       // Other native buffers must use deferred element type checking
-      return Array(
+      return Array(_buffer:
         source._buffer.downcast(
           toBufferWithDeferredTypeCheckOf: TargetElement.self))
     }
@@ -90,7 +90,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
         p += 1
       }
     }
-    return Array(_ArrayBuffer(buf, shiftedToStartIndex: 0))
+    return Array(_buffer: _ArrayBuffer(buf, shiftedToStartIndex: 0))
     
   case (.value, .explicit):
     _sanityCheckFailure(
@@ -121,7 +121,7 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
     
     if _fastPath(native != nil) {
       if native!.storesOnlyElementsOfType(TargetElement.self) {
-        return Array(a._buffer.cast(toBufferOf: TargetElement.self))
+        return Array(_buffer: a._buffer.cast(toBufferOf: TargetElement.self))
       }
       return nil
     }
@@ -136,7 +136,7 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
         }
       }
     }
-    return Array(a._buffer.cast(toBufferOf: TargetElement.self))
+    return Array(_buffer: a._buffer.cast(toBufferOf: TargetElement.self))
   }
   return []
 }
@@ -169,7 +169,7 @@ ElementwiseBridging:
       p.initialize(with: value!)
       p += 1
     }
-    return Array(_ArrayBuffer(buf, shiftedToStartIndex: 0))
+    return Array(_buffer: _ArrayBuffer(buf, shiftedToStartIndex: 0))
   }
   while false
   

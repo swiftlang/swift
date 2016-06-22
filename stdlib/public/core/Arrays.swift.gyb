@@ -732,7 +732,7 @@ public struct ${Self}<Element>
     get {
       _checkIndex(bounds.lowerBound)
       _checkIndex(bounds.upperBound)
-      return ArraySlice(_buffer[bounds])
+      return ArraySlice(_buffer: _buffer[bounds])
     }
     set(rhs) {
       _checkIndex(bounds.lowerBound)
@@ -884,9 +884,18 @@ public struct ${Self}<Element>
 
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
-  public init(_ _buffer: _Buffer) {
+  public init(_buffer: _Buffer) {
     self._buffer = _buffer
   }
+
+%if Self == 'ArraySlice':
+  // FIXME(ABI): SR-1873 this shim allows the below init(arrayLiteral:) to
+  // compile, but it goes through a general collection initializer instead of
+  // the expected efficient one for _SliceBuffer<Element> above.
+  public init(_buffer: _ContiguousArrayBuffer<Element>) {
+    self.init(_buffer)
+  }
+%end
 
   public var _buffer: _Buffer
 }
@@ -926,7 +935,7 @@ extension ${Self} : ArrayLiteralConvertible {
   ///
   /// - Parameter elements: A variadic list of elements of the new array.
   public init(arrayLiteral elements: Element...) {
-    self.init(_extractOrCopyToNativeArrayBuffer(elements._buffer))
+    self.init(_buffer: _extractOrCopyToNativeArrayBuffer(elements._buffer))
   }
 %end
 }
@@ -1027,7 +1036,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   public init<S : Sequence>(_ s: S)
     where S.Iterator.Element == Element {
 
-    self = ${Self}(_Buffer(s._copyToNativeArrayBuffer(),
+    self = ${Self}(_buffer: _Buffer(s._copyToNativeArrayBuffer(),
       shiftedToStartIndex: 0))
   }
 
@@ -1114,7 +1123,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
         storage, to: _ContiguousArrayStorage<Element>.self))
     
     return (
-      Array(_Buffer(innerBuffer, shiftedToStartIndex: 0)),
+      Array(_buffer: _Buffer(innerBuffer, shiftedToStartIndex: 0)),
         innerBuffer.firstElementAddress)
   }
 
@@ -2082,7 +2091,7 @@ public func != <Element : Equatable>(
 public func _arrayUpCast<Derived, Base>(_ a: Array<Derived>) -> Array<Base> {
   // FIXME: Dynamic casting is currently not possible without the objc runtime:
   // rdar://problem/18801510
-  return Array(a._buffer.cast(toBufferOf: Base.self))
+  return Array(_buffer: a._buffer.cast(toBufferOf: Base.self))
 }
 #endif
 
@@ -2113,7 +2122,7 @@ extension Array {
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
   public init(_immutableCocoaArray: _NSArrayCore) {
-    self = Array(_ArrayBuffer(nsArray: _immutableCocoaArray))
+    self = Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
   }
 }
 #endif
