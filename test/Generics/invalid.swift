@@ -71,3 +71,11 @@ func badDiagnostic2() {
   // expected-note@-2 {{overloads for 'eatDinnerConcrete' exist with these partially matching parameter lists: (d: Pizzas<ChiliFlakes>.NewYork, t: Deli<ChiliFlakes>.Pepperoni), (d: Pizzas<Pepper>.DeepDish, t: Deli<Pepper>.Pepperoni)}}
 
 }
+
+// Real error is that we cannot infer the generic parameter from context
+
+func takesAny(_ a: Any) {}
+
+func badDiagnostic3() {
+  takesAny(Deli.self) // expected-error {{argument type 'Deli<_>.Type' does not conform to expected type 'Any' (aka 'protocol<>')}}
+}
