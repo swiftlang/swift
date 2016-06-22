@@ -284,6 +284,9 @@ public protocol Integer : ${IntegerBase} {
   /// returns `nil` otherwise.
   init?<T : FloatingPoint>(exactly source: T)
 
+  /// Truncates the `source` to the closest representable value of `Self`.
+  init<T : FloatingPoint>(_ source: T)
+
   /// Creates an instance of `Self` from the value of any other `Integer`,
   /// trapping if value of `source` cannot be represented by `Self`.
   init<T : Integer>(_ source: T)
@@ -310,7 +313,6 @@ public protocol Integer : ${IntegerBase} {
   /// If `self` is negative, returns the index of the least significant bit of
   /// our representation such that all more-significant bits are 1.
   /// Has the value -1 if `self` is 0.
-  /// Has the value equal to `bitWidth - 1` for fixed width integers.
   var signBitIndex: Word { get }
 
 % for x in binaryArithmetic['Integer']:
@@ -333,6 +335,10 @@ public protocol Integer : ${IntegerBase} {
 
 extension Integer {
   public init?<T : FloatingPoint>(exactly source: T) {
+    fatalError()
+  }
+
+  public init<T : FloatingPoint>(_ source: T) {
     fatalError()
   }
 
