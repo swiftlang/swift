@@ -1167,6 +1167,15 @@ public func runAllTests() {
   }
 }
 
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+
+@_silgen_name("swift_leaks_startTrackingObjects")
+func startTrackingObjects(_: UnsafePointer<CChar>)
+@_silgen_name("swift_leaks_stopTrackingObjects")
+func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
+
+#endif
+
 public final class TestSuite {
   public init(_ name: String) {
     self.name = name
@@ -1225,6 +1234,11 @@ public final class TestSuite {
       f()
     }
     let test = _testByName(testName)
+
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    startTrackingObjects(name)
+#endif
+
     switch test.code {
     case .single(let code):
       precondition(
@@ -1234,6 +1248,11 @@ public final class TestSuite {
     case .parameterized(code: let code, _):
       code(parameter!)
     }
+
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    _ = stopTrackingObjects(name)
+#endif
+
     if let f = _testTearDownCode {
       f()
     }

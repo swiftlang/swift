@@ -40,6 +40,9 @@ if "@SWIFT_ASAN_BUILD@" == "TRUE":
 else:
     config.available_features.add('no_asan')
 
+if "@SWIFT_RUNTIME_ENABLE_LEAK_CHECKER@" == "TRUE":
+    config.available_features.add('leak-checker')
+
 if '@SWIFT_TOOLS_ENABLE_LTO@'.lower() in ['full', 'thin']:
     config.available_features.add('lto')
 else:
