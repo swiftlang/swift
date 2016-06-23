@@ -1211,7 +1211,7 @@ details of the setups of other systems or automated environments.""")
         "--stdlib-deployment-targets",
         help="list of targets to compile or cross-compile the Swift standard "
              "library for. %(default)s by default.",
-        nargs="*",
+        action=arguments.action.concat, type=arguments.type.shell_split,
         default=[
             target.name
             for target in stdlib_targets])
