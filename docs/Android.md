@@ -191,7 +191,6 @@ $ utils/build-script \
   -R \                                           # Build in ReleaseAssert mode.
   -T \                                           # Run all tests.
   --android \                                    # Build for Android.
-  --android-deploy-device-path /data/local/tmp \ # Temporary directory on the device where Android tests are run.
   --android-ndk ~/android-ndk-r12 \              # Path to an Android NDK.
   --android-ndk-version 21 \
   --android-icu-uc ~/libicu-android/armeabi-v7a/libicuuc.so \
