@@ -2422,7 +2422,6 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   if (replace) {
     auto replacer = llvm::ConstantExpr::getBitCast(var, replace->getType());
     replace->replaceAllUsesWith(replacer);
-    replace.release();
   }
 
   // Keep type metadata around for all types, although the runtime can currently
