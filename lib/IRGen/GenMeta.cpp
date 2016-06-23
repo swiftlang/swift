@@ -157,7 +157,6 @@ namespace {
   /// the fill operations that the compiler emits for the bound decl.
   ///
   /// FIXME: Rework to use GenericSignature instead of AllArchetypes
-  /// FIXME: Rework for nested generics
   struct GenericArguments {
     /// The values to use to initialize the arguments structure.
     SmallVector<llvm::Value *, 8> Values;
@@ -190,11 +189,23 @@ namespace {
       }
     }
 
-    void collect(IRGenFunction &IGF, CanBoundGenericType type) {
-      GenericTypeRequirements requirements(IGF.IGM, type->getDecl());
+    void collect(IRGenFunction &IGF, CanType type) {
+      NominalTypeDecl *decl;
+      CanType parentType;
+
+      if (auto nominalType = dyn_cast<NominalType>(type)) {
+        decl = nominalType->getDecl();
+        parentType = nominalType.getParent();
+      } else {
+        auto boundType = cast<BoundGenericType>(type);
+        decl = boundType->getDecl();
+        parentType = boundType.getParent();
+      }
+
+      GenericTypeRequirements requirements(IGF.IGM, decl);
 
       if (requirements.hasParentType()) {
-        Values.push_back(IGF.emitTypeMetadataRef(type.getParent()));
+        Values.push_back(IGF.emitTypeMetadataRef(parentType));
       }
 
       auto subs =
@@ -209,7 +220,7 @@ namespace {
         }
       });
 
-      collectTypes(IGF.IGM, type->getDecl());
+      collectTypes(IGF.IGM, decl);
       assert(Types.size() == Values.size());
     }
   };
@@ -373,8 +384,8 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   }
 
   // We are applying generic parameters to a generic type.
-  auto boundGeneric = cast<BoundGenericType>(theType);
-  assert(boundGeneric->getDecl() == theDecl);
+  assert(theType->isSpecialized() &&
+         theType->getAnyNominal() == theDecl);
 
   // Check to see if we've maybe got a local reference already.
   if (auto cache = IGF.tryGetLocalTypeData(theType,
@@ -383,7 +394,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
 
   // Grab the substitutions.
   GenericArguments genericArgs;
-  genericArgs.collect(IGF, boundGeneric);
+  genericArgs.collect(IGF, theType);
   assert(genericArgs.Values.size() > 0 && "no generic args?!");
 
   // Call the generic metadata accessor function.
@@ -452,8 +463,6 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   // access if it contains a resilient type.
   if (isa<StructType>(type) || isa<EnumType>(type)) {
     auto nominalType = cast<NominalType>(type);
-    assert(!nominalType->getDecl()->isGenericContext() &&
-           "shouldn't be called for a generic type");
 
     // Imported type metadata always requires an accessor.
     if (nominalType->getDecl()->hasClangNode())
@@ -530,9 +539,9 @@ irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type) {
     // Metadata accessors for fully-substituted generic types are
     // emitted with shared linkage.
     if (nominal->isGenericContext() && !nominal->isObjC()) {
-      if (isa<BoundGenericType>(type))
+      if (type->isSpecialized())
         return MetadataAccessStrategy::NonUniqueAccessor;
-      assert(isa<UnboundGenericType>(type));
+      assert(type->hasUnboundGenericType());
     }
 
     // If the type doesn't guarantee that it has an access function,

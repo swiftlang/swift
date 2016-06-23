@@ -940,32 +940,17 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     Buffer << '_';
     return;
 
-  case TypeKind::UnboundGeneric: {
-    // We normally reject unbound types in IR-generation, but there
-    // are several occasions in which we'd like to mangle them in the
-    // abstract.
-    auto decl = cast<UnboundGenericType>(tybase)->getDecl();
-    mangleNominalType(cast<NominalTypeDecl>(decl));
-    return;
-  }
-
+  case TypeKind::UnboundGeneric:
   case TypeKind::Class:
   case TypeKind::Enum:
-  case TypeKind::Struct: {
-    return mangleNominalType(cast<NominalType>(tybase)->getDecl());
-  }
-
+  case TypeKind::Struct:
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
-    // type ::= 'G' <type> <type>+ '_'
-    auto *boundType = cast<BoundGenericType>(tybase);
-    Buffer << 'G';
-    mangleNominalType(boundType->getDecl());
-    for (auto arg : boundType->getGenericArgs()) {
-      mangleType(arg, /*uncurry*/ 0);
-    }
-    Buffer << '_';
+    if (type->isSpecialized())
+      mangleBoundGenericType(type);
+    else
+      mangleNominalType(tybase->getAnyNominal());
     return;
   }
 
@@ -1330,6 +1315,46 @@ void Mangler::mangleNominalType(const NominalTypeDecl *decl) {
   mangleDeclName(decl);
 
   addSubstitution(key);
+}
+
+static void
+collectBoundGenericArgs(Type type,
+                        SmallVectorImpl<SmallVector<Type, 2>> &genericArgs) {
+  if (auto *unboundType = type->getAs<UnboundGenericType>()) {
+    if (auto parent = unboundType->getParent())
+      collectBoundGenericArgs(parent, genericArgs);
+    genericArgs.push_back({});
+  } else if (auto *nominalType = type->getAs<NominalType>()) {
+    if (auto parent = nominalType->getParent())
+      collectBoundGenericArgs(parent, genericArgs);
+    genericArgs.push_back({});
+  } else {
+    auto *boundType = type->castTo<BoundGenericType>();
+    if (auto parent = boundType->getParent())
+      collectBoundGenericArgs(parent, genericArgs);
+
+    SmallVector<Type, 2> args;
+    for (auto arg : boundType->getGenericArgs())
+      args.push_back(arg);
+    genericArgs.push_back(args);
+  }
+}
+
+void Mangler::mangleBoundGenericType(Type type) {
+  // type ::= 'G' <type> (<type>+ '_')+
+  Buffer << 'G';
+  auto *nominal = type->getAnyNominal();
+  mangleNominalType(nominal);
+
+  SmallVector<SmallVector<Type, 2>, 2> genericArgs;
+  collectBoundGenericArgs(type, genericArgs);
+  assert(!genericArgs.empty());
+
+  for (auto args : genericArgs) {
+    for (auto arg : args)
+      mangleType(arg, /*uncurry*/ 0);
+    Buffer << '_';
+  }
 }
 
 void Mangler::mangleProtocolDecl(const ProtocolDecl *protocol) {

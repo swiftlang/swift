@@ -215,3 +215,4 @@ _TFE1a ---> _TFE1a
 _TF21$__lldb_module_for_E0au3$E0Ps13ErrorProtocol_ ---> $__lldb_module_for_E0.$E0.unsafeMutableAddressor : Swift.ErrorProtocol
 _TMps10Comparable ---> protocol descriptor for Swift.Comparable
 _TFC4testP33_83378C430F65473055F1BD53F3ADCDB71C5doFoofT_T_ ---> test.(C in _83378C430F65473055F1BD53F3ADCDB7).doFoo () -> ()
+_TFVV15nested_generics5Lunch6DinnerCfT11firstCoursex12secondCourseGSqqd___9leftoversx14transformationFxqd___GS1_x_qd___ ---> nested_generics.Lunch.Dinner.init (firstCourse : A, secondCourse : A1?, leftovers : A, transformation : (A) -> A1) -> nested_generics.Lunch<A>.Dinner<A1>
