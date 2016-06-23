@@ -111,6 +111,9 @@ endfunction()
 macro(swift_common_standalone_build_config product is_cross_compiling)
   option(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
 
+  precondition_translate_flag(${product}_PATH_TO_LLVM_SOURCE PATH_TO_LLVM_SOURCE)
+  precondition_translate_flag(${product}_PATH_TO_LLVM_BUILD PATH_TO_LLVM_BUILD)
+
   if(${is_cross_compiling})
     # Can't run llvm-config from the cross-compiled LLVM.
     set(LLVM_TOOLS_BINARY_DIR "" CACHE PATH "Path to llvm/bin")
@@ -148,8 +151,8 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
     NO_DEFAULT_PATH)
 
   set(LLVM_CMAKE_PATHS
-      "${LLVM_BINARY_DIR}/share/llvm/cmake"
-      "${LLVM_BINARY_DIR}/lib/cmake/llvm")
+      "${PATH_TO_LLVM_BUILD}/share/llvm/cmake"
+      "${PATH_TO_LLVM_BUILD}/lib/cmake/llvm")
 
   set(LLVMCONFIG_FILE)
   foreach(CMAKE_PATH ${LLVM_CMAKE_PATHS})
@@ -173,15 +176,9 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   set(LLVM_ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS_saved}")
 
   # Clang
-  set(${product}_PATH_TO_LLVM_SOURCE "${LLVM_MAIN_SRC_DIR}")
-  set(${product}_PATH_TO_LLVM_BUILD "${LLVM_BINARY_DIR}")
-
-  set(PATH_TO_LLVM_SOURCE "${${product}_PATH_TO_LLVM_SOURCE}")
-  set(PATH_TO_LLVM_BUILD "${${product}_PATH_TO_LLVM_BUILD}")
-
-  set(${product}_PATH_TO_CLANG_SOURCE "${${product}_PATH_TO_LLVM_SOURCE}/tools/clang"
+  set(${product}_PATH_TO_CLANG_SOURCE "${PATH_TO_LLVM_SOURCE}/tools/clang"
       CACHE PATH "Path to Clang source code.")
-  set(${product}_PATH_TO_CLANG_BUILD "${${product}_PATH_TO_LLVM_BUILD}" CACHE PATH
+  set(${product}_PATH_TO_CLANG_BUILD "${PATH_TO_LLVM_BUILD}" CACHE PATH
     "Path to the directory where Clang was built or installed.")
 
   set(${product}_PATH_TO_CMARK_SOURCE "${${product}_PATH_TO_CMARK_SOURCE}"
@@ -217,11 +214,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   endif()
 
   list(APPEND CMAKE_MODULE_PATH "${${product}_PATH_TO_LLVM_BUILD}/share/llvm/cmake")
-
-  get_filename_component(PATH_TO_LLVM_BUILD "${${product}_PATH_TO_LLVM_BUILD}"
-    ABSOLUTE)
-  get_filename_component(PATH_TO_CLANG_BUILD "${${product}_PATH_TO_CLANG_BUILD}"
-    ABSOLUTE)
 
   set(LLVM_ABI_BREAKING_CHECKS "WITH_ASSERTS")
 

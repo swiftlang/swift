@@ -1,3 +1,5 @@
+include(SwiftUtils)
+
 # Translate a yes/no variable to the presence of a given string in a
 # variable.
 #
@@ -20,3 +22,8 @@ macro(translate_flags prefix options)
   endforeach()
 endmacro()
 
+# Set ${outvar} to ${${invar}}, asserting if ${invar} is not set.
+function(precondition_translate_flag invar outvar)
+  precondition(${invar})
+  set(${outvar} "${${invar}}" PARENT_SCOPE)
+endfunction()
