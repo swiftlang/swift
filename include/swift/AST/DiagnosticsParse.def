@@ -998,10 +998,6 @@ ERROR(unexpected_tokens_before_closure_in,none,
 ERROR(expected_closure_rbrace,none,
       "expected '}' at end of closure", ())
 
-ERROR(trailing_closure_requires_parens,none,
-      "trailing closure requires parentheses for disambiguation in this"
-      " context", ())
-
 WARNING(trailing_closure_excess_newlines,none,
         "trailing closure is separated from call site by multiple newlines", ())
 NOTE(trailing_closure_call_here,none,

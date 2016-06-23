@@ -2784,6 +2784,120 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
   }
 }
 
+// Perform checkStmtConditionTrailingClosure for single expression.
+static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
+  if (E == nullptr || isa<ErrorExpr>(E)) return;
+
+  // Shallow walker. just dig into implicit expression.
+  class DiagnoseWalker : public ASTWalker {
+    TypeChecker &TC;
+
+    void diagnoseIt(const CallExpr *E) {
+      auto argsExpr = E->getArg();
+      auto argsTy = argsExpr->getType();
+
+      // Ignore invalid argument type. Some diagnostics are already emitted.
+      if (!argsTy || argsTy->is<ErrorType>()) return;
+
+      if (auto TSE = dyn_cast<TupleShuffleExpr>(argsExpr))
+        argsExpr = TSE->getSubExpr();
+
+      SmallString<16> replacement;
+      SourceLoc lastLoc;
+      SourceRange closureRange;
+      if (auto PE = dyn_cast<ParenExpr>(argsExpr)) {
+        // Ignore non-trailing-closure.
+        if (!PE->hasTrailingClosure()) return;
+
+        closureRange = PE->getSubExpr()->getSourceRange();
+        lastLoc = PE->getLParenLoc();
+        if (lastLoc.isValid()) {
+          // Empty paren: e.g. if funcName() { 1 } { ... }
+          replacement = "";
+        } else {
+          // Bare trailing closure: e.g. if funcName { 1 } { ... }
+          replacement = "(";
+          lastLoc = E->getFn()->getEndLoc();
+        }
+      } else if (auto TE = dyn_cast<TupleExpr>(argsExpr)) {
+        // Ignore non-trailing-closure.
+        if (!TE->hasTrailingClosure()) return;
+
+        // Tuple + trailing closure: e.g. if funcName(x: 1) { 1 } { ... }
+        auto numElements = TE->getNumElements();
+        assert(numElements >= 2 && "Unexpected num of elements in TupleExpr");
+        closureRange = TE->getElement(numElements - 1)->getSourceRange();
+        lastLoc = TE->getElement(numElements - 2)->getEndLoc();
+        replacement = ", ";
+      } else {
+        // Can't be here.
+        return;
+      }
+
+      // Add argument label of the closure that is going to be enclosed in
+      // parens.
+      if (auto TT = argsTy->getAs<TupleType>()) {
+        assert(TT->getNumElements() != 0 && "Unexpected empty TupleType");
+        auto closureLabel = TT->getElement(TT->getNumElements() - 1).getName();
+        if(!closureLabel.empty()) {
+          replacement += closureLabel.str();
+          replacement += ": ";
+        }
+      }
+
+      // Emit diagnostics.
+      lastLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, lastLoc);
+      TC.diagnose(closureRange.Start, diag::trailing_closure_requires_parens)
+        .fixItReplaceChars(lastLoc, closureRange.Start, replacement)
+        .fixItInsertAfter(closureRange.End, ")");
+    }
+
+  public:
+    DiagnoseWalker(TypeChecker &tc) : TC(tc) { }
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      // Dig into implict expression.
+      if (E->isImplicit()) return { true, E };
+      // Diagnose call expression.
+      if (auto CE = dyn_cast<CallExpr>(E))
+        diagnoseIt(CE);
+      // Don't dig any further.
+      return { false, E };
+    }
+  };
+
+  DiagnoseWalker Walker(TC);
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
+/// \brief Diagnose trailing closure in statement-conditions.
+///
+/// Conditional statements, including 'for' or `switch` doesn't allow ambiguous
+/// trailing closures in these conditions part. Even if the parser can recover
+/// them, we force them to disambiguate.
+//
+/// E.g.:
+///   if let _ = arr?.map {$0+1} { ... }
+///   for _ in numbers.filter {$0 > 4} { ... }
+static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Stmt *S) {
+  if (auto LCS = dyn_cast<LabeledConditionalStmt>(S)) {
+    for (auto elt : LCS->getCond()) {
+      if (elt.getKind() == StmtConditionElement::CK_PatternBinding)
+        checkStmtConditionTrailingClosure(TC, elt.getInitializer());
+      else if (elt.getKind() == StmtConditionElement::CK_Boolean)
+        checkStmtConditionTrailingClosure(TC, elt.getBoolean());
+      // No trailing closure for CK_Availability: e.g. `if #available() {}`.
+    }
+  } else if (auto SS = dyn_cast<SwitchStmt>(S)) {
+    checkStmtConditionTrailingClosure(TC, SS->getSubjectExpr());
+  } else if (auto FES = dyn_cast<ForEachStmt>(S)) {
+    checkStmtConditionTrailingClosure(TC, FES->getSequence());
+    checkStmtConditionTrailingClosure(TC, FES->getWhere());
+  } else if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
+    for (auto CS : DCS->getCatches())
+      checkStmtConditionTrailingClosure(TC, CS->getGuardExpr());
+  }
+}
 
 static Optional<ObjCSelector>
 parseObjCSelector(ASTContext &ctx, StringRef string) {
@@ -3222,6 +3336,8 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
   
   if (auto switchStmt = dyn_cast<SwitchStmt>(S))
     checkSwitch(TC, switchStmt);
+
+  checkStmtConditionTrailingClosure(TC, S);
 }
 
 //===----------------------------------------------------------------------===//
