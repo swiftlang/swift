@@ -2495,7 +2495,7 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
                                     CanType input, CanType result,
                                     const ExtInfo &info) {
     // Knowing that the argument types are independently canonical is
-    // not suffiicient to guarantee that the function type will be canonical.
+    // not sufficient to guarantee that the function type will be canonical.
     auto fnType = GenericFunctionType::get(sig, input, result, info);
     return cast<GenericFunctionType>(fnType->getCanonicalType());
   }

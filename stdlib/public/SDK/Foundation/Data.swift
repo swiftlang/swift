@@ -163,7 +163,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     
     /// Initialize a `Data` with the specified size.
     ///
-    /// This initializer doesn not necessarily allocate the requested memory right away. Mutable data allocates additional memory as needed, so `capacity` simply establishes the initial capacity. When it does allocate the initial memory, though, it allocates the specified amount.
+    /// This initializer doesn't necessarily allocate the requested memory right away. Mutable data allocates additional memory as needed, so `capacity` simply establishes the initial capacity. When it does allocate the initial memory, though, it allocates the specified amount.
     ///
     /// This method sets the `count` of the data to 0.
     /// 

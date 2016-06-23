@@ -460,7 +460,7 @@ fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_fun
   result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(src), false._value)
 %       end
 % 
-% if not safelyConvertable:
+% if not safelyConvertible:
   ${error_check}
 % end
   self._value = result.value
@@ -472,7 +472,7 @@ fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_fun
 %    srcSigned = src_ty.is_signed
 %    Src = src_ty.stdlib_name
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
-%    safelyConvertable = (srcBits < bits and (srcSign == sign or signed)) or (srcBits == bits and srcSign == sign)
+%    safelyConvertible = (srcBits < bits and (srcSign == sign or signed)) or (srcBits == bits and srcSign == sign)
 
 @_transparent
 extension ${Self} {
@@ -487,7 +487,7 @@ extension ${Self} {
     }
   }
     
-% if safelyConvertable: 
+% if safelyConvertible:
   @available(*, message: "Converting ${Src} to ${Self} will always succeed.")
 % end
   @_transparent 
