@@ -157,6 +157,9 @@ namespace swift {
     /// Whether we are stripping the "NS" prefix from Foundation et al.
     bool StripNSPrefix = true;
 
+    /// Should 'id' in Objective-C be imported as 'Any' in Swift?
+    bool EnableIdAsAny = false;
+
     /// Enable the Swift 3 migration via Fix-Its.
     bool Swift3Migration = false;
 
