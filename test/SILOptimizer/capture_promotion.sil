@@ -110,6 +110,29 @@ bb0:
   %15 = apply %12(%14, %13) : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
   store %15 to %11a : $*Int
 
+// CHECK-NOT: function_ref @closure_indirect_result :
+// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_TTSf2i_i_i_n__closure_indirect_result
+// CHECK-NOT: function_ref @closure_indirect_result :
+
+// The three strong retains are removed
+
+// The Foo variable is loaded from and retained, because it is a reference type
+// CHECK-NEXT: [[LOADFOO:%.*]] = load {{.*}} : $*Foo
+// CHECK-NEXT: strong_retain [[LOADFOO]] : $Foo
+
+// The Baz variable is loaded and retain_value'd, because it is a non-trivial
+// aggregate type
+// CHECK-NEXT: [[LOADBAZ:%.*]] = load {{.*}} : $*Baz
+// CHECK-NEXT: retain_value [[LOADBAZ:%.*]] : $Baz
+
+// The Int variable is loaded only, because it is trivial
+// CHECK-NEXT: [[LOADINT:%.*]] = load {{.*}} : $*Int
+
+// The partial apply has one value argument for each pair of arguments that was
+// previously used to capture and pass the variable by reference
+// CHECK-NEXT: {{.*}} = partial_apply [[CLOSURE_PROMOTE]]([[LOADFOO]], [[LOADBAZ]], [[LOADINT]])
+
+
   %17 = function_ref @closure_indirect_result : $@convention(thin) (@owned @box Foo, @owned @box Baz, @owned @box Int) -> @out Int
   strong_retain %1 : $@box Foo
   strong_retain %6 : $@box Baz
