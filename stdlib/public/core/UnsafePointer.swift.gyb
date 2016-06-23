@@ -172,8 +172,8 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The pointee is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
-  // FIXME: add tests (since the `count` has been added)
   public func initialize(with newValue: Pointee, count: Int = 1) {
+    // FIXME: add tests (since the `count` has been added)
     _debugPrecondition(count >= 0,
       "${Self}.initialize(with:): negative count")
     // Must not use `initializeFrom` with a `Collection` as that will introduce
