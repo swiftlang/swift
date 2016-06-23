@@ -2502,7 +2502,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     return BufferPointer(self)
   }
 
-  // All underscored functions are unsafe and need a _fixLifetime in the caller.
+  // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _body: _HashedContainerStorageHeader {
     unsafeAddress {
       return UnsafePointer(buffer._valuePointer)
@@ -2514,32 +2514,38 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   @_versioned
   internal var _capacity: Int {
+    defer { _fixLifetime(self) }
     return _body.capacity
   }
 
   @_versioned
   internal var _count: Int {
     set {
+      defer { _fixLifetime(self) }
       _body.count = newValue
     }
     get {
+      defer { _fixLifetime(self) }
       return _body.count
     }
   }
 
-  internal var _maxLoadFactorInverse : Double {
+  internal var _maxLoadFactorInverse: Double {
+    defer { _fixLifetime(self) }
     return _body.maxLoadFactorInverse
   }
 
+  // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal
   var _initializedHashtableEntriesBitMapStorage: UnsafeMutablePointer<UInt> {
     return _roundUp(buffer._elementPointer, toAlignmentOf: UInt.self)
   }
 
+  // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _keys: UnsafeMutablePointer<Key> {
     let bitMapSizeInBytes =
       _unsafeMultiply(
-        _UnsafeBitMap.sizeInWords(forSizeInBits: _capacity),
+        _UnsafeBitMap.sizeInWords(forSizeInBits: _body.capacity),
         strideof(UInt.self))
     let start =
       UnsafeMutablePointer<UInt8>(_initializedHashtableEntriesBitMapStorage)
@@ -2548,8 +2554,9 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   }
 
 %if Self == 'Dictionary':
+  // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _values: UnsafeMutablePointer<Value> {
-    let keysSizeInBytes = _unsafeMultiply(_capacity, strideof(Key.self))
+    let keysSizeInBytes = _unsafeMultiply(_body.capacity, strideof(Key.self))
     let start = UnsafeMutablePointer<UInt8>(_keys) + keysSizeInBytes
     return _roundUp(start, toAlignmentOf: Value.self)
   }
@@ -2660,30 +2667,23 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   public // @testable
   var capacity: Int {
-    let result = buffer._capacity
-    _fixLifetime(buffer)
-    return result
+    return buffer._capacity
   }
 
   @_versioned
   @_transparent
   internal var count: Int {
     get {
-      let result = buffer._count
-      _fixLifetime(buffer)
-      return result
+      return buffer._count
     }
     nonmutating set(newValue) {
       buffer._count = newValue
-      _fixLifetime(buffer)
     }
   }
 
   @_transparent
   internal var maxLoadFactorInverse: Double {
-    let result = buffer._maxLoadFactorInverse
-    _fixLifetime(buffer)
-    return result
+    return buffer._maxLoadFactorInverse
   }
 
   @_versioned
