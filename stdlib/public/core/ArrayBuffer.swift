@@ -369,6 +369,7 @@ extension _ArrayBuffer {
     } else {
       // ObjC arrays do their own subscript checking.
       element = _nonNative.objectAtIndex(i)
+      print("checking \(element) is \(Element.self)")
       _precondition(
         element is Element,
         "NSArray element failed to match the Swift Array Element type")
