@@ -1429,10 +1429,11 @@ except that they can be enforced by the compiler.
 - ``trivial``: Promises that assignment just requires a fixed-size bit-for-bit
   copy without any indirection or reference-counting operations.
 
-- ``size_in_bits(N)``: Promises that the type is not larger than a certain
-  size. (It may be smaller.)
+- ``maximumFootprint(sizeInBits: N, alignmentInBits: A)``: Promises that the
+  type's size and required alignment are at most N bits and A bits,
+  respectively. (Both may be smaller.)
 
-- ``fixed_size``: Promises that the type has *some* size known at compile-time,
+- ``fixedSize``: Promises that the type has *some* size known at compile-time,
   allowing optimizations like promoting allocations to the stack. Only applies
   to fixed-contents structs and closed enums, which can already infer this
   information; the explicit annotation allows it to be enforced.
@@ -1442,13 +1443,18 @@ underscore the fact that they do not affect how a type is used at the source
 level, but do allow for additional optimizations. We may also expose some of
 these qualities to static or dynamic queries for performance-sensitive code.
 
-.. note:: Previous revisions of this document contained a ``no_payload``
+.. note:: Previous revisions of this document contained a ``noPayload``
     assertion for enums. However, this doesn't actually offer any additional
-    optimization opportunities over combining ``trivial`` with ``size_in_bits``,
-    and the latter is more flexible.
+    optimization opportunities over combining ``trivial`` with
+    ``maximumFootprint``, and the latter is more flexible.
+
+.. note:: None of these names / spellings are final. The name "trivial" comes
+    from C++, though Swift's trivial is closer to C++'s "`trivially copyable`__".
 
 All of these features need to be versioned, just like the more semantic
 fragility attributes above. The exact spelling is not proposed by this document.
+
+__ http://en.cppreference.com/w/cpp/types/is_trivially_copyable
 
 
 Resilience Domains
