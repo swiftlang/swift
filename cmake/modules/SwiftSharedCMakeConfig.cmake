@@ -230,7 +230,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
 
   set(LLVM_MAIN_INCLUDE_DIR "${LLVM_MAIN_SRC_DIR}/include")
   set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
-  set(LLVM_BINARY_DIR ${CMAKE_BINARY_DIR})
   set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src")
   set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
 
