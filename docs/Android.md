@@ -133,7 +133,14 @@ device in order to execute it.
 ### 4. Deploying the build products to the device
 
 You can use the `adb push` command to copy build products from your Linux
-environment to your Android device. Verify your device is connected and is
+environment to your Android device. If you haven't already installed `adb`,
+you may do so via `apt-get`:
+
+```
+$ sudo apt-get install android-tools-adb
+```
+
+Once you have `adb` installed, verify your device is connected and is
 listed when you run the `adb devices` command, then run the following
 commands to copy the Swift Android stdlib:
 
