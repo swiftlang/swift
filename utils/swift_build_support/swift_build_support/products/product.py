@@ -20,11 +20,6 @@ class Product(object):
         """
         return cls.__name__.lower()
 
-    @classmethod
-    def get_build_directory_name(cls, host_target):
-        return "{}-{}".format(cls.product_name(),
-                              host_target.name)
-
     def __init__(self, args, toolchain, source_dir, build_dir):
         self.args = args
         self.toolchain = toolchain
