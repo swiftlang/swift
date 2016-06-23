@@ -382,6 +382,10 @@ var fl_p: Float = 0x1p // expected-error {{expected a digit in floating point ex
 var fl_q: Float = 0x1p+ // expected-error {{expected a digit in floating point exponent}}
 var fl_r: Float = 0x1.0fp // expected-error {{expected a digit in floating point exponent}}
 var fl_s: Float = 0x1.0fp+ // expected-error {{expected a digit in floating point exponent}}
+var fl_t: Float = 0x1.p // expected-error {{value of type 'Int' has no member 'p'}}
+var fl_u: Float = 0x1.p2 // expected-error {{value of type 'Int' has no member 'p2'}}
+var fl_v: Float = 0x1.p+ // expected-error {{'+' is not a postfix unary operator}}
+var fl_w: Float = 0x1.p+2 // expected-error {{value of type 'Int' has no member 'p'}}
 
 var if1: Double = 1.0 + 4  // integer literal ok as double.
 var if2: Float = 1.0 + 4  // integer literal ok as float.
