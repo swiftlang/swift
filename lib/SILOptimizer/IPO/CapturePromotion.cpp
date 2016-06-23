@@ -747,6 +747,11 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       if (signatureHasDependentTypes(*CalleeTy))
         return false;
 
+      // The code currently does not handle indirect results correctly.
+      // Conservatively, bail
+      if (CalleeTy->hasIndirectResults())
+        return false;
+
       auto closureType = PAI->getType().castTo<SILFunctionType>();
 
       // Calculate the index into the closure's argument list of the captured
