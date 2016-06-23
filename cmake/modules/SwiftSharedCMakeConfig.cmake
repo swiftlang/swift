@@ -212,8 +212,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
 
   list(APPEND CMAKE_MODULE_PATH "${${product}_PATH_TO_LLVM_BUILD}/share/llvm/cmake")
 
-  set(LLVM_ABI_BREAKING_CHECKS "WITH_ASSERTS")
-
   include(AddLLVM)
   include(TableGen)
   include(HandleLLVMOptions)
