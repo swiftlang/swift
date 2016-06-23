@@ -507,7 +507,7 @@ void SILSerializer::writeOneTypeOneOperandLayout(ValueKind valueKind,
 /// Write an instruction that looks exactly like a conversion: all
 /// important information is encoded in the operand and the result type.
 void SILSerializer::writeConversionLikeInstruction(const SILInstruction *I) {
-  assert(I->getNumOperands() - I->getOpenedArchetypeOperands().size() == 1);
+  assert(I->getNumOperands() == 1);
   writeOneTypeOneOperandLayout(I->getKind(), 0, I->getType(),
                                I->getOperand(0));
 }
@@ -1395,9 +1395,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     handleSILDeclRef(S, AMI->getMember(), ListOfValues);
 
     // Add an optional operand.
-    TypeID OperandTy = TypeID();
-    unsigned OperandTyCategory = 0;
-    SILValue OptionalOpenedExistential = SILValue();
+    TypeID OperandTy =
+        AMI->hasOperand()
+            ? S.addTypeRef(AMI->getOperand()->getType().getSwiftRValueType())
+            : TypeID();
+    unsigned OperandTyCategory =
+        AMI->hasOperand() ? (unsigned)AMI->getOperand()->getType().getCategory()
+                          : 0;
+    SILValue OptionalOpenedExistential =
+        AMI->hasOperand() ? AMI->getOperand() : SILValue();
     auto OperandValueId = addValueRef(OptionalOpenedExistential);
 
     SILInstWitnessMethodLayout::emitRecord(
