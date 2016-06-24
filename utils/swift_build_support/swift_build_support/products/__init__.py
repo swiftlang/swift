@@ -21,16 +21,18 @@ from .swift import Swift
 from .swiftpm import SwiftPM
 from .xctest import XCTest
 
-__all__ = [
-    'CMark',
-    'Ninja',
-    'Foundation',
-    'LibDispatch',
-    'LLBuild',
-    'LLDB',
-    'LLVM',
-    'Ninja',
-    'Swift',
-    'SwiftPM',
-    'XCTest',
+known_product_classes = [
+    CMark,
+    Foundation,
+    LibDispatch,
+    LLBuild,
+    LLDB,
+    LLVM,
+    Ninja,
+    Swift,
+    SwiftPM,
+    XCTest,
 ]
+
+__all__ = [cls.__class__.__name__
+           for cls in known_product_classes]

@@ -35,6 +35,75 @@ def _register(registry, name, value):
     setattr(registry, name, value)
 
 
+# Custom Namespace -----------------------------------------------------------
+
+class NestedNamespace(object):
+    """A namespace implementation which supports nested structure references for
+    parameter "dest" values.
+
+    This allows initializing more complicated data structures directly in the
+    argument namespace. Any nested objects *must* be initialized in the
+    namespace directly before use. For exampe:
+
+      class Foo(object):
+          def __init__(self):
+              self.thing = False
+
+      args = NestedNamespace()
+      args.foo = Foo()
+
+      ...
+
+      parser.add_argument('--foo-thing', dest="foo.thing")
+
+    This class supports accessing the members via both subscription
+    (`args["foo"]`) and attribute style (`args.foo`) for convenience in
+    programmatic access to groups of arguments.
+    """
+
+    def __init__(self, **kwargs):
+        for (key, value) in kwargs.items():
+            setattr(self, key, value)
+
+    def __getitem__(self, index):
+        return getattr(self, index)
+
+    def __setitem__(self, index, value):
+        return setattr(self, index, value)
+
+    def __setattr__(self, key, val):
+        e = key.split(".", 1)
+        if len(e) == 1:
+            self.__dict__[key] = val
+        else:
+            (ns, key) = e
+            if ns not in self.__dict__:
+                raise AttributeError(ns)
+            setattr(self.__dict__[ns], key, val)
+
+    def __getattr__(self, key):
+        e = key.split(".", 1)
+        if len(e) == 1:
+            if key not in self.__dict__:
+                raise AttributeError(key)
+            return self.__dict__[key]
+        else:
+            (ns, key) = e
+            if ns not in self.__dict__:
+                raise AttributeError(ns)
+            return getattr(self.__dict__[ns], key)
+
+    def toJSON(self):
+        """Convert to a JSON encodeable representation."""
+        result = {}
+        for (key, value) in self.__dict__.items():
+            if isinstance(value, (str, bool, int, list, dict, None.__class__)):
+                result[key] = value
+            else:
+                result[key] = value.toJSON()
+        return result
+
+
 # Types ----------------------------------------------------------------------
 type = _Registry()
 

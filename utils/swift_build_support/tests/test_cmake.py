@@ -10,8 +10,8 @@
 
 import os
 import unittest
-from argparse import Namespace
 
+from swift_build_support.arguments import NestedNamespace
 from swift_build_support.cmake import CMake, CMakeOptions
 from swift_build_support.toolchain import host_toolchain
 
@@ -27,18 +27,22 @@ class CMakeTestCase(unittest.TestCase):
     def default_args(self):
         """Return new args object with default values
         """
-        return Namespace(host_cc="/path/to/clang",
-                         host_cxx="/path/to/clang++",
-                         enable_asan=False,
-                         enable_ubsan=False,
-                         export_compile_commands=False,
-                         distcc=False,
-                         cmake_generator="Ninja",
-                         clang_compiler_version=None,
-                         build_jobs=8,
-                         build_args=[],
-                         verbose_build=False,
-                         build_ninja=False)
+        args = NestedNamespace(
+            host_cc="/path/to/clang",
+            host_cxx="/path/to/clang++",
+            enable_asan=False,
+            enable_ubsan=False,
+            export_compile_commands=False,
+            distcc=False,
+            cmake_generator="Ninja",
+            clang_compiler_version=None,
+            build_jobs=8,
+            build_args=[],
+            verbose_build=False)
+        args.products = NestedNamespace()
+        args.products.ninja = NestedNamespace()
+        args.products.ninja.build = False
+        return args
 
     def cmake(self, args):
         """Return new CMake object initialized with given args
@@ -48,7 +52,7 @@ class CMakeTestCase(unittest.TestCase):
         toolchain.cxx = args.host_cxx
         if args.distcc:
             toolchain.distcc = self.mock_distcc_path()
-        if args.build_ninja:
+        if args.products.ninja.build:
             toolchain.ninja = '/path/to/built/ninja'
         return CMake(args=args, toolchain=toolchain)
 
@@ -145,7 +149,7 @@ class CMakeTestCase(unittest.TestCase):
 
     def test_common_options_build_ninja(self):
         args = self.default_args()
-        args.build_ninja = True
+        args.products.ninja.build = True
         cmake = self.cmake(args)
         self.assertEqual(
             list(cmake.common_options()),
@@ -162,7 +166,7 @@ class CMakeTestCase(unittest.TestCase):
         args.distcc = True
         args.cmake_generator = 'Xcode'
         args.clang_compiler_version = ("3", "8", "0")
-        args.build_ninja = True
+        args.products.ninja.build = True
         cmake = self.cmake(args)
         self.assertEqual(
             list(cmake.common_options()),

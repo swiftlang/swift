@@ -17,10 +17,11 @@
 #
 # ----------------------------------------------------------------------------
 
+import argparse
 import subprocess
 
 
-def parse_args(parser, argv):
+def parse_args(parser, argv, namespace=argparse.Namespace()):
     """
     Parse given argument list with given argparse.ArgumentParser.
 
@@ -31,7 +32,7 @@ def parse_args(parser, argv):
         build-script -RT -- --reconfigure
     """
     args, unknown_args = parser.parse_known_args(
-        list(arg for arg in argv if arg != '--'))
+        list(arg for arg in argv if arg != '--'), namespace)
     args.build_script_impl_args = unknown_args
     return args
 
