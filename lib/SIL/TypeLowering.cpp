@@ -2074,13 +2074,16 @@ getAnyFunctionRefFromCapture(CapturedValue capture) {
 CaptureInfo
 TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   // First, bail out if there are no local captures at all.
-  if (!fn.getCaptureInfo().hasLocalCaptures()) {
+  if (!fn.getCaptureInfo().hasLocalCaptures() &&
+      !fn.getCaptureInfo().hasDynamicSelfCapture()) {
     CaptureInfo info;
     info.setGenericParamCaptures(
         fn.getCaptureInfo().hasGenericParamCaptures());
     return info;
   };
-  
+
+  assert(fn.getAsDeclContext()->getParent()->isLocalContext());
+
   // See if we've cached the lowered capture list for this function.
   auto found = LoweredCaptures.find(fn);
   if (found != LoweredCaptures.end())
@@ -2090,6 +2093,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
   llvm::SetVector<CapturedValue> captures;
   bool capturesGenericParams = false;
+  DynamicSelfType *capturesDynamicSelf;
   
   std::function<void (AnyFunctionRef)> collectFunctionCaptures
   = [&](AnyFunctionRef curFn) {
@@ -2098,6 +2102,8 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   
     if (curFn.getCaptureInfo().hasGenericParamCaptures())
       capturesGenericParams = true;
+    if (curFn.getCaptureInfo().hasDynamicSelfCapture())
+      capturesDynamicSelf = curFn.getCaptureInfo().getDynamicSelfType();
 
     SmallVector<CapturedValue, 4> localCaptures;
     curFn.getCaptureInfo().getLocalCaptures(localCaptures);
@@ -2108,7 +2114,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
         collectFunctionCaptures(*capturedFn);
         continue;
       }
-      
+
       // If the capture is of a computed property, grab the transitive captures
       // of its accessors.
       if (auto capturedVar = dyn_cast<VarDecl>(capture.getDecl())) {
@@ -2127,10 +2133,10 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           // Directly capture storage if we're supposed to.
           if (capture.isDirect())
             goto capture_value;
-            
+
           // Otherwise, transitively capture the accessors.
           SWIFT_FALLTHROUGH;
-          
+
         case VarDecl::Computed: {
           collectFunctionCaptures(capturedVar->getGetter());
           if (auto setter = capturedVar->getSetter())
@@ -2156,6 +2162,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   assert(inserted.second && "already in map?!");
   auto &cachedCaptures = inserted.first->second;
   cachedCaptures.setGenericParamCaptures(capturesGenericParams);
+  cachedCaptures.setDynamicSelfType(capturesDynamicSelf);
   cachedCaptures.setCaptures(Context.AllocateCopy(captures));
   
   return cachedCaptures;

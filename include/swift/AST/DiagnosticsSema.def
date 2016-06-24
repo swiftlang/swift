@@ -802,7 +802,8 @@ ERROR(c_function_pointer_from_generic_function,none,
 ERROR(c_function_pointer_from_function_with_context,none,
       "a C function pointer cannot be formed from a "
       "%select{local function|closure}0 that captures "
-      "%select{context|generic parameters}1", (bool, bool))
+      "%select{context|generic parameters|dynamic Self type}1",
+      (bool, unsigned))
 NOTE(c_function_pointer_captures_here,none,
      "%0 captured here", (Identifier))
 

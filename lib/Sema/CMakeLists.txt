@@ -27,6 +27,7 @@ add_swift_library(swiftSema STATIC
   TypeCheckConstraints.cpp
   TypeCheckDecl.cpp
   TypeChecker.cpp
+  TypeCheckCaptures.cpp
   TypeCheckError.cpp
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
