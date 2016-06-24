@@ -557,10 +557,15 @@ function(_add_swift_library_single target name)
     set(libkind MODULE)
   elseif(SWIFTLIB_SINGLE_OBJECT_LIBRARY)
     set(libkind OBJECT)
+  # If both SHARED and STATIC are specified, we add the SHARED library first.
+  # The STATIC library is handled further below.
   elseif(SWIFTLIB_SINGLE_SHARED)
     set(libkind SHARED)
+  elseif(SWIFTLIB_SINGLE_STATIC)
+    set(libkind STATIC)
   else()
-    set(libkind)
+    message(FATAL_ERROR
+        "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
 
   handle_gyb_sources(
@@ -721,7 +726,6 @@ function(_add_swift_library_single target name)
   # Configure the static library target.
   # Set compile and link flags for the non-static target.
   # Do these LAST.
-
   set(target_static)
   if(SWIFTLIB_SINGLE_IS_STDLIB AND SWIFTLIB_SINGLE_STATIC)
     set(target_static "${target}-static")
