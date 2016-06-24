@@ -13,6 +13,7 @@
 #include "DictionaryKeys.h"
 #include "sourcekitd/Internal.h"
 #include "sourcekitd/Logging.h"
+#include "sourcekitd/RequestResponsePrinterBase.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -298,77 +299,12 @@ public:
   }
 };
 
-class VariantPrinter : public VariantVisitor<VariantPrinter> {
-  raw_ostream &OS;
-  unsigned Indent;
-  bool PrintAsJSON;
+class VariantPrinter : public VariantVisitor<VariantPrinter>,   
+                       public RequestResponsePrinterBase<VariantPrinter,
+                                                         sourcekitd_variant_t> {
 public:
   VariantPrinter(raw_ostream &OS, unsigned Indent = 0, bool PrintAsJSON = false)
-    : OS(OS), Indent(Indent), PrintAsJSON(PrintAsJSON) { }
-
-  void visitNull() {
-    OS << "<<NULL>>";
-  }
-
-  void visitDictionary(const DictMap &Map) {
-    OS << "{\n";
-    Indent += 2;
-    for (unsigned i = 0, e = Map.size(); i != e; ++i) {
-      auto &Pair = Map[i];
-      OS.indent(Indent);
-      if (PrintAsJSON) {
-        visitString(Pair.first.getName());
-      } else {
-        OSColor(OS, DictKeyColor) << Pair.first.getName();
-      }
-      OS << ": ";
-      VariantPrinter(OS, Indent, PrintAsJSON).visit(Pair.second);
-      if (i < e-1)
-        OS << ',';
-      OS << '\n';
-    }
-    Indent -= 2;
-    OS.indent(Indent) << '}';
-  }
-
-  void visitArray(ArrayRef<sourcekitd_variant_t> Arr) {
-    OS << "[\n";
-    Indent += 2;
-    for (unsigned i = 0, e = Arr.size(); i != e; ++i) {
-      auto Obj = Arr[i];
-      OS.indent(Indent);
-      VariantPrinter(OS, Indent, PrintAsJSON).visit(Obj);
-      if (i < e-1)
-        OS << ',';
-      OS << '\n';
-    }
-    Indent -= 2;
-    OS.indent(Indent) << ']';
-  }
-
-  void visitInt64(int64_t Val) {
-    OS << Val;
-  }
-
-  void visitBool(bool Val) {
-    OS << Val;
-  }
-
-  void visitString(StringRef Str) {
-    OS << '\"';
-    // Avoid raw_ostream's write_escaped, we don't want to escape unicode
-    // characters because it will be invalid JSON.
-    writeEscaped(Str, OS);
-    OS << '\"';
-  }
-
-  void visitUID(StringRef UID) {
-    if (PrintAsJSON) {
-      visitString(UID);
-    } else {
-      OSColor(OS, UIDColor) << UID;
-    }
-  }
+    : RequestResponsePrinterBase(OS, Indent, PrintAsJSON) { }
 };
 }
 

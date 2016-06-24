@@ -14,13 +14,12 @@
 #include "sourcekitd/CodeCompletionResultsArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
-#include "sourcekitd/Logging.h"
+#include "sourcekitd/RequestResponsePrinterBase.h"
 #include "SourceKit/Support/UIdent.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include <map>
 #include <vector>
 #include <xpc/xpc.h>
 
@@ -137,60 +136,12 @@ public:
   }
 };
 
-class SKDObjectPrinter : public SKDObjectVisitor<SKDObjectPrinter> {
-  raw_ostream &OS;
-  unsigned Indent;
+class SKDObjectPrinter : public SKDObjectVisitor<SKDObjectPrinter>,
+                         public RequestResponsePrinterBase<SKDObjectPrinter,
+                                                           sourcekitd_object_t> {
 public:
   SKDObjectPrinter(raw_ostream &OS, unsigned Indent = 0)
-    : OS(OS), Indent(Indent) { }
-
-  void visitDictionary(const DictMap &Map) {
-    OS << "{\n";
-    Indent += 2;
-    for (unsigned i = 0, e = Map.size(); i != e; ++i) {
-      auto &Pair = Map[i];
-      OS.indent(Indent);
-      OSColor(OS, DictKeyColor) << Pair.first.getName();
-      OS << ": ";
-      SKDObjectPrinter(OS, Indent).visit(Pair.second);
-      if (i < e-1)
-        OS << ',';
-      OS << '\n';
-    }
-    Indent -= 2;
-    OS.indent(Indent) << '}';
-  }
-
-  void visitArray(ArrayRef<sourcekitd_object_t> Arr) {
-    OS << "[\n";
-    Indent += 2;
-    for (unsigned i = 0, e = Arr.size(); i != e; ++i) {
-      auto Obj = Arr[i];
-      OS.indent(Indent);
-      SKDObjectPrinter(OS, Indent).visit(Obj);
-      if (i < e-1)
-        OS << ',';
-      OS << '\n';
-    }
-    Indent -= 2;
-    OS.indent(Indent) << ']';
-  }
-
-  void visitInt64(int64_t Val) {
-    OS << Val;
-  }
-
-  void visitString(StringRef Str) {
-    OS << '\"';
-    // Avoid raw_ostream's write_escaped, we don't want to escape unicode
-    // characters because it will be invalid JSON.
-    writeEscaped(Str, OS);
-    OS << '\"';
-  }
-
-  void visitUID(StringRef UID) {
-    OSColor(OS, UIDColor) << UID;
-  }
+    : RequestResponsePrinterBase(OS, Indent) { }
 };
 
 } // anonymous namespace.
