@@ -128,11 +128,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
         SOURCE_DIR llvm_config_src_dir
     )
 
-    # Assertions should follow llvm-config's setting by default.
-    set(LLVM_ENABLE_ASSERTIONS ${llvm_config_enable_assertions}
-        CACHE BOOL "Enable assertions")
-    mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
-
     set(LLVM_TOOLS_BINARY_DIR "${llvm_config_tools_binary_dir}" CACHE PATH "Path to llvm/bin")
 
     set(${product}_NATIVE_LLVM_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
@@ -162,10 +157,32 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
 
   # Save and restore variables that LLVM configuration overrides.
   set(LLVM_TOOLS_BINARY_DIR_saved "${LLVM_TOOLS_BINARY_DIR}")
-  set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
+
+  # If we already have a cached value for LLVM_ENABLE_ASSERTIONS, save the value.
+  if (DEFINED LLVM_ENABLE_ASSERTIONS)
+    set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
+  endif()
+  # Then we import LLVMCONFIG_FILE. This is going to override whatever cached
+  # value we have for LLVM_ENABLE_ASSERTIONS.
   include(${LLVMCONFIG_FILE})
   set(LLVM_TOOLS_BINARY_DIR "${LLVM_TOOLS_BINARY_DIR_saved}")
-  set(LLVM_ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS_saved}")
+
+  # If we did not have a cached value for LLVM_ENABLE_ASSERTIONS, set
+  # LLVM_ENABLE_ASSERTIONS_saved to be the ENABLE_ASSERTIONS value from LLVM so
+  # we follow LLVMConfig.cmake's value by default if nothing is provided.
+  if (NOT DEFINED LLVM_ENABLE_ASSERTIONS_saved)
+    set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
+  endif()
+
+  # Then set LLVM_ENABLE_ASSERTIONS with a default value of
+  # LLVM_ENABLE_ASSERTIONS_saved.
+  #
+  # The effect of this is that if LLVM_ENABLE_ASSERTION did not have a cached
+  # value, then LLVM_ENABLE_ASSERTIONS_saved is set to LLVM's value, so we get a
+  # default value from LLVM.
+  set(LLVM_ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS_saved}"
+    CACHE BOOL "Enable assertions")
+  mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
 
   precondition_translate_flag(LLVM_BUILD_LIBRARY_DIR LLVM_LIBRARY_DIR)
   precondition_translate_flag(LLVM_BUILD_MAIN_INCLUDE_DIR LLVM_MAIN_INCLUDE_DIR)
