@@ -26,15 +26,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
 
   precondition_translate_flag(${product}_PATH_TO_LLVM_SOURCE PATH_TO_LLVM_SOURCE)
   precondition_translate_flag(${product}_PATH_TO_LLVM_BUILD PATH_TO_LLVM_BUILD)
-  set(PATH_TO_LLVM_TOOLS_BINARY_DIR "${PATH_TO_LLVM_BUILD}/bin")
-
-  if(NOT ${is_cross_compiling})
-    set(${product}_NATIVE_LLVM_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
-    set(${product}_NATIVE_CLANG_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
-  endif()
-
-  find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" "${${product}_NATIVE_LLVM_TOOLS_PATH}"
-    NO_DEFAULT_PATH)
 
   set(LLVM_CMAKE_PATHS
       "${PATH_TO_LLVM_BUILD}/share/llvm/cmake"
@@ -125,6 +116,18 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   endif()
 
   list(APPEND CMAKE_MODULE_PATH "${${product}_PATH_TO_LLVM_BUILD}/share/llvm/cmake")
+
+  if(${is_cross_compiling})
+    find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" "${${product}_NATIVE_LLVM_TOOLS_PATH}"
+      NO_DEFAULT_PATH)
+    if ("${LLVM_TABLEGEN_EXE}" STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
+      message(FATAL_ERROR "Failed to find tablegen in ${${product}_NATIVE_LLVM_TOOLS_PATH}")
+    endif()
+  else()
+    set(LLVM_TABLEGEN_EXE llvm-tblgen)
+    set(${product}_NATIVE_LLVM_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
+    set(${product}_NATIVE_CLANG_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
+  endif()
 
   include(AddLLVM)
   include(TableGen)
