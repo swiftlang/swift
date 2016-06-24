@@ -1556,6 +1556,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
     declContextOrOffset = AFD;
   } else if (auto SD = dyn_cast<SubscriptDecl>(D)) {
     declContextOrOffset = SD;
+  } else if (auto TAD = dyn_cast<TypeAliasDecl>(D)) {
+    declContextOrOffset = TAD;
   } else {
     llvm_unreachable("Unknown Decl : DeclContext kind");
   }
