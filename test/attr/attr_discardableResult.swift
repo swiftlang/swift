@@ -41,9 +41,16 @@ class C1 {
   func f1() -> Int { }
 
   func f2() -> Int { }
+
+  @discardableResult
+  func me() -> Self { return self }
+
+  func reallyMe() -> Self { return self }
 }
 
-func testFunctionsInClass(c1 : C1) {
+class C2 : C1 {}
+
+func testFunctionsInClass(c1 : C1, c2: C2) {
   C1.f1Static()     // okay
   C1.f2Static()     // expected-warning {{result of call to 'f2Static()' is unused}}
   _ = C1.f2Static() // okay
@@ -60,6 +67,15 @@ func testFunctionsInClass(c1 : C1) {
   c1.f1()           // okay
   c1.f2()           // expected-warning {{result of call to 'f2()' is unused}}
   _ = c1.f2()       // okay
+
+  c1.me()           // okay
+  c2.me()           // okay
+
+  c1.reallyMe()     // expected-warning {{result of call to 'reallyMe()' is unused}}
+  c2.reallyMe()     // expected-warning {{result of call to 'reallyMe()' is unused}}
+
+  _ = c1.reallyMe() // okay
+  _ = c2.reallyMe() // okay
 }
 
 struct S1 {
@@ -92,6 +108,18 @@ func testFunctionsInStruct(s1 : S1) {
   _ = s1.f2()       // okay
 }
 
+protocol P1 {
+  @discardableResult
+  func me() -> Self
+
+  func reallyMe() -> Self
+}
+
+func testFunctionsInExistential(p1 : P1) {
+  p1.me()           // okay
+  p1.reallyMe()     // expected-warning {{result of call to 'reallyMe()' is unused}}
+  _ = p1.reallyMe() // okay
+}
 
 let x = 4
 "Hello \(x+1) world"  // expected-warning {{expression of type 'String' is unused}}
