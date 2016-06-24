@@ -12,6 +12,7 @@
 from __future__ import print_function
 
 import argparse
+import json
 import multiprocessing
 import os
 import pipes
@@ -70,6 +71,19 @@ def call_without_sleeping(command, env=None, dry_run=False, echo=False):
         command = ["caffeinate"] + list(command)
 
     shell.call(command, env=env, dry_run=dry_run, echo=echo)
+
+
+class ProductConfiguration(object):
+    """High-level product configuration."""
+
+    def __init__(self, product_class):
+        self.product_class = product_class
+        self.build = False
+
+    def toJSON(self):
+        result = dict(self.__dict__)
+        result["product_class"] = self.product_class.__name__
+        return result
 
 
 class HostSpecificConfiguration(object):
@@ -243,7 +257,7 @@ class BuildScriptInvocation(object):
         # Build LLDB if any LLDB-related options were specified.
         if args.lldb_build_variant is not None or \
            args.lldb_assertions is not None:
-            args.build_lldb = True
+            args.products.lldb.build = True
 
         # Set the default build variant.
         if args.build_variant is None:
@@ -293,18 +307,18 @@ class BuildScriptInvocation(object):
             args.cmake_generator = "Ninja"
 
         ninja_required = (
-            args.cmake_generator == 'Ninja' or args.build_foundation)
+            args.cmake_generator == 'Ninja' or args.products.foundation.build)
         if ninja_required and toolchain.ninja is None:
-            args.build_ninja = True
+            args.products.ninja.build = True
 
         # SwiftPM and XCTest have a dependency on Foundation.
         # On OS X, Foundation is built automatically using xcodebuild.
         # On Linux, we must ensure that it is built manually.
-        if ((args.build_swiftpm or args.build_xctest) and
+        if ((args.products.swiftpm.build or args.products.xctest.build) and
                 platform.system() != "Darwin"):
-            args.build_foundation = True
+            args.products.foundation.build = True
 
-        # Propagate global --skip-build
+        # Propagate global --skip-build.
         if args.skip_build:
             args.skip_build_linux = True
             args.skip_build_freebsd = True
@@ -314,13 +328,9 @@ class BuildScriptInvocation(object):
             args.skip_build_tvos = True
             args.skip_build_watchos = True
             args.skip_build_android = True
+            for cls in products.known_product_classes:
+                args.products[cls.product_name()].build = False
             args.skip_build_benchmarks = True
-            args.build_lldb = False
-            args.build_llbuild = False
-            args.build_swiftpm = False
-            args.build_xctest = False
-            args.build_foundation = False
-            args.build_libdispatch = False
 
         # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
         # merely shorthands for --skip-build-{**os}-{device,simulator}
@@ -611,24 +621,13 @@ class BuildScriptInvocation(object):
                 "--install-symroot", os.path.abspath(args.install_symroot)
             ]
 
-        if args.skip_build:
-            impl_args += ["--skip-build-cmark",
-                          "--skip-build-llvm",
-                          "--skip-build-swift"]
+        # Add the per-product skip-build args.
+        for cls in products.known_product_classes:
+            if not args.products[cls.product_name()].build:
+                impl_args += ["--skip-build-{}".format(cls.product_name())]
+
         if args.skip_build_benchmarks:
             impl_args += ["--skip-build-benchmarks"]
-        if not args.build_foundation:
-            impl_args += ["--skip-build-foundation"]
-        if not args.build_xctest:
-            impl_args += ["--skip-build-xctest"]
-        if not args.build_lldb:
-            impl_args += ["--skip-build-lldb"]
-        if not args.build_llbuild:
-            impl_args += ["--skip-build-llbuild"]
-        if not args.build_libdispatch:
-            impl_args += ["--skip-build-libdispatch"]
-        if not args.build_swiftpm:
-            impl_args += ["--skip-build-swiftpm"]
         if args.build_swift_stdlib_unittest_extra:
             impl_args += ["--build-swift-stdlib-unittest-extra"]
 
@@ -813,21 +812,12 @@ class BuildScriptInvocation(object):
         # but it matches the existing structure of the `build-script-impl`.
 
         product_classes = []
-        product_classes.append(products.CMark)
-        product_classes.append(products.LLVM)
-        product_classes.append(products.Swift)
-        if self.args.build_lldb:
-            product_classes.append(products.LLDB)
-        if self.args.build_llbuild:
-            product_classes.append(products.LLBuild)
-        if self.args.build_libdispatch:
-            product_classes.append(products.LibDispatch)
-        if self.args.build_foundation:
-            product_classes.append(products.Foundation)
-        if self.args.build_xctest:
-            product_classes.append(products.XCTest)
-        if self.args.build_swiftpm:
-            product_classes.append(products.SwiftPM)
+        for cls in [products.CMark, products.LLVM, products.Swift,
+                    products.LLDB, products.LLBuild,
+                    products.LibDispatch, products.Foundation, products.XCTest,
+                    products.SwiftPM]:
+            if self.args.products[cls.product_name()].build:
+                product_classes.append(cls)
         return product_classes
 
     def execute(self):
@@ -1180,6 +1170,16 @@ It is a policy decision aimed at making the builds uniform across all
 environments and easily reproducible by engineers who are not familiar with the
 details of the setups of other systems or automated environments.""")
 
+    # Create the custom argument namespace.
+    namespace = arguments.NestedNamespace()
+    namespace.products = arguments.NestedNamespace()
+    for cls in products.known_product_classes:
+        setattr(namespace.products, cls.product_name(),
+                ProductConfiguration(cls))
+    namespace.products.cmark.build = True
+    namespace.products.llvm.build = True
+    namespace.products.swift.build = True
+
     parser.add_argument(
         "-n", "--dry-run",
         help="print the commands that would be executed, but do not execute "
@@ -1221,42 +1221,22 @@ details of the setups of other systems or automated environments.""")
              "targets to build the Swift standard library for, or 'all'.",
         type=arguments.type.shell_split, default=["all"])
 
+    # Add options to select projects to build.
     projects_group = parser.add_argument_group(
         title="Options to select projects")
-    projects_group.add_argument(
-        "-l", "--lldb",
-        help="build LLDB",
-        action="store_true",
-        dest="build_lldb")
-    projects_group.add_argument(
-        "-b", "--llbuild",
-        help="build llbuild",
-        action="store_true",
-        dest="build_llbuild")
-    projects_group.add_argument(
-        "-p", "--swiftpm",
-        help="build swiftpm",
-        action="store_true",
-        dest="build_swiftpm")
-    projects_group.add_argument(
-        "--xctest",
-        help="build xctest",
-        action=arguments.action.optional_bool,
-        dest="build_xctest")
-    projects_group.add_argument(
-        "--foundation",
-        help="build foundation",
-        action=arguments.action.optional_bool,
-        dest="build_foundation")
-    projects_group.add_argument(
-        "--libdispatch",
-        help="build libdispatch",
-        action=arguments.action.optional_bool,
-        dest="build_libdispatch")
-    projects_group.add_argument(
-        "--build-ninja",
-        help="build the Ninja tool",
-        action=arguments.action.optional_bool)
+    for cls in products.known_product_classes:
+        # Special case for short form aliases.
+        short_alias = {products.LLDB: "l",
+                       products.LLBuild: "b",
+                       products.SwiftPM: "p"}.get(cls)
+        argnames = []
+        if short_alias is not None:
+            argnames.append("-" + short_alias)
+        argnames.append("--" + cls.product_name())
+        projects_group.add_argument(
+            *argnames, help="enable {}".format(cls.__name__),
+            action=arguments.action.optional_bool,
+            dest="products.{}.build".format(cls.product_name()))
 
     extra_actions_group = parser.add_argument_group(
         title="Extra actions to perform before or in addition to building")
@@ -1880,7 +1860,13 @@ details of the setups of other systems or automated environments.""")
         "--skip-test-optimized",
         action=arguments.action.unavailable)
 
-    args = migration.parse_args(parser, sys.argv[1:])
+    # Build script testing support.
+    parser.add_argument(
+        "--dump-argument-state",
+        help="dump information on the build script argument state",
+        action="store_true")
+
+    args = migration.parse_args(parser, sys.argv[1:], namespace)
 
     if args.build_script_impl_args:
         # If we received any impl args, check if `build-script-impl` would
@@ -1914,6 +1900,11 @@ details of the setups of other systems or automated environments.""")
     # Validate the arguments.
     BuildScriptInvocation.validate_arguments(toolchain, args)
 
+    # If we are just dumping the arguments, do so now.
+    if args.dump_argument_state:
+        print(json.dumps(args.toJSON(), indent=2, sort_keys=True))
+        return 0
+
     # Create the build script invocation.
     invocation = BuildScriptInvocation(toolchain, args)
 
@@ -1932,7 +1923,7 @@ details of the setups of other systems or automated environments.""")
     shell.makedirs(invocation.workspace.build_root)
 
     # Build ninja if required, which will update the toolchain.
-    if args.build_ninja:
+    if args.products.ninja.build:
         invocation.build_ninja()
 
     # Execute the underlying build script implementation.

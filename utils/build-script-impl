@@ -105,6 +105,7 @@ KNOWN_SETTINGS=(
     reconfigure                 ""               "force a CMake configuration run even if CMakeCache.txt already exists"
     swift-primary-variant-sdk   ""               "default SDK for target binaries"
     swift-primary-variant-arch  ""               "default arch for target binaries"
+    skip-build-ninja            ""               "set to skip building Ninja"
     skip-build-cmark            ""               "set to skip building CommonMark"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"

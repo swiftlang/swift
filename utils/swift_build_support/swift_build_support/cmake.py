@@ -115,7 +115,7 @@ class CMake(object):
             define("LLVM_VERSION_MINOR:STRING", minor)
             define("LLVM_VERSION_PATCH:STRING", patch)
 
-        if args.build_ninja and args.cmake_generator == 'Ninja':
+        if args.products.ninja.build and args.cmake_generator == 'Ninja':
             define('CMAKE_MAKE_PROGRAM', toolchain.ninja)
 
         return options
