@@ -27,32 +27,23 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   precondition_translate_flag(${product}_PATH_TO_LLVM_SOURCE PATH_TO_LLVM_SOURCE)
   precondition_translate_flag(${product}_PATH_TO_LLVM_BUILD PATH_TO_LLVM_BUILD)
 
-  set(LLVM_CMAKE_PATHS
+  set(SWIFT_LLVM_CMAKE_PATHS
       "${PATH_TO_LLVM_BUILD}/share/llvm/cmake"
       "${PATH_TO_LLVM_BUILD}/lib/cmake/llvm")
 
-  set(LLVMCONFIG_FILE)
-  foreach(CMAKE_PATH ${LLVM_CMAKE_PATHS})
-    list(APPEND CMAKE_MODULE_PATH "${CMAKE_PATH}")
-
-    if(EXISTS "${CMAKE_PATH}/LLVMConfig.cmake")
-      set(LLVMCONFIG_FILE "${CMAKE_PATH}/LLVMConfig.cmake")
-      break()
-    endif()
+  # Add all LLVM CMake paths to our cmake module path.
+  foreach(path ${SWIFT_LLVM_CMAKE_PATHS})
+    list(APPEND CMAKE_MODULE_PATH ${path})
   endforeach()
-
-  if(${LLVMCONFIG_FILE} STREQUAL "")
-    message(FATAL_ERROR "Not found: ${LLVMCONFIG_FILE}")
-  endif()
 
   # If we already have a cached value for LLVM_ENABLE_ASSERTIONS, save the value.
   if (DEFINED LLVM_ENABLE_ASSERTIONS)
     set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
   endif()
 
-  # Then we import LLVMCONFIG_FILE. This is going to override whatever cached
-  # value we have for LLVM_ENABLE_ASSERTIONS.
-  include(${LLVMCONFIG_FILE})
+  # Then we import LLVMConfig. This is going to override whatever cached value
+  # we have for LLVM_ENABLE_ASSERTIONS.
+  include(LLVMConfig)
 
   # If we did not have a cached value for LLVM_ENABLE_ASSERTIONS, set
   # LLVM_ENABLE_ASSERTIONS_saved to be the ENABLE_ASSERTIONS value from LLVM so
