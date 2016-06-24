@@ -2395,6 +2395,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ "${SKIP_TEST_XCTEST}" ]]; then
                     continue
                 fi
+                # If libdispatch is being built then XCTest will need access to it
+                if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
+                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
+                    LIBDISPATCH_BUILD_ARGS="--libdispatch-src-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
+                fi
                 echo "--- Running tests for ${product} ---"
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
@@ -2402,6 +2407,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 call "${XCTEST_SOURCE_DIR}"/build_script.py test \
                     --swiftc="${SWIFTC_BIN}" \
                     --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
+                    ${LIBDISPATCH_BUILD_ARGS} \
                     "${XCTEST_BUILD_DIR}"
                 echo "--- Finished tests for ${product} ---"
                 continue
@@ -2415,12 +2421,18 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ "${SKIP_TEST_FOUNDATION}" ]]; then
                     continue
                 fi
+                # If libdispatch is being built, TestFoundation will need access to it
+                if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
+                    LIBDISPATCH_LIB_DIR=":$(build_directory ${host} libdispatch)/src/.libs"
+                else
+                    LIBDISPATCH_LIB_DIR=""
+                fi
                 echo "--- Running tests for ${product} ---"
                 build_dir=$(build_directory ${host} ${product})
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call ${NINJA_BIN} TestFoundation
-                call env LD_LIBRARY_PATH="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"/lib/swift/:"${build_dir}/Foundation":"${XCTEST_BUILD_DIR}":${LD_LIBRARY_PATH} "${build_dir}"/TestFoundation/TestFoundation
+                call env LD_LIBRARY_PATH="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"/lib/swift/:"${build_dir}/Foundation":"${XCTEST_BUILD_DIR}""${LIBDISPATCH_LIB_DIR}":${LD_LIBRARY_PATH} "${build_dir}"/TestFoundation/TestFoundation
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
