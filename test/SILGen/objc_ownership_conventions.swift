@@ -116,16 +116,18 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
   // CHECK: strong_retain [[G]]
   // CHECK: [[NS_G:%[0-9]+]] = upcast [[G:%[0-9]+]] : $Gizmo to $NSObject
-  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : NSObject -> () -> AnyObject.Type! , $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
-  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : NSObject -> () -> NSAnsing.Type! , $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype NSAnsing.Type>
+  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype NSAnsing.Type>
   // CHECK:      select_enum [[OPT_OBJC]]
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
-  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[THICK]]
+  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<NSAnsing.Type>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[THICK]]
   // CHECK:      [[RES:%.*]] = unchecked_enum_data
+  // CHECK:      [[OPENED:%.*]] = open_existential_metatype [[RES]]
+  // CHECK:      [[RES_ANY:%.*]] = init_existential_metatype [[OPENED]]
   // CHECK:      strong_release [[G]] : $Gizmo
   // CHECK:      strong_release [[G]] : $Gizmo
-  // CHECK-NEXT: return [[RES]] : $@thick AnyObject.Type
+  // CHECK-NEXT: return [[RES_ANY]] : $@thick AnyObject.Type
   return g.qualifiedClassProp
 }
 
