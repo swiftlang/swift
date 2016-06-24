@@ -1,6 +1,6 @@
 set(LLVM_TARGET_DEFINITIONS Options.td)
-tablegen(LLVM Options.inc -gen-opt-parser-defs)
-add_public_tablegen_target(sourcekitdTestOptionsTableGen)
+swift_tablegen(Options.inc -gen-opt-parser-defs)
+swift_add_public_tablegen_target(sourcekitdTestOptionsTableGen)
 
 if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
   set(SOURCEKITD_TEST_DEPEND sourcekitdInProc)
