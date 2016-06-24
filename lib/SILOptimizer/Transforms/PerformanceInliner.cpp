@@ -1449,6 +1449,9 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (AppliesToInline.empty())
     return false;
 
+  SILOpenedArchetypesTracker OpenedArchetypes(*Caller);
+  bool isOpenedArchetypeMapInitialized = false;
+
   // Second step: do the actual inlining.
   for (auto AI : AppliesToInline) {
     SILFunction *Callee = AI.getReferencedFunction();
@@ -1468,12 +1471,21 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
           Caller->size() << "] " << Callee->getName() << "\n";
     );
 
+    // Lazily initialize the opened archetypes map.
+    if (!isOpenedArchetypeMapInitialized) {
+      isOpenedArchetypeMapInitialized = true;
+      OpenedArchetypes.collectOpenedArchetypesOfFunction();
+      // Handle removal of instructions.
+      Caller->getModule().registerDeleteNotificationHandler(&OpenedArchetypes);
+    }
+
     // Notice that we will skip all of the newly inlined ApplyInsts. That's
     // okay because we will visit them in our next invocation of the inliner.
     TypeSubstitutionMap ContextSubs;
     SILInliner Inliner(*Caller, *Callee,
                        SILInliner::InlineKind::PerformanceInline, ContextSubs,
-                       AI.getSubstitutions());
+                       AI.getSubstitutions(),
+                       OpenedArchetypes);
 
     auto Success = Inliner.inlineFunction(AI, Args);
     (void) Success;

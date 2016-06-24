@@ -305,6 +305,10 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
   SmallVector<SILValue, 16> CaptureArgs;
   SmallVector<SILValue, 32> FullArgs;
+
+  SILOpenedArchetypesTracker OpenedArchetypes(*F);
+  bool isOpenedArchetypeMapInitialized = false;
+
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     for (auto I = FI->begin(), E = FI->end(); I != E; ++I) {
       FullApplySite InnerAI = FullApplySite::isa(&*I);
@@ -349,6 +353,15 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
                            "a fragile function");
         }
         continue;
+      }
+
+      // Lazily initialize the opened archetypes map.
+      if (!isOpenedArchetypeMapInitialized) {
+        isOpenedArchetypeMapInitialized = true;
+        OpenedArchetypes.collectOpenedArchetypesOfFunction();
+        // Handle removal of instructions.
+        F->getModule().registerDeleteNotificationHandler(
+            &OpenedArchetypes);
       }
 
       // Then recursively process it first before trying to inline it.
@@ -399,7 +412,8 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       SILInliner Inliner(*F, *CalleeFunction,
                          SILInliner::InlineKind::MandatoryInline,
-                         ContextSubs, ApplySubs);
+                         ContextSubs, ApplySubs,
+                         OpenedArchetypes);
       if (!Inliner.inlineFunction(InnerAI, FullArgs)) {
         I = InnerAI.getInstruction()->getIterator();
         continue;

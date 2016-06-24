@@ -51,6 +51,20 @@ public:
   using SILClonerWithScopes<ImplClass>::doPostProcess;
   using SILClonerWithScopes<ImplClass>::ValueMap;
   using SILClonerWithScopes<ImplClass>::addBlockWithUnreachable;
+  using SILClonerWithScopes<ImplClass>::OpenedArchetypes;
+
+  TypeSubstCloner(SILFunction &To,
+                  SILFunction &From,
+                  TypeSubstitutionMap &ContextSubs,
+                  ArrayRef<Substitution> ApplySubs,
+                  SILOpenedArchetypesTracker &OpenedArchetypes,
+                  bool Inlining = false)
+    : SILClonerWithScopes<ImplClass>(To, OpenedArchetypes, Inlining),
+      SwiftMod(From.getModule().getSwiftModule()),
+      SubsMap(ContextSubs),
+      Original(From),
+      ApplySubs(ApplySubs),
+      Inlining(Inlining) { }
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
@@ -63,6 +77,7 @@ public:
       Original(From),
       ApplySubs(ApplySubs),
       Inlining(Inlining) { }
+
 
 protected:
   SILType remapType(SILType Ty) {
@@ -204,6 +219,18 @@ protected:
     auto Conformance = sub.getConformances()[0];
 
     auto newLookupType = getOpASTType(Inst->getLookupType());
+    SILValue OpenedExistential;
+    if (Inst->hasOperand())
+      OpenedExistential = getOpValue(Inst->getOperand());
+    else if (newLookupType->isOpenedExistential()) {
+      // Obtain the instruction defining this opened archetype.
+      assert(
+          OpenedArchetypes.getOpenedArchetypeDef(newLookupType) &&
+          "Definition of an opened archetype should have been seen before its "
+          "use");
+      OpenedExistential = OpenedArchetypes.getOpenedArchetypeDef(newLookupType);
+    }
+
     if (Conformance.isConcrete()) {
       CanType Ty = Conformance.getConcrete()->getType()->getCanonicalType();
 
@@ -223,7 +250,7 @@ protected:
         getBuilder().createWitnessMethod(
             getOpLocation(Inst->getLoc()), newLookupType, Conformance,
             Inst->getMember(), getOpType(Inst->getType()),
-            Inst->hasOperand() ? getOpValue(Inst->getOperand()) : SILValue(),
+            OpenedExistential,
             Inst->isVolatile()));
   }
 
