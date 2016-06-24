@@ -205,6 +205,12 @@ if(PYTHONINTERP_FOUND)
         # These are supported testing SDKs, but their implementation of
         # `command_upload_stdlib` is hidden.
       elseif("${SDK}" STREQUAL "ANDROID")
+        if("${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}" STREQUAL "")
+          message(FATAL_ERROR
+              "When running Android host tests, you must specify the directory on the device "
+              "to which Swift build products will be deployed.")
+        endif()
+
         # Warning: This step will fail if you do not have an Android device
         #          connected via USB. See docs/Android.md for details on
         #          how to run the test suite for Android.

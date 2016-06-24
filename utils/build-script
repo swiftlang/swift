@@ -1773,6 +1773,7 @@ details of the setups of other systems or automated environments.""")
         help="Path on an Android device to which built Swift stdlib products "
              "will be deployed. If running host tests, specify the '{}' "
              "directory.".format(adb.commands.DEVICE_TEMP_DIR),
+        default=adb.commands.DEVICE_TEMP_DIR,
         metavar="PATH")
 
     parser.add_argument(
