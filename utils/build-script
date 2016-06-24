@@ -249,6 +249,13 @@ class BuildScriptInvocation(object):
         if args.build_variant is None:
             args.build_variant = "Debug"
 
+        # Set the default stdlib-deployment-targets, if none were provided.
+        if args.stdlib_deployment_targets is None:
+            stdlib_targets = \
+                StdlibDeploymentTarget.default_stdlib_deployment_targets()
+            args.stdlib_deployment_targets = [
+                target.name for target in stdlib_targets]
+
         # Propagate the default build variant.
         if args.cmark_build_variant is None:
             args.cmark_build_variant = args.build_variant
@@ -1206,15 +1213,12 @@ details of the setups of other systems or automated environments.""")
              "tools for. Can be used multiple times.",
         action=arguments.action.concat, type=arguments.type.shell_split,
         default=[])
-    stdlib_targets = StdlibDeploymentTarget.default_stdlib_deployment_targets()
     targets_group.add_argument(
         "--stdlib-deployment-targets",
         help="list of targets to compile or cross-compile the Swift standard "
              "library for. %(default)s by default.",
-        nargs="*",
-        default=[
-            target.name
-            for target in stdlib_targets])
+        action=arguments.action.concat, type=arguments.type.shell_split,
+        default=None)
     targets_group.add_argument(
         "--build-stdlib-deployment-targets",
         help="A space-separated list that filters which of the configured "
