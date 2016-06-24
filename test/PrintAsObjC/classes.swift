@@ -233,6 +233,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (NSArray * _Nonnull)emptyArray;
 // CHECK-NEXT: - (NSArray * _Nullable)maybeArray;
 // CHECK-NEXT: - (NSRuncingMode)someEnum;
+// CHECK-NEXT: - (Class <NSCoding> _Nullable)protocolClass;
 // CHECK-NEXT: - (struct _NSZone * _Nullable)zone;
 // CHECK-NEXT: - (CFTypeRef _Nullable)cf:(CFTreeRef _Nonnull)x str:(CFStringRef _Nonnull)str str2:(CFMutableStringRef _Nonnull)str2 obj:(CFAliasForTypeRef _Nonnull)obj;
 // CHECK-NEXT: - (void)appKitInImplementation;
@@ -248,6 +249,7 @@ typealias AliasForNSRect = NSRect
   func maybeArray() -> NSArray? { return nil }
 
   func someEnum() -> RuncingMode { return .mince }
+  func protocolClass() -> NSCoding.Type? { return nil }
 
   func zone() -> NSZone? { return nil }
 
