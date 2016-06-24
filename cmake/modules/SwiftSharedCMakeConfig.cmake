@@ -241,11 +241,9 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
     include_directories(${INCLUDE_DIR})
   endforeach ()
 
-  link_directories(
-      "${LLVM_LIBRARY_DIR}"
-      # FIXME: if we want to support separate Clang builds and mix different
-      # build configurations of Clang and Swift, this line should be adjusted.
-      "${PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib")
+  # *NOTE* if we want to support separate Clang builds as well as separate LLVM
+  # builds, the clang build directory needs to be added here.
+  link_directories("${LLVM_LIBRARY_DIR}")
 
   set(LIT_ARGS_DEFAULT "-sv")
   if(XCODE)
