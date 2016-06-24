@@ -2174,9 +2174,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
                         call autoreconf -fvi
                     with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                               call env CC="${LLVM_BIN}/clang" CCX="${LLVM_BIN}/clang" SWIFTC="${SWIFTC_BIN}" \
-                               "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
-                               --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
+                        call env CC="${LLVM_BIN}/clang" CXX="${LLVM_BIN}/clang++" SWIFTC="${SWIFTC_BIN}" \
+                            "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
+                            --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
 
                 fi
                 with_pushd "${LIBDISPATCH_BUILD_DIR}" \
