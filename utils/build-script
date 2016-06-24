@@ -78,47 +78,57 @@ class HostSpecificConfiguration(object):
     def __init__(self, host_target, invocation):
         """Initialize for the given `host_target`."""
 
-        # Compute the set of deployment targets to configure/build.
         args = invocation.args
-        if host_target == args.host_target:
-            # This host is the user's desired product, so honor the requested
-            # set of targets to configure/build.
-            stdlib_targets_to_configure = args.stdlib_deployment_targets
-            if "all" in args.build_stdlib_deployment_targets:
-                stdlib_targets_to_build = set(stdlib_targets_to_configure)
-            else:
-                stdlib_targets_to_build = set(
-                    args.build_stdlib_deployment_targets).intersection(
-                        set(args.stdlib_deployment_targets))
-        else:
-            # Otherwise, this is a host we are building as part of
-            # cross-compiling, so we only need the target itself.
-            stdlib_targets_to_configure = [host_target]
-            stdlib_targets_to_build = set(stdlib_targets_to_configure)
 
-        # Compute the lists of **CMake** targets for each use case (configure
-        # vs. build vs. run) and the SDKs to configure with.
-        self.sdks_to_configure = set()
+        # [*] Compute the list of deployment targets to configure.
+        #
+        #  We only need to configure cross-compiled stdlib targets.
+        #  The host_target is implicitly configured by CMake.
+
+        self.host_target = StdlibDeploymentTarget\
+            .get_target_for_name(host_target)
+        if self.host_target is None:
+                diagnostics.fatal("unknown host target: %r" % (
+                    host_target))
+
+        self.stdlib_targets_to_configure = []
+        # FIXME: Cross-compiled hosts don't support cross-compiled targets
+        # or filtering build lists, only because we don't
+        # have an argument structure to define them for NxM hosts and targets.
+        if host_target == args.host_target:
+            for name in args.cross_compile_stdlib_deployment_targets:
+                dpymt_target = StdlibDeploymentTarget.get_target_for_name(name)
+                if dpymt_target is None:
+                    diagnostics.fatal("unknown stdlib target: %r" % (
+                        name))
+                else:
+                    self.stdlib_targets_to_configure.append(dpymt_target)
+
+        # [*] Compute the list of deployment targets to build.
+        #
+        # Even though we don't need to configure host_target, we do need
+        # to explicitly build it.
+        # So by default, build all configured targets + the host
+
+        self.stdlib_targets_to_build = [self.host_target]
+        self.stdlib_targets_to_build += self.stdlib_targets_to_configure
+
+        if host_target == args.host_target and \
+                "all" not in args.build_stdlib_deployment_targets:
+            self.stdlib_targets_to_build = \
+                [t for t in self.stdlib_targets_to_build
+                 if t.name in args.build_stdlib_deployment_targets]
+
+        # [*] Compute the lists of **CMake** build/run targets
+
         self.swift_stdlib_build_targets = []
         self.swift_test_run_targets = []
         self.swift_benchmark_build_targets = []
         self.swift_benchmark_run_targets = []
-        for deployment_target_name in stdlib_targets_to_configure:
-            # Get the target object.
-            deployment_target = StdlibDeploymentTarget.get_target_for_name(
-                deployment_target_name)
-            if deployment_target is None:
-                diagnostics.fatal("unknown target: %r" % (
-                    deployment_target_name,))
+        for deployment_target in self.stdlib_targets_to_build:
 
-            # Add the SDK to use.
             deployment_platform = deployment_target.platform
-            self.sdks_to_configure.add(deployment_platform.sdk_name)
-
-            # If we aren't actually building this target (only configuring
-            # it), do nothing else.
-            if deployment_target_name not in stdlib_targets_to_build:
-                continue
+            name = deployment_target.name
 
             # Compute which actions are desired.
             build = (
@@ -143,7 +153,6 @@ class HostSpecificConfiguration(object):
                 else:
                     test = False
 
-            name = deployment_target.name
             if build:
                 # Validation and long tests require building the full standard
                 # library, whereas the other targets can build a slightly
@@ -205,7 +214,7 @@ class BuildScriptInvocation(object):
                 diagnostics.fatal(
                     "can't find distcc-pump (please install distcc-pump)")
 
-        if args.host_target is None or args.stdlib_deployment_targets is None:
+        if args.host_target is None:
             diagnostics.fatal("unknown operating system")
 
         if args.symbols_package:
@@ -401,17 +410,19 @@ class BuildScriptInvocation(object):
             args.build_subdir = \
                 swift_build_support.workspace.compute_build_subdir(args)
 
-        # Add optional stdlib-deployment-targets
+        # Add optional cross-compile-stdlib-deployment-targets
         if args.android:
-            args.stdlib_deployment_targets.append(
+            args.cross_compile_stdlib_deployment_targets.append(
                 StdlibDeploymentTarget.Android.armv7.name)
 
         # Infer platform flags from manually-specified configure targets.
         # This doesn't apply to Darwin platforms, as they are
         # already configured. No building without the platform flag, though.
 
-        android_tgts = [tgt for tgt in args.stdlib_deployment_targets
-                        if StdlibDeploymentTarget.Android.contains(tgt)]
+        android_tgts = \
+            [tgt for tgt in args.cross_compile_stdlib_deployment_targets
+             if StdlibDeploymentTarget.Android.contains(tgt)]
+
         if not args.android and len(android_tgts) > 0:
             args.android = True
             args.skip_build_android = True
@@ -546,8 +557,6 @@ class BuildScriptInvocation(object):
             "--build-dir", self.workspace.build_root,
             "--install-prefix", args.install_prefix,
             "--host-target", args.host_target,
-            "--stdlib-deployment-targets",
-            " ".join(args.stdlib_deployment_targets),
             "--host-cc", toolchain.cc,
             "--host-cxx", toolchain.cxx,
             "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
@@ -580,10 +589,24 @@ class BuildScriptInvocation(object):
                 pipes.quote(arg) for arg in cmake.build_args()),
         ]
 
+        # Specify additional stdlib targets to configure. Remove zero-length
+        # names.
+        args.cross_compile_stdlib_deployment_targets = \
+            [t for t in args.cross_compile_stdlib_deployment_targets
+             if len(t) > 0]
+
+        if args.cross_compile_stdlib_deployment_targets is not None and \
+                len(args.cross_compile_stdlib_deployment_targets) > 0 and \
+                'none' not in args.cross_compile_stdlib_deployment_targets:
+            impl_args += ["--cross-compile-stdlib-deployment-targets",
+                          " ".join(
+                              args.cross_compile_stdlib_deployment_targets)]
+        # Specify stdlib targets to build
         if args.build_stdlib_deployment_targets:
             impl_args += [
                 "--build-stdlib-deployment-targets", " ".join(
                     args.build_stdlib_deployment_targets)]
+        # Specify additional hosts to configure + build
         if args.cross_compile_hosts:
             impl_args += [
                 "--cross-compile-hosts", " ".join(args.cross_compile_hosts)]
@@ -787,16 +810,18 @@ class BuildScriptInvocation(object):
             config = HostSpecificConfiguration(host_target, self)
 
             # Convert into `build-script-impl` style variables.
+            stdlib_target_names = [t.name for t
+                                   in config.stdlib_targets_to_configure]
             options[host_target] = {
-                "SWIFT_SDKS": " ".join(sorted(
-                    config.sdks_to_configure)),
-                "SWIFT_STDLIB_TARGETS": " ".join(
+                "SWIFT_CROSS_COMPILE_STDLIB_TARGETS": " ".join(
+                    stdlib_target_names),
+                "SWIFT_STDLIB_BUILD_TARGETS": " ".join(
                     config.swift_stdlib_build_targets),
-                "SWIFT_BENCHMARK_TARGETS": " ".join(
+                "SWIFT_BENCHMARK_BUILD_TARGETS": " ".join(
                     config.swift_benchmark_build_targets),
-                "SWIFT_RUN_BENCHMARK_TARGETS": " ".join(
+                "SWIFT_BENCHMARK_RUN_TARGETS": " ".join(
                     config.swift_benchmark_run_targets),
-                "SWIFT_TEST_TARGETS": " ".join(
+                "SWIFT_TEST_RUN_TARGETS": " ".join(
                     config.swift_test_run_targets),
             }
 
@@ -1206,15 +1231,14 @@ details of the setups of other systems or automated environments.""")
              "tools for. Can be used multiple times.",
         action=arguments.action.concat, type=arguments.type.shell_split,
         default=[])
-    stdlib_targets = StdlibDeploymentTarget.default_stdlib_deployment_targets()
+    default_cross_stdlib_targets = StdlibDeploymentTarget\
+        .default_cross_compile_stdlib_targets()
     targets_group.add_argument(
-        "--stdlib-deployment-targets",
-        help="list of targets to compile or cross-compile the Swift standard "
+        "--cross-compile-stdlib-deployment-targets",
+        help="list of targets to cross-compile the Swift standard "
              "library for. %(default)s by default.",
         nargs="*",
-        default=[
-            target.name
-            for target in stdlib_targets])
+        default=[t.name for t in default_cross_stdlib_targets])
     targets_group.add_argument(
         "--build-stdlib-deployment-targets",
         help="A space-separated list that filters which of the configured "

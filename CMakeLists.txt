@@ -123,8 +123,11 @@ set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
 # * toolchain-dev-tools -- install development tools useful in a shared toolchain
 # * dev -- headers and libraries required to use Swift compiler as a library.
 
-set(SWIFT_SDKS "" CACHE STRING
-    "If non-empty, limits building target binaries only to specified SDKs (despite other SDKs being available)")
+set(SWIFT_CROSS_COMPILE_STDLIB_TARGETS "" CACHE STRING
+    "A list of deployment-targets to cross-compile the standard-library for (by default, the standard library is always compiled for the host)")
+
+set(SWIFT_SKIP_HOST_STDLIB "" CACHE STRING
+  "If True, will not build the standard library for the host")
 
 set(SWIFT_PRIMARY_VARIANT_SDK "" CACHE STRING
     "Primary SDK for target binaries")
@@ -418,10 +421,97 @@ function(check_working_std_regex result_var_name)
 endfunction()
 check_working_std_regex(SWIFT_HAVE_WORKING_STD_REGEX)
 
-# If SWIFT_HOST_VARIANT_SDK not given, try to detect from the CMAKE_SYSTEM_NAME.
-if(SWIFT_HOST_VARIANT_SDK)
-  set(SWIFT_HOST_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
+#
+# Enable additional warnings.
+#
+swift_common_cxx_warnings()
+
+#
+# Configure SDKs.
+#
+
+function(get_sdk_from_stdlib_target stdlib_target result_var_name)
+  string(REPLACE "-" ";" target_components "${stdlib_target}")
+  list(GET target_components 0 target_sdk)
+  
+  # Darwin SDK names don't match their stdlib-deployment-target names
+  if("${target_sdk}" STREQUAL "macosx")
+    set(target_sdk "OSX")
+  elseif("${target_sdk}" STREQUAL "iphoneos")
+    set(target_sdk "IOS")
+  elseif("${target_sdk}" STREQUAL "iphonesimulator")
+    set(target_sdk "IOS_SIMULATOR")
+  elseif("${target_sdk}" STREQUAL "appletvos")
+    set(target_sdk "TVOS")
+  elseif("${target_sdk}" STREQUAL "appletvsimulator")
+    set(target_sdk "TVOS_SIMULATOR")
+  elseif("${target_sdk}" STREQUAL "watchos")
+    set(target_sdk "WATCHOS")
+  elseif("${target_sdk}" STREQUAL "watchsimulator")
+    set(target_sdk "WATCHOS_SIMULATOR")
+  endif()
+
+  string(TOUPPER "${target_sdk}" target_sdk)
+  set("${result_var_name}" "${target_sdk}" PARENT_SCOPE)
+endfunction()
+
+function(get_arch_from_stdlib_target stdlib_target result_var_name)
+  string(REPLACE "-" ";" target_components "${stdlib_target}")
+  list(GET target_components 1 target_arch)
+  set("${result_var_name}" "${target_arch}" PARENT_SCOPE)
+endfunction()
+
+# Calculate the triple for an sdk/architecture.
+# Will only return a result for supported targets.
+function(get_triple sdk arch result_var_name)
+  if("${sdk}" STREQUAL "LINUX")
+    if("${arch}" STREQUAL "x86_64")
+      set(triple "x86_64-unknown-linux-gnu")
+    elseif("${arch}" STREQUAL "aarch64")
+      set(triple "aarch64-unknown-linux-gnu")
+    elseif("${arch}" STREQUAL "s390x")
+      set(triple "s390x-unknown-linux-gnu")
+    elseif("${arch}" MATCHES "(powerpc64|powerpc64le)")
+      set(triple "${arch}-unknown-linux-gnu")
+    elseif("${arch}" MATCHES "(armv6|armv7)")
+      set(triple "${arch}-unknown-linux-gnueabihf")
+    endif()
+  elseif("${sdk}" STREQUAL "ANDROID")
+    if("${arch}" STREQUAL "armv7")
+      set(triple "armv7-none-linux-androideabi")
+    endif()
+  elseif("${sdk}" STREQUAL "FREEBSD")
+    if("${arch}" STREQUAL "x86_64")
+      # FIXME: Using the host OS version won't produce correct results for
+      # cross-compilation.
+      string(REPLACE "[-].*" "" FREEBSD_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION})
+      message(STATUS "FreeBSD Version: ${FREEBSD_SYSTEM_VERSION}")
+      set(triple "x86_64-unknown-freebsd${FREEBSD_SYSTEM_VERSION}")
+    endif()
+  elseif("${sdk}" STREQUAL "CYGWIN")
+    if("${arch}" STREQUAL "x86_64")
+      set(triple "x86_64-unknown-windows-cygnus")
+    endif()
+  #FIXME: Add Darwin sdks
+  endif()
+
+  set("${result_var_name}" "${triple}" PARENT_SCOPE)
+endfunction()
+
+# Set SWIFT_HOST_VARIANT_SDK/ARCH
+# - Parse from SWIFT_HOST, if given.
+# - Derive from CMAKE_SYSTEM_NAME/PROCESSOR otherwise
+
+if(SWIFT_HOST)
+  get_sdk_from_stdlib_target("${SWIFT_HOST}" SWIFT_HOST_VARIANT_SDK_default)
+  get_arch_from_stdlib_target("${SWIFT_HOST}" SWIFT_HOST_VARIANT_ARCH_default)
+  if("${SWIFT_HOST_VARIANT_SDK_default}" STREQUAL "" OR
+     "${SWIFT_HOST_VARIANT_ARCH_default}" STREQUAL "")
+      message(FATAL_ERROR "Invalid SWIFT_HOST; cannot be parsed.")
+  endif()
 else()
+
+  # Derive SDK
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     set(SWIFT_HOST_VARIANT_SDK_default "LINUX")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
@@ -433,12 +523,8 @@ else()
   else()
     message(FATAL_ERROR "Unable to detect SDK for host system: ${CMAKE_SYSTEM_NAME}")
   endif()
-endif()
 
-# If SWIFT_HOST_VARIANT_ARCH not given, try to detect from the CMAKE_SYSTEM_PROCESSOR.
-if(SWIFT_HOST_VARIANT_ARCH)
-  set(SWIFT_HOST_VARIANT_ARCH_default, "${SWIFT_HOST_VARIANT_ARCH}")
-else()
+  # Derive ARCH
   if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
     set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
@@ -464,47 +550,18 @@ set(SWIFT_HOST_VARIANT_SDK "${SWIFT_HOST_VARIANT_SDK_default}" CACHE STRING
 set(SWIFT_HOST_VARIANT_ARCH "${SWIFT_HOST_VARIANT_ARCH_default}" CACHE STRING
     "Deployment arch for Swift host tools (the compiler).")
 
-#
-# Enable additional warnings.
-#
-swift_common_cxx_warnings()
 
-#
-# Configure SDKs.
-#
-
-function(is_sdk_requested name result_var_name)
-  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${name}")
-    set("${result_var_name}" "TRUE" PARENT_SCOPE)
-  else()
-    list(FIND SWIFT_SDKS "${name}" sdk_index)
-    if(${sdk_index} EQUAL -1)
-      set("${result_var_name}" "FALSE" PARENT_SCOPE)
-    else()
-      set("${result_var_name}" "TRUE" PARENT_SCOPE)
-    endif()
-  endif()
-endfunction()
 
 if(XCODE)
   # FIXME: Cannot cross-compile the standard library using Xcode.  Xcode
   # insists on passing -mmacosx-version-min to the compiler, and we need
   # to pass -mios-version-min.  Clang sees both options and complains.
-  set(SWIFT_SDKS "OSX")
+  set(SWIFT_CROSS_COMPILE_STDLIB_TARGETS "")
 endif()
 
-# FIXME: the parameters we specify in SWIFT_SDKS are lacking architecture specifics,
-# so we need to hard-code it. For example, the SDK for Android is just 'ANDROID', 
-# which we assume below to be armv7. 
-# The iOS SDKs all have their architectures hardcoded because they are just specified by name (e.g. 'IOS' or 'WATCHOS').
-# We can't cross-compile the standard library for another linux architecture,
-# because the SDK list would just be 'LINUX' and we couldn't disambiguate it from the host.
-# 
-# To fix it, we would need to append the architecture to the SDKs,
-# for example: 'OSX-x86_64;IOS-armv7;...etc'.
-# We could easily do that - we have all of that information in build-script-impl.
-# Also, we would need to be provided with the sysroot for each SDK (see SWIFT_ANDROID_SDK_PATH/SWIFT_SDK_ANDROID_PATH).
-# Darwin targets cheat and use `xcrun`.
+
+# FIXME: Configure prefixes should include architecture, not just SDK name
+# Otherwise, we can't configure two linux targets with different sysroots.
 
 if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
   
@@ -512,47 +569,45 @@ if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
   set(SWIFT_HOST_VARIANT "linux" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [linux].")
 
-  # Calculate the host triple
-  if("${SWIFT_HOST_TRIPLE}" STREQUAL "")
-    if("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "x86_64")
-      set(SWIFT_HOST_TRIPLE "x86_64-unknown-linux-gnu")
-    elseif("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "aarch64")
-      set(SWIFT_HOST_TRIPLE "aarch64-unknown-linux-gnu")
-    elseif("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "(powerpc64|powerpc64le)")
-      set(SWIFT_HOST_TRIPLE "${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu")
-    elseif("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "s390x")
-      set(SWIFT_HOST_TRIPLE "s390x-unknown-linux-gnu")
-    elseif("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "(armv6|armv7)")
-      set(SWIFT_HOST_TRIPLE "${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnueabihf")
-    else()
-      message(FATAL_ERROR "Unable to calculate triple for linux host on ${SWIFT_HOST_VARIANT_ARCH}")
+  # Configure the host
+  if(NOT SWIFT_SKIP_HOST_STDLIB)
+    get_triple("${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}" SWIFT_HOST_TRIPLE)
+    if(NOT SWIFT_HOST_TRIPLE)
+      message(FATAL_ERROR "Unsupported Linux target: ${SWIFT_HOST_VARIANT_ARCH}")
     endif()
-  endif()
 
-  # Should we build the standard library for the host?
-  is_sdk_requested(LINUX swift_build_linux)
-  if(swift_build_linux)
-    configure_sdk_unix(LINUX "Linux" "linux" "${SWIFT_HOST_VARIANT}" "${SWIFT_HOST_VARIANT_ARCH}" "${SWIFT_HOST_TRIPLE}" "/")
+    configure_sdk_unix(LINUX "Linux" "linux" "${SWIFT_HOST_VARIANT}" "${SWIFT_HOST_VARIANT_ARCH}" "${SWIFT_HOST_TRIPLE}" "${CMAKE_SYSROOT}")
     set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
   endif()
 
-  # Compatible cross-compile SDKS for LINUX: ANDROID (arch always armv7)
-  is_sdk_requested(ANDROID swift_build_android)
-  if("${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-    set(swift_can_crosscompile_stdlib_android FALSE)
-  else()
-    set(swift_can_crosscompile_stdlib_android TRUE)
-  endif()
-
-  if(swift_build_android AND ${swift_can_crosscompile_stdlib_android})
-    configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi" "${SWIFT_ANDROID_SDK_PATH}")
-    # If we're not building for the host, the cross-compiled target should be the 'primary variant'.
-    if("${swift_build_linux}" STREQUAL "FALSE")
-      set(SWIFT_PRIMARY_VARIANT_SDK_default "ANDROID")
-      set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
+  # Configure additional (cross-compile) targets.
+  foreach(stdlib_target ${SWIFT_CROSS_COMPILE_STDLIB_TARGETS})
+    get_sdk_from_stdlib_target("${stdlib_target}" target_sdk)
+    get_arch_from_stdlib_target("${stdlib_target}" target_arch)
+    get_triple("${target_sdk}" "${target_arch}" target_triple)
+  
+    if(NOT(target_sdk AND target_arch AND target_triple))
+      message(FATAL_ERROR "Unsupported target: ${stdlib_target}")
     endif()
-  endif()
+
+    # Compatible cross-compile SDKS for LINUX: ANDROID (only armv7)
+    if("${target_sdk}" STREQUAL "ANDROID")
+      if(NOT SWIFT_ANDROID_NDK_PATH)
+        message(FATAL_ERROR "Android NDK Path is required")
+      endif()
+      configure_sdk_unix(ANDROID "Android" "android" "android" "${target_arch}" "${target_triple}" "${SWIFT_ANDROID_SDK_PATH}")
+    else()
+      message(FATAL_ERROR "We don't support cross-compiling for ${target_sdk} on Linux yet")
+    endif()
+
+    # If we're not building for the host, the first cross-compiled target should be the 'primary variant'.
+    if(SWIFT_SKIP_HOST_STDLIB AND NOT SWIFT_PRIMARY_VARIANT_SDK_default)
+      set(SWIFT_PRIMARY_VARIANT_SDK_default "${target_sdk}")
+      set(SWIFT_PRIMARY_VARIANT_ARCH_default "${target_arch}")
+    endif()
+
+  endforeach()
 
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
   
@@ -560,14 +615,14 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
   set(SWIFT_HOST_VARIANT "freebsd" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [freebsd].")
 
-  # FIXME: Using the host OS version won't produce correct results for
-  # cross-compilation.
-  string(REPLACE "[-].*" "" FREEBSD_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION})
-  message(STATUS "FreeBSD Version: ${FREEBSD_SYSTEM_VERSION}")
-  configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64"
-    "x86_64-unknown-freebsd${FREEBSD_SYSTEM_VERSION}" "/")
+  get_triple("${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}" SWIFT_HOST_TRIPLE)
+  if(NOT SWIFT_HOST_TRIPLE)
+    message(FATAL_ERROR "Unsupported FreeBSD target: ${SWIFT_HOST_VARIANT_ARCH}")
+  endif()
+  
+  configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "${SWIFT_HOST_VARIANT}" "${SWIFT_HOST_VARIANT_ARCH}" "${SWIFT_HOST_TRIPLE}" "${CMAKE_SYSROOT}")
   set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
-  set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
   
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
   
@@ -575,9 +630,17 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
   set(SWIFT_HOST_VARIANT "windows" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [windows].")
   
-  configure_sdk_unix(CYGWIN "Cygwin" "windows" "cygwin" "windows" "x86_64-unknown-windows-cygnus" "/")
+  get_triple("${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}" SWIFT_HOST_TRIPLE)
+  if(NOT SWIFT_HOST_TRIPLE)
+    message(FATAL_ERROR "Unsupported Cygwin target: ${SWIFT_HOST_VARIANT_ARCH}")
+  endif()
+  
+  # FIXME: The arguments here look incorrect
+  # - 'cygwin' should be 'windows' (the variant, as above)
+  # - 'windows' should be '${SWIFT_HOST_VARIANT_ARCH}' (the architecture)
+  configure_sdk_unix(CYGWIN "Cygwin" "windows" "cygwin" "windows" "${SWIFT_HOST_TRIPLE}" "${CMAKE_SYSROOT}")
   set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
-  set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 
 elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
 
@@ -594,34 +657,61 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   message(STATUS "${xcode_version}")
   message(STATUS "")
 
-  is_sdk_requested(OSX swift_build_osx)
-  if(swift_build_osx)
-    configure_sdk_darwin(
-        OSX "OS X" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}"
-        macosx macosx macosx "x86_64")
+  # Compatible host/cross-compile SDKS for Darwin OSes:
+  # OSX, IOS(_SIMULATOR), TVOS(_SIMULATOR), WATCHOS(_SIMULATOR)
+
+  # - configure_sdk_darwin handles the architectures for each SDK,
+  #   so we need to gather them up (including merging host/cross targets in one list)
+  # - configure_sdk_darwin calculates its own triple, so
+  #   Darwin target validation happens here.
+
+  set(OSX_VALID_ARCHITECTURES "x86_64")
+  set(IOS_VALID_ARCHITECTURES "armv7;armv7s;arm64")
+  set(TVOS_VALID_ARCHITECTURES "arm64")
+  set(WATCHOS_VALID_ARCHITECTURES "armv7k")
+  set(IOS_SIMULATOR_VALID_ARCHITECTURES "i386;x86_64")
+  set(TVOS_SIMULATOR_VALID_ARCHITECTURES "x86_64")
+  set(WATCHOS_SIMULATOR_VALID_ARCHITECTURES "i386")
+
+  foreach(stdlib_target ${SWIFT_CROSS_COMPILE_STDLIB_TARGETS})
+    get_sdk_from_stdlib_target("${stdlib_target}" target_sdk)
+    get_arch_from_stdlib_target("${stdlib_target}" target_arch)
+
+    list_contains("${${target_sdk}_VALID_ARCHITECTURES}" "${target_arch}" is_valid_arch)
+    if(NOT is_valid_arch)
+      message(FATAL_ERROR "${target_arch} is not a recognised architecture for ${target_sdk}")
+    endif()
+    list(APPEND SWIFT_TARGET_${target_sdk}_ARCHS "${target_arch}")
+  endforeach()
+
+  if(NOT SWIFT_SKIP_HOST_STDLIB)
+    list(APPEND SWIFT_TARGET_${SWIFT_HOST_VARIANT_SDK}_ARCHS "${SWIFT_HOST_VARIANT_ARCH}")
+  endif()
+
+  # OSX
+  if(SWIFT_TARGET_OSX_ARCHS)
+    configure_sdk_darwin(OSX "OS X" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}"
+                         macosx macosx macosx "${SWIFT_TARGET_OSX_ARCHS}")
     configure_target_variant(OSX-DA "OS X Debug+Asserts"   OSX DA "Debug+Asserts")
     configure_target_variant(OSX-RA "OS X Release+Asserts" OSX RA "Release+Asserts")
     configure_target_variant(OSX-R  "OS X Release"         OSX R  "Release")
   endif()
 
-  # Compatible cross-compile SDKS for Darwin OSes: IOS, IOS_SIMULATOR, TVOS,
-  #   TVOS_SIMULATOR, WATCHOS, WATCHOS_SIMULATOR (archs hardcoded below).
-
-  is_sdk_requested(IOS swift_build_ios)
-  if(swift_build_ios)
+  # IOS
+  if(SWIFT_TARGET_IOS_ARCHS)
     configure_sdk_darwin(
         IOS "iOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}"
-        iphoneos ios ios "armv7;armv7s;arm64")
+        iphoneos ios ios "${SWIFT_TARGET_IOS_ARCHS}")
     configure_target_variant(IOS-DA "iOS Debug+Asserts"   IOS DA "Debug+Asserts")
     configure_target_variant(IOS-RA "iOS Release+Asserts" IOS RA "Release+Asserts")
     configure_target_variant(IOS-R  "iOS Release"         IOS R "Release")
   endif()
 
-  is_sdk_requested(IOS_SIMULATOR swift_build_ios_simulator)
-  if(swift_build_ios_simulator)
+  # IOS_SIMULATOR
+  if(SWIFT_TARGET_IOS_SIMULATOR_ARCHS)
     configure_sdk_darwin(
         IOS_SIMULATOR "iOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}"
-        iphonesimulator ios-simulator ios "i386;x86_64")
+        iphonesimulator ios-simulator ios "${SWIFT_TARGET_IOS_SIMULATOR_ARCHS}")
     configure_target_variant(
         IOS_SIMULATOR-DA "iOS Debug+Asserts"   IOS_SIMULATOR DA "Debug+Asserts")
     configure_target_variant(
@@ -629,22 +719,22 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
     configure_target_variant(
         IOS_SIMULATOR-R  "iOS Release"         IOS_SIMULATOR R "Release")
   endif()
-
-  is_sdk_requested(TVOS swift_build_tvos)
-  if(swift_build_tvos)
+  
+  # TVOS
+  if(SWIFT_TARGET_TVOS_ARCHS)
     configure_sdk_darwin(
         TVOS "tvOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
-        appletvos tvos tvos "arm64")
+        appletvos tvos tvos "${SWIFT_TARGET_TVOS_ARCHS}")
     configure_target_variant(TVOS-DA "tvOS Debug+Asserts"   TVOS DA "Debug+Asserts")
     configure_target_variant(TVOS-RA "tvOS Release+Asserts" TVOS RA "Release+Asserts")
     configure_target_variant(TVOS-R  "tvOS Release"         TVOS R "Release")
   endif()
-
-  is_sdk_requested(TVOS_SIMULATOR swift_build_tvos_simulator)
-  if(swift_build_tvos_simulator)
+  
+  # TVOS_SIMULATOR
+  if(SWIFT_TARGET_TVOS_SIMULATOR_ARCHS)
     configure_sdk_darwin(
         TVOS_SIMULATOR "tvOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
-        appletvsimulator tvos-simulator tvos "x86_64")
+        appletvsimulator tvos-simulator tvos "${SWIFT_TARGET_TVOS_SIMULATOR_ARCHS}")
     configure_target_variant(
       TVOS_SIMULATOR-DA "tvOS Debug+Asserts"   TVOS_SIMULATOR DA "Debug+Asserts")
     configure_target_variant(
@@ -652,22 +742,22 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
     configure_target_variant(
       TVOS_SIMULATOR-R  "tvOS Release"         TVOS_SIMULATOR R "Release")
   endif()
-
-  is_sdk_requested(WATCHOS swift_build_watchos)
-  if(swift_build_watchos)
+  
+  # WATCHOS
+  if(SWIFT_TARGET_WATCHOS_ARCHS)
     configure_sdk_darwin(
         WATCHOS "watchOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-        watchos watchos watchos "armv7k")
+        watchos watchos watchos "${SWIFT_TARGET_WATCHOS_ARCHS}")
     configure_target_variant(WATCHOS-DA "watchOS Debug+Asserts"   WATCHOS DA "Debug+Asserts")
     configure_target_variant(WATCHOS-RA "watchOS Release+Asserts" WATCHOS RA "Release+Asserts")
     configure_target_variant(WATCHOS-R  "watchOS Release"         WATCHOS R "Release")
   endif()
-
-  is_sdk_requested(WATCHOS_SIMULATOR swift_build_watchos_simulator)
-  if(swift_build_watchos_simulator)
+  
+  # WATCHOS_SIMULATOR
+  if(SWIFT_TARGET_WATCHOS_SIMULATOR_ARCHS)
     configure_sdk_darwin(
         WATCHOS_SIMULATOR "watchOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-        watchsimulator watchos-simulator watchos "i386")
+        watchsimulator watchos-simulator watchos "${SWIFT_TARGET_WATCHOS_SIMULATOR_ARCHS}")
     configure_target_variant(WATCHOS_SIMULATOR-DA "watchOS Debug+Asserts"   WATCHOS_SIMULATOR DA "Debug+Asserts")
     configure_target_variant(WATCHOS_SIMULATOR-RA "watchOS Release+Asserts" WATCHOS_SIMULATOR RA "Release+Asserts")
     configure_target_variant(WATCHOS_SIMULATOR-R  "watchOS Release"         WATCHOS_SIMULATOR R "Release")
@@ -688,28 +778,37 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   # Primary variant is always OSX; even on iOS hosts.
   set(SWIFT_PRIMARY_VARIANT_SDK_default "OSX")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
-
+else()
+  message(FATAL_ERROR "Unknown Host SDK")
 endif()
+
+# Confirm that all requested SDKs were configured.
+
+if((NOT SWIFT_SKIP_HOST_STDLIB) AND SWIFT_HOST_VARIANT_SDK)
+  list(APPEND requested_sdks "${SWIFT_HOST_VARIANT_SDK}")
+endif()
+foreach(stdlib_target ${SWIFT_CROSS_COMPILE_STDLIB_TARGETS})
+  get_sdk_from_stdlib_target("${stdlib_target}" target_sdk)
+  list(APPEND requested_sdks "${target_sdk}")
+endforeach()
+list(REMOVE_DUPLICATES requested_sdks)
+list_subtract("${requested_sdks}" "${SWIFT_CONFIGURED_SDKS}" unknown_sdks)
+
+if(NOT "${unknown_sdks}" STREQUAL "")
+  message(FATAL_ERROR "${unknown_sdks} was requested but not configured.")
+endif()
+
+if("${SWIFT_CONFIGURED_SDKS}" STREQUAL "")
+  message(FATAL_ERROR "No SDKs selected.")
+endif()
+
+# Set sdk/arch flags.
 
 if("${SWIFT_PRIMARY_VARIANT_SDK}" STREQUAL "")
   set(SWIFT_PRIMARY_VARIANT_SDK "${SWIFT_PRIMARY_VARIANT_SDK_default}")
 endif()
 if("${SWIFT_PRIMARY_VARIANT_ARCH}" STREQUAL "")
   set(SWIFT_PRIMARY_VARIANT_ARCH "${SWIFT_PRIMARY_VARIANT_ARCH_default}")
-endif()
-
-if("${SWIFT_SDKS}" STREQUAL "")
-  set(SWIFT_SDKS "${SWIFT_CONFIGURED_SDKS}")
-endif()
-
-list_subtract("${SWIFT_SDKS}" "${SWIFT_CONFIGURED_SDKS}" unknown_sdks)
-
-if(NOT "${unknown_sdks}" STREQUAL "")
-  message(FATAL_ERROR "Unknown SDKs: ${unknown_sdks}")
-endif()
-
-if("${SWIFT_CONFIGURED_SDKS}" STREQUAL "")
-  message(FATAL_ERROR "No SDKs selected.")
 endif()
 
 if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "")
@@ -724,8 +823,10 @@ set(SWIFT_PRIMARY_VARIANT_SUFFIX
     "-${SWIFT_SDK_${SWIFT_PRIMARY_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_PRIMARY_VARIANT_ARCH}")
 
 # Clear universal library names to prevent adding duplicates
-foreach(sdk ${SWIFT_SDKS})
-  unset(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR} CACHE)
+unset(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR} CACHE)
+foreach(stdlib_target ${SWIFT_CROSS_COMPILE_STDLIB_TARGETS})
+  get_sdk_from_stdlib_target("${stdlib_target}" target_sdk)
+  unset(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${target_sdk}_LIB_SUBDIR} CACHE)
 endforeach()
 
 if(SWIFT_PARALLEL_LINK_JOBS)
@@ -744,13 +845,15 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(CMAKE_OSX_DEPLOYMENT_TARGET "")
 endif()
 
-message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
+message(STATUS "Configuration Summary:")
+message(STATUS "")
+message(STATUS "Host for Swift tools: ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
 message(STATUS "  LTO:        ${SWIFT_TOOLS_ENABLE_LTO}")
 message(STATUS "")
 
-message(STATUS "Building Swift standard library and SDK overlays for SDKs: ${SWIFT_SDKS}")
+message(STATUS "Swift standard library and SDK overlay targets: ${SWIFT_CONFIGURED_SDKS}")
 message(STATUS "  Build type: ${SWIFT_STDLIB_BUILD_TYPE}")
 message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
 message(STATUS "")
@@ -790,8 +893,7 @@ if(SWIFT_BUILD_TOOLS)
   add_subdirectory(tools)
 endif()
 
-is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
-if(SWIFT_BUILD_TOOLS AND SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
+if(SWIFT_BUILD_TOOLS AND SWIFT_BUILD_STDLIB AND NOT SWIFT_SKIP_HOST_STDLIB)
   add_subdirectory(tools/swift-reflection-dump)
 endif()
 

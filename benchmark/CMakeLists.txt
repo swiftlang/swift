@@ -199,7 +199,7 @@ endforeach()
 
 set(executable_targets)
 
-if(SWIFT_SDKS)
+if(SWIFT_CONFIGURED_SDKS)
   set(IS_SWIFT_BUILD true)
 endif()
 

@@ -17,7 +17,7 @@ if(SWIFT_BUILD_STATIC_STDLIB)
 endif()
 
 add_custom_target(swift-stdlib-all)
-foreach(SDK ${SWIFT_SDKS})
+foreach(SDK ${SWIFT_CONFIGURED_SDKS})
   add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
   add_custom_target("swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})

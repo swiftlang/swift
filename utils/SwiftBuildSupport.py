@@ -142,7 +142,8 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
         diagnostics.fatal("missing option(s) for preset '" + preset_name +
                           "': " + ", ".join(missing_opts))
 
-    # Migrate 'swift-sdks' parameter to 'stdlib-deployment-targets'
+    # Migrate 'swift-sdks' parameter to
+    # 'cross-compile-stdlib-deployment-targets'
     for opt in build_script_impl_opts:
         if opt.startswith("--swift-sdks"):
             sdks_to_configure = opt.split("=")[1].split(";")
@@ -164,8 +165,10 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
                     tgts += StdlibDeploymentTarget.AppleWatch.targets
                 elif sdk == "WATCHOS_SIMULATOR":
                     tgts += StdlibDeploymentTarget.AppleWatchSimulator.targets
+            tgts = [x for x in tgts
+                    if x != StdlibDeploymentTarget.host_target()]
 
-            build_script_opts.append("--stdlib-deployment-targets=" +
+            build_script_opts.append("--cross-compile-stdlib-deployment-targets=" +
                                      " ".join([tgt.name for tgt in tgts]))
     # Filter the swift-sdks parameter
     build_script_impl_opts = [opt for opt in build_script_impl_opts

@@ -3,7 +3,7 @@
 # Each element in this list is an SDK for which the various
 # SWIFT_SDK_${name}_* variables are defined. Swift libraries will be
 # built for each variant.
-set(SWIFT_CONFIGURED_SDKS)
+set(SWIFT_CONFIGURED_SDKS "")
 
 # Report the given SDK to the user.
 function(_report_sdk prefix)
@@ -106,6 +106,8 @@ macro(configure_sdk_darwin
 
   # Add this to the list of known SDKs.
   list(APPEND SWIFT_CONFIGURED_SDKS "${prefix}")
+  set(SWIFT_CONFIGURED_SDKS "${SWIFT_CONFIGURED_SDKS}" CACHE STRING
+      "The SDKs which have been configured to build")
 
   _report_sdk("${prefix}")
 endmacro()
@@ -134,6 +136,8 @@ macro(configure_sdk_unix
 
   # Add this to the list of known SDKs.
   list(APPEND SWIFT_CONFIGURED_SDKS "${prefix}")
+  set(SWIFT_CONFIGURED_SDKS "${SWIFT_CONFIGURED_SDKS}" CACHE STRING
+      "The SDKs which have been configured to build")
 
   _report_sdk("${prefix}")
 endmacro()
