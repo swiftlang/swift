@@ -395,7 +395,7 @@ public:
   /// getStartLoc - Return the location of the start of the expression.
   SourceLoc getStartLoc() const;
 
-  /// \brief Retrieve the location of the end of the expression.
+  /// \brief Retrieve the location of the last token of the expression.
   SourceLoc getEndLoc() const;
   
   /// getLoc - Return the caret location of this expression.
