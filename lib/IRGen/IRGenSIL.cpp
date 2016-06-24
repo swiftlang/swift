@@ -26,6 +26,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/TargetInfo.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -343,7 +344,10 @@ public:
       StackSlotKey;
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
+  llvm::SmallDenseMap<llvm::Type *, Address, 8> DebugScratchpads;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
+  llvm::SmallVector<std::pair<DominancePoint, llvm::Instruction *>, 8>
+      ValueVariables;
   unsigned NumAnonVars = 0;
   unsigned NumCondFails = 0;
 
@@ -577,7 +581,44 @@ public:
     return Name;
   }
 
-  /// At -O0, emit a shadow copy of an Address in an alloca, so the
+  /// At -Onone, forcibly keep all LLVM values that are tracked by
+  /// debug variables alive by inserting an empty inline assembler
+  /// expression depending on the value in the blocks dominated by the
+  /// value.
+  void emitDebugVariableRangeExtension(const SILBasicBlock *CurBB) {
+    if (IGM.IRGen.Opts.Optimize)
+      return;
+    for (auto &Variable : ValueVariables) {
+      auto VarDominancePoint = Variable.first;
+      llvm::Value *Storage = Variable.second;
+      if (getActiveDominancePoint() == VarDominancePoint ||
+          isActiveDominancePointDominatedBy(VarDominancePoint)) {
+        llvm::Type *ArgTys;
+        auto *Ty = Storage->getType()->getScalarType();
+        // Pointers and Floats are expected to fit into a register.
+        if (Ty->isPointerTy() || Ty->isFloatingPointTy())
+          ArgTys = { Storage->getType() };
+        else {
+          // The storage is guaranteed to be no larger than the register width.
+          // Extend the storage so it would fit into a register.
+          llvm::Type *IntTy;
+          switch (IGM.getClangASTContext().getTargetInfo().getRegisterWidth()) {
+          case 64: IntTy = IGM.Int64Ty; break;
+          case 32: IntTy = IGM.Int32Ty; break;
+          default: llvm_unreachable("unsupported register width");
+          }
+          ArgTys = { IntTy };
+          Storage = Builder.CreateZExtOrBitCast(Storage, IntTy);
+        }
+        // Emit an empty inline assembler expression depending on the register.
+        auto *AsmFnTy = llvm::FunctionType::get(IGM.VoidTy, ArgTys, false);
+        auto *InlineAsm = llvm::InlineAsm::get(AsmFnTy, "", "r", true);
+        Builder.CreateCall(InlineAsm, Storage);
+      }
+    }
+  }
+
+  /// At -Onone, emit a shadow copy of an Address in an alloca, so the
   /// register allocator doesn't elide the dbg.value intrinsic when
   /// register pressure is high.  There is a trade-off to this: With
   /// shadow copies, we lose the precise lifetime.
@@ -589,8 +630,23 @@ public:
     if (IGM.IRGen.Opts.Optimize || (ArgNo == 0) ||
         isa<llvm::AllocaInst>(Storage) ||
         isa<llvm::UndefValue>(Storage) ||
-        Ty == IGM.RefCountedPtrTy) // No debug info is emitted for refcounts.
-      return Storage;
+        Ty == IGM.RefCountedPtrTy) { // No debug info is emitted for refcounts.
+      // Account for bugs in LLVM.
+      //
+      // - The LLVM type legalizer currently doesn't update debug
+      //   intrinsics when a large value is split up into smaller
+      //   pieces. Note that this heuristic as a bit too conservative
+      //   on 32-bit targets as it will also fire for doubles.
+      //
+      // - CodeGen Prepare may drop dbg.values pointing to PHI instruction.
+      if (IGM.DataLayout.getTypeSizeInBits(Storage->getType()) <=
+          IGM.getClangASTContext().getTargetInfo().getRegisterWidth() &&
+          !isa<llvm::PHINode>(Storage)) {
+        if (auto *Value = dyn_cast<llvm::Instruction>(Storage))
+          ValueVariables.push_back({getActiveDominancePoint(), Value});
+        return Storage;
+      }
+    }
 
     if (Align.isZero())
       Align = IGM.getPointerAlignment();
@@ -1516,6 +1572,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         }
       }
     }
+    if (isa<TermInst>(&I))
+      emitDebugVariableRangeExtension(BB);
     visit(&I);
 
     assert(!EmissionNotes.count(&I) &&

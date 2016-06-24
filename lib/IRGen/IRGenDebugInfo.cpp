@@ -969,9 +969,7 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
   // the variable that is live throughout the function. With SIL
   // optimizations this is not guaranteed and a variable can end up in
   // two allocas (for example, one function inlined twice).
-  if (!Opts.Optimize &&
-      (isa<llvm::AllocaInst>(Storage) ||
-       isa<llvm::UndefValue>(Storage)))
+  if (isa<llvm::AllocaInst>(Storage))
     DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
   else
     DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
