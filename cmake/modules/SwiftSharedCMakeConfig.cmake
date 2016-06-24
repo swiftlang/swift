@@ -113,25 +113,11 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
 
   precondition_translate_flag(${product}_PATH_TO_LLVM_SOURCE PATH_TO_LLVM_SOURCE)
   precondition_translate_flag(${product}_PATH_TO_LLVM_BUILD PATH_TO_LLVM_BUILD)
+  set(PATH_TO_LLVM_TOOLS_BINARY_DIR "${PATH_TO_LLVM_BUILD}/bin")
 
-  if(${is_cross_compiling})
-    # Can't run llvm-config from the cross-compiled LLVM.
-    set(LLVM_TOOLS_BINARY_DIR "" CACHE PATH "Path to llvm/bin")
-  else()
-    # Rely on llvm-config.
-    _swift_llvm_config_info(
-        ENABLE_ASSERTIONS llvm_config_enable_assertions
-        TOOLS_BINARY_DIR llvm_config_tools_binary_dir
-        LIBRARY_DIR llvm_config_library_dir
-        INCLUDE_DIR llvm_config_include_dir
-        OBJ_ROOT_DIR llvm_config_obj_root
-        SOURCE_DIR llvm_config_src_dir
-    )
-
-    set(LLVM_TOOLS_BINARY_DIR "${llvm_config_tools_binary_dir}" CACHE PATH "Path to llvm/bin")
-
-    set(${product}_NATIVE_LLVM_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
-    set(${product}_NATIVE_CLANG_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
+  if(NOT ${is_cross_compiling})
+    set(${product}_NATIVE_LLVM_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
+    set(${product}_NATIVE_CLANG_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
   endif()
 
   find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" "${${product}_NATIVE_LLVM_TOOLS_PATH}"
@@ -155,17 +141,14 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
     message(FATAL_ERROR "Not found: ${LLVMCONFIG_FILE}")
   endif()
 
-  # Save and restore variables that LLVM configuration overrides.
-  set(LLVM_TOOLS_BINARY_DIR_saved "${LLVM_TOOLS_BINARY_DIR}")
-
   # If we already have a cached value for LLVM_ENABLE_ASSERTIONS, save the value.
   if (DEFINED LLVM_ENABLE_ASSERTIONS)
     set(LLVM_ENABLE_ASSERTIONS_saved "${LLVM_ENABLE_ASSERTIONS}")
   endif()
+
   # Then we import LLVMCONFIG_FILE. This is going to override whatever cached
   # value we have for LLVM_ENABLE_ASSERTIONS.
   include(${LLVMCONFIG_FILE})
-  set(LLVM_TOOLS_BINARY_DIR "${LLVM_TOOLS_BINARY_DIR_saved}")
 
   # If we did not have a cached value for LLVM_ENABLE_ASSERTIONS, set
   # LLVM_ENABLE_ASSERTIONS_saved to be the ENABLE_ASSERTIONS value from LLVM so
@@ -184,6 +167,7 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
     CACHE BOOL "Enable assertions")
   mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
 
+  precondition(LLVM_TOOLS_BINARY_DIR)
   precondition_translate_flag(LLVM_BUILD_LIBRARY_DIR LLVM_LIBRARY_DIR)
   precondition_translate_flag(LLVM_BUILD_MAIN_INCLUDE_DIR LLVM_MAIN_INCLUDE_DIR)
   precondition_translate_flag(LLVM_BUILD_BINARY_DIR LLVM_BINARY_DIR)

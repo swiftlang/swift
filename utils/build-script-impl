@@ -1832,11 +1832,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     native_llvm_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
                     native_clang_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
                     native_swift_tools_path="$(build_directory "${LOCAL_HOST}" swift)/bin"
-
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DLLVM_TOOLS_BINARY_DIR:PATH=$(build_directory ${host} llvm)/bin
-                    )
                 else
                     build_perf_testsuite_this_time=$(true_false "$(not ${SKIP_BUILD_BENCHMARKS})")
                     build_tests_this_time=${SOURCE_TREE_INCLUDES_TESTS}
