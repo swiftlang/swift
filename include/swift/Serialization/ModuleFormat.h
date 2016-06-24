@@ -760,6 +760,7 @@ namespace decls_block {
     TypeIDField, // interface type
     BCFixed<1>,  // implicit flag
     AccessibilityKindField // accessibility
+    // Trailed by generic parameters (if any).
   >;
 
   using GenericTypeParamDeclLayout = BCRecordLayout<

@@ -1556,6 +1556,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
     declContextOrOffset = AFD;
   } else if (auto SD = dyn_cast<SubscriptDecl>(D)) {
     declContextOrOffset = SD;
+  } else if (auto TAD = dyn_cast<TypeAliasDecl>(D)) {
+    declContextOrOffset = TAD;
   } else {
     llvm_unreachable("Unknown Decl : DeclContext kind");
   }
@@ -2160,6 +2162,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                            SourceLoc(), underlyingType,
                                            genericParams, DC);
     declOrOffset = alias;
+
+    if (genericParams) {
+      SmallVector<GenericTypeParamType *, 4> paramTypes;
+      for (auto &genericParam : *genericParams) {
+        paramTypes.push_back(genericParam->getDeclaredType()
+                               ->castTo<GenericTypeParamType>());
+      }
+
+      // Read the generic requirements.
+      SmallVector<Requirement, 4> requirements;
+      readGenericRequirements(requirements);
+
+      auto sig = GenericSignature::get(paramTypes, requirements);
+      alias->setGenericSignature(sig);
+    }
 
     alias->computeType();
 

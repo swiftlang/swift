@@ -774,6 +774,7 @@ public:
   /// to be in a correct and valid form.
   ///
   /// \param type The generic type to which to apply arguments.
+  /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param generic The arguments to apply with the angle bracket range for
@@ -786,8 +787,8 @@ public:
   /// error.
   ///
   /// \see applyUnboundGenericArguments
-  Type applyGenericArguments(Type type, SourceLoc loc, DeclContext *dc,
-                             GenericIdentTypeRepr *generic,
+  Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
+                             DeclContext *dc, GenericIdentTypeRepr *generic,
                              bool isGenericSignature,
                              GenericTypeResolver *resolver);
 
@@ -797,7 +798,8 @@ public:
   /// number of generic arguments given, whereas applyGenericArguments emits
   /// diagnostics in those cases.
   ///
-  /// \param unbound The unbound generic type to which to apply arguments.
+  /// \param type The unbound generic type to which to apply arguments.
+  /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param genericArgs The list of generic arguments to apply to the type.
@@ -809,8 +811,8 @@ public:
   /// error.
   ///
   /// \see applyGenericArguments
-  Type applyUnboundGenericArguments(UnboundGenericType *unbound, SourceLoc loc,
-                                    DeclContext *dc,
+  Type applyUnboundGenericArguments(Type type, GenericTypeDecl *decl,
+                                    SourceLoc loc, DeclContext *dc,
                                     MutableArrayRef<TypeLoc> genericArgs,
                                     bool isGenericSignature,
                                     GenericTypeResolver *resolver);

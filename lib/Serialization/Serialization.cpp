@@ -2191,6 +2191,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 typeAlias->isImplicit(),
                                 rawAccessLevel);
     writeGenericParams(typeAlias->getGenericParams(), DeclTypeAbbrCodes);
+    writeRequirements(typeAlias->getGenericRequirements());
     break;
   }
 

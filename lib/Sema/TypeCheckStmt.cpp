@@ -1017,13 +1017,17 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     return;
   }
 
-  // Drill through noop expressions we don't care about, like ParanExprs.
+  // Drill through noop expressions we don't care about.
   auto valueE = E;
   while (1) {
     valueE = valueE->getValueProvidingExpr();
     
     if (auto *OEE = dyn_cast<OpenExistentialExpr>(valueE))
       valueE = OEE->getSubExpr();
+    else if (auto *CRCE = dyn_cast<CovariantReturnConversionExpr>(valueE))
+      valueE = CRCE->getSubExpr();
+    else if (auto *EE = dyn_cast<ErasureExpr>(valueE))
+      valueE = EE->getSubExpr();
     else
       break;
   }
