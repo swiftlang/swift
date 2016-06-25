@@ -224,14 +224,11 @@ static SILLocation::DebugLoc getDebugLocation(Optional<SILLocation> OptLoc,
 
 
 /// Determine whether this debug scope belongs to an explicit closure.
-static bool isExplicitClosure(const SILDebugScope *DS) {
-  if (DS) {
-    auto *SILFn = DS->getInlinedFunction();
-    if (SILFn && SILFn->hasLocation())
-      if (Expr *E = SILFn->getLocation().getAsASTNode<Expr>())
-        if (isa<ClosureExpr>(E))
-          return true;
-  }
+static bool isExplicitClosure(const SILFunction *SILFn) {
+  if (SILFn && SILFn->hasLocation())
+    if (Expr *E = SILFn->getLocation().getAsASTNode<Expr>())
+      if (isa<ClosureExpr>(E))
+        return true;
   return false;
 }
 
@@ -676,10 +673,10 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   // Mark everything that is not visible from the source code (i.e.,
   // does not have a Swift name) as artificial, so the debugger can
   // ignore it. Explicit closures are exempt from this rule. We also
-  // make an exception for main, which, albeit it does not
+  // make an exception for toplevel code, which, although it does not
   // have a Swift name, does appear prominently in the source code.
   if ((Name.empty() && LinkageName != SWIFT_ENTRY_POINT_FUNCTION &&
-       !isExplicitClosure(DS)) ||
+       !isExplicitClosure(SILFn)) ||
       // ObjC thunks should also not show up in the linetable, because we
       // never want to set a breakpoint there.
       (Rep == SILFunctionTypeRepresentation::ObjCMethod) ||
