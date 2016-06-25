@@ -1183,7 +1183,7 @@ uint64_t IRGenDebugInfo::getSizeOfBasicType(DebugTypeInfo DbgTy) {
     return IGM.DataLayout.getTypeSizeInBits(StorageType);
 
   // This type is too large to fit in a register.
-  assert(BitWidth > IGM.DataLayout.getLargestLegalIntTypeSize());
+  assert(BitWidth > IGM.DataLayout.getLargestLegalIntTypeSizeInBits());
   return BitWidth;
 }
 
