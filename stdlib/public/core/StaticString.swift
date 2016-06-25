@@ -259,7 +259,7 @@ public struct StaticString
 
 extension StaticString {
   public var customMirror: Mirror {
-    return Mirror(reflecting: String(self))
+    return Mirror(reflecting: String(describing: self))
   }
 }
 

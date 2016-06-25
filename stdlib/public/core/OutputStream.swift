@@ -164,6 +164,10 @@ public protocol CustomStringConvertible {
   var description: String { get }
 }
 
+public protocol LosslessStringConvertible : CustomStringConvertible {
+  init?(_ description: String)
+}
+
 /// A type with a customized textual representation suitable for debugging
 /// purposes.
 ///

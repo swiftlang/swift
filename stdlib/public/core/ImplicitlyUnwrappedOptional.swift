@@ -45,7 +45,7 @@ extension ImplicitlyUnwrappedOptional : CustomStringConvertible {
   public var description: String {
     switch self {
     case .some(let value):
-      return String(value)
+      return String(describing: value)
     case .none:
       return "nil"
     }
