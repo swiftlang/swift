@@ -366,27 +366,6 @@ class BuildScriptInvocation(object):
             args.skip_test_tvos = True
             args.skip_test_watchos = True
 
-        # --build-swift-stdlib and --build-swift-sdk-overlay are deprecated
-        # aliases for --build-swift-{dynamic,static}-stdlib and
-        # --build-swift-{dynamic,static}-sdk-overlay. The deprecated options
-        # are None by default, but if specified they take precedence over the
-        # new, more granular options.
-        if args.build_swift_stdlib is not None:
-            if args.build_swift_stdlib:
-                args.build_swift_dynamic_stdlib = True
-                args.build_swift_static_stdlib = False
-            else:
-                args.build_swift_dynamic_stdlib = False
-                args.build_swift_static_stdlib = False
-
-        if args.build_swift_sdk_overlay is not None:
-            if args.build_swift_sdk_overlay:
-                args.build_swift_dynamic_sdk_overlay = True
-                args.build_swift_static_sdk_overlay = False
-            else:
-                args.build_swift_dynamic_sdk_overlay = False
-                args.build_swift_static_sdk_overlay = False
-
         # --skip-test-ios is merely a shorthand for host and simulator tests.
         if args.skip_test_ios:
             args.skip_test_ios_host = True
@@ -1560,13 +1539,6 @@ details of the setups of other systems or automated environments.""")
     run_build_group = parser.add_argument_group(
         title="Run build")
     run_build_group.add_argument(
-        "--build-swift-stdlib",
-        help="a deprecated alias for '--build-swift-dynamic-stdlib=1 "
-             "--build-swift-static-stdlib=0'. When specified, this takes "
-             "precedence over those options",
-        action=arguments.action.optional_bool,
-        default=None)
-    run_build_group.add_argument(
         "--build-swift-dynamic-stdlib",
         help="build dynamic variants of the Swift standard library",
         action=arguments.action.optional_bool,
@@ -1575,13 +1547,6 @@ details of the setups of other systems or automated environments.""")
         "--build-swift-static-stdlib",
         help="build static variants of the Swift standard library",
         action=arguments.action.optional_bool)
-    run_build_group.add_argument(
-        "--build-swift-sdk-overlay",
-        help="a deprecated alias for '--build-swift-dynamic-sdk-overlay=1 "
-             "--build-swift-static-sdk-overlay=0'. When specified, this takes "
-             "precedence over those options",
-        action=arguments.action.optional_bool,
-        default=None)
     run_build_group.add_argument(
         "--build-swift-dynamic-sdk-overlay",
         help="build dynamic variants of the Swift SDK overlay",
