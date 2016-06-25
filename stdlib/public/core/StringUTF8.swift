@@ -375,7 +375,7 @@ extension String {
       return UTF8View(self._core)
     }
     set {
-      self = String(newValue)
+      self = String(describing: newValue)
     }
   }
 

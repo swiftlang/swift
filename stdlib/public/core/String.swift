@@ -981,6 +981,23 @@ extension String {
     return _nativeUnicodeUppercaseString(self)
 #endif
   }
+  
+  public // @testable
+  init<T: LosslessStringConvertible>(_ v: T) {
+    self = v.description
+  }
+}
+
+extension String : CustomStringConvertible {
+  public var description: String {
+    return self
+  }
+}
+
+extension String : LosslessStringConvertible {
+  public init?(_ description: String) {
+    self = description
+  }
 }
 
 extension String {

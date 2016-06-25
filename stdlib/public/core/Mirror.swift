@@ -855,7 +855,7 @@ extension String {
   ///     }
   ///
   ///     let p = Point(x: 21, y: 30)
-  ///     print(String(p))
+  ///     print(String(describing: p))
   ///     // Prints "Point(x: 21, y: 30)"
   ///
   /// After adding `CustomStringConvertible` conformance by implementing the
@@ -867,11 +867,11 @@ extension String {
   ///         }
   ///     }
   ///
-  ///     print(String(p))
+  ///     print(String(describing: p))
   ///     // Prints "(21, 30)"
   ///
   /// - SeeAlso: `String.init<Subject>(reflecting: Subject)`
-  public init<Subject>(_ instance: Subject) {
+  public init<Subject>(describing instance: Subject) {
     self.init()
     _print_unlocked(instance, &self)
   }

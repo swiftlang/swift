@@ -353,6 +353,14 @@ public struct Character :
   internal var _representation: Representation
 }
 
+extension Character : CustomStringConvertible {
+  public var description: String {
+    return String(self)
+  }
+}
+
+extension Character : LosslessStringConvertible {}
+
 extension Character : CustomDebugStringConvertible {
   /// A textual representation of the character, suitable for debugging.
   public var debugDescription: String {
