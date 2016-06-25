@@ -3687,21 +3687,28 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
                                  bool isStaticMethod, bool isInOut) {
   ASTContext &C = DC->getASTContext();
   auto selfType = DC->getSelfTypeInContext();
+  auto selfInterfaceType = DC->getSelfInterfaceType();
+
+  assert(!!selfType == !!selfInterfaceType);
 
   // If we have a selfType (i.e. we're not in the parser before we know such
   // things, configure it.
-  if (selfType) {
-    if (isStaticMethod)
+  if (selfType && selfInterfaceType) {
+    if (isStaticMethod) {
       selfType = MetatypeType::get(selfType);
+      selfInterfaceType = MetatypeType::get(selfInterfaceType);
+    }
     
-    if (isInOut)
+    if (isInOut) {
       selfType = InOutType::get(selfType);
+      selfInterfaceType = InOutType::get(selfInterfaceType);
+    }
   }
-    
+
   auto *selfDecl = new (C) ParamDecl(/*IsLet*/!isInOut, SourceLoc(),SourceLoc(),
                                      Identifier(), loc, C.Id_self, selfType,DC);
   selfDecl->setImplicit();
-  selfDecl->setInterfaceType(DC->getSelfInterfaceType());
+  selfDecl->setInterfaceType(selfInterfaceType);
   return selfDecl;
 }
 
