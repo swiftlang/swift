@@ -76,15 +76,6 @@ function(is_darwin_based_sdk sdk_name out_var)
   endif()
 endfunction()
 
-function(is_windows_based_sdk sdk_name out_var)
-  if("${sdk_name}" STREQUAL "WINDOWS" OR
-     "${sdk_name}" STREQUAL "CYGWIN")
-   set(${out_var} TRUE PARENT_SCOPE)
- else()
-   set(${out_var} FALSE PARENT_SCOPE)
- endif()
-endfunction()
-
 # Usage:
 # _add_variant_c_compile_link_flags(
 #   SDK sdk
