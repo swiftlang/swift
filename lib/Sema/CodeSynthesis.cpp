@@ -2106,6 +2106,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
         // Apply the superclass substitutions to produce an interface
         // type in terms of the class generic signature.
         auto paramSubstTy = paramTy.subst(moduleDecl, subsMap, SubstOptions());
+        decl->setInterfaceType(paramSubstTy);
 
         // Map it to a contextual type in terms of the class's archetypes.
         decl->overwriteType(ArchetypeBuilder::mapTypeIntoContext(

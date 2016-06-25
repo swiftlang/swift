@@ -1238,7 +1238,8 @@ public:
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
-  Type importFunctionType(const clang::FunctionDecl *clangDecl,
+  Type importFunctionType(DeclContext *dc,
+                          const clang::FunctionDecl *clangDecl,
                           clang::QualType resultType,
                           ArrayRef<const clang::ParmVarDecl *> params,
                           bool isVariadic, bool isNoReturn,
@@ -1257,7 +1258,8 @@ public:
   ///
   /// \returns the imported function return type, or null if the type cannot be
   /// imported.
-  Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
+  Type importFunctionReturnType(DeclContext *dc,
+                                const clang::FunctionDecl *clangDecl,
                                 clang::QualType resultType,
                                 bool allowNSUIntegerAsInt);
 
@@ -1273,7 +1275,8 @@ public:
   ///
   /// \returns The imported parameter list on success, or null on failure
   ParameterList *
-  importFunctionParameterList(const clang::FunctionDecl *clangDecl,
+  importFunctionParameterList(DeclContext *dc,
+                              const clang::FunctionDecl *clangDecl,
                               ArrayRef<const clang::ParmVarDecl *> params,
                               bool isVariadic, bool allowNSUIntegerAsInt,
                               ArrayRef<Identifier> argNames);
