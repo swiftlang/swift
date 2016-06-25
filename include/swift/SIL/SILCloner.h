@@ -17,7 +17,6 @@
 #ifndef SWIFT_SIL_SILCLONER_H
 #define SWIFT_SIL_SILCLONER_H
 
-#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILVisitor.h"
@@ -40,19 +39,9 @@ class SILCloner : protected SILVisitor<ImplClass> {
 public:
   using SILVisitor<ImplClass>::asImpl;
 
-  explicit SILCloner(SILFunction &F,
-                     SILOpenedArchetypesTracker &OpenedArchetypesTracker)
-      : Builder(F), InsertBeforeBB(nullptr),
-        OpenedArchetypesTracker(OpenedArchetypesTracker) {
-    Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  }
-
   explicit SILCloner(SILFunction &F)
-      : Builder(F), InsertBeforeBB(nullptr),
-        OpenedArchetypesTracker(F) {
-    Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  }
-
+    : Builder(F), InsertBeforeBB(nullptr) { }
+  
   /// Clients of SILCloner who want to know about any newly created
   /// instructions can install a SmallVector into the builder to collect them.
   void setTrackingList(SmallVectorImpl<SILInstruction*> *II) {
@@ -210,14 +199,6 @@ protected:
   void cleanUp(SILFunction *F);
 
 public:
-  void doPreProcess(SILInstruction *Orig) {
-    // Extend the set of available opened archetypes by the opened archetypes
-    // used by the instruction being cloned.
-    auto OpenedArchetypeOperands = Orig->getOpenedArchetypeOperands();
-    Builder.getOpenedArchetypes().addOpenedArchetypeOperands(
-        OpenedArchetypeOperands);
-  }
-
   void doPostProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     asImpl().postProcess(Orig, Cloned);
     assert((Orig->getDebugScope() ? Cloned->getDebugScope()!=nullptr : true) &&
@@ -236,8 +217,6 @@ protected:
   llvm::MapVector<SILBasicBlock*, SILBasicBlock*> BBMap;
 
   TypeSubstitutionMap OpenedExistentialSubs;
-  SILOpenedArchetypesTracker OpenedArchetypesTracker;
-
   /// Set of basic blocks where unreachable was inserted.
   SmallPtrSet<SILBasicBlock *, 32> BlocksWithUnreachables;
 };
@@ -274,10 +253,8 @@ template<typename ImplClass>
 class SILClonerWithScopes : public SILCloner<ImplClass> {
   friend class SILCloner<ImplClass>;
 public:
-  SILClonerWithScopes(SILFunction &To,
-                      SILOpenedArchetypesTracker &OpenedArchetypesTracker,
-                      bool Disable = false)
-      : SILCloner<ImplClass>(To, OpenedArchetypesTracker) {
+  SILClonerWithScopes(SILFunction &To, bool Disable = false)
+    : SILCloner<ImplClass>(To) {
 
     // We only want to do this when we generate cloned functions, not
     // when we inline.
@@ -291,24 +268,6 @@ public:
 
     scopeCloner.reset(new ScopeCloner(To));
   }
-
-  SILClonerWithScopes(SILFunction &To,
-                      bool Disable = false)
-      : SILCloner<ImplClass>(To) {
-
-    // We only want to do this when we generate cloned functions, not
-    // when we inline.
-
-    // FIXME: This is due to having TypeSubstCloner inherit from
-    //        SILClonerWithScopes, and having TypeSubstCloner be used
-    //        both by passes that clone whole functions and ones that
-    //        inline functions.
-    if (Disable)
-      return;
-
-    scopeCloner.reset(new ScopeCloner(To));
-  }
-
 
 private:
   std::unique_ptr<ScopeCloner> scopeCloner;
@@ -374,12 +333,8 @@ void
 SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
   SILFunction &F = getBuilder().getFunction();
   // Iterate over and visit all instructions other than the terminator to clone.
-  for (auto I = BB->begin(), E = --BB->end(); I != E; ++I) {
-    // Update the set of available opened archetypes with the opned archetypes
-    // used by the current instruction.
-    doPreProcess(&*I);
+  for (auto I = BB->begin(), E = --BB->end(); I != E; ++I)
     asImpl().visit(&*I);
-  }
   // Iterate over successors to do the depth-first search.
   for (auto &Succ : BB->getSuccessors()) {
     auto BBI = BBMap.find(Succ);
@@ -1296,17 +1251,16 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
   auto conformance =
-      getOpConformance(Inst->getLookupType(), Inst->getConformance());
-  auto lookupType = Inst->getLookupType();
-  auto newLookupType = getOpASTType(lookupType);
+    getOpConformance(Inst->getLookupType(), Inst->getConformance());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(
       Inst,
       getBuilder()
           .createWitnessMethod(
               getOpLocation(Inst->getLoc()),
-              newLookupType, conformance,
+              getOpASTType(Inst->getLookupType()), conformance,
               Inst->getMember(), getOpType(Inst->getType()),
+              Inst->hasOperand() ? getOpValue(Inst->getOperand()) : SILValue(),
               Inst->isVolatile()));
 }
 

@@ -51,20 +51,6 @@ public:
   using SILClonerWithScopes<ImplClass>::doPostProcess;
   using SILClonerWithScopes<ImplClass>::ValueMap;
   using SILClonerWithScopes<ImplClass>::addBlockWithUnreachable;
-  using SILClonerWithScopes<ImplClass>::OpenedArchetypesTracker;
-
-  TypeSubstCloner(SILFunction &To,
-                  SILFunction &From,
-                  TypeSubstitutionMap &ContextSubs,
-                  ArrayRef<Substitution> ApplySubs,
-                  SILOpenedArchetypesTracker &OpenedArchetypesTracker,
-                  bool Inlining = false)
-    : SILClonerWithScopes<ImplClass>(To, OpenedArchetypesTracker, Inlining),
-      SwiftMod(From.getModule().getSwiftModule()),
-      SubsMap(ContextSubs),
-      Original(From),
-      ApplySubs(ApplySubs),
-      Inlining(Inlining) { }
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
@@ -77,7 +63,6 @@ public:
       Original(From),
       ApplySubs(ApplySubs),
       Inlining(Inlining) { }
-
 
 protected:
   SILType remapType(SILType Ty) {
@@ -238,6 +223,7 @@ protected:
         getBuilder().createWitnessMethod(
             getOpLocation(Inst->getLoc()), newLookupType, Conformance,
             Inst->getMember(), getOpType(Inst->getType()),
+            Inst->hasOperand() ? getOpValue(Inst->getOperand()) : SILValue(),
             Inst->isVolatile()));
   }
 

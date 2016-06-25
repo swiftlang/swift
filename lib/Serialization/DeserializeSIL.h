@@ -82,7 +82,6 @@ namespace swift {
                                      SmallVectorImpl<uint64_t> &scratch);
     /// Read a SIL instruction within a given SIL basic block.
     bool readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
-                            SILBuilder &Builder,
                             unsigned RecordKind,
                             SmallVectorImpl<uint64_t> &scratch);
 

@@ -19,7 +19,6 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
@@ -357,7 +356,7 @@ public:
                               X->getMember().getHashCode(),
                               X->getConformance(),
                               X->getType(),
-                              !X->getOpenedArchetypeOperands().empty(),
+                              X->hasOperand(),
                               llvm::hash_combine_range(
                               Operands.begin(),
                               Operands.end()));
@@ -698,9 +697,6 @@ static ApplyWitnessPair getOpenExistentialUsers(OpenExistentialAddrInst *OE) {
 
   for (auto *UI : getNonDebugUses(OE)) {
     auto *User = UI->getUser();
-    if (!isa<WitnessMethodInst>(User) &&
-        User->isOpenedArchetypeOperand(UI->getOperandNumber()))
-      continue;
     // Check that we have a single Apply user.
     if (auto *AA = dyn_cast<ApplyInst>(User)) {
       if (AI)
@@ -764,10 +760,6 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
     return false;
 
   SILBuilder Builder(FromAI);
-  // Make archetypes used by the ToAI available to the builder.
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(*FromAI->getFunction());
-  OpenedArchetypesTracker.registerUsedOpenedArchetypes(ToAI);
-  Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 
   assert(FromAI->getArguments().size() == ToAI->getArguments().size() &&
          "Invalid number of arguments");

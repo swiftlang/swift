@@ -79,8 +79,8 @@ SILInstruction *SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc,
   if (!SILType::canRefCast(Op->getType(), ResultTy, M))
     return nullptr;
 
-  return insert(UncheckedRefCastInst::create(getSILDebugLocation(Loc), Op,
-                                             ResultTy, F, OpenedArchetypes));
+  return insert(
+      new (M) UncheckedRefCastInst(getSILDebugLocation(Loc), Op, ResultTy));
 }
 
 // Create the appropriate cast instruction based on result type.
@@ -89,16 +89,16 @@ SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
                                                    SILType Ty) {
   auto &M = F.getModule();
   if (Ty.isTrivial(M))
-    return insert(UncheckedTrivialBitCastInst::create(
-        getSILDebugLocation(Loc), Op, Ty, F, OpenedArchetypes));
+    return insert(
+        new (M) UncheckedTrivialBitCastInst(getSILDebugLocation(Loc), Op, Ty));
 
   if (auto refCast = tryCreateUncheckedRefCast(Loc, Op, Ty))
-    return refCast;
+    return refCast;  
 
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
-  return insert(UncheckedBitwiseCastInst::create(getSILDebugLocation(Loc), Op,
-                                                 Ty, F, OpenedArchetypes));
+  return insert(
+      new (M) UncheckedBitwiseCastInst(getSILDebugLocation(Loc), Op, Ty));
 }
 
 BranchInst *SILBuilder::createBranch(SILLocation Loc,

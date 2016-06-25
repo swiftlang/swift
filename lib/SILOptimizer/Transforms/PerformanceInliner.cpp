@@ -1468,19 +1468,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
           Caller->size() << "] " << Callee->getName() << "\n";
     );
 
-    SILOpenedArchetypesTracker OpenedArchetypesTracker(*Caller);
-    Caller->getModule().registerDeleteNotificationHandler(&OpenedArchetypesTracker);
-    // The callee only needs to know about opened archetypes used in
-    // the substitution list.
-    OpenedArchetypesTracker.registerUsedOpenedArchetypes(AI.getInstruction());
-
     // Notice that we will skip all of the newly inlined ApplyInsts. That's
     // okay because we will visit them in our next invocation of the inliner.
     TypeSubstitutionMap ContextSubs;
     SILInliner Inliner(*Caller, *Callee,
                        SILInliner::InlineKind::PerformanceInline, ContextSubs,
-                       AI.getSubstitutions(),
-                       OpenedArchetypesTracker);
+                       AI.getSubstitutions());
 
     auto Success = Inliner.inlineFunction(AI, Args);
     (void) Success;
