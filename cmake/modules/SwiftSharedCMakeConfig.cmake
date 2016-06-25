@@ -112,22 +112,35 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
 endmacro()
 
 macro(swift_common_standalone_build_config_clang product is_cross_compiling)
-  # Clang
   set(${product}_PATH_TO_CLANG_SOURCE "${PATH_TO_LLVM_SOURCE}/tools/clang"
       CACHE PATH "Path to Clang source code.")
   set(${product}_PATH_TO_CLANG_BUILD "${PATH_TO_LLVM_BUILD}" CACHE PATH
     "Path to the directory where Clang was built or installed.")
 
-  if(NOT EXISTS "${${product}_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h")
+  set(PATH_TO_CLANG_SOURCE "${${product}_PATH_TO_CLANG_SOURCE}")
+  set(PATH_TO_CLANG_BUILD "${${product}_PATH_TO_CLANG_BUILD}")
+
+  # Add all Clang CMake paths to our cmake module path.
+  set(SWIFT_CLANG_CMAKE_PATHS
+    "${PATH_TO_CLANG_BUILD}/share/clang/cmake")
+  foreach(path ${SWIFT_CLANG_CMAKE_PATHS})
+    list(APPEND CMAKE_MODULE_PATH ${path})
+  endforeach()
+
+  # Then include ClangTargets.cmake. If Clang adds a ClangConfig.cmake, this is
+  # where it will be included. By including ClangTargets.cmake, we at least get
+  # the right dependency ordering for clang libraries.
+  include(ClangTargets)
+
+  if(NOT EXISTS "${PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h")
     message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
   endif()
-  get_filename_component(CLANG_MAIN_SRC_DIR ${${product}_PATH_TO_CLANG_SOURCE}
-    ABSOLUTE)
+  get_filename_component(CLANG_MAIN_SRC_DIR "${PATH_TO_CLANG_SOURCE}" ABSOLUTE)
 
-  if(NOT EXISTS "${${product}_PATH_TO_CLANG_BUILD}/tools/clang/include/clang/Basic/Version.inc")
+  if(NOT EXISTS "${PATH_TO_CLANG_BUILD}/tools/clang/include/clang/Basic/Version.inc")
     message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_BUILD to a directory containing a Clang build.")
   endif()
-  set(CLANG_BUILD_INCLUDE_DIR "${${product}_PATH_TO_CLANG_BUILD}/tools/clang/include")
+  set(CLANG_BUILD_INCLUDE_DIR "${PATH_TO_CLANG_BUILD}/tools/clang/include")
 
   if (NOT ${is_cross_compiling})
     set(${product}_NATIVE_CLANG_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
