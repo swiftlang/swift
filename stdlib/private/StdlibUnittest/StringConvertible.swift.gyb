@@ -112,7 +112,7 @@ extension CustomPrintableValue : CustomDebugStringConvertible {
 public func expectPrinted<T>(
   expectedOneOf patterns: [String], _ object: T, ${TRACE}
 ) {
-  let actual = String(object)
+  let actual = String(describing: object)
   if !patterns.contains(actual) {
     expectationFailure(
       "expected: any of \(String(reflecting: patterns))\n"

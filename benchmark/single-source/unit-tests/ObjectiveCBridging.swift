@@ -73,7 +73,7 @@ public func run_ObjectiveCBridgeFromNSStringForced(_ N: Int) {
 
 @inline(never)
 func testObjectiveCBridgeToNSString() {
-  let nativeString = String("Native")
+  let nativeString = "Native"
 
   var s: NSString?
   for _ in 0 ..< 10_000 {

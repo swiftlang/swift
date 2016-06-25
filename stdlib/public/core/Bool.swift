@@ -146,6 +146,18 @@ extension Bool : Equatable, Hashable {
   }
 }
 
+extension Bool : LosslessStringConvertible {
+  public init?(_ description: String) {
+    if description == "true" {
+      self = true
+    } else if description == "false" {
+      self = false
+    } else {
+      return nil
+    }
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Operators
 //===----------------------------------------------------------------------===//

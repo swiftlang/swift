@@ -249,12 +249,23 @@ public struct UnicodeScalar :
 extension UnicodeScalar : CustomStringConvertible, CustomDebugStringConvertible {
   /// An escaped textual representation of the Unicode scalar.
   public var description: String {
-    return "\"\(escaped(asASCII: false))\""
+    return String(value)
   }
   /// An escaped textual representation of the Unicode scalar, suitable for
   /// debugging.
   public var debugDescription: String {
     return "\"\(escaped(asASCII: true))\""
+  }
+}
+
+extension UnicodeScalar : LosslessStringConvertible {
+  public init?(_ description: String) {
+    if let v = UInt32(description) where (v < 0xD800 || v > 0xDFFF)
+      && v <= 0x10FFFF {
+      self = UnicodeScalar(v)
+    }
+
+    return nil
   }
 }
 
