@@ -626,14 +626,7 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
         initArgTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/true);
       }
     } else {
-      argTy = paramLists[e - i - 1]->getType(Context);
-
-      // For an implicit declaration, our argument type will be in terms of
-      // archetypes rather than dependent types. Replace the
-      // archetypes with their corresponding dependent types.
-      if (func->isImplicit()) {
-        argTy = ArchetypeBuilder::mapTypeOutOfContext(func, argTy); 
-      }
+      argTy = paramLists[e - i - 1]->getInterfaceType(func);
 
       if (initFuncTy)
         initArgTy = argTy;
@@ -653,9 +646,12 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
   }
 
   // Record the interface type.
+  assert(!funcTy->hasArchetype());
   func->setInterfaceType(funcTy);
-  if (initFuncTy)
+  if (initFuncTy) {
+    assert(!initFuncTy->hasArchetype());
     cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
+  }
 
   if (func->getGenericParams()) {
     // Collect all generic params referenced in parameter types,

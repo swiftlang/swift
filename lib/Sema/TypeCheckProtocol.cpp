@@ -1889,17 +1889,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            TypeDecl *typeDecl,
                                            DeclContext *fromDC,
                                            bool performRedeclarationCheck) {
-  // If the declaration context from which the type witness was determined
-  // differs from that of the conformance, adjust the type so that it is
-  // based on the declaration context of the conformance.
-  if (fromDC != DC && DC->getGenericSignatureOfContext() &&
-      fromDC->getGenericSignatureOfContext() && !isa<ProtocolDecl>(fromDC)) {
-    // Map the type to an interface type.
-    type = ArchetypeBuilder::mapTypeOutOfContext(fromDC, type);
-
-    // Map the type into the conformance's context.
-    type = Adoptee->getTypeOfMember(DC->getParentModule(), type, fromDC);
-  }
 
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {

@@ -372,9 +372,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       continue;
 
     // Retrieve the interface type for this inherited type.
-    if (DC->isGenericContext() && DC->isTypeContext()) {
+    if (inheritedTy->hasArchetype())
       inheritedTy = ArchetypeBuilder::mapTypeOutOfContext(DC, inheritedTy);
-    }
 
     // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
