@@ -141,7 +141,8 @@ ERROR(lex_editor_placeholder,none,
       "editor placeholder in source file", ())
 WARNING(lex_editor_placeholder_in_playground,none,
         "editor placeholder in source file", ())
-
+ERROR(lex_conflict_marker_in_file,none,
+      "source control conflict marker in source file", ())
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
@@ -174,8 +175,6 @@ ERROR(disallowed_var_multiple_getset,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
 
-ERROR(disallowed_type,none,
-      "type not allowed here", ())
 ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
 ERROR(var_init_self_referential,none,
@@ -652,6 +651,8 @@ ERROR(expected_langle_protocol,PointsToFirstBadToken,
       "expected '<' in protocol composition type", ())
 ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol composition type", ())
+ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
+      "protocol composition is neither allowed nor needed here", ())
 
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
@@ -659,8 +660,16 @@ ERROR(expected_rangle_protocol,PointsToFirstBadToken,
 
 ERROR(expected_pattern,PointsToFirstBadToken,
       "expected pattern", ())
-ERROR(expected_pattern_is_keyword,none,
-      "keyword '%0' cannot be used as an identifier", (StringRef))
+ERROR(keyword_cant_be_identifier,none,
+      "keyword '%0' cannot be used as an identifier here", (StringRef))
+ERROR(repeated_identifier,none,
+      "found an unexpected second identifier in %0 declaration; is there an accidental break?", (StringRef))
+NOTE(join_identifiers,none,
+     "join the identifiers together", ())
+NOTE(join_identifiers_camel_case,none,
+     "join the identifiers together with camel-case", ())
+NOTE(backticks_to_escape,none,
+     "if this name is unavoidable, use backticks to escape it", ())
 ERROR(expected_rparen_tuple_pattern_list,none,
       "expected ')' at end of tuple pattern", ())
 ERROR(untyped_pattern_ellipsis,none,
@@ -763,6 +772,8 @@ ERROR(expected_close_after_else_directive,none,
       "further conditions after #else are unreachable", ())
 
 /// Associatedtype Statement
+WARNING(typealias_in_protocol_deprecated,none,
+      "use of 'typealias' to declare associated types is deprecated; use 'associatedtype' instead", ())
 ERROR(typealias_inside_protocol_without_type,none,
       "typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement", ())
 ERROR(associatedtype_outside_protocol,none,
@@ -1073,11 +1084,23 @@ ERROR(expected_type_after_as,none,
 ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
+// Keypath expressions.
+ERROR(expr_keypath_expected_lparen,PointsToFirstBadToken,
+      "expected '(' following '#keyPath'", ())
+ERROR(expr_keypath_expected_property_or_type,PointsToFirstBadToken,
+      "expected property or type name within '#keyPath(...)'", ())
+ERROR(expr_keypath_expected_rparen,PointsToFirstBadToken,
+      "expected ')' to complete '#keyPath' expression", ())
+ERROR(expr_keypath_compound_name,none,
+      "cannot use compound name %0 in '#keyPath' expression", (DeclName))
+
 // Selector expressions.
 ERROR(expr_selector_expected_lparen,PointsToFirstBadToken,
       "expected '(' following '#selector'", ())
-ERROR(expr_selector_expected_expr,PointsToFirstBadToken,
+ERROR(expr_selector_expected_method_expr,PointsToFirstBadToken,
       "expected expression naming a method within '#selector(...)'", ())
+ERROR(expr_selector_expected_property_expr,PointsToFirstBadToken,
+      "expected expression naming a property within '#selector(...)'", ())
 ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#selector' expression", ())
 
@@ -1234,16 +1257,8 @@ ERROR(attr_unowned_expected_rparen,none,
       "expected ')' after specifier for 'unowned'", ())
 
 // warn_unused_result
-WARNING(attr_warn_unused_result_expected_name,none,
-        "expected parameter 'message' or 'mutable_variant'", ())
-WARNING(attr_warn_unused_result_duplicate_parameter,none,
-      "duplicate '%0' parameter; previous value will be ignored", (StringRef))
-ERROR(attr_warn_unused_result_expected_colon,none,
-      "expected ':' following '%0' parameter", (StringRef))
-ERROR(attr_warn_unused_result_expected_string,none,
-      "expected a string following ':' for '%0' parameter", (StringRef))
-WARNING(attr_warn_unused_result_unknown_parameter,none,
-        "unknown parameter '%0' in 'warn_unused_result' attribute", (StringRef))
+WARNING(attr_warn_unused_result_removed,none,
+        "'warn_unused_result' attribute behavior is now the default", ())
 ERROR(attr_warn_unused_result_expected_rparen,none,
       "expected ')' after 'warn_unused_result' attribute", ())
 
@@ -1254,6 +1269,10 @@ ERROR(expected_rangle_generics_param,PointsToFirstBadToken,
       "expected '>' to complete generic parameter list", ())
 ERROR(expected_generics_parameter_name,PointsToFirstBadToken,
       "expected an identifier to name generic parameter", ())
+ERROR(unexpected_class_constraint,none,
+       "'class' constraint can only appear on protocol declarations", ())
+NOTE(suggest_anyobject,none,
+     "did you mean to constrain %0 with the 'AnyObject' protocol?", (Identifier))
 ERROR(expected_generics_type_restriction,none,
       "expected a type name or protocol composition restricting %0",
       (Identifier))
@@ -1268,6 +1287,10 @@ ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
+ERROR(where_without_generic_params,none,
+      "'where' clause cannot be attached to "
+      "%select{a non-generic|a protocol|an associated type}0 "
+      "declaration", (unsigned))
 
 //------------------------------------------------------------------------------
 // Conditional compilation parsing diagnostics

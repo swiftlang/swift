@@ -1,0 +1,6 @@
+---
+Name: AudioToolbox
+
+Enumerators:
+- Name: kMusicSequenceLoadSMF_PreserveTracks
+  SwiftName: smf_PreserveTracks

@@ -362,16 +362,8 @@ struct IUOFailableModel : NonFailableRefinement, IUOFailableRequirement {
   // CHECK:   [[META:%[0-9]+]] = metatype $@thin IUOFailableModel.Type
   // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFV9witnesses16IUOFailableModelC{{.*}} : $@convention(method) (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
   // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[FOO]], [[META]]) : $@convention(method) (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
-  // CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<IUOFailableModel>
-  // CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]] : $*ImplicitlyUnwrappedOptional<IUOFailableModel>
-  
-  // CHECK:   [[FORCE_FN:%[0-9]+]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x{{.*}} : $@convention(thin) <τ_0_0> (@in ImplicitlyUnwrappedOptional<τ_0_0>) -> @out τ_0_0
-  // CHECK:   [[RESULT_TEMP:%[0-9]+]] = alloc_stack $IUOFailableModel
-  // CHECK:   apply [[FORCE_FN]]<IUOFailableModel>([[RESULT_TEMP]], [[IUO_RESULT_TEMP]]) : $@convention(thin) <τ_0_0> (@in ImplicitlyUnwrappedOptional<τ_0_0>) -> @out τ_0_0
-  // CHECK:   [[RESULT:%[0-9]+]] = load [[RESULT_TEMP]] : $*IUOFailableModel
+  // CHECK:   [[RESULT:%[0-9]+]] = unchecked_enum_data [[IUO_RESULT]]
   // CHECK:   store [[RESULT]] to [[SELF]] : $*IUOFailableModel
-  // CHECK:   dealloc_stack [[RESULT_TEMP]] : $*IUOFailableModel
-  // CHECK:   dealloc_stack [[IUO_RESULT_TEMP]] : $*ImplicitlyUnwrappedOptional<IUOFailableModel>
   // CHECK:   return
   init!(foo: Int) { return nil }
 }
@@ -408,7 +400,7 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
 
 final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_26NonFailableClassRefinementS_FS1_C{{.*}}
-  // CHECK: function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
+  // CHECK: unchecked_enum_data
   // CHECK: return [[RESULT:%[0-9]+]] : $IUOFailableClassModel
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_27IUOFailableClassRequirementS_FS1_C{{.*}}
@@ -428,7 +420,7 @@ protocol HasAssoc {
 protocol GenericParameterNameCollisionProtocol {
   func foo<T>(_ x: T)
   associatedtype Assoc2
-  func bar<T>(_ x: T -> Assoc2)
+  func bar<T>(_ x: (T) -> Assoc2)
 }
 
 struct GenericParameterNameCollision<T: HasAssoc> :
@@ -442,7 +434,7 @@ struct GenericParameterNameCollision<T: HasAssoc> :
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}bar{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@owned @callee_owned (@in T) -> @out T1.Assoc, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
   // CHECK:       bb0(%0 : $@callee_owned (@in T) -> @out T1.Assoc, %1 : $*GenericParameterNameCollision<T1>):
   // CHECK:         apply {{%.*}}<T1, T1.Assoc, T>
-  func bar<V>(_ x: V -> T.Assoc) {}
+  func bar<V>(_ x: (V) -> T.Assoc) {}
 }
 
 protocol PropertyRequirement {

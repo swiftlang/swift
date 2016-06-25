@@ -28,6 +28,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/Type.h"
+#include "clang/Sema/Sema.h"
 #include "clang/Basic/TargetInfo.h"
 #include "IRGenModule.h"
 
@@ -68,14 +69,16 @@ static CanType getNamedSwiftType(Module *stdlib, StringRef name) {
   return CanType();
 }
 
-static clang::CanQualType getClangBuiltinTypeFromKind(
-  const clang::ASTContext &context,
-  clang::BuiltinType::Kind kind) {
+static clang::CanQualType
+getClangBuiltinTypeFromKind(const clang::ASTContext &context,
+                            clang::BuiltinType::Kind kind) {
   switch (kind) {
-#define BUILTIN_TYPE(Id, SingletonId) \
-  case clang::BuiltinType::Id: return context.SingletonId;
+#define BUILTIN_TYPE(Id, SingletonId)                                          \
+  case clang::BuiltinType::Id:                                                 \
+    return context.SingletonId;
 #include "clang/AST/BuiltinTypes.def"
   }
+  llvm_unreachable("Unexpected builtin type!");
 }
 
 static clang::CanQualType getClangSelectorType(
@@ -226,18 +229,14 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
 }
 
 static clang::CanQualType getClangBuiltinTypeFromTypedef(
-                      const clang::ASTContext &context, StringRef typedefName) {
-  auto identifier = &context.Idents.get(typedefName);
-  auto lookup = context.getTranslationUnitDecl()->lookup(identifier);
+                                       clang::Sema &sema, StringRef typedefName) {
+  auto &context = sema.getASTContext();
   
-  clang::TypedefDecl *typedefDecl = nullptr;
-  for (auto found : lookup) {
-    auto foundTypedef = dyn_cast<clang::TypedefDecl>(found);
-    if (!foundTypedef)
-      continue;
-    typedefDecl = foundTypedef;
-    break;
-  }
+  auto identifier = &context.Idents.get(typedefName);
+  auto found = sema.LookupSingleName(sema.TUScope, identifier,
+                                     clang::SourceLocation(),
+                                     clang::Sema::LookupOrdinaryName);
+  auto typedefDecl = dyn_cast_or_null<clang::TypedefDecl>(found);
   if (!typedefDecl)
     return {};
   
@@ -285,17 +284,18 @@ ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
     CanType swiftType = getNamedSwiftType(stdlib, swiftName);
     if (!swiftType) return;
     
+    auto &sema = IGM.Context.getClangModuleLoader()->getClangSema();
     // Handle Int and UInt specially. On Apple platforms, these correspond to
     // the NSInteger and NSUInteger typedefs, so map them back to those typedefs
     // if they're available, to ensure we get consistent ObjC @encode strings.
     if (swiftType->getAnyNominal() == IGM.Context.getIntDecl()) {
-      if (auto NSIntegerTy = getClangBuiltinTypeFromTypedef(ctx, "NSInteger")) {
+      if (auto NSIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSInteger")){
         Cache.insert({swiftType, NSIntegerTy});
         return;
       }
     } else if (swiftType->getAnyNominal() == IGM.Context.getUIntDecl()) {
       if (auto NSUIntegerTy =
-            getClangBuiltinTypeFromTypedef(ctx, "NSUInteger")) {
+            getClangBuiltinTypeFromTypedef(sema, "NSUInteger")) {
         Cache.insert({swiftType, NSUIntegerTy});
         return;
       }
@@ -740,7 +740,9 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
       // FIXME: Handle _Bool and DarwinBoolean.
       auto &ctx = IGM.getClangASTContext();
       auto &TI = ctx.getTargetInfo();
-      if (TI.useSignedCharForObjCBool()) {
+      // FIXME: Figure out why useSignedCharForObjCBool() returns
+      // 'true' on Linux
+      if (IGM.ObjCInterop && TI.useSignedCharForObjCBool()) {
         return ctx.SignedCharTy;
       }
     }

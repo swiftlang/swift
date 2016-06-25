@@ -19,12 +19,13 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
     self._elements = _elements
   }
 
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made, and no preceding call to `self.next()`
-  ///   has returned `nil`.
+  ///   since the copy was made.
   public mutating func next() -> Element? {
     let result = _elements
     _elements = nil
@@ -35,41 +36,43 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
 }
 
 /// A collection containing a single element of type `Element`.
-public struct CollectionOfOne<Element> : RandomAccessCollection {
-
-  // FIXME: swift-3-indexing-model - compiler bug prevents this
-  // typealias from being sufficient.  Instead we need to define the
-  // var below.
-  //
-  // public typealias indices = CountableRange<Int>
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
+public struct CollectionOfOne<Element>
+  : MutableCollection, RandomAccessCollection {
 
   /// Construct an instance containing just `element`.
   public init(_ element: Element) {
     self._element = element
   }
 
+  public typealias Index = Int
+
   /// The position of the first element.
   public var startIndex: Int {
     return 0
   }
 
-  /// The "past the end" position; always identical to
-  /// `index(after: startIndex)`.
+  /// The "past the end" position---that is, the position one greater than the
+  /// last valid subscript argument.
   ///
-  /// - Note: `endIndex` is not a valid argument to `subscript`.
+  /// In a `CollectionOfOne` instance, `endIndex` is always identical to
+  /// `index(after: startIndex)`.
   public var endIndex: Int {
     return 1
   }
   
   /// Always returns `endIndex`.
-  @warn_unused_result
   public func index(after i: Int) -> Int {
     _precondition(i == startIndex)
     return endIndex
   }
+
+  /// Always returns `startIndex`.
+  public func index(before i: Int) -> Int {
+    _precondition(i == endIndex)
+    return startIndex
+  }
+
+  public typealias Indices = CountableRange<Int>
 
   /// Returns an iterator over the elements of this sequence.
   ///
@@ -82,8 +85,30 @@ public struct CollectionOfOne<Element> : RandomAccessCollection {
   ///
   /// - Precondition: `position == 0`.
   public subscript(position: Int) -> Element {
-    _precondition(position == 0, "Index out of range")
-    return _element
+    get {
+      _precondition(position == 0, "Index out of range")
+      return _element
+    }
+    set {
+      _precondition(position == 0, "Index out of range")
+      _element = newValue
+    }
+  }
+
+  public subscript(bounds: Range<Int>)
+    -> MutableRandomAccessSlice<CollectionOfOne<Element>> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return MutableRandomAccessSlice(base: self, bounds: bounds)
+    }
+    set {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      _precondition(bounds.count == newValue.count,
+        "CollectionOfOne can't be resized")
+      if let newElement = newValue.first {
+        _element = newElement
+      }
+    }
   }
 
   /// The number of elements (always one).
@@ -91,7 +116,14 @@ public struct CollectionOfOne<Element> : RandomAccessCollection {
     return 1
   }
 
-  internal let _element: Element
+  internal var _element: Element
+}
+
+extension CollectionOfOne : CustomDebugStringConvertible {
+  /// A textual representation of `self`, suitable for debugging.
+  public var debugDescription: String {
+    return "CollectionOfOne(\(String(reflecting: _element)))"
+  }
 }
 
 extension CollectionOfOne : CustomReflectable {

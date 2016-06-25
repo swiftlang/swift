@@ -12,12 +12,16 @@ class Sub : Base {
   }
 }
 
+// CHECK-LABEL: sil hidden @_TFC21accessibility_vtables3SubcfT_S0_ : $@convention(method) (@owned Sub) -> @owned Sub
+// CHECK:       bb0(%0 : $Sub):
+// CHECK:         function_ref @_TFs26_unimplemented_initializerFT9classNameVs12StaticString8initNameS_4fileS_4lineSu6columnSu_T_
+
 // CHECK-LABEL: sil_vtable Sub {
 // CHECK-NEXT:  #Base.internalMethod!1: _TFC28accessibility_vtables_helper4Base14internalMethod
 // CHECK-NEXT:  #Base.prop!getter.1: _TFC21accessibility_vtables3Subg4propSi  // accessibility_vtables.Sub.prop.getter : Swift.Int
 // CHECK-NEXT:  #Base.prop!setter.1: _TFC28accessibility_vtables_helper4Bases4propSi  // accessibility_vtables_helper.Base.prop.setter : Swift.Int
 // CHECK-NEXT:  #Base.prop!materializeForSet.1: _TFC28accessibility_vtables_helper4Basem4propSi  // accessibility_vtables_helper.Base.prop.materializeForSet : Swift.Int
-// CHECK-NEXT:  #Base.init!initializer.1: _TFC28accessibility_vtables_helper4Basec
+// CHECK-NEXT:  #Base.init!initializer.1: _TFC21accessibility_vtables3SubcfT_S0_  // accessibility_vtables.Sub.init () -> accessibility_vtables.Sub
 // CHECK-NEXT: #Sub.internalMethod!1: _TFC21accessibility_vtables3Sub14internalMethod
 // CHECK-NEXT: #Sub.prop!setter.1: _TFC21accessibility_vtables3Subs4propSi   // accessibility_vtables.Sub.prop.setter : Swift.Int
 // CHECK-NEXT: #Sub.prop!materializeForSet.1: _TFC21accessibility_vtables3Subm4propSi  // accessibility_vtables.Sub.prop.materializeForSet : Swift.Int

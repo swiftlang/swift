@@ -5,9 +5,11 @@
 // RUN: %target-run-simple-swift %s %t | FileCheck %s
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
-import Darwin
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(Android)
+  import Glibc
+#endif
 
 let sourcePath = Process.arguments[1]
 let tempPath = Process.arguments[2] + "/libc.txt"

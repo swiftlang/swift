@@ -21,22 +21,22 @@ import SwiftShims
 //===----------------------------------------------------------------------===//
 
 @_transparent
-@warn_unused_result
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtrImpl(
-  object target: UnsafeMutablePointer<OpaquePointer?>,
-  expected: UnsafeMutablePointer<OpaquePointer?>,
-  desired: OpaquePointer?) -> Bool {
+  object target: UnsafeMutablePointer<UnsafeMutablePointer<Void>?>,
+  expected: UnsafeMutablePointer<UnsafeMutablePointer<Void>?>,
+  desired: UnsafeMutablePointer<Void>?) -> Bool {
 
   // We use Builtin.Word here because Builtin.RawPointer can't be nil.
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
     target._rawValue,
     UInt(bitPattern: expected.pointee)._builtinWordValue,
     UInt(bitPattern: desired)._builtinWordValue)
-  expected.pointee = OpaquePointer(bitPattern: Int(oldValue))
+  expected.pointee = UnsafeMutablePointer(bitPattern: Int(oldValue))
   return Bool(won)
 }
 
+% for optional in ['', '?']:
 /// Atomic compare and exchange of `UnsafeMutablePointer<T>` with sequentially
 /// consistent memory ordering.  Precise semantics are defined in C++11 or C11.
 ///
@@ -65,25 +65,26 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
 /// compare-and-exchange instruction will operate on the writeback buffer, and
 /// you will get a *race* while doing writeback into shared memory.
 @_transparent
-@warn_unused_result
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr<T>(
-  object target: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
-  expected: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
-  desired: UnsafeMutablePointer<T>) -> Bool {
+  object target: UnsafeMutablePointer<UnsafeMutablePointer<T>${optional}>,
+  expected: UnsafeMutablePointer<UnsafeMutablePointer<T>${optional}>,
+  desired: UnsafeMutablePointer<T>${optional}) -> Bool {
   return _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
-    desired: OpaquePointer(desired))
+    desired: UnsafeMutablePointer(desired))
 }
+% end
 
 @_transparent
+@discardableResult
 public // @testable
 func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
   desired: AnyObject) -> Bool {
-  var expected: OpaquePointer? = nil
-  let desiredPtr = OpaquePointer(bitPattern: Unmanaged.passRetained(desired))
+  var expected: UnsafeMutablePointer<Void>? = nil
+  let desiredPtr = Unmanaged.passRetained(desired).toOpaque()
   let wonRace = _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),
     expected: &expected,
@@ -98,7 +99,6 @@ func _stdlib_atomicInitializeARCRef(
 
 % for bits in [ 32, 64 ]:
 
-@warn_unused_result
 @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongUInt${bits}(
@@ -112,7 +112,6 @@ func _stdlib_atomicCompareExchangeStrongUInt${bits}(
   return Bool(won)
 }
 
-@warn_unused_result
 @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongInt${bits}(
@@ -142,7 +141,6 @@ func _swift_stdlib_atomicStoreInt${bits}(
     desired: UInt${bits}(bitPattern: desired))
 }
 
-@warn_unused_result
 public // @testable
 func _swift_stdlib_atomicLoadUInt${bits}(
   object target: UnsafeMutablePointer<UInt${bits}>) -> UInt${bits} {
@@ -151,7 +149,6 @@ func _swift_stdlib_atomicLoadUInt${bits}(
   return UInt${bits}(value)
 }
 
-@warn_unused_result
 func _swift_stdlib_atomicLoadInt${bits}(
   object target: UnsafeMutablePointer<Int${bits}>) -> Int${bits} {
   return Int${bits}(bitPattern:
@@ -174,7 +171,6 @@ func _swift_stdlib_atomicFetch${operation}UInt${bits}(
 }
 
 // Warning: no overflow checking.
-@warn_unused_result
 func _swift_stdlib_atomicFetch${operation}Int${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,
   operand: Int${bits}) -> Int${bits} {
@@ -187,7 +183,6 @@ func _swift_stdlib_atomicFetch${operation}Int${bits}(
 
 % end
 
-@warn_unused_result
 func _stdlib_atomicCompareExchangeStrongInt(
   object target: UnsafeMutablePointer<Int>,
   expected: UnsafeMutablePointer<Int>,
@@ -197,7 +192,7 @@ func _stdlib_atomicCompareExchangeStrongInt(
     object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
     desired: UInt32(bitPattern: Int32(desired)))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   return _stdlib_atomicCompareExchangeStrongUInt64(
     object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
@@ -212,7 +207,7 @@ func _swift_stdlib_atomicStoreInt(
   return _swift_stdlib_atomicStoreUInt32(
     object: UnsafeMutablePointer(target),
     desired: UInt32(bitPattern: Int32(desired)))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   return _swift_stdlib_atomicStoreUInt64(
     object: UnsafeMutablePointer(target),
     desired: UInt64(bitPattern: Int64(desired)))
@@ -220,21 +215,19 @@ func _swift_stdlib_atomicStoreInt(
 }
 
 @_transparent
-@warn_unused_result
 public func _swift_stdlib_atomicLoadInt(
   object target: UnsafeMutablePointer<Int>) -> Int {
 #if arch(i386) || arch(arm)
   return Int(Int32(bitPattern:
     _swift_stdlib_atomicLoadUInt32(
       object: UnsafeMutablePointer(target))))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   return Int(Int64(bitPattern:
     _swift_stdlib_atomicLoadUInt64(
       object: UnsafeMutablePointer(target))))
 #endif
 }
 
-@warn_unused_result
 @_transparent
 public // @testable
 func _swift_stdlib_atomicLoadPtrImpl(
@@ -245,7 +238,6 @@ func _swift_stdlib_atomicLoadPtrImpl(
 }
 
 @_transparent
-@warn_unused_result
 public // @testable
 func _stdlib_atomicLoadARCRef(
   object target: UnsafeMutablePointer<AnyObject?>
@@ -253,7 +245,8 @@ func _stdlib_atomicLoadARCRef(
   let result = _swift_stdlib_atomicLoadPtrImpl(
     object: UnsafeMutablePointer(target))
   if let unwrapped = result {
-    return Unmanaged<AnyObject>.fromOpaque(unwrapped).takeUnretainedValue()
+    return Unmanaged<AnyObject>.fromOpaque(
+      UnsafePointer(unwrapped)).takeUnretainedValue()
   }
   return nil
 }
@@ -268,7 +261,7 @@ public func _swift_stdlib_atomicFetch${operation}Int(
     _swift_stdlib_atomicFetch${operation}UInt32(
       object: UnsafeMutablePointer(target),
       operand: UInt32(bitPattern: Int32(operand)))))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   return Int(Int64(bitPattern:
     _swift_stdlib_atomicFetch${operation}UInt64(
       object: UnsafeMutablePointer(target),
@@ -292,7 +285,6 @@ public final class _stdlib_AtomicInt {
     return _swift_stdlib_atomicStoreInt(object: _valuePtr, desired: desired)
   }
 
-  @warn_unused_result
   public func load() -> Int {
     return _swift_stdlib_atomicLoadInt(object: _valuePtr)
   }
@@ -309,7 +301,6 @@ public final class _stdlib_AtomicInt {
   }
 % end
 
-  @warn_unused_result
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
     var expectedVar = expected
     let result = _stdlib_atomicCompareExchangeStrongInt(
@@ -352,7 +343,6 @@ internal struct _Buffer72 {
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
-@warn_unused_result
 @_silgen_name("swift_float${bits}ToString")
 func _float${bits}ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
@@ -360,18 +350,29 @@ func _float${bits}ToStringImpl(
   _ debug: Bool
 ) -> UInt
 
-@warn_unused_result
 func _float${bits}ToString(_ value: Float${bits}, debug: Bool) -> String {
 
-% # FIXME: support Float80
-% if bits != 80:
-  if value.isInfinite {
-    return value.isSignMinus ? "-inf" : "inf"
+  if !value.isFinite {
+    let significand = value.significandBitPattern
+    if significand == 0 {
+      // Infinity
+      return value.sign == .minus ? "-inf" : "inf"
+    }
+    else {
+      // NaN
+      if !debug {
+        return "nan"
+      }
+      let isSignaling = (significand & Float${bits}._quietNaNMask) == 0
+      let payload = significand & ((Float${bits}._quietNaNMask >> 1) - 1)
+      // FIXME(performance): Inefficient String manipulation. We could move
+      // this to C function.
+      return
+        (value.sign == .minus ? "-" : "")
+        + (isSignaling ? "snan" : "nan")
+        + (payload == 0 ? "" : ("(0x" + String(payload, radix: 16) + ")"))
+    }
   }
-  if value.isNaN {
-    return "nan"
-  }
-% end
 
   _sanityCheck(sizeof(_Buffer32.self) == 32)
   _sanityCheck(sizeof(_Buffer72.self) == 72)
@@ -394,7 +395,6 @@ func _float${bits}ToString(_ value: Float${bits}, debug: Bool) -> String {
 
 % end
 
-@warn_unused_result
 @_silgen_name("swift_int64ToString")
 func _int64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
@@ -402,7 +402,6 @@ func _int64ToStringImpl(
   _ radix: Int64, _ uppercase: Bool
 ) -> UInt
 
-@warn_unused_result
 func _int64ToString(
   _ value: Int64, radix: Int64 = 10, uppercase: Bool = false
 ) -> String {
@@ -433,14 +432,12 @@ func _int64ToString(
   }
 }
 
-@warn_unused_result
 @_silgen_name("swift_uint64ToString")
 func _uint64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: UInt64, _ radix: Int64, _ uppercase: Bool
 ) -> UInt
 
-@warn_unused_result
 public // @testable
 func _uint64ToString(
     _ value: UInt64, radix: Int64 = 10, uppercase: Bool = false
@@ -472,7 +469,6 @@ func _uint64ToString(
   }
 }
 
-@warn_unused_result
 func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
     UInt64(
@@ -480,7 +476,7 @@ func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
       radix: 16,
       uppercase: false
     )
-  for _ in 0..<(2 * sizeof(UnsafePointer<Void>) - result.utf16.count) {
+  for _ in 0..<(2 * sizeof(UnsafePointer<Void>.self) - result.utf16.count) {
     result = "0" + result
   }
   return "0x" + result
@@ -506,6 +502,16 @@ class _SwiftNativeNSSet {}
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSEnumeratorBase)
 class _SwiftNativeNSEnumerator {}
 
+@objc @_swift_native_objc_runtime_base(_SwiftNativeNSDataBase)
+public class _SwiftNativeNSData {
+  public init() {}
+}
+
+@objc @_swift_native_objc_runtime_base(_SwiftNativeNSCharacterSetBase)
+public class _SwiftNativeNSCharacterSet {
+  public init() {}
+}
+
 //===----------------------------------------------------------------------===//
 // Support for reliable testing of the return-autoreleased optimization
 //===----------------------------------------------------------------------===//
@@ -521,7 +527,7 @@ class _SwiftNativeNSEnumerator {}
   @objc dynamic func initializeReturnAutoreleased() {
     // On x86_64 it is sufficient to perform one cycle of return-autoreleased
     // call sequence in order to initialize all required PLT entries.
-    self.returnsAutoreleased(self)
+    _ = self.returnsAutoreleased(self)
   }
 }
 

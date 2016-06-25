@@ -1,4 +1,5 @@
-#include "ObjCClasses.h"
+#import "ObjCClasses.h"
+#import <Foundation/NSError.h>
 #include <stdio.h>
 
 @implementation HasHiddenIvars
@@ -8,10 +9,24 @@
 @synthesize t;
 @end
 
-@implementation NilError
-+ (BOOL) throwIt: (NSError**) error {
+@implementation TestingNSError
++ (BOOL)throwNilError:(NSError **)error {
   return 0;
 }
+
++ (nullable void *)maybeThrow:(BOOL)shouldThrow error:(NSError **)error {
+  if (shouldThrow) {
+    *error = [NSError errorWithDomain:@"pointer error" code:0 userInfo:nil];
+    return 0;
+  }
+  return (void *)42;
+}
+
++ (nullable void (^)(void))blockThrowError:(NSError **)error {
+  *error = [NSError errorWithDomain:@"block error" code:0 userInfo:nil];
+  return 0;
+}
+
 @end
 
 @implementation Container
@@ -108,3 +123,12 @@ static int _value = 0;
 
 #endif
 
+@implementation BridgedInitializer
+- (id) initWithArray: (NSArray*) array {
+  _objects = array;
+  return self;
+}
+- (NSInteger) count {
+  return _objects.count;
+}
+@end

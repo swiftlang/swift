@@ -127,6 +127,8 @@ static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
     captureSection,
     typeRefSection,
     reflectionStringsSection,
+    /*LocalStartAddress*/ 0,
+    /*RemoteStartAddress*/ 0,
   };
 }
 

@@ -76,7 +76,7 @@ ClassProperties.test("runtime")
   let prop = class_getProperty(object_getClass(theClass), "value")
   expectNotEmpty(prop)
 
-  let nameAsCString = property_getName(prop)
+  let nameAsCString = property_getName(prop)!
   expectNotEmpty(nameAsCString)
   expectEqual("value", String(cString: nameAsCString))
 }

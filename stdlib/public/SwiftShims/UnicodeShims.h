@@ -17,7 +17,12 @@
 #ifndef SWIFT_STDLIB_SHIMS_UNICODESHIMS_H_
 #define SWIFT_STDLIB_SHIMS_UNICODESHIMS_H_
 
+#include "SwiftStdint.h"
 #include "Visibility.h"
+
+#ifdef __cplusplus
+namespace swift { extern "C" {
+#endif
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern const __swift_uint8_t *_swift_stdlib_GraphemeClusterBreakPropertyTrie;
@@ -53,32 +58,33 @@ extern const __swift_uint16_t *
 _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix;
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__attribute__((pure))
-__swift_int32_t _swift_stdlib_unicode_compare_utf16_utf16(
-  const __swift_uint16_t *Left, __swift_int32_t LeftLength,
-  const __swift_uint16_t *Right, __swift_int32_t RightLength);
+__attribute__((__pure__)) __swift_int32_t
+_swift_stdlib_unicode_compare_utf16_utf16(const __swift_uint16_t *Left,
+                                          __swift_int32_t LeftLength,
+                                          const __swift_uint16_t *Right,
+                                          __swift_int32_t RightLength);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__attribute__((pure))
-__swift_int32_t _swift_stdlib_unicode_compare_utf8_utf16(
-  const char *Left, __swift_int32_t LeftLength,
-  const __swift_uint16_t *Right, __swift_int32_t RightLength);
+__attribute__((__pure__)) __swift_int32_t
+_swift_stdlib_unicode_compare_utf8_utf16(const char *Left,
+                                         __swift_int32_t LeftLength,
+                                         const __swift_uint16_t *Right,
+                                         __swift_int32_t RightLength);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__attribute__((pure))
-__swift_int32_t _swift_stdlib_unicode_compare_utf8_utf8(
-  const char *Left, __swift_int32_t LeftLength,
-  const char *Right, __swift_int32_t RightLength);
+__attribute__((__pure__)) __swift_int32_t
+_swift_stdlib_unicode_compare_utf8_utf8(const char *Left,
+                                        __swift_int32_t LeftLength,
+                                        const char *Right,
+                                        __swift_int32_t RightLength);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__attribute__((pure))
-__swift_intptr_t _swift_stdlib_unicode_hash(
-  const __swift_uint16_t *Str, __swift_int32_t Length);
+__attribute__((__pure__)) __swift_intptr_t
+_swift_stdlib_unicode_hash(const __swift_uint16_t *Str, __swift_int32_t Length);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__attribute__((pure))
-__swift_intptr_t _swift_stdlib_unicode_hash_ascii(
-  const char *Str, __swift_int32_t Length);
+__attribute__((__pure__)) __swift_intptr_t
+_swift_stdlib_unicode_hash_ascii(const char *Str, __swift_int32_t Length);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_int32_t _swift_stdlib_unicode_strToUpper(
@@ -90,5 +96,8 @@ __swift_int32_t _swift_stdlib_unicode_strToLower(
   __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
   const __swift_uint16_t *Source, __swift_int32_t SourceLength);
 
+#ifdef __cplusplus
+}} // extern "C", namespace swift
+#endif
 
 #endif

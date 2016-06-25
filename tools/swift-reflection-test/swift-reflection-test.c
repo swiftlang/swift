@@ -55,9 +55,14 @@ static void errorAndExit(const char *message) {
   abort();
 }
 
-swift_reflection_section_t
+static swift_reflection_section_t
 makeLocalSection(void *Buffer, RemoteSection Section,
                  RemoteReflectionInfo Info) {
+  if (Section.Size == 0) {
+    swift_reflection_section_t LS = {NULL, NULL};
+    return LS;
+  }
+
   uintptr_t Base
     = (uintptr_t)Buffer + Section.StartAddress - Info.StartAddress;
   swift_reflection_section_t LS = {
@@ -67,6 +72,7 @@ makeLocalSection(void *Buffer, RemoteSection Section,
   return LS;
 }
 
+static
 uintptr_t getStartAddress(const RemoteSection Sections[], size_t Count) {
   uintptr_t Start = 0;
   for (size_t i = 0; i < Count; ++i) {
@@ -80,6 +86,7 @@ uintptr_t getStartAddress(const RemoteSection Sections[], size_t Count) {
   return Start;
 }
 
+static
 uintptr_t getEndAddress(const RemoteSection Sections[], size_t Count) {
   uintptr_t End = 0;
   for (size_t i = 0; i < Count; ++i) {
@@ -89,6 +96,7 @@ uintptr_t getEndAddress(const RemoteSection Sections[], size_t Count) {
   return End;
 }
 
+static
 RemoteReflectionInfo makeRemoteReflectionInfo(RemoteSection fieldmd,
                                               RemoteSection assocty,
                                               RemoteSection builtin,
@@ -118,41 +126,40 @@ RemoteReflectionInfo makeRemoteReflectionInfo(RemoteSection fieldmd,
   return Info;
 }
 
-swift_reflection_section_t
-makeSwiftReflectionSection(uintptr_t Base, size_t Size) {
-  swift_reflection_section_t section;
-  section.Begin = (void*)Base;
-  section.End = (void*)(Base + Size);
-  return section;
-}
-
 static const size_t ReadEnd = 0;
 static const size_t WriteEnd = 1;
 
+static
 int PipeMemoryReader_getParentReadFD(const PipeMemoryReader *Reader) {
   return Reader->from_child[ReadEnd];
 }
 
+static
 int PipeMemoryReader_getChildWriteFD(const PipeMemoryReader *Reader) {
   return Reader->from_child[WriteEnd];
 }
 
+static
 int PipeMemoryReader_getParentWriteFD(const PipeMemoryReader *Reader) {
     return Reader->to_child[WriteEnd];
 }
 
+static
 int PipeMemoryReader_getChildReadFD(const PipeMemoryReader *Reader) {
     return Reader->to_child[ReadEnd];
 }
 
+static
 uint8_t PipeMemoryReader_getPointerSize(void *Context) {
   return sizeof(uintptr_t);
 }
 
+static
 uint8_t PipeMemoryReader_getSizeSize(void *Context) {
   return sizeof(size_t);
 }
 
+static
 void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
                                            void *Dest, size_t Size) {
   int ReadFD = PipeMemoryReader_getParentReadFD(Reader);
@@ -167,20 +174,24 @@ void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
   }
 }
 
-int PipeMemoryReader_readBytes(void *Context,
-                               addr_t Address, void *Dest, uint64_t Size) {
+static
+int PipeMemoryReader_readBytes(void *Context, swift_addr_t Address, void *Dest,
+                               uint64_t Size) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   uintptr_t TargetAddress = Address;
+  size_t TargetSize = (size_t)Size;
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
   write(WriteFD, REQUEST_READ_BYTES, 2);
   write(WriteFD, &TargetAddress, sizeof(TargetAddress));
-  write(WriteFD, &Size, sizeof(size_t));
+  write(WriteFD, &TargetSize, sizeof(size_t));
   PipeMemoryReader_collectBytesFromPipe(Reader, Dest, Size);
   return 1;
 }
 
-addr_t PipeMemoryReader_getSymbolAddress(void *Context, const char *SymbolName,
-                                         uint64_t Length) {
+static
+swift_addr_t PipeMemoryReader_getSymbolAddress(void *Context,
+                                               const char *SymbolName,
+                                               uint64_t Length) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   uintptr_t Address = 0;
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
@@ -192,7 +203,16 @@ addr_t PipeMemoryReader_getSymbolAddress(void *Context, const char *SymbolName,
   return (uintptr_t)Address;
 }
 
-uintptr_t
+static InstanceKind
+PipeMemoryReader_receiveInstanceKind(const PipeMemoryReader *Reader) {
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_INSTANCE_KIND, 2);
+  uint8_t KindValue = 0;
+  PipeMemoryReader_collectBytesFromPipe(Reader, &KindValue, sizeof(KindValue));
+  return KindValue;
+}
+
+static uintptr_t
 PipeMemoryReader_receiveInstanceAddress(const PipeMemoryReader *Reader) {
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
   write(WriteFD, REQUEST_INSTANCE_ADDRESS, 2);
@@ -202,20 +222,13 @@ PipeMemoryReader_receiveInstanceAddress(const PipeMemoryReader *Reader) {
   return InstanceAddress;
 }
 
-void PipeMemoryReader_sendExitMessage(const PipeMemoryReader *Reader) {
+static
+void PipeMemoryReader_sendDoneMessage(const PipeMemoryReader *Reader) {
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
-  write(WriteFD, REQUEST_EXIT, 2);
+  write(WriteFD, REQUEST_DONE, 2);
 }
 
-uint8_t PipeMemoryReader_receivePointerSize(const PipeMemoryReader *Reader) {
-  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
-  write(WriteFD, REQUEST_POINTER_SIZE, 2);
-  uint8_t PointerSize = 0;
-  PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&PointerSize,
-                                        sizeof(PointerSize));
-  return PointerSize;
-}
-
+static
 PipeMemoryReader createPipeMemoryReader() {
   PipeMemoryReader Reader;
   if (pipe(Reader.to_child))
@@ -225,6 +238,7 @@ PipeMemoryReader createPipeMemoryReader() {
   return Reader;
 }
 
+static
 RemoteSection makeRemoteSection(const PipeMemoryReader *Reader) {
   uintptr_t Start;
   size_t Size;
@@ -236,7 +250,7 @@ RemoteSection makeRemoteSection(const PipeMemoryReader *Reader) {
   return RS;
 }
 
-void
+static void
 PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
                                        const PipeMemoryReader *Reader) {
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
@@ -283,7 +297,9 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
       makeLocalSection(Buffer, RemoteInfo.builtin, RemoteInfo),
       makeLocalSection(Buffer, RemoteInfo.capture, RemoteInfo),
       makeLocalSection(Buffer, RemoteInfo.typeref, RemoteInfo),
-      makeLocalSection(Buffer, RemoteInfo.reflstr, RemoteInfo)
+      makeLocalSection(Buffer, RemoteInfo.reflstr, RemoteInfo),
+      /*LocalStartAddress*/ (uintptr_t) Buffer,
+      /*RemoteStartAddress*/ RemoteInfo.StartAddress,
     };
     swift_reflection_addReflectionInfo(RC, Info);
   }
@@ -291,14 +307,76 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
   free(RemoteInfos);
 }
 
-uint64_t PipeMemoryReader_getStringLength(void *Context, addr_t Address) {
+uint64_t PipeMemoryReader_getStringLength(void *Context, swift_addr_t Address) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  uintptr_t TargetAddress = (uintptr_t)Address;
   write(WriteFD, REQUEST_STRING_LENGTH, 2);
-  write(WriteFD, &Address, sizeof(Address));
+  write(WriteFD, &TargetAddress, sizeof(TargetAddress));
   uintptr_t Length = 0;
   PipeMemoryReader_collectBytesFromPipe(Reader, &Length, sizeof(Length));
   return Length;
+}
+
+int reflectHeapObject(SwiftReflectionContextRef RC,
+                       const PipeMemoryReader Pipe) {
+  uintptr_t instance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
+  if (instance == 0) {
+    // Child has no more instances to examine
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 0;
+  }
+  printf("Instance pointer in child address space: 0x%lx\n",
+         instance);
+
+  swift_typeref_t TR = swift_reflection_typeRefForInstance(RC, instance);
+
+  printf("Type reference:\n");
+  swift_reflection_dumpTypeRef(TR);
+  printf("\n");
+
+  printf("Type info:\n");
+  swift_reflection_dumpInfoForInstance(RC, instance);
+
+  printf("\n");
+
+  PipeMemoryReader_sendDoneMessage(&Pipe);
+  return 1;
+}
+
+int reflectExistential(SwiftReflectionContextRef RC,
+                       const PipeMemoryReader Pipe,
+                       swift_typeref_t MockExistentialTR) {
+  uintptr_t instance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
+  if (instance == 0) {
+    // Child has no more instances to examine
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 0;
+  }
+  printf("Instance pointer in child address space: 0x%lx\n",
+         instance);
+
+  swift_typeref_t InstanceTypeRef;
+  swift_addr_t StartOfInstanceData = 0;
+
+  if (!swift_reflection_projectExistential(RC, instance, MockExistentialTR,
+                                           &InstanceTypeRef,
+                                           &StartOfInstanceData)) {
+    printf("swift_reflection_projectExistential failed.\n");
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 0;
+  }
+
+  printf("Type reference:\n");
+  swift_reflection_dumpTypeRef(InstanceTypeRef);
+  printf("\n");
+
+  printf("Type info:\n");
+  swift_reflection_dumpInfoForTypeRef(RC, InstanceTypeRef);
+  printf("\n");
+
+  PipeMemoryReader_sendDoneMessage(&Pipe);
+  return 1;
 }
 
 int doDumpHeapInstance(const char *BinaryFilename) {
@@ -320,7 +398,6 @@ int doDumpHeapInstance(const char *BinaryFilename) {
     default: { // Parent
       close(PipeMemoryReader_getChildReadFD(&Pipe));
       close(PipeMemoryReader_getChildWriteFD(&Pipe));
-
       SwiftReflectionContextRef RC = swift_reflection_createReflectionContext(
         (void*)&Pipe,
         PipeMemoryReader_getPointerSize,
@@ -333,25 +410,47 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       if (PointerSize != sizeof(uintptr_t))
         errorAndExit("Child process had unexpected architecture");
 
-      uintptr_t instance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
-      assert(instance);
-      printf("Instance pointer in child address space: 0x%lx\n",
-        instance);
-
       PipeMemoryReader_receiveReflectionInfo(RC, &Pipe);
 
-      printf("Type reference:\n");
+      while (1) {
+        InstanceKind Kind = PipeMemoryReader_receiveInstanceKind(&Pipe);
+        switch (Kind) {
+        case Object:
+          printf("Reflecting an object.\n");
+          if (!reflectHeapObject(RC, Pipe))
+            return EXIT_SUCCESS;
+          break;
+        case Existential: {
+          swift_typeref_t AnyTR
+            = swift_reflection_typeRefForMangledTypeName(RC, "_TtP_", 5);
 
-      swift_typeref_t TR = swift_reflection_typeRefForInstance(RC, instance);
-      swift_reflection_dumpTypeRef(TR);
-      printf("\n");
-
-      printf("Type info:\n");
-      swift_reflection_dumpInfoForInstance(RC, instance);
+          printf("Reflecting an existential.\n");
+          if (!reflectExistential(RC, Pipe, AnyTR))
+            return EXIT_SUCCESS;
+          break;
+        }
+        case ErrorExistential: {
+          swift_typeref_t ErrorTR
+            = swift_reflection_typeRefForMangledTypeName(RC,
+              "_TtPs13ErrorProtocol_", 21);
+          printf("Reflecting an error existential.\n");
+          if (!reflectExistential(RC, Pipe, ErrorTR))
+            return EXIT_SUCCESS;
+          break;
+        }
+        case Closure:
+          printf("Reflecting a closure.\n");
+          if (!reflectHeapObject(RC, Pipe))
+            return EXIT_SUCCESS;
+          break;
+        case None:
+          swift_reflection_destroyReflectionContext(RC);
+          printf("Done.\n");
+          return EXIT_SUCCESS;
+        }
+      }
     }
   }
-
-  PipeMemoryReader_sendExitMessage(&Pipe);
   return EXIT_SUCCESS;
 }
 

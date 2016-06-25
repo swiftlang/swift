@@ -1,4 +1,4 @@
-//===--- Reverse.swift - Lazy sequence reversal ---------------------------===//
+//===--- Reverse.swift - Sequence and collection reversal -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,6 +9,28 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+extension MutableCollection where Self : BidirectionalCollection {
+  /// Reverses the elements of the collection in place.
+  ///
+  ///     var characters: [Character] = ["C", "a", "f", "é"]
+  ///     characters.reverse()
+  ///     print(cafe.characters)
+  ///     // Prints "["é", "f", "a", "C"]
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of elements in the
+  ///   collection.
+  public mutating func reverse() {
+    if isEmpty { return }
+    var f = startIndex
+    var l = index(before: endIndex)
+    while f < l {
+      swap(&self[f], &self[l])
+      formIndex(after: &f)
+      formIndex(before: &l)
+    }
+  }
+}
 
 // FIXME(ABI)(compiler limitation): we should have just one type,
 // `ReversedCollection`, that has conditional conformances to
@@ -28,7 +50,6 @@ public struct ReversedIndex<Base : Collection> : Comparable {
   public let base: Base.Index
 }
 
-@warn_unused_result
 public func == <Base : Collection>(
   lhs: ReversedIndex<Base>,
   rhs: ReversedIndex<Base>
@@ -36,7 +57,6 @@ public func == <Base : Collection>(
   return lhs.base == rhs.base
 }
 
-@warn_unused_result
 public func < <Base : Collection>(
   lhs: ReversedIndex<Base>,
   rhs: ReversedIndex<Base>
@@ -92,23 +112,19 @@ public struct ReversedCollection<
     return ReversedIndex(_base.startIndex)
   }
 
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     return ReversedIndex(_base.index(before: i.base))
   }
 
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     return ReversedIndex(_base.index(after: i.base))
   }
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     return ReversedIndex(_base.index(i.base, offsetBy: -n))
   }
 
-  @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -116,7 +132,6 @@ public struct ReversedCollection<
     return _base.index(i.base, offsetBy: -n, limitedBy: limit.base).map { ReversedIndex($0) }
   }
 
-  @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     return _base.distance(from: end.base, to: start.base)
   }
@@ -146,7 +161,6 @@ public struct ReversedRandomAccessIndex<
   public let base: Base.Index
 }
 
-@warn_unused_result
 public func == <Base : Collection>(
   lhs: ReversedRandomAccessIndex<Base>,
   rhs: ReversedRandomAccessIndex<Base>
@@ -154,7 +168,6 @@ public func == <Base : Collection>(
   return lhs.base == rhs.base
 }
 
-@warn_unused_result
 public func < <Base : Collection>(
   lhs: ReversedRandomAccessIndex<Base>,
   rhs: ReversedRandomAccessIndex<Base>
@@ -205,24 +218,20 @@ public struct ReversedRandomAccessCollection<
     return ReversedRandomAccessIndex(_base.startIndex)
   }
 
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     return ReversedRandomAccessIndex(_base.index(before: i.base))
   }
 
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     return ReversedRandomAccessIndex(_base.index(after: i.base))
   }
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     // FIXME: swift-3-indexing-model: tests.
     return ReversedRandomAccessIndex(_base.index(i.base, offsetBy: -n))
   }
 
-  @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -231,7 +240,6 @@ public struct ReversedRandomAccessCollection<
     return _base.index(i.base, offsetBy: -n, limitedBy: limit.base).map { Index($0) }
   }
 
-  @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     // FIXME: swift-3-indexing-model: tests.
     return _base.distance(from: end.base, to: start.base)
@@ -275,7 +283,6 @@ extension BidirectionalCollection {
   ///     // Prints "sdrawkcaB"
   ///
   /// - Complexity: O(1)
-  @warn_unused_result
   public func reversed() -> ReversedCollection<Self> {
     return ReversedCollection(_base: self)
   }
@@ -309,7 +316,6 @@ extension RandomAccessCollection {
   ///     // Prints "[7, 5, 3]"
   ///
   /// - Complexity: O(1)
-  @warn_unused_result
   public func reversed() -> ReversedRandomAccessCollection<Self> {
     return ReversedRandomAccessCollection(_base: self)
   }
@@ -323,7 +329,6 @@ extension LazyCollectionProtocol
   /// Returns the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
-  @warn_unused_result
   public func reversed() -> LazyBidirectionalCollection<
     ReversedCollection<Elements>
   > {
@@ -339,7 +344,6 @@ extension LazyCollectionProtocol
   /// Returns the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
-  @warn_unused_result
   public func reversed() -> LazyRandomAccessCollection<
     ReversedRandomAccessCollection<Elements>
   > {

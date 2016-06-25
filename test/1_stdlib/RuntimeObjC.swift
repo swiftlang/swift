@@ -15,16 +15,6 @@ import CoreGraphics
 import SwiftShims
 import MirrorObjC
 
-// FIXME: Should go into the standard library.
-public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
-      -> Self {
-    var result: Self? = nil
-    _forceBridgeFromObjectiveC(source!, result: &result)
-    return result!
-  }
-}
-
 var nsObjectCanaryCount = 0
 @objc class NSObjectCanary : NSObject {
   override init() {
@@ -100,6 +90,13 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     return false
   }
 
+  static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
+      -> BridgedValueType {
+    var result: BridgedValueType? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+
   var value: Int
   var canaryRef = SwiftObjectCanary()
 }
@@ -146,6 +143,13 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
     return false
   }
 
+  static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
+      -> BridgedLargeValueType {
+    var result: BridgedLargeValueType? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+
   var value: Int {
     let x = value0
     assert(value0 == x && value1 == x && value2 == x && value3 == x &&
@@ -187,6 +191,13 @@ struct ConditionallyBridgedValueType<T> : _ObjectiveCBridgeable {
 
     result = nil
     return false
+  }
+
+  static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
+      -> ConditionallyBridgedValueType {
+    var result: ConditionallyBridgedValueType? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
   }
 
   static func _isBridgedToObjectiveC() -> Bool {
@@ -422,10 +433,10 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a12GenericClassMVS_11PlainStruct_",
               NSStringFromClass(GenericClass<PlainStruct.Type>.self))
   expectEqual("_TtGC1a12GenericClassFMVS_11PlainStructS1__",
-              NSStringFromClass(GenericClass<PlainStruct.Type -> PlainStruct>.self))
+              NSStringFromClass(GenericClass<(PlainStruct.Type) -> PlainStruct>.self))
 
   expectEqual("_TtGC1a12GenericClassFzMVS_11PlainStructS1__",
-              NSStringFromClass(GenericClass<PlainStruct.Type throws -> PlainStruct>.self))
+              NSStringFromClass(GenericClass<(PlainStruct.Type) throws -> PlainStruct>.self))
   expectEqual("_TtGC1a12GenericClassFTVS_11PlainStructROS_9PlainEnum_Si_",
               NSStringFromClass(GenericClass<(PlainStruct, inout PlainEnum) -> Int>.self))
 
@@ -440,8 +451,8 @@ Runtime.test("Generic class ObjC runtime names") {
 
   expectEqual("_TtGC1a12GenericClassCSo7CFArray_",
               NSStringFromClass(GenericClass<CFArray>.self))
-  expectEqual("_TtGC1a12GenericClassVSC9NSDecimal_",
-              NSStringFromClass(GenericClass<NSDecimal>.self))
+  expectEqual("_TtGC1a12GenericClassVSC7Decimal_",
+              NSStringFromClass(GenericClass<Decimal>.self))
   expectEqual("_TtGC1a12GenericClassCSo8NSObject_",
               NSStringFromClass(GenericClass<NSObject>.self))
   expectEqual("_TtGC1a12GenericClassCSo8NSObject_",

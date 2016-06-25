@@ -50,7 +50,7 @@ func instanceMethods(_ b: B) {
   b.performAdd(1, 2, 3, 4) // expected-error{{missing argument labels 'withValue:withValue:withValue2:' in call}} {{19-19=withValue: }} {{22-22=withValue: }} {{25-25=withValue2: }}
 
   // Both class and instance methods exist.
-  b.description
+  _ = b.description
   b.instanceTakesObjectClassTakesFloat(b)
   b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{cannot convert value of type 'Double' to expected argument type 'AnyObject!'}}
 
@@ -87,21 +87,21 @@ func instanceMethodsInExtensions(_ b: B) {
   b.method(1, separateExtMethod:3.5)
 
   let m1 = b.method(_:onCat1:)
-  m1(1, onCat1: 2.5)
+  _ = m1(1, onCat1: 2.5)
 
   let m2 = b.method(_:onExtA:)
-  m2(1, onExtA: 2.5)
+  _ = m2(1, onExtA: 2.5)
 
   let m3 = b.method(_:onExtB:)
-  m3(1, onExtB: 2.5)
+  _ = m3(1, onExtB: 2.5)
 
   let m4 = b.method(_:separateExtMethod:)
-  m4(1, separateExtMethod: 2.5)
+  _ = m4(1, separateExtMethod: 2.5)
 }
 
 func dynamicLookupMethod(_ b: AnyObject) {
   if let m5 = b.method(_:separateExtMethod:) {
-    m5(1, separateExtMethod: 2.5)
+    _ = m5(1, separateExtMethod: 2.5)
   }
 }
 
@@ -191,9 +191,9 @@ func testProtocols(_ b: B, bp: BProto) {
   bp2 = b.getAsProto()
 
   var c1 : Cat1Proto = b
-  var bcat1 = b.getAsProtoWithCat()
+  var bcat1 = b.getAsProtoWithCat()!
   c1 = bcat1
-  bcat1 = c1 // expected-error{{cannot assign value of type 'Cat1Proto' to type 'protocol<BProto, Cat1Proto>!'}}
+  bcat1 = c1 // expected-error{{value of type 'Cat1Proto' does not conform to 'protocol<BProto, Cat1Proto>' in assignment}}
 }
 
 // Methods only defined in a protocol
@@ -205,15 +205,16 @@ func testProtocolMethods(_ b: B, p2m: P2.Type) {
   // Imported constructor.
   var b2 = B(viaP2: 3.14159, second: 3.14159)
 
-  p2m.init(viaP2:3.14159, second: 3.14159)
+  _ = p2m.init(viaP2:3.14159, second: 3.14159)
 }
 
 func testId(_ x: AnyObject) {
   x.perform!("foo:", with: x) // expected-warning{{no method declared with Objective-C selector 'foo:'}}
+  // expected-warning @-1 {{result of call is unused, but produces 'Unmanaged<AnyObject>!'}}
 
-  x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
-  x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)
-  x.performAdd?(1, withValue: 2, withValue: 3, withValue2: 4)
+  _ = x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
+  _ = x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)
+  _ = x.performAdd?(1, withValue: 2, withValue: 3, withValue2: 4)
 }
 
 class MySubclass : B {
@@ -225,7 +226,7 @@ class MySubclass : B {
 }
 
 func getDescription(_ array: NSArray) {
-  array.description
+  _ = array.description
 }
 
 // Method overriding with unfortunate ordering.
@@ -258,29 +259,29 @@ func almostSubscriptableKeyMismatchInherited(_ roc: ReadOnlyCollectionChild,
 
 // Use of 'Class' via dynamic lookup.
 func classAnyObject(_ obj: NSObject) {
-  obj.myClass().description!()
+  _ = obj.myClass().description!()
 }
 
 // Protocol conformances
-class Wobbler : NSWobbling { // expected-note{{candidate has non-matching type '()'}}
+class Wobbler : Wobbling { // expected-note{{candidate has non-matching type '()'}}
   @objc func wobble() { }
 
-  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'NSWobbling'}}{{3-3=@objc }}
+  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'Wobbling'}}{{none}}
   // expected-error@-1{{method cannot be an implementation of an @objc requirement because its result type cannot be represented in Objective-C}}
 }
 
-extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'NSMaybeInitWobble'}}
+extension Wobbler : MaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'MaybeInitWobble'}}
 }
 
-@objc class Wobbler2 : NSObject, NSWobbling { // expected-note{{candidate has non-matching type '()'}}
+@objc class Wobbler2 : NSObject, Wobbling { // expected-note{{candidate has non-matching type '()'}}
   func wobble() { }
   func returnMyself() -> Self { return self }
 }
 
-extension Wobbler2 : NSMaybeInitWobble { // expected-error{{type 'Wobbler2' does not conform to protocol 'NSMaybeInitWobble'}}
+extension Wobbler2 : MaybeInitWobble { // expected-error{{type 'Wobbler2' does not conform to protocol 'MaybeInitWobble'}}
 }
 
-func optionalMemberAccess(_ w: NSWobbling) {
+func optionalMemberAccess(_ w: Wobbling) {
   w.wobble()
   w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}} {{11-11=!}}
   var x: AnyObject = w[5] // expected-error{{value of optional type 'AnyObject!?' not unwrapped; did you mean to use '!' or '?'?}} {{26-26=!}}
@@ -305,16 +306,16 @@ class NSObjectable : NSObjectProtocol {
 // Properties with custom accessors
 func customAccessors(_ hive: Hive, bee: Bee) {
   markUsed(hive.isMakingHoney)
-  markUsed(hive.makingHoney()) // expected-error{{value of type 'Hive' has no member 'makingHoney'}}
+  markUsed(hive.makingHoney()) // expected-error{{cannot call value of non-function type 'Bool'}}
   hive.setMakingHoney(true) // expected-error{{value of type 'Hive' has no member 'setMakingHoney'}}
 
-  hive.`guard`.description // okay
-  hive.`guard`.description! // no-warning
+  _ = hive.`guard`.description // okay
+  _ = hive.`guard`.description! // no-warning
   hive.`guard` = bee // no-warning
 }
 
 // instancetype/Dynamic Self invocation.
-func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
+func testDynamicSelf(_ queen: Bee, wobbler: Wobbling) {
   var hive = Hive()
 
   // Factory method with instancetype result.
@@ -323,13 +324,13 @@ func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
   hive = hive1
 
   // Instance method with instancetype result.
-  var hive2 = hive.visit()
+  var hive2 = hive!.visit()
   hive2 = hive
   hive = hive2
 
   // Instance method on a protocol with instancetype result.
-  var wobbler2 = wobbler.returnMyself()
-  var wobbler: NSWobbling = wobbler2
+  var wobbler2 = wobbler.returnMyself()!
+  var wobbler: Wobbling = wobbler2
   wobbler2 = wobbler
 
   // Instance method on a base class with instancetype result, called on the
@@ -340,7 +341,7 @@ func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
 }
 
 func testRepeatedProtocolAdoption(_ w: NSWindow) {
-  w.description
+  _ = w.description
 }
 
 class ProtocolAdopter1 : FooProto {
@@ -379,16 +380,16 @@ func testPreferClassMethodToCurriedInstanceMethod(_ obj: NSObject) {
 func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
                                     rev: PropertyAndMethodReverseCollision) {
   obj.object = nil
-  obj.object(obj, doSomething:Selector("action"))
+  obj.object(obj, doSomething:#selector(getter: NSMenuItem.action))
 
   obj.dynamicType.classRef = nil
-  obj.dynamicType.classRef(obj, doSomething:Selector("action"))
+  obj.dynamicType.classRef(obj, doSomething:#selector(getter: NSMenuItem.action))
 
   rev.object = nil
-  rev.object(rev, doSomething:Selector("action"))
+  rev.object(rev, doSomething:#selector(getter: NSMenuItem.action))
 
   rev.dynamicType.classRef = nil
-  rev.dynamicType.classRef(rev, doSomething:Selector("action"))
+  rev.dynamicType.classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
 
   var value: AnyObject
   value = obj.protoProp()
@@ -401,7 +402,7 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
 func testSubscriptAndPropertyRedeclaration(_ obj: SubscriptAndProperty) {
   _ = obj.x
   obj.x = 5
-  obj.objectAtIndexedSubscript(5) // expected-error{{'objectAtIndexedSubscript' is unavailable: use subscripting}}
+  _ = obj.objectAtIndexedSubscript(5) // expected-error{{'objectAtIndexedSubscript' is unavailable: use subscripting}}
   obj.setX(5) // expected-error{{value of type 'SubscriptAndProperty' has no member 'setX'}}
 
   _ = obj[0]
@@ -549,7 +550,7 @@ extension Printing {
 func testSetInitializers() {
   let a: [AnyObject] = [NSObject()]
 
-  let _ = NSCountedSet(array: a)
+  let _ = CountedSet(array: a)
   let _ = NSMutableSet(array: a)
 }
 
@@ -597,8 +598,4 @@ func testNSUInteger(_ obj: NSUIntegerTests, uint: UInt, int: Int) {
   let num = NSNumber(value: uint)
   let _: String = num.uintValue // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
 }
-
-
-// <rdar://problem/25168818> Don't import None members in NS_OPTIONS types
-let _ = NSRuncingOptions.none // expected-error {{'none' is unavailable: use [] to construct an empty option set}}
 

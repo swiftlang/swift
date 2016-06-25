@@ -285,6 +285,10 @@ static SILInstruction *constantFoldBinary(BuiltinInst *BI,
   case BuiltinValueKind::ExactUDiv:
     return nullptr;
 
+  // Not supported now.
+  case BuiltinValueKind::FRem:
+    return nullptr;
+
   // Fold constant division operations and report div by zero.
   case BuiltinValueKind::SDiv:
   case BuiltinValueKind::SRem:

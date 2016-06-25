@@ -204,7 +204,7 @@ extension Int : IsBefore {
 }
 
 func callMin(_ x: Int, y: Int, a: Float, b: Float) {
-  min2(x, y)
+  _ = min2(x, y)
   min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
 }
 

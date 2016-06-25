@@ -258,6 +258,12 @@ def no_link_objc_runtime : Flag<["-"], "no-link-objc-runtime">,
   Flags<[HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't link in additions to the Objective-C runtime">;
 
+def static_stdlib: Flag<["-"], "static-stdlib">,
+  HelpText<"Statically link the Swift standard library">;
+def no_static_stdlib: Flag<["-"], "no-static-stdlib">,
+  Flags<[HelpHidden]>,
+  HelpText<"Don't statically link the Swift standard library">;
+
 def use_ld : Joined<["-"], "use-ld=">,
   Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies the linker to be used">;
@@ -459,5 +465,11 @@ def enable_testing : Flag<["-"], "enable-testing">,
 def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,
   HelpText<"Turn on runtime checks for erroneous behavior.">;
+
+def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  MetaVarName<"<type>">,
+  HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
+  " additional options separated by commas">;
 
 include "FrontendOptions.td"

@@ -52,7 +52,6 @@
 
 using namespace swift;
 using namespace irgen;
-using clang::CodeGen::CodeGenABITypes;
 using llvm::Attribute;
 
 const unsigned DefaultAS = 0;
@@ -275,6 +274,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     FunctionPtrTy,
     RefCountedPtrTy,
   });
+  WitnessFunctionPairTy = createStructType(*this, "swift.function", {
+    FunctionPtrTy,
+    WitnessTablePtrTy,
+  });
   
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
                   ->getPointerTo(DefaultAS);
@@ -387,8 +390,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     RegisterPreservingCC = DefaultCC;
   }
 
-  ABITypes = new CodeGenABITypes(clangASTContext, Module);
-
   if (IRGen.Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
     DebugInfo = new IRGenDebugInfo(IRGen.Opts, *CI, *this, Module, SF);
   }
@@ -399,9 +400,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 IRGenModule::~IRGenModule() {
   destroyClangTypeConverter();
   delete &Types;
-  if (DebugInfo)
-    delete DebugInfo;
-  delete ABITypes;
+  delete DebugInfo;
 }
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
@@ -864,12 +863,9 @@ void IRGenModule::emitAutolinkInfo() {
 
   // Collect the linker options already in the module (from ClangCodeGen).
   auto *LinkerOptions = Module.getModuleFlag(LinkerOptionsFlagName);
-  if (LinkerOptions) {
-    for (auto &LinkOption : cast<llvm::MDNode>(LinkerOptions)->operands()) {
-      LinkOption->dump();
+  if (LinkerOptions)
+    for (const auto &LinkOption : cast<llvm::MDNode>(LinkerOptions)->operands())
       AutolinkEntries.push_back(LinkOption);
-    }
-  }
 
   // Remove duplicates.
   llvm::SmallPtrSet<llvm::Metadata*, 4> knownAutolinkEntries;
@@ -882,6 +878,9 @@ void IRGenModule::emitAutolinkInfo() {
                         AutolinkEntries.end());
 
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("unknown object format");
+  case llvm::Triple::COFF:
   case llvm::Triple::MachO: {
     llvm::LLVMContext &ctx = Module.getContext();
 
@@ -900,7 +899,6 @@ void IRGenModule::emitAutolinkInfo() {
     }
     break;
   }
-  case llvm::Triple::COFF:
   case llvm::Triple::ELF: {
     // Merge the entries into null-separated string.
     llvm::SmallString<64> EntriesString;
@@ -926,9 +924,6 @@ void IRGenModule::emitAutolinkInfo() {
     addUsedGlobal(var);
     break;
   }
-  default:
-    llvm_unreachable("Don't know how to emit autolink entries for "
-                     "the selected object format.");
   }
 
   if (!IRGen.Opts.ForceLoadSymbolName.empty()) {
@@ -969,7 +964,7 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
                          (uint32_t)(swiftVersion << 8));
 }
 
-void IRGenModule::finalize() {
+bool IRGenModule::finalize() {
   const char *ModuleHashVarName = "llvm.swift_module_hash";
   if (IRGen.Opts.OutputKind == IRGenOutputKind::ObjectFile &&
       !Module.getGlobalVariable(ModuleHashVarName)) {
@@ -1000,11 +995,21 @@ void IRGenModule::finalize() {
     addUsedGlobal(ModuleHash);
   }
   emitLazyPrivateDefinitions();
+
+  // Finalize clang IR-generation.
+  finalizeClangCodeGen();
+
+  // If that failed, report failure up and skip the final clean-up.
+  if (!ClangCodeGen->GetModule())
+    return false;
+
   emitAutolinkInfo();
   emitGlobalLists();
   if (DebugInfo)
     DebugInfo->finalize();
   cleanupClangCodeGenMetadata();
+
+  return true;
 }
 
 /// Emit lazy definitions that have to be emitted in this specific

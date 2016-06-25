@@ -241,7 +241,7 @@ SILGenModule::getBridgedObjectiveCTypeRequirement(SILLocation loc) {
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
   AssociatedTypeDecl *found = nullptr;
-  DeclName name(ctx.getIdentifier("_ObjectiveCType"));
+  DeclName name(ctx.Id_ObjectiveCType);
   for (auto member : proto->lookupDirect(name, true)) {
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       found = assocType;
@@ -875,9 +875,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   auto *f =
-      M.createFunction(makeModuleFragile
-                           ? SILLinkage::Public
-                           : SILLinkage::Private,
+      M.createFunction(SILLinkage::Private,
                        funcName, initSILType, nullptr,
                        SILLocation(binding), IsNotBare, IsNotTransparent,
                        makeModuleFragile
@@ -1309,6 +1307,10 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
   SourceFileScope scope(*this, sf);
   for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem))
     visit(D);
+
+  // Mark any conformances as "used".
+  for (auto conformance : sf->getUsedConformances())
+    useConformance(ProtocolConformanceRef(conformance));
 }
 
 //===----------------------------------------------------------------------===//

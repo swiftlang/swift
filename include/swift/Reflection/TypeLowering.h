@@ -32,6 +32,7 @@ using llvm::dyn_cast;
 
 class TypeRef;
 class TypeRefBuilder;
+class BuiltinTypeDescriptor;
 
 enum class RecordKind : unsigned {
   Tuple,
@@ -43,7 +44,7 @@ enum class RecordKind : unsigned {
 
   // An existential is a three-word buffer followed by value metadata and
   // witness tables.
-  Existential,
+  OpaqueExistential,
 
   // A class existential is a retainable pointer followed by witness
   // tables.
@@ -52,9 +53,17 @@ enum class RecordKind : unsigned {
   // An existential metatype.
   ExistentialMetatype,
 
+  // An error existential is a special kind of heap object, so is a retainable
+  // pointer, with no witness tables.
+  ErrorExistential,
+
   // A class instance layout, consisting of the stored properties of
   // one class, excluding superclasses.
   ClassInstance,
+
+  // A closure context instance layout, consisting of the captured values.
+  // For now, captured values do not retain their names.
+  ClosureContext,
 };
 
 enum class ReferenceCounting : unsigned {
@@ -102,6 +111,22 @@ struct FieldInfo {
   unsigned Offset;
   const TypeRef *TR;
   const TypeInfo &TI;
+};
+
+/// Builtins and (opaque) imported value types
+class BuiltinTypeInfo : public TypeInfo {
+  std::string Name;
+
+public:
+  explicit BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor);
+
+  const std::string &getMangledTypeName() const {
+    return Name;
+  }
+
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Builtin;
+  }
 };
 
 /// Class instances, structs, tuples
@@ -171,8 +196,16 @@ public:
 
   TypeRefBuilder &getBuilder() { return Builder; }
 
+  /// Tests if the type is concrete enough that its size is known.
+  /// For example, a bound generic class is fixed size even if some
+  /// of the generic argument types contain generic parameters.
+  bool hasFixedSize(const TypeRef *TR);
+
   /// Returns layout information for a value of the given type.
   /// For a class, this returns the lowering of the reference value.
+  ///
+  /// The type must either be concrete, or at least fixed-size, as
+  /// determined by the isFixedSize() predicate.
   const TypeInfo *getTypeInfo(const TypeRef *TR);
 
   /// Returns layout information for an instance of the given
@@ -199,6 +232,37 @@ public:
     auto TI = new TypeInfoTy(::std::forward<Args>(args)...);
     Pool.push_back(std::unique_ptr<const TypeInfo>(TI));
     return TI;
+  }
+};
+
+/// Utility class for performing universal layout for types such as
+/// tuples, structs, thick functions, etc.
+class RecordTypeInfoBuilder {
+  TypeConverter &TC;
+  unsigned Size, Alignment, Stride, NumExtraInhabitants;
+  RecordKind Kind;
+  std::vector<FieldInfo> Fields;
+  bool Invalid;
+
+public:
+  RecordTypeInfoBuilder(TypeConverter &TC, RecordKind Kind)
+    : TC(TC), Size(0), Alignment(1), Stride(0), NumExtraInhabitants(0),
+      Kind(Kind), Invalid(false) {}
+
+  bool isInvalid() const {
+    return Invalid;
+  }
+
+  unsigned addField(unsigned fieldSize, unsigned fieldAlignment);
+  void addField(const std::string &Name, const TypeRef *TR);
+  const RecordTypeInfo *build();
+
+  unsigned getNumFields() const {
+    return Fields.size();
+  }
+
+  unsigned getFieldOffset(unsigned Index) const {
+    return Fields[Index].Offset;
   }
 };
 

@@ -483,7 +483,7 @@ func _workerThreadOneTrial<RT : RaceTestWithPerTrialData>(
   var threadLocalData = rt.makeThreadLocalData()
   if true {
     let trialSpinBarrier = sharedState.trialSpinBarrier
-    trialSpinBarrier.fetchAndAdd(1)
+    _ = trialSpinBarrier.fetchAndAdd(1)
     while trialSpinBarrier.load() < racingThreadCount {}
   }
   // Perform racy operations.
@@ -573,3 +573,31 @@ public func consumeCPU(units amountOfWork: Int) {
     }
   }
 }
+
+internal struct ClosureBasedRaceTest : RaceTestWithPerTrialData {
+  static var thread: () -> () = {}
+
+  class RaceData {}
+  typealias ThreadLocalData = Void
+  typealias Observation = Void
+
+  func makeRaceData() -> RaceData { return RaceData() }
+  func makeThreadLocalData() -> Void { return Void() }
+
+  func thread1(
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
+  ) {
+    ClosureBasedRaceTest.thread()
+  }
+
+  func evaluateObservations(
+    _ observations: [Observation],
+    _ sink: (RaceTestObservationEvaluation) -> Void
+  ) {}
+}
+
+public func runRaceTest(trials: Int, threads: Int? = nil, body: () -> ()) {
+  ClosureBasedRaceTest.thread = body
+  runRaceTest(ClosureBasedRaceTest.self, trials: trials, threads: threads)
+}
+

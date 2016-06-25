@@ -26,7 +26,7 @@ import Foundation
   @objc func takeAndReturnEnum(_ foo: FooComments) -> NegativeValues {
     return .Zung
   }
-  @objc func acceptPlainEnum(_: NSMalformedEnumMissingTypedef) {}
+  @objc func acceptPlainEnum(_: MalformedEnumMissingTypedef) {}
   @objc func takeAndReturnRenamedEnum(_ foo: EnumNamed) -> EnumNamed {
     return .A
   }
@@ -69,9 +69,14 @@ import Foundation
   func methodNotExportedToObjC() {}
 }
 
-// CHECK-LABEL: /// Foo: A feer, a female feer.
+// CHECK: /**
+// CHECK-NEXT: Foo: A feer, a female feer.
+// CHECK-NEXT: */
+
 // CHECK-NEXT: typedef SWIFT_ENUM(NSInteger, FooComments) {
-// CHECK:   /// Zim: A zeer, a female zeer.
+// CHECK: /**
+// CHECK-NEXT: Zim: A zeer, a female zeer.
+// CHECK: */
 // CHECK-NEXT:   FooCommentsZim = 0,
 // CHECK-NEXT:   FooCommentsZang = 1,
 // CHECK-NEXT:   FooCommentsZung = 2,

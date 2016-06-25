@@ -45,15 +45,15 @@ func testNonAmbiguousStringComparisons() {
 
 func testAmbiguousStringComparisons(s: String) {
   let nsString = s as NSString
-  let a1 = s == nsString
-  let a2 = s != nsString
+  let a1 = s as NSString == nsString
+  let a2 = s as NSString != nsString
   let a3 = s < nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{24-24= as String}}
   let a4 = s <= nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{25-25= as String}}
   let a5 = s >= nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{25-25= as String}}
   let a6 = s > nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{24-24= as String}}
   // now the other way
-  let a7 = nsString == s
-  let a8 = nsString != s
+  let a7 = nsString == s as NSString
+  let a8 = nsString != s as NSString
   let a9 = nsString < s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{20-20= as String}}
   let a10 = nsString <= s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
   let a11 = nsString >= s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
@@ -68,12 +68,10 @@ func testStringIsNotASequence(s: String) {
 
 func testStringDeprecation(hello: String) {
   let hello2 = hello
-    .addingPercentEscapes(using: NSUTF8StringEncoding) // expected-warning{{'addingPercentEscapes(using:)' is deprecated}}
+    .addingPercentEscapes(using: .utf8) // expected-warning{{'addingPercentEscapes(using:)' is deprecated}}
 
   _ = hello2?
-    .replacingPercentEscapes(using: NSUTF8StringEncoding) // expected-warning{{'replacingPercentEscapes(using:)' is deprecated}}
-
-
+    .replacingPercentEscapes(using: .utf8) // expected-warning{{'replacingPercentEscapes(using:)' is deprecated}}
 }
 
 // Positive and negative tests for String collection types. Testing the complete

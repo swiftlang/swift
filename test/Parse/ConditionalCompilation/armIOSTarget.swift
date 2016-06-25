@@ -7,7 +7,7 @@
 let i: Int = "Hello"
 #endif
 
-#if arch(arm) && os(iOS) && _runtime(_ObjC)
+#if arch(arm) && os(iOS) && _runtime(_ObjC) && _endian(little)
 class C {}
 var x = C()
 #endif

@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 248; // Last change: [nonatomic] attribute
+const uint16_t VERSION_MINOR = 251; // Last change: SILFunctionType::isPseudogeneric
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -702,6 +702,7 @@ namespace decls_block {
     ParameterConventionField, // callee convention
     SILFunctionTypeRepresentationField, // representation
     BCFixed<1>,            // noreturn?
+    BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // error result?
     BCFixed<30>,           // number of parameters
     BCFixed<30>,           // number of results
@@ -759,6 +760,7 @@ namespace decls_block {
     TypeIDField, // interface type
     BCFixed<1>,  // implicit flag
     AccessibilityKindField // accessibility
+    // Trailed by generic parameters (if any).
   >;
 
   using GenericTypeParamDeclLayout = BCRecordLayout<
@@ -851,6 +853,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // stub implementation?
+    BCFixed<1>,  // throws?
     CtorInitializerKindField,  // initializer kind
     TypeIDField, // type (signature)
     TypeIDField, // type (interface)
@@ -904,6 +907,7 @@ namespace decls_block {
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // mutating?
     BCFixed<1>,   // has dynamic self?
+    BCFixed<1>,   // throws?
     BCVBR<5>,     // number of parameter patterns
     TypeIDField,  // type (signature)
     TypeIDField,  // interface type
@@ -1371,14 +1375,6 @@ namespace decls_block {
     BCVBR<5>,   // number of bytes in rename string
     BCVBR<5>,   // number of bytes in message string
     BCBlob      // rename, followed by message
-  >;
-
-  using WarnUnusedResultDeclAttrLayout = BCRecordLayout<
-    WarnUnusedResult_DECL_ATTR,
-    BCFixed<1>, // implicit flag
-    BCVBR<6>,  // index at the end of the message,
-    BCBlob     // blob contains the message and mutating-version
-               // strings, separated by the prior index
   >;
 
   using SpecializeDeclAttrLayout = BCRecordLayout<

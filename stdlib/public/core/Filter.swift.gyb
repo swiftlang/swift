@@ -1,4 +1,4 @@
-//===--- Filter.swift.gyb -------------------------------------------------===//
+//===--- Filter.swift.gyb -------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -26,12 +26,13 @@ from gyb_stdlib_support import (
 public struct LazyFilterIterator<
   Base : IteratorProtocol
 > : IteratorProtocol, Sequence {
-  /// Advances to the next element and returns it, or `nil` if no next
-  /// element exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made, and no preceding call to `self.next()`
-  ///   has returned `nil`.
+  ///   since the copy was made.
   public mutating func next() -> Base.Element? {
     while let n = _base.next() {
       if _predicate(n) {
@@ -113,7 +114,6 @@ public struct LazyFilterIndex<Base : Collection> : Comparable {
   public let base: Base.Index
 }
 
-@warn_unused_result
 public func == <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -121,7 +121,6 @@ public func == <Base : Collection>(
   return lhs.base == rhs.base
 }
 
-@warn_unused_result
 public func != <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -129,7 +128,6 @@ public func != <Base : Collection>(
   return lhs.base != rhs.base
 }
 
-@warn_unused_result
 public func < <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -137,7 +135,6 @@ public func < <Base : Collection>(
   return lhs.base < rhs.base
 }
 
-@warn_unused_result
 public func <= <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -145,7 +142,6 @@ public func <= <Base : Collection>(
   return lhs.base <= rhs.base
 }
 
-@warn_unused_result
 public func >= <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -153,7 +149,6 @@ public func >= <Base : Collection>(
   return lhs.base >= rhs.base
 }
 
-@warn_unused_result
 public func > <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -215,19 +210,16 @@ public struct ${Self}<
     return LazyFilterIndex(base: index)
   }
 
-  /// The collection's "past the end" position.
+  /// The collection's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `index(after:)`.
-  ///
-  /// - Complexity: O(1).
+  /// `endIndex` is always reachable from `startIndex` by zero or more
+  /// applications of `index(after:)`.
   public var endIndex: Index {
     return LazyFilterIndex(base: _base.endIndex)
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     var i = i
     formIndex(after: &i)
@@ -245,7 +237,6 @@ public struct ${Self}<
   }
 
 %   if Traversal == 'Bidirectional':
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     var i = i
     formIndex(before: &i)
@@ -306,7 +297,6 @@ extension LazySequenceProtocol {
   ///   the result is used. No buffering storage is allocated and each
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
-  @warn_unused_result
   public func filter(
     _ predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
@@ -328,7 +318,6 @@ extension LazyCollectionProtocol
   ///   the result is used. No buffering storage is allocated and each
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
-  @warn_unused_result
   public func filter(
     _ predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilter${collectionForTraversal(Traversal)}<Self.Elements> {

@@ -55,6 +55,7 @@ namespace SourceKit {
   typedef RefPtr<ImmutableTextSnapshot> ImmutableTextSnapshotRef;
   class SwiftASTManager;
   class SwiftLangSupport;
+  class Context;
 
 class SwiftEditorDocument :
     public ThreadSafeRefCountedBase<SwiftEditorDocument> {
@@ -250,6 +251,9 @@ public:
   static SourceKit::UIdent getUIDForSymbol(swift::index::SymbolKind kind,
                                            swift::index::SymbolSubKindSet subKinds,
                                            bool isRef);
+
+  static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
+
 
   static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 

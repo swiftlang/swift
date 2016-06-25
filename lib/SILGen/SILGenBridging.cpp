@@ -13,6 +13,7 @@
 #include "SILGenFunction.h"
 #include "RValue.h"
 #include "Scope.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -56,14 +57,14 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   auto witnessRef = gen.emitGlobalFunctionRef(loc, witnessConstant);
 
   // Determine the substitutions.
-  ArrayRef<Substitution> substitutions;
   auto witnessFnTy = witnessRef->getType();
 
-  if (auto valueTypeBGT = swiftValueType->getAs<BoundGenericType>()) {
-    // Compute the substitutions.
-    substitutions = valueTypeBGT->getSubstitutions(gen.SGM.SwiftModule,
-                                                   nullptr);
+  // Compute the substitutions.
+  ArrayRef<Substitution> substitutions =
+      swiftValueType->gatherAllSubstitutions(
+          gen.SGM.SwiftModule, nullptr);
 
+  if (!substitutions.empty()) {
     // Substitute into the witness function tye.
     witnessFnTy = witnessFnTy.substGenericArgs(gen.SGM.M, substitutions);
   }
@@ -99,15 +100,12 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
   auto witnessRef = gen.emitGlobalFunctionRef(loc, witnessConstant);
 
   // Determine the substitutions.
-  ArrayRef<Substitution> substitutions;
   auto witnessFnTy = witnessRef->getType().castTo<SILFunctionType>();
 
   Type swiftValueType = conformance->getType();
-  if (auto valueTypeBGT = swiftValueType->getAs<BoundGenericType>()) {
-    // Compute the substitutions.
-    substitutions = valueTypeBGT->getSubstitutions(gen.SGM.SwiftModule,
-                                                   nullptr);
-  }
+  ArrayRef<Substitution> substitutions =
+      swiftValueType->gatherAllSubstitutions(
+          gen.SGM.SwiftModule, nullptr);
 
   // Substitute into the witness function type.
   if (!substitutions.empty())
@@ -311,37 +309,57 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // Build the invoke function signature. The block will capture the original
   // function value.
   auto fnTy = fn.getType().castTo<SILFunctionType>();
+  auto fnInterfaceTy = cast<SILFunctionType>(CanType(
+    ArchetypeBuilder::mapTypeOutOfContext(SGM.M.getSwiftModule(),
+                                          F.getContextGenericParams(),
+                                          fnTy)));
+  auto blockInterfaceTy = cast<SILFunctionType>(CanType(
+    ArchetypeBuilder::mapTypeOutOfContext(SGM.M.getSwiftModule(),
+                                          F.getContextGenericParams(),
+                                          blockTy)));
+
   auto storageTy = SILBlockStorageType::get(fnTy);
+  auto storageInterfaceTy = SILBlockStorageType::get(fnInterfaceTy);
 
   // Build the invoke function type.
   SmallVector<SILParameterInfo, 4> params;
-  params.push_back(SILParameterInfo(storageTy,
+  params.push_back(SILParameterInfo(storageInterfaceTy,
                                  ParameterConvention::Indirect_InoutAliasable));
-  std::copy(blockTy->getParameters().begin(),
-            blockTy->getParameters().end(),
+  std::copy(blockInterfaceTy->getParameters().begin(),
+            blockInterfaceTy->getParameters().end(),
             std::back_inserter(params));
 
+  // The block invoke function must be pseudogeneric. This should be OK for now
+  // since a bridgeable function's parameters and returns should all be
+  // trivially representable in ObjC so not need to exercise the type metadata.
+  //
+  // Ultimately we may need to capture generic parameters in block storage, but
+  // that will require a redesign of the interface to support dependent-layout
+  // context. Currently we don't capture anything directly into a block but a
+  // Swift closure, but that's totally dumb.
   auto invokeTy =
-    SILFunctionType::get(nullptr,
+    SILFunctionType::get(F.getLoweredFunctionType()->getGenericSignature(),
                      SILFunctionType::ExtInfo()
                        .withRepresentation(SILFunctionType::Representation::
-                                           CFunctionPointer),
+                                           CFunctionPointer)
+                       .withIsPseudogeneric(),
                      ParameterConvention::Direct_Unowned,
                      params,
-                     blockTy->getAllResults(),
-                     blockTy->getOptionalErrorResult(),
+                     blockInterfaceTy->getAllResults(),
+                     blockInterfaceTy->getOptionalErrorResult(),
                      getASTContext());
 
   // Create the invoke function. Borrow the mangling scheme from reabstraction
   // thunks, which is what we are in spirit.
-  auto thunk = SGM.getOrCreateReabstractionThunk(nullptr,
+  auto thunk = SGM.getOrCreateReabstractionThunk(F.getContextGenericParams(),
                                                  invokeTy,
-                                                 fnTy,
-                                                 blockTy,
+                                                 fnInterfaceTy,
+                                                 blockInterfaceTy,
                                                  F.isFragile());
 
   // Build it if necessary.
   if (thunk->empty()) {
+    thunk->setContextGenericParams(F.getContextGenericParams());
     SILGenFunction thunkSGF(SGM, *thunk);
     auto loc = RegularLocation::getAutoGeneratedLocation();
     buildFuncToBlockInvokeBody(thunkSGF, loc, blockTy, storageTy, fnTy);
@@ -356,8 +374,10 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // reference.
   B.createStore(loc, fn.getValue(), capture);
   auto invokeFn = B.createFunctionRef(loc, thunk);
+  
   auto stackBlock = B.createInitBlockStorageHeader(loc, storage, invokeFn,
-                                      SILType::getPrimitiveObjectType(blockTy));
+                                      SILType::getPrimitiveObjectType(blockTy),
+                                      getForwardingSubstitutions());
 
   // Copy the block so we have an independent heap object we can hand off.
   auto heapBlock = B.createCopyBlock(loc, stackBlock);
@@ -1040,9 +1060,6 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     };
 
     {
-      GenericContextScope genericScope(SGM.Types,
-                                       foreignFnTy->getGenericSignature());
-
       for (unsigned nativeParamIndex : indices(params)) {
         // Bring the parameter to +1.
         auto paramValue = params[nativeParamIndex];
@@ -1091,7 +1108,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         }
 
         auto foreignParam = foreignFnTy->getParameters()[foreignArgIndex++];
-        SILType foreignArgTy = foreignParam.getSILType();
+        SILType foreignArgTy = F.mapTypeIntoContext(foreignParam.getSILType());
         auto bridged = emitNativeToBridgedValue(fd, param,
                                 SILFunctionTypeRepresentation::CFunctionPointer,
                                 foreignArgTy.getSwiftRValueType());

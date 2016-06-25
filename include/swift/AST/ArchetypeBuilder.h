@@ -327,7 +327,7 @@ public:
   ArrayRef<ArchetypeType *> getAllArchetypes();
   
   /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(DeclContext *dc, Type type,
+  static Type mapTypeIntoContext(const DeclContext *dc, Type type,
                                  LazyResolver *resolver = nullptr);
 
   /// Map an interface type to a contextual type.
@@ -337,7 +337,7 @@ public:
                                  LazyResolver *resolver = nullptr);
 
   /// Map a contextual type to an interface type.
-  static Type mapTypeOutOfContext(DeclContext *dc, Type type);
+  static Type mapTypeOutOfContext(const DeclContext *dc, Type type);
 
   /// Map a contextual type to an interface type.
   static Type mapTypeOutOfContext(ModuleDecl *M,

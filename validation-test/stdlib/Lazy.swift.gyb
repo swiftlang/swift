@@ -9,11 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/Lazy.swift
-// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-build-swift %t/Lazy.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -57,25 +53,6 @@ LazyTestSuite.test("Repeated") {
 // FIXME: trap tests.
 
 //===----------------------------------------------------------------------===//
-// CollectionOfOne
-//===----------------------------------------------------------------------===//
-
-// Check that the generic parameter is called 'Element'.
-extension CollectionOfOne where Element : TestProtocol1 {
-  var _elementIsTestProtocol1: Bool {
-    fatalError("not implemented")
-  }
-}
-
-LazyTestSuite.test("CollectionOfOne") {
-  checkRandomAccessCollection(
-    [ OpaqueValue(42) ],
-    CollectionOfOne(OpaqueValue(42))) { $0.value == $1.value }
-}
-
-// FIXME: trap tests.
-
-//===----------------------------------------------------------------------===//
 // IteratorOverOne
 //===----------------------------------------------------------------------===//
 
@@ -99,6 +76,117 @@ LazyTestSuite.test("IteratorOverOne") {
 }
 
 //===----------------------------------------------------------------------===//
+// CollectionOfOne
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Element'.
+extension CollectionOfOne where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+LazyTestSuite.test("CollectionOfOne") {
+  let c = CollectionOfOne(OpaqueValue(42))
+  expectEqual(0, c.startIndex)
+  expectEqual(1, c.endIndex)
+  expectEqual(0..<1, c.indices)
+
+  checkRandomAccessCollection(
+    [ OpaqueValue(42) ], c) { $0.value == $1.value }
+}
+
+LazyTestSuite.test("CollectionOfOne/AssociatedTypes") {
+  typealias Subject = CollectionOfOne<OpaqueValue<Int>>
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: IteratorOverOne<OpaqueValue<Int>>.self,
+    subSequenceType: MutableRandomAccessSlice<Subject>.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
+
+% for (name, operation, indices) in [
+%   ('index(after:)', '_ = c.index(after: i)', '-2, -1, 1, 2'),
+%   ('index(before:)', '_ = c.index(before: i)', '-1, 0, 2'),
+%   ('subscript(Index)/Get', '_ = c[i]', '-2, -1, 1, 2'),
+%   ('subscript(Index)/Set', 'c[i] = OpaqueValue(42)', '-2, -1, 1, 2'),
+% ]:
+LazyTestSuite.test("CollectionOfOne/${name}")
+  .forEach(in: [${indices}]) {
+  i in
+
+  var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  expectCrashLater()
+  ${operation}
+}
+% end
+
+LazyTestSuite.test("CollectionOfOne/index(after:), index(before:)") {
+  let c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  expectEqual(1, c.index(after: 0))
+  expectEqual(0, c.index(before: 1))
+}
+
+LazyTestSuite.test("CollectionOfOne/subscript(Index)/Get/Set/NoTrap") {
+  var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  c[0] = OpaqueValue(4242)
+  expectEqual(4242, c[0].value)
+  expectEqualSequence([OpaqueValue(4242)], c) { $0.value == $1.value }
+}
+
+% for (name, operation) in [
+%   ('subscript(Range<Index>)/Get', '_ = c[r]'),
+%   ('subscript(Range<Index>)/Set', 'c[r] = slice'),
+% ]:
+LazyTestSuite.test("CollectionOfOne/${name}/Trap")
+  .forEach(in: [
+    -1 ..< -1, -1..<0, -1..<1, 1..<2, 2..<2,
+  ] as [Range<Int>]) {
+  r in
+  var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  let slice = r.count == 0 ? c[0..<0] : c[0..<1]
+  expectCrashLater()
+  ${operation}
+}
+% end
+
+LazyTestSuite.test("CollectionOfOne/subscript(Range<Index>)/Set/DifferentLength/Trap")
+  .forEach(in: [ 0..<0, 0..<1, 1..<1 ] as [Range<Int>]) {
+  r in
+  var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  let slice = r.count == 0 ? c[0..<1] : c[0..<0]
+  expectCrashLater()
+  c[r] = slice
+}
+
+LazyTestSuite.test("CollectionOfOne/subscript(Range<Index>)/Get/Set/Empty/NoTrap") {
+  var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  let slice0 = c[0..<0]
+  let slice1 = c[1..<1]
+  checkRandomAccessCollection([], slice0) { $0.value == $1.value }
+  checkRandomAccessCollection([], slice1) { $0.value == $1.value }
+  c[0..<0] = slice0
+  c[0..<0] = slice1
+  c[1..<1] = slice0
+  c[1..<1] = slice1
+  expectEqualSequence([OpaqueValue(42)], c) { $0.value == $1.value }
+}
+
+LazyTestSuite.test("CollectionOfOne/{CustomDebugStringConvertible,CustomReflectable}") {
+  let c = CollectionOfOne(CustomPrintableValue(42))
+  expectPrinted("CollectionOfOne((value: 42).debugDescription)", c)
+  expectDebugPrinted("CollectionOfOne((value: 42).debugDescription)", c)
+  expectDumped(
+    "▿ CollectionOfOne((value: 42).debugDescription)\n" +
+    "  ▿ element: (value: 42).debugDescription\n" +
+    "    - value: 42\n" +
+    "    - identity: 0\n",
+    c)
+}
+
+//===----------------------------------------------------------------------===//
 // EmptyCollection
 //===----------------------------------------------------------------------===//
 
@@ -116,6 +204,15 @@ LazyTestSuite.test("EmptyCollection") {
   expectEqual(0..<0, c.indices)
 
   checkRandomAccessCollection([], c) { $0.value == $1.value }
+}
+
+LazyTestSuite.test("EmptyCollection/CustomReflectable") {
+  let c = EmptyCollection<OpaqueValue<Int>>()
+  expectPrinted("EmptyCollection<OpaqueValue<Int>>()", c)
+  expectDebugPrinted("Swift.EmptyCollection<StdlibUnittest.OpaqueValue<Swift.Int>>()", c)
+  expectDumped(
+    "- Swift.EmptyCollection<StdlibUnittest.OpaqueValue<Swift.Int>>\n",
+    c)
 }
 
 LazyTestSuite.test("EmptyCollection/Equatable") {

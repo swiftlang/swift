@@ -91,9 +91,7 @@ class F: D {
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuo
 // CHECK:         [[WRAP_X:%.*]] = enum $Optional<B>
-// CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
-// CHECK:         apply [[FORCE_UNWRAP_FN]]<B>([[UNWRAP_Y_ADDR:%[0-9]*]],
-// CHECK:         [[UNWRAP_Y:%.*]] = load [[UNWRAP_Y_ADDR]]
+// CHECK:         [[UNWRAP_Y:%.*]] = unchecked_enum_data
 // CHECK:         [[RES:%.*]] = apply {{%.*}}([[WRAP_X]], [[UNWRAP_Y]], %2, %3)
 // CHECK:         [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]
 // CHECK:         return [[WRAP_RES]]
@@ -131,11 +129,11 @@ class Y: X<D> {
 // optional.
 
 class Foo {
-  func foo(x: Int -> Int) -> (Int -> Int)? {}
+  func foo(x: (Int) -> Int) -> ((Int) -> Int)? {}
 }
 
 class Bar: Foo {
-  override func foo(x: (Int -> Int)?) -> Int -> Int {}
+  override func foo(x: ((Int) -> Int)?) -> (Int) -> Int {}
 }
 
 // rdar://problem/21364764
@@ -151,7 +149,7 @@ class Aap {
 
   func flip() -> (() -> S?) {}
 
-  func map() -> S -> () -> Aap? {}
+  func map() -> (S) -> () -> Aap? {}
 }
 
 class Noot : Aap {
@@ -163,7 +161,7 @@ class Noot : Aap {
 
   override func flip() -> (() -> S) {}
 
-  override func map() -> S? -> () -> Noot {}
+  override func map() -> (S?) -> () -> Noot {}
 }
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks3Bar3foo{{.*}} : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<Int -> Int>

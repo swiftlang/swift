@@ -63,7 +63,7 @@ func iuoContext() -> Foo! {
 
 // Favor the outermost type if the member appears at multiple levels of
 // unwrapping.
-func nestedOptContext() -> Foo!? {
+func nestedOptContext() -> Foo?? {
   return .none
 }
 

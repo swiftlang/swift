@@ -66,7 +66,7 @@ public:
     if (requirements.empty()) return;
 
     auto subs = type->castTo<BoundGenericType>()
-                    ->getSubstitutions(IGM.getSwiftModule(), nullptr);
+                    ->gatherAllSubstitutions(IGM.getSwiftModule(), nullptr);
     requirements.enumerateFulfillments(IGM, subs,
                     [&](unsigned reqtIndex, CanType argType,
                         Optional<ProtocolConformanceRef> conf) {

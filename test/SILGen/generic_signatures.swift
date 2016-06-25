@@ -77,7 +77,7 @@ func concreteJungle<T where T : Fooable, T.Foo == C>(t: T.Foo) -> C {
   return c
 }
 
-func concreteJungle<T where T : Fooable, T.Foo == C>(f: T.Foo -> C) -> T.Foo {
-  let ff: C -> T.Foo = f
+func concreteJungle<T where T : Fooable, T.Foo == C>(f: (T.Foo) -> C) -> T.Foo {
+  let ff: (C) -> T.Foo = f
   return ff(C())
 }

@@ -210,13 +210,15 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   auto moduleDC = parentDecl->getModuleContext();
 
   DeclName name(C, C.Id_EqualsOperator, params);
-  auto eqDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
-                           SourceLoc(), name,
-                           SourceLoc(), SourceLoc(), SourceLoc(),
-                           genericParams,
-                           Type(), params,
-                           TypeLoc::withoutLoc(boolTy),
-                           &moduleDC->getDerivedFileUnit());
+  auto eqDecl =
+    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+                     /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
+                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     genericParams,
+                     params, Type(),
+                     TypeLoc::withoutLoc(boolTy),
+                     &moduleDC->getDerivedFileUnit());
   eqDecl->setImplicit();
   eqDecl->getAttrs().add(new (C) InfixAttr(/*implicit*/false));
   auto op = C.getStdlibModule()->lookupInfixOperator(C.Id_EqualsOperator);
@@ -246,6 +248,8 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   // Compute the interface type.
   Type interfaceTy;
   if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
+    eqDecl->setGenericSignature(genericSig);
+
     auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
     TupleTypeElt ifaceParamElts[] = {
       enumIfaceTy, enumIfaceTy,
@@ -360,7 +364,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     return nullptr;
   }
   
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
+  auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC);
   
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
@@ -368,10 +372,13 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   };
   
   FuncDecl *getterDecl =
-      FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                       Identifier(), SourceLoc(), SourceLoc(), SourceLoc(),
-                       nullptr, Type(), params, TypeLoc::withoutLoc(intType),
-                       parentDC);
+      FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+                       /*FuncLoc=*/SourceLoc(),
+                       Identifier(), /*NameLoc=*/SourceLoc(),
+                       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                       /*AccessorKeywordLoc=*/SourceLoc(),
+                       /*GenericParams=*/nullptr, params,
+                       Type(), TypeLoc::withoutLoc(intType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(deriveBodyHashable_enum_hashValue);
 
@@ -392,10 +399,11 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   // Compute the interface type of hashValue().
   Type interfaceType;
   Type selfIfaceType = getterDecl->computeInterfaceSelfType(false);
-  if (auto sig = parentDC->getGenericSignatureOfContext())
+  if (auto sig = parentDC->getGenericSignatureOfContext()) {
+    getterDecl->setGenericSignature(sig);
     interfaceType = GenericFunctionType::get(sig, selfIfaceType, methodType,
                                              AnyFunctionType::ExtInfo());
-  else
+  } else
     interfaceType = FunctionType::get(selfType, methodType);
   
   getterDecl->setInterfaceType(interfaceType);

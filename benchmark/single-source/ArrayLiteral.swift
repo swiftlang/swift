@@ -23,7 +23,7 @@ func makeArray() -> [Int] {
 @inline(never)
 public func run_ArrayLiteral(_ N: Int) {
   for _ in 1...10000*N {
-    makeArray()
+    _ = makeArray()
   }
 }
 

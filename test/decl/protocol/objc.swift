@@ -58,8 +58,8 @@ class C2b : P2 {
 }
 
 @objc protocol P3 {
-  optional func doSomething(x: Int)
-  optional func doSomething(y: Int)
+  @objc optional func doSomething(x: Int)
+  @objc optional func doSomething(y: Int)
 }
 
 class C3a : P3 {
@@ -69,10 +69,10 @@ class C3a : P3 {
 // Complain about optional requirements that aren't satisfied
 // according to Swift, but would conflict in Objective-C.
 @objc protocol OptP1 {
-  optional func method() // expected-note 2{{requirement 'method()' declared here}}
+  @objc optional func method() // expected-note 2{{requirement 'method()' declared here}}
 
-  optional var property1: ObjCClass { get } // expected-note 2{{requirement 'property1' declared here}}
-  optional var property2: ObjCClass { get set } // expected-note{{requirement 'property2' declared here}}
+  @objc optional var property1: ObjCClass { get } // expected-note 2{{requirement 'property1' declared here}}
+  @objc optional var property2: ObjCClass { get set } // expected-note{{requirement 'property2' declared here}}
 }
 
 @objc class OptC1a : OptP1 { // expected-note 3{{class 'OptC1a' declares conformance to protocol 'OptP1' here}}
@@ -130,6 +130,19 @@ class C4b : P4 {
 // Don't infer when there is an ambiguity.
 class C4_5a : P4, P5 {
   func method(x: Int, y: Int) { }
-  // expected-error@-1{{Objective-C method 'methodWithX:y:' provided by method 'method(x:y:)' does not match the requirement's selector ('foo:bar:')}}
-  // expected-error@-2{{Objective-C method 'methodWithX:y:' provided by method 'method(x:y:)' does not match the requirement's selector ('wibble:wobble:')}}
+  // expected-error@-1{{ambiguous inference of Objective-C name for instance method 'method(x:y:)' ('foo:bar:' vs 'wibble:wobble:')}}
+  // expected-note@-2{{'method(x:y:)' (in protocol 'P4') provides Objective-C name 'foo:bar:'}}{{3-3=@objc(foo:bar:) }}
+  // expected-note@-3{{'method(x:y:)' (in protocol 'P5') provides Objective-C name 'wibble:wobble:'}}{{3-3=@objc(wibble:wobble:) }}
+  // expected-note@-4{{add '@nonobjc' to silence this error}}{{3-3=@nonobjc }}
+  // expected-error@-5{{Objective-C method 'foo:bar:' provided by method 'method(x:y:)' does not match the requirement's selector ('wibble:wobble:')}}
+}
+
+// Don't complain about a selector mismatch in cases where the
+// selector will be inferred.
+@objc protocol P6 {
+  func doSomething(_ sender: AnyObject?) // expected-note{{requirement 'doSomething' declared here}}
+}
+
+class C6a : P6 {
+  func doSomething(sender: AnyObject?) { } // expected-error{{method 'doSomething(sender:)' has different argument names from those required by protocol 'P6' ('doSomething')}}{{20-20=_ }}{{none}}
 }

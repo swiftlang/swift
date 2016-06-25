@@ -85,6 +85,15 @@ swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
 }
 
 swift_typeref_t
+swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
+                                           const char *MangledTypeName,
+                                           uint64_t Length) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TR = Context->readTypeFromMangledName(MangledTypeName, Length);
+  return reinterpret_cast<swift_typeref_t>(TR);
+}
+
+swift_typeref_t
 swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
                                           unsigned Index) {
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
@@ -110,8 +119,12 @@ swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef) {
 
 swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   switch (TI.getKind()) {
-  case TypeInfoKind::Builtin:
+  case TypeInfoKind::Builtin: {
+    auto &BuiltinTI = cast<BuiltinTypeInfo>(TI);
+    if (BuiltinTI.getMangledTypeName() == "Bp")
+      return SWIFT_RAW_POINTER;
     return SWIFT_BUILTIN;
+  }
   case TypeInfoKind::Record: {
     auto &RecordTI = cast<RecordTypeInfo>(TI);
     switch (RecordTI.getRecordKind()) {
@@ -121,14 +134,18 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
       return SWIFT_STRUCT;
     case RecordKind::ThickFunction:
       return SWIFT_THICK_FUNCTION;
-    case RecordKind::Existential:
-      return SWIFT_EXISTENTIAL;
+    case RecordKind::OpaqueExistential:
+      return SWIFT_OPAQUE_EXISTENTIAL;
     case RecordKind::ClassExistential:
       return SWIFT_CLASS_EXISTENTIAL;
+    case RecordKind::ErrorExistential:
+      return SWIFT_ERROR_EXISTENTIAL;
     case RecordKind::ExistentialMetatype:
       return SWIFT_EXISTENTIAL_METATYPE;
     case RecordKind::ClassInstance:
       return SWIFT_CLASS_INSTANCE;
+    case RecordKind::ClosureContext:
+      return SWIFT_CLOSURE_CONTEXT;
     }
   }
   case TypeInfoKind::Reference: {
@@ -237,20 +254,34 @@ swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
 }
 
 int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
-                                        addr_t InstanceAddress,
+                                        swift_addr_t ExistentialAddress,
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *InstanceTypeRef,
-                                        addr_t *StartOfInstanceData) {
-  // TODO
-  return false;
+                                        swift_addr_t *StartOfInstanceData) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
+  auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
+  const TypeRef *InstanceTR = nullptr;
+  RemoteAddress RemoteStartOfInstanceData(nullptr);
+  auto Success = Context->projectExistential(RemoteExistentialAddress,
+                                             ExistentialTR,
+                                             &InstanceTR,
+                                             &RemoteStartOfInstanceData);
+
+  if (Success) {
+    *InstanceTypeRef = reinterpret_cast<swift_typeref_t>(InstanceTR);
+    *StartOfInstanceData = RemoteStartOfInstanceData.getAddressData();
+  }
+
+  return Success;
 }
 
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   if (TR == nullptr) {
-    std::cerr << "<null type reference>\n";
+    std::cout << "<null type reference>\n";
   } else {
-    TR->dump();
+    TR->dump(std::cout);
   }
 }
 
@@ -260,9 +291,9 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto TI = Context->getTypeInfo(TR);
   if (TI == nullptr) {
-    std::cerr << "<null type info>\n";
+    std::cout << "<null type info>\n";
   } else {
-    TI->dump();
+    TI->dump(std::cout);
   }
 }
 
@@ -271,9 +302,9 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto TI = Context->getMetadataTypeInfo(Metadata);
   if (TI == nullptr) {
-    std::cerr << "<null type info>\n";
+    std::cout << "<null type info>\n";
   } else {
-    TI->dump();
+    TI->dump(std::cout);
   }
 }
 
@@ -282,8 +313,19 @@ void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto TI = Context->getInstanceTypeInfo(Object);
   if (TI == nullptr) {
-    std::cerr << "<null type info>\n";
+    std::cout << "<null type info>\n";
   } else {
-    TI->dump();
+    TI->dump(std::cout);
   }
+}
+
+size_t swift_reflection_demangle(const char *MangledName, size_t Length,
+                                 char *OutDemangledName, size_t MaxLength) {
+  if (MangledName == NULL || Length == 0)
+    return 0;
+
+  std::string Mangled(MangledName, Length);
+  auto Demangled = Demangle::demangleTypeAsString(Mangled);
+  strncpy(OutDemangledName, Demangled.c_str(), MaxLength);
+  return Demangled.size();
 }

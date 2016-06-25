@@ -1,21 +1,19 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
-// RUN: %S/../../utils/gyb %s -o %t/main.swift
-// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
-// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control
-// RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Array
+// RUN: %gyb %s -o %t/main.swift
+// RUN: if [ %target-runtime == "objc" ]; then \
+// RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
+// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control; \
+// RUN: else \
+// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Array -Xfrontend -disable-access-control; \
+// RUN: fi
+// RUN: %line-directive %t/main.swift -- %target-run %t/Array
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
-import Darwin
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-
-import StdlibUnittestFoundationExtras
-import Foundation
 
 %{
 all_array_types = ['ContiguousArray', 'ArraySlice', 'Array']
@@ -56,6 +54,9 @@ func withInoutT<T>(_ x: inout T, body: (x: inout T) -> Void) {
 
 % for element_type in ['TestValueTy', 'TestBridgedValueTy']:
 %   for array_type in all_array_types:
+%     if element_type == 'TestBridgedValueTy':
+#if _runtime(_ObjC)
+%     end
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
   var a: ${array_type}<${array_type}<${element_type}>> = [[
@@ -225,8 +226,16 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   expectEqual(90, a[0][8].value)
 }
 
+%     if element_type == 'TestBridgedValueTy':
+#endif // _runtime(_ObjC)
+%     end
 %   end
 % end
+
+#if _runtime(_ObjC)
+import Darwin
+import StdlibUnittestFoundationExtras
+import Foundation
 
 // FIXME: all the tests below are applicable to ArraySlice, too.
 
@@ -302,7 +311,7 @@ class CustomImmutableNSArray : NSArray {
   @objc
   override func countByEnumerating(
     with state: UnsafeMutablePointer<NSFastEnumerationState>,
-    objects: AutoreleasingUnsafeMutablePointer<AnyObject>,
+    objects: AutoreleasingUnsafeMutablePointer<AnyObject?>,
     count: Int
   ) -> Int {
     var theState = state.pointee
@@ -557,10 +566,10 @@ for indexRange in [
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
       numElements: 0, capacity: 16)
     let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
     expectCrashLater()
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(indexRange))
   }
 }
@@ -572,10 +581,10 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
       numElements: 3, capacity: 16)
     let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
     expectCrashLater()
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(indexRange))
   }
 }
@@ -583,7 +592,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
 ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
   let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
-  a.getObjects(
+  a.available_getObjects(
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
   var v: AnyObject = buffer[0]
@@ -830,10 +839,10 @@ for indexRange in [
     let a = getBridgedNSArrayOfValueTypeCustomBridged(
       numElements: 0, capacity: 16)
     let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
     expectCrashLater()
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(indexRange))
   }
 }
@@ -845,10 +854,10 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
     let a = getBridgedNSArrayOfValueTypeCustomBridged(
       numElements: 3, capacity: 16)
     let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
     expectCrashLater()
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(indexRange))
   }
 }
@@ -856,7 +865,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
 ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
   let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
-  a.getObjects(
+  a.available_getObjects(
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
   var v: AnyObject = buffer[0]
@@ -1139,6 +1148,8 @@ ArrayTestSuite.tearDown {
     expectNoLeaksOfObjCDictionaryKeysValues()
   }
 }
+
+#endif // _runtime(_ObjC)
 
 runAllTests()
 

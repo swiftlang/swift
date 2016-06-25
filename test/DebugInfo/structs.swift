@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
+
 // Capture the pointer size from type Int
 // CHECK: %Si = type <{ i[[PTRSIZE:[0-9]+]] }>
 
@@ -7,14 +8,12 @@ struct A {
 }
 
 func test(_ x : A) {
-  var vx = x
+  var _ = x
 }
 // CHECK:    define hidden void @_TF7structs4test
-// CHECK: [[VX:%.*]] = alloca
 // CHECK: [[X_DBG:%.*]] = alloca
 // CHECK: call void @llvm.dbg.declare(metadata {{.*}}* [[X_DBG]], metadata [[X_MD:!.*]], metadata
 // CHECK: ![[A_DI:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "A",{{.*}}identifier
-
 
 class C {
   var lots_of_extra_storage: (Int, Int, Int) = (1, 2, 3)

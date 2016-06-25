@@ -450,11 +450,28 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // If we failed lookup of an operator, check to see it to see if it is
     // because two operators are juxtaposed e.g. (x*-4) that needs whitespace.
     // If so, emit specific diagnostics for it.
-    if (!diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
-      diagnose(Loc, diag::use_unresolved_identifier, Name,
-               UDRE->getName().isOperator())
-        .highlight(UDRE->getSourceRange());
+    if (diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
+      return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
+
+    // TODO: Name will be a compound name if it was written explicitly as
+    // one, but we should also try to propagate labels into this.
+    DeclNameLoc nameLoc = UDRE->getNameLoc();
+
+    performTypoCorrection(DC, UDRE->getRefKind(), Name, Loc, LookupOptions,
+                          Lookup);
+
+    diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
+      .highlight(UDRE->getSourceRange());
+
+    // Note all the correction candidates.
+    for (auto &result : Lookup) {
+      noteTypoCorrection(Name, nameLoc, result);
+    }
+
+    // TODO: consider recovering from here.  We may want some way to suppress
+    // downstream diagnostics, though.
+
     return new (Context) ErrorExpr(UDRE->getSourceRange());
   }
 
@@ -621,12 +638,27 @@ namespace {
     /// node when visited.
     Expr *UnresolvedCtorRebindTarget = nullptr;
 
+    /// The expressions that are direct arguments of call expressions.
+    llvm::SmallPtrSet<Expr *, 4> CallArgs;
+
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // If this is a call, record the argument expression.
+      if (auto call = dyn_cast<CallExpr>(expr)) {
+        CallArgs.insert(call->getArg());
+      }
+
+      // If this is an unresolved member with a call argument (e.g.,
+      // .some(x)), record the argument expression.
+      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
+        if (auto arg = unresolvedMember->getArgument())
+          CallArgs.insert(arg);
+      }
+
       // Local function used to finish up processing before returning. Every
       // return site should call through here.
       auto finish = [&](bool recursive, Expr *expr) {
@@ -858,6 +890,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
 TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
+  // Don't try simplifying a call argument, because we don't want to
+  // simplify away the required ParenExpr/TupleExpr.
+  if (CallArgs.count(E) > 0) return nullptr;
 
   // Fold 'T.Type' or 'T.Protocol' into a metatype when T is a TypeExpr.
   if (auto *MRE = dyn_cast<UnresolvedDotExpr>(E)) {
@@ -1325,8 +1360,6 @@ namespace {
   };
 }
 
-
-
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
@@ -1436,9 +1469,11 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
 Optional<Type> TypeChecker::
 getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
+                                   ConcreteDeclRef &referencedDecl,
                                  FreeTypeVariableBinding allowFreeTypeVariables,
                                    ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+  referencedDecl = nullptr;
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
@@ -1471,6 +1506,11 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   assert(exprType && !exprType->is<ErrorType>() && "erroneous solution?");
   assert(!exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
+
+  // Dig the declaration out of the solution.
+  auto semanticExpr = expr->getSemanticsProvidingExpr();
+  auto topLocator = cs.getConstraintLocator(semanticExpr);
+  referencedDecl = solution.resolveLocatorToDecl(topLocator);
 
   // Recover the original type if needed.
   recoverOriginalType();
@@ -1813,11 +1853,11 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
                        sequenceProto->getDeclaredType(), Locator);
 
-      auto generatorLocator =
+      auto iteratorLocator =
         cs.getConstraintLocator(Locator,
                                 ConstraintLocator::SequenceIteratorProtocol);
       auto elementLocator =
-        cs.getConstraintLocator(generatorLocator,
+        cs.getConstraintLocator(iteratorLocator,
                                 ConstraintLocator::GeneratorElementType);
 
       // Collect constraints from the element pattern.
@@ -1826,48 +1866,58 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       if (!InitType)
         return true;
       
-      // Manually search for the generator witness. If no generator/element pair
+      // Manually search for the iterator witness. If no iterator/element pair
       // exists, solve for them.
-      // FIXME: rename generatorType to iteratorType due to the protocol
-      // renaming
-      Type generatorType;
+      Type iteratorType;
       Type elementType;
       
       NameLookupOptions lookupOptions = defaultMemberTypeLookupOptions;
       if (isa<AbstractFunctionDecl>(cs.DC))
         lookupOptions |= NameLookupFlags::KnownPrivate;
-      auto member = cs.TC.lookupMemberType(cs.DC,
-                                           expr->getType()->getRValueType(),
-                                           tc.Context.Id_Iterator,
-                                           lookupOptions);
+
+      auto sequenceType = expr->getType()->getRValueType();
+
+      // If the sequence type is an existential, we should not attempt to
+      // look up the member type at all, since we cannot represent associated
+      // types of existentials.
+      //
+      // We will diagnose it later.
+      if (!sequenceType->isExistentialType()) {
+        auto member = cs.TC.lookupMemberType(cs.DC,
+                                             sequenceType,
+                                             tc.Context.Id_Iterator,
+                                             lookupOptions);
       
-      if (member) {
-        generatorType = member.front().second;
-        
-        member = cs.TC.lookupMemberType(cs.DC,
-                                        generatorType,
-                                        tc.Context.Id_Element,
-                                        lookupOptions);
-        
-        if (member)
-          elementType = member.front().second;
+        if (member) {
+          iteratorType = member.front().second;
+
+          member = cs.TC.lookupMemberType(cs.DC,
+                                          iteratorType,
+                                          tc.Context.Id_Element,
+                                          lookupOptions);
+
+          if (member)
+            elementType = member.front().second;
+        }
       }
-      
+
+      // If the type lookup failed, just add some constraints we can
+      // try to solve later.
       if (elementType.isNull()) {
       
-        // Determine the generator type of the sequence.
-        generatorType = cs.createTypeVariable(Locator, /*options=*/0);
+        // Determine the iterator type of the sequence.
+        iteratorType = cs.createTypeVariable(Locator, /*options=*/0);
         cs.addConstraint(Constraint::create(
                            cs, ConstraintKind::TypeMember,
-                           SequenceType, generatorType,
-                           tc.Context.Id_Iterator, generatorLocator));
+                           SequenceType, iteratorType,
+                           tc.Context.Id_Iterator, iteratorLocator));
 
-        // Determine the element type of the generator.
+        // Determine the element type of the iterator.
         // FIXME: Should look up the type witness.
         elementType = cs.createTypeVariable(Locator, /*options=*/0);
         cs.addConstraint(Constraint::create(
                            cs, ConstraintKind::TypeMember,
-                           generatorType, elementType,
+                           iteratorType, elementType,
                            tc.Context.Id_Element, elementLocator));
       }
       
@@ -2731,7 +2781,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (toExistential || fromExistential || fromArchetype || toArchetype)
     return CheckedCastKind::ValueCast;
 
-  // Reality check casts between concrete types.
+  // Check for casts between concrete types that cannot succeed.
 
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
   
@@ -2806,14 +2856,25 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
   auto clas = toType->getClassOrBoundGenericClass();
-  if (!clas || !clas->isForeign()) {
-    if (suppressDiagnostics) {
-      return CheckedCastKind::Unresolved;
-    }
-    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
-      .highlight(diagFromRange)
-      .highlight(diagToRange);
+  if (clas && clas->isForeign())
+    return CheckedCastKind::ValueCast;
+  
+  // Don't warn on casts that change the generic parameters of ObjC generic
+  // classes. This may be necessary to force-fit ObjC APIs that depend on
+  // covariance, or for APIs where the generic parameter annotations in the
+  // ObjC headers are inaccurate.
+  if (clas && clas->usesObjCGenericsModel()) {
+    if (fromType->getClassOrBoundGenericClass() == clas)
+      return CheckedCastKind::ValueCast;
   }
+  
+  if (suppressDiagnostics) {
+    return CheckedCastKind::Unresolved;
+  }
+  diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+    .highlight(diagFromRange)
+    .highlight(diagToRange);
+
   return CheckedCastKind::ValueCast;
 }
 

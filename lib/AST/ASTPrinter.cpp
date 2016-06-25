@@ -68,7 +68,7 @@ collectNameTypeMap(Type Ty, const DeclContext *DC) {
     assert(ParamDecls.size() == Args.size());
 
     // Map type parameter names with their instantiating arguments.
-    for (unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
+    for (unsigned I = 0, N = ParamDecls.size(); I < N; I++) {
       (*IdMap)[ParamDecls[I]->getName().str()] = Args[I];
     }
   } while ((BaseTy = BaseTy->getSuperclass(nullptr)));
@@ -1589,6 +1589,10 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
       D->getAttrs().isUnavailable(D->getASTContext()))
     return false;
 
+  // Skip stub declarations used for prior variants of Swift.
+  if (D->getAttrs().isUnavailableInCurrentSwift())
+    return false;
+
   if (Options.ExplodeEnumCaseDecls) {
     if (isa<EnumElementDecl>(D))
       return true;
@@ -2609,7 +2613,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
     });
   }
 
-  if (AFD->isBodyThrowing()) {
+  if (AFD->hasThrows()) {
     if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
       Printer << " " << tok::kw_rethrows;
     else
@@ -3716,6 +3720,9 @@ public:
         break;
       }
     }
+
+    if (info.isPseudogeneric())
+      Printer << "@pseudogeneric ";
 
     if (info.isNoReturn())
       Printer << "@noreturn ";

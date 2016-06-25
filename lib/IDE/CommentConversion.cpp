@@ -447,196 +447,43 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
 // Conversion to Doxygen.
 //===----------------------------------------------------------------------===//
 
-namespace {
-struct CommentToDoxygenConverter {
-  raw_ostream &OS;
-  unsigned PendingNewlines = 1;
+class DoxygenConverter : public MarkupASTVisitor<DoxygenConverter> {
+  llvm::raw_ostream &OS;
+  unsigned Indent;
+  unsigned IsFreshLine : 1;
 
-  CommentToDoxygenConverter(raw_ostream &OS) : OS(OS) {}
-
-  void print(StringRef Text) {
-    for (unsigned i = 0; i != PendingNewlines; ++i) {
-      OS << "\n///";
-      if (i == PendingNewlines - 1)
-        OS << " ";
-    }
-    PendingNewlines = 0;
-    OS << Text;
-  }
-
-  void printNewline() {
-    PendingNewlines++;
-  }
-
-  void printASTNode(const MarkupASTNode *N) {
-    switch (N->getKind()) {
-#define MARKUP_AST_NODE(Id, Parent) \
-case ASTNodeKind::Id: \
-print##Id(cast<Id>(N)); \
-break;
-#define ABSTRACT_MARKUP_AST_NODE(Id, Parent)
-#define MARKUP_AST_NODE_RANGE(Id, FirstId, LastId)
-#include "swift/Markup/ASTNodes.def"
+  void printIndent() {
+    for (unsigned i = 0; i < Indent; ++i) {
+      OS << ' ';
     }
   }
 
-#define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
-  void print##Id(const Id *Field) { \
-    OS << "\\" << #XMLKind << " "; \
-    for (auto Child : Field->getChildren()) \
-      printASTNode(Child); \
-      printNewline(); \
-  }
-#include "swift/Markup/SimpleFields.def"
-
-  void printDocument(const Document *D) {
-    // FIXME: Why keep doing this?
-    llvm_unreachable("Can't print a swift::markup::Document as XML directly");
+  void indent() {
+    Indent += 2;
   }
 
-  void printBlockQuote(const BlockQuote *BQ) {
-    print("<blockquote>");
-    for (const auto *N : BQ->getChildren())
-      printASTNode(N);
-
-    print("</blockquote>");
+  void dedent() {
+    Indent -= 2;
   }
 
-  void printList(const List *BL) {
-    print(BL->isOrdered() ? "<ol>" : "<ul>");
-    for (const auto *I : BL->getChildren())
-      printASTNode(I);
-
-    print(BL->isOrdered() ? "</ol>" : "</ul>");
-  }
-
-  void printItem(const Item *I) {
-    print("<li>");
-    for (const auto *N : I->getChildren())
-      printASTNode(N);
-
-    print("</li>");
-  }
-
-  void printCodeBlock(const CodeBlock *CB) {
-    print("<code>");
-    SmallVector<StringRef, 8> Lines;
-    CB->getLiteralContent().split(Lines, "\n");
-    for (auto Line : Lines) {
-      print(Line);
-      printNewline();
+  void print(StringRef Str) {
+    for (auto c : Str) {
+      if (c == '\n') {
+        IsFreshLine = true;
+      } else {
+        if (IsFreshLine) {
+          printIndent();
+          IsFreshLine = false;
+        }
+      }
+      OS << c;
     }
-    print("</code>");
-  }
-
-  void printCode(const Code *C) {
-    print("<code>");
-    SmallVector<StringRef, 8> Lines;
-    C->getLiteralContent().split(Lines, "\n");
-    for (auto Line : Lines) {
-      print(Line);
-      printNewline();
-    }
-    print("</code>");
-  }
-
-  void printHTML(const HTML *H) {
-    print(H->getLiteralContent().str());
-  }
-
-  void printInlineHTML(const InlineHTML *IH) {
-    print(IH->getLiteralContent().str());
-  }
-
-  void printSoftBreak(const SoftBreak *SB) {
-    printNewline();
-  }
-
-  void printLineBreak(const LineBreak *LB) {
-    print("<br/>");
-    printNewline();
-  }
-
-  void printLink(const Link *L) {
-    SmallString<32> Tag;
-    llvm::raw_svector_ostream S(Tag);
-    S << "<a href=\"" << L->getDestination() << "\">";
-    print(S.str());
-
-    for (const auto N : L->getChildren())
-      printASTNode(N);
-
-    print("</a>");
-  }
-
-  void printImage(const Image *I) {
-    SmallString<64> Tag;
-    llvm::raw_svector_ostream S(Tag);
-    S << "<img src=\"" << I->getDestination() << "\"";
-    if (I->hasTitle())
-      S << " title=\"" << I->getTitle() << "\"";
-    if (I->getChildren().size()) {
-      S << " alt=\"";
-      for (const auto N : I->getChildren())
-        printInlinesUnder(N, S);
-      S << "\"";
-    }
-    S << "\\>";
-    print(S.str());
-  }
-
-  void printParagraph(const Paragraph *P) {
-    for (const auto *N : P->getChildren())
-      printASTNode(N);
-  }
-
-  void printEmphasis(const Emphasis *E) {
-    print("<em>");
-    for (const auto *N : E->getChildren())
-      printASTNode(N);
-
-    print("</em>");
-  }
-
-  void printStrong(const Strong *E) {
-    print("<em>");
-    for (const auto *N : E->getChildren())
-      printASTNode(N);
-
-    print("</em>");
-  }
-
-  void printHRule(const HRule *HR) {
-    print("<hr/>");
-  }
-
-  void printHeader(const Header *H) {
-    llvm::SmallString<4> Tag;
-    llvm::raw_svector_ostream TagStream(Tag);
-    TagStream << "<h" << H->getLevel() << ">";
-    print(TagStream.str());
-    for (auto Child : H->getChildren())
-      printASTNode(Child);
-
-    llvm::SmallString<5> EndTag;
-    llvm::raw_svector_ostream EndTagStream(EndTag);
-    EndTagStream << "</h" << H->getLevel() << ">";
-    print(EndTagStream.str());
-  }
-
-  void printText(const Text *T) {
-    print(T->getLiteralContent().str());
-  }
-
-  void printPrivateExtension(const PrivateExtension *PE) {
-    llvm_unreachable("Can't directly print Doxygen for a Swift Markup PrivateExtension");
   }
 
   void printNestedParamField(const ParamField *PF) {
     auto Parts = PF->getParts().getValue();
     if (Parts.Brief.hasValue()) {
-      printASTNode(Parts.Brief.getValue());
-      printNewline();
+      visit(Parts.Brief.getValue());
     }
 
     if (!Parts.ParamFields.empty()) {
@@ -669,8 +516,7 @@ break;
       print(" returns: ");
 
       for (auto Child : Parts.ReturnsField.getValue()->getChildren()) {
-        printASTNode(Child);
-        printNewline();
+        visit(Child);
       }
     }
 
@@ -681,93 +527,247 @@ break;
       print(" error: ");
 
       for (auto Child : Parts.ThrowsField.getValue()->getChildren()) {
-        printASTNode(Child);
-        printNewline();
+        visit(Child);
       }
     }
 
     for (auto BodyNode : Parts.BodyNodes) {
-      printASTNode(BodyNode);
-      printNewline();
+      visit(BodyNode);
     }
+  }
+
+public:
+  DoxygenConverter(llvm::raw_ostream &OS, unsigned Indent = 0)
+    : OS(OS), Indent(Indent), IsFreshLine(true) {
+    printIndent();
+    print("/**");
+    printNewline();
+    indent();
+  }
+
+  void printNewline() {
+    print("\n");
+  }
+
+  void visitDocument(const Document *D) {
+    for (const auto *Child : D->getChildren())
+      visit(Child);
+  }
+
+  void visitBlockQuote(const BlockQuote *BQ) {
+    print("<blockquote>");
+    printNewline();
+    for (const auto *Child : BQ->getChildren())
+      visit(Child);
+    printNewline();
+    print("</blockquote>");
     printNewline();
   }
 
-  void printParamField(const ParamField *PF) {
+  void visitList(const List *BL) {
+    print(BL->isOrdered() ? "<ol>" : "<ul>");
+    indent();
+    printNewline();
+    for (const auto *Child : BL->getChildren())
+      visit(Child);
+    dedent();
+    print(BL->isOrdered() ? "</ol>" : "</ul>");
+    printNewline();
+  }
+
+  void visitItem(const Item *I) {
+    print("<li>");
+    indent();
+    printNewline();
+    for (const auto *N : I->getChildren())
+      visit(N);
+    dedent();
+    print("</li>");
+    printNewline();
+  }
+
+  void visitCodeBlock(const CodeBlock *CB) {
+    print("\\code");
+    printNewline();
+    print(CB->getLiteralContent());
+    printNewline();
+    print("\\endcode");
+  }
+
+  void visitCode(const Code *C) {
+    print("\\code");
+    printNewline();
+    print(C->getLiteralContent());
+    printNewline();
+    print("\\endcode");
+  }
+
+  void visitHTML(const HTML *H) {
+    print(H->getLiteralContent());
+  }
+
+  void visitInlineHTML(const InlineHTML *IH) {
+    print(IH->getLiteralContent());
+  }
+
+  void visitSoftBreak(const SoftBreak *SB) {
+    printNewline();
+  }
+
+  void visitLineBreak(const LineBreak *LB) {
+    print("<br/>");
+    printNewline();
+  }
+
+  void visitLink(const Link *L) {
+    SmallString<32> Tag;
+    llvm::raw_svector_ostream S(Tag);
+    S << "<a href=\"" << L->getDestination() << "\">";
+    print(S.str());
+    for (const auto *Child : L->getChildren())
+      visit(Child);
+    print("</a>");
+  }
+
+  void visitImage(const Image *I) {
+    SmallString<64> Tag;
+    llvm::raw_svector_ostream S(Tag);
+    S << "<img src=\"" << I->getDestination() << "\"";
+    if (I->hasTitle())
+      S << " title=\"" << I->getTitle() << "\"";
+    if (I->getChildren().size()) {
+      S << " alt=\"";
+      for (const auto *Child : I->getChildren())
+        printInlinesUnder(Child, S);
+      S << "\"";
+    }
+    S << "\\>";
+    print(S.str());
+  }
+
+  void visitParagraph(const Paragraph *P) {
+    for (const auto *Child : P->getChildren())
+      visit(Child);
+    printNewline();
+  }
+
+  void visitEmphasis(const Emphasis *E) {
+    print("<em>");
+    for (const auto *Child : E->getChildren())
+      visit(Child);
+    print("</em>");
+  }
+
+  void visitStrong(const Strong *E) {
+    print("<em>");
+    for (const auto *Child : E->getChildren())
+      visit(Child);
+    print("</em>");
+  }
+
+  void visitHRule(const HRule *HR) {
+    print("<hr/>");
+    printNewline();
+  }
+
+  void visitHeader(const Header *H) {
+    llvm::SmallString<4> Tag;
+    llvm::raw_svector_ostream TagStream(Tag);
+    TagStream << "<h" << H->getLevel() << ">";
+    print(TagStream.str());
+    for (const auto *Child : H->getChildren())
+      visit(Child);
+    llvm::SmallString<5> EndTag;
+    llvm::raw_svector_ostream EndTagStream(EndTag);
+    EndTagStream << "</h" << H->getLevel() << ">";
+    print(EndTagStream.str());
+    printNewline();
+  }
+
+  void visitText(const Text *T) {
+    print(T->getLiteralContent());
+  }
+
+  void visitPrivateExtension(const PrivateExtension *PE) {
+    llvm_unreachable("Can't directly print Doxygen for a Swift Markup PrivateExtension");
+  }
+
+  void visitParamField(const ParamField *PF) {
     print("\\param ");
     print(PF->getName());
     print(" ");
     if (PF->isClosureParameter()) {
       printNestedParamField(PF);
     } else {
-      for (auto Child : PF->getChildren()) {
-        printASTNode(Child);
+      for (const auto *Child : PF->getChildren()) {
+        visit(Child);
       }
     }
     printNewline();
   }
 
-  void printReturnField(const ReturnsField *RF) {
+  void visitReturnField(const ReturnsField *RF) {
     print("\\returns ");
-    print(" ");
-    for (auto Child : RF->getChildren())
-      printASTNode(Child);
-
+    for (const auto *Child : RF->getChildren())
+      visit(Child);
     printNewline();
   }
 
-  void printThrowField(const ThrowsField *TF) {
+  void visitThrowField(const ThrowsField *TF) {
     print("\\param error ");
-    for (auto Child : TF->getChildren())
-      printASTNode(Child);
+    for (const auto *Child : TF->getChildren())
+      visit(Child);
+    printNewline();
+  }
 
+#define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
+  void visit##Id(const Id *Field) { \
+    print(#Keyword); \
+    print(":"); \
+    printNewline(); \
+    for (const auto *Child : Field->getChildren()) \
+      visit(Child); \
+  }
+#include "swift/Markup/SimpleFields.def"
+
+  ~DoxygenConverter() {
+    dedent();
+    print("*/");
     printNewline();
   }
 };
-} // unnamed namespace
 
 void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
                                            raw_ostream &OS) {
-  CommentToDoxygenConverter Converter(OS);
+  DoxygenConverter Converter(OS);
 
   auto Brief = DC->getBrief();
   if (Brief.hasValue()) {
-    SmallString<256> BriefStr;
-    llvm::raw_svector_ostream OS(BriefStr);
-    swift::markup::printInlinesUnder(Brief.getValue(), OS);
-    Converter.print(OS.str());
-    Converter.printNewline();
-    Converter.printNewline();
+    Converter.visit(Brief.getValue());
   }
 
   for (const auto *N : DC->getBodyNodes()) {
     if (const auto *P = dyn_cast<Paragraph>(N)) {
-      Converter.printASTNode(P);
-      Converter.printNewline();
-      Converter.printNewline();
+      Converter.visit(P);
       continue;
     }
-    Converter.printASTNode(N);
-    Converter.printNewline();
+    Converter.visit(N);
   }
 
   for (const auto PF : DC->getParamFields()) {
-    Converter.printParamField(PF);
-    Converter.printNewline();
+    Converter.visit(PF);
   }
 
   auto TF = DC->getThrowsField();
   if (TF.hasValue()) {
-    Converter.printThrowField(TF.getValue());
     Converter.printNewline();
+    Converter.visit(TF.getValue());
   }
 
   auto RF = DC->getReturnsField();
   if (RF.hasValue()) {
-    Converter.printReturnField(RF.getValue());
     Converter.printNewline();
+    Converter.visit(RF.getValue());
   }
-
-  if (Converter.PendingNewlines != 0)
-    OS << "\n";
 }
+

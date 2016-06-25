@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-internal func _writeBackMutableSlice<
+internal func _writeBackMutableSlice<C, Slice_>(
+  _ self_: inout C, bounds: Range<C.Index>, slice: Slice_
+) where
   C : MutableCollection,
-  Slice_ : Collection
-  where
+  Slice_ : Collection,
   C._Element == Slice_.Iterator.Element,
-  C.Index == Slice_.Index
->(_ self_: inout C, bounds: Range<C.Index>, slice: Slice_) {
+  C.Index == Slice_.Index {
 
   self_._failEarlyRangeCheck(bounds, bounds: self_.startIndex..<self_.endIndex)
 
@@ -39,9 +39,9 @@ internal func _writeBackMutableSlice<
 
   _precondition(
     selfElementIndex == selfElementsEndIndex,
-    "Cannot replace a slice of a MutableCollection with a slice of a larger size")
+    "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
   _precondition(
     newElementIndex == newElementsEndIndex,
-    "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
+    "Cannot replace a slice of a MutableCollection with a slice of a larger size")
 }
 

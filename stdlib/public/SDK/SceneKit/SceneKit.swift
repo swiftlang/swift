@@ -11,12 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import SceneKit // Clang module
+import CoreGraphics
+import simd
 
 // MARK: Exposing SCNFloat
 
 #if os(OSX)
 public typealias SCNFloat = CGFloat
-#elseif os(iOS) || os(tvOS)
+#elseif os(iOS) || os(tvOS) || os(watchOS)
 public typealias SCNFloat = Float
 #endif
 
@@ -141,14 +143,18 @@ extension double4x4 {
   }
 }
 
-// MARK: APIs refined for Swift
+// MARK: Swift Extensions
 
 @available(iOS, introduced: 8.0)
 @available(OSX, introduced: 10.8)
 extension SCNGeometryElement {
+  /// Creates an instance from `indices` for a `primitiveType`
+  /// that has a constant number of indices per primitive
+  /// - Precondition: the `primitiveType` must be `.triangles`, `.triangleStrip`, `.line` or `.point`
   public convenience init<IndexType : Integer>(
     indices: [IndexType], primitiveType: SCNGeometryPrimitiveType
   ) {
+    precondition(primitiveType == .triangles || primitiveType == .triangleStrip || primitiveType == .line || primitiveType == .point, "Expected constant number of indices per primitive")
     let indexCount = indices.count
     let primitiveCount: Int
     switch primitiveType {
@@ -160,16 +166,58 @@ extension SCNGeometryElement {
       primitiveCount = indexCount / 2
     case .point:
       primitiveCount = indexCount
+    case .polygon:
+      fatalError("Expected constant number of indices per primitive")
     }
     self.init(
-      data: NSData(bytes: indices, length: indexCount * sizeof(IndexType)),
+      data: Data(bytes: UnsafePointer<UInt8>(indices), count: indexCount * sizeof(IndexType.self)),
       primitiveType: primitiveType,
       primitiveCount: primitiveCount,
-      bytesPerIndex: sizeof(IndexType))
+      bytesPerIndex: sizeof(IndexType.self))
+    _fixLifetime(indices)
   }
 }
 
-@warn_unused_result
+@available(iOS, introduced: 8.0)
+@available(OSX, introduced: 10.8)
+extension SCNGeometrySource {
+  public convenience init(vertices: [SCNVector3]) {
+    self.init(vertices: UnsafePointer(vertices), count: vertices.count)
+  }
+  public convenience init(normals: [SCNVector3]) {
+    self.init(normals: UnsafePointer(normals), count: normals.count)
+  }
+  public convenience init(textureCoordinates: [CGPoint]) {
+    self.init(textureCoordinates: UnsafePointer(textureCoordinates), count: textureCoordinates.count)
+  }
+}
+
+@available(iOS, introduced: 8.0)
+@available(OSX, introduced: 10.10)
+extension SCNBoundingVolume {
+  public var boundingBox: (min: SCNVector3, max: SCNVector3) {
+    get {
+      var min = SCNVector3Zero
+      var max = SCNVector3Zero
+      getBoundingBoxMin(&min, max: &max)
+      return (min: min, max: max)
+    }
+    set {
+      var min = newValue.min
+      var max = newValue.max
+      setBoundingBoxMin(&min, max: &max)
+    }
+  }
+  public var boundingSphere: (center: SCNVector3, radius: Float) {
+    var center = SCNVector3Zero
+    var radius = CGFloat(0.0)
+    getBoundingSphereCenter(&center, radius: &radius)
+    return (center: center, radius: Float(radius))
+  }
+}
+
+// MARK: APIs refined for Swift
+
 @_silgen_name("SCN_Swift_SCNSceneSource_entryWithIdentifier")
 internal func SCN_Swift_SCNSceneSource_entryWithIdentifier(
   _ self_: AnyObject,
@@ -179,10 +227,9 @@ internal func SCN_Swift_SCNSceneSource_entryWithIdentifier(
 @available(iOS, introduced: 8.0)
 @available(OSX, introduced: 10.8)
 extension SCNSceneSource {
-  @warn_unused_result
   public func entryWithIdentifier<T>(_ uid: String, withClass entryClass: T.Type) -> T? {
     return SCN_Swift_SCNSceneSource_entryWithIdentifier(
-      self, uid, entryClass as! AnyObject) as! T?
+      self, uid as NSString, entryClass as! AnyObject) as! T?
   }
 }
 

@@ -5,26 +5,16 @@
 
 import Foundation
 
-extension NSDecimal {
-  init?(_ string: String) {
-    self.init()
-    let scanner = NSScanner(string: string)
-    if !scanner.scanDecimal(&self) {
-      return nil
-    }
-  }
-}
-
 enum NSDecimalResult: StringLiteralConvertible, Equatable, CustomStringConvertible {
-  case Some(NSDecimal)
-  case Error(NSCalculationError)
+  case Some(Decimal)
+  case Error(Decimal.CalculationError)
   
   init() {
-    self = .Some(NSDecimal())
+    self = .Some(Decimal())
   }
   
   init(stringLiteral: String) {
-    if let value = NSDecimal(stringLiteral) {
+    if let value = Decimal(string: stringLiteral) {
       self = .Some(value)
     } else {
       self = .Error(.lossOfPrecision)
@@ -50,9 +40,9 @@ enum NSDecimalResult: StringLiteralConvertible, Equatable, CustomStringConvertib
   func pow10(_ power: Int) -> NSDecimalResult {
     switch self {
     case .Some(var decimal):
-      var result = NSDecimal()
+      var result = Decimal()
       let error = NSDecimalMultiplyByPowerOf10(&result, &decimal, Int16(power),
-                                               .roundPlain)
+                                               .plain)
       if error != .noError {
         return .Error(error)
       } else {
@@ -77,8 +67,8 @@ func ==(x: NSDecimalResult, y: NSDecimalResult) -> Bool {
 func +(x: NSDecimalResult, y: NSDecimalResult) -> NSDecimalResult {
   switch (x, y) {
   case var (.Some(x1), .Some(y1)):
-    var result = NSDecimal()
-    let error = NSDecimalAdd(&result, &x1, &y1, .roundPlain)
+    var result = Decimal()
+    let error = NSDecimalAdd(&result, &x1, &y1, .plain)
     if error != .noError {
       return .Error(error)
     } else {

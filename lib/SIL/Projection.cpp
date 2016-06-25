@@ -875,25 +875,11 @@ createProjection(SILBuilder &B, SILLocation Loc, SILValue Arg) const {
   return Proj->createProjection(B, Loc, Arg);
 }
 
-std::string
-ProjectionTreeNode::getNameEncoding(const ProjectionTree &PT) const {
-  std::string Encoding;
-  const ProjectionTreeNode *Node = this;
-  while (Node) {
-    if (Node->isRoot())
-      break;
-    Encoding += std::to_string(Node->Proj->getIndex());
-    Node = Node->getParent(PT);
-  }
-  return Encoding;
-}
-
 void
 ProjectionTreeNode::
 processUsersOfValue(ProjectionTree &Tree,
                     llvm::SmallVectorImpl<ValueNodePair> &Worklist,
-                    SILValue Value, LivenessKind Kind,
-                    llvm::DenseSet<SILInstruction *> &Releases) {
+                    SILValue Value) {
   DEBUG(llvm::dbgs() << "    Looking at Users:\n");
 
   // For all uses of V...
@@ -911,13 +897,6 @@ processUsersOfValue(ProjectionTree &Tree,
     if (!P.isValid()) {
       DEBUG(llvm::dbgs() << "            Failed to create projection. Adding "
             "to non projection user!\n");
-      // Is the user an epilogue release ?
-      if (Kind == IgnoreEpilogueReleases) {
-        bool EpilogueReleaseUser = !Releases.empty();
-        EpilogueReleaseUser &= Releases.find(User) != Releases.end();
-        if (EpilogueReleaseUser)
-          continue;
-      }
       addNonProjectionUser(Op);
       continue;
     }
@@ -949,12 +928,6 @@ processUsersOfValue(ProjectionTree &Tree,
       // The only projection which we do not currently handle are enums since we
       // may not know the correct case. This can be extended in the future.
       // Is the user an epilogue release ?
-      if (Kind == IgnoreEpilogueReleases) {
-        bool EpilogueReleaseUser = !Releases.empty();
-        EpilogueReleaseUser &= Releases.find(User) != Releases.end();
-        if (EpilogueReleaseUser)
-          continue;
-      }
       addNonProjectionUser(Op);
     }
   }
@@ -1156,22 +1129,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 ProjectionTree::
-ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA, SILType BaseTy) 
-  : Mod(Mod), Allocator(BPA),
-    Kind(ProjectionTreeNode::LivenessKind::NormalUseLiveness) {
-  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy);
-
-  // Create the root node of the tree with our base type.
-  createRoot(BaseTy);
-
-  // Create the rest of the type tree lazily based on uses.
-}
-
-ProjectionTree::
-ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA, SILType BaseTy,
-               ProjectionTreeNode::LivenessKind Kind,
-               llvm::DenseSet<SILInstruction *> Insts)
-  : Mod(Mod), Allocator(BPA), Kind(Kind), EpilogueReleases(Insts) {
+ProjectionTree(SILModule &Mod, SILType BaseTy) : Mod(Mod) {
   DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy);
 
   // Create the root node of the tree with our base type.
@@ -1183,25 +1141,6 @@ ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA, SILType BaseTy,
 ProjectionTree::~ProjectionTree() {
   // Do nothing !. Eventually the all the projection tree nodes will be freed
   // when the BPA allocator is free.
-}
-
-void
-ProjectionTree::initializeWithExistingTree(const ProjectionTree &PT) {
-  Kind = PT.Kind;
-  EpilogueReleases = PT.EpilogueReleases;
-  LiveLeafIndices = PT.LiveLeafIndices;
-  for (const auto &N : PT.ProjectionTreeNodes) {
-    ProjectionTreeNodes.push_back(new (Allocator) ProjectionTreeNode(*N));
-  }
-}
-
-std::string ProjectionTree::getNameEncoding() const {
-  std::string Encoding;
-  for (unsigned index : LiveLeafIndices) {
-    const ProjectionTreeNode *Node = ProjectionTreeNodes[index];
-    Encoding += Node->getNameEncoding(*this);
-  }
-  return Encoding;
 }
 
 SILValue
@@ -1285,7 +1224,7 @@ computeUsesAndLiveness(SILValue Base) {
     // If Value is not null, collate all users of Value the appropriate child
     // nodes and add such items to the worklist.
     if (Value) {
-      Node->processUsersOfValue(*this, UseWorklist, Value, Kind, EpilogueReleases);
+      Node->processUsersOfValue(*this, UseWorklist, Value);
     }
 
     // If this node is live due to a non projection user, propagate down its
@@ -1449,11 +1388,9 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
 
     // Grab the parent of this node.
     ProjectionTreeNode *Parent = Node->getParent(*this);
-    DEBUG(llvm::dbgs() << "        Visiting parent of leaf: " <<
-          Parent->getType() << "\n");
 
     // If the parent is dead, continue.
-    if (!Parent->IsLive) {
+    if (!Parent || !Parent->IsLive) {
       DEBUG(llvm::dbgs() << "        Parent is dead... continuing.\n");
       continue;
     }

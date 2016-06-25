@@ -85,8 +85,3 @@ class HDerived : H {
   override func f(_ x: Int) { }
   override class func f(_ x: Int) { }
 }
-
-// Generic class locally defined in non-generic function (rdar://problem/20116710)
-func f3() {
-  class B<T> {}
-}

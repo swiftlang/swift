@@ -1,7 +1,7 @@
 #ifndef SWIFT_TEST_OBJC_CLASSES_H
 #define SWIFT_TEST_OBJC_CLASSES_H
 
-#import <Foundation/NSObject.h>
+#import <Foundation/NSArray.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -14,9 +14,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property NSInteger t;
 @end
 
-/* This class has a method that doesn't fill in the error properly. */
-@interface NilError : NSObject
-+ (BOOL) throwIt: (NSError**) error;
+@interface TestingNSError : NSObject
++ (BOOL)throwNilError:(NSError**)error;
++ (nullable void *)maybeThrow:(BOOL)shouldThrow error:(NSError **)error;
++ (nullable void (^)(void))blockThrowError:(NSError **)error;
 @end
 
 @interface Container<C> : NSObject
@@ -86,6 +87,12 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 #endif // __has_feature(objc_class_property)
+
+@interface BridgedInitializer<T> : NSObject
+@property (readwrite) NSArray<T> *objects;
+@property (readonly) NSInteger count;
+- (id) initWithArray: (NSArray<T>*) array;
+@end
 
 NS_ASSUME_NONNULL_END
 

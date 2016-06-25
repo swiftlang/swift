@@ -21,8 +21,8 @@ use(x) // expected-error{{unresolved identifier 'x'}}
 
 if let x = nonOptional() { } // expected-error{{initializer for conditional binding must have Optional type, not 'Int'}}
 
-class B {}
-class D : B {}
+class B {} // expected-note * {{did you mean 'B'?}}
+class D : B {}// expected-note * {{did you mean 'D'?}}
 
 // TODO poor recovery in these cases
 if let {} // expected-error {{expected '{' after 'if' condition}}
@@ -36,7 +36,7 @@ if let x = foo() {
 
 if let x = foo() {
   use(x)
-} else if let y = foo() {
+} else if let y = foo() { // expected-note {{did you mean 'y'?}}
   use(x) // expected-error{{unresolved identifier 'x'}}
   use(y)
 } else {
@@ -119,7 +119,7 @@ func testShadowing(_ a: Int?, b: Int?, c: Int?, d: Int?) {
 
 func useInt(_ x: Int) {}
 
-func testWhileScoping(_ a: Int?) {
+func testWhileScoping(_ a: Int?) {// expected-note {{did you mean 'a'?}}
   while let x = a { }
   useInt(x) // expected-error{{use of unresolved identifier 'x'}}
 }

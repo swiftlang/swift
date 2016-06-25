@@ -65,7 +65,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
   for (i, f) in gtr {
     sum = sum + i
     sumf = sumf + f
-    sum = sum + f  // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+    sum = sum + f  // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Float'}} expected-note {{expected an argument list of type '(Int, Int)'}}
   }
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }
@@ -172,3 +172,9 @@ func testOptionalSequence() {
   }
 }
 
+// Crash with (invalid) for each over an existential
+func testExistentialSequence(s: Sequence) { // expected-error {{protocol 'Sequence' can only be used as a generic constraint because it has Self or associated type requirements}}
+  for x in s { // expected-error {{using 'Sequence' as a concrete type conforming to protocol 'Sequence' is not supported}}
+    _ = x
+  }
+}

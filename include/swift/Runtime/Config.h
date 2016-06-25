@@ -30,6 +30,16 @@
 #endif
 #endif
 
+/// Does the current Swift platform use LLVM's intrinsic "swiftcall"
+/// calling convention for Swift functions?
+#ifndef SWIFT_USE_SWIFTCALL
+#ifdef __s390x__
+#define SWIFT_USE_SWIFTCALL 1
+#else
+#define SWIFT_USE_SWIFTCALL 0
+#endif
+#endif
+
 /// Does the current Swift platform allow information other than the
 /// class pointer to be stored in the isa field?  If so, when deriving
 /// the class pointer of an object, we must apply a
@@ -89,6 +99,18 @@
 #define SWIFT_CC_preserve_most __attribute__((preserve_most))
 #define SWIFT_CC_preserve_all  __attribute__((preserve_all))
 #define SWIFT_CC_c
+
+#if SWIFT_USE_SWIFTCALL
+#define SWIFT_CC_swift __attribute__((swiftcall))
+#define SWIFT_CONTEXT __attribute__((swift_context))
+#define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
+#define SWIFT_INDIRECT_RESULT __attribute__((swift_indirect_result))
+#else
+#define SWIFT_CC_swift
+#define SWIFT_CONTEXT
+#define SWIFT_ERROR_RESULT
+#define SWIFT_INDIRECT_RESULT
+#endif
 
 // Map a logical calling convention (e.g. RegisterPreservingCC) to LLVM calling
 // convention.

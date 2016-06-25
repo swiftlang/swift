@@ -14,6 +14,10 @@ import Darwin
 import Glibc
 #endif
 
+func operationCount(_ n: Int) -> Int {
+  return _isDebugAssertConfiguration() ? n/2 : n
+}
+
 final class HeapBool {
   var value: Bool
   init(_ value: Bool) {
@@ -792,39 +796,39 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
 var AtomicIntTestSuite = TestSuite("AtomicInt")
 
 AtomicIntTestSuite.test("fetchAndAdd/1") {
-  runRaceTest(AtomicInt_fetchAndAdd_1_RaceTest.self, operations: 6400)
+  runRaceTest(AtomicInt_fetchAndAdd_1_RaceTest.self, operations: operationCount(6400))
 }
 
 AtomicIntTestSuite.test("fetchAndAdd/ReleaseAtomicStores/1") {
   runRaceTest(
     AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest.self,
-    operations: 12800)
+    operations: operationCount(12800))
 }
 
 AtomicIntTestSuite.test("fetchAndAdd/ReleaseAtomicStores/2") {
   runRaceTest(
     AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest.self,
-    operations: 12800)
+    operations: operationCount(12800))
 }
 
 AtomicIntTestSuite.test("fetchAndAdd/ReleaseNonAtomicStores/1") {
   runRaceTest(
     AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest.self,
-    operations: 25600)
+    operations: operationCount(25600))
 }
 
 AtomicIntTestSuite.test("fetchAndAnd/1") {
-  runRaceTest(AtomicInt_fetchAndAnd_1_RaceTest.self, operations: 6400)
+  runRaceTest(AtomicInt_fetchAndAnd_1_RaceTest.self, operations: operationCount(6400))
 }
 // FIXME: add more tests for fetchAndAnd, like we have for fetchAndAdd.
 
 AtomicIntTestSuite.test("fetchAndOr/1") {
-  runRaceTest(AtomicInt_fetchAndOr_1_RaceTest.self, operations: 6400)
+  runRaceTest(AtomicInt_fetchAndOr_1_RaceTest.self, operations: operationCount(6400))
 }
 // FIXME: add more tests for fetchAndOr, like we have for fetchAndAdd.
 
 AtomicIntTestSuite.test("fetchAndXor/1") {
-  runRaceTest(AtomicInt_fetchAndXor_1_RaceTest.self, operations: 6400)
+  runRaceTest(AtomicInt_fetchAndXor_1_RaceTest.self, operations: operationCount(6400))
 }
 // FIXME: add more tests for fetchAndXor, like we have for fetchAndAdd.
 
@@ -832,7 +836,7 @@ AtomicIntTestSuite.test("fetchAndXor/1") {
 var AtomicARCRefTestSuite = TestSuite("AtomicARCRef")
 
 AtomicARCRefTestSuite.test("initialize,load") {
-  runRaceTest(AtomicInitializeARCRefRaceTest.self, operations: 25600)
+  runRaceTest(AtomicInitializeARCRefRaceTest.self, operations: operationCount(25600))
   expectEqual(0, dummyObjectCount.getSum())
 }
 

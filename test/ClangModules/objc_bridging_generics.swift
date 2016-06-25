@@ -234,6 +234,14 @@ extension AnimalContainer {
     _ = #selector(AnimalContainer.doesntUseGenericParam3)
     _ = #selector(AnimalContainer.doesntUseGenericParam4)
   }
+
+  // rdar://problem/26283886
+  func funcWithWrongArgType(x: NSObject) {}
+
+  func crashWithInvalidSubscript(x: NSArray) {
+    _ = funcWithWrongArgType(x: x[12])
+    // expected-error@-1{{'AnyObject' is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}}
+  }
 }
 
 extension PettableContainer {
@@ -300,3 +308,11 @@ class SwiftConcreteSubclassC<T>: GenericClass<NSString> {
   override func arrayOfThings() -> [NSString] {}
 }
 
+// FIXME: Some generic ObjC APIs rely on covariance. We don't handle this well
+// in Swift yet, but ensure we don't emit spurious warnings when
+// `as!` is used to force types to line up.
+func foo(x: GenericClass<NSMutableString>) {
+  let x2 = x as! GenericClass<NSString>
+  takeGenericClass(x2)
+  takeGenericClass(unsafeBitCast(x, to: GenericClass<NSString>.self))
+}

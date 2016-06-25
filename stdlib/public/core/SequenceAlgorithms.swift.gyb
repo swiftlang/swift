@@ -117,7 +117,6 @@ ${orderingExplanation}
   ///
   /// - SeeAlso: `min(isOrderedBefore:)`
 %   end
-  @warn_unused_result
   public func min(
 %   if preds:
     isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
@@ -170,7 +169,6 @@ ${orderingExplanation}
   ///
   /// - SeeAlso: `max(isOrderedBefore:)`
 %   end
-  @warn_unused_result
   public func max(
 %   if preds:
     isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
@@ -238,15 +236,16 @@ ${equivalenceExplanation}
   ///
   /// - SeeAlso: `starts(with:isEquivalent:)`
 %   end
-  @warn_unused_result
-  public func starts<
-    PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
-  >(
+  public func starts<PossiblePrefix>(
     with possiblePrefix: PossiblePrefix${"," if preds else ""}
 %   if preds:
     isEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
-  ) ${rethrows_}-> Bool {
+  ) ${rethrows_}-> Bool
+    where
+    PossiblePrefix : Sequence,
+    PossiblePrefix.${GElement} == ${GElement} {
+
     var possiblePrefixIterator = possiblePrefix.makeIterator()
     for e0 in self {
       if let e1 = possiblePrefixIterator.next() {
@@ -313,15 +312,16 @@ ${equivalenceExplanation}
   ///
   /// - SeeAlso: `elementsEqual(_:isEquivalent:)`
 %   end
-  @warn_unused_result
-  public func elementsEqual<
-    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
-  >(
+  public func elementsEqual<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
     isEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
-  ) ${rethrows_}-> Bool {
+  ) ${rethrows_}-> Bool
+    where
+    OtherSequence: Sequence,
+    OtherSequence.${GElement} == ${GElement} {
+
     var iter1 = self.makeIterator()
     var iter2 = other.makeIterator()
     while true {
@@ -397,15 +397,16 @@ ${orderingExplanation}
   ///   perform localized comparison.
   /// - SeeAlso: `lexicographicallyPrecedes(_:isOrderedBefore:)`
 %   end
-  @warn_unused_result
-  public func lexicographicallyPrecedes<
-    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
-  >(
+  public func lexicographicallyPrecedes<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
     isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
-  ) ${rethrows_}-> Bool {
+  ) ${rethrows_}-> Bool
+    where
+    OtherSequence : Sequence,
+    OtherSequence.${GElement} == ${GElement} {
+
     var iter1 = self.makeIterator()
     var iter2 = other.makeIterator()
     while true {
@@ -449,7 +450,6 @@ extension Sequence where Iterator.Element : Equatable {
   /// - Parameter element: The element to find in the sequence.
   /// - Returns: `true` if the element was found in the sequence; otherwise,
   ///   `false`.
-  @warn_unused_result
   public func contains(_ element: ${GElement}) -> Bool {
     if let result = _customContainsEquatableElement(element) {
       return result
@@ -500,7 +500,6 @@ extension Sequence {
   ///   the passed element represents a match.
   /// - Returns: `true` if the sequence contains an element that satisfies
   ///   `predicate`; otherwise, `false`.
-  @warn_unused_result
   public func contains(
     _ predicate: @noescape (${GElement}) throws -> Bool
   ) rethrows -> Bool {
@@ -547,7 +546,6 @@ extension Sequence {
   ///     in the next call of the `combine` closure or returned to the
   ///     caller.
   /// - Returns: The final accumulated value.
-  @warn_unused_result
   public func reduce<T>(
     _ initial: T, combine: @noescape (T, ${GElement}) throws -> T
   ) rethrows -> T {
@@ -573,7 +571,6 @@ extension Sequence {
   ///
   /// - Returns: An array containing the elements of this sequence in
   ///   reverse order.
-  @warn_unused_result
   public func reversed() -> [${GElement}] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
@@ -619,11 +616,10 @@ extension Sequence {
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
   /// - SeeAlso: `flatten()`, `map(_:)`
-  @warn_unused_result
-  public func flatMap<S : Sequence>(
-    _ transform: @noescape (${GElement}) throws -> S
-  ) rethrows -> [S.${GElement}] {
-    var result: [S.${GElement}] = []
+  public func flatMap<SegmentOfResult : Sequence>(
+    _ transform: @noescape (${GElement}) throws -> SegmentOfResult
+  ) rethrows -> [SegmentOfResult.${GElement}] {
+    var result: [SegmentOfResult.${GElement}] = []
     for element in self {
       result.append(contentsOf: try transform(element))
     }
@@ -656,11 +652,10 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
-  @warn_unused_result
-  public func flatMap<T>(
-    _ transform: @noescape (${GElement}) throws -> T?
-  ) rethrows -> [T] {
-    var result: [T] = []
+  public func flatMap<ElementOfResult>(
+    _ transform: @noescape (${GElement}) throws -> ElementOfResult?
+  ) rethrows -> [ElementOfResult] {
+    var result: [ElementOfResult] = []
     for element in self {
       if let newElement = try transform(element) {
         result.append(newElement)
@@ -696,22 +691,26 @@ extension Sequence {
   }
 
   @available(*, unavailable, renamed: "starts")
-  public func startsWith<
-    PossiblePrefix : Sequence where PossiblePrefix.Iterator.Element == Iterator.Element
-  >(
+  public func startsWith<PossiblePrefix>(
     with possiblePrefix: PossiblePrefix,
     isEquivalent: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
-  ) rethrows-> Bool {
+  ) rethrows-> Bool
+    where
+    PossiblePrefix : Sequence,
+    PossiblePrefix.Iterator.Element == Iterator.Element {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "lexicographicallyPrecedes")
   public func lexicographicalCompare<
-    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
+    OtherSequence
   >(
     _ other: OtherSequence,
     isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
-  ) rethrows -> Bool {
+  ) rethrows -> Bool
+    where
+    OtherSequence : Sequence,
+    OtherSequence.${GElement} == ${GElement} {
     Builtin.unreachable()
   }
 }
@@ -728,20 +727,22 @@ extension Sequence where Iterator.Element : Comparable {
   }
 
   @available(*, unavailable, renamed: "starts")
-  public func startsWith<
-    PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
-  >(
+  public func startsWith<PossiblePrefix>(
     with possiblePrefix: PossiblePrefix
-  ) -> Bool {
+  ) -> Bool
+    where
+    PossiblePrefix : Sequence,
+    PossiblePrefix.${GElement} == ${GElement} {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "lexicographicallyPrecedes")
-  public func lexicographicalCompare<
-    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
-  >(
+  public func lexicographicalCompare<OtherSequence>(
     _ other: OtherSequence
-  ) -> Bool {
+  ) -> Bool
+    where
+    OtherSequence : Sequence,
+    OtherSequence.${GElement} == ${GElement} {
     Builtin.unreachable()
   }
 }

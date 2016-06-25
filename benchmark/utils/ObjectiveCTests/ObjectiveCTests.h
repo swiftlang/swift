@@ -12,9 +12,13 @@
 
 #import <Foundation/Foundation.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface BridgeTester : NSObject {
   NSString *myString;
   NSArray<NSString *> *myArrayOfStrings;
+  NSDate *myBeginDate;
+  NSDate *myEndDate;
 }
 
 - (id)init;
@@ -23,4 +27,10 @@
 - (void)testFromArrayOfStrings:(NSArray<NSString *> *)arr;
 - (NSArray<NSString *> *)testToArrayOfStrings;
 
+- (NSDate *)beginDate;
+- (NSDate *)endDate;
+- (void)useDate:(NSDate *)date;
+
 @end
+
+NS_ASSUME_NONNULL_END

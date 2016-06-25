@@ -181,9 +181,10 @@ public:
                         const SILDebugScope *DS);
 
   /// Create debug metadata for a global variable.
-  void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage, StringRef Name,
+  void emitGlobalVariableDeclaration(llvm::Constant *Storage, StringRef Name,
                                      StringRef LinkageName,
                                      DebugTypeInfo DebugType,
+                                     bool IsLocalToUnit,
                                      Optional<SILLocation> Loc);
 
   /// Emit debug metadata for type metadata (for generic types). So meta.
@@ -212,6 +213,8 @@ private:
   /// local reference to the type.
   llvm::DIType *createType(DebugTypeInfo DbgTy, StringRef MangledName,
                            llvm::DIScope *Scope, llvm::DIFile *File);
+  /// Get a previously created type from the cache.
+  llvm::DIType *getTypeOrNull(TypeBase *Ty);
   /// Get the DIType corresponding to this DebugTypeInfo from the cache,
   /// or build a fresh DIType otherwise.  There is the underlying
   /// assumption that no two types that share the same canonical type

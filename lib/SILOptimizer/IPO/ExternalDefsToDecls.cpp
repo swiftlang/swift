@@ -26,7 +26,7 @@ class ExternalDefsToDecls : public SILModuleTransform {
     for (auto &F : *getModule()) {
       SILLinkage linkage = F.getLinkage();
       if (isAvailableExternally(linkage) && F.isDefinition() &&
-          !hasSharedVisibility(linkage)) {
+          !hasSharedVisibility(linkage) && !F.isTransparent()) {
         F.convertToDeclaration();
         invalidateAnalysis(&F, SILAnalysis::InvalidationKind::FunctionBody);
       }

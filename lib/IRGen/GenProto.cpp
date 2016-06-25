@@ -75,6 +75,11 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
   : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType) {
   initGenerics();
 
+  if (fnType->isPseudogeneric()) {
+    addPseudogenericFulfillments();
+    return;
+  }
+
   auto rep = fnType->getRepresentation();
 
   if (rep == SILFunctionTypeRepresentation::WitnessMethod) {
@@ -106,6 +111,17 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
         considerParameter(params[index], index, false);
     }
   }
+}
+
+void PolymorphicConvention::addPseudogenericFulfillments() {
+  enumerateRequirements([&](GenericRequirement reqt) {
+    MetadataPath path;
+    path.addImpossibleComponent();
+
+    unsigned sourceIndex = 0; // unimportant, since impossible
+    Fulfillments.addFulfillment({reqt.TypeParameter, reqt.Protocol},
+                                sourceIndex, std::move(path));
+  });
 }
 
 void PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback) {
@@ -180,24 +196,25 @@ void PolymorphicConvention::initGenerics() {
   Generics = FnType->getGenericSignature();
 }
 
-void PolymorphicConvention::considerNewTypeSource(SourceKind kind, unsigned paramIndex,
-                           CanType type, IsExact_t isExact,
-                           bool isSelfParameter) {
+void PolymorphicConvention::considerNewTypeSource(SourceKind kind,
+                                                  unsigned paramIndex,
+                                                  CanType type,
+                                                  IsExact_t isExact) {
   if (!Fulfillments.isInterestingTypeForFulfillments(type)) return;
 
   // Prospectively add a source.
   Sources.emplace_back(kind, paramIndex, type);
 
   // Consider the source.
-  if (!considerType(type, isExact, isSelfParameter,
-                    Sources.size() - 1, MetadataPath())) {
+  if (!considerType(type, isExact, Sources.size() - 1, MetadataPath())) {
     // If it wasn't used in any fulfillments, remove it.
     Sources.pop_back();
   }
 }
 
-bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact, bool isSelfParameter,
-                  unsigned sourceIndex, MetadataPath &&path) {
+bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact,
+                                         unsigned sourceIndex,
+                                         MetadataPath &&path) {
   struct Callback : FulfillmentMap::InterestingKeysCallback {
     PolymorphicConvention &Self;
     Callback(PolymorphicConvention &self) : Self(self) {}
@@ -216,8 +233,7 @@ bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact, bool i
       return Self.getConformsTo(type);
     }
   } callbacks(*this);
-  return Fulfillments.searchTypeMetadata(IGM, type, isExact, isSelfParameter,
-                                         sourceIndex,
+  return Fulfillments.searchTypeMetadata(IGM, type, isExact, sourceIndex,
                                          std::move(path), callbacks);
 }
 
@@ -240,8 +256,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
     // If the Self type is concrete, we have a witness thunk with a
     // fully substituted Self type. The witness table parameter is not
     // used.
-    considerType(selfTy, IsInexact, /*isSelfParameter*/ true,
-                 Sources.size() - 1, MetadataPath());
+    considerType(selfTy, IsInexact, Sources.size() - 1, MetadataPath());
   }
 }
 
@@ -257,12 +272,13 @@ void PolymorphicConvention::considerObjCGenericSelf(CanSILFunctionType fnType) {
   if (isa<GenericTypeParamType>(selfTy))
     addSelfMetadataFulfillment(selfTy);
   else
-    considerType(selfTy, IsInexact, /*isSelfParameter*/ true,
+    considerType(selfTy, IsInexact,
                  Sources.size() - 1, MetadataPath());
 }
 
-void PolymorphicConvention::considerParameter(SILParameterInfo param, unsigned paramIndex,
-                       bool isSelfParameter) {
+void PolymorphicConvention::considerParameter(SILParameterInfo param,
+                                              unsigned paramIndex,
+                                              bool isSelfParameter) {
   auto type = param.getType();
   switch (param.getConvention()) {
       // Indirect parameters do give us a value we can use, but right now
@@ -275,8 +291,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param, unsigned p
       if (!isSelfParameter) return;
       if (type->getNominalOrBoundGenericNominal()) {
         considerNewTypeSource(SourceKind::GenericLValueMetadata,
-                              paramIndex, type, IsExact,
-                              isSelfParameter);
+                              paramIndex, type, IsExact);
       }
       return;
 
@@ -287,7 +302,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param, unsigned p
       // Classes are sources of metadata.
       if (type->getClassOrBoundGenericClass()) {
         considerNewTypeSource(SourceKind::ClassPointer, paramIndex, type,
-                              IsInexact, isSelfParameter);
+                              IsInexact);
         return;
       }
 
@@ -296,9 +311,15 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param, unsigned p
         if (metatypeTy->getRepresentation() != MetatypeRepresentation::Thick)
           return;
 
+        // Thick metatypes for Objective-C parameterized classes are not
+        // sources of metadata.
         CanType objTy = metatypeTy.getInstanceType();
+        if (auto classDecl = objTy->getClassOrBoundGenericClass())
+          if (classDecl->usesObjCGenericsModel())
+            return;
+
         considerNewTypeSource(SourceKind::Metadata, paramIndex, objTy,
-                              IsInexact, isSelfParameter);
+                              IsInexact);
         return;
       }
 
@@ -1117,7 +1138,6 @@ public:
           }
         } callback;
         Fulfillments->searchTypeMetadata(IGM, ConcreteType, IsExact,
-                                         /*isSelf*/ false,
                                          /*sourceIndex*/ 0, MetadataPath(),
                                          callback);
       }
@@ -1341,7 +1361,9 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
 
   // Load and check whether it was null.
   auto cachedResult = IGF.Builder.CreateLoad(cache);
-  // FIXME: cachedResult->setOrdering(Consume);
+  // TODO: When LLVM supports Consume, we should use it here.
+  if (IGF.IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
+    cachedResult->setOrdering(llvm::AtomicOrdering::Acquire);
   auto cacheIsEmpty = IGF.Builder.CreateIsNull(cachedResult);
   llvm::BasicBlock *fetchBB = IGF.createBasicBlock("fetch");
   llvm::BasicBlock *contBB = IGF.createBasicBlock("cont");
@@ -1585,12 +1607,11 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (wt->isDeclaration())
     return;
 
-  bool mustEmitDefinition = !isAvailableExternally(wt->getLinkage());
-
-  // Don't emit a witness table that is available externally if we are emitting
-  // code for the JIT. We do not do any optimization for the JIT and it has
-  // problems with external symbols that get merged with non-external symbols.
-  if (IRGen.Opts.UseJIT && !mustEmitDefinition)
+  // Don't emit a witness table that is available externally.
+  // It can end up in having duplicate symbols for generated associated type
+  // metadata access functions.
+  // Also, it is not a big benefit for LLVM to emit such witness tables.
+  if (isAvailableExternally(wt->getLinkage()))
     return;
 
   // Build the witnesses.
@@ -1613,13 +1634,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   global->setAlignment(getWitnessTableAlignment().getValue());
 
   // FIXME: resilience; this should use the conformance's publishing scope.
-  if (mustEmitDefinition) {
-    wtableBuilder.buildAccessFunction(global);
-  }
-
-  // Build the conformance record, if it lives in this TU.
-  if (!mustEmitDefinition)
-    return;
+  wtableBuilder.buildAccessFunction(global);
 
   // Behavior conformances can't be reflected.
   if (wt->getConformance()->isBehaviorConformance())
@@ -1877,7 +1892,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
 
     auto argIndex =
       getDependentTypeIndex(generics, *module, requirement.TypeParameter);
-    Substitution sub = generic->getSubstitutions(module, nullptr)[argIndex];
+    Substitution sub = generic->gatherAllSubstitutions(module, nullptr)[argIndex];
 
     // In either case, we need to change the type.
     sourceKey.Type = sub.getReplacement()->getCanonicalType();
@@ -2607,9 +2622,9 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                               ProtocolConformanceRef conformance,
                               Explosion &out) {
   auto fn = cast<AbstractFunctionDecl>(member.getDecl());
-
-  assert(cast<ProtocolDecl>(fn->getDeclContext())
-           == conformance.getRequirement());
+  auto fnProto = cast<ProtocolDecl>(fn->getDeclContext());
+  
+  conformance = conformance.getInherited(fnProto);
 
   // Find the witness table.
   // FIXME conformance for concrete type

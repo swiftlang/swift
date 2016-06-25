@@ -17,16 +17,13 @@
 // are involved in its construction.  This feature is crucial for
 // preventing infinite recursion even in non-asserting cases.
 
-/// A simple string designed to represent text that is "knowable at
-/// compile-time".
+/// A string type designed to represent text that is known at compile time.
 ///
-/// Logically speaking, each instance looks something like this:
-///
-///      enum StaticString {
-///        case ascii(start: UnsafePointer<UInt8>, count: Int)
-///        case utf8(start: UnsafePointer<UInt8>, count: Int)
-///        case scalar(UnicodeScalar)
-///      }
+/// Instances of the `StaticString` type are immutable. `StaticString` provides
+/// limited, pointer-based access to its contents, unlike Swift's more
+/// commonly used `String` type. A static string can store its value as a
+/// pointer to an ASCII code unit sequence, as a pointer to a UTF-8 code unit
+/// sequence, or as a single Unicode scalar value.
 @_fixed_layout
 public struct StaticString
   : _BuiltinUnicodeScalarLiteralConvertible,
@@ -56,10 +53,11 @@ public struct StaticString
   ///   ASCII.
   internal var _flags: Builtin.Int8
 
-  /// A pointer to the beginning of UTF-8 code units.
+  /// A pointer to the beginning of the string's UTF-8 encoded representation.
   ///
-  /// - Precondition: `self` stores a pointer to either ASCII or UTF-8 code
-  ///   units.
+  /// The static string must store a pointer to either ASCII or UTF-8 code
+  /// units. Accessing this property when `hasPointerRepresentation` is
+  /// `false` triggers a runtime error.
   @_transparent
   public var utf8Start: UnsafePointer<UInt8> {
     _precondition(
@@ -70,7 +68,9 @@ public struct StaticString
 
   /// The stored Unicode scalar value.
   ///
-  /// - Precondition: `self` stores a single Unicode scalar value.
+  /// The static string must store a single Unicode scalar value. Accessing
+  /// this property when `hasPointerRepresentation` is `true` triggers a
+  /// runtime error.
   @_transparent
   public var unicodeScalar: UnicodeScalar {
     _precondition(
@@ -79,11 +79,10 @@ public struct StaticString
     return UnicodeScalar(UInt32(UInt(_startPtrOrData)))
   }
 
-  /// If `self` stores a pointer to ASCII or UTF-8 code units, the
-  /// length in bytes of that data.
+  /// The length in bytes of the static string's ASCII or UTF-8 representation.
   ///
-  /// If `self` stores a single Unicode scalar value, the value of
-  /// `utf8CodeUnitCount` is unspecified.
+  /// - Warning: If the static string stores a single Unicode scalar value, the
+  ///   value of `utf8CodeUnitCount` is unspecified.
   @_transparent
   public var utf8CodeUnitCount: Int {
     _precondition(
@@ -92,25 +91,38 @@ public struct StaticString
     return Int(_utf8CodeUnitCount)
   }
 
-  /// `true` iff `self` stores a pointer to ASCII or UTF-8 code units.
+  /// A Boolean value indicating whether the static string stores a pointer to
+  /// ASCII or UTF-8 code units.
   @_transparent
   public var hasPointerRepresentation: Bool {
     return (UInt8(_flags) & 0x1) == 0
   }
 
-  /// `true` if `self` stores a pointer to ASCII code units.
+  /// A Boolean value that is `true` if the static string stores a pointer to
+  /// ASCII code units.
   ///
-  /// If `self` stores a single Unicode scalar value, the value of
-  /// `isASCII` is unspecified.
+  /// Use this property in conjunction with `hasPointerRepresentation` to
+  /// determine whether a static string with pointer representation stores an
+  /// ASCII or UTF-8 code unit sequence.
+  ///
+  /// - Warning: If the static string stores a single Unicode scalar value, the
+  ///   value of `isASCII` is unspecified.
   @_transparent
   public var isASCII: Bool {
     return (UInt8(_flags) & 0x2) != 0
   }
 
-  /// Invoke `body` with a buffer containing the UTF-8 code units of
-  /// `self`.
+  /// Invokes the given closure with a buffer containing the static string's
+  /// UTF-8 code unit sequence.
   ///
-  /// This method works regardless of what `self` stores.
+  /// This method works regardless of whether the static string stores a
+  /// pointer or a single Unicode scalar value.
+  ///
+  /// - Parameter body: A closure that takes a buffer pointer to the static
+  ///   string's UTF-8 code unit sequence as its sole argument. If the closure
+  ///   has a return value, it is used as the return value of the
+  ///   `withUTF8Buffer(invoke:)` method.
+  /// - Returns: The return value of the `body` closure, if any.
   public func withUTF8Buffer<R>(
     invoke body: @noescape (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
@@ -130,7 +142,7 @@ public struct StaticString
     }
   }
 
-  /// Create an empty instance.
+  /// Creates an empty static string.
   @_transparent
   public init() {
     self = ""
@@ -169,7 +181,10 @@ public struct StaticString
     self = StaticString(unicodeScalar: value)
   }
 
-  /// Create an instance initialized to `value`.
+  /// Creates an instance initialized to a single Unicode scalar.
+  ///
+  /// Do not call this initializer directly. It may be used by the compiler
+  /// when you initialize a static string with a Unicode scalar.
   @effects(readonly)
   @_transparent
   public init(unicodeScalarLiteral value: StaticString) {
@@ -190,7 +205,11 @@ public struct StaticString
     )
   }
 
-  /// Create an instance initialized to `value`.
+  /// Creates an instance initialized to a single character that is made up of
+  /// one or more Unicode code points.
+  ///
+  /// Do not call this initializer directly. It may be used by the compiler
+  /// when you initialize a static string using an extended grapheme cluster.
   @effects(readonly)
   @_transparent
   public init(extendedGraphemeClusterLiteral value: StaticString) {
@@ -210,14 +229,17 @@ public struct StaticString
       isASCII: isASCII)
   }
 
-  /// Create an instance initialized to `value`.
+  /// Creates an instance initialized to the value of a string literal.
+  ///
+  /// Do not call this initializer directly. It may be used by the compiler
+  /// when you initialize a static string using a string literal.
   @effects(readonly)
   @_transparent
   public init(stringLiteral value: StaticString) {
     self = value
   }
 
-  /// A textual representation of `self`.
+  /// A string representation of the static string.
   public var description: String {
     return withUTF8Buffer {
       (buffer) in
@@ -225,7 +247,7 @@ public struct StaticString
     }
   }
 
-  /// A textual representation of `self`, suitable for debugging.
+  /// A textual representation of the static string, suitable for debugging.
   public var debugDescription: String {
     return self.description.debugDescription
   }

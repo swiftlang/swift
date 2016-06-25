@@ -79,7 +79,7 @@ func test_mixed_overload(_ a: A, x: X, y: Y) {
 }
 
 func test_mixed_overload_coerce(_ a: A, x: inout X, y: Y, z: Z) {
-  a.mixed2(z: z)
+  _ = a.mixed2(z: z)
   var y1 = A.mixed2(z: z)
   y1 = y
   _ = y1
@@ -124,7 +124,7 @@ extension A {
   }
 
   func test_mixed_overload_coerce(x: inout X, y: Y, z: Z) {
-    mixed2(z: z)
+    _ = mixed2(z: z)
     x = mixed2(z: z)
   }
 

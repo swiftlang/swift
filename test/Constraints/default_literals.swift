@@ -12,12 +12,12 @@ acceptDouble(&i2)
 func ternary<T>(_ cond: Bool,
                 _ ifTrue: @autoclosure () -> T,
                 _ ifFalse: @autoclosure () -> T) -> T {}
-ternary(false, 1, 2.5)
-ternary(false, 2.5, 1)
+_ = ternary(false, 1, 2.5)
+_ = ternary(false, 2.5, 1)
 
 // <rdar://problem/18447543>
-ternary(false, 1, 2 as Int32)
-ternary(false, 1, 2 as Float)
+_ = ternary(false, 1, 2 as Int32)
+_ = ternary(false, 1, 2 as Float)
 
 func genericFloatingLiteral<T : FloatLiteralConvertible>(_ x: T) {
   var _ : T = 2.5

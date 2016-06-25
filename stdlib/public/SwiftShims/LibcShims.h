@@ -30,9 +30,17 @@ namespace swift { extern "C" {
 // This declaration is not universally correct.  We verify its correctness for
 // the current platform in the runtime code.
 #if defined(__linux__) && defined (__arm__) && !defined(__android__)
-typedef      int __swift_ssize_t;
+typedef           int __swift_ssize_t;
+#elif defined(_MSC_VER)
+#if defined(_M_ARM) || defined(_M_IX86)
+typedef           int __swift_ssize_t;
+#elif defined(_M_X64)
+typedef long long int __swift_ssize_t;
 #else
-typedef long int __swift_ssize_t;
+#error unsupported machine type
+#endif
+#else
+typedef      long int __swift_ssize_t;
 #endif
 
 // General utilities <stdlib.h>
@@ -48,11 +56,10 @@ __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
                                            __swift_size_t nitems);
 
 // String handling <string.h>
-__attribute__((pure))
-SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_size_t _swift_stdlib_strlen(const char *s);
+__attribute__((__pure__)) SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+_swift_stdlib_strlen(const char *s);
 
-__attribute__((pure))
+__attribute__((__pure__))
 SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
@@ -66,9 +73,8 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_close(int fd);
 
 // Non-standard extensions
-__attribute__((const))
-SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_size_t _swift_stdlib_malloc_size(const void *ptr);
+__attribute__((__const__)) SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+_swift_stdlib_malloc_size(const void *ptr);
 
 // Random number <random>
 SWIFT_RUNTIME_STDLIB_INTERFACE

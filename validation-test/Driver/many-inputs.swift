@@ -16,3 +16,6 @@
 // RUN: (cd %t && %target-build-swift -emit-library ./*.swift -o ./libMultiFile)
 // RUN: nm %t/libMultiFile | FileCheck %t/check.txt
 
+// REQUIRES: long_test
+// REQUIRES: executable_test
+

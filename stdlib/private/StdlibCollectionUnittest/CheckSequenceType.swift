@@ -127,7 +127,9 @@ public struct FindTest {
   ) {
     self.expected = expected
     self.element = MinimalEquatableValue(element)
-    self.sequence = sequence.map(MinimalEquatableValue.init)
+    self.sequence = sequence.enumerated().map {
+      return MinimalEquatableValue($1, identity: $0) 
+    }
     self.expectedLeftoverSequence = expectedLeftoverSequence.map(
       MinimalEquatableValue.init)
     self.loc = SourceLoc(file, line, comment: "test data")
@@ -1448,11 +1450,6 @@ extension TestSuite {
   public func addSequenceTests<
     S : Sequence,
     SequenceWithEquatableElement : Sequence
-    where
-    SequenceWithEquatableElement.Iterator.Element : Equatable,
-    S.SubSequence : Sequence,
-    S.SubSequence.Iterator.Element == S.Iterator.Element,
-    S.SubSequence.SubSequence == S.SubSequence
   >(
     _ testNamePrefix: String = "",
     makeSequence: ([S.Iterator.Element]) -> S,
@@ -1464,7 +1461,12 @@ extension TestSuite {
     extractValueFromEquatable: ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
-  ) {
+  ) where
+    SequenceWithEquatableElement.Iterator.Element : Equatable,
+    S.SubSequence : Sequence,
+    S.SubSequence.Iterator.Element == S.Iterator.Element,
+    S.SubSequence.SubSequence == S.SubSequence {
+
     var testNamePrefix = testNamePrefix
 
     if checksAdded.contains(#function) {
@@ -1482,7 +1484,7 @@ extension TestSuite {
       return makeSequenceOfEquatable(elements.map(wrapValueIntoEquatable))
     }
 
-    testNamePrefix += String(S.Type)
+    testNamePrefix += String(S.Type.self)
 
     let isMultiPass = makeSequence([])
       ._preprocessingPass { true } ?? false
@@ -1768,6 +1770,30 @@ self.test("\(testNamePrefix).forEach/semantics") {
     expectEqualSequence(
       test.sequence, elements,
       stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// first()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).first/semantics") {
+  for test in findTests {
+    let s = makeWrappedSequenceWithEquatableElement(test.sequence)
+    let closureLifetimeTracker = LifetimeTracked(0)
+    let found = s.first {
+      _blackHole(closureLifetimeTracker)
+      return $0 == wrapValueIntoEquatable(test.element)
+    }
+    expectEqual(
+      test.expected == nil ? nil : wrapValueIntoEquatable(test.element),
+      found,
+      stackTrace: SourceLocStack().with(test.loc))
+    if test.expected != nil {
+      expectEqual(
+        test.expected, (found as? MinimalEquatableValue)?.identity,
+        "find() should find only the first element matching its predicate")
+    }
   }
 }
 

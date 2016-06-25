@@ -62,184 +62,287 @@ Functions:
 # The below are attempts at providing better names than inference
 # CGAffineTransform
 - Name: CGAffineTransformMakeTranslation
-  SwiftName: CGAffineTransform.init(withTranslationX:y:)
+  SwiftName: CGAffineTransform.init(translationX:y:)
 - Name: CGAffineTransformMakeScale
-  SwiftName: CGAffineTransform.init(withScaleX:y:)
+  SwiftName: CGAffineTransform.init(scaleX:y:)
 - Name: CGAffineTransformMakeRotation
-  SwiftName: CGAffineTransform.init(withRotationAngle:)
+  SwiftName: CGAffineTransform.init(rotationAngle:)
+- Name: CGAffineTransformIsIdentity
+  SwiftName: getter:CGAffineTransform.isIdentity(self:)
 - Name: CGAffineTransformTranslate
   SwiftName: CGAffineTransform.translateBy(self:x:y:)
 - Name: CGAffineTransformScale
   SwiftName: CGAffineTransform.scaleBy(self:x:y:)
 - Name: CGAffineTransformRotate
-  SwiftName: CGAffineTransform.rotate(self:byAngle:)
+  SwiftName: CGAffineTransform.rotate(self:_:)
 - Name: CGAffineTransformConcat
   SwiftName: CGAffineTransform.concat(self:_:)
 - Name: CGAffineTransformEqualToTransform
   SwiftName: CGAffineTransform.equalTo(self:_:)
 - Name: CGPointApplyAffineTransform
-  SwiftName: CGPoint.applyAffineTransform(self:_:)
+  SwiftName: CGPoint.apply(self:transform:)
 - Name: CGSizeApplyAffineTransform
-  SwiftName: CGSize.applyAffineTransform(self:_:)
+  SwiftName: CGSize.apply(self:transform:)
 - Name: CGRectApplyAffineTransform
-  SwiftName: CGRect.applyAffineTransform(self:_:)
+  SwiftName: CGRect.apply(self:transform:)
 # CGBitmapContext
+- Name: CGBitmapContextCreateWithData
+  SwiftName: CGContext.init(data:width:height:bitsPerComponent:bytesPerRow:space:bitmapInfo:releaseCallback:releaseInfo:)
+- Name: CGBitmapContextCreate
+  SwiftName: CGContext.init(data:width:height:bitsPerComponent:bytesPerRow:space:bitmapInfo:)
+- Name: CGBitmapContextGetData
+  SwiftName: getter:CGContext.data(self:)
+- Name: CGBitmapContextGetWidth
+  SwiftName: getter:CGContext.width(self:)
+- Name: CGBitmapContextGetHeight
+  SwiftName: getter:CGContext.height(self:)
+- Name: CGBitmapContextGetBitsPerComponent
+  SwiftName: getter:CGContext.bitsPerComponent(self:)
+- Name: CGBitmapContextGetBitsPerPixel
+  SwiftName: getter:CGContext.bitsPerPixel(self:)
+- Name: CGBitmapContextGetBytesPerRow
+  SwiftName: getter:CGContext.bytesPerRow(self:)
+- Name: CGBitmapContextGetColorSpace
+  SwiftName: getter:CGContext.colorSpace(self:)
+- Name: CGBitmapContextGetAlphaInfo
+  SwiftName: getter:CGContext.alphaInfo(self:)
 - Name: CGBitmapContextCreateImage
-  SwiftName: CGContextRef.makeImageFromBitmap(self:)
+  SwiftName: CGContext.makeImage(self:)
 # CGColor
 - Name: CGColorCreate
-  SwiftName: CGColorRef.init(withColorSpace:components:)
+  SwiftName: CGColor.init(colorSpace:components:)
+- Name: CGColorCreateGenericGray
+  SwiftName: CGColor.init(gray:alpha:)
+- Name: CGColorCreateGenericRGB
+  SwiftName: CGColor.init(red:green:blue:alpha:)
+- Name: CGColorCreateCMYK
+  SwiftName: CGColor.init(cyan:magenta:yellow:black:alpha:)
 - Name: CGColorGetConstantColor
-  SwiftName: CGColorRef.constantColorForName(_:)
+  SwiftName: CGColor.constantColor(for:)
+- Name: CGColorCreateWithPattern
+  SwiftName: CGColor.init(patternSpace:pattern:components:)
+- Name: CGColorCreateCopy
+  SwiftName: CGColor.init(_:)
+# - Name: CGColorCreateCopyWithAlpha
+#   SwiftName: CGColor.init(_:alpha:)
+- Name: CGColorCreateCopyByMatchingToColorSpace
+  SwiftName: CGColor.convert(_:intent:self:options:)
 - Name: CGColorEqualToColor
-  SwiftName: CGColorRef.equalTo(self:_:)
+  SwiftName: CGColor.equalTo(self:_:)
 # CGColorSpace
+- Name: CGColorSpaceCreateWithICCProfile
+  SwiftName: CGColorSpace.init(iccProfileData:)
+- Name: CGColorSpaceCreateWithPlatformColorSpace
+  SwiftName: CGColorSpace.init(platformColorSpaceRef:)
+- Name: CGColorSpaceCreateWithName
+  SwiftName: CGColorSpace.init(name:)
+- Name: CGColorSpaceCopyName
+  SwiftName: getter:CGColorSpace.name(self:)
 - Name: CGColorSpaceCopyICCProfile
-  SwiftName: CGColorSpaceRef.copyICCData(self:)
+  SwiftName: getter:CGColorSpace.iccData(self:)
 # CGContext
 - Name: CGContextScaleCTM
-  SwiftName: CGContextRef.scaleBy(self:x:y:)
+  SwiftName: CGContext.scale(self:x:y:)
 - Name: CGContextTranslateCTM
-  SwiftName: CGContextRef.translateBy(self:x:y:)
+  SwiftName: CGContext.translate(self:x:y:)
 - Name: CGContextRotateCTM
-  SwiftName: CGContextRef.rotate(self:byAngle:)
+  SwiftName: CGContext.rotate(self:byAngle:)
 - Name: CGContextSetLineWidth
-  SwiftName: CGContextRef.setLineWidth(self:_:)
+  SwiftName: CGContext.setLineWidth(self:_:)
 - Name: CGContextSetMiterLimit
-  SwiftName: CGContextRef.setMiterLimit(self:_:)
-- Name: CGContextSetLineDash
-  SwiftName: CGContextRef.setLineDash(self:withPhase:lengths:count:)
+  SwiftName: CGContext.setMiterLimit(self:_:)
+# - Name: CGContextSetLineDash
+#   SwiftName: CGContext.setLineDash(self:phase:lengths:count:)
 - Name: CGContextSetFlatness
-  SwiftName: CGContextRef.setFlatness(self:_:)
+  SwiftName: CGContext.setFlatness(self:_:)
 - Name: CGContextSetAlpha
-  SwiftName: CGContextRef.setAlpha(self:_:)
+  SwiftName: CGContext.setAlpha(self:_:)
 - Name: CGContextMoveToPoint
-  SwiftName: CGContextRef.moveTo(self:x:y:)
+  SwiftName: CGContext.moveTo(self:x:y:)
 - Name: CGContextAddLineToPoint
-  SwiftName: CGContextRef.addLineTo(self:x:y:)
+  SwiftName: CGContext.addLineTo(self:x:y:)
 - Name: CGContextAddCurveToPoint
-  SwiftName: CGContextRef.addCurve(self:cp1x:cp1y:cp2x:cp2y:endingAtX:y:)
+  SwiftName: CGContext.addCurveTo(self:cp1x:cp1y:cp2x:cp2y:endingAtX:y:)
 - Name: CGContextAddQuadCurveToPoint
-  SwiftName: CGContextRef.addQuadCurve(self:cpx:cpy:endingAtX:y:)
+  SwiftName: CGContext.addQuadCurveTo(self:cpx:cpy:endingAtX:y:)
 - Name: CGContextAddRects
-  SwiftName: CGContextRef.addRects(self:_:count:)
+  SwiftName: CGContext.addRects(self:_:count:)
 - Name: CGContextAddLines
-  SwiftName: CGContextRef.addLines(self:between:count:)
+  SwiftName: CGContext.addLines(self:between:count:)
 - Name: CGContextAddEllipseInRect
-  SwiftName: CGContextRef.addEllipseIn(self:_:)
+  SwiftName: CGContext.addEllipse(self:inRect:)
 - Name: CGContextAddArc
-  SwiftName: CGContextRef.addArc(self:centeredAtX:y:radius:startAngle:endAngle:clockwise:)
+  SwiftName: CGContext.addArc(self:centerX:y:radius:startAngle:endAngle:clockwise:)
 - Name: CGContextAddArcToPoint
-  SwiftName: CGContextRef.addArc(self:x1:y1:x2:y2:radius:)
+  SwiftName: CGContext.addArc(self:x1:y1:x2:y2:radius:)
 - Name: CGContextIsPathEmpty
-  SwiftName: getter:CGContextRef.isPathEmpty(self:)
+  SwiftName: getter:CGContext.isPathEmpty(self:)
 - Name: CGContextGetPathCurrentPoint
-  SwiftName: getter:CGContextRef.currentPointOfPath(self:)
+  SwiftName: getter:CGContext.currentPointOfPath(self:)
 - Name: CGContextGetPathBoundingBox
-  SwiftName: getter:CGContextRef.boundingBoxOfPath(self:)
+  SwiftName: getter:CGContext.boundingBoxOfPath(self:)
+- Name: CGContextCopyPath
+  SwiftName: CGContext.path(self:)
 - Name: CGContextPathContainsPoint
-  SwiftName: CGContextRef.pathContains(self:_:mode:)
+  SwiftName: CGContext.pathContains(self:_:mode:)
 - Name: CGContextDrawPath
-  SwiftName: CGContextRef.drawPath(self:using:)
+  SwiftName: CGContext.drawPath(self:using:)
 - Name: CGContextFillRect
-  SwiftName: CGContextRef.fill(self:_:)
+  SwiftName: CGContext.fill(self:_:)
 - Name: CGContextFillRects
-  SwiftName: CGContextRef.fill(self:_:count:)
+  SwiftName: CGContext.fill(self:_:count:)
 - Name: CGContextStrokeRect
-  SwiftName: CGContextRef.stroke(self:_:)
+  SwiftName: CGContext.stroke(self:_:)
 - Name: CGContextStrokeRectWithWidth
-  SwiftName: CGContextRef.stroke(self:_:width:)
+  SwiftName: CGContext.stroke(self:_:width:)
 - Name: CGContextClearRect
-  SwiftName: CGContextRef.clear(self:_:)
+  SwiftName: CGContext.clear(self:_:)
 - Name: CGContextFillEllipseInRect
-  SwiftName: CGContextRef.fillEllipse(self:in:)
+  SwiftName: CGContext.fillEllipse(self:in:)
 - Name: CGContextStrokeEllipseInRect
-  SwiftName: CGContextRef.strokeEllipse(self:in:)
+  SwiftName: CGContext.strokeEllipse(self:in:)
 - Name: CGContextStrokeLineSegments
-  SwiftName: CGContextRef.strokeLineSegments(self:between:count:)
+  SwiftName: CGContext.strokeLineSegments(self:between:count:)
 - Name: CGContextGetClipBoundingBox
-  SwiftName: getter:CGContextRef.boundingBoxOfClipPath(self:)
+  SwiftName: getter:CGContext.boundingBoxOfClipPath(self:)
 - Name: CGContextClipToRect
-  SwiftName: CGContextRef.clip(self:to:)
+  SwiftName: CGContext.clipTo(self:_:)
 - Name: CGContextClipToRects
-  SwiftName: CGContextRef.clip(self:to:count:)
+  SwiftName: CGContext.clipTo(self:_:count:)
 - Name: CGContextSetFillColor
-  SwiftName: CGContextRef.setFillColor(self:withComponents:)
+  SwiftName: CGContext.setFillColor(self:_:)
 - Name: CGContextSetFillColorWithColor
-  SwiftName: CGContextRef.setFillColor(self:_:)
+  SwiftName: CGContext.setFillColor(self:_:)
 - Name: CGContextSetFillPattern
-  SwiftName: CGContextRef.setFillPattern(self:_:colorComponents:)
+  SwiftName: CGContext.setFillPattern(self:_:colorComponents:)
 - Name: CGContextSetStrokePattern
-  SwiftName: CGContextRef.setStrokePattern(self:_:colorComponents:)
+  SwiftName: CGContext.setStrokePattern(self:_:colorComponents:)
 - Name: CGContextSetPatternPhase
-  SwiftName: CGContextRef.setPatternPhase(self:_:)
+  SwiftName: CGContext.setPatternPhase(self:_:)
 - Name: CGContextSetGrayFillColor
-  SwiftName: CGContextRef.setFillColor(self:withGray:alpha:)
+  SwiftName: CGContext.setFillColor(self:gray:alpha:)
 - Name: CGContextSetGrayStrokeColor
-  SwiftName: CGContextRef.setStrokeColor(self:withGray:alpha:)
+  SwiftName: CGContext.setStrokeColor(self:gray:alpha:)
 - Name: CGContextSetRGBFillColor
-  SwiftName: CGContextRef.setFillColor(self:withRed:green:blue:alpha:)
+  SwiftName: CGContext.setFillColor(self:red:green:blue:alpha:)
 - Name: CGContextSetRGBStrokeColor
-  SwiftName: CGContextRef.setStrokeColor(self:withRed:green:blue:alpha:)
+  SwiftName: CGContext.setStrokeColor(self:red:green:blue:alpha:)
 - Name: CGContextSetStrokeColor
-  SwiftName: CGContextRef.setStrokeColor(self:withComponents:)
+  SwiftName: CGContext.setStrokeColor(self:_:)
 - Name: CGContextSetStrokeColorWithColor
-  SwiftName: CGContextRef.setStrokeColor(self:_:)
+  SwiftName: CGContext.setStrokeColor(self:_:)
 - Name: CGContextSetCMYKFillColor
-  SwiftName: CGContextRef.setFillColor(self:withCyan:magenta:yellow:black:alpha:)
+  SwiftName: CGContext.setFillColor(self:cyan:magenta:yellow:black:alpha:)
 - Name: CGContextSetCMYKStrokeColor
-  SwiftName: CGContextRef.setStrokeColor(self:withCyan:magenta:yellow:black:alpha:)
+  SwiftName: CGContext.setStrokeColor(self:cyan:magenta:yellow:black:alpha:)
 - Name: CGContextDrawImage
-  SwiftName: CGContextRef.draw(self:in:image:)
+  SwiftName: CGContext.draw(self:in:image:)
 - Name: CGContextDrawTiledImage
-  SwiftName: CGContextRef.draw(self:in:byTiling:)
+  SwiftName: CGContext.draw(self:in:byTiling:)
 - Name: CGContextSetShadowWithColor
-  SwiftName: CGContextRef.setShadow(self:withOffset:blur:color:)
-- Name: CGContextSetShadow
-  SwiftName: CGContextRef.setShadow(self:withOffset:blur:)
+  SwiftName: CGContext.setShadow(self:offset:blur:color:)
+# - Name: CGContextSetShadow
+#   SwiftName: CGContext.setShadow(self:offset:blur:)
 - Name: CGContextSetCharacterSpacing
-  SwiftName: CGContextRef.setCharacterSpacing(self:_:)
+  SwiftName: CGContext.setCharacterSpacing(self:_:)
 - Name: CGContextGetTextPosition
-  SwiftName: getter:CGContextRef.textPosition(self:)
+  SwiftName: getter:CGContext.textPosition(self:)
 - Name: CGContextSetFontSize
-  SwiftName: CGContextRef.setFontSize(self:_:)
+  SwiftName: CGContext.setFontSize(self:_:)
 - Name: CGContextShowGlyphsAtPositions
-  SwiftName: CGContextRef.showGlyphs(self:_:atPositions:count:)
-- Name: CGContextBeginPage
-  SwiftName: CGContextRef.beginPage(self:withMediaBox:)
+  SwiftName: CGContext.showGlyphs(self:_:atPositions:count:)
+# - Name: CGContextBeginPage
+#   SwiftName: CGContext.beginPage(self:mediaBox:)
 - Name: CGContextSetShouldAntialias
-  SwiftName: CGContextRef.setShouldAntialias(self:_:)
+  SwiftName: CGContext.setShouldAntialias(self:_:)
 - Name: CGContextSetAllowsAntialiasing
-  SwiftName: CGContextRef.setAllowsAntialiasing(self:_:)
+  SwiftName: CGContext.setAllowsAntialiasing(self:_:)
 - Name: CGContextSetShouldSmoothFonts
-  SwiftName: CGContextRef.setShouldSmoothFonts(self:_:)
+  SwiftName: CGContext.setShouldSmoothFonts(self:_:)
 - Name: CGContextSetAllowsFontSmoothing
-  SwiftName: CGContextRef.setAllowsFontSmoothing(self:_:)
+  SwiftName: CGContext.setAllowsFontSmoothing(self:_:)
 - Name: CGContextSetShouldSubpixelPositionFonts
-  SwiftName: CGContextRef.setShouldSubpixelPositionFonts(self:_:)
+  SwiftName: CGContext.setShouldSubpixelPositionFonts(self:_:)
 - Name: CGContextSetAllowsFontSubpixelPositioning
-  SwiftName: CGContextRef.setAllowsFontSubpixelPositioning(self:_:)
+  SwiftName: CGContext.setAllowsFontSubpixelPositioning(self:_:)
 - Name: CGContextSetShouldSubpixelQuantizeFonts
-  SwiftName: CGContextRef.setShouldSubpixelQuantizeFonts(self:_:)
+  SwiftName: CGContext.setShouldSubpixelQuantizeFonts(self:_:)
 - Name: CGContextSetAllowsFontSubpixelQuantization
-  SwiftName: CGContextRef.setAllowsFontSubpixelQuantization(self:_:)
+  SwiftName: CGContext.setAllowsFontSubpixelQuantization(self:_:)
 - Name: CGContextBeginTransparencyLayer
-  SwiftName: CGContextRef.beginTransparencyLayer(self:withAuxiliaryInfo:)
+  SwiftName: CGContext.beginTransparencyLayer(self:auxiliaryInfo:)
 - Name: CGContextBeginTransparencyLayerWithRect
-  SwiftName: CGContextRef.beginTransparencyLayer(self:in:auxiliaryInfo:)
+  SwiftName: CGContext.beginTransparencyLayer(self:in:auxiliaryInfo:)
+- Name: CGContextConvertPointToDeviceSpace
+  SwiftName: CGContext.convertToDeviceSpace(self:_:)
+- Name: CGContextConvertPointToUserSpace
+  SwiftName: CGContext.convertToUserSpace(self:_:)
+- Name: CGContextConvertSizeToDeviceSpace
+  SwiftName: CGContext.convertToDeviceSpace(self:_:)
+- Name: CGContextConvertSizeToUserSpace
+  SwiftName: CGContext.convertToUserSpace(self:_:)
+- Name: CGContextConvertRectToDeviceSpace
+  SwiftName: CGContext.convertToDeviceSpace(self:_:)
+- Name: CGContextConvertRectToUserSpace
+  SwiftName: CGContext.convertToUserSpace(self:_:)
+# CGDataConsumer
+# - Name: CGDataConsumerCreateWithURL
+#   SwiftName: CGDataConsumer.init(url:)
+# - Name: CGDataConsumerCreateWithCFData
+#   SwiftName: CGDataConsumer.init(data:)
+# CGDataProvider
+# - Name: CGDataProviderCreateWithData
+#   SwiftName: CGDataProvider.init(dataInfo:data:size:releaseData:)
+# - Name: CGDataProviderCreateWithCFData
+#   SwiftName: CGDataProvider.init(data:)
+# - Name: CGDataProviderCreateWithURL
+#   SwiftName: CGDataProvider.init(url:)
+# - Name: CGDataProviderCreateWithFilename
+#   SwiftName: CGDataProvider.init(filename:)
+- Name: CGDataProviderCopyData
+  SwiftName: getter:CGDataProvider.data(self:)
+# CGDirectDisplay
+- Name: CGDisplayModeCopyPixelEncoding
+  SwiftName: getter:CGDisplayMode.pixelEncoding(self:)
+- Name: CGDisplayCreateImageForRect
+  SwiftName: CGDisplayCreateImage(_:rect:)
 # CGEvent
 - Name: CGEventCreateFromData
-  SwiftName: CGEventRef.init(withDataAllocator:data:)
+  SwiftName: CGEvent.init(withDataAllocator:data:)
+- Name: CGEventCreateData
+  SwiftName: getter:CGEvent.data(self:)
+- Name: CGEventCreateCopy
+  SwiftName: CGEvent.copy(self:)
 - Name: CGEventPostToPid
-  SwiftName: CGEventRef.postToPid(_:self:)
+  SwiftName: CGEvent.postToPid(_:self:)
 - Name: CGEventCreateSourceFromEvent
-  SwiftName: CGEventSourceRef.init(_:)
+  SwiftName: CGEventSource.init(event:)
 # CGFont
+- Name: CGFontCreateWithDataProvider
+  SwiftName: CGFont.init(_:)
+- Name: CGFontCreateWithFontName
+  SwiftName: CGFont.init(_:)
+- Name: CGFontCopyPostScriptName
+  SwiftName: getter:CGFont.postScriptName(self:)
+- Name: CGFontCopyFullName
+  SwiftName: getter:CGFont.fullName(self:)
+- Name: CGFontCopyVariationAxes
+  SwiftName: getter:CGFont.variationAxes(self:)
+- Name: CGFontCopyVariations
+  SwiftName: getter:CGFont.variations(self:)
+- Name: CGFontCopyGlyphNameForGlyph
+  SwiftName: CGFont.name(self:for:)
+- Name: CGFontCopyTableTags
+  SwiftName: getter:CGFont.tableTags(self:)
 - Name: CGFontCopyTableForTag
-  SwiftName: CGFontRef.copyTableForTag(self:_:)
+  SwiftName: CGFont.table(self:for:)
 # CGGeometry
 - Name: CGPointEqualToPoint
   SwiftName: CGPoint.equalTo(self:_:)
+- Name: CGPointCreateDictionaryRepresentation
+  SwiftName: getter:CGPoint.dictionaryRepresentation(self:)
+- Name: CGRectCreateDictionaryRepresentation
+  SwiftName: getter:CGRect.dictionaryRepresentation(self:)
 - Name: CGPointMakeWithDictionaryRepresentation
   SwiftName: CGPoint.makeWithDictionaryRepresentation(_:self:)
 - Name: CGSizeMakeWithDictionaryRepresentation
@@ -250,60 +353,116 @@ Functions:
   SwiftName: CGSize.equalTo(self:_:)
 - Name: CGRectEqualToRect
   SwiftName: CGRect.equalTo(self:_:)
+# CGGradient
+# - Name: CGGradientCreateWithColorComponents
+#   SwiftName: CGGradient.init(colorComponentsSpace:components:locations:count:)
+# - Name: CGGradientCreateWithColorSpace
+#   SwiftName: CGGradient.init(colorSpace:colors:locations:)
+
+# CGImage
+- Name: CGImageCreateCopyWithColorSpace
+  SwiftName: CGImage.copy(self:colorSpace:)
+- Name: CGImageCreateWithImageInRect
+  SwiftName: CGImage.cropping(self:to:)
+- Name: CGImageCreateWithMask
+  SwiftName: CGImage.masking(self:_:)
+- Name: CGImageCreateWithMaskingColors
+  SwiftName: CGImage.copy(self:maskingColorComponents:)
+- Name: CGImageIsMask
+  SwiftName: getter:CGImage.isMask(self:)
+# CGLayer
+- Name: CGLayerCreateWithContext
+  SwiftName: CGLayer.init(_:size:auxiliaryInfo:)
+- Name: CGContextDrawLayerInRect
+  SwiftName: CGContext.draw(self:in:layer:)
+- Name: CGContextDrawLayerAtPoint
+  SwiftName: CGContext.draw(self:at:layer:)
+
+# CGPDFContext
+- Name: CGPDFContextCreate
+  SwiftName: CGContext.init(consumer:mediaBox:_:)
+- Name: CGPDFContextCreateWithURL
+  SwiftName: CGContext.init(_:mediaBox:_:)
+- Name: CGPDFContextClose
+  SwiftName: CGContext.closePDF(self:)
+- Name: CGPDFContextBeginPage
+  SwiftName: CGContext.beginPDFPage(self:_:)
+- Name: CGPDFContextEndPage
+  SwiftName: CGContext.endPDFPage(self:)
+- Name: CGPDFContextAddDocumentMetadata
+  SwiftName: CGContext.addDocumentMetadata(self:_:)
+- Name: CGPDFContextSetURLForRect
+  SwiftName: CGContext.setURL(self:_:for:)
+- Name: CGPDFContextAddDestinationAtPoint
+  SwiftName: CGContext.addDestination(self:_:at:)
+- Name: CGPDFContextSetDestinationForRect
+  SwiftName: CGContext.setDestination(self:_:for:)
+
 # CGPDFDocument
 - Name: CGPDFDocumentGetID
-  SwiftName: getter:CGPDFDocumentRef.fileIdentifier(self:)
+  SwiftName: getter:CGPDFDocument.fileIdentifier(self:)
 - Name: CGPDFDocumentIsEncrypted
-  SwiftName: getter:CGPDFDocumentRef.isEncrypted(self:)
+  SwiftName: getter:CGPDFDocument.isEncrypted(self:)
 - Name: CGPDFDocumentIsUnlocked
-  SwiftName: getter:CGPDFDocumentRef.isUnlocked(self:)
+  SwiftName: getter:CGPDFDocument.isUnlocked(self:)
 - Name: CGPDFDocumentAllowsPrinting
-  SwiftName: getter:CGPDFDocumentRef.allowsPrinting(self:)
+  SwiftName: getter:CGPDFDocument.allowsPrinting(self:)
 - Name: CGPDFDocumentAllowsCopying
-  SwiftName: getter:CGPDFDocumentRef.allowsCopying(self:)
+  SwiftName: getter:CGPDFDocument.allowsCopying(self:)
 - Name: CGPDFDocumentCreateWithProvider
-  SwiftName: CGPDFDocumentRef.init(_:)
+  SwiftName: CGPDFDocument.init(_:)
 - Name: CGPDFDocumentCreateWithURL
-  SwiftName: CGPDFDocumentRef.init(with:)
+  SwiftName: CGPDFDocument.init(_:)
 - Name: CGPDFDocumentUnlockWithPassword
-  SwiftName: CGPDFDocumentRef.unlockWithPassword(self:_:)
+  SwiftName: CGPDFDocument.unlockWithPassword(self:_:)
 - Name: CGPDFDocumentGetPage
-  SwiftName: CGPDFDocumentRef.page(self:AtIndex:)
+  SwiftName: CGPDFDocument.page(self:at:)
 # CGPDFPage
-- Name: CGPDFPageGetBoxRect
-  SwiftName: getter:CGPDFPageRef.boxRect(self:)
+# FIXME: cannot be getter, due to extra parameter
+# - Name: CGPDFPageGetBoxRect
+#   SwiftName: getter:CGPDFPage.boxRect(self:)
 # CGPSConverter
 - Name: CGPSConverterIsConverting
-  SwiftName: getter:CGPSConverterRef.isConverting(self:)
+  SwiftName: getter:CGPSConverter.isConverting(self:)
 # CGPath
+- Name: CGPathCreateCopy
+  SwiftName: CGPath.copy(self:)
+- Name: CGPathCreateCopyByTransformingPath
+  SwiftName: CGPath.copy(self:using:)
+- Name: CGPathCreateMutableCopy
+  SwiftName: CGPath.mutableCopy(self:)
+- Name: CGPathCreateMutableCopyByTransformingPath
+  SwiftName: CGPath.mutableCopy(self:using:)
 - Name: CGPathEqualToPath
-  SwiftName: CGPathRef.equalTo(self:_:)
+  SwiftName: CGPath.equalTo(self:_:)
 - Name: CGPathGetPathBoundingBox
-  SwiftName: getter:CGPathRef.boundingBoxOfPath(self:)
+  SwiftName: getter:CGPath.boundingBoxOfPath(self:)
 - Name: CGPathContainsPoint
-  SwiftName: CGPathRef.containsPoint(self:_:point:eoFill:)
+  SwiftName: CGPath.containsPoint(self:_:point:eoFill:)
 - Name: CGPathMoveToPoint
-  SwiftName: CGMutablePathRef.moveTo(self:_:x:y:)
+  SwiftName: CGMutablePath.moveTo(self:_:x:y:)
 - Name: CGPathAddLineToPoint
-  SwiftName: CGMutablePathRef.addLineTo(self:_:x:y:)
+  SwiftName: CGMutablePath.addLineTo(self:_:x:y:)
 - Name: CGPathAddCurveToPoint
-  SwiftName: CGMutablePathRef.addCurve(self:_:cp1x:cp1y:cp2x:cp2y:endingAtX:y:)
+  SwiftName: CGMutablePath.addCurve(self:_:cp1x:cp1y:cp2x:cp2y:endingAtX:y:)
 - Name: CGPathAddQuadCurveToPoint
-  SwiftName: CGMutablePathRef.addQuadCurve(self:_:cpx:cpy:endingAtX:y:)
+  SwiftName: CGMutablePath.addQuadCurve(self:_:cpx:cpy:endingAtX:y:)
 - Name: CGPathAddRect
-  SwiftName: CGMutablePathRef.addRect(self:_:rect:)
+  SwiftName: CGMutablePath.addRect(self:_:rect:)
 - Name: CGPathAddRects
-  SwiftName: CGMutablePathRef.addRects(self:_:rects:count:)
+  SwiftName: CGMutablePath.addRects(self:_:rects:count:)
 - Name: CGPathAddLines
-  SwiftName: CGMutablePathRef.addLines(self:_:between:count:)
+  SwiftName: CGMutablePath.addLines(self:_:between:count:)
 - Name: CGPathAddEllipseInRect
-  SwiftName: CGMutablePathRef.addEllipseIn(self:_:rect:)
+  SwiftName: CGMutablePath.addEllipseIn(self:_:rect:)
 - Name: CGPathAddArc
-  SwiftName: CGMutablePathRef.addArc(self:_:x:y:radius:startAngle:endAngle:clockwise:)
+  SwiftName: CGMutablePath.addArc(self:_:x:y:radius:startAngle:endAngle:clockwise:)
 - Name: CGPathAddArcToPoint
-  SwiftName: CGMutablePathRef.addArc(self:_:x1:y1:x2:y2:radius:)
+  SwiftName: CGMutablePath.addArc(self:_:x1:y1:x2:y2:radius:)
 - Name: CGPathAddPath
-  SwiftName: CGMutablePathRef.addPath(self:_:path:)
+  SwiftName: CGMutablePath.addPath(self:_:path:)
+- Name: CGPathIsEmpty
+  SwiftName: getter:CGPath.isEmpty(self:)
 
 #
 # Global variables
@@ -401,6 +560,16 @@ Enumerators:
   SwiftName: CGWindowLevelKey.cursorWindow
 - Name: kCGAssistiveTechHighWindowLevelKey
   SwiftName: CGWindowLevelKey.assistiveTechHighWindow
+# CGConfigureOption
+- Name: kCGConfigureForAppOnly
+  SwiftName: forAppOnly
+# CGScreenUpdateOperation
+- Name: kCGScreenUpdateOperationRefresh
+  SwiftName: refresh
+# CGWindowListOption
+- Name: kCGWindowListOptionAll
+  SwiftName: optionAll
+
 
 #
 # Tags

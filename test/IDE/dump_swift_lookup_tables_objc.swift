@@ -42,38 +42,46 @@
 // CHECK-NEXT:     TU: SNSomeClass
 // CHECK-NEXT:   SomeProtocol:
 // CHECK-NEXT:     TU: SNSomeProtocol
-// CHECK-NEXT:   UIActionSheet:
+// CHECK:        UIActionSheet:
 // CHECK-NEXT:     TU: UIActionSheet
-// CHECK-NEXT:   __CCItem:
-// CHECK-NEXT:     TU: __CCItem
 // CHECK-NEXT:   __swift:
 // CHECK-NEXT:     TU: __swift
 // CHECK-NEXT:   accessibilityFloat:
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility accessibilityFloat]
+// CHECK-NEXT:   badPointerMethodAndReturnError:
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports badPointerMethodAndReturnError:]
+// CHECK-NEXT:   blockMethod:
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports blockMethodAndReturnError:]
 // CHECK-NEXT:   categoryMethodWith:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass categoryMethodWithX:y:], -[SNSomeClass categoryMethodWithX:y:z:]
-// CHECK-NEXT:   doubleProperty:
+// CHECK:        doubleProperty:
 // CHECK-NEXT:     SNSomeClass: SNSomeClass.doubleProperty
 // CHECK-NEXT:   extensionMethodWith:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass extensionMethodWithX:y:]
-// CHECK-NEXT:   floatProperty:
+// CHECK:        floatProperty:
 // CHECK-NEXT:     SNSomeClass: SNSomeClass.floatProperty
+// CHECK-NEXT:   functionPointerMethod:
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports functionPointerMethodAndReturnError:]
 // CHECK-NEXT:   init:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass initWithFloat:], -[SNSomeClass initWithDefault], +[SNSomeClass someClassWithDouble:], +[SNSomeClass someClassWithTry:], +[SNSomeClass buildWithUnsignedChar:]
 // CHECK-NEXT:     UIActionSheet: -[UIActionSheet initWithTitle:delegate:cancelButtonTitle:destructiveButtonTitle:otherButtonTitles:]
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports initAndReturnError:], -[NSErrorImports initWithFloat:error:]
 // CHECK-NEXT:   instanceMethodWith:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass instanceMethodWithX:Y:Z:]
-// CHECK-NEXT:   method:
+// CHECK:        method:
 // CHECK-NEXT:     NSErrorImports: -[NSErrorImports methodAndReturnError:], -[NSErrorImports methodWithFloat:error:]
-// CHECK-NEXT:   objectAtIndexedSubscript:
+// CHECK:        objectAtIndexedSubscript:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 // CHECK-NEXT:   optSetter:
 // CHECK-NEXT:     SNCollision: SNCollision.optSetter
+// CHECK-NEXT:   pointerMethod:
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports pointerMethodAndReturnError:]
 // CHECK-NEXT:   protoInstanceMethodWith:
 // CHECK-NEXT:     SNSomeProtocol: -[SNSomeProtocol protoInstanceMethodWithX:y:]
-// CHECK-NEXT:   reqSetter:
+// CHECK:        reqSetter:
 // CHECK-NEXT:     SNCollision: SNCollision.reqSetter
+// CHECK-NEXT:   selectorMethod:
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports selectorMethodAndReturnError:]
 // CHECK-NEXT:   setAccessibilityFloat:
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility setAccessibilityFloat:]
 // CHECK-NEXT:   subscript:

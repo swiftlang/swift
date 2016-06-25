@@ -10,7 +10,7 @@ func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {}
 func takesNoEscapeClosure(_ fn : @noescape () -> Int) {
   takesNoEscapeClosure { 4 }  // ok
 
-  fn()  // ok
+  _ = fn()  // ok
 
   var x = fn  // expected-error {{@noescape parameter 'fn' may only be called}}
 
@@ -22,7 +22,7 @@ func takesNoEscapeClosure(_ fn : @noescape () -> Int) {
 
   // This is not ok, because it escapes the 'fn' closure.
   func nested_function() {
-    fn()   // expected-error {{declaration closing over @noescape parameter 'fn' may allow it to escape}}
+    _ = fn()   // expected-error {{declaration closing over @noescape parameter 'fn' may allow it to escape}}
   }
 
   takesNoEscapeClosure(fn)  // ok
@@ -44,6 +44,7 @@ class SomeClass {
     takesNoEscapeClosure { x }
   }
 
+  @discardableResult
   func foo() -> Int {
     foo()
 
@@ -105,6 +106,7 @@ class SomeClass {
     }
 
     struct Outer {
+      @discardableResult
       func bar() -> Int {
         bar()
 
@@ -126,6 +128,7 @@ class SomeClass {
 
     func structOuter() {
       struct Inner {
+        @discardableResult
         func bar() -> Int {
           bar() // no-warning
 
@@ -178,16 +181,16 @@ protocol P2 : P1 {
   associatedtype Element
 }
 
-func overloadedEach<O: P1, T>(_ source: O, _ transform: O.Element -> (), _: T) {}
+func overloadedEach<O: P1, T>(_ source: O, _ transform: (O.Element) -> (), _: T) {}
 
-func overloadedEach<P: P2, T>(_ source: P, _ transform: P.Element -> (), _: T) {}
+func overloadedEach<P: P2, T>(_ source: P, _ transform: (P.Element) -> (), _: T) {}
 
 struct S : P2 {
   typealias Element = Int
-  func each(_ transform: @noescape Int -> ()) {
-    overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @noescape Int -> (), Int)'}}
+  func each(_ transform: @noescape (Int) -> ()) {
+    overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @noescape (Int) -> (), Int)'}}
                    transform, 1)
-    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, O.Element -> (), T), (P, P.Element -> (), T)}}
+    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, (O.Element) -> (), T), (P, (P.Element) -> (), T)}}
   }
 }
 
@@ -269,7 +272,7 @@ func doThing2(_ completion: CompletionHandlerNE) {
 }
 
 // <rdar://problem/19997680> @noescape doesn't work on parameters of function type
-func apply<T, U>(_ f: @noescape (T) -> U, g: @noescape (@noescape T -> U) -> U) -> U {
+func apply<T, U>(_ f: @noescape (T) -> U, g: @noescape (@noescape (T) -> U) -> U) -> U {
   return g(f)
 }
 
@@ -282,21 +285,21 @@ enum r19997577Type {
   func reduce<Result>(_ initial: Result, _ combine: @noescape (Result, r19997577Type) -> Result) -> Result {
     let binary: @noescape (r19997577Type, r19997577Type) -> Result = { combine(combine(combine(initial, self), $0), $1) }
     switch self {
-    case Unit:
+    case .Unit:
       return combine(initial, self)
-    case let Function(t1, t2):
+    case let .Function(t1, t2):
       return binary(t1(), t2())
-    case let Sum(t1, t2):
+    case let .Sum(t1, t2):
       return binary(t1(), t2())
     }
   }
 }
 
 // type attribute and decl attribute
-func noescapeD(@noescape f: () -> Bool) {} // expected-warning {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape}}
+func noescapeD(@noescape f: () -> Bool) {} // expected-warning {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape }}
 func noescapeT(f: @noescape () -> Bool) {} // ok
-func autoclosureD(@autoclosure f: () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure}}
+func autoclosureD(@autoclosure f: () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure }}
 func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
 
 func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {}
-func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure}}
+func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure }}

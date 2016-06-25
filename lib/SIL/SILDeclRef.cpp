@@ -275,8 +275,12 @@ bool SILDeclRef::isClangGenerated() const {
   if (!hasDecl())
     return false;
 
-  auto clangNode = getDecl()->getClangNode().getAsDecl();
-  if (auto nd = dyn_cast_or_null<clang::NamedDecl>(clangNode)) {
+  return isClangGenerated(getDecl()->getClangNode());
+}
+
+// FIXME: this is a weird predicate.
+bool SILDeclRef::isClangGenerated(ClangNode node) {
+  if (auto nd = dyn_cast_or_null<clang::NamedDecl>(node.getAsDecl())) {
     // ie, 'static inline' functions for which we must ask Clang to emit a body
     // for explicitly
     if (!nd->isExternallyVisible())
@@ -328,15 +332,8 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       if (isa<ClangModuleUnit>(derivedFor->getModuleScopeContext()))
         return ClangLinkage;
   }
-
-  // If the module is being built with -sil-serialize-all, everything has
-  // to have public linkage.
-  if (moduleContext->getParentModule()->getResilienceStrategy()
-      == ResilienceStrategy::Fragile) {
-    return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);
-  }
-
-  // Otherwise, linkage is determined by accessibility at the AST level.
+  
+  // Otherwise, we have external linkage.
   switch (d->getEffectiveAccess()) {
     case Accessibility::Private:
       return (forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal);

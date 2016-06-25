@@ -1,9 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/Assertions.swift
-// RUN: %S/../../utils/line-directive %t/Assertions.swift -- %target-build-swift %t/Assertions.swift -o %t/a.out
-//
-// RUN: %S/../../utils/line-directive %t/Assertions.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -160,6 +155,68 @@ AssertionsTestSuite.test("expectEqualsUnordered(Range<T>, [T])") {
   }
 
 % end
+}
+
+AssertionsTestSuite.test("expectEqual<T : Equatable>") {
+  let _0 = MinimalEquatableValue(0)
+  let _1 = MinimalEquatableValue(1)
+
+  expectEqual(_0, _0)
+  expectEqual(_1, _1)
+  expectFailure {
+    expectEqual(_0, _1)
+    expectEqual(_1, _0)
+  }
+}
+
+AssertionsTestSuite.test("expectEqual<T : Equatable, U : Equatable>") {
+  let _0 = MinimalEquatableValue(0)
+  let _1 = MinimalEquatableValue(1)
+
+  for a in [_0, _1] {
+    for b in [_0, _1] {
+      for c in [_0, _1] {
+        for d in [_0, _1] {
+          let lhs = (a, b)
+          let rhs = (c, d)
+          if lhs == rhs {
+            expectEqual(lhs, rhs)
+          } else {
+            expectFailure {
+              expectEqual(lhs, rhs)
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+AssertionsTestSuite.test("expectEqual<T : Equatable, U : Equatable, V : Equatable>") {
+  let _0 = MinimalEquatableValue(0)
+  let _1 = MinimalEquatableValue(1)
+
+  for a in [_0, _1] {
+    for b in [_0, _1] {
+      for c in [_0, _1] {
+        for d in [_0, _1] {
+          for e in [_0, _1] {
+            for f in [_0, _1] {
+              let lhs = (a, b, c)
+              let rhs = (d, e, f)
+              if lhs == rhs {
+                expectEqual(lhs, rhs)
+              } else {
+                expectFailure {
+                  expectEqual(lhs, rhs)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 runAllTests()

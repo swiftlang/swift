@@ -36,6 +36,30 @@ static bool isUnmappedDecl(Decl *D) {
   return D->isImplicit() || isa<EnumCaseDecl>(D);
 }
 
+/// Walk the non-static initializers in \p PBD.
+static void walkForProfiling(PatternBindingDecl *PBD, ASTWalker &Walker) {
+  if (PBD && !PBD->isStatic())
+    for (auto E : PBD->getPatternList())
+      if (E.getInit())
+        E.getInit()->walk(Walker);
+}
+
+/// Walk the AST of \c Root and related nodes that are relevant for profiling.
+static void walkForProfiling(AbstractFunctionDecl *Root, ASTWalker &Walker) {
+  Root->walk(Walker);
+
+  // We treat class initializers as part of the constructor for profiling.
+  if (auto *CD = dyn_cast<ConstructorDecl>(Root)) {
+    Type DT = CD->getDeclContext()->getDeclaredTypeInContext();
+    auto *NominalType = DT->getNominalOrBoundGenericNominal();
+    for (auto *Member : NominalType->getMembers()) {
+      // Find pattern binding declarations that have initializers.
+      if (auto *PBD = dyn_cast<PatternBindingDecl>(Member))
+        walkForProfiling(PBD, Walker);
+    }
+  }
+}
+
 ProfilerRAII::ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D)
     : SGM(SGM), PreviousProfiler(std::move(SGM.Profiler)) {
   const auto &Opts = SGM.M.getOptions();
@@ -82,6 +106,7 @@ struct MapRegionCounters : public ASTWalker {
       CounterMap[FS->getBody()] = NextCounter++;
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       CounterMap[FES->getBody()] = NextCounter++;
+      walkForProfiling(FES->getIterator(), *this);
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       CounterMap[SS] = NextCounter++;
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
@@ -324,7 +349,8 @@ private:
     CounterExpr *JumpsToLabel = nullptr;
     Stmt *ParentStmt = Parent.getAsStmt();
     if (ParentStmt) {
-      if (isa<DoCatchStmt>(ParentStmt) || isa<CatchStmt>(ParentStmt))
+      if (isa<DoStmt>(ParentStmt) || isa<DoCatchStmt>(ParentStmt) ||
+          isa<CatchStmt>(ParentStmt))
         return;
       if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
         JumpsToLabel = &getCounter(LS);
@@ -494,6 +520,7 @@ public:
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       assignCounter(FES, CounterExpr::Zero());
       assignCounter(FES->getBody());
+      walkForProfiling(FES->getIterator(), *this);
 
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       assignCounter(SS);
@@ -503,6 +530,10 @@ public:
 
     } else if (isa<CaseStmt>(S)) {
       pushRegion(S);
+
+    } else if (auto *DS = dyn_cast<DoStmt>(S)) {
+      assignCounter(DS->getBody(), CounterExpr::Ref(getCurrentCounter()));
+      assignCounter(DS);
 
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
       assignCounter(DCS->getBody(), CounterExpr::Ref(getCurrentCounter()));
@@ -624,25 +655,6 @@ public:
 };
 
 } // end anonymous namespace
-
-/// Walk the AST of \c Root and related nodes that are relevant for profiling.
-static void walkForProfiling(AbstractFunctionDecl *Root, ASTWalker &Walker) {
-  Root->walk(Walker);
-
-  // We treat class initializers as part of the constructor for profiling.
-  if (auto *CD = dyn_cast<ConstructorDecl>(Root)) {
-    Type DT = CD->getDeclContext()->getDeclaredTypeInContext();
-    auto *NominalType = DT->getNominalOrBoundGenericNominal();
-    for (auto *Member : NominalType->getMembers()) {
-      // Find pattern binding declarations that have initializers.
-      if (auto *PBD = dyn_cast<PatternBindingDecl>(Member))
-        if (!PBD->isStatic())
-          for (auto E : PBD->getPatternList())
-            if (E.getInit())
-              E.getInit()->walk(Walker);
-    }
-  }
-}
 
 static llvm::GlobalValue::LinkageTypes
 getEquivalentPGOLinkage(FormalLinkage Linkage) {

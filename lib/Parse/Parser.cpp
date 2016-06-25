@@ -600,7 +600,15 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
   }
 
   checkForInputIncomplete();
-  diagnose(Tok, D);
+
+  if (Tok.isKeyword()) {
+    diagnose(Tok, diag::keyword_cant_be_identifier, Tok.getText());
+    diagnose(Tok, diag::backticks_to_escape)
+      .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
+  } else {
+    diagnose(Tok, D);
+  }
+
   return true;
 }
 
@@ -826,7 +834,7 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
   auto parseBaseName = [&](StringRef text) -> bool {
     // Split the text into context name and base name.
     StringRef contextName, baseName;
-    std::tie(contextName, baseName) = text.split('.');
+    std::tie(contextName, baseName) = text.rsplit('.');
     if (baseName.empty()) {
       baseName = contextName;
       contextName = StringRef();
@@ -834,14 +842,26 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
       return true;
     }
 
+    auto isValidIdentifier = [](StringRef text) -> bool {
+      return Lexer::isIdentifier(text) && text != "_";
+    };
+
     // Make sure we have an identifier for the base name.
-    if (!Lexer::isIdentifier(baseName) || baseName == "_")
+    if (!isValidIdentifier(baseName))
       return true;
 
-    // If we have a context, make sure it is an identifier.
-    if (!contextName.empty() &&
-        (!Lexer::isIdentifier(contextName) || contextName == "_"))
-      return true;
+    // If we have a context, make sure it is an identifier, or a series of
+    // dot-separated identifiers.
+    // FIXME: What about generic parameters?
+    if (!contextName.empty()) {
+      StringRef first;
+      StringRef rest = contextName;
+      do {
+        std::tie(first, rest) = rest.split('.');
+        if (!isValidIdentifier(first))
+          return true;
+      } while (!rest.empty());
+    }
 
     // Record the results.
     result.ContextName = contextName;

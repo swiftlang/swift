@@ -64,7 +64,6 @@ def TypedUnaryIntrinsicFunctions():
 // Note these have a corresponding LLVM intrinsic
 % for T, CT, bits, ufunc in TypedUnaryIntrinsicFunctions():
 @_transparent
-@warn_unused_result
 public func _${ufunc}(_ x: ${T}) -> ${T} {
   return ${T}(_bits: Builtin.int_${ufunc}_FPIEEE${bits}(x._value))
 }

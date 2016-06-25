@@ -14,15 +14,46 @@
 
 /// A type that represents a Boolean value.
 ///
-/// Types that conform to the `Boolean` protocol can be used as
-/// the condition in control statements (`if`, `while`, C-style `for`)
-/// and other logical value contexts (e.g., `case` statement guards).
+/// Types that conform to the `Boolean` protocol can be used as the condition
+/// in control statements, such as `if` and `while`, and in other contexts
+/// that require a logical value, such as the `where` clause of a `case`
+/// statement.
 ///
-/// Only three types provided by Swift, `Bool`, `DarwinBoolean`, and `ObjCBool`,
-/// conform to `Boolean`. Expanding this set to include types that
-/// represent more than simple boolean values is discouraged.
+/// Swift uses only simple Boolean values in conditional contexts to help avoid
+/// accidental programming errors and to help maintain the clarity of each
+/// control statement. Unlike other programming languages, integers or strings
+/// cannot be used where a Boolean value is expected.
+///
+/// For example, the following code sample will not compile, because it
+/// attempts to use the integer `i` in a logical context:
+///
+///     var i = 5
+///     while i {
+///         print(i)
+///         i -= 1
+///     }
+///
+/// The correct approach in Swift is to compare the `i` value with zero in the
+/// `while` statement.
+///
+///     while i != 0 {
+///         print(i)
+///         i -= 1
+///     }
+///
+/// Conforming to the Boolean Protocol
+/// ==================================
+///
+/// Only three types provided by Swift---`Bool`, `DarwinBoolean`, and
+/// `ObjCBool`---conform to the `Boolean` protocol. Expanding this set to
+/// include types that represent more than simple Boolean values is
+/// discouraged.
+///
+/// To add `Boolean` conformance to your custom type, implement a `boolValue`
+/// property that represents your type as an instance of `Bool`, the default
+/// concrete type for the `Boolean` protocol.
 public protocol Boolean {
-  /// The value of `self`, expressed as a `Bool`.
+  /// This value expressed as a `Bool` instance.
   var boolValue: Bool { get }
 }
 
@@ -96,7 +127,7 @@ public protocol Boolean {
 /// In the case of the `Directions` option set, an instance can contain zero,
 /// one, or more of the four defined directions. This example declares a
 /// constant with three currently allowed moves. The raw value of the
-/// `allowedMoves` instance is the result of the bitwise `OR` of its three
+/// `allowedMoves` instance is the result of the bitwise OR of its three
 /// members' raw values:
 ///
 ///     let allowedMoves: Directions = [.up, .down, .left]
@@ -105,8 +136,8 @@ public protocol Boolean {
 ///
 /// Option sets use bitwise operations on their associated raw values to
 /// implement their mathematical set operations. For example, the `contains()`
-/// method on `allowedMoves` performs a bitwise `AND` operation to check
-/// whether the option set contains an element.
+/// method on `allowedMoves` performs a bitwise AND operation to check whether
+/// the option set contains an element.
 ///
 ///     print(allowedMoves.contains(.right))
 ///     // Prints "false"
@@ -159,53 +190,48 @@ public protocol RawRepresentable {
   var rawValue: RawValue { get }
 }
 
-/// Returns a Boolean value indicating whether the two operands are equal.
+/// Returns a Boolean value indicating whether the two arguments are equal.
 ///
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-/// - Returns: `true` if the two operands have equal raw values; otherwise,
-///   `false`.
-@warn_unused_result
-public func == <
-  T : RawRepresentable where T.RawValue : Equatable
->(lhs: T, rhs: T) -> Bool {
+public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
+  where T.RawValue : Equatable {
   return lhs.rawValue == rhs.rawValue
 }
 
-/// Returns a Boolean value indicating whether the two operands are not equal.
+/// Returns a Boolean value indicating whether the two arguments are not equal.
 ///
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-/// - Returns: `true` if the two operands have unequal raw values; otherwise,
-///   `false`.
-@warn_unused_result
-public func != <
-  T : RawRepresentable where T.RawValue : Equatable
->(lhs: T, rhs: T) -> Bool {
+public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
+  where T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
 }
 
 // This overload is needed for ambiguity resolution against the
 // implementation of != for T : Equatable
-/// Returns a Boolean value indicating whether the two operands are not equal.
+/// Returns a Boolean value indicating whether the two arguments are not equal.
 ///
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-/// - Returns: `true` if the two operands have unequal raw values; otherwise,
-///   `false`.
-@warn_unused_result
-public func != <
-  T : Equatable where T : RawRepresentable, T.RawValue : Equatable
->(lhs: T, rhs: T) -> Bool {
+public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
+  where T : RawRepresentable, T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
 }
 
-/// Conforming types can be initialized with `nil`.
+/// A type that can be initialized using the nil literal, `nil`.
+///
+/// `nil` has a specific meaning in Swift---the absence of a value. Only the
+/// `Optional` type conforms to `NilLiteralConvertible`.
+/// `NilLiteralConvertible` conformance for types that use `nil` for other
+/// purposes is discouraged.
+///
+/// - SeeAlso: `Optional`
 public protocol NilLiteralConvertible {
-  /// Create an instance initialized with `nil`.
+  /// Creates an instance initialized with `nil`.
   init(nilLiteral: ())
 }
 
@@ -235,11 +261,32 @@ public protocol _BuiltinBooleanLiteralConvertible {
   init(_builtinBooleanLiteral value: Builtin.Int1)
 }
 
-/// Conforming types can be initialized with the Boolean literals
-/// `true` and `false`.
+/// A type that can be initialized with the Boolean literals `true` and
+/// `false`.
+///
+/// Only three types provided by Swift---`Bool`, `DarwinBoolean`, and
+/// `ObjCBool`---are treated as Boolean values. Expanding this set to include
+/// types that represent more than simple Boolean values is discouraged.
+///
+/// To add `BooleanLiteralConvertible` conformance to your custom type,
+/// implement the `init(booleanLiteral:)` initializer that creates an instance
+/// of your type with the given Boolean value.
 public protocol BooleanLiteralConvertible {
+  /// A type that can represent a Boolean literal, such as `Bool`.
   associatedtype BooleanLiteralType : _BuiltinBooleanLiteralConvertible
-  /// Create an instance initialized to `value`.
+
+  /// Creates an instance initialized to the given Boolean value.
+  ///
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using one of the Boolean literals `true` and `false`. For
+  /// example:
+  ///
+  ///     let twasBrillig = true
+  ///
+  /// In this example, the assignments to the `twasBrillig` constant calls this
+  /// Boolean literal initializer behind the scenes.
+  ///
+  /// - Parameter value: The value of the new instance.
   init(booleanLiteral value: BooleanLiteralType)
 }
 
@@ -247,11 +294,31 @@ public protocol _BuiltinUnicodeScalarLiteralConvertible {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32)
 }
 
-/// Conforming types can be initialized with string literals
-/// containing a single [Unicode scalar value](http://www.unicode.org/glossary/#unicode_scalar_value).
+/// A type that can be initialized with a string literal containing a single
+/// Unicode scalar value.
+///
+/// The `String`, `StaticString`, `Character`, and `UnicodeScalar` types all
+/// conform to the `UnicodeScalarLiteralConvertible` protocol. You can
+/// initialize a variable of any of these types using a string literal that
+/// holds a single Unicode scalar.
+///
+///     let ñ: UnicodeScalar = "ñ"
+///     print(ñ)
+///     // Prints "ñ"
+///
+/// Conforming to UnicodeScalarLiteralConvertible
+/// =============================================
+///
+/// To add `UnicodeScalarLiteralConvertible` conformance to your custom type,
+/// implement the required initializer.
 public protocol UnicodeScalarLiteralConvertible {
+  /// A type that can represent a Unicode scalar literal.
+  ///
+  /// Valid types for `UnicodeScalarLiteralType` are `UnicodeScalar`,
+  /// `String`, and `StaticString`.
   associatedtype UnicodeScalarLiteralType : _BuiltinUnicodeScalarLiteralConvertible
-  /// Create an instance initialized to `value`.
+
+  /// Creates an instance initialized to the given value.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
 }
 
@@ -264,14 +331,40 @@ public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
     isASCII: Builtin.Int1)
 }
 
-/// Conforming types can be initialized with string literals
-/// containing a single [Unicode extended grapheme cluster](http://www.unicode.org/glossary/#extended_grapheme_cluster).
+/// A type that can be initialized with a string literal containing a single
+/// extended grapheme cluster.
+///
+/// An *extended grapheme cluster* is a group of one or more Unicode code
+/// points that approximates a single user-perceived character.  Many
+/// individual characters, such as "é", "김", and "🇮🇳", can be made up of
+/// multiple Unicode code points. These code points are combined by Unicode's
+/// boundary algorithms into extended grapheme clusters.
+///
+/// The `String`, `StaticString`, and `Character` types conform to the
+/// `ExtendedGraphemeClusterLiteralConvertible` protocol. You can initialize a
+/// variable or constant of any of these types using a string literal that
+/// holds a single character.
+///
+///     let snowflake: Character = "❄︎"
+///     print(snowflake)
+///     // Prints "❄︎"
+///
+/// Conforming to ExtendedGraphemeClusterLiteralConvertible
+/// =======================================================
+///
+/// To add `ExtendedGraphemeClusterLiteralConvertible` conformance to your
+/// custom type, implement the required initializer.
 public protocol ExtendedGraphemeClusterLiteralConvertible
   : UnicodeScalarLiteralConvertible {
 
+  /// A type that can represent an extended grapheme cluster literal.
+  ///
+  /// Valid types for `ExtendedGraphemeClusterLiteralType` are `Character`,
+  /// `String`, and `StaticString`.
   associatedtype ExtendedGraphemeClusterLiteralType
     : _BuiltinExtendedGraphemeClusterLiteralConvertible
-  /// Create an instance initialized to `value`.
+  
+  /// Creates an instance initialized to the given value.
   init(extendedGraphemeClusterLiteral value: ExtendedGraphemeClusterLiteralType)
 }
 
@@ -292,14 +385,30 @@ public protocol _BuiltinUTF16StringLiteralConvertible
     utf16CodeUnitCount: Builtin.Word)
 }
 
-/// Conforming types can be initialized with arbitrary string literals.
+/// A type that can be initialized with a string literal.
+///
+/// The `String` and `StaticString` types conform to the
+/// `StringLiteralConvertible` protocol. You can initialize a variable or
+/// constant of either of these types using a string literal of any length.
+///
+///     let picnicGuest = "Deserving porcupine"
+///
+/// Conforming to StringLiteralConvertible
+/// ======================================
+///
+/// To add `StringLiteralConvertible` conformance to your custom type,
+/// implement the required initializer.
 public protocol StringLiteralConvertible
   : ExtendedGraphemeClusterLiteralConvertible {
   // FIXME: when we have default function implementations in protocols, provide
   // an implementation of init(extendedGraphemeClusterLiteral:).
-
+  
+  /// A type that can represent a string literal.
+  ///
+  /// Valid types for `StringLiteralType` are `String` and `StaticString`.
   associatedtype StringLiteralType : _BuiltinStringLiteralConvertible
-  /// Create an instance initialized to `value`.
+  
+  /// Creates an instance initialized to the given string value.
   init(stringLiteral value: StringLiteralType)
 }
 
@@ -413,44 +522,173 @@ public protocol StringLiteralConvertible
 ///         }
 ///     }
 public protocol ArrayLiteralConvertible {
+  /// The type of the elements of an array literal.
   associatedtype Element
   /// Creates an instance initialized with the given elements.
   init(arrayLiteral elements: Element...)
 }
 
-/// Conforming types can be initialized with dictionary literals.
+/// A type that can be initialized using a dictionary literal.
+///
+/// A dictionary literal is a simple way of writing a list of key-value pairs.
+/// You write each key-value pair with a colon (`:`) separating the key and
+/// the value. The dictionary literal is made up of one or more key-value
+/// pairs, separated by commas and surrounded with square brackets.
+///
+/// To declare a dictionary, assign a dictionary literal to a variable or
+/// constant:
+///
+///     let countryCodes = ["BR": "Brazil", "GH": "Ghana",
+///                         "JP": "Japan", "US": "United States"]
+///     // 'countryCodes' has type [String: String]
+///
+///     print(countryCodes["BR"]!)
+///     // Prints "Brazil"
+///
+/// When the context provides enough type information, you can use a special
+/// form of the dictionary literal, square brackets surrounding a single
+/// colon, to initialize an empty dictionary.
+///
+///     var frequencies: [String: Int] = [:]
+///     print(frequencies.count)
+///     // Prints "0"
+///
+/// - Note: A dictionary literal is *not* the same as an instance of
+///   `Dictionary` or the similarly named `DictionaryLiteral` type. You can't
+///   initialize a type that conforms to `DictionaryLiteralConvertible` simply
+///   by assigning an instance of one of these types.
+///
+/// Conforming to the DictionaryLiteralConvertible Protocol
+/// =======================================================
+///
+/// To add the capability to be initialized with a dictionary literal to your
+/// own custom types, declare an `init(dictionaryLiteral:)` initializer. The
+/// following example shows the dictionary literal initializer for a
+/// hypothetical `CountedSet` type, which uses setlike semantics while keeping
+/// track of the count for duplicate elements:
+///
+///     struct CountedSet<Element: Hashable>: Collection, SetAlgebra {
+///         // implementation details
+///
+///         /// Updates the count stored in the set for the given element,
+///         /// adding the element if necessary.
+///         ///
+///         /// - Parameter n: The new count for `element`. `n` must be greater
+///         ///   than or equal to zero.
+///         /// - Parameter element: The element to set the new count on.
+///         mutating func updateCount(_ n: Int, for element: Element)
+///     }
+///
+///     extension CountedSet: DictionaryLiteralConvertible {
+///         init(dictionaryLiteral elements: (Element, Int)...) {
+///             self.init()
+///             for (element, count) in elements {
+///                 self.updateCount(count, for: element)
+///             }
+///         }
+///     }
 public protocol DictionaryLiteralConvertible {
+  /// The key type of a dictionary literal.
   associatedtype Key
+  /// The value type of a dictionary literal.
   associatedtype Value
   /// Create an instance initialized with `elements`.
   init(dictionaryLiteral elements: (Key, Value)...)
 }
 
-/// Conforming types can be initialized with string interpolations
-/// containing `\(`...`)` clauses.
+/// A type that can be initialized by string interpolation with a string
+/// literal that includes expressions.
+///
+/// Use string interpolation to include one or more expressions in a string
+/// literal, wrapped in a set of parentheses and prefixed by a backslash. For
+/// example:
+///
+///     let price = 2
+///     let number = 3
+///     let message = "One cookie: $\(price), \(number) cookies: $\(price * number)."
+///     print(message)
+///     // Prints "One cookie: $2, 3 cookies: $6."
+///
+/// Conforming to the StringInterpolationConvertible Protocol
+/// =========================================================
+///
+/// To use string interpolation to initialize instances of your custom type,
+/// implement the required initializers for `StringInterpolationConvertible`
+/// conformance. String interpolation is a multiple-step initialization
+/// process. When you use string interpolation, the following steps occur:
+///
+/// 1. The string literal is broken into pieces. Each segment of the string
+///    literal before, between, and after any included expressions, along with
+///    the individual expressions themselves, are passed to the
+///    `init(stringInterpolationSegment:)` initializer.
+/// 2. The results of those calls are passed to the
+///    `init(stringInterpolation:)` initializer in the order in which they
+///    appear in the string literal.
+///
+/// In other words, initializing the `message` constant in the example above
+/// using string interpolation is equivalent to the following code:
+///
+///     let message = String(stringInterpolation:
+///           String(stringInterpolationSegment: "One cookie: $"),
+///           String(stringInterpolationSegment: price),
+///           String(stringInterpolationSegment: ", "),
+///           String(stringInterpolationSegment: number),
+///           String(stringInterpolationSegment: " cookies: $"),
+///           String(stringInterpolationSegment: price * number),
+///           String(stringInterpolationSegment: "."))
 public protocol StringInterpolationConvertible {
-  /// Create an instance by concatenating the elements of `strings`.
+  /// Creates an instance by concatenating the given values.
+  ///
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// you use string interpolation. For example:
+  ///
+  ///     let s = "\(5) x \(2) = \(5 * 2)"
+  ///     print(s)
+  ///     // Prints "5 x 2 = 10"
+  ///
+  /// After calling `init(stringInterpolationSegment:)` with each segment of
+  /// the string literal, this initializer is called with their string
+  /// representations.
+  ///
+  /// - Parameter strings: An array of instances of the conforming type.
   init(stringInterpolation strings: Self...)
-  /// Create an instance containing `expr`'s `print` representation.
+  
+  /// Creates an instance containing the appropriate representation for the
+  /// given value.
+  ///
+  /// Do not call this initializer directly. It is used by the compiler for
+  /// each string interpolation segment when you use string interpolation. For
+  /// example:
+  ///
+  ///     let s = "\(5) x \(2) = \(5 * 2)"
+  ///     print(s)
+  ///     // Prints "5 x 2 = 10"
+  ///
+  /// This initializer is called five times when processing the string literal
+  /// in the example above; once each for the following: the integer `5`, the
+  /// string `" x "`, the integer `2`, the string `" = "`, and the result of
+  /// the expression `5 * 2`.
+  ///
+  /// - Parameter expr: The expression to represent.
   init<T>(stringInterpolationSegment expr: T)
 }
 
 /// Conforming types can be initialized with color literals (e.g.
 /// `#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)`).
 public protocol _ColorLiteralConvertible {
-  init(red: Float, green: Float, blue: Float, alpha: Float)
+  init(colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
 }
 
 /// Conforming types can be initialized with image literals (e.g.
 /// `#imageLiteral(resourceName: "hi.png")`).
 public protocol _ImageLiteralConvertible {
-  init(resourceName: String)
+  init(imageLiteralResourceName path: String)
 }
 
 /// Conforming types can be initialized with strings (e.g.
 /// `#fileLiteral(resourceName: "resource.txt")`).
 public protocol _FileReferenceLiteralConvertible {
-  init(resourceName: String)
+  init(fileReferenceLiteralResourceName path: String)
 }
 
 /// A container is destructor safe if whether it may store to memory on

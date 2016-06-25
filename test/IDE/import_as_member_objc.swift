@@ -44,8 +44,6 @@ import IAMError
 
 // Errors
 ErrorStruct.hasPrototype();
-ErrorStruct.nonPrototype();
-  // expected-error@-1{{type 'ErrorStruct' has no member 'nonPrototype'}}
 
 // Protocols
 @objc class Foo : NSObject, IAMProto {}
@@ -70,3 +68,9 @@ FooErr.mutateSomeStaticState()
 let someClassOpts: SomeClass.Options = .fuzzyDice
 let someClass = SomeClass(value: 3.14159)
 someClass.applyOptions(someClassOpts)
+
+class SomeSub : UnavailableDefaultInitSub { }
+
+// Handle default initializers.
+let udi1 = UnavailableDefaultInit()
+let udis1 = UnavailableDefaultInitSub()

@@ -37,7 +37,7 @@ struct B {
 }
 
 func test2(_ b : B!) {
-  var b = b
+  var b: B! = b
   let x = b.x
   b.x = x
   b = nil
@@ -56,7 +56,7 @@ func test3(_ x: Subscriptable!) -> Int {
 }
 
 // Callable
-func test4(_ f: (Int -> Float)!) -> Float {
+func test4(_ f: ((Int) -> Float)!) -> Float {
   return f(5)
 }
 
@@ -73,7 +73,7 @@ class Test9b : Test9a {}
 func test9_produceUnchecked() -> Test9b! { return Test9b() }
 func test9_consume(_ foo : Test9b) {}
 func test9() -> Test9a {
-  let foo = test9_produceUnchecked()
+  let foo = test9_produceUnchecked()!
   test9_consume(foo)
   let _ : Test9a = foo
   return foo
@@ -89,6 +89,6 @@ func test11_helper<T : P11>(_ t: T) { }
 func test11(_ i: Int!, j: Int!) {
   var j = j
   test11_helper(i)
-  test11_helper(j)
+  test11_helper(j!)
   j = nil
 }

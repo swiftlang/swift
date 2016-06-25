@@ -14,21 +14,38 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_MSC_VER)
+#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
+#else
+#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#if defined(_MSC_VER)
+#include <io.h>
+#else
 #include <unistd.h>
-#include <pthread.h>
+#endif
 #include <stdarg.h>
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Basic/Demangle.h"
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/StringRef.h"
+#if !defined(_MSC_VER)
 #include <cxxabi.h>
-#if !defined(__CYGWIN__) && !defined(__ANDROID__)
+#endif
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+
 // execinfo.h is not available on Android. Checks in this file ensure that
 // fatalError behaves as expected, but without stack traces.
 #include <execinfo.h>
+// We are only using dlfcn.h in code that is invoked on non cygwin/android
+// platforms. So I am putting it here.
+#include <dlfcn.h>
 #endif
 
 #ifdef __APPLE__
@@ -41,112 +58,88 @@ enum: uint32_t {
 };
 } // end namespace FatalErrorFlags
 
-#if !defined(__CYGWIN__) && !defined(__ANDROID__)
-LLVM_ATTRIBUTE_ALWAYS_INLINE
-static bool
-isIdentifier(char c)
-{
-  return isalnum(c) || c == '_' || c == '$';
-}
+using namespace swift;
 
-static bool
-demangledLinePrefix(std::string line, std::string prefix,
-                    std::string &out,
-                    bool (*demangle)(std::string, std::string &))
-{
-  int symbolStart = -1;
-  int symbolEnd = -1;
-  
-  for (size_t i = 0; i < line.size(); i++) {
-    char c = line[i];
-    
-    bool hasBegun = symbolStart != -1;
-    bool isIdentifierChar = isIdentifier(c);
-    bool isEndOfSymbol = hasBegun && !isIdentifierChar;
-    bool isEndOfLine = i == line.size() - 1;
-    
-    if (isEndOfLine || isEndOfSymbol) {
-      symbolEnd = i;
-      break;
-    }
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 
-    bool canFindPrefix = (line.size() - 2) - i > prefix.size();
-    if (!hasBegun && canFindPrefix && !isIdentifierChar &&
-        line.substr(i + 1, prefix.size()) == prefix) {
-      symbolStart = i + 1;
-      continue;
-    }
-  }
-  
-  if (symbolStart == -1 || symbolEnd == -1) {
-    out = line;
+static bool getSymbolNameAddr(llvm::StringRef libraryName, Dl_info dlinfo,
+                              std::string &symbolName, uintptr_t &addrOut) {
+
+  // If we failed to find a symbol and thus dlinfo->dli_sname is nullptr, we
+  // need to use the hex address.
+  bool hasUnavailableAddress = dlinfo.dli_sname == nullptr;
+
+  // If the address is unavailable, just use <unavailable> as the symbol
+  // name. We do not set addrOut, since addrOut will be set to our ptr address.
+  if (hasUnavailableAddress) {
+    symbolName += "<unavailable>";
     return false;
-  } else {
-    auto symbol = line.substr(symbolStart, symbolEnd - symbolStart);
-    
-    std::string demangled;
-    bool success = demangle(symbol, demangled);
-    
-    if (success) {
-      line.replace(symbolStart, symbolEnd - symbolStart, demangled);
-    }
-    
-    out = line;
-    
-    return success;
   }
-}
 
-static std::string
-demangledLine(std::string line) {
-  std::string res;
-  bool success = false;
-  auto cppPrefix = "_Z"; // not sure how to check for DARWIN's __Z here.
-  success = demangledLinePrefix(line, cppPrefix, res,
-                                [](std::string symbol, std::string &out) {
-    int status;
-    auto demangled = abi::__cxa_demangle(symbol.c_str(), 0, 0, &status);
-    if (demangled == NULL || status != 0) {
-      out = symbol;
-      return false;
-    } else {
-      out = demangled;
-      free(demangled);
-      return true;
-    }
-  });
-  if (success) return res;
-  success = demangledLinePrefix(line, "_T", res,
-                                [](std::string symbol, std::string &out) {
-    out = swift::Demangle::demangleSymbolAsString(symbol);
+  // Ok, now we know that we have some sort of "real" name. Set the outAddr.
+  addrOut = uintptr_t(dlinfo.dli_saddr);
+
+  // First lets try to demangle using cxxabi. If this fails, we will try to
+  // demangle with swift. We are taking advantage of __cxa_demangle actually
+  // providing failure status instead of just returning the original string like
+  // swift demangle.
+  int status;
+  char *demangled = abi::__cxa_demangle(dlinfo.dli_sname, 0, 0, &status);
+  if (status == 0) {
+    assert(demangled != nullptr && "If __cxa_demangle succeeds, demangled "
+                                   "should never be nullptr");
+    symbolName += demangled;
+    free(demangled);
     return true;
-  });
-  if (success) return res;
-  return line;
+  }
+  assert(demangled == nullptr && "If __cxa_demangle fails, demangled should "
+                                 "be a nullptr");
+
+  // Otherwise, try to demangle with swift. If swift fails to demangle, it will
+  // just pass through the original output.
+  symbolName = demangleSymbolAsString(
+      dlinfo.dli_sname, strlen(dlinfo.dli_sname),
+      Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+  return true;
 }
 
-const int STACK_DEPTH = 128;
+/// This function dumps one line of a stack trace. It is assumed that \p address
+/// is the address of the stack frame at index \p index.
+static void dumpStackTraceEntry(unsigned index, void *framePC) {
+  Dl_info dlinfo;
 
-static char **
-reportBacktrace(int *count)
-{
-  void **addrs = (void **)malloc(sizeof(void *) * STACK_DEPTH);
-  if (addrs == NULL) {
-    if (count) *count = 0;
-    return NULL;
-  }
-  int symbolCount = backtrace(addrs, STACK_DEPTH);
-  if (count) *count = symbolCount;
-
-  char **symbols = backtrace_symbols(addrs, symbolCount);
-  free(addrs);
-  if (symbols == NULL) {
-    if (count) *count = 0;
-    return NULL;
+  // 0 is failure for dladdr. We do not use nullptr since it is an int
+  // argument. This violates normal unix patterns. See man page for dladdr on OS
+  // X.
+  if (0 == dladdr(framePC, &dlinfo)) {
+    return;
   }
 
-  return symbols;
+  // According to the man page of dladdr, if dladdr returns non-zero, then we
+  // know that it must have fname, fbase set. Thus, we find the library name
+  // here.
+  StringRef libraryName = StringRef(dlinfo.dli_fname).rsplit('/').second;
+
+  // Next we get the symbol name that we are going to use in our backtrace.
+  std::string symbolName;
+  // We initialize symbolAddr to framePC so that if we succeed in finding the
+  // symbol, we get the offset in the function and if we fail to find the symbol
+  // we just get HexAddr + 0.
+  uintptr_t symbolAddr = uintptr_t(framePC);
+  bool foundSymbol =
+      getSymbolNameAddr(libraryName, dlinfo, symbolName, symbolAddr);
+
+  // We do not use %p here for our pointers since the format is implementation
+  // defined. This makes it logically impossible to check the output. Forcing
+  // hexadecimal solves this issue.
+  static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx %s + %td\n";
+
+  // Then dump the backtrace.
+  fprintf(stderr, backtraceEntryFormat, index, libraryName.data(),
+          foundSymbol ? symbolAddr : uintptr_t(framePC), symbolName.c_str(),
+          ptrdiff_t(uintptr_t(framePC) - symbolAddr));
 }
+
 #endif
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
@@ -160,8 +153,8 @@ reportBacktrace(int *count)
 extern "C" {
 CRASH_REPORTER_CLIENT_HIDDEN
 struct crashreporter_annotations_t gCRAnnotations
-    __attribute__((section("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
-        CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
+__attribute__((__section__("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
+    CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
 }
 
 // Report a message to any forthcoming crash log.
@@ -172,7 +165,7 @@ reportOnCrash(uint32_t flags, const char *message)
   // mutex calls fatalError when an error is detected and fatalError ends up
   // calling us. In other words we could get infinite recursion if the
   // mutex errors.
-  static swift::StaticUnsafeMutex crashlogLock();
+  static swift::StaticUnsafeMutex crashlogLock;
 
   crashlogLock.lock();
 
@@ -200,24 +193,29 @@ reportOnCrash(uint32_t flags, const char *message)
 
 #endif
 
-
 // Report a message to system console and stderr.
 static void
 reportNow(uint32_t flags, const char *message)
 {
+#if defined(_MSC_VER)
+#define STDERR_FILENO 2
+  _write(STDERR_FILENO, message, strlen(message));
+#else
   write(STDERR_FILENO, message, strlen(message));
+#endif
 #ifdef __APPLE__
   asl_log(NULL, NULL, ASL_LEVEL_ERR, "%s", message);
 #endif
-#if !defined(__CYGWIN__) && !defined(__ANDROID__)
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   if (flags & FatalErrorFlags::ReportBacktrace) {
     fputs("Current stack trace:\n", stderr);
-    int count = 0;
-    char **trace = reportBacktrace(&count);
-    for (int i = 0; i < count; i++) {
-      fprintf(stderr, "%s\n", demangledLine(trace[i]).c_str());
+    constexpr unsigned maxSupportedStackDepth = 128;
+    void *addrs[maxSupportedStackDepth];
+
+    int symbolCount = backtrace(addrs, maxSupportedStackDepth);
+    for (int i = 0; i < symbolCount; ++i) {
+      dumpStackTraceEntry(i, addrs[i]);
     }
-    free(trace);
   }
 #endif
 }
@@ -230,6 +228,26 @@ void swift::swift_reportError(uint32_t flags,
   reportOnCrash(flags, message);
 }
 
+static int swift_vasprintf(char **strp, const char *fmt, va_list ap) {
+#if defined(_MSC_VER)
+  int len = _vscprintf(fmt, ap);
+  if (len < 0)
+    return -1;
+  char *buffer = reinterpret_cast<char *>(malloc(len + 1));
+  if (!buffer)
+    return -1;
+  int result = vsprintf(*strp, fmt, ap);
+  if (result < 0) {
+    free(buffer);
+    return -1;
+  }
+  *strp = buffer;
+  return result;
+#else
+  return vasprintf(strp, fmt, ap);
+#endif
+}
+
 // Report a fatal error to system console, stderr, and crash logs, then abort.
 LLVM_ATTRIBUTE_NORETURN
 void
@@ -239,7 +257,7 @@ swift::fatalError(uint32_t flags, const char *format, ...)
   va_start(args, format);
 
   char *log;
-  vasprintf(&log, format, args);
+  swift_vasprintf(&log, format, args);
 
   swift_reportError(flags, log);
   abort();

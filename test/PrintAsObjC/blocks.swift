@@ -60,7 +60,7 @@ typealias MyInt = Int
                  (Int32) -> (UInt32)) ->
                 ((Int8) -> (UInt8))) {}
 
-  func returnsBlockWithInput() -> (NSObject -> ())? {
+  func returnsBlockWithInput() -> ((NSObject) -> ())? {
     return nil
   }
   func returnsBlockWithParenthesizedInput() -> ((NSObject) -> ())? {
@@ -70,8 +70,8 @@ typealias MyInt = Int
     return nil
   }
 
-  func blockWithTypealias(_ input: MyTuple -> MyInt) {}
-  func blockWithSimpleTypealias(_ input: MyInt -> MyInt) {}
+  func blockWithTypealias(_ input: (MyTuple) -> MyInt) {}
+  func blockWithSimpleTypealias(_ input: (MyInt) -> MyInt) {}
 
   func namedArguments(_ input: (f1: Float, f2: Float, d1: Double, d2: Double) -> ()) {}
   func blockTakesNamedBlock(_ input: (block: () -> ()) -> ()) {}
@@ -79,18 +79,18 @@ typealias MyInt = Int
     return nil
   }
 
-  func blockWithTypealiasWithNames(_ input: MyNamedTuple -> MyInt) {}
+  func blockWithTypealiasWithNames(_ input: (MyNamedTuple) -> MyInt) {}
 
   func blockWithKeyword(_ _Nullable: (`class`: Int) -> Int) {}
 
-  func functionPointers(_ input: @convention(c) Int -> Int)
-      -> @convention(c) Int -> Int {
+  func functionPointers(_ input: @convention(c) (Int) -> Int)
+      -> @convention(c) (Int) -> Int {
     return input
   }
 
   func functionPointerTakesAndReturnsFunctionPointer(
-    _ input: @convention(c) Int -> Int
-                              -> @convention(c) Int -> Int
+    _ input: @convention(c) (Int) -> (Int)
+                              -> @convention(c) (Int) -> Int
   ) {
   }
 
@@ -99,10 +99,10 @@ typealias MyInt = Int
     return input
   }
 
-  var savedBlock: (Int -> Int)?
+  var savedBlock: ((Int) -> Int)?
   var savedBlockWithName: ((x: Int) -> Int)?
-  var savedFunctionPointer: @convention(c) Int -> Int = { $0 }
-  var savedFunctionPointer2: (@convention(c) Int -> Int)? = { $0 }
+  var savedFunctionPointer: @convention(c) (Int) -> Int = { $0 }
+  var savedFunctionPointer2: (@convention(c) (Int) -> Int)? = { $0 }
   var savedFunctionPointerWithName: @convention(c) (x: Int) -> Int = { $0 }
 
   // The following uses a clang keyword as the name.

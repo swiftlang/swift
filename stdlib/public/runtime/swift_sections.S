@@ -76,3 +76,8 @@ define_simple_section swift3_assocty
 
 define_sized_section swift2_protocol_conformances
 define_sized_section swift2_type_metadata
+#if defined(__arm__)
+    .section .note.GNU-stack,"",%progbits
+#else
+    .section .note.GNU-stack,"",@progbits
+#endif

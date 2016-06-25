@@ -186,20 +186,20 @@ __attribute__((availability(ios,introduced=8.0)))
 typedef __INT32_TYPE__ int32_t;
 
 @interface NSNumber : NSValue
-+ (NSNumber *)numberWithInt:(int)value;
-+ (NSNumber *)numberWithInteger:(NSInteger)value;
-+ (NSNumber *)numberWithUnsignedInteger:(NSUInteger)value;
-+ (NSNumber *)numberWithDouble:(double)value;
++ (nonnull NSNumber *)numberWithInt:(int)value;
++ (nonnull NSNumber *)numberWithInteger:(NSInteger)value;
++ (nonnull NSNumber *)numberWithUnsignedInteger:(NSUInteger)value;
++ (nonnull NSNumber *)numberWithDouble:(double)value;
 
-- (NSNumber *)initWithInteger:(NSInteger)value;
-- (NSNumber *)initWithUnsignedInteger:(NSUInteger)value;
-- (NSNumber *)initWithDouble:(double)value;
-- (NSNumber *)addDouble:(double)value;
-- (NSNumber *)addBool:(BOOL)value;
+- (nonnull NSNumber *)initWithInteger:(NSInteger)value;
+- (nonnull NSNumber *)initWithUnsignedInteger:(NSUInteger)value;
+- (nonnull NSNumber *)initWithDouble:(double)value;
+- (nonnull NSNumber *)addDouble:(double)value;
+- (nonnull NSNumber *)addBool:(BOOL)value;
 
-- (NSNumber *)addUInt16:(unsigned short)value;
-- (NSNumber *)addInt:(int)value;
-- (NSNumber *)subtractInt32:(int32_t)value;
+- (nonnull NSNumber *)addUInt16:(unsigned short)value;
+- (nonnull NSNumber *)addInt:(int)value;
+- (nonnull NSNumber *)subtractInt32:(int32_t)value;
 
 @property NSInteger integerValue;
 @property NSUInteger unsignedIntegerValue;
@@ -384,17 +384,29 @@ NS_ENUM(NSInteger, NSMalformedEnumMissingTypedef) {
   NSMalformedEnumMissingTypedefValue
 };
 
+@interface NSNumberFormatter : NSObject
+@end
+
 typedef NS_ENUM(NSUInteger, NSNumberFormatterBehavior) {
   NSNumberFormatterBehaviorDefault = 0,
   NSNumberFormatterBehavior10_0 = 1000,
   NSNumberFormatterBehavior10_4 = 1040,
 };
 
+@interface NSNotification : NSObject
+@end
+
+@interface NSNotificationQueue : NSObject
+@end
+
 typedef NS_ENUM(NSUInteger, NSPostingStyle) {
   NSPostWhenIdle = 1,
   NSPostASAP = 2,
   NSPostNow = 3
 };
+
+@interface NSXMLNode : NSObject
+@end
 
 typedef NS_ENUM(NSUInteger, NSXMLNodeKind) {
   NSXMLInvalidKind = 0,
@@ -480,6 +492,9 @@ typedef NS_OPTIONS(NSUInteger, NSKeyValueObservingOptions) {
   NSKeyValueObservingOptionInitial /*NS_ENUM_AVAILABLE(10_5, 2_0)*/ = 0x04,
   NSKeyValueObservingOptionPrior /*NS_ENUM_AVAILABLE(10_5, 2_0)*/ = 0x08
 };
+
+@interface NSCalendar : NSObject
+@end
 
 #define NS_CALENDAR_ENUM_DEPRECATED(osx_in, osx_out, ios_in, ios_out, msg) \
   __attribute__((availability(macosx, introduced=osx_in, deprecated=osx_out, message=msg))) \
@@ -764,6 +779,9 @@ extern void CGColorRelease(CGColorRef color) __attribute__((availability(macosx,
 @property (readonly) Class classForPortCoder NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead");
 @end
 
+typedef NSString *__nonnull NSNotificationName
+    __attribute((swift_newtype(struct)));
+
 NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 extern NSString * const NSConnectionReplyMode;
 NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
@@ -1012,5 +1030,17 @@ extern NSString *NSHTTPRequestKey;
 -(void)messageSomeObject:(nonnull id)object selector:(SEL)selector;
 @end
 
+@interface NSSoapDispenser<Fragrance> : NSObject
+
+@end
+
 #define NSTimeIntervalSince1970 978307200.0
 #define NS_DO_SOMETHING 17
+
+typedef NS_ENUM(NSUInteger, NSClothingStyle) {
+  NSClothingStyleFormal = 0,
+  NSClothingStyleSemiFormal,
+  NSClothingStyleHipster,
+  NSClothingStyleHippie
+};
+static const NSClothingStyle NSClothingStyleOfficeCasual __attribute__((availability(swift,unavailable,replacement="NSClothingStyleSemiFormal"))) = NSClothingStyleSemiFormal;

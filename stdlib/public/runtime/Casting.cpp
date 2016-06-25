@@ -161,41 +161,19 @@ static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
                                    bool qualified,
                                    std::string &result) {
 
-  if (func->getNumArguments() == 1) {
-    auto firstArgument = func->getArguments()[0].getPointer();
-    bool isInout = func->getArguments()[0].getFlag();
-
-    // This could be a single input tuple, with one or more arguments inside,
-    // but guaranteed to not have inout types.
-    if (auto tupleMetadata = dyn_cast<TupleTypeMetadata>(firstArgument)) {
-          _buildNameForMetadata(tupleMetadata,
-                                TypeSyntaxLevel::TypeSimple,
-                                qualified,
-                                result);
-    } else {
-      if (isInout)
-        result += "inout ";
-
-      _buildNameForMetadata(firstArgument,
-                            TypeSyntaxLevel::TypeSimple,
-                            qualified,
-                            result);
+  result += "(";
+  for (size_t i = 0; i < func->getNumArguments(); ++i) {
+    auto arg = func->getArguments()[i].getPointer();
+    bool isInout = func->getArguments()[i].getFlag();
+    if (isInout)
+      result += "inout ";
+    _buildNameForMetadata(arg, TypeSyntaxLevel::TypeSimple,
+                          qualified, result);
+    if (i < func->getNumArguments() - 1) {
+      result += ", ";
     }
-  } else {
-      result += "(";
-      for (size_t i = 0; i < func->getNumArguments(); ++i) {
-        auto arg = func->getArguments()[i].getPointer();
-        bool isInout = func->getArguments()[i].getFlag();
-        if (isInout)
-          result += "inout ";
-        _buildNameForMetadata(arg, TypeSyntaxLevel::TypeSimple,
-                              qualified, result);
-        if (i < func->getNumArguments() - 1) {
-          result += ", ";
-        }
-      }
-      result += ")";
   }
+  result += ")";
   
   if (func->throws()) {
     result += " throws";
@@ -340,7 +318,7 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 extern "C"
 TwoWordPair<const char *, uintptr_t>::Return
 swift_getTypeName(const Metadata *type, bool qualified) {
@@ -431,7 +409,7 @@ static void _failCorruptType(const Metadata *type) {
 }
 
 #if SWIFT_OBJC_INTEROP
-// Objective-c bridging helpers.
+// Objective-C bridging helpers.
 namespace {
   struct _ObjectiveCBridgeableWitnessTable;
 }
@@ -814,7 +792,7 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
 }
 
 #if SWIFT_OBJC_INTEROP
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
 extern "C" id
 swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
@@ -846,7 +824,7 @@ swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   }
 }
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
 extern "C" id
 swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
@@ -2548,8 +2526,8 @@ findBridgeWitness(const Metadata *T) {
 }
 
 /// \param value passed at +1, consumed.
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" HeapObject *swift_bridgeNonVerbatimToObjectiveC(
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" HeapObject *_swift_bridgeNonVerbatimToObjectiveC(
   OpaqueValue *value, const Metadata *T
 ) {
   assert(!swift_isClassOrObjCExistentialTypeImpl(T));
@@ -2571,8 +2549,8 @@ extern "C" HeapObject *swift_bridgeNonVerbatimToObjectiveC(
   return nullptr;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" const Metadata *_swift_getBridgedNonVerbatimObjectiveCType(
   const Metadata *value, const Metadata *T
 ) {
   // Classes and Objective-C existentials bridge verbatim.
@@ -2587,15 +2565,15 @@ extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
   return nullptr;
 }
 
-// @_silgen_name("swift_bridgeNonVerbatimFromObjectiveC")
+// @_silgen_name("_swift_bridgeNonVerbatimFromObjectiveC")
 // func _bridgeNonVerbatimFromObjectiveC<NativeType>(
 //     x: AnyObject, 
 //     nativeType: NativeType.Type
 //     inout result: T?
 // )
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void
-swift_bridgeNonVerbatimFromObjectiveC(
+_swift_bridgeNonVerbatimFromObjectiveC(
   HeapObject *sourceValue,
   const Metadata *nativeType,
   OpaqueValue *destValue,
@@ -2631,15 +2609,15 @@ swift_bridgeNonVerbatimFromObjectiveC(
   swift::crash("value type is not bridged to Objective-C");
 }
 
-// @_silgen_name("swift_bridgeNonVerbatimFromObjectiveCConditional")
+// @_silgen_name("_swift_bridgeNonVerbatimFromObjectiveCConditional")
 // func _bridgeNonVerbatimFromObjectiveCConditional<NativeType>(
 //   x: AnyObject, 
 //   nativeType: T.Type,
 //   inout result: T?
 // ) -> Bool
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool
-swift_bridgeNonVerbatimFromObjectiveCConditional(
+_swift_bridgeNonVerbatimFromObjectiveCConditional(
   HeapObject *sourceValue,
   const Metadata *nativeType,
   OpaqueValue *destValue,
@@ -2676,9 +2654,9 @@ swift_bridgeNonVerbatimFromObjectiveCConditional(
     destValue, nativeType, nativeType, bridgeWitness);
 }
 
-// func isBridgedNonVerbatimToObjectiveC<T>(x: T.Type) -> Bool
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool swift_isBridgedNonVerbatimToObjectiveC(
+// func _isBridgedNonVerbatimToObjectiveC<T>(x: T.Type) -> Bool
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" bool _swift_isBridgedNonVerbatimToObjectiveC(
   const Metadata *value, const Metadata *T
 ) {
   assert(!swift_isClassOrObjCExistentialTypeImpl(T));
@@ -2689,30 +2667,26 @@ extern "C" bool swift_isBridgedNonVerbatimToObjectiveC(
 }
 #endif
 
-// func isClassOrObjCExistential<T>(x: T.Type) -> Bool
-SWIFT_RUNTIME_EXPORT
-extern "C" bool swift_isClassOrObjCExistentialType(const Metadata *value,
-                                               const Metadata *T) {
+// func _isClassOrObjCExistential<T>(x: T.Type) -> Bool
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" bool _swift_isClassOrObjCExistentialType(const Metadata *value,
+                                                    const Metadata *T) {
   return swift_isClassOrObjCExistentialTypeImpl(T);
 }
 
-// func swift_class_getSuperclass(_: AnyClass) -> AnyClass?
-SWIFT_RUNTIME_EXPORT
-extern "C" const Metadata *swift_class_getSuperclass(
-  const Metadata *theClass
-) {
+const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
   if (const ClassMetadata *classType = theClass->getClassObject())
     if (classHasSuperclass(classType))
       return swift_getObjCClassMetadata(classType->SuperClass);
   return nullptr;
 }
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
 extern "C" bool swift_isClassType(const Metadata *type) {
   return Metadata::isAnyKindOfClass(type->getKind());
 }
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(c) SWIFT_RUNTIME_EXPORT
 extern "C" bool swift_isOptionalType(const Metadata *type) {
   return type->getKind() == MetadataKind::Optional;
 }

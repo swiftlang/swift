@@ -21,12 +21,13 @@
 import MachO
 import Darwin
 
+let RequestInstanceKind = "k"
 let RequestInstanceAddress = "i"
 let RequestReflectionInfos = "r"
 let RequestReadBytes = "b";
 let RequestSymbolAddress = "s"
 let RequestStringLength = "l"
-let RequestExit = "e"
+let RequestDone = "d"
 let RequestPointerSize = "p"
 
 internal func debugLog(_ message: String) {
@@ -34,6 +35,14 @@ internal func debugLog(_ message: String) {
   fputs("Child: \(message)\n", stderr)
   fflush(stderr)
 #endif
+}
+
+public enum InstanceKind : UInt8 {
+  case None
+  case Object
+  case Existential
+  case ErrorExistential
+  case Closure
 }
 
 /// Represents a section in a loaded image in this process.
@@ -112,22 +121,20 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
   let header = unsafeBitCast(_dyld_get_image_header(i),
     to: UnsafePointer<MachHeader>.self)
 
-  let imageName = _dyld_get_image_name(i)
-  if let fieldmd = getSectionInfo("__swift3_fieldmd", header) {
-      let assocty = getSectionInfo("__swift3_assocty", header)
-      let builtin = getSectionInfo("__swift3_builtin", header)
-      let capture = getSectionInfo("__swift3_capture", header)
-      let typeref = getSectionInfo("__swift3_typeref", header)
-      let reflstr = getSectionInfo("__swift3_reflstr", header)
-      return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
-                            fieldmd: fieldmd,
-                            assocty: assocty,
-                            builtin: builtin,
-                            capture: capture,
-                            typeref: typeref,
-                            reflstr: reflstr)
-  }
-  return nil
+  let imageName = _dyld_get_image_name(i)!
+  let fieldmd = getSectionInfo("__swift3_fieldmd", header)
+  let assocty = getSectionInfo("__swift3_assocty", header)
+  let builtin = getSectionInfo("__swift3_builtin", header)
+  let capture = getSectionInfo("__swift3_capture", header)
+  let typeref = getSectionInfo("__swift3_typeref", header)
+  let reflstr = getSectionInfo("__swift3_reflstr", header)
+  return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
+                        fieldmd: fieldmd,
+                        assocty: assocty,
+                        builtin: builtin,
+                        capture: capture,
+                        typeref: typeref,
+                        reflstr: reflstr)
 }
 
 internal func sendBytes<T>(from address: UnsafePointer<T>, count: Int) {
@@ -189,7 +196,7 @@ internal func sendReflectionInfos() {
 
 internal func printErrnoAndExit() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  let errorCString = strerror(errno)
+  let errorCString = strerror(errno)!
   let message = String(validatingUTF8: errorCString)! + "\n"
   let bytes = Array(message.utf8)
   fwrite(bytes, 1, bytes.count, stderr)
@@ -255,11 +262,17 @@ internal func sendPointerSize() {
 /// - Get the pointer size of this process, which affects assumptions about the
 ///   the layout of runtime structures with pointer-sized fields.
 /// - Read raw bytes out of this process's address space.
-public func reflect(_ instance: AnyObject) {
+///
+/// The parent sends a Done message to indicate that it's done
+/// looking at this instance. It will continue to ask for instances,
+/// so call doneReflecting() when you don't have any more instances.
+internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
   while let command = readLine(strippingNewline: true) {
     switch command {
+    case String(validatingUTF8: RequestInstanceKind)!:
+      sendValue(kind.rawValue)
     case String(validatingUTF8: RequestInstanceAddress)!:
-      sendAddress(of: instance)
+      sendValue(instanceAddress)
     case String(validatingUTF8: RequestReflectionInfos)!:
       sendReflectionInfos()
     case String(validatingUTF8: RequestReadBytes)!:
@@ -270,12 +283,203 @@ public func reflect(_ instance: AnyObject) {
       sendStringLength()
     case String(validatingUTF8: RequestPointerSize)!:
       sendPointerSize();
-    case String(validatingUTF8: RequestExit)!:
-      exit(EXIT_SUCCESS)
+    case String(validatingUTF8: RequestDone)!:
+      return;
     default:
-      fatalError("Unknown request received!")
+      fatalError("Unknown request received: '\(Array(command.utf8))'!")
     }
   }
+}
+
+/// Reflect a class instance.
+///
+/// This reflects the stored properties of the immediate class.
+/// The superclass is not (yet?) visited.
+public func reflect(object: AnyObject) {
+  let address = unsafeAddress(of: object)
+  let addressValue = unsafeBitCast(address, to: UInt.self)
+  reflect(instanceAddress: addressValue, kind: .Object)
+}
+
+/// Reflect any type at all by boxing it into an existential container (an `Any`)
+///
+/// Given a class, this will reflect the reference value, and not the contents
+/// of the instance. Use `reflect(object:)` for that.
+///
+/// This function serves to exercise the projectExistential function of the
+/// SwiftRemoteMirror API.
+///
+/// It tests the three conditions of existential layout:
+///
+/// ## Class existentials
+///
+/// For example, a `MyClass as Any`:
+/// ```
+/// [Pointer to class instance]
+/// [Witness table 1]
+/// [Witness table 2]
+/// ...
+/// [Witness table n]
+/// ```
+///
+/// ## Existentials whose contained type fits in the 3-word buffer
+///
+/// For example, a `(1, 2) as Any`:
+/// ```
+/// [Tuple element 1: Int]
+/// [Tuple element 2: Int]
+/// [-Empty_]
+/// [Metadata Pointer]
+/// [Witness table 1]
+/// [Witness table 2]
+/// ...
+/// [Witness table n]
+/// ```
+///
+/// ## Existentials whose contained type has to be allocated into a
+///    heap buffer.
+///
+/// For example, a `LargeStruct<T> as Any`:
+/// ```
+/// [Pointer to unmanaged heap container] --> [Large struct]
+/// [-Empty-]
+/// [-Empty-]
+/// [Metadata Pointer]
+/// [Witness table 1]
+/// [Witness table 2]
+/// ...
+/// [Witness table n]
+/// ```
+///
+/// The test doesn't care about the witness tables - we only care
+/// about what's in the buffer, so we always put these values into
+/// an Any existential.
+public func reflect<T>(any: T) {
+  let any: Any = any
+  let anyPointer = UnsafeMutablePointer<Any>(allocatingCapacity: sizeof(Any.self))
+  anyPointer.initialize(with: any)
+  let anyPointerValue = unsafeBitCast(anyPointer, to: UInt.self)
+  reflect(instanceAddress: anyPointerValue, kind: .Existential)
+  anyPointer.deallocateCapacity(sizeof(Any.self))
+}
+
+// Reflect an `ErrorProtocol`, a.k.a. an "error existential".
+//
+// These are always boxed on the heap, with the following layout:
+//
+// - Word 0: Metadata Pointer
+// - Word 1: 2x 32-bit reference counts
+//
+// If Objective-C interop is available, an ErrorProtocol is also an
+// `NSError`, and so has:
+//
+// - Word 2: code (NSInteger)
+// - Word 3: domain (NSString *)
+// - Word 4: userInfo (NSDictionary *)
+//
+// Then, always follow:
+//
+// - Word 2 or 5: Instance type metadata pointer
+// - Word 3 or 6: Instance witness table for conforming
+//   to `Swift.ErrorProtocol`.
+//
+// Following that is the instance that conforms to `ErrorProtocol`,
+// rounding up to its alignment.
+public func reflect<T: ErrorProtocol>(error: T) {
+  let error: ErrorProtocol = error
+  let errorPointerValue = unsafeBitCast(error, to: UInt.self)
+  reflect(instanceAddress: errorPointerValue, kind: .ErrorExistential)
+}
+
+/// Wraps a thick function with arity 0.
+struct ThickFunction0 {
+  var function: () -> ()
+}
+
+/// Wraps a thick function with arity 1.
+struct ThickFunction1 {
+  var function: (Int) -> ()
+}
+
+/// Wraps a thick function with arity 2.
+struct ThickFunction2 {
+  var function: (Int, String) -> ()
+}
+
+/// Wraps a thick function with arity 3.
+struct ThickFunction3 {
+  var function: (Int, String, AnyObject?) -> ()
+}
+
+struct ThickFunctionParts {
+  var function: UnsafePointer<Void>
+  var context: Optional<UnsafePointer<Void>>
+}
+
+/// Reflect a closure context. The given function must be a Swift-native
+/// @convention(thick) function value.
+public func reflect(function: () -> ()) {
+  let fn = UnsafeMutablePointer<ThickFunction0>(
+      allocatingCapacity: sizeof(ThickFunction0.self))
+  fn.initialize(with: ThickFunction0(function: function))
+
+  let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
+  let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
+
+  reflect(instanceAddress: contextPointer, kind: .Object)
+
+  fn.deallocateCapacity(sizeof(ThickFunction0.self))
+}
+
+/// Reflect a closure context. The given function must be a Swift-native
+/// @convention(thick) function value.
+public func reflect(function: (Int) -> ()) {
+  let fn = UnsafeMutablePointer<ThickFunction1>(
+      allocatingCapacity: sizeof(ThickFunction1.self))
+  fn.initialize(with: ThickFunction1(function: function))
+
+  let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
+  let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
+
+  reflect(instanceAddress: contextPointer, kind: .Object)
+
+  fn.deallocateCapacity(sizeof(ThickFunction1.self))
+}
+
+/// Reflect a closure context. The given function must be a Swift-native
+/// @convention(thick) function value.
+public func reflect(function: (Int, String) -> ()) {
+  let fn = UnsafeMutablePointer<ThickFunction2>(
+      allocatingCapacity: sizeof(ThickFunction2.self))
+  fn.initialize(with: ThickFunction2(function: function))
+
+  let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
+  let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
+
+  reflect(instanceAddress: contextPointer, kind: .Object)
+
+  fn.deallocateCapacity(sizeof(ThickFunction2.self))
+}
+
+/// Reflect a closure context. The given function must be a Swift-native
+/// @convention(thick) function value.
+public func reflect(function: (Int, String, AnyObject?) -> ()) {
+  let fn = UnsafeMutablePointer<ThickFunction3>(
+      allocatingCapacity: sizeof(ThickFunction3.self))
+  fn.initialize(with: ThickFunction3(function: function))
+
+  let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
+  let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
+
+  reflect(instanceAddress: contextPointer, kind: .Object)
+
+  fn.deallocateCapacity(sizeof(ThickFunction3.self))
+}
+
+/// Call this function to indicate to the parent that there are
+/// no more instances to look at.
+public func doneReflecting() {
+  reflect(instanceAddress: UInt(InstanceKind.None.rawValue), kind: .None)
 }
 
 /* Example usage

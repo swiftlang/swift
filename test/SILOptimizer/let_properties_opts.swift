@@ -301,7 +301,7 @@ public func testStructWithMultipleInitsAndInlinedInitializer() {
 // CHECK: struct_extract %0 : $StructWithOnlyPublicLetProperties, #StructWithOnlyPublicLetProperties.Prop0
 // CHECK: return
 
-// CHECK-WMO-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_33StructWithOnlyPublicLetPropertiesVs5Int32 
+// CHECK-WMO-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_33StructWithOnlyPublicLetPropertiesVs5Int32
 // CHECK-WMO: struct_extract %0 : $StructWithOnlyPublicLetProperties, #StructWithOnlyPublicLetProperties.Prop0
 // CHECK-WMO: return
 public func testStructPropertyAccessibility(_ b: StructWithOnlyPublicLetProperties) -> Int32 {

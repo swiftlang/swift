@@ -391,3 +391,9 @@ module SwiftGlibc [system] {
     }
   }
 }
+
+module CUUID [system] {
+  header "${GLIBC_INCLUDE_PATH}/uuid/uuid.h"
+  link "uuid"
+  export *
+}

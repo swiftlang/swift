@@ -320,6 +320,24 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
     // trivial accessors.
     return AccessSemantics::DirectToStorage;
   }
+  
+  // Check for property behavior initializations.
+  if (auto *AFD_DC = dyn_cast<AbstractFunctionDecl>(DC)) {
+    if (member->hasBehaviorNeedingInitialization() &&
+        // In a ctor.
+        isa<ConstructorDecl>(AFD_DC) &&
+        
+        // Ctor is for immediate class, not a derived class.
+        AFD_DC->getParent()->getDeclaredTypeOfContext()->getCanonicalType() ==
+          member->getDeclContext()->getDeclaredTypeOfContext()->getCanonicalType() &&
+        
+        // Is a "self.property" reference.
+        isa<DeclRefExpr>(base) &&
+        AFD_DC->getImplicitSelfDecl() == cast<DeclRefExpr>(base)->getDecl()) {
+      // Do definite initialization analysis to handle this property.
+      return AccessSemantics::BehaviorInitialization;
+    }
+  }
 
   // If the value is always directly accessed from this context, do it.
   return member->getAccessSemanticsFromContext(DC);
@@ -753,7 +771,8 @@ namespace {
       ConcreteDeclRef memberRef;
       Type refTy;
       Type dynamicSelfFnType;
-      if (openedFullType->hasTypeVariable()) {
+      if (member->getInterfaceType()->is<GenericFunctionType>() ||
+          openedFullType->hasTypeVariable()) {
         // We require substitutions. Figure out what they are.
 
         // Figure out the declaration context where we'll get the generic
@@ -920,7 +939,15 @@ namespace {
       // For types and properties, build member references.
       if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
         assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
-        assert(baseIsInstance || !member->isInstanceMember());
+        if (!baseIsInstance && member->isInstanceMember()) {
+          assert(memberLocator.getBaseLocator() && 
+                 cs.UnevaluatedRootExprs.count(
+                   memberLocator.getBaseLocator()->getAnchor()) &&
+                 "Attempt to reference an instance member of a metatype");
+          auto baseInstanceTy = base->getType()->getRValueInstanceType();
+          base = new (context) UnevaluatedInstanceExpr(base, baseInstanceTy);
+          base->setImplicit();
+        }
 
         auto memberRefExpr
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
@@ -1096,6 +1123,8 @@ namespace {
                        ConstraintLocatorBuilder locator,
                        Optional<Pattern*> typeFromPattern = None);
 
+    using LevelTy = llvm::PointerEmbeddedInt<unsigned, 2>;
+
     /// \brief Coerce the given expression (which is the argument to a call) to
     /// the given parameter type.
     ///
@@ -1103,11 +1132,16 @@ namespace {
     ///
     /// \param arg The argument expression.
     /// \param paramType The parameter type.
+    /// \param applyOrLevel For function applications, the ApplyExpr that forms
+    /// the call. Otherwise, a specific level describing which parameter level
+    /// we're applying.
     /// \param locator Locator used to describe where in this expression we are.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
-    Expr *coerceCallArguments(Expr *arg, Type paramType,
-                              ConstraintLocatorBuilder locator);
+    Expr *
+    coerceCallArguments(Expr *arg, Type paramType,
+                        llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
+                        ConstraintLocatorBuilder locator);
 
     /// \brief Coerce the given object argument (e.g., for the base of a
     /// member expression) to the given type.
@@ -1176,9 +1210,9 @@ namespace {
       }
 
       // Coerce the index argument.
-      index = coerceCallArguments(index, indexTy,
-                                  locator.withPathElement(
-                                    ConstraintLocator::SubscriptIndex));
+      index = coerceCallArguments(
+          index, indexTy, LevelTy(1),
+          locator.withPathElement(ConstraintLocator::SubscriptIndex));
       if (!index)
         return nullptr;
 
@@ -1414,7 +1448,7 @@ namespace {
 
       // Add substitution for the dependent type T._ObjectiveCType.
       if (conformsToBridgedToObjectiveC) {
-        auto objcTypeId = tc.Context.getIdentifier("_ObjectiveCType");
+        auto objcTypeId = tc.Context.Id_ObjectiveCType;
         auto objcAssocType = cast<AssociatedTypeDecl>(
                                conformance->getProtocol()->lookupDirect(
                                  objcTypeId).front());
@@ -1431,7 +1465,7 @@ namespace {
 
       ConcreteDeclRef fnSpecRef(tc.Context, fn, Subs);
       Expr *fnRef = new (tc.Context) DeclRefExpr(fnSpecRef,
-                                                 DeclNameLoc(object->getLoc()),
+                                                 DeclNameLoc(object->getStartLoc()),
                                                  /*Implicit=*/true);
       TypeSubstitutionMap subMap;
       auto genericParam = fnGenericParams[0];
@@ -2039,6 +2073,38 @@ namespace {
       }
     }
 
+    /// Adjust the type of the arguments to an object literal.
+    ///
+    /// The constraint system has verified that the arguments are convertible
+    /// to an idealized initializer signature, but we need them to be
+    /// convertible to the actual initializer signature, which differs only
+    /// by labels.  We make this work by rewriting the type of the argument
+    /// expression to use the correct labels.  This creates an inconsistency
+    /// between the labels of the TupleExpr and its type, but it has the
+    /// great merit of not requiring any complexity outside of the treatment
+    /// of object literals.
+    void adjustObjectLiteralArgumentType(Expr *arg, DeclName constrName) {
+      // If the argument expression isn't a tuple, propagating this type
+      // is more complicated than we can do here.  Bailing out will probably
+      // cause a terrible diagnostic, but fortunately, this is not a case we
+      // need excellent QoI for.
+      if (!isa<TupleExpr>(arg))
+        return;
+
+      auto paramLabels = constrName.getArgumentNames();
+
+      auto argType = arg->getType()->getAs<TupleType>();
+      if (!argType || argType->getNumElements() != paramLabels.size())
+        return;
+
+      SmallVector<TupleTypeElt, 4> newElts;
+      size_t index = 0;
+      for (auto &oldElt : argType->getElements()) {
+        newElts.push_back(TupleTypeElt(oldElt.getType(), paramLabels[index++]));
+      }
+      arg->setType(TupleType::get(newElts, cs.getASTContext()));
+    }
+
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       if (expr->getType() && !expr->getType()->hasTypeVariable())
         return expr;
@@ -2070,6 +2136,7 @@ namespace {
         
       DeclName constrName(tc.getObjectLiteralConstructorName(expr));
       Expr *arg = expr->getArg();
+      adjustObjectLiteralArgumentType(arg, constrName);
       Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
                                                 ctx);
       Expr *semanticExpr = tc.callWitness(base, dc, proto, conformance,
@@ -2816,12 +2883,20 @@ namespace {
         tc.diagnose(expr->getLoc(), diag::isa_is_always_true, "is");
         expr->setCastKind(castKind);
         break;
+      case CheckedCastKind::ValueCast:
+        // Check the cast target is a non-foreign type
+        if (auto cls = toType->getAs<ClassType>()) {
+          if (cls->getDecl()->isForeign()) {
+            tc.diagnose(expr->getLoc(), diag::isa_is_foreign_check, toType);
+          }
+        }
+        expr->setCastKind(castKind);
+        break;
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::SetDowncastBridged:
-      case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         // Valid checks.
         expr->setCastKind(castKind);
@@ -3258,6 +3333,13 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
     
+    Expr *visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
+      // Should already be type-checked.
+      Type valueType = simplifyType(expr->getType());
+      expr->setType(valueType);
+      return expr;
+    }
+    
     Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       Type valueType = simplifyType(E->getType());
       E->setType(valueType);
@@ -3392,48 +3474,157 @@ namespace {
         return E;
       }
 
-      // If the declaration we found was not a method or initializer,
-      // complain.
-      auto func = dyn_cast<AbstractFunctionDecl>(foundDecl);
-      if (!func) {
-        Optional<InFlightDiagnostic> diag;
-        if (auto VD = dyn_cast<VarDecl>(foundDecl)) {
-          diag.emplace(tc.diagnose(E->getLoc(), diag::expr_selector_var,
-                                   isa<ParamDecl>(VD)
-                                   ? 1
-                                   : VD->getDeclContext()->isTypeContext()
-                                     ? 0
-                                     : 2));
-        } else {
-          diag.emplace(tc.diagnose(E->getLoc(),
-                                   diag::expr_selector_not_method_or_init));
+      // Check whether we found an entity that #selector could refer to.
+      // If we found a method or initializer, check it.
+      AbstractFunctionDecl *method = nullptr;
+      if (auto func = dyn_cast<AbstractFunctionDecl>(foundDecl)) {
+        // Methods and initializers.
+
+        // If this isn't a method, complain.
+        if (!func->getDeclContext()->isTypeContext()) {
+          tc.diagnose(E->getLoc(), diag::expr_selector_not_method,
+                      func->getDeclContext()->isModuleScopeContext(),
+                      func->getFullName())
+            .highlight(subExpr->getSourceRange());
+          tc.diagnose(func, diag::decl_declared_here, func->getFullName());
+          return E;
         }
-        diag->highlight(subExpr->getSourceRange());
-        diag.reset();
+
+        // Check that we requested a method.
+        switch (E->getSelectorKind()) {
+        case ObjCSelectorExpr::Method:
+          break;
+
+        case ObjCSelectorExpr::Getter:
+        case ObjCSelectorExpr::Setter:
+          // Complain that we cannot ask for the getter or setter of a
+          // method.
+          tc.diagnose(E->getModifierLoc(),
+                      diag::expr_selector_expected_property,
+                      E->getSelectorKind() == ObjCSelectorExpr::Setter,
+                      foundDecl->getDescriptiveKind(),
+                      foundDecl->getFullName())
+            .fixItRemoveChars(E->getModifierLoc(),
+                              E->getSubExpr()->getStartLoc());
+
+          // Update the AST to reflect the fix.
+          E->overrideObjCSelectorKind(ObjCSelectorExpr::Method, SourceLoc());
+          break;
+        }
+
+        // Note the method we're referring to.
+        method = func;
+      } else if (auto var = dyn_cast<VarDecl>(foundDecl)) {
+        // Properties.
+
+        // If this isn't a property on a type, complain.
+        if (!var->getDeclContext()->isTypeContext()) {
+          tc.diagnose(E->getLoc(), diag::expr_selector_not_property,
+                      isa<ParamDecl>(var), var->getFullName())
+            .highlight(subExpr->getSourceRange());
+          tc.diagnose(var, diag::decl_declared_here, var->getFullName());
+          return E;
+        }
+
+        // Check that we requested a property getter or setter.
+        switch (E->getSelectorKind()) {
+        case ObjCSelectorExpr::Method: {
+          bool isSettable = var->isSettable(cs.DC) &&
+            var->isSetterAccessibleFrom(cs.DC);
+          auto primaryDiag =
+            tc.diagnose(E->getLoc(), diag::expr_selector_expected_method,
+                        isSettable, var->getFullName());
+          primaryDiag.highlight(subExpr->getSourceRange());
+
+          // The point at which we will insert the modifier.
+          SourceLoc modifierLoc = E->getSubExpr()->getStartLoc();
+
+          // Make sure we have the accessors.
+          tc.synthesizeAccessorsForStorage(var,
+                                           /*wantMaterializeForSet=*/false);
+
+          // If the property is settable, we don't know whether the
+          // user wanted the getter or setter. Provide notes for each.
+          if (isSettable) {
+            // Flush the primary diagnostic. We have notes to add.
+            primaryDiag.flush();
+
+            // Add notes for the getter and setter, respectively.
+            tc.diagnose(modifierLoc, diag::expr_selector_add_modifier,
+                        false, var->getFullName())
+              .fixItInsert(modifierLoc, "getter: ");
+            tc.diagnose(modifierLoc, diag::expr_selector_add_modifier,
+                        true, var->getFullName())
+              .fixItInsert(modifierLoc, "setter: ");
+
+            // Bail out now. We don't know what the user wanted, so
+            // don't fill in the details.
+            return E;
+          }
+
+          // The property is non-settable, so add "getter:".
+          primaryDiag.fixItInsert(modifierLoc, "getter: ");
+          E->overrideObjCSelectorKind(ObjCSelectorExpr::Getter, modifierLoc);
+          method = var->getGetter();
+          break;
+        }
+
+        case ObjCSelectorExpr::Getter:
+          method = var->getGetter();
+          break;
+
+        case ObjCSelectorExpr::Setter:
+          // Make sure we actually have a setter.
+          if (!var->isSettable(cs.DC)) {
+            tc.diagnose(E->getLoc(), diag::expr_selector_property_not_settable,
+                        var->getDescriptiveKind(), var->getFullName());
+            tc.diagnose(var, diag::decl_declared_here, var->getFullName());
+            return E;
+          }
+
+          // Make sure the setter is accessible.
+          if (!var->isSetterAccessibleFrom(cs.DC)) {
+            tc.diagnose(E->getLoc(),
+                        diag::expr_selector_property_setter_inaccessible,
+                        var->getDescriptiveKind(), var->getFullName());
+            tc.diagnose(var, diag::decl_declared_here, var->getFullName());
+            return E;
+          }
+
+          method = var->getSetter();
+          break;
+        }
+      } else {
+        // Cannot reference with #selector.
+        tc.diagnose(E->getLoc(), diag::expr_selector_no_declaration)
+          .highlight(subExpr->getSourceRange());
         tc.diagnose(foundDecl, diag::decl_declared_here,
                     foundDecl->getFullName());
         return E;
       }
+      assert(method && "Didn't find a method?");
 
       // The declaration we found must be exposed to Objective-C.
-      if (!func->isObjC()) {
+      if (!method->isObjC()) {
         tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
-                    isa<ConstructorDecl>(func))
+                    foundDecl->getDescriptiveKind(), foundDecl->getFullName())
           .highlight(subExpr->getSourceRange());
-        if (foundDecl->getLoc().isValid()) {
-          tc.diagnose(foundDecl,
-                      diag::expr_selector_make_objc,
-                      isa<ConstructorDecl>(func))
-            .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
-                         "@objc ");
-        } else {
-          tc.diagnose(foundDecl, diag::decl_declared_here,
-                      foundDecl->getFullName());
-        }
+        tc.diagnose(foundDecl, diag::make_decl_objc,
+                    foundDecl->getDescriptiveKind())
+          .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
+                       "@objc ");
         return E;
       }
 
-      E->setMethod(func);
+      // Note which method we're referencing.
+      E->setMethod(method);
+      return E;
+    }
+
+    Expr *visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+      if (auto semanticE = E->getSemanticExpr())
+        E->setType(semanticE->getType());
+
       return E;
     }
 
@@ -3525,7 +3716,9 @@ static ConcreteDeclRef
 resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
    std::function<Optional<SelectedOverload>(ConstraintLocator *)> findOvlChoice,
    std::function<ConcreteDeclRef (ValueDecl *decl,
-                                  Type openedType)> getConcreteDeclRef)
+                                  Type openedType,
+                                  ConstraintLocator *declLocator)>
+     getConcreteDeclRef)
 {
   assert(locator && "Null locator");
   if (!locator->getAnchor())
@@ -3590,7 +3783,8 @@ resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
     if (auto selected = findOvlChoice(anchorLocator)) {
       if (selected->choice.isDecl())
         return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType);
+                                  selected->openedType,
+                                  anchorLocator);
     }
   }
   
@@ -3601,19 +3795,73 @@ resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
     if (auto selected = findOvlChoice(anchorLocator)) {
       if (selected->choice.isDecl())
         return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType);
+                                  selected->openedType,
+                                  anchorLocator);
+    }
+  }
+
+  if (isa<UnresolvedDotExpr>(anchor)) {
+    // Unresolved member: find the resolved overload.
+    auto anchorLocator = cs.getConstraintLocator(anchor,
+                                                 ConstraintLocator::Member);
+    if (auto selected = findOvlChoice(anchorLocator)) {
+      if (selected->choice.isDecl())
+        return getConcreteDeclRef(selected->choice.getDecl(),
+                                  selected->openedType,
+                                  anchorLocator);
     }
   }
 
   return ConcreteDeclRef();
 }
 
+ConcreteDeclRef Solution::resolveLocatorToDecl(
+                  ConstraintLocator *locator) const {
+  auto &cs = getConstraintSystem();
 
-/// \brief Given a constraint locator, find the owner of default arguments for
-/// that tuple, i.e., a FuncDecl.
+  // Simplify the locator.
+  SourceRange range;
+  locator = simplifyLocator(cs, locator, range);
+
+  // If we didn't map down to a specific expression, we can't handle a default
+  // argument.
+  if (!locator->getAnchor() || !locator->getPath().empty())
+    return nullptr;
+
+  if (auto resolved
+        = ::resolveLocatorToDecl(cs, locator,
+            [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
+              auto known = overloadChoices.find(locator);
+              if (known == overloadChoices.end()) {
+                return None;
+              }
+
+              return known->second;
+            },
+            [&](ValueDecl *decl, Type openedType, ConstraintLocator *locator)
+                  -> ConcreteDeclRef {
+              if (decl->getInnermostDeclContext()->isGenericContext()) {
+                SmallVector<Substitution, 4> subs;
+                computeSubstitutions(
+                  decl->getType(),
+                  decl->getInnermostDeclContext(),
+                  openedType, locator, subs);
+                return ConcreteDeclRef(cs.getASTContext(), decl, subs);
+              }
+              
+              return decl;
+            })) {
+    return resolved;
+  }
+
+  return ConcreteDeclRef();
+}
+
+/// \brief Given a constraint locator, find the declaration reference
+/// to the callee, it is a call to a declaration.
 static ConcreteDeclRef
-findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
-                     ConstraintLocator *locator) {
+findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
+                  ConstraintLocator *locator) {
   if (locator->getPath().empty() || !locator->getAnchor())
     return nullptr;
 
@@ -3648,42 +3896,7 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
     locator = cs.getConstraintLocator(locator->getAnchor(), newPath, newFlags);
   }
 
-  // Simplify the locator.
-  SourceRange range;
-  locator = simplifyLocator(cs, locator, range);
-
-  // If we didn't map down to a specific expression, we can't handle a default
-  // argument.
-  if (!locator->getAnchor() || !locator->getPath().empty())
-    return nullptr;
-
-  if (auto resolved
-        = resolveLocatorToDecl(cs, locator,
-            [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
-              auto known = solution.overloadChoices.find(locator);
-              if (known == solution.overloadChoices.end()) {
-                return None;
-              }
-
-              return known->second;
-            },
-            [&](ValueDecl *decl,
-                Type openedType) -> ConcreteDeclRef {
-              if (decl->getInnermostDeclContext()->isGenericContext()) {
-                SmallVector<Substitution, 4> subs;
-                solution.computeSubstitutions(
-                  decl->getType(),
-                  decl->getInnermostDeclContext(),
-                  openedType, locator, subs);
-                return ConcreteDeclRef(cs.getASTContext(), decl, subs);
-              }
-              
-              return decl;
-            })) {
-    return resolved;
-  }
-
-  return nullptr;
+  return solution.resolveLocatorToDecl(locator);
 }
 
 static bool
@@ -3707,7 +3920,7 @@ shouldApplyAddingLabelFixit(TuplePattern *tuplePattern, TupleType *fromTuple,
     if (curFrom->getElements().size() != n ||
         curTo->getElements().size() != n)
       return false;
-    for (unsigned i = 0; i < n; i ++) {
+    for (unsigned i = 0; i < n; i++) {
       Pattern* subPat = curPattern->getElement(i).getPattern();
       const TupleTypeElt &subFrom = curFrom->getElement(i);
       const TupleTypeElt &subTo = curTo->getElement(i);
@@ -3874,7 +4087,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  fromTuple->getElements().size());
   SmallVector<Expr *, 2> callerDefaultArgs;
-  ConcreteDeclRef defaultArgsOwner;
+  ConcreteDeclRef callee =
+    findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
     const auto &toElt = toTuple->getElement(i);
@@ -3882,32 +4096,15 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
     // If we're default-initializing this member, there's nothing to do.
     if (sources[i] == TupleShuffleExpr::DefaultInitialize) {
-      // Dig out the owner of the default arguments.
-      ConcreteDeclRef argOwner;
-      if (!defaultArgsOwner) {
-        argOwner
-          = findDefaultArgsOwner(cs, solution,
-                                 cs.getConstraintLocator(locator));
-        assert(argOwner && "Missing default arguments owner?");
-      } else {
-        argOwner = defaultArgsOwner;
-      }
-
       anythingShuffled = true;
       hasInits = true;
       toSugarFields.push_back(toElt);
 
       // Create a caller-side default argument, if we need one.
       if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
-                                            argOwner, i).first) {
+                                            callee, i).first) {
         callerDefaultArgs.push_back(defArg);
         sources[i] = TupleShuffleExpr::CallerDefaultInitialize;
-      }
-      if (!defaultArgsOwner) {
-        defaultArgsOwner = argOwner;
-      } else {
-        assert(defaultArgsOwner == argOwner &&
-               "default args on same func have different owners");
       }
       continue;
     }
@@ -4065,7 +4262,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   auto shuffle = new (tc.Context) TupleShuffleExpr(
                                     expr, mapping,
                                     TupleShuffleExpr::SourceIsTuple,
-                                    defaultArgsOwner,
+                                    callee,
                                     tc.Context.AllocateCopy(variadicArgs),
                                     callerDefaultArgsCopy,
                                     toSugarType);
@@ -4146,7 +4343,9 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   SmallVector<int, 4> elements;
   SmallVector<unsigned, 1> variadicArgs;
   SmallVector<Expr*, 4> callerDefaultArgs;
-  ConcreteDeclRef defaultArgsOwner = nullptr;
+  ConcreteDeclRef callee =
+    findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
+
   i = 0;
   for (auto &field : toTuple->getElements()) {
     if (field.isVararg()) {
@@ -4167,20 +4366,9 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 
     assert(field.hasDefaultArg() && "Expected a default argument");
 
-    ConcreteDeclRef argOwner;
-    // Dig out the owner of the default arguments.
-    if (!defaultArgsOwner) {
-      argOwner
-      = findDefaultArgsOwner(cs, solution,
-                             cs.getConstraintLocator(locator));
-      assert(argOwner && "Missing default arguments owner?");
-    } else {
-      argOwner = defaultArgsOwner;
-    }
-
     // Create a caller-side default argument, if we need one.
     if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
-                                          argOwner, i).first) {
+                                          callee, i).first) {
       // Record the caller-side default argument expression.
       // FIXME: Do we need to record what this was synthesized from?
       elements.push_back(TupleShuffleExpr::CallerDefaultInitialize);
@@ -4189,13 +4377,6 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
       // Record the owner of the default argument.
       elements.push_back(TupleShuffleExpr::DefaultInitialize);
     }
-    if (!defaultArgsOwner) {
-      defaultArgsOwner = argOwner;
-    } else {
-      assert(defaultArgsOwner == argOwner &&
-             "default args on same func have different owners");
-    }
-
     ++i;
   }
 
@@ -4205,7 +4386,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   return new (tc.Context) TupleShuffleExpr(expr,
                             tc.Context.AllocateCopy(elements),
                             TupleShuffleExpr::SourceIsScalar,
-                            defaultArgsOwner,
+                            callee,
                             tc.Context.AllocateCopy(variadicArgs),
                             tc.Context.AllocateCopy(callerDefaultArgs),
                             destSugarTy);
@@ -4388,14 +4569,56 @@ Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type ob
   return expr;
 }
 
-Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
-                                        ConstraintLocatorBuilder locator) {
+/// Determine whether the given expression is a reference to an
+/// unbound instance member of a type.
+static bool isReferenceToMetatypeMember(Expr *expr) {
+  expr = expr->getSemanticsProvidingExpr();
+  if (auto dotIgnored = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr))
+    return dotIgnored->getLHS()->getType()->is<AnyMetatypeType>();
+  if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(expr))
+    return dotSyntax->getBase()->getType()->is<AnyMetatypeType>();
+  return false;
+}
+
+Expr *ExprRewriter::coerceCallArguments(
+    Expr *arg, Type paramType,
+    llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
+    ConstraintLocatorBuilder locator) {
 
   bool allParamsMatch = arg->getType()->isEqual(paramType);
-  
+
+  // Find the callee declaration.
+  ConcreteDeclRef callee =
+    findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
+
+  // Determine the level,
+  unsigned level = 0;
+  if (applyOrLevel.is<LevelTy>()) {
+    // Level specified by caller.
+    level = applyOrLevel.get<LevelTy>();
+  } else if (callee) {
+    // Determine the level based on the application itself.
+    auto apply = applyOrLevel.get<ApplyExpr *>();
+
+    // Only calls to members of types can have level > 0.
+    auto calleeDecl = callee.getDecl();
+    if (calleeDecl->getDeclContext()->isTypeContext()) {
+      // Level 1 if we're not applying "self".
+      if (auto call = dyn_cast<CallExpr>(apply)) {
+        if (!calleeDecl->isInstanceMember() ||
+            !isReferenceToMetatypeMember(call->getDirectCallee()))
+          level = 1;
+      } else if (isa<PrefixUnaryExpr>(apply) ||
+                 isa<PostfixUnaryExpr>(apply) ||
+                 isa<BinaryExpr>(apply)) {
+        level = 1;
+      }
+    }
+  }
+
   // Determine the parameter bindings.
-  auto params = decomposeArgParamType(paramType);
-  auto args = decomposeArgParamType(arg->getType());
+  auto params = decomposeParamType(paramType, callee.getDecl(), level);
+  auto args = decomposeArgType(arg->getType());
 
   // Quickly test if any further fix-ups for the argument types are necessary.
   // FIXME: This hack is only necessary to work around some problems we have
@@ -4477,7 +4700,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   SmallVector<Expr*, 4> fromTupleExpr(argTuple? argTuple->getNumElements() : 1);
   SmallVector<unsigned, 4> variadicArgs;
   SmallVector<Expr *, 2> callerDefaultArgs;
-  ConcreteDeclRef defaultArgsOwner = nullptr;
   Type sliceType = nullptr;
   SmallVector<int, 4> sources;
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
@@ -4531,22 +4753,11 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
 
     // If we are using a default argument, handle it now.
     if (parameterBindings[paramIdx].empty()) {
-      // Dig out the owner of the default arguments.
-      ConcreteDeclRef argOwner;
-      if (!defaultArgsOwner) {
-        argOwner
-        = findDefaultArgsOwner(cs, solution,
-                               cs.getConstraintLocator(locator));
-        assert(argOwner && "Missing default arguments owner?");
-      } else {
-        argOwner = defaultArgsOwner;
-      }
-
       // Create a caller-side default argument, if we need one.
       Expr *defArg;
       DefaultArgumentKind defArgKind;
       std::tie(defArg, defArgKind) = getCallerDefaultArg(tc, dc, arg->getLoc(),
-                                                         argOwner, paramIdx);
+                                                         callee, paramIdx);
 
       // Note that we'll be doing a shuffle involving default arguments.
       anythingShuffled = true;
@@ -4564,12 +4775,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
         sources.push_back(TupleShuffleExpr::CallerDefaultInitialize);
       } else {
         sources.push_back(TupleShuffleExpr::DefaultInitialize);
-      }
-      if (!defaultArgsOwner) {
-        defaultArgsOwner = argOwner;
-      } else {
-        assert(defaultArgsOwner == argOwner &&
-               "default args on same func have different owners");
       }
       continue;
     }
@@ -4671,7 +4876,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   auto shuffle = new (tc.Context) TupleShuffleExpr(
                                     arg, mapping,
                                     isSourceScalar,
-                                    defaultArgsOwner,
+                                    callee,
                                     tc.Context.AllocateCopy(variadicArgs),
                                     callerDefaultArgsCopy,
                                     paramType);
@@ -5646,8 +5851,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // the function.
   if (auto fnType = fn->getType()->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
-
     Expr *arg = coerceCallArguments(origArg, fnType->getInput(),
+                                    apply,
                                     locator.withPathElement(
                                       ConstraintLocator::ApplyArgument));
     if (!arg) {
@@ -5677,6 +5882,42 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                     covariantResultType);
     }
 
+    // Extract all arguments.
+    auto *CEA = arg;
+    if (auto *TSE = dyn_cast<TupleShuffleExpr>(CEA))
+      CEA = TSE->getSubExpr();
+    // The argument is either a ParenExpr or TupleExpr.
+    ArrayRef<Expr *> arguments;
+    ArrayRef<TypeBase *> types;
+
+    if (auto *TE = dyn_cast<TupleExpr>(CEA))
+      arguments = TE->getElements();
+    else if (auto *PE = dyn_cast<ParenExpr>(CEA))
+      arguments = PE->getSubExpr();
+    else
+      arguments = apply->getArg();
+
+    for (auto arg: arguments) {
+      bool isNoEscape = false;
+      while (1) {
+        if (auto AFT = arg->getType()->getAs<AnyFunctionType>()) {
+          isNoEscape = isNoEscape || AFT->isNoEscape();
+        }
+
+        if (auto conv = dyn_cast<ImplicitConversionExpr>(arg))
+          arg = conv->getSubExpr();
+        else if (auto *PE = dyn_cast<ParenExpr>(arg))
+          arg = PE->getSubExpr();
+        else
+          break;
+      }
+      if (!isNoEscape) {
+        if (auto DRE = dyn_cast<DeclRefExpr>(arg))
+          if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
+            tc.addEscapingFunctionAsArgument(FD, apply);
+          }
+      }
+    }
     return result;
   }
 
@@ -6389,14 +6630,23 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   if (!witness)
     return nullptr;
 
+  // Form a syntactic expression that describes the reference to the
+  // witness.
+  // FIXME: Egregious hack.
+  Expr *unresolvedDot = new (Context) UnresolvedDotExpr(
+                                        base, SourceLoc(),
+                                        witness->getFullName(),
+                                        DeclNameLoc(base->getEndLoc()),
+                                        /*Implicit=*/true);
+  auto dotLocator = cs.getConstraintLocator(unresolvedDot);
+
   // Form a reference to the witness itself.
-  auto locator = cs.getConstraintLocator(base);
   Type openedFullType, openedType;
   std::tie(openedFullType, openedType)
     = cs.getTypeOfMemberReference(base->getType(), witness,
                                   /*isTypeReference=*/false,
                                   /*isDynamicResult=*/false,
-                                  locator);
+                                  dotLocator);
 
   // Form the call argument.
   // FIXME: Standardize all callers to always provide all argument names,
@@ -6468,7 +6718,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                            base->getStartLoc(),
                                            witness,
                                            DeclNameLoc(base->getEndLoc()),
-                                           openedType, locator, locator,
+                                           openedType, dotLocator, dotLocator,
                                            /*Implicit=*/true,
                                            AccessSemantics::Ordinary,
                                            /*isDynamic=*/false);
@@ -6633,32 +6883,10 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   auto &tc = cs.getTypeChecker();
   tc.requireOptionalIntrinsics(expr->getLoc());
 
-  // Find the library intrinsic.
+  // Match the optional value against its `Some` case.
   auto &ctx = tc.Context;
-  auto *fn = ctx.getOptionalIsSomeDecl(&tc, OTK_Optional);
-  tc.validateDecl(fn);
-
-  // Form a reference to the function. This library intrinsic is generic, so we
-  // need to form substitutions and compute the resulting type.
-  auto unwrappedOptionalType = expr->getType()->getOptionalObjectType();
-
-  Substitution sub(unwrappedOptionalType, {});
-  ConcreteDeclRef fnSpecRef(ctx, fn, sub);
-  auto *fnRef =
-      new (ctx) DeclRefExpr(fnSpecRef, DeclNameLoc(), /*Implicit=*/true);
-
-  TypeSubstitutionMap subMap;
-  auto genericParam = fn->getGenericSignatureOfContext()->getGenericParams()[0];
-  subMap[genericParam->getCanonicalType()->castTo<SubstitutableType>()] =
-      unwrappedOptionalType;
-  fnRef->setType(fn->getInterfaceType().subst(
-      constraintSystem->DC->getParentModule(), subMap, None));
-
-  Expr *call = new (ctx) CallExpr(fnRef, expr, /*Implicit=*/true);
-
-  bool failed = tc.typeCheckExpressionShallow(call, cs.DC);
-  assert(!failed && "Could not call library intrinsic?");
-  (void)failed;
-  return call;
+  auto isSomeExpr = new (ctx) EnumIsCaseExpr(expr, ctx.getOptionalSomeDecl());
+  isSomeExpr->setType(tc.lookupBoolType(cs.DC));
+  return isSomeExpr;
 }
 

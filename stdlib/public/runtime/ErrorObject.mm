@@ -89,6 +89,18 @@ using namespace swift;
   }
 }
 
+- (id)copyWithZone:(NSZone *)zone {
+  (void)zone;
+  // _SwiftNativeNSError is immutable, so we can return the same instance back.
+  return [self retain];
+}
+
+- (Class)classForCoder {
+  // This is a runtime-private subclass. When archiving or unarchiving, do so
+  // as an NSError.
+  return getNSErrorClass();
+}
+
 @end
 
 Class swift::getNSErrorClass() {
@@ -261,17 +273,20 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
 // @_silgen_name("swift_stdlib_getErrorDomainNSString")
 // public func _stdlib_getErrorDomainNSString<T : ErrorProtocol>
 //   (x: UnsafePointer<T>) -> AnyObject
+SWIFT_CC(swift)
 extern "C" NSString *swift_stdlib_getErrorDomainNSString(
                                                  const OpaqueValue *error,
                                                  const Metadata *T,
                                                  const WitnessTable *ErrorProtocol);
 // @_silgen_name("swift_stdlib_getErrorCode")
 // public func _stdlib_getErrorCode<T : ErrorProtocol>(x: UnsafePointer<T>) -> Int
+SWIFT_CC(swift)
 extern "C" NSInteger swift_stdlib_getErrorCode(const OpaqueValue *error,
                                                const Metadata *T,
                                                const WitnessTable *ErrorProtocol);
 
 /// Take an ErrorProtocol box and turn it into a valid NSError instance.
+SWIFT_CC(swift)
 static id _swift_bridgeErrorProtocolToNSError_(SwiftError *errorObject) {
   auto ns = reinterpret_cast<NSError *>(errorObject);
 
@@ -330,9 +345,11 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   // public func _stdlib_bridgeNSErrorToErrorProtocol<
   //   T : _ObjectiveCBridgeableErrorProtocol
   // >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
+  typedef SWIFT_CC(swift)
+    bool BridgeFn(NSError *, OpaqueValue*, const Metadata *,
+                  const WitnessTable *);
   auto bridgeNSErrorToErrorProtocol = SWIFT_LAZY_CONSTANT(
-        reinterpret_cast<bool (*)(NSError *, OpaqueValue*, const Metadata *,
-                                  const WitnessTable *)>
+        reinterpret_cast<BridgeFn*>
           (dlsym(RTLD_DEFAULT, "swift_stdlib_bridgeNSErrorToErrorProtocol")));
   // protocol _ObjectiveCBridgeableErrorProtocol
   auto TheObjectiveCBridgeableErrorProtocolProtocol = SWIFT_LAZY_CONSTANT(

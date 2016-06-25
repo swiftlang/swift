@@ -6,6 +6,7 @@ func test() {
   #^A^#
 }
 
+// XFAIL: broken_std_regex
 // RUN: %complete-test -hide-none -group=none -tok=A %s -raw -- -I %S/Inputs -F %S/../Inputs/libIDE-mock-sdk > %t
 // RUN: FileCheck %s < %t
 

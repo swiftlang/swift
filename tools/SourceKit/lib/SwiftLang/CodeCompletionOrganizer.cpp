@@ -439,6 +439,7 @@ static bool isHighPriorityKeyword(CodeCompletionKeywordKind kind) {
   case CodeCompletionKeywordKind::kw_if:
   case CodeCompletionKeywordKind::kw_for:
   case CodeCompletionKeywordKind::kw_while:
+  case CodeCompletionKeywordKind::kw_return:
   case CodeCompletionKeywordKind::kw_func:
     return true;
   default:
@@ -446,10 +447,21 @@ static bool isHighPriorityKeyword(CodeCompletionKeywordKind kind) {
   }
 }
 
-bool FilterRules::hideCompletion(Completion *completion) const {
+bool FilterRules::hideName(StringRef name) const {
+  auto I = hideByName.find(name);
+  if (I != hideByName.end())
+      return I->getValue();
+  return hideAll;
+}
 
-  if (!completion->getName().empty()) {
-    auto I = hideByName.find(completion->getName());
+bool FilterRules::hideCompletion(Completion *completion) const {
+  return hideCompletion(completion, completion->getName(), completion->getCustomKind());
+}
+
+bool FilterRules::hideCompletion(SwiftResult *completion, StringRef name, void *customKind) const {
+
+  if (!name.empty()) {
+    auto I = hideByName.find(name);
     if (I != hideByName.end())
       return I->getValue();
   }
@@ -467,7 +479,7 @@ bool FilterRules::hideCompletion(Completion *completion) const {
     break;
   }
   case Completion::Pattern: {
-    if (completion->hasCustomKind()) {
+    if (customKind) {
       // FIXME: individual custom completions
       if (hideCustomCompletions)
         return true;
@@ -739,6 +751,7 @@ static int compareHighPriorityKeywords(Item &a_, Item &b_) {
     CodeCompletionKeywordKind::kw_if,
     CodeCompletionKeywordKind::kw_for,
     CodeCompletionKeywordKind::kw_while,
+    CodeCompletionKeywordKind::kw_return,
     CodeCompletionKeywordKind::kw_func,
   };
   auto size = sizeof(order) / sizeof(order[0]);
@@ -911,7 +924,7 @@ static void sortTopN(const Options &options, Group *group,
     if (!beginNewIndex)
       return;
 
-    assert(endNewIndex > beginNewIndex && endNewIndex < contents.size());
+    assert(endNewIndex > beginNewIndex && endNewIndex <= contents.size());
 
     // Temporarily copy the first result to temporary storage.
     SmallVector<Item *, 16> firstResults;
@@ -925,6 +938,7 @@ static void sortTopN(const Options &options, Group *group,
       contents[ci] = std::unique_ptr<Item>(firstResults[i]);
     }
     unsigned topN = endNewIndex - beginNewIndex;
+    assert(topN <= options.showTopNonLiteralResults);
     for (unsigned ci = topN, i = 0; i < beginNewIndex; ++i, ++ci) {
       assert(ci < contents.size() && !contents[ci]);
       contents[ci] = std::unique_ptr<Item>(firstResults[i]);
@@ -1180,6 +1194,8 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
       case ChunkKind::DeclAttrParamEqual:
       case ChunkKind::Comma:
       case ChunkKind::Whitespace:
+      case ChunkKind::Ellipsis:
+      case ChunkKind::Ampersand:
         continue;
       case ChunkKind::CallParameterColon:
         // Since we don't add the type, also don't add the space after ':'.

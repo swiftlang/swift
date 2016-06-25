@@ -53,7 +53,7 @@ HashingTestSuite.test("_mixUInt64/GoldenValues") {
 HashingTestSuite.test("_mixUInt/GoldenValues") {
 #if arch(i386) || arch(arm)
   expectEqual(0x11b8_82c9, _mixUInt(0x0))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(0xb2b2_4f68_8dc4_164d, _mixUInt(0x0))
 #else
   fatalError("unimplemented")
@@ -63,7 +63,7 @@ HashingTestSuite.test("_mixUInt/GoldenValues") {
 HashingTestSuite.test("_mixInt/GoldenValues") {
 #if arch(i386) || arch(arm)
   expectEqual(Int(bitPattern: 0x11b8_82c9), _mixInt(0x0))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(Int(bitPattern: 0xb2b2_4f68_8dc4_164d), _mixInt(0x0))
 #else
   fatalError("unimplemented")
@@ -93,7 +93,7 @@ HashingTestSuite.test("_squeezeHashValue/Int") {
 #if arch(i386) || arch(arm)
   expectEqual(-0x6e477d37, _squeezeHashValue(0, Int.min..<(Int.max - 1)))
   expectEqual(0x38a3ea26, _squeezeHashValue(2, Int.min..<(Int.max - 1)))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(0x32b24f688dc4164d, _squeezeHashValue(0, Int.min..<(Int.max - 1)))
   expectEqual(-0x6d1cc14f97aa822, _squeezeHashValue(1, Int.min..<(Int.max - 1)))
 #else
@@ -144,6 +144,7 @@ HashingTestSuite.test("overridePerExecutionHashSeed/overflow") {
   // Test that we don't use checked arithmetic on the seed.
   _HashingDetail.fixedSeedOverride = UInt64.max
   expectEqual(0x4344_dc3a_239c_3e81, _mixUInt64(0xffff_ffff_ffff_ffff))
+  _HashingDetail.fixedSeedOverride = 0
 }
 
 runAllTests()

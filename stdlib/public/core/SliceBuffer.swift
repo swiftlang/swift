@@ -76,13 +76,12 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   /// - Precondition: This buffer is backed by a uniquely-referenced
   ///   `_ContiguousArrayBuffer` and
   ///   `insertCount <= numericCast(newValues.count)`.
-  public mutating func replace<
-    C : Collection where C.Iterator.Element == Element
-  >(
+  public mutating func replace<C>(
     subRange: Range<Int>,
     with insertCount: Int,
     elementsOf newValues: C
-  ) {
+  ) where C : Collection, C.Iterator.Element == Element {
+
     _invariantCheck()
     _sanityCheck(insertCount <= numericCast(newValues.count))
 
@@ -133,7 +132,6 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
 
   //===--- Non-essential bits ---------------------------------------------===//
 
-  @warn_unused_result
   public mutating func requestUniqueMutableBackingBuffer(
     minimumCapacity: Int
   ) -> NativeBuffer? {
@@ -163,12 +161,10 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     return nil
   }
 
-  @warn_unused_result
   public mutating func isMutableAndUniquelyReferenced() -> Bool {
     return _hasNativeBuffer && isUniquelyReferenced()
   }
 
-  @warn_unused_result
   public mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
     return _hasNativeBuffer && isUniquelyReferencedOrPinned()
   }
@@ -176,7 +172,6 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
-  @warn_unused_result
   public func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer && nativeBuffer.count == count) {
@@ -185,6 +180,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     return nil
   }
 
+  @discardableResult
   public func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
@@ -238,18 +234,15 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     return count
   }
 
-  @warn_unused_result
   mutating func isUniquelyReferenced() -> Bool {
     return isUniquelyReferencedNonObjC(&owner)
   }
 
-  @warn_unused_result
   mutating func isUniquelyReferencedOrPinned() -> Bool {
     return isUniquelyReferencedOrPinnedNonObjC(&owner)
   }
 
   @_versioned
-  @warn_unused_result
   func getElement(_ i: Int) -> Element {
     _sanityCheck(i >= startIndex, "negative slice index is out of range")
     _sanityCheck(i < endIndex, "slice index out of range")
@@ -293,11 +286,11 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   /// In an empty collection, `startIndex == endIndex`.
   public var startIndex: Int
 
-  /// The collection's "past the end" position.
+  /// The collection's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `index(after:)`.
+  /// `endIndex` is always reachable from `startIndex` by zero or more
+  /// applications of `index(after:)`.
   public var endIndex: Int {
     get {
       return Int(endIndexAndFlags >> 1)

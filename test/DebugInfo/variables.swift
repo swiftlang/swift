@@ -47,9 +47,11 @@ var unused: Int32 = -1
 func foo(_ dt: Float) -> Float {
   // CHECK-DAG: call void @llvm.dbg.declare
   // CHECK-DAG: !DILocalVariable(name: "f"
-  var f: Float = 9.78
+  let f: Float = 9.78
+
   // CHECK-DAG: !DILocalVariable(name: "r"
-  var r: Float = f*dt
+  let r: Float = f*dt
+
   return r
 }
 

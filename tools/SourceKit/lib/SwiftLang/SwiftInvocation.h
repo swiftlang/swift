@@ -14,6 +14,7 @@
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTINVOCATION_H
 
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include <string>
 #include <vector>
 
 namespace swift {

@@ -160,10 +160,15 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
   auto *paramList = ParameterList::create(Context, params);
   
   DeclName Name(Context, Id, paramList);
-  auto FD = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
-                          SourceLoc(), Name, SourceLoc(), SourceLoc(),
-                          SourceLoc(), /*GenericParams=*/nullptr, FnType,
-                          paramList, TypeLoc::withoutLoc(ResType), DC);
+  auto FD = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
+                             StaticSpellingKind::None,
+                             /*FuncLoc=*/SourceLoc(),
+                             Name, /*NameLoc=*/SourceLoc(),
+                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                             /*AccessorKeywordLoc=*/SourceLoc(),
+                             /*GenericParams=*/nullptr,
+                             paramList, FnType,
+                             TypeLoc::withoutLoc(ResType), DC);
   FD->setImplicit();
   FD->setAccessibility(Accessibility::Public);
   return FD;
@@ -195,7 +200,6 @@ getBuiltinGenericFunction(Identifier Id,
     requirements.push_back(Requirement(RequirementKind::WitnessMarker,
                                        param, Type()));
   }
-  
   GenericSignature *Sig = GenericSignature::get(GenericParamTypes,requirements);
   
   Type InterfaceType = GenericFunctionType::get(Sig,
@@ -222,10 +226,13 @@ getBuiltinGenericFunction(Identifier Id,
                                              ResBodyType, GenericParams, Info);
   
   DeclName Name(Context, Id, paramList);
-  auto func = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
-                               SourceLoc(), Name,
-                               SourceLoc(), SourceLoc(), SourceLoc(),
-                               GenericParams, FnType, paramList,
+  auto func = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
+                               StaticSpellingKind::None,
+                               /*FuncLoc=*/SourceLoc(),
+                               Name, /*NameLoc=*/SourceLoc(),
+                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                               /*AccessorKeywordLoc=*/SourceLoc(),
+                               GenericParams, paramList, FnType,
                                TypeLoc::withoutLoc(ResBodyType), DC);
     
   func->setInterfaceType(InterfaceType);

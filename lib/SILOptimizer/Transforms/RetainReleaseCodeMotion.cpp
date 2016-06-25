@@ -94,6 +94,7 @@ STATISTIC(NumRetainsSunk, "Number of retains sunk");
 STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
 llvm::cl::opt<bool> DisableRRCodeMotion("disable-rr-cm", llvm::cl::init(false));
+llvm::cl::opt<bool> DisableIfWithCriticalEdge("disable-with-critical-edge", llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 //                             Utility 
@@ -105,41 +106,6 @@ static bool isRetainInstruction(SILInstruction *I) {
 
 static bool isReleaseInstruction(SILInstruction *I) {
   return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
-}
-
-/// Creates an increment on \p Ptr before insertion point \p InsertPt that
-/// creates a strong_retain if \p Ptr has reference semantics itself or a
-/// retain_value if \p Ptr is a non-trivial value without reference-semantics.
-static SILInstruction *
-createIncrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
-  // Set up the builder we use to insert at our insertion point.
-  SILBuilder B(InsertPt);
-  auto Loc = RegularLocation(SourceLoc());
-
-  // If Ptr is refcounted itself, create the strong_retain and
-  // return.
-  if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRetain(Loc, Ptr, Atomicity::Atomic);
-
-  // Otherwise, create the retain_value.
-  return B.createRetainValue(Loc, Ptr, Atomicity::Atomic);
-}
-
-/// Creates a decrement on \p Ptr before insertion point \p InsertPt that
-/// creates a strong_release if \p Ptr has reference semantics itself or
-/// a release_value if \p Ptr is a non-trivial value without reference-semantics.
-static SILInstruction *
-createDecrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
-  // Setup the builder we will use to insert at our insertion point.
-  SILBuilder B(InsertPt);
-  auto Loc = RegularLocation(SourceLoc());
-
-  // If Ptr has reference semantics itself, create a strong_release.
-  if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRelease(Loc, Ptr, Atomicity::Atomic);
-
-  // Otherwise create a release value.
-  return B.createReleaseValue(Loc, Ptr, Atomicity::Atomic);
 }
 
 //===----------------------------------------------------------------------===//
@@ -189,7 +155,7 @@ protected:
   bool MultiIteration;
 
   /// The allocator we are currently using.
-  llvm::BumpPtrAllocator &BPA;
+  llvm::SpecificBumpPtrAllocator<BlockState> &BPA;
 
   /// Current function we are analyzing.
   SILFunction *F;
@@ -224,16 +190,9 @@ protected:
   /// we compute the genset and killset.
   llvm::SmallPtrSet<SILBasicBlock *, 8> InterestBlocks;
 
-  /// An RC-identity cache.
-  /// TODO: this should be cached in RCIdentity analysis.
-  llvm::DenseMap<SILValue, SILValue> RCCache;
-
   /// Return the rc-identity root of the SILValue.
   SILValue getRCRoot(SILValue R) {
-    auto Iter = RCCache.find(R);
-    if (Iter != RCCache.end())
-      return Iter->second;
-     return RCCache[R] = RCFI->getRCIdentityRoot(R);
+     return RCFI->getRCIdentityRoot(R);
   }
 
   /// Return the rc-identity root of the RC instruction, i.e.
@@ -246,7 +205,7 @@ protected:
 
 public:
   /// Constructor.
-  CodeMotionContext(llvm::BumpPtrAllocator &BPA, SILFunction *F,
+  CodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA, SILFunction *F,
                     PostOrderFunctionInfo *PO, AliasAnalysis *AA,
                     RCIdentityFunctionInfo *RCFI)
     : MultiIteration(true), BPA(BPA), F(F), PO(PO), AA(AA), RCFI(RCFI) {}
@@ -365,9 +324,9 @@ class RetainCodeMotionContext : public CodeMotionContext {
 
 public:
   /// Constructor.
-  RetainCodeMotionContext(llvm::BumpPtrAllocator &BPA, SILFunction *F,
-                          PostOrderFunctionInfo *PO, AliasAnalysis *AA,
-                          RCIdentityFunctionInfo *RCFI)
+  RetainCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+                          SILFunction *F, PostOrderFunctionInfo *PO,
+                          AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI)
       : CodeMotionContext(BPA, F, PO, AA, RCFI) {
     MultiIteration = requireIteration();
   }
@@ -437,7 +396,7 @@ void RetainCodeMotionContext::initializeCodeMotionDataFlow() {
 
   // Initialize all the data flow bit vector for all basic blocks.
   for (auto &BB : *F) {
-    BlockStates[&BB] = new (BPA) RetainBlockState(&BB == &*F->begin(),
+    BlockStates[&BB] = new (BPA.Allocate()) RetainBlockState(&BB == &*F->begin(),
                                  RCRootVault.size(), MultiIteration);
   }
 }
@@ -691,9 +650,9 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
 
 public:
   /// Constructor.
-  ReleaseCodeMotionContext(llvm::BumpPtrAllocator &BPA, SILFunction *F,
-                           PostOrderFunctionInfo *PO, AliasAnalysis *AA,
-                           RCIdentityFunctionInfo *RCFI,
+  ReleaseCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+                           SILFunction *F, PostOrderFunctionInfo *PO,
+                           AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI,
                            bool FreezeEpilogueReleases,
                            ConsumedArgToEpilogueReleaseMatcher &ERM)
       : CodeMotionContext(BPA, F, PO, AA, RCFI),
@@ -776,8 +735,8 @@ void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
   if (Throw != F->end())
     Exits.insert(&*Throw);
   for (auto &BB : *F) {
-    BlockStates[&BB] = new (BPA) ReleaseBlockState(Exits.count(&BB),
-                                 RCRootVault.size(), MultiIteration);
+    BlockStates[&BB] = new (BPA.Allocate()) ReleaseBlockState(Exits.count(&BB),
+                                            RCRootVault.size(), MultiIteration);
   }
 }
 
@@ -1047,6 +1006,11 @@ public:
     if (!F->shouldOptimize())
       return;
 
+    // Return if there is critical edge and we are disabling critical edge
+    // splitting.
+    if (DisableIfWithCriticalEdge && hasCriticalEdges(*F, false))
+      return;
+
     DEBUG(llvm::dbgs() << "*** RRCM on function: " << F->getName() << " ***\n");
     // Split all critical edges.
     //
@@ -1054,7 +1018,7 @@ public:
     // to create critical edges.
     bool EdgeChanged = splitAllCriticalEdges(*F, false, nullptr, nullptr);
 
-    llvm::BumpPtrAllocator BPA;
+    llvm::SpecificBumpPtrAllocator<BlockState> BPA;
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);

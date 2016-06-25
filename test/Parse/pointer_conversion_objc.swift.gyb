@@ -1,13 +1,13 @@
 // RUN: rm -rf %t && mkdir -p %t
 
-// RUN: %S/../../utils/gyb -DOPT_KIND=None %s -o %t/pointer_conversion.swift
-// RUN: %S/../../utils/line-directive %t/pointer_conversion.swift -- %target-swift-frontend -parse -verify %t/pointer_conversion.swift
+// RUN: %gyb -DOPT_KIND=None %s -o %t/pointer_conversion.swift
+// RUN: %line-directive %t/pointer_conversion.swift -- %target-swift-frontend -parse -verify %t/pointer_conversion.swift
 
-// RUN: %S/../../utils/gyb -DOPT_KIND=Optional %s -o %t/pointer_conversion_opt.swift
-// RUN: %S/../../utils/line-directive %t/pointer_conversion_opt.swift -- %target-swift-frontend -parse -verify %t/pointer_conversion_opt.swift
+// RUN: %gyb -DOPT_KIND=Optional %s -o %t/pointer_conversion_opt.swift
+// RUN: %line-directive %t/pointer_conversion_opt.swift -- %target-swift-frontend -parse -verify %t/pointer_conversion_opt.swift
 
-// RUN: %S/../../utils/gyb -DOPT_KIND=ImplicitlyUnwrappedOptional %s -o %t/pointer_conversion_iuo.swift
-// RUN: %S/../../utils/line-directive %t/pointer_conversion_iuo.swift -- %target-swift-frontend -parse -verify %t/pointer_conversion_iuo.swift
+// RUN: %gyb -DOPT_KIND=ImplicitlyUnwrappedOptional %s -o %t/pointer_conversion_iuo.swift
+// RUN: %line-directive %t/pointer_conversion_iuo.swift -- %target-swift-frontend -parse -verify %t/pointer_conversion_iuo.swift
 
 // REQUIRES: objc_interop
 
@@ -25,6 +25,7 @@ class D {}
 
 func takesMutablePointer(_ x: UnsafeMutablePointer<Int>${suffix}) {}
 func takesMutableVoidPointer(_ x: UnsafeMutablePointer<Void>${suffix}) {}
+@discardableResult
 func takesConstPointer(_ x: UnsafePointer<Int>${suffix}) -> Character { return "x" }
 func takesConstVoidPointer(_ x: UnsafePointer<Void>${suffix}) {}
 

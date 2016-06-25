@@ -175,6 +175,16 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
 
+  if (const Arg *A = Args.getLastArg(OPT_warn_long_function_bodies)) {
+    unsigned attempt;
+    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    } else {
+      Opts.WarnLongFunctionBodies = attempt;
+    }
+  }
+
   Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
   if (Args.hasArg(OPT_disable_playground_transform))
     Opts.PlaygroundTransform = false;
@@ -730,6 +740,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
+  Opts.EnableExperimentalNestedGenericTypes |=
+    Args.hasArg(OPT_enable_experimental_nested_generic_types);
+
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   
@@ -760,11 +773,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.WarnOmitNeedlessWords = Args.hasArg(OPT_warn_omit_needless_words);
   Opts.StripNSPrefix |= Args.hasArg(OPT_enable_strip_ns_prefix);
   Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
-  if (Args.hasArg(OPT_disable_infer_iuos)) {
-    Opts.InferIUOs = false;
-  }
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
+  Opts.EnableProtocolTypealiases |= Args.hasArg(OPT_enable_protocol_typealiases);
 
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
                                OPT_disable_objc_attr_requires_foundation_module)) {
@@ -1220,6 +1231,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 
+  Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
+
   // This is set to true by default.
   Opts.UseIncrementalLLVMCodeGen &=
     !Args.hasArg(OPT_disable_incremental_llvm_codegeneration);
@@ -1257,14 +1270,18 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
   }
 
-  if (Args.hasArg(OPT_enable_reflection_metadata)) {
-    Opts.EnableReflectionMetadata = true;
-    if (Args.hasArg(OPT_enable_reflection_names)) {
-      Opts.EnableReflectionNames = true;
-    }
-    if (Args.hasArg(OPT_enable_reflection_builtins)) {
-      Opts.EnableReflectionBuiltins = true;
-    }
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
+    Opts.SanitizeCoverage =
+        parseSanitizerCoverageArgValue(A, Triple, Diags, Opts.Sanitize);
+  }
+
+  if (Args.hasArg(OPT_disable_reflection_metadata)) {
+    Opts.EnableReflectionMetadata = false;
+    Opts.EnableReflectionNames = false;
+  }
+
+  if (Args.hasArg(OPT_disable_reflection_names)) {
+    Opts.EnableReflectionNames = false;
   }
 
   return false;

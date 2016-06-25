@@ -40,5 +40,5 @@ x
 // CHECK: key.sourcetext: "    "
 // CHECK: key.sourcetext: "}"
 //                        "foo(a: ["
-// CHECK: key.sourcetext: "           3: 3"
+// CHECK: key.sourcetext: "    3: 3"
 // CHECK: key.sourcetext: "    x"

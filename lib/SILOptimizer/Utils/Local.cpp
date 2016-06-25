@@ -31,6 +31,41 @@
 
 using namespace swift;
 
+/// Creates an increment on \p Ptr before insertion point \p InsertPt that
+/// creates a strong_retain if \p Ptr has reference semantics itself or a
+/// retain_value if \p Ptr is a non-trivial value without reference-semantics.
+SILInstruction *
+swift::createIncrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
+  // Set up the builder we use to insert at our insertion point.
+  SILBuilder B(InsertPt);
+  auto Loc = RegularLocation(SourceLoc());
+
+  // If Ptr is refcounted itself, create the strong_retain and
+  // return.
+  if (Ptr->getType().isReferenceCounted(B.getModule()))
+    return B.createStrongRetain(Loc, Ptr, Atomicity::Atomic);
+
+  // Otherwise, create the retain_value.
+  return B.createRetainValue(Loc, Ptr, Atomicity::Atomic);
+}
+
+/// Creates a decrement on \p Ptr before insertion point \p InsertPt that
+/// creates a strong_release if \p Ptr has reference semantics itself or
+/// a release_value if \p Ptr is a non-trivial value without reference-semantics.
+SILInstruction *
+swift::createDecrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
+  // Setup the builder we will use to insert at our insertion point.
+  SILBuilder B(InsertPt);
+  auto Loc = RegularLocation(SourceLoc());
+
+  // If Ptr has reference semantics itself, create a strong_release.
+  if (Ptr->getType().isReferenceCounted(B.getModule()))
+    return B.createStrongRelease(Loc, Ptr, Atomicity::Atomic);
+
+  // Otherwise create a release value.
+  return B.createReleaseValue(Loc, Ptr, Atomicity::Atomic);
+}
+
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
@@ -467,6 +502,22 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
 
   SILValue CastedValue;
 
+  if (SrcTy.isAddress() && DestTy.isAddress()) {
+    // Cast between two addresses and that's it.
+    if (CheckOnly)
+      return Value;
+    CastedValue = B->createUncheckedAddrCast(Loc, Value, DestTy);
+    return CastedValue;
+  }
+
+  if (SrcTy.isAddress() != DestTy.isAddress()) {
+    // Addresses aren't compatible with values.
+    if (CheckOnly)
+      return None;
+    llvm_unreachable("Addresses aren't compatible with values");
+    return SILValue();
+  }
+
   auto &M = B->getModule();
   OptionalTypeKind SrcOTK;
   OptionalTypeKind DestOTK;
@@ -603,6 +654,18 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
       return Value;
     CastedValue = B->createUpcast(Loc, Value, DestTy);
     return CastedValue;
+  }
+
+  if (auto mt1 = dyn_cast<AnyMetatypeType>(SrcTy.getSwiftRValueType())) {
+    if (auto mt2 = dyn_cast<AnyMetatypeType>(DestTy.getSwiftRValueType())) {
+      if (mt1->getRepresentation() == mt2->getRepresentation()) {
+        // Cast between two metatypes and that's it.
+        if (CheckOnly)
+          return Value;
+        CastedValue = B->createUncheckedBitCast(Loc, Value, DestTy);
+        return CastedValue;
+      }
+    }
   }
 
   if (SrcTy.isAddress() && DestTy.isAddress()) {
@@ -1591,12 +1654,11 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   auto SILFnTy = SILType::getPrimitiveObjectType(
       M.Types.getConstantFunctionType(BridgeFuncDeclRef));
-  ArrayRef<Substitution> Subs;
-  if (Source.getNominalOrBoundGenericNominal()->getGenericSignature()) {
-    // Get substitutions, if source is a bound generic type.
-    Subs = Source->castTo<BoundGenericType>()->getSubstitutions(
-        M.getSwiftModule(), nullptr);
-  }
+
+  // Get substitutions, if source is a bound generic type.
+  ArrayRef<Substitution> Subs =
+      Source->gatherAllSubstitutions(
+          M.getSwiftModule(), nullptr);
 
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
   SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();

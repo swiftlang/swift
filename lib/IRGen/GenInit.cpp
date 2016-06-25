@@ -21,9 +21,11 @@
 #include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/IR/GlobalVariable.h"
 
+#include "DebugTypeInfo.h"
 #include "Explosion.h"
 #include "GenHeap.h"
 #include "GenTuple.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "FixedTypeInfo.h"
@@ -37,8 +39,17 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   
   // If the variable is empty in all resilience domains, don't actually emit it;
   // just return undef.
-  if (ti.isKnownEmpty(ResilienceExpansion::Minimal))
+  if (ti.isKnownEmpty(ResilienceExpansion::Minimal)) {
+    if (DebugInfo && var->getDecl()) {
+      auto Zero = llvm::ConstantInt::get(Int64Ty, 0);
+      DebugTypeInfo DbgTy(var->getDecl(), var->getLoweredType().getSwiftType(),
+                          Int8Ty, Size(0), Alignment(1));
+      DebugInfo->emitGlobalVariableDeclaration(
+          Zero, var->getDecl()->getName().str(), "", DbgTy,
+          var->getLinkage() != SILLinkage::Public, SILLocation(var->getDecl()));
+    }
     return ti.getUndefAddress();
+  }
 
   /// Get the global variable.
   Address addr = getAddrOfSILGlobalVariable(var, ti,

@@ -1,10 +1,5 @@
 // -*- swift -*-
-
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %S/../../../utils/gyb %s -o %t/main.swift
-// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-build-swift %t/main.swift -o %t/LazyMapCollection.swift.a.out
-// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-run %t/LazyMapCollection.swift.a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -60,58 +55,38 @@ CollectionTests.add${traversal}${kind}Tests(
 % for (traversal, kind) in variations:
 CollectionTests.test("LazyMapCollection instances (${traversal}${kind})") {
   do {
-    // MinimalIterator will error if next() is called after exhaustion
-    var resiliency = CollectionMisuseResiliencyChecks.all
-    resiliency.callNextOnExhaustedGenerator = false 
-
     let expected = ["convent", "conform", "constrict", "condone"]
     let base = ["vent", "form", "strict", "done"]
 % if kind == 'Sequence':
     checkSequence(
       expected,
-      MinimalSequence(elements: base).lazy.map { "con" + $0 },
-      resiliencyChecks: resiliency
-    )
+      MinimalSequence(elements: base).lazy.map { "con" + $0 })
 % elif traversal == '' and kind == 'Collection':
     checkForwardCollection(expected,
       MinimalCollection(elements: base).lazy.map { "con" + $0 },
-      resiliencyChecks: resiliency,
-      sameValue: { $0 == $1 }
-    )
+      sameValue: { $0 == $1 })
 % else:
     check${traversal}${kind}(expected,
       Minimal${traversal}${kind}(elements: base).lazy.map { "con" + $0 },
-      resiliencyChecks: resiliency,
-      sameValue: { $0 == $1 }
-    )
+      sameValue: { $0 == $1 })
 % end
   }
   do {
-    // MinimalIterator will error if next() is called after exhaustion
-    var resiliency = CollectionMisuseResiliencyChecks.all
-    resiliency.callNextOnExhaustedGenerator = false 
-
     let expected = [1, 4, 9, 16, 25, 36, 49, 64]
     let base = [1, 2, 3, 4, 5, 6, 7, 8]
 % if kind == 'Sequence':
     checkSequence(
       expected,
-      MinimalSequence(elements: base).lazy.map { $0 * $0 },
-      resiliencyChecks: resiliency
-    )
+      MinimalSequence(elements: base).lazy.map { $0 * $0 })
 % elif traversal == '' and kind == 'Collection':
     checkForwardCollection(expected,
       MinimalCollection(elements: base).lazy.map { $0 * $0 },
-      resiliencyChecks: resiliency,
-      sameValue: { $0 == $1 }
-    )
+      sameValue: { $0 == $1 })
 % else:
     check${traversal}${kind}(
       expected,
       Minimal${traversal}${kind}(elements: base).lazy.map { $0 * $0 },
-      resiliencyChecks: resiliency,
-      sameValue: { $0 == $1 }
-    )
+      sameValue: { $0 == $1 })
 % end
   }
 }

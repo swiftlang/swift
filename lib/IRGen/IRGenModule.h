@@ -64,13 +64,12 @@ namespace clang {
   template <class> class CanQual;
   class CodeGenerator;
   class Decl;
+  class GlobalDecl;
   class Type;
   namespace CodeGen {
-    class CodeGenABITypes;
     class CGFunctionInfo;
   }
 }
-using clang::CodeGen::CodeGenABITypes;
 
 namespace swift {
   class ArchetypeBuilder;
@@ -361,9 +360,6 @@ public:
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
   IRGenDebugInfo *DebugInfo;
-  /// A Clang-to-IR-type converter for types appearing in function
-  /// signatures of Objective-C methods and C functions.
-  CodeGenABITypes *ABITypes;
 
   /// A global variable which stores the hash of the module. Used for
   /// incremental compilation.
@@ -409,6 +405,7 @@ public:
   llvm::PointerType *UnownedReferencePtrTy;/// %swift.unowned_reference*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
+  llvm::StructType *WitnessFunctionPairTy;    /// { i8*, %witness.table* }
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
@@ -622,21 +619,6 @@ public:
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
-  void emitReflectionMetadata(const NominalTypeDecl *Decl);
-  void emitAssociatedTypeMetadataRecord(const NominalTypeDecl *Decl);
-  void emitAssociatedTypeMetadataRecord(const ExtensionDecl *Ext);
-  void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
-  void emitBuiltinReflectionMetadata();
-  llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
-  llvm::Constant *getAddrOfFieldName(StringRef Name);
-  llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &SILFn,
-                                             HeapLayout &Layout);
-  std::string getBuiltinTypeMetadataSectionName();
-  std::string getFieldTypeMetadataSectionName();
-  std::string getAssociatedTypeMetadataSectionName();
-  std::string getCaptureDescriptorMetadataSectionName();
-  std::string getReflectionStringsSectionName();
-  std::string getReflectionTypeRefSectionName();
 
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
@@ -644,6 +626,9 @@ public:
                         llvm::function_ref<void(IRGenFunction &IGF)> generate);
 
 private:
+  llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
+                                           ForDefinition_t forDefinition);
+
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
@@ -689,9 +674,6 @@ private:
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
   SmallVector<CanType, 4> RuntimeResolvableTypes;
-  /// Builtin types referenced by types in this module when emitting
-  /// reflection metadata.
-  llvm::SetVector<CanType> BuiltinTypes;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -731,6 +713,37 @@ private:
   void emitGlobalLists();
   void emitAutolinkInfo();
   void cleanupClangCodeGenMetadata();
+
+//--- Remote reflection metadata --------------------------------------------
+public:
+  /// Builtin types referenced by types in this module when emitting
+  /// reflection metadata.
+  llvm::SetVector<CanType> BuiltinTypes;
+  /// Imported classes referenced by types in this module when emitting
+  /// reflection metadata.
+  llvm::SetVector<ClassDecl *> ImportedClasses;
+  /// Imported protocols referenced by types in this module when emitting
+  /// reflection metadata.
+  llvm::SetVector<ProtocolDecl *> ImportedProtocols;
+
+  llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
+  llvm::Constant *getAddrOfFieldName(StringRef Name);
+  llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
+                                             CanSILFunctionType origCalleeType,
+                                             CanSILFunctionType substCalleeType,
+                                             ArrayRef<Substitution> subs,
+                                             const HeapLayout &layout);
+  llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
+
+  void emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance);
+  void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
+  void emitBuiltinReflectionMetadata();
+  std::string getBuiltinTypeMetadataSectionName();
+  std::string getFieldTypeMetadataSectionName();
+  std::string getAssociatedTypeMetadataSectionName();
+  std::string getCaptureDescriptorMetadataSectionName();
+  std::string getReflectionStringsSectionName();
+  std::string getReflectionTypeRefSectionName();
 
 //--- Runtime ---------------------------------------------------------------
 public:
@@ -783,7 +796,12 @@ public:
 
   void emitSourceFile(SourceFile &SF, unsigned StartElem);
   void addLinkLibrary(const LinkLibrary &linkLib);
-  void finalize();
+
+  /// Attempt to finalize the module.
+  ///
+  /// This can fail, in which it will return false and the module will be
+  /// invalid.
+  bool finalize();
 
   llvm::AttributeSet constructInitialAttributes();
 
@@ -800,7 +818,7 @@ public:
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
 
   void emitNestedTypeDecls(DeclRange members);
-  void emitClangDecl(clang::Decl *decl);
+  void emitClangDecl(const clang::Decl *decl);
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
@@ -946,7 +964,6 @@ public:
   void emitTypeVerifier();
 private:
   void emitGlobalDecl(Decl *D);
-  void emitExternalDefinition(Decl *D);
 };
 
 /// Stores a pointer to an IRGenModule.

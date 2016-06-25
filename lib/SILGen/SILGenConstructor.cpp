@@ -17,12 +17,15 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/Mangle.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Basic/Defer.h"
 
 using namespace swift;
 using namespace Lowering;
+using namespace Mangle;
 
 static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
                                            ValueDecl *ctor) {
@@ -206,7 +209,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
-  prepareEpilog(Type(), ctor->isBodyThrowing(), CleanupLocation(ctor));
+  prepareEpilog(Type(), ctor->hasThrows(), CleanupLocation(ctor));
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -589,7 +592,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(Type(), ctor->isBodyThrowing(),
+  prepareEpilog(Type(), ctor->hasThrows(),
                 CleanupLocation::get(endOfInitLoc));
 
   // If the constructor can fail, set up an alternative epilog for constructor
@@ -692,6 +695,32 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   }
 }
 
+static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
+                                          VarDecl *selfDecl) {
+  CanType selfFormalType = selfDecl->getType()
+      ->getInOutObjectType()->getCanonicalType();
+  if (selfFormalType->hasReferenceSemantics())
+    return SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType(),
+                                 AccessSemantics::DirectToStorage,
+                                 SGFContext::AllowImmediatePlusZero)
+      .getAsSingleValue(SGF, loc);
+  else
+    return SGF.emitLValueForDecl(loc, selfDecl,
+                                 selfDecl->getType()->getCanonicalType(),
+                                 AccessKind::Write,
+                                 AccessSemantics::DirectToStorage);
+}
+
+static LValue emitLValueForMemberInit(SILGenFunction &SGF, SILLocation loc,
+                                      VarDecl *selfDecl,
+                                      VarDecl *property) {
+  CanType selfFormalType = selfDecl->getType()
+    ->getInOutObjectType()->getCanonicalType();
+  auto self = emitSelfForMemberInit(SGF, loc, selfDecl);
+  return SGF.emitPropertyLValue(loc, self, selfFormalType, property,
+                                AccessKind::Write,
+                                AccessSemantics::DirectToStorage);
+}
 
 /// Emit a member initialization for the members described in the
 /// given pattern from the given source value.
@@ -720,28 +749,11 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     auto named = cast<NamedPattern>(pattern);
     // Form the lvalue referencing this member.
     WritebackScope scope(SGF);
-    SILLocation loc = pattern;
-    ManagedValue self;
-    CanType selfFormalType = selfDecl->getType()
-        ->getInOutObjectType()->getCanonicalType();
-    if (selfFormalType->hasReferenceSemantics())
-      self = SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType(),
-                                   AccessSemantics::DirectToStorage,
-                                   SGFContext::AllowImmediatePlusZero)
-        .getAsSingleValue(SGF, loc);
-    else
-      self = SGF.emitLValueForDecl(loc, selfDecl,
-                                   src.getType()->getCanonicalType(),
-                                   AccessKind::Write,
-                                   AccessSemantics::DirectToStorage);
-
-    LValue memberRef =
-      SGF.emitPropertyLValue(loc, self, selfFormalType, named->getDecl(),
-                             AccessKind::Write,
-                             AccessSemantics::DirectToStorage);
+    LValue memberRef = emitLValueForMemberInit(SGF, pattern, selfDecl,
+                                               named->getDecl());
 
     // Assign to it.
-    SGF.emitAssignToLValue(loc, std::move(src), std::move(memberRef));
+    SGF.emitAssignToLValue(pattern, std::move(src), std::move(memberRef));
     return;
   }
 
@@ -765,20 +777,117 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
   }
 }
 
+static SILValue getBehaviorInitStorageFn(SILGenFunction &gen,
+                                         VarDecl *behaviorVar) {
+  std::string behaviorInitName;
+  {
+    Mangler m;
+    m.mangleBehaviorInitThunk(behaviorVar);
+    behaviorInitName = m.finalize();
+  }
+  
+  SILFunction *thunkFn;
+  // Skip out early if we already emitted this thunk.
+  if (auto existing = gen.SGM.M.lookUpFunction(behaviorInitName)) {
+    thunkFn = existing;
+  } else {
+    auto init = behaviorVar->getBehavior()->InitStorageDecl.getDecl();
+    auto initFn = gen.SGM.getFunction(SILDeclRef(init), NotForDefinition);
+    
+    // Emit a thunk to inject the `self` metatype and implode tuples.
+    auto storageVar = behaviorVar->getBehavior()->StorageDecl;
+    auto selfTy = behaviorVar->getDeclContext()->getDeclaredInterfaceType();
+    auto initTy = gen.getLoweredType(selfTy).getFieldType(behaviorVar,
+                                                          gen.SGM.M);
+    auto storageTy = gen.getLoweredType(selfTy).getFieldType(storageVar,
+                                                             gen.SGM.M);
+    
+    auto initConstantTy = initFn->getLoweredType().castTo<SILFunctionType>();
+    
+    auto param = SILParameterInfo(initTy.getSwiftRValueType(),
+                        initTy.isAddress() ? ParameterConvention::Indirect_In
+                                           : ParameterConvention::Direct_Owned);
+    auto result = SILResultInfo(storageTy.getSwiftRValueType(),
+                              storageTy.isAddress() ? ResultConvention::Indirect
+                                                    : ResultConvention::Owned);
+    
+    initConstantTy = SILFunctionType::get(initConstantTy->getGenericSignature(),
+                                          initConstantTy->getExtInfo(),
+                                          ParameterConvention::Direct_Unowned,
+                                          param,
+                                          result,
+                                          // TODO: throwing initializer?
+                                          None,
+                                          gen.getASTContext());
+    
+    // TODO: Generate the body of the thunk.
+    thunkFn = gen.SGM.M.getOrCreateFunction(SILLocation(behaviorVar),
+                                            behaviorInitName,
+                                            SILLinkage::PrivateExternal,
+                                            initConstantTy,
+                                            IsBare, IsTransparent, IsFragile);
+    
+    
+  }
+  return gen.B.createFunctionRef(behaviorVar, thunkFn);
+}
+
+static SILValue getBehaviorSetterFn(SILGenFunction &gen, VarDecl *behaviorVar) {
+  auto set = behaviorVar->getSetter();
+  auto setFn = gen.SGM.getFunction(SILDeclRef(set), NotForDefinition);
+
+  // TODO: The setter may need to be a thunk, to implode tuples or perform
+  // reabstractions.
+  return gen.B.createFunctionRef(behaviorVar, setFn);
+}
+
 void SILGenFunction::emitMemberInitializers(VarDecl *selfDecl,
                                             NominalTypeDecl *nominal) {
   for (auto member : nominal->getMembers()) {
-    // Find pattern binding declarations that have initializers.
-    auto pbd = dyn_cast<PatternBindingDecl>(member);
-    if (!pbd || pbd->isStatic()) continue;
+    // Find instance pattern binding declarations that have initializers.
+    if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
+      if (pbd->isStatic()) continue;
 
-    for (auto entry : pbd->getPatternList()) {
-      auto init = entry.getInit();
-      if (!init) continue;
+      for (auto entry : pbd->getPatternList()) {
+        auto init = entry.getInit();
+        if (!init) continue;
 
-      // Cleanup after this initialization.
-      FullExpr scope(Cleanups, entry.getPattern());
-      emitMemberInit(*this, selfDecl, entry.getPattern(), emitRValue(init));
+        // Cleanup after this initialization.
+        FullExpr scope(Cleanups, entry.getPattern());
+        emitMemberInit(*this, selfDecl, entry.getPattern(), emitRValue(init));
+      }
+    }
+    
+    // Introduce behavior initialization markers for properties that need them.
+    if (auto var = dyn_cast<VarDecl>(member)) {
+      if (var->isStatic()) continue;
+      if (!var->hasBehaviorNeedingInitialization()) continue;
+      
+      // Get the initializer method for behavior.
+      auto init = var->getBehavior()->InitStorageDecl;
+      SILValue initFn = getBehaviorInitStorageFn(*this, var);
+      
+      // Get the behavior's storage we need to initialize.
+      auto storage = var->getBehavior()->StorageDecl;
+      LValue storageRef = emitLValueForMemberInit(*this, var, selfDecl,storage);
+      // Shed any reabstraction over the member.
+      while (storageRef.isLastComponentTranslation())
+        storageRef.dropLastTranslationComponent();
+      
+      auto storageAddr = emitAddressOfLValue(var, std::move(storageRef),
+                                             AccessKind::ReadWrite);
+      
+      // Get the setter.
+      auto setterFn = getBehaviorSetterFn(*this, var);
+      auto self = emitSelfForMemberInit(*this, var, selfDecl);
+      
+      auto mark = B.createMarkUninitializedBehavior(var,
+               initFn, init.getSubstitutions(), storageAddr.getValue(),
+               setterFn, getForwardingSubstitutions(), self.getValue(),
+               getLoweredType(var->getType()).getAddressType());
+      
+      // The mark instruction stands in for the behavior property.
+      VarLocs[var].value = mark;
     }
   }
 }

@@ -34,7 +34,9 @@
 #include "../SwiftShims/RuntimeShims.h"
 #include "Private.h"
 #include "swift/Runtime/Debug.h"
+#if SWIFT_OBJC_INTEROP
 #include <dlfcn.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unordered_map>
@@ -47,7 +49,7 @@
 using namespace swift;
 
 #if SWIFT_HAS_ISA_MASKING
-OBJC_EXPORT __attribute__((weak_import))
+OBJC_EXPORT __attribute__((__weak_import__))
 const uintptr_t objc_debug_isa_class_mask;
 
 static uintptr_t computeISAMask() {
@@ -75,9 +77,9 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 
 #if SWIFT_OBJC_INTEROP
 struct SwiftObject_s {
-  void *isa  __attribute__((unavailable));
-  uint32_t strongRefCount  __attribute__((unavailable));
-  uint32_t weakRefCount  __attribute__((unavailable));
+  void *isa __attribute__((__unavailable__));
+  uint32_t strongRefCount __attribute__((__unavailable__));
+  uint32_t weakRefCount __attribute__((__unavailable__));
 };
 
 static_assert(sizeof(SwiftObject_s) == sizeof(HeapObject),
@@ -88,10 +90,9 @@ static_assert(std::is_trivially_destructible<SwiftObject_s>::value,
               "SwiftObject must be trivially destructible");
 
 #if __has_attribute(objc_root_class)
-__attribute__((objc_root_class))
+__attribute__((__objc_root_class__))
 #endif
-SWIFT_RUNTIME_EXPORT
-@interface SwiftObject<NSObject> {
+SWIFT_RUNTIME_EXPORT @interface SwiftObject<NSObject> {
   SwiftObject_s header;
 }
 
@@ -148,12 +149,13 @@ extern "C" void swift_getSummary(String *out, OpaqueValue *value,
                                  const Metadata *T);
 
 static NSString *_getDescription(SwiftObject *obj) {
+  typedef SWIFT_CC(swift) NSString *ConversionFn(void *sx, void *sy, void *sz);
+
   // Cached lookup of swift_convertStringToNSString, which is in Foundation.
-  static NSString *(*convertStringToNSString)(void *sx, void *sy, void *sz)
-    = nullptr;
+  static ConversionFn *convertStringToNSString = nullptr;
   
   if (!convertStringToNSString) {
-    convertStringToNSString = (decltype(convertStringToNSString))(uintptr_t)
+    convertStringToNSString = (ConversionFn *)(uintptr_t)
       dlsym(RTLD_DEFAULT, "swift_convertStringToNSString");
     // If Foundation hasn't loaded yet, fall back to returning the static string
     // "SwiftObject". The likelihood of someone invoking -description without
@@ -169,11 +171,13 @@ static NSString *_getDescription(SwiftObject *obj) {
 }
 
 static NSString *_getClassDescription(Class cls) {
+  typedef SWIFT_CC(swift) NSString *ConversionFn(Class cls);
+
   // Cached lookup of NSStringFromClass, which is in Foundation.
-  static NSString *(*NSStringFromClass_fn)(Class cls) = nullptr;
+  static ConversionFn *NSStringFromClass_fn = nullptr;
   
   if (!NSStringFromClass_fn) {
-    NSStringFromClass_fn = (decltype(NSStringFromClass_fn))(uintptr_t)
+    NSStringFromClass_fn = (ConversionFn *)(uintptr_t)
       dlsym(RTLD_DEFAULT, "NSStringFromClass");
     // If Foundation hasn't loaded yet, fall back to returning the static string
     // "SwiftObject". The likelihood of someone invoking +description without
@@ -1022,7 +1026,7 @@ static void doWeakDestroy(WeakReference *addr, bool valueIsNative) {
 
 void swift::swift_unknownWeakInit(WeakReference *addr, void *value) {
   if (isObjCTaggedPointerOrNull(value)) {
-    addr->Value = (HeapObject*) value;
+    addr->Value = (uintptr_t) value;
     return;
   }
   doWeakInit(addr, value, usesNativeSwiftReferenceCounting_allocated(value));
@@ -1033,18 +1037,18 @@ void swift::swift_unknownWeakAssign(WeakReference *addr, void *newValue) {
   // and re-initialize.
   if (isObjCTaggedPointerOrNull(newValue)) {
     swift_unknownWeakDestroy(addr);
-    addr->Value = (HeapObject*) newValue;
+    addr->Value = (uintptr_t) newValue;
     return;
   }
 
   bool newIsNative = usesNativeSwiftReferenceCounting_allocated(newValue);
 
   // If the existing value is not allocated, this is just an initialize.
-  void *oldValue = addr->Value;
+  void *oldValue = (void*) addr->Value;
   if (isObjCTaggedPointerOrNull(oldValue))
     return doWeakInit(addr, newValue, newIsNative);
 
-  bool oldIsNative = usesNativeSwiftReferenceCounting_allocated(oldValue);
+  bool oldIsNative = isNativeSwiftWeakReference(addr);
 
   // If they're both native, we can use the native function.
   if (oldIsNative && newIsNative)
@@ -1061,53 +1065,62 @@ void swift::swift_unknownWeakAssign(WeakReference *addr, void *newValue) {
 }
 
 void *swift::swift_unknownWeakLoadStrong(WeakReference *addr) {
-  void *value = addr->Value;
+  if (isNativeSwiftWeakReference(addr)) {
+    return swift_weakLoadStrong(addr);
+  }
+
+  void *value = (void*) addr->Value;
   if (isObjCTaggedPointerOrNull(value)) return value;
 
-  if (usesNativeSwiftReferenceCounting_allocated(value)) {
-    return swift_weakLoadStrong(addr);
-  } else {
-    return (void*) objc_loadWeakRetained((id*) &addr->Value);
-  }
+  return (void*) objc_loadWeakRetained((id*) &addr->Value);
 }
 
 void *swift::swift_unknownWeakTakeStrong(WeakReference *addr) {
-  void *value = addr->Value;
+  if (isNativeSwiftWeakReference(addr)) {
+    return swift_weakTakeStrong(addr);
+  }
+
+  void *value = (void*) addr->Value;
   if (isObjCTaggedPointerOrNull(value)) return value;
 
-  if (usesNativeSwiftReferenceCounting_allocated(value)) {
-    return swift_weakTakeStrong(addr);
-  } else {
-    void *result = (void*) objc_loadWeakRetained((id*) &addr->Value);
-    objc_destroyWeak((id*) &addr->Value);
-    return result;
-  }
+  void *result = (void*) objc_loadWeakRetained((id*) &addr->Value);
+  objc_destroyWeak((id*) &addr->Value);
+  return result;
 }
 
 void swift::swift_unknownWeakDestroy(WeakReference *addr) {
+  if (isNativeSwiftWeakReference(addr)) {
+    return swift_weakDestroy(addr);
+  }
+
   id object = (id) addr->Value;
   if (isObjCTaggedPointerOrNull(object)) return;
-  doWeakDestroy(addr, usesNativeSwiftReferenceCounting_allocated(object));
+  objc_destroyWeak((id*) &addr->Value);
 }
+
 void swift::swift_unknownWeakCopyInit(WeakReference *dest, WeakReference *src) {
+  if (isNativeSwiftWeakReference(src)) {
+    return swift_weakCopyInit(dest, src);
+  }
+
   id object = (id) src->Value;
   if (isObjCTaggedPointerOrNull(object)) {
-    dest->Value = (HeapObject*) object;
-    return;
+    dest->Value = (uintptr_t) object;
+  } else {
+    objc_copyWeak((id*) &dest->Value, (id*) src);
   }
-  if (usesNativeSwiftReferenceCounting_allocated(object))
-    return swift_weakCopyInit(dest, src);
-  objc_copyWeak((id*) &dest->Value, (id*) src);
 }
 void swift::swift_unknownWeakTakeInit(WeakReference *dest, WeakReference *src) {
+  if (isNativeSwiftWeakReference(src)) {
+    return swift_weakTakeInit(dest, src);
+  }
+
   id object = (id) src->Value;
   if (isObjCTaggedPointerOrNull(object)) {
-    dest->Value = (HeapObject*) object;
-    return;
+    dest->Value = (uintptr_t) object;
+  } else {
+    objc_moveWeak((id*) &dest->Value, (id*) &src->Value);
   }
-  if (usesNativeSwiftReferenceCounting_allocated(object))
-    return swift_weakTakeInit(dest, src);
-  objc_moveWeak((id*) &dest->Value, (id*) &src->Value);
 }
 void swift::swift_unknownWeakCopyAssign(WeakReference *dest, WeakReference *src) {
   if (dest == src) return;
@@ -1499,7 +1512,7 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
 
 using ClassExtents = TwoWordPair<size_t, size_t>;
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 extern "C"
 ClassExtents::Return
 swift_class_getInstanceExtents(const Metadata *c) {

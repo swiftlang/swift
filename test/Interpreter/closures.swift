@@ -35,11 +35,11 @@ func test() {
 test()
 
 // <rdar://problem/19776288>
-func map<T>(_ fn: T -> ()) {
+func map<T>(_ fn: (T) -> ()) {
     print("Void overload")
 }
 
-func map<T,U>(_ fn: T -> U) {
+func map<T,U>(_ fn: (T) -> U) {
     print("Non-void overload")
 }
 

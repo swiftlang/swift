@@ -44,7 +44,7 @@
 
 using namespace swift;
 
-% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator'):
+% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator', 'Data', 'CharacterSet', 'IndexSet'):
 SWIFT_RUNTIME_STDLIB_INTERFACE
 @interface _SwiftNativeNS${Class}Base : NS${Class}
 {
@@ -95,7 +95,7 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 @end
 % end
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool
 swift_stdlib_NSObject_isEqual(NSObject *NS_RELEASES_ARGUMENT lhs,
                               NSObject *NS_RELEASES_ARGUMENT rhs) {
@@ -105,7 +105,7 @@ swift_stdlib_NSObject_isEqual(NSObject *NS_RELEASES_ARGUMENT lhs,
   return Result;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
     NSString *NS_RELEASES_ARGUMENT lhs, NSString *NS_RELEASES_ARGUMENT rhs) {
   // 'kCFCompareNonliteral' actually means "normalize to NFD".
@@ -116,7 +116,7 @@ extern "C" int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
   return Result;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" int32_t
 swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr(void *Lhs,
                                                              void *Rhs) {
@@ -129,7 +129,7 @@ swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr(void *Lhs,
   return Result;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" size_t
 swift_stdlib_NSStringHashValue(NSString *NS_RELEASES_ARGUMENT str,
                                bool isASCII) {
@@ -140,7 +140,7 @@ swift_stdlib_NSStringHashValue(NSString *NS_RELEASES_ARGUMENT str,
   return Result;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" size_t
 swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
   NSString *str = (NSString *)opaque;
@@ -148,7 +148,7 @@ swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
 }
 
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
                                                   NSString *prefix) {
   auto Length = CFStringGetLength((__bridge CFStringRef)theString);
@@ -161,7 +161,7 @@ extern "C" bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
   return Result;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool swift_stdlib_NSStringHasPrefixNFDPointer(void *theString,
                                                          void *prefix) {
   auto Length = CFStringGetLength((__bridge CFStringRef)theString);
@@ -172,7 +172,7 @@ extern "C" bool swift_stdlib_NSStringHasPrefixNFDPointer(void *theString,
   return Result;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool
 swift_stdlib_NSStringHasSuffixNFD(NSString *NS_RELEASES_ARGUMENT theString,
                                   NSString *NS_RELEASES_ARGUMENT suffix) {
@@ -186,7 +186,7 @@ swift_stdlib_NSStringHasSuffixNFD(NSString *NS_RELEASES_ARGUMENT theString,
   return Result;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool swift_stdlib_NSStringHasSuffixNFDPointer(void *theString,
                                                          void *suffix) {
   auto Length = CFStringGetLength((__bridge CFStringRef)theString);
@@ -197,7 +197,7 @@ extern "C" bool swift_stdlib_NSStringHasSuffixNFDPointer(void *theString,
   return Result;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" NS_RETURNS_RETAINED NSString *
 swift_stdlib_NSStringLowercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   NSString *Result = objc_retain(str.lowercaseString);
@@ -205,7 +205,7 @@ swift_stdlib_NSStringLowercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   return Result;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" NS_RETURNS_RETAINED NSString *
 swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   NSString *Result = objc_retain(str.uppercaseString);
@@ -213,7 +213,7 @@ swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   return Result;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void swift_stdlib_CFSetGetValues(NSSet *NS_RELEASES_ARGUMENT set,
                                             const void **values) {
   CFSetGetValues((__bridge CFSetRef)set, values);

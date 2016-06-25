@@ -71,7 +71,7 @@ internal func _cocoaStringToContiguous(
   source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
   _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(source) == nil,
-    "Known contiguously-stored strings should already be converted to Swift")
+    "Known contiguously stored strings should already be converted to Swift")
 
   let startIndex = range.lowerBound
   let count = range.upperBound - startIndex
@@ -107,7 +107,7 @@ internal func _cocoaStringSlice(
   
   _sanityCheck(
     _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
-    "Known contiguously-stored strings should already be converted to Swift")
+    "Known contiguously stored strings should already be converted to Swift")
 
   let cfResult: AnyObject = _swift_stdlib_CFStringCreateWithSubstring(
     nil, cfSelf, _swift_shims_CFRange(
@@ -124,7 +124,7 @@ internal func _cocoaStringSubscript(
   let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
 
   _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
-    "Known contiguously-stored strings should already be converted to Swift")
+    "Known contiguously stored strings should already be converted to Swift")
 
   return _swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
 }

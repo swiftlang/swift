@@ -18,6 +18,8 @@ config.variant_sdk = "@VARIANT_SDK@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
 config.swiftlib_dir = "@LIT_SWIFTLIB_DIR@"
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
+config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
+config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
 
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 
@@ -25,6 +27,11 @@ if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
 else:
     config.available_features.add('no_asan')
+
+if '@SWIFT_TOOLS_ENABLE_LTO@'.lower() in ['full', 'thin']:
+    config.available_features.add('lto')
+else:
+    config.available_features.add('no_lto')
 
 if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
     config.available_features.add('asserts')

@@ -85,7 +85,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/Utils/LSBase.h"
+#include "swift/SILOptimizer/Utils/LoadStoreOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/MapVector.h"
@@ -179,7 +179,7 @@ namespace {
 constexpr unsigned MaxLSLocationBBMultiplicationNone = 128*128;
 
 /// we could run optimistic RLE on functions with less than 64 basic blocks
-/// and 64 locations which is a sizeable function.
+/// and 64 locations which is a sizable function.
 constexpr unsigned MaxLSLocationBBMultiplicationPessimistic = 64*64;
 
 /// forward declaration.
@@ -1487,13 +1487,26 @@ bool RLEContext::run() {
   // Finally, perform the redundant load replacements.
   llvm::DenseSet<SILInstruction *> InstsToDelete;
   bool SILChanged = false;
-  for (auto &X : BBToLocState) {
-    for (auto &F : X.second.getRL()) {
-      DEBUG(llvm::dbgs() << "Replacing  " << SILValue(F.first) << "With "
-                         << F.second);
+  for (auto &B : *Fn) {
+    auto &State = BBToLocState[&B];
+    auto &Loads = State.getRL();
+    // Nothing to forward.
+    if (Loads.empty())
+      continue;
+    // We iterate the instructions in the basic block in a deterministic order
+    // and use this order to perform the load forwarding. 
+    //
+    // NOTE: we could end up with different SIL depending on the ordering load
+    // forwarding is performed.
+    for (auto I = B.rbegin(), E = B.rend(); I != E; ++I) {
+      auto Iter = Loads.find(&*I);
+      if (Iter == Loads.end())
+        continue;
+      DEBUG(llvm::dbgs() << "Replacing  " << SILValue(Iter->first) << "With "
+            << Iter->second);
       SILChanged = true;
-      F.first->replaceAllUsesWith(F.second);
-      InstsToDelete.insert(F.first);
+      Iter->first->replaceAllUsesWith(Iter->second);
+      InstsToDelete.insert(Iter->first);
       ++NumForwardedLoads;
     }
   }

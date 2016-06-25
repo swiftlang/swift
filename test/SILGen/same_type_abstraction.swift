@@ -5,7 +5,7 @@ protocol Associated {
 }
 
 struct Abstracted<T: Associated, U: Associated> {
-  let closure: T.Assoc -> U.Assoc
+  let closure: (T.Assoc) -> U.Assoc
 }
 
 struct S1 {}

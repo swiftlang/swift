@@ -20,6 +20,7 @@
 #include "ImportEnumInfo.h"
 #include "SwiftLookupTable.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
@@ -65,7 +66,6 @@ class TypedefNameDecl;
 namespace swift {
 
 class ASTContext;
-class ClangModuleUnit;
 class ClassDecl;
 class ConstructorDecl;
 class Decl;
@@ -314,7 +314,10 @@ private:
 
 public:
   /// \brief Mapping of already-imported declarations.
-  llvm::DenseMap<const clang::Decl *, Decl *> ImportedDecls;
+  ///
+  /// The "char" in the key is a "bool" in disguise that indicates whether this
+  /// is a Swift 2 name vs. a Swift 3 name.
+  llvm::DenseMap<std::pair<const clang::Decl *, char>, Decl *> ImportedDecls;
 
   /// \brief The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
@@ -371,7 +374,7 @@ public:
 
   /// \brief Mapping of already-imported declarations from protocols, which
   /// can (and do) get replicated into classes.
-  llvm::DenseMap<std::pair<const clang::Decl *, DeclContext *>, Decl *>
+  llvm::DenseMap<std::tuple<const clang::Decl *, DeclContext *, char>, Decl *>
     ImportedProtocolDecls;
 
   /// Mapping from identifiers to the set of macros that have that name along
@@ -565,7 +568,7 @@ public:
 
   /// \brief Keep track of initializer declarations that correspond to
   /// imported methods.
-  llvm::DenseMap<std::pair<const clang::ObjCMethodDecl *, DeclContext *>,
+  llvm::DenseMap<std::tuple<const clang::ObjCMethodDecl *, DeclContext *, char>,
                  ConstructorDecl *>
     Constructors;
 
@@ -777,8 +780,7 @@ public:
 
   /// Determine the imported CF type for the given typedef-name, or the empty
   /// string if this is not an imported CF type name.
-  static StringRef getCFTypeName(const clang::TypedefNameDecl *decl,
-                                 StringRef *secondaryName = nullptr);
+  static StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
 
   /// Retrieve the type name of a Clang type for the purposes of
   /// omitting unneeded words.
@@ -833,10 +835,6 @@ public:
   struct ImportedName {
     /// The imported name.
     DeclName Imported;
-
-    /// An additional alias to the imported name, which should be
-    /// recorded in name lookup tables as well.
-    DeclName Alias;
 
     /// Whether this name was explicitly specified via a Clang
     /// swift_name attribute.
@@ -908,12 +906,15 @@ public:
         return true;
       }
     }
+
   };
 
   /// Flags that control the import of names in importFullName.
   enum class ImportNameFlags {
     /// Suppress the factory-method-as-initializer transformation.
     SuppressFactoryMethodAsInit = 0x01,
+    /// Produce the Swift 2 name of the given entity.
+    Swift2Name = 0x02,
   };
 
   /// Options that control the import of names in importFullName.
@@ -933,6 +934,10 @@ public:
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
                              const clang::MacroInfo *macro,
                              clang::ASTContext &clangCtx);
+
+  /// Print an imported name as a string suitable for the swift_name attribute,
+  /// or the 'Rename' field of AvailableAttr.
+  void printSwiftName(ImportedName, bool fullyQualified, llvm::raw_ostream &os);
 
   /// Retrieve the property type as determined by the given accessor.
   static clang::QualType
@@ -973,6 +978,14 @@ public:
   /// translated into Swift.
   ValueDecl *importMacro(Identifier name, clang::MacroInfo *macro);
 
+  /// Find the swift_newtype attribute on the given typedef, if present.
+  clang::SwiftNewtypeAttr *getSwiftNewtypeAttr(
+      const clang::TypedefNameDecl *decl,
+      bool useSwift2Name);
+
+  /// Map a Clang identifier name to its imported Swift equivalent.
+  StringRef getSwiftNameFromClangName(StringRef name);
+
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.
   ///
@@ -985,13 +998,15 @@ public:
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
-  Decl *importDeclCached(const clang::NamedDecl *ClangDecl);
+  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, bool useSwift2Name);
 
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl,
+                       bool useSwift2Name,
                        bool &TypedefIsSuperfluous,
                        bool &HadForwardDeclaration);
 
   Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
+                               bool useSwift2Name,
                                bool SuperfluousTypedefsAreTransparent);
 
   /// \brief Same as \c importDeclReal, but for use inside importer
@@ -1000,8 +1015,8 @@ public:
   /// Unlike \c importDeclReal, this function for convenience transparently
   /// looks through superfluous typedefs and returns the imported underlying
   /// decl in that case.
-  Decl *importDecl(const clang::NamedDecl *ClangDecl) {
-    return importDeclAndCacheImpl(ClangDecl,
+  Decl *importDecl(const clang::NamedDecl *ClangDecl, bool useSwift2Name) {
+    return importDeclAndCacheImpl(ClangDecl, useSwift2Name,
                                   /*SuperfluousTypedefsAreTransparent=*/true);
   }
 
@@ -1011,8 +1026,8 @@ public:
   ///
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
-  Decl *importDeclReal(const clang::NamedDecl *ClangDecl) {
-    return importDeclAndCacheImpl(ClangDecl,
+  Decl *importDeclReal(const clang::NamedDecl *ClangDecl, bool useSwift2Name) {
+    return importDeclAndCacheImpl(ClangDecl, useSwift2Name,
                                   /*SuperfluousTypedefsAreTransparent=*/false);
   }
 
@@ -1023,7 +1038,7 @@ public:
   /// \returns The imported declaration, or null if this declaration could not
   /// be represented in Swift.
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
-                           ProtocolDecl *proto);
+                           bool useSwift2Name, ProtocolDecl *proto);
 
   /// \brief Import the given Clang declaration context into Swift.
   ///
@@ -1084,6 +1099,10 @@ public:
                             ConstantConvertKind convertKind,
                             bool isStatic,
                             ClangNode ClangN);
+
+  /// Determine whether the given declaration is considered
+  /// 'unavailable' in Swift.
+  bool isUnavailableInSwift(const clang::Decl *decl);
 
   /// \brief Add "Unavailable" annotation to the swift declaration.
   void markUnavailable(ValueDecl *decl, StringRef unavailabilityMsg);
@@ -1443,6 +1462,26 @@ public:
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
+
+  /// Whether the given decl is a global Notification
+  static bool isNSNotificationGlobal(const clang::NamedDecl *);
+
+  // If this decl is associated with a swift_newtype (and we're honoring
+  // swift_newtype), return it, otherwise null
+  clang::TypedefNameDecl *findSwiftNewtype(const clang::NamedDecl *decl,
+                                           clang::Sema &clangSema,
+                                           bool useSwift2Name);
+
+  /// Whether the passed type is NSString *
+  static bool isNSString(const clang::Type *);
+  static bool isNSString(clang::QualType);
+
+  /// Whether the given declaration was exported from Swift.
+  ///
+  /// Note that this only checks the immediate declaration being passed.
+  /// For things like methods and properties that are nested in larger types,
+  /// it's the top-level declaration that should be checked.
+  static bool hasNativeSwiftDecl(const clang::Decl *decl);
 };
 
 }

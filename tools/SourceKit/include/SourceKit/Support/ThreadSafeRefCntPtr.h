@@ -16,6 +16,8 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/Mutex.h"
 #include <atomic>
+#include <type_traits>
+#include <utility>
 
 namespace SourceKit {
 

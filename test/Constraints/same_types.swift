@@ -153,3 +153,16 @@ func test8a<
 func rdar19137463<T where T.a == T>(_ t: T) {} // expected-error{{'a' is not a member type of 'T'}}
 rdar19137463(1)
 
+
+// FIXME: Terrible diagnostic
+
+struct Brunch<U : Fooable where U.Foo == X> { } // expected-note{{requirement specified as 'U.Foo' == 'X' [with U = BadFooable]}}
+
+struct BadFooable : Fooable {
+  typealias Foo = DoesNotExist // expected-error{{use of undeclared type 'DoesNotExist'}}
+  var foo: Foo { while true {} }
+}
+
+func bogusInOutError(d: inout Brunch<BadFooable>) {} // expected-error{{parameters may not have the 'var' specifier}}
+// expected-error@-1{{'Brunch' requires the types '<<error type>>' and 'X' be equivalent}}
+

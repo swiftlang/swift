@@ -452,9 +452,8 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
     return getRepresentative()->getNestedType(nestedName, builder);
 
     // If we already have a nested type with this name, return it.
-  llvm::TinyPtrVector<PotentialArchetype *> &nested = NestedTypes[nestedName];
-  if (!nested.empty()) {
-    return nested.front();
+  if (!NestedTypes[nestedName].empty()) {
+    return NestedTypes[nestedName].front();
   }
 
   // Attempt to resolve this nested type to an associated type
@@ -531,6 +530,8 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
       // If we have resolved this nested type to more than one associated
       // type, create same-type constraints between them.
       RequirementSource source(RequirementSource::Inferred, SourceLoc());
+      llvm::TinyPtrVector<PotentialArchetype *> &nested =
+          NestedTypes[nestedName];
       if (!nested.empty()) {
         auto existing = nested.front();
         if (existing->getTypeAliasDecl() && !pa->getTypeAliasDecl()) {
@@ -567,6 +568,7 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
 
   // We couldn't resolve the nested type yet, so create an
   // unresolved associated type.
+  llvm::TinyPtrVector<PotentialArchetype *> &nested = NestedTypes[nestedName];
   if (nested.empty()) {
     nested.push_back(new PotentialArchetype(this, nestedName));
     ++builder.Impl->NumUnresolvedNestedTypes;
@@ -2016,8 +2018,8 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "\n";
 }
 
-Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type,
-                                         LazyResolver *resolver) {
+Type ArchetypeBuilder::mapTypeIntoContext(const DeclContext *dc, Type type,
+                                          LazyResolver *resolver) {
   // If the type is not dependent, there's nothing to map.
   if (!type->hasTypeParameter())
     return type;
@@ -2079,7 +2081,7 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
 }
 
 Type
-ArchetypeBuilder::mapTypeOutOfContext(DeclContext *dc, Type type) {
+ArchetypeBuilder::mapTypeOutOfContext(const DeclContext *dc, Type type) {
   GenericParamList *genericParams = dc->getGenericParamsOfContext();
   return mapTypeOutOfContext(dc->getParentModule(), genericParams, type);
 }
@@ -2155,6 +2157,9 @@ addRequirements(
     ArchetypeBuilder::PotentialArchetype *pa,
     llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> &knownPAs,
     SmallVectorImpl<Requirement> &requirements) {
+
+  auto &ctx = builder.getASTContext();
+
   // If the potential archetype has been bound away to a concrete type,
   // it needs no requirements.
   if (pa->isConcreteType())
@@ -2179,8 +2184,8 @@ addRequirements(
 
   ProtocolType::canonicalizeProtocols(protocols);
   for (auto proto : protocols) {
-    requirements.push_back(Requirement(RequirementKind::Conformance,
-                                       type, proto->getDeclaredType()));
+    requirements.push_back(Requirement(RequirementKind::Conformance, type,
+                                       ProtocolType::get(proto, ctx)));
   }
 }
 

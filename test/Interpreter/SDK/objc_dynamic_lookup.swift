@@ -29,7 +29,7 @@ print((dict["World"]!)!.description)
 // CHECK: NSDictionary subscript with an index fails
 var optVal2 = dict[1]
 if optVal2 != nil {
-   print(optVal2.description)
+   print(optVal2!.description)
 } else {
    print("NSDictionary subscript with an index fails")
 }

@@ -6,8 +6,8 @@ class Base1 {
   func f0a(_ x: [Int]?) { }
   func f1(_ x: [[Int]]) { }
   func f1a(_ x: [[Int]]?) { }
-  func f2(_ x: [[Int] -> [Int]]) { }
-  func f2a(_ x: [[Int]? -> [Int]?]?) { }
+  func f2(_ x: [([Int]) -> [Int]]) { }
+  func f2a(_ x: [([Int]?) -> [Int]?]?) { }
 }
 
 class Derived1 : Base1 {
@@ -15,8 +15,8 @@ class Derived1 : Base1 {
   override func f0a(_ x: Optional<Array<Int>>) { }
   override func f1(_ x: Array<Array<Int>>) { }
   override func f1a(_ x: Optional<Array<Array<Int>>>) { }
-  override func f2(_ x: Array<Array<Int> -> Array<Int>>) { }
-  override func f2a(_ x: Optional<Array<Optional<Array<Int>> -> Optional<Array<Int>>>>) { }
+  override func f2(_ x: Array<(Array<Int>) -> Array<Int>>) { }
+  override func f2a(_ x: Optional<Array<(Optional<Array<Int>>) -> Optional<Array<Int>>>>) { }
 }
 
 

@@ -42,3 +42,14 @@ protocol P2 {
 struct XP2 : P2 { // expected-error{{initializer 'init(foo:)' has different argument names from those required by protocol 'P2' ('init')}}
   let foo: Int 
 }
+
+// rdar://problem/22981205
+protocol P3 {
+  subscript(val: String, label arg: String) -> Int { get } // expected-note{{requirement 'subscript(_:label:)' declared here}}
+}
+
+class MislabeledSubscript : P3 {
+  subscript(val: String, label: String) -> Int { // expected-error{{method 'subscript' has different argument names from those required by protocol 'P3' ('subscript(_:label:)')}}
+    return 1
+  }
+}

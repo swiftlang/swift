@@ -12,12 +12,15 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
-// RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror
+// RUN: if [ %target-runtime == "objc" ]; \
+// RUN: then \
+// RUN:   %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g && \
+// RUN:   %target-build-swift %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror; \
+// RUN: else \
+// RUN:   %target-build-swift %s -o %t/Mirror; \
+// RUN: fi
 // RUN: %target-run %t/Mirror
 // REQUIRES: executable_test
-
-// XFAIL: linux
 
 import StdlibUnittest
 
@@ -354,6 +357,7 @@ mirrors.test("class/CustomizedSuper/Synthesized") {
   }
 }
 
+#if _runtime(_ObjC)
 import Foundation
 
 //===--- ObjC Base Classes ------------------------------------------------===//
@@ -425,7 +429,7 @@ mirrors.test("class/ObjCUncustomizedSuper/Synthesized/Explicit") {
 }
 
 mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
-  class A : NSDateFormatter, CustomReflectable {
+  class A : DateFormatter, CustomReflectable {
     var a: Int = 1
     var customMirror: Mirror {
       return Mirror(self, children: ["aye": a])
@@ -450,9 +454,9 @@ mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", a.children.first!.label)
     if let d = expectNotEmpty(a.superclassMirror) {
-      expectTrue(d.subjectType == NSDateFormatter.self)
+      expectTrue(d.subjectType == DateFormatter.self)
       if let f = expectNotEmpty(d.superclassMirror) {
-        expectTrue(f.subjectType == NSFormatter.self)
+        expectTrue(f.subjectType == Formatter.self)
         if let o = expectNotEmpty(f.superclassMirror) {
           expectTrue(o.subjectType == NSObject.self)
           expectEmpty(o.superclassMirror)
@@ -461,6 +465,7 @@ mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
     }
   }
 }
+#endif // _runtime(_ObjC)
 
 //===--- Suppressed Superclass Mirrors ------------------------------------===//
 mirrors.test("Class/Root/NoSuperclassMirror") {
@@ -717,7 +722,10 @@ mirrors.test("PlaygroundQuickLook") {
   struct X {}
   switch PlaygroundQuickLook(reflecting: X()) {
   case .text(let text):
+#if _runtime(_ObjC)
+// FIXME: Enable if non-objc hasSuffix is implemented.
     expectTrue(text.hasSuffix(".(X #1)()"), text)
+#endif
   default:
     expectTrue(false)
   }
@@ -730,6 +738,36 @@ mirrors.test("PlaygroundQuickLook") {
   }
 }
 
+class Parent {}
+
+extension Parent : _DefaultCustomPlaygroundQuickLookable {
+  var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text("base")
+  }
+}
+
+class Child : Parent { }
+
+class FancyChild : Parent, CustomPlaygroundQuickLookable {
+  var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text("child")
+  }
+}
+
+mirrors.test("_DefaultCustomPlaygroundQuickLookable") {
+  // testing the workaround for custom quicklookables in subclasses
+  switch PlaygroundQuickLook(reflecting: Child()) {
+  case .text("base"): break
+  default: expectUnreachable("Base custom quicklookable was expected")
+  }
+
+  switch PlaygroundQuickLook(reflecting: FancyChild()) {
+  case .text("child"): break
+  default: expectUnreachable("FancyChild custom quicklookable was expected")
+  }
+}
+
+#if _runtime(_ObjC)
 import MirrorObjC
 mirrors.test("ObjC") {
   // Some Foundation classes lie about their ivars, which would crash
@@ -737,6 +775,7 @@ mirrors.test("ObjC") {
   // Objective-C classes from the default mirror implementation.
   expectEqual(0, Mirror(reflecting: HasIVars()).children.count)
 }
+#endif
 
 mirrors.test("String.init") {
   expectEqual("42", String(42))

@@ -332,7 +332,9 @@ static void
 computeNewArgInterfaceTypes(SILFunction *F,
                             IndicesSet &PromotableIndices,
                             SmallVectorImpl<SILParameterInfo> &OutTys) {
-  auto Parameters = F->getLoweredFunctionType()->getParameters();
+  auto FunctionTy = F->getLoweredFunctionType();
+  auto Parameters = FunctionTy->getParameters();
+  auto NumIndirectResults = FunctionTy->getNumIndirectResults();
 
   DEBUG(llvm::dbgs() << "Preparing New Args!\n");
 
@@ -340,11 +342,16 @@ computeNewArgInterfaceTypes(SILFunction *F,
   for (unsigned Index : indices(Parameters)) {
     auto &param = Parameters[Index];
 
+    // The PromotableIndices index is expressed as the argument index (num
+    // indirect result + param index). Add back the num indirect results to get
+    // the arg index when working with PromotableIndices.
+    unsigned ArgIndex = Index + NumIndirectResults;
+
     DEBUG(llvm::dbgs() << "Index: " << Index << "; PromotableIndices: "
-          << (PromotableIndices.count(Index)?"yes":"no")
+          << (PromotableIndices.count(ArgIndex)?"yes":"no")
           << " Param: "; param.dump());
 
-    if (!PromotableIndices.count(Index)) {
+    if (!PromotableIndices.count(ArgIndex)) {
       OutTys.push_back(param);
       continue;
     }
@@ -377,8 +384,14 @@ static std::string getSpecializedName(SILFunction *F,
   CanSILFunctionType FTy = F->getLoweredFunctionType();
 
   ArrayRef<SILParameterInfo> Parameters = FTy->getParameters();
+  auto NumIndirectResults = FTy->getNumIndirectResults();
+
   for (unsigned Index : indices(Parameters)) {
-    if (!PromotableIndices.count(Index))
+    // The PromotableIndices index is expressed as the argument index (num
+    // indirect result + param index). Add back the num indirect results to get
+    // the arg index when working with PromotableIndices.
+    unsigned ArgIndex = Index + NumIndirectResults;
+    if (!PromotableIndices.count(ArgIndex))
       continue;
     FSSM.setArgumentBoxToValue(Index);
   }
@@ -907,19 +920,20 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
-  auto CalleePInfo =
-      PAI->getCallee()->getType().castTo<SILFunctionType>()->getParameters();
-  auto PInfo = PAI->getType().castTo<SILFunctionType>()->getParameters();
-  unsigned FirstIndex = PInfo.size();
+  auto CalleeFunctionTy = PAI->getCallee()->getType().castTo<SILFunctionType>();
+  auto CalleePInfo = CalleeFunctionTy->getParameters();
+  unsigned FirstIndex =
+      PAI->getType().castTo<SILFunctionType>()->getNumSILArguments();
   unsigned OpNo = 1, OpCount = PAI->getNumOperands();
   SmallVector<SILValue, 16> Args;
+  auto NumIndirectResults = CalleeFunctionTy->getNumIndirectResults();
   while (OpNo != OpCount) {
     unsigned Index = OpNo - 1 + FirstIndex;
     if (PromotableIndices.count(Index)) {
       SILValue BoxValue = PAI->getOperand(OpNo);
       AllocBoxInst *ABI = cast<AllocBoxInst>(BoxValue);
 
-      SILParameterInfo CPInfo = CalleePInfo[Index];
+      SILParameterInfo CPInfo = CalleePInfo[Index - NumIndirectResults];
       assert(CPInfo.getSILType() == BoxValue->getType() &&
              "SILType of parameter info does not match type of parameter");
       // Cleanup the captured argument.

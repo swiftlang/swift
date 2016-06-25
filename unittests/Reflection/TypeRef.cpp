@@ -346,3 +346,70 @@ TEST(TypeRefTest, UniqueAfterSubstitution) {
   EXPECT_EQ(ConcreteBG, SubstitutedBG);
 }
 
+// Make sure subst() and isConcrete() walk into parent types
+TEST(TypeRefTest, NestedTypes) {
+  TypeRefBuilder Builder;
+
+  auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
+
+  std::string ParentName("parent");
+  std::vector<const TypeRef *> ParentArgs { GTP00 };
+  auto Parent = Builder.createBoundGenericType(ParentName, ParentArgs,
+                                               /*parent*/ nullptr);
+
+  std::string ChildName("child");
+  auto Child = Builder.createNominalType(ChildName, Parent);
+
+  EXPECT_FALSE(Child->isConcrete());
+
+  std::string SubstName("subst");
+  auto SubstArg = Builder.createNominalType(SubstName, /*parent*/ nullptr);
+
+  std::vector<const TypeRef *> SubstParentArgs { SubstArg };
+  auto SubstParent = Builder.createBoundGenericType(ParentName,
+                                                    SubstParentArgs,
+                                                    /*parent*/ nullptr);
+  auto SubstChild = Builder.createNominalType(ChildName, SubstParent);
+
+  GenericArgumentMap Subs;
+  Subs[{0,0}] = SubstArg;
+
+  EXPECT_TRUE(Child->isConcreteAfterSubstitutions(Subs));
+  EXPECT_EQ(SubstChild, Child->subst(Builder, Subs));
+}
+
+TEST(TypeRefTest, DeriveSubstitutions) {
+  TypeRefBuilder Builder;
+
+  auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
+  auto GTP01 = Builder.createGenericTypeParameterType(0, 1);
+
+  std::string NominalName("nominal");
+  std::vector<const TypeRef *> NominalArgs { GTP00 };
+  auto Nominal = Builder.createBoundGenericType(NominalName, NominalArgs,
+                                               /*parent*/ nullptr);
+
+  auto Result = Builder.createTupleType({GTP00, GTP01}, "", false);
+  auto Func = Builder.createFunctionType({Nominal}, {}, Result,
+                                         FunctionTypeFlags());
+
+  std::string SubstOneName("subst1");
+  auto SubstOne = Builder.createNominalType(SubstOneName, /*parent*/ nullptr);
+
+  std::string SubstTwoName("subst2");
+  auto SubstTwo = Builder.createNominalType(SubstTwoName, /*parent*/ nullptr);
+
+  GenericArgumentMap Subs;
+  Subs[{0,0}] = SubstOne;
+  Subs[{0,1}] = SubstTwo;
+
+  auto Subst = Func->subst(Builder, Subs);
+
+  GenericArgumentMap DerivedSubs;
+  EXPECT_TRUE(TypeRef::deriveSubstitutions(DerivedSubs, Func, Subst));
+
+  auto ResultOne = DerivedSubs[{0,0}];
+  auto ResultTwo = DerivedSubs[{0,1}];
+  EXPECT_EQ(SubstOne, ResultOne);
+  EXPECT_EQ(SubstTwo, ResultTwo);
+}

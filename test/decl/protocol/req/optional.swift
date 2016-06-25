@@ -6,11 +6,11 @@
 @objc class ObjCClass { }
 
 @objc protocol P1 {
-  optional func method(_ x: Int) // expected-note 2{{requirement 'method' declared here}}
+  @objc optional func method(_ x: Int) // expected-note 2{{requirement 'method' declared here}}
 
-  optional var prop: Int { get } // expected-note{{requirement 'prop' declared here}}
+  @objc optional var prop: Int { get } // expected-note{{requirement 'prop' declared here}}
 
-  optional subscript (i: Int) -> ObjCClass? { get } // expected-note{{requirement 'subscript' declared here}}
+  @objc optional subscript (i: Int) -> ObjCClass? { get } // expected-note{{requirement 'subscript' declared here}}
 }
 
 @objc protocol P2 {
@@ -117,7 +117,7 @@ extension C6 : P1 {
 @objc class C8 : P2 { // expected-note{{class 'C8' declares conformance to protocol 'P2' here}}
   func objcMethod(int x: Int) { } // expected-error{{Objective-C method 'objcMethodWithInt:' provided by method 'objcMethod(int:)' conflicts with optional requirement method 'method(y:)' in protocol 'P2'}}
   // expected-note@-1{{add '@nonobjc' to silence this error}}{{3-3=@nonobjc }}
-  // expected-note@-2{{rename method to match requirement 'method(y:)'}}{{3-3=@objc(objcMethodWithInt:) }}{{8-18=method}}{{19-22=y}}
+  // expected-note@-2{{rename method to match requirement 'method(y:)'}}{{8-18=method}}{{19-22=y}}{{none}}
 }
 
 
@@ -220,9 +220,13 @@ optional class optErrorClass { // expected-error{{'optional' modifier cannot be 
   
 protocol optErrorProtocol {
   optional func foo(_ x: Int) // expected-error{{'optional' can only be applied to members of an @objc protocol}}
+}
+
+@objc protocol optObjcAttributeProtocol {
+  optional func foo(_ x: Int) // expected-error{{'optional' requirements are an Objective-C compatibility feature; add '@objc'}}{{3-3=@objc }}
   optional associatedtype Assoc  // expected-error{{'optional' modifier cannot be applied to this declaration}} {{3-12=}}
 }
 
 @objc protocol optionalInitProto {
-  optional init() // expected-error{{'optional' cannot be applied to an initializer}}
+  @objc optional init() // expected-error{{'optional' cannot be applied to an initializer}}
 }

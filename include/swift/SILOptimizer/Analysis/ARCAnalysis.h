@@ -189,6 +189,9 @@ private:
   ExitKind Kind;
   llvm::SmallMapVector<SILArgument *, ReleaseList, 8> ArgInstMap;
 
+  /// Set to true if we found some releases but not all for the argument.
+  llvm::DenseSet<SILArgument *> FoundSomeReleases;
+
   /// Eventually this will be used in place of HasBlock.
   SILBasicBlock *ProcessedBlock;
 
@@ -238,6 +241,12 @@ public:
         return true;
     }
     return false;
+  }
+
+  /// Return true if we've found some epilogue releases for the argument
+  /// but not all.
+  bool hasSomeReleasesForArgument(SILArgument *Arg) {
+    return FoundSomeReleases.find(Arg) != FoundSomeReleases.end();
   }
 
   bool isSingleRelease(SILArgument *Arg) const {
@@ -344,6 +353,36 @@ bool getFinalReleasesForValue(SILValue Value, ReleaseTracker &Tracker);
 
 /// Match a call to a trap BB with no ARC relevant side effects.
 bool isARCInertTrapBB(const SILBasicBlock *BB);
+
+/// Get the two result values of the builtin "unsafeGuaranteed" instruction.
+///
+/// Gets the (GuaranteedValue, Token) tuple from a call to "unsafeGuaranteed"
+/// if the tuple elements are identified by a single tuple_extract use.
+/// Otherwise, returns a (nullptr, nullptr) tuple.
+std::pair<SILInstruction *, SILInstruction *>
+getSingleUnsafeGuaranteedValueResult(BuiltinInst *UnsafeGuaranteedInst);
+
+/// Get the single builtin "unsafeGuaranteedEnd" user of a builtin
+/// "unsafeGuaranteed"'s token.
+BuiltinInst *getUnsafeGuaranteedEndUser(SILInstruction *UnsafeGuaranteedToken);
+
+/// Walk backwards from an unsafeGuaranteedEnd builtin instruction looking for a
+/// release on the reference returned by the matching unsafeGuaranteed builtin
+/// ignoring releases on the way.
+/// Return nullptr if no release is found.
+///
+///    %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
+///    %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
+///    %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
+///    strong_release %5 : $Foo // <-- Matching release.
+///    strong_release %6 : $Foo // Ignore.
+///    %12 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
+///
+/// Alternatively, look for the release after the unsafeGuaranteedEnd.
+SILInstruction *findReleaseToMatchUnsafeGuaranteedValue(
+    SILInstruction *UnsafeGuaranteedEndI, SILInstruction *UnsafeGuaranteedI,
+    SILValue UnsafeGuaranteedValue, SILBasicBlock &BB,
+    RCIdentityFunctionInfo &RCFI);
 
 } // end namespace swift
 

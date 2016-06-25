@@ -46,16 +46,22 @@ class alignas(8) TypeRepr {
   void operator=(const TypeRepr&) = delete;
 
   /// \brief The subclass of TypeRepr that this is.
-  unsigned Kind : 7;
+  unsigned Kind : 6;
 
   /// Whether this type representation is known to contain an invalid
   /// type.
   unsigned Invalid : 1;
 
+  /// Whether this type representation had a warning emitted related to it.
+  /// This is a hack related to how we resolve type exprs multiple times in
+  /// generic contexts.
+  unsigned Warned : 1;
+
   SourceLoc getLocImpl() const { return getStartLoc(); }
 
 protected:
-  TypeRepr(TypeReprKind K) : Kind(static_cast<unsigned>(K)), Invalid(false) {}
+  TypeRepr(TypeReprKind K)
+    : Kind(static_cast<unsigned>(K)), Invalid(false), Warned(false) {}
 
 public:
   TypeReprKind getKind() const { return static_cast<TypeReprKind>(Kind); }
@@ -66,6 +72,11 @@ public:
   /// Note that this type representation describes an invalid type.
   void setInvalid() { Invalid = true; }
 
+  /// If a warning is produced about this type repr, keep track of that so we
+  /// don't emit another one upon further reanalysis.
+  bool isWarnedAbout() const { return Warned; }
+  void setWarned() { Warned = true; }
+  
   /// Get the representative location for pointing at this type.
   SourceLoc getLoc() const;
 

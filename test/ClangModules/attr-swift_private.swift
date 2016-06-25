@@ -1,7 +1,10 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -parse %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -emit-ir %s -D IRGEN | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -print-module -source-filename="%s" -module-to-print SwiftPrivateAttr > %t.txt
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir %s -D IRGEN | FileCheck %s
+
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -print-module -source-filename="%s" -module-to-print SwiftPrivateAttr > %t.txt
 // RUN: FileCheck -check-prefix=GENERATED-NEGATIVE %s < %t.txt
 // RUN: diff -U3 %S/Inputs/SwiftPrivateAttr.txt %t.txt
 
@@ -113,8 +116,8 @@ func makeSureAnyObject(_: AnyObject) {}
 
 #if !IRGEN
 func testUnavailableRefs() {
-  var x: __PrivCFTypeRef // expected-error {{'__PrivCFTypeRef' is unavailable in Swift}}
-  var y: __PrivCFSubRef // expected-error {{'__PrivCFSubRef' is unavailable in Swift}}
+  var x: __PrivCFTypeRef // expected-error {{'__PrivCFTypeRef' has been renamed to '__PrivCFType'}}
+  var y: __PrivCFSubRef // expected-error {{'__PrivCFSubRef' has been renamed to '__PrivCFSub'}}
 }
 #endif
 

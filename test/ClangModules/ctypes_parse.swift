@@ -17,7 +17,7 @@ func testColor() {
   c = blue
   _ = c.rawValue
   checkRawRepresentable(c)
-  checkEquatable(c)
+  _ = checkEquatable(c)
   checkEquatablePattern(c)
 }
 
@@ -32,7 +32,7 @@ func testAnonEnum() {
   a = AnonConst2
 #if arch(i386) || arch(arm)
   _ = a as CUnsignedLongLong
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   _ = a as CUnsignedLong
 #else
   __portMe()
@@ -193,18 +193,18 @@ func testFunctionPointers() {
   let fp = getFunctionPointer()
   useFunctionPointer(fp)
 
-  _ = fp as (@convention(c) (CInt) -> CInt)
+  _ = fp as (@convention(c) (CInt) -> CInt)?
 
   let wrapper: FunctionPointerWrapper = FunctionPointerWrapper(a: nil, b: nil)
   _ = FunctionPointerWrapper(a: fp, b: fp)
   useFunctionPointer(wrapper.a)
   _ = wrapper.b as (@convention(c) (CInt) -> CInt)
 
-  var anotherFP: @convention(c) (CInt, CLong, UnsafeMutablePointer<Void>!) -> Void
+  var anotherFP: @convention(c) (CInt, CLong, UnsafeMutablePointer<Void>?) -> Void
     = getFunctionPointer2()
 
   useFunctionPointer2(anotherFP)
-  anotherFP = fp // expected-error {{cannot assign value of type 'fptr!' to type '@convention(c) (CInt, CLong, UnsafeMutablePointer<Void>!) -> Void'}}
+  anotherFP = fp // expected-error {{cannot assign value of type 'fptr?' to type '@convention(c) (CInt, CLong, UnsafeMutablePointer<Void>?) -> Void'}}
 }
 
 func testStructDefaultInit() {

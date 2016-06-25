@@ -1,0 +1,16 @@
+Name: BrokenAPINotes
+Functions:
+  - Name: ZXSpectrumGetAccumulator
+    SwiftName: 'getter:ZXSpectrum.accumulator(self:)'
+  - Name: ZXSpectrumSetAccumulator
+    SwiftName: 'setter:ZXSpectrum.accumulator(self:newValue:)'
+  - Name: ZXSpectrumGetRegister
+    SwiftName: 'getter:ZXSpectrum.register(self:which:)'
+  - Name: ZXSpectrumSetRegister
+    SwiftName: 'setter:ZXSpectrum.register(self:which:newValue:)'
+  - Name: ZXSpectrumGetMisnamedRegister
+    SwiftName: 'getter:ZXSpectrum.misnamedRegister(self:)'
+  - Name: ZXSpectrumSetMisnamedRegister
+    SwiftName: 'setter:ZXSpectrum.misnamedRegister(self:newValue:)'
+  - Name: ZXSpectrumHelperReset
+    SwiftName: 'ZXSpectrum.Helper.reset()'

@@ -73,20 +73,11 @@ func test8(_ g: Gizmo) -> Gizmo {
   return g.clone()
   // CHECK: bb0([[G:%.*]] : $Gizmo):
   // CHECK-NOT:  retain
-  // CHECK: alloc_stack $ImplicitlyUnwrappedOptional<Gizmo>
-  // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.clone!1.foreign
-  // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[G]])
-  // CHECK-NEXT: store
-  // CHECK-NEXT: function_ref
-  // CHECK-NEXT: function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
-  // CHECK-NEXT: alloc_stack
-  // CHECK-NEXT: apply
-  // CHECK-NEXT: [[RESULT:%.*]] = load
-  // CHECK-NEXT: dealloc_stack
-  // CHECK-NOT: release [[G]]
-  // CHECK-NEXT: dealloc_stack
-  // CHECK-NEXT: release [[G]]
-  // CHECK-NEXT: return [[RESULT]]
+  // CHECK:      [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.clone!1.foreign
+  // CHECK-NOT:  retain [[RESULT]]
+  // CHECK:      [[RESULT:%.*]] = unchecked_enum_data
+  // CHECK-NOT:  retain [[RESULT]]
+  // CHECK:      return [[RESULT]]
 }
 // duplicate returns an autoreleased object at +0.
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test9
@@ -94,20 +85,12 @@ func test9(_ g: Gizmo) -> Gizmo {
   return g.duplicate()
   // CHECK: bb0([[G:%.*]] : $Gizmo):
   // CHECK-NOT:      retain [[G:%0]]
-  // CHECK: alloc_stack
-  // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.duplicate!1.foreign
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.duplicate!1.foreign
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[G]])
-  // CHECK-NEXT: store [[RESULT]]
-  // CHECK-NEXT: function_ref
-  // CHECK-NEXT: function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
-  // CHECK-NEXT: alloc_stack
-  // CHECK-NEXT: apply
-  // CHECK-NEXT: [[RESULT:%.*]] = load
-  // CHECK-NEXT: dealloc_stack
-  // CHECK-NOT: release [[G]]
-  // CHECK-NEXT: dealloc_stack
-  // CHECK-NEXT: release [[G]]
-  // CHECK-NEXT: return [[RESULT]]
+  // CHECK-NOT:  retain [[RESULT]]
+  // CHECK:      [[RESULT:%.*]] = unchecked_enum_data
+  // CHECK-NOT:  retain [[RESULT]]
+  // CHECK:      return [[RESULT]]
 }
 
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions6test10
@@ -121,9 +104,7 @@ func test10(_ g: Gizmo) -> AnyClass {
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[THICK]]
-  // CHECK:      [[T0:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
-  // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%[0-9]*]], {{.*}})
-  // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]
+  // CHECK:      [[RES:%.*]] = unchecked_enum_data
   // CHECK:      strong_release [[G]] : $Gizmo
   // CHECK:      strong_release [[G]] : $Gizmo
   // CHECK-NEXT: return [[RES]] : $@thick AnyObject.Type
@@ -135,25 +116,25 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
   // CHECK: strong_retain [[G]]
   // CHECK: [[NS_G:%[0-9]+]] = upcast [[G:%[0-9]+]] : $Gizmo to $NSObject
-  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : NSObject -> () -> AnyObject.Type! , $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
-  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : NSObject -> () -> NSAnsing.Type! , $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype NSAnsing.Type>
+  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype NSAnsing.Type>
   // CHECK:      select_enum [[OPT_OBJC]]
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
-  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[THICK]]
-  // CHECK:      [[T0:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
-  // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%[0-9]*]], {{.*}})
-  // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]
+  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<NSAnsing.Type>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[THICK]]
+  // CHECK:      [[RES:%.*]] = unchecked_enum_data
+  // CHECK:      [[OPENED:%.*]] = open_existential_metatype [[RES]]
+  // CHECK:      [[RES_ANY:%.*]] = init_existential_metatype [[OPENED]]
   // CHECK:      strong_release [[G]] : $Gizmo
   // CHECK:      strong_release [[G]] : $Gizmo
-  // CHECK-NEXT: return [[RES]] : $@thick AnyObject.Type
+  // CHECK-NEXT: return [[RES_ANY]] : $@thick AnyObject.Type
   return g.qualifiedClassProp
 }
 
 // ObjC blocks should have cdecl calling convention and follow C/ObjC
 // ownership conventions, where the callee, arguments, and return are all +0.
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions10applyBlock
-func applyBlock(_ f: @convention(block) Gizmo -> Gizmo, x: Gizmo) -> Gizmo {
+func applyBlock(_ f: @convention(block) (Gizmo) -> Gizmo, x: Gizmo) -> Gizmo {
   // CHECK:     bb0([[BLOCK:%.*]] : $@convention(block) (Gizmo) -> @autoreleased Gizmo, [[ARG:%.*]] : $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:       strong_retain [[BLOCK_COPY]]
@@ -167,7 +148,7 @@ func applyBlock(_ f: @convention(block) Gizmo -> Gizmo, x: Gizmo) -> Gizmo {
 }
 
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions15maybeApplyBlock
-func maybeApplyBlock(_ f: (@convention(block) Gizmo -> Gizmo)?, x: Gizmo) -> Gizmo? {
+func maybeApplyBlock(_ f: (@convention(block) (Gizmo) -> Gizmo)?, x: Gizmo) -> Gizmo? {
   // CHECK:     bb0([[BLOCK:%.*]] : $Optional<@convention(block) Gizmo -> Gizmo>, [[ARG:%.*]] : $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   return f?(x)

@@ -199,5 +199,5 @@ class Bas : NSObject {
 func ==(lhs: Bas, rhs: Bas) -> Bool { return true }
 
 class OptionalBlockProperty: NSObject {
-  var x: ([AnyObject] -> [AnyObject])?
+  var x: (([AnyObject]) -> [AnyObject])?
 }

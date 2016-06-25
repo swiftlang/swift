@@ -22,14 +22,6 @@ from gyb_stdlib_support import (
 
 import StdlibUnittest
 
-/// State that is created every time a fresh generator is created with
-/// `MinimalSequence.makeIterator()`.
-internal class _MinimalIteratorPrivateState<T> {
-  internal init() {}
-
-  internal var returnedNilCounter: Int = 0
-}
-
 /// State shared by all generators of a MinimalSequence.
 internal class _MinimalIteratorSharedState<T> {
   internal init(_ data: [T]) {
@@ -50,7 +42,7 @@ internal class _MinimalIteratorSharedState<T> {
 ///
 /// This generator will return `nil` only once.
 public struct MinimalIterator<T> : IteratorProtocol {
-  public init<S : Sequence where S.Iterator.Element == T>(_ s: S) {
+  public init<S : Sequence>(_ s: S) where S.Iterator.Element == T {
     self._sharedState = _MinimalIteratorSharedState(Array(s))
   }
 
@@ -64,26 +56,12 @@ public struct MinimalIterator<T> : IteratorProtocol {
 
   public func next() -> T? {
     if _sharedState.i == _sharedState.data.count {
-      if isConsumed {
-        expectUnreachable("next() was called on a consumed generator")
-      }
-      _privateState.returnedNilCounter += 1
       return nil
     }
     defer { _sharedState.i += 1 }
     return _sharedState.data[_sharedState.i]
   }
 
-  public var isConsumed: Bool {
-    return returnedNilCounter >= 1
-  }
-
-  public var returnedNilCounter: Int {
-    return _privateState.returnedNilCounter
-  }
-
-  internal let _privateState: _MinimalIteratorPrivateState<T> =
-    _MinimalIteratorPrivateState()
   internal let _sharedState: _MinimalIteratorSharedState<T>
 }
 
@@ -115,10 +93,10 @@ public enum UnderestimatedCountBehavior {
 ///
 /// This sequence is consumed when its generator is advanced.
 public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
-  public init<S : Sequence where S.Iterator.Element == T>(
+  public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) {
+  ) where S.Iterator.Element == T {
     let data = Array(elements)
     self._sharedState = _MinimalIteratorSharedState(data)
 
@@ -139,7 +117,6 @@ public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
 
   public let timesMakeIteratorCalled = ResettableValue(0)
 
-  @warn_unused_result
   public func makeIterator() -> MinimalIterator<T> {
     timesMakeIteratorCalled.value += 1
     return MinimalIterator(_sharedState)
@@ -180,23 +157,23 @@ internal enum _CollectionOperation : Equatable {
     var newElementsIds = elementsLastMutatedStateIds
     var newEndIndexId = endIndexLastMutatedStateId
     switch self {
-    case reserveCapacity:
+    case .reserveCapacity:
       let invalidIndices = newElementsIds.indices
       newElementsIds.replaceSubrange(
         Range(invalidIndices),
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case append:
+    case .append:
       newElementsIds.append(nextStateId)
       newEndIndexId = nextStateId
 
-    case appendContentsOf(let count):
+    case .appendContentsOf(let count):
       newElementsIds.append(contentsOf:
         repeatElement(nextStateId, count: count))
       newEndIndexId = nextStateId
 
-    case replaceRange(let subRange, let replacementCount):
+    case .replaceRange(let subRange, let replacementCount):
       newElementsIds.replaceSubrange(
         subRange,
         with: repeatElement(nextStateId, count: replacementCount))
@@ -207,7 +184,7 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case insert(let atIndex):
+    case .insert(let atIndex):
       newElementsIds.insert(nextStateId, at: atIndex)
 
       let invalidIndices = atIndex..<newElementsIds.endIndex
@@ -216,7 +193,7 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case insertContentsOf(let atIndex, let count):
+    case .insertContentsOf(let atIndex, let count):
       newElementsIds.insert(
         contentsOf: repeatElement(nextStateId, count: count),
         at: atIndex)
@@ -227,7 +204,7 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case removeAtIndex(let index):
+    case .removeAtIndex(let index):
       newElementsIds.remove(at: index)
 
       let invalidIndices = index..<newElementsIds.endIndex
@@ -236,11 +213,11 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case removeLast:
+    case .removeLast:
       newElementsIds.removeLast()
       newEndIndexId = nextStateId
 
-    case removeRange(let subRange):
+    case .removeRange(let subRange):
       newElementsIds.removeSubrange(subRange)
 
       let invalidIndices = subRange.lowerBound..<newElementsIds.endIndex
@@ -249,7 +226,7 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case removeAll(let keepCapacity):
+    case .removeAll(let keepCapacity):
       newElementsIds.removeAll(keepingCapacity: keepCapacity)
       newEndIndexId = nextStateId
     }
@@ -397,15 +374,17 @@ internal struct _CollectionStateTransition {
   }
 }
 
+% for Index in ['MinimalIndex', 'MinimalStrideableIndex']:
+
 //===----------------------------------------------------------------------===//
-// MinimalIndex
+// ${Index}
 //===----------------------------------------------------------------------===//
 
 /// Asserts that the two indices are allowed to participate in a binary
 /// operation.
 internal func _expectCompatibleIndices(
-  _ first: MinimalIndex,
-  _ second: MinimalIndex,
+  _ first: ${Index},
+  _ second: ${Index},
   ${TRACE}
 ) {
   if first._collectionState._id == second._collectionState._id {
@@ -420,7 +399,7 @@ internal func _expectCompatibleIndices(
   }
 
   func lastMutatedStateId(
-    of i: MinimalIndex,
+    of i: ${Index},
     in state: _CollectionState
   ) -> Int {
     let offset = i.position
@@ -451,7 +430,7 @@ internal func _expectCompatibleIndices(
   }
 }
 
-public struct MinimalIndex : Comparable {
+public struct ${Index} : Comparable {
   public init(
     collectionState: _CollectionState,
     position: Int,
@@ -461,7 +440,7 @@ public struct MinimalIndex : Comparable {
     expectTrapping(
       position,
       in: startIndex...endIndex)
-    self = MinimalIndex(
+    self = ${Index}(
       _collectionState: collectionState,
       uncheckedPosition: position)
   }
@@ -478,16 +457,40 @@ public struct MinimalIndex : Comparable {
   public let position: Int
 
   public static var trapOnRangeCheckFailure = ResettableValue(true)
+
+%   if 'Strideable' in Index:
+  public var timesAdvancedCalled = ResettableValue(0)
+  public var timesDistanceCalled = ResettableValue(0)
+%   end
 }
 
-public func == (lhs: MinimalIndex, rhs: MinimalIndex) -> Bool {
+public func == (lhs: ${Index}, rhs: ${Index}) -> Bool {
   _expectCompatibleIndices(lhs, rhs)
   return lhs.position == rhs.position
 }
 
-public func < (lhs: MinimalIndex, rhs: MinimalIndex) -> Bool {
+public func < (lhs: ${Index}, rhs: ${Index}) -> Bool {
   _expectCompatibleIndices(lhs, rhs)
   return lhs.position < rhs.position
+}
+
+% end
+
+extension MinimalStrideableIndex : Strideable {
+  public typealias Stride = Int
+
+  public func distance(to other: MinimalStrideableIndex) -> Int {
+    timesDistanceCalled.value += 1
+    _expectCompatibleIndices(self, other)
+    return other.position - position
+  }
+
+  public func advanced(by n: Int) -> MinimalStrideableIndex {
+    timesAdvancedCalled.value += 1
+    return MinimalStrideableIndex(
+      _collectionState: _collectionState,
+      uncheckedPosition: position + n)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -504,18 +507,25 @@ Int64 distances.
 % for Traversal in TRAVERSALS:
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
-%       SelfSlice = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
-%       Self = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
-%       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
+%       for StrideableIndex in [ False, True ]:
+%         SelfSlice = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
+%         Self = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+%         Self += 'WithStrideableIndex' if StrideableIndex else ''
+%         SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
+%         Index = 'MinimalStrideableIndex' if StrideableIndex else 'MinimalIndex'
+%         # Only generating MinimalRandomAccessCollectionWithStrideableIndex
+%         if not StrideableIndex or (
+%           StrideableIndex and Traversal == 'RandomAccess' and
+%           not Mutable):
 
 /// A minimal implementation of `Collection` with extra checks.
 public struct ${Self}<T> : ${SelfProtocols} {
   /// Creates a collection with given contents, but a unique modification
   /// history.  No other instance has the same modification history.
-  public init<S : Sequence where S.Iterator.Element == T>(
+  public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) {
+  ) where S.Iterator.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -536,16 +546,19 @@ public struct ${Self}<T> : ${SelfProtocols} {
     }
   }
 
+%     if StrideableIndex:
+  public typealias Indices = CountableRange<${Index}>
+%     end
+
 %     if RangeReplaceable:
   public init() {
     self.underestimatedCount = 0
     self._elements = []
-    self._collectionState = _CollectionState(name: "\(self.dynamicType)", elementCount: 0)
+    self._collectionState =
+      _CollectionState(name: "\(self.dynamicType)", elementCount: 0)
   }
 
-  public init<
-    S : Sequence where S.Iterator.Element == T
-  >(_ elements: S) {
+  public init<S : Sequence>(_ elements: S) where S.Iterator.Element == T {
     self.underestimatedCount = 0
     self._elements = Array(elements)
     self._collectionState =
@@ -560,40 +573,40 @@ public struct ${Self}<T> : ${SelfProtocols} {
     return MinimalIterator(_elements)
   }
 
-  public typealias Index = MinimalIndex
+  public typealias Index = ${Index}
   public typealias IndexDistance = Int
 
-  internal func _index(forPosition i: Int) -> MinimalIndex {
-    return MinimalIndex(
+  internal func _index(forPosition i: Int) -> ${Index} {
+    return ${Index}(
       collectionState: _collectionState,
       position: i,
       startIndex: _elements.startIndex,
       endIndex: _elements.endIndex)
   }
 
-  internal func _uncheckedIndex(forPosition i: Int) -> MinimalIndex {
-    return MinimalIndex(
+  internal func _uncheckedIndex(forPosition i: Int) -> ${Index} {
+    return ${Index}(
       _collectionState: _collectionState,
       uncheckedPosition: i)
   }
 
   public let timesStartIndexCalled = ResettableValue(0)
 
-  public var startIndex: MinimalIndex {
+  public var startIndex: ${Index} {
     timesStartIndexCalled.value += 1
     return _uncheckedIndex(forPosition: _elements.startIndex)
   }
 
   public let timesEndIndexCalled = ResettableValue(0)
 
-  public var endIndex: MinimalIndex {
+  public var endIndex: ${Index} {
     timesEndIndexCalled.value += 1
     return _uncheckedIndex(forPosition: _elements.endIndex)
   }
 
   public func _failEarlyRangeCheck(
-    _ index: MinimalIndex,
-    bounds: Range<MinimalIndex>
+    _ index: ${Index},
+    bounds: Range<${Index}>
   ) {
     _expectCompatibleIndices(
       _uncheckedIndex(forPosition: index.position),
@@ -612,8 +625,8 @@ public struct ${Self}<T> : ${SelfProtocols} {
   }
 
   public func _failEarlyRangeCheck(
-    _ range: Range<MinimalIndex>,
-    bounds: Range<MinimalIndex>
+    _ range: Range<${Index}>,
+    bounds: Range<${Index}>
   ) {
     _expectCompatibleIndices(
       _uncheckedIndex(forPosition: range.lowerBound.position),
@@ -634,23 +647,20 @@ public struct ${Self}<T> : ${SelfProtocols} {
       in: bounds.lowerBound.position..<bounds.upperBound.position)
   }
 
-  @warn_unused_result
-  public func index(after i: MinimalIndex) -> MinimalIndex {
+  public func index(after i: ${Index}) -> ${Index} {
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
     return _uncheckedIndex(forPosition: i.position + 1)
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
-  @warn_unused_result
-  public func index(before i: MinimalIndex) -> MinimalIndex {
+  public func index(before i: ${Index}) -> ${Index} {
     // FIXME: swift-3-indexing-model: perform a range check and use
     // return _uncheckedIndex(forPosition: i.position - 1)
     return _index(forPosition: i.position - 1)
   }
 %     end
 
-  @warn_unused_result
-  public func distance(from start: MinimalIndex, to end: MinimalIndex)
+  public func distance(from start: ${Index}, to end: ${Index})
     -> IndexDistance {
 %     if Traversal == 'Forward':
     _precondition(start <= end,
@@ -666,7 +676,6 @@ public struct ${Self}<T> : ${SelfProtocols} {
     return end.position - start.position
   }
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
 %     if Traversal == 'Forward':
     _precondition(n >= 0,
@@ -679,7 +688,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
     return _index(forPosition: i.position + n)
   }
 
-  public subscript(i: MinimalIndex) -> T {
+  public subscript(i: ${Index}) -> T {
     get {
       _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
       return _elements[i.position]
@@ -692,7 +701,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
 %     end
   }
 
-  public subscript(bounds: Range<MinimalIndex>) -> ${SelfSlice}<${Self}<T>> {
+  public subscript(bounds: Range<${Index}>) -> ${SelfSlice}<${Self}<T>> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
       return ${SelfSlice}(base: self, bounds: bounds)
@@ -717,20 +726,18 @@ public struct ${Self}<T> : ${SelfProtocols} {
     _elements.append(x)
   }
 
-  public mutating func append<
-    S : Sequence where S.Iterator.Element == T
-  >(contentsOf newElements: S) {
+  public mutating func append<S : Sequence>(contentsOf newElements: S)
+    where S.Iterator.Element == T {
     let oldCount = count
     _elements.append(contentsOf: newElements)
     let newCount = count
     _willMutate(.appendContentsOf(count: newCount - oldCount))
   }
 
-  public mutating func replaceSubrange<
-    C : Collection where C.Iterator.Element == T
-  >(
-    _ subRange: Range<MinimalIndex>, with newElements: C
-  ) {
+  public mutating func replaceSubrange<C>(
+    _ subRange: Range<${Index}>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == T {
     let oldCount = count
     _elements.replaceSubrange(
       subRange.lowerBound.position..<subRange.upperBound.position,
@@ -743,14 +750,14 @@ public struct ${Self}<T> : ${SelfProtocols} {
         + newCount - oldCount))
   }
 
-  public mutating func insert(_ newElement: T, at i: MinimalIndex) {
+  public mutating func insert(_ newElement: T, at i: ${Index}) {
     _willMutate(.insert(atIndex: i.position))
     _elements.insert(newElement, at: i.position)
   }
 
-  public mutating func insert<
-    S : Collection where S.Iterator.Element == T
-  >(contentsOf newElements: S, at i: MinimalIndex) {
+  public mutating func insert<S : Collection>(
+    contentsOf newElements: S, at i: ${Index}
+  ) where S.Iterator.Element == T {
     let oldCount = count
     _elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
@@ -763,7 +770,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
   }
 
   @discardableResult
-  public mutating func remove(at i: MinimalIndex) -> T {
+  public mutating func remove(at i: ${Index}) -> T {
     _willMutate(.removeAtIndex(index: i.position))
     return _elements.remove(at: i.position)
   }
@@ -774,7 +781,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
     return _elements.removeLast()
   }
 
-  public mutating func removeSubrange(_ subRange: Range<MinimalIndex>) {
+  public mutating func removeSubrange(_ subRange: Range<${Index}>) {
     if !subRange.isEmpty {
       _willMutate(.removeRange(
         subRange: subRange.lowerBound.position..<subRange.upperBound.position))
@@ -810,6 +817,8 @@ public struct ${Self}<T> : ${SelfProtocols} {
 %   end
 }
 
+%         end
+%       end
 %     end
 %   end
 % end
@@ -823,15 +832,14 @@ public struct DefaultedSequence<Element> : Sequence {
     self.base = base
   }
 
-  public init<S : Sequence where S.Iterator.Element == Element>(
+  public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) {
+  ) where S.Iterator.Element == Element {
     self.init(base: MinimalSequence(
       elements: elements, underestimatedCount: underestimatedCount))
   }
 
-  @warn_unused_result
   public func makeIterator() -> MinimalIterator<Element> {
     return base.makeIterator()
   }
@@ -844,18 +852,30 @@ public struct DefaultedSequence<Element> : Sequence {
 % for Traversal in TRAVERSALS:
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
-%       SelfSlice = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
-%       Self = 'Defaulted' + SelfSlice.replace('Slice', 'Collection')
-%       Base = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
-%       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
+%       for StrideableIndex in [ False, True ]:
+%         SelfSlice = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
+%         Self = 'Defaulted' + SelfSlice.replace('Slice', 'Collection')
+%         Self += 'WithStrideableIndex' if StrideableIndex else ''
+%         Base = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+%         Base += 'WithStrideableIndex' if StrideableIndex else ''
+%         SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
+%         Index = 'MinimalStrideableIndex' if StrideableIndex else 'MinimalIndex'
+%         # Only generating DefaultedRandomAccessCollectionWithStrideableIndex
+%         if not StrideableIndex or (
+%           StrideableIndex and Traversal == 'RandomAccess' and
+%           not Mutable and not RangeReplaceable):
 
 /// A Collection that uses as many default implementations as
 /// `Collection` can provide.
 public struct ${Self}<Element> : ${SelfProtocols} {
   public typealias Base = ${Base}<Element>
   public typealias Iterator = MinimalIterator<Element>
-  public typealias Index = MinimalIndex
+  public typealias Index = ${Index}
   public typealias IndexDistance = Int
+
+%   if StrideableIndex:
+  public typealias Indices = CountableRange<${Index}>
+%   end
 
 %   if Mutable or RangeReplaceable:
   public var base: Base
@@ -875,10 +895,10 @@ public struct ${Self}<Element> : ${SelfProtocols} {
     self.base = Base(elements: elements)
   }
 
-  public init<S : Sequence where S.Iterator.Element == Element>(
+  public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) {
+  ) where S.Iterator.Element == Element {
     self.init(base:
       ${Base}(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -889,58 +909,57 @@ public struct ${Self}<Element> : ${SelfProtocols} {
 
   public let timesMakeIteratorCalled = ResettableValue(0)
 
-  @warn_unused_result
   public func makeIterator() -> MinimalIterator<Element> {
     timesMakeIteratorCalled.value += 1
     return base.makeIterator()
   }
 
+%     if not StrideableIndex:
+
   public let timesSuccessorCalled = ResettableValue(0)
 
-  @warn_unused_result
-  public func index(after i: MinimalIndex) -> MinimalIndex {
+  public func index(after i: ${Index}) -> ${Index} {
     timesSuccessorCalled.value += 1
     return base.index(after: i)
   }
 
-%     if Traversal in ['Bidirectional', 'RandomAccess']:
+%       if Traversal in ['Bidirectional', 'RandomAccess']:
   public let timesPredecessorCalled = ResettableValue(0)
 
-  @warn_unused_result
-  public func index(before i: MinimalIndex) -> MinimalIndex {
+  public func index(before i: ${Index}) -> ${Index} {
     timesPredecessorCalled.value += 1
     return base.index(before: i)
   }
-%     end
+%       end
 
-%     if Traversal == 'RandomAccess':
-  @warn_unused_result
-  public func distance(from start: MinimalIndex, to end: MinimalIndex)
+%       if Traversal == 'RandomAccess':
+  public func distance(from start: ${Index}, to end: ${Index})
     -> IndexDistance {
     return base.distance(from: start, to: end)
   }
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     return base.index(i, offsetBy: n)
   }
-%     end
+%       end
+
+%     end # if not StrideableIndex
 
   public let timesStartIndexCalled = ResettableValue(0)
 
-  public var startIndex: MinimalIndex {
+  public var startIndex: ${Index} {
     timesStartIndexCalled.value += 1
     return base.startIndex
   }
 
   public let timesEndIndexCalled = ResettableValue(0)
 
-  public var endIndex: MinimalIndex {
+  public var endIndex: ${Index} {
     timesEndIndexCalled.value += 1
     return base.endIndex
   }
 
-  public subscript(i: MinimalIndex) -> Element {
+  public subscript(i: ${Index}) -> Element {
     get {
       return base[i]
     }
@@ -954,7 +973,7 @@ public struct ${Self}<Element> : ${SelfProtocols} {
     // FIXME: swift-3-indexing-model: use defaults.
 //     if Self not in ['DefaultedCollection', 'DefaultedBidirectionalCollection', 'DefaultedRandomAccessCollection', 'DefaultedMutableCollection', 'DefaultedRangeReplaceableCollection']:
 
-  public subscript(bounds: Range<MinimalIndex>) -> ${SelfSlice}<${Self}<Base._Element>> {
+  public subscript(bounds: Range<${Index}>) -> ${SelfSlice}<${Self}<Base._Element>> {
     get {
       // FIXME: swift-3-indexing-model: range check.
       return ${SelfSlice}(base: self, bounds: bounds)
@@ -971,12 +990,10 @@ public struct ${Self}<Element> : ${SelfProtocols} {
     base = Base()
   }
 
-  public mutating func replaceSubrange<
-    C : Collection where C.Iterator.Element == Element
-  >(
+  public mutating func replaceSubrange<C>(
     _ subRange: Range<${Self}<Element>.Index>,
     with newElements: C
-  ) {
+  ) where C : Collection, C.Iterator.Element == Element {
     base.replaceSubrange(subRange, with: newElements)
   }
 %   end
@@ -990,7 +1007,7 @@ public struct Defaulted${Traversal}RangeReplaceableSlice<Element>
   public typealias Self_ = Defaulted${Traversal}RangeReplaceableSlice<Element>
   public typealias Base = ${Base}<Element>
   public typealias Iterator = MinimalIterator<Element>
-  public typealias Index = MinimalIndex
+  public typealias Index = ${Index}
 
   public var base: Base
   public var startIndex: Index
@@ -1026,7 +1043,6 @@ public struct Defaulted${Traversal}RangeReplaceableSlice<Element>
       base: Base(elements: elements))
   }
 
-  @warn_unused_result
   public func makeIterator() -> MinimalIterator<Element> {
     return MinimalIterator(Array(self))
   }
@@ -1069,6 +1085,8 @@ public struct Defaulted${Traversal}RangeReplaceableSlice<Element>
 }
 */
 
+%         end
+%       end
 %     end
 %   end
 % end

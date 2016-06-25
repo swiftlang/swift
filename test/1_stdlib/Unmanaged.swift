@@ -54,6 +54,21 @@ UnmanagedTests.test("_withUnsafeGuaranteedRef/return") {
   }
 }
 
+UnmanagedTests.test("Opaque") {
+  var ref = Foobar()
+  let opaquePtr = Unmanaged.passUnretained(ref).toOpaque()
+  
+  let unknownPtr = Int(bitPattern: opaquePtr)
+  let voidPtr = UnsafePointer<Void>(bitPattern: unknownPtr)
+  expectNotEmpty(voidPtr, "toOpaque must not return null pointer")
+  
+  let unmanaged = Unmanaged<Foobar>.fromOpaque(voidPtr!)
+  expectEqual(
+    ref === unmanaged.takeUnretainedValue(),
+    true,
+    "fromOpaque must return the same reference")
+  
+  _fixLifetime(ref)
+}
 
 runAllTests()
-

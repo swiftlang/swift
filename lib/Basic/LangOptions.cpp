@@ -40,7 +40,13 @@ static const StringRef SupportedConditionalCompilationArches[] = {
   "i386",
   "x86_64",
   "powerpc64",
-  "powerpc64le"
+  "powerpc64le",
+  "s390x"
+};
+
+static const StringRef SupportedConditionalCompilationEndianness[] = {
+  "little",
+  "big"
 };
 
 bool LangOptions::isPlatformConditionOSSupported(StringRef OSName) {
@@ -56,6 +62,14 @@ LangOptions::isPlatformConditionArchSupported(StringRef ArchName) {
                            std::end(SupportedConditionalCompilationArches),
                            ArchName);
   return foundIt != std::end(SupportedConditionalCompilationArches);
+}
+
+bool
+LangOptions::isPlatformConditionEndiannessSupported(StringRef Endianness) {
+  auto foundIt = std::find(std::begin(SupportedConditionalCompilationEndianness),
+                           std::end(SupportedConditionalCompilationEndianness),
+                           Endianness);
+  return foundIt != std::end(SupportedConditionalCompilationEndianness);
 }
 
 StringRef
@@ -141,12 +155,43 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::x86_64:
     addPlatformConditionValue("arch", "x86_64");
     break;
+  case llvm::Triple::ArchType::systemz:
+    addPlatformConditionValue("arch", "s390x");
+    break;
   default:
     UnsupportedArch = true;
   }
 
   if (UnsupportedOS || UnsupportedArch)
     return { UnsupportedOS, UnsupportedArch };
+
+  // Set the "_endian" platform condition.
+  switch (Target.getArch()) {
+  case llvm::Triple::ArchType::arm:
+  case llvm::Triple::ArchType::thumb:
+    addPlatformConditionValue("_endian", "little");
+    break;
+  case llvm::Triple::ArchType::aarch64:
+    addPlatformConditionValue("_endian", "little");
+    break;
+  case llvm::Triple::ArchType::ppc64:
+    addPlatformConditionValue("_endian", "big");
+    break;
+  case llvm::Triple::ArchType::ppc64le:
+    addPlatformConditionValue("_endian", "little");
+    break;
+  case llvm::Triple::ArchType::x86:
+    addPlatformConditionValue("_endian", "little");
+    break;
+  case llvm::Triple::ArchType::x86_64:
+    addPlatformConditionValue("_endian", "little");
+    break;
+  case llvm::Triple::ArchType::systemz:
+    addPlatformConditionValue("_endian", "big");
+    break;
+  default:
+    llvm_unreachable("undefined architecture endianness");
+  }
 
   // Set the "runtime" platform condition.
   if (EnableObjCInterop)

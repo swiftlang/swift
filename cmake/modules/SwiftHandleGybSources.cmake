@@ -38,8 +38,6 @@ function(handle_gyb_source_single dependency_out_var_name)
       "${options}" "${single_value_args}" "${multi_value_args}" ${ARGN})
 
   set(gyb_flags
-      "--test" # Run gyb's self-tests whenever we use it.  They're cheap
-               # enough and it keeps us honest.
       ${SWIFT_GYB_FLAGS}
       ${GYB_SINGLE_FLAGS})
 

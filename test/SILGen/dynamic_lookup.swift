@@ -88,7 +88,7 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK-NEXT: [[OPT:%.*]] = load [[OPTTEMP]]
   // CHECK-NEXT: store [[OPT]] to [[PBOPT]] : $*ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: dealloc_stack [[OPTTEMP]]
-  var of = obj.f
+  var of: (() -> ())! = obj.f
 
   // Exit
   // CHECK-NEXT: strong_release [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
@@ -120,7 +120,7 @@ func opt_to_static_method(_ obj: AnyObject) {
   // CHECK-NEXT: [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: dynamic_method_br [[OBJCMETA]] : $@objc_metatype (@opened({{".*"}}) AnyObject).Type, #X.staticF!1.foreign, [[HASMETHOD:[A-Za-z0-9_]+]], [[NOMETHOD:[A-Za-z0-9_]+]]
-  var optF = obj.dynamicType.staticF
+  var optF: (() -> ())! = obj.dynamicType.staticF
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup15opt_to_property
@@ -132,7 +132,6 @@ func opt_to_property(_ obj: AnyObject) {
   // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[INT_BOX:%[0-9]+]] = alloc_box $Int
   // CHECK-NEXT: project_box [[INT_BOX]]
-  // CHECK-NEXT: [[UNKNOWN_USE:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
@@ -162,7 +161,6 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK-NEXT: store [[I]] to [[PBI]] : $*Int
   // CHECK-NEXT: alloc_box $Int
   // CHECK-NEXT: project_box
-  // CHECK-NEXT: [[UNKNOWN_USE:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
@@ -229,7 +227,7 @@ func downcast(_ obj: AnyObject) -> X {
 @objc class Juice { }
 
 @objc protocol Fruit {
-  optional var juice: Juice { get }
+  @objc optional var juice: Juice { get }
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup7consumeFPS_5Fruit_T_

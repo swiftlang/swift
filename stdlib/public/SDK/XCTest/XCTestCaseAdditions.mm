@@ -132,7 +132,8 @@ fail:
 
 XCT_EXPORT XCTestCase *_XCTCurrentTestCase(void);
 
-XCT_EXPORT NS_RETURNS_RETAINED XCTestCase *_XCTCurrentTestCaseBridge(void);
+XCT_EXPORT SWIFT_CC(swift) NS_RETURNS_RETAINED
+XCTestCase *_XCTCurrentTestCaseBridge(void);
 
 NS_RETURNS_RETAINED XCTestCase *_XCTCurrentTestCaseBridge(void)
 {
@@ -154,7 +155,8 @@ NS_RETURNS_RETAINED XCTestCase *_XCTCurrentTestCaseBridge(void)
 
 XCT_EXPORT NS_RETURNS_RETAINED NSDictionary *_XCTRunThrowableBlockBridge(void (^block)());
 
-NS_RETURNS_RETAINED NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
+SWIFT_CC(swift) NS_RETURNS_RETAINED
+NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
 {
     NSDictionary *result;
     

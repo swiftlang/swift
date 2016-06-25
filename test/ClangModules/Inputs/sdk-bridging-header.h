@@ -2,9 +2,9 @@
 
 @class NSArray;
 
-@interface Predicate : NSObject
-+ (Predicate *)truePredicate;
-+ (Predicate *)not;
-+ (Predicate *)and:(NSArray *)subpredicates;
-+ (Predicate *)or:(NSArray *)subpredicates;
+@interface MyPredicate : NSObject
++ (nonnull MyPredicate *)truePredicate;
++ (nonnull MyPredicate *)not;
++ (nonnull MyPredicate *)and:(nonnull NSArray *)subpredicates;
++ (nonnull MyPredicate *)or:(nonnull NSArray *)subpredicates;
 @end

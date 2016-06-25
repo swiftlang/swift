@@ -20,7 +20,7 @@ func test1(_ power: Unmanaged<CCPowerSupply>) {
 }
 
 func test2() {
-  let fridge = CCRefrigeratorCreate(kCCPowerStandard)
+  let fridge = CCRefrigeratorCreate(kCCPowerStandard)!
   assertUnmanaged(fridge)
 }
 
@@ -32,7 +32,7 @@ func test4() {
   // FIXME: this should not require a type annotation
   let power: CCPowerSupply = kCCPowerStandard
   assertManaged(power)
-  let fridge = CCRefrigeratorCreate(power)
+  let fridge = CCRefrigeratorCreate(power)!
   assertUnmanaged(fridge)
 }
 
@@ -48,7 +48,7 @@ func test6() {
 }
 
 func test7() {
-  let value = CFBottom()
+  let value = CFBottom()!
   assertUnmanaged(value)
 }
 
@@ -92,11 +92,11 @@ func testChainedAliases(_ fridge: CCRefrigerator) {
   _ = fridge as CCRefrigerator
 
   _ = fridge as CCFridge
-  _ = fridge as CCFridgeRef // expected-error{{'CCFridgeRef' is unavailable in Swift}}
+  _ = fridge as CCFridgeRef // expected-error{{'CCFridgeRef' has been renamed to 'CCFridge'}} {{17-28=CCFridge}}
 }
 
 func testBannedImported(_ object: CCOpaqueTypeRef) {
-  CCRetain(object) // expected-error {{'CCRetain' is unavailable: Core Foundation objects are automatically memory managed}}
+  CCRetain(object) // expected-error {{'CCRetain' is unavailable: Core Foundation objects are automatically memory managed}} expected-warning {{result of call to 'CCRetain' is unused}}
   CCRelease(object) // expected-error {{'CCRelease' is unavailable: Core Foundation objects are automatically memory managed}}
 }
 
@@ -140,8 +140,13 @@ func nameCollisions() {
   isOptionalFloat(&otherAlias) // okay
 
   var np: NotAProblem?
-  var np2: NotAProblemRef? // expected-error{{'NotAProblemRef' is unavailable in Swift}}
+  var np2: NotAProblemRef? // expected-error{{'NotAProblemRef' has been renamed to 'NotAProblem'}} {{12-26=NotAProblem}}
 
   np = np2
   np2 = np
+}
+
+func testNonConstVoid() {
+  let value: Unmanaged<CFNonConstVoidRef> = CFNonConstBottom()!
+  assertUnmanaged(value)
 }

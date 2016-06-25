@@ -5,18 +5,10 @@ protocol P2 : P1 { }
 protocol P3 { }
 
 struct X<T : P1, U : P2, V> { 
-  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' nested in type}}
+  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' cannot be nested in type 'X'}}
 
   struct NonGenericInner { } // expected-error{{nested in generic type}}
 }
-
-struct Y {
-  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' nested in type}}
-
-  struct NonGenericInner { } 
-}
-
-struct Z<T : P1 where T.AssocType : P3> { }
 
 extension Int : P1 {
   typealias AssocType = Int
@@ -116,10 +108,12 @@ func notHashableArray<T>(_ x: [T]) {
 }
 
 func hashableArray<T : Hashable>(_ x: [T]) {
+  // expected-warning @+1 {{unused}}
   x.worseHashEver // okay
 }
 
 func intArray(_ x: [Int]) {
+  // expected-warning @+1 {{unused}}
   x.worseHashEver
 }
 
@@ -130,7 +124,7 @@ extension GenericClass where T : Equatable {
 }
 
 func genericClassEquatable<T : Equatable>(_ gc: GenericClass<T>, x: T, y: T) {
-  gc.foo(x, y: y)
+  _ = gc.foo(x, y: y)
 }
 
 func genericClassNotEquatable<T>(_ gc: GenericClass<T>, x: T, y: T) {
@@ -158,4 +152,4 @@ struct S4<Q>: P4 {
   init(_: Q) { }
 }
 
-extension S4 where T : P5 {} // expected-error{{type 'T' in conformance requirement does not refer to a generic parameter or associated type}}
+extension S4 where T : P5 {} // expected-FIXME-error{{type 'T' in conformance requirement does not refer to a generic parameter or associated type}}

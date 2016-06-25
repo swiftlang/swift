@@ -104,7 +104,7 @@ private class IndirectChildBoundGenericConcrete:
     override func overrideMe() { }
 }
 
-private class IndirectChildFunction<U>: IndirectMethodCall<U -> U> {
+private class IndirectChildFunction<U>: IndirectMethodCall<(U) -> U> {
     @inline(never)
     override func overrideMe() { }
 }

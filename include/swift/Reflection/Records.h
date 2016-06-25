@@ -104,12 +104,25 @@ struct FieldRecordIterator {
 };
 
 enum class FieldDescriptorKind : uint16_t {
+  // Swift nominal types.
   Struct,
   Class,
   Enum,
+
+  // A Swift opaque protocol. There are no fields, just a record for the
+  // type itself.
   Protocol,
+
+  // A Swift class-bound protocol.
   ClassProtocol,
+
+  // An Objective-C protocol, which may be imported or defined in Swift.
   ObjCProtocol,
+
+  // An Objective-C class, which may be imported or defined in Swift.
+  // In the former case, field type metadata is not emitted, and
+  // must be obtained from the Objective-C runtime.
+  ObjCClass
 };
 
 // Field descriptors contain a collection of field records for a single
@@ -476,8 +489,16 @@ class CaptureDescriptor {
   }
 
 public:
+  /// The number of captures in the closure and the number of typerefs that
+  /// immediately follow this struct.
   uint32_t NumCaptureTypes;
+
+  /// The number of sources of metadata available in the MetadataSourceMap
+  /// directly following the list of capture's typerefs.
   uint32_t NumMetadataSources;
+
+  /// The number of items in the NecessaryBindings structure at the head of
+  /// the closure.
   uint32_t NumBindings;
 
   using const_iterator = FieldRecordIterator;

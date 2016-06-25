@@ -89,24 +89,16 @@ CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
             isWhitelistedCFTypeName(typedefDecl->getName())) {
           return forRecord(isConst, record->getDecl());
         }
-      } else if (isConst && pointee->isVoidType()) {
+      } else if (pointee->isVoidType()) {
         if (typedefDecl->hasAttr<clang::ObjCBridgeAttr>() ||
             isWhitelistedCFTypeName(typedefDecl->getName())) {
-          return forConstVoid();
+          return isConst ? forConstVoid() : forVoid();
         }
       }
     }
   }
 
   return forInvalid();
-}
-
-/// Return the name to import a CF typedef as.
-static StringRef getImportedCFTypeName(StringRef name) {
-  // If the name ends in the CF typedef suffix ("Ref"), drop that.
-  if (name.endswith(SWIFT_CFTYPE_SUFFIX))
-    return name.drop_back(strlen(SWIFT_CFTYPE_SUFFIX));
-  return name;
 }
 
 bool ClangImporter::Implementation::isCFTypeDecl(
@@ -117,19 +109,12 @@ bool ClangImporter::Implementation::isCFTypeDecl(
 }
 
 StringRef ClangImporter::Implementation::getCFTypeName(
-            const clang::TypedefNameDecl *decl,
-            StringRef *secondaryName) {
-  if (secondaryName) *secondaryName = "";
-
+            const clang::TypedefNameDecl *decl) {
   if (auto pointee = CFPointeeInfo::classifyTypedef(decl)) {
     auto name = decl->getName();
-    if (pointee.isRecord() || pointee.isTypedef()) {
-      auto resultName = getImportedCFTypeName(name);
-      if (secondaryName && name != resultName)
-        *secondaryName = name;
-
-      return resultName;
-    }
+    if (pointee.isRecord() || pointee.isTypedef())
+      if (name.endswith(SWIFT_CFTYPE_SUFFIX))
+        return name.drop_back(strlen(SWIFT_CFTYPE_SUFFIX));
 
     return name;
   }

@@ -82,6 +82,11 @@ public:
 
   /// Return the protocol requirement.
   ProtocolDecl *getRequirement() const;
+  
+  /// Get the inherited conformance corresponding to the given protocol.
+  /// Returns `this` if `parent` is already the same as the protocol this
+  /// conformance represents.
+  ProtocolConformanceRef getInherited(ProtocolDecl *parent) const;
 
   void dump() const;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;

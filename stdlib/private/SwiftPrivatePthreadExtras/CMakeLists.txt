@@ -8,7 +8,7 @@ elseif(SWIFT_HOST_VARIANT STREQUAL "linux" OR SWIFT_HOST_VARIANT STREQUAL "freeb
     Glibc)
 endif()
 
-add_swift_library(swiftSwiftPrivatePthreadExtras SHARED IS_STDLIB
+add_swift_library(swiftSwiftPrivatePthreadExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   SwiftPrivatePthreadExtras.swift

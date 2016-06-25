@@ -3,6 +3,8 @@ import Foo
 
 var x: FooClassBase
 
+// REQUIRES: objc_interop
+
 // RUN: rm -rf %t.overlays
 // RUN: mkdir %t.overlays
 //

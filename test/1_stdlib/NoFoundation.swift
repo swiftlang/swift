@@ -34,5 +34,6 @@ _ = no as No
 //===--- Tests ------------------------------------------------------------===//
 
 import Dispatch
-print(dispatch_get_global_queue(0,0))
-
+if #available(OSX 10.10, iOS 8.0, *) {
+	print(DispatchQueue.global(attributes: .qosDefault))
+}

@@ -96,13 +96,12 @@ tests.test("clSetKernelArgsListAPPLE") {
   //
   var count = DATA_SIZE
   for i in 0..<count {
-    data[i] = Float(rand()) / Float(RAND_MAX)
+    data[i] = 0.0
   }
   
   // Connect to a compute device
   //
-  var gpu = 1
-  err = clGetDeviceIDs(nil, cl_device_type(gpu != 0 ? CL_DEVICE_TYPE_GPU : CL_DEVICE_TYPE_CPU), 1, &device_id, nil)
+  err = clGetDeviceIDs(nil, cl_device_type(CL_DEVICE_TYPE_ALL), 1, &device_id, nil)
   if (err != CL_SUCCESS)
   {
     print("Error: Failed to create a device group!")

@@ -6,9 +6,9 @@ func f2(_ x: @autoclosure () -> Float) {}
 
 var f : Float
 
-f0(f0(f))
-f0(1)
-f1(f1(f))
+_ = f0(f0(f))
+_ = f0(1)
+_ = f1(f1(f))
 f2(f)
 f2(1.0)
 
@@ -23,14 +23,14 @@ func ff() -> (Int) -> (Float) { return weirdCast }
 
 // Block <-> function conversions
 
-var funct: Int -> Int = { $0 }
-var block: @convention(block) Int -> Int = funct
+var funct: (Int) -> Int = { $0 }
+var block: @convention(block) (Int) -> Int = funct
 funct = block
 block = funct
 
 // Application of implicitly unwrapped optional functions
 
-var optFunc: (String -> String)! = { $0 }
+var optFunc: ((String) -> String)! = { $0 }
 var s: String = optFunc("hi")
 
 // <rdar://problem/17652759> Default arguments cause crash with tuple permutation

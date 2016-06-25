@@ -49,6 +49,7 @@
     "Indices.swift",
     "Existential.swift",
     "WriteBackMutableSlice.swift",
+    "UnfoldSequence.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
@@ -104,8 +105,8 @@
       "IntegerParsing.swift"],
     "Floating": [
       "FloatingPoint.swift",
-      "FloatingPointOperations.swift",
-      "FloatingPointParsing.swift"]}
+      "FloatingPointParsing.swift",
+      "FloatingPointTypes.swift"]}
   ],
   "Optional": [
     "ImplicitlyUnwrappedOptional.swift",
@@ -138,6 +139,8 @@
     "Unmanaged.swift",
     "Availability.swift",
     "Process.swift",
-    "Tuple.swift"
+    "Tuple.swift",
+    "NewtypeWrapper.swift",
+    "UnsafeBitMap.swift"
   ]
 }

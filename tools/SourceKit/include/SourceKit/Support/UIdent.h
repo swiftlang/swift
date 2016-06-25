@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
+#include <atomic>
 
 namespace llvm {
   class raw_ostream;

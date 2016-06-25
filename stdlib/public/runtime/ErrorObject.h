@@ -142,7 +142,7 @@ struct SwiftError : SwiftErrorHeader {
 /// copied (or taken if \c isTake is true) into the newly-allocated error box.
 /// If value is null, the box's contents will be left uninitialized, and
 /// \c isTake should be false.
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 extern "C" BoxPair::Return swift_allocError(const Metadata *type,
                                           const WitnessTable *errorConformance,
                                           OpaqueValue *value, bool isTake);
@@ -181,7 +181,7 @@ SWIFT_RUNTIME_EXPORT
 extern "C" void swift_willThrow(SwiftError *object);
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_unexpectedError(SwiftError *object)
-  __attribute__((noreturn));
+    __attribute__((__noreturn__));
 
 #if SWIFT_OBJC_INTEROP
 

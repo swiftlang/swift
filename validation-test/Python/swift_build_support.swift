@@ -1,1 +1,1 @@
-// RUN: %{python} -m unittest discover -s %S/../../utils/swift_build_support
+// RUN: %{python} -m unittest discover -s %utils/swift_build_support

@@ -2,13 +2,22 @@
 
 @interface GenericClass<T> : NSObject
 - (id)initWithThing:(T)thing;
+- (id)initWithArrayOfThings:(NSArray<T> *__nonnull)things;
 - (void)dealloc;
 - (__nullable T)thing;
 - (int)count;
 + (__nullable T)classThing;
 - (__nonnull NSArray<T> *)arrayOfThings;
+- (void)setArrayOfThings:(NSArray<T> *__nonnull)things;
+
+- (T __nonnull)objectAtIndexedSubscript:(uint16_t)i;
+- (void)setObject:(T __nonnull)object atIndexedSubscript:(uint16_t)i;
+
+- (void)performBlockOnThings: (T __nonnull (^ __nonnull)(T __nonnull))block;
+- (T __nonnull (^ __nonnull)(T __nonnull))blockForPerformingOnThings;
 
 @property (nonatomic) __nullable T propertyThing;
+@property (nonatomic) __nullable NSArray<T> *propertyArrayOfThings;
 @end
 
 @interface GenericClass<T> (Private)

@@ -1124,17 +1124,19 @@ sil @unknown : $@convention(thin) () -> Builtin.Int1
 
 // RANGECHECK-LABEL: sil @rangeCheck_early_exit
 // RANGECHECK: bb0
+// RANGECHECK:   cond_fail
 // RANGECHECK:   cond_br {{.*}}, bb2, bb1
-// RANGECHECK: bb1
-// RANGECHECK:  [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// RANGECHECK: bb1:
+// RANGECHECK-NOT:  cond_fail
 // RANGECHECK:   br bb3
-// RANGECHECK: bb2
+// RANGECHECK: bb2:
 // RANGECHECK:  return
-// RANGECHECK: bb3
+// RANGECHECK: bb3({{.*}}):
+// RANGECHECK:  apply
 // RANGECHECK:  cond_br {{.*}}, bb4, bb2
-// RANGECHECK: bb4
-// RANGECHECK:   builtin "xor_Int1"([[TRUE]]
-// RANGECHECK:   builtin "xor_Int1"([[TRUE]]
+// RANGECHECK: bb4:
+// RANGECHECK:   cond_fail
+// RANGECHECK:   cond_fail
 // RANGECHECK:   cond_br {{.*}}, bb2, bb3
 // RANGECHECK: }
 sil @rangeCheck_early_exit : $@convention(thin) (Builtin.Int64) -> () {

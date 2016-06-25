@@ -17,7 +17,7 @@ extension UnsafeBufferPointer {
   public init(_ audioBuffer: AudioBuffer) {
     self.init(
       start: UnsafePointer<Element>(audioBuffer.mData),
-      count: Int(audioBuffer.mDataByteSize) / strideof(Element))
+      count: Int(audioBuffer.mDataByteSize) / strideof(Element.self))
   }
 }
 
@@ -27,7 +27,7 @@ extension UnsafeMutableBufferPointer {
   public init(_ audioBuffer: AudioBuffer) {
     self.init(
       start: UnsafeMutablePointer<Element>(audioBuffer.mData),
-      count: Int(audioBuffer.mDataByteSize) / strideof(Element))
+      count: Int(audioBuffer.mDataByteSize) / strideof(Element.self))
   }
 }
 
@@ -40,7 +40,7 @@ extension AudioBuffer {
   ) {
     self.mNumberChannels = UInt32(numberOfChannels)
     self.mData = UnsafeMutablePointer<Void>(typedBuffer.baseAddress)
-    self.mDataByteSize = UInt32(typedBuffer.count * strideof(Element))
+    self.mDataByteSize = UInt32(typedBuffer.count * strideof(Element.self))
   }
 }
 
@@ -50,8 +50,8 @@ extension AudioBufferList {
   public static func sizeInBytes(maximumBuffers: Int) -> Int {
     _precondition(maximumBuffers >= 1,
       "AudioBufferList should contain at least one AudioBuffer")
-    return sizeof(AudioBufferList) +
-      (maximumBuffers - 1) * strideof(AudioBuffer)
+    return sizeof(AudioBufferList.self) +
+      (maximumBuffers - 1) * strideof(AudioBuffer.self)
   }
 
   /// Allocate an `AudioBufferList` with a capacity for the specified number of

@@ -14,10 +14,11 @@ func test_unavailable_instance_method(_ x : NSObject) -> Bool {
 }
 
 func test_unavailable_method_in_protocol(_ x : NSObjectProtocol) {
+  // expected-warning @+1 {{expression of type 'NSObjectProtocol' is unused}}
   x.retain() // expected-error {{'retain()' is unavailable}}
 }
 func test_unavailable_method_in_protocol_use_class_instance(_ x : NSObject) {
-  x.retain() // expected-error {{'retain()' is unavailable}}
+  x.retain() // expected-error {{'retain()' is unavailable}} expected-warning {{result of call to 'retain()' is unused}}
 }
 
 func test_unavailable_func(_ x : NSObject) {
@@ -33,9 +34,9 @@ func test_NSInvocation(_ x: NSInvocation,         // expected-error {{'NSInvocat
                        z: NSMethodSignature) {} // expected-error {{'NSMethodSignature' is unavailable}}
 
 func test_class_avail(_ x:NSObject, obj: AnyObject) {
-  x.`class`() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
-  NSObject.`class`() // expected-error {{'class()' is unavailable in Swift: use 'self' instead}}
-  obj.`class`!() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
+  x.`class`() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}} expected-warning {{result of call to 'class()' is unused}}
+  _ = NSObject.`class`() // expected-error {{'class()' is unavailable in Swift: use 'self' instead}}
+  _ = obj.`class`!() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
 }
 
 func test_unavailable_app_extension() {
@@ -55,9 +56,9 @@ func test_swift_unavailable() {
 func test_CFReleaseRetainAutorelease(_ x: CFTypeRef, color: CGColor) {
   CFRelease(x)              // expected-error {{'CFRelease' is unavailable: Core Foundation objects are automatically memory managed}}
   CGColorRelease(color)     // expected-error {{'CGColorRelease' is unavailable: Core Foundation objects are automatically memory managed}}
-  CFRetain(x)               // expected-error {{'CFRetain' is unavailable: Core Foundation objects are automatically memory managed}}
-  CGColorRetain(color)      // expected-error {{'CGColorRetain' is unavailable: Core Foundation objects are automatically memory managed}}
-  CFAutorelease(x)          // expected-error {{'CFAutorelease' is unavailable: Core Foundation objects are automatically memory managed}}
+  CFRetain(x)               // expected-error {{'CFRetain' is unavailable: Core Foundation objects are automatically memory managed}} expected-warning {{result of call to 'CFRetain' is unused}}
+  CGColorRetain(color)      // expected-error {{'CGColorRetain' is unavailable: Core Foundation objects are automatically memory managed}} expected-warning {{result of call to 'CGColorRetain' is unused}}
+  CFAutorelease(x)          // expected-error {{'CFAutorelease' is unavailable: Core Foundation objects are automatically memory managed}} expected-warning {{result of call to 'CFAutorelease' is unused}}
 }
 
 func testRedeclarations() {
@@ -82,9 +83,9 @@ func testRedeclarations() {
 }
 
 func test_NSZone(_ z : NSZone) { 
-  NSCreateZone(1, 1, true)  // expected-error {{'NSCreateZone' is unavailable}}
+  NSCreateZone(1, 1, true)  // expected-error {{'NSCreateZone' is unavailable}} expected-warning {{result of call to 'NSCreateZone' is unused}}
   NSSetZoneName(z, "name")  // expected-error {{'NSSetZoneName' is unavailable}}
-  NSZoneName(z)             // expected-error {{'NSZoneName' is unavailable}}
+  NSZoneName(z)             // expected-error {{'NSZoneName' is unavailable}} expected-warning {{result of call to 'NSZoneName' is unused}}
 }
 
 func test_DistributedObjects(_ o: NSObject,
@@ -100,12 +101,17 @@ func test_DistributedObjects(_ o: NSObject,
 
   let ca = NSConnectionDidDieNotification // expected-error {{'NSConnectionDidDieNotification' is unavailable in Swift: Use NSXPCConnection instead}}
   let cc = NSConnectionReplyMode // expected-error {{'NSConnectionReplyMode' is unavailable in Swift: Use NSXPCConnection instead}}
-  o.classForPortCoder // expected-error {{'classForPortCoder' is unavailable in Swift: Use NSXPCConnection instead}}
+  _ = o.classForPortCoder // expected-error {{'classForPortCoder' is unavailable in Swift: Use NSXPCConnection instead}}
 }
 
 func test_NSCalendarDate(_ o: NSCalendarDate) {} // expected-error {{'NSCalendarDate' is unavailable in Swift: Use NSCalendar and NSDateComponents and NSDateFormatter instead}}
 
-func test_dispatch(_ object: dispatch_object_t) {
-  dispatch_retain(object);  // expected-error {{'dispatch_retain' is unavailable}}
-  dispatch_release(object); // expected-error {{'dispatch_release' is unavailable}}
+func testImportAsMember() {
+  _ = CGColorCreateGenericGray(0.5, 1.0) // expected-error {{'CGColorCreateGenericGray' has been replaced by 'CGColor.init(gray:alpha:)'}} {{7-31=CGColor}} {{32-32=gray: }} {{37-37=alpha: }}
+  _ = CGColor(gray: 0.5, alpha: 1.0)
+}
+
+func testUnavailableRenamedEnum() {
+  _ = ClothingStyle.hipster
+  _ = NSClothingStyleOfficeCasual // expected-error{{'NSClothingStyleOfficeCasual' has been renamed to 'ClothingStyle.semiFormal'}} {{7-34=ClothingStyle.semiFormal}}
 }

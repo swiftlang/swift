@@ -128,6 +128,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     An `existential` value with its dynamic type pulled out, so that the 
     compiler can do something with it.
 
+  overlay
+    A library that is imported whenever a C library or framework by the same
+    name is imported. The purpose of an overlay is to augment and extend a
+    library on the system when the library on the system cannot be modified.
+    Apple has a number of overlays for its own SDKs in stdlib/public/SDK/.
+
   PR
     1. "Problem Report": An issue reported in `LLVM's bug tracker`__. 
        See also `SR`.
@@ -164,6 +170,11 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     Describes a type or function where making certain changes will not break
     binary compatibility. See :doc:`LibraryEvolution.rst <LibraryEvolution>`.
 
+  runtime
+    Code that implements a language's dynamic features that aren't just
+    compiled down to plain instructions. For example, Swift's runtime library
+    includes support for dynamic casting and for the Mirror-based reflection.
+
   script mode
     The parsing mode that allows top-level imperative code in a source file.
 
@@ -184,6 +195,11 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     "PR" for Swift because we wanted to be able to unambiguously reference
     LLVM bugs.
 
+  stdlib
+    "Standard library". Sometimes this just means the "Swift" module (also
+    known as "swiftCore"); sometimes it means everything in the stdlib/
+    directory. Pronounced "stid-lib" or "ess-tee-dee-lib".
+
   trap
     A deterministic runtime failure. Can be used as both as a noun ("Using an
     out-of-bounds index on an Array results in a trap") and a verb
@@ -192,6 +208,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
   type metadata
     The runtime representation of a type, and everything you can do with it.
     Like a ``Class`` in Objective-C, but for any type.
+
+  USR
+    A Unified Symbol Resolution (USR) is a string that identifies a particular
+    entity (function, class, variable, etc.) within a program. USRs can be
+    compared across translation units to determine, e.g., when references in
+    one translation refer to an entity defined in another translation unit.
 
   value witness table
     A runtime structure that describes how to do basic operations on an unknown

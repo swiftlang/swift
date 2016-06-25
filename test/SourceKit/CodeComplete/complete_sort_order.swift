@@ -7,6 +7,7 @@ func test() {
 
 }
 
+// XFAIL: broken_std_regex
 // RUN: %sourcekitd-test -req=complete -req-opts=hidelowpriority=0 -pos=7:1 %s -- %s > %t.orig
 // RUN: FileCheck -check-prefix=NAME %s < %t.orig
 // Make sure the order is as below, foo(Int) should come before foo(String).
@@ -52,6 +53,7 @@ func test1() {
 // STMT: if
 // STMT: for
 // STMT: while
+// STMT: return
 // STMT: func
 // STMT: foo(a: Int)
 
@@ -61,14 +63,14 @@ func test5() {
   #^STMT_1,r,ret,retur,return^#
 }
 // STMT_1-LABEL: Results for filterText: r [
+// STMT_1-NEXT:    return
 // STMT_1-NEXT:    retLocal
 // STMT_1-NEXT:    repeat
-// STMT_1-NEXT:    return
 // STMT_1-NEXT:    required
 // STMT_1: ]
 // STMT_1-LABEL: Results for filterText: ret [
-// STMT_1-NEXT:    retLocal
 // STMT_1-NEXT:    return
+// STMT_1-NEXT:    retLocal
 // STMT_1-NEXT:    repeat
 // STMT_1: ]
 // STMT_1-LABEL: Results for filterText: retur [
@@ -116,6 +118,15 @@ func test3(x: Int) {
 // EXPR_TOP_1: y
 // EXPR_TOP_1: z
 // EXPR_TOP_1: zzz
+
+// Test where there are fewer results than 'top'.
+// RUN: %complete-test -top=1000 -tok=FEW_1 %s | FileCheck %s -check-prefix=FEW_1
+func test3b() -> Int {
+  return #^FEW_1^#
+}
+// FEW_1: test3b()
+// FEW_1: Int
+// FEW_1: 0
 
 // Top 3
 // RUN: %complete-test -top=3 -tok=EXPR_2 %s | FileCheck %s -check-prefix=EXPR_TOP_3

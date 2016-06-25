@@ -43,7 +43,7 @@ entry:
 // CHECK:         unconditional_checked_cast_addr
 sil @function_cast_nothrow_to_nothrow_substitutable : $@convention(thin) <T> () -> () {
 entry:
-  %a = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@in ()) -> @out ()                 to T -> T        in undef : $*(@in T) -> @out T
+  %a = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@in ()) -> @out ()                 to (T) -> T        in undef : $*(@in T) -> @out T
   return undef : $()
 }
 
@@ -51,7 +51,7 @@ entry:
 // CHECK:         unconditional_checked_cast_addr
 sil @function_cast_nothrow_substitutable_to_nothrow : $@convention(thin) <T> () -> () {
 entry:
-  %a = unconditional_checked_cast_addr take_on_success T -> T        in undef : $*(@in T) -> @out T                 to () -> ()        in undef : $*(@in ()) -> @out ()
+  %a = unconditional_checked_cast_addr take_on_success (T) -> T        in undef : $*(@in T) -> @out T                 to () -> ()        in undef : $*(@in ()) -> @out ()
   return undef : $()
 }
 

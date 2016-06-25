@@ -1,0 +1,16 @@
+#!/bin/bash
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+python -c 'import flake8; import flake8_import_order' 2>/dev/null
+if [[ $? != 0 ]]; then
+  echo "Missing modules flake8 or flake8-import-order. Please be sure to install these python packages before linting."
+  exit 1
+fi
+
+cd "$SCRIPT_DIR/.."
+if [[ $? != 0 ]]; then
+  echo "Could not change directory to '$SCRIPT_DIR/..'."
+  exit 1
+fi
+flake8

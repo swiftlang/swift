@@ -842,14 +842,14 @@ static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
 /// the given target.
 static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
   if (target.isMacOSX()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 11), "OSX");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 12), "OSX");
 
   } else if (target.isiOS()) {
     // Includes both iOS and TVOS.
-    return isSDKTooOld(sdkPath, clang::VersionTuple(9, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 0), "Simulator", "OS");
 
   } else if (target.isWatchOS()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(2, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(3, 0), "Simulator", "OS");
 
   } else {
     return false;
@@ -1104,6 +1104,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   OI.SelectedSanitizer = SanitizerKind::None;
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ))
     OI.SelectedSanitizer = parseSanitizerArgValues(A, TC.getTriple(), Diags);
+
+  // Check that the sanitizer coverage flags are supported if supplied.
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ))
+    (void)parseSanitizerCoverageArgValue(A, TC.getTriple(), Diags,
+                                         OI.SelectedSanitizer);
 }
 
 void Driver::buildActions(const ToolChain &TC,

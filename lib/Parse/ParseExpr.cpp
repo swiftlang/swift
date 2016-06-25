@@ -501,6 +501,9 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
         new (Context) InOutExpr(Loc, SubExpr.get(), Type()));
   }
 
+  case tok::pound_keyPath:
+    return parseExprKeyPath();
+
   case tok::pound_selector:
     return parseExprSelector();
 
@@ -549,10 +552,110 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
       new (Context) PrefixUnaryExpr(Operator, SubExpr.get()));
 }
 
+///   expr-keypath:
+///     '#keyPath' '(' unqualified-name ('.' unqualified-name) * ')'
+///
+ParserResult<Expr> Parser::parseExprKeyPath() {
+  // Consume '#keyPath'.
+  SourceLoc keywordLoc = consumeToken(tok::pound_keyPath);
+
+  // Parse the leading '('.
+  if (!Tok.is(tok::l_paren)) {
+    diagnose(Tok, diag::expr_keypath_expected_lparen);
+    return makeParserError();
+  }
+  SourceLoc lParenLoc = consumeToken(tok::l_paren);
+
+  // Handle code completion.
+  SmallVector<Identifier, 4> names;
+  SmallVector<SourceLoc, 4> nameLocs;
+  auto handleCodeCompletion = [&](bool hasDot) -> ParserResult<Expr> {
+    ObjCKeyPathExpr *expr = nullptr;
+    if (!names.empty()) {
+      expr = ObjCKeyPathExpr::create(Context, keywordLoc, lParenLoc, names,
+                                     nameLocs, Tok.getLoc());
+    }
+
+    if (CodeCompletion)
+      CodeCompletion->completeExprKeyPath(expr, hasDot);
+
+    // Eat the code completion token because we handled it.
+    consumeToken(tok::code_complete);
+    return makeParserCodeCompletionResult(expr);
+  };
+
+  // Parse the sequence of unqualified-names.
+  ParserStatus status;
+  while (true) {
+    // Handle code completion.
+    if (Tok.is(tok::code_complete))
+      return handleCodeCompletion(!names.empty());
+
+    // Parse the next name.
+    DeclNameLoc nameLoc;
+    bool afterDot = !names.empty();
+    auto name = parseUnqualifiedDeclName(
+                  afterDot, nameLoc, 
+                  diag::expr_keypath_expected_property_or_type);
+    if (!name) {
+      status.setIsParseError();
+      break;
+    }
+
+    // Cannot use compound names here.
+    if (name.isCompoundName()) {
+      diagnose(nameLoc.getBaseNameLoc(), diag::expr_keypath_compound_name,
+               name)
+        .fixItReplace(nameLoc.getSourceRange(), name.getBaseName().str());
+    }
+
+    // Record the name we parsed.
+    names.push_back(name.getBaseName());
+    nameLocs.push_back(nameLoc.getBaseNameLoc());
+
+    // Handle code completion.
+    if (Tok.is(tok::code_complete))
+      return handleCodeCompletion(false);
+
+    // Parse the next period to continue the path.
+    if (consumeIf(tok::period))
+      continue;
+
+    break;
+  }
+
+  // Parse the closing ')'.
+  SourceLoc rParenLoc;
+  if (status.isError()) {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    if (Tok.is(tok::r_paren))
+      rParenLoc = consumeToken();
+    else
+      rParenLoc = Tok.getLoc();
+  } else {
+    parseMatchingToken(tok::r_paren, rParenLoc,
+                       diag::expr_keypath_expected_rparen, lParenLoc);
+  }
+
+  // If we cannot build a useful expression, just return an error
+  // expression.
+  if (names.empty() || status.isError()) {
+    return makeParserResult<Expr>(
+             new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+  }
+
+  // We're done: create the key-path expression.
+  return makeParserResult<Expr>(
+           ObjCKeyPathExpr::create(Context, keywordLoc, lParenLoc, names,
+                                   nameLocs, rParenLoc));
+}
+
 /// parseExprSelector
 ///
 ///   expr-selector:
 ///     '#selector' '(' expr ')'
+///     '#selector' '(' 'getter' ':' expr ')'
+///     '#selector' '(' 'setter' ':' expr ')'
 ///
 ParserResult<Expr> Parser::parseExprSelector() {
   // Consume '#selector'.
@@ -564,13 +667,47 @@ ParserResult<Expr> Parser::parseExprSelector() {
     return makeParserError();
   }
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
+  SourceLoc modifierLoc;
+
+  // Parse possible 'getter:' or 'setter:' modifiers, and determine
+  // the kind of selector we're working with.
+  ObjCSelectorExpr::ObjCSelectorKind selectorKind;
+  if (peekToken().is(tok::colon) &&
+      (Tok.isContextualKeyword("getter") ||
+       Tok.isContextualKeyword("setter"))) {
+    // Parse the modifier.
+    if (Tok.isContextualKeyword("getter"))
+      selectorKind = ObjCSelectorExpr::Getter;
+    else
+      selectorKind = ObjCSelectorExpr::Setter;
+
+    modifierLoc = consumeToken(tok::identifier);
+    (void)consumeToken(tok::colon);
+  } else {
+    selectorKind = ObjCSelectorExpr::Method;
+  }
+
+  ObjCSelectorContext selectorContext;
+  switch (selectorKind) {
+  case ObjCSelectorExpr::Getter:
+    selectorContext = ObjCSelectorContext::GetterSelector;
+    break;
+  case ObjCSelectorExpr::Setter:
+    selectorContext = ObjCSelectorContext::SetterSelector;
+    break;
+  case ObjCSelectorExpr::Method:
+    selectorContext = ObjCSelectorContext::MethodSelector;
+  }
 
   // Parse the subexpression.
   CodeCompletionCallbacks::InObjCSelectorExprRAII
-    InObjCSelectorExpr(CodeCompletion);
-  ParserResult<Expr> subExpr = parseExpr(diag::expr_selector_expected_expr);
+    InObjCSelectorExpr(CodeCompletion, selectorContext);
+  ParserResult<Expr> subExpr =
+    parseExpr(selectorKind == ObjCSelectorExpr::Method
+                ? diag::expr_selector_expected_method_expr
+                : diag::expr_selector_expected_property_expr);
   if (subExpr.hasCodeCompletion())
-    return subExpr;
+    return makeParserCodeCompletionResult<Expr>();
 
   // Parse the closing ')'
   SourceLoc rParenLoc;
@@ -586,13 +723,23 @@ ParserResult<Expr> Parser::parseExprSelector() {
   }
 
   // If the subexpression was in error, just propagate the error.
-  if (subExpr.isParseError())
-    return makeParserResult<Expr>(
-             new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+  if (subExpr.isParseError()) {
+    if (subExpr.hasCodeCompletion()) {
+      auto res = makeParserResult(
+                   new (Context) ObjCSelectorExpr(selectorKind, keywordLoc,
+                                                  lParenLoc, modifierLoc,
+                                                  subExpr.get(), rParenLoc));
+      res.setHasCodeCompletion();
+      return res;
+    } else {
+      return makeParserResult<Expr>(
+               new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+    }
+  }
 
   return makeParserResult<Expr>(
-    new (Context) ObjCSelectorExpr(keywordLoc, lParenLoc, subExpr.get(),
-                                   rParenLoc));
+    new (Context) ObjCSelectorExpr(selectorKind, keywordLoc, lParenLoc,
+                                   modifierLoc, subExpr.get(), rParenLoc));
 }
 
 static DeclRefKind getDeclRefKindForOperator(tok kind) {

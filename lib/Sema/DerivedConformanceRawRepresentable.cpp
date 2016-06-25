@@ -266,7 +266,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   }
 
   Type enumType = parentDC->getDeclaredTypeInContext();
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
+  auto *selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC,
                                          /*static*/false, /*inout*/true);
 
   auto *rawDecl = new (C) ParamDecl(/*IsLet*/true, SourceLoc(), SourceLoc(),
@@ -278,10 +278,13 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   auto retTy = OptionalType::get(enumType);
   DeclName name(C, C.Id_init, paramList);
   
-  auto initDecl = new (C) ConstructorDecl(name, SourceLoc(),
-                                          /*failability*/ OTK_Optional,
-                                          SourceLoc(), selfDecl, paramList,
-                                          nullptr, SourceLoc(), parentDC);
+  auto initDecl =
+    new (C) ConstructorDecl(name, SourceLoc(),
+                            /*Failability=*/ OTK_Optional,
+                            /*FailabilityLoc=*/SourceLoc(),
+                            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                            selfDecl, paramList,
+                            /*GenericParams=*/nullptr, parentDC);
   
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
@@ -323,6 +326,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   Type allocIfaceType;
   Type initIfaceType;
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
+    initDecl->setGenericSignature(sig);
+
     allocIfaceType = GenericFunctionType::get(sig, selfInterfaceType,
                                               interfaceType,
                                               FunctionType::ExtInfo());

@@ -1,13 +1,13 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-#if os(Linux) || os(FreeBSD)
+#if os(Linux) || os(FreeBSD) || os(Android)
   import Glibc
   // FIXME: this is a quick hack for non Darwin platforms
   // where they doesn't have CoreGraphics module.
   #if arch(i386) || arch(arm)
     typealias CGFloat = Float
-  #elseif arch(x86_64) || arch(arm64)
+  #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
     typealias CGFloat = Double
   #endif
 #else
@@ -252,24 +252,6 @@ MathTests.test("Binary functions") {
 }
 
 MathTests.test("Other functions") {
-
-  (i1, i2, i3) = (fpclassify(dx), fpclassify(fx), fpclassify(gx))
-  expectEqual("fpclassify 4 4 fpclassify", print3("fpclassify", i1, i2, i3))
-
-  (b1, b2, b3) = (isnormal(dx), isnormal(fx), isnormal(gx))
-  expectEqual("isnormal true true isnormal", print3("isnormal", b1, b2, b3))
-
-  (b1, b2, b3) = (isfinite(dx), isfinite(fx), isfinite(gx))
-  expectEqual("isfinite true true isfinite", print3("isfinite", b1, b2, b3))
-
-  (b1, b2, b3) = (isinf(dx), isinf(fx), isinf(gx))
-  expectEqual("isinf false false isinf", print3("isinf", b1, b2, b3))
-
-  (b1, b2, b3) = (isnan(dx), isnan(fx), isnan(gx))
-  expectEqual("isnan false false isnan", print3("isnan", b1, b2, b3))
-
-  (i1, i2, i3) = (signbit(dx), signbit(fx), signbit(gx))
-  expectEqual("signbit 0 0 signbit", print3("signbit", i1, i2, i3))
 
   (d1, d2) = modf(dy)
   (f1, f2) = modf(fy)

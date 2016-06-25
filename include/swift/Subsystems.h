@@ -160,10 +160,14 @@ namespace swift {
   /// types and diagnose problems therein.
   ///
   /// \param StartElem Where to start for incremental type-checking in the main
-  ///                  source file.
+  /// source file.
+  ///
+  /// \param WarnLongFunctionBodies If non-zero, warn when a function body takes
+  /// longer than this many milliseconds to type-check
   void performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                            OptionSet<TypeCheckingFlags> Options,
-                           unsigned StartElem = 0);
+                           unsigned StartElem = 0,
+                           unsigned WarnLongFunctionBodies = 0);
 
   /// Once type checking is complete, this walks protocol requirements
   /// to resolve default witnesses.

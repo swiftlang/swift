@@ -26,6 +26,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/TargetInfo.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -343,7 +344,10 @@ public:
       StackSlotKey;
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
+  llvm::SmallDenseMap<llvm::Type *, Address, 8> DebugScratchpads;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
+  llvm::SmallVector<std::pair<DominancePoint, llvm::Instruction *>, 8>
+      ValueVariables;
   unsigned NumAnonVars = 0;
   unsigned NumCondFails = 0;
 
@@ -577,7 +581,44 @@ public:
     return Name;
   }
 
-  /// At -O0, emit a shadow copy of an Address in an alloca, so the
+  /// At -Onone, forcibly keep all LLVM values that are tracked by
+  /// debug variables alive by inserting an empty inline assembler
+  /// expression depending on the value in the blocks dominated by the
+  /// value.
+  void emitDebugVariableRangeExtension(const SILBasicBlock *CurBB) {
+    if (IGM.IRGen.Opts.Optimize)
+      return;
+    for (auto &Variable : ValueVariables) {
+      auto VarDominancePoint = Variable.first;
+      llvm::Value *Storage = Variable.second;
+      if (getActiveDominancePoint() == VarDominancePoint ||
+          isActiveDominancePointDominatedBy(VarDominancePoint)) {
+        llvm::Type *ArgTys;
+        auto *Ty = Storage->getType()->getScalarType();
+        // Pointers and Floats are expected to fit into a register.
+        if (Ty->isPointerTy() || Ty->isFloatingPointTy())
+          ArgTys = { Storage->getType() };
+        else {
+          // The storage is guaranteed to be no larger than the register width.
+          // Extend the storage so it would fit into a register.
+          llvm::Type *IntTy;
+          switch (IGM.getClangASTContext().getTargetInfo().getRegisterWidth()) {
+          case 64: IntTy = IGM.Int64Ty; break;
+          case 32: IntTy = IGM.Int32Ty; break;
+          default: llvm_unreachable("unsupported register width");
+          }
+          ArgTys = { IntTy };
+          Storage = Builder.CreateZExtOrBitCast(Storage, IntTy);
+        }
+        // Emit an empty inline assembler expression depending on the register.
+        auto *AsmFnTy = llvm::FunctionType::get(IGM.VoidTy, ArgTys, false);
+        auto *InlineAsm = llvm::InlineAsm::get(AsmFnTy, "", "r", true);
+        Builder.CreateCall(InlineAsm, Storage);
+      }
+    }
+  }
+
+  /// At -Onone, emit a shadow copy of an Address in an alloca, so the
   /// register allocator doesn't elide the dbg.value intrinsic when
   /// register pressure is high.  There is a trade-off to this: With
   /// shadow copies, we lose the precise lifetime.
@@ -589,8 +630,23 @@ public:
     if (IGM.IRGen.Opts.Optimize || (ArgNo == 0) ||
         isa<llvm::AllocaInst>(Storage) ||
         isa<llvm::UndefValue>(Storage) ||
-        Ty == IGM.RefCountedPtrTy) // No debug info is emitted for refcounts.
-      return Storage;
+        Ty == IGM.RefCountedPtrTy) { // No debug info is emitted for refcounts.
+      // Account for bugs in LLVM.
+      //
+      // - The LLVM type legalizer currently doesn't update debug
+      //   intrinsics when a large value is split up into smaller
+      //   pieces. Note that this heuristic as a bit too conservative
+      //   on 32-bit targets as it will also fire for doubles.
+      //
+      // - CodeGen Prepare may drop dbg.values pointing to PHI instruction.
+      if (IGM.DataLayout.getTypeSizeInBits(Storage->getType()) <=
+          IGM.getClangASTContext().getTargetInfo().getRegisterWidth() &&
+          !isa<llvm::PHINode>(Storage)) {
+        if (auto *Value = dyn_cast<llvm::Instruction>(Storage))
+          ValueVariables.push_back({getActiveDominancePoint(), Value});
+        return Storage;
+      }
+    }
 
     if (Align.isZero())
       Align = IGM.getPointerAlignment();
@@ -1516,6 +1572,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         }
       }
     }
+    if (isa<TermInst>(&I))
+      emitDebugVariableRangeExtension(BB);
     visit(&I);
 
     assert(!EmissionNotes.count(&I) &&
@@ -3362,9 +3420,8 @@ visitIsUniqueOrPinnedInst(swift::IsUniqueOrPinnedInst *i) {
 }
 
 static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
-                                                  const SILInstruction *allocInst,
+                                                  SILInstruction *allocInst,
                                                   const TypeInfo &ti,
-                                                  SILValue addressValue,
                                                   Address fixedSizeBuffer,
                                                   const llvm::Twine &name) {
   // There's no point in doing this for fixed-sized types, since we'll allocate
@@ -3384,8 +3441,8 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
     // Does this instruction use the allocation? If not, continue.
     auto Ops = inst->getAllOperands();
     if (std::none_of(Ops.begin(), Ops.end(),
-                     [&addressValue](const Operand &Op) {
-                       return Op.get() == addressValue;
+                     [allocInst](const Operand &Op) {
+                       return Op.get() == allocInst;
                      }))
       continue;
 
@@ -3409,7 +3466,7 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
       IGF.Builder.CreateLifetimeStart(fixedSizeBuffer,
                                       getFixedBufferSize(IGF.IGM));
     }
-    IGF.setContainerOfUnallocatedAddress(addressValue, fixedSizeBuffer);
+    IGF.setContainerOfUnallocatedAddress(allocInst, fixedSizeBuffer);
     return true;
   }
   
@@ -3456,10 +3513,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   // If a dynamic alloc_stack is immediately initialized by a copy_addr
   // operation, we can combine the allocation and initialization using an
   // optimized value witness.
-  if (tryDeferFixedSizeBufferInitialization(*this, i, type,
-                                            i,
-                                            Address(),
-                                            dbgname))
+  if (tryDeferFixedSizeBufferInitialization(*this, i, type, Address(), dbgname))
     return;
 
   auto addr = type.allocateStack(*this,
@@ -3589,7 +3643,11 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 # endif
 
   auto boxTy = i->getType().castTo<SILBoxType>();
-  OwnedAddress boxWithAddr = emitAllocateBox(*this, boxTy, DbgName);
+  auto boxInterfaceTy = cast<SILBoxType>(
+      CurSILFn->mapTypeOutOfContext(boxTy)
+          ->getCanonicalType());
+  OwnedAddress boxWithAddr = emitAllocateBox(*this, boxTy, boxInterfaceTy,
+                                             DbgName);
   setLoweredBox(i, boxWithAddr);
 
   if (IGM.DebugInfo && Decl) {
@@ -4253,7 +4311,7 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
   auto &srcTI = getTypeInfo(i->getLoweredConcreteType());
 
   // See if we can defer initialization of the buffer to a copy_addr into it.
-  if (tryDeferFixedSizeBufferInitialization(*this, i, srcTI, i, buffer, ""))
+  if (tryDeferFixedSizeBufferInitialization(*this, i, srcTI, buffer, ""))
     return;
   
   // Allocate in the destination fixed-size buffer.
@@ -4456,52 +4514,37 @@ void IRGenSILFunction::setAllocatedAddressForBuffer(SILValue v,
 
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   SILType addrTy = i->getSrc()->getType();
+  const TypeInfo &addrTI = getTypeInfo(addrTy);
   Address src = getLoweredAddress(i->getSrc());
-  Address dest;
-  bool isFixedBufferInitialization;
   // See whether we have a deferred fixed-size buffer initialization.
   auto &loweredDest = getLoweredValue(i->getDest());
   if (loweredDest.isUnallocatedAddressInBuffer()) {
-    isFixedBufferInitialization = true;
-    dest = loweredDest.getContainerOfAddress();
+    assert(i->isInitializationOfDest()
+           && "need to initialize an unallocated buffer");
+    Address cont = loweredDest.getContainerOfAddress();
+    if (i->isTakeOfSrc()) {
+      Address addr = addrTI.initializeBufferWithTake(*this, cont, src, addrTy);
+      setAllocatedAddressForBuffer(i->getDest(), addr);
+    } else {
+      Address addr = addrTI.initializeBufferWithCopy(*this, cont, src, addrTy);
+      setAllocatedAddressForBuffer(i->getDest(), addr);
+    }
   } else {
-    isFixedBufferInitialization = false;
-    dest = loweredDest.getAddress();
-  }
-  
-  const TypeInfo &addrTI = getTypeInfo(addrTy);
-
-  unsigned takeAndOrInitialize =
-    (i->isTakeOfSrc() << 1U) | i->isInitializationOfDest();
-  static const unsigned COPY = 0, TAKE = 2, ASSIGN = 0, INITIALIZE = 1;
-  
-  switch (takeAndOrInitialize) {
-  case ASSIGN | COPY:
-    assert(!isFixedBufferInitialization
-           && "can't assign into an unallocated buffer");
-    addrTI.assignWithCopy(*this, dest, src, addrTy);
-    break;
-  case INITIALIZE | COPY:
-    if (isFixedBufferInitialization) {
-      Address addr = addrTI.initializeBufferWithCopy(*this, dest, src, addrTy);
-      setAllocatedAddressForBuffer(i->getDest(), addr);
-    } else
-      addrTI.initializeWithCopy(*this, dest, src, addrTy);
-    break;
-  case ASSIGN | TAKE:
-    assert(!isFixedBufferInitialization
-           && "can't assign into an unallocated buffer");
-    addrTI.assignWithTake(*this, dest, src, addrTy);
-    break;
-  case INITIALIZE | TAKE:
-    if (isFixedBufferInitialization) {
-      Address addr = addrTI.initializeBufferWithTake(*this, dest, src, addrTy);
-      setAllocatedAddressForBuffer(i->getDest(), addr);
-    } else
-      addrTI.initializeWithTake(*this, dest, src, addrTy);
-    break;
-  default:
-    llvm_unreachable("unexpected take/initialize attribute combination?!");
+    Address dest = loweredDest.getAddress();
+    
+    if (i->isInitializationOfDest()) {
+      if (i->isTakeOfSrc()) {
+        addrTI.initializeWithTake(*this, dest, src, addrTy);
+      } else {
+        addrTI.initializeWithCopy(*this, dest, src, addrTy);
+      }
+    } else {
+      if (i->isTakeOfSrc()) {
+        addrTI.assignWithTake(*this, dest, src, addrTy);
+      } else {
+        addrTI.assignWithCopy(*this, dest, src, addrTy);
+      }
+    }
   }
 }
 

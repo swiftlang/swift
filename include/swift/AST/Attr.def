@@ -57,6 +57,7 @@ TYPE_ATTR(callee_guaranteed)
 TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
 TYPE_ATTR(deallocating)
+TYPE_ATTR(pseudogeneric)
 
 // SIL metatype attributes.
 TYPE_ATTR(thin)
@@ -232,9 +233,6 @@ DECL_ATTR(_alignment, Alignment, OnStruct | OnEnum | UserInaccessible, 56)
 SIMPLE_DECL_ATTR(rethrows, Rethrows,
                  OnFunc | OnConstructor | RejectByParser, 57)
 
-DECL_ATTR(warn_unused_result, WarnUnusedResult,
-          OnFunc | OnConstructor | LongAttribute, 58)
-
 DECL_ATTR(_swift_native_objc_runtime_base, SwiftNativeObjCRuntimeBase,
           OnClass | UserInaccessible, 59)
 
@@ -261,6 +259,8 @@ SIMPLE_DECL_ATTR(_versioned, Versioned,
 
 SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
                  OnFunc | OnConstructor | LongAttribute, 65)
+
+SIMPLE_DECL_ATTR(GKInspectable, GKInspectable, OnVar, 66)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -150,7 +150,7 @@ func gcd_23700031<T>(_ a: T, b: T) {
   var a = a
   var b = b
   (a, b) = (b, a % b)  // expected-error {{binary operator '%' cannot be applied to two 'T' operands}}
-  // expected-note @-1 {{overloads for '%' exist with these partially matching parameter lists: (UInt8, UInt8), (Int8, Int8), (UInt16, UInt16), (Int16, Int16), (UInt32, UInt32), (Int32, Int32), (UInt64, UInt64), (Int64, Int64), (UInt, UInt), (Int, Int), (Float, Float)}}
+  // expected-note @-1 {{overloads for '%' exist with these partially matching parameter lists: (UInt8, UInt8), (Int8, Int8), (UInt16, UInt16), (Int16, Int16), (UInt32, UInt32), (Int32, Int32), (UInt64, UInt64), (Int64, Int64), (UInt, UInt), (Int, Int)}}
 }
 
 // <rdar://problem/24210190>
@@ -172,7 +172,7 @@ func foo(_ pair: (Int,Int)) -> Victory<(x:Int, y:Int)> {
 
 // https://bugs.swift.org/browse/SR-596
 // Compiler crashes when accessing a non-existent property of a closure parameter
-func call(_ f: C -> Void) {}
+func call(_ f: (C) -> Void) {}
 func makeRequest() {
   call { obj in
     print(obj.invalidProperty)  // expected-error {{value of type 'C' has no member 'invalidProperty'}}

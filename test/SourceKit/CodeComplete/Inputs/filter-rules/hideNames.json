@@ -4,8 +4,8 @@
     key.hide: 1,
     key.names: [
       "hideThis1()",
-      "hideThis2(:namedParam2:)",
-      "hideThis3()",
+      "hideThis2(_:namedParam2:)",
+      "hideThis3(namedParam1:_:)",
     ]
   },
   {

@@ -177,7 +177,7 @@ func unarchive() {
 
   // Feed it into an unarchiver.
   let data = NSData(bytes: rawData, length: rawData.count)
-  let unarchiver = NSKeyedUnarchiver(forReadingWith: data)
+  let unarchiver = NSKeyedUnarchiver(forReadingWith: data as Data)
 
   guard let strings
       = unarchiver.decodeObject(forKey: "strings") as? Foo<NSString> else {

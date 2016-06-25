@@ -973,6 +973,22 @@ namespace {
       if (!validateForwardCapture(DRE->getDecl()))
         return { false, DRE };
 
+      bool isInOut = D->hasType() && D->getInterfaceType()->is<InOutType>();
+      bool isNested = false;
+      if (auto f = AFR.getAbstractFunctionDecl())
+        isNested = f->getDeclContext()->isLocalContext();
+
+      if (isInOut && !AFR.isKnownNoEscape() && !isNested) {
+        if (D->getNameStr() == "self") {
+          TC.diagnose(DRE->getLoc(),
+            diag::closure_implicit_capture_mutating_self);
+        } else {
+          TC.diagnose(DRE->getLoc(),
+            diag::closure_implicit_capture_without_noescape);
+        }
+        return { false, DRE };
+      }
+
       // We're going to capture this, compute flags for the capture.
       unsigned Flags = 0;
 
@@ -1053,14 +1069,14 @@ namespace {
       // Referring to a class-constrained generic or metatype
       // doesn't require its type metadata.
       if (auto declRef = dyn_cast<DeclRefExpr>(E))
-        return !declRef->getDecl()->isObjC()
-          && !E->getType()->hasRetainablePointerRepresentation()
-          && !E->getType()->is<AnyMetatypeType>();
+        return (!declRef->getDecl()->isObjC()
+                && !E->getType()->hasRetainablePointerRepresentation()
+                && !E->getType()->is<AnyMetatypeType>());
       
       // Loading classes or metatypes doesn't require their metadata.
       if (isa<LoadExpr>(E))
-        return !E->getType()->hasRetainablePointerRepresentation()
-          && !E->getType()->is<AnyMetatypeType>();
+        return (!E->getType()->hasRetainablePointerRepresentation()
+                && !E->getType()->is<AnyMetatypeType>());
       
       // Accessing @objc members doesn't require type metadata.
       if (auto memberRef = dyn_cast<MemberRefExpr>(E))
@@ -1078,13 +1094,14 @@ namespace {
       }
       
       if (auto subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
-        return !subscriptExpr->getDecl().getDecl()->isObjC();
+        return (subscriptExpr->hasDecl() &&
+                !subscriptExpr->getDecl().getDecl()->isObjC());
       }
       
       // Getting the dynamic type of a class doesn't require type metadata.
       if (isa<DynamicTypeExpr>(E))
-        return !E->getType()->castTo<AnyMetatypeType>()->getInstanceType()
-          ->hasRetainablePointerRepresentation();
+        return (!E->getType()->castTo<AnyMetatypeType>()->getInstanceType()
+                    ->hasRetainablePointerRepresentation());
       
       // Building a fixed-size tuple doesn't require type metadata.
       // Approximate this for the purposes of being able to invoke @objc methods
@@ -1122,8 +1139,8 @@ namespace {
       
       // Opening an @objc existential or metatype is a no-op.
       if (auto open = dyn_cast<OpenExistentialExpr>(E))
-        return !open->getSubExpr()->getType()->isObjCExistentialType()
-          && !open->getSubExpr()->getType()->is<AnyMetatypeType>();
+        return (!open->getSubExpr()->getType()->isObjCExistentialType()
+                && !open->getSubExpr()->getType()->is<AnyMetatypeType>());
       
       // Erasure to an ObjC existential or between metatypes doesn't require
       // type metadata.
@@ -1214,6 +1231,28 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   FindCapturedVars finder(*this, Captures, GenericParamCaptureLoc, AFR);
   AFR.getBody()->walk(finder);
 
+  unsigned inoutCount = 0;
+  for (auto C: Captures) {
+    if (auto type = C.getDecl()->getInterfaceType())
+      if (isa<InOutType>(type.getPointer()))
+        inoutCount++;
+  }
+
+  if (inoutCount > 0) {
+    if (auto e = AFR.getAbstractFunctionDecl()) {
+      for (auto returnOccurrence: getEscapingFunctionAsReturnValue(e)) {
+        diagnose(returnOccurrence->getReturnLoc(),
+          diag::nested_function_escaping_inout_capture);
+      }
+      auto occurrences = getEscapingFunctionAsArgument(e);
+      for (auto occurrence: occurrences) {
+        diagnose(occurrence->getLoc(),
+          diag::nested_function_with_implicit_capture_argument,
+          inoutCount > 1);
+      }
+    }
+  }
+
   if (AFR.hasType() && !AFR.isObjC()) {
     finder.checkType(AFR.getType(), AFR.getLoc());
   }
@@ -1238,19 +1277,14 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     }
   }
 
-  // Since nested generic functions are not supported yet, the only case where
-  // generic parameters can be captured is by closures and non-generic local
-  // functions.
-  //
-  // So we only set GenericParamCaptures if we have a closure, or a
-  // non-generic function defined inside a local context.
   auto *AFD = AFR.getAbstractFunctionDecl();
-  if (!AFD ||
-      (!AFD->getGenericParams() &&
-       AFD->getDeclContext()->isLocalContext())) {
-    AFR.getCaptureInfo()
-      .setGenericParamCaptures(GenericParamCaptureLoc.isValid());
+  if (AFD) {
+    if (AFD->getGenericParams())
+      AFR.getCaptureInfo().setGenericParamCaptures(true);
   }
+
+  if (GenericParamCaptureLoc.isValid())
+    AFR.getCaptureInfo().setGenericParamCaptures(true);
 
   if (Captures.empty())
     AFR.getCaptureInfo().setCaptures(None);

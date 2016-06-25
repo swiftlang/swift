@@ -44,6 +44,9 @@ The testsuite is split into three subsets:
 
 * Long tests, which are marked with ``REQUIRES: long_test``.
 
+  Unlike other tests, every long test should also include either
+  ``REQUIRES: nonexecutable_test`` or ``REQUIRES: executable_test``.
+
 Running the LLVM lit-based testsuite
 ------------------------------------
 
@@ -377,10 +380,12 @@ use this pattern::
   // RUN: %target-swift-frontend ... | FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 
   // CHECK: common line
-  // CHECK-i386:   only for i386
-  // CHECK-x86_64: only for x86_64
-  // CHECK-armv7:  only for armv7
-  // CHECK-arm64:  only for arm64
+  // CHECK-i386:        only for i386
+  // CHECK-x86_64:      only for x86_64
+  // CHECK-armv7:       only for armv7
+  // CHECK-arm64:       only for arm64
+  // CHECK-powerpc64:   only for powerpc64
+  // CHECK-powerpc64le: only for powerpc64le
 
 Features for ``REQUIRES`` and ``XFAIL``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

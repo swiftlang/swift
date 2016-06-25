@@ -326,8 +326,11 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether we are overridden later.
     unsigned Overridden : 1;
+
+    /// Whether the function body throws.
+    unsigned Throws : 1;
   };
-  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 10 };
+  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 11 };
   static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
 
   class FuncDeclBitfields {
@@ -664,7 +667,7 @@ public:
   /// Retrieve the innermost declaration context corresponding to this
   /// declaration, which will either be the declaration itself (if it's
   /// also a declaration context) or its declaration context.
-  DeclContext *getInnermostDeclContext();
+  DeclContext *getInnermostDeclContext() const;
 
   /// \brief Retrieve the module in which this declaration resides.
   ModuleDecl *getModuleContext() const;
@@ -2141,6 +2144,10 @@ public:
   /// first slot.
   Optional<ObjCSelector> getObjCRuntimeName() const;
 
+  /// Determine whether the given declaration can infer @objc, or the
+  /// Objective-C name, if used to satisfy the given requirement.
+  bool canInferObjCFromRequirement(ValueDecl *requirement);
+
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
@@ -2252,7 +2259,7 @@ public:
   bool isObjC() const {
     return getAttrs().hasAttribute<ObjCAttr>();
   }
-
+  
   void setIsObjC(bool Value);
 
   /// Is this declaration marked with 'final'?
@@ -2404,14 +2411,14 @@ public:
     return GenericSig;
   }
   
-  void setIsValidatingGenericSignature(bool ivgs = true) {
-    ValidatingGenericSignature = ivgs;
+  void setIsValidatingGenericSignature(bool validating=true) {
+    ValidatingGenericSignature = validating;
   }
   
-  bool IsValidatingGenericSignature() {
+  bool isValidatingGenericSignature() const {
     return ValidatingGenericSignature;
   }
-  
+
   // Resolve ambiguity due to multiple base classes.
   using TypeDecl::getASTContext;
   using DeclContext::operator new;
@@ -2764,18 +2771,12 @@ protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
 
-  void setDeclaredType(Type declaredTy) {
-    assert(DeclaredTy.isNull() && "Already set declared type");
-    DeclaredTy = declaredTy;
-  }
-
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   SourceLoc NameLoc,
                   MutableArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams) :
     GenericTypeDecl(K, DC, name, NameLoc, inherited, GenericParams),
-    IterableDeclContext(IterableDeclContextKind::NominalTypeDecl),
-    DeclaredTy(nullptr)
+    IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     setGenericParams(GenericParams);
     NominalTypeDeclBits.HasDelayedMembers = false;
@@ -2846,12 +2847,15 @@ public:
     return SearchedForFailableInits;
   }
 
-  /// getDeclaredType - Retrieve the type declared by this entity.
-  Type getDeclaredType() const { return DeclaredTy; }
-
-  /// Compute the type (and declared type) of this nominal type.
+  /// Compute the type of this nominal type.
   void computeType();
 
+  /// getDeclaredType - Retrieve the type declared by this entity, without
+  /// any generic parameters bound if this is a generic type.
+  Type getDeclaredType() const;
+
+  /// getDeclaredType - Retrieve the type declared by this entity, with
+  /// context archetypes bound if this is a generic type.
   Type getDeclaredTypeInContext() const;
 
   /// Get the "interface" type of the given nominal type, which is the
@@ -3203,6 +3207,10 @@ public:
   /// Retrieve the superclass of this class, or null if there is no superclass.
   Type getSuperclass() const { return LazySemanticInfo.Superclass.getPointer(); }
 
+  /// Retrieve the ClassDecl for the superclass of this class, or null if there
+  /// is no superclass.
+  ClassDecl *getSuperclassDecl() const;
+
   /// Set the superclass of this class.
   void setSuperclass(Type superclass) {
     LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
@@ -3336,6 +3344,13 @@ public:
     auto NTD = dyn_cast<NominalTypeDecl>(C);
     return NTD && classof(NTD);
   }
+  
+  /// Returns true if the decl uses the Objective-C generics model.
+  ///
+  /// This is true of imported Objective-C classes.
+  bool usesObjCGenericsModel() const {
+    return isObjC() && hasClangNode() && isGenericContext();
+  }
 };
 
 
@@ -3425,7 +3440,8 @@ public:
   bool inheritsFrom(const ProtocolDecl *Super) const;
   
   ProtocolType *getDeclaredType() const {
-    return reinterpret_cast<ProtocolType *>(DeclaredTy.getPointer());
+    return reinterpret_cast<ProtocolType *>(
+      NominalTypeDecl::getDeclaredType().getPointer());
   }
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
@@ -3652,6 +3668,10 @@ enum class AccessStrategy : unsigned char {
   /// The decl is a VarDecl with its own backing storage; evaluate its
   /// address directly.
   Storage,
+  
+  /// The decl is a VarDecl with storage defined by a property behavior;
+  /// this access may initialize or reassign the storage based on dataflow.
+  BehaviorStorage,
 
   /// The decl has addressors; call the appropriate addressor for the
   /// access kind.  These calls are currently always direct.
@@ -3681,6 +3701,12 @@ struct BehaviorRecord {
   // Storage declaration and initializer for use by definite initialization.
   VarDecl *StorageDecl = nullptr;
   ConcreteDeclRef InitStorageDecl = nullptr;
+  
+  bool needsInitialization() const {
+    assert((bool)StorageDecl == (bool)InitStorageDecl
+           && "DI state not consistent");
+    return StorageDecl != nullptr;
+  }
   
   BehaviorRecord(TypeRepr *ProtocolName,
                  Expr *Param)
@@ -4128,6 +4154,15 @@ public:
     return BehaviorInfo.getPointer() != nullptr;
   }
   
+  /// Does the storage use a behavior, and require definite initialization
+  /// analysis.
+  bool hasBehaviorNeedingInitialization() const {
+    if (auto behavior = getBehavior()) {
+      return behavior->needsInitialization();
+    }
+    return false;
+  }
+  
   /// Get the behavior info.
   const BehaviorRecord *getBehavior() const {
     return BehaviorInfo.getPointer();
@@ -4175,7 +4210,8 @@ public:
     return VarDeclBits.IsUserAccessible;
   }
 
-  /// \brief Retrieve the source range of the variable type.
+  /// Retrieve the source range of the variable type, or an invalid range if the
+  /// variable's type is not explicitly written in the source.
   ///
   /// Only for use in diagnostics.  It is not always possible to always
   /// precisely point to the variable type because of type aliases.
@@ -4378,9 +4414,22 @@ public:
   /// Note that this decl is created, but it is returned with an incorrect
   /// DeclContext that needs to be set correctly.  This is automatically handled
   /// when a function is created with this as part of its argument list.
+  /// For a generic context, this also gives the parameter an unbound generic
+  /// type with the expectation that type-checking will fill in the context
+  /// generic parameters.
+  static ParamDecl *createUnboundSelf(SourceLoc loc, DeclContext *DC,
+                                      bool isStatic = false,
+                                      bool isInOut = false);
+
+  /// Create an implicit 'self' decl for a method in the specified decl context.
+  /// If 'static' is true, then this is self for a static method in the type.
   ///
+  /// Note that this decl is created, but it is returned with an incorrect
+  /// DeclContext that needs to be set correctly.  This is automatically handled
+  /// when a function is created with this as part of its argument list.
   static ParamDecl *createSelf(SourceLoc loc, DeclContext *DC,
-                               bool isStatic = false, bool isInOut = false);
+                               bool isStatic = false,
+                               bool isInOut = false);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
@@ -4569,18 +4618,25 @@ protected:
 
   CaptureInfo Captures;
 
+  /// Location of the 'throws' token.
+  SourceLoc ThrowsLoc;
+
   ImportAsMemberStatus IAMStatus;
 
-  AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
-                       SourceLoc NameLoc, unsigned NumParameterLists,
+  AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent,
+                       DeclName Name, SourceLoc NameLoc,
+                       bool Throws, SourceLoc ThrowsLoc,
+                       unsigned NumParameterLists,
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), GenericParams(nullptr), GenericSig(nullptr) {
+        Body(nullptr), GenericParams(nullptr), GenericSig(nullptr),
+        ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
     AbstractFunctionDeclBits.Overridden = false;
+    AbstractFunctionDeclBits.Throws = Throws;
 
     // Verify no bitfield truncation.
     assert(AbstractFunctionDeclBits.NumParameterLists == NumParameterLists);
@@ -4613,6 +4669,12 @@ public:
   void setSelfIndex(uint8_t idx) { return IAMStatus.setSelfIndex(idx); }
 
 public:
+  /// Retrieve the location of the 'throws' keyword, if present.
+  SourceLoc getThrowsLoc() const { return ThrowsLoc; }
+
+  /// Returns true if the function body throws.
+  bool hasThrows() const { return AbstractFunctionDeclBits.Throws; }
+
   // FIXME: Hack that provides names with keyword arguments for accessors.
   DeclName getEffectiveFullName() const;
 
@@ -4827,9 +4889,6 @@ public:
   /// Resolved during type checking
   void setIsOverridden() { AbstractFunctionDeclBits.Overridden = true; }
 
-  /// Whether the function body is 'throws'.
-  bool isBodyThrowing() const;
-
   /// Set information about the foreign error convention used by this
   /// declaration.
   void setForeignErrorConvention(const ForeignErrorConvention &convention);
@@ -4872,7 +4931,6 @@ class FuncDecl final : public AbstractFunctionDecl,
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
-  SourceLoc ThrowsLoc;  // Location of the 'throws' token.
   SourceLoc AccessorKeywordLoc; // Location of the accessor keyword, e.g. 'set'.
 
   TypeLoc FnRetType;
@@ -4897,14 +4955,17 @@ class FuncDecl final : public AbstractFunctionDecl,
                        AddressorKind> OperatorAndAddressorKind;
 
   FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
-           SourceLoc FuncLoc, DeclName Name,
-           SourceLoc NameLoc, SourceLoc ThrowsLoc,
+           SourceLoc FuncLoc,
+           DeclName Name, SourceLoc NameLoc,
+           bool Throws, SourceLoc ThrowsLoc,
            SourceLoc AccessorKeywordLoc,
            unsigned NumParameterLists,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
-    : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc,
+    : AbstractFunctionDecl(DeclKind::Func, Parent,
+                           Name, NameLoc,
+                           Throws, ThrowsLoc,
                            NumParameterLists, GenericParams),
-      StaticLoc(StaticLoc), FuncLoc(FuncLoc), ThrowsLoc(ThrowsLoc),
+      StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       AccessorKeywordLoc(AccessorKeywordLoc),
       OverriddenOrDerivedForOrBehaviorParamDecl(),
       OperatorAndAddressorKind(nullptr, AddressorKind::NotAddressor) {
@@ -4922,11 +4983,12 @@ class FuncDecl final : public AbstractFunctionDecl,
 
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
                               StaticSpellingKind StaticSpelling,
-                              SourceLoc FuncLoc, DeclName Name,
-                              SourceLoc NameLoc, SourceLoc ThrowsLoc,
+                              SourceLoc FuncLoc,
+                              DeclName Name, SourceLoc NameLoc,
+                              bool Throws, SourceLoc ThrowsLoc,
                               SourceLoc AccessorKeywordLoc,
-                              GenericParamList *GenericParams, Type Ty,
-                              unsigned NumParameterLists,
+                              GenericParamList *GenericParams,
+                              unsigned NumParameterLists, Type Ty,
                               DeclContext *Parent,
                               ClangNode ClangN);
 
@@ -4934,19 +4996,22 @@ public:
   /// Factory function only for use by deserialization.
   static FuncDecl *createDeserialized(ASTContext &Context, SourceLoc StaticLoc,
                                       StaticSpellingKind StaticSpelling,
-                                      SourceLoc FuncLoc, DeclName Name,
-                                      SourceLoc NameLoc, SourceLoc ThrowsLoc,
+                                      SourceLoc FuncLoc,
+                                      DeclName Name, SourceLoc NameLoc,
+                                      bool Throws, SourceLoc ThrowsLoc,
                                       SourceLoc AccessorKeywordLoc,
-                                      GenericParamList *GenericParams, Type Ty,
-                                      unsigned NumParameterLists,
+                                      GenericParamList *GenericParams,
+                                      unsigned NumParameterLists, Type Ty,
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
                           StaticSpellingKind StaticSpelling,
-                          SourceLoc FuncLoc, DeclName Name, SourceLoc NameLoc,
-                          SourceLoc ThrowsLoc, SourceLoc AccessorKeywordLoc,
+                          SourceLoc FuncLoc,
+                          DeclName Name, SourceLoc NameLoc,
+                          bool Throws, SourceLoc ThrowsLoc,
+                          SourceLoc AccessorKeywordLoc,
                           GenericParamList *GenericParams,
-                          Type Ty, ArrayRef<ParameterList *> ParameterLists,
+                          ArrayRef<ParameterList *> ParameterLists, Type Ty,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
 
@@ -5009,7 +5074,6 @@ public:
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
-  SourceLoc getThrowsLoc() const { return ThrowsLoc; }
   SourceLoc getAccessorKeywordLoc() const {return AccessorKeywordLoc; }
 
   SourceLoc getStartLoc() const {
@@ -5423,9 +5487,6 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// The location of the '!' or '?' for a failable initializer.
   SourceLoc FailabilityLoc;
 
-  // Location of the 'throws' token.
-  SourceLoc ThrowsLoc;
-
   ParameterList *ParameterLists[2];
 
   /// The type of the initializing constructor.
@@ -5445,9 +5506,10 @@ class ConstructorDecl : public AbstractFunctionDecl {
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
                   OptionalTypeKind Failability, SourceLoc FailabilityLoc,
-                  ParamDecl *selfParam, ParameterList *BodyParams,
+                  bool Throws, SourceLoc ThrowsLoc,
+                  ParamDecl *SelfParam, ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
-                  SourceLoc throwsLoc, DeclContext *Parent);
+                  DeclContext *Parent);
 
   void setParameterLists(ParamDecl *selfParam, ParameterList *bodyParams);
 
@@ -5585,9 +5647,6 @@ public:
 
   /// Retrieve the location of the '!' or '?' in a failable initializer.
   SourceLoc getFailabilityLoc() const { return FailabilityLoc; }
-
-  /// Retrieve the location of the 'throws' keyword, if present.
-  SourceLoc getThrowsLoc() const { return ThrowsLoc; }
 
   /// Whether the implementation of this method is a stub that traps at runtime.
   bool hasStubImplementation() const {

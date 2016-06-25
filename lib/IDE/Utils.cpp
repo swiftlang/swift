@@ -238,9 +238,15 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
                                                &DiagBuf,
                                                /*ShouldOwnClient=*/false);
 
+  // Clang expects this to be like an actual command line. So we need to pass in
+  // "clang" for argv[0].
+  std::vector<const char *> ClangArgList;
+  ClangArgList.push_back("clang");
+  ClangArgList.insert(ClangArgList.end(), ArgList.begin(), ArgList.end());
+
   // Create a new Clang compiler invocation.
   llvm::IntrusiveRefCntPtr<clang::CompilerInvocation> ClangInvok{
-    clang::createInvocationFromCommandLine(ArgList, ClangDiags)
+    clang::createInvocationFromCommandLine(ClangArgList, ClangDiags)
   };
   if (!ClangInvok || ClangDiags->hasErrorOccurred()) {
     for (auto I = DiagBuf.err_begin(), E = DiagBuf.err_end(); I != E; ++I) {

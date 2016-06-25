@@ -25,6 +25,9 @@
 @interface NSNumber : NSObject
 @end
 
+@interface NSNotification : NSObject
+@end
+
 @interface Foo
 
 - (NSString*) foo;
@@ -50,6 +53,9 @@ __attribute__((availability(macosx,introduced=10.51)))
 @interface NSUserNotificationAction : NSObject
 @end
 
+__attribute__((availability(macosx,introduced=10.51)))
+void future_function_should_be_weak();
+
 extern int weak_variable __attribute__((weak_import));
 
 @interface NSError : NSObject
@@ -59,3 +65,6 @@ extern int weak_variable __attribute__((weak_import));
 @property NSDictionary *userInfo;
 
 @end
+
+typedef NSString *__nonnull NSNotificationName
+    __attribute((swift_newtype(struct)));

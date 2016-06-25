@@ -253,7 +253,7 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
                                             llvm::Constant *captureDescriptor,
                                             MetadataKind kind) {
   // Build the fields of the private metadata.
-  SmallVector<llvm::Constant*, 4> fields;
+  SmallVector<llvm::Constant*, 5> fields;
   fields.push_back(dtorFn);
   fields.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
   fields.push_back(llvm::ConstantStruct::get(IGM.TypeMetadataStructTy,
@@ -1386,7 +1386,7 @@ public:
 
   /// Allocate a box of the given type.
   virtual OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType,
+  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
            const llvm::Twine &name) const = 0;
 
   /// Deallocate an uninitialized box.
@@ -1404,7 +1404,7 @@ public:
   EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType,
+  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
            const llvm::Twine &name) const override {
     return OwnedAddress(IGF.getTypeInfo(boxedType).getUndefAddress(),
                         IGF.IGM.RefCountedNull);
@@ -1429,7 +1429,7 @@ public:
   NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType,
+  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
            const llvm::Twine &name) const override {
     auto &ti = IGF.getTypeInfo(boxedType);
     // Use the runtime to allocate a box of the appropriate size.
@@ -1470,14 +1470,15 @@ public:
   {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, const llvm::Twine &name)
+  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+           const llvm::Twine &name)
   const override {
     // Allocate a new object using the layout.
 
-    auto nullCaptureDescriptor
-      = llvm::ConstantPointerNull::get(IGF.IGM.CaptureDescriptorPtrTy);
+    auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
+        boxedInterfaceType.getSwiftRValueType());
     llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name,
-                                                     nullCaptureDescriptor);
+                                                     boxDescriptor);
     Address rawAddr = project(IGF, allocation, boxedType);
     return {rawAddr, allocation};
   }
@@ -1586,9 +1587,13 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
 
 OwnedAddress
 irgen::emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
+                       CanSILBoxType boxInterfaceType,
                        const llvm::Twine &name) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
-  return boxTI.allocate(IGF, boxType->getBoxedAddressType(), name);
+  return boxTI.allocate(IGF,
+                        boxType->getBoxedAddressType(),
+                        boxInterfaceType->getBoxedAddressType(),
+                        name);
 }
 
 void irgen::emitDeallocateBox(IRGenFunction &IGF,

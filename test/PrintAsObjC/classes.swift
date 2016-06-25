@@ -160,6 +160,8 @@ class NotObjC {}
 // CHECK-NEXT: - (void)methodWithReservedParameterNames:(id _Nonnull)long_ protected:(id _Nonnull)protected_;
 // CHECK-NEXT: - (void)honorRenames:(CustomName * _Nonnull)_;
 // CHECK-NEXT: - (Methods * _Nullable __unsafe_unretained)unmanaged:(id _Nonnull __unsafe_unretained)_;
+// CHECK-NEXT: - (void)initAllTheThings SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: - (void)initTheOtherThings SWIFT_METHOD_FAMILY(none);
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -215,6 +217,9 @@ class NotObjC {}
   func honorRenames(_: ClassWithCustomName) {}
 
   func unmanaged(_: Unmanaged<AnyObject>) -> Unmanaged<Methods>? { return nil }
+
+  func initAllTheThings() {}
+  @objc(initTheOtherThings) func setUpOtherThings() {}
 }
 
 typealias AliasForNSRect = NSRect
@@ -228,6 +233,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (NSArray * _Nonnull)emptyArray;
 // CHECK-NEXT: - (NSArray * _Nullable)maybeArray;
 // CHECK-NEXT: - (NSRuncingMode)someEnum;
+// CHECK-NEXT: - (Class <NSCoding> _Nullable)protocolClass;
 // CHECK-NEXT: - (struct _NSZone * _Nullable)zone;
 // CHECK-NEXT: - (CFTypeRef _Nullable)cf:(CFTreeRef _Nonnull)x str:(CFStringRef _Nonnull)str str2:(CFMutableStringRef _Nonnull)str2 obj:(CFAliasForTypeRef _Nonnull)obj;
 // CHECK-NEXT: - (void)appKitInImplementation;
@@ -242,7 +248,8 @@ typealias AliasForNSRect = NSRect
   func emptyArray() -> NSArray { return NSArray() }
   func maybeArray() -> NSArray? { return nil }
 
-  func someEnum() -> NSRuncingMode { return .mince }
+  func someEnum() -> RuncingMode { return .mince }
+  func protocolClass() -> NSCoding.Type? { return nil }
 
   func zone() -> NSZone? { return nil }
 
@@ -369,8 +376,11 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, readonly, strong) Properties * _Nonnull mySelf;
 // CHECK-NEXT: @property (nonatomic, readonly) double pi;
 // CHECK-NEXT: @property (nonatomic) NSInteger computed;
-// CHECK-NEXT: @property (nonatomic, class, strong) Properties * _Nonnull shared;
-// CHECK-NEXT: @property (nonatomic, class, readonly, strong) Properties * _Nonnull sharedRO;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, strong) Properties * _Nonnull shared;)
+// CHECK-NEXT: + (Properties * _Nonnull)shared;
+// CHECK-NEXT: + (void)setShared:(Properties * _Nonnull)newValue;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, strong) Properties * _Nonnull sharedRO;)
+// CHECK-NEXT: + (Properties * _Nonnull)sharedRO;
 // CHECK-NEXT: @property (nonatomic, weak) Properties * _Nullable weakOther;
 // CHECK-NEXT: @property (nonatomic, assign) Properties * _Nonnull unownedOther;
 // CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * _Nonnull unmanagedOther;
@@ -399,14 +409,37 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(CustomName) NSArray<CustomName *> *  _Nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * _Nullable outletCollectionAnyObject;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray<id <NSObject>> * _Nullable outletCollectionProto;
-// CHECK-NEXT: @property (nonatomic, class, readonly) NSInteger staticInt;
-// CHECK-NEXT: @property (nonatomic, class, copy) NSString * _Nonnull staticString;
-// CHECK-NEXT: @property (nonatomic, class, readonly) double staticDouble;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger staticInt;)
+// CHECK-NEXT: + (NSInteger)staticInt;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, copy) NSString * _Nonnull staticString;)
+// CHECK-NEXT: + (NSString * _Nonnull)staticString;
+// CHECK-NEXT: + (void)setStaticString:(NSString * _Nonnull)value;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) double staticDouble;)
+// CHECK-NEXT: + (double)staticDouble;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, copy) NSDictionary<NSString *, NSString *> * _Nonnull staticDictionary;)
+// CHECK-NEXT: + (NSDictionary<NSString *, NSString *> * _Nonnull)staticDictionary;
 // CHECK-NEXT: @property (nonatomic, strong) Properties * _Nullable wobble;
 // CHECK-NEXT: @property (nonatomic, getter=isEnabled, setter=setIsEnabled:) BOOL enabled;
 // CHECK-NEXT: @property (nonatomic, getter=isAnimated) BOOL animated;
 // CHECK-NEXT: @property (nonatomic, getter=register, setter=setRegister:) BOOL register_;
 // CHECK-NEXT: @property (nonatomic, readonly, strong, getter=this) Properties * _Nonnull this_;
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger privateSetter;
+// CHECK-NEXT: @property (nonatomic, readonly, getter=customGetterNameForPrivateSetter) BOOL privateSetterCustomNames;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger privateSetter;)
+// CHECK-NEXT: + (NSInteger)privateSetter;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, getter=customGetterNameForPrivateSetter) BOOL privateSetterCustomNames;)
+// CHECK-NEXT: + (BOOL)customGetterNameForPrivateSetter;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger sharedConstant;)
+// CHECK-NEXT: + (NSInteger)sharedConstant;
+// CHECK-NEXT: @property (nonatomic) NSInteger initContext;
+// CHECK-NEXT: - (NSInteger)initContext SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger initContextRO;
+// CHECK-NEXT: - (NSInteger)initContextRO SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: @property (nonatomic, getter=initGetter) BOOL getterIsInit;
+// CHECK-NEXT: - (BOOL)initGetter SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: @property (nonatomic, setter=initSetter:) BOOL setterIsInit;
+// CHECK-NEXT: - (void)initSetter:(BOOL)newValue SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: @property (nonatomic, copy) NSURL * _Nullable customValueTypeProp;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -475,6 +508,7 @@ public class NonObjCClass { }
   static var staticDouble: Double {
     return 2.0
   }
+  static var staticDictionary: [String: String] { return [:] }
 
   @objc(wobble) var wibble: Properties?
 
@@ -487,6 +521,32 @@ public class NonObjCClass { }
 
   var register: Bool = false
   var this: Properties { return self }
+
+  private(set) var privateSetter = 2
+  private(set) var privateSetterCustomNames: Bool {
+    @objc(customGetterNameForPrivateSetter) get { return true }
+    @objc(customSetterNameForPrivateSetter:) set {}
+  }
+
+  static private(set) var privateSetter = 2
+  class private(set) var privateSetterCustomNames: Bool {
+    @objc(customGetterNameForPrivateSetter) get { return true }
+    @objc(customSetterNameForPrivateSetter:) set {}
+  }
+  static let sharedConstant = 2
+
+  var initContext = 4
+  var initContextRO: Int { return 4 }
+  var getterIsInit: Bool {
+    @objc(initGetter) get { return true }
+    set {}
+  }
+  var setterIsInit: Bool {
+    get { return true }
+    @objc(initSetter:) set {}
+  }
+
+  var customValueTypeProp: URL?
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
@@ -593,7 +653,7 @@ public class NonObjCClass { }
 
   init() throws { }
   init(string: String) throws { }
-  init(fn: Int -> Int) throws { }
+  init(fn: (Int) -> Int) throws { }
 }
 
 @objc class Spoon: Fungible {}

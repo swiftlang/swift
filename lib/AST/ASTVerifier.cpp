@@ -835,6 +835,26 @@ struct ASTNodeBase {};
       checkSameType(lhsTy, S->getSrc()->getType(), "assignment operands");
       verifyCheckedBase(S);
     }
+    
+    void verifyChecked(EnumIsCaseExpr *E) {
+      auto nom = E->getSubExpr()->getType()->getAnyNominal();
+      if (!nom || !isa<EnumDecl>(nom)) {
+        Out << "enum_is_decl operand is not an enum: ";
+        E->getSubExpr()->getType().print(Out);
+        Out << '\n';
+        abort();
+      }
+      
+      if (nom != E->getEnumElement()->getParentEnum()) {
+        Out << "enum_is_decl case is not member of enum:\n";
+        Out << "  case: ";
+        E->getEnumElement()->print(Out);
+        Out << "\n  type: ";
+        E->getSubExpr()->getType().print(Out);
+        Out << '\n';
+        abort();
+      }
+    }
 
     void verifyChecked(TupleExpr *E) {
       const TupleType *exprTy = E->getType()->castTo<TupleType>();
@@ -2196,6 +2216,15 @@ struct ASTNodeBase {};
         abort();
       }
 
+      // If the function has a generic interface type, it should also have a
+      // generic signature.
+      if (AFD->getInterfaceType()->is<GenericFunctionType>() !=
+          (AFD->getGenericSignature() != nullptr)) {
+        Out << "Missing generic signature for generic function\n";
+        AFD->dump(Out);
+        abort();
+      }
+
       // If there is an interface type, it shouldn't have any unresolved
       // dependent member types.
       // FIXME: This is a general property of the type system.
@@ -2226,13 +2255,36 @@ struct ASTNodeBase {};
       // Throwing @objc methods must have a foreign error convention.
       if (AFD->isObjC() &&
           static_cast<bool>(AFD->getForeignErrorConvention())
-            != AFD->isBodyThrowing()) {
-        if (AFD->isBodyThrowing())
+            != AFD->hasThrows()) {
+        if (AFD->hasThrows())
           Out << "@objc method throws but does not have a foreign error "
               << "convention";
         else
           Out << "@objc method has a foreign error convention but does not "
               << "throw";
+        abort();
+      }
+
+      // If a decl has the Throws bit set, the ThrowsLoc should be valid,
+      // and vice versa, unless the decl was imported, de-serialized, or
+      // implicit.
+      if (!AFD->isImplicit() &&
+          isa<SourceFile>(AFD->getModuleScopeContext()) &&
+          (AFD->getThrowsLoc().isValid() != AFD->hasThrows())) {
+        Out << "function 'throws' location does not match 'throws' flag\n";
+        AFD->dump(Out);
+        abort();
+      }
+
+      // If a decl has the Throws bit set, the function type should throw,
+      // and vice versa.
+      auto fnTy = AFD->getType()->castTo<AnyFunctionType>();
+      for (unsigned i = 1, e = AFD->getNaturalArgumentCount(); i != e; ++i)
+        fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+
+      if (AFD->hasThrows() != fnTy->getExtInfo().throws()) {
+        Out << "function 'throws' flag does not match function type\n";
+        AFD->dump(Out);
         abort();
       }
 
@@ -2746,14 +2798,6 @@ struct ASTNodeBase {};
       }
       checkSourceRanges(D->getSourceRange(), Parent,
                         [&]{ D->print(Out); });
-      if (auto *VD = dyn_cast<VarDecl>(D)) {
-        if (!VD->getTypeSourceRangeForDiagnostics().isValid()) {
-          Out << "invalid type source range for variable decl: ";
-          D->print(Out);
-          Out << "\n";
-          abort();
-        }
-      }
     }
 
     /// \brief Verify that the given source ranges is contained within the

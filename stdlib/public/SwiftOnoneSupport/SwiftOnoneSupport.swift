@@ -14,8 +14,6 @@
 import Swift
 
 struct _Prespecialize {
-  class C {}
-
   // Create specializations for the arrays of most
   // popular builtin integer and floating point types.
   static internal func _specializeArrays() {
@@ -145,6 +143,7 @@ struct _Prespecialize {
   }
 
   // Force pre-specialization of Range<Int>
+  @discardableResult
   static internal func _specializeRanges() -> Int {
     let a = [Int](repeating: 1, count: 10)
     var count = 0

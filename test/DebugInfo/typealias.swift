@@ -14,14 +14,15 @@ class DWARF {
 
 func main () {
   // CHECK-DAG: !DILocalVariable(name: "a",{{.*}} type: ![[DIEOFFSET]]
-  var a : DWARF.DIEOffset = 123
+  let a : DWARF.DIEOffset = 123
   markUsed(a)
   // CHECK-DAG: !DILocalVariable(name: "b",{{.*}} type: ![[DIEOFFSET]]
-  var b = DWARF.DIEOffset(456) as DWARF.DIEOffset
+  let b = DWARF.DIEOffset(456) as DWARF.DIEOffset
   markUsed(b)
-  
+
   // CHECK-DAG: !DILocalVariable(name: "c",{{.*}} type: ![[PRIVATETYPE]]
   let c = DWARF.usePrivateType()
+  markUsed(c);
 }
 
 main();

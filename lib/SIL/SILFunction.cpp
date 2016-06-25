@@ -101,7 +101,6 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     InlineStrategy(inlineStrategy),
     Linkage(unsigned(Linkage)),
     KeepAsPublic(false),
-    ForeignBody(false),
     EffectsKindAttr(E) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
@@ -158,6 +157,11 @@ void SILFunction::setDeclContext(Decl *D) {
 
 void SILFunction::setDeclContext(Expr *E) {
   DeclCtx = dyn_cast_or_null<AbstractClosureExpr>(E);
+}
+
+bool SILFunction::hasForeignBody() const {
+  if (!hasClangNode()) return false;
+  return SILDeclRef::isClangGenerated(getClangNode());
 }
 
 void SILFunction::numberValues(llvm::DenseMap<const ValueBase*,

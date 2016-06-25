@@ -18,14 +18,6 @@ extension TestSuite {
   public func addRangeReplaceableSliceTests<
     C : RangeReplaceableCollection,
     CollectionWithEquatableElement : RangeReplaceableCollection
-    where
-    C.SubSequence == C,
-    C.Indices : Collection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
-    CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
-    CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
@@ -39,7 +31,15 @@ extension TestSuite {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
     collectionIsBidirectional: Bool = false
-  ) {
+  ) where
+    C.SubSequence == C,
+    C.Indices : Collection,
+    C.Indices.Iterator.Element == C.Index,
+    C.Indices.Index == C.Index,
+    C.Indices.SubSequence == C.Indices,
+    CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
+    CollectionWithEquatableElement.Iterator.Element : Equatable {
+
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
@@ -65,7 +65,7 @@ extension TestSuite {
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
     //===------------------------------------------------------------------===//
     // removeFirst()
@@ -153,14 +153,6 @@ extension TestSuite {
   public func addRangeReplaceableBidirectionalSliceTests<
     C : protocol<BidirectionalCollection, RangeReplaceableCollection>,
     CollectionWithEquatableElement : protocol<BidirectionalCollection, RangeReplaceableCollection>
-    where
-    C.SubSequence == C,
-    C.Indices : BidirectionalCollection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
-    CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
-    CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
@@ -173,7 +165,15 @@ extension TestSuite {
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
-  ) {
+  ) where
+    C.SubSequence == C,
+    C.Indices : BidirectionalCollection,
+    C.Indices.Iterator.Element == C.Index,
+    C.Indices.Index == C.Index,
+    C.Indices.SubSequence == C.Indices,
+    CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
+    CollectionWithEquatableElement.Iterator.Element : Equatable {
+
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
@@ -210,7 +210,7 @@ extension TestSuite {
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
     //===------------------------------------------------------------------===//
     // removeLast()
@@ -300,14 +300,6 @@ extension TestSuite {
   public func addRangeReplaceableRandomAccessSliceTests<
     C : protocol<RandomAccessCollection, RangeReplaceableCollection>,
     CollectionWithEquatableElement : protocol<RandomAccessCollection, RangeReplaceableCollection>
-    where
-    C.SubSequence == C,
-    C.Indices : RandomAccessCollection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
-    CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
-    CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
@@ -320,7 +312,15 @@ extension TestSuite {
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
-  ) {
+  ) where
+    C.SubSequence == C,
+    C.Indices : RandomAccessCollection,
+    C.Indices.Iterator.Element == C.Index,
+    C.Indices.Index == C.Index,
+    C.Indices.SubSequence == C.Indices,
+    CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
+    CollectionWithEquatableElement.Iterator.Element : Equatable {
+
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
@@ -351,7 +351,7 @@ extension TestSuite {
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
     // No tests yet.
   } // addRangeReplaceableRandomAccessSliceTests

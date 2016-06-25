@@ -437,6 +437,9 @@ void MaterializeForSetEmitter::emit(SILGenFunction &gen) {
   SILValue address;
   SILFunction *callbackFn = nullptr;
   switch (strategy) {
+  case AccessStrategy::BehaviorStorage:
+    llvm_unreachable("materializeForSet should never engage in behavior init");
+  
   case AccessStrategy::Storage:
     address = emitUsingStorage(gen, loc, self, std::move(indicesRV));
     break;

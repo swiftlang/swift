@@ -81,6 +81,7 @@ public class SequenceLog {
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var forEach = TypeIndexed(0)
+  public static var first = TypeIndexed(0)
   public static var dropFirst = TypeIndexed(0)
   public static var dropLast = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
@@ -113,7 +114,6 @@ public class CollectionLog : SequenceLog {
   public static var isEmpty = TypeIndexed(0)
   public static var count = TypeIndexed(0)
   public static var _customIndexOfEquatableElement = TypeIndexed(0)
-  public static var first = TypeIndexed(0)
   public static var advance = TypeIndexed(0)
   public static var advanceLimit = TypeIndexed(0)
   public static var distance = TypeIndexed(0)
@@ -221,7 +221,6 @@ public struct ${Self}<
     return base.underestimatedCount
   }
 
-  @warn_unused_result
   public func map<T>(
     _ transform: @noescape (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
@@ -229,7 +228,6 @@ public struct ${Self}<
     return try base.map(transform)
   }
 
-  @warn_unused_result
   public func filter(
     _ includeElement: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
@@ -242,6 +240,13 @@ public struct ${Self}<
   ) rethrows {
     Log.forEach[selfType] += 1
     try base.forEach(body)
+  }
+  
+  public func first(
+    where predicate: @noescape (Base.Iterator.Element) throws -> Bool
+  ) rethrows -> Base.Iterator.Element? {
+    Log.first[selfType] += 1
+    return try base.first(where: predicate)
   }
 
   public typealias SubSequence = Base.SubSequence
@@ -360,7 +365,6 @@ public struct ${Self}<
     base._failEarlyRangeCheck(range, bounds: bounds)
   }
 
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     Log.successor[selfType] += 1
     return base.index(after: i)
@@ -417,13 +421,11 @@ public struct ${Self}<
     return base.first
   }
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     Log.advance[selfType] += 1
     return base.index(i, offsetBy: n)
   }
 
-  @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -431,7 +433,6 @@ public struct ${Self}<
     return base.index(i, offsetBy: n, limitedBy: limit)
   }
 
-  @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     Log.distance[selfType] += 1
     return base.distance(from: start, to: end)
@@ -462,9 +463,8 @@ public struct ${Self}<
     Log.initRepeating[selfType] += 1
   }
 
-  public init<
-    S : Sequence where S.Iterator.Element == Iterator.Element
-  >(_ elements: S) {
+  public init<S : Sequence>(_ elements: S)
+    where S.Iterator.Element == Iterator.Element {
     self.base = Base(elements)
     Log.initWithSequence[selfType] += 1
   }
@@ -484,9 +484,9 @@ public struct ${Self}<
     base.append(newElement)
   }
 
-  public mutating func append<
-    S : Sequence where S.Iterator.Element == Base.Iterator.Element
-  >(contentsOf newElements: S) {
+  public mutating func append<S : Sequence>(
+    contentsOf newElements: S
+  ) where S.Iterator.Element == Base.Iterator.Element {
     Log.appendContentsOf[selfType] += 1
     base.append(contentsOf: newElements)
   }
@@ -498,9 +498,9 @@ public struct ${Self}<
     base.insert(newElement, at: i)
   }
 
-  public mutating func insert<
-    C : Collection where C.Iterator.Element == Base.Iterator.Element
-  >(contentsOf newElements: C, at i: Index) {
+  public mutating func insert<C : Collection>(
+    contentsOf newElements: C, at i: Index
+  ) where C.Iterator.Element == Base.Iterator.Element {
     Log.insertContentsOf[selfType] += 1
     base.insert(contentsOf: newElements, at: i)
   }
@@ -533,11 +533,9 @@ public struct ${Self}<
     base.removeSubrange(bounds)
   }
 
-  public mutating func replaceSubrange<
-    C : Collection where C.Iterator.Element == Base.Iterator.Element
-  >(
+  public mutating func replaceSubrange<C : Collection>(
     _ bounds: Range<Index>, with newElements: C
-  ) {
+  ) where C.Iterator.Element == Base.Iterator.Element {
     Log.replaceSubrange[selfType] += 1
     base.replaceSubrange(bounds, with: newElements)
   }
@@ -548,7 +546,6 @@ public struct ${Self}<
   }
 %     end
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     BidirectionalCollectionLog.predecessor[selfType] += 1
     return base.index(before: i)
@@ -572,36 +569,34 @@ public struct ${Self}<
 // Custom assertions
 //===----------------------------------------------------------------------===//
 
-public func expectCustomizable<
-  T : Wrapper where
-  T : LoggingType,
-  T.Base : Wrapper, T.Base : LoggingType,
-  T.Log == T.Base.Log
->(_: T, _ counters: TypeIndexed<Int>,
+public func expectCustomizable<T : Wrapper>(
+  _: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line
-) {
+) where
+  T : LoggingType,
+  T.Base : Wrapper, T.Base : LoggingType,
+  T.Log == T.Base.Log {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
   expectNotEqual(0, counters[T.self], message(), stackTrace: newTrace)
   expectEqual(
     counters[T.self], counters[T.Base.self], message(), stackTrace: newTrace)
 }
 
-public func expectNotCustomizable<
-  T : Wrapper where
-  T : LoggingType,
-  T.Base : Wrapper, T.Base : LoggingType,
-  T.Log == T.Base.Log
->(_: T, _ counters: TypeIndexed<Int>,
+public func expectNotCustomizable<T : Wrapper>(
+  _: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line
-) {
+) where
+  T : LoggingType,
+  T.Base : Wrapper, T.Base : LoggingType,
+  T.Log == T.Base.Log {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
   expectNotEqual(0, counters[T.self], message(), stackTrace: newTrace)
   expectEqual(0, counters[T.Base.self], message(), stackTrace: newTrace)

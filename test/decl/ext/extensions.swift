@@ -49,8 +49,8 @@ extension S1.NestedStruct {} // no-error
 struct S1_2 {
   // expected-error @+4 {{type member may not be named 'Type', since it would conflict with the 'foo.Type' expression}}
   // expected-error @+3 {{type member may not be named 'Type', since it would conflict with the 'foo.Type' expression}}
-  // expected-note @+2 {{backticks can escape this name if it is important to use}} {{8-12=`Type`}}
-  // expected-note @+1 {{backticks can escape this name if it is important to use}} {{8-12=`Type`}}
+  // expected-note @+2 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
+  // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
   enum Type {}
 }
 struct S1_3 {

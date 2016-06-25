@@ -168,18 +168,56 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 
 DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
   switch (expr->getLiteralKind()) {
-    case ObjectLiteralExpr::colorLiteral: {
-      return DeclName(Context, Context.Id_init,
-                      { Context.getIdentifier("red"),
-                        Context.getIdentifier("green"),
-                        Context.getIdentifier("blue"),
-                        Context.getIdentifier("alpha") });
-    }
-    case ObjectLiteralExpr::imageLiteral:
-    case ObjectLiteralExpr::fileLiteral: {
-      return DeclName(Context, Context.Id_init,
-                      { Context.getIdentifier("resourceName") });
-    }
+  case ObjectLiteralExpr::colorLiteral: {
+    return DeclName(Context, Context.Id_init,
+                    { Context.getIdentifier("colorLiteralRed"),
+                      Context.getIdentifier("green"),
+                      Context.getIdentifier("blue"),
+                      Context.getIdentifier("alpha") });
+  }
+  case ObjectLiteralExpr::imageLiteral: {
+    return DeclName(Context, Context.Id_init,
+                    { Context.getIdentifier("imageLiteralResourceName") });
+  }
+  case ObjectLiteralExpr::fileLiteral: {
+    return DeclName(Context, Context.Id_init,
+            { Context.getIdentifier("fileReferenceLiteralResourceName") });
+  }
+  }
+  llvm_unreachable("unknown literal constructor");
+}
+
+/// Return an idealized form of the parameter type of the given
+/// object-literal initializer.  This removes references to the protocol
+/// name from the first argument label, which would be otherwise be
+/// redundant when writing out the object-literal syntax:
+///
+///   #fileLiteral(fileReferenceLiteralResourceName: "hello.jpg")
+///
+/// Doing this allows us to preserve a nicer (and source-compatible)
+/// literal syntax while still giving the initializer a semantically
+/// unambiguous name.
+Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
+                                                ConstructorDecl *ctor) {
+  Type argType = ctor->getArgumentType();
+  auto argTuple = argType->getAs<TupleType>();
+  if (!argTuple) return argType;
+
+  auto replace = [&](StringRef replacement) -> Type {
+    SmallVector<TupleTypeElt, 4> elements;
+    elements.append(argTuple->getElements().begin(),
+                    argTuple->getElements().end());
+    elements[0] = TupleTypeElt(elements[0].getType(),
+                               Context.getIdentifier(replacement));
+    return TupleType::get(elements, Context);
+  };
+
+  switch (expr->getLiteralKind()) {
+  case ObjectLiteralExpr::colorLiteral:
+    return replace("red");
+  case ObjectLiteralExpr::fileLiteral:
+  case ObjectLiteralExpr::imageLiteral:
+    return replace("resourceName");
   }
   llvm_unreachable("unknown literal constructor");
 }
@@ -498,7 +536,8 @@ void swift::typeCheckExternalDefinitions(SourceFile &SF) {
 
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 OptionSet<TypeCheckingFlags> Options,
-                                unsigned StartElem) {
+                                unsigned StartElem,
+                                unsigned WarnLongFunctionBodies) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
@@ -516,6 +555,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     TypeChecker TC(Ctx);
     SharedTimer timer("Type checking / Semantic analysis");
 
+    TC.setWarnLongFunctionBodies(WarnLongFunctionBodies);
     if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
       TC.enableDebugTimeFunctionBodies();
 
@@ -703,13 +743,28 @@ Type swift::lookUpTypeInContext(DeclContext *DC, StringRef Name) {
   }
 }
 
-static Optional<Type> getTypeOfCompletionContextExpr(TypeChecker &TC,
-                                                     DeclContext *DC,
-                                                     Expr *&parsedExpr) {
+static Optional<Type> getTypeOfCompletionContextExpr(
+                        TypeChecker &TC,
+                        DeclContext *DC,
+                        CompletionTypeCheckKind kind,
+                        Expr *&parsedExpr,
+                        ConcreteDeclRef &referencedDecl) {
+  switch (kind) {
+  case CompletionTypeCheckKind::Normal:
+    // Handle below.
+    break;
+
+  case CompletionTypeCheckKind::ObjCKeyPath:
+    referencedDecl = nullptr;
+    if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(parsedExpr))
+      return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResulType=*/true);
+
+    return None;
+  }
 
   CanType originalType = parsedExpr->getType().getCanonicalTypeOrNull();
   if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
-                                   FreeTypeVariableBinding::GenericParameters))
+                 referencedDecl, FreeTypeVariableBinding::GenericParameters))
     return T;
 
   // Try to recover if we've made any progress.
@@ -724,19 +779,24 @@ static Optional<Type> getTypeOfCompletionContextExpr(TypeChecker &TC,
 
 /// \brief Return the type of an expression parsed during code completion, or
 /// a null \c Type on error.
-Optional<Type> swift::getTypeOfCompletionContextExpr(ASTContext &Ctx,
-                                                     DeclContext *DC,
-                                                     Expr *&parsedExpr) {
+Optional<Type> swift::getTypeOfCompletionContextExpr(
+                        ASTContext &Ctx,
+                        DeclContext *DC,
+                        CompletionTypeCheckKind kind,
+                        Expr *&parsedExpr,
+                        ConcreteDeclRef &referencedDecl) {
 
   if (Ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker *>(Ctx.getLazyResolver());
-    return ::getTypeOfCompletionContextExpr(*TC, DC, parsedExpr);
+    return ::getTypeOfCompletionContextExpr(*TC, DC, kind, parsedExpr,
+                                            referencedDecl);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine diags(Ctx.SourceMgr);
     TypeChecker TC(Ctx, diags);
     // Try to solve for the actual type of the expression.
-    return ::getTypeOfCompletionContextExpr(TC, DC, parsedExpr);
+    return ::getTypeOfCompletionContextExpr(TC, DC, kind, parsedExpr,
+                                            referencedDecl);
   }
 }
 

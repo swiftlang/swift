@@ -25,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -360,14 +361,15 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
 
   // Check 'Tok', return false if ':' or '=' cannot be found.
-  // Complain if '=' is found and suggest replacing it with ':'.
+  // Complain if '=' is found and suggest replacing it with ": ".
   auto findAttrValueDelimiter = [&]() -> bool {
     if (!Tok.is(tok::colon)) {
       if (!Tok.is(tok::equal))
         return false;
-      else
-        diagnose(Tok.getLoc(), diag::replace_equal_with_colon_for_value)
-          .fixItReplace(Tok.getLoc(), ":");
+
+      bool wantSpace = (Tok.getRange().getEnd() == peekToken().getLoc());
+      diagnose(Tok.getLoc(), diag::replace_equal_with_colon_for_value)
+        .fixItReplace(Tok.getLoc(), wantSpace ? ": " : ":");
     }
     return true;
   };
@@ -886,8 +888,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           Message = Value.getValue();
         } else {
           ParsedDeclName parsedName = parseDeclName(Value.getValue());
-          if (!parsedName || parsedName.isInstanceMember() ||
-              parsedName.isPropertyAccessor()) {
+          if (!parsedName) {
             diagnose(Loc, diag::attr_availability_invalid_renamed, AttrName);
             DiscardAttribute = true;
             continue;
@@ -1086,119 +1087,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     Attributes.add(attr);
     break;
   }
-
-  case DAK_WarnUnusedResult: {
-    // @warn_unused_result with no arguments.
-    if (Tok.isNot(tok::l_paren)) {
-      auto attr = new (Context) WarnUnusedResultAttr(AtLoc, Loc, false);
-      Attributes.add(attr);
-      break;
-    }
-
-    // @warn_unused_result with arguments.
-    StringRef message;
-    StringRef mutableVariant;
-    SourceLoc lParenLoc = consumeToken();
-    bool invalid = false;
-    do {
-      // If we see a closing parenthesis,
-      if (Tok.is(tok::r_paren))
-        break;
-
-      if (Tok.isNot(tok::identifier)) {
-        diagnose(Tok, diag::attr_warn_unused_result_expected_name);
-        if (Tok.isNot(tok::r_paren))
-          skipUntil(tok::r_paren);
-        invalid = true;
-        break;
-      }
-
-      // Consume the identifier.
-      StringRef name = Tok.getText();
-      SourceLoc nameLoc = consumeToken();
-
-      // Figure out which parameter it is.
-      enum class KnownParameter {
-        Message,
-        MutableVariant
-       };
-
-      Optional<KnownParameter> known
-        = llvm::StringSwitch<Optional<KnownParameter>>(name)
-            .Case("message", KnownParameter::Message)
-            .Case("mutable_variant", KnownParameter::MutableVariant)
-            .Default(None);
-
-      // If we don't have the ':', try the deprecated '='. If that doesn't
-      // exist neither, complain.
-      if (findAttrValueDelimiter()) {
-        consumeToken();
-      } else {
-        if (known)
-          diagnose(Tok, diag::attr_warn_unused_result_expected_colon, name);
-        else
-          diagnose(Tok, diag::attr_warn_unused_result_unknown_parameter, name);
-        continue;
-      }
-
-      // If we don't have a string, complain.
-      if (Tok.isNot(tok::string_literal)) {
-        diagnose(Tok, diag::attr_warn_unused_result_expected_string, name);
-        if (Tok.isNot(tok::r_paren))
-          skipUntil(tok::r_paren);
-        invalid = true;
-        break;
-      }
-
-      // Dig out the string.
-      auto string = getStringLiteralIfNotInterpolated(*this, nameLoc, Tok,
-                                                      name.str());
-      consumeToken(tok::string_literal);
-      if (!string) {
-        continue;
-      }
-
-      if (!known) {
-        diagnose(nameLoc, diag::attr_warn_unused_result_unknown_parameter,
-                 name);
-        continue;
-      }
-
-      StringRef *whichParam;
-      switch (*known) {
-      case KnownParameter::Message:
-        whichParam = &message;
-        break; 
-
-      case KnownParameter::MutableVariant:
-        whichParam = &mutableVariant;
-        break;
-      }
-
-      if (!whichParam->empty()) {
-        diagnose(nameLoc, diag::attr_warn_unused_result_duplicate_parameter, 
-                 name);
-      }
-
-      *whichParam = *string;
-    } while (consumeIf(tok::comma));
-
-    // Parse the closing ')'.
-    SourceLoc rParenLoc;
-    if (Tok.isNot(tok::r_paren)) {
-      parseMatchingToken(tok::r_paren, rParenLoc,
-                         diag::attr_warn_unused_result_expected_rparen,
-                         lParenLoc);
-    }
-    if (Tok.is(tok::r_paren)) {
-      rParenLoc = consumeToken();
-    }
-
-    Attributes.add(new (Context) WarnUnusedResultAttr(AtLoc, Loc, lParenLoc,
-                                                      message, mutableVariant,
-                                                      rParenLoc, false));
-    break;
-    }
 
   case DAK_Swift3Migration: {
     if (Tok.isNot(tok::l_paren)) {
@@ -1458,6 +1346,41 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     DK = DAK_Available;
     diagnose(Tok, diag::attr_availability_renamed)
         .fixItReplace(Tok.getLoc(), "available");
+  }
+
+
+  if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
+    // The behavior created by @warn_unused_result is now the default. Emit a
+    // Fix-It to remove.
+    SourceLoc attrLoc = consumeToken();
+
+    // @warn_unused_result with no arguments.
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(AtLoc, diag::attr_warn_unused_result_removed)
+        .fixItRemove(SourceRange(AtLoc, attrLoc));
+
+      return false;
+    }
+
+    // @warn_unused_result with arguments.
+    SourceLoc lParenLoc = consumeToken();
+    skipUntil(tok::r_paren);
+
+    // Parse the closing ')'.
+    SourceLoc rParenLoc;
+    if (Tok.isNot(tok::r_paren)) {
+      parseMatchingToken(tok::r_paren, rParenLoc,
+                         diag::attr_warn_unused_result_expected_rparen,
+                         lParenLoc);
+    }
+    if (Tok.is(tok::r_paren)) {
+      rParenLoc = consumeToken();
+    }
+
+    diagnose(AtLoc, diag::attr_warn_unused_result_removed)
+      .fixItRemove(SourceRange(AtLoc, rParenLoc));
+
+    return false;
   }
 
   if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK))
@@ -2175,7 +2098,12 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       break;
     }
     case tok::kw_typealias:
-      DeclResult = parseDeclTypeAlias(Flags, Attributes);
+      if (Flags.contains(PD_InProtocol) &&
+          !Context.LangOpts.EnableProtocolTypealiases) {
+        DeclResult = parseDeclAssociatedType(Flags, Attributes);
+      } else {
+        DeclResult = parseDeclTypeAlias(Flags, Attributes);
+      }
       Status = DeclResult;
       break;
     case tok::kw_associatedtype:
@@ -2291,9 +2219,11 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
   }
 
   if (auto SF = CurDeclContext->getParentSourceFile()) {
-    for (auto Attr : Attributes) {
-      if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
-        SF->AttrsRequiringFoundation.insert({Attr->getKind(), Attr});
+    if (!getScopeInfo().isInactiveConfigBlock()) {
+      for (auto Attr : Attributes) {
+        if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
+          SF->AttrsRequiringFoundation.insert({Attr->getKind(), Attr});
+      }
     }
   }
 
@@ -2425,6 +2355,8 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
       break;
     default:
       diagnose(Tok, diag::expected_identifier_in_decl, "import");
+      diagnose(Tok, diag::keyword_cant_be_identifier, Tok.getText());
+      diagnose(Tok, diag::backticks_to_escape);
       return nullptr;
     }
     KindLoc = consumeToken();
@@ -2519,6 +2451,28 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
 
       // Record the location of the 'class' keyword.
       *classRequirementLoc = classLoc;
+      continue;
+    }
+
+    // Provide a nice error if protocol composition is used.
+    if (Tok.is(tok::kw_protocol) && startsWithLess(peekToken())) {
+      auto compositionResult = parseTypeComposition();
+      Status |= compositionResult;
+      if (auto composition = compositionResult.getPtrOrNull()) {
+        // Record the protocols inside the composition.
+        Inherited.append(composition->getProtocols().begin(),
+                         composition->getProtocols().end());
+
+        // Provide fixits to remove the composition, leaving the types intact.
+        auto angleRange = composition->getAngleBrackets();
+        diagnose(composition->getProtocolLoc(),
+                 diag::disallowed_protocol_composition)
+            .fixItRemove({composition->getProtocolLoc(), angleRange.Start})
+            .fixItRemove(startsWithGreater(L->getTokenAt(angleRange.End))
+                             ? angleRange.End
+                             : SourceLoc());
+      }
+
       continue;
     }
 
@@ -2926,10 +2880,10 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 ///
 /// \verbatim
 ///   decl-typealias:
-///     'typealias' identifier generic-params? '=' type
+///     'typealias' identifier generic-params? '=' type requirement-clause?
 /// \endverbatim
-ParserResult<TypeDecl> Parser::parseDeclTypeAlias(Parser::ParseDeclOptions Flags,
-                                                  DeclAttributes &Attributes) {
+ParserResult<TypeDecl> Parser::
+parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   ParserPosition startPosition = getParserPosition();
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   Identifier Id;
@@ -2972,20 +2926,37 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(Parser::ParseDeclOptions Flags
     return parseDeclAssociatedType(Flags, Attributes);
   }
   
-  if (Tok.is(tok::colon)) {
-    // It is a common mistake to write "typealias A : Int" instead of = Int.
-    // Recognize this and produce a fixit.
-    diagnose(Tok, diag::expected_equal_in_typealias)
-        .fixItReplace(Tok.getLoc(), "=");
-    consumeToken(tok::colon);
-  } else if (parseToken(tok::equal, diag::expected_equal_in_typealias)) {
+  ParserResult<TypeRepr> UnderlyingTy;
+
+  if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
+    if (Tok.is(tok::colon)) {
+      // It is a common mistake to write "typealias A : Int" instead of = Int.
+      // Recognize this and produce a fixit.
+      diagnose(Tok, diag::expected_equal_in_typealias)
+          .fixItReplace(Tok.getLoc(), "=");
+      consumeToken(tok::colon);
+    } else {
+      consumeToken(tok::equal);
+    }
+
+    UnderlyingTy = parseType(diag::expected_type_in_typealias);
+    Status |= UnderlyingTy;
+    if (UnderlyingTy.isNull())
+      return Status;
+  }
+
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(genericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+  }
+
+  if (UnderlyingTy.isNull()) {
+    diagnose(Tok, diag::expected_equal_in_typealias);
     Status.setIsParseError();
     return Status;
   }
-  ParserResult<TypeRepr> UnderlyingTy = parseType(diag::expected_type_in_typealias);
-  Status |= UnderlyingTy;
-  if (UnderlyingTy.isNull())
-    return Status;
 
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
                                           UnderlyingTy.getPtrOrNull(),
@@ -3017,7 +2988,10 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   // ask us to fix up leftover Swift 2 code intending to be an associatedtype.
   if (Tok.is(tok::kw_typealias)) {
     AssociatedTypeLoc = consumeToken(tok::kw_typealias);
-    diagnose(AssociatedTypeLoc, diag::typealias_inside_protocol_without_type)
+    auto diagnosis = Context.LangOpts.EnableProtocolTypealiases ?
+      diag::typealias_inside_protocol_without_type :
+      diag::typealias_in_protocol_deprecated;
+    diagnose(AssociatedTypeLoc, diagnosis)
         .fixItReplace(AssociatedTypeLoc, "associatedtype");
   } else {
     AssociatedTypeLoc = consumeToken(tok::kw_associatedtype);
@@ -3055,6 +3029,16 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
       return Status;
   }
   
+  // Parse a 'where' clause if present. These are not supported, but we will
+  // get better QoI this way.
+  if (Tok.is(tok::kw_where)) {
+    GenericParamList *unused = nullptr;
+    auto whereStatus = parseFreestandingGenericWhereClause(
+        unused, WhereClauseKind::AssociatedType);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+  }
+
   if (!Flags.contains(PD_InProtocol)) {
     diagnose(AssociatedTypeLoc, diag::associatedtype_outside_protocol)
         .fixItReplace(AssociatedTypeLoc, "typealias");
@@ -3118,7 +3102,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   
   // Add the implicit 'self' to Params, if needed.
   if (Flags & Parser::PD_HasContainerType)
-    Params.push_back(ParameterList::createSelf(DeclLoc, P->CurDeclContext));
+    Params.push_back(ParameterList::createUnboundSelf(DeclLoc, P->CurDeclContext));
   
   // Add the "(value)" and subscript indices parameter clause.
   Params.push_back(ValueArg);
@@ -3197,10 +3181,11 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
 
   // Start the function.
   auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
-                             /* FIXME*/DeclLoc, Identifier(),
-                             DeclLoc, SourceLoc(), AccessorKeywordLoc,
+                             /*FIXME FuncLoc=*/DeclLoc, Identifier(),
+                             /*NameLoc=*/DeclLoc, /*Throws=*/false,
+                             /*ThrowsLoc=*/SourceLoc(), AccessorKeywordLoc,
                              /*GenericParams=*/nullptr,
-                             Type(), Params, ReturnType, P->CurDeclContext);
+                             Params, Type(), ReturnType, P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
   // default to mutating.  get/address default to
@@ -4235,7 +4220,10 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
     
     // Parse a behavior block if present.
-    if (consumeIf(tok::kw___behavior)) {
+    if (Context.LangOpts.EnableExperimentalPropertyBehaviors
+        && Tok.is(tok::identifier)
+        && Tok.getRawText().equals("__behavior")) {
+      consumeToken(tok::identifier);
       auto type = parseType(diag::expected_behavior_name,
                             /*handle completion*/ true);
       if (type.isParseError())
@@ -4404,7 +4392,8 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 /// \verbatim
 ///   decl-func:
 ///     attribute-list? ('static' | 'class')? 'mutating'? 'func' 
-///               any-identifier generic-params? func-signature stmt-brace?
+///               any-identifier generic-params? func-signature where-clause?
+///               stmt-brace?
 /// \endverbatim
 ///
 /// \note The caller of this method must ensure that the next token is 'func'.
@@ -4457,6 +4446,34 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                                 diag::invalid_diagnostic);
     if (NameStatus.isError())
       return nullptr;
+  } else {
+    // We parsed an identifier for the function declaration. If we see another
+    // identifier, it might've been a single identifier that got broken by a
+    // space or newline accidentally.
+    if (Tok.isIdentifierOrUnderscore() && SimpleName.str().back() != '<') {
+      diagnose(Tok.getLoc(), diag::repeated_identifier, "function");
+
+      SourceRange DoubleIdentifierRange(NameLoc, Tok.getLoc());
+
+      // Provide two fix-its: a direct concatenation of the two identifiers
+      // and a camel-cased version.
+
+      auto DirectConcatenation = NameTok.getText().str() + Tok.getText().str();
+
+      diagnose(Tok.getLoc(), diag::join_identifiers)
+        .fixItReplace(DoubleIdentifierRange, DirectConcatenation);
+
+      SmallString<8> CapitalizedScratch;
+      auto Capitalized = camel_case::toSentencecase(Tok.getText(),
+                                                    CapitalizedScratch);
+      auto CamelCaseConcatenation = NameTok.getText().str() + Capitalized.str();
+
+      if (DirectConcatenation != CamelCaseConcatenation)
+        diagnose(Tok.getLoc(), diag::join_identifiers_camel_case)
+          .fixItReplace(DoubleIdentifierRange, CamelCaseConcatenation);
+
+      consumeToken();
+    }
   }
 
   DebuggerContextChange DCC(*this, SimpleName, DeclKind::Func);
@@ -4509,7 +4526,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // "(int)->int" on FooTy into "(self: FooTy.Type)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
   if (HasContainerType)
-    BodyParams.push_back(ParameterList::createSelf(NameLoc, CurDeclContext));
+    BodyParams.push_back(ParameterList::createUnboundSelf(NameLoc, CurDeclContext));
 
   DefaultArgumentInfo DefaultArgs(HasContainerType);
   TypeRepr *FuncRetTy = nullptr;
@@ -4523,6 +4540,13 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
     return SignatureStatus;
+  }
+  
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
   }
   
   // Protocol method arguments may not have default values.
@@ -4545,8 +4569,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
     // Create the decl for the func and add it to the parent scope.
     FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
-                          FuncLoc, FullName, NameLoc, throwsLoc, SourceLoc(),
-                          GenericParams, Type(), BodyParams, FuncRetTy,
+                          FuncLoc, FullName, NameLoc,
+                          /*Throws=*/throwsLoc.isValid(), throwsLoc,
+                          /*AccessorKeywordLoc=*/SourceLoc(),
+                          GenericParams, BodyParams, Type(), FuncRetTy,
                           CurDeclContext);
     
     // Add the attributes here so if we need them while parsing the body
@@ -4654,7 +4680,7 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
 /// \verbatim
 ///   decl-enum:
 ///      'enum' attribute-list identifier generic-params? inheritance?
-///          '{' decl-enum-body '}'
+///          where-clause? '{' decl-enum-body '}'
 ///   decl-enum-body:
 ///      decl*
 /// \endverbatim
@@ -4697,6 +4723,14 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     UD->setInherited(Context.AllocateCopy(Inherited));
   }
+  
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+    UD->setGenericParams(GenericParams);
+  }
 
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
@@ -4716,12 +4750,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   UD->setBraces({LBLoc, RBLoc});
 
   addToScope(UD);
-
-  if (Flags & PD_DisallowNominalTypes) {
-    diagnose(EnumLoc, diag::disallowed_type);
-    Status.setIsParseError();
-    UD->setInvalid();
-  }
 
   return DCC.fixupParserResult(Status, UD);
 }
@@ -4934,7 +4962,7 @@ bool Parser::parseNominalDeclMembers(SourceLoc LBLoc, SourceLoc &RBLoc,
 /// \verbatim
 ///   decl-struct:
 ///      'struct' attribute-list identifier generic-params? inheritance?
-///          '{' decl-struct-body '}
+///          where-clause? '{' decl-struct-body '}
 ///   decl-struct-body:
 ///      decl*
 /// \endverbatim
@@ -4980,6 +5008,14 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     SD->setInherited(Context.AllocateCopy(Inherited));
   }
+  
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+    SD->setGenericParams(GenericParams);
+  }
 
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
@@ -5001,12 +5037,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
 
   addToScope(SD);
 
-  if (Flags & PD_DisallowNominalTypes) {
-    diagnose(StructLoc, diag::disallowed_type);
-    Status.setIsParseError();
-    SD->setInvalid();
-  }
-
   return DCC.fixupParserResult(Status, SD);
 }
 
@@ -5015,7 +5045,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
 /// \verbatim
 ///   decl-class:
 ///      'class' attribute-list identifier generic-params? inheritance?
-///          '{' decl-class-body '}
+///          where-clause? '{' decl-class-body '}
 ///   decl-class-body:
 ///      decl*
 /// \endverbatim
@@ -5061,6 +5091,14 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
     CD->setInherited(Context.AllocateCopy(Inherited));
   }
 
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+    CD->setGenericParams(GenericParams);
+  }
+
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
     LBLoc = PreviousLoc;
@@ -5085,12 +5123,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   CD->setBraces({LBLoc, RBLoc});
 
   addToScope(CD);
-
-  if (Flags & PD_DisallowNominalTypes) {
-    diagnose(ClassLoc, diag::disallowed_type);
-    Status.setIsParseError();
-    CD->setInvalid();
-  }
 
   return DCC.fixupParserResult(Status, CD);
 }
@@ -5144,6 +5176,16 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Status |= parseInheritance(InheritedProtocols, &classRequirementLoc);
   }
 
+  // Parse a 'where' clause if present. These are not supported, but we will
+  // get better QoI this way.
+  if (Tok.is(tok::kw_where)) {
+    GenericParamList *unused = nullptr;
+    auto whereStatus = parseFreestandingGenericWhereClause(
+        unused, WhereClauseKind::Protocol);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+  }
+
   ProtocolDecl *Proto
     = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,
                                  ProtocolName,
@@ -5170,7 +5212,6 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     } else {
       // Parse the members.
       ParseDeclOptions Options(PD_HasContainerType |
-                               PD_DisallowNominalTypes |
                                PD_DisallowInit |
                                PD_InProtocol);
       if (parseNominalDeclMembers(LBraceLoc, RBraceLoc,
@@ -5183,16 +5224,6 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Proto->setBraces({LBraceLoc, RBraceLoc});
   }
   
-  if (Flags & PD_DisallowNominalTypes) {
-    diagnose(ProtocolLoc, diag::disallowed_type);
-    Status.setIsParseError();
-    Proto->setInvalid();
-  } else if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
-    diagnose(ProtocolLoc, diag::decl_inner_scope);
-    Status.setIsParseError();
-    Proto->setInvalid();
-  }
-
   return DCC.fixupParserResult(Status, Proto);
 }
 
@@ -5344,13 +5375,21 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));
   }
 
-  auto *SelfDecl = ParamDecl::createSelf(ConstructorLoc, CurDeclContext);
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+  }
+  
+  auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failability, FailabilityLoc,
+                                           throwsLoc.isValid(), throwsLoc,
                                            SelfDecl, BodyPattern,
-                                           GenericParams, throwsLoc,
+                                           GenericParams,
                                            CurDeclContext);
   
   CtorInitializerKind initKind = CtorInitializerKind::Designated;
@@ -5439,7 +5478,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  auto *SelfDecl = ParamDecl::createSelf(DestructorLoc, CurDeclContext);
+  auto *SelfDecl = ParamDecl::createUnboundSelf(DestructorLoc, CurDeclContext);
 
   Scope S(this, ScopeKind::DestructorBody);
   auto *DD = new (Context) DestructorDecl(Context.Id_deinit, DestructorLoc,

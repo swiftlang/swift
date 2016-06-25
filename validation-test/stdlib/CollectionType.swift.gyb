@@ -1,21 +1,16 @@
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/Collection.swift -D test_path="%S"
-// RUN: %S/../../utils/line-directive %t/Collection.swift -- %target-build-swift %t/Collection.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/Collection.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 // <rdar://problem/24357067> The compiler never finishes compiling validation-test/stdlib/CollectionType.swift.gyb in -O
 // REQUIRES: swift_test_mode_optimize_none
 
-%{
-import gyb
-from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
-}%
+% import os.path
+% import gyb
+% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
 
 import StdlibUnittest
 import StdlibCollectionUnittest
-import SwiftPrivate
 
 
 var CollectionTypeTests = TestSuite("Collection")
@@ -44,7 +39,6 @@ struct CollectionWithDefaultUnderestimatedCount : Collection {
       position: _count, startIndex: 0, endIndex: _count)
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,
@@ -88,7 +82,6 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
     return _data.endIndex
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return _data.index(after: i)
   }
@@ -112,7 +105,7 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
   }
 
   func filter(
-    @noescape _ transform: (Element) throws -> Bool
+    _ transform: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
     MinimalCollectionWithCustomFilter.timesFilterWasCalled += 1
     return try _data.filter(transform)
@@ -126,7 +119,7 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
 
 func callStaticCollectionFilter(
   _ sequence: MinimalCollectionWithDefaultFilter<OpaqueValue<Int>>,
-  @noescape includeElement: (OpaqueValue<Int>) -> Bool
+  includeElement: @noescape (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(includeElement)
   expectType([OpaqueValue<Int>].self, &result)
@@ -135,7 +128,7 @@ func callStaticCollectionFilter(
 
 func callStaticCollectionFilter(
   _ sequence: MinimalCollectionWithCustomFilter<OpaqueValue<Int>>,
-  @noescape includeElement: (OpaqueValue<Int>) -> Bool
+  includeElement: @noescape (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(includeElement)
   expectType([OpaqueValue<Int>].self, &result)
@@ -144,7 +137,7 @@ func callStaticCollectionFilter(
 
 func callGenericCollectionFilter<S : Collection>(
   _ sequence: S,
-  @noescape includeElement: (S.Iterator.Element) -> Bool
+  includeElement: @noescape (S.Iterator.Element) -> Bool
 ) -> [S.Iterator.Element] {
   var result = sequence.filter(includeElement)
   expectType(Array<S.Iterator.Element>.self, &result)
@@ -225,7 +218,6 @@ struct MinimalCollectionWith${Implementation}Map<Element>
     return _data.endIndex
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return _data.index(after: i)
   }
@@ -249,7 +241,7 @@ struct MinimalCollectionWith${Implementation}Map<Element>
   }
 
   func map<T>(
-    @noescape _ transform: (Element) throws -> T
+    _ transform: @noescape (Element) throws -> T
   ) rethrows -> [T] {
     MinimalCollectionWithCustomMap.timesMapWasCalled += 1
     return try _data.map(transform)
@@ -263,7 +255,7 @@ struct MinimalCollectionWith${Implementation}Map<Element>
 
 func callStaticCollectionMap<T>(
   _ collection: MinimalCollectionWithDefaultMap<OpaqueValue<Int>>,
-  @noescape transform: (OpaqueValue<Int>) -> T
+  transform: @noescape (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -272,7 +264,7 @@ func callStaticCollectionMap<T>(
 
 func callStaticCollectionMap<T>(
   _ collection: MinimalCollectionWithCustomMap<OpaqueValue<Int>>,
-  @noescape transform: (OpaqueValue<Int>) -> T
+  transform: @noescape (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -281,7 +273,7 @@ func callStaticCollectionMap<T>(
 
 func callGenericCollectionMap<C : Collection, T>(
   _ collection: C,
-  @noescape transform: (C.Iterator.Element) -> T
+  transform: @noescape (C.Iterator.Element) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -345,7 +337,7 @@ CollectionTypeTests.test(
 // flatMap()
 //===----------------------------------------------------------------------===//
 
-% TLazyFlatMapTest = gyb.parse_template("{}/Inputs/flatMap.gyb".format(test_path))
+% TLazyFlatMapTest = gyb.parse_template(os.path.join(os.path.dirname(__file__), "Inputs/flatMap.gyb"))
 % LazyFlatMapTest = gyb.execute_template(TLazyFlatMapTest, Test='CollectionTypeTests', Kinds=['Collection', 'BidirectionalCollection'])
 ${LazyFlatMapTest}
 
@@ -390,7 +382,6 @@ struct CollectionWithCustomUnderestimatedCount : Collection {
       position: 0xffff, startIndex: 0, endIndex: 0xffff)
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,
@@ -444,7 +435,6 @@ struct MinimalCollectionWithDefaultIterator : Collection {
       position: _count, startIndex: 0, endIndex: _count)
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,
@@ -518,7 +508,6 @@ struct MinimalCollectionWithCustomIterator : Collection {
       position: _count, startIndex: 0, endIndex: _count)
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,
@@ -586,6 +575,26 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/writeback") {
   collection[i..<j].sort()
   expectEqualSequence(
     [ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
+}
+
+CollectionTypeTests.test("subscript(_: Range<Index>)/defaultImplementation/sliceTooLarge")
+  .crashOutputMatches("Cannot replace a slice of a MutableCollection with a slice of a larger size")
+  .code {
+  var x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  expectCrashLater()
+  x.withUnsafeMutableBufferPointer { buffer in
+    buffer[2..<4] = buffer[4..<8]
+  }
+}
+
+CollectionTypeTests.test("subscript(_: Range<Index>)/defaultImplementation/sliceTooSmall")
+  .crashOutputMatches("Cannot replace a slice of a MutableCollection with a slice of a smaller size")
+  .code {
+  var x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  expectCrashLater()
+  x.withUnsafeMutableBufferPointer { buffer in
+    buffer[2..<6] = buffer[6..<8]
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -730,7 +739,7 @@ CollectionTypeTests.test("index(of:)/ContinueSearch") {
 
 CollectionTypeTests.test("Collection/split/dispatch") {
   var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  tester.split { $0.value == 1 }
+  _ = tester.split { $0.value == 1 }
   expectCustomizable(tester, tester.log.split)
 }
 
@@ -740,7 +749,7 @@ CollectionTypeTests.test("Collection/split/dispatch") {
 
 CollectionTypeTests.test("Collection/prefix(through:)/dispatch") {
   var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
-  tester.prefix(through: 1)
+  _ = tester.prefix(through: 1)
   expectCustomizable(tester, tester.log.prefixThrough)
 }
 
@@ -750,7 +759,7 @@ CollectionTypeTests.test("Collection/prefix(through:)/dispatch") {
 
 CollectionTypeTests.test("Collection/prefix(upTo:)/dispatch") {
   var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  tester.prefix(upTo: 1)
+  _ = tester.prefix(upTo: 1)
   expectCustomizable(tester, tester.log.prefixUpTo)
 }
 
@@ -760,7 +769,7 @@ CollectionTypeTests.test("Collection/prefix(upTo:)/dispatch") {
 
 CollectionTypeTests.test("Collection/suffix(from:)/dispatch") {
   var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
-  tester.suffix(from: 1)
+  _ = tester.suffix(from: 1)
   expectCustomizable(tester, tester.log.suffixFrom)
 }
 

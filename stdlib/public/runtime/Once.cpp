@@ -49,6 +49,8 @@ void swift::swift_once(swift_once_t *predicate, void (*fn)(void *)) {
   // process (the token is a word that is atomically incremented from 0 to
   // 1 to 2 during initialization) to work. We should implement our own version
   // that we can rely on to continue to work that way.
+  // The MSVC port also relies on this, because the std::call_once on MSVC
+  // follows the compatible init process.
   // For more information, see rdar://problem/18499385
   std::call_once(*predicate, [fn]() { fn(nullptr); });
 #endif

@@ -1,4 +1,4 @@
-add_swift_library(swiftSema
+add_swift_library(swiftSema STATIC
   CodeSynthesis.cpp
   Constraint.cpp
   ConstraintGraph.cpp
@@ -29,6 +29,7 @@ add_swift_library(swiftSema
   TypeChecker.cpp
   TypeCheckError.cpp
   TypeCheckExpr.cpp
+  TypeCheckExprObjC.cpp
   TypeCheckGeneric.cpp
   TypeCheckNameLookup.cpp
   TypeCheckPattern.cpp

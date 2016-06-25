@@ -17,7 +17,6 @@ import SwiftShims
 ///
 /// This is a magic entry point known to the compiler. It is called in
 /// generated code for API availability checking.
-@warn_unused_result
 @_semantics("availability.osversion")
 public func _stdlib_isOSVersionAtLeast(
   _ major: Builtin.Word,
@@ -45,7 +44,6 @@ public func _stdlib_isOSVersionAtLeast(
 
 extension _SwiftNSOperatingSystemVersion : Comparable { }
 
-@warn_unused_result
 public func == (
   lhs: _SwiftNSOperatingSystemVersion,
   rhs: _SwiftNSOperatingSystemVersion
@@ -56,7 +54,6 @@ public func == (
 }
 
 /// Lexicographic comparison of version components.
-@warn_unused_result
 public func < (
   lhs: _SwiftNSOperatingSystemVersion,
   rhs: _SwiftNSOperatingSystemVersion
@@ -72,7 +69,6 @@ public func < (
   return lhs.patchVersion < rhs.patchVersion
 }
 
-@warn_unused_result
 public func >= (
   lhs: _SwiftNSOperatingSystemVersion,
   rhs: _SwiftNSOperatingSystemVersion

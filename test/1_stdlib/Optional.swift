@@ -209,7 +209,7 @@ OptionalTests.test("??") {
 }
 
 OptionalTests.test("flatMap") {
-  let half: Int32 -> Int16? =
+  let half: (Int32) -> Int16? =
     { if $0 % 2 == 0 { return Int16($0 / 2) } else { return .none } }
 
   expectOptionalEqual(2 as Int16, half(4))
@@ -379,20 +379,6 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(String(optNoString), "Optional(main.TestNoString)")
   expectEqual(debugPrintStr(optNoString), "Optional(main.TestNoString)")
 
-  let iouNoString: TestNoString! = TestNoString()
-  // IUO directly conforms to CustomStringConvertible.
-  // Disabled pending SR-164
-  //   expectTrue(iouNoString is CustomStringConvertible)
-  expectTrue(canGenericCast(iouNoString, CustomStringConvertible.self))
-  expectFalse(iouNoString is Streamable)
-  expectFalse(canGenericCast(iouNoString, Streamable.self))
-  // CustomDebugStringConvertible conformance is a temporary hack.
-  // Disabled pending SR-164
-  //   expectTrue(iouNoString is CustomDebugStringConvertible)
-  expectTrue(canGenericCast(iouNoString, CustomDebugStringConvertible.self))
-  expectEqual(String(iouNoString), "main.TestNoString")
-  expectEqual(debugPrintStr(iouNoString), "main.TestNoString")
-
   let optString: TestString? = TestString()
   expectTrue(optString is CustomStringConvertible)
   expectTrue(canGenericCast(optString, CustomStringConvertible.self))
@@ -401,18 +387,6 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(String(TestString()), "AString")
   expectEqual(String(optString), "Optional(XString)")
   expectEqual(debugPrintStr(optString), "Optional(XString)")
-
-  let iouString: TestString! = TestString()
-  expectTrue(iouString is CustomStringConvertible)
-  expectTrue(canGenericCast(iouString, CustomStringConvertible.self))
-  // CustomDebugStringConvertible conformance is a temporary hack.
-  expectTrue(iouString is CustomDebugStringConvertible)
-  expectTrue(canGenericCast(iouString, CustomDebugStringConvertible.self))
-  expectEqual(String(iouString), "AString")
-  // FIXME: Ideally the debug output would be "XString", but a reasonable
-  // implementation of that behavior requires conditional conformance.
-  // (directly invoking debugPrint(Any) already works correctly).
-  expectEqual(debugPrintStr(iouString), "AString")
 
   let optStream: TestStream? = TestStream()
   expectTrue(optStream is Streamable)

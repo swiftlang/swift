@@ -21,9 +21,7 @@ func getDescription(_ o: NSObject) -> String {
 // CHECK:  [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]],
 // CHECK:  [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
-// CHECK:  [[T0:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
-// CHECK:  apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
-// CHECK:  [[NATIVE:%.*]] = load [[NATIVE_BUF]]
+// CHECK:  [[NATIVE:%.*]] = unchecked_enum_data {{.*}} : $ImplicitlyUnwrappedOptional<String>
 // CHECK:  return [[NATIVE]] 
 // CHECK:}
 
@@ -43,9 +41,7 @@ func getUppercaseString(_ s: NSString) -> String {
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]]
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
-// CHECK:   [[T0:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
-// CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
-// CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
+// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data {{.*}} : $ImplicitlyUnwrappedOptional<String>
 // CHECK:   return [[NATIVE]]
 // CHECK: }
 
@@ -164,9 +160,7 @@ func callBar() -> String {
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]]
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
-// CHECK:   [[T0:%.*]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
-// CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%[0-9]*]],
-// CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
+// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data {{.*}} : $ImplicitlyUnwrappedOptional<String>
 // CHECK:   return [[NATIVE]]
 // CHECK: }
 
@@ -365,7 +359,7 @@ class Bas : NSObject {
 }
 
 // CHECK-LABEL: sil hidden @_TF13objc_bridging16applyStringBlock
-func applyStringBlock(_ f: @convention(block) String -> String, x: String) -> String {
+func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> String {
   // CHECK: [[BLOCK:%.*]] = copy_block %0
   // CHECK: [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK: [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]

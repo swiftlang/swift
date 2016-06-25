@@ -1473,6 +1473,7 @@ static raw_ostream &operator<<(raw_ostream &os, AccessSemantics accessKind) {
   case AccessSemantics::Ordinary: return os;
   case AccessSemantics::DirectToStorage: return os << " direct_to_storage";
   case AccessSemantics::DirectToAccessor: return os << " direct_to_accessor";
+  case AccessSemantics::BehaviorInitialization: return os << " behavior_init";
   }
   llvm_unreachable("bad access kind");
 }
@@ -1955,6 +1956,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E) {
+    printCommon(E, "unevaluated_instance") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 
   void visitInOutExpr(InOutExpr *E) {
     printCommon(E, "inout_expr") << '\n';
@@ -2155,6 +2161,12 @@ public:
     printRec(E->getSrc());
     OS << ')';
   }
+  void visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
+    printCommon(E, "enum_is_case_expr") << ' ' <<
+      E->getEnumElement()->getName() << "\n";
+    printRec(E->getSubExpr());
+    
+  }
   void visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
     printCommon(E, "unresolved_pattern_expr") << '\n';
     printRec(E->getSubPattern());
@@ -2198,14 +2210,46 @@ public:
     OS << ')';
   }
   void visitObjCSelectorExpr(ObjCSelectorExpr *E) {
-    printCommon(E, "objc_selector_expr") << " decl=";
-    if (auto method = E->getMethod())
+    printCommon(E, "objc_selector_expr");
+    OS << " kind=";
+    switch (E->getSelectorKind()) {
+      case ObjCSelectorExpr::Method:
+        OS << "method";
+        break;
+      case ObjCSelectorExpr::Getter:
+        OS << "getter";
+        break;
+      case ObjCSelectorExpr::Setter:
+        OS << "setter";
+        break;
+    }
+    OS << " decl=";
+    if (auto method = E->getMethod()) {
       method->dumpRef(OS);
-    else
+    } else {
       OS << "<unresolved>";
+    }
     OS << '\n';
     printRec(E->getSubExpr());
     OS << ')';
+  }
+
+  void visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+    printCommon(E, "keypath_expr");
+    for (unsigned i = 0, n = E->getNumComponents(); i != n; ++i) {
+      OS << "\n";
+      OS.indent(Indent + 2);
+      OS << "component=";
+      if (auto decl = E->getComponentDecl(i))
+        decl->dumpRef(OS);
+      else
+        OS << E->getComponentName(i);
+    }
+    if (auto semanticE = E->getSemanticExpr()) {
+      OS << '\n';
+      printRec(semanticE);
+    }
+    OS << ")";
   }
 };
 

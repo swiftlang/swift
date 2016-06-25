@@ -816,16 +816,16 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
   DeclName name(Context, Context.getIdentifier("$defer"), params);
   auto tempDecl
     = FuncDecl::create(Context,
-                       /*static*/ SourceLoc(),
+                       /*StaticLoc=*/ SourceLoc(),
                        StaticSpellingKind::None,
-                       /*func*/ SourceLoc(),
+                       /*FuncLoc=*/ SourceLoc(),
                        name,
-                       /*name*/ SourceLoc(),
-                       /*throws*/ SourceLoc(), /*Accessor keyword*/SourceLoc(),
+                       /*NameLoc=*/ SourceLoc(),
+                       /*Throws=*/ false, /*ThrowsLoc=*/ SourceLoc(),
+                       /*AccessorKeywordLoc=*/SourceLoc(),
                        /*generic params*/ nullptr,
-                       Type(),
                        params,
-                       /*return type*/ TypeLoc(),
+                       Type(), TypeLoc(),
                        CurDeclContext);
   tempDecl->setImplicit();
   setLocalDiscriminator(tempDecl);
@@ -1608,7 +1608,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
 //    "_compiler_version"), and whose argument is a named decl ref expression
 ConditionalCompilationExprState
 Parser::evaluateConditionalCompilationExpr(Expr *condition) {
-    // Evaluate a ParenExpr.
+  // Evaluate a ParenExpr.
   if (auto *PE = dyn_cast<ParenExpr>(condition))
     return evaluateConditionalCompilationExpr(PE->getSubExpr());
   
@@ -1709,6 +1709,7 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
     }
 
     if (!fnName.equals("arch") && !fnName.equals("os") &&
+        !fnName.equals("_endian") &&
         !fnName.equals("_runtime") &&
         !fnName.equals("swift") &&
         !fnName.equals("_compiler_version")) {
@@ -1798,6 +1799,11 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
             diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
                      "architecture", fnName);
             return ConditionalCompilationExprState::error();
+          }
+        } else if (fnName == "_endian") {
+          if (!LangOptions::isPlatformConditionEndiannessSupported(argument)) {
+            diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
+                     "endianness", fnName);
           }
         }
         auto target = Context.LangOpts.getPlatformConditionValue(fnName);

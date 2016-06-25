@@ -14,7 +14,7 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
     set(LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
   endif ()
 
-  configure_lit_site_cfg("${source_path}" "${destination_path}")
+  configure_file("${source_path}" "${destination_path}" @ONLY)
 
   if(NOT "${installed_name}" STREQUAL "")
     swift_install_in_component(testsuite-tools
@@ -124,20 +124,8 @@ if(PYTHONINTERP_FOUND)
   normalize_boolean_spelling(SWIFT_ASAN_BUILD)
   is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
-  if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
-    set(profdata_merge_worker
-        "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
-    set(command_profdata_merge_start
-      COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}"
-          -l "${swift_test_results_dir}/profdata_merge.log"
-          start
-          -o "${swift_test_results_dir}")
-    set(command_profdata_merge_stop
-      COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" stop)
-  else()
-    set(command_profdata_merge_start)
-    set(command_profdata_merge_stop)
-  endif()
+  set(profdata_merge_worker
+      "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
 
   set(TEST_MODES
       optimize_none optimize optimize_unchecked
@@ -161,6 +149,19 @@ if(PYTHONINTERP_FOUND)
       # A directory where to put the xUnit-style XML test results.
       set(swift_test_results_dir
           "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+
+      if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
+          set(command_profdata_merge_start
+              COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}"
+              -l "${swift_test_results_dir}/profdata_merge.log"
+              start
+              -o "${swift_test_results_dir}")
+          set(command_profdata_merge_stop
+              COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" stop)
+      else()
+          set(command_profdata_merge_start)
+          set(command_profdata_merge_stop)
+      endif()
 
       set(command_clean_test_results_dir
           COMMAND "${CMAKE_COMMAND}" -E remove_directory "${swift_test_results_dir}"
@@ -198,29 +199,47 @@ if(PYTHONINTERP_FOUND)
       set(validation_test_dependencies
           "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
+      set(command_upload_stdlib)
+      set(command_upload_swift_reflection_test)
+      if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
+        # These are supported testing SDKs, but their implementation of
+        # `command_upload_stdlib` is hidden.
+      elseif("${SDK}" STREQUAL "ANDROID")
+        if("${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}" STREQUAL "")
+          message(FATAL_ERROR
+              "When running Android host tests, you must specify the directory on the device "
+              "to which Swift build products will be deployed.")
+        endif()
+
+        # Warning: This step will fail if you do not have an Android device
+        #          connected via USB. See docs/Android.md for details on
+        #          how to run the test suite for Android.
+        set(command_upload_stdlib
+            COMMAND
+                # Reboot the device and remove everything in its tmp
+                # directory. Build products and test executables are pushed
+                # to that directory when running the test suite.
+                ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
+            COMMAND
+                ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
+                --ndk "${SWIFT_ANDROID_NDK_PATH}"
+                --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
+                # Build products like libswiftCore.so.
+                "${SWIFTLIB_DIR}/android"
+                # These two directories may contain the same libraries,
+                # but upload both to device just in case. Duplicates will be
+                # overwritten, and uploading doesn't take very long anyway.
+                "${SWIFT_ANDROID_ICU_UC}"
+                "${SWIFT_ANDROID_ICU_I18N}")
+      endif()
+      add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
+          ${command_upload_stdlib}
+          ${command_upload_swift_reflection_test}
+          COMMENT "Uploading stdlib")
+
       foreach(test_mode ${TEST_MODES})
         set(LIT_ARGS "${SWIFT_TEST_EXTRA_ARGS} ${LLVM_LIT_ARGS}")
         separate_arguments(LIT_ARGS)
-
-        if(test_mode STREQUAL "optimize_none")
-          # No special arguments required.
-        elseif(test_mode STREQUAL "optimize")
-          list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
-        elseif(test_mode STREQUAL "optimize_unchecked")
-          list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
-        elseif(test_mode STREQUAL "only_executable")
-          list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
-        elseif(test_mode STREQUAL "only_non_executable")
-          list(APPEND LIT_ARGS "--param" "run_only_tests=non_executable_tests")
-        else()
-          message(FATAL_ERROR "Unknown test mode: ${test_mode}")
-        endif()
-
-        set(test_mode_target_suffix "")
-        if(NOT test_mode STREQUAL "optimize_none")
-          list(APPEND LIT_ARGS "--param" "swift_test_mode=${test_mode}")
-          set(test_mode_target_suffix "-${test_mode}")
-        endif()
 
         if(NOT SWIFT_BUILD_STDLIB)
           list(APPEND LIT_ARGS
@@ -229,25 +248,7 @@ if(PYTHONINTERP_FOUND)
 
         list(APPEND LIT_ARGS "--xunit-xml-output=${swift_test_results_dir}/lit-tests.xml")
 
-        set(command_upload_stdlib)
-        if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
-          # These are supported testing SDKs.
-        endif()
-
         foreach(test_subset ${TEST_SUBSETS})
-          set(want_this_combination TRUE)
-          if(test_subset STREQUAL "only_long")
-            # Long tests are only run in 'optimize_none' mode.
-            if(NOT test_mode STREQUAL "optimize_none")
-              set(want_this_combination FALSE)
-            endif()
-
-            list(APPEND LIT_ARGS "--param" "run_only_tests=long_tests")
-          endif()
-          if(test_subset STREQUAL "all")
-            list(APPEND LIT_ARGS "--param" "run_only_tests=all")
-          endif()
-
           set(directories)
           set(dependencies ${test_dependencies})
 
@@ -270,17 +271,26 @@ if(PYTHONINTERP_FOUND)
             set(test_subset_target_suffix "")
           endif()
 
-          if(want_this_combination)
-            add_custom_target("check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}"
-                ${command_upload_stdlib}
-                ${command_clean_test_results_dir}
-                ${command_profdata_merge_start}
-                COMMAND ${PYTHON_EXECUTABLE} "${LIT}" ${LIT_ARGS} ${directories}
-                ${command_profdata_merge_stop}
-                DEPENDS ${dependencies}
-                COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
-                ${cmake_3_2_USES_TERMINAL})
+          set(test_mode_target_suffix "")
+          if(NOT test_mode STREQUAL "optimize_none")
+            set(test_mode_target_suffix "-${test_mode}")
           endif()
+
+          add_custom_target("check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}"
+              ${command_upload_stdlib}
+              ${command_upload_swift_reflection_test}
+              ${command_clean_test_results_dir}
+              ${command_profdata_merge_start}
+              COMMAND
+                ${PYTHON_EXECUTABLE} "${LIT}"
+                ${LIT_ARGS}
+                "--param" "swift_test_subset=${test_subset}"
+                "--param" "swift_test_mode=${test_mode}"
+                ${directories}
+              ${command_profdata_merge_stop}
+              DEPENDS ${dependencies}
+              COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
+              ${cmake_3_2_USES_TERMINAL})
         endforeach()
       endforeach()
     endforeach()

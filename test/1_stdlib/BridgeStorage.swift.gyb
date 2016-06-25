@@ -15,9 +15,7 @@
 //  distinguish these cases efficiently.
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/out.swift
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -64,10 +62,10 @@ import Foundation
 func isOSAtLeast(_ major: Int, _ minor: Int, patch: Int = 0) -> Bool {
   // isOperatingSystemAtLeastVersion() is unavailable on some OS versions.
   if #available(iOS 8.0, OSX 10.10, *) {
-    let procInfo: AnyObject = NSProcessInfo.processInfo()
+    let procInfo: AnyObject = ProcessInfo.processInfo()
     return procInfo.isOperatingSystemAtLeast(
-            NSOperatingSystemVersion(majorVersion: major, minorVersion: minor,
-                                     patchVersion: patch))
+             OperatingSystemVersion(majorVersion: major, minorVersion: minor,
+                                    patchVersion: patch))
   }
 
   return false

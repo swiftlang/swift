@@ -58,14 +58,10 @@ public func withInvalidOrderings(_ body: ((Int, Int) -> Bool) -> Void) {
   body { (_,_) in defer {i += 1}; return i % 5 == 0 }
 }
 
-internal func _mapInPlace<
-  C : MutableCollection
-  where
-  C.Indices.Iterator.Element == C.Index
->(
+internal func _mapInPlace<C : MutableCollection>(
   _ elements: inout C,
   _ transform: @noescape (C.Iterator.Element) -> C.Iterator.Element
-) {
+) where C.Indices.Iterator.Element == C.Index {
   for i in elements.indices {
     elements[i] = transform(elements[i])
   }
@@ -76,18 +72,6 @@ extension TestSuite {
     C : MutableCollection,
     CollectionWithEquatableElement : MutableCollection,
     CollectionWithComparableElement : MutableCollection
-    where
-    C.SubSequence : MutableCollection,
-    C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index == C.Index,
-    C.SubSequence.Indices.Iterator.Element == C.Index,
-    C.SubSequence.SubSequence == C.SubSequence,
-    C.Indices : Collection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
-    CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithComparableElement.Iterator.Element : Comparable
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
@@ -108,7 +92,19 @@ extension TestSuite {
     withUnsafeMutableBufferPointerIsSupported: Bool,
     isFixedLengthCollection: Bool,
     collectionIsBidirectional: Bool = false
-  ) {
+  ) where
+    C.SubSequence : MutableCollection,
+    C.SubSequence.Iterator.Element == C.Iterator.Element,
+    C.SubSequence.Index == C.Index,
+    C.SubSequence.Indices.Iterator.Element == C.Index,
+    C.SubSequence.SubSequence == C.SubSequence,
+    C.Indices : Collection,
+    C.Indices.Iterator.Element == C.Index,
+    C.Indices.Index == C.Index,
+    C.Indices.SubSequence == C.Indices,
+    CollectionWithEquatableElement.Iterator.Element : Equatable,
+    CollectionWithComparableElement.Iterator.Element : Comparable {
+
     var testNamePrefix = testNamePrefix
 
     if checksAdded.contains(#function) {
@@ -140,7 +136,7 @@ extension TestSuite {
       return makeCollectionOfComparable(elements.map(wrapValueIntoComparable))
     }
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
 //===----------------------------------------------------------------------===//
 // subscript(_: Index)
@@ -586,18 +582,6 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
     C : protocol<BidirectionalCollection, MutableCollection>,
     CollectionWithEquatableElement : protocol<BidirectionalCollection, MutableCollection>,
     CollectionWithComparableElement : protocol<BidirectionalCollection, MutableCollection>
-    where
-    C.SubSequence : protocol<BidirectionalCollection, MutableCollection>,
-    C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index == C.Index,
-    C.SubSequence.Indices.Iterator.Element == C.Index,
-    C.SubSequence.SubSequence == C.SubSequence,
-    C.Indices : BidirectionalCollection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
-    CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithComparableElement.Iterator.Element : Comparable
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
@@ -617,7 +601,19 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
     outOfBoundsSubscriptOffset: Int = 1,
     withUnsafeMutableBufferPointerIsSupported: Bool,
     isFixedLengthCollection: Bool
-  ) {
+  ) where
+    C.SubSequence : protocol<BidirectionalCollection, MutableCollection>,
+    C.SubSequence.Iterator.Element == C.Iterator.Element,
+    C.SubSequence.Index == C.Index,
+    C.SubSequence.Indices.Iterator.Element == C.Index,
+    C.SubSequence.SubSequence == C.SubSequence,
+    C.Indices : BidirectionalCollection,
+    C.Indices.Iterator.Element == C.Index,
+    C.Indices.Index == C.Index,
+    C.Indices.SubSequence == C.Indices,
+    CollectionWithEquatableElement.Iterator.Element : Equatable,
+    CollectionWithComparableElement.Iterator.Element : Comparable {
+    
     var testNamePrefix = testNamePrefix
 
     if checksAdded.contains(#function) {
@@ -661,7 +657,7 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
 //===----------------------------------------------------------------------===//
 // subscript(_: Index)
@@ -686,6 +682,20 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
 }
 
 //===----------------------------------------------------------------------===//
+// reverse()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).reverse()") {
+  for test in reverseTests {
+    var c = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
+    c.reverse()
+    expectEqual(
+      test.expected, c.map { extractValue($0).value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
 
   } // addMutableBidirectionalCollectionTests
 
@@ -693,19 +703,6 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     C : protocol<RandomAccessCollection, MutableCollection>,
     CollectionWithEquatableElement : protocol<RandomAccessCollection, MutableCollection>,
     CollectionWithComparableElement : protocol<RandomAccessCollection, MutableCollection>
-    where
-    C.SubSequence : protocol<RandomAccessCollection, MutableCollection>,
-    C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index == C.Index,
-    C.SubSequence.Indices.Iterator.Element == C.Index,
-    C.SubSequence.SubSequence == C.SubSequence,
-    C.Indices : RandomAccessCollection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
-    CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithComparableElement.Iterator.Element : Comparable,
-    CollectionWithComparableElement.SubSequence.Indices.Iterator.Element == CollectionWithComparableElement.Index
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
@@ -725,7 +722,20 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     outOfBoundsSubscriptOffset: Int = 1,
     withUnsafeMutableBufferPointerIsSupported: Bool,
     isFixedLengthCollection: Bool
-  ) {
+  ) where
+    C.SubSequence : protocol<RandomAccessCollection, MutableCollection>,
+    C.SubSequence.Iterator.Element == C.Iterator.Element,
+    C.SubSequence.Index == C.Index,
+    C.SubSequence.Indices.Iterator.Element == C.Index,
+    C.SubSequence.SubSequence == C.SubSequence,
+    C.Indices : RandomAccessCollection,
+    C.Indices.Iterator.Element == C.Index,
+    C.Indices.Index == C.Index,
+    C.Indices.SubSequence == C.Indices,
+    CollectionWithEquatableElement.Iterator.Element : Equatable,
+    CollectionWithComparableElement.Iterator.Element : Comparable,
+    CollectionWithComparableElement.SubSequence.Indices.Iterator.Element == CollectionWithComparableElement.Index {
+    
     var testNamePrefix = testNamePrefix
 
     if checksAdded.contains(#function) {
@@ -773,7 +783,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
       return makeCollectionOfComparable(elements.map(wrapValueIntoComparable))
     }
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
 //===----------------------------------------------------------------------===//
 // sort()

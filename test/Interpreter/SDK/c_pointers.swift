@@ -23,7 +23,7 @@ typealias XXColor = UIColor
 //
 
 let rgb = CGColorSpaceCreateDeviceRGB()
-let cgRed = CGColor(withColorSpace: rgb, components: [1.0, 0.0, 0.0, 1.0])!
+let cgRed = CGColor(colorSpace: rgb, components: [1.0, 0.0, 0.0, 1.0])!
 
 let nsRed = XXColor(cgColor: cgRed)
 
@@ -85,7 +85,7 @@ print("NSError out:")
 autoreleasepool {
   do {
     let s = try NSString(contentsOfFile: "/hopefully/does/not/exist\u{1B}",
-                         encoding: NSUTF8StringEncoding)
+                         encoding: String.Encoding.utf8.rawValue)
     _preconditionFailure("file should not actually exist")
   } catch {
     print(error._code) // CHECK-NEXT: 260
@@ -98,7 +98,7 @@ class DumbString: NSString {
   override func character(at x: Int) -> unichar { _preconditionFailure("nope") }
   override var length: Int { return 0 }
 
-  convenience init(contentsOfFile s: String, encoding: NSStringEncoding) throws {
+  convenience init(contentsOfFile s: String, encoding: String.Encoding) throws {
     self.init()
     throw NSError(domain: "Malicious Mischief", code: 594, userInfo: nil)
   }
@@ -108,7 +108,7 @@ class DumbString: NSString {
 print("NSError in:")
 autoreleasepool {
   do {
-    try DumbString(contentsOfFile: "foo", encoding: NSUTF8StringEncoding)
+    try DumbString(contentsOfFile: "foo", encoding: .utf8)
   } catch {
     print(error._domain) // CHECK-NEXT: Malicious Mischief
     print(error._code) // CHECK-NEXT: 594
@@ -128,7 +128,7 @@ puts(s)
 
 var unsorted = [3, 14, 15, 9, 2, 6, 5]
 qsort(&unsorted, unsorted.count, sizeofValue(unsorted[0])) { a, b in
-  return Int32(UnsafePointer<Int>(a).pointee - UnsafePointer<Int>(b).pointee)
+  return Int32(UnsafePointer<Int>(a!).pointee - UnsafePointer<Int>(b!).pointee)
 }
 // CHECK-NEXT: [2, 3, 5, 6, 9, 14, 15]
 print(unsorted)

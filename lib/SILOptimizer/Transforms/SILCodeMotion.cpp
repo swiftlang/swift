@@ -34,6 +34,7 @@
 STATISTIC(NumSunk, "Number of instructions sunk");
 STATISTIC(NumRefCountOpsSimplified, "Number of enum ref count ops simplified");
 STATISTIC(NumHoisted, "Number of instructions hoisted");
+STATISTIC(NumSILArgumentReleaseHoisted, "Number of silargument release instructions hoisted");
 
 llvm::cl::opt<bool> DisableSILRRCodeMotion("disable-sil-cm-rr-cm", llvm::cl::init(true));
 
@@ -44,6 +45,10 @@ namespace {
 //===----------------------------------------------------------------------===//
 //                                  Utility
 //===----------------------------------------------------------------------===//
+
+static bool isReleaseInstruction(SILInstruction *I) {
+  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
+}
 
 static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
                                        EnumElementDecl *EnumDecl,
@@ -105,6 +110,47 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 //===----------------------------------------------------------------------===//
 //                            Generic Sinking Code
 //===----------------------------------------------------------------------===//
+
+/// \brief Hoist release on a SILArgument to its predecessors.
+static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
+  // There is no block to hoist releases to.
+  if (BB->pred_empty())
+    return false;
+
+  // Only try to hoist the first instruction. RRCM should have hoisted the release
+  // to the beginning of the block if it can.
+  auto Head = &*BB->begin();
+  // Make sure it is a release instruction.
+  if (!isReleaseInstruction(&*Head))
+    return false;
+
+  // Make sure it is a release on a SILArgument of the current basic block..
+  SILArgument *SA = dyn_cast<SILArgument>(Head->getOperand(0));
+  if (!SA || SA->getParent() != BB)
+    return false;
+
+  // Make sure the release will not be blocked by the terminator instructions
+  // Make sure the terminator does not block, nor is a branch with multiple targets.
+  for (auto P : BB->getPreds()) {
+    if (!isa<BranchInst>(P->getTerminator()))
+      return false;
+  }
+
+  // Make sure we can get all the incoming values.
+  llvm::SmallVector<SILValue , 4> PredValues;
+  if (!SA->getIncomingValues(PredValues))
+    return false;
+
+  // Ok, we can get all the incoming values and create releases for them.
+  unsigned indices = 0;
+  for (auto P : BB->getPreds()) {
+    createDecrementBefore(PredValues[indices++], P->getTerminator());
+  }
+  // Erase the old instruction.
+  Head->eraseFromParent();
+  ++NumSILArgumentReleaseHoisted;
+  return true;
+}
 
 static const int SinkSearchWindow = 6;
 
@@ -806,10 +852,11 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   return true;
 }
 
-static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
-                                  SILBasicBlock::iterator I,
-                                  bool CanSinkToSuccessors, AliasAnalysis *AA,
-                                  RCIdentityFunctionInfo *RCIA) {
+static bool tryTosinkIncrementsIntoSwitchRegions(SILBasicBlock::iterator T,
+                                                 SILBasicBlock::iterator I,
+                                                 bool CanSinkToSuccessors,
+                                                 AliasAnalysis *AA,
+                                                 RCIdentityFunctionInfo *RCIA) {
   // The following methods should only be attempted if we can sink to our
   // successor.
   if (CanSinkToSuccessors) {
@@ -828,168 +875,15 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
         return true;
   }
 
-  if (!isa<StrongRetainInst>(I) && !isa<RetainValueInst>(I))
-    return false;
-
-  SILValue Ptr = I->getOperand(0);
-  if (auto B = valueHasARCDecrementOrCheckInInstructionRange(Ptr, std::next(I),
-                                                             T, AA)) {
-    DEBUG(llvm::dbgs() << "    Moving " << *I);
-    I->moveBefore(&**B);
-    return true;
-  }
-
-  // Ok, we have a ref count instruction that *could* be sunk. If we have a
-  // terminator that we cannot sink through or the cfg will not let us sink
-  // into our predecessors, just move the increment before the terminator.
-  if (!CanSinkToSuccessors ||
-      (!isa<CheckedCastBranchInst>(T) && !isa<CondBranchInst>(T))) {
-    DEBUG(llvm::dbgs() << "    Moving " << *I);
-    I->moveBefore(&*T);
-    return true;
-  }
-
-  // Ok, it is legal for us to sink this increment to our successors. Create a
-  // copy of this instruction in each one of our successors unless they are
-  // ignorable trap blocks.
-  DEBUG(llvm::dbgs() << "    Sinking " << *I);
-  SILBuilderWithScope Builder(T, &*I);
-  for (auto &Succ : T->getParent()->getSuccessors()) {
-    SILBasicBlock *SuccBB = Succ.getBB();
-
-    if (isARCInertTrapBB(SuccBB))
-      continue;
-
-    Builder.setInsertionPoint(&*SuccBB->begin());
-    if (isa<StrongRetainInst>(I)) {
-      Builder.createStrongRetain(I->getLoc(), Ptr, Atomicity::Atomic);
-    } else {
-      assert(isa<RetainValueInst>(I) && "This can only be retain_value");
-      Builder.createRetainValue(I->getLoc(), Ptr, Atomicity::Atomic);
-    }
-  }
-
-  // Then erase this instruction.
-  I->eraseFromParent();
-  NumSunk++;
-  return true;
+  // At this point, this is a retain on a regular SSA value, leave it to retain
+  // release code motion to sink.
+  return false;
 }
 
-static bool isRetainAvailableInSomeButNotAllPredecessors(
-    SILValue Ptr, SILBasicBlock *BB, AliasAnalysis *AA,
-    RCIdentityFunctionInfo *RCIA,
-    llvm::SmallDenseMap<SILBasicBlock *, Optional<SILInstruction *>, 4>
-        &CheckUpToInstruction) {
-  bool AvailInSome = false;
-  bool NotAvailInSome = false;
-
-  Ptr = RCIA->getRCIdentityRoot(Ptr);
-
-  // Check whether a retain on the pointer is available in the predecessors.
-  for (auto *Pred : BB->getPreds()) {
-
-    // Find the first retain of the pointer.
-    auto Retain = std::find_if(
-        Pred->rbegin(), Pred->rend(), [=](const SILInstruction &I) -> bool {
-          if (!isa<StrongRetainInst>(I) && !isa<RetainValueInst>(I))
-            return false;
-
-          return Ptr == RCIA->getRCIdentityRoot(I.getOperand(0));
-        });
-
-    // Check that there is no decrement or check from the increment to the end
-    // of the basic block. After we have hoisted the first release this release
-    // would prevent further hoisting. Instead we check that no decrement or
-    // check occurs up to this hoisted release.
-    auto End = CheckUpToInstruction[Pred];
-    auto EndIt = SILBasicBlock::iterator(End ? *End : Pred->getTerminator());
-    if (Retain == Pred->rend() || valueHasARCDecrementOrCheckInInstructionRange(
-                                      Ptr, Retain->getIterator(), EndIt, AA)) {
-      NotAvailInSome = true;
-      continue;
-    }
-
-    // Alright, the retain is 'available' for merging with a release from a
-    // successor block.
-    AvailInSome = true;
-  }
-
-  return AvailInSome && NotAvailInSome;
-}
-
-static bool hoistDecrementsToPredecessors(SILBasicBlock *BB, AliasAnalysis *AA,
-                                          RCIdentityFunctionInfo *RCIA) {
-  if (BB->getSinglePredecessor())
-    return false;
-
-  // Make sure we can move potential decrements to the predecessors and collect
-  // retains we could match.
-  for (auto *Pred : BB->getPreds())
-    if (!Pred->getSingleSuccessor())
-      return false;
-
-  bool HoistedDecrement = false;
-
-  // When we hoist a release to the predecessor block this release would block
-  // hoisting further releases because it looks like a ARC decrement in the
-  // predecessor block. Instead once we hoisted a release we scan only to this
-  // release when looking for ARC decrements or checks.
-  llvm::SmallDenseMap<SILBasicBlock *, Optional<SILInstruction *>, 4>
-      CheckUpToInstruction;
-
-  for (auto It = BB->begin(); It != BB->end();) {
-    auto *Inst = &*It;
-    ++It;
-
-    if (!isa<StrongReleaseInst>(Inst) && !isa<ReleaseValueInst>(Inst))
-      continue;
-
-    SILValue Ptr = Inst->getOperand(0);
-
-    // The pointer must be defined outside of this basic block.
-    if (Ptr->getParentBB() == BB)
-      continue;
-
-    // No arc use to the beginning of this block.
-    if (valueHasARCUsesInInstructionRange(Ptr, BB->begin(), Inst->getIterator(),
-                                          AA))
-      continue;
-
-    if (!isRetainAvailableInSomeButNotAllPredecessors(Ptr, BB, AA, RCIA,
-                                                      CheckUpToInstruction))
-      continue;
-
-    // Hoist decrement to predecessors.
-    DEBUG(llvm::dbgs() << "    Hoisting " << *Inst);
-    SILBuilderWithScope Builder(Inst);
-    for (auto *PredBB : BB->getPreds()) {
-      Builder.setInsertionPoint(PredBB->getTerminator());
-      SILInstruction *Release;
-      if (isa<StrongReleaseInst>(Inst)) {
-        Release =
-            Builder.createStrongRelease(Inst->getLoc(), Ptr, Atomicity::Atomic);
-      } else {
-        assert(isa<ReleaseValueInst>(Inst) && "This can only be retain_value");
-        Release =
-            Builder.createReleaseValue(Inst->getLoc(), Ptr, Atomicity::Atomic);
-      }
-      // Update the last instruction to consider when looking for ARC uses or
-      // decrements in predecessor blocks.
-      if (!CheckUpToInstruction[PredBB])
-        CheckUpToInstruction[PredBB] = Release;
-    }
-
-    Inst->eraseFromParent();
-    HoistedDecrement = true;
-  }
-
-  return HoistedDecrement;
-}
 /// Try sink a retain as far as possible.  This is either to successor BBs,
 /// or as far down the current BB as possible
-static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA,
-                                  RCIdentityFunctionInfo *RCIA) {
-
+static bool sinkIncrementsIntoSwitchRegions(SILBasicBlock *BB, AliasAnalysis *AA,
+                                            RCIdentityFunctionInfo *RCIA) {
   // Make sure that each one of our successors only has one predecessor,
   // us.
   // If that condition is not true, we can still sink to the end of this BB,
@@ -1021,13 +915,16 @@ static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA,
     //      terminator, sink the ref count inst into either our successors.
     //   2. If there are such decrements, move the retain right before that
     //      decrement.
-    Changed |= tryToSinkRefCountInst(S->getIterator(), Inst->getIterator(),
-                                     CanSinkToSuccessor, AA, RCIA);
+    Changed |= tryTosinkIncrementsIntoSwitchRegions(S->getIterator(),
+                                                    Inst->getIterator(),
+                                                    CanSinkToSuccessor, 
+                                                    AA, RCIA);
   }
 
   // Handle the first instruction in the BB.
   Changed |=
-      tryToSinkRefCountInst(S->getIterator(), SI, CanSinkToSuccessor, AA, RCIA);
+      tryTosinkIncrementsIntoSwitchRegions(S->getIterator(), SI,
+                                           CanSinkToSuccessor, AA, RCIA);
   return Changed;
 }
 
@@ -1701,11 +1598,16 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     DEBUG(llvm::dbgs() << "    Attempting to move releases into "
           "predecessors!\n");
 
-    if (HoistReleases)
+    // Perform a relatively local forms of retain sinking and release hoisting
+    // regarding switch regions and SILargument. This are not handled by retain
+    // release code motion.
+    if (HoistReleases) {
       Changed |= State.hoistDecrementsIntoSwitchRegions(AA);
+    }
 
+    // Sink switch related retains.
+    Changed |= sinkIncrementsIntoSwitchRegions(State.getBB(), AA, RCIA);
     Changed |= State.sinkIncrementsOutOfSwitchRegions(AA, RCIA);
-
 
     // Then attempt to sink code from predecessors. This can include retains
     // which is why we always attempt to move releases up the CFG before sinking
@@ -1716,19 +1618,12 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     Changed |= sinkCodeFromPredecessors(State.getBB());
     Changed |= sinkArgumentsFromPredecessors(State.getBB());
     Changed |= sinkLiteralsFromPredecessors(State.getBB());
+    // Try to hoist release of a SILArgument to predecessors.
+    Changed |= hoistSILArgumentReleaseInst(State.getBB());
 
     // Then perform the dataflow.
     DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
     Changed |= State.process();
-
-    // Finally we try to sink retain instructions from this BB to the next BB.
-    if (!DisableSILRRCodeMotion)
-      Changed |= sinkRefCountIncrement(State.getBB(), AA, RCIA);
-
-    // And hoist decrements to predecessors. This is beneficial if we can then
-    // match them up with an increment in some of the predecessors.
-    if (!DisableSILRRCodeMotion && HoistReleases)
-      Changed |= hoistDecrementsToPredecessors(State.getBB(), AA, RCIA);
   }
 
   return Changed;

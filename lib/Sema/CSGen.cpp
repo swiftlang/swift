@@ -1193,8 +1193,12 @@ namespace {
           baseTy = baseTy->getLValueOrInOutObjectType();
         }
         
-        if (auto arraySliceTy = dyn_cast<ArraySliceType>(baseTy.getPointer())) {
-          baseTy = arraySliceTy->getDesugaredType();
+        if (CS.isArrayType(baseTy.getPointer())) {
+
+          if (auto arraySliceTy = 
+                dyn_cast<ArraySliceType>(baseTy.getPointer())) {
+            baseTy = arraySliceTy->getDesugaredType();
+          }
           
           auto indexExpr = subscriptExpr->getIndex();
           
@@ -1386,7 +1390,12 @@ namespace {
                        protocol->getDeclaredType(),
                        CS.getConstraintLocator(expr));
 
-      // Add constraint on args.
+      // The arguments are required to be argument-convertible to the
+      // idealized parameter type of the initializer, which generally
+      // simplifies the first label (e.g. "colorLiteralRed:") by stripping
+      // all the redundant stuff about literals (leaving e.g. "red:").
+      // Constraint application will quietly rewrite the type of 'args' to
+      // use the right labels before forming the call to the initializer.
       DeclName constrName = tc.getObjectLiteralConstructorName(expr);
       assert(constrName);
       ArrayRef<ValueDecl *> constrs = protocol->lookupDirect(constrName);
@@ -1395,8 +1404,9 @@ namespace {
         return nullptr;
       }
       auto *constr = cast<ConstructorDecl>(constrs.front());
+      auto constrParamType = tc.getObjectLiteralParameterType(expr, constr);
       CS.addConstraint(ConstraintKind::ArgumentTupleConversion,
-        expr->getArg()->getType(), constr->getArgumentType(),
+        expr->getArg()->getType(), constrParamType,
         CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       Type result = tv;
@@ -2543,9 +2553,14 @@ namespace {
                       Diag<> diag_no_base_class) {
       DeclContext *typeContext = selfDecl->getDeclContext()->getParent();
       assert(typeContext && "constructor without parent context?!");
+
+      // A DC can fail to have a declared type in context when it's invalid.
+      Type declaredType = typeContext->getDeclaredTypeInContext();
+      if (!declaredType)
+        return Type();
+
       auto &tc = CS.getTypeChecker();
-      ClassDecl *classDecl = typeContext->getDeclaredTypeInContext()
-                               ->getClassOrBoundGenericClass();
+      ClassDecl *classDecl = declaredType->getClassOrBoundGenericClass();
       if (!classDecl) {
         tc.diagnose(diagLoc, diag_not_in_class);
         return Type();
@@ -2555,8 +2570,7 @@ namespace {
         return Type();
       }
 
-      Type superclassTy = typeContext->getDeclaredTypeInContext()
-                            ->getSuperclass(&tc);
+      Type superclassTy = declaredType->getSuperclass(&tc);
       if (selfDecl->hasType() && selfDecl->getType()->is<AnyMetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
       return superclassTy;
@@ -2800,6 +2814,11 @@ namespace {
     Type visitOpenExistentialExpr(OpenExistentialExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
+    
+    Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
+      // Should already be type-checked.
+      return expr->getType();
+    }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       if (E->getTypeLoc().isNull()) {
@@ -2826,6 +2845,7 @@ namespace {
         return nullptr;
       }
 
+      
       // Make sure we can reference ObjectiveC.Selector.
       // FIXME: Fix-It to add the import?
       auto type = CS.getTypeChecker().getObjCSelectorType(CS.DC);
@@ -2835,6 +2855,10 @@ namespace {
       }
 
       return type;
+    }
+
+    Type visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+      return E->getSemanticExpr()->getType();
     }
   };
 
@@ -2904,6 +2928,19 @@ namespace {
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // Note that the subexpression of a #selector expression is
+      // unevaluated.
+      if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
+        CG.getConstraintSystem().UnevaluatedRootExprs.insert(sel->getSubExpr());
+      }
+
+      // Check a key-path expression, which fills in its semantic
+      // expression as a string literal.
+      if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(expr)) {
+        auto &cs = CG.getConstraintSystem();
+        (void)cs.getTypeChecker().checkObjCKeyPathExpr(cs.DC, keyPath);
+      }
+
       // For closures containing only a single expression, the body participates
       // in type checking.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
@@ -3274,6 +3311,8 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
     CreatedTC.reset(new TypeChecker(DC.getASTContext()));
     TC = CreatedTC.get();
   }
+  if (ED->getAsProtocolExtensionContext())
+    return TC->isProtocolExtensionUsable(&DC, BaseTy, const_cast<ExtensionDecl*>(ED));
   ConstraintSystem CS(*TC, &DC, Options);
   auto Loc = CS.getConstraintLocator(nullptr);
   std::vector<Identifier> Scratch;
@@ -3427,7 +3466,7 @@ void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                                                     VD->getFullName());
     if (Result.OtherViables.empty())
       continue;
-    if (!Result.Favored->getDeclContext()->isGenericTypeContext())
+    if (!Result.Favored->getDeclContext()->isGenericContext())
       continue;
     for (ValueDecl *Default : Result.OtherViables) {
       if (Default->getDeclContext()->isExtensionContext()) {

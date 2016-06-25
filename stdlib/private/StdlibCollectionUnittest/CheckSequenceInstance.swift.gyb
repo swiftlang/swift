@@ -26,14 +26,13 @@ import StdlibUnittest
 
 public func checkIterator<
   ${genericParam}, I : IteratorProtocol
-  where I.Element == ${Element}
 >(
   _ expected: ${Expected},
   _ iterator: I,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
-) {
+) where I.Element == ${Element} {
   // Copying a `IteratorProtocol` is allowed.
   var mutableGen = iterator
   var actual: [${Element}] = []
@@ -43,24 +42,21 @@ public func checkIterator<
   expectEqualSequence(
     expected, actual, ${trace}, sameValue: sameValue)
 
-  if resiliencyChecks.callNextOnExhaustedGenerator {
-    // Having returned `.None` once, a `IteratorProtocol` should not generate more
-    // elements.
-    for _ in 0..<10 {
-      expectEmpty(mutableGen.next(), ${trace})
-    }
+  // Having returned `.None` once, a `IteratorProtocol` should not generate
+  // more elements.
+  for _ in 0..<10 {
+    expectEmpty(mutableGen.next(), ${trace})
   }
 }
 
 public func checkIterator<
   ${genericParam}, I : IteratorProtocol
-  where I.Element == ${Element}, ${Element} : Equatable
 >(
   _ expected: ${Expected},
   _ iterator: I,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
-) {
+) where I.Element == ${Element}, ${Element} : Equatable {
   checkIterator(
     expected, iterator, ${trace},
     resiliencyChecks: resiliencyChecks, showFrame: false
@@ -69,15 +65,13 @@ public func checkIterator<
 
 public func checkSequence<
   ${genericParam}, S : Sequence
-  where
-  S.Iterator.Element == ${Element}
 >(
   _ expected: ${Expected},
   _ sequence: S,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
-) {
+) where S.Iterator.Element == ${Element} {
   let expectedCount: Int = numericCast(expected.count)
   checkIterator(
     expected, sequence.makeIterator(), ${trace},
@@ -89,7 +83,7 @@ public func checkSequence<
 
   // Check that _copyContents does the right thing if we can do so
   // without destroying the sequence.
-  sequence._preprocessingPass { () -> Void in 
+  _ = sequence._preprocessingPass { () -> Void in
     var count = 0
     for _ in sequence { count += 1 }
     let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
@@ -107,15 +101,15 @@ public func checkSequence<
 
 public func checkSequence<
   ${genericParam}, S : Sequence
-  where
-  S.Iterator.Element == ${Element},
-  S.Iterator.Element : Equatable
 >(
   _ expected: ${Expected},
   _ sequence: S,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
-) {
+) where
+  S.Iterator.Element == ${Element},
+  S.Iterator.Element : Equatable {
+
   checkSequence(
     expected, sequence, ${trace},
     resiliencyChecks: resiliencyChecks, showFrame: false

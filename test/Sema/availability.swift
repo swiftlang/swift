@@ -19,7 +19,7 @@ func foo(x : NSUInteger) { // expected-error {{'NSUInteger' is unavailable: use 
 // Test preventing overrides of unavailable methods.
 class ClassWithUnavailable {
   @available(*, unavailable)
-  func doNotOverride() {}
+  func doNotOverride() {} // expected-note {{'doNotOverride()' has been explicitly marked unavailable here}}
 
   // FIXME: extraneous diagnostic here
   @available(*, unavailable)
@@ -43,7 +43,7 @@ func testInit() {
   ClassWithUnavailable(int: 0) // expected-error {{'init(int:)' is unavailable}} // expected-warning{{unused}}
 }
 
-func testSuvscript(cwu: ClassWithUnavailable) {
+func testSubscript(cwu: ClassWithUnavailable) {
   _ = cwu[5] // expected-error{{'subscript' is unavailable}}
 }
 
@@ -62,6 +62,23 @@ func testString() {
   }
 }
  */
+
+// Test preventing protocol witnesses for unavailable requirements
+@objc
+protocol ProtocolWithRenamedRequirement {
+  @available(*, unavailable, renamed: "new(bar:)")
+  @objc optional func old(foo: Int) // expected-note{{'old(foo:)' has been explicitly marked unavailable here}}
+  func new(bar: Int)
+}
+
+class ClassWithGoodWitness : ProtocolWithRenamedRequirement {
+  @objc func new(bar: Int) {}
+}
+
+class ClassWithBadWitness : ProtocolWithRenamedRequirement {
+  @objc func old(foo: Int) {} // expected-error{{'old(foo:)' has been renamed to 'new(bar:)'}}
+  @objc func new(bar: Int) {}
+}
 
 @available(OSX, unavailable)
 let unavailableOnOSX: Int = 0 // expected-note{{explicitly marked unavailable here}}

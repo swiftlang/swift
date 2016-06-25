@@ -40,8 +40,8 @@ Ctor(f:12.5) // expected-warning{{unused}}
 
 // Default arguments for nested constructors/functions.
 struct Outer<T> {
-  struct Inner { // expected-error{{type 'Inner' nested in generic type}}
-    struct VeryInner {// expected-error{{type 'VeryInner' nested in generic type}}
+  struct Inner { // expected-error{{type 'Inner' cannot be nested in generic type 'Outer'}}
+    struct VeryInner {// expected-error{{type 'VeryInner' cannot be nested in generic type 'Inner'}}
       init (i : Int = 17, f : Float = 1.5) { }
       static func f(i: Int = 17, f: Float = 1.5) { }
       func g(i: Int = 17, f: Float = 1.5) { }
@@ -103,7 +103,7 @@ foo(true ? "foo" : "bar")
 func foo2<T>(_ x: T, y: Bool = true) {}
 
 extension Array {
-  func bar(_ x: Element -> Bool) -> Int? { return 0 }
+  func bar(_ x: (Element) -> Bool) -> Int? { return 0 }
 }
 
 foo2([].bar { $0 == "c" }!)
@@ -111,3 +111,14 @@ foo2([].bar { $0 == "c" }!)
 // rdar://problem/21643052
 let a = ["1", "2"].map { Int($0) }
 
+// Default arguments for static members used via ".foo"
+struct X<T> {
+  static func foo(i: Int, j: Int = 0) -> X {
+    return X()
+  }
+
+  static var bar: X { return X() }
+}
+
+let testXa: X<Int> = .foo(i: 0)
+let testXb: X<Int> = .bar

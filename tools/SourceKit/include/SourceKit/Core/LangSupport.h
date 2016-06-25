@@ -27,7 +27,6 @@ namespace llvm {
   class MemoryBuffer;
 }
 namespace SourceKit {
-  class Context;
 
 struct EntityInfo {
   UIdent Kind;
@@ -39,6 +38,7 @@ struct EntityInfo {
   bool IsTestCandidate = false;
   unsigned Line = 0;
   unsigned Column = 0;
+  ArrayRef<UIdent> Attrs;
 
   EntityInfo() = default;
 };
@@ -156,7 +156,7 @@ struct FilterRule {
   };
   Kind kind;
   bool hide;
-  std::vector<StringRef> names;
+  std::vector<StringRef> names; ///< Must be null-terminated.
   std::vector<UIdent> uids;
 };
 
@@ -471,9 +471,6 @@ public:
                           StringRef ModuleName,
                           ArrayRef<const char *> Args,
                           DocInfoConsumer &Consumer) = 0;
-
-  static std::unique_ptr<LangSupport> createSwiftLangSupport(
-                                                     SourceKit::Context &SKCtx);
 };
 
 } // namespace SourceKit

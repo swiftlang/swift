@@ -23,7 +23,6 @@ public protocol _Pointer {
 
 /// Derive a pointer argument from a convertible pointer type.
 @_transparent
-@warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertPointerToPointerArgument<
   FromPointer : _Pointer,
@@ -34,7 +33,6 @@ func _convertPointerToPointerArgument<
 
 /// Derive a pointer argument from the address of an inout parameter.
 @_transparent
-@warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertInOutToPointerArgument<
   ToPointer : _Pointer
@@ -47,7 +45,6 @@ func _convertInOutToPointerArgument<
 /// This always produces a non-null pointer, even if the array doesn't have any
 /// storage.
 @_transparent
-@warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertConstArrayToPointerArgument<
   FromElement,
@@ -70,7 +67,6 @@ func _convertConstArrayToPointerArgument<
 ///
 /// This always produces a non-null pointer, even if the array's length is 0.
 @_transparent
-@warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
   FromElement,
@@ -87,7 +83,6 @@ func _convertMutableArrayToPointerArgument<
 }
 
 /// Derive a UTF-8 pointer argument from a value string parameter.
-@warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
   ToPointer : _Pointer

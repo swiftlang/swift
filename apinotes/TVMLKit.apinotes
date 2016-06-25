@@ -6,6 +6,20 @@ Classes:
   - Selector: 'registerViewElementClass:forElementName:'
     SwiftName: 'registerViewElementClass(_:elementName:)'
     MethodKind: Class
+- Name: TVInterfaceFactory
+  Methods:
+  - Selector: 'imageForResource:'
+    SwiftName: 'resourceImage(name:)'
+    MethodKind: Instance
+  - Selector: 'viewForElement:existingView:'
+    SwiftName: 'makeView(element:existingView:)'
+    MethodKind: Instance
+  - Selector: 'viewControllerForElement:existingViewController:'
+    SwiftName: 'makeViewController(element:existingViewController:)'
+    MethodKind: Instance
+  - Selector: 'URLForResource:'
+    SwiftName: 'resourceURL(name:)'
+    MethodKind: Instance
 - Name: TVStyleFactory
   Methods:
   - Selector: 'registerStyle:withType:inherited:'
@@ -32,10 +46,10 @@ Classes:
     SwiftName: children
   Methods:
   - Selector: 'dispatchEventOfType:canBubble:cancellable:extraInfo:completion:'
-    SwiftName: 'dispatchEvent(type:canBubble:cancellable:extraInfo:completion:Bool):)'
+    SwiftName: 'dispatchEvent(type:canBubble:cancellable:extraInfo:completion:)'
     MethodKind: Instance
   - Selector: 'dispatchEventWithName:canBubble:cancellable:extraInfo:completion:'
-    SwiftName: 'dispatchEvent(name:canBubble:cancellable:extraInfo:completion:Bool):)'
+    SwiftName: 'dispatchEvent(name:canBubble:cancellable:extraInfo:completion:)'
     MethodKind: Instance
 - Name: TVViewElementStyle
   Methods:
@@ -56,6 +70,9 @@ Protocols:
     MethodKind: Instance
 - Name: TVInterfaceCreating
   Methods:
+  - Selector: 'imageForResource:'
+    SwiftName: 'resourceImage(name:)'
+    MethodKind: Instance
   - Selector: 'viewForElement:existingView:'
     SwiftName: 'makeView(element:existingView:)'
     MethodKind: Instance

@@ -18,6 +18,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -1050,16 +1051,6 @@ public:
     auto InitStorageTy = InitStorage->getType().getAs<SILFunctionType>();
     require(InitStorageTy,
             "mark_uninitialized initializer must be a function");
-    if (auto sig = InitStorageTy->getGenericSignature()) {
-      require(sig->getGenericParams().size()
-              == MU->getInitStorageSubstitutions().size(),
-              "mark_uninitialized initializer must be given right number "
-              "of substitutions");
-    } else {
-      require(MU->getInitStorageSubstitutions().size() == 0,
-              "mark_uninitialized initializer must be given right number "
-              "of substitutions");
-    }
     auto SubstInitStorageTy = InitStorageTy->substGenericArgs(F.getModule(),
                                              F.getModule().getSwiftModule(),
                                              MU->getInitStorageSubstitutions());
@@ -1075,16 +1066,6 @@ public:
     auto SetterTy = Setter->getType().getAs<SILFunctionType>();
     require(SetterTy,
             "mark_uninitialized setter must be a function");
-    if (auto sig = SetterTy->getGenericSignature()) {
-      require(sig->getGenericParams().size()
-              == MU->getSetterSubstitutions().size(),
-              "mark_uninitialized initializer must be given right number "
-              "of substitutions");
-    } else {
-      require(MU->getSetterSubstitutions().size() == 0,
-              "mark_uninitialized initializer must be given right number "
-              "of substitutions");
-    }
     auto SubstSetterTy = SetterTy->substGenericArgs(F.getModule(),
                                                F.getModule().getSwiftModule(),
                                                MU->getSetterSubstitutions());
@@ -1341,6 +1322,10 @@ public:
   // Is a SIL type a potential lowering of a formal type?
   static bool isLoweringOf(SILType loweredType,
                            CanType formalType) {
+    // Dynamic self has the same lowering as its contained type.
+    if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
+      formalType = CanType(dynamicSelf->getSelfType());
+
     // Metatypes preserve their instance type through lowering.
     if (auto loweredMT = loweredType.getAs<MetatypeType>()) {
       if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
@@ -1704,7 +1689,10 @@ public:
                                      dynResults,
                                      methodTy->getOptionalErrorResult(),
                                      F.getASTContext());
-    return SILType::getPrimitiveObjectType(fnTy);
+    auto boundFnTy = ArchetypeBuilder::mapTypeIntoContext(
+        method.getDecl()->getDeclContext(), fnTy)
+      ->getCanonicalType();
+    return SILType::getPrimitiveObjectType(boundFnTy);
   }
   
   void checkDynamicMethodInst(DynamicMethodInst *EMI) {
@@ -1717,12 +1705,13 @@ public:
               "operand must have metatype type");
       require(operandType.getSwiftType()->castTo<MetatypeType>()
                 ->getInstanceType()->mayHaveSuperclass(),
-              "operand must have metatype of class or class-bound type");
+              "operand must have metatype of class or class-bounded type");
     }
     
-    requireSameType(EMI->getType(),
-                    getDynamicMethodType(operandType, EMI->getMember()),
-                    "result must be of the method's type");
+    require(getDynamicMethodType(operandType, EMI->getMember())
+              .getSwiftRValueType()
+              ->isBindableTo(EMI->getType().getSwiftRValueType(), nullptr),
+            "result must be of the method's type");
   }
 
   void checkClassMethodInst(ClassMethodInst *CMI) {
@@ -2215,10 +2204,18 @@ public:
               "upcast operand must be a class or class metatype instance");
       CanType opInstTy(UI->getOperand()->getType().castTo<MetatypeType>()
                          ->getInstanceType());
-      require(instTy->getClassOrBoundGenericClass(),
+      auto instClass = instTy->getClassOrBoundGenericClass();
+      require(instClass,
               "upcast must convert a class metatype to a class metatype");
-      require(instTy->isExactSuperclassOf(opInstTy, nullptr),
-              "upcast must cast to a superclass or an existential metatype");
+      
+      if (instClass->usesObjCGenericsModel()) {
+        require(instClass->getDeclaredTypeInContext()
+                  ->isBindableToSuperclassOf(opInstTy, nullptr),
+                "upcast must cast to a superclass or an existential metatype");
+      } else {
+        require(instTy->isExactSuperclassOf(opInstTy, nullptr),
+                "upcast must cast to a superclass or an existential metatype");
+      }
       return;
     }
 
@@ -2241,10 +2238,18 @@ public:
           FromTy.getSwiftRValueType().getAnyOptionalObjectType());
     }
 
-    require(ToTy.getClassOrBoundGenericClass(),
+    auto ToClass = ToTy.getClassOrBoundGenericClass();
+    require(ToClass,
             "upcast must convert a class instance to a class type");
-    require(ToTy.isExactSuperclassOf(FromTy),
-            "upcast must cast to a superclass");
+      if (ToClass->usesObjCGenericsModel()) {
+        require(ToClass->getDeclaredTypeInContext()
+                  ->isBindableToSuperclassOf(FromTy.getSwiftRValueType(),
+                                             nullptr),
+                "upcast must cast to a superclass or an existential metatype");
+      } else {
+        require(ToTy.isExactSuperclassOf(FromTy),
+                "upcast must cast to a superclass or an existential metatype");
+      }
   }
 
   void checkIsNonnullInst(IsNonnullInst *II) {
@@ -2671,14 +2676,24 @@ public:
               "no arguments");
   }
 
+  bool verifyBranchArgs(SILValue branchArg, SILArgument *bbArg) {
+    // NOTE: IRGen currently does not support the following method_inst
+    // variants as branch arguments.
+    // Once this is supported, the check can be removed.
+    require(!(isa<MethodInst>(branchArg) &&
+              cast<MethodInst>(branchArg)->getMember().isForeign),
+        "branch argument cannot be a witness_method or an objc method_inst");
+    return branchArg->getType() == bbArg->getType();
+  }
+
   void checkBranchInst(BranchInst *BI) {
     require(BI->getArgs().size() == BI->getDestBB()->bbarg_size(),
             "branch has wrong number of arguments for dest bb");
     require(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
-                      BI->getDestBB()->bbarg_begin(),
-                      [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg->getType() == bbArg->getType();
-                      }),
+                       BI->getDestBB()->bbarg_begin(),
+                       [&](SILValue branchArg, SILArgument *bbArg) {
+                         return verifyBranchArgs(branchArg, bbArg);
+                       }),
             "branch argument types do not match arguments for dest bb");
   }
 
@@ -2700,8 +2715,8 @@ public:
             "identical destinations");
     require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
                       CBI->getTrueBB()->bbarg_begin(),
-                      [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg->getType() == bbArg->getType();
+                      [&](SILValue branchArg, SILArgument *bbArg) {
+                        return verifyBranchArgs(branchArg, bbArg);
                       }),
             "true branch argument types do not match arguments for dest bb");
 
@@ -2709,8 +2724,8 @@ public:
             "false branch has wrong number of arguments for dest bb");
     require(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
                       CBI->getFalseBB()->bbarg_begin(),
-                      [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg->getType() == bbArg->getType();
+                      [&](SILValue branchArg, SILArgument *bbArg) {
+                        return verifyBranchArgs(branchArg, bbArg);
                       }),
             "false branch argument types do not match arguments for dest bb");
   }
@@ -2731,9 +2746,11 @@ public:
     require(DMBI->getHasMethodBB()->bbarg_size() == 1,
             "true bb for dynamic_method_br must take an argument");
     
-    requireSameType(DMBI->getHasMethodBB()->bbarg_begin()[0]->getType(),
-                    getDynamicMethodType(operandType, DMBI->getMember()),
-              "bb argument for dynamic_method_br must be of the method's type");
+    auto bbArgTy = DMBI->getHasMethodBB()->bbarg_begin()[0]->getType();
+    require(getDynamicMethodType(operandType, DMBI->getMember())
+              .getSwiftRValueType()
+              ->isBindableTo(bbArgTy.getSwiftRValueType(), nullptr),
+            "bb argument for dynamic_method_br must be of the method's type");
   }
   
   void checkProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
@@ -2766,9 +2783,16 @@ public:
             "invoke function operand must be a c function");
     require(invokeTy->getParameters().size() >= 1,
             "invoke function must take at least one parameter");
+    require(!invokeTy->getGenericSignature() ||
+            invokeTy->getExtInfo().isPseudogeneric(),
+            "invoke function must not take reified generic parameters");
+    
+    invokeTy = checkApplySubstitutions(IBSHI->getSubstitutions(),
+                                    SILType::getPrimitiveObjectType(invokeTy));
+    
     auto storageParam = invokeTy->getParameters()[0];
     require(storageParam.getConvention() ==
-              ParameterConvention::Indirect_InoutAliasable,
+            ParameterConvention::Indirect_InoutAliasable,
             "invoke function must take block storage as @inout_aliasable "
             "parameter");
     require(storageParam.getType() == storageTy,

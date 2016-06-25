@@ -1,5 +1,8 @@
 // Check interface produced for the standard library.
 //
+// REQUIRES: long_test
+// REQUIRES: nonexecutable_test
+//
 // RUN: %target-swift-frontend -parse %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=Swift -source-filename %s -print-interface > %t.txt
 // RUN: FileCheck -check-prefix=CHECK-ARGC %s < %t.txt
@@ -33,8 +36,8 @@
 // DONT_CHECK-NOT: {{([^I]|$)([^n]|$)([^d]|$)([^e]|$)([^x]|$)([^a]|$)([^b]|$)([^l]|$)([^e]|$)}}
 // CHECK-NOT: buffer: _ArrayBuffer
 // CHECK-NOT: func ~>
-// FIXME: Builtin.
-// FIXME: RawPointer
+// CHECK-NOT: Builtin.
+// CHECK-NOT: RawPointer
 // CHECK-NOT: extension [
 // CHECK-NOT: extension {{.*}}?
 // CHECK-NOT: extension {{.*}}!
@@ -94,5 +97,4 @@ func foo(x: _Pointer) {} // Checks that this protocol actually exists.
 
 // CHECK-FREQUENT-WORD: ///
 // CHECK-FREQUENT-WORD-NOT: where Slice<Dictionary<Key, Value>> == Slice<Self>
-// CHECK-FREQUENT-WORD-NOT: @warn_unused_result
 // CHECK-COLLECTION-GROUP: extension MutableCollection

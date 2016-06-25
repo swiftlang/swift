@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+
+# This script uses a regex to validate the output of our backtraces.
+# The layout we assume is:
+#
+# <frame number> <library name> <address> <demangled name> + <offset>
+#
+# It currently just checks that the backtrace results in at least one correctly
+# formatted entry. It does not directly validate the input since the output
+# would not be robust against standard library changes.
+#
+# TODO: We could have the user pass in the frame number, library name, and
+# demangled name. These we can always validate as true in a robust way. On the
+# other hand, address and offset are more difficult to validate in a robust way
+# in the face of small codegen differences, so without any further thought I
+# imagine we can just check the format.
+#
+# 11 libswiftCore.dylib 0x000000000dce84d0l _fatalErrorMessage(StaticString,
+# StaticString, StaticString, UInt, flags : UInt32) -> () + 444
+
+import re
+import sys
+
+TARGET_RE = re.compile(
+    "(?P<index>\d+) +(?P<object>\S+) +(?P<address>0x[0-9a-fA-F]{16}) "
+    "(?P<routine>[^+]+) [+] (?P<offset>\d+)")
+
+lines = sys.stdin.readlines()
+
+found_stack_trace_start = False
+found_stack_trace_entry = False
+for l in lines:
+    l = l.rstrip("\n")
+
+    # First see if we found the start of our stack trace start. If so, set the
+    # found stack trace flag and continue.
+    if l == "Current stack trace:":
+        assert(not found_stack_trace_start)
+        found_stack_trace_start = True
+        continue
+
+    # Otherwise, if we have not yet found the stack trace start, continue. We
+    # need to find the stack trace start line.
+    if not found_stack_trace_start:
+        continue
+
+    # Ok, we are in the middle of matching a stack trace entry.
+    m = TARGET_RE.match(l)
+    # If we fail to match, we have exited the stack trace entry region
+    if m is None:
+        break
+    # At this point, we know that we have some sort of match.
+    found_stack_trace_entry = True
+    print("Stack Trace Entry:")
+    print("\tIndex: '%(index)s'\n\tObject File: '%(object)s'\n\tAddress: "
+          "'%(address)s'\n\tRoutine: '%(routine)s'\n\tOffset: '%(offset)s'"
+          "\n" % m.groupdict())
+
+# Once we have processed all of the lines, make sure that we found at least one
+# stack trace entry.
+assert(found_stack_trace_entry)

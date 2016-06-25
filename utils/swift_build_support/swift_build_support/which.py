@@ -16,9 +16,13 @@
 #
 # ----------------------------------------------------------------------------
 
-import subprocess
+from __future__ import absolute_import
+
+from . import cache_util
+from . import shell
 
 
+@cache_util.cached
 def which(cmd):
     """
     Return the path to an executable which would be run if
@@ -30,7 +34,8 @@ def which(cmd):
     We provide our own implementation because shutil.which() has not
     been backported to Python 2.7, which we support.
     """
-    try:
-        return subprocess.check_output(['which', cmd]).rstrip().decode()
-    except subprocess.CalledProcessError:
+    out = shell.capture(['which', cmd],
+                        dry_run=False, echo=False, optional=True)
+    if out is None:
         return None
+    return out.rstrip()

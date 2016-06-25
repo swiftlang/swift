@@ -487,6 +487,8 @@ enum class CompletionKind {
   PostfixExprParen,
   SuperExpr,
   SuperExprDot,
+  KeyPathExpr,
+  KeyPathExprDot,
   TypeSimpleBeginning,
   TypeIdentifierWithDot,
   TypeIdentifierWithoutDot,
@@ -535,11 +537,9 @@ public:
   };
 
   enum NotRecommendedReason {
-
     Redundant,
-
     TypeMismatch,
-
+    Deprecated,
     NoReason,
   };
 

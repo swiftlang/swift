@@ -74,6 +74,12 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
         Ty = parseTypeIdentifier();
       } else if (Tok.getKind() == tok::kw_protocol) {
         Ty = parseTypeComposition();
+      } else if (Tok.getKind() == tok::kw_class) {
+        diagnose(Tok, diag::unexpected_class_constraint);
+        diagnose(Tok, diag::suggest_anyobject, Name)
+          .fixItReplace(Tok.getLoc(), "AnyObject");
+        consumeToken();
+        Invalid = true;
       } else {
         diagnose(Tok, diag::expected_generics_type_restriction, Name);
         Invalid = true;
@@ -254,3 +260,43 @@ ParserStatus Parser::parseGenericWhereClause(
 
   return Status;
 }
+
+
+/// Parse a free-standing where clause attached to a declaration, adding it to
+/// a generic parameter list that may (or may not) already exist.
+ParserStatus Parser::
+parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
+                                    WhereClauseKind kind) {
+  assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
+  
+  // Push the generic arguments back into a local scope so that references will
+  // find them.
+  Scope S(this, ScopeKind::Generics);
+  
+  if (genericParams)
+    for (auto pd : genericParams->getParams())
+      addToScope(pd);
+  
+  SmallVector<RequirementRepr, 4> Requirements;
+  if (genericParams)
+    Requirements.append(genericParams->getRequirements().begin(),
+                        genericParams->getRequirements().end());
+  
+  SourceLoc WhereLoc;
+  bool FirstTypeInComplete;
+  auto result = parseGenericWhereClause(WhereLoc, Requirements,
+                                        FirstTypeInComplete);
+  if (result.shouldStopParsing() || Requirements.empty())
+    return result;
+
+  if (!genericParams)
+    diagnose(WhereLoc, diag::where_without_generic_params, unsigned(kind));
+  else
+    genericParams = GenericParamList::create(Context,
+                                             genericParams->getLAngleLoc(),
+                                             genericParams->getParams(),
+                                             WhereLoc, Requirements,
+                                             genericParams->getRAngleLoc());
+  return ParserStatus();
+}
+

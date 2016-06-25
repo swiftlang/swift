@@ -1,4 +1,4 @@
-add_swift_library(swiftIndex
+add_swift_library(swiftIndex STATIC
   Index.cpp
   IndexDataConsumer.cpp
   IndexSymbol.cpp

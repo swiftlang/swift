@@ -9,9 +9,9 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
+// RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
+// RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone
+// RUN: %line-directive %t/out.swift -- %target-run %t/a.out
 // --stdlib-unittest-filter DoubleWidth/
 
 // REQUIRES: executable_test
@@ -150,7 +150,6 @@ public protocol Arithmetic : Equatable, IntegerLiteralConvertible {
 % for x in binaryArithmetic['Arithmetic']:
   // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
-  @warn_unused_result
   func ${x.name}(${x.firstArg} rhs: Self) -> Self
 
   // implementation hook
@@ -190,7 +189,6 @@ extension SignedArithmetic {
 %   for x in binaryArithmetic[Protocol]:
 %     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 @_transparent
-@warn_unused_result
 public func ${x.operator} <T: ${Protocol}>(lhs: T, rhs: T) -> T {
   return lhs.${x.name}(${callLabel}rhs)
 }
@@ -203,7 +201,6 @@ public func ${x.operator}= <T: ${Protocol}>(lhs: inout T, rhs: T) {
 % end
 
 @_transparent
-@warn_unused_result
 public prefix func -<T: SignedArithmetic>(x: T) -> T {
   return x.negate()
 }
@@ -263,9 +260,7 @@ public protocol Integer : ${IntegerBase} {
   // Dispatching through these puts less stress on the user reading
   // the interface and error messages (and on the type checker) than
   // does having many operator overloads.
-  @warn_unused_result
   func isEqual(to rhs: Self) -> Bool
-  @warn_unused_result
   func isLess(than rhs: Self) -> Bool
 
   /// Creates an instance of `Self` from the value of any other `Integer`,
@@ -285,7 +280,6 @@ public protocol Integer : ${IntegerBase} {
 
   /// Return n-th word (counting from the right) in the underlying
   /// representation of `self`.
-  @warn_unused_result
   func nthWord(_ n: Word) -> UWord
 
   /// A number of bits in current representation of `self`
@@ -301,7 +295,6 @@ public protocol Integer : ${IntegerBase} {
 % for x in binaryArithmetic['Integer']:
   // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
-  @warn_unused_result
   func ${x.name}(${x.firstArg} rhs: Self) -> Self
 
   // implementation hook
@@ -329,20 +322,17 @@ extension Integer {
 
 //===--- Homogeneous comparison -------------------------------------------===//
 @_transparent
-@warn_unused_result
 public func == <T : Integer>(lhs:T, rhs: T) -> Bool {
   return lhs.isEqual(to: rhs)
 }
 
 @_transparent
-@warn_unused_result
 public func < <T : Integer>(lhs: T, rhs: T) -> Bool {
   return lhs.isLess(than: rhs)
 }
 
 //===--- Heterogeneous comparison -----------------------------------------===//
 @_transparent
-@warn_unused_result
 public func == <T : Integer, U : Integer>(lhs:T, rhs: U) -> Bool {
   return (lhs > 0) == (rhs > 0)
     && T(extendingOrTruncating: rhs) == lhs
@@ -350,13 +340,11 @@ public func == <T : Integer, U : Integer>(lhs:T, rhs: U) -> Bool {
 }
 
 @_transparent
-@warn_unused_result
 public func != <T : Integer, U : Integer>(lhs:T, rhs: U) -> Bool {
   return !(lhs == rhs)
 }
 
 @_transparent
-@warn_unused_result
 public func < <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
   let lhsSign = lhs < 0 ? -1 : lhs > 0 ? 1 : 0
   let rhsSign = rhs < 0 ? -1 : rhs > 0 ? 1 : 0
@@ -381,19 +369,16 @@ public func < <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
 }
 
 @inline(__always)
-@warn_unused_result
 public func <= <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
   return !(rhs < lhs)
 }
 
 @inline(__always)
-@warn_unused_result
 public func >= <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
   return !(lhs < rhs)
 }
 
 @inline(__always)
-@warn_unused_result
 public func > <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
   return rhs < lhs
 }
@@ -410,25 +395,21 @@ public func > <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool {
 //     <T : Integer>(T, T) -> Bool
 
 @_transparent
-@warn_unused_result
 public func != <T : Integer>(lhs: T, rhs: T) -> Bool {
   return !(lhs == rhs)
 }
 
 @inline(__always)
-@warn_unused_result
 public func <= <T : Integer>(lhs: T, rhs: T) -> Bool {
   return !(rhs < lhs)
 }
 
 @inline(__always)
-@warn_unused_result
 public func >= <T : Integer>(lhs: T, rhs: T) -> Bool {
   return !(lhs < rhs)
 }
 
 @inline(__always)
-@warn_unused_result
 public func > <T : Integer>(lhs: T, rhs: T) -> Bool {
   return rhs < lhs
 }
@@ -474,25 +455,21 @@ comment = '''
   /// - Precondition: `rhs != 0`''' if x.kind == '/' else '')
 }%
 ${comment}
-  @warn_unused_result
   func ${x.name}WithOverflow(
     ${x.firstArg} rhs: Self
   ) -> (partialValue: Self, overflow: ArithmeticOverflow)
 % end
 
 % for x in binaryBitwise + maskingShifts:
-  @warn_unused_result
   func ${x.name}(_ rhs: Self) -> Self
 % end
 
-  @warn_unused_result
   func doubleWidthMultiply(_ other: Self) -> (high: Self, low: AbsoluteValue)
 
   init(_truncatingBits bits: UWord)
 }
 
 % for x in binaryBitwise:
-@warn_unused_result
 @_transparent
 public func ${x.operator} <T: FixedWidthInteger>(lhs: T, rhs: T) -> T {
   return lhs.${x.name}(rhs)
@@ -505,7 +482,6 @@ public func ${x.operator}= <T: FixedWidthInteger>(lhs: inout T, rhs: T) {
 % end
 
 % for x in maskingShifts:
-@warn_unused_result
 @_transparent
 public func ${x.operator} <T: FixedWidthInteger>(lhs: T, rhs: T) -> T {
   return lhs.${x.name}(rhs)
@@ -516,7 +492,6 @@ public func ${x.operator}= <T: FixedWidthInteger>(lhs: inout T, rhs: T) {
   lhs = lhs ${x.operator} rhs
 }
 
-@warn_unused_result
 @_transparent
 public func ${x.operator} <
   T: FixedWidthInteger, U: Integer
@@ -531,7 +506,6 @@ public func ${x.operator}= <
   lhs = lhs ${x.operator} rhs
 }
 
-@warn_unused_result
 @_transparent
 public func ${x.nonMaskingOperator} <
   T: FixedWidthInteger, U: Integer
@@ -544,7 +518,6 @@ public func ${x.nonMaskingOperator} <
 
 // "Smart shift", supporting overshifts and negative shifts
 
-@warn_unused_result
 @_transparent
 public func ${x.nonMaskingOperator} <
   T: FixedWidthInteger
@@ -579,7 +552,6 @@ public func ${x.nonMaskingOperator}= <
 }
 % end
 
-@warn_unused_result
 @inline(__always)
 public prefix func ~ <T: FixedWidthInteger>(x: T) -> T {
   return 0 &- x &- 1
@@ -610,7 +582,6 @@ extension FixedWidthInteger {
   ///
   /// Note: use this function to avoid the cost of overflow checking
   /// when you are sure that the operation won't overflow.
-  @warn_unused_result
   @_transparent
   public func unsafe${capitalize(x.name)}(rhs: Self) -> Self {
     let (result, overflow) = self.${x.name}WithOverflow(${callLabel}rhs)
@@ -664,7 +635,6 @@ extension FixedWidthInteger {
 % for x in allBinaryArithmetic:
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 %   if x.kind != '/':
-@warn_unused_result
 public func &${x.operator} <T: FixedWidthInteger>(lhs: T, rhs: T) -> T {
   return lhs.${x.name}WithOverflow(${callLabel}rhs).partialValue
 }
@@ -798,12 +768,10 @@ public struct ${Self}
     _storage = x._storage
   }
 
-  @warn_unused_result
   public func isEqual(to rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_Int${bits}(_storage, rhs._storage))
   }
 
-  @warn_unused_result
   public func isLess(than rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_${u}lt_Int${bits}(_storage, rhs._storage))
   }
@@ -813,7 +781,6 @@ public struct ${Self}
   /// Return a pair consisting of `self` ${x.operator} `rhs`,
   /// truncated to fit if necessary, and a flag indicating whether an
   /// arithmetic overflow occurred.
-  @warn_unused_result
   @_transparent
   public func ${x.name}WithOverflow(
     ${x.firstArg} rhs: ${Self}
@@ -852,7 +819,6 @@ public struct ${Self}
   }
 
 % for x in binaryBitwise:
-  @warn_unused_result
   @_transparent
   public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
     return ${Self}(
@@ -861,7 +827,6 @@ public struct ${Self}
 % end
 
 % for x in maskingShifts:
-  @warn_unused_result
   @_transparent
   public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
     let rhs_ = rhs & ${Self}._highBitIndex
@@ -887,7 +852,6 @@ public struct ${Self}
 
 
   @_transparent
-  @warn_unused_result
   public func countLeadingZeros() -> Word {
     return Word(
       ${Self}(
@@ -934,7 +898,6 @@ public struct ${Self}
 % end
 
 %     dbits = bits*2
-  @warn_unused_result
   public func doubleWidthMultiply(_ other: ${Self})
     -> (high: ${Self}, low: ${Self}.AbsoluteValue) {
 %       if bits > 64:
@@ -992,13 +955,11 @@ public struct DoubleWidth<
       _storage.high.absoluteValue, _storage.low.absoluteValue))
   }
 
-  @warn_unused_result
   public func isEqual(to rhs: DoubleWidth<T>) -> Bool {
     return (_storage.high == rhs._storage.high) &&
            (_storage.low == rhs._storage.low)
   }
 
-  @warn_unused_result
   public func isLess(than rhs: DoubleWidth<T>) -> Bool {
     if _storage.high < rhs._storage.high {
       return true
@@ -1017,7 +978,6 @@ public struct DoubleWidth<
     fatalError()
   }
 
-  @warn_unused_result
   public func nthWord(_ n: Word) -> UWord {
     if T.bitWidth < ${word_bits} || T.bitWidth % ${word_bits} != 0 {
       fatalError("nthWord is not supported on this type")
@@ -1073,7 +1033,6 @@ public struct DoubleWidth<
 % end
 
 
-  @warn_unused_result
   public func multipliedWithOverflow(
     by rhs: DoubleWidth<T>
   ) -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
@@ -1135,7 +1094,6 @@ public struct DoubleWidth<
   }
 
 % for x in allBinaryArithmetic[3:]:
-  @warn_unused_result
   public func ${x.name}WithOverflow(
     ${x.firstArg} rhs: DoubleWidth<T>
   ) -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
@@ -1143,14 +1101,12 @@ public struct DoubleWidth<
   }
 % end
 
-  @warn_unused_result
   public func doubleWidthMultiply(_ other: DoubleWidth<T>)
     -> (high: DoubleWidth<T>, low: DoubleWidth<T>.AbsoluteValue) {
       fatalError()
   }
 
 % for x in binaryBitwise + maskingShifts:
-  @warn_unused_result
   public func ${x.name}(_ rhs: DoubleWidth<T>) -> DoubleWidth<T> {
     fatalError()
   }
@@ -1200,12 +1156,10 @@ public struct ${Self}
     fatalError()
   }
 
-  @warn_unused_result
   public func isEqual(to rhs: ${Self}) -> Bool {
     return _storage.isEqual(to: rhs._storage)
   }
 
-  @warn_unused_result
   public func isLess(than rhs: ${Self}) -> Bool {
     return _storage.isLess(than: rhs._storage)
   }
@@ -1215,7 +1169,6 @@ public struct ${Self}
   /// Return a pair consisting of `self` ${x.operator} `rhs`,
   /// truncated to fit if necessary, and a flag indicating whether an
   /// arithmetic overflow occurred.
-  @warn_unused_result
   public func ${x.name}WithOverflow(
     ${x.firstArg} rhs: ${Self}
   ) -> (partialValue: ${Self}, overflow: ArithmeticOverflow) {
@@ -1224,7 +1177,6 @@ public struct ${Self}
 %   end
 
 % for x in binaryBitwise:
-  @warn_unused_result
   @_transparent
   public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
     fatalError()
@@ -1232,7 +1184,6 @@ public struct ${Self}
 % end
 
 % for x in maskingShifts:
-  @warn_unused_result
   @_transparent
   public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
     fatalError()
@@ -1247,7 +1198,6 @@ public struct ${Self}
     return _storage.signBitIndex
   }
 
-  @warn_unused_result
   public func countLeadingZeros() -> Word {
     fatalError()
   }
@@ -1268,7 +1218,6 @@ public struct ${Self}
   }
 % end
 
-  @warn_unused_result
   public func doubleWidthMultiply(_ other: ${Self})
     -> (high: ${Self}, low: ${Self}.AbsoluteValue) {
     let (high: high, low: low) = _storage.doubleWidthMultiply(other._storage)

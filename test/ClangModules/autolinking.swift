@@ -16,6 +16,7 @@
 // UNSUPPORTED: OS=linux-gnu
 // UNSUPPORTED: OS=linux-gnueabihf
 // UNSUPPORTED: OS=freebsd
+// UNSUPPORTED: OS=linux-androideabi
 
 import LinkMusket
 import LinkFramework

@@ -10,52 +10,114 @@
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import os
-import platform
 import unittest
 
-from swift_build_support.toolchain import host_clang, host_toolchain
+from swift_build_support import toolchain
+from swift_build_support.toolchain import host_toolchain
 
 
-class HostClangTestCase(unittest.TestCase):
-    def test_clang_available_on_this_platform(self):
-        # Test that Clang is installed on this platform, as a means of
-        # testing host_clang().
-        clang = host_clang(xcrun_toolchain='default')
-
-        # The CC and CXX from host_clang() should be of the form
-        # 'path/to/clang', where 'clang' may have a trailing version
-        # number.
-        self.assertTrue(os.path.split(clang.cc)[-1].startswith('clang'))
-        self.assertTrue(os.path.split(clang.cxx)[-1].startswith('clang++'))
+def get_suffix(path, prefix):
+    basename = os.path.basename(path)
+    return basename[len(prefix):]
 
 
-class HostToolchainTestCase(unittest.TestCase):
-    def test_found_executables_match(self):
-        # Test that the raw invocation of _first_common_executables
-        # either returns None or matching paths.
-        suffixes = ['', '-3.8', '-3.7', '-3.6']
-        toolchain = host_toolchain(suffixes=suffixes)
-        self.assertTrue(len(toolchain.tools) == 2)
+class ToolchainTestCase(unittest.TestCase):
 
-        exec_names = {'foo': 'a-tool-that-does-not-exist'}
-        toolchain = host_toolchain(tools=exec_names,
-                                   suffixes=suffixes)
-        self.assertIsNone(toolchain)
+    def test_clang_tools(self):
+        tc = host_toolchain()
 
-    @unittest.skipUnless(platform.system() == 'Darwin',
-                         'llvm-cov is only guaranteed to exist on OS X')
-    def test_can_find_llvm_cov(self):
-        suffixes = ['', '-3.8', '-3.7', '-3.6']
-        exec_names = {'llvm_cov': 'llvm-cov'}
-        toolchain = host_toolchain(tools=exec_names, suffixes=suffixes)
+        self.assertIsNotNone(tc.cc)
+        self.assertIsNotNone(tc.cxx)
 
-        # must have clang, clang++, and llvm-cov
-        self.assertTrue(len(toolchain.tools) == 3)
+        self.assertTrue(
+            os.path.isabs(tc.cc) and
+            os.path.basename(tc.cc).startswith('clang'))
+        self.assertTrue(
+            os.path.isabs(tc.cxx) and
+            os.path.basename(tc.cxx).startswith('clang++'))
 
-        try:
-            toolchain.llvm_cov
-        except AttributeError:
-            self.fail("toolchain does not have llvm_cov")
+    def test_llvm_tools(self):
+        tc = host_toolchain()
+
+        self.assertTrue(
+            tc.llvm_profdata is None or
+            os.path.isabs(tc.llvm_profdata) and
+            os.path.basename(tc.llvm_profdata).startswith('llvm-profdata'))
+        self.assertTrue(
+            tc.llvm_cov is None or
+            os.path.isabs(tc.llvm_cov) and
+            os.path.basename(tc.llvm_cov).startswith('llvm-cov'))
+
+    def test_misc_tools(self):
+        tc = host_toolchain()
+
+        # CMake
+        self.assertIsNotNone(tc.cmake)
+        self.assertTrue(
+            os.path.basename(tc.cmake).startswith('cmake'))
+
+        # Ninja
+        self.assertTrue(tc.ninja is None or
+                        os.path.basename(tc.ninja) == 'ninja' or
+                        os.path.basename(tc.ninja) == 'ninja-build')
+        # distcc
+        self.assertTrue(tc.distcc is None or
+                        os.path.basename(tc.distcc) == 'distcc')
+        # pump
+        self.assertTrue(tc.distcc_pump is None or
+                        os.path.basename(tc.distcc_pump) == 'pump' or
+                        os.path.basename(tc.distcc_pump) == 'distcc-pump')
+
+    def test_find_tool(self):
+        tc = host_toolchain()
+
+        # Toolchain.find_tool(path) can find arbitrary tool in PATH
+
+        sh = tc.find_tool('sh')
+        self.assertTrue(sh is not None and
+                        os.path.isabs(sh) and
+                        os.path.basename(sh) == 'sh')
+        tar = tc.find_tool('tar')
+        self.assertTrue(tar is not None and
+                        os.path.isabs(tar) and
+                        os.path.basename(tar) == 'tar')
+
+    def test_tools_suffix_match(self):
+        tc = host_toolchain()
+
+        # CC and CXX must have consistent suffix
+        cc_suffix = get_suffix(tc.cc, 'clang')
+        cxx_suffix = get_suffix(tc.cxx, 'clang++')
+        self.assertEqual(cc_suffix, cxx_suffix)
+
+    def test_tools_llvm_suffix(self):
+        tc = host_toolchain()
+
+        cov_suffix = None
+        profdata_suffix = None
+        if tc.llvm_cov:
+            cov_suffix = get_suffix(tc.llvm_cov, 'llvm-cov')
+        if tc.llvm_profdata:
+            profdata_suffix = get_suffix(tc.llvm_profdata, 'llvm-profdata')
+
+        if profdata_suffix is not None and cov_suffix is not None:
+            self.assertEqual(profdata_suffix, cov_suffix)
+
+        # If we have suffixed clang, llvm tools must have the same suffix.
+        cc_suffix = get_suffix(tc.cc, 'clang')
+        if cc_suffix != '':
+            if cov_suffix is not None:
+                self.assertEqual(cc_suffix, cov_suffix)
+            if profdata_suffix is not None:
+                self.assertEqual(cc_suffix, profdata_suffix)
+
+    def test_toolchain_instances(self):
+        # Check that we can instantiate every toolchain, even if it isn't the
+        # current platform.
+        toolchain.MacOSX()
+        toolchain.Linux()
+        toolchain.FreeBSD()
+        toolchain.Cygwin()
 
 
 if __name__ == '__main__':

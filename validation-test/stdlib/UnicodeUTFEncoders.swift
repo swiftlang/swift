@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %target-build-swift %s -o %t/a.out -O
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -8,18 +11,15 @@ import StdlibUnittest
 
 import Foundation
 
-@_silgen_name("random") func random() -> UInt32
-@_silgen_name("srandomdev") func srandomdev()
-
 protocol TestableUnicodeCodec : UnicodeCodec {
   associatedtype CodeUnit : Integer
-  static func encodingId() -> NSStringEncoding
+  static func encodingId() -> String.Encoding
   static func name() -> NSString
 }
 
 extension UTF8 : TestableUnicodeCodec {
-  static func encodingId() -> NSStringEncoding {
-    return NSUTF8StringEncoding
+  static func encodingId() -> String.Encoding {
+    return .utf8
   }
   static func name() -> NSString {
     return "UTF8"
@@ -27,8 +27,8 @@ extension UTF8 : TestableUnicodeCodec {
 }
 
 extension UTF16 : TestableUnicodeCodec {
-  static func encodingId() -> NSStringEncoding {
-    return NSUTF16LittleEndianStringEncoding
+  static func encodingId() -> String.Encoding {
+    return .utf16LittleEndian
   }
   static func name() -> NSString {
     return "UTF16"
@@ -36,8 +36,8 @@ extension UTF16 : TestableUnicodeCodec {
 }
 
 extension UTF32 : TestableUnicodeCodec {
-  static func encodingId() -> NSStringEncoding {
-    return NSUTF32LittleEndianStringEncoding
+  static func encodingId() -> String.Encoding {
+    return .utf32LittleEndian
   }
   static func name() -> NSString {
     return "UTF32"
@@ -69,7 +69,7 @@ func nthUnicodeScalar(_ n: UInt32) -> UnicodeScalar {
 // `buffer` should have a length >= 4
 func nsEncode<CodeUnit>(
   _ c: UInt32,
-  _ encoding: NSStringEncoding,
+  _ encoding: String.Encoding,
   _ buffer: inout [CodeUnit],
   _ used: inout Int
 ) {
@@ -79,25 +79,25 @@ func nsEncode<CodeUnit>(
   let s = NSString(
     bytes: &c,
     length: 4,
-    encoding: NSUTF32LittleEndianStringEncoding)!
+    encoding: String.Encoding.utf32LittleEndian.rawValue)!
 
   s.getBytes(
     &buffer,
     maxLength: buffer.count,
     usedLength: &used,
-    encoding: encoding,
+    encoding: encoding.rawValue,
     options: [],
     range: NSRange(location: 0, length: s.length),
     remaining: nil)
 }
 
-class CodecTest<Codec : TestableUnicodeCodec> {
+final class CodecTest<Codec : TestableUnicodeCodec> {
   var used = 0
   typealias CodeUnit = Codec.CodeUnit
   var nsEncodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
   var encodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
 
-  func testOne(_ scalar: UnicodeScalar) {
+  final func testOne(_ scalar: UnicodeScalar) {
     /* Progress reporter
     if (scalar.value % 0x1000) == 0 {
       print("\(asHex(scalar.value))")
@@ -126,7 +126,7 @@ class CodecTest<Codec : TestableUnicodeCodec> {
       scalar, decoded,
       "Decoding failed: \(asHex(scalar.value)) => " +
       "\(asHex(nsEncoded)) => \(asHex(decoded.value))"
-    )
+    ) { $0 == $1 }
 
     encodeIndex = encodeBuffer.startIndex
     Codec.encode(scalar, sendingOutputTo: encodeOutput)
@@ -134,10 +134,10 @@ class CodecTest<Codec : TestableUnicodeCodec> {
       nsEncoded, encodeBuffer[0..<encodeIndex],
       "Decoding failed: \(asHex(nsEncoded)) => " +
         "\(asHex(scalar.value)) => \(asHex(self.encodeBuffer[0]))"
-    )
+    ) { $0 == $1 }
   }
 
-  func run(_ minScalarOrd: Int, _ maxScalarOrd: Int) {
+  final func run(_ minScalarOrd: Int, _ maxScalarOrd: Int) {
     print("testing \(Codec.name())")
     for i in minScalarOrd..<maxScalarOrd {
       testOne(nthUnicodeScalar(UInt32(i)))
@@ -147,27 +147,9 @@ class CodecTest<Codec : TestableUnicodeCodec> {
 
 var UTFEncoders = TestSuite("UTFEncoders")
 
-UTFEncoders.test("encodeRandomBlock") {
-  srandomdev()
-  // To avoid swamping the buildbot, by default, test only one out of
-  // testGroupCount cases, selected at random.  You can adjust the `testAll`
-  // variable below to test everything.
-  var testGroupCount = 128
-  var testGroup = random() % testGroupCount
-  var testAll = false
-  var minScalarOrd: Int
-  var maxScalarOrd: Int
-
-  if testAll {
-    print("Testing all Unicode scalars")
-    minScalarOrd = 0
-    maxScalarOrd = unicodeScalarCount
-  } else {
-    print("Testing Unicode scalar group \(testGroup) of \(testGroupCount)")
-    minScalarOrd = unicodeScalarCount * testGroup / testGroupCount
-    maxScalarOrd = unicodeScalarCount * (testGroup+1) / testGroupCount
-  }
-
+UTFEncoders.test("encode") {
+  let minScalarOrd = 0
+  let maxScalarOrd = unicodeScalarCount
   CodecTest<UTF8>().run(minScalarOrd, maxScalarOrd)
   CodecTest<UTF16>().run(minScalarOrd, maxScalarOrd)
   CodecTest<UTF32>().run(minScalarOrd, maxScalarOrd)

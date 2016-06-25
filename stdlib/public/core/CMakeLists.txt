@@ -50,8 +50,8 @@ set(SWIFTLIB_ESSENTIAL
   FlatMap.swift
   Flatten.swift.gyb
   FloatingPoint.swift.gyb
-  FloatingPointOperations.swift.gyb
   FloatingPointParsing.swift.gyb
+  FloatingPointTypes.swift.gyb
   HashedCollections.swift.gyb
   Hashing.swift
   HeapBuffer.swift
@@ -70,6 +70,7 @@ set(SWIFTLIB_ESSENTIAL
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
+  NewtypeWrapper.swift.gyb
   ObjCMirrors.swift
   Optional.swift
   OptionSet.swift
@@ -113,6 +114,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeScalar.swift
   UnicodeTrie.swift.gyb
   Unmanaged.swift
+  UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
   WriteBackMutableSlice.swift
@@ -130,6 +132,7 @@ set(SWIFTLIB_SOURCES
   Process.swift
   SliceBuffer.swift
   Tuple.swift.gyb
+  UnfoldSequence.swift
   VarArgs.swift
   Zip.swift
   )
@@ -140,7 +143,6 @@ set(swift_core_private_link_libraries)
 set(swift_stdlib_compile_flags)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(APPEND swift_core_link_flags "-all_load")
-  list(APPEND swift_core_private_link_libraries swiftRuntime swiftStdlibStubs)
   list(APPEND swift_core_framework_depends Foundation)
   list(APPEND swift_core_framework_depends CoreFoundation)
 else()
@@ -155,7 +157,6 @@ else()
   # effort has been completed.
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
-  list(APPEND swift_core_private_link_libraries swiftRuntime swiftStdlibStubs)
   find_package(ICU REQUIRED COMPONENTS uc i18n)
   list(APPEND swift_core_private_link_libraries
       ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY})
@@ -183,12 +184,12 @@ if(SWIFT_STDLIB_SIL_DEBUGGING)
 endif()
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
-  add_swift_library(swift_stdlib_essential SHARED IS_STDLIB IS_STDLIB_CORE
+  add_swift_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
       ${SWIFTLIB_ESSENTIAL})
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
 
-add_swift_library(swiftCore SHARED IS_STDLIB IS_STDLIB_CORE
+add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
   ${SWIFTLIB_SOURCES}
   # The copy_shim_headers target dependency is required to let the
   # build system know that there's a rule to produce the shims
@@ -202,5 +203,6 @@ add_swift_library(swiftCore SHARED IS_STDLIB IS_STDLIB_CORE
   SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags}
   LINK_FLAGS ${swift_core_link_flags}
   PRIVATE_LINK_LIBRARIES ${swift_core_private_link_libraries}
+  INCORPORATE_OBJECT_LIBRARIES swiftRuntime swiftStdlibStubs
   FRAMEWORK_DEPENDS ${swift_core_framework_depends}
   INSTALL_IN_COMPONENT stdlib)

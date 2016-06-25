@@ -66,7 +66,7 @@ How to specify files:
         cmpcodesize test.o newversion.o
 
 4) Two lists of files, separated by '--':
-    Compares a set a files.
+    Compares a set of files.
     Example:
         cmpcodesize olddir/*.o -- newdir/*.o
 

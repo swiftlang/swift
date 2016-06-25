@@ -101,7 +101,7 @@ protocol Clonable {
   func doubleMaybeClone() -> Self??
   func subdivideClone() -> (Self, Self)
   func metatypeOfClone() -> Self.Type
-  func badClonerFn() -> (Self -> Self)
+  func badClonerFn() -> ((Self) -> Self)
   func veryBadClonerFn() -> ((inout Self) -> ())
   func goodClonerFn() -> (() -> Self)
 }

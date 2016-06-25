@@ -48,3 +48,6 @@ void CCRefrigeratorCreateIndirect(CCRefrigeratorRef * __nullable __attribute__((
 // Note that the fridge parameter is incorrectly annotated.
 void CCRefrigeratorGetPowerSupplyIndirect(CCRefrigeratorRef __attribute__((cf_returns_not_retained)) fridge, CCPowerSupplyRef * __nonnull __attribute__((cf_returns_not_retained)) outPower);
 void CCRefrigeratorGetItemUnaudited(CCRefrigeratorRef fridge, unsigned index, CCItemRef *outItem);
+
+typedef void *CFNonConstVoidRef __attribute__((objc_bridge(id)));
+CFNonConstVoidRef CFNonConstBottom();

@@ -770,8 +770,16 @@ getConformanceAndConcreteType(FullApplySite AI,
   // Find the conformance for the protocol we're interested in.
   for (auto Conformance : Conformances) {
     auto Requirement = Conformance.getRequirement();
-    if (Requirement == Protocol || Requirement->inheritsFrom(Protocol)) {
+    if (Requirement == Protocol) {
       return std::make_pair(Conformance, ConcreteType);
+    }
+    if (Requirement->inheritsFrom(Protocol)) {
+      // If Requirement != Protocol, then the abstract conformance cannot be used
+      // as is and we need to create a proper conformance.
+      return std::make_pair(Conformance.isAbstract()
+                                ? ProtocolConformanceRef(Protocol)
+                                : Conformance,
+                            ConcreteType);
     }
   }
 
