@@ -843,7 +843,7 @@ void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name) {
     if (GP->isProtocolSelf())
       Context = PrintNameContext::GenericParameter;
   } else if (T && T->is<DynamicSelfType>()) {
-    assert(T->getAs<DynamicSelfType>()->getSelfType()->getAnyNominal() &&
+    assert(T->castTo<DynamicSelfType>()->getSelfType()->getAnyNominal() &&
            "protocol Self handled as GenericTypeParamDecl");
     Context = PrintNameContext::ClassDynamicSelf;
   }

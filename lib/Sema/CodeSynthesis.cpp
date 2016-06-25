@@ -67,7 +67,7 @@ static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
 }
 
 static ParamDecl *buildLetArgument(SourceLoc loc, DeclContext *DC,
-                                  StringRef name, Type type) {
+                                   StringRef name, Type type) {
   return buildArgument(loc, DC, name, type, /*isLet*/ true);
 }
 
@@ -182,8 +182,8 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   // Add a "(value : T, indices...)" argument list.
   auto storageType = getTypeOfStorage(storage, TC);
   valueDecl = buildLetArgument(storage->getLoc(),
-                                     storage->getDeclContext(), "value",
-                                     storageType);
+                               storage->getDeclContext(), "value",
+                               storageType);
   params.push_back(buildIndexForwardingParamList(storage, valueDecl));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);

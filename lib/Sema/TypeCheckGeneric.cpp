@@ -641,9 +641,6 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
 
     auto info = applyFunctionTypeAttributes(func, i);
 
-    // FIXME: We shouldn't even get here if the function isn't locally generic
-    // to begin with, but fixing that requires a lot of reengineering for local
-    // definitions in generic contexts.
     if (sig && i == e-1) {
       funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
       if (initFuncTy)

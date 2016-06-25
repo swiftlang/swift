@@ -1817,6 +1817,8 @@ static Type replaceDynamicSelfWithSelf(Type t) {
 
 /// Replace any DynamicSelf types with their underlying Self type.
 static CanType replaceDynamicSelfWithSelf(CanType t) {
+  if (!t->hasDynamicSelfType())
+    return t;
   return replaceDynamicSelfWithSelf(Type(t))->getCanonicalType();
 }
 
