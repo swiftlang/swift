@@ -315,11 +315,12 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
   if (!ObjectFile)
     return true;
 
-  const char *HashSectionName = HashGlobal->getSection();
+  StringRef HashSectionName = HashGlobal->getSection();
   // Strip the segment name. For mach-o the GlobalVariable's section name format
   // is <segment>,<section>.
-  if (const char *Comma = ::strchr(HashSectionName, ','))
-    HashSectionName = Comma + 1;
+  size_t Comma = HashSectionName.find_last_of(',');
+  if (HashSectionName != StringRef::npos)
+    HashSectionName = HashSectionName.substr(Comma + 1);
 
   // Search for the section which holds the hash.
   for (auto &Section : ObjectFile->sections()) {
