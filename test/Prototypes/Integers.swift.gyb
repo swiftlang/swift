@@ -12,7 +12,7 @@
 // RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
 // RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone
 // RUN: %line-directive %t/out.swift -- %target-run %t/a.out
-// --stdlib-unittest-filter DoubleWidth/
+// --stdlib-unittest-filter minBitsRequired
 
 // REQUIRES: executable_test
 
@@ -310,10 +310,10 @@ public protocol Integer : ${IntegerBase} {
   /// Will be constant for fixed-width integer types.
   var bitWidth : Word { get }
 
-  /// If `self` is negative, returns the index of the least significant bit of
-  /// our representation such that all more-significant bits are 1.
-  /// Has the value -1 if `self` is 0.
-  var signBitIndex: Word { get }
+  /// Returns the number of bits required to represent the value of `self` in a
+  /// signed type using two's completment representation.
+  /// The minimum value for this property should naturally be 1.
+  var minBitsRequiredForSignedRepresentation: Word { get }
 
 % for x in binaryArithmetic['Integer']:
   // defaulted using an in-place counterpart, but can be used as an
@@ -707,7 +707,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   public init<T : Integer>(_ source: T) {
     _assertCond(
       source >= 0, "negative value \(source) not representable by \(Self.self)")
-    let requiredBits = source.signBitIndex + 1
+    let requiredBits = source.minBitsRequiredForSignedRepresentation - 1
     _assertCond(
       requiredBits <= Self.bitWidth,
       "\(Self.self) cannot store all \(requiredBits)  bits "
@@ -719,7 +719,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   public init?<T : Integer>(exactly source: T) {
     _assertCond(
       source >= 0, "negative value \(source) not representable by \(Self.self)")
-    let requiredBits = source.signBitIndex + 1
+    let requiredBits = source.minBitsRequiredForSignedRepresentation - 1
     if requiredBits > Self.bitWidth {
       return nil
     }
@@ -759,7 +759,7 @@ extension SignedInteger {
 extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : Integer>(_ source: T) {
-    let requiredBits = source.signBitIndex + (source >= 0 ? 2 : 1)
+    let requiredBits = source.minBitsRequiredForSignedRepresentation
     _assertCond(
       requiredBits <= Self.bitWidth,
       "\(Self.self) cannot store all \(requiredBits) bits "
@@ -769,7 +769,7 @@ extension SignedInteger where Self : FixedWidthInteger {
 
   @_transparent
   public init?<T : Integer>(exactly source: T) {
-    let requiredBits = source.signBitIndex + (source >= 0 ? 2 : 1)
+    let requiredBits = source.minBitsRequiredForSignedRepresentation
     if requiredBits > Self.bitWidth {
       return nil
     }
@@ -887,12 +887,12 @@ public struct ${Self}
   public var bitWidth: Word { return ${bits} }
 
   @_transparent
-  public var signBitIndex: Word {
+  public var minBitsRequiredForSignedRepresentation: Word {
 % if signed:
     let x = self < 0 ? ~self : self
-    return ${Self}.bitWidth - 1 - x.countLeadingZeros()
+    return (x == 0) ? 1 : (${Self}.bitWidth - x.countLeadingZeros() + 1)
 % else:
-    return ${Self}.bitWidth - 1 - self.countLeadingZeros()
+    return (self == 0) ? 1 : (${Self}.bitWidth - self.countLeadingZeros() + 1)
 % end
   }
 
@@ -1047,7 +1047,8 @@ public struct DoubleWidth<
     return 2 * T.bitWidth
   }
 
-  public var signBitIndex: Word {
+  public var minBitsRequiredForSignedRepresentation: Word {
+    // FIXME: WRONG !!!!!!!!!!!!!!!!!!!!!!
     return (self == DoubleWidth<T>()) ? -1 : (bitWidth - 1)
   }
 
@@ -1244,8 +1245,8 @@ public struct ${Self}
 
   public var bitWidth: Word { return 128 }
 
-  public var signBitIndex: Word {
-    return _storage.signBitIndex
+  public var minBitsRequiredForSignedRepresentation: Word {
+    return _storage.minBitsRequiredForSignedRepresentation
   }
 
   public func countLeadingZeros() -> Word {
@@ -1485,12 +1486,12 @@ tests.test("CountLeadingZeros") {
   expectEqual(0, Int8.min.countLeadingZeros())
 }
 
-tests.test("signBitIndex") {
-  expectEqual(7, UInt8.max.signBitIndex)
-  expectEqual(-1, UInt8.min.signBitIndex)
-  expectEqual(6, Int8.max.signBitIndex)
-  expectEqual(-1, (0 as Int8).signBitIndex)
-  expectEqual(6, Int8.min.signBitIndex)
+tests.test("minBitsRequiredForSignedRepresentation") {
+  expectEqual(9, UInt8.max.minBitsRequiredForSignedRepresentation)
+  expectEqual(1, UInt8.min.minBitsRequiredForSignedRepresentation)
+  expectEqual(8, Int8.max.minBitsRequiredForSignedRepresentation)
+  expectEqual(1, (0 as Int8).minBitsRequiredForSignedRepresentation)
+  expectEqual(8, Int8.min.minBitsRequiredForSignedRepresentation)
 }
 
 tests.test("Conversion8to16") {
@@ -1864,9 +1865,9 @@ tests.test("DoubleWidth/${SType}/subtracting beyond min") {
 %   end
 % end
 
-tests.test("DoubleWidth/signBitIndex") {
-  expectEqual(15, DoubleWidth<UInt8>.max.signBitIndex)
-  expectEqual(-1, DoubleWidth<UInt8>.min.signBitIndex)
+tests.test("DoubleWidth/minBitsRequiredForSignedRepresentation") {
+  expectEqual(15, DoubleWidth<UInt8>.max.minBitsRequiredForSignedRepresentation)
+  expectEqual(-1, DoubleWidth<UInt8>.min.minBitsRequiredForSignedRepresentation)
 }
 
 tests.test("DoubleWidth/UInt64/nthWord") {
