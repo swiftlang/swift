@@ -1291,9 +1291,9 @@ public:
     if (WMI->isVolatile())
       *this << "[volatile] ";
     *this << "$" << WMI->getLookupType() << ", " << WMI->getMember();
-    if (!WMI->getOpenedArchetypeOperands().empty()) {
+    if (WMI->hasOperand()) {
       *this << ", ";
-      *this << getIDAndType(WMI->getOpenedArchetypeOperands()[0].get());
+      *this << getIDAndType(WMI->getOperand());
     }
     *this << " : " << WMI->getType();
   }

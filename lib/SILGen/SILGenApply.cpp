@@ -547,12 +547,18 @@ public:
       auto proto = Constant.getDecl()->getDeclContext()
                                      ->getAsProtocolOrProtocolExtensionContext();
       auto archetype = getWitnessMethodSelfType();
+      // Get the openend existential value if the archetype is an opened
+      // existential type.
+      SILValue OpenedExistential;
+      if (!archetype->getOpenedExistentialType().isNull())
+        OpenedExistential = SelfValue;
 
       SILValue fn = gen.B.createWitnessMethod(Loc,
                                   archetype,
                                   ProtocolConformanceRef(proto),
                                   *constant,
                                   constantInfo.getSILType(),
+                                  OpenedExistential,
                                   constant->isForeign);
       mv = ManagedValue::forUnmanaged(fn);
       break;
