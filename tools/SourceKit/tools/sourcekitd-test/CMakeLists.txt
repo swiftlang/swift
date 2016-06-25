@@ -1,6 +1,9 @@
 set(LLVM_TARGET_DEFINITIONS Options.td)
 swift_tablegen(Options.inc -gen-opt-parser-defs)
 swift_add_public_tablegen_target(sourcekitdTestOptionsTableGen)
+# Add this directories binary directory to the include list to make sure that we
+# can properly include Options.inc.
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
   set(SOURCEKITD_TEST_DEPEND sourcekitdInProc)
