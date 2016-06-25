@@ -12,6 +12,25 @@ else()
   set(cmake_3_2_USES_TERMINAL USES_TERMINAL)
 endif()
 
+macro(swift_common_standalone_build_config_cmark product)
+  set(${product}_PATH_TO_CMARK_SOURCE "${${product}_PATH_TO_CMARK_SOURCE}"
+    CACHE PATH "Path to CMark source code.")
+  set(${product}_PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
+    CACHE PATH "Path to the directory where CMark was built.")
+  set(${product}_CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}" CACHE PATH
+    "Path to the directory where CMark was installed.")
+  get_filename_component(PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
+    ABSOLUTE)
+  get_filename_component(CMARK_MAIN_SRC_DIR "${${product}_PATH_TO_CMARK_SOURCE}"
+    ABSOLUTE)
+  get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
+    ABSOLUTE)
+  set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src")
+  set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
+  include_directories("${CMARK_MAIN_INCLUDE_DIR}"
+                      "${CMARK_BUILD_INCLUDE_DIR}")
+endmacro()
+
 # Common cmake project config for standalone builds.
 #
 # Parameters:
@@ -74,19 +93,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   set(${product}_PATH_TO_CLANG_BUILD "${PATH_TO_LLVM_BUILD}" CACHE PATH
     "Path to the directory where Clang was built or installed.")
 
-  set(${product}_PATH_TO_CMARK_SOURCE "${${product}_PATH_TO_CMARK_SOURCE}"
-      CACHE PATH "Path to CMark source code.")
-  set(${product}_PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
-    CACHE PATH "Path to the directory where CMark was built.")
-  set(${product}_CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}" CACHE PATH
-    "Path to the directory where CMark was installed.")
-  get_filename_component(PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
-    ABSOLUTE)
-  get_filename_component(CMARK_MAIN_SRC_DIR "${${product}_PATH_TO_CMARK_SOURCE}"
-    ABSOLUTE)
-  get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
-    ABSOLUTE)
-
   if(NOT EXISTS "${${product}_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h")
     message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
   else()
@@ -133,16 +139,12 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
     "Version number that will be placed into the libclang library , in the form XX.YY")
 
   set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
-  set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src")
-  set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
 
   set(CMAKE_INCLUDE_CURRENT_DIR ON)
   include_directories("${PATH_TO_LLVM_BUILD}/include"
                       "${LLVM_MAIN_INCLUDE_DIR}"
                       "${CLANG_BUILD_INCLUDE_DIR}"
-                      "${CLANG_MAIN_INCLUDE_DIR}"
-                      "${CMARK_MAIN_INCLUDE_DIR}"
-                      "${CMARK_BUILD_INCLUDE_DIR}")
+                      "${CLANG_MAIN_INCLUDE_DIR}")
   foreach (INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
     include_directories(${INCLUDE_DIR})
   endforeach ()
@@ -168,6 +170,8 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   if (LLVM_ENABLE_DOXYGEN)
     find_package(Doxygen REQUIRED)
   endif()
+
+  swift_common_standalone_build_config_cmark(${product})
 endmacro()
 
 # Common cmake project config for unified builds.
