@@ -816,6 +816,10 @@ NSStringAPIs.test("init(format:_:...)") {
   // test for rdar://problem/18317906
   expectEqual("3.12", String(format: "%.2f", 3.123456789))
   expectEqual("3.12", NSString(format: "%.2f", 3.123456789))
+  
+  // test for SR-1378 rdar://problem/26051182
+  expectEqual("two one two", String(format: "%2$@ %1$@ %2$@", "one", "two"))
+  expectEqual("two one two", NSString(format: "%2$@ %1$@ %2$@", "one", "two"))
 }
 
 NSStringAPIs.test("init(format:arguments:)") {
