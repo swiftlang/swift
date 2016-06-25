@@ -106,8 +106,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
       ABSOLUTE)
   endif()
 
-  list(APPEND CMAKE_MODULE_PATH "${${product}_PATH_TO_LLVM_BUILD}/share/llvm/cmake")
-
   if(${is_cross_compiling})
     find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" "${${product}_NATIVE_LLVM_TOOLS_PATH}"
       NO_DEFAULT_PATH)
