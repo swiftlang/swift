@@ -12,6 +12,42 @@ else()
   set(cmake_3_2_USES_TERMINAL USES_TERMINAL)
 endif()
 
+macro(swift_common_standalone_build_config_clang product is_cross_compiling)
+  # Clang
+  set(${product}_PATH_TO_CLANG_SOURCE "${PATH_TO_LLVM_SOURCE}/tools/clang"
+      CACHE PATH "Path to Clang source code.")
+  set(${product}_PATH_TO_CLANG_BUILD "${PATH_TO_LLVM_BUILD}" CACHE PATH
+    "Path to the directory where Clang was built or installed.")
+
+  if(NOT EXISTS "${${product}_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h")
+    message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
+  else()
+    get_filename_component(CLANG_MAIN_SRC_DIR ${${product}_PATH_TO_CLANG_SOURCE}
+      ABSOLUTE)
+  endif()
+
+  if(EXISTS "${${product}_PATH_TO_CLANG_BUILD}/include/clang/Basic/Version.inc")
+    set(CLANG_BUILD_INCLUDE_DIR "${${product}_PATH_TO_CLANG_BUILD}/include")
+  elseif(EXISTS "${${product}_PATH_TO_CLANG_BUILD}/tools/clang/include/clang/Basic/Version.inc")
+    set(CLANG_BUILD_INCLUDE_DIR "${${product}_PATH_TO_CLANG_BUILD}/tools/clang/include")
+  else()
+    message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_BUILD to a directory containing a Clang build.")
+  endif()
+  if(CLANG_MAIN_INCLUDE_DIR)
+    get_filename_component(CLANG_MAIN_SRC_DIR ${${product}_PATH_TO_CLANG_SOURCE}
+      ABSOLUTE)
+  endif()
+
+  if (NOT ${is_cross_compiling})
+    set(${product}_NATIVE_CLANG_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
+  endif()
+
+  set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
+
+  include_directories("${CLANG_BUILD_INCLUDE_DIR}"
+                      "${CLANG_MAIN_INCLUDE_DIR}")
+endmacro()
+
 macro(swift_common_standalone_build_config_cmark product)
   set(${product}_PATH_TO_CMARK_SOURCE "${${product}_PATH_TO_CMARK_SOURCE}"
     CACHE PATH "Path to CMark source code.")
@@ -87,31 +123,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   precondition_translate_flag(LLVM_BUILD_BINARY_DIR LLVM_BINARY_DIR)
   precondition_translate_flag(LLVM_BUILD_MAIN_SRC_DIR LLVM_MAIN_SRC_DIR)
 
-  # Clang
-  set(${product}_PATH_TO_CLANG_SOURCE "${PATH_TO_LLVM_SOURCE}/tools/clang"
-      CACHE PATH "Path to Clang source code.")
-  set(${product}_PATH_TO_CLANG_BUILD "${PATH_TO_LLVM_BUILD}" CACHE PATH
-    "Path to the directory where Clang was built or installed.")
-
-  if(NOT EXISTS "${${product}_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h")
-    message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
-  else()
-    get_filename_component(CLANG_MAIN_SRC_DIR ${${product}_PATH_TO_CLANG_SOURCE}
-      ABSOLUTE)
-  endif()
-
-  if(EXISTS "${${product}_PATH_TO_CLANG_BUILD}/include/clang/Basic/Version.inc")
-    set(CLANG_BUILD_INCLUDE_DIR "${${product}_PATH_TO_CLANG_BUILD}/include")
-  elseif(EXISTS "${${product}_PATH_TO_CLANG_BUILD}/tools/clang/include/clang/Basic/Version.inc")
-    set(CLANG_BUILD_INCLUDE_DIR "${${product}_PATH_TO_CLANG_BUILD}/tools/clang/include")
-  else()
-    message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_BUILD to a directory containing a Clang build.")
-  endif()
-  if(CLANG_MAIN_INCLUDE_DIR)
-    get_filename_component(CLANG_MAIN_SRC_DIR ${${product}_PATH_TO_CLANG_SOURCE}
-      ABSOLUTE)
-  endif()
-
   if(${is_cross_compiling})
     find_program(SWIFT_TABLEGEN_EXE "llvm-tblgen" "${${product}_NATIVE_LLVM_TOOLS_PATH}"
       NO_DEFAULT_PATH)
@@ -121,7 +132,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   else()
     set(SWIFT_TABLEGEN_EXE llvm-tblgen)
     set(${product}_NATIVE_LLVM_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
-    set(${product}_NATIVE_CLANG_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
   endif()
 
   include(AddLLVM)
@@ -138,13 +148,9 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
     "${PACKAGE_VERSION_MAJOR}.${PACKAGE_VERSION_MINOR}" CACHE STRING
     "Version number that will be placed into the libclang library , in the form XX.YY")
 
-  set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
-
   set(CMAKE_INCLUDE_CURRENT_DIR ON)
   include_directories("${PATH_TO_LLVM_BUILD}/include"
-                      "${LLVM_MAIN_INCLUDE_DIR}"
-                      "${CLANG_BUILD_INCLUDE_DIR}"
-                      "${CLANG_MAIN_INCLUDE_DIR}")
+                      "${LLVM_MAIN_INCLUDE_DIR}")
   foreach (INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
     include_directories(${INCLUDE_DIR})
   endforeach ()
@@ -171,6 +177,7 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
     find_package(Doxygen REQUIRED)
   endif()
 
+  swift_common_standalone_build_config_clang(${product} ${is_cross_compiling})
   swift_common_standalone_build_config_cmark(${product})
 endmacro()
 
