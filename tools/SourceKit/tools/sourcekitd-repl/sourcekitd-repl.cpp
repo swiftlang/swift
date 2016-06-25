@@ -652,7 +652,7 @@ static bool handleRequest(StringRef ReqStr, std::string &ErrorMessage) {
 
 
 int main(int argc, const char **argv) {
-  llvm::sys::PrintStackTraceOnErrorSignal();
+  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
 
   sourcekitd_initialize();
 
