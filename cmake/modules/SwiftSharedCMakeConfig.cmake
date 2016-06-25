@@ -122,7 +122,8 @@ macro(swift_common_standalone_build_config_clang product is_cross_compiling)
 
   # Add all Clang CMake paths to our cmake module path.
   set(SWIFT_CLANG_CMAKE_PATHS
-    "${PATH_TO_CLANG_BUILD}/share/clang/cmake")
+    "${PATH_TO_CLANG_BUILD}/share/clang/cmake"
+    "${PATH_TO_CLANG_BUILD}/lib/cmake/clang")
   foreach(path ${SWIFT_CLANG_CMAKE_PATHS})
     list(APPEND CMAKE_MODULE_PATH ${path})
   endforeach()
