@@ -716,7 +716,7 @@ public:
     }
 
     // Does it make sense to substitute types?
-    bool shouldSubst = !isa<UnboundGenericType>(BaseTy.getPointer()) &&
+    bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
                        !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
                        !BaseTy->isAnyExistentialType();
     ModuleDecl *M = DC->getParentModule();

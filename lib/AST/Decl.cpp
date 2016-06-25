@@ -4762,3 +4762,9 @@ ClassDecl *ClassDecl::getSuperclassDecl() const {
     return superclass->getClassOrBoundGenericClass();
     return nullptr;
 }
+
+void ClassDecl::setSuperclass(Type superclass) {
+  assert((!superclass || !superclass->hasArchetype())
+         && "superclass must be interface type");
+  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+}
