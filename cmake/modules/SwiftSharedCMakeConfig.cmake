@@ -12,71 +12,7 @@ else()
   set(cmake_3_2_USES_TERMINAL USES_TERMINAL)
 endif()
 
-macro(swift_common_standalone_build_config_clang product is_cross_compiling)
-  # Clang
-  set(${product}_PATH_TO_CLANG_SOURCE "${PATH_TO_LLVM_SOURCE}/tools/clang"
-      CACHE PATH "Path to Clang source code.")
-  set(${product}_PATH_TO_CLANG_BUILD "${PATH_TO_LLVM_BUILD}" CACHE PATH
-    "Path to the directory where Clang was built or installed.")
-
-  if(NOT EXISTS "${${product}_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h")
-    message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
-  else()
-    get_filename_component(CLANG_MAIN_SRC_DIR ${${product}_PATH_TO_CLANG_SOURCE}
-      ABSOLUTE)
-  endif()
-
-  if(EXISTS "${${product}_PATH_TO_CLANG_BUILD}/include/clang/Basic/Version.inc")
-    set(CLANG_BUILD_INCLUDE_DIR "${${product}_PATH_TO_CLANG_BUILD}/include")
-  elseif(EXISTS "${${product}_PATH_TO_CLANG_BUILD}/tools/clang/include/clang/Basic/Version.inc")
-    set(CLANG_BUILD_INCLUDE_DIR "${${product}_PATH_TO_CLANG_BUILD}/tools/clang/include")
-  else()
-    message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_BUILD to a directory containing a Clang build.")
-  endif()
-  if(CLANG_MAIN_INCLUDE_DIR)
-    get_filename_component(CLANG_MAIN_SRC_DIR ${${product}_PATH_TO_CLANG_SOURCE}
-      ABSOLUTE)
-  endif()
-
-  if (NOT ${is_cross_compiling})
-    set(${product}_NATIVE_CLANG_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
-  endif()
-
-  set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
-
-  include_directories("${CLANG_BUILD_INCLUDE_DIR}"
-                      "${CLANG_MAIN_INCLUDE_DIR}")
-endmacro()
-
-macro(swift_common_standalone_build_config_cmark product)
-  set(${product}_PATH_TO_CMARK_SOURCE "${${product}_PATH_TO_CMARK_SOURCE}"
-    CACHE PATH "Path to CMark source code.")
-  set(${product}_PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
-    CACHE PATH "Path to the directory where CMark was built.")
-  set(${product}_CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}" CACHE PATH
-    "Path to the directory where CMark was installed.")
-  get_filename_component(PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
-    ABSOLUTE)
-  get_filename_component(CMARK_MAIN_SRC_DIR "${${product}_PATH_TO_CMARK_SOURCE}"
-    ABSOLUTE)
-  get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
-    ABSOLUTE)
-  set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src")
-  set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
-  include_directories("${CMARK_MAIN_INCLUDE_DIR}"
-                      "${CMARK_BUILD_INCLUDE_DIR}")
-endmacro()
-
-# Common cmake project config for standalone builds.
-#
-# Parameters:
-#   product
-#     The product name, e.g. Swift or SourceKit. Used as prefix for some
-#     cmake variables.
-#
-#   is_cross_compiling
-#     Whether this is cross-compiling host tools.
-macro(swift_common_standalone_build_config product is_cross_compiling)
+macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   option(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
 
   precondition_translate_flag(${product}_PATH_TO_LLVM_SOURCE PATH_TO_LLVM_SOURCE)
@@ -176,7 +112,74 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   if (LLVM_ENABLE_DOXYGEN)
     find_package(Doxygen REQUIRED)
   endif()
+endmacro()
 
+macro(swift_common_standalone_build_config_clang product is_cross_compiling)
+  # Clang
+  set(${product}_PATH_TO_CLANG_SOURCE "${PATH_TO_LLVM_SOURCE}/tools/clang"
+      CACHE PATH "Path to Clang source code.")
+  set(${product}_PATH_TO_CLANG_BUILD "${PATH_TO_LLVM_BUILD}" CACHE PATH
+    "Path to the directory where Clang was built or installed.")
+
+  if(NOT EXISTS "${${product}_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h")
+    message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
+  else()
+    get_filename_component(CLANG_MAIN_SRC_DIR ${${product}_PATH_TO_CLANG_SOURCE}
+      ABSOLUTE)
+  endif()
+
+  if(EXISTS "${${product}_PATH_TO_CLANG_BUILD}/include/clang/Basic/Version.inc")
+    set(CLANG_BUILD_INCLUDE_DIR "${${product}_PATH_TO_CLANG_BUILD}/include")
+  elseif(EXISTS "${${product}_PATH_TO_CLANG_BUILD}/tools/clang/include/clang/Basic/Version.inc")
+    set(CLANG_BUILD_INCLUDE_DIR "${${product}_PATH_TO_CLANG_BUILD}/tools/clang/include")
+  else()
+    message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_BUILD to a directory containing a Clang build.")
+  endif()
+  if(CLANG_MAIN_INCLUDE_DIR)
+    get_filename_component(CLANG_MAIN_SRC_DIR ${${product}_PATH_TO_CLANG_SOURCE}
+      ABSOLUTE)
+  endif()
+
+  if (NOT ${is_cross_compiling})
+    set(${product}_NATIVE_CLANG_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
+  endif()
+
+  set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
+
+  include_directories("${CLANG_BUILD_INCLUDE_DIR}"
+                      "${CLANG_MAIN_INCLUDE_DIR}")
+endmacro()
+
+macro(swift_common_standalone_build_config_cmark product)
+  set(${product}_PATH_TO_CMARK_SOURCE "${${product}_PATH_TO_CMARK_SOURCE}"
+    CACHE PATH "Path to CMark source code.")
+  set(${product}_PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
+    CACHE PATH "Path to the directory where CMark was built.")
+  set(${product}_CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}" CACHE PATH
+    "Path to the directory where CMark was installed.")
+  get_filename_component(PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
+    ABSOLUTE)
+  get_filename_component(CMARK_MAIN_SRC_DIR "${${product}_PATH_TO_CMARK_SOURCE}"
+    ABSOLUTE)
+  get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
+    ABSOLUTE)
+  set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src")
+  set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
+  include_directories("${CMARK_MAIN_INCLUDE_DIR}"
+                      "${CMARK_BUILD_INCLUDE_DIR}")
+endmacro()
+
+# Common cmake project config for standalone builds.
+#
+# Parameters:
+#   product
+#     The product name, e.g. Swift or SourceKit. Used as prefix for some
+#     cmake variables.
+#
+#   is_cross_compiling
+#     Whether this is cross-compiling host tools.
+macro(swift_common_standalone_build_config product is_cross_compiling)
+  swift_common_standalone_build_config_llvm(${product} ${is_cross_compiling})
   swift_common_standalone_build_config_clang(${product} ${is_cross_compiling})
   swift_common_standalone_build_config_cmark(${product})
 endmacro()
