@@ -168,8 +168,8 @@ public:
       selfType = conformance->getType();
     } else {
       auto *proto = cast<ProtocolDecl>(requirement->getDeclContext());
-      selfInterfaceType = proto->getProtocolSelf()->getDeclaredType();
-      selfType = proto->getProtocolSelf()->getArchetype();
+      selfInterfaceType = proto->getSelfInterfaceType();
+      selfType = proto->getSelfTypeInContext();
     }
 
     MaterializeForSetEmitter emitter(SGM, linkage, witness, witnessSubs,
@@ -205,16 +205,9 @@ public:
   forConcreteImplementation(SILGenModule &SGM,
                             FuncDecl *witness,
                             ArrayRef<Substitution> witnessSubs) {
-    Type selfInterfaceType, selfType;
-
     auto *dc = witness->getDeclContext();
-    if (auto *proto = dc->getAsProtocolOrProtocolExtensionContext()) {
-      selfInterfaceType = proto->getProtocolSelf()->getDeclaredType();
-      selfType = ArchetypeBuilder::mapTypeIntoContext(dc, selfInterfaceType);
-    } else {
-      selfInterfaceType = dc->getDeclaredInterfaceType();
-      selfType = dc->getDeclaredTypeInContext();
-    }
+    Type selfInterfaceType = dc->getSelfInterfaceType();
+    Type selfType = dc->getSelfTypeInContext();
 
     SILDeclRef constant(witness);
     auto constantInfo = SGM.Types.getConstantInfo(constant);

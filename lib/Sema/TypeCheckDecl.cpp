@@ -4075,7 +4075,8 @@ public:
       return false;
     }
 
-    // 'Self' is only a dynamic self on class methods.
+    // 'Self' is only a dynamic self on class methods and
+    // protocol requirements.
     auto declaredType = dc->getDeclaredTypeOfContext();
     if (declaredType->is<ErrorType>())
       return false;

@@ -587,15 +587,8 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
     auto *dc = ctor->getDeclContext();
 
-    // FIXME: shouldn't this just be
-    // ctor->getDeclContext()->getDeclaredInterfaceType()?
-    if (dc->getAsProtocolOrProtocolExtensionContext()) {
-      funcTy = dc->getProtocolSelf()->getDeclaredType();
-    } else {
-      funcTy = dc->getAsNominalTypeOrNominalTypeExtensionContext()
-          ->getDeclaredInterfaceType();
-    }
-    
+    funcTy = dc->getSelfInterfaceType();
+
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)
       funcTy = OptionalType::get(ctor->getFailability(), funcTy);

@@ -1839,7 +1839,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     // For default implementations, Self is the protocol archetype.
     } else {
       auto *proto = cast<ProtocolDecl>(requirement.getDecl()->getDeclContext());
-      selfType = proto->getProtocolSelf()->getArchetype();
+      selfType = proto->getSelfTypeInContext();
     }
   }
 

@@ -296,8 +296,7 @@ ArrayRef<Type> TypeBase::getAllGenericArgs(SmallVectorImpl<Type> &scratch) {
     if (auto protoType = type->getAs<ProtocolType>()) {
       auto proto = protoType->getDecl();
       allGenericArgs.push_back(
-        llvm::makeArrayRef(
-          proto->getProtocolSelf()->getDeclaredInterfaceType()));
+        llvm::makeArrayRef(proto->getSelfInterfaceType()));
 
       // Continue up to the parent.
       type = protoType->getParent();
@@ -2606,8 +2605,8 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
           conformanceType = metatypeType->getInstanceType().getPointer();
           
           if (auto protocolType = dyn_cast<ProtocolType>(conformanceType)) {
-            conformanceType = protocolType->getDecl()->getProtocolSelf()
-                                ->getArchetype();
+            conformanceType = protocolType->getDecl()
+                                          ->getSelfTypeInContext().getPointer();
           }
         }
         
@@ -2965,8 +2964,9 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   if (dc->getAsProtocolOrProtocolExtensionContext()) {
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
-    substitutions[dc->getProtocolSelf()->getDeclaredType()
-                    ->getCanonicalType()->castTo<GenericTypeParamType>()]
+    substitutions[dc->getSelfInterfaceType()
+                    ->getCanonicalType()
+                    ->castTo<GenericTypeParamType>()]
       = baseTy;
     return substitutions;
   }

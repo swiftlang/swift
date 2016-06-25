@@ -831,7 +831,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         DC = DC->getParent();
 
         if (DC->getAsProtocolExtensionContext())
-          ExtendedType = DC->getProtocolSelf()->getArchetype();
+          ExtendedType = DC->getSelfTypeInContext();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())

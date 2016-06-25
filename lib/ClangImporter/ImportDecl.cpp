@@ -3644,12 +3644,7 @@ namespace {
       auto selfVar =
         ParamDecl::createSelf(SourceLoc(), dc, /*isStatic*/!isInstance);
       bodyParams.push_back(ParameterList::createWithoutLoc(selfVar));
-      Type selfContextType;
-      if (dc->getAsProtocolOrProtocolExtensionContext()) {
-        selfContextType = dc->getProtocolSelf()->getArchetype();
-      } else {
-        selfContextType = dc->getDeclaredTypeInContext();
-      }
+      Type selfContextType = dc->getSelfTypeInContext();
       if (!isInstance) {
         selfContextType = MetatypeType::get(selfContextType);
       }
@@ -4333,8 +4328,7 @@ namespace {
 
       // Figure out the curried 'self' type for the interface type. It's always
       // either the generic parameter type 'Self' or a metatype thereof.
-      auto selfDecl = dc->getProtocolSelf();
-      auto selfTy = selfDecl->getDeclaredType();
+      auto selfTy = dc->getSelfInterfaceType();
       auto interfaceInputTy = selfTy;
       auto inputTy = fnType->getInput();
       if (auto tupleTy = inputTy->getAs<TupleType>()) {
@@ -4344,7 +4338,7 @@ namespace {
       if (inputTy->is<MetatypeType>())
         interfaceInputTy = MetatypeType::get(interfaceInputTy);
 
-      auto selfArchetype = selfDecl->getArchetype();
+      auto selfArchetype = dc->getSelfTypeInContext();
       auto interfaceResultTy = fnType->getResult().transform(
         [&](Type type) -> Type {
           if (type->is<DynamicSelfType>() || type->isEqual(selfArchetype)) {

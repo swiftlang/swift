@@ -376,14 +376,11 @@ Type TypeChecker::resolveTypeInContext(
           // instead of the existential type.
           assert(fromType->is<ProtocolType>());
 
-          auto protoSelf = parentDC->getProtocolSelf();
-          if (protoSelf == nullptr)
+          auto selfType = parentDC->getSelfInterfaceType();
+          if (!selfType)
             return ErrorType::get(Context);
-
-          auto selfType = protoSelf
-              ->getDeclaredType()
-              ->castTo<GenericTypeParamType>();
-          fromType = resolver->resolveGenericTypeParamType(selfType);
+          fromType = resolver->resolveGenericTypeParamType(
+              selfType->castTo<GenericTypeParamType>());
 
           if (assocType) {
             // Odd special case, ask Doug to explain it over pizza one day

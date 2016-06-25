@@ -925,7 +925,7 @@ matchWitness(TypeChecker &tc,
     // the required type and the witness type.
     cs.emplace(tc, dc, ConstraintSystemOptions());
 
-    Type selfIfaceTy = proto->getProtocolSelf()->getDeclaredType();
+    Type selfIfaceTy = proto->getSelfInterfaceType();
     Type selfTy;
 
     // For a concrete conformance, use the conforming type as the
@@ -2882,7 +2882,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     // Create a set of type substitutions for all known associated type.
     // FIXME: Base this on dependent types rather than archetypes?
     TypeSubstitutionMap substitutions;
-    substitutions[Proto->getProtocolSelf()->getArchetype()] = Adoptee;
+    substitutions[Proto->getSelfTypeInContext().getPointer()] = Adoptee;
     for (auto member : Proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         if (Conformance->hasTypeWitness(assocType)) {

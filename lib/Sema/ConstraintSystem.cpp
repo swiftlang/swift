@@ -1016,7 +1016,7 @@ void ConstraintSystem::openGeneric(
       // skip.
       if (skipProtocolSelfConstraint &&
           protoDecl == outerDC->getAsProtocolOrProtocolExtensionContext() &&
-          (protoDecl->getProtocolSelf()->getDeclaredType()->getCanonicalType() ==
+          (protoDecl->getSelfInterfaceType()->getCanonicalType() ==
            req.getFirstType()->getCanonicalType())) {
         break;
       }
@@ -1218,8 +1218,8 @@ ConstraintSystem::getTypeOfMemberReference(
 
       if (outerDC->getAsProtocolOrProtocolExtensionContext()) {
         // Retrieve the type variable for 'Self'.
-        selfTy = replacements[outerDC->getProtocolSelf()->getDeclaredType()
-                                ->getCanonicalType()];
+        selfTy = replacements[outerDC->getSelfInterfaceType()
+                                     ->getCanonicalType()];
       } else {
         // Open the nominal type.
         selfTy = openType(nominal->getDeclaredInterfaceType(), locator,
