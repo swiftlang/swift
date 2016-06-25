@@ -84,8 +84,6 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
     "${PACKAGE_VERSION_MAJOR}.${PACKAGE_VERSION_MINOR}" CACHE STRING
     "Version number that will be placed into the libclang library , in the form XX.YY")
 
-  include_directories("${PATH_TO_LLVM_BUILD}/include"
-                      "${LLVM_MAIN_INCLUDE_DIR}")
   foreach (INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
     include_directories(${INCLUDE_DIR})
   endforeach ()
