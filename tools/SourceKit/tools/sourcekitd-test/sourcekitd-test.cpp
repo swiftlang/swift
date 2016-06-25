@@ -166,7 +166,7 @@ int main(int argc, const char **argv) {
 }
 
 static int skt_main(int argc, const char **argv) {
-  llvm::sys::PrintStackTraceOnErrorSignal();
+  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
 
   sourcekitd_initialize();
 
