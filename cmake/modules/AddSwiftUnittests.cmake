@@ -51,6 +51,10 @@ function(add_swift_unittest test_dirname)
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -fuse-ld=gold")
   endif()
+  if(SWIFT_ENABLE_LLD_LINKER)
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
+      LINK_FLAGS " -fuse-ld=lld")
+  endif()
 endfunction()
 
 

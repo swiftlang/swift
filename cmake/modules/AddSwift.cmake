@@ -888,6 +888,9 @@ function(_add_swift_library_single target name)
      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     list(APPEND link_flags "-fuse-ld=gold")
   endif()
+  if (SWIFT_ENABLE_LLD_LINKER)
+    list(APPEND link_flags "-fuse-ld=lld")
+  endif()
 
   # Configure plist creation for OS X.
   set(PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
@@ -1529,6 +1532,9 @@ function(_add_swift_executable_single name)
   if(SWIFT_ENABLE_GOLD_LINKER AND
      "${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     list(APPEND link_flags "-fuse-ld=gold")
+  endif()
+  if(SWIFT_ENABLE_LLD_LINKER)
+    list(APPEND link_flags "-fuse-ld=lld")
   endif()
 
   # Find the names of dependency library targets.
