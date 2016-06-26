@@ -105,7 +105,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::CUDA:
   case llvm::Triple::NVCL:
   case llvm::Triple::AMDHSA:
-  case llvm::Triple::PS4:
   case llvm::Triple::ELFIAMCU:
     return "";
   case llvm::Triple::Darwin:
@@ -120,6 +119,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "freebsd";
   case llvm::Triple::Win32:
     return "windows";
+  case llvm::Triple::PS4:
+    return "ps4";
   }
   llvm_unreachable("unsupported OS");
 }

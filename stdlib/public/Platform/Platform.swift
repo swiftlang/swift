@@ -96,7 +96,7 @@ public func || <T : Boolean>(
 
 public var errno : Int32 {
   get {
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(PS4)
     return __error().pointee
 // FIXME: os(Windows) should be replaced, such as triple(Cygwin)
 #elseif os(Android) || os(Windows)
@@ -106,7 +106,7 @@ public var errno : Int32 {
 #endif
   }
   set(val) {
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(PS4)
     return __error().pointee = val
 #elseif os(Android) || os(Windows)
     return __errno().pointee = val
@@ -121,7 +121,7 @@ public var errno : Int32 {
 // stdio.h
 //===----------------------------------------------------------------------===//
 
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(PS4)
 public var stdin : UnsafeMutablePointer<FILE> {
   get {
     return __stdinp
@@ -354,7 +354,7 @@ public var SIG_DFL: sig_t? { return nil }
 public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
 public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
 public var SIG_HOLD: sig_t { return unsafeBitCast(5, to: sig_t.self) }
-#elseif os(Linux) || os(FreeBSD) || os(Android) || os(Windows)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Windows)
 #if os(Windows)
 // In Cygwin, the below SIG_* have the same value with Linux.
 // Verified with libstdc++6 v5.3.0 in Cygwin v2.4.1 64bit.
@@ -386,7 +386,7 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
   return UnsafeMutablePointer<sem_t>(bitPattern: -1)
-#elseif os(Linux) || os(FreeBSD) || os(Android) || os(Windows)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Windows)
   // The value is ABI.  Value verified to be correct on Glibc.
   return UnsafeMutablePointer<sem_t>(bitPattern: 0)
 #else
@@ -429,7 +429,7 @@ public func sem_open(
 //===----------------------------------------------------------------------===//
 
 // FreeBSD defines extern char **environ differently than Linux.
-#if os(FreeBSD)
+#if os(FreeBSD) || os(PS4)
 @_silgen_name("_swift_FreeBSD_getEnv")
 func _swift_FreeBSD_getEnv(
 ) -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>>

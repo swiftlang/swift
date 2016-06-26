@@ -1005,7 +1005,7 @@ StringTests.test(
 #endif
 }
 
-#if os(Linux) || os(FreeBSD) || os(Android)
+#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
 #endif
 
