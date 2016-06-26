@@ -781,18 +781,38 @@ static StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
   return os.str();
 }
 
+llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
+                                                      StringRef library) {
+  llvm::SmallString<32> buffer;
+
+  if (T.isWindowsMSVCEnvironment() || T.isWindowsItaniumEnvironment()) {
+    bool quote = library.find(' ') != StringRef::npos;
+
+    buffer += "/DEFAULTLIB:";
+    if (quote)
+      buffer += '"';
+    buffer += library;
+    if (!library.endswith_lower(".lib"))
+      buffer += ".lib";
+    if (quote)
+      buffer += '"';
+  } else {
+    buffer += "-l";
+    buffer += library;
+  }
+
+  return buffer;
+}
+
 void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   llvm::LLVMContext &ctx = Module.getContext();
 
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
-    // FIXME: Use target-independent linker option.
-    // Clang uses CGM.getTargetCodeGenInfo().getDependentLibraryOption(...).
-    llvm::SmallString<32> buf;
-    buf += "-l";
-    buf += linkLib.getName();
-    auto flag = llvm::MDString::get(ctx, buf);
-    AutolinkEntries.push_back(llvm::MDNode::get(ctx, flag));
+    llvm::SmallString<32> opt =
+        getTargetDependentLibraryOption(Triple, linkLib.getName());
+    AutolinkEntries.push_back(
+        llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
     break;
   }
   case LibraryKind::Framework: {
