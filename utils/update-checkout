@@ -196,12 +196,12 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         config = json.load(f)
     validate_config(config)
 
-    # If branch is None, default to using the default branch alias specified by
-    # our configuration file.
-    if scheme is None:
-        scheme = config['default-branch-scheme']
-
     if clone or clone_with_ssh:
+        # If branch is None, default to using the default branch alias specified by
+        # our configuration file.
+        if scheme is None:
+            scheme = config['default-branch-scheme']
+
         obtain_additional_swift_sources(
             config, clone_with_ssh, scheme, skip_history,
             args.skip_repository_list)
