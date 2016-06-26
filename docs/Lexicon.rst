@@ -52,6 +52,9 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     Describes a type or function where making changes will break binary
     compatibility. See :doc:`LibraryEvolution.rst <LibraryEvolution>`.
 
+  iff
+    "if and only if". This term comes from mathematics.
+
   IUO (implicitly unwrapped optional)
     A type like Optional, but it implicitly converts to its wrapped type. If
     the value is ``nil`` during such a conversion, the program traps just as
