@@ -37,6 +37,11 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     protocol. Represented in the compiler by the ProtocolConformance type at
     the AST level. See also `witness table`.
 
+  contextual type
+    The type of a value or declaration from inside a generic context. This type
+    may contain `archetypes <archetype>` and cannot be used directly from
+    outside the context. Compare with `interface type`.
+
   DI (definite initialization / definitive initialization)
     The feature that no uninitialized variables, constants, or properties will
     be read by a program, or the analysis pass that operates on SIL to
@@ -54,6 +59,11 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
 
   iff
     "if and only if". This term comes from mathematics.
+
+  interface type
+    The type of a value or declaration outside its generic context. These types
+    can be compared across declarations but cannot be used directly from within
+    the context. Compare with `contextual type`.
 
   IUO (implicitly unwrapped optional)
     A type like Optional, but it implicitly converts to its wrapped type. If
