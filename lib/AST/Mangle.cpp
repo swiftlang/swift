@@ -735,6 +735,10 @@ void Mangler::mangleAssociatedTypeName(DependentMemberType *dmt,
   addSubstitution(assocTy);
 }
 
+static void
+collectBoundGenericArgs(Type type,
+                        SmallVectorImpl<SmallVector<Type, 2>> &genericArgs);
+
 /// Mangle a type into the buffer.
 ///
 /// Type manglings should never start with [0-9dz_] or end with [0-9].
@@ -850,7 +854,27 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     mangleDeclName(decl);
     return;
   }
-
+  case TypeKind::BoundGenericAlias: {
+    auto BoundGenericAliasTy = cast<BoundGenericAliasType>(tybase);
+    if (DWARFMangling) {
+      TypeAliasDecl *decl = BoundGenericAliasTy->getDecl();
+      // type ::= 'G' <type> (<type>+ '_')+
+      Buffer << "Ga";
+      mangleContextOf(decl);
+      mangleDeclName(decl);
+      SmallVector<SmallVector<Type, 2>, 2> genericArgs;
+      collectBoundGenericArgs(BoundGenericAliasTy, genericArgs);
+      assert(!genericArgs.empty());
+      for (auto args : genericArgs) {
+        for (auto arg : args)
+          mangleType(arg, /*uncurry*/ 0);
+        Buffer << '_';
+      }
+      return;
+    } else
+      return mangleType(BoundGenericAliasTy->getSinglyDesugaredType(),
+                        uncurryLevel);
+  }
   case TypeKind::Paren:
     return mangleSugaredType<ParenType>(type);
   case TypeKind::AssociatedType:
@@ -867,7 +891,8 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     assert(DWARFMangling && "sugared types are only legal for the debugger");
     auto *IUO = cast<ImplicitlyUnwrappedOptionalType>(tybase);
     auto implDecl = tybase->getASTContext().getImplicitlyUnwrappedOptionalDecl();
-    auto GenTy = BoundGenericType::get(implDecl, Type(), IUO->getBaseType());
+    auto GenTy =
+        BoundGenericNominalType::get(implDecl, Type(), IUO->getBaseType());
     return mangleType(GenTy, 0);
   }
 
@@ -1324,7 +1349,7 @@ collectBoundGenericArgs(Type type,
       collectBoundGenericArgs(parent, genericArgs);
     genericArgs.push_back({});
   } else {
-    auto *boundType = type->castTo<BoundGenericType>();
+    auto *boundType = cast<BoundGenericType>(type.getPointer());
     if (auto parent = boundType->getParent())
       collectBoundGenericArgs(parent, genericArgs);
 

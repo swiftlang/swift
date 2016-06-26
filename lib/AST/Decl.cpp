@@ -2088,7 +2088,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
 
       args.push_back(paramTy);
     }
-    return BoundGenericType::get(decl, Ty, args);
+    return BoundGenericNominalType::get(decl, Ty, args);
   } else {
     return NominalType::get(decl, Ty, ctx);
   }

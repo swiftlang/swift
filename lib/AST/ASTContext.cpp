@@ -1733,6 +1733,10 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     // InheritedConformances ?
 }
 
+bool ASTContext::hasActiveConstraintSolver() const {
+  return Impl.CurrentConstraintSolverArena.get();
+}
+
 namespace {
   /// Produce a deterministic ordering of the given declarations.
   class OrderDeclarations {
@@ -2686,10 +2690,24 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   return result;
 }
 
-void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
-                               NominalTypeDecl *TheDecl, Type Parent,
-                               ArrayRef<Type> GenericArgs,
-                               RecursiveTypeProperties &properties) {
+BoundGenericType::BoundGenericType(TypeKind theKind, GenericTypeDecl *theDecl,
+                                   Type parent, ArrayRef<Type> genericArgs,
+                                   const ASTContext *context,
+                                   RecursiveTypeProperties properties)
+    : TypeBase(theKind, context, properties), TheDecl(theDecl), Parent(parent),
+      GenericArgs(genericArgs) {}
+
+void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID) {
+  if (getKind() == TypeKind::BoundGenericAlias)
+    reinterpret_cast<BoundGenericAliasType *>(this)->Profile(ID);
+  else
+    reinterpret_cast<BoundGenericNominalType *>(this)->Profile(ID);
+}
+
+void BoundGenericAliasType::Profile(llvm::FoldingSetNodeID &ID,
+                                    TypeAliasDecl *TheDecl, Type Parent,
+                                    ArrayRef<Type> GenericArgs,
+                                    RecursiveTypeProperties &properties) {
   ID.AddPointer(TheDecl);
   ID.AddPointer(Parent.getPointer());
   if (Parent) properties |= Parent->getRecursiveProperties();
@@ -2700,24 +2718,50 @@ void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
   }
 }
 
-BoundGenericType::BoundGenericType(TypeKind theKind,
-                                   NominalTypeDecl *theDecl,
-                                   Type parent,
-                                   ArrayRef<Type> genericArgs,
-                                   const ASTContext *context,
-                                   RecursiveTypeProperties properties)
-  : TypeBase(theKind, context, properties),
-    TheDecl(theDecl), Parent(parent), GenericArgs(genericArgs)
-{
-}
-
-BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
-                                        Type Parent,
-                                        ArrayRef<Type> GenericArgs) {
+BoundGenericAliasType *BoundGenericAliasType::get(TypeAliasDecl *TheDecl,
+                                                  Type Parent,
+                                                  ArrayRef<Type> GenericArgs) {
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
   RecursiveTypeProperties properties;
-  BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs, properties);
+  BoundGenericAliasType::Profile(ID, TheDecl, Parent, GenericArgs, properties);
+  auto arena = getArena(properties);
+  auto &cache = C.Impl.getArena(arena).BoundGenericTypes;
+  void *InsertPos = 0;
+  if (auto *BGAT = cache.FindNodeOrInsertPos(ID, InsertPos))
+    return reinterpret_cast<BoundGenericAliasType *>(BGAT);
+
+  ArrayRef<Type> ArgsCopy = C.AllocateCopy(GenericArgs, arena);
+  auto *newType = new (C, arena)
+      BoundGenericAliasType(TheDecl, Parent, ArgsCopy, properties);
+
+  cache.InsertNode(newType, InsertPos);
+
+  return newType;
+}
+
+void BoundGenericNominalType::Profile(llvm::FoldingSetNodeID &ID,
+                                      NominalTypeDecl *TheDecl, Type Parent,
+                                      ArrayRef<Type> GenericArgs,
+                                      RecursiveTypeProperties &properties) {
+  ID.AddPointer(TheDecl);
+  ID.AddPointer(Parent.getPointer());
+  if (Parent) properties |= Parent->getRecursiveProperties();
+  ID.AddInteger(GenericArgs.size());
+  for (Type Arg : GenericArgs) {
+    ID.AddPointer(Arg.getPointer());
+    properties |= Arg->getRecursiveProperties();
+  }
+}
+
+BoundGenericNominalType *
+BoundGenericNominalType::get(NominalTypeDecl *TheDecl, Type Parent,
+                             ArrayRef<Type> GenericArgs) {
+  ASTContext &C = TheDecl->getDeclContext()->getASTContext();
+  llvm::FoldingSetNodeID ID;
+  RecursiveTypeProperties properties;
+  BoundGenericNominalType::Profile(ID, TheDecl, Parent, GenericArgs,
+                                   properties);
 
   auto arena = getArena(properties);
 
@@ -2725,7 +2769,7 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   if (BoundGenericType *BGT =
         C.Impl.getArena(arena).BoundGenericTypes.FindNodeOrInsertPos(ID,
                                                                      InsertPos))
-    return BGT;
+    return reinterpret_cast<BoundGenericNominalType *>(BGT);
 
   ArrayRef<Type> ArgsCopy = C.AllocateCopy(GenericArgs, arena);
   bool IsCanonical = !Parent || Parent->isCanonical();
@@ -2738,7 +2782,7 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
     }
   }
 
-  BoundGenericType *newType;
+  BoundGenericNominalType *newType;
   if (auto theClass = dyn_cast<ClassDecl>(TheDecl)) {
     newType = new (C, arena) BoundGenericClassType(theClass, Parent, ArgsCopy,
                                                    IsCanonical ? &C : 0,

@@ -4345,8 +4345,8 @@ void TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
   // Objective-C.
   ConformanceCheckOptions options = ConformanceCheckFlags::InExpression
     | ConformanceCheckFlags::SuppressDependencyTracking;
-  if (!conformsToProtocol(bound->getDecl()->getDeclaredType(), proto, dc,
-                          options))
+  if (!conformsToProtocol(bound->getDecl()->getDeclaredType(),
+                          proto, dc, options))
     return;
 
   // Mark the conformances within the arguments.

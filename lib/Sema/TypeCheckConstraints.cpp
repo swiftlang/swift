@@ -1561,6 +1561,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   auto &solution = viable[0];
   bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
   bool skipClosures = options.contains(TypeCheckExprFlags::SkipMultiStmtClosures);
+
   auto result = cs.applySolution(solution, expr, convertType.getType(),
                                  isDiscarded, suppressDiagnostics,
                                  skipClosures);
@@ -1740,7 +1741,6 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
     log << "---Solution---\n";
     solution.dump(log);
   }
-
   expr->setType(solution.simplifyType(*this, expr->getType()));
   CCE->setType(solution.simplifyType(*this, CCE->getType()));
   return false;
@@ -1782,6 +1782,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
   // Apply the solution to the expression.
   auto result = cs.applySolutionShallow(solution, expr, 
                                         /*suppressDiagnostics=*/false);
+
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
     return true;
@@ -2524,6 +2525,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   Expr *result = solution.coerceToType(expr, type,
                                        cs.getConstraintLocator(expr),
                                        false, typeFromPattern);
+
   if (!result) {
     return true;
   }

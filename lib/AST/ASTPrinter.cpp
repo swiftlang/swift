@@ -3688,6 +3688,11 @@ public:
   }
 
   void visitBoundGenericType(BoundGenericType *T) {
+    if (auto *Alias = dyn_cast<BoundGenericAliasType>(T)) {
+      if (Options.PrintForSIL)
+        return visit(Alias->getSinglyDesugaredType());
+    }
+
     if (Options.SynthesizeSugarOnTypes) {
       auto *NT = T->getDecl();
       auto &Ctx = T->getASTContext();
@@ -3725,6 +3730,11 @@ public:
 
     printTypeDeclName(T);
     printGenericArgs(T->getGenericArgs());
+
+    if (auto *Alias = dyn_cast<BoundGenericAliasType>(T)) {
+      Printer << " = ";
+      visit(Alias->getSinglyDesugaredType());
+    }
   }
 
   void visitEnumType(EnumType *T) {

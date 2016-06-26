@@ -1158,9 +1158,9 @@ private:
     return nullptr;
   }
 
-  NodePointer demangleBoundGenericArgs(NodePointer nominalType) {
+  NodePointer demangleBoundGenericArgs(NodePointer nominalOrAliasType) {
     // Generic arguments for the outermost type come first.
-    NodePointer parentOrModule = nominalType->getChild(0);
+    NodePointer parentOrModule = nominalOrAliasType->getChild(0);
 
     if (parentOrModule->getKind() != Node::Kind::Module &&
         parentOrModule->getKind() != Node::Kind::Function &&
@@ -1169,11 +1169,11 @@ private:
 
       // Rebuild this type with the new parent type, which may have
       // had its generic arguments applied.
-      NodePointer result = NodeFactory::create(nominalType->getKind());
+      NodePointer result = NodeFactory::create(nominalOrAliasType->getKind());
       result->addChild(parentOrModule);
-      result->addChild(nominalType->getChild(1));
+      result->addChild(nominalOrAliasType->getChild(1));
 
-      nominalType = result;
+      nominalOrAliasType = result;
     }
 
     NodePointer args = NodeFactory::create(Node::Kind::TypeList);
@@ -1189,15 +1189,15 @@ private:
     // If there were no arguments at this level there is nothing left
     // to do.
     if (args->getNumChildren() == 0)
-      return nominalType;
+      return nominalOrAliasType;
 
     // Otherwise, build a bound generic type node from the unbound
     // type and arguments.
     NodePointer unboundType = NodeFactory::create(Node::Kind::Type);
-    unboundType->addChild(nominalType);
+    unboundType->addChild(nominalOrAliasType);
 
     Node::Kind kind;
-    switch (nominalType->getKind()) { // look through Type node
+    switch (nominalOrAliasType->getKind()) { // look through Type node
       case Node::Kind::Class:
         kind = Node::Kind::BoundGenericClass;
         break;
@@ -1206,6 +1206,9 @@ private:
         break;
       case Node::Kind::Enum:
         kind = Node::Kind::BoundGenericEnum;
+        break;
+      case Node::Kind::TypeAlias:
+        kind = Node::Kind::BoundGenericAlias;
         break;
       default:
         return nullptr;
@@ -1221,11 +1224,15 @@ private:
     //
     // Each level of nominal type nesting has its own list of arguments.
 
-    NodePointer nominalType = demangleNominalType();
-    if (!nominalType)
+    NodePointer type;
+    if (Mangled.peek() == 'a')
+      type = demangleTypeImpl();
+    else
+      type = demangleNominalType();
+    if (!type)
       return nullptr;
-
-    return demangleBoundGenericArgs(nominalType);
+    
+    return demangleBoundGenericArgs(type);
   }
 
   NodePointer demangleContext() {
@@ -2383,6 +2390,7 @@ private:
     case Node::Kind::ArchetypeRef:
     case Node::Kind::AssociatedType:
     case Node::Kind::AssociatedTypeRef:
+    case Node::Kind::BoundGenericAlias:
     case Node::Kind::BoundGenericClass:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericStructure:
@@ -3394,6 +3402,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "witness table offset for ";
     print(pointer->getFirstChild());
     return;
+  case Node::Kind::BoundGenericAlias:
   case Node::Kind::BoundGenericClass:
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:

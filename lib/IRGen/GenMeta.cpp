@@ -197,7 +197,7 @@ namespace {
         decl = nominalType->getDecl();
         parentType = nominalType.getParent();
       } else {
-        auto boundType = cast<BoundGenericType>(type);
+        auto boundType = cast<BoundGenericNominalType>(type);
         decl = boundType->getDecl();
         parentType = boundType.getParent();
       }
@@ -656,7 +656,7 @@ namespace {
       return emitNominalMetadataRef(IGF, type->getDecl(), type);
     }
 
-    llvm::Value *visitBoundGenericType(CanBoundGenericType type) {
+    llvm::Value *visitBoundGenericNominalType(CanBoundGenericNominalType type) {
       assert(!type->isExistentialType());
       return emitNominalMetadataRef(IGF, type->getDecl(), type);
     }

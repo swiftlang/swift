@@ -1340,7 +1340,8 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
-    return convertAnyNominalType(ty, cast<BoundGenericType>(ty)->getDecl());
+    return convertAnyNominalType(ty,
+                                 cast<BoundGenericNominalType>(ty)->getDecl());
   case TypeKind::InOut:
     return convertInOutType(cast<InOutType>(ty));
   case TypeKind::Tuple:

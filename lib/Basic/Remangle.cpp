@@ -1034,7 +1034,11 @@ void Remangler::mangleTypeAlias(Node *node) {
   SubstitutionEntry entry;
   if (trySubstitution(node, entry)) return;
   Out << 'a';
-  mangleChildNodes(node); // context, identifier
+//  mangleChildNodes(node); // context, identifier
+  EntityContext ctx;
+  assert(node->getNumChildren() == 2);
+  mangleEntityContext(node->getChild(0).get(), ctx); // context
+  mangle(node->getChild(1).get()); // name 
   addSubstitution(entry);
 }
 
@@ -1527,11 +1531,13 @@ void Remangler::mangleProtocolWithoutPrefix(Node *node) {
 
 static bool isSpecialized(Node *node) {
   switch (node->getKind()) {
+  case Node::Kind::BoundGenericAlias:
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
   case Node::Kind::BoundGenericClass:
     return true;
 
+  case Node::Kind::TypeAlias:
   case Node::Kind::Structure:
   case Node::Kind::Enum:
   case Node::Kind::Class: {
@@ -1549,6 +1555,7 @@ static bool isSpecialized(Node *node) {
 
 NodePointer Remangler::getUnspecialized(Node *node) {
   switch (node->getKind()) {
+  case Node::Kind::TypeAlias:
   case Node::Kind::Structure:
   case Node::Kind::Enum:
   case Node::Kind::Class: {
@@ -1562,6 +1569,7 @@ NodePointer Remangler::getUnspecialized(Node *node) {
     return result;
   }
 
+  case Node::Kind::BoundGenericAlias:
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
   case Node::Kind::BoundGenericClass: {
@@ -1592,6 +1600,7 @@ void Remangler::mangleGenericArgs(Node *node, EntityContext &ctx) {
     break;
   }
 
+  case Node::Kind::BoundGenericAlias:
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
   case Node::Kind::BoundGenericClass: {
@@ -1654,6 +1663,17 @@ void Remangler::mangleNominalType(Node *node, char kind, EntityContext &ctx) {
   if (trySubstitution(node, entry)) return;
   mangleNamedEntity(node, kind, "", ctx);
   addSubstitution(entry);
+}
+
+void Remangler::mangleBoundGenericAlias(Node *node) {
+  Out << 'G';
+  EntityContext ctx;
+
+  NodePointer unboundType = getUnspecialized(node);
+  TemporaryNodes.push_back(unboundType);
+
+  mangleTypeAlias(unboundType.get());
+  mangleGenericArgs(node, ctx);
 }
 
 void Remangler::mangleBoundGenericClass(Node *node) {

@@ -971,9 +971,8 @@ namespace {
                                                 importedTypeArgs[1]);
             } else {
               // Everything else.
-              bridgedType =
-                  BoundGenericType::get(cast<NominalTypeDecl>(unboundDecl),
-                                        Type(), importedTypeArgs);
+              bridgedType = BoundGenericNominalType::get(
+                  cast<NominalTypeDecl>(unboundDecl), Type(), importedTypeArgs);
             }
           }
 
@@ -1081,9 +1080,9 @@ static Type getUnmanagedType(ClangImporter::Implementation &impl,
   if (!unmanagedDecl || unmanagedDecl->getGenericParams()->size() != 1)
     return payloadType;
 
-  Type unmanagedClassType = BoundGenericType::get(unmanagedDecl,
-                                                  /*parent*/ Type(),
-                                                  payloadType);
+  Type unmanagedClassType =
+      BoundGenericNominalType::get(unmanagedDecl,
+                                   /*parent*/ Type(), payloadType);
   return unmanagedClassType;
 }
 
@@ -1600,9 +1599,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
   // Append an additional argument to represent varargs.
   if (isVariadic) {
-    auto paramTy =
-        BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
-                              {SwiftContext.TheAnyType});
+    auto paramTy = BoundGenericNominalType::get(
+        SwiftContext.getArrayDecl(), Type(), {SwiftContext.TheAnyType});
     auto name = SwiftContext.getIdentifier("varargs");
     auto param = new (SwiftContext)
         ParamDecl(true, SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
@@ -2201,7 +2199,7 @@ getNamedSwiftTypeSpecialization(Module *module, StringRef name,
         if (params->size() == args.size()) {
           // When we form the bound generic type, make sure we get the
           // substitutions.
-          auto *BGT = BoundGenericType::get(nominalDecl, Type(), args);
+          auto *BGT = BoundGenericNominalType::get(nominalDecl, Type(), args);
           return BGT;
         }
       }

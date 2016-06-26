@@ -1909,10 +1909,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // The above conversions also apply to implicitly unwrapped optional types,
   // except that there is no implicit conversion from T? to T!.
   {
-    BoundGenericType *boundGenericType2;
+    BoundGenericNominalType *boundGenericType2;
     
     if (concrete && kind >= TypeMatchKind::Subtype &&
-        (boundGenericType2 = type2->getAs<BoundGenericType>())) {
+        (boundGenericType2 = type2->getAs<BoundGenericNominalType>())) {
       auto decl2 = boundGenericType2->getDecl();
       if (auto optionalKind2 = decl2->classifyAsOptionalType()) {
         assert(boundGenericType2->getGenericArgs().size() == 1);
@@ -3642,7 +3642,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     increaseScore(SK_ValueToOptional);
 
     assert(matchKind >= TypeMatchKind::Subtype);
-    auto generic2 = type2->castTo<BoundGenericType>();
+    auto generic2 = type2->castTo<BoundGenericNominalType>();
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(type1, generic2->getGenericArgs()[0],
                       matchKind, (subFlags | TMF_UnwrappingOptional), locator);
@@ -3659,8 +3659,8 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   case ConversionRestrictionKind::OptionalToOptional: {
     addContextualScore();
     assert(matchKind >= TypeMatchKind::Subtype);
-    auto generic1 = type1->castTo<BoundGenericType>();
-    auto generic2 = type2->castTo<BoundGenericType>();
+    auto generic1 = type1->castTo<BoundGenericNominalType>();
+    auto generic2 = type2->castTo<BoundGenericNominalType>();
     assert(generic1->getDecl()->classifyAsOptionalType());
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(generic1->getGenericArgs()[0],
@@ -3681,7 +3681,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   case ConversionRestrictionKind::ForceUnchecked: {
     addContextualScore();
     assert(matchKind >= TypeMatchKind::Conversion);
-    auto boundGenericType1 = type1->castTo<BoundGenericType>();
+    auto boundGenericType1 = type1->castTo<BoundGenericNominalType>();
     assert(boundGenericType1->getDecl()->classifyAsOptionalType()
              == OTK_ImplicitlyUnwrappedOptional);
     assert(boundGenericType1->getGenericArgs().size() == 1);

@@ -1276,8 +1276,8 @@ private:
     printNullability(optionalKind);
   }
 
-  void visitBoundGenericType(BoundGenericType *BGT,
-                             Optional<OptionalTypeKind> optionalKind) {
+  void visitBoundGenericNominalType(BoundGenericNominalType *BGT,
+                                    Optional<OptionalTypeKind> optionalKind) {
     // Handle bridged types.
     if (!isa<StructDecl>(BGT->getDecl()) &&
         printIfObjCBridgeable(BGT->getDecl(), BGT->getGenericArgs(),

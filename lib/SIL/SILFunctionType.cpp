@@ -2203,8 +2203,8 @@ namespace {
 
       CanType origObjectType = origType.getGenericArgs()[0];
       CanType substObjectType = visit(origObjectType);
-      return CanType(BoundGenericType::get(origType->getDecl(), Type(),
-                                           substObjectType));
+      return CanType(BoundGenericNominalType::get(origType->getDecl(), Type(),
+                                                  substObjectType));
     }
 
     /// Any other type is would be a valid type in the AST.  Just

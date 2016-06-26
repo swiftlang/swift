@@ -1045,12 +1045,15 @@ void ConstraintSystem::openGeneric(
   for (auto gp : params) {
     auto *archetype = ArchetypeBuilder::mapTypeIntoContext(innerDC, gp)
         ->castTo<ArchetypeType>();
-    auto typeVar = createTypeVariable(getConstraintLocator(
-                                        locator.withPathElement(
-                                          LocatorPathElt(archetype))),
-                                      TVO_PrefersSubtypeBinding |
-                                      TVO_MustBeMaterializable);
-    replacements[gp->getCanonicalType()] = typeVar;
+    auto found = replacements.find(gp->getCanonicalType());
+    if (found == replacements.end()) {
+      auto typeVar = createTypeVariable(getConstraintLocator(
+                                          locator.withPathElement(
+                                            LocatorPathElt(archetype))),
+                                        TVO_PrefersSubtypeBinding |
+                                        TVO_MustBeMaterializable);
+      replacements[gp->getCanonicalType()] = typeVar;
+    }
   }
 
   GetTypeVariable getTypeVariable{*this, locator};

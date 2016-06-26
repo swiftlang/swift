@@ -4516,15 +4516,15 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   return new (ctx) ErasureExpr(expr, toType, conformances);
 }
 
-static unsigned getOptionalBindDepth(const BoundGenericType *bgt) {
+static unsigned getOptionalBindDepth(const BoundGenericNominalType *bgt) {
   
   if (bgt->getDecl()->classifyAsOptionalType()) {
     auto tyarg = bgt->getGenericArgs()[0];
     
     unsigned innerDepth = 0;
-    
-    if (auto wrappedBGT = dyn_cast<BoundGenericType>(tyarg->
-                                                     getCanonicalType())) {
+
+    if (auto wrappedBGT =
+            dyn_cast<BoundGenericNominalType>(tyarg->getCanonicalType())) {
       innerDepth = getOptionalBindDepth(wrappedBGT);
     }
     
@@ -4535,9 +4535,8 @@ static unsigned getOptionalBindDepth(const BoundGenericType *bgt) {
 }
 
 static Type getOptionalBaseType(const Type &type) {
-  
-  if (auto bgt = dyn_cast<BoundGenericType>(type->
-                                            getCanonicalType())) {
+
+  if (auto bgt = dyn_cast<BoundGenericNominalType>(type->getCanonicalType())) {
     if (bgt->getDecl()->classifyAsOptionalType()) {
       return getOptionalBaseType(bgt->getGenericArgs()[0]);
     }
@@ -4552,8 +4551,8 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   auto &tc = cs.getTypeChecker();
   Type fromType = expr->getType();
   
-  auto fromGenericType = fromType->castTo<BoundGenericType>();
-  auto toGenericType = toType->castTo<BoundGenericType>();
+  auto fromGenericType = fromType->castTo<BoundGenericNominalType>();
+  auto toGenericType = toType->castTo<BoundGenericNominalType>();
   assert(fromGenericType->getDecl()->classifyAsOptionalType());
   assert(toGenericType->getDecl()->classifyAsOptionalType());
   tc.requireOptionalIntrinsics(expr->getLoc());
@@ -5218,7 +5217,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
         
     case ConversionRestrictionKind::ValueToOptional: {
-      auto toGenericType = toType->castTo<BoundGenericType>();
+      auto toGenericType = toType->castTo<BoundGenericNominalType>();
       assert(toGenericType->getDecl()->classifyAsOptionalType());
       tc.requireOptionalIntrinsics(expr->getLoc());
 
@@ -5591,7 +5590,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coercion to Optional<T>.
-  if (auto toGenericType = toType->getAs<BoundGenericType>()) {
+  if (auto toGenericType = toType->getAs<BoundGenericNominalType>()) {
     if (toGenericType->getDecl()->classifyAsOptionalType()) {
       tc.requireOptionalIntrinsics(expr->getLoc());
 

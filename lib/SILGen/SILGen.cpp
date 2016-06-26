@@ -402,14 +402,12 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   CanType PtrPtrInt8Ty = C.TheRawPointerType;
   if (auto PointerDecl = C.getUnsafeMutablePointerDecl()) {
     if (auto Int8Decl = cast<TypeDecl>(findStdlibDecl("Int8"))) {
-      Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
-                                                 nullptr,
-                                                 Int8Decl->getDeclaredType());
+      Type PointerInt8Ty = BoundGenericNominalType::get(
+          PointerDecl, nullptr, Int8Decl->getDeclaredType());
       Type OptPointerInt8Ty = OptionalType::get(PointerInt8Ty);
-      PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
-                                           nullptr,
-                                           OptPointerInt8Ty)
-        ->getCanonicalType();
+      PtrPtrInt8Ty =
+          BoundGenericNominalType::get(PointerDecl, nullptr, OptPointerInt8Ty)
+              ->getCanonicalType();
     }
   }
 

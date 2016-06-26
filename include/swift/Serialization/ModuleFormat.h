@@ -669,6 +669,13 @@ namespace decls_block {
     BCArray<TypeIDField> // generic arguments
   >;
 
+  using BoundGenericAliasTypeLayout = BCRecordLayout<
+    BOUND_GENERIC_ALIAS_TYPE,
+    DeclIDField, // generic decl
+    TypeIDField, // parent
+    BCArray<TypeIDField> // generic arguments
+  >;
+
   using BoundGenericSubstitutionLayout = BCRecordLayout<
     BOUND_GENERIC_SUBSTITUTION,
     TypeIDField,  // replacement

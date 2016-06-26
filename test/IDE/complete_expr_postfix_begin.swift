@@ -54,8 +54,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INVALID_7 | %FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INVALID_8 | %FileCheck %s -check-prefix=COMMON
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_1 | %FileCheck %s -check-prefix=MY_ALIAS
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_2 | %FileCheck %s -check-prefix=MY_ALIAS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_1 | %FileCheck %s -check-prefix=MY_ALIAS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_2 | %FileCheck %s -check-prefix=MY_ALIAS_2
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_1 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_2 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
@@ -404,16 +404,18 @@ func testGenericTypealias1() {
   var y: (Int, Int)
   y = #^GENERIC_TYPEALIAS_1^#
 }
-// FIXME: should we use the alias name in the annotation?
-// MY_ALIAS: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
-// MY_ALIAS: Decl[LocalVar]/Local/TypeRelation[Identical]: x[#(Int, Int)#];
-// MY_ALIAS: Decl[LocalVar]/Local/TypeRelation[Identical]: y[#(Int, Int)#];
+// MY_ALIAS_1: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
+// MY_ALIAS_1: Decl[LocalVar]/Local/TypeRelation[Identical]: x[#MyAlias<Int>#];
+// MY_ALIAS_1: Decl[LocalVar]/Local/TypeRelation[Identical]: y[#(Int, Int)#];
 func testGenericTypealias2() {
   typealias MyAlias<T> = (T, T)
   let x: (Int, Int) = (1, 2)
   var y: MyAlias<Int>
   y = #^GENERIC_TYPEALIAS_2^#
 }
+// MY_ALIAS_2: Decl[TypeAlias]/Local:                        MyAlias[#(T, T)#];
+// MY_ALIAS_2: Decl[LocalVar]/Local/TypeRelation[Identical]: x[#(Int, Int)#];
+// MY_ALIAS_2: Decl[LocalVar]/Local/TypeRelation[Identical]: y[#MyAlias<Int>#];
 
 func testInForEach1(arg: Int) {
   let local = 2

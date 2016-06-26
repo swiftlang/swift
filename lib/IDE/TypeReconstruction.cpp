@@ -913,7 +913,7 @@ static void VisitNodeBoundGeneric(
       Type parent_type;
       if (parent_decl->isTypeContext())
         parent_type = parent_decl->getDeclaredTypeOfContext();
-      result._types.push_back(Type(BoundGenericType::get(
+      result._types.push_back(Type(BoundGenericNominalType::get(
           nominal_type_decl, parent_type, template_types_result._types)));
     }
   }

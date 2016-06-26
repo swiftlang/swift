@@ -772,6 +772,9 @@ public:
   /// \brief Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
+  /// Returns whether a constraint solver is active.
+  bool hasActiveConstraintSolver() const;
+  
   /// Complain if @objc or dynamic is used without importing Foundation.
   void diagnoseAttrsRequiringFoundation(SourceFile &SF);
 

@@ -483,7 +483,8 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
           return nullptr;
 
         Type objectType = arg.getType();
-        return BoundGenericType::get(nominal, /*parent*/ Type(), objectType);
+        return BoundGenericNominalType::get(nominal, /*parent*/ Type(),
+                                            objectType);
       }
     }  
   }
@@ -535,15 +536,23 @@ Type TypeChecker::applyUnboundGenericArguments(
     genericArgTypes.push_back(genericArg.getType());
   }
 
+  SourceLoc noteLoc = decl->getLoc();
+  if (noteLoc.isInvalid())
+    noteLoc = loc;
+
+  BoundGenericType *BGT;
+  GenericSignature *genericSig = decl->getGenericSignature();
+  SmallVector<Type, 4> scratch;
+  ArrayRef<Type> allGenericArgs;
+
   // If we're completing a generic TypeAlias, then we map the types provided
   // onto the underlying type.
   if (auto *TAD = dyn_cast<TypeAliasDecl>(decl)) {
-    auto signature = TAD->getGenericSignature();
-
     TypeSubstitutionMap subs;
     for (unsigned i = 0, e = genericArgs.size(); i < e; i++) {
-      auto t = signature->getInnermostGenericParams()[i];
+      auto t = genericSig->getInnermostGenericParams()[i];
       subs[t->getCanonicalType().getPointer()] = genericArgs[i].getType();
+      scratch.push_back(genericArgs[i].getType());
     }
 
     if (auto outerSig = TAD->getDeclContext()->getGenericSignatureOfContext()) {
@@ -558,47 +567,50 @@ Type TypeChecker::applyUnboundGenericArguments(
       type = ArchetypeBuilder::mapTypeOutOfContext(TAD, TAD->getUnderlyingType());
     }
 
-    type = type.subst(dc->getParentModule(), subs, None);
-
-    // FIXME: return a SubstitutedType to preserve the fact that
-    // we resolved a generic TypeAlias, for availability diagnostics.
-    // A better fix might be to introduce a BoundGenericAliasType
-    // which desugars as appropriate.
-    return SubstitutedType::get(TAD->getDeclaredType(), type, Context);
+    // Enable this to get the original behavior for comparison.
+    if (0) {
+      Type substType = type.subst(dc->getParentModule(), subs, None);
+      return SubstitutedType::get(TAD->getDeclaredType(), substType, Context);
+    }
+    // FIXME: When the parent is also a bound generic type,
+    // getDeclaredTypeInContext() will return its generic type parameters as
+    // archetypes, which then won't be resolved.
+    // If we use getDeclaredTypeOfContext() we get further but SILGen will crash
+    // when the context is generic, because we will have a type variable instead
+    // of an archetype.
+//    auto Parent = TAD->getDeclContext()->getDeclaredTypeInContext();
+    auto Parent = TAD->getDeclContext()->getDeclaredTypeOfContext();
+    BGT = BoundGenericAliasType::get(TAD, Parent, genericArgTypes);
+    // This is the only case where we want to check the generic arguments of a
+    // sugared type.
+    allGenericArgs = scratch;
   }
-  
-  // Form the bound generic type.
-  auto *UGT = type->castTo<UnboundGenericType>();
-  auto *BGT = BoundGenericType::get(cast<NominalTypeDecl>(decl),
-                                    UGT->getParent(), genericArgTypes);
+  else {
+    // Form the bound generic type.
+    auto *UGT = type->castTo<UnboundGenericType>();
+    BGT = BoundGenericNominalType::get(cast<NominalTypeDecl>(decl),
+                                       UGT->getParent(), genericArgTypes);
+    // Collect the complete set of generic arguments.
+    allGenericArgs = BGT->getAllGenericArgs(scratch);
+  }
 
   // Check protocol conformance.
   if (!BGT->hasTypeParameter() && !BGT->hasTypeVariable()) {
-    SourceLoc noteLoc = decl->getLoc();
-    if (noteLoc.isInvalid())
-      noteLoc = loc;
-
     // FIXME: Record that we're checking substitutions, so we can't end up
     // with infinite recursion.
 
-    // Collect the complete set of generic arguments.
-    SmallVector<Type, 4> scratch;
-    ArrayRef<Type> allGenericArgs = BGT->getAllGenericArgs(scratch);
-
     // Check the generic arguments against the generic signature.
-    auto genericSig = decl->getGenericSignature();
     if (!decl->hasType() || decl->isValidatingGenericSignature()) {
       diagnose(loc, diag::recursive_requirement_reference);
       return nullptr;
     }
     assert(genericSig != nullptr);
-    if (checkGenericArguments(dc, loc, noteLoc, UGT, genericSig,
+    if (checkGenericArguments(dc, loc, noteLoc, type, genericSig,
                               allGenericArgs))
       return nullptr;
 
     useObjectiveCBridgeableConformancesOfArgs(dc, BGT);
   }
-
   return BGT;
 }
 
@@ -609,7 +621,6 @@ static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type,
                                      GenericIdentTypeRepr *generic,
                                      TypeResolutionOptions options,
                                      GenericTypeResolver *resolver) {
-
   Type ty = TC.applyGenericArguments(type, decl, loc, dc, generic,
                                      options, resolver);
   if (!ty)
@@ -674,7 +685,6 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             GenericTypeResolver *resolver,
                             UnsatisfiedDependency *unsatisfiedDependency) {
   assert(dc && "No declaration context for type resolution?");
-
   // If we have a callback to report dependencies, do so.
   if (unsatisfiedDependency) {
     if ((*unsatisfiedDependency)(requestResolveTypeDecl(typeDecl)))
@@ -1375,6 +1385,11 @@ static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
                                   AllowPotentiallyUnavailableProtocol))
       return true;
   }
+  if (auto *BGAT = dyn_cast<BoundGenericAliasType>(ty.getPointer())) {
+    if (checkTypeDeclAvailability(BGAT->getDecl(), IdType, Loc, DC, TC,
+                                  AllowPotentiallyUnavailableProtocol))
+      return true;
+  }
 
   if (auto *GPT = dyn_cast<GenericTypeParamType>(ty.getPointer())) {
     if (auto GP = GPT->getDecl()) {
@@ -1672,7 +1687,6 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                               GenericTypeResolver *resolver,
                               UnsatisfiedDependency *unsatisfiedDependency) {
   PrettyStackTraceTypeRepr stackTrace(Context, "resolving", TyR);
-
   // Make sure we always have a resolver to use.
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
   if (!resolver)
@@ -1693,7 +1707,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   // If we know the type representation is invalid, just return an
   // error type.
-  if (repr->isInvalid()) return ErrorType::get(TC.Context);
+  if (repr->isInvalid())
+    return ErrorType::get(TC.Context);
 
   // Strip the "is function input" bits unless this is a type that knows about
   // them.
@@ -3190,11 +3205,9 @@ bool TypeChecker::isRepresentableInObjC(
     Type errorParameterType = getNSErrorType(dc);
     if (errorParameterType) {
       errorParameterType = OptionalType::get(errorParameterType);
-      errorParameterType
-        = BoundGenericType::get(
-            Context.getAutoreleasingUnsafeMutablePointerDecl(),
-            nullptr,
-            errorParameterType);
+      errorParameterType = BoundGenericNominalType::get(
+          Context.getAutoreleasingUnsafeMutablePointerDecl(), nullptr,
+          errorParameterType);
       errorParameterType = OptionalType::get(errorParameterType);
     }
 
