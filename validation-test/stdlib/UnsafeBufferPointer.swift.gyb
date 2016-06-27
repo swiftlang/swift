@@ -15,6 +15,8 @@ struct SubscriptGetTest {
   /// The values that should be expected by slicing the UBP, or `nil` if the
   /// test is expected to crash.
   let expectedValues: [Int]?
+  /// Same as `expectedValues`, but for closed ranges. `nil` if no difference.
+  let expectedClosedValues: [Int]?
   let loc: SourceLoc
 
   static var elementCount = (end - start)
@@ -35,10 +37,12 @@ struct SubscriptGetTest {
 
   init(
     rangeSelection: RangeSelection, expectedValues: [Int]? = nil,
+    expectedClosedValues: [Int]? = nil,
     file: String = #file, line: UInt = #line
   ) {
     self.rangeSelection = rangeSelection
     self.expectedValues = expectedValues
+    self.expectedClosedValues = expectedClosedValues ?? expectedValues
     self.loc = SourceLoc(file, line, comment: "test data")
   }
 }
@@ -48,8 +52,12 @@ let subscriptGetTests : [SubscriptGetTest] = [
   SubscriptGetTest(rangeSelection: .emptyRange, expectedValues: []),
 
   // Valid, edges.
-  SubscriptGetTest(rangeSelection: .leftEdge, expectedValues: [0]),
-  SubscriptGetTest(rangeSelection: .rightEdge, expectedValues: [19]),
+  SubscriptGetTest(rangeSelection: .leftEdge,
+    expectedValues: [],
+    expectedClosedValues: [0]),
+  SubscriptGetTest(rangeSelection: .rightEdge,
+    expectedValues: [],
+    expectedClosedValues: [19]),
 
   // Valid, internal.
   SubscriptGetTest(rangeSelection: .leftHalf, 
@@ -60,6 +68,12 @@ let subscriptGetTests : [SubscriptGetTest] = [
     expectedValues: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]),
   SubscriptGetTest(rangeSelection: .full,
     expectedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+  SubscriptGetTest(rangeSelection: .offsets(2, 4),
+    expectedValues: [2, 3],
+    expectedClosedValues: [2, 3, 4]),
+  SubscriptGetTest(rangeSelection: .offsets(16, 19),
+    expectedValues: [16, 17, 18],
+    expectedClosedValues: [16, 17, 18, 19]),
 
   // Invalid, bottom out of bounds.
   SubscriptGetTest(rangeSelection: .offsets(-1, -1)),
@@ -181,13 +195,17 @@ ${SelfName}TestSuite.test("badNilCount")
 }
 
 %   for RangeName in ['range', 'countableRange', 'closedRange', 'countableClosedRange']:
-${SelfName}TestSuite.test("subscript/get").forEach(in: subscriptGetTests) { 
+${SelfName}TestSuite.test("subscript/${RangeName}/get").forEach(in: subscriptGetTests) { 
   (test) in
 
+  let expectedValues: [Int]?
 %      if 'closed' in RangeName.lower():
   if test.rangeSelection.isEmpty {
     return
   }
+  expectedValues = test.expectedClosedValues
+%      else:
+  expectedValues = test.expectedValues
 %      end
 
   let elementCount = SubscriptGetTest.elementCount
@@ -198,10 +216,10 @@ ${SelfName}TestSuite.test("subscript/get").forEach(in: subscriptGetTests) {
 
   let range = test.rangeSelection.${RangeName}(in: buffer)
 
-  if test.expectedValues == nil { expectCrashLater() }
+  if expectedValues == nil { expectCrashLater() }
   let slice = buffer[range]
   expectEqual(
-    test.expectedValues!,
+    expectedValues!,
     slice.map { $0.value },
     stackTrace: SourceLocStack().with(test.loc)
   )
