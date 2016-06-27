@@ -1326,6 +1326,23 @@ public:
     if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
       formalType = CanType(dynamicSelf->getSelfType());
 
+    // Optional of dynamic self has the same lowering as its contained type.
+    OptionalTypeKind loweredOptionalKind;
+    OptionalTypeKind formalOptionalKind;
+
+    CanType loweredObjectType = loweredType.getSwiftRValueType()
+        .getAnyOptionalObjectType(loweredOptionalKind);
+    CanType formalObjectType = formalType
+        .getAnyOptionalObjectType(formalOptionalKind);
+
+    if (loweredOptionalKind != OTK_None) {
+      if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalObjectType)) {
+        formalObjectType = dynamicSelf->getSelfType()->getCanonicalType();
+      }
+      return ((loweredOptionalKind == formalOptionalKind) &&
+              loweredObjectType == formalObjectType);
+    }
+
     // Metatypes preserve their instance type through lowering.
     if (auto loweredMT = loweredType.getAs<MetatypeType>()) {
       if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
