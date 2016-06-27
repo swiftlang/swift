@@ -131,7 +131,10 @@ macro(swift_common_standalone_build_config_clang product is_cross_compiling)
   # Then include ClangTargets.cmake. If Clang adds a ClangConfig.cmake, this is
   # where it will be included. By including ClangTargets.cmake, we at least get
   # the right dependency ordering for clang libraries.
-  include(ClangTargets)
+  include(ClangTargets OPTIONAL RESULT_VARIABLE clang_targets_included)
+  if(NOT clang_targets_included)
+    message(WARNING "Could not import ClangTargets module")
+  endif()
 
   if(NOT EXISTS "${PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h")
     message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
