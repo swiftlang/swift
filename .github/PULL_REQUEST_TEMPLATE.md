@@ -1,4 +1,4 @@
-<!-- Please complete this template before creating pull request. -->
+<!-- Please complete this template before creating the pull request. -->
 #### What's in this pull request?
 <!-- Description about pull request. -->
 
