@@ -1976,7 +1976,7 @@ public:
       return true;
 
     swift::markup::MarkupContext MC;
-    auto DC = getDocComment(MC, D);
+    auto DC = getSingleDocComment(MC, D);
     if (DC.hasValue())
       swift::markup::dump(DC.getValue()->getDocument(), OS);
 

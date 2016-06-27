@@ -432,7 +432,7 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
   }
 
   swift::markup::MarkupContext MC;
-  auto DC = getDocComment(MC, D);
+  auto DC = getCascadingDocComment(MC, D);
   if (!DC.hasValue())
     return false;
 

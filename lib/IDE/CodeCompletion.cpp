@@ -257,7 +257,7 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
   if (!Interested)
     return;
   static swift::markup::MarkupContext MC;
-  auto DC = getDocComment(MC, D);
+  auto DC = getSingleDocComment(MC, D);
   if (!DC.hasValue())
     return;
   SwiftDocWordExtractor Extractor(Words);
