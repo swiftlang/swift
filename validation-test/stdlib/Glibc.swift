@@ -18,4 +18,10 @@ GlibcTestSuite.test("errno") {
   expectEqual(EBADF, errno)
 }
 
+var GlibcIoctlConstants = TestSuite("GlibcIoctlConstants")
+
+GlibcIoctlConstants.test("tty ioctl constants availability") {
+  let aConstant = TIOCGWINSZ
+}
+
 runAllTests()
