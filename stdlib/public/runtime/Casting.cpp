@@ -669,10 +669,12 @@ isAnyObjectExistentialType(const ExistentialTypeMetadata *targetType) {
   if (numProtos != 1)
     return false;
   const ProtocolDescriptor *protocol = targetType->Protocols[0];
+  bool isAnyObjectProtocol =
+      protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject;
   // Assert that AnyObject does not need any witness tables. We rely on this.
-  assert(!protocol->Flags.needsWitnessTable() &&
+  assert(!isAnyObjectProtocol || !protocol->Flags.needsWitnessTable() &&
          "AnyObject should not require witness tables");
-  return (protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject);
+  return isAnyObjectProtocol;
 }
 
 /// Given a possibly-existential value, find its dynamic type and the
