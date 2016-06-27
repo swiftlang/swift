@@ -14,11 +14,12 @@ TRAVERSALS = ['Forward', 'Bidirectional', 'RandomAccess']
 def collectionForTraversal(traversal):  # noqa (N802 function name should be lowercase)
     if traversal == 'Forward':
         return 'Collection'
-    if traversal == 'Bidirectional':
+    elif traversal == 'Bidirectional':
         return 'BidirectionalCollection'
-    if traversal == 'RandomAccess':
+    elif traversal == 'RandomAccess':
         return 'RandomAccessCollection'
-    assert False, 'unknown traversal'
+    else:
+        raise ValueError("Unknown traversal %r" % traversal)
 
 
 def sliceTypeName(traversal, mutable, rangeReplaceable):  # noqa (N802)
@@ -42,18 +43,20 @@ def protocolsForCollectionFeatures(traversal, mutable, rangeReplaceable):  # noq
 def defaultIndicesForTraversal(traversal):  # noqa (N802)
     if traversal == 'Forward':
         return 'DefaultIndices'
-    if traversal == 'Bidirectional':
+    elif traversal == 'Bidirectional':
         return 'DefaultBidirectionalIndices'
-    if traversal == 'RandomAccess':
+    elif traversal == 'RandomAccess':
         return 'DefaultRandomAccessIndices'
-    assert False, 'unknown traversal'
+    else:
+        raise ValueError("Unknown traversal %r" % traversal)
 
 
 def documentationNameForTraversal(traversal):  # noqa (N802)
     if traversal == 'Forward':
         return 'collection'
-    if traversal == 'Bidirectional':
+    elif traversal == 'Bidirectional':
         return 'bidirectional collection'
-    if traversal == 'RandomAccess':
+    elif traversal == 'RandomAccess':
         return 'random-access collection'
-    assert False, 'unknown traversal'
+    else:
+        raise ValueError("Unknown traversal %r" % traversal)
