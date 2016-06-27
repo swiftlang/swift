@@ -755,7 +755,7 @@ the actual representation is larger than 3 words). By itself, this value cannot
 be interpreted, because it's type is not known statically, and may change due to
 assignment. The vtable provides the means to manipulate the value, because it
 provides a mapping between the protocols to which the existential type conforms
-(which is known statically) to the functions that implementation that
+(which is known statically) to the functions that implements that
 functionality for the type of the value. The value, therefore, can only be
 safely manipulated through the functions in this vtable.
 
