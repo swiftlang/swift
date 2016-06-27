@@ -380,6 +380,42 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
   return Finder.getFoundStmt();
 }
 
+/// Erase any ErrorType types on the given expression, allowing later
+/// type-checking to make progress.
+///
+/// FIXME: this is fundamentally a workaround for the fact that we may end up
+/// typechecking parts of an expression more than once - first for checking
+/// the context, and later for checking more-specific things like unresolved
+/// members.  We should restructure code-completion type-checking so that we
+/// never typecheck more than once (or find a more principled way to do it).
+static void eraseErrorTypes(Expr *E) {
+  assert(E);
+  struct Eraser : public ASTWalker {
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (expr && expr->getType() && expr->getType()->is<ErrorType>())
+        expr->setType(Type());
+      return { true, expr };
+    }
+    bool walkToTypeLocPre(TypeLoc &TL) override {
+      if (TL.getType() && TL.getType()->is<ErrorType>())
+        TL.setType(Type(), /*was validated*/false);
+      return true;
+    }
+
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      if (P && P->hasType() && P->getType()->is<ErrorType>()) {
+        P->setType(Type());
+      }
+      return { true, P };
+    }
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+  };
+
+  E->walk(Eraser());
+}
+
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
   std::uninitialized_copy(Chunks.begin(), Chunks.end(),
                           getTrailingObjects<Chunk>());
@@ -1327,6 +1363,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       return std::make_pair(ParsedExpr->getType(),
                             ParsedExpr->getReferencedDecl());
 
+    eraseErrorTypes(ParsedExpr);
+
     ConcreteDeclRef ReferencedDecl = nullptr;
     Expr *ModifiedExpr = ParsedExpr;
     if (auto T = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
@@ -1336,6 +1374,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       // modify the original expression. We should understand what effect that
       // may have on code completion.
       ParsedExpr = ModifiedExpr;
+
       return std::make_pair(*T, ReferencedDecl);
     }
     return None;
@@ -3125,7 +3164,8 @@ public:
   }
 
   void tryPostfixOperator(Expr *expr, PostfixOperatorDecl *op) {
-    assert(expr->getType());
+    if (!expr->getType())
+      return;
     // We allocate these expressions on the stack because we know they can't
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::PostfixOperator,
@@ -3194,8 +3234,8 @@ public:
     // FIXME: these checks should apply to the LHS of the operator, not the
     // immediately left expression.  Move under the type-checking.
     Expr *LHS = sequence.drop_back(2).back();
-    if (LHS->getType()->is<MetatypeType>() ||
-        LHS->getType()->is<AnyFunctionType>())
+    if (LHS->getType() && (LHS->getType()->is<MetatypeType>() ||
+                           LHS->getType()->is<AnyFunctionType>()))
       return;
 
     // We allocate these expressions on the stack because we know they can't
@@ -3245,6 +3285,7 @@ public:
   void typeCheckLeadingSequence(SmallVectorImpl<Expr *> &sequence) {
     Expr *expr =
         SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
+    eraseErrorTypes(expr);
     // Take advantage of the fact the type-checker leaves the types on the AST.
     if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
                              expr)) {
@@ -3282,6 +3323,7 @@ public:
     sequence.push_back(nullptr); // operator
     sequence.push_back(nullptr); // RHS
     auto *SE = SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
+    eraseErrorTypes(SE);
 
     for (auto op : operators) {
       switch (op->getKind()) {
@@ -3297,6 +3339,7 @@ public:
         if (seenInfixOperators.insert(op->getName()).second) {
           tryInfixOperatorCompletion(cast<InfixOperatorDecl>(op), SE);
           // Reset sequence.
+          eraseErrorTypes(SE);
           SE->setElement(SE->getNumElements() - 1, nullptr);
           SE->setElement(SE->getNumElements() - 2, nullptr);
         }
@@ -3313,8 +3356,9 @@ public:
     }
 
     // FIXME: unify this with the ?.member completions.
-    if (auto T = LHS->getType()->getRValueType()->getOptionalObjectType())
-      addPostfixBang(T);
+    if (auto T = LHS->getType())
+      if (auto ValueT = T->getRValueType()->getOptionalObjectType())
+        addPostfixBang(ValueT);
   }
 
   void addValueLiteralCompletions() {
@@ -5056,6 +5100,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     CurDeclContext->walkContext(Walker);
     bool Success = false;
     if (auto PE = Walker.ParentFarthest.get<Expr *>()) {
+      eraseErrorTypes(PE);
       Success = typeCheckUnresolvedExpr(*CurDeclContext, UnresolvedExpr, PE,
                                         PossibleTypes);
       Lookup.getUnresolvedMemberCompletions(

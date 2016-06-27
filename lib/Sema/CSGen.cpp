@@ -3220,6 +3220,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   InferUnresolvedMemberConstraintGenerator MCG(E, CS);
   ConstraintWalker cw(MCG);
   Parent->walk(cw);
+
   SmallVector<Solution, 3> solutions;
   if (CS.solve(solutions, FreeTypeVariableBinding::Allow)) {
     return false;
