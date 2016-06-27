@@ -980,7 +980,7 @@ static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref) {
   auto fn = IGM.getAddrOfSILFunction(SILFn, NotForDefinition);
   fn->setVisibility(llvm::GlobalValue::DefaultVisibility);
   fn->setLinkage(llvm::GlobalValue::InternalLinkage);
-  fn->setUnnamedAddr(true);
+  fn->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
   return llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
 }

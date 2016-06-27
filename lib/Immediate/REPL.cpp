@@ -772,7 +772,7 @@ private:
     for (auto &global : M.globals()) {
       if (!global.hasName())
         continue;
-      if (global.hasUnnamedAddr())
+      if (global.hasGlobalUnnamedAddr())
         continue;
 
       global.setVisibility(llvm::GlobalValue::DefaultVisibility);

@@ -622,7 +622,7 @@ IRGenModule::createStringConstant(StringRef Str,
   // unnamed_addr to prevent it from going into the cstrings section and getting
   // coalesced.
   if (!willBeRelativelyAddressed)
-    global->setUnnamedAddr(true);
+    global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
   if (!sectionName.empty())
     global->setSection(sectionName);
