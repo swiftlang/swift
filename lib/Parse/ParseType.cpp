@@ -467,10 +467,15 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
                                   /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
-    // If this is an inout marker in an argument list, consume the inout.
+    // If this is an deprecated use of the inout marker in an argument list,
+    // consume the inout.
     SourceLoc InOutLoc;
-    consumeIf(tok::kw_inout, InOutLoc);
-
+    bool hasAnyInOut = false;
+    bool hasValidInOut = false;
+    if (consumeIf(tok::kw_inout, InOutLoc)) {
+      hasAnyInOut = true;
+      hasValidInOut = false;
+    }
     // If the tuple element starts with "ident :", then
     // the identifier is an element tag, and it is followed by a type
     // annotation.
@@ -483,6 +488,18 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
       // Consume the ':'.
       consumeToken(tok::colon);
+      SourceLoc postColonLoc = Tok.getLoc();
+
+      // Consume 'inout' if present.
+      if (!hasAnyInOut && consumeIf(tok::kw_inout, InOutLoc)) {
+        hasValidInOut = true;
+      }
+
+      SourceLoc extraneousInOutLoc;
+      while (consumeIf(tok::kw_inout, extraneousInOutLoc)) {
+        diagnose(Tok.getLoc(), diag::parameter_inout_var_let_repeated)
+          .fixItRemove(extraneousInOutLoc);
+      }
 
       // Parse the type annotation.
       ParserResult<TypeRepr> type = parseType(diag::expected_type);
@@ -491,13 +508,18 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       if (type.isNull())
         return makeParserError();
 
+      if (!hasValidInOut && hasAnyInOut) {
+        diagnose(Tok.getLoc(), diag::inout_as_attr_disallowed)
+          .fixItRemove(InOutLoc)
+          .fixItInsert(postColonLoc, "inout ");
+      }
+
       // If an 'inout' marker was specified, build the type.  Note that we bury
       // the inout locator within the named locator.  This is weird but required
       // by sema apparently.
       if (InOutLoc.isValid())
         type = makeParserResult(new (Context) InOutTypeRepr(type.get(),
                                                             InOutLoc));
-
       
       ElementsR.push_back(
           new (Context) NamedTypeRepr(name, type.get(), nameLoc));
