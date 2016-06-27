@@ -627,6 +627,11 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-swiftpm"]
         if args.build_swift_stdlib_unittest_extra:
             impl_args += ["--build-swift-stdlib-unittest-extra"]
+        if args.build_swift_stdlib is not None:
+            if args.build_swift_stdlib:
+                impl_args += ["--build-swift-stdlib=1"]
+            else:
+                impl_args += ["--build-swift-stdlib=0"]
 
         if args.skip_build_linux:
             impl_args += ["--skip-build-linux"]
@@ -1398,6 +1403,14 @@ details of the setups of other systems or automated environments.""")
         "--build-swift-stdlib-unittest-extra",
         help="Build optional StdlibUnittest components",
         action="store_true")
+    parser.add_argument(
+        "--build-swift-stdlib",
+        help="Whether to build the core standard library",
+        metavar="BOOL",
+        nargs='?',
+        type=arguments.type.bool,
+        default=None,
+        const=True)
 
     run_build_group = parser.add_argument_group(
         title="Run build")
