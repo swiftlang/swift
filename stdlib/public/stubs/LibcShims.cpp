@@ -93,7 +93,7 @@ size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
 }
 #elif defined(_MSC_VER)
 #include <malloc.h>
-size_t _swift_stdlib_malloc_size(const void *ptr) {
+size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
   return _msize(const_cast<void *>(ptr));
 }
 #elif defined(__FreeBSD__)
