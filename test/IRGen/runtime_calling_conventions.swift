@@ -29,7 +29,7 @@ public func foo(_ c: C) {
 // CHECK-NEXT: ret void
 // CHECK: attributes #[[ATTR_REF]] = { noinline nounwind }
 
-// OPT-CHECK: define linkonce_odr hidden void @rt_swift_release(%swift.refcounted*) #[[ATTR_REF:[0-9]+]]
+// OPT-CHECK: define linkonce_odr hidden void @rt_swift_release(%swift.refcounted*) local_unnamed_addr #[[ATTR_REF:[0-9]+]]
 // OPT-CHECK: load void (%swift.refcounted*)*, void (%swift.refcounted*)** @_swift_release
 // OPT-CHECK-NEXT: tail call void %load(%swift.refcounted* %0)
 // OPT-CHECK-NEXT: ret void
