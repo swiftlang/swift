@@ -2,7 +2,7 @@
 
 // This is close enough to get typo-correction.
 func test_short_and_close() {
-  let foo = 4 // expected-note {{did you mean 'foo'?}}
+  let foo = 4
   let bab = fob + 1 // expected-error {{use of unresolved identifier}}
 }
 
@@ -18,7 +18,7 @@ func *(x: Whatever, y: Whatever) {}
 // This works even for single-character identifiers.
 func test_very_short() {
   // Note that we don't suggest operators.
-  let x = 0 // expected-note {{did you mean 'x'?}}
+  let x = 0
   let longer = y // expected-error {{use of unresolved identifier 'y'}}
 }
 
@@ -29,21 +29,21 @@ func test_own_initializer() {
 
 // Report candidates that are the same distance in different ways.
 func test_close_matches() {
-  let match1 = 0 // expected-note {{did you mean 'match1'?}}
-  let match22 = 0 // expected-note {{did you mean 'match22'?}}
+  let match1 = 0
+  let match22 = 0
   let x = match2 // expected-error {{use of unresolved identifier 'match2'}}
 }
 
 // Report not-as-good matches if they're still close enough to the best.
 func test_keep_if_not_too_much_worse() {
-  let longmatch1 = 0 // expected-note {{did you mean 'longmatch1'?}}
-  let longmatch22 = 0 // expected-note {{did you mean 'longmatch22'?}}
+  let longmatch1 = 0
+  let longmatch22 = 0
   let x = longmatch // expected-error {{use of unresolved identifier 'longmatch'}}
 }
 
 // Report not-as-good matches if they're still close enough to the best.
 func test_drop_if_too_different() {
-  let longlongmatch1 = 0 // expected-note {{did you mean 'longlongmatch1'?}}
+  let longlongmatch1 = 0
   let longlongmatch2222 = 0
   let x = longlongmatch // expected-error {{use of unresolved identifier 'longlongmatch'}}
 }
@@ -61,8 +61,8 @@ func test_too_many_same() {
 
 // But if some are better than others, just drop the worse tier.
 func test_too_many_but_some_better() {
-  let mtch1 = 0 // expected-note {{did you mean 'mtch1'?}}
-  let mtch2 = 0 // expected-note {{did you mean 'mtch2'?}}
+  let mtch1 = 0
+  let mtch2 = 0
   let match3 = 0
   let match4 = 0
   let match5 = 0

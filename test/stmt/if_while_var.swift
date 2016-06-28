@@ -36,7 +36,7 @@ if let x = foo() {
 
 if let x = foo() {
   use(x)
-} else if let y = foo() { // expected-note {{did you mean 'y'?}}
+} else if let y = foo() {
   use(x) // expected-error{{unresolved identifier 'x'}}
   use(y)
 } else {
@@ -119,7 +119,7 @@ func testShadowing(_ a: Int?, b: Int?, c: Int?, d: Int?) {
 
 func useInt(_ x: Int) {}
 
-func testWhileScoping(_ a: Int?) {// expected-note {{did you mean 'a'?}}
+func testWhileScoping(_ a: Int?) {
   while let x = a { }
   useInt(x) // expected-error{{use of unresolved identifier 'x'}}
 }

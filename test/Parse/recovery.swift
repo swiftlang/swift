@@ -488,9 +488,9 @@ public enum TestB {
 class bar {}
 var baz: bar
 // expected-error@+1{{unnamed parameters must be written with the empty name '_'}}
-func foo1(bar!=baz) {} // expected-note {{did you mean 'foo1'?}}
+func foo1(bar!=baz) {}
 // expected-error@+1{{unnamed parameters must be written with the empty name '_'}}
-func foo2(bar! = baz) {}// expected-note {{did you mean 'foo2'?}}
+func foo2(bar! = baz) {}
 
 // rdar://19605567
 // expected-error@+1{{use of unresolved identifier 'esp'}}
@@ -524,13 +524,13 @@ func a(s: S[{{g) -> Int {}  // expected-note {{to match this opening '('}}
 // expected-error@+3{{expected '(' for initializer parameters}}
 // expected-error@+2{{initializers may only be declared within a type}}
 // expected-error@+1{{expected an identifier to name generic parameter}}
-func F() { init<( } )} // expected-note {{did you mean 'F'?}}
+func F() { init<( } )}
 
 // rdar://20337695
 func f1() {
 
   // expected-error @+6 {{use of unresolved identifier 'C'}}
-  // expected-note @+5 {{did you mean 'n'?}}
+  //
   // expected-error @+4 {{unary operator cannot be separated from its operand}} {{11-12=}}
   // expected-error @+3 {{'==' is not a prefix unary operator}}
   // expected-error @+2 {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
