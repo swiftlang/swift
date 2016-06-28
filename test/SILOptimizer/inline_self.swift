@@ -33,12 +33,30 @@ func callIt(fn: () -> ()) {
   fn()
 }
 
-// Do not inline C.capturesSelf() into main either.
-class Z {
-  func capturesSelf() -> Self {
+class BaseZ {
+  final func baseCapturesSelf() -> Self {
     let fn = { [weak self] in _ = self }
     callIt(fn: fn)
     return self
+  }
+}
+
+// Do not inline C.capturesSelf() into main either.
+class Z : BaseZ {
+  final func capturesSelf() -> Self {
+    let fn = { [weak self] in _ = self }
+    callIt(fn: fn)
+    return self
+  }
+
+  // Inline captureSelf into callCaptureSelf,
+  // because their respective Self types refer to the same type.
+  final func callCapturesSelf() -> Self {
+    return capturesSelf()
+  }
+
+  final func callBaseCapturesSelf() -> Self {
+    return baseCapturesSelf()
   }
 }
 
@@ -49,7 +67,16 @@ _ = Z().capturesSelf()
 // CHECK: [[F:%[0-9]+]] = function_ref @_TZFC11inline_self1C7factory{{.*}} : $@convention(method) (Int, @thick C.Type) -> @owned C
 // CHECK: apply [[F]](%{{.+}}, %{{.+}}) : $@convention(method) (Int, @thick C.Type) -> @owned C
 
-// CHECK: [[Z:%.*]] = alloc_ref $Z
 // CHECK: function_ref inline_self.Z.capturesSelf () -> Self
 // CHECK: [[F:%[0-9]+]] = function_ref @_TFC11inline_self1Z12capturesSelffT_DS0_ : $@convention(method) (@guaranteed Z) -> @owned Z
-// CHECK: apply [[F]]([[Z]]) : $@convention(method) (@guaranteed Z) -> @owned Z
+// CHECK: [[Z:%.*]] = alloc_ref $Z
+// CHECK: apply [[F]]([[Z]]) : $@convention(method) (@guaranteed Z) -> @owned
+// CHECK: return
+
+// CHECK-LABEL: sil hidden @_TFC11inline_self1Z16callCapturesSelffT_DS0_ : $@convention(method)
+// CHECK-NOT: function_ref @_TFC11inline_self1Z12capturesSelffT_DS0_
+// CHECK: }
+
+// CHECK-LABEL: sil hidden @_TFC11inline_self1Z20callBaseCapturesSelffT_DS0_
+// CHECK-NOT: function_ref @_TFC11inline_self5BaseZ16baseCapturesSelffT_DS0_
+// CHECK: }
