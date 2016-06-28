@@ -344,7 +344,6 @@ public:
       StackSlotKey;
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
-  llvm::SmallDenseMap<llvm::Type *, Address, 8> DebugScratchpads;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
   llvm::SmallVector<std::pair<DominancePoint, llvm::Instruction *>, 8>
       ValueVariables;
