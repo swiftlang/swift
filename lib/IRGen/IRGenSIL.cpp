@@ -1258,6 +1258,10 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   assert(params.empty() && "didn't claim all parameters!");
 
+  // emitPolymorphicParameters() may create function calls, so we need
+  // to initialize the debug location here.
+  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo, IGF.Builder);
+  
   // Bind polymorphic arguments. This can only be done after binding
   // all the value parameters, and must be done even for non-polymorphic
   // functions because of imported Objective-C generics.

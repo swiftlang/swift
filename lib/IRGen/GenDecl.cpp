@@ -573,12 +573,16 @@ void IRGenModule::emitRuntimeRegistration() {
   {
     llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
     llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
-    IRBuilder Builder(getLLVMContext());
+    IRBuilder Builder(getLLVMContext(), DebugInfo);
     Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+    if (DebugInfo)
+      DebugInfo->setEntryPointLoc(Builder);
     Builder.CreateCall(RegistrationFunction, {});
   }
   
   IRGenFunction RegIGF(*this, RegistrationFunction);
+  if (DebugInfo)
+    DebugInfo->emitArtificialFunction(RegIGF, RegistrationFunction);
   
   // Register ObjC protocols, classes, and extensions we added.
   if (ObjCInterop) {
@@ -1004,12 +1008,17 @@ void IRGenModule::emitTypeVerifier() {
   {
     llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
     llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
-    IRBuilder Builder(getLLVMContext());
+    IRBuilder Builder(getLLVMContext(), DebugInfo);
     Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+    if (DebugInfo)
+      DebugInfo->setEntryPointLoc(Builder);
     Builder.CreateCall(VerifierFunction, {});
   }
 
   IRGenFunction VerifierIGF(*this, VerifierFunction);
+  if (DebugInfo)
+    DebugInfo->emitArtificialFunction(VerifierIGF, VerifierFunction);
+
   emitTypeLayoutVerifier(VerifierIGF, TypesToVerify);
   VerifierIGF.Builder.CreateRetVoid();
 }

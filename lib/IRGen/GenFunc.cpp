@@ -1424,6 +1424,8 @@ static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
                                      IGM.getModule());
   func->setAttributes(IGM.constructInitialAttributes());
   IRGenFunction IGF(IGM, func);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, func);
   
   // Copy the captures from the source to the destination.
   Explosion params = IGF.collectParameters();
@@ -1459,6 +1461,8 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
                                      IGM.getModule());
   func->setAttributes(IGM.constructInitialAttributes());
   IRGenFunction IGF(IGM, func);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, func);
   
   // Destroy the captures.
   Explosion params = IGF.collectParameters();

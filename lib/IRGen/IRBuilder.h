@@ -38,6 +38,9 @@ class IRBuilder : public IRBuilderBase {
   /// ordering.
   llvm::BasicBlock *ClearedIP;
 
+  /// Whether debug information is requested. Only used in assertions.
+  bool DebugInfo;
+
   // Set calling convention of the call instruction using
   // the same calling convention as the callee function.
   // This ensures that they are always compatible.
@@ -50,8 +53,8 @@ class IRBuilder : public IRBuilderBase {
   }
 
 public:
-  IRBuilder(llvm::LLVMContext &Context)
-    : IRBuilderBase(Context), ClearedIP(nullptr) {}
+  IRBuilder(llvm::LLVMContext &Context, bool DebugInfo)
+    : IRBuilderBase(Context), ClearedIP(nullptr), DebugInfo(DebugInfo) {}
 
   /// Determines if the current location is apparently reachable.  The
   /// invariant we maintain is that the insertion point of the builder
@@ -259,6 +262,7 @@ public:
   llvm::CallInst *CreateCall(llvm::Value *Callee, ArrayRef<llvm::Value *> Args,
                              const Twine &Name = "",
                              llvm::MDNode *FPMathTag = nullptr) {
+    assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
     auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;
@@ -268,6 +272,7 @@ public:
                              ArrayRef<llvm::Value *> Args,
                              const Twine &Name = "",
                              llvm::MDNode *FPMathTag = nullptr) {
+    assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
     auto Call = IRBuilderBase::CreateCall(FTy, Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;
@@ -277,6 +282,7 @@ public:
                              ArrayRef<llvm::Value *> Args,
                              const Twine &Name = "",
                              llvm::MDNode *FPMathTag = nullptr) {
+    assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
     auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;
