@@ -73,7 +73,8 @@ class IRGenDebugInfo {
   llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
   llvm::DIFile *MainFile = nullptr;     /// The main file.
   llvm::DIModule *MainModule = nullptr; /// The current module.
-  llvm::MDNode *EntryPointFn = nullptr; /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
+  llvm::DIScope *EntryPointFn =
+      nullptr;                          /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
   TypeAliasDecl *MetadataTypeDecl;      /// The type decl for swift.type.
   llvm::DIType *InternalType; /// Catch-all type for opaque internal types.
 
@@ -128,6 +129,12 @@ public:
     Builder.SetCurrentDebugLocation(DL);
   }
 
+  /// Set the location for SWIFT_ENTRY_POINT_FUNCTION.
+  void setEntryPointLoc(IRBuilder &Builder);
+
+  /// Return the scope for  SWIFT_ENTRY_POINT_FUNCTION.
+  llvm::DIScope *getEntryPointFn();
+  
   /// Emit debug info for an import declaration.
   ///
   /// The DWARF output for import decls is similar to that of a using

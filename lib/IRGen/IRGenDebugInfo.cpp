@@ -337,6 +337,11 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   Builder.SetCurrentDebugLocation(DL);
 }
 
+void IRGenDebugInfo::setEntryPointLoc(IRBuilder &Builder) {
+  auto DL = llvm::DebugLoc::get(0, 0, getEntryPointFn(), nullptr);
+  Builder.SetCurrentDebugLocation(DL);
+}
+
 llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
   if (DS == 0)
     return MainFile;
@@ -482,6 +487,20 @@ static CanSILFunctionType getFunctionType(SILType SILTy) {
   return FnTy;
 }
 
+llvm::DIScope *IRGenDebugInfo::getEntryPointFn() {
+  // Lazily create EntryPointFn.
+  if (!EntryPointFn) {
+    auto main = IGM.getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
+    assert(main && "emitting TopLevelCodeDecl in module without "
+           SWIFT_ENTRY_POINT_FUNCTION "?");
+    EntryPointFn = DBuilder.createReplaceableCompositeType(
+      llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
+        MainFile, MainFile, 0);
+  }
+  return EntryPointFn;
+}
+
+
 llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   if (!DC)
     return TheCU;
@@ -504,17 +523,7 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     return getOrCreateContext(DC->getParent());
 
   case DeclContextKind::TopLevelCodeDecl:
-    // Lazily create EntryPointFn.
-    if (!EntryPointFn) {
-      auto main = IGM.getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
-      assert(main && "emitting TopLevelCodeDecl in module without "
-                     SWIFT_ENTRY_POINT_FUNCTION "?");
-      EntryPointFn = DBuilder.createReplaceableCompositeType(
-            llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
-            MainFile, MainFile, 0);
-    }
-
-    return cast<llvm::DIScope>(EntryPointFn);
+    return getEntryPointFn();
 
   case DeclContextKind::Module:
     return getOrCreateModule({Module::AccessPathTy(), cast<ModuleDecl>(DC)});

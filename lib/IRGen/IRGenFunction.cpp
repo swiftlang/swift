@@ -35,7 +35,7 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
                              llvm::Function *Fn,
                              const SILDebugScope *DbgScope,
                              Optional<SILLocation> DbgLoc)
-  : IGM(IGM), Builder(IGM.getLLVMContext()),
+  : IGM(IGM), Builder(IGM.getLLVMContext(), IGM.DebugInfo),
     CurFn(Fn), DbgScope(DbgScope)
   {
 
