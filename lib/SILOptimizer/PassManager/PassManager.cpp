@@ -25,6 +25,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/TimeValue.h"
 #include "llvm/Support/GraphWriter.h"
 
@@ -93,6 +94,40 @@ llvm::cl::list<std::string>
 llvm::cl::opt<bool> SILVerifyWithoutInvalidation(
     "sil-verify-without-invalidation", llvm::cl::init(false),
     llvm::cl::desc("Verify after passes even if the pass has not invalidated"));
+
+
+static llvm::ManagedStatic<std::vector<unsigned>> DebugPassNumbers;
+
+namespace {
+
+struct DebugOnlyPassNumberOpt {
+  void operator=(const std::string &Val) const {
+    if (Val.empty())
+      return;
+    SmallVector<StringRef, 8> dbgPassNumbers;
+    StringRef(Val).split(dbgPassNumbers, ',', -1, false);
+    for (auto dbgPassNumber : dbgPassNumbers) {
+      int PassNumber;
+      if (dbgPassNumber.getAsInteger(10, PassNumber) || PassNumber < 0)
+        llvm_unreachable("The pass number should be an integer number >= 0");
+      DebugPassNumbers->push_back(static_cast<unsigned>(PassNumber));
+    }
+  }
+};
+
+}
+
+static DebugOnlyPassNumberOpt DebugOnlyPassNumberOptLoc;
+
+static llvm::cl::opt<DebugOnlyPassNumberOpt, true,
+                     llvm::cl::parser<std::string>>
+    DebugOnly("debug-only-pass-number",
+              llvm::cl::desc("Enable a specific type of debug output (comma "
+                             "separated list pass numbers)"),
+              llvm::cl::Hidden, llvm::cl::ZeroOrMore,
+              llvm::cl::value_desc("pass number"),
+              llvm::cl::location(DebugOnlyPassNumberOptLoc),
+              llvm::cl::ValueRequired);
 
 static bool doPrintBefore(SILTransform *T, SILFunction *F) {
   if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
@@ -163,6 +198,31 @@ static void printModule(SILModule *Mod, bool EmitVerboseSIL) {
   }
 }
 
+class DebugPrintEnabler {
+  bool OldDebugFlag;
+public:
+  DebugPrintEnabler(unsigned PassNumber) {
+    OldDebugFlag = llvm::DebugFlag;
+    if (llvm::DebugFlag)
+      return;
+    if (DebugPassNumbers->empty())
+      return;
+    // Enable debug printing if the pass number matches
+    // one of the pass numbers provided as a command line option.
+    for (auto DebugPassNumber : *DebugPassNumbers) {
+      if (DebugPassNumber == PassNumber) {
+        llvm::DebugFlag = true;
+        return;
+      }
+    }
+  }
+
+  ~DebugPrintEnabler() {
+    llvm::DebugFlag = OldDebugFlag;
+  }
+};
+
+
 SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
   Mod(M), StageName(Stage) {
   
@@ -216,7 +276,9 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
   for (auto SFT : FuncTransforms) {
-    PrettyStackTraceSILFunctionTransform X(SFT);
+    PrettyStackTraceSILFunctionTransform X(SFT, NumPassesRun);
+    DebugPrintEnabler DebugPrint(NumPassesRun);
+
     SFT->injectPassManager(this);
     SFT->injectFunction(F);
 
@@ -409,7 +471,8 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
 
   const SILOptions &Options = getOptions();
 
-  PrettyStackTraceSILModuleTransform X(SMT);
+  PrettyStackTraceSILModuleTransform X(SMT, NumPassesRun);
+  DebugPrintEnabler DebugPrint(NumPassesRun);
 
   SMT->injectPassManager(this);
   SMT->injectModule(Mod);
