@@ -203,6 +203,7 @@ macro(swift_common_unified_build_config product)
   set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(LLVM_PACKAGE_VERSION ${PACKAGE_VERSION})
+  set(SWIFT_TABLEGEN_EXE llvm-tblgen)
 
   # If cmark was checked out into tools/cmark, expect to build it as
   # part of the unified build.
@@ -227,6 +228,8 @@ macro(swift_common_unified_build_config product)
       "${CLANG_MAIN_INCLUDE_DIR}"
       "${CMARK_MAIN_INCLUDE_DIR}"
       "${CMARK_BUILD_INCLUDE_DIR}")
+
+  include(AddSwiftTableGen) # This imports TableGen from LLVM.
 
   check_cxx_compiler_flag("-Werror -Wnested-anon-types" CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
   if(CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
