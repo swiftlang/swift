@@ -27,19 +27,21 @@ namespace reflection {
 class FieldRecordFlags {
   using int_type = uint32_t;
   enum : int_type {
-    IsObjC = 0x00000001,
+    // Is this an indirect enum case?
+    IsIndirectCase = 0x1
   };
   int_type Data;
+
 public:
-  bool isObjC() const {
-    return Data & IsObjC;
+  bool isIndirectCase() const {
+    return (Data & IsIndirectCase) == IsIndirectCase;
   }
 
-  void setIsObjC(bool ObjC) {
-    if (ObjC)
-      Data |= IsObjC;
+  void setIsIndirectCase(bool IndirectCase=true) {
+    if (IndirectCase)
+      Data |= IsIndirectCase;
     else
-      Data &= ~IsObjC;
+      Data &= ~IsIndirectCase;
   }
 
   int_type getRawValue() const {
@@ -69,8 +71,8 @@ public:
     return "";
   }
 
-  bool isObjC() const {
-    return Flags.isObjC();
+  bool isIndirectCase() const {
+    return Flags.isIndirectCase();
   }
 };
 

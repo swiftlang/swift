@@ -25,6 +25,7 @@
 
 #include "ConstantBuilder.h"
 #include "GenClass.h"
+#include "GenEnum.h"
 #include "GenHeap.h"
 #include "GenProto.h"
 #include "IRGenModule.h"
@@ -294,11 +295,12 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   const uint32_t fieldRecordSize = 12;
   const NominalTypeDecl *NTD;
 
-  void addFieldDecl(const ValueDecl *value, CanType type) {
-    reflection::FieldRecordFlags Flags;
-    Flags.setIsObjC(value->isObjC());
+  void addFieldDecl(const ValueDecl *value, CanType type,
+                    bool indirect=false) {
+    reflection::FieldRecordFlags flags;
+    flags.setIsIndirectCase(indirect);
 
-    addConstantInt32(Flags.getRawValue());
+    addConstantInt32(flags.getRawValue());
 
     if (!type) {
       addConstantInt32(0);
@@ -315,9 +317,75 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     }
   }
 
-  void layout() {
-    using swift::reflection::FieldDescriptorKind;
+  void layoutRecord() {
+    auto kind = FieldDescriptorKind::Struct;
 
+    if (auto CD = dyn_cast<ClassDecl>(NTD)) {
+      auto RC = getReferenceCountingForClass(IGM, const_cast<ClassDecl *>(CD));
+      if (RC == ReferenceCounting::ObjC)
+        kind = FieldDescriptorKind::ObjCClass;
+      else
+        kind = FieldDescriptorKind::Class;
+    }
+
+    addConstantInt16(uint16_t(kind));
+    addConstantInt16(fieldRecordSize);
+
+    // Imported classes don't need field descriptors
+    if (NTD->hasClangNode()) {
+      assert(isa<ClassDecl>(NTD));
+      addConstantInt32(0);
+      return;
+    }
+
+    auto properties = NTD->getStoredProperties();
+    addConstantInt32(std::distance(properties.begin(), properties.end()));
+    for (auto property : properties)
+      addFieldDecl(property,
+                   property->getInterfaceType()
+                       ->getCanonicalType());
+  }
+
+  void layoutEnum() {
+    auto enumDecl = cast<EnumDecl>(NTD);
+    auto &strategy = irgen::getEnumImplStrategy(
+        IGM, enumDecl->getDeclaredTypeInContext()
+                     ->getCanonicalType());
+
+    addConstantInt16(uint16_t(FieldDescriptorKind::Enum));
+    addConstantInt16(fieldRecordSize);
+    addConstantInt32(strategy.getElementsWithPayload().size() +
+                     strategy.getElementsWithNoPayload().size());
+
+    for (auto enumCase : strategy.getElementsWithPayload()) {
+        bool indirect = (enumCase.decl->isIndirect() ||
+                         enumDecl->isIndirect());
+        addFieldDecl(enumCase.decl,
+                     enumCase.decl->getArgumentInterfaceType()
+                                  ->getCanonicalType(),
+                     indirect);
+    }
+
+    for (auto enumCase : strategy.getElementsWithNoPayload()) {
+        addFieldDecl(enumCase.decl, CanType());
+    }
+  }
+
+  void layoutProtocol() {
+    auto protocolDecl = cast<ProtocolDecl>(NTD);
+    FieldDescriptorKind Kind;
+    if (protocolDecl->isObjC())
+      Kind = FieldDescriptorKind::ObjCProtocol;
+    else if (protocolDecl->requiresClass())
+      Kind = FieldDescriptorKind::ClassProtocol;
+    else
+      Kind = FieldDescriptorKind::Protocol;
+    addConstantInt16(uint16_t(Kind));
+    addConstantInt16(fieldRecordSize);
+    addConstantInt32(0);
+  }
+
+  void layout() {
     PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
     auto type = NTD->getDeclaredType()->getCanonicalType();
     addTypeRef(NTD->getModuleContext(), type);
@@ -329,66 +397,18 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
     switch (NTD->getKind()) {
       case DeclKind::Class:
-      case DeclKind::Struct: {
-        auto kind = FieldDescriptorKind::Struct;
-
-        if (auto CD = dyn_cast<ClassDecl>(NTD)) {
-          auto RC = getReferenceCountingForClass(IGM, const_cast<ClassDecl *>(CD));
-          if (RC == ReferenceCounting::ObjC)
-            kind = FieldDescriptorKind::ObjCClass;
-          else
-            kind = FieldDescriptorKind::Class;
-        }
-
-        addConstantInt16(uint16_t(kind));
-        addConstantInt16(fieldRecordSize);
-
-        // Imported classes don't need field descriptors
-        if (NTD->hasClangNode()) {
-          assert(isa<ClassDecl>(NTD));
-          addConstantInt32(0);
-          break;
-        }
-
-        auto properties = NTD->getStoredProperties();
-        addConstantInt32(std::distance(properties.begin(), properties.end()));
-        for (auto property : properties)
-          addFieldDecl(property,
-                       property->getInterfaceType()
-                       ->getCanonicalType());
+      case DeclKind::Struct:
+        layoutRecord();
         break;
-      }
-      case DeclKind::Enum: {
-        auto enumDecl = cast<EnumDecl>(NTD);
-        auto cases = enumDecl->getAllElements();
-        addConstantInt16(uint16_t(FieldDescriptorKind::Enum));
-        addConstantInt16(fieldRecordSize);
-        addConstantInt32(std::distance(cases.begin(), cases.end()));
-        for (auto enumCase : cases) {
-          if (enumCase->hasArgumentType()) {
-            addFieldDecl(enumCase,
-                         enumCase->getArgumentInterfaceType()
-                         ->getCanonicalType());
-          } else {
-            addFieldDecl(enumCase, CanType());
-          }
-        }
+
+      case DeclKind::Enum:
+        layoutEnum();
         break;
-      }
-      case DeclKind::Protocol: {
-        auto protocolDecl = cast<ProtocolDecl>(NTD);
-        FieldDescriptorKind Kind;
-        if (protocolDecl->isObjC())
-          Kind = FieldDescriptorKind::ObjCProtocol;
-        else if (protocolDecl->requiresClass())
-          Kind = FieldDescriptorKind::ClassProtocol;
-        else
-          Kind = FieldDescriptorKind::Protocol;
-        addConstantInt16(uint16_t(Kind));
-        addConstantInt16(fieldRecordSize);
-        addConstantInt32(0);
+
+      case DeclKind::Protocol:
+        layoutProtocol();
         break;
-      }
+
       default:
         llvm_unreachable("Not a nominal type");
         break;
@@ -842,6 +862,20 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     BuiltinTypes.insert(Context.TheBridgeObjectType);
     BuiltinTypes.insert(Context.TheRawPointerType);
     BuiltinTypes.insert(Context.TheUnsafeValueBufferType);
+
+    // This would not be necessary if RawPointer had the same set of
+    // extra inhabitants as these. But maybe it's best not to codify
+    // that in the ABI anyway.
+    CanType thinFunction = CanFunctionType::get(
+      TupleType::getEmpty(Context),
+      TupleType::getEmpty(Context),
+      AnyFunctionType::ExtInfo().withRepresentation(
+          FunctionTypeRepresentation::Thin));
+    BuiltinTypes.insert(thinFunction);
+
+    CanType anyMetatype = CanExistentialMetatypeType::get(
+      ProtocolCompositionType::get(Context, {})->getCanonicalType());
+    BuiltinTypes.insert(anyMetatype);
   }
 
   for (auto CD : ImportedClasses)

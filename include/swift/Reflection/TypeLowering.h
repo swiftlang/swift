@@ -34,9 +34,22 @@ class TypeRef;
 class TypeRefBuilder;
 class BuiltinTypeDescriptor;
 
+// Defined in TypeLowering.cpp, not public -- they're friends below
+class LowerType;
+class RecordTypeInfoBuilder;
+class ExistentialTypeInfoBuilder;
+
 enum class RecordKind : unsigned {
   Tuple,
   Struct,
+
+  // An enum with no payload cases. The record will have no fields, but
+  // will have the correct size.
+  NoPayloadEnum,
+
+  // An enum with a single payload case. The record consists of a single
+  // field, being the enum payload.
+  SinglePayloadEnum,
 
   // A Swift-native function is always a function pointer followed by a
   // retainable, nullable context pointer.
@@ -185,10 +198,16 @@ class TypeConverter {
   llvm::DenseMap<const TypeRef *, const TypeInfo *> Cache;
   llvm::DenseMap<std::pair<unsigned, unsigned>,
                  const ReferenceTypeInfo *> ReferenceCache;
+
   const TypeRef *RawPointerTR = nullptr;
   const TypeRef *NativeObjectTR = nullptr;
   const TypeRef *UnknownObjectTR = nullptr;
+  const TypeRef *ThinFunctionTR = nullptr;
+  const TypeRef *AnyMetatypeTR = nullptr;
+
+  const TypeInfo *ThinFunctionTI = nullptr;
   const TypeInfo *ThickFunctionTI = nullptr;
+  const TypeInfo *AnyMetatypeTI = nullptr;
   const TypeInfo *EmptyTI = nullptr;
 
 public:
@@ -216,15 +235,29 @@ public:
                                            unsigned start,
                                            unsigned align);
 
-  /* Not really public */
+private:
+  friend class swift::reflection::LowerType;
+  friend class swift::reflection::RecordTypeInfoBuilder;
+  friend class swift::reflection::ExistentialTypeInfoBuilder;
+
   const ReferenceTypeInfo *
   getReferenceTypeInfo(ReferenceKind Kind,
                        ReferenceCounting Refcounting);
 
+  /// TypeRefs for special types for which we need to know the layout
+  /// intrinsically in order to layout anything else.
+  ///
+  /// IRGen emits BuiltinTypeDescriptors for these when compiling the
+  /// standard library.
   const TypeRef *getRawPointerTypeRef();
   const TypeRef *getNativeObjectTypeRef();
   const TypeRef *getUnknownObjectTypeRef();
+  const TypeRef *getThinFunctionTypeRef();
+  const TypeRef *getAnyMetatypeTypeRef();
+
+  const TypeInfo *getThinFunctionTypeInfo();
   const TypeInfo *getThickFunctionTypeInfo();
+  const TypeInfo *getAnyMetatypeTypeInfo();
   const TypeInfo *getEmptyTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>
@@ -242,18 +275,20 @@ class RecordTypeInfoBuilder {
   unsigned Size, Alignment, Stride, NumExtraInhabitants;
   RecordKind Kind;
   std::vector<FieldInfo> Fields;
+  bool Empty;
   bool Invalid;
 
 public:
   RecordTypeInfoBuilder(TypeConverter &TC, RecordKind Kind)
     : TC(TC), Size(0), Alignment(1), Stride(0), NumExtraInhabitants(0),
-      Kind(Kind), Invalid(false) {}
+      Kind(Kind), Empty(true), Invalid(false) {}
 
   bool isInvalid() const {
     return Invalid;
   }
 
-  unsigned addField(unsigned fieldSize, unsigned fieldAlignment);
+  unsigned addField(unsigned fieldSize, unsigned fieldAlignment,
+                    unsigned numExtraInhabitants);
   void addField(const std::string &Name, const TypeRef *TR);
   const RecordTypeInfo *build();
 
@@ -263,6 +298,13 @@ public:
 
   unsigned getFieldOffset(unsigned Index) const {
     return Fields[Index].Offset;
+  }
+
+  void setNumExtraInhabitants(unsigned numExtraInhabitants) {
+    // We can only take away extra inhabitants while performing
+    // record layout, never add new ones.
+    assert(numExtraInhabitants <= NumExtraInhabitants);
+    NumExtraInhabitants = numExtraInhabitants;
   }
 };
 
