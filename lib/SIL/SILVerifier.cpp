@@ -30,6 +30,7 @@
 #include "swift/Basic/Range.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 using namespace swift;
@@ -3212,6 +3213,27 @@ public:
     SILVisitor::visitSILBasicBlock(BB);
   }
 
+  void visitSILBasicBlocks(SILFunction *F) {
+    // Visit all basic blocks in the RPOT order.
+    // This ensures that any open_existential instructions, which
+    // open archetypes, are seen before the uses of these archetypes.
+    llvm::ReversePostOrderTraversal<SILFunction *> RPOT(F);
+    llvm::DenseSet<SILBasicBlock *> VisitedBBs;
+    for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
+      auto *BB = *Iter;
+      VisitedBBs.insert(BB);
+      visitSILBasicBlock(BB);
+    }
+
+    // Visit all basic blocks that were not visited during the RPOT traversal,
+    // e.g. unrechable basic blocks.
+    for (auto &BB : *F) {
+      if (VisitedBBs.count(&BB))
+        continue;
+      visitSILBasicBlock(&BB);
+    }
+  }
+
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
@@ -3262,7 +3284,13 @@ public:
     verifyEpilogBlocks(F);
     verifyStackHeight(F);
     verifyBranches(F);
-    SILVisitor::visitSILFunction(F);
+
+    visitSILBasicBlocks(F);
+
+    // Verify archetypes after all basic blocks are visited,
+    // because we build the map of archteypes as we visit the
+    // instructions.
+    verifyOpenedArchetypes(F);
   }
 
   void verify() {
