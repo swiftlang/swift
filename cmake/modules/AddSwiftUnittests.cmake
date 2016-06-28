@@ -47,7 +47,10 @@ function(add_swift_unittest test_dirname)
       set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
         LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
     endif()
-  elseif(${SWIFT_ENABLE_GOLD_LINKER})
+  endif()
+
+  if(SWIFT_ENABLE_GOLD_LINKER AND
+     "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -fuse-ld=gold")
   endif()
