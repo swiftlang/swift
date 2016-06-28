@@ -89,6 +89,14 @@ bool TypeBase::hasReferenceSemantics() {
   return getCanonicalType().hasReferenceSemantics();
 }
 
+bool TypeBase::isAny() {
+  if (auto comp = getAs<ProtocolCompositionType>())
+    if (comp->getProtocols().empty())
+      return true;
+  
+  return false;
+}
+
 bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }
@@ -1953,9 +1961,8 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   
   // Any can be bridged to id.
   if (type->getASTContext().LangOpts.EnableIdAsAny) {
-    if (auto protoCompTy = type->getAs<ProtocolCompositionType>()) {
-      if (protoCompTy->getProtocols().empty())
-        return ForeignRepresentableKind::Bridged;
+    if (type->isAny()) {
+      return ForeignRepresentableKind::Bridged;
     }
   }
   
