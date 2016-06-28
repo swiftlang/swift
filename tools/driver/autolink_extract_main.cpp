@@ -139,12 +139,9 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
       // FIXME: BinaryFileName below should instead be ld-style names for
       // object files in archives, e.g. "foo.a(bar.o)".
       if (!ChildBinary) {
-        llvm::handleAllErrors(
-            ChildBinary.takeError(), [&](llvm::ErrorInfoBase &EI) {
-              Instance.getDiags().diagnose(SourceLoc(),
-                                           diag::error_open_input_file,
-                                           BinaryFileName, EI.message());
-            });
+        Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
+                                     BinaryFileName,
+                                     llvm::toString(ChildBinary.takeError()));
         return true;
       }
       if (extractLinkerFlags(ChildBinary->get(), Instance, BinaryFileName,
