@@ -4,22 +4,15 @@
 
 // CHECK: import Builtin
 // CHECK: import Swift
-// SIB-CHECK: import Builtin
-// SIB-CHECK: import Swift
+
+// CHECK: func unknown()
 
 // CHECK: struct X {
 // CHECK-NEXT:  func test()
 // CHECK-NEXT:  init
 // CHECK-NEXT: }
-// SIB-CHECK: struct X {
-// SIB-CHECK-NEXT:  func test()
-// SIB-CHECK-NEXT:  init
-// SIB-CHECK-NEXT: }
 
-// CHECK: func unknown()
-// SIB-CHECK: func unknown()
-
-
+// CHECK: sil @unknown : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil hidden [fragile] @_TFVs1X4testfT_T_ : $@convention(method) (X) -> ()
 // CHECK: bb0
@@ -28,6 +21,22 @@
 // CHECK-NEXT: apply
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
+
+// CHECK-NOT: sil {{.*}} @_TFVs1XCfT_S_ : $@convention(thin) (@thin X.Type) -> X
+
+
+// SIB-CHECK: import Builtin
+// SIB-CHECK: import Swift
+
+// SIB-CHECK: func unknown()
+
+// SIB-CHECK: struct X {
+// SIB-CHECK-NEXT:  func test()
+// SIB-CHECK-NEXT:  init
+// SIB-CHECK-NEXT: }
+
+// SIB-CHECK: sil @unknown : $@convention(thin) () -> ()
+
 // SIB-CHECK-LABEL: sil hidden @_TFVs1X4testfT_T_ : $@convention(method) (X) -> ()
 // SIB-CHECK: bb0
 // SIB-CHECK-NEXT: function_ref
@@ -36,10 +45,6 @@
 // SIB-CHECK-NEXT: tuple
 // SIB-CHECK-NEXT: return
 
-// CHECK: sil @unknown : $@convention(thin) () -> ()
-// SIB-CHECK: sil @unknown : $@convention(thin) () -> ()
-
-// CHECK-NOT: sil {{.*}} @_TFVs1XCfT_S_ : $@convention(thin) (@thin X.Type) -> X
 // SIB-CHECK-NOT: sil {{.*}} @_TFVs1XCfT_S_ : $@convention(thin) (@thin X.Type) -> X
 
 @_silgen_name("unknown")
