@@ -1951,6 +1951,14 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   if (type->isObjCExistentialType())
     return ForeignRepresentableKind::Object;
   
+  // Any can be bridged to id.
+  if (type->getASTContext().LangOpts.EnableIdAsAny) {
+    if (auto protoCompTy = type->getAs<ProtocolCompositionType>()) {
+      if (protoCompTy->getProtocols().empty())
+        return ForeignRepresentableKind::Bridged;
+    }
+  }
+  
   // Class-constrained generic parameters, from ObjC generic classes.
   if (auto tyContext = dc->getInnermostTypeContext())
     if (auto clas = tyContext->getAsClassOrClassExtensionContext())
