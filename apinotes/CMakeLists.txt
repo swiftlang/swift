@@ -2,6 +2,7 @@ set(SWIFT_API_NOTES_INPUTS
   AVFoundation
   AppKit
   AudioToolbox
+  CloudKit
   CoreData
   CoreGraphics
   CoreLocation
