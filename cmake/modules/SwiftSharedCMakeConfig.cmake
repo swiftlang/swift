@@ -12,6 +12,34 @@ else()
   set(cmake_3_2_USES_TERMINAL USES_TERMINAL)
 endif()
 
+function(get_effective_platform_for_triple triple output)
+  string(FIND "${triple}" "macos" IS_MACOS)
+  if (IS_MACOS)
+    set(${output} "" PARENT_SCOPE)
+    return()
+  endif()
+  message(FATAL_ERROR "Not supported")
+endfunction()
+
+# Eliminate $(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME) from a path.
+#
+# We do not support compiling llvm with an Xcode setting beyond the one that was
+# used with build-script. This allows us to remove those paths. Right now,
+# nothing here is tested for cross compiling with Xcode, but it is in principal
+# possible.
+function(escape_llvm_path_for_xcode path outvar)
+  # First check if we are using Xcode. If not, return early.
+  if (NOT XCODE)
+    set(${outvar} "${path}" PARENT_SCOPE)
+    return()
+  endif()
+
+  get_effective_platform_for_triple("${SWIFT_HOST_TRIPLE}" SWIFT_EFFECTIVE_PLATFORM_NAME)
+  string(REPLACE "$(CONFIGURATION)" "${LLVM_BUILD_TYPE}" path "${path}")
+  string(REPLACE "$(EFFECTIVE_PLATFORM_NAME)" "${SWIFT_EFFECTIVE_PLATFORM_NAME}" path "${path}")
+  set(${outvar} "${path}" PARENT_SCOPE)
+endfunction()
+
 macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   option(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
 
@@ -55,20 +83,23 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
 
   precondition(LLVM_TOOLS_BINARY_DIR)
+  escape_llvm_path_for_xcode("${LLVM_TOOLS_BINARY_DIR}" LLVM_TOOLS_BINARY_DIR)
   precondition_translate_flag(LLVM_BUILD_LIBRARY_DIR LLVM_LIBRARY_DIR)
+  escape_llvm_path_for_xcode("${LLVM_LIBRARY_DIR}" LLVM_LIBRARY_DIR)
   precondition_translate_flag(LLVM_BUILD_MAIN_INCLUDE_DIR LLVM_MAIN_INCLUDE_DIR)
   precondition_translate_flag(LLVM_BUILD_BINARY_DIR LLVM_BINARY_DIR)
   precondition_translate_flag(LLVM_BUILD_MAIN_SRC_DIR LLVM_MAIN_SRC_DIR)
+  precondition(LLVM_LIBRARY_DIRS)
+  escape_llvm_path_for_xcode("${LLVM_LIBRARY_DIRS}" LLVM_LIBRARY_DIRS)
 
-  if(${is_cross_compiling})
-    find_program(SWIFT_TABLEGEN_EXE "llvm-tblgen" "${${product}_NATIVE_LLVM_TOOLS_PATH}"
-      NO_DEFAULT_PATH)
-    if ("${SWIFT_TABLEGEN_EXE}" STREQUAL "SWIFT_TABLEGEN_EXE-NOTFOUND")
-      message(FATAL_ERROR "Failed to find tablegen in ${${product}_NATIVE_LLVM_TOOLS_PATH}")
-    endif()
-  else()
-    set(SWIFT_TABLEGEN_EXE llvm-tblgen)
-    set(${product}_NATIVE_LLVM_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
+  if(NOT ${is_cross_compiling})
+    set(${product}_NATIVE_LLVM_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
+  endif()
+
+  find_program(SWIFT_TABLEGEN_EXE "llvm-tblgen" "${${product}_NATIVE_LLVM_TOOLS_PATH}"
+    NO_DEFAULT_PATH)
+  if ("${SWIFT_TABLEGEN_EXE}" STREQUAL "SWIFT_TABLEGEN_EXE-NOTFOUND")
+    message(FATAL_ERROR "Failed to find tablegen in ${${product}_NATIVE_LLVM_TOOLS_PATH}")
   endif()
 
   include(AddLLVM)
@@ -86,6 +117,7 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
     "Version number that will be placed into the libclang library , in the form XX.YY")
 
   foreach (INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
+    escape_llvm_path_for_xcode("${INCLUDE_DIR}" INCLUDE_DIR)
     include_directories(${INCLUDE_DIR})
   endforeach ()
 
@@ -144,7 +176,7 @@ macro(swift_common_standalone_build_config_clang product is_cross_compiling)
   set(CLANG_BUILD_INCLUDE_DIR "${PATH_TO_CLANG_BUILD}/tools/clang/include")
 
   if (NOT ${is_cross_compiling})
-    set(${product}_NATIVE_CLANG_TOOLS_PATH "${PATH_TO_LLVM_TOOLS_BINARY_DIR}")
+    set(${product}_NATIVE_CLANG_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
   endif()
 
   set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
