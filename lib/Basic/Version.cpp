@@ -321,23 +321,7 @@ std::string getSwiftFullVersion() {
   OS << SWIFT_VENDOR " ";
 #endif
 
-  OS << "Swift version " SWIFT_VERSION_STRING;
-#ifndef SWIFT_COMPILER_VERSION
-  OS << "-dev";
-#endif
-
-#if defined(SWIFT_COMPILER_VERSION)
-  OS << " (swiftlang-" SWIFT_COMPILER_VERSION;
-#if defined(CLANG_COMPILER_VERSION)
-  OS << " clang-" CLANG_COMPILER_VERSION;
-#endif
-  OS << ")";
-#elif defined(LLVM_REVISION) || defined(CLANG_REVISION) || \
-      defined(SWIFT_REVISION)
-  OS << " (";
-  printFullRevisionString(OS);
-  OS << ")";
-#endif
+  OS << "Swift version " SWIFT_VERSION_STRING " (swift-3.0-PREVIEW-1)";
   return OS.str();
 }
 
