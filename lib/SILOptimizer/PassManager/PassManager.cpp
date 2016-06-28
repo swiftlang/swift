@@ -216,7 +216,7 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
   for (auto SFT : FuncTransforms) {
-    PrettyStackTraceSILFunctionTransform X(SFT);
+    PrettyStackTraceSILFunctionTransform X(SFT, NumPassesRun);
     SFT->injectPassManager(this);
     SFT->injectFunction(F);
 
@@ -409,7 +409,7 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
 
   const SILOptions &Options = getOptions();
 
-  PrettyStackTraceSILModuleTransform X(SMT);
+  PrettyStackTraceSILModuleTransform X(SMT, NumPassesRun);
 
   SMT->injectPassManager(this);
   SMT->injectModule(Mod);
