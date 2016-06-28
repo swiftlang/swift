@@ -490,9 +490,6 @@ static CanSILFunctionType getFunctionType(SILType SILTy) {
 llvm::DIScope *IRGenDebugInfo::getEntryPointFn() {
   // Lazily create EntryPointFn.
   if (!EntryPointFn) {
-    auto main = IGM.getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
-    assert(main && "emitting TopLevelCodeDecl in module without "
-           SWIFT_ENTRY_POINT_FUNCTION "?");
     EntryPointFn = DBuilder.createReplaceableCompositeType(
       llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
         MainFile, MainFile, 0);

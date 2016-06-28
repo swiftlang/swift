@@ -539,7 +539,8 @@ void IRGenModule::emitRuntimeRegistration() {
   
   // If we're debugging, we probably don't have a main. Find a
   // function marked with the LLDBDebuggerFunction attribute instead.
-  if (!EntryPoint && Context.LangOpts.DebuggerSupport) {
+  if (Context.LangOpts.DebuggerSupport) {
+    assert(!EntryPoint && "unexpected main");
     for (SILFunction &SF : getSILModule()) {
       if (SF.hasLocation()) {
         if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
@@ -573,15 +574,16 @@ void IRGenModule::emitRuntimeRegistration() {
   {
     llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
     llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
-    IRBuilder Builder(getLLVMContext(), DebugInfo);
+    IRBuilder Builder(getLLVMContext(),
+                      DebugInfo && !Context.LangOpts.DebuggerSupport);
     Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
-    if (DebugInfo)
+    if (DebugInfo && !Context.LangOpts.DebuggerSupport)
       DebugInfo->setEntryPointLoc(Builder);
     Builder.CreateCall(RegistrationFunction, {});
   }
   
   IRGenFunction RegIGF(*this, RegistrationFunction);
-  if (DebugInfo)
+  if (DebugInfo && !Context.LangOpts.DebuggerSupport)
     DebugInfo->emitArtificialFunction(RegIGF, RegistrationFunction);
   
   // Register ObjC protocols, classes, and extensions we added.
