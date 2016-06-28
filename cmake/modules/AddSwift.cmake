@@ -1,3 +1,5 @@
+include(SwiftList)
+
 # SWIFTLIB_DIR is the directory in the build tree where Swift resource files
 # should be placed.  Note that $CMAKE_CFG_INTDIR expands to "." for
 # single-configuration builds.
@@ -5,23 +7,6 @@ set(SWIFTLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")
 set(SWIFTSTATICLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift_static")
-
-function(_list_add_string_suffix input_list suffix result_var_name)
-  set(result)
-  foreach(element ${input_list})
-    list(APPEND result "${element}${suffix}")
-  endforeach()
-  set("${result_var_name}" "${result}" PARENT_SCOPE)
-endfunction()
-
-function(_list_escape_for_shell input_list result_var_name)
-  set(result "")
-  foreach(element ${input_list})
-    string(REPLACE " " "\\ " element "${element}")
-    set(result "${result}${element} ")
-  endforeach()
-  set("${result_var_name}" "${result}" PARENT_SCOPE)
-endfunction()
 
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
