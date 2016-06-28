@@ -173,7 +173,7 @@ class InstanceStaticTestClass {
 
   @objc static func staticMethod() {}
 
-  @objc func instanceMethod() {} // expected-note {{did you mean 'instanceMethod'?}}
+  @objc func instanceMethod() {}
 
   @objc func instanceAndStaticMethod() {}
   @objc class func instanceAndStaticMethod() {}

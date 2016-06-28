@@ -525,6 +525,8 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         NameLookupOptions lookupOptions,
                                         LookupResult &result,
                                         unsigned maxResults) {
+  // Temporarily disable.
+#if 0
   // Fill in a collection of the most reasonable entries.
   TopCollection<unsigned, ValueDecl*> entries(maxResults);
   auto consumer = makeDeclConsumer([&](ValueDecl *decl,
@@ -563,6 +565,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
 
   for (auto &entry : entries)
     result.add({ entry.Value, nullptr });
+#endif
 }
 
 static InFlightDiagnostic

@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift -parse-as-library
 
-let x = 42 // expected-note{{did you mean 'x'?}}
+let x = 42
 x + x; // expected-error {{expressions are not allowed at the top level}} expected-warning {{result of operator '+' is unused}}
 x + x; // expected-error {{expressions are not allowed at the top level}} expected-warning {{result of operator '+' is unused}}
 // Make sure we don't crash on closures at the top level

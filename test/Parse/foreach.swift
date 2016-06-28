@@ -8,7 +8,7 @@ struct IntRange<Int> : Sequence, IteratorProtocol {
   func makeIterator() -> IntRange<Int> { return self }
 }
 
-func for_each(r: Range<Int>, iir: IntRange<Int>) { // expected-note 2 {{did you mean 'r'?}}
+func for_each(r: Range<Int>, iir: IntRange<Int>) {
   var sum = 0
 
   // Simple foreach loop, using the variable in the body

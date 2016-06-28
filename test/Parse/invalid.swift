@@ -17,7 +17,7 @@ func test3() {
   undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}} expected-note {{to match this opening '('}} expected-error {{expected ',' separator}} {{19-19=,}}
 } // expected-error {{expected expression in list of expressions}} expected-error {{expected ')' in expression list}}
 
-func runAction() {} // expected-note {{did you mean 'runAction'?}}
+func runAction() {}
 
 // rdar://16601779
 func foo() {
