@@ -26,6 +26,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Basic/Defer.h" // must be included after Tokens.def.
 #include "swift/Subsystems.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -41,6 +42,8 @@
 #include "clang/Index/USRGeneration.h"
 #include <algorithm>
 #include <string>
+
+#undef defer // for Tokens.def; use defer_impl instead.
 
 using namespace swift;
 using namespace ide;
@@ -3246,6 +3249,13 @@ public:
     CodeCompletionExpr CCE((SourceRange()));
     sequence.back() = &CCE;
 
+    defer_impl {
+      // Reset sequence.
+      SE->setElement(SE->getNumElements() - 1, nullptr);
+      SE->setElement(SE->getNumElements() - 2, nullptr);
+      eraseErrorTypes(SE);
+    };
+
     Expr *expr = SE;
     if (!typeCheckCompletionSequence(const_cast<DeclContext *>(CurrDeclContext),
                                      expr)) {
@@ -3336,13 +3346,8 @@ public:
           tryPostfixOperator(LHS, cast<PostfixOperatorDecl>(op));
         break;
       case DeclKind::InfixOperator:
-        if (seenInfixOperators.insert(op->getName()).second) {
+        if (seenInfixOperators.insert(op->getName()).second)
           tryInfixOperatorCompletion(cast<InfixOperatorDecl>(op), SE);
-          // Reset sequence.
-          eraseErrorTypes(SE);
-          SE->setElement(SE->getNumElements() - 1, nullptr);
-          SE->setElement(SE->getNumElements() - 2, nullptr);
-        }
         break;
       default:
         llvm_unreachable("unexpected operator kind");
