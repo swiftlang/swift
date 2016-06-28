@@ -24,6 +24,12 @@
 
 #include <iostream>
 
+[[noreturn]]
+static void unreachable(const char *Message) {
+  std::cerr << "fatal error: " << Message << "\n";
+  std::abort();
+}
+
 using namespace swift;
 using namespace reflection;
 
@@ -167,7 +173,7 @@ public:
     }
     }
 
-    assert(false && "Bad TypeInfo kind");
+    unreachable("Bad TypeInfo kind");
   }
 };
 
@@ -675,13 +681,13 @@ public:
 
   MetatypeRepresentation
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    assert(false && "Must have concrete TypeRef");
+    unreachable("Must have concrete TypeRef");
     return MetatypeRepresentation::Unknown;
   }
 
   MetatypeRepresentation
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    assert(false && "Must have concrete TypeRef");
+    unreachable("Must have concrete TypeRef");
     return MetatypeRepresentation::Unknown;
   }
 
@@ -893,13 +899,13 @@ public:
 
   const TypeInfo *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    assert(false && "Must have concrete TypeRef");
+    unreachable("Must have concrete TypeRef");
     return nullptr;
   }
 
   const TypeInfo *
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    assert(false && "Must have concrete TypeRef");
+    unreachable("Must have concrete TypeRef");
     return nullptr;
   }
 
@@ -980,7 +986,7 @@ public:
   }
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
-    assert(false && "Can't lower opaque TypeRef");
+    unreachable("Can't lower opaque TypeRef");
     return nullptr;
   }
 };
