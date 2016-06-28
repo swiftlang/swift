@@ -1,4 +1,4 @@
-//===--- TypeCheckCaptures.cpp - Capture Analysis ------------------------===//
+//===--- TypeCheckCaptures.cpp - Capture Analysis -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
