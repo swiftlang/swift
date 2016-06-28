@@ -63,6 +63,12 @@ public struct Selector : StringLiteralConvertible {
   }
 }
 
+extension Selector : Equatable {}
+
+public func ==(lhs: Selector, rhs: Selector) -> Bool {
+  return sel_isEqual(lhs, rhs)
+}
+
 public struct NSZone {
   public var pointer : OpaquePointer
 }
