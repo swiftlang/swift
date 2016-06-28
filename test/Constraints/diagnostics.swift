@@ -780,4 +780,4 @@ class SR1594 {
 // FIXME: Bad diagnostic
 func secondArgumentNotLabeled(a:Int, _ b: Int) { }
 secondArgumentNotLabeled(10, 20)
-// expected-error@-1 {{argument '_' must precede unnamed parameter #0}}
+// expected-error@-1 {{unnamed parameter #1 must precede unnamed parameter #0}}

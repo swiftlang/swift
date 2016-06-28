@@ -4002,24 +4002,53 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     Identifier first = tuple->getElementName(OOOArgIdx);
     Identifier second = tuple->getElementName(OOOPrevArgIdx);
 
-    SourceLoc diagLoc;
-    if (!first.empty())
-      diagLoc = tuple->getElementNameLoc(OOOArgIdx);
-    else
-      diagLoc = tuple->getElement(OOOArgIdx)->getStartLoc();
-
-    if (!second.empty()) {
-      TC.diagnose(diagLoc, diag::argument_out_of_order, first, second)
-        .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
-        .highlight(SourceRange(tuple->getElementNameLoc(OOOPrevArgIdx),
-                               tuple->getElement(OOOPrevArgIdx)->getEndLoc()));
-      return true;
+    // Build a mapping from arguments to parameters.
+    SmallVector<unsigned, 4> argBindings(tuple->getNumElements());
+    for (unsigned paramIdx = 0; paramIdx != paramBindings.size(); ++paramIdx) {
+      for (auto argIdx : paramBindings[paramIdx])
+        argBindings[argIdx] = paramIdx;
     }
 
-    TC.diagnose(diagLoc, diag::argument_out_of_order_named_unnamed, first,
-                OOOPrevArgIdx)
-      .highlight(tuple->getElement(OOOArgIdx)->getSourceRange())
-      .highlight(tuple->getElement(OOOPrevArgIdx)->getSourceRange());
+    auto firstRange = tuple->getElement(OOOArgIdx)->getSourceRange();
+    if (!first.empty()) {
+      firstRange.Start = tuple->getElementNameLoc(OOOArgIdx);
+    }
+    unsigned OOOParamIdx = argBindings[OOOArgIdx];
+    if (paramBindings[OOOParamIdx].size() > 1) {
+      firstRange.End =
+        tuple->getElement(paramBindings[OOOParamIdx].back())->getEndLoc();
+    }
+
+    auto secondRange = tuple->getElement(OOOPrevArgIdx)->getSourceRange();
+    if (!second.empty()) {
+      secondRange.Start = tuple->getElementNameLoc(OOOPrevArgIdx);
+    }
+    unsigned OOOPrevParamIdx = argBindings[OOOPrevArgIdx];
+    if (paramBindings[OOOPrevParamIdx].size() > 1) {
+      secondRange.End =
+        tuple->getElement(paramBindings[OOOPrevParamIdx].back())->getEndLoc();
+    }
+
+    SourceLoc diagLoc = firstRange.Start;
+
+    if (first.empty() && second.empty()) {
+      TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_unnamed,
+                  OOOArgIdx, OOOPrevArgIdx)
+        .fixItExchange(firstRange, secondRange);
+    } else if (first.empty() && !second.empty()) {
+      TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_named,
+                  OOOArgIdx, second)
+        .fixItExchange(firstRange, secondRange);
+    } else if (!first.empty() && second.empty()) {
+      TC.diagnose(diagLoc, diag::argument_out_of_order_named_unnamed,
+                  first, OOOPrevArgIdx)
+        .fixItExchange(firstRange, secondRange);
+    } else {
+      TC.diagnose(diagLoc, diag::argument_out_of_order_named_named,
+                  first, second)
+        .fixItExchange(firstRange, secondRange);
+    }
+
     return true;
   }
 
