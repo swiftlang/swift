@@ -298,6 +298,22 @@ macro(swift_common_cxx_warnings)
   check_cxx_compiler_flag("-fapplication-extension" CXX_SUPPORTS_FAPPLICATION_EXTENSION)
 endmacro()
 
+function(_gather_library_interface_dependencies outvar libnames)
+  # Collect dependencies.
+  set(new_libnames)
+  foreach(lib ${libnames})
+    list(APPEND new_libnames "${lib}")
+    get_target_property(extra_libraries "${lib}" INTERFACE_LINK_LIBRARIES)
+    foreach(dep ${extra_libraries})
+      if(NOT "${new_libnames}" STREQUAL "")
+        list(REMOVE_ITEM new_libnames "${dep}")
+      endif()
+      list(APPEND new_libnames "${dep}")
+    endforeach()
+  endforeach()
+  set(${outvar} "${new_libnames}" PARENT_SCOPE)
+endfunction()
+
 # Like 'llvm_config()', but uses libraries from the selected build
 # configuration in LLVM.  ('llvm_config()' selects the same build configuration
 # in LLVM as we have for Swift.)
@@ -307,19 +323,8 @@ function(swift_common_llvm_config target)
   if((SWIFT_BUILT_STANDALONE OR SOURCEKIT_BUILT_STANDALONE) AND NOT "${CMAKE_CFG_INTDIR}" STREQUAL ".")
     llvm_map_components_to_libnames(libnames ${link_components})
 
-    # Collect dependencies.
-    set(new_libnames)
-    foreach(lib ${libnames})
-      list(APPEND new_libnames "${lib}")
-      get_target_property(extra_libraries "${lib}" INTERFACE_LINK_LIBRARIES)
-      foreach(dep ${extra_libraries})
-        if(NOT "${new_libnames}" STREQUAL "")
-          list(REMOVE_ITEM new_libnames "${dep}")
-        endif()
-        list(APPEND new_libnames "${dep}")
-      endforeach()
-    endforeach()
-    set(libnames "${new_libnames}")
+    # Gather all of the interface dependencies of the libraries.
+    _gather_library_interface_dependencies(libnames "${libnames}")
 
     # Translate library names into full path names.
     set(new_libnames)
