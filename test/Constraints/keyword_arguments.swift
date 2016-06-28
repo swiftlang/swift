@@ -101,10 +101,10 @@ defargs1(y: 2, z: 3)
 defargs1(z: 3)
 defargs1(x: 1, z: 3)
 
-// Using defaults (out-of-order, allowed)
-defargs1(z: 3, y: 2, x: 1)
-defargs1(x: 1, z: 3, y: 2)
-defargs1(y: 2, x: 1)
+// Using defaults (out-of-order, error by SE-0060)
+defargs1(z: 3, y: 2, x: 1) // expected-error{{argument 'y' must precede argument 'z'}}
+defargs1(x: 1, z: 3, y: 2) // expected-error{{argument 'y' must precede argument 'z'}}
+defargs1(y: 2, x: 1) // expected-error{{argument 'x' must precede argument 'y'}}
 
 // Default arguments "boxed in".
 func defargs2(first: Int, x: Int = 1, y: Int = 2, z: Int = 3, last: Int) { }
@@ -115,9 +115,9 @@ defargs2(first: 1, x: 1, last: 4)
 defargs2(first: 1, y: 2, z: 3, last: 4)
 defargs2(first: 1, last: 4)
 
-// Using defaults in the middle (out-of-order, allowed)
-defargs2(first: 1, z: 3, x: 1, last: 4)
-defargs2(first: 1, z: 3, y: 2, last: 4)
+// Using defaults in the middle (out-of-order, error by SE-0060)
+defargs2(first: 1, z: 3, x: 1, last: 4) // expected-error{{argument 'x' must precede argument 'z'}}
+defargs2(first: 1, z: 3, y: 2, last: 4) // expected-error{{argument 'y' must precede argument 'z'}}
 
 // Using defaults that have moved past a non-defaulted parameter
 defargs2(x: 1, first: 1, last: 4) // expected-error{{argument 'first' must precede argument 'x'}}
@@ -173,8 +173,8 @@ variadics3(1)
 variadics3()
 
 // Using variadics (out-of-order)
-variadics3(y: 0, 1, 2, 3) // FIXME: error here
-variadics3(z: 1, 1) // FIXME: error here?
+variadics3(y: 0, 1, 2, 3) // expected-error{{argument '_' must precede argument 'y'}}
+variadics3(z: 1, 1) // expected-error{{argument '_' must precede argument 'z'}}
 
 func variadics4(x: Int..., y: Int = 2, z: Int = 3) { }
 
@@ -198,7 +198,7 @@ variadics4()
 
 // Using variadics (in-order, some missing)
 variadics4(y: 0, x: 1, 2, 3) // expected-error{{extra argument in call}}
-variadics4(z: 1, x: 1) // FIXME: error
+variadics4(z: 1, x: 1) // expected-error{{argument 'x' must precede argument 'z'}}
 
 func variadics5(_ x: Int, y: Int, _ z: Int...) { }
 
@@ -211,6 +211,26 @@ variadics5(1, y: 2, 1, 2, 3)
 // Using various (out-of-order)
 variadics5(1, 2, 3, 4, 5, 6, y: 7) // expected-error{{argument 'y' must precede unnamed parameter #1}}
 variadics5(y: 1, 2, 3, 4, 5, 6, 7) // expected-error{{missing argument for parameter #1 in call}}
+
+func variadics6(x: Int..., y: Int = 2, z: Int) { }
+
+// Using variadics (in-order, complete)
+variadics6(x: 1, 2, 3, y: 0, z: 1)
+variadics6(x: 1, y: 0, z: 1)
+variadics6(y: 0, z: 1)
+
+// Using variadics (in-order, some missing)
+variadics6(x: 1, 2, 3, y: 0) // expected-error{{missing argument for parameter 'z' in call}}
+variadics6(x: 1, z: 1)
+variadics6(z: 1)
+
+variadics6(x: 1, 2, 3, z: 1)
+variadics6(x: 1, z: 1)
+variadics6(z: 1)
+
+variadics6(x: 1, 2, 3) // expected-error{{missing argument for parameter 'z' in call}}
+variadics6(x: 1) // expected-error{{missing argument for parameter 'z' in call}}
+variadics6() // expected-error{{missing argument for parameter 'z' in call}}
 
 func outOfOrder(_ a : Int, b: Int) {
   outOfOrder(b: 42, 52)  // expected-error {{argument '_' must precede argument 'b'}}
