@@ -154,7 +154,7 @@ extension String {
   ///
   ///     print(strncmp(s1, s2, 14))
   ///     // Prints "0"
-  ///     print(String(s1.utf8.prefix(14))
+  ///     print(String(s1.utf8.prefix(14)))
   ///     // Prints "They call me '"
   ///
   /// Extending the compared character count to 15 includes the differing
@@ -162,7 +162,7 @@ extension String {
   ///
   ///     print(strncmp(s1, s2, 15))
   ///     // Prints "-17"
-  ///     print(String(s1.utf8.prefix(14))
+  ///     print(String(s1.utf8.prefix(15)))
   ///     // Prints "They call me 'B"
   public struct UTF8View
     : Collection, 
