@@ -245,6 +245,13 @@ class BuildScriptInvocation(object):
         if args.build_variant is None:
             args.build_variant = "Debug"
 
+        # Set the default stdlib-deployment-targets, if none were provided.
+        if args.stdlib_deployment_targets is None:
+            stdlib_targets = \
+                StdlibDeploymentTarget.default_stdlib_deployment_targets()
+            args.stdlib_deployment_targets = [
+                target.name for target in stdlib_targets]
+
         # Propagate the default build variant.
         if args.cmark_build_variant is None:
             args.cmark_build_variant = args.build_variant
@@ -627,6 +634,11 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-swiftpm"]
         if args.build_swift_stdlib_unittest_extra:
             impl_args += ["--build-swift-stdlib-unittest-extra"]
+        if args.build_swift_stdlib is not None:
+            if args.build_swift_stdlib:
+                impl_args += ["--build-swift-stdlib=1"]
+            else:
+                impl_args += ["--build-swift-stdlib=0"]
 
         if args.skip_build_linux:
             impl_args += ["--skip-build-linux"]
@@ -1081,15 +1093,12 @@ details of the setups of other systems or automated environments.""")
              "tools for. Can be used multiple times.",
         action=arguments.action.concat, type=arguments.type.shell_split,
         default=[])
-    stdlib_targets = StdlibDeploymentTarget.default_stdlib_deployment_targets()
     targets_group.add_argument(
         "--stdlib-deployment-targets",
         help="list of targets to compile or cross-compile the Swift standard "
              "library for. %(default)s by default.",
-        nargs="*",
-        default=[
-            target.name
-            for target in stdlib_targets])
+        action=arguments.action.concat, type=arguments.type.shell_split,
+        default=None)
     targets_group.add_argument(
         "--build-stdlib-deployment-targets",
         help="A space-separated list that filters which of the configured "
@@ -1398,6 +1407,14 @@ details of the setups of other systems or automated environments.""")
         "--build-swift-stdlib-unittest-extra",
         help="Build optional StdlibUnittest components",
         action="store_true")
+    parser.add_argument(
+        "--build-swift-stdlib",
+        help="Whether to build the core standard library",
+        metavar="BOOL",
+        nargs='?',
+        type=arguments.type.bool,
+        default=None,
+        const=True)
 
     run_build_group = parser.add_argument_group(
         title="Run build")
