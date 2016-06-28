@@ -46,6 +46,12 @@ void CaptureInfo::dump() const {
 
 void CaptureInfo::print(raw_ostream &OS) const {
   OS << "captures=(";
+
+  if (hasGenericParamCaptures())
+    OS << "<generic> ";
+  if (hasDynamicSelfCapture())
+    OS << "<dynamic_self> ";
+
   bool isFirst = true;
   
   for (auto capture : getCaptures()) {

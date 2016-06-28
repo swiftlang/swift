@@ -55,10 +55,20 @@ public:
 
   CapturedValue(ValueDecl *D, unsigned Flags) : Value(D, Flags) {}
 
+  static CapturedValue getDynamicSelfMetadata() {
+    return CapturedValue(nullptr, 0);
+  }
+
   bool isDirect() const { return Value.getInt() & IsDirect; }
   bool isNoEscape() const { return Value.getInt() & IsNoEscape; }
 
-  ValueDecl *getDecl() const { return Value.getPointer(); }
+  bool isDynamicSelfMetadata() const { return !Value.getPointer(); }
+
+  ValueDecl *getDecl() const {
+    assert(Value.getPointer() && "dynamic Self metadata capture does not "
+           "have a value");
+    return Value.getPointer();
+  }
 
   unsigned getFlags() const { return Value.getInt(); }
 
@@ -106,19 +116,26 @@ template <> struct DenseMapInfo<swift::CapturedValue> {
 
 namespace swift {
 
+class DynamicSelfType;
+
 /// \brief Stores information about captured variables.
 class CaptureInfo {
   const CapturedValue *Captures;
+  DynamicSelfType *DynamicSelf;
   unsigned Count = 0;
   bool GenericParamCaptures : 1;
   bool Computed : 1;
 
 public:
   CaptureInfo()
-    : Captures(nullptr), Count(0), GenericParamCaptures(0), Computed(0) { }
+    : Captures(nullptr), DynamicSelf(nullptr), Count(0),
+      GenericParamCaptures(0), Computed(0) { }
 
   bool hasBeenComputed() { return Computed; }
-  bool empty() { return Count == 0; }
+
+  bool isTrivial() {
+    return Count == 0 && !GenericParamCaptures && !DynamicSelf;
+  }
 
   ArrayRef<CapturedValue> getCaptures() const {
     return llvm::makeArrayRef(Captures, Count);
@@ -139,12 +156,26 @@ public:
   bool hasLocalCaptures() const;
 
   /// \returns true if the function captures any generic type parameters.
-  bool hasGenericParamCaptures() {
+  bool hasGenericParamCaptures() const {
     return GenericParamCaptures;
   }
 
   void setGenericParamCaptures(bool genericParamCaptures) {
     GenericParamCaptures = genericParamCaptures;
+  }
+
+  /// \returns true if the function captures the dynamic Self type.
+  bool hasDynamicSelfCapture() const {
+    return DynamicSelf != nullptr;
+  }
+
+  /// \returns the captured dynamic Self type, if any.
+  DynamicSelfType *getDynamicSelfType() const {
+    return DynamicSelf;
+  }
+
+  void setDynamicSelfType(DynamicSelfType *dynamicSelf) {
+    DynamicSelf = dynamicSelf;
   }
 
   void dump() const;

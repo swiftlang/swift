@@ -737,7 +737,7 @@ namespace {
     
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type) {
       printCommon(D, Type, FuncColor);
-      if (!D->getCaptureInfo().empty()) {
+      if (!D->getCaptureInfo().isTrivial()) {
         OS << " ";
         D->getCaptureInfo().print(OS);
       }
@@ -2014,7 +2014,7 @@ public:
   llvm::raw_ostream &printClosure(AbstractClosureExpr *E, char const *name) {
     printCommon(E, name);
     OS << " discriminator=" << E->getDiscriminator();
-    if (!E->getCaptureInfo().empty()) {
+    if (!E->getCaptureInfo().isTrivial()) {
       OS << " ";
       E->getCaptureInfo().print(OS);
     }
