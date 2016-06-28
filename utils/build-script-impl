@@ -2407,6 +2407,14 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
                     LIBDISPATCH_BUILD_ARGS="--libdispatch-src-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
                 fi
+
+                # Use XCTEST_BUILD_TYPE to build either --debug or --release.
+                if [[ "${XCTEST_BUILD_TYPE}" ==  "Debug" ]] ; then
+                    XCTEST_BUILD_ARGS="--debug"
+                else
+                    XCTEST_BUILD_ARGS="--release"
+                fi
+
                 echo "--- Running tests for ${product} ---"
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
@@ -2415,6 +2423,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     --swiftc="${SWIFTC_BIN}" \
                     --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
                     ${LIBDISPATCH_BUILD_ARGS} \
+                    $XCTEST_BUILD_ARGS \
                     "${XCTEST_BUILD_DIR}"
                 echo "--- Finished tests for ${product} ---"
                 continue
