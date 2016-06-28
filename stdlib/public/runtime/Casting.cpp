@@ -663,12 +663,27 @@ static void _maybeDeallocateOpaqueExistential(OpaqueValue *srcExistential,
   }
 }
 
+static bool
+isAnyObjectExistentialType(const ExistentialTypeMetadata *targetType) {
+  unsigned numProtos =  targetType->Protocols.NumProtocols;
+  if (numProtos != 1)
+    return false;
+  const ProtocolDescriptor *protocol = targetType->Protocols[0];
+  bool isAnyObjectProtocol =
+      protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject;
+  // Assert that AnyObject does not need any witness tables. We rely on this.
+  assert(!isAnyObjectProtocol || !protocol->Flags.needsWitnessTable() &&
+         "AnyObject should not require witness tables");
+  return isAnyObjectProtocol;
+}
+
 /// Given a possibly-existential value, find its dynamic type and the
 /// address of its storage.
-static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
-                                    OpaqueValue *&outValue,
-                                    const Metadata *&outType,
-                                    bool &inoutCanTake) {
+static void
+findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
+                        OpaqueValue *&outValue, const Metadata *&outType,
+                        bool &inoutCanTake,
+                        bool isTargetTypeAnyObject) {
   switch (type->getKind()) {
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
@@ -696,12 +711,23 @@ static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
     
     case ExistentialTypeRepresentation::Opaque:
     case ExistentialTypeRepresentation::ErrorProtocol: {
+      const Metadata *innerType = existentialType->getDynamicType(value);
+
+      // Short cut class in existential as AnyObject casts.
+      if (isTargetTypeAnyObject  &&
+          innerType->getKind() == MetadataKind::Class) {
+        // inline value buffer storage.
+        outValue = value;
+        outType = 0;
+        inoutCanTake= true;
+        return;
+      }
       OpaqueValue *innerValue
         = existentialType->projectValue(value);
-      const Metadata *innerType = existentialType->getDynamicType(value);
       inoutCanTake &= existentialType->mayTakeValue(value);
+
       return findDynamicValueAndType(innerValue, innerType,
-                                     outValue, outType, inoutCanTake);
+                                     outValue, outType, inoutCanTake, false);
     }
     }
   }
@@ -736,7 +762,7 @@ swift::swift_getDynamicType(OpaqueValue *value, const Metadata *self) {
   OpaqueValue *outValue;
   const Metadata *outType;
   bool canTake = false;
-  findDynamicValueAndType(value, self, outValue, outType, canTake);
+  findDynamicValueAndType(value, self, outValue, outType, canTake, false);
   return outType;
 }
 
@@ -876,8 +902,17 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   OpaqueValue *srcDynamicValue;
   const Metadata *srcDynamicType;
   bool canTake = true;
+
+  // Are we casting to AnyObject? In this case we can fast-path casts from
+  // classes.
+  bool isTargetTypeAnyObject =
+      targetType->getKind() == MetadataKind::Existential &&
+      isAnyObjectExistentialType(targetType);
+
+  // We don't care what the target type of a cast from class to AnyObject is.
+  // srcDynamicType will be set to a nullptr in this case to save a lookup.
   findDynamicValueAndType(src, srcType, srcDynamicValue, srcDynamicType,
-                          canTake);
+                          canTake, isTargetTypeAnyObject);
 
   auto maybeDeallocateSourceAfterSuccess = [&] {
     if (shouldDeallocateSource(/*succeeded*/ true, flags)) {
@@ -897,10 +932,12 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   case ExistentialTypeRepresentation::Class: {
     auto destExistential =
       reinterpret_cast<ClassExistentialContainer*>(dest);
+    MetadataKind kind =
+        srcDynamicType ? srcDynamicType->getKind() : MetadataKind::Class;
 
     // If the source type is a value type, it cannot possibly conform
     // to a class-bounded protocol. 
-    switch (srcDynamicType->getKind()) {
+    switch (kind) {
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Metatype: {
 #if SWIFT_OBJC_INTEROP
@@ -965,8 +1002,11 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       return _fail(src, srcType, targetType, flags);
     }
 
-    // Check for protocol conformances and fill in the witness tables.
-    if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
+    // Check for protocol conformances and fill in the witness tables. If
+    // srcDynamicType equals nullptr we have a cast from an existential
+    // container with a class instance to AnyObject. In this case no check is
+    // necessary.
+    if (srcDynamicType && !_conformsToProtocols(srcDynamicValue, srcDynamicType,
                               targetType->Protocols,
                               destExistential->getWitnessTables())) {
       return _fail(src, srcType, targetType, flags, srcDynamicType);
