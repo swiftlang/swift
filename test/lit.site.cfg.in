@@ -64,6 +64,13 @@ if "@SWIFT_OPTIMIZED@" == "TRUE":
 if "@SWIFT_HAVE_WORKING_STD_REGEX@" == "FALSE":
     config.available_features.add('broken_std_regex')
 
+if "@CMAKE_GENERATOR@" == "Xcode":
+    xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
+                                 'bin')
+    lit_config.note('Adding to path: ' + xcode_bin_dir)
+    config.environment['PATH'] = \
+      os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
+
 # Let the main config do the real work.
 if config.test_exec_root is None:
     config.test_exec_root = os.path.dirname(os.path.realpath(__file__))

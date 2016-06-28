@@ -56,6 +56,13 @@ else:
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
 
+if "@CMAKE_GENERATOR@" == "Xcode":
+    xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
+                                 'bin')
+    lit_config.note('Adding to path: ' + xcode_bin_dir)
+    config.environment['PATH'] = \
+      os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
+
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
 lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/validation-test/lit.cfg")
