@@ -10,6 +10,7 @@ add_swift_library(swiftFrontendTool STATIC
     swiftFrontend
     swiftClangImporter
     swiftOption
+  LINK_IMPORTED_LIBRARIES
     clangAPINotes
     clangBasic
 )

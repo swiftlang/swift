@@ -44,6 +44,7 @@ add_swift_library(swiftIRGen STATIC
     swiftSIL
     swiftSILGen
 
+  LINK_IMPORTED_LIBRARIES
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
     clangCodeGen

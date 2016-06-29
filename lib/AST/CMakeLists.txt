@@ -48,6 +48,7 @@ add_swift_library(swiftAST STATIC
 
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
+  LINK_IMPORTED_LIBRARIES
     clangCodeGen
     clangIndex
     clangFormat

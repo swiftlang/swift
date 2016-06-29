@@ -7,6 +7,7 @@ add_swift_executable(swift-llvm-opt
   swiftSema
   swiftAST
 
+  LINK_IMPORTED_LIBRARIES
   # Clang libraries included to appease the linker on linux.
   clangBasic
   clangCodeGen
