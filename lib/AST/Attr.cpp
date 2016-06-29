@@ -342,7 +342,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
   }
 
   Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-  defer { Printer.printStructurePost(PrintStructureKind::BuiltinAttribute); };
+  SWIFT_DEFER {
+    Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+  };
 
   switch (getKind()) {
   case DAK_Semantics:

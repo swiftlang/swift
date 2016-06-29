@@ -11,8 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletion.h"
-#include "swift/IDE/CodeCompletionCache.h"
-#include "swift/IDE/Utils.h"
 #include "CodeCompletionResultBuilder.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
@@ -20,19 +18,16 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/IDE/CodeCompletionCache.h"
+#include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/Basic/Defer.h" // must be included after Tokens.def.
 #include "swift/Subsystems.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Comment.h"
@@ -40,10 +35,13 @@
 #include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
 #include "clang/Index/USRGeneration.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <string>
-
-#undef defer // for Tokens.def; use defer_impl instead.
 
 using namespace swift;
 using namespace ide;
@@ -3259,7 +3257,7 @@ public:
     CodeCompletionExpr CCE((SourceRange()));
     sequence.back() = &CCE;
 
-    defer_impl {
+    SWIFT_DEFER {
       // Reset sequence.
       SE->setElement(SE->getNumElements() - 1, nullptr);
       SE->setElement(SE->getNumElements() - 2, nullptr);

@@ -4073,7 +4073,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
-  defer {
+  SWIFT_DEFER {
     // If we didn't parse any patterns, don't create the pattern binding decl.
     if (PBDEntries.empty())
       return;

@@ -356,7 +356,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     {
       bool iBTC = decl->isBeingTypeChecked();
       decl->setIsBeingTypeChecked();
-      defer {decl->setIsBeingTypeChecked(iBTC); };
+      SWIFT_DEFER { decl->setIsBeingTypeChecked(iBTC); };
 
       // Validate the type.
       if (validateType(inherited, DC, options, resolver)) {
@@ -988,9 +988,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 
   // On any path out of this function, make sure to mark the binding as done
   // being type checked.
-  defer {
-    binding->setIsBeingTypeChecked(false);
-  };
+  SWIFT_DEFER { binding->setIsBeingTypeChecked(false); };
 
   // Resolve the pattern.
   auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
@@ -5662,7 +5660,7 @@ public:
     }
 
     {
-      defer { EED->setIsBeingTypeChecked(false); };
+      SWIFT_DEFER { EED->setIsBeingTypeChecked(false); };
 
       // Now that we have an argument type we can set the element's declared
       // type.
@@ -6815,7 +6813,7 @@ static Type checkExtensionGenericParams(
   };
 
   ext->setIsBeingTypeChecked(true);
-  defer { ext->setIsBeingTypeChecked(false); };
+  SWIFT_DEFER { ext->setIsBeingTypeChecked(false); };
 
   // Validate the generic type signature.
   bool invalid = false;

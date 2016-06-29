@@ -14,10 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ArchetypeBuilder.h"
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -29,13 +29,13 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Parse/Lexer.h"
-#include "swift/Basic/Defer.h" // Must come after include of Tokens.def.
 #include "swift/Config.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
@@ -44,8 +44,8 @@
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ConvertUTF.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <queue>
 
@@ -975,9 +975,6 @@ void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
   printNamePost(Context);
 }
 
-// FIXME: Restore defer after Tokens.def.
-#define defer defer_impl
-
 void StreamPrinter::printText(StringRef Text) {
   OS << Text;
 }
@@ -1510,7 +1507,7 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
     }
 
     Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
-    defer {
+    SWIFT_DEFER {
       Printer.printStructurePost(PrintStructureKind::GenericRequirement);
     };
 
@@ -2508,7 +2505,7 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
   Printer.callPrintStructurePre(PrintStructureKind::FunctionParameter, param);
-  defer {
+  SWIFT_DEFER {
     Printer.printStructurePost(PrintStructureKind::FunctionParameter, param);
   };
 
@@ -3398,7 +3395,7 @@ public:
 
   void visit(Type T) {
     Printer.printTypePre(TypeLoc::withoutLoc(T));
-    defer { Printer.printTypePost(TypeLoc::withoutLoc(T)); };
+    SWIFT_DEFER { Printer.printTypePost(TypeLoc::withoutLoc(T)); };
 
     // If we have an alternate name for this type, use it.
     if (Options.AlternativeTypeNames) {
@@ -3505,7 +3502,7 @@ public:
 
   void visitTupleType(TupleType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::TupleType);
-    defer { Printer.printStructurePost(PrintStructureKind::TupleType); };
+    SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
 
     Printer << "(";
 
@@ -3517,7 +3514,9 @@ public:
       Type EltType = TD.getType();
 
       Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
-      defer { Printer.printStructurePost(PrintStructureKind::TupleElement); };
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::TupleElement);
+      };
 
       if (TD.hasName()) {
         Printer.printName(TD.getName(), PrintNameContext::TupleElement);
@@ -3730,7 +3729,9 @@ public:
 
   void visitFunctionType(FunctionType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
-    defer { Printer.printStructurePost(PrintStructureKind::FunctionType); };
+    SWIFT_DEFER {
+      Printer.printStructurePost(PrintStructureKind::FunctionType);
+    };
 
     printFunctionExtInfo(T->getExtInfo());
     printWithParensIfNotSimple(T->getInput());
@@ -3747,7 +3748,9 @@ public:
 
   void visitPolymorphicFunctionType(PolymorphicFunctionType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
-    defer { Printer.printStructurePost(PrintStructureKind::FunctionType); };
+    SWIFT_DEFER {
+      Printer.printStructurePost(PrintStructureKind::FunctionType);
+    };
 
     printFunctionExtInfo(T->getExtInfo());
     printGenericParams(&T->getGenericParams());
@@ -3901,7 +3904,9 @@ public:
 
   void visitGenericFunctionType(GenericFunctionType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
-    defer { Printer.printStructurePost(PrintStructureKind::FunctionType); };
+    SWIFT_DEFER {
+      Printer.printStructurePost(PrintStructureKind::FunctionType);
+    };
 
     printFunctionExtInfo(T->getExtInfo());
     printGenericSignature(T->getGenericParams(), T->getRequirements());

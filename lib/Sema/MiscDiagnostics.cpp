@@ -849,7 +849,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
     llvm::SmallString<16> str;
     // If the diagnostic is local, flush it before returning.
     // This makes sure it's emitted before 'str' is destroyed.
-    defer { diagOpt.reset(); };
+    SWIFT_DEFER { diagOpt.reset(); };
 
     if (newNames[0].empty()) {
       // This is probably a conversion from a value of labeled tuple type to

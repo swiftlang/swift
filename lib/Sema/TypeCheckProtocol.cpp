@@ -2814,9 +2814,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // Track when we are checking type witnesses.
   ProtocolConformanceState initialState = Conformance->getState();
   Conformance->setState(ProtocolConformanceState::CheckingTypeWitnesses);
-  defer {
-    Conformance->setState(initialState);
-  };
+  SWIFT_DEFER { Conformance->setState(initialState); };
 
   for (auto member : Proto->getMembers()) {
     auto assocType = dyn_cast<AssociatedTypeDecl>(member);
@@ -3143,7 +3141,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
       valueWitnesses.push_back({inferredReq.first, witnessReq.Witness});
       if (witnessReq.Witness->getDeclContext()->getAsProtocolExtensionContext())
         ++numValueWitnessesInProtocolExtensions;
-      defer {
+      SWIFT_DEFER {
         if (witnessReq.Witness->getDeclContext()->getAsProtocolExtensionContext())
           --numValueWitnessesInProtocolExtensions;
         valueWitnesses.pop_back();
@@ -3527,7 +3525,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   // Note that we're resolving this witness.
   assert(ResolvingWitnesses.count(requirement) == 0 && "Currently resolving");
   ResolvingWitnesses.insert(requirement);
-  defer { ResolvingWitnesses.erase(requirement); };
+  SWIFT_DEFER { ResolvingWitnesses.erase(requirement); };
 
   // Make sure we've validated the requirement.
   if (!requirement->hasType())
@@ -3931,7 +3929,7 @@ checkConformsToProtocol(TypeChecker &TC,
 
   // Note that we are checking this conformance now.
   conformance->setState(ProtocolConformanceState::Checking);
-  defer { conformance->setState(ProtocolConformanceState::Complete); };
+  SWIFT_DEFER { conformance->setState(ProtocolConformanceState::Complete); };
 
   // If the protocol itself is invalid, there's nothing we can do.
   if (Proto->isInvalid()) {

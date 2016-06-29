@@ -906,7 +906,7 @@ bool TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
 
   typeDecl->setIsValidatingGenericSignature();
 
-  defer { typeDecl->setIsValidatingGenericSignature(false); };
+  SWIFT_DEFER { typeDecl->setIsValidatingGenericSignature(false); };
 
   auto *gp = typeDecl->getGenericParams();
   auto *dc = typeDecl->getDeclContext();

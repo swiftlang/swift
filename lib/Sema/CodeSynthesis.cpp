@@ -1702,7 +1702,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     assert(!var->getBehavior()->Conformance.hasValue());
     
     // The property should be considered computed by the time we're through.
-    defer {
+    SWIFT_DEFER {
       assert(!var->hasStorage() && "behavior var was not made computed");
     };
     

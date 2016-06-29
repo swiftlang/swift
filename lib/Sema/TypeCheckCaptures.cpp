@@ -270,7 +270,7 @@ public:
         }
         // Recursively check the transitive captures.
         capturePath.push_back(func);
-        defer { capturePath.pop_back(); };
+        SWIFT_DEFER { capturePath.pop_back(); };
         for (auto capture : func->getCaptureInfo().getCaptures())
           if (!validateForwardCapture(capture.getDecl()))
             return false;
