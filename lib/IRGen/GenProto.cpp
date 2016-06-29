@@ -1669,54 +1669,11 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
   }
 }
 
-/// Emit a polymorphic parameters clause, binding all the metadata necessary.
-void EmitPolymorphicParameters::emit(Explosion &in,
-                                     WitnessMetadata *witnessMetadata,
-                                     const GetParameterFn &getParameter) {
-  // Collect any early sources and bind local type data from them.
-  for (const Source &source : getSources()) {
-    bindExtraSource(source, in, witnessMetadata);
-  }
-
-  // Collect any concrete type metadata that's been passed separately.
-  enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
-    auto value = in.claimNext();
-    bindGenericRequirement(IGF, requirement, value,
-                           [&](CanType type) { return getTypeInContext(type);});
-  });
-
-  // Bind all the fulfillments we can from the formal parameters.
-  bindParameterSources(getParameter);
-
-  // Bind all the archetype access paths.
-  bindArchetypeAccessPaths();
-}
-
-void EmitPolymorphicParameters::bindArchetypeAccessPaths() {
-  if (!Generics) return;
-
-  // Remember all the extra ways we have of reaching the parameter
-  // archetypes due to type equality constraints.
-  for (auto reqt : Generics->getRequirements()) {
-    // Ignore non-same-type requirements in this pass.
-    if (reqt.getKind() != RequirementKind::SameType) continue;
-
-    // Ignore equality constraints to concrete types.  This is really
-    // just a fast-path; we still have to handle this case later.
-    // TODO: This might be a faster / better-cached way to materialize
-    // local type data for the concrete type.
-    if (!reqt.getSecondType()->isTypeParameter()) continue;
-
-    auto firstType = reqt.getFirstType()->getCanonicalType();
-    auto secondType = reqt.getSecondType()->getCanonicalType();
-
-    addPotentialArchetypeAccessPath(firstType, secondType);
-    addPotentialArchetypeAccessPath(secondType, firstType);
-  }
-}
-
-void EmitPolymorphicParameters::
-addPotentialArchetypeAccessPath(CanType targetDepType, CanType sourceDepType) {
+static
+void addPotentialArchetypeAccessPath(IRGenFunction &IGF,
+                                     CanType targetDepType,
+                                     CanType sourceDepType,
+                                     GetTypeParameterInContextFn getInContext) {
   assert(targetDepType->isTypeParameter());
   assert(sourceDepType->isTypeParameter());
 
@@ -1732,14 +1689,65 @@ addPotentialArchetypeAccessPath(CanType targetDepType, CanType sourceDepType) {
   // These can end up as non-archetypes because of multiple levels of
   // equality.
   auto destArchetype =
-    dyn_cast<ArchetypeType>(getTypeInContext(targetDepType));
+    dyn_cast<ArchetypeType>(getInContext(targetDepType));
   if (!destArchetype) return;
   auto srcBaseArchetype =
-    dyn_cast<ArchetypeType>(getTypeInContext(sourceDepMemberType.getBase()));
+    dyn_cast<ArchetypeType>(getInContext(sourceDepMemberType.getBase()));
   if (!srcBaseArchetype) return;
 
   IGF.addArchetypeAccessPath(destArchetype,
                              {srcBaseArchetype, association});
+}
+
+static void bindArchetypeAccessPaths(IRGenFunction &IGF,
+                                     GenericSignature *Generics,
+                                     GetTypeParameterInContextFn getInContext) {
+  // Remember all the extra ways we have of reaching the parameter
+  // archetypes due to type equality constraints.
+  for (auto reqt : Generics->getRequirements()) {
+    // Ignore non-same-type requirements in this pass.
+    if (reqt.getKind() != RequirementKind::SameType) continue;
+
+    // Ignore equality constraints to concrete types.  This is really
+    // just a fast-path; we still have to handle this case later.
+    // TODO: This might be a faster / better-cached way to materialize
+    // local type data for the concrete type.
+    if (!reqt.getSecondType()->isTypeParameter()) continue;
+
+    auto firstType = reqt.getFirstType()->getCanonicalType();
+    auto secondType = reqt.getSecondType()->getCanonicalType();
+
+    addPotentialArchetypeAccessPath(IGF, firstType, secondType, getInContext);
+    addPotentialArchetypeAccessPath(IGF, secondType, firstType, getInContext);
+  }
+}
+
+/// Emit a polymorphic parameters clause, binding all the metadata necessary.
+void EmitPolymorphicParameters::emit(Explosion &in,
+                                     WitnessMetadata *witnessMetadata,
+                                     const GetParameterFn &getParameter) {
+  // Collect any early sources and bind local type data from them.
+  for (const Source &source : getSources()) {
+    bindExtraSource(source, in, witnessMetadata);
+  }
+  
+  auto getInContext = [&](CanType type) -> CanType {
+    return getTypeInContext(type);
+  };
+
+  // Collect any concrete type metadata that's been passed separately.
+  enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
+    auto value = in.claimNext();
+    bindGenericRequirement(IGF, requirement, value, getInContext);
+  });
+
+  // Bind all the fulfillments we can from the formal parameters.
+  bindParameterSources(getParameter);
+
+  if (!Generics) return;
+  
+  // Bind all the archetype access paths.
+  bindArchetypeAccessPaths(IGF, Generics, getInContext);
 }
 
 void IRGenFunction::addArchetypeAccessPath(CanArchetypeType targetArchetype,
@@ -2507,6 +2515,12 @@ void GenericTypeRequirements::bindFromBuffer(IRGenFunction &IGF,
                                              Address buffer,
                                     GetTypeParameterInContextFn getInContext) {
   bindFromGenericRequirementsBuffer(IGF, Requirements, buffer, getInContext);
+
+  auto Generics = TheDecl->getGenericSignature();
+  if (!Generics) return;
+
+  // Bind all the archetype access paths in the signature's requirements.
+  bindArchetypeAccessPaths(IGF, Generics, getInContext);
 }
 
 void irgen::bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
