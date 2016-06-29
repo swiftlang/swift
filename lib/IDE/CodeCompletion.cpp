@@ -2394,6 +2394,7 @@ public:
         (EED->hasAccessibility() && !EED->isAccessibleFrom(CurrDeclContext)) ||
         shouldHideDeclFromCompletionResults(EED))
       return;
+
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2406,14 +2407,18 @@ public:
     Builder.addTextChunk(EED->getName().str());
     if (EED->hasArgumentType())
       addPatternFromType(Builder, EED->getArgumentType());
-    Type EnumType = EED->getType();
 
     // Enum element is of function type such as EnumName.type -> Int ->
     // EnumName; however we should show Int -> EnumName as the type
-    if (auto FuncType = EED->getType()->getAs<AnyFunctionType>()) {
-      EnumType = FuncType->getResult();
+    Type EnumType;
+    if (EED->hasType()) {
+      EnumType = EED->getType();
+      if (auto FuncType = EnumType->getAs<AnyFunctionType>()) {
+        EnumType = FuncType->getResult();
+      }
     }
-    addTypeAnnotation(Builder, EnumType);
+    if (EnumType)
+      addTypeAnnotation(Builder, EnumType);
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation,
@@ -2700,7 +2705,10 @@ public:
     }
   }
 
-  bool handleEnumElement(Decl *D, DeclVisibilityKind Reason) {
+  bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason) {
+    if (!D->hasType())
+      TypeResolver->resolveDeclSignature(D);
+
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
       addEnumElementRef(EED, Reason, /*HasTypeContext=*/true);
       return true;
@@ -2708,6 +2716,8 @@ public:
       llvm::DenseSet<EnumElementDecl *> Elements;
       ED->getAllElements(Elements);
       for (auto *Ele : Elements) {
+        if (!Ele->hasType())
+          TypeResolver->resolveDeclSignature(Ele);
         addEnumElementRef(Ele, Reason, /*HasTypeContext=*/true);
       }
       return true;
@@ -3352,7 +3362,8 @@ public:
     LookupByName Lookup(*this, FuncNames);
     lookupVisibleDecls(Lookup, CurrDeclContext, TypeResolver.get(), true);
     if (HasReturn)
-      Lookup.unboxType(getReturnTypeFromContext(CurrDeclContext));
+      if (auto ReturnType = getReturnTypeFromContext(CurrDeclContext))
+        Lookup.unboxType(ReturnType);
   }
 
   static bool getPositionInTupleExpr(DeclContext &DC, Expr *Target,
