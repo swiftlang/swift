@@ -763,15 +763,13 @@ function(_add_swift_library_single target name)
         "${swift_object_dependency_target}"
         ${LLVM_COMMON_DEPENDS})
 
-  # HACK: On some systems or build directory setups, CMake will not find static
-  # archives of Clang libraries in the Clang build directory, and it will pass
-  # them as '-lclangFoo'.  Some other logic in CMake would reorder libraries
-  # specified with this syntax, which breaks linking.
+  # HACK: On some systems or build directory setups, CMake will not find
+  # static archives of CMark libraries in the CMark build directory, and it
+  # will pass them as '-lcmark'. This will be fixed by upstreaming support
+  # for generating a cmake export file. But until then, we need to fix any
+  # dependencies on cmark by hand.
   set(prefixed_link_libraries)
   foreach(dep ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
-    if("${dep}" MATCHES "^clang")
-      set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-    endif()
     if("${dep}" STREQUAL "cmark")
       set(dep "${CMARK_LIBRARY_DIR}/lib${dep}.a")
     endif()
@@ -779,6 +777,7 @@ function(_add_swift_library_single target name)
   endforeach()
   set(SWIFTLIB_SINGLE_LINK_LIBRARIES "${prefixed_link_libraries}")
 
+  swift_config_imported_libraries(SWIFTLIB_SINGLE_LINK_IMPORTED_LIBRARIES "${SWIFTLIB_SINGLE_LINK_IMPORTED_LIBRARIES}")
   if("${libkind}" STREQUAL "SHARED")
     target_link_libraries("${target}" PRIVATE ${SWIFTLIB_SINGLE_LINK_LIBRARIES}
       ${SWIFTLIB_SINGLE_LINK_IMPORTED_LIBRARIES})
@@ -1570,6 +1569,7 @@ function(_add_swift_executable_single name)
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
+  swift_config_imported_libraries(SWIFTEXE_SINGLE_LINK_IMPORTED_LIBRARIES "${SWIFTEXE_SINGLE_LINK_IMPORTED_LIBRARIES}")
   target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_IMPORTED_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_COMPONENT_DEPENDS})
 
