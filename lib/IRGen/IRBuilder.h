@@ -38,8 +38,10 @@ class IRBuilder : public IRBuilderBase {
   /// ordering.
   llvm::BasicBlock *ClearedIP;
 
+#ifndef NDEBUG
   /// Whether debug information is requested. Only used in assertions.
   bool DebugInfo;
+#endif
 
   // Set calling convention of the call instruction using
   // the same calling convention as the callee function.
@@ -54,7 +56,11 @@ class IRBuilder : public IRBuilderBase {
 
 public:
   IRBuilder(llvm::LLVMContext &Context, bool DebugInfo)
-    : IRBuilderBase(Context), ClearedIP(nullptr), DebugInfo(DebugInfo) {}
+    : IRBuilderBase(Context), ClearedIP(nullptr)
+#ifndef NDEBUG
+    , DebugInfo(DebugInfo)
+#endif
+    {}
 
   /// Determines if the current location is apparently reachable.  The
   /// invariant we maintain is that the insertion point of the builder
