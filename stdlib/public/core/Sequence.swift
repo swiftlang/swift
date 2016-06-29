@@ -510,8 +510,11 @@ public protocol Sequence {
   func suffix(_ maxLength: Int) -> SubSequence
 
   /// Returns the longest possible subsequences of the sequence, in order, that
-  /// don't contain elements satisfying the given predicate. Elements that are
-  /// used to split the sequence are not returned as part of any subsequence.
+  /// don't contain elements satisfying the given predicate.
+  ///
+  /// The resulting array consists of at most `maxSplits + 1` subsequences.
+  /// Elements that are used to split the sequence are not returned as part of
+  /// any subsequence.
   ///
   /// The following examples show the effects of the `maxSplits` and
   /// `omittingEmptySubsequences` parameters when splitting a string using a
@@ -521,7 +524,7 @@ public protocol Sequence {
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
   ///     print(line.characters.split(isSeparator: { $0 == " " })
   ///                          .map(String.init))
-  ///     // Prints "["BLANCHE:", "I", "don't", "want", "realism.", "I", "want", "magic!"]"
+  ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
@@ -822,7 +825,7 @@ extension Sequence {
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
   ///     print(line.characters.split(isSeparator: { $0 == " " })
   ///                          .map(String.init))
-  ///     // Prints "["BLANCHE:", "I", "don't", "want", "realism.", "I", "want", "magic!"]"
+  ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
@@ -988,8 +991,11 @@ extension Sequence {
 
 extension Sequence where Iterator.Element : Equatable {
   /// Returns the longest possible subsequences of the sequence, in order,
-  /// around elements equal to the given element. Elements that are used to
-  /// split the sequence are not returned as part of any subsequence.
+  /// around elements equal to the given element.
+  ///
+  /// The resulting array consists of at most `maxSplits + 1` subsequences.
+  /// Elements that are used to split the sequence are not returned as part of
+  /// any subsequence.
   ///
   /// The following examples show the effects of the `maxSplits` and
   /// `omittingEmptySubsequences` parameters when splitting a string at each
@@ -999,7 +1005,7 @@ extension Sequence where Iterator.Element : Equatable {
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
   ///     print(line.characters.split(separator: " ")
   ///                          .map(String.init))
-  ///     // Prints "["BLANCHE:", "I", "don't", "want", "realism.", "I", "want", "magic!"]"
+  ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
