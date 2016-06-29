@@ -146,7 +146,7 @@ func testCompleteModuleQualifiedFoo2() {
   Foo#^CLANG_QUAL_FOO_2^#
 // If the number of results below changes, then you need to add a result to the
 // list below.
-// CLANG_QUAL_FOO_2: Begin completions, 64 items
+// CLANG_QUAL_FOO_2: Begin completions, 69 items
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]:        .FooClassBase[#FooClassBase#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]:        .FooClassDerived[#FooClassDerived#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]:        .ClassWithInternalProt[#ClassWithInternalProt#]{{; name=.+$}}
@@ -176,6 +176,10 @@ func testCompleteModuleQualifiedFoo2() {
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_3[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_4[#UInt32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_5[#UInt64#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_6[#typedef_int_t#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_7[#typedef_int_t#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_OR[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_AND[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_REDEF_1[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_REDEF_2[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FooEnum1X[#FooEnum1#]{{; name=.+$}}
