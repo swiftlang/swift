@@ -34,6 +34,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_29 | FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_30 | FileCheck %s -check-prefix=UNRESOLVED_2
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INVALID_1
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OTHER_FILE_1 %S/Inputs/EnumFromOtherFile.swift | FileCheck %s -check-prefix=OTHER_FILE_1
+
 enum SomeEnum1 {
   case South
   case North
@@ -229,3 +233,18 @@ let TopLevelVar1 = OptionSetTaker7([.#^UNRESOLVED_28^#], Op2: [.Option4])
 let TopLevelVar2 = OptionSetTaker1([.#^UNRESOLVED_29^#])
 
 let TopLevelVar3 = OptionSetTaker7([.Option1], Op2: [.#^UNRESOLVED_30^#])
+
+func testInvalid1() {
+  func invalid() -> NoSuchEnum {
+    return .#^INVALID_1^# // Don't crash.
+  }
+}
+
+func enumFromOtherFile() -> EnumFromOtherFile {
+  return .#^OTHER_FILE_1^# // Don't crash.
+}
+// OTHER_FILE_1: Begin completions
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     b({#String#})[#(String) -> EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     a({#Int#})[#(Int) -> EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     c[#EnumFromOtherFile#];
+// OTHER_FILE_1: End completions
