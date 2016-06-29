@@ -3,6 +3,9 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* Traps from force-unwrapping nil `Optional`s now show the source location
+  of the force unwrap operator.
+
 * [SE-0093](https://github.com/apple/swift-evolution/blob/master/proposals/0093-slice-base.md): Slice types now have a `base` property that allows public readonly access to their base collections.
 
 * Nested generic functions may now capture bindings from the environment, for example:
@@ -280,8 +283,7 @@ Swift 3.0
     person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
     ```
 
-* Traps from force-unwrapping nil `Optional`s now show the source location
-  of the force unwrap operator.
+**If you are adding a new entry, add it to the top of the file, not here!**
 
 
 Swift 2.2
