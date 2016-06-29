@@ -313,8 +313,9 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   //
   // The actual closure has a closure expression as scope.
   if (Loc && isAbstractClosure(*Loc) && DS && !isAbstractClosure(DS->Loc)
-      && !Loc->is<ImplicitReturnLocation>())
-    return;
+      && !Loc->is<ImplicitReturnLocation>()) {
+    L.Line = L.Column = 0;
+  }
 
   if (L.Line == 0 && DS == LastScope) {
     // Reuse the last source location if we are still in the same

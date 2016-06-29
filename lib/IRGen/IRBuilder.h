@@ -262,6 +262,7 @@ public:
   llvm::CallInst *CreateCall(llvm::Value *Callee, ArrayRef<llvm::Value *> Args,
                              const Twine &Name = "",
                              llvm::MDNode *FPMathTag = nullptr) {
+    assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
     auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;
@@ -271,6 +272,7 @@ public:
                              ArrayRef<llvm::Value *> Args,
                              const Twine &Name = "",
                              llvm::MDNode *FPMathTag = nullptr) {
+    assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
     auto Call = IRBuilderBase::CreateCall(FTy, Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;
@@ -280,6 +282,7 @@ public:
                              ArrayRef<llvm::Value *> Args,
                              const Twine &Name = "",
                              llvm::MDNode *FPMathTag = nullptr) {
+    assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
     auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;
