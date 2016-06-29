@@ -305,7 +305,7 @@ class NSObjectable : NSObjectProtocol {
 // Properties with custom accessors
 func customAccessors(_ hive: Hive, bee: Bee) {
   markUsed(hive.isMakingHoney)
-  markUsed(hive.makingHoney()) // expected-error{{cannot call value of non-function type 'Bool'}}
+  markUsed(hive.makingHoney()) // expected-error{{cannot call value of non-function type 'Bool'}}{{28-30=}}
   hive.setMakingHoney(true) // expected-error{{value of type 'Hive' has no member 'setMakingHoney'}}
 
   _ = hive.`guard`.description // okay

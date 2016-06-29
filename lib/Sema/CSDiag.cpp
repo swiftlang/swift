@@ -4328,9 +4328,20 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         }
       }
     
-    diagnose(callExpr->getArg()->getStartLoc(),
-             diag::cannot_call_non_function_value, fnExpr->getType())
-    .highlight(fnExpr->getSourceRange());
+    auto arg = callExpr->getArg();
+    auto diag = diagnose(arg->getStartLoc(),
+                         diag::cannot_call_non_function_value,
+                         fnExpr->getType());
+    diag.highlight(fnExpr->getSourceRange());
+    
+    // If the argument is an empty tuple, then offer a
+    // fix-it to remove the empty tuple and use the value
+    // directly.
+    if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+      if (tuple->getNumElements() == 0) {
+        diag.fixItRemove(arg->getSourceRange());
+      }
+    }
     return true;
   }
   
