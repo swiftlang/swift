@@ -314,6 +314,30 @@ function(_gather_library_interface_dependencies outvar libnames)
   set(${outvar} "${new_libnames}" PARENT_SCOPE)
 endfunction()
 
+# Go through all of the passed in libraries and replace any references to
+# llvm/clang libraries with the correct library name.
+#
+# This will replace swift_common_llvm_config since we no longer require
+# llvm-build components now that we have cmake exported interfaces.
+function(swift_config_imported_libraries outvar)
+  # Gather up all of the library dependencies.
+  _gather_library_interface_dependencies(libnames "${ARGN}")
+
+  # Then translate all of the library names into full paths.
+  set(new_libnames)
+  foreach(dep ${libnames})
+    if("${dep}" MATCHES "^LLVM" OR "${dep}" MATCHES "^clang")
+      list(APPEND new_libnames
+        "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
+    elseif("${dep}" MATCHES "^cmark")
+      set(dep "${CMARK_LIBRARY_DIR}/lib${dep}.a")
+    else()
+      list(APPEND new_libnames "${dep}")
+    endif()
+  endforeach()
+  set(${outvar} "${new_libnames}" PARENT_SCOPE)
+endfunction()
+
 # Like 'llvm_config()', but uses libraries from the selected build
 # configuration in LLVM.  ('llvm_config()' selects the same build configuration
 # in LLVM as we have for Swift.)
@@ -323,20 +347,8 @@ function(swift_common_llvm_config target)
   if((SWIFT_BUILT_STANDALONE OR SOURCEKIT_BUILT_STANDALONE) AND NOT "${CMAKE_CFG_INTDIR}" STREQUAL ".")
     llvm_map_components_to_libnames(libnames ${link_components})
 
-    # Gather all of the interface dependencies of the libraries.
-    _gather_library_interface_dependencies(libnames "${libnames}")
-
     # Translate library names into full path names.
-    set(new_libnames)
-    foreach(dep ${libnames})
-      if("${dep}" MATCHES "^LLVM")
-        list(APPEND new_libnames
-            "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-      else()
-        list(APPEND new_libnames "${dep}")
-      endif()
-    endforeach()
-    set(libnames "${new_libnames}")
+    swift_config_imported_libraries(libnames ${libnames})
 
     get_target_property(target_type "${target}" TYPE)
     if("${target_type}" STREQUAL "STATIC_LIBRARY")
