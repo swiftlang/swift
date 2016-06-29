@@ -537,10 +537,10 @@ void IRGenModule::emitRuntimeRegistration() {
   SILFunction *EntryPoint =
     getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
   
-  // If we're debugging, we probably don't have a main. Find a
-  // function marked with the LLDBDebuggerFunction attribute instead.
-  if (Context.LangOpts.DebuggerSupport) {
-    assert(!EntryPoint && "unexpected main");
+  // If we're debugging (and not in the REPL), we don't have a
+  // main. Find a function marked with the LLDBDebuggerFunction
+  // attribute instead.
+  if (!EntryPoint && Context.LangOpts.DebuggerSupport) {
     for (SILFunction &SF : getSILModule()) {
       if (SF.hasLocation()) {
         if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
