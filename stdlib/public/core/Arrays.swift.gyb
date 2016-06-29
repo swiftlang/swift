@@ -2084,19 +2084,6 @@ public func != <Element : Equatable>(
 %end
 
 #if _runtime(_ObjC)
-/// Returns an `Array<Base>` containing the same elements as `a` in
-/// O(1).
-///
-/// - Precondition: `Base` is a base class or base `@objc` protocol (such
-///   as `AnyObject`) of `Derived`.
-public func _arrayUpCast<Derived, Base>(_ a: Array<Derived>) -> Array<Base> {
-  // FIXME: Dynamic casting is currently not possible without the objc runtime:
-  // rdar://problem/18801510
-  return Array(_buffer: a._buffer.cast(toBufferOf: Base.self))
-}
-#endif
-
-#if _runtime(_ObjC)
 extension Array {
   /// Tries to downcast the source `NSArray` as our native buffer type.
   /// If it succeeds, creates a new `Array` around it and returns that.
