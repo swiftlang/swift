@@ -180,16 +180,19 @@ set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
   "The GCC version to use when building for Android. Currently only 4.9 is supported.")
 set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android SDK tools that will be passed to the swiftc frontend")
-set(SWIFT_ANDROID_ICU_UC "" CACHE STRING
-  "Path to a directory containing libicuuc.so")
-set(SWIFT_ANDROID_ICU_UC_INCLUDE "" CACHE STRING
-  "Path to a directory containing headers for libicuuc")
-set(SWIFT_ANDROID_ICU_I18N "" CACHE STRING
-  "Path to a directory containing libicui18n.so")
-set(SWIFT_ANDROID_ICU_I18N_INCLUDE "" CACHE STRING
-  "Path to a directory containing headers libicui18n")
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
+
+foreach(sdk ANDROID;FREEBSD;LINUX)
+  set(SWIFT_${sdk}_ICU_UC "" CACHE STRING
+      "Path to a directory containing the icuuc library for ${sdk}")
+  set(SWIFT_${sdk}_ICU_UC_INCLUDE "" CACHE STRING
+      "Path to a directory containing headers for icuuc for ${sdk}")
+  set(SWIFT_${sdk}_ICU_I18N "" CACHE STRING
+      "Path to a directory containing the icui18n library for ${sdk}")
+  set(SWIFT_${sdk}_ICU_I18N_INCLUDE "" CACHE STRING
+      "Path to a directory containing headers icui18n for ${sdk}")
+endforeach()
 
 #
 # User-configurable Darwin-specific options.
