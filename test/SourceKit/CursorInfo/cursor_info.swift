@@ -196,6 +196,8 @@ func tupleResult1() -> (Int, Int) {}
 func tupleResult2(f: () -> Void) {}
 typealias MyVoid = ()
 
+func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -666,3 +668,10 @@ typealias MyVoid = ()
 
 // RUN: %sourcekitd-test -req=cursor -pos=197:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK84 %s
 // CHECK84: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyVoid</decl.name> = <tuple>()</tuple></decl.typealias>
+
+// RUN: %sourcekitd-test -req=cursor -pos=199:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK85 %s
+// CHECK85-NOT: @rethrows
+// CHECK85: <Declaration>func rethrowingFunction1({{.*}}) rethrows</Declaration>
+// CHECK85-NOT: @rethrows
+// CHECK85: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>rethrowingFunction1</decl.name>({{.*}}) <syntaxtype.keyword>rethrows</syntaxtype.keyword></decl.function.free>
+// CHECK85-NOT: @rethrows
