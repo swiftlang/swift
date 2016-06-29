@@ -199,9 +199,12 @@ static void printModule(SILModule *Mod, bool EmitVerboseSIL) {
 }
 
 class DebugPrintEnabler {
+#ifndef NDEBUG
   bool OldDebugFlag;
+#endif
 public:
   DebugPrintEnabler(unsigned PassNumber) {
+#ifndef NDEBUG
     OldDebugFlag = llvm::DebugFlag;
     if (llvm::DebugFlag)
       return;
@@ -215,10 +218,13 @@ public:
         return;
       }
     }
+#endif
   }
 
   ~DebugPrintEnabler() {
+#ifndef NDEBUG
     llvm::DebugFlag = OldDebugFlag;
+#endif
   }
 };
 
