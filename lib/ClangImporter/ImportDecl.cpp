@@ -1243,7 +1243,7 @@ namespace {
       theClass->setSuperclass(superclass);
       theClass->setCheckedInheritanceClause();
       theClass->setAddedImplicitInitializers(); // suppress all initializers
-      theClass->setForeign(true);
+      theClass->setForeignClassKind(ClassDecl::ForeignKind::CFType);
       addObjCAttribute(theClass, None);
       Impl.registerExternalDecl(theClass);
 
@@ -5660,7 +5660,8 @@ namespace {
           nsObjectTy->getClassOrBoundGenericClass();
 
         auto result = createRootClass(nsObjectDecl->getDeclContext());
-        result->setForeign(true);
+        // FIXME: Should use RuntimeOnly.
+        result->setForeignClassKind(ClassDecl::ForeignKind::CFType);
         return result;
       }
 

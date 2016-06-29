@@ -2684,16 +2684,6 @@ static bool checkObjCWithGenericParams(TypeChecker &TC,
   return false;
 }
 
-static bool isForeignClassContext(DeclContext *DC) {
-  auto type = DC->getDeclaredTypeInContext();
-  if (!type)
-    return false;
-  auto clas = type->getClassOrBoundGenericClass();
-  if (!clas)
-    return false;
-  return clas->isForeign();
-}
-
 /// CF types cannot have @objc methods, because they don't have real class
 /// objects.
 static bool checkObjCInForeignClassContext(TypeChecker &TC,
@@ -2701,16 +2691,24 @@ static bool checkObjCInForeignClassContext(TypeChecker &TC,
                                            ObjCReason Reason) {
   bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
 
-  if (isForeignClassContext(VD->getDeclContext())) {
-    if (Diagnose) {
-      TC.diagnose(VD->getLoc(), diag::objc_invalid_on_foreign_class,
-                  getObjCDiagnosticAttrKind(Reason));
-      describeObjCReason(TC, VD, Reason);
-    }
-    return true;
-  }
+  auto type = VD->getDeclContext()->getDeclaredTypeInContext();
+  if (!type)
+    return false;
 
-  return false;
+  auto clas = type->getClassOrBoundGenericClass();
+  if (!clas)
+    return false;
+
+  if (clas->getForeignClassKind() == ClassDecl::ForeignKind::Normal)
+    return false;
+
+  if (Diagnose) {
+    // FIXME: Customize diagnostic here for various foreign class kinds.
+    TC.diagnose(VD->getLoc(), diag::objc_invalid_on_foreign_class,
+                getObjCDiagnosticAttrKind(Reason));
+    describeObjCReason(TC, VD, Reason);
+  }
+  return true;
 }
 
 bool TypeChecker::isCIntegerType(const DeclContext *DC, Type T) {

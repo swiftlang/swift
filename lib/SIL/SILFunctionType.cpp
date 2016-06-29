@@ -401,18 +401,24 @@ enum class ConventionsKind : uint8_t {
         
         if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
           // CF type as foreign class
-          if (substTy->getClassOrBoundGenericClass()
-              && substTy->getClassOrBoundGenericClass()->isForeign())
+          if (substTy->getClassOrBoundGenericClass() &&
+              substTy->getClassOrBoundGenericClass()->getForeignClassKind() ==
+                ClassDecl::ForeignKind::CFType) {
             return false;
+          }
           // swift_newtype-ed CF type as foreign class
           if (auto typedefTy = clangTy->getAs<clang::TypedefType>()) {
             if (typedefTy->getDecl()->getAttr<clang::SwiftNewtypeAttr>()) {
               // Make sure that we actually made the struct during import
               if (auto underlyingType =
                       substTy->getSwiftNewtypeUnderlyingType()) {
-                if (underlyingType->getClassOrBoundGenericClass() &&
-                    underlyingType->getClassOrBoundGenericClass()->isForeign())
-                  return false;
+                if (auto underlyingClass =
+                        underlyingType->getClassOrBoundGenericClass()) {
+                  if (underlyingClass->getForeignClassKind() ==
+                          ClassDecl::ForeignKind::CFType) {
+                    return false;
+                  }
+                }
               }
             }
           }

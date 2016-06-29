@@ -3951,7 +3951,8 @@ checkConformsToProtocol(TypeChecker &TC,
   if (Proto->isObjC() &&
       !Proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
     if (auto clas = canT->getClassOrBoundGenericClass())
-      if (clas->isForeign()) {
+      if (clas->getForeignClassKind() != ClassDecl::ForeignKind::Normal) {
+        // FIXME: Customize the error message for different foreign class kinds.
         TC.diagnose(ComplainLoc,
                     diag::foreign_class_cannot_conform_to_objc_protocol,
                     T, Proto->getDeclaredType());

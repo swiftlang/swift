@@ -5438,6 +5438,7 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   if (auto classType = dyn_cast<ClassType>(type)) {
     assert(!classType.getParent());
     auto classDecl = classType->getDecl();
+    // FIXME: Differentiate between the different kinds of foreign classes.
     assert(classDecl->isForeign());
 
     ForeignClassMetadataBuilder builder(*this, classDecl);
