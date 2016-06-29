@@ -51,12 +51,24 @@ void IRGenModule::emitCoverageMapping() {
     if (std::find(Files.begin(), Files.end(), M.getFile()) == Files.end())
       Files.push_back(M.getFile());
 
+  // Awkwardly munge absolute filenames into a vector of StringRefs.
+  // TODO: This is heinous - the same thing is happening in clang, but the API
+  // really needs to be cleaned up for both.
   llvm::SmallVector<std::string, 8> FilenameStrs;
+  llvm::SmallVector<StringRef, 8> FilenameRefs;
   for (StringRef Name : Files) {
     llvm::SmallString<256> Path(Name);
     llvm::sys::fs::make_absolute(Path);
     FilenameStrs.push_back(std::string(Path.begin(), Path.end()));
+    FilenameRefs.push_back(FilenameStrs.back());
   }
+
+  // Encode the filenames first.
+  std::string FilenamesAndCoverageMappings;
+  llvm::raw_string_ostream OS(FilenamesAndCoverageMappings);
+  llvm::coverage::CoverageFilenamesSectionWriter(FilenameRefs).write(OS);
+  size_t FilenamesSize = OS.str().size();
+  size_t CurrentSize, PrevSize = FilenamesSize;
 
   // Now we need to build up the list of function records.
   llvm::LLVMContext &Ctx = LLVMContext;
@@ -76,7 +88,6 @@ void IRGenModule::emitCoverageMapping() {
   std::vector<llvm::Constant *> FunctionNames;
   std::vector<llvm::Constant *> FunctionRecords;
   std::vector<CounterMappingRegion> Regions;
-  std::vector<std::string> CoverageMappings;
   for (const auto &M : Mappings) {
     unsigned FileID =
         std::find(Files.begin(), Files.end(), M.getFile()) - Files.begin();
@@ -85,13 +96,10 @@ void IRGenModule::emitCoverageMapping() {
       Regions.emplace_back(CounterMappingRegion::makeRegion(
           MR.Counter, /*FileID=*/0, MR.StartLine, MR.StartCol, MR.EndLine,
           MR.EndCol));
-
-    std::string CoverageMapping;
-    llvm::raw_string_ostream OS(CoverageMapping);
+    // Append each function's regions into the encoded buffer.
     llvm::coverage::CoverageMappingWriter W({FileID}, M.getExpressions(),
                                             Regions);
     W.write(OS);
-    OS.flush();
 
     std::string NameValue = llvm::getPGOFuncName(
         M.getName(),
@@ -102,32 +110,34 @@ void IRGenModule::emitCoverageMapping() {
         *getModule(), llvm::GlobalValue::LinkOnceAnyLinkage, NameValue);
     FunctionNames.push_back(llvm::ConstantExpr::getBitCast(NamePtr, Int8PtrTy));
 
+    CurrentSize = OS.str().size();
+    unsigned MappingLen = CurrentSize - PrevSize;
+    StringRef CoverageMapping(OS.str().c_str() + PrevSize, MappingLen);
+
     uint64_t FuncHash = M.getHash();
 
     // Create a record for this function.
     llvm::Constant *FunctionRecordVals[] = {
 #define COVMAP_FUNC_RECORD(Type, LLVMType, Name, Init) Init,
 #include "llvm/ProfileData/InstrProfData.inc"
+#undef COVMAP_FUNC_RECORD
     };
 
     FunctionRecords.push_back(llvm::ConstantStruct::get(
         FunctionRecordTy, makeArrayRef(FunctionRecordVals)));
-    CoverageMappings.push_back(CoverageMapping);
+    PrevSize = CurrentSize;
   }
+  size_t CoverageMappingSize = PrevSize - FilenamesSize;
 
-  size_t FilenamesSize;
-  size_t CoverageMappingSize;
-  llvm::Expected<std::string> CoverageDataOrErr =
-      llvm::coverage::encodeFilenamesAndRawMappings(
-          FilenameStrs, CoverageMappings, FilenamesSize, CoverageMappingSize);
-  if (llvm::Error E = CoverageDataOrErr.takeError()) {
-    llvm::handleAllErrors(std::move(E), [](llvm::ErrorInfoBase &EI) {
-      llvm::report_fatal_error(EI.message());
-    });
+  // Append extra zeroes if necessary to ensure that the size of the filenames
+  // and coverage mappings is a multiple of 8.
+  if (size_t Rem = OS.str().size() % 8) {
+    CoverageMappingSize += 8 - Rem;
+    for (size_t I = 0, S = 8 - Rem; I < S; ++I)
+      OS << '\0';
   }
-  std::string CoverageData = std::move(CoverageDataOrErr.get());
   auto *FilenamesAndMappingsVal =
-      llvm::ConstantDataArray::getString(Ctx, CoverageData, false);
+      llvm::ConstantDataArray::getString(Ctx, OS.str(), false);
 
   auto *RecordsTy =
       llvm::ArrayType::get(FunctionRecordTy, FunctionRecords.size());
