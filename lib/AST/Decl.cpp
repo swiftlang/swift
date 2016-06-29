@@ -3235,14 +3235,9 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
     }
   }
 
-  // If the Swift name starts with the word "is", use that Swift name as the
-  // getter name.
-  auto var = cast<VarDecl>(this);
-  if (camel_case::getFirstWord(var->getName().str()) == "is")
-    return ObjCSelector(ctx, 0, { var->getName() });
-
   // The getter selector is the property name itself.
-  return ObjCSelector(ctx, 0, { var->getObjCPropertyName() });
+  auto var = cast<VarDecl>(this);
+  return VarDecl::getDefaultObjCGetterSelector(ctx, var->getObjCPropertyName());
 }
 
 ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
@@ -3528,25 +3523,21 @@ Identifier VarDecl::getObjCPropertyName() const {
       return name->getSelectorPieces()[0];
   }
 
-  // If the Swift property name starts with the word "is", strip the
-  // "is" and lowercase the rest when forming the Objective-C property
-  // name.
-  ASTContext &ctx = getASTContext();
-  StringRef nameStr = getName().str();
-  if (camel_case::getFirstWord(nameStr) == "is") {
-    SmallString<16> scratch;
-    return ctx.getIdentifier(camel_case::toLowercaseWord(nameStr.substr(2),
-                                                         scratch));
-  }
-
   return getName();
 }
+
+ObjCSelector VarDecl::getDefaultObjCGetterSelector(ASTContext &ctx,
+                                                   Identifier propertyName) {
+  return ObjCSelector(ctx, 0, propertyName);
+}
+
 
 ObjCSelector VarDecl::getDefaultObjCSetterSelector(ASTContext &ctx,
                                                    Identifier propertyName) {
   llvm::SmallString<16> scratch;
   scratch += "set";
   camel_case::appendSentenceCase(scratch, propertyName.str());
+
   return ObjCSelector(ctx, 1, ctx.getIdentifier(scratch));
 }
 

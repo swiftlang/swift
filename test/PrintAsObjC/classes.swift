@@ -420,7 +420,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: + (NSDictionary<NSString *, NSString *> * _Nonnull)staticDictionary;
 // CHECK-NEXT: @property (nonatomic, strong) Properties * _Nullable wobble;
 // CHECK-NEXT: @property (nonatomic, getter=isEnabled, setter=setIsEnabled:) BOOL enabled;
-// CHECK-NEXT: @property (nonatomic, getter=isAnimated) BOOL animated;
+// CHECK-NEXT: @property (nonatomic) BOOL isAnimated;
 // CHECK-NEXT: @property (nonatomic, getter=register, setter=setRegister:) BOOL register_;
 // CHECK-NEXT: @property (nonatomic, readonly, strong, getter=this) Properties * _Nonnull this_;
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger privateSetter;
