@@ -433,9 +433,17 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
         clang::APValue value;
         if (tokenI[1].is(clang::tok::pipe)) {
-          value = clang::APValue(firstInteger | secondInteger);
+          if (firstInteger.getBitWidth() == secondInteger.getBitWidth()) {
+            value = clang::APValue(firstInteger | secondInteger);
+          } else {
+            return nullptr;
+          }
         } else if (tokenI[1].is(clang::tok::amp)) {
-          value = clang::APValue(firstInteger & secondInteger);
+          if (firstInteger.getBitWidth() == secondInteger.getBitWidth()) {
+            value = clang::APValue(firstInteger & secondInteger);
+          } else {
+            return nullptr;
+          }
         } else if (tokenI[1].is(clang::tok::pipepipe)) {
           auto firstBool = firstInteger.getBoolValue();
           auto secondBool = firstInteger.getBoolValue();
