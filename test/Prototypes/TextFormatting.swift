@@ -349,7 +349,7 @@ xprintln(toPrettyString(424242~>format(radix:16, width:8)))
 // CHECK-NEXT: |   67932|
 
 var zero = "0"
-xprintln(toPrettyString(-434343~>format(width:8, fill:zero)))
+xprintln(toPrettyString(-434343~>format(fill:zero, width:8)))
 // CHECK-NEXT: |-0434343|
 
 xprintln(toPrettyString(-42~>format(radix:13, width:8)))

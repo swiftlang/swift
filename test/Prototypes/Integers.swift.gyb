@@ -1333,8 +1333,8 @@ import StdlibUnittest
 func expectEqual<T : FixedWidthInteger>(
   _ expected: T, _ actual: T,
   _ message: @autoclosure () -> String = "",
-  showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) {
   if expected != actual {
@@ -1353,15 +1353,15 @@ func expectEqual<T : FixedWidthInteger>(
 func expectEqual<T : FixedWidthInteger>(
   _ expected: (T, ArithmeticOverflow), _ actual: (T, ArithmeticOverflow),
   _ message: @autoclosure () -> String = "",
-  showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) {
 % for i in 0, 1:
   expectEqual(
     expected.${i}, actual.${i}, message(),
-    showFrame: false,
-    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
+    showFrame: false)
 % end
 }
 

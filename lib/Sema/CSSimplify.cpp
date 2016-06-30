@@ -540,19 +540,9 @@ matchCallArguments(ArrayRef<CallArgParam> args,
         continue;
       }
 
-      // The argument binds to a parameter that comes earlier than the
-      // previous argument. This is fine so long as this parameter and all of
-      // those parameters up to (and including) the previously-bound parameter
-      // are either variadic or have a default argument.
-      for (unsigned i = paramIdx; i != prevParamIdx + 1; ++i) {
-        const auto &param = params[i];
-        if (param.Variadic || param.HasDefaultArgument)
-          continue;
-
-        unsigned prevArgIdx = parameterBindings[prevParamIdx].front();
-        listener.outOfOrderArgument(argIdx, prevArgIdx);
-        return true;
-      }
+      unsigned prevArgIdx = parameterBindings[prevParamIdx].front();
+      listener.outOfOrderArgument(argIdx, prevArgIdx);
+      return true;
     }
   }
 
