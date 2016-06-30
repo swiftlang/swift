@@ -799,9 +799,8 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
       // Look in the generic parameters after checking our local declaration.
       GenericParams = AFD->getGenericParams();
-    } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
+    } else if (auto CE = dyn_cast<ClosureExpr>(DC)) {
       if (Loc.isValid()) {
-        auto CE = cast<ClosureExpr>(ACE);
         namelookup::FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());
         if (auto P = CE->getParameters()) {
           namelookup::FindLocalVal(SM, Loc, Consumer).checkParameterList(P);
