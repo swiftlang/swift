@@ -1533,6 +1533,10 @@ Enumerators:
   SwiftName: currencyPlural
 - Name: NSNumberFormatterCurrencyAccountingStyle
   SwiftName: currencyAccounting
+- Name: NSPointerFunctionsStrongMemory
+  SwiftName: strongMemory
+- Name: NSPointerFunctionsObjectPersonality
+  SwiftName: objectPersonality
 - Name: NSXMLDocumentXMLKind
   SwiftName: xml
 - Name: NSXMLDocumentXHTMLKind
