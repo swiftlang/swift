@@ -120,11 +120,15 @@ public class ManagedBuffer<Value, Element>
 
   /// The stored `Value` instance.
   public final var value: Value {
-    unsafeAddress {
-      return ManagedBufferPointer(self).withUnsafeMutablePointerToValue { UnsafePointer($0) }
+    get {
+      return ManagedBufferPointer(self).withUnsafeMutablePointerToValue {
+        $0.pointee
+      }
     }
-    unsafeMutableAddress {
-      return ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0 }
+    set {
+      ManagedBufferPointer(self).withUnsafeMutablePointerToValue {
+        $0.pointee = newValue
+      }
     }
   }
 }
@@ -229,11 +233,11 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// The stored `Value` instance.
   public var value: Value {
-    unsafeAddress {
-      return UnsafePointer(_valuePointer)
+    get {
+      return _valuePointer.pointee
     }
-    unsafeMutableAddress {
-      return _valuePointer
+    set {
+      return _valuePointer.pointee = newValue
     }
   }
 
