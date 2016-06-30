@@ -10,7 +10,6 @@
 
 import StdlibUnittest
 
-
 %{
 
 floatNameToSignificandBits = { 'Float32':24, 'Float64':53, 'Float80':64 }
@@ -34,120 +33,74 @@ var FloatingPointConversionFailures = TestSuite("FloatingPointToFloatingPointCon
 
 %   if otherSignificandBits <= selfSignificandBits:
 
-/// Always-safe conversion from ${OtherFloat}.greatestFiniteMagnitude to ${Self}.
-FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=${OtherFloat}.greatestFiniteMagnitude") {
-  // Test that we don't truncate floats that shouldn't be truncated.
-  let input = ${OtherFloat}.greatestFiniteMagnitude 
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion")
+  .forEach(in: [
+     ${OtherFloat}.greatestFiniteMagnitude,
+    -${OtherFloat}.greatestFiniteMagnitude,
+     (1.0 as ${OtherFloat}).nextUp,
+     (1.0 as ${OtherFloat}).nextDown,
+    (-1.0 as ${OtherFloat}).nextUp,
+    (-1.0 as ${OtherFloat}).nextDown,
+  ]) {
+  input in
+  // FIXME: we should have a stronger postcondition here.
   let result = ${Self}(input)
-  var resultConvertedBack = ${OtherFloat}(result)
-  expectEqual(input, resultConvertedBack)
-}
-
-/// Never-truncating conversion from ${OtherFloat}.nextUp to ${Self}.
-FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=${OtherFloat}.1.0.nextUp") {
-  // Test that we don't truncate floats that shouldn't be truncated.
-  let input = (1.0 as ${OtherFloat}).nextUp
-  var result = ${Self}(input)
-  var resultConvertedBack = ${OtherFloat}(result)
-  expectEqual(input, resultConvertedBack)
-}
-
-/// Never-nil failable conversion from ${OtherFloat}.greatestFiniteMagnitude to ${Self}.
-FloatingPointConversionFailures.test("${OtherFloat}To${Self}FailableConversion/dest=${OtherFloat}.greatestFiniteMagnitude") {
-  // Test that nothing interesting happens and we end up with a non-nil, identical result.
-  let input = ${OtherFloat}.greatestFiniteMagnitude 
-  var result = ${Self}(exactly: input)
-  expectNotEmpty(result)
-  var resultConvertedBack = ${OtherFloat}(result!)
-  expectEqual(input, resultConvertedBack)
-}
-
-/// Never-nil conversion from ${OtherFloat}.nextUp to ${Self}.
-FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/dest=${OtherFloat}.1.0.nextUp") {
-  // Test that nothing interesting happens and we end up with a non-nil, identical result.
-  let input = (1.0 as ${OtherFloat}).nextUp
-  var result = ${Self}(exactly: input)
-  expectNotEmpty(result)
-  var resultConvertedBack = ${OtherFloat}(result!)
+  let resultConvertedBack = ${OtherFloat}(result)
   expectEqual(input, resultConvertedBack)
 }
 
 %   else:
 
-/// Always-succeeding, but out-of-range conversion from ${OtherFloat}.greatestFiniteMagnitude to ${Self}.
-FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=${OtherFloat}.greatestFiniteMagnitude") {
-  // Test that we check if we truncate floats not representable by another type.
-  let input = ${OtherFloat}.greatestFiniteMagnitude 
-  var result = ${Self}(input)
-  var resultConvertedBack = ${OtherFloat}(result)
-  expectEqual(${OtherFloat}.infinity, resultConvertedBack)
-}
-
-/// Always-truncating conversion from ${OtherFloat}.nextUp to ${Self}.
-FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=${OtherFloat}.1.0.nextUp") {
-  // Test that we check if we truncate floats not representable by another type.
-  let input = (1.0 as ${OtherFloat}).nextUp
-  var result = ${Self}(input)
-  var resultConvertedBack = ${OtherFloat}(result)
-  expectEqual(1.0, resultConvertedBack)
-}
-
-/// Always-nil failable conversion from ${OtherFloat}.greatestFiniteMagnitude to ${Self}.
-FloatingPointConversionFailures.test("${OtherFloat}To${Self}FailableConversion/dest=${OtherFloat}.greatestFiniteMagnitude") {
-  // Test that we check if we return nil when a float would be truncated in conversion.
-  let input = ${OtherFloat}.greatestFiniteMagnitude 
-  var result = ${Self}(exactly: input)
-  expectEmpty(result)
-}
-
-/// Always-nil failable conversion from ${OtherFloat}.nextUp to ${Self}.
-FloatingPointConversionFailures.test("${OtherFloat}To${Self}FailableConversion/dest=${OtherFloat}.1.0.nextUp") {
-  // Test that we check if we return nil when a float would be truncated in conversion.
-  let input = (1.0 as ${OtherFloat}).nextUp
-  var result = ${Self}(exactly: input)
-  expectEmpty(result)
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion")
+  .forEach(in: [
+    ( ${OtherFloat}.greatestFiniteMagnitude,  ${Self}.infinity),
+    (-${OtherFloat}.greatestFiniteMagnitude, -${Self}.infinity),
+    ( (1.0 as ${OtherFloat}).nextUp,    1.0 as ${Self}),
+    ( (1.0 as ${OtherFloat}).nextDown,  1.0 as ${Self}),
+    ((-1.0 as ${OtherFloat}).nextUp,   -1.0 as ${Self}),
+    ((-1.0 as ${OtherFloat}).nextDown, -1.0 as ${Self}),
+  ]) {
+  (input, expectedResult) in
+  expectEqual(expectedResult, ${Self}(input))
 }
 
 %   end
 
-FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=NaN") {
-  let input = ${OtherFloat}.nan
-  var result = ${Self}(input)
-  var resultConvertedBack = ${OtherFloat}(result)
-  expectTrue(input.isNaN)
-  expectTrue(resultConvertedBack.isNaN)
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/special") {
+  expectEqual( 1.0 as ${Self},   ${Self}(exactly:  1.0 as ${OtherFloat}))
+  expectEqual(-1.0 as ${Self},   ${Self}(exactly: -1.0 as ${OtherFloat}))
+  expectEqual( ${Self}.infinity, ${Self}( ${OtherFloat}.infinity))
+  expectEqual(-${Self}.infinity, ${Self}(-${OtherFloat}.infinity))
+  expectTrue(${Self}(${OtherFloat}.nan).isNaN)
 }
 
-FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/dest=NaN") {
-  let input = ${OtherFloat}.nan
-  var result = ${Self}(exactly: input)
+FloatingPointConversionFailures.test("${OtherFloat}To${Self}FailableConversion")
+  .forEach(in: [
+    ${OtherFloat}.greatestFiniteMagnitude,
+    -${OtherFloat}.greatestFiniteMagnitude,
+    (1.0 as ${OtherFloat}).nextUp,
+    (1.0 as ${OtherFloat}).nextDown,
+    (-1.0 as ${OtherFloat}).nextUp,
+    (-1.0 as ${OtherFloat}).nextDown,
+  ]) {
+  input in
+  let result = ${Self}(exactly: input)
+%   if otherSignificandBits <= selfSignificandBits:
+  if let result = expectNotEmpty(result) {
+    // FIXME: we should have a stronger postcondition here.
+    expectEqual(input, ${OtherFloat}(result))
+  }
+%   else:
   expectEmpty(result)
+%   end
 }
 
-FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=inf") {
-  let input = ${OtherFloat}.infinity
-  var result = ${Self}(input)
-  var resultConvertedBack = ${OtherFloat}(result)
-  expectEqual(input, resultConvertedBack)
-}
-
-FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/dest=inf") {
-  let input = ${OtherFloat}.infinity
-  var result = ${Self}(exactly: input)
-  expectEqual(${Self}.infinity, result)
-}
-
-FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=-inf") {
-  let input = -${OtherFloat}.infinity
-  var result = ${Self}(input)
-  var resultConvertedBack = ${OtherFloat}(result)
-  expectEqual(input, resultConvertedBack)
-}
-
-FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/dest=-inf") {
-  let input = -${OtherFloat}.infinity
-  var result = ${Self}(exactly: input)
-  expectEqual(-${Self}.infinity, result)
+FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/AlwaysSuccess") {
+  expectEqual( 1.0 as ${Self},   ${Self}(exactly:  1.0 as ${OtherFloat}))
+  expectEqual(-1.0 as ${Self},   ${Self}(exactly: -1.0 as ${OtherFloat}))
+  expectEqual( ${Self}.infinity, ${Self}(exactly:  ${OtherFloat}.infinity))
+  expectEqual(-${Self}.infinity, ${Self}(exactly: -${OtherFloat}.infinity))
+  expectEmpty(${Self}(exactly: ${OtherFloat}.nan))
 }
 
 %   if OtherFloat == 'Float80':
