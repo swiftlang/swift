@@ -1124,13 +1124,22 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
     return nullptr;
   }
 
+  SILFunction *Caller = AI.getFunction();
+
   // We don't support inlining a function that binds dynamic self because we
   // have no mechanism to preserve the original function's local self metadata.
   if (computeMayBindDynamicSelf(Callee)) {
-    return nullptr;
+    // Check if passed Self is the same as the Self of the caller.
+    // In this case, it is safe to inline because both functions
+    // use the same Self.
+    if (AI.hasSelfArgument() && Caller->hasSelfParam()) {
+      auto CalleeSelf = stripCasts(AI.getSelfArgument());
+      auto CallerSelf = Caller->getSelfArgument();
+      if (CalleeSelf != SILValue(CallerSelf))
+        return nullptr;
+    } else
+      return nullptr;
   }
-
-  SILFunction *Caller = AI.getFunction();
 
   // Detect self-recursive calls.
   if (Caller == Callee) {
