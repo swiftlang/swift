@@ -2398,19 +2398,6 @@ StringRef ClassDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
-bool ClassDecl::isOnlyObjCRuntimeVisible() const {
-  auto clangDecl = getClangDecl();
-  if (!clangDecl) return false;
-
-  auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl);
-  if (!objcClass) return false;
-
-  if (auto def = objcClass->getDefinition())
-    objcClass = def;
-
-  return objcClass->hasAttr<clang::ObjCRuntimeVisibleAttr>();
-}
-
 ArtificialMainKind ClassDecl::getArtificialMainKind() const {
   if (getAttrs().hasAttribute<UIApplicationMainAttr>())
     return ArtificialMainKind::UIApplicationMain;

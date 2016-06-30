@@ -2648,14 +2648,6 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
         return true;
       }
 
-      // Cannot define @objc members of an Objective-C runtime visible class,
-      // because doing so would create a category.
-      if (CD->isOnlyObjCRuntimeVisible()) {
-        if (diagnose)
-          tc.diagnose(value, diag::objc_in_objc_runtime_visible);
-        return true;
-      }
-
       extendedTy = CD->getSuperclass();
     }
   }
@@ -2699,15 +2691,28 @@ static bool checkObjCInForeignClassContext(TypeChecker &TC,
   if (!clas)
     return false;
 
-  if (clas->getForeignClassKind() == ClassDecl::ForeignKind::Normal)
+  switch (clas->getForeignClassKind()) {
+  case ClassDecl::ForeignKind::Normal:
     return false;
 
-  if (Diagnose) {
-    // FIXME: Customize diagnostic here for various foreign class kinds.
-    TC.diagnose(VD->getLoc(), diag::objc_invalid_on_foreign_class,
-                getObjCDiagnosticAttrKind(Reason));
-    describeObjCReason(TC, VD, Reason);
+  case ClassDecl::ForeignKind::CFType:
+    if (Diagnose) {
+      TC.diagnose(VD, diag::objc_invalid_on_foreign_class,
+                  getObjCDiagnosticAttrKind(Reason));
+      describeObjCReason(TC, VD, Reason);
+    }
+    break;
+
+  case ClassDecl::ForeignKind::RuntimeOnly:
+    if (Diagnose) {
+      TC.diagnose(VD, diag::objc_in_objc_runtime_visible,
+                  VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
+                  clas->getName());
+      describeObjCReason(TC, VD, Reason);
+    }
+    break;
   }
+
   return true;
 }
 

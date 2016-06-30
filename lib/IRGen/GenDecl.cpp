@@ -2272,6 +2272,7 @@ Address IRGenModule::getAddrOfObjCClassRef(ClassDecl *theClass) {
 llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass,
                                                 ForDefinition_t forDefinition) {
   assert(ObjCInterop && "getting address of ObjC class in no-interop mode");
+  assert(!theClass->isForeign());
   LinkEntity entity = LinkEntity::forObjCClass(theClass);
   DebugTypeInfo DbgTy(theClass, ObjCClassPtrTy,
                       getPointerSize(), getPointerAlignment());
@@ -2285,6 +2286,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass,
 llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass,
                                                 ForDefinition_t forDefinition) {
   assert(ObjCInterop && "getting address of ObjC metaclass in no-interop mode");
+  assert(!theClass->isForeign());
   LinkEntity entity = LinkEntity::forObjCMetaclass(theClass);
   DebugTypeInfo DbgTy(theClass, ObjCClassPtrTy,
                       getPointerSize(), getPointerAlignment());

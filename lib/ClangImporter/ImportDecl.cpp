@@ -5660,8 +5660,7 @@ namespace {
           nsObjectTy->getClassOrBoundGenericClass();
 
         auto result = createRootClass(nsObjectDecl->getDeclContext());
-        // FIXME: Should use RuntimeOnly.
-        result->setForeignClassKind(ClassDecl::ForeignKind::CFType);
+        result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
         return result;
       }
 
@@ -5732,6 +5731,8 @@ namespace {
 
       if (declaredNative)
         markMissingSwiftDecl(result);
+      if (decl->getAttr<clang::ObjCRuntimeVisibleAttr>())
+        result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
 
       // If this Objective-C class has a supertype, import it.
       SmallVector<TypeLoc, 4> inheritedTypes;

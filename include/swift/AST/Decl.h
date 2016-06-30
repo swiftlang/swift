@@ -3315,10 +3315,6 @@ public:
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
 
-  /// Determine whether the class is only visible to the Objective-C runtime
-  /// and not to the linker.
-  bool isOnlyObjCRuntimeVisible() const;
-
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.
   ///

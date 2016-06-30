@@ -1934,8 +1934,8 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // as @objc, don't diagnose.
   Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
   if (auto classDecl = contextTy->getClassOrBoundGenericClass()) {
-    // One cannot define @objc members of Objective-C runtime visible classes.
-    if (classDecl->isOnlyObjCRuntimeVisible())
+    // One cannot define @objc members of any foreign classes.
+    if (classDecl->isForeign())
       return None;
 
     if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
@@ -3722,9 +3722,17 @@ public:
                       Super->getName());
         }
 
-        if (Super->isOnlyObjCRuntimeVisible()) {
+        switch (Super->getForeignClassKind()) {
+        case ClassDecl::ForeignKind::Normal:
+          break;
+        case ClassDecl::ForeignKind::CFType:
+          TC.diagnose(CD, diag::inheritance_from_cf_class,
+                      Super->getName());
+          break;
+        case ClassDecl::ForeignKind::RuntimeOnly:
           TC.diagnose(CD, diag::inheritance_from_objc_runtime_visible_class,
                       Super->getName());
+          break;
         }
       }
 
