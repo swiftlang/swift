@@ -458,8 +458,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// This is a value of \c StoredInheritsSuperclassInits.
     unsigned InheritsSuperclassInits : 2;
 
-    /// Whether this class is "foreign".
-    unsigned Foreign : 1;
+    /// \see ClassDecl::ForeignKind
+    unsigned RawForeignKind : 2;
     
     /// Whether this class contains a destructor decl.
     ///
@@ -468,7 +468,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// control inserting the implicit destructor.
     unsigned HasDestructorDecl : 1;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 7 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 8 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class StructDeclBitfields {
@@ -3238,6 +3238,19 @@ public:
     ClassDeclBits.RequiresStoredPropertyInits = requiresInits;
   }
 
+  /// \see getForeignClassKind
+  enum class ForeignKind : uint8_t {
+    /// A normal Swift or Objective-C class.
+    Normal = 0,
+    /// An imported Core Foundation type. These are AnyObject-compatible but
+    /// do not have runtime metadata.
+    CFType,
+    /// An imported Objective-C type whose class and metaclass symbols are not
+    /// both available at link-time but can be accessed through the Objective-C
+    /// runtime.
+    RuntimeOnly
+  };
+
   /// Whether this class is "foreign", meaning that it is implemented
   /// by a runtime that Swift does not have first-class integration
   /// with.  This generally means that:
@@ -3248,11 +3261,18 @@ public:
   ///
   /// We may find ourselves wanting to break this bit into more
   /// precise chunks later.
-  bool isForeign() const {
-    return ClassDeclBits.Foreign;
+  ForeignKind getForeignClassKind() const {
+    return static_cast<ForeignKind>(ClassDeclBits.RawForeignKind);
   }
-  void setForeign(bool isForeign = true) {
-    ClassDeclBits.Foreign = isForeign;
+  void setForeignClassKind(ForeignKind kind) {
+    ClassDeclBits.RawForeignKind = static_cast<unsigned>(kind);
+  }
+
+  /// Returns true if this class is any kind of "foreign class".
+  ///
+  /// \see getForeignClassKind
+  bool isForeign() const {
+    return getForeignClassKind() != ForeignKind::Normal;
   }
 
   /// Find a method of a class that overrides a given method.
@@ -3294,10 +3314,6 @@ public:
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
-
-  /// Determine whether the class is only visible to the Objective-C runtime
-  /// and not to the linker.
-  bool isOnlyObjCRuntimeVisible() const;
 
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.

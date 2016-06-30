@@ -292,10 +292,8 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
     if (doesClassMetadataRequireDynamicInitialization(IGM, theDecl))
       return nullptr;
 
-  // Otherwise, just respect genericity and Objective-C runtime visibility.
-  } else if ((theDecl->isGenericContext()
-              && !isTypeErasedGenericClass(theDecl))
-             || theDecl->isOnlyObjCRuntimeVisible()) {
+  // Otherwise, just respect genericity.
+  } else if (theDecl->isGenericContext() && !isTypeErasedGenericClass(theDecl)){
     return nullptr;
   }
 
@@ -331,12 +329,14 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
                                             bool allowUninitialized) {
   // If the class is visible only through the Objective-C runtime, form the
   // appropriate runtime call.
-  if (theClass->isOnlyObjCRuntimeVisible()) {
+  if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::RuntimeOnly) {
     SmallString<64> scratch;
     auto className =
         IGF.IGM.getAddrOfGlobalString(theClass->getObjCRuntimeName(scratch));
     return IGF.Builder.CreateCall(IGF.IGM.getLookUpClassFn(), className);
   }
+
+  assert(!theClass->isForeign());
 
   Address classRef = IGF.IGM.getAddrOfObjCClassRef(theClass);
   auto classObject = IGF.Builder.CreateLoad(classRef);

@@ -2648,14 +2648,6 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
         return true;
       }
 
-      // Cannot define @objc members of an Objective-C runtime visible class,
-      // because doing so would create a category.
-      if (CD->isOnlyObjCRuntimeVisible()) {
-        if (diagnose)
-          tc.diagnose(value, diag::objc_in_objc_runtime_visible);
-        return true;
-      }
-
       extendedTy = CD->getSuperclass();
     }
   }
@@ -2684,16 +2676,6 @@ static bool checkObjCWithGenericParams(TypeChecker &TC,
   return false;
 }
 
-static bool isForeignClassContext(DeclContext *DC) {
-  auto type = DC->getDeclaredTypeInContext();
-  if (!type)
-    return false;
-  auto clas = type->getClassOrBoundGenericClass();
-  if (!clas)
-    return false;
-  return clas->isForeign();
-}
-
 /// CF types cannot have @objc methods, because they don't have real class
 /// objects.
 static bool checkObjCInForeignClassContext(TypeChecker &TC,
@@ -2701,16 +2683,37 @@ static bool checkObjCInForeignClassContext(TypeChecker &TC,
                                            ObjCReason Reason) {
   bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
 
-  if (isForeignClassContext(VD->getDeclContext())) {
+  auto type = VD->getDeclContext()->getDeclaredTypeInContext();
+  if (!type)
+    return false;
+
+  auto clas = type->getClassOrBoundGenericClass();
+  if (!clas)
+    return false;
+
+  switch (clas->getForeignClassKind()) {
+  case ClassDecl::ForeignKind::Normal:
+    return false;
+
+  case ClassDecl::ForeignKind::CFType:
     if (Diagnose) {
-      TC.diagnose(VD->getLoc(), diag::objc_invalid_on_foreign_class,
+      TC.diagnose(VD, diag::objc_invalid_on_foreign_class,
                   getObjCDiagnosticAttrKind(Reason));
       describeObjCReason(TC, VD, Reason);
     }
-    return true;
+    break;
+
+  case ClassDecl::ForeignKind::RuntimeOnly:
+    if (Diagnose) {
+      TC.diagnose(VD, diag::objc_in_objc_runtime_visible,
+                  VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
+                  clas->getName());
+      describeObjCReason(TC, VD, Reason);
+    }
+    break;
   }
 
-  return false;
+  return true;
 }
 
 bool TypeChecker::isCIntegerType(const DeclContext *DC, Type T) {

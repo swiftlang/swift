@@ -611,7 +611,8 @@ private:
     if (auto weakTy = ty->getAs<WeakStorageType>()) {
       auto innerTy = weakTy->getReferentType()->getAnyOptionalObjectType();
       auto innerClass = innerTy->getClassOrBoundGenericClass();
-      if ((innerClass && !innerClass->isForeign()) ||
+      if ((innerClass &&
+           innerClass->getForeignClassKind()!=ClassDecl::ForeignKind::CFType) ||
           (innerTy->isObjCExistentialType() && !isCFTypeRef(innerTy))) {
         os << ", weak";
       }
@@ -653,7 +654,8 @@ private:
           break;
         }
       } else if ((dyn_cast_or_null<ClassDecl>(nominal) &&
-                  !cast<ClassDecl>(nominal)->isForeign()) ||
+                  cast<ClassDecl>(nominal)->getForeignClassKind() !=
+                    ClassDecl::ForeignKind::CFType) ||
                  (copyTy->isObjCExistentialType() && !isCFTypeRef(copyTy))) {
         os << ", strong";
       }
@@ -1617,8 +1619,10 @@ public:
   }
 
   bool forwardDeclare(const ClassDecl *CD) {
-    if (!CD->isObjC() || CD->isForeign())
+    if (!CD->isObjC() ||
+        CD->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       return false;
+    }
     forwardDeclare(CD, [&]{ os << "@class " << getNameForObjC(CD) << ";\n"; });
     return true;
   }

@@ -2310,6 +2310,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Class: {
     auto theClass = cast<ClassDecl>(D);
     verifyAttrSerializable(theClass);
+    assert(!theClass->isForeign());
 
     auto contextID = addDeclContextRef(theClass->getDeclContext());
 
@@ -2331,7 +2332,6 @@ void Serializer::writeDecl(const Decl *D) {
                             theClass->isImplicit(),
                             theClass->isObjC(),
                             theClass->requiresStoredPropertyInits(),
-                            theClass->isForeign(),
                             addTypeRef(theClass->getSuperclass()),
                             rawAccessLevel,
                             conformances.size(),

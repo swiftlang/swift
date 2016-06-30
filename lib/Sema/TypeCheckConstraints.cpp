@@ -2856,7 +2856,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
   auto clas = toType->getClassOrBoundGenericClass();
-  if (clas && clas->isForeign())
+  if (clas && clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return CheckedCastKind::ValueCast;
   
   // Don't warn on casts that change the generic parameters of ObjC generic

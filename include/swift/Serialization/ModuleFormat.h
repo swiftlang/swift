@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 251; // Last change: SILFunctionType::isPseudogeneric
+const uint16_t VERSION_MINOR = 252; // Last change: remove class's "foreign" field
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -816,7 +816,6 @@ namespace decls_block {
     BCFixed<1>,        // implicit?
     BCFixed<1>,        // explicitly objc?
     BCFixed<1>,        // requires stored property initial values
-    BCFixed<1>,        // foreign
     TypeIDField,       // superclass
     AccessibilityKindField, // accessibility
     BCVBR<4>,               // number of conformances
