@@ -49,7 +49,7 @@ TypeNameTests.test("Prints") {
     _typeName(GC2<Model, Model2>.self))
   
   expectEqual("main.P", _typeName(P.self))
-  typealias PP2 = protocol<P, P2>
+  typealias PP2 = P & P2
   expectEqual("protocol<main.P, main.P2>",
     _typeName(PP2.self))
   expectEqual("protocol<>", _typeName(Any.self))

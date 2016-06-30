@@ -25,7 +25,7 @@ func test_concrete_erasure(_ x: ClericalError) -> Error {
 
 protocol HairType {}
 
-func test_composition_erasure(_ x: protocol<HairType, Error>) -> Error {
+func test_composition_erasure(_ x: HairType & Error) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials24test_composition_erasureFPs5ErrorS_8HairType_PS0__
@@ -38,7 +38,7 @@ func test_composition_erasure(_ x: protocol<HairType, Error>) -> Error {
 
 protocol HairClass: class {}
 
-func test_class_composition_erasure(_ x: protocol<HairClass, Error>) -> Error {
+func test_class_composition_erasure(_ x: HairClass & Error) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPs5ErrorS_9HairClass_PS0__

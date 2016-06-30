@@ -389,7 +389,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
                                      inheritedClause[i-1].getSourceRange().End);
       SourceLoc afterMyEndLoc
         = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                     inherited.getSourceRange().End);
+                                     inherited.getSourceRange().Start);
 
       diagnose(inherited.getSourceRange().Start,
                diag::duplicate_inheritance, inheritedTy)
@@ -853,7 +853,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   // If there's no type yet, come back to it later.
   if (!current->hasType())
     return;
-
+  
   // Make sure we don't do this checking again.
   current->setCheckedRedeclaration(true);
 
@@ -867,6 +867,13 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   SourceFile *currentFile = currentDC->getParentSourceFile();
   if (!currentFile || currentDC->isLocalContext())
     return;
+
+  // Cannot define a global type called 'Any'
+  if (current->getFullName() == tc.Context.getIdentifier("Any")) {
+    // TODO: Diagnose this as an error; current workaround needs this capability though
+//    tc.diagnose(current, diag::invalid_redecl_any);
+//    return;
+  }
 
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
   bool isCascading = true;

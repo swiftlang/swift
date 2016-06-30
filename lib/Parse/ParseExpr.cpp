@@ -1752,8 +1752,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   // Consume the base name.
   Identifier baseName = Context.getIdentifier(Tok.getText());
   SourceLoc baseNameLoc;
-  if (Tok.is(tok::identifier) || Tok.is(tok::kw_Self) ||
-      Tok.is(tok::kw_self)) {
+  if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self)) {
     baseNameLoc = consumeIdentifier(&baseName);
   } else if (afterDot && Tok.isKeyword()) {
     baseNameLoc = consumeToken();
@@ -1851,9 +1850,7 @@ static bool shouldAddSelfFixit(DeclContext* Current, DeclName Name,
 ///   expr-identifier:
 ///     unqualified-decl-name generic-args?
 Expr *Parser::parseExprIdentifier() {
-  assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
-         Tok.is(tok::kw_Self));
-
+  assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
   Token IdentTok = Tok;
 
   // Parse the unqualified-decl-name.

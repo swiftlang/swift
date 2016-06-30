@@ -55,7 +55,7 @@ func intToAll<T>(_ x: Int) -> T {
 }
 
 // CHECK: define hidden i64 @_TF13generic_casts8anyToInt{{.*}}(%"protocol<>"* noalias nocapture dereferenceable({{.*}}))
-func anyToInt(_ x: protocol<>) -> Int {
+func anyToInt(_ x: Any) -> Int {
   return x as! Int
 }
 
@@ -71,11 +71,11 @@ func anyToInt(_ x: protocol<>) -> Int {
 @objc class ObjCClass {}
 
 // CHECK: define hidden %objc_object* @_TF13generic_casts9protoCast{{.*}}(%C13generic_casts9ObjCClass*) {{.*}} {
-func protoCast(_ x: ObjCClass) -> protocol<ObjCProto1, NSRuncing> {
+func protoCast(_ x: ObjCClass) -> ObjCProto1 & NSRuncing {
   // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_"
   // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing"
   // CHECK: call %objc_object* @swift_dynamicCastObjCProtocolUnconditional(%objc_object* {{%.*}}, i64 2, i8** {{%.*}})
-  return x as! protocol<ObjCProto1, NSRuncing>
+  return x as! ObjCProto1 & NSRuncing
 }
 
 @objc class ObjCClass2 : NSObject, ObjCProto2 {

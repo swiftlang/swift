@@ -20,31 +20,40 @@ func refinementErasure(_ p: Pub) {
   useBarAsType(p)
 }
 
-typealias Compo = protocol<HasSelfRequirements, Bar>
+typealias Compo = HasSelfRequirements & Bar
 
 struct CompoAssocType {
-  typealias Compo = protocol<HasSelfRequirements, Bar> // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
+  typealias Compo = HasSelfRequirements & Bar // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
 }
 
 func useAsRequirement<T: HasSelfRequirements>(_ x: T) { }
-func useCompoAsRequirement<T: protocol<HasSelfRequirements, Bar>>(_ x: T) { }
+func useCompoAsRequirement<T: HasSelfRequirements & Bar>(_ x: T) { }
 func useCompoAliasAsRequirement<T: Compo>(_ x: T) { }
 
 func useAsWhereRequirement<T where T: HasSelfRequirements>(_ x: T) { }
-func useCompoAsWhereRequirement<T where T: protocol<HasSelfRequirements, Bar>>(_ x: T) { }
+func useCompoAsWhereRequirement<T where T: HasSelfRequirements & Bar>(_ x: T) { }
 func useCompoAliasAsWhereRequirement<T where T: Compo>(_ x: T) { }
 
 func useAsType(_ x: HasSelfRequirements) { } // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
-func useCompoAsType(_ x: protocol<HasSelfRequirements, Bar>) { } // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
+func useCompoAsType(_ x: HasSelfRequirements & Bar) { } // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
 func useCompoAliasAsType(_ x: Compo) { } // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
 
 struct TypeRequirement<T: HasSelfRequirements> {}
-struct CompoTypeRequirement<T: protocol<HasSelfRequirements, Bar>> {}
+struct CompoTypeRequirement<T: HasSelfRequirements & Bar> {}
 struct CompoAliasTypeRequirement<T: Compo> {}
 
-struct CompoTypeWhereRequirement<T where T: protocol<HasSelfRequirements, Bar>> {}
+struct CompoTypeWhereRequirement<T where T: HasSelfRequirements & Bar> {}
 struct CompoAliasTypeWhereRequirement<T where T: Compo> {}
 
+struct Struct2<T : Pub & Bar> { }
+struct Struct3<T : Pub & Bar & P3> { } // expected-error {{use of undeclared type 'P3'}}
+struct Struct4<T where T : Pub & Bar> { }
+
+struct Struct5<T : protocol<Pub, Bar>> { } // expected-warning {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
+struct Struct6<T where T : protocol<Pub, Bar>> { } // expected-warning {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
+
+typealias T1 = Pub & Bar
+typealias T2 = protocol<Pub , Bar> // expected-warning {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
 
 // rdar://problem/20593294
 protocol HasAssoc {
@@ -72,7 +81,7 @@ var b: HasAssoc // expected-error {{protocol 'HasAssoc' can only be used as a ge
 
 // Further generic constraint error testing - typealias used inside statements
 protocol P {}
-typealias MoreHasAssoc = protocol<HasAssoc, P>
+typealias MoreHasAssoc = HasAssoc & P
 func testHasMoreAssoc(_ x: Any) {
   if let p = x as? MoreHasAssoc { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint}}
     p.foo() // don't crash here.

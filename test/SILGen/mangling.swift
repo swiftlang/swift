@@ -55,13 +55,13 @@ protocol Bar {}
 
 // Ensure protocol list manglings are '_' terminated regardless of length
 // CHECK-LABEL: sil hidden @_TF8mangling12any_protocolFP_T_
-func any_protocol(_: protocol<>) {}
+func any_protocol(_: Any) {}
 // CHECK-LABEL: sil hidden @_TF8mangling12one_protocolFPS_3Foo_T_
 func one_protocol(_: Foo) {}
 // CHECK-LABEL: sil hidden @_TF8mangling18one_protocol_twiceFTPS_3Foo_PS0___T_
 func one_protocol_twice(_: Foo, _: Foo) {}
 // CHECK-LABEL: sil hidden @_TF8mangling12two_protocolFPS_3BarS_3Foo_T_
-func two_protocol(_: protocol<Foo, Bar>) {}
+func two_protocol(_: Foo & Bar) {}
 
 // Ensure archetype depths are mangled correctly.
 class Zim<T> {
@@ -73,7 +73,7 @@ class Zim<T> {
 
 // Don't crash mangling single-protocol "composition" types.
 // CHECK-LABEL: sil hidden @_TF8mangling27single_protocol_compositionFT1xPS_3Foo__T_
-func single_protocol_composition(x x: protocol<Foo>) {}
+func single_protocol_composition(x x: protocol<Foo>) {} // expected-warning {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
 
 // Clang-imported classes and protocols get mangled into a magic 'So' context
 // to make collisions into link errors. <rdar://problem/14221244>

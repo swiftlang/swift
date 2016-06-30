@@ -51,7 +51,7 @@ func pointers_to_swift_functions(_ x: Int) {
 func unsupported(_ a: Any) -> Int { return 0 }
 
 func pointers_to_bad_swift_functions(_ x: Int) {
-  calls(unsupported, x) // expected-error{{C function pointer signature '(Any) -> Int' is not compatible with expected type '@convention(c) (Int) -> Int'}}
+  calls(unsupported, x) // expected-error{{C function pointer signature '(protocol<>) -> Int' is not compatible with expected type '@convention(c) (Int) -> Int'}}
 }
 
 // CHECK-LABEL: sil shared @_TFIvV19c_function_pointers22StructWithInitializers3fn1cT_T_iU_FT_T_ : $@convention(thin) () -> () {

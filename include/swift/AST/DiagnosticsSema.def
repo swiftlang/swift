@@ -517,6 +517,7 @@ ERROR(reserved_member_name,none,
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
+ERROR(invalid_redecl_any,none,"invalid redeclaration of 'Any'; cannot override type keyword", ())
 
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (Identifier))
@@ -1387,7 +1388,7 @@ ERROR(circular_protocol_def,none,
 NOTE(protocol_here,none,
      "protocol %0 declared here", (Identifier))
 ERROR(protocol_composition_not_protocol,none, 
-      "non-protocol type %0 cannot be used within 'protocol<...>'", (Type))
+      "non-protocol type %0 cannot be used within a protocol composition", (Type))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 
@@ -2683,7 +2684,7 @@ ERROR(objc_convention_invalid,none,
 ERROR(function_type_no_parens,none,
       "single argument function types require parentheses", ())
 NOTE(not_objc_empty_protocol_composition,none,
-     "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
+     "'Any' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,none,
      "protocol %0 is not '@objc'", (Type))
 NOTE(not_objc_empty_tuple,none,

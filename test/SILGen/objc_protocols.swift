@@ -111,7 +111,7 @@ func objc_protocol_partial_apply(_ x: NSRuncing) {
 }
 
 // CHECK-LABEL: sil hidden  @_TF14objc_protocols25objc_protocol_composition
-func objc_protocol_composition(_ x: protocol<NSRuncing, NSFunging>) {
+func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $protocol<NSFunging, NSRuncing> to $[[OPENED:@opened(.*) protocol<NSFunging, NSRuncing>]]
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED]], #NSRuncing.runce!1.foreign
   // CHECK: apply [[METHOD]]<[[OPENED]]>([[THIS]])

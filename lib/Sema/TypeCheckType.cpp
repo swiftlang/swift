@@ -821,6 +821,10 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
                            dyn_cast<GenericIdentTypeRepr>(comp), options,
                            resolver, unsatisfiedDependency);
+    
+    // if it is an 'Any' type, return the unbounded composition type
+  } else if (comp->getIdentifier() == TC.Context.Id_Any) {
+    return ProtocolCompositionType::get(TC.Context, ArrayRef<Type>());
   }
 
   // Resolve the first component, which is the only one that requires
@@ -832,7 +836,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       comp->getIdentifier() == TC.Context.Id_Self) {
     auto func = cast<FuncDecl>(DC);
     assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
-
+    
     return func->getDynamicSelf();
   }
 
@@ -3182,7 +3186,7 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   SmallVector<ProtocolDecl *, 4> Protocols;
   if (T->isExistentialType(Protocols)) {
     if (Protocols.empty()) {
-      // protocol<> is not @objc.
+      // Any is not @objc.
       diagnose(TypeRange.Start, diag::not_objc_empty_protocol_composition);
       return;
     }

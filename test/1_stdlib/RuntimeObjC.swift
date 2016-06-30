@@ -443,11 +443,11 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a12GenericClassPS_9ProtocolA__",
               NSStringFromClass(GenericClass<ProtocolA>.self))
   expectEqual("_TtGC1a12GenericClassPS_9ProtocolAS_9ProtocolB__",
-              NSStringFromClass(GenericClass<protocol<ProtocolA, ProtocolB>>.self))
+              NSStringFromClass(GenericClass<ProtocolA & ProtocolB>.self))
   expectEqual("_TtGC1a12GenericClassPMPS_9ProtocolAS_9ProtocolB__",
-              NSStringFromClass(GenericClass<protocol<ProtocolA, ProtocolB>.Type>.self))
+              NSStringFromClass(GenericClass<(ProtocolA & ProtocolB).Type>.self))
   expectEqual("_TtGC1a12GenericClassMPS_9ProtocolAS_9ProtocolB__",
-              NSStringFromClass(GenericClass<protocol<ProtocolB, ProtocolA>.Protocol>.self))
+              NSStringFromClass(GenericClass<(ProtocolB & ProtocolA).Protocol>.self))
 
   expectEqual("_TtGC1a12GenericClassCSo7CFArray_",
               NSStringFromClass(GenericClass<CFArray>.self))
@@ -460,7 +460,7 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a12GenericClassPSo9NSCopying__",
               NSStringFromClass(GenericClass<NSCopying>.self))
   expectEqual("_TtGC1a12GenericClassPSo9NSCopyingS_9ProtocolAS_9ProtocolB__",
-              NSStringFromClass(GenericClass<protocol<ProtocolB, NSCopying, ProtocolA>>.self))
+              NSStringFromClass(GenericClass<ProtocolB & NSCopying & ProtocolA>.self))
 
   expectEqual("_TtGC1a17MultiGenericClassGVS_13GenericStructSi_GOS_11GenericEnumGS2_Si___",
               NSStringFromClass(MultiGenericClass<GenericStruct<Int>,
@@ -767,7 +767,7 @@ Reflection.test("MetatypeMirror") {
     dump(objcProtocolConcreteMetatype, to: &output)
     expectEqual(expectedObjCProtocolConcrete, output)
 
-    typealias Composition = protocol<SomeNativeProto, SomeObjCProto>
+    typealias Composition = SomeNativeProto & SomeObjCProto
     let compositionConcreteMetatype = Composition.self
     let expectedComposition = "- protocol<a.SomeNativeProto, a.SomeObjCProto> #0\n"
     output = ""

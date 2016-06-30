@@ -13,20 +13,20 @@ extension Float32 : Barable {
 }
 
 func f0(_: Barable) {}
-func f1(_ x: protocol<Fooable, Barable>) {}
+func f1(_ x: Fooable & Barable) {}
 func f2(_: Float) {}
 let nilFunc: Optional<(Barable) -> ()> = nil
 
-func g(_: (protocol<Barable, Fooable>) -> ()) {}
+func g(_: (Barable & Fooable) -> ()) {}
 
 protocol Classable : AnyObject {}
 class SomeArbitraryClass {}
 
 func fc0(_: Classable) {}
-func fc1(_: protocol<Fooable, Classable>) {}
+func fc1(_: Fooable & Classable) {}
 func fc2(_: AnyObject) {}
 func fc3(_: SomeArbitraryClass) {}
-func gc(_: (protocol<Classable, Fooable>) -> ()) {}
+func gc(_: (Classable & Fooable) -> ()) {}
 
 var i : Int
 var f : Float

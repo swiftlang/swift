@@ -81,7 +81,7 @@ public enum _DisabledRangeIndex_ {}
 public struct CountableRange<Bound> : RandomAccessCollection
   where
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>,
+  Bound : _Strideable & Comparable,
   Bound.Stride : SignedInteger {
 
   /// The range's lower bound.
@@ -578,7 +578,7 @@ public func ..< <Bound>(
 ) -> CountableRange<Bound>
   where
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>,
+  Bound : _Strideable & Comparable,
   Bound.Stride : Integer {
 
   // FIXME: swift-3-indexing-model: tests for traps.

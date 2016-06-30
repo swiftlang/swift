@@ -190,7 +190,7 @@ class MyClass2 : P2 {
 protocol P1{}
 
 class MyClass3 {
-  func foo<T: protocol<P1, P2>>(_ t : T) {}
+  func foo<T: P1 & P2>(_ t : T) {}
 }
 
 func testArchetypeReplacement4(_ a : MyClass1) {

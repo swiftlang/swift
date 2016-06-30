@@ -79,8 +79,8 @@ printType(J.Type.self)
 // CHECK: found type: J.Type
 
 protocol K {}
-typealias JK = protocol<J,K>
-typealias KJ = protocol<K,J>
+typealias JK = J & K
+typealias KJ = K & J
 printType(JK.self)
 // CHECK: found type: protocol<J, K>
 printType(KJ.self)

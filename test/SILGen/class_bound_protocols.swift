@@ -36,7 +36,7 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols21class_bound_generic_2
-func class_bound_generic_2<T : protocol<ClassBound, NotClassBound>>(x: T) -> T {
+func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $T
@@ -62,7 +62,7 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols32class_bound_protocol_composition
-func class_bound_protocol_composition(x: protocol<ClassBound, NotClassBound>)
+func class_bound_protocol_composition(x: ClassBound & NotClassBound)
 -> protocol<ClassBound, NotClassBound> {
   var x = x
   // CHECK: bb0([[X:%.*]] : $protocol<ClassBound, NotClassBound>):
@@ -83,7 +83,7 @@ func class_bound_erasure(x: ConcreteClass) -> ClassBound {
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols30class_bound_existential_upcast
-func class_bound_existential_upcast(x: protocol<ClassBound,ClassBound2>)
+func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 -> ClassBound {
   return x
   // CHECK: [[OPENED:%.*]] = open_existential_ref {{%.*}} : $protocol<ClassBound, ClassBound2> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, ClassBound2>]]
@@ -93,7 +93,7 @@ func class_bound_existential_upcast(x: protocol<ClassBound,ClassBound2>)
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols41class_bound_to_unbound_existential_upcast
 func class_bound_to_unbound_existential_upcast
-(x: protocol<ClassBound,NotClassBound>) -> NotClassBound {
+(x: ClassBound & NotClassBound) -> NotClassBound {
   return x
   // CHECK: [[X_OPENED:%.*]] = open_existential_ref %1 : $protocol<ClassBound, NotClassBound> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, NotClassBound>]]
   // CHECK: [[PAYLOAD_ADDR:%.*]] = init_existential_addr %0 : $*NotClassBound, [[OPENED_TYPE]]
