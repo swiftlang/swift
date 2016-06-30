@@ -202,7 +202,7 @@ StringTests.test("ForeignIndexes/subscript(Index)/OutOfBoundsTrap") {
 
   let i = donor.index(_nth: 3)
   expectCrashLater()
-  acceptor[i]
+  _ = acceptor[i]
 }
 
 StringTests.test("String/subscript(_:Range)") {
@@ -229,7 +229,7 @@ StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/1") {
 
   let r = donor.startIndex..<donor.index(_nth: 4)
   expectCrashLater()
-  acceptor[r]
+  _ = acceptor[r]
 }
 
 StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/2") {
@@ -240,7 +240,7 @@ StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/2") {
 
   let r = donor.index(_nth: 4)..<donor.index(_nth: 5)
   expectCrashLater()
-  acceptor[r]
+  _ = acceptor[r]
 }
 
 StringTests.test("ForeignIndexes/replaceSubrange/OutOfBoundsTrap/1") {
@@ -497,9 +497,7 @@ StringTests.test("COW/removeSubrange/start") {
 
     // No more reallocations are expected.
     str.removeSubrange(str.startIndex..<str.index(_nth: 1))
-    // FIXME: extra reallocation, should be expectEqual()
-    expectNotEqual(heapStrIdentity, str.bufferID)
-    // end FIXME
+    expectEqual(heapStrIdentity, str.bufferID)
     expectEqual(literalIdentity, slice.bufferID)
     expectEqual("345678", str)
     expectEqual("12345678", slice)
@@ -526,9 +524,7 @@ StringTests.test("COW/removeSubrange/start") {
 
     // No more reallocations are expected.
     str.removeSubrange(str.startIndex..<str.index(_nth: 1))
-    // FIXME: extra reallocation, should be expectEqual()
-    expectNotEqual(heapStrIdentity2, str.bufferID)
-    // end FIXME
+    expectEqual(heapStrIdentity2, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
     expectEqual("5678", str)
     expectEqual("345678", slice)
@@ -559,9 +555,7 @@ StringTests.test("COW/removeSubrange/end") {
     // No more reallocations are expected.
     str.append(UnicodeScalar("x"))
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
-    // FIXME: extra reallocation, should be expectEqual()
-    expectNotEqual(heapStrIdentity, str.bufferID)
-    // end FIXME
+    expectEqual(heapStrIdentity, str.bufferID)
     expectEqual(literalIdentity, slice.bufferID)
     expectEqual("1234567", str)
     expectEqual("12345678", slice)
@@ -569,9 +563,7 @@ StringTests.test("COW/removeSubrange/end") {
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
     str.append(UnicodeScalar("x"))
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
-    // FIXME: extra reallocation, should be expectEqual()
-    //expectNotEqual(heapStrIdentity, str.bufferID)
-    // end FIXME
+    expectEqual(heapStrIdentity, str.bufferID)
     expectEqual(literalIdentity, slice.bufferID)
     expectEqual("123456", str)
     expectEqual("12345678", slice)
@@ -599,9 +591,7 @@ StringTests.test("COW/removeSubrange/end") {
     // No more reallocations are expected.
     str.append(UnicodeScalar("x"))
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
-    // FIXME: extra reallocation, should be expectEqual()
-    expectNotEqual(heapStrIdentity, str.bufferID)
-    // end FIXME
+    expectEqual(heapStrIdentity, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
     expectEqual("12345", str)
     expectEqual("123456", slice)
@@ -609,9 +599,7 @@ StringTests.test("COW/removeSubrange/end") {
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
     str.append(UnicodeScalar("x"))
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
-    // FIXME: extra reallocation, should be expectEqual()
-    //expectNotEqual(heapStrIdentity, str.bufferID)
-    // end FIXME
+    expectEqual(heapStrIdentity, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
     expectEqual("1234", str)
     expectEqual("123456", slice)
@@ -634,16 +622,14 @@ StringTests.test("COW/replaceSubrange/end") {
     slice.replaceSubrange(slice.endIndex..<slice.endIndex, with: "a")
     expectNotEqual(literalIdentity, slice.bufferID)
     expectEqual(literalIdentity, str.bufferID)
-    let heapStrIdentity = str.bufferID
+    let heapStrIdentity = slice.bufferID
     expectEqual("1234567a", slice)
     expectEqual("12345678", str)
 
     // No more reallocations are expected.
     slice.replaceSubrange(
       slice.index(_nthLast: 1)..<slice.endIndex, with: "b")
-    // FIXME: extra reallocation, should be expectEqual()
-    expectNotEqual(heapStrIdentity, slice.bufferID)
-    // end FIXME
+    expectEqual(heapStrIdentity, slice.bufferID)
     expectEqual(literalIdentity, str.bufferID)
 
     expectEqual("1234567b", slice)
@@ -675,9 +661,7 @@ StringTests.test("COW/replaceSubrange/end") {
     // No more reallocations are expected.
     slice.replaceSubrange(
       slice.index(_nthLast: 1)..<slice.endIndex, with: "b")
-    // FIXME: extra reallocation, should be expectEqual()
-    expectNotEqual(heapStrIdentity2, slice.bufferID)
-    // end FIXME
+    expectEqual(heapStrIdentity2, slice.bufferID)
     expectEqual(heapStrIdentity1, str.bufferID)
 
     expectEqual("1234567b", slice)
