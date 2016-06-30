@@ -341,7 +341,12 @@ extension ${Self}: BinaryFloatingPoint {
 
   public static var pi: ${Self} {
 %if bits == 32:
-    return Float(0x1.921fb6p1)
+    // Note: this is not the correctly-rounded (to nearest) value of pi,
+    // because pi would round *up* in Float precision, which can result
+    // in angles in the wrong quadrant if users aren't careful.  This is
+    // not a problem for Double or Float80, as pi rounds down in both of
+    // those formats.
+    return Float(0x1.921fb4p1)
 %elif bits == 64:
     return Double(0x1.921fb54442d18p1)
 %elif bits == 80:
