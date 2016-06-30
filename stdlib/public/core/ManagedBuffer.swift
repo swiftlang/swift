@@ -45,7 +45,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointerToValue<R>(
-    _ body: (UnsafeMutablePointer<Value>) -> R
+    _ body: @noescape (UnsafeMutablePointer<Value>) -> R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
@@ -56,7 +56,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointerToElements<R>(
-    _ body: (UnsafeMutablePointer<Element>) -> R
+    _ body: @noescape (UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
   }
@@ -67,7 +67,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointers<R>(
-    _ body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
+    _ body: @noescape (UnsafeMutablePointer<Value>, UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return ManagedBufferPointer(self).withUnsafeMutablePointers(body)
   }
@@ -99,7 +99,7 @@ public class ManagedBuffer<Value, Element>
   /// generate an initial `Value`.
   public final class func create(
     minimumCapacity: Int,
-    initialValue: (ManagedProtoBuffer<Value, Element>) -> Value
+    initialValue: @noescape (ManagedProtoBuffer<Value, Element>) -> Value
   ) -> ManagedBuffer<Value, Element> {
 
     let p = ManagedBufferPointer<Value, Element>(
@@ -185,7 +185,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
-    initialValue: (buffer: AnyObject, capacity: (AnyObject) -> Int) -> Value
+    initialValue: @noescape (buffer: AnyObject, capacity: @noescape (AnyObject) -> Int) -> Value
   ) {
     self = ManagedBufferPointer(bufferClass: bufferClass, minimumCapacity: minimumCapacity)
 
@@ -268,7 +268,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointerToElements<R>(
-    _ body: (UnsafeMutablePointer<Element>) -> R
+    _ body: @noescape (UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
   }
@@ -279,11 +279,10 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointers<R>(
-    _ body: @noescape (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
+    _ body: @noescape (UnsafeMutablePointer<Value>, UnsafeMutablePointer<Element>) -> R
   ) -> R {
-    let result = body(_valuePointer, _elementPointer)
-    _fixLifetime(_nativeBuffer)
-    return result
+    defer { _fixLifetime(_nativeBuffer) }
+    return body(_valuePointer, _elementPointer)
   }
 
   /// Returns `true` iff `self` holds the only strong reference to its buffer.
