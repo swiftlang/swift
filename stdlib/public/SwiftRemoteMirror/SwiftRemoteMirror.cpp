@@ -132,6 +132,10 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
       return SWIFT_TUPLE;
     case RecordKind::Struct:
       return SWIFT_STRUCT;
+    case RecordKind::NoPayloadEnum:
+      return SWIFT_NO_PAYLOAD_ENUM;
+    case RecordKind::SinglePayloadEnum:
+      return SWIFT_SINGLE_PAYLOAD_ENUM;
     case RecordKind::ThickFunction:
       return SWIFT_THICK_FUNCTION;
     case RecordKind::OpaqueExistential:
