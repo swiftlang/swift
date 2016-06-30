@@ -40,6 +40,29 @@ function(escape_llvm_path_for_xcode path outvar)
   set(${outvar} "${path}" PARENT_SCOPE)
 endfunction()
 
+# What this function does is go through each of the passed in imported targets
+# from LLVM/Clang and changes them to use the appropriate fully expanded paths.
+#
+# TODO: This function needs a better name.
+function(fix_imported_target_locations_for_xcode targets)
+  foreach(t ${targets})
+    if (NOT TARGET ${t})
+      message(FATAL_ERROR "${t} is not a target?!")
+    endif()
+
+    get_target_property(TARGET_TYPE ${t} TYPE)
+
+    # We only want to do this for static libraries for now.
+    if (NOT ${TARGET_TYPE} STREQUAL "STATIC_LIBRARY")
+      continue()
+    endif()
+
+    set_target_properties(${t} PROPERTIES
+      IMPORTED_LOCATION_DEBUG "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${t}.a"
+      IMPORTED_LOCATION_RELEASE "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${t}.a")
+  endforeach()
+endfunction()
+
 macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   option(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
 
@@ -91,6 +114,16 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   precondition_translate_flag(LLVM_BUILD_MAIN_SRC_DIR LLVM_MAIN_SRC_DIR)
   precondition(LLVM_LIBRARY_DIRS)
   escape_llvm_path_for_xcode("${LLVM_LIBRARY_DIRS}" LLVM_LIBRARY_DIRS)
+
+  # This could be computed using ${CMAKE_CFG_INTDIR} if we want to link Swift
+  # against a matching LLVM build configuration.  However, we usually want to be
+  # flexible and allow linking a debug Swift against optimized LLVM.
+  set(LLVM_RUNTIME_OUTPUT_INTDIR "${LLVM_BINARY_DIR}")
+  set(LLVM_LIBRARY_OUTPUT_INTDIR "${LLVM_LIBRARY_DIR}")
+
+  if (XCODE)
+    fix_imported_target_locations_for_xcode("${LLVM_EXPORTED_TARGETS}")
+  endif()
 
   if(NOT ${is_cross_compiling})
     set(${product}_NATIVE_LLVM_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
@@ -180,6 +213,10 @@ macro(swift_common_standalone_build_config_clang product is_cross_compiling)
   endif()
 
   set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
+
+  if (XCODE)
+    fix_imported_target_locations_for_xcode("${CLANG_EXPORTED_TARGETS}")
+  endif()
 
   include_directories("${CLANG_BUILD_INCLUDE_DIR}"
                       "${CLANG_MAIN_INCLUDE_DIR}")

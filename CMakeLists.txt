@@ -384,12 +384,6 @@ if(NOT EXISTS "${CLANG_MAIN_INCLUDE_DIR}/clang/AST/Decl.h")
   message(FATAL_ERROR "Clang is missing from llvm/tools subdirectory.")
 endif()
 
-# This could be computed using ${CMAKE_CFG_INTDIR} if we want to link Swift
-# against a matching LLVM build configuration.  However, we usually want to be
-# flexible and allow linking a debug Swift against optimized LLVM.
-set(LLVM_RUNTIME_OUTPUT_INTDIR "${LLVM_BINARY_DIR}")
-set(LLVM_LIBRARY_OUTPUT_INTDIR "${LLVM_LIBRARY_DIR}")
-
 set(SWIFT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(SWIFT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
