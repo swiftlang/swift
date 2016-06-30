@@ -171,23 +171,23 @@ TGV12TypeLowering3BoxVs5Int16_Vs5Int32_
 
 V12TypeLowering15ReferenceStruct
 // CHECK-64:      (struct TypeLowering.ReferenceStruct)
-// CHECK-64-NEXT: (struct size=72 alignment=8 stride=72 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT: (struct size=72 alignment=8 stride=72 num_extra_inhabitants=[[PTR_XI:2048|2147483647]]
 // CHECK-64-NEXT:   (field name=strongRef offset=0
 // CHECK-64-NEXT:     (reference kind=strong refcounting=native))
 // CHECK-64-NEXT:   (field name=optionalStrongRef offset=8
-// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1:2047|2147483646]]
 // CHECK-64-NEXT:       (field name=some offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
 // CHECK-64-NEXT:   (field name=strongRefTuple offset=16
-// CHECK-64-NEXT:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:       (field offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))
 // CHECK-64-NEXT:       (field offset=8
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
 // CHECK-64-NEXT:   (field name=optionalStrongRefTuple offset=32
-// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:         (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:           (field offset=0
 // CHECK-64-NEXT:             (reference kind=strong refcounting=native))
 // CHECK-64-NEXT:           (field offset=8
@@ -230,33 +230,33 @@ V12TypeLowering15ReferenceStruct
 
 V12TypeLowering14FunctionStruct
 // CHECK-64:      (struct TypeLowering.FunctionStruct)
-// CHECK-64-NEXT: (struct size=64 alignment=8 stride=64 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT: (struct size=64 alignment=8 stride=64 num_extra_inhabitants=[[PTR_XI_2:4096|2147483647]]
 // CHECK-64-NEXT:   (field name=thickFunction offset=0
-// CHECK-64-NEXT:     (thick_function size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (thick_function size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI_2]]
 // CHECK-64-NEXT:       (field name=function offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_2]]))
 // CHECK-64-NEXT:       (field name=context offset=8
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
 // CHECK-64-NEXT:   (field name=optionalThickFunction offset=16
-// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI_2_SUB_1:4095|2147483646]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (thick_function size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:         (thick_function size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI_2]]
 // CHECK-64-NEXT:           (field name=function offset=0
-// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_2]]))
 // CHECK-64-NEXT:           (field name=context offset=8
 // CHECK-64-NEXT:             (reference kind=strong refcounting=native))))))
 // CHECK-64-NEXT:   (field name=thinFunction offset=32
-// CHECK-64-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_2]]))
 // CHECK-64-NEXT:   (field name=optionalThinFunction offset=40
-// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_2_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_2]]))))
 // CHECK-64-NEXT:   (field name=cFunction offset=48
-// CHECK-64-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_2]]))
 // CHECK-64-NEXT:   (field name=optionalCFunction offset=56
-// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_2_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647)))))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_2]])))))
 
 // CHECK-32: (struct TypeLowering.FunctionStruct)
 // CHECK-32-NEXT: (struct size=32 alignment=4 stride=32 num_extra_inhabitants=4096
@@ -293,27 +293,27 @@ V12TypeLowering17ExistentialStruct
 // CHECK-64-NEXT:   (field name=any offset=0
 // CHECK-64-NEXT:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=0
 // CHECK-64-NEXT:       (field name=metadata offset=24
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))))
 // CHECK-64-NEXT:   (field name=optionalAny offset=32
 // CHECK-64-NEXT:     (single_payload_enum size=33 alignment=8 stride=40 num_extra_inhabitants=0
 // CHECK-64-NEXT:       (field name=some offset=0
 // CHECK-64-NEXT:         (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=0
 // CHECK-64-NEXT:           (field name=metadata offset=24
-// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))))
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))))))
 // CHECK-64-NEXT:   (field name=anyObject offset=72
 // CHECK-64-NEXT:     (class_existential size=8 alignment=8 stride=8
 // CHECK-64-NEXT:       (field name=object offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=unknown))))
 // CHECK-64-NEXT:   (field name=optionalAnyObject offset=80
-// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (class_existential size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:         (class_existential size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:           (field name=object offset=0
 // CHECK-64-NEXT:             (reference kind=strong refcounting=unknown))))))
 // CHECK-64-NEXT:   (field name=anyProto offset=88
 // CHECK-64-NEXT:     (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=0
 // CHECK-64-NEXT:       (field name=metadata offset=24
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))
 // CHECK-64-NEXT:       (field name=wtable offset=32
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-64-NEXT:   (field name=optionalAnyProto offset=128
@@ -321,13 +321,13 @@ V12TypeLowering17ExistentialStruct
 // CHECK-64-NEXT:       (field name=some offset=0
 // CHECK-64-NEXT:         (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=0
 // CHECK-64-NEXT:           (field name=metadata offset=24
-// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))
 // CHECK-64-NEXT:           (field name=wtable offset=32
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))))
 // CHECK-64-NEXT:   (field name=anyProtoComposition offset=176
 // CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=0
 // CHECK-64-NEXT:       (field name=metadata offset=24
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))
 // CHECK-64-NEXT:       (field name=wtable offset=32
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
 // CHECK-64-NEXT:       (field name=wtable offset=40
@@ -337,55 +337,55 @@ V12TypeLowering17ExistentialStruct
 // CHECK-64-NEXT:       (field name=some offset=0
 // CHECK-64-NEXT:         (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=0
 // CHECK-64-NEXT:           (field name=metadata offset=24
-// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))
 // CHECK-64-NEXT:           (field name=wtable offset=32
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
 // CHECK-64-NEXT:           (field name=wtable offset=40
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))))
 // CHECK-64-NEXT:   (field name=anyClassBoundProto1 offset=280
-// CHECK-64-NEXT:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:       (field name=object offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=unknown))
 // CHECK-64-NEXT:       (field name=wtable offset=8
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-64-NEXT:   (field name=optionalAnyClassBoundProto1 offset=296
-// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:         (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:           (field name=object offset=0
 // CHECK-64-NEXT:             (reference kind=strong refcounting=unknown))
 // CHECK-64-NEXT:           (field name=wtable offset=8
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))))
 // CHECK-64-NEXT:   (field name=anyClassBoundProto2 offset=312
-// CHECK-64-NEXT:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:       (field name=object offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=unknown))
 // CHECK-64-NEXT:       (field name=wtable offset=8
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-64-NEXT:   (field name=optionalAnyClassBoundProto2 offset=328
-// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:         (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:           (field name=object offset=0
 // CHECK-64-NEXT:             (reference kind=strong refcounting=unknown))
 // CHECK-64-NEXT:           (field name=wtable offset=8
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))))
 // CHECK-64-NEXT:   (field name=anyClassBoundProtoComposition1 offset=344
-// CHECK-64-NEXT:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:       (field name=object offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=unknown))
 // CHECK-64-NEXT:       (field name=wtable offset=8
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-64-NEXT:   (field name=optionalAnyClassBoundProtoComposition1 offset=360
-// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:         (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:           (field name=object offset=0
 // CHECK-64-NEXT:             (reference kind=strong refcounting=unknown))
 // CHECK-64-NEXT:           (field name=wtable offset=8
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))))
 // CHECK-64-NEXT:   (field name=anyClassBoundProtoComposition2 offset=376
-// CHECK-64-NEXT:     (class_existential size=24 alignment=8 stride=24 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (class_existential size=24 alignment=8 stride=24 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:       (field name=object offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=unknown))
 // CHECK-64-NEXT:       (field name=wtable offset=8
@@ -393,9 +393,9 @@ V12TypeLowering17ExistentialStruct
 // CHECK-64-NEXT:       (field name=wtable offset=16
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-64-NEXT:   (field name=optionalAnyClassBoundProtoComposition2 offset=400
-// CHECK-64-NEXT:     (single_payload_enum size=24 alignment=8 stride=24 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=24 alignment=8 stride=24 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (class_existential size=24 alignment=8 stride=24 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:         (class_existential size=24 alignment=8 stride=24 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:           (field name=object offset=0
 // CHECK-64-NEXT:             (reference kind=strong refcounting=unknown))
 // CHECK-64-NEXT:           (field name=wtable offset=8
@@ -407,7 +407,7 @@ V12TypeLowering17ExistentialStruct
 // CHECK-64-NEXT:       (field name=object offset=0
 // CHECK-64-NEXT:         (reference kind=weak refcounting=unknown))))
 // CHECK-64-NEXT:   (field name=weakAnyClassBoundProto offset=432
-// CHECK-64-NEXT:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:       (field name=object offset=0
 // CHECK-64-NEXT:         (reference kind=weak refcounting=unknown))
 // CHECK-64-NEXT:       (field name=wtable offset=8
@@ -540,55 +540,55 @@ V12TypeLowering17ExistentialStruct
 
 V12TypeLowering14MetatypeStruct
 // CHECK-64:      (struct TypeLowering.MetatypeStruct)
-// CHECK-64-NEXT: (struct size=152 alignment=8 stride=152 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT: (struct size=152 alignment=8 stride=152 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:   (field name=any offset=0
-// CHECK-64-NEXT:     (existential_metatype size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (existential_metatype size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:       (field name=metadata offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))))
 // CHECK-64-NEXT:   (field name=optionalAny offset=8
-// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (existential_metatype size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:         (existential_metatype size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:           (field name=metadata offset=0
-// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))))
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))))))
 // CHECK-64-NEXT:   (field name=anyObject offset=16
-// CHECK-64-NEXT:     (existential_metatype size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (existential_metatype size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:       (field name=metadata offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))))
 // CHECK-64-NEXT:   (field name=optionalAnyObject offset=24
-// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (existential_metatype size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:         (existential_metatype size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:           (field name=metadata offset=0
-// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))))
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))))))
 // CHECK-64-NEXT:   (field name=anyProto offset=32
-// CHECK-64-NEXT:     (existential_metatype size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (existential_metatype size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:       (field name=metadata offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))
 // CHECK-64-NEXT:       (field name=wtable offset=8
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-64-NEXT:   (field name=optionalAnyProto offset=48
-// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (existential_metatype size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:         (existential_metatype size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:           (field name=metadata offset=0
-// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))
 // CHECK-64-NEXT:           (field name=wtable offset=8
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))))
 // CHECK-64-NEXT:   (field name=anyProtoComposition offset=64
-// CHECK-64-NEXT:     (existential_metatype size=24 alignment=8 stride=24 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (existential_metatype size=24 alignment=8 stride=24 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:       (field name=metadata offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))
 // CHECK-64-NEXT:       (field name=wtable offset=8
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
 // CHECK-64-NEXT:       (field name=wtable offset=16
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-64-NEXT:   (field name=optionalAnyProtoComposition offset=88
-// CHECK-64-NEXT:     (single_payload_enum size=24 alignment=8 stride=24 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=24 alignment=8 stride=24 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (existential_metatype size=24 alignment=8 stride=24 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:         (existential_metatype size=24 alignment=8 stride=24 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:           (field name=metadata offset=0
-// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))
 // CHECK-64-NEXT:           (field name=wtable offset=8
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
 // CHECK-64-NEXT:           (field name=wtable offset=16
@@ -596,21 +596,21 @@ V12TypeLowering14MetatypeStruct
 // CHECK-64-NEXT:   (field name=structMetatype offset=112
 // CHECK-64-NEXT:     (builtin size=0 alignment=1 stride=0 num_extra_inhabitants=0))
 // CHECK-64-NEXT:   (field name=optionalStructMetatype offset=112
-// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))))
 // CHECK-64-NEXT:   (field name=classMetatype offset=120
-// CHECK-64-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))
 // CHECK-64-NEXT:   (field name=optionalClassMetatype offset=128
-// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))))
 // CHECK-64-NEXT:   (field name=abstractMetatype offset=136
-// CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
+// CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:       (field name=t offset=0
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]]))
 // CHECK-64-NEXT:       (field name=u offset=8
-// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647)))))
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]])))))
 
 // CHECK-32: (struct TypeLowering.MetatypeStruct)
 // CHECK-32-NEXT: (struct size=76 alignment=4 stride=76 num_extra_inhabitants=4096
