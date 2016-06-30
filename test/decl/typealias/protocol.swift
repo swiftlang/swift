@@ -152,3 +152,22 @@ struct T5 : P5 {
   var v7: T5.T2 // OK
 }
 
+// Unqualified lookup finds typealiases in protocol extensions, though
+protocol P6 {
+  associatedtype A
+}
+
+extension P6 {
+  typealias Y = A
+}
+
+struct S6 : P6 {
+  typealias A = Int
+
+  // FIXME
+  func inTypeContext(y: Y) // expected-error {{use of undeclared type 'Y'}}
+
+  func inExpressionContext() {
+    _ = Y.self
+  }
+}
