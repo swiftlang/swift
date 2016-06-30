@@ -243,7 +243,19 @@ static bool isAbstractClosure(const SILLocation &Loc) {
 llvm::MDNode *IRGenDebugInfo::createInlinedAt(const SILDebugScope *DS) {
   llvm::MDNode *InlinedAt = nullptr;
   if (DS) {
-    for (auto *CS : DS->flattenedInlineTree()) {
+    // The inlined-at chain, starting with the innermost (noninlined) scope.
+    auto Scopes = DS->flattenedInlineTree();
+
+    // See if we share a common prefix with the last chain of inline scopes.
+    unsigned N = 0;
+    while (N < LastInlineChain.size() && N < Scopes.size() &&
+           LastInlineChain[N].first == Scopes[N])
+      InlinedAt = LastInlineChain[N++].second;
+    LastInlineChain.resize(N);
+
+    // Construct the new suffix.
+    for (; N < Scopes.size(); ++N) {
+      auto *CS = Scopes[N];
       // In SIL the inlined-at information is part of the scopes, in
       // LLVM IR it is part of the location. Transforming the inlined-at
       // SIL scope to a location means skipping the inlined-at scope.
@@ -251,6 +263,9 @@ llvm::MDNode *IRGenDebugInfo::createInlinedAt(const SILDebugScope *DS) {
       auto *ParentScope = getOrCreateScope(Parent);
       auto L = CS->Loc.decodeDebugLoc(SM);
       InlinedAt = llvm::DebugLoc::get(L.Line, L.Column, ParentScope, InlinedAt);
+
+      // Cache the suffix.
+      LastInlineChain.push_back({CS, llvm::TrackingMDNodeRef(InlinedAt)});
     }
   }
   return InlinedAt;
