@@ -281,9 +281,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   public func withUnsafeMutablePointers<R>(
     _ body: @noescape (UnsafeMutablePointer<Value>, UnsafeMutablePointer<Element>) -> R
   ) -> R {
-    let result = body(_valuePointer, _elementPointer)
-    _fixLifetime(_nativeBuffer)
-    return result
+    defer { _fixLifetime(_nativeBuffer) }
+    return body(_valuePointer, _elementPointer)
   }
 
   /// Returns `true` iff `self` holds the only strong reference to its buffer.
