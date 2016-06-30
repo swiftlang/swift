@@ -111,6 +111,14 @@ enum class FieldDescriptorKind : uint16_t {
   Class,
   Enum,
 
+  // Fixed-size multi-payload enums have a special descriptor format that
+  // encodes spare bits.
+  //
+  // FIXME: Actually implement this. For now, a descriptor with this kind
+  // just means we also have a builtin descriptor from which we get the
+  // size and alignment.
+  MultiPayloadEnum,
+
   // A Swift opaque protocol. There are no fields, just a record for the
   // type itself.
   Protocol,
@@ -144,6 +152,22 @@ public:
   const uint32_t NumFields;
 
   using const_iterator = FieldRecordIterator;
+
+  bool isEnum() const {
+    return (Kind == FieldDescriptorKind::Enum ||
+            Kind == FieldDescriptorKind::MultiPayloadEnum);
+  }
+
+  bool isClass() const {
+    return (Kind == FieldDescriptorKind::Class ||
+            Kind == FieldDescriptorKind::ObjCClass);
+  }
+
+  bool isProtocol() const {
+    return (Kind == FieldDescriptorKind::Protocol ||
+            Kind == FieldDescriptorKind::ClassProtocol ||
+            Kind == FieldDescriptorKind::ObjCProtocol);
+  }
 
   const_iterator begin() const {
     auto Begin = getFieldRecordBuffer();

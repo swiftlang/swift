@@ -173,10 +173,10 @@ public:
   /// storage type, calculates its size and alignment, and produces the
   /// TypeInfo for the enum.
   virtual TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                            SILType Type,
-                                            EnumDecl *theEnum,
-                                            llvm::StructType *enumTy) = 0;
-  
+                                           SILType Type,
+                                           EnumDecl *theEnum,
+                                           llvm::StructType *enumTy) = 0;
+
   const TypeInfo &getTypeInfo() const {
     assert(TI);
     return *TI;

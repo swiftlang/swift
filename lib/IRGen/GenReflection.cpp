@@ -197,7 +197,7 @@ protected:
           else if (auto PD = dyn_cast<ProtocolDecl>(Nominal))
             IGM.ImportedProtocols.insert(PD);
           else
-            IGM.BuiltinTypes.insert(CanType(t));
+            IGM.OpaqueTypes.insert(Nominal);
         }
     });
   }
@@ -352,7 +352,18 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
         IGM, enumDecl->getDeclaredTypeInContext()
                      ->getCanonicalType());
 
-    addConstantInt16(uint16_t(FieldDescriptorKind::Enum));
+    auto kind = FieldDescriptorKind::Enum;
+
+    // If this is a fixed-size multi-payload enum, we have to emit a descriptor
+    // with the size and alignment of the type, because the reflection library
+    // cannot derive this information at runtime.
+    if (strategy.getElementsWithPayload().size() > 1 &&
+        !strategy.needsPayloadSizeInMetadata()) {
+      kind = FieldDescriptorKind::MultiPayloadEnum;
+      IGM.OpaqueTypes.insert(enumDecl);
+    }
+
+    addConstantInt16(uint16_t(kind));
     addConstantInt16(fieldRecordSize);
     addConstantInt32(strategy.getElementsWithPayload().size() +
                      strategy.getElementsWithNoPayload().size());
@@ -448,25 +459,40 @@ public:
   }
 };
 
-class BuiltinTypeMetadataBuilder : public ReflectionMetadataBuilder {
-  void addBuiltinType(CanType builtinType) {
-    addTypeRef(builtinType->getASTContext().TheBuiltinModule, builtinType);
+class FixedTypeMetadataBuilder : public ReflectionMetadataBuilder {
+  void addFixedType(Module *module, CanType type,
+                    const FixedTypeInfo &ti) {
+    addTypeRef(module, type);
 
-    auto &ti = cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(builtinType));
     addConstantInt32(ti.getFixedSize().getValue());
     addConstantInt32(ti.getFixedAlignment().getValue());
     addConstantInt32(ti.getFixedStride().getValue());
     addConstantInt32(ti.getFixedExtraInhabitantCount(IGM));
   }
 
+  void addBuiltinType(CanType builtinType) {
+    auto &ti = cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(builtinType));
+    addFixedType(builtinType->getASTContext().TheBuiltinModule, builtinType, ti);
+  }
+
+  void addOpaqueType(const NominalTypeDecl *nominalDecl) {
+    auto &ti = cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(
+        nominalDecl->getDeclaredTypeInContext()->getCanonicalType()));
+
+    addFixedType(nominalDecl->getParentModule(),
+                 nominalDecl->getDeclaredType()->getCanonicalType(), ti);
+  }
+
   void layout() {
-    for (auto builtinType : IGM.BuiltinTypes) {
+    for (auto builtinType : IGM.BuiltinTypes)
       addBuiltinType(builtinType);
-    }
+
+    for (auto nominalDecl : IGM.OpaqueTypes)
+      addOpaqueType(nominalDecl);
   }
 
 public:
-  BuiltinTypeMetadataBuilder(IRGenModule &IGM)
+  FixedTypeMetadataBuilder(IRGenModule &IGM)
     : ReflectionMetadataBuilder(IGM) {}
 
   llvm::GlobalVariable *emit() {
@@ -889,7 +915,7 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
   for (auto PD : ImportedProtocols)
     emitFieldMetadataRecord(PD);
 
-  BuiltinTypeMetadataBuilder builder(*this);
+  FixedTypeMetadataBuilder builder(*this);
   auto var = builder.emit();
   if (var)
     addUsedGlobal(var);

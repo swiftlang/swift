@@ -107,6 +107,9 @@ public:
     case TypeInfoKind::Record: {
       auto &RecordTI = cast<RecordTypeInfo>(TI);
       switch (RecordTI.getRecordKind()) {
+      case RecordKind::Invalid:
+        printHeader("invalid");
+        break;
       case RecordKind::Struct:
         printHeader("struct");
         break;
@@ -115,6 +118,9 @@ public:
         break;
       case RecordKind::SinglePayloadEnum:
         printHeader("single_payload_enum");
+        break;
+      case RecordKind::MultiPayloadEnum:
+        printHeader("multi_payload_enum");
         break;
       case RecordKind::Tuple:
         printHeader("tuple");
@@ -252,6 +258,7 @@ class ExistentialTypeInfoBuilder {
         case FieldDescriptorKind::ObjCClass:
         case FieldDescriptorKind::Struct:
         case FieldDescriptorKind::Enum:
+        case FieldDescriptorKind::MultiPayloadEnum:
         case FieldDescriptorKind::Class:
           Invalid = true;
           continue;
@@ -369,9 +376,6 @@ unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
   // Update the aggregate alignment
   Alignment = std::max(Alignment, fieldAlignment);
 
-  // Re-calculate the stride
-  Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
-
   // The extra inhabitants of a record are the same as the extra
   // inhabitants of the first field of the record.
   if (Empty) {
@@ -399,6 +403,9 @@ void RecordTypeInfoBuilder::addField(const std::string &Name,
 const RecordTypeInfo *RecordTypeInfoBuilder::build() {
   if (Invalid)
     return nullptr;
+
+  // Calculate the stride
+  unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
 
   return TC.makeTypeInfo<RecordTypeInfo>(
       Size, Alignment, Stride,
@@ -811,6 +818,131 @@ static unsigned getNumTagBytes(size_t size, unsigned emptyCases,
           numTags < 65536 ? 2 : 4);
 }
 
+class EnumTypeInfoBuilder {
+  TypeConverter &TC;
+  unsigned Size, Alignment, NumExtraInhabitants;
+  RecordKind Kind;
+  std::vector<FieldInfo> Cases;
+  bool Invalid;
+
+  const TypeRef *getCaseTypeRef(FieldTypeInfo Case) {
+    // An indirect case is like a payload case with an agument type
+    // of Builtin.NativeObject.
+    if (Case.Indirect)
+      return TC.getNativeObjectTypeRef();
+
+    return Case.TR;
+  }
+
+  void addCase(const std::string &Name, const TypeRef *TR,
+               const TypeInfo *TI) {
+    if (TI == nullptr) {
+      Invalid = true;
+      return;
+    }
+
+    Size = std::max(Size, TI->getSize());
+    Alignment = std::max(Alignment, TI->getAlignment());
+
+    Cases.push_back({Name, /*offset=*/0, TR, *TI});
+  }
+
+public:
+  EnumTypeInfoBuilder(TypeConverter &TC)
+    : TC(TC), Size(0), Alignment(0), NumExtraInhabitants(0),
+      Kind(RecordKind::Invalid), Invalid(false) {}
+
+  const TypeInfo *build(const TypeRef *TR, const FieldDescriptor *FD) {
+    // Sort enum into payload and no-payload cases.
+    unsigned NoPayloadCases = 0;
+    std::vector<FieldTypeInfo> PayloadCases;
+
+    for (auto Case : TC.getBuilder().getFieldTypeRefs(TR, FD)) {
+      if (Case.TR == nullptr) {
+        NoPayloadCases++;
+        continue;
+      }
+
+      PayloadCases.push_back(Case);
+    }
+
+    // NoPayloadEnumImplStrategy
+    if (PayloadCases.empty()) {
+      Kind = RecordKind::NoPayloadEnum;
+      Size += getNumTagBytes(/*payloadSize=*/0,
+                             NoPayloadCases,
+                             /*payloadCases=*/0);
+
+    // SinglePayloadEnumImplStrategy
+    } else if (PayloadCases.size() == 1) {
+      auto *CaseTR = getCaseTypeRef(PayloadCases[0]);
+      auto *CaseTI = TC.getTypeInfo(CaseTR);
+
+      // An enum consisting of a single payload case and nothing else
+      // is lowered as the payload type.
+      if (NoPayloadCases == 0)
+        return CaseTI;
+
+      Kind = RecordKind::SinglePayloadEnum;
+      addCase(PayloadCases[0].Name, CaseTR, CaseTI);
+
+      // Below logic should match the runtime function
+      // swift_initEnumValueWitnessTableSinglePayload().
+      NumExtraInhabitants = CaseTI->getNumExtraInhabitants();
+      if (NumExtraInhabitants >= NoPayloadCases) {
+        // Extra inhabitants can encode all no-payload cases.
+        NumExtraInhabitants -= NoPayloadCases;
+      } else {
+        // Not enough extra inhabitants for all cases. We have to add an
+        // extra tag field.
+        NumExtraInhabitants = 0;
+        Size += getNumTagBytes(Size,
+                               NoPayloadCases - NumExtraInhabitants,
+                               /*payloadCases=*/1);
+      }
+
+    // MultiPayloadEnumImplStrategy
+    } else {
+      Kind = RecordKind::MultiPayloadEnum;
+
+      // Check if this is a dynamic or static multi-payload enum
+      for (auto Case : PayloadCases) {
+        auto *CaseTR = getCaseTypeRef(Case);
+        auto *CaseTI = TC.getTypeInfo(CaseTR);
+        addCase(Case.Name, CaseTR, CaseTI);
+      }
+
+      // If we have a fixed descriptor for this type, it is a fixed-size
+      // multi-payload enum that possibly uses payload spare bits.
+      auto *FixedDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR);
+      if (FixedDescriptor) {
+        Size = FixedDescriptor->Size;
+        Alignment = FixedDescriptor->Alignment;
+        NumExtraInhabitants = FixedDescriptor->NumExtraInhabitants;
+      } else {
+        // Dynamic multi-payload enums do not have extra inhabitants
+        NumExtraInhabitants = 0;
+
+        // Dynamic multi-payload enums always use an extra tag to differentiate
+        // between cases
+        Size += getNumTagBytes(Size,
+                               NoPayloadCases,
+                               PayloadCases.size());
+      }
+    }
+
+    if (Invalid)
+      return nullptr;
+
+    // Calculate the stride
+    unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+
+    return TC.makeTypeInfo<RecordTypeInfo>(
+        Size, Alignment, Stride,
+        NumExtraInhabitants, Kind, Cases);
+  }
+};
+
 class LowerType
   : public TypeRefVisitor<LowerType, const TypeInfo *> {
   TypeConverter &TC;
@@ -840,80 +972,6 @@ public:
     return TC.makeTypeInfo<BuiltinTypeInfo>(descriptor);
   }
 
-  const TypeInfo *visitEnumTypeRef(const TypeRef *TR,
-                                   const FieldDescriptor *FD) {
-    // Sort enum into payload and no-payload cases.
-    unsigned NoPayloadCases = 0;
-    unsigned PayloadCases = 0;
-    const TypeRef *PayloadTR = nullptr;
-    FieldTypeInfo PayloadCase;
-
-    for (auto Case : TC.getBuilder().getFieldTypeRefs(TR, FD)) {
-      if (Case.TR == nullptr) {
-        NoPayloadCases++;
-        continue;
-      }
-
-      PayloadCases++;
-      PayloadCase = Case;
-
-      // An indirect case is like a payload case with an agument type
-      // of Builtin.NativeObject.
-      if (Case.Indirect)
-        PayloadTR = TC.getNativeObjectTypeRef();
-      else
-        PayloadTR = Case.TR;
-    }
-
-    if (PayloadCases == 0) {
-      RecordTypeInfoBuilder builder(TC, RecordKind::NoPayloadEnum);
-
-      unsigned tagBytes = getNumTagBytes(/*payloadSize=*/0,
-                                         NoPayloadCases,
-                                         /*payloadCases=*/0);
-      builder.addField(tagBytes, 1, 0);
-
-      return builder.build();
-    } else if (PayloadCases == 1) {
-      auto *PayloadTI = TC.getTypeInfo(PayloadTR);
-      if (PayloadTI == nullptr)
-        return nullptr;
-
-      // An enum consisting of a single payload case and nothing else
-      // is lowered as the payload type.
-      if (NoPayloadCases == 0)
-        return PayloadTI;
-
-      RecordTypeInfoBuilder builder(TC, RecordKind::SinglePayloadEnum);
-      builder.addField(PayloadCase.Name, PayloadTR);
-
-      // Below logic should match the runtime function
-      // swift_initEnumValueWitnessTableSinglePayload().
-
-      unsigned numExtraInhabitants = PayloadTI->getNumExtraInhabitants();
-
-      if (numExtraInhabitants >= NoPayloadCases) {
-        // Extra inhabitants can encode all no-payload cases.
-        unsigned unusedExtraInhabitants = numExtraInhabitants - NoPayloadCases;
-        builder.setNumExtraInhabitants(unusedExtraInhabitants);
-
-      } else {
-        // Not enough extra inhabitants for all cases. We have to add an
-        // extra tag field.
-        unsigned tagBytes = getNumTagBytes(PayloadTI->getSize(),
-                                           NoPayloadCases - numExtraInhabitants,
-                                           /*payloadCases=*/1);
-        builder.addField(tagBytes, 1, 0);
-      }
-
-      return builder.build();
-    } else {
-
-      // FIXME: Multi-payload enums are not supported right now
-      return nullptr;
-    }
-  }
-
   const TypeInfo *visitAnyNominalTypeRef(const TypeRef *TR) {
     auto *FD = TC.getBuilder().getFieldTypeInfo(TR);
     if (FD == nullptr) {
@@ -941,7 +999,10 @@ public:
       return builder.build();
     }
     case FieldDescriptorKind::Enum:
-      return visitEnumTypeRef(TR, FD);
+    case FieldDescriptorKind::MultiPayloadEnum: {
+      EnumTypeInfoBuilder builder(TC);
+      return builder.build(TR, FD);
+    }
     case FieldDescriptorKind::ObjCClass:
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Unknown);
@@ -1172,6 +1233,7 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   }
   case FieldDescriptorKind::Struct:
   case FieldDescriptorKind::Enum:
+  case FieldDescriptorKind::MultiPayloadEnum:
   case FieldDescriptorKind::ObjCProtocol:
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
