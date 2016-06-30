@@ -10,7 +10,6 @@
 
 import StdlibUnittest
 
-
 %{
 
 floatNameToSignificandBits = { 'Float32':24, 'Float64':53, 'Float80':64 }
@@ -110,44 +109,16 @@ FloatingPointConversionFailures.test("${OtherFloat}To${Self}FailableConversion/d
 
 %   end
 
-FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=NaN") {
-  let input = ${OtherFloat}.nan
-  var result = ${Self}(input)
-  var resultConvertedBack = ${OtherFloat}(result)
-  expectTrue(input.isNaN)
-  expectTrue(resultConvertedBack.isNaN)
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/special") {
+  expectEqual( ${Self}.infinity, ${Self}( ${OtherFloat}.infinity))
+  expectEqual(-${Self}.infinity, ${Self}(-${OtherFloat}.infinity))
+  expectTrue(${Self}(${OtherFloat}.nan).isNaN)
 }
 
-FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/dest=NaN") {
-  let input = ${OtherFloat}.nan
-  var result = ${Self}(exactly: input)
-  expectEmpty(result)
-}
-
-FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=inf") {
-  let input = ${OtherFloat}.infinity
-  var result = ${Self}(input)
-  var resultConvertedBack = ${OtherFloat}(result)
-  expectEqual(input, resultConvertedBack)
-}
-
-FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/dest=inf") {
-  let input = ${OtherFloat}.infinity
-  var result = ${Self}(exactly: input)
-  expectEqual(${Self}.infinity, result)
-}
-
-FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=-inf") {
-  let input = -${OtherFloat}.infinity
-  var result = ${Self}(input)
-  var resultConvertedBack = ${OtherFloat}(result)
-  expectEqual(input, resultConvertedBack)
-}
-
-FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/dest=-inf") {
-  let input = -${OtherFloat}.infinity
-  var result = ${Self}(exactly: input)
-  expectEqual(-${Self}.infinity, result)
+FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/special") {
+  expectEqual( ${Self}.infinity, ${Self}(exactly:  ${OtherFloat}.infinity))
+  expectEqual(-${Self}.infinity, ${Self}(exactly: -${OtherFloat}.infinity))
+  expectEmpty(${Self}(exactly: ${OtherFloat}.nan))
 }
 
 %   if OtherFloat == 'Float80':
