@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 
-// RUN: %clang %target-cc-options -isysroot %sdk -fobjc-arc %S/Inputs/objc_runtime_visible.m -fmodules -dynamiclib -o %t/libobjc_runtime_visible.dylib
+// RUN: %clang %target-cc-options -isysroot %sdk -fobjc-arc %S/Inputs/objc_runtime_visible.m -fmodules -nodefaultlibs -lc -dynamiclib -o %t/libobjc_runtime_visible.dylib
 // RUN: nm -g %t/libobjc_runtime_visible.dylib | FileCheck %s
 // RUN: %target-build-swift -import-objc-header %S/Inputs/objc_runtime_visible.h %t/libobjc_runtime_visible.dylib %s -o %t/main
 // RUN: %target-run %t/main
