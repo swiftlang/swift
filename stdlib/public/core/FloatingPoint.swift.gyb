@@ -122,6 +122,9 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
 
   /// The mathematical constant pi = 3.14159...
   ///
+  /// This value should be rounded towards zero to keep user computations
+  /// with angles from inadvertently ending up in the wrong quadrant.
+  ///
   /// Extensible floating-point types might provide additional APIs to obtain
   /// this value to caller-specified precision.
   static var pi: Self { get }

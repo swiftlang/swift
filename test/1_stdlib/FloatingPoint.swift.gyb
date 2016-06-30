@@ -104,7 +104,7 @@ FloatingPoint.test("Float/staticProperties") {
   expectBitwiseEqual(bitPattern: 0x7fa0_0000, Ty.signalingNaN)
   expectBitwiseEqual(bitPattern: 0x7f80_0000, Ty.infinity)
   expectBitwiseEqual(0x1.ffff_fe__p127, Ty.greatestFiniteMagnitude)
-  expectBitwiseEqual(0x1.921f_b6__p1, Ty.pi)
+  expectBitwiseEqual(0x1.921f_b4__p1, Ty.pi)
   expectBitwiseEqual(0x1.0p-23, Ty.ulpOfOne)
   expectBitwiseEqual(0x1.0p-126, Ty.leastNormalMagnitude)
 #if arch(arm)
