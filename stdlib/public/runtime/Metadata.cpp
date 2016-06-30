@@ -1576,7 +1576,7 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
   auto *classWords = reinterpret_cast<uintptr_t *>(theClass);
   auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
   while (ancestor && ancestor->isTypeMetadata()) {
-    auto description = ancestor->getDescription();
+    auto &description = ancestor->getDescription();
     auto &genericParams = description->GenericParams;
 
     // Copy the parent type.
@@ -2486,7 +2486,7 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
 
 template<> const GenericMetadata *
 Metadata::getGenericPattern() const {
-  auto ntd = getNominalTypeDescriptor();
+  auto &ntd = getNominalTypeDescriptor();
   if (!ntd)
     return nullptr;
   return ntd->getGenericMetadataPattern();
@@ -2713,3 +2713,5 @@ swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
 
   return entry->get(genericTable);
 }
+
+uint64_t swift::RelativeDirectPointerNullPtr = 0;
