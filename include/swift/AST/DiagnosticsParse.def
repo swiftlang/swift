@@ -654,6 +654,11 @@ ERROR(expected_rangle_protocol,PointsToFirstBadToken,
 ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
       "protocol composition is neither allowed nor needed here", ())
 
+WARNING(deprecated_protocol_composition,PointsToFirstBadToken,
+        "'protocol<...>' composition syntax is deprecated; use infix '&' instead", ())
+WARNING(deprecated_any_composition,PointsToFirstBadToken,
+        "'protocol<>' syntax is deprecated; use 'Any' instead", ())
+
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
 //------------------------------------------------------------------------------

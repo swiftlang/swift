@@ -283,7 +283,7 @@ tests.test("Another/${Any}") {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  if let downcastToProtocols = expectNotEmpty(subclassAsAnyArray as? [protocol<Barable, Fooable>]) {
+  if let downcastToProtocols = expectNotEmpty(subclassAsAnyArray as? [Barable & Fooable]) {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 

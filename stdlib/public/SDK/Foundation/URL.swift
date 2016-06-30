@@ -220,12 +220,12 @@ public struct URLResourceValues {
     /// An identifier which can be used to compare two file system objects for equality using `isEqual`.
     ///
     /// Two object identifiers are equal if they have the same file system path or if the paths are linked to same inode on the same file system. This identifier is not persistent across system restarts.
-    public var fileResourceIdentifier: protocol<NSCopying, NSCoding, NSSecureCoding, NSObjectProtocol>? { return _get(.fileResourceIdentifierKey) }
+    public var fileResourceIdentifier: (NSCopying & NSCoding & NSSecureCoding & NSObjectProtocol)? { return _get(.fileResourceIdentifierKey) }
     
     /// An identifier that can be used to identify the volume the file system object is on. 
     ///
     /// Other objects on the same volume will have the same volume identifier and can be compared using for equality using `isEqual`. This identifier is not persistent across system restarts.
-    public var volumeIdentifier: protocol<NSCopying, NSCoding, NSSecureCoding, NSObjectProtocol>? { return _get(.volumeIdentifierKey) }
+    public var volumeIdentifier: (NSCopying & NSCoding & NSSecureCoding & NSObjectProtocol)? { return _get(.volumeIdentifierKey) }
     
     /// The optimal block size when reading or writing this file's data, or nil if not available.
     public var preferredIOBlockSize: Int? { return _get(.preferredIOBlockSizeKey) }
@@ -271,7 +271,7 @@ public struct URLResourceValues {
     ///
     /// For URLs which refer to the same file inode, the generation identifier will change when the data in the file's data fork is changed (changes to extended attributes or other file system metadata do not change the generation identifier). For URLs which refer to the same directory inode, the generation identifier will change when direct children of that directory are added, removed or renamed (changes to the data of the direct children of that directory will not change the generation identifier). The generation identifier is persistent across system restarts. The generation identifier is tied to a specific document on a specific volume and is not transferred when the document is copied to another volume. This property is not supported by all volumes.
     @available(OSX 10.10, iOS 8.0, *)
-    public var generationIdentifier: protocol<NSCopying, NSCoding, NSSecureCoding, NSObjectProtocol>? { return _get(.generationIdentifierKey) }
+    public var generationIdentifier: (NSCopying & NSCoding & NSSecureCoding & NSObjectProtocol)? { return _get(.generationIdentifierKey) }
     
     /// The document identifier -- a value assigned by the kernel to a document (which can be either a file or directory) and is used to identify the document regardless of where it gets moved on a volume.
     ///

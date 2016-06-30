@@ -58,11 +58,11 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
 
   switch (Tok.getKind()) {
   case tok::kw_Self:
+      ty = parseTypeIdentifier();
+      break;
   case tok::identifier:
-    ty = parseTypeIdentifier();
-    break;
   case tok::kw_protocol:
-    ty = parseTypeComposition();
+    ty = parseTypeIdentifierOrTypeComposition();
     break;
   case tok::l_paren:
     ty = parseTypeTupleBody();
@@ -93,7 +93,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     diagnose(Tok, MessageID);
     return nullptr;
   }
-
+  
   // '.Type', '.Protocol', '?', and '!' still leave us with type-simple.
   while (ty.isNonNull()) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
@@ -297,7 +297,7 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionResult<IdentTypeRepr>();
     }
-
+    
     diagnose(Tok, diag::expected_identifier_for_type);
 
     // If there is a keyword at the start of a new line, we won't want to
@@ -389,63 +389,122 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   return makeParserResult(Status, ITR);
 }
 
-/// parseTypeComposition
-///   
-///   type-composition:
-///     'protocol' '<' type-composition-list? '>'
+/// parseTypeIdentifierOrTypeComposition
+/// - Identifiers and compositions both start with the same identifier
+///   token, parse it and continue constructing a composition if the
+///   next token is '&'
 ///
-///   type-composition-list:
+///   type-composition-deprecated:
+///     'protocol' '<' type-composition-list-deprecated? '>'
+///
+///   type-composition-list-deprecated:
 ///     type-identifier (',' type-identifier)*
 ///
-ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
-  SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
- 
-  // Check for the starting '<'.
-  if (!startsWithLess(Tok)) {
-    diagnose(Tok, diag::expected_langle_protocol);
-    return nullptr;
-  }
-  SourceLoc LAngleLoc = consumeStartingLess();
+///   type-composition:
+///     type-identifier ('&' type-identifier)*
+///
+ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
   
-  // Check for empty protocol composition.
-  if (startsWithGreater(Tok)) {
-    SourceLoc RAngleLoc = consumeStartingGreater();
-    return makeParserResult(new (Context) ProtocolCompositionTypeRepr(
-                                             ArrayRef<IdentTypeRepr *>(),
-                                             ProtocolLoc,
-                                             SourceRange(LAngleLoc,
-                                                         RAngleLoc)));
-  }
-  
-  // Parse the type-composition-list.
-  ParserStatus Status;
-  SmallVector<IdentTypeRepr *, 4> Protocols;
-  do {
-    // Parse the type-identifier.
-    ParserResult<IdentTypeRepr> Protocol = parseTypeIdentifier();
-    Status |= Protocol;
-    if (Protocol.isNonNull())
-      Protocols.push_back(Protocol.get());
-  } while (consumeIf(tok::comma));
-  
-  // Check for the terminating '>'.
-  SourceLoc EndLoc = PreviousLoc;
-  if (startsWithGreater(Tok)) {
-    EndLoc = consumeStartingGreater();
-  } else {
-    if (Status.isSuccess()) {
-      diagnose(Tok, diag::expected_rangle_protocol);
-      diagnose(LAngleLoc, diag::opening_angle);
-      Status.setIsParseError();
+  // handle deprecated case
+  if (Tok.getKind() == tok::kw_protocol) {
+    SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
+    
+    // Check for the starting '<'.
+    if (!startsWithLess(Tok)) {
+      diagnose(Tok, diag::expected_langle_protocol);
+      return nullptr;
     }
+    SourceLoc LAngleLoc = consumeStartingLess();
+    
+    // Check for empty protocol composition.
+    if (startsWithGreater(Tok)) {
+      SourceLoc RAngleLoc = consumeStartingGreater();
+      
+      auto AnyRange = SourceRange(LAngleLoc, RAngleLoc);
+      
+      // warn that 'protocol<>' is depreacted and offer to
+      // repalace with the 'Any' keyword
+      diagnose(LAngleLoc, diag::deprecated_any_composition)
+        .fixItReplace(AnyRange, "Any");
+      
+      return makeParserResult(new (Context) ProtocolCompositionTypeRepr(ArrayRef<IdentTypeRepr *>(),
+                                                                        ProtocolLoc,
+                                                                        AnyRange));
+    }
+    
+    // Parse the type-composition-list.
+    ParserStatus Status;
+    SmallVector<IdentTypeRepr *, 4> Protocols;
+    SmallVector<SourceLoc, 4> Commas; // used offer fixit to convert commas to '&'
+    do {
+      // Parse the type-identifier.
+      ParserResult<IdentTypeRepr> Protocol = parseTypeIdentifier();
+      Status |= Protocol;
+      if (Protocol.isNonNull())
+        Protocols.push_back(Protocol.get());
+      Commas.push_back(Tok.getLoc());
+    } while (consumeIf(tok::comma));
 
-    // Skip until we hit the '>'.
-    EndLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
+    // token after last typename wasn't a comma, don't replace
+    // it with a '&'
+    Commas.pop_back();
+
+    // Check for the terminating '>'.
+    SourceLoc RAngleLoc = PreviousLoc;
+    if (startsWithGreater(Tok)) {
+      RAngleLoc = consumeStartingGreater();
+    } else {
+      if (Status.isSuccess()) {
+        diagnose(Tok, diag::expected_rangle_protocol);
+        diagnose(LAngleLoc, diag::opening_angle);
+        Status.setIsParseError();
+      }
+      
+      // Skip until we hit the '>'.
+      RAngleLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
+    }
+    
+    // replace 'protocol<T1, T2>' with 'T1 & T2'
+    auto Diag = diagnose(ProtocolLoc, diag::deprecated_protocol_composition);
+    auto composition = ProtocolCompositionTypeRepr::create(Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
+
+    Diag.highlight({ProtocolLoc, RAngleLoc});
+    for (auto Comma : Commas)          // remove commas and '<'
+      Diag.fixItReplace(Comma, " & ");
+    Diag // remove 'protocol<'
+      .fixItRemove(ProtocolLoc)
+      .fixItRemove(LAngleLoc)
+      .fixItRemove(RAngleLoc); // remove '>'
+
+    return makeParserResult(Status, composition);
+    
+  } else {
+    SourceLoc FirstTypeLoc = Tok.getLoc();
+    
+    // parse the first type
+    ParserResult<IdentTypeRepr> FirstType = parseTypeIdentifier();
+    if (!Tok.isContextualPunctuator("&"))
+      return FirstType;
+
+    SmallVector<IdentTypeRepr *, 4> Protocols;
+    ParserStatus Status;
+    
+    if (FirstType.isNonNull())
+      Protocols.push_back(FirstType.get());
+    Status |= FirstType;
+    
+    while (Tok.isContextualPunctuator("&")) {
+      consumeToken(); // consume '&'
+      ParserResult<IdentTypeRepr> Protocol = parseTypeIdentifier();
+      Status |= Protocol;
+      if (Protocol.isNonNull())
+        Protocols.push_back(Protocol.get());
+    };
+    
+    return makeParserResult(Status, ProtocolCompositionTypeRepr::create(Context, Protocols, FirstTypeLoc, {FirstTypeLoc, Tok.getLoc()}));
   }
-
-  return makeParserResult(Status, ProtocolCompositionTypeRepr::create(
-      Context, Protocols, ProtocolLoc, SourceRange(LAngleLoc, EndLoc)));
 }
+
 
 /// parseTypeTupleBody
 ///   type-tuple:
@@ -796,12 +855,12 @@ bool Parser::canParseGenericArguments() {
 bool Parser::canParseType() {
   switch (Tok.getKind()) {
   case tok::kw_Self:
+      if (!canParseTypeIdentifier())
+        return false;
+      break;
+  case tok::kw_protocol: // deprecated composition syntax
   case tok::identifier:
-    if (!canParseTypeIdentifier())
-      return false;
-    break;
-  case tok::kw_protocol:
-    if (!canParseTypeComposition())
+    if (!canParseTypeIdentifierOrTypeComposition())
       return false;
     break;
   case tok::l_paren: {
@@ -871,6 +930,23 @@ bool Parser::canParseType() {
   return true;
 }
 
+bool Parser::canParseTypeIdentifierOrTypeComposition() {
+  if (Tok.is(tok::kw_protocol))
+    return canParseTypeComposition();
+  
+  while (true) {
+    if (!canParseTypeIdentifier())
+      return false;
+    
+    if (Tok.isContextualPunctuator("&")) {
+      consumeToken();
+      continue;
+    } else {
+      return true;
+    }
+  }
+}
+
 bool Parser::canParseTypeIdentifier() {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self))
     return false;
@@ -901,6 +977,7 @@ bool Parser::canParseTypeIdentifier() {
   }
 }
 
+/// Can parse the deprecated 'protocol<...>'
 bool Parser::canParseTypeComposition() {
   consumeToken(tok::kw_protocol);
   

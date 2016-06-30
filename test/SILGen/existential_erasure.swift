@@ -16,7 +16,7 @@ struct X: P, Q {
   }
 }
 
-func makePQ() -> protocol<P,Q> { return X() }
+func makePQ() -> P & Q { return X() }
 
 func useP(_ x: P) { }
 

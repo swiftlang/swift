@@ -128,7 +128,7 @@ class Impl: FooProto, AnotherProto {
 }
 
 // CHECK-LABEL: define hidden %swift.type* @_TF7objc_ir27protocolCompositionMetatypeFT1pCS_4Impl_PMPSo12AnotherProtoSo8FooProto_(%C7objc_ir4Impl*) {{.*}} {
-func protocolCompositionMetatype(p: Impl) -> protocol<FooProto, AnotherProto>.Type {
+func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: = getelementptr inbounds %C7objc_ir4Impl, %C7objc_ir4Impl* %0, i32 0, i32 0, i32 0
   // CHECK-NOT: {{retain|release}}
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType(i8* {{%.+}})
@@ -141,7 +141,7 @@ func protocolCompositionMetatype(p: Impl) -> protocol<FooProto, AnotherProto>.Ty
 } // CHECK: }
 
 // CHECK-LABEL: define hidden %swift.type* @_TF7objc_ir28protocolCompositionMetatype2FT1pCS_4Impl_PMPSo12AnotherProtoSo8FooProto_(%C7objc_ir4Impl*) {{.*}} {
-func protocolCompositionMetatype2(p: Impl) -> protocol<FooProto, AnotherProto>.Type {
+func protocolCompositionMetatype2(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: = getelementptr inbounds %C7objc_ir4Impl, %C7objc_ir4Impl* %0, i32 0, i32 0, i32 0
   // CHECK-NOT: {{retain|release}}
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType2(i8* {{%.+}})

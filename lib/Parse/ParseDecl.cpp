@@ -2433,35 +2433,42 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
       continue;
     }
 
-    // Provide a nice error if protocol composition is used.
-    if (Tok.is(tok::kw_protocol) && startsWithLess(peekToken())) {
-      auto compositionResult = parseTypeComposition();
-      Status |= compositionResult;
-      if (auto composition = compositionResult.getPtrOrNull()) {
-        // Record the protocols inside the composition.
-        Inherited.append(composition->getProtocols().begin(),
-                         composition->getProtocols().end());
-
+    auto usesDeprecatedCompositionSyntax = Tok.is(tok::kw_protocol) && startsWithLess(peekToken());
+    
+    auto compositionResult = parseTypeIdentifierOrTypeComposition();
+    Status |= compositionResult;
+    
+    if (auto composition = dyn_cast_or_null<ProtocolCompositionTypeRepr>(compositionResult.getPtrOrNull())) {
+      // Record the protocols inside the composition.
+      Inherited.append(composition->getProtocols().begin(),
+                       composition->getProtocols().end());
+      if (usesDeprecatedCompositionSyntax) {
         // Provide fixits to remove the composition, leaving the types intact.
-        auto angleRange = composition->getAngleBrackets();
-        diagnose(composition->getProtocolLoc(),
+        auto compositionRange = composition->getCompositionRange();
+        diagnose(composition->getStartLoc(),
                  diag::disallowed_protocol_composition)
-            .fixItRemove({composition->getProtocolLoc(), angleRange.Start})
-            .fixItRemove(startsWithGreater(L->getTokenAt(angleRange.End))
-                             ? angleRange.End
-                             : SourceLoc());
+          .highlight({composition->getStartLoc(), compositionRange.End})
+          .fixItRemove({composition->getStartLoc(), compositionRange.Start})
+          .fixItRemove(startsWithGreater(L->getTokenAt(compositionRange.End))
+                     ? compositionRange.End
+                     : SourceLoc());
+      } else {
+        diagnose(composition->getStartLoc(),
+                 diag::disallowed_protocol_composition)
+          .highlight(composition->getCompositionRange());
+        // TODO: Decompose 'A & B & C' list to 'A, B, C'
       }
-
       continue;
+    } else {
+      // Parse the inherited type (which must be a protocol).
+      ParserResult<TypeRepr> Ty = compositionResult;
+      Status |= Ty;
+      // Record the type.
+      if (Ty.isNonNull())
+        Inherited.push_back(Ty.get());
     }
 
-    // Parse the inherited type (which must be a protocol).
-    ParserResult<TypeRepr> Ty = parseTypeIdentifier();
-    Status |= Ty;
-
-    // Record the type.
-    if (Ty.isNonNull())
-      Inherited.push_back(Ty.get());
+    
 
     // Check for a ',', which indicates that there are more protocols coming.
   } while (consumeIf(tok::comma, prevComma));

@@ -138,7 +138,7 @@ func fooFuncWithComment5()
 func redeclaredInMultipleModulesFunc1(_ a: Int32) -> Int32
 
 @available(*, unavailable, message: "Variadic function is unavailable")
-func fooFuncUsingVararg(_ a: Int32, _ varargs: Any...) -> Int32 // This comment should not show without decl.
+func fooFuncUsingVararg(_ a: Int32, _ varargs: protocol<>...) -> Int32 // This comment should not show without decl.
 
 /// Aaa.  FooProtocolBase.  Bbb.
 protocol FooProtocolBase {

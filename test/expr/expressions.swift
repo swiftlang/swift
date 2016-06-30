@@ -229,8 +229,10 @@ func test_lambda() {
 }
 
 func test_lambda2() {
-  // expected-warning @+1 {{result of call is unused}}
-  { () -> protocol<Int> in // expected-error {{non-protocol type 'Int' cannot be used within 'protocol<...>'}}
+  { () -> protocol<Int> in
+    // expected-warning @-1 {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
+    // expected-error @-2 {{non-protocol type 'Int' cannot be used within a protocol composition}}
+    // expected-warning @-3 {{result of call is unused}}
     return 1
   }()
 }
@@ -786,12 +788,12 @@ func inoutTests(_ arr: inout Int) {
 
   // <rdar://problem/23249098>
   func takeAny(_ x: Any) {}
-  takeAny(&x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
+  takeAny(&x) // expected-error{{'&' used with non-inout argument of type 'protocol<>'}}
   func takeManyAny(_ x: Any...) {}
-  takeManyAny(&x) // expected-error{{'&' used with non-inout argument of type 'Any' (aka 'protocol<>')}}
-  takeManyAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
+  takeManyAny(&x) // expected-error{{'&' used with non-inout argument of type 'protocol<>'}}
+  takeManyAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'protocol<>'}}
   func takeIntAndAny(_ x: Int, _ y: Any) {}
-  takeIntAndAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
+  takeIntAndAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'protocol<>'}}
 }
 
 

@@ -7,7 +7,7 @@ import ObjectiveC
 @objc protocol ObjCProto {}
 @objc protocol ObjCProto2 {}
 protocol NonObjCProto {}
-typealias TwoObjCProtos = protocol<ObjCProto, ObjCProto2>
+typealias TwoObjCProtos = ObjCProto & ObjCProto2
 
 func takesProtocol(_ x: Protocol) {}
 

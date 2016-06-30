@@ -1186,7 +1186,7 @@ struct d2800_ProtocolWithAssociatedType1Impl : d2700_ProtocolWithAssociatedType1
 struct GenericParams1<
     StructGenericFoo : FooProtocol,
     StructGenericFooX : FooClass,
-    StructGenericBar : protocol<FooProtocol, BarProtocol>,
+    StructGenericBar : FooProtocol & BarProtocol,
     StructGenericBaz> {
 // PASS_ONE_LINE_TYPE-DAG: {{^}}struct GenericParams1<StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : protocol<BarProtocol, FooProtocol>, StructGenericBaz> {{{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
@@ -1195,7 +1195,7 @@ struct GenericParams1<
   init<
       GenericFoo : FooProtocol,
       GenericFooX : FooClass,
-      GenericBar : protocol<FooProtocol, BarProtocol>,
+      GenericBar : FooProtocol & BarProtocol,
       GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz,
                   d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz)
   {}
@@ -1207,7 +1207,7 @@ struct GenericParams1<
   func genericParams1<
       GenericFoo : FooProtocol,
       GenericFooX : FooClass,
-      GenericBar : protocol<FooProtocol, BarProtocol>,
+      GenericBar : FooProtocol & BarProtocol,
       GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz,
                   d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz)
   {}
@@ -1226,7 +1226,7 @@ struct GenericParams3<T : FooProtocol where T : BarProtocol, T : QuxProtocol> {}
 struct GenericParams4<T : QuxProtocol where T.Qux : FooProtocol> {}
 // PASS_ONE_LINE-DAG: {{^}}struct GenericParams4<T : QuxProtocol where T.Qux : FooProtocol> {{{$}}
 
-struct GenericParams5<T : QuxProtocol where T.Qux : protocol<FooProtocol, BarProtocol>> {}
+struct GenericParams5<T : QuxProtocol where T.Qux : FooProtocol & BarProtocol> {}
 // PREFER_TYPE_PRINTING: {{^}}struct GenericParams5<T : QuxProtocol where T.Qux : protocol<BarProtocol, FooProtocol>> {{{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
 //

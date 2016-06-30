@@ -48,6 +48,6 @@ func existentialMetatypeUpcast1(_ x: PP.Type) -> P.Type {
 // CHECK:         [[OPENED:%.*]] = open_existential_metatype %0
 // CHECK:         [[NEW:%.*]] = init_existential_metatype [[OPENED]]
 // CHECK:         return [[NEW]]
-func existentialMetatypeUpcast2(_ x: protocol<P,Q>.Type) -> P.Type {
+func existentialMetatypeUpcast2(_ x: (P & Q).Type) -> P.Type {
   return x
 }
