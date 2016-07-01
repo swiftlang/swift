@@ -1025,8 +1025,8 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
                                      Type actualArgType,
                                      TypeSubstitutionMap &archetypesMap) {
   // Type visitor doesn't handle unresolved types.
-  if (paramType->is<UnresolvedType>() ||
-      actualArgType->is<UnresolvedType>())
+  if (paramType->hasUnresolvedType() ||
+      actualArgType->hasUnresolvedType())
     return false;
   
   class GenericVisitor : public TypeMatcher<GenericVisitor> {
