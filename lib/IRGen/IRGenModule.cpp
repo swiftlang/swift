@@ -92,11 +92,13 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   case IRGenDebugInfoKind::LineTables:
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
- case IRGenDebugInfoKind::Normal:
+  case IRGenDebugInfoKind::ASTTypes:
+    // TODO: Enable -gmodules for the clang code generator.
+  case IRGenDebugInfoKind::DwarfTypes:
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
-  if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
+  if (Opts.DebugInfoKind > IRGenDebugInfoKind::None) {
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
     CGO.DwarfDebugFlags = Opts.DWARFDebugFlags;
@@ -383,16 +385,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // Only use the new calling conventions on platforms that support it.
   auto Arch = Triple.getArch();
   if (SWIFT_RT_USE_RegisterPreservingCC &&
-      Arch == llvm::Triple::ArchType::aarch64) {
+      Arch == llvm::Triple::ArchType::aarch64)
     RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
-  }
-  else {
+  else
     RegisterPreservingCC = DefaultCC;
-  }
 
-  if (IRGen.Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
+  if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
     DebugInfo = new IRGenDebugInfo(IRGen.Opts, *CI, *this, Module, SF);
-  }
 
   initClangTypeConverter();
 }

@@ -1142,11 +1142,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.DebugInfoKind = IRGenDebugInfoKind::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
       Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+    else if (A->getOption().matches(options::OPT_gdwarf_types))
+      Opts.DebugInfoKind = IRGenDebugInfoKind::DwarfTypes;
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
 
-    if (Opts.DebugInfoKind == IRGenDebugInfoKind::Normal) {
+    if (Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
       ArgStringList RenderedArgs;
       for (auto A : Args)
         A->render(Args, RenderedArgs);

@@ -135,9 +135,9 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   TheCU = DBuilder.createCompileUnit(
       Lang, AbsMainFile, Opts.DebugCompilationDir, Producer, IsOptimized,
       Flags, MajorRuntimeVersion, SplitName,
-      Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables
-          ? llvm::DICompileUnit::LineTablesOnly
-          : llvm::DICompileUnit::FullDebug);
+      Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables
+          ? llvm::DICompileUnit::FullDebug
+          : llvm::DICompileUnit::LineTablesOnly);
   MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile).data());
 
   // Because the swift compiler relies on Clang to setup the Module,
@@ -395,7 +395,7 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
   llvm::DIScope *Parent = getOrCreateScope(ParentScope);
   assert(isa<llvm::DILocalScope>(Parent) && "not a local scope");
 
-  if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
+  if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return Parent;
 
   assert(DS->Parent && "lexical block must have a parent subprogram");
@@ -682,9 +682,9 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   }
 
   CanSILFunctionType FnTy = getFunctionType(SILTy);
-  auto Params = Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables
-    ? nullptr
-    : createParameterTypes(SILTy, DeclCtx);
+  auto Params = Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables
+                    ? createParameterTypes(SILTy, DeclCtx)
+                    : nullptr;
   llvm::DISubroutineType *DIFnTy = DBuilder.createSubroutineType(Params);
   llvm::DITemplateParameterArray TemplateParameters = nullptr;
   llvm::DISubprogram *Decl = nullptr;
@@ -740,7 +740,7 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
 }
 
 void IRGenDebugInfo::emitImport(ImportDecl *D) {
-  if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
+  if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
   swift::Module *M = IGM.Context.getModule(D->getModulePath());
@@ -828,7 +828,7 @@ TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF,
                                       llvm::Value *Metadata,
                                       StringRef Name) {
-  if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
+  if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
   auto TName = BumpAllocatedString(("$swift.type." + Name).str());
@@ -883,7 +883,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
   if (!DS)
     return;
 
-  if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
+  if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
   if (!DbgTy.size)
@@ -1004,7 +1004,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::Constant *Var,
                                                    DebugTypeInfo DbgTy,
                                                    bool IsLocalToUnit,
                                                    Optional<SILLocation> Loc) {
-  if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
+  if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
   llvm::DIType *Ty = getOrCreateType(DbgTy);
