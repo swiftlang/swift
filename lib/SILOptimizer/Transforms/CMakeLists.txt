@@ -13,6 +13,7 @@ set(TRANSFORMS_SOURCES
   Transforms/GenericSpecializer.cpp
   Transforms/MergeCondFail.cpp
   Transforms/PerformanceInliner.cpp
+  Transforms/PrepareForIRGen.cpp
   Transforms/RedundantLoadElimination.cpp
   Transforms/RedundantOverflowCheckRemoval.cpp
   Transforms/ReleaseDevirtualizer.cpp

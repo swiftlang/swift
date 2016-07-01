@@ -387,7 +387,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Try to hoist all releases, including epilogue releases. This should be
   // after FSO.
   PM.addLateReleaseHoisting();
-
+  PM.addPrepareForIRGen();
+  
   PM.runOneIteration();
 
   PM.resetAndRemoveTransformations();
