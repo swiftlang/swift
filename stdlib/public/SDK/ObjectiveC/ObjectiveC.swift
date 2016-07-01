@@ -39,7 +39,7 @@ public struct ObjCBool : Boolean, BooleanLiteralConvertible {
 
 #else
   // Everywhere else it is C/C++'s "Bool"
-  var _value : Bool
+  var _value: Bool
 
   public init(_ value: Bool) {
     self._value = value
@@ -97,7 +97,7 @@ func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
 /// The compiler has special knowledge of this type.
 @_fixed_layout
 public struct Selector : StringLiteralConvertible {
-  var ptr : OpaquePointer
+  var ptr: OpaquePointer
 
   /// Create a selector from a string.
   public init(_ str : String) {
@@ -171,7 +171,7 @@ extension Selector : CustomReflectable {
 
 @_fixed_layout
 public struct NSZone {
-  var pointer : OpaquePointer
+  var pointer: OpaquePointer
 }
 
 // Note: NSZone becomes Zone in Swift 3.

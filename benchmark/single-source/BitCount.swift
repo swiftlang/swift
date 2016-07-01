@@ -18,7 +18,7 @@ import TestsUtils
 
 func countBitSet(_ num: Int) -> Int {
   let bits = sizeof(Int.self) * 8
-  var cnt : Int = 0
+  var cnt: Int = 0
   var mask: Int = 1
   for _ in 0...bits {
     if num & mask != 0 {

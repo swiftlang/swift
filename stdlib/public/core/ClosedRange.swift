@@ -40,7 +40,7 @@ public struct ClosedRangeIndex<Bound> : Comparable
   internal init(_ x: Bound) { _value = .inRange(x) }
   
   internal var _value: _ClosedRangeIndexRepresentation<Bound>
-  internal var _dereferenced : Bound {
+  internal var _dereferenced: Bound {
     switch _value {
     case .inRange(let x): return x
     case .pastEnd: _preconditionFailure("Index out of range")

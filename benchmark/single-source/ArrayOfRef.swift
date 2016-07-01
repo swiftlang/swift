@@ -35,7 +35,7 @@ class ConstructibleArray<T:Constructible> {
 // Reference to a POD class.
 class POD : Constructible {
   typealias Element=Int
-  var x : Int
+  var x: Int
   required init(e:Int) { self.x = e }
 }
 
@@ -50,7 +50,7 @@ class Dummy {}
 // Reference to a reference. The nested reference is shared across elements.
 class CommonRef : Constructible {
   typealias Element=Dummy
-  var d : Dummy
+  var d: Dummy
   required init(e:Dummy) { self.d = e }
 }
 
@@ -85,7 +85,7 @@ func genRefEnumArray() {
 // Struct holding a reference.
 struct S : Constructible {
   typealias Element=Dummy
-  var d : Dummy
+  var d: Dummy
   init(e:Dummy) { self.d = e }
 }
 

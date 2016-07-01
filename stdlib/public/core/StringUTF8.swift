@@ -219,14 +219,14 @@ extension String {
 
       /// True iff the index is at the end of its view or if the next
       /// byte begins a new UnicodeScalar.
-      internal var _isOnUnicodeScalarBoundary : Bool {
+      internal var _isOnUnicodeScalarBoundary: Bool {
         let buffer = UInt32(truncatingBitPattern: _buffer)
         let (codePoint, _) = UTF8._decodeOne(buffer)
         return codePoint != nil || _isAtEnd
       }
 
       /// True iff the index is at the end of its view
-      internal var _isAtEnd : Bool {
+      internal var _isAtEnd: Bool {
         return _buffer == Index._emptyBuffer
           && _coreIndex == _core.endIndex
       }

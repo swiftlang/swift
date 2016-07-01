@@ -5050,15 +5050,15 @@ Swift 2.2
     var x = Int8(-129)
     // error: integer literal overflows when stored into 'Int8'
 
-    var y : Int = 0xFFFF_FFFF_FFFF_FFFF_F
+    var y: Int = 0xFFFF_FFFF_FFFF_FFFF_F
     // error: integer literal overflows when stored into 'Int'
     ```
 
   Overflows in constant integer expressions are also reported by the compiler.
 
     ```swift
-    var x : Int8 = 125
-    var y : Int8 = x + 125
+    var x: Int8 = 125
+    var y: Int8 = x + 125
     // error: arithmetic operation '125 + 125' (on type 'Int8') results in
     //        an overflow
     ```
