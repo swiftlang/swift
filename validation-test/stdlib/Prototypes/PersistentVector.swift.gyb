@@ -490,8 +490,8 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     layout: _PVSparseVectorNodeLayoutParameters
   ) {
     precondition(i >= keyCount && i < 32) // sanity check
-    precondition(childNodePopulationBitmap[i] == false) // sanity check
-    precondition(keyPopulationBitmap[i] == false) // sanity check
+    precondition(!childNodePopulationBitmap[i]) // sanity check
+    precondition(!keyPopulationBitmap[i]) // sanity check
 
     (_keyVector(layout: layout) + keyCount).initialize(with: key)
     (_valueVector(layout: layout) + keyCount).initialize(with: value)
@@ -1135,8 +1135,8 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
     value: Value
   ) {
     precondition(i >= 0 && i < 32) // sanity check
-    precondition(childNodePopulationBitmap[i] == false) // sanity check
-    precondition(keyPopulationBitmap[i] == false) // sanity check
+    precondition(!childNodePopulationBitmap[i]) // sanity check
+    precondition(!keyPopulationBitmap[i]) // sanity check
 
     UnsafeMutablePointer<Key>(
       _childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
@@ -1664,7 +1664,7 @@ struct _PVAnyNodePointer<Key : Hashable, Value>
     case 2:
       return Mirror(reflecting: asCollisionNode)
     default:
-      return Mirror(self, children: [ "unknown tag" : tag ])
+      return Mirror(self, children: ["unknown tag": tag])
     }
   }
 }
@@ -1896,7 +1896,7 @@ PersistentVectorTests.test("sizeof") {
 }
 
 %{
-  TRACE = '''_ message: @autoclosure ()->String = "",
+  TRACE = '''_ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),
     file: String = #file, line: UInt = #line'''
