@@ -9,6 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+import SwiftShims
 
 // TODO: API review
 /// A type representing an error value that can be thrown.
@@ -111,17 +112,12 @@
 public protocol ErrorProtocol {
   var _domain: String { get }
   var _code: Int { get }
-}
-
-extension ErrorProtocol {
-  public var _domain: String {
-    return String(reflecting: self.dynamicType)
-  }
+  var _userInfo: AnyObject? { get }
 }
 
 #if _runtime(_ObjC)
-// Helper functions for the C++ runtime to have easy access to domain and
-// code as Objective-C values.
+// Helper functions for the C++ runtime to have easy access to domain,
+// code, and userInfo as Objective-C values.
 @_silgen_name("swift_stdlib_getErrorDomainNSString")
 public func _stdlib_getErrorDomainNSString<T : ErrorProtocol>(_ x: UnsafePointer<T>)
 -> AnyObject {
@@ -132,6 +128,17 @@ public func _stdlib_getErrorDomainNSString<T : ErrorProtocol>(_ x: UnsafePointer
 public func _stdlib_getErrorCode<T : ErrorProtocol>(_ x: UnsafePointer<T>) -> Int {
   return x.pointee._code
 }
+
+// Helper functions for the C++ runtime to have easy access to domain and
+// code as Objective-C values.
+@_silgen_name("swift_stdlib_getErrorUserInfoNSDictionary")
+public func _stdlib_getErrorUserInfoNSDictionary<T : ErrorProtocol>(_ x: UnsafePointer<T>)
+-> AnyObject? {
+  return x.pointee._userInfo
+}
+
+@_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
+public func _stdlib_getErrorDefaultUserInfo(_ error: ErrorProtocol) -> AnyObject?
 
 // Known function for the compiler to use to coerce `ErrorProtocol` instances
 // to `NSError`.
@@ -154,3 +161,17 @@ public func _errorInMain(_ error: ErrorProtocol) {
 
 @available(*, unavailable, renamed: "ErrorProtocol")
 public typealias ErrorType = ErrorProtocol
+
+extension ErrorProtocol {
+  public var _domain: String {
+    return String(reflecting: self.dynamicType)
+  }
+
+  public var _userInfo: AnyObject? {
+#if _runtime(_ObjC)
+    return _stdlib_getErrorDefaultUserInfo(self)
+#else
+    return nil
+#endif
+  }
+}

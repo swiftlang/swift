@@ -285,6 +285,34 @@ extern "C" NSInteger swift_stdlib_getErrorCode(const OpaqueValue *error,
                                                const Metadata *T,
                                                const WitnessTable *ErrorProtocol);
 
+//@_silgen_name("swift_stdlib_getErrorUserInfoNSDictionary")
+//public func _stdlib_getErrorUserInfoNSDictionary<T : ErrorProtocol>(_ x: UnsafePointer<T>) -> AnyObject
+SWIFT_CC(swift)
+extern "C" NSDictionary *swift_stdlib_getErrorUserInfoNSDictionary(
+                           const OpaqueValue *error,
+                           const Metadata *T,
+                           const WitnessTable *ErrorProtocol);
+
+//@_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
+//public func _stdlib_getErrorDefaultUserInfo<T : ErrorProtocol>(_ x: UnsafePointer<T>) -> AnyObject
+SWIFT_CC(swift) SWIFT_RT_ENTRY_VISIBILITY
+extern "C" NSDictionary *swift_stdlib_getErrorDefaultUserInfo(
+                           const OpaqueValue *error,
+                           const Metadata *T,
+                           const WitnessTable *ErrorProtocol) {
+  typedef SWIFT_CC(swift)
+    NSDictionary *GetDefaultFn(const OpaqueValue *error,
+                               const Metadata *T,
+                               const WitnessTable *ErrorProtocol);
+
+  auto foundationGetDefaultUserInfo = SWIFT_LAZY_CONSTANT(
+        reinterpret_cast<GetDefaultFn*>
+          (dlsym(RTLD_DEFAULT, "swift_Foundation_getErrorDefaultUserInfo")));
+  if (!foundationGetDefaultUserInfo) { return nullptr; }
+
+  return foundationGetDefaultUserInfo(error, T, ErrorProtocol);
+}
+
 /// Take an ErrorProtocol box and turn it into a valid NSError instance.
 SWIFT_CC(swift)
 static id _swift_bridgeErrorProtocolToNSError_(SwiftError *errorObject) {
@@ -302,21 +330,30 @@ static id _swift_bridgeErrorProtocolToNSError_(SwiftError *errorObject) {
   
   NSString *domain = swift_stdlib_getErrorDomainNSString(value, type, witness);
   NSInteger code = swift_stdlib_getErrorCode(value, type, witness);
-  // TODO: user info?
-  
+  NSDictionary *userInfo =
+    swift_stdlib_getErrorUserInfoNSDictionary(value, type, witness);
+
   // The error code shouldn't change, so we can store it blindly, even if
   // somebody beat us to it. The store can be relaxed, since we'll do a
   // store(release) of the domain last thing to publish the initialized
   // NSError.
   errorObject->code.store(code, std::memory_order_relaxed);
 
-  // However, we need to cmpxchg in the domain; if somebody beat us to it,
+  // However, we need to cmpxchg the userInfo; if somebody beat us to it,
+  // we need to release.
+  CFDictionaryRef expectedUserInfo = nullptr;
+  if (!errorObject->userInfo.compare_exchange_strong(expectedUserInfo,
+                                                     (CFDictionaryRef)userInfo,
+                                                     std::memory_order_acq_rel))
+    objc_release(userInfo);
+
+  // We also need to cmpxchg in the domain; if somebody beat us to it,
   // we need to release.
   //
   // Storing the domain must be the LAST THING we do, since it's
   // the signal that the NSError has been initialized.
-  CFStringRef expected = nullptr;
-  if (!errorObject->domain.compare_exchange_strong(expected,
+  CFStringRef expectedDomain = nullptr;
+  if (!errorObject->domain.compare_exchange_strong(expectedDomain,
                                                    (CFStringRef)domain,
                                                    std::memory_order_acq_rel))
     objc_release(domain);

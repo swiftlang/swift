@@ -314,4 +314,143 @@ ErrorProtocolBridgingTests.test("Thrown NSError identity is preserved") {
   }
 }
 
+// Check errors customized via protocol.
+struct MyCustomizedError : ErrorProtocol {
+  let domain: String
+  let code: Int
+}
+
+extension MyCustomizedError : LocalizedError {
+  var errorDescription: String? {
+    return NSLocalizedString("something went horribly wrong", comment: "")
+  }
+
+  var failureReason: String? {
+    return NSLocalizedString("because someone wrote 'throw'", comment: "")
+  }
+
+  var recoverySuggestion: String? {
+    return NSLocalizedString("delete the 'throw'", comment: "")
+  }
+
+  var helpAnchor: String? {
+    return NSLocalizedString("there is no help when writing tests", comment: "")
+  }
+}
+
+extension MyCustomizedError : CustomNSError {
+  var errorDomain: String {
+    return domain
+  }
+
+  /// The error code within the given domain.
+  var errorCode: Int {
+    return code
+  }
+
+  /// The user-info dictionary.
+  var errorUserInfo: [String : AnyObject] {
+    return [ NSURLErrorKey : URL(string: "https://swift.org")! as AnyObject]
+  }
+}
+
+extension MyCustomizedError : RecoverableError {
+  var recoveryOptions: [String] {
+    return ["Delete 'throw'", "Disable the test" ]
+  }
+
+  func attemptRecovery(optionIndex recoveryOptionIndex: Int) -> Bool {
+    return recoveryOptionIndex == 0
+  }
+}
+
+/// Fake definition of the informal protocol
+/// "NSErrorRecoveryAttempting" that we use to poke at the object
+/// produced for a RecoverableError.
+@objc protocol FakeNSErrorRecoveryAttempting {
+  @objc(attemptRecoveryFromError:optionIndex:delegate:didRecoverSelector:contextInfo:)
+  func attemptRecovery(fromError nsError: ErrorProtocol,
+                       optionIndex recoveryOptionIndex: Int,
+                       delegate: AnyObject?,
+                       didRecoverSelector: Selector,
+                       contextInfo: UnsafeMutablePointer<Void>?)
+
+  @objc(attemptRecoveryFromError:optionIndex:)
+  func attemptRecovery(fromError nsError: ErrorProtocol,
+                       optionIndex recoveryOptionIndex: Int) -> Bool
+}
+
+class RecoveryDelegate {
+  let expectedSuccess: Bool
+  let expectedContextInfo: UnsafeMutablePointer<Void>?
+  var called = false
+
+  init(expectedSuccess: Bool,
+       expectedContextInfo: UnsafeMutablePointer<Void>?) {
+    self.expectedSuccess = expectedSuccess
+    self.expectedContextInfo = expectedContextInfo
+  }
+
+  @objc func recover(success: Bool, contextInfo: UnsafeMutablePointer<Void>?) {
+    expectEqual(expectedSuccess, success)
+    expectEqual(expectedContextInfo, contextInfo)
+    called = true
+  }
+}
+
+ErrorProtocolBridgingTests.test("Customizing NSError via protocols") {
+  let error = MyCustomizedError(domain: "custom", code: 12345)
+  let nsError = error as NSError
+
+  // CustomNSError
+  expectEqual("custom", nsError.domain)
+  expectEqual(12345, nsError.code)
+  expectOptionalEqual(URL(string: "https://swift.org")!,
+    nsError.userInfo[NSURLErrorKey] as? URL)
+
+  // LocalizedError
+  expectOptionalEqual("something went horribly wrong",
+    nsError.userInfo[NSLocalizedDescriptionKey] as? String)
+  expectOptionalEqual("because someone wrote 'throw'", 
+    nsError.userInfo[NSLocalizedFailureReasonErrorKey] as? String)
+  expectOptionalEqual("delete the 'throw'",
+    nsError.userInfo[NSLocalizedRecoverySuggestionErrorKey] as? String)
+  expectOptionalEqual("there is no help when writing tests",
+    nsError.userInfo[NSHelpAnchorErrorKey] as? String)
+
+  // RecoverableError
+  expectOptionalEqual(["Delete 'throw'", "Disable the test" ],
+    nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey] as? [String])
+
+  // Directly recover.
+  let attempter = nsError.userInfo[NSRecoveryAttempterErrorKey]! 
+  expectOptionalEqual(attempter.attemptRecovery(fromError: nsError,
+                      optionIndex: 0),
+    true)
+  expectOptionalEqual(attempter.attemptRecovery(fromError: nsError,
+                      optionIndex: 1),
+    false)
+
+  // Recover through delegate.
+  let rd1 = RecoveryDelegate(expectedSuccess: true, expectedContextInfo: nil)
+  expectEqual(false, rd1.called)
+  attempter.attemptRecovery(
+    fromError: nsError,
+    optionIndex: 0,
+    delegate: rd1,
+    didRecoverSelector: #selector(RecoveryDelegate.recover(success:contextInfo:)),
+    contextInfo: nil)
+  expectEqual(true, rd1.called)
+
+  let rd2 = RecoveryDelegate(expectedSuccess: false, expectedContextInfo: nil)
+  expectEqual(false, rd2.called)
+  attempter.attemptRecovery(
+    fromError: nsError,
+    optionIndex: 1,
+    delegate: rd2,
+    didRecoverSelector: #selector(RecoveryDelegate.recover(success:contextInfo:)),
+    contextInfo: nil)
+  expectEqual(true, rd2.called)
+}
+
 runAllTests()

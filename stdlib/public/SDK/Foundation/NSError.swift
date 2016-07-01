@@ -13,6 +13,177 @@
 import CoreFoundation
 import Darwin
 
+/// Describes an error that provides localized messages describing why
+/// an error occurred and provides more information about the error.
+public protocol LocalizedError : ErrorProtocol {
+  /// A localized message describing what error occurred.
+  var errorDescription: String? { get }
+
+  /// A localized message describing the reason for the failure.
+  var failureReason: String? { get }
+
+  /// A localized message describing how one might recover from the failure.
+  var recoverySuggestion: String? { get }
+
+  /// A localized message providing "help" text if the user requests help.
+  var helpAnchor: String? { get }
+}
+
+public extension LocalizedError {
+  var errorDescription: String? { return nil }
+  var failureReason: String? { return nil }
+  var recoverySuggestion: String? { return nil }
+  var helpAnchor: String? { return nil }
+}
+
+@_silgen_name("NS_Swift_performErrorRecoverySelector")
+internal func NS_Swift_performErrorRecoverySelector(
+  delegate: AnyObject?,
+  selector: Selector,
+  success: ObjCBool,
+  contextInfo: UnsafeMutablePointer<Void>?)
+
+/// Class that implements the informal protocol
+/// NSErrorRecoveryAttempting, which is used by NSError when it
+/// attempts recovery from an error.
+class _NSErrorRecoveryAttempter {
+  // FIXME: If we could meaningfully cast the nsError back to RecoverableError,
+  // we wouldn't need to capture this and could use the user-info
+  // domain providers even for recoverable errors.
+  let error: RecoverableError
+
+  init(error: RecoverableError) {
+    self.error = error
+  }
+
+  @objc(attemptRecoveryFromError:optionIndex:delegate:didRecoverSelector:contextInfo:)
+  func attemptRecovery(fromError nsError: NSError,
+                       optionIndex recoveryOptionIndex: Int,
+                       delegate: AnyObject?,
+                       didRecoverSelector: Selector,
+                       contextInfo: UnsafeMutablePointer<Void>?) {
+    error.attemptRecovery(optionIndex: recoveryOptionIndex) { success in
+      NS_Swift_performErrorRecoverySelector(
+        delegate: delegate,
+        selector: didRecoverSelector,
+        success: ObjCBool(success),
+        contextInfo: contextInfo)
+    }
+  }
+
+  @objc(attemptRecoveryFromError:optionIndex:)
+  func attemptRecovery(fromError nsError: NSError,
+                       optionIndex recoveryOptionIndex: Int) -> Bool {
+    return error.attemptRecovery(optionIndex: recoveryOptionIndex)
+  }
+}
+
+/// Describes an error that may be recoverably by presenting several
+/// potential recovery options to the user.
+public protocol RecoverableError : ErrorProtocol {
+  /// Provides a set of possible recovery options to present to the user.
+  var recoveryOptions: [String] { get }
+
+  /// Attempt to recover from this error when the user selected the
+  /// option at the given index. This routine must call resultHandler and
+  /// indicate whether recovery was successful (or not).
+  ///
+  /// This entry point is used for recovery of errors handled at a
+  /// "document" granularity, that do not affect the entire
+  /// application.
+  func attemptRecovery(optionIndex recoveryOptionIndex: Int,
+                       andThen resultHandler: (recovered: Bool) -> Void)
+
+  /// Attempt to recover from this error when the user selected the
+  /// option at the given index. Returns true to indicate
+  /// successful recovery, and false otherwise.
+  ///
+  /// This entry point is used for recovery of errors handled at
+  /// the "application" granularity, where nothing else in the
+  /// application can proceed until the attmpted error recovery
+  /// completes.
+  func attemptRecovery(optionIndex recoveryOptionIndex: Int) -> Bool
+}
+
+public extension RecoverableError {
+  /// By default, implements document-modal recovery via application-model
+  /// recovery.
+  func attemptRecovery(optionIndex recoveryOptionIndex: Int,
+                       andThen resultHandler: (recovered: Bool) -> Void) {
+    resultHandler(recovered: attemptRecovery(optionIndex: recoveryOptionIndex))
+  }
+}
+
+/// Describes an error type that specifically provides a domain, code,
+/// and user-info dictionary.
+public protocol CustomNSError : ErrorProtocol {
+  /// The domain of the error.
+  var errorDomain: String { get }
+
+  /// The error code within the given domain.
+  var errorCode: Int { get }
+
+  /// The user-info dictionary.
+  var errorUserInfo: [String : AnyObject] { get }
+}
+
+public extension ErrorProtocol where Self : CustomNSError {
+  /// Default implementation for customized NSErrors.
+  var _domain: String { return self.errorDomain }
+
+  /// Default implementation for customized NSErrors.
+  var _code: Int { return self.errorCode }
+}
+
+/// Retrieve the default userInfo dictionary for a given error.
+@_silgen_name("swift_Foundation_getErrorDefaultUserInfo")
+public func _swift_Foundation_getErrorDefaultUserInfo(_ error: ErrorProtocol)
+  -> AnyObject? {
+  // If the OS supports value user info value providers, use those
+  // to lazily populate the user-info dictionary for this domain.
+  if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+    // FIXME: This is not implementable until we can recover the
+    // original error from an NSError.
+  }
+
+  // Populate the user-info dictionary 
+  var result: [String : AnyObject]
+
+  // Initialize with custom user-info.
+  if let customNSError = error as? CustomNSError {
+    result = customNSError.errorUserInfo
+  } else {
+    result = [:]
+  }
+
+  if let localizedError = error as? LocalizedError {
+    if let description = localizedError.errorDescription {
+      result[NSLocalizedDescriptionKey] = description as AnyObject
+    }
+    
+    if let reason = localizedError.failureReason {
+      result[NSLocalizedFailureReasonErrorKey] = reason as AnyObject
+    }
+    
+    if let suggestion = localizedError.recoverySuggestion {   
+      result[NSLocalizedRecoverySuggestionErrorKey] = suggestion as AnyObject
+    }
+    
+    if let helpAnchor = localizedError.helpAnchor {   
+      result[NSHelpAnchorErrorKey] = helpAnchor as AnyObject
+    }
+  }
+
+  if let recoverableError = error as? RecoverableError {
+    result[NSLocalizedRecoveryOptionsErrorKey] =
+      recoverableError.recoveryOptions as AnyObject
+    result[NSRecoveryAttempterErrorKey] =
+      _NSErrorRecoveryAttempter(error: recoverableError)
+  }
+
+  return result as AnyObject
+}
+
 // NSError and CFError conform to the standard ErrorProtocol protocol. Compiler
 // magic allows this to be done as a "toll-free" conversion when an NSError
 // or CFError is used as an ErrorProtocol existential.
@@ -20,6 +191,7 @@ import Darwin
 extension NSError : ErrorProtocol {
   public var _domain: String { return domain }
   public var _code: Int { return code }
+  public var _userInfo: AnyObject? { return userInfo as AnyObject }
 }
 
 extension CFError : ErrorProtocol {
@@ -29,6 +201,10 @@ extension CFError : ErrorProtocol {
 
   public var _code: Int {
     return CFErrorGetCode(self)
+  }
+
+  public var _userInfo: AnyObject? {
+    return CFErrorCopyUserInfo(self) as AnyObject?
   }
 }
 
