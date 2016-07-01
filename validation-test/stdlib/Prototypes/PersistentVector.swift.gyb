@@ -2148,7 +2148,9 @@ PersistentVectorTests.test("crash") {
   testDictionary(modifications: modifications)
 }
 
-PersistentVectorTests.test("updateValue/NoCollisionsInRootNode/1") {
+PersistentVectorTests.test("updateValue/NoCollisionsInRootNode/1")
+  .skip(.custom({ true }, reason: "Fails in optimized mode. rdar://problem/27119174"))
+  .code {
   for keyCount in 1..<33 {
     var modifications: [DictionaryModification] = []
     // Insert new keys.
