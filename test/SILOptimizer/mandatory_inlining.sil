@@ -880,7 +880,7 @@ bb0(%0 : $*Self):
 }
 
 // Check that P2_s call can be properly inlined and the resulting witness_method instruction
-// uses the opned archetype from the caller.
+// uses the opened archetype from the caller.
 // CHECK-LABEL: sil hidden @L_start
 // CHECK: open_existential_addr{{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+"\) P2]]
 // CHECK: witness_method $@[[OPENED_ARCHETYPE]], #P2.c!getter.1, %{{[0-9]+}} : $*@[[OPENED_ARCHETYPE]]

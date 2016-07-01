@@ -311,7 +311,7 @@ option(SWIFT_BUILD_SOURCEKIT
     ${SWIFT_BUILD_SOURCEKIT_default})
 
 #
-# Assume a new enough ar to generate the index at construction time.  This avois
+# Assume a new enough ar to generate the index at construction time. This avoids
 # having to invoke ranlib as a secondary command.
 #
 

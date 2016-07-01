@@ -311,7 +311,7 @@ public protocol Integer : ${IntegerBase} {
   var bitWidth : Word { get }
 
   /// Returns the number of bits required to represent the value of `self` in a
-  /// signed type using two's completment representation.
+  /// signed type using two's complement representation.
   /// The minimum value for this property should naturally be 1.
   var minBitsRequiredForSignedRepresentation: Word { get }
 

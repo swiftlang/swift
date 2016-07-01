@@ -32,7 +32,7 @@ using namespace swift;
 using namespace Lowering;
 
 // Collect used open archetypes from a given type into the \p openedArchetypes.
-// \p openedArchetyes is being used as a set  We don't use a real set type here
+// \p openedArchetypes is being used as a set. We don't use a real set type here
 // for performance reasons.
 static void
 collectOpenedArchetypes(CanType Ty,

@@ -375,7 +375,7 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
   SILFunction &F = getBuilder().getFunction();
   // Iterate over and visit all instructions other than the terminator to clone.
   for (auto I = BB->begin(), E = --BB->end(); I != E; ++I) {
-    // Update the set of available opened archetypes with the opned archetypes
+    // Update the set of available opened archetypes with the opened archetypes
     // used by the current instruction.
     doPreProcess(&*I);
     asImpl().visit(&*I);

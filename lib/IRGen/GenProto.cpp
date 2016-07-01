@@ -415,7 +415,7 @@ PolymorphicConvention::getFulfillmentForTypeMetadata(CanType type) const {
 
 void irgen::enumerateGenericParamFulfillments(IRGenModule &IGM,
                                   CanSILFunctionType fnType,
-                                  GenericParamFulfillfmentCallback callback) {
+                                  GenericParamFulfillmentCallback callback) {
   PolymorphicConvention convention(IGM, fnType);
 
   // Check if any requirements were fulfilled by metadata stored inside a

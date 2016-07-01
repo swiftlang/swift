@@ -3874,7 +3874,7 @@ bool Parser::parseDeclSIL() {
       SILOpenedArchetypesTracker OpenedArchetypesTracker(*FunctionState.F);
       SILBuilder B(*FunctionState.F);
       // Track the archetypes just like SILGen. This
-      // is required for adding typedef operands to instrucitons.
+      // is required for adding typedef operands to instructions.
       B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 
       do {
