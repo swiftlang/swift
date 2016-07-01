@@ -197,7 +197,7 @@ extension LazySequenceProtocol {
   }
 }
 
-@available(*, unavailable, renamed: "LazyCollectionProtocol")
+@available(*, unavailable, renamed: "LazySequenceProtocol")
 public typealias LazySequenceType = LazySequenceProtocol
 
 extension LazySequenceProtocol {

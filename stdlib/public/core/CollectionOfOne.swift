@@ -136,7 +136,7 @@ extension CollectionOfOne : CustomReflectable {
 public struct GeneratorOfOne<Element> {}
 
 extension IteratorOverOne {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> IteratorOverOne<Element> {
     Builtin.unreachable()
   }

@@ -366,14 +366,14 @@ extension ReversedRandomAccessCollection {
 }
 
 extension BidirectionalCollection {
-  @available(*, unavailable, renamed: "reversed")
+  @available(*, unavailable, renamed: "reversed()")
   public func reverse() -> ReversedCollection<Self> {
     Builtin.unreachable()
   }
 }
 
 extension RandomAccessCollection {
-  @available(*, unavailable, renamed: "reversed")
+  @available(*, unavailable, renamed: "reversed()")
   public func reverse() -> ReversedRandomAccessCollection<Self> {
     Builtin.unreachable()
   }
@@ -385,7 +385,7 @@ extension LazyCollectionProtocol
   Elements : BidirectionalCollection
 {
 
-  @available(*, unavailable, renamed: "reversed")
+  @available(*, unavailable, renamed: "reversed()")
   public func reverse() -> LazyCollection<
     ReversedCollection<Elements>
   > {
@@ -398,7 +398,7 @@ extension LazyCollectionProtocol
   Self : RandomAccessCollection,
   Elements : RandomAccessCollection
 {
-  @available(*, unavailable, renamed: "reversed")
+  @available(*, unavailable, renamed: "reversed()")
   public func reverse() -> LazyCollection<
     ReversedRandomAccessCollection<Elements>
   > {

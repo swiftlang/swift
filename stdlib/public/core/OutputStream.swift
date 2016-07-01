@@ -553,7 +553,7 @@ public typealias OutputStreamType = OutputStream
 
 extension Streamable {
   @available(*, unavailable, renamed: "write(to:)")
-  public func writeTo<Target : OutputStream>(target: inout Target) {
+  public func writeTo<Target : OutputStream>(_ target: inout Target) {
     Builtin.unreachable()
   }
 }
