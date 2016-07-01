@@ -1239,6 +1239,28 @@ bb(%0 : $*Array<X>, %1 : $@callee_owned (@inout X) -> (@out (), @error ErrorType
   return %r : $()
 }
 
+// CHECK-LABEL: CG of arraysemantics_createUninitialized
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
+// CHECK-NEXT:    Val %2 Esc: R, Succ: (%4.2)
+// CHECK-NEXT:    Val %4 Esc: R, Succ: (%4.1)
+// CHECK-NEXT:    Con %4.1 Esc: R, Succ: %2
+// CHECK-NEXT:    Con %4.2 Esc: R, Succ: %0
+// CHECK-NEXT:    Ret  Esc: R, Succ: %4
+// CHECK-NEXT:  End
+sil @arraysemantics_createUninitialized : $@convention(thin) (@owned X) -> @owned Array<X> {
+bb0(%0 : $X):
+  %1 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
+  %2 = apply %1() : $@convention(thin) () -> @owned AnyObject
+  %3 = function_ref @createUninitialized : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+  %4 = apply %3(%2) : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+  %5 = tuple_extract %4 : $(Array<X>, UnsafeMutablePointer<X>), 0
+  %6 = tuple_extract %4 : $(Array<X>, UnsafeMutablePointer<X>), 1
+  %7 = struct_extract %6 : $UnsafeMutablePointer<X>, #UnsafeMutablePointer._rawValue
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to $*X
+  store %0 to %8 : $*X
+  return %5 : $Array<X>
+}
+
 sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error ErrorType), @inout Array<X>) -> (@out (), @error ErrorType)
 sil [_semantics "array.props.isNativeTypeChecked"] @is_native_type_checked : $@convention(method) (@guaranteed Array<X>) -> Bool
 sil [_semantics "array.check_subscript"] @check_subscript : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
@@ -1251,6 +1273,10 @@ sil [_semantics "array.get_capacity"] @get_capacity : $@convention(method) (@gua
 
 sil [_semantics "pair_no_escaping_closure"] @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
 sil [_semantics "self_no_escaping_closure"] @unsafeWithNotEscapedSelfPointer: $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+sil [_semantics "array.uninitialized"] @createUninitialized : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+
+// A simplified version of swift_bufferAllocate
+sil @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
 
 // CHECK-LABEL: CG of semantics_pair_no_escaping_closure
 // CHECK-NEXT:   Arg %0 Esc: A, Succ:
