@@ -664,11 +664,11 @@ bool IAMInference::validToImportAsProperty(
     // as a getter with no setter, or we cannot be a property
     if (isGet) {
       pairedAccessor = nullptr;
-      return true;
+      setterDecl = nullptr;
+    } else  {
+      // This is set-only as far as we're concerned
+      return false;
     }
-
-    // This is set-only as far as we're concerned
-    return false;
   }
 
   if (!selfIndex)
