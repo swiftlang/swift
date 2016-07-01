@@ -569,6 +569,17 @@ private:
     if (Info.ID == diag::objc_witness_selector_mismatch.ID ||
         Info.ID == diag::witness_non_objc.ID)
       return false;
+    // The following interact badly with the swift migrator by removing @IB*
+    // attributes when there is some unrelated type issue.
+    if (Info.ID == diag::invalid_iboutlet.ID ||
+        Info.ID == diag::iboutlet_nonobjc_class.ID ||
+        Info.ID == diag::iboutlet_nonobjc_protocol.ID ||
+        Info.ID == diag::iboutlet_nonobject_type.ID ||
+        Info.ID == diag::iboutlet_only_mutable.ID ||
+        Info.ID == diag::invalid_ibdesignable_extension.ID ||
+        Info.ID == diag::invalid_ibinspectable.ID ||
+        Info.ID == diag::invalid_ibaction_decl.ID)
+      return false;
 
     if (Kind == DiagnosticKind::Error)
       return true;
