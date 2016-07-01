@@ -27,6 +27,8 @@ config.targets_to_build = "@TARGETS_TO_BUILD@"
 config.variant_triple = "@VARIANT_TRIPLE@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
 config.variant_sdk = "@VARIANT_SDK@"
+config.swift_test_results_dir = \
+    lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"

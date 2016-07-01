@@ -116,11 +116,11 @@ function(_add_variant_c_compile_link_flags)
       "-arch" "${CFLAGS_ARCH}"
       "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks"
       "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
+  endif()
       
-    if(CFLAGS_ANALYZE_CODE_COVERAGE)
-      list(APPEND result "-fprofile-instr-generate"
-                         "-fcoverage-mapping")
-    endif()
+  if(CFLAGS_ANALYZE_CODE_COVERAGE)
+    list(APPEND result "-fprofile-instr-generate"
+                       "-fcoverage-mapping")
   endif()
 
   _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)

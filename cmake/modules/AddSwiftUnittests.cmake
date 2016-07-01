@@ -42,11 +42,6 @@ function(add_swift_unittest test_dirname)
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -Xlinker -rpath -Xlinker ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx")
-
-    if(SWIFT_ANALYZE_CODE_COVERAGE)
-      set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
-        LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
-    endif()
   endif()
 
   if(SWIFT_ENABLE_GOLD_LINKER AND
@@ -57,6 +52,11 @@ function(add_swift_unittest test_dirname)
   if(SWIFT_ENABLE_LLD_LINKER)
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -fuse-ld=lld")
+  endif()
+
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
+      LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
   endif()
 endfunction()
 

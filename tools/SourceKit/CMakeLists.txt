@@ -249,11 +249,10 @@ macro(add_sourcekit_executable name)
       set_target_properties(${name}
         PROPERTIES
         LINK_FLAGS "-Wl,-exported_symbol,_main")
-
-      if(SWIFT_ANALYZE_CODE_COVERAGE)
-        set_property(TARGET "${name}" APPEND_STRING PROPERTY
-          LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
-      endif()
+    endif()
+    if(SWIFT_ANALYZE_CODE_COVERAGE)
+      set_property(TARGET "${name}" APPEND_STRING PROPERTY
+        LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
     endif()
   endif()
   add_sourcekit_default_compiler_flags("${name}")
