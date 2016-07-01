@@ -5,6 +5,10 @@ set(swift_stdlib_unittest_framework_depends)
 set(swift_stdlib_unittest_compile_flags
   "-Xfrontend" "-disable-objc-attr-requires-foundation-module")
 
+if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
+  list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER")
+endif()
+
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   list(APPEND swift_stdlib_unittest_platform_sources
     GetOSVersion.mm)
