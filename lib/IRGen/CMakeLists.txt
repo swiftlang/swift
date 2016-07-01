@@ -35,6 +35,7 @@ add_swift_library(swiftIRGen STATIC
   IRGenSIL.cpp
   Linking.cpp
   LocalTypeData.cpp
+  StackAllocation.cpp
   StructLayout.cpp
   SwiftTargetInfo.cpp
   TypeLayoutVerifier.cpp

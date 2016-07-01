@@ -65,6 +65,51 @@ FUNCTION(ProjectBox, swift_projectBox, DefaultCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+FUNCTION(StackAllocC, swift_stackAllocC, DefaultCC,
+         RETURNS(OpaquePtrTy),
+         ARGS(Int8PtrTy->getPointerTo(), Int8PtrTy, SizeTy, TypeMetadataPtrTy,
+              OpaquePtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(StackAllocA, swift_stackAllocA, DefaultCC,
+         RETURNS(OpaquePtrTy),
+         ARGS(Int8PtrTy->getPointerTo(), Int8PtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(StackAllocCc, swift_stackAllocCc, DefaultCC,
+         RETURNS(OpaquePtrPairTy),
+         ARGS(Int8PtrTy->getPointerTo(), Int8PtrTy, SizeTy, TypeMetadataPtrTy,
+              OpaquePtrTy, OpaquePtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(StackAllocCA, swift_stackAllocCA, DefaultCC,
+         RETURNS(OpaquePtrPairTy),
+         ARGS(Int8PtrTy->getPointerTo(), Int8PtrTy, SizeTy, TypeMetadataPtrTy,
+              OpaquePtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(StackAllocCa, swift_stackAllocCa, DefaultCC,
+         RETURNS(OpaquePtrPairTy),
+         ARGS(Int8PtrTy->getPointerTo(), Int8PtrTy, SizeTy, TypeMetadataPtrTy,
+              OpaquePtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(StackAllocAA, swift_stackAllocAA, DefaultCC,
+         RETURNS(OpaquePtrPairTy),
+         ARGS(Int8PtrTy->getPointerTo(), Int8PtrTy, SizeTy, TypeMetadataPtrTy,
+              TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(StackAllocAa, swift_stackAllocAa, DefaultCC,
+         RETURNS(OpaquePtrPairTy),
+         ARGS(Int8PtrTy->getPointerTo(), Int8PtrTy, SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(StackDealloc, swift_stackDealloc, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy->getPointerTo(0)),
+         ATTRS(NoUnwind))
+
 // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocObject, swift_allocObject,
          _swift_allocObject, _swift_allocObject_, RegisterPreservingCC,

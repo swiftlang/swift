@@ -1421,6 +1421,8 @@ void IRGenSILFunction::emitSILFunction() {
     if (!visitedBlocks.count(&bb))
       LoweredBBs[&bb].bb->eraseFromParent();
 
+  StackAlloc.finish();
+  
   assert(EmissionNotes.empty() &&
          "didn't claim emission notes for all instructions!");
 }
@@ -2335,6 +2337,9 @@ static void emitReturnInst(IRGenSILFunction &IGF,
 }
 
 void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
+  
+  StackAlloc.functionExit();
+  
   Explosion result = getLoweredExplosion(i->getOperand());
 
   // Implicitly autorelease the return value if the function's result
@@ -2351,6 +2356,9 @@ void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
 }
 
 void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
+
+  StackAlloc.functionExit();
+
   // Store the exception to the error slot.
   llvm::Value *exn = getLoweredSingletonExplosion(i->getOperand());
 
@@ -3513,18 +3521,23 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 # endif
 
   (void) Decl;
+  
+  
+  Address optimizedAddr = StackAlloc.allocStack(i);
+  if (optimizedAddr.isValid()) {
+    setLoweredAddress(i, optimizedAddr);
+    return;
+  }
+  
   // If a dynamic alloc_stack is immediately initialized by a copy_addr
   // operation, we can combine the allocation and initialization using an
   // optimized value witness.
   if (tryDeferFixedSizeBufferInitialization(*this, i, type, Address(), dbgname))
     return;
 
-  auto addr = type.allocateStack(*this,
-                                 i->getElementType(),
-                                 dbgname);
+  auto addr = type.allocateStack(*this, i->getElementType(), dbgname);
 
   emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
-  
   setLoweredContainedAddress(i, addr);
 }
 
@@ -3559,6 +3572,9 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
+  if (StackAlloc.deallocStack(i))
+    return;
+
   auto allocatedType = i->getOperand()->getType();
   const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
   Address container = getLoweredContainerOfAddress(i->getOperand());
@@ -4519,6 +4535,10 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   SILType addrTy = i->getSrc()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
   Address src = getLoweredAddress(i->getSrc());
+  
+  if (StackAlloc.copyAddr(i, src))
+    return;
+  
   // See whether we have a deferred fixed-size buffer initialization.
   auto &loweredDest = getLoweredValue(i->getDest());
   if (loweredDest.isUnallocatedAddressInBuffer()) {
@@ -4552,11 +4572,15 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
 }
 
 static DeallocStackInst *
-findPairedDeallocStackForDestroyAddr(DestroyAddrInst *destroyAddr) {
+findPairedDeallocStackForDestroyAddr(DestroyAddrInst *destroyAddr,
+                                     const StackAllocation &StackAlloc) {
   // This peephole only applies if the address being destroyed is the
   // result of an alloc_stack.
   auto allocStack = dyn_cast<AllocStackInst>(destroyAddr->getOperand());
   if (!allocStack) return nullptr;
+  
+  if (StackAlloc.noDeallocNeededFor(allocStack))
+    return nullptr;
 
   for (auto inst = &*std::next(destroyAddr->getIterator()); !isa<TermInst>(inst);
        inst = &*std::next(inst->getIterator())) {
@@ -4587,7 +4611,7 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   if (!isa<FixedTypeInfo>(addrTI)) {
     // If we can find a matching dealloc stack, just set an emission note
     // on it; that will cause it to destroy the current value.
-    if (auto deallocStack = findPairedDeallocStackForDestroyAddr(i)) {
+    if (auto deallocStack = findPairedDeallocStackForDestroyAddr(i, StackAlloc)) {
       addEmissionNote(deallocStack);
       return;
     }

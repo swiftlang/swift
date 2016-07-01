@@ -282,6 +282,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
                   ->getPointerTo(DefaultAS);
 
+  OpaquePtrPairTy = createStructType(*this, "swift.opaque_pair", {
+    OpaquePtrTy,
+    OpaquePtrTy,
+  });
+
   ProtocolConformanceRecordTy
     = createStructType(*this, "swift.protocol_conformance", {
       RelativeAddressTy,

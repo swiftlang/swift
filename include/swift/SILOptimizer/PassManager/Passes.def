@@ -179,6 +179,8 @@ PASS(PerformanceConstantPropagation, "performance-constant-propagation",
      "Propagate constants and do not emit diagnostics")
 PASS(PredictableMemoryOptimizations, "predictable-memopt",
      "Predictable early memory optimizations")
+PASS(PrepareForIRGen, "prepare-for-irgen",
+     "Perform peephole optimizations before IRGen")
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "Devirtualize release-instructions")
 PASS(RetainSinking, "retain-sinking",
