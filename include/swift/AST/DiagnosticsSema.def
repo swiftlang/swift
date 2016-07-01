@@ -459,7 +459,7 @@ ERROR(sema_no_import_repl,none,
 NOTE(sema_no_import_no_sdk,none,
      "did you forget to set an SDK using -sdk or SDKROOT?", ())
 NOTE(sema_no_import_no_sdk_xcrun,none,
-     "use \"xcrun -sdk macosx swiftc\" to select the default OS X SDK "
+     "use \"xcrun swiftc\" to select the default macOS SDK "
      "installed with Xcode", ())
 WARNING(sema_import_current_module,none,
         "this file is part of module %0; ignoring import", (Identifier))
