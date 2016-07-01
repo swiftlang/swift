@@ -21,7 +21,7 @@ func createSelector(foo: Foo) -> Selector {
 
 // CHECK-LABEL: sil hidden @{{.*}}createGetterSelector
 func createGetterSelector() -> Selector {
-  // CHECK: string_literal objc_selector "isProperty"
+  // CHECK: string_literal objc_selector "property"
   return #selector(getter: Foo.isProperty)
 }
 

@@ -667,7 +667,8 @@ private:
     // Handle custom accessor names.
     llvm::SmallString<64> buffer;
     if (hasReservedName ||
-        VD->getObjCGetterSelector() != ObjCSelector(ctx, 0, { objCName })) {
+        VD->getObjCGetterSelector() !=
+          VarDecl::getDefaultObjCGetterSelector(ctx, objCName)) {
       os << ", getter=" << VD->getObjCGetterSelector().getString(buffer);
     }
     if (isSettable) {
