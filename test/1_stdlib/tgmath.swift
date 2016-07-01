@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-#if os(Linux) || os(FreeBSD) || os(Android)
+#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
   import Glibc
   // FIXME: this is a quick hack for non Darwin platforms
   // where they doesn't have CoreGraphics module.

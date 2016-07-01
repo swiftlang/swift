@@ -13,7 +13,7 @@
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
 #endif
 
@@ -284,7 +284,9 @@ internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   return _NSGetEnviron().pointee
 #elseif os(FreeBSD)
-  return environ;
+  return environ
+#elseif os(PS4)
+  return environ
 #elseif os(Android)
   return environ
 #else
