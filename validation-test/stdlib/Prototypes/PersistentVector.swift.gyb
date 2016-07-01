@@ -1964,9 +1964,9 @@ struct UnittestDictionary<Key : Equatable, Value> {
 
   subscript(key: Key) -> Value? {
     get {
-      for (existingKey, exstingValue) in _elements {
+      for (existingKey, existingValue) in _elements {
         if key == existingKey {
-          return exstingValue
+          return existingValue
         }
       }
       return nil

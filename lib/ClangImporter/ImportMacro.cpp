@@ -398,7 +398,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                                  clang::APValue(value),
                                  ConstantConvertKind::Coerce, /*static=*/false,
                                  ClangN);
-    // Check for a expression of the form (FLAG1 | FLAG2), (FLAG1 & FLAG2),
+    // Check for an expression of the form (FLAG1 | FLAG2), (FLAG1 & FLAG2),
     // (FLAG1 || FLAG2), or (FLAG1 || FLAG2)
     } else if (tokenI[0].is(clang::tok::identifier) &&
                isBinaryOperator(tokenI[1]) &&

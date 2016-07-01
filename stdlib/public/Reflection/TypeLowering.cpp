@@ -847,7 +847,7 @@ class EnumTypeInfoBuilder {
   bool Invalid;
 
   const TypeRef *getCaseTypeRef(FieldTypeInfo Case) {
-    // An indirect case is like a payload case with an agument type
+    // An indirect case is like a payload case with an argument type
     // of Builtin.NativeObject.
     if (Case.Indirect)
       return TC.getNativeObjectTypeRef();

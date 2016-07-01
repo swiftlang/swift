@@ -3226,7 +3226,7 @@ public:
     }
 
     // Visit all basic blocks that were not visited during the RPOT traversal,
-    // e.g. unrechable basic blocks.
+    // e.g. unreachable basic blocks.
     for (auto &BB : *F) {
       if (VisitedBBs.count(&BB))
         continue;
@@ -3288,7 +3288,7 @@ public:
     visitSILBasicBlocks(F);
 
     // Verify archetypes after all basic blocks are visited,
-    // because we build the map of archteypes as we visit the
+    // because we build the map of archetypes as we visit the
     // instructions.
     verifyOpenedArchetypes(F);
   }

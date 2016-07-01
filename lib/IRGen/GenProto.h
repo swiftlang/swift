@@ -228,14 +228,14 @@ namespace irgen {
     }
   };
 
-  using GenericParamFulfillfmentCallback =
+  using GenericParamFulfillmentCallback =
     llvm::function_ref<void(CanType genericParamType,
                             const MetadataSource &source,
                             const MetadataPath &path)>;
 
   void enumerateGenericParamFulfillments(IRGenModule &IGM,
-                                         CanSILFunctionType fnType,
-                                  GenericParamFulfillfmentCallback callback);
+    CanSILFunctionType fnType,
+    GenericParamFulfillmentCallback callback);
 
 } // end namespace irgen
 } // end namespace swift
