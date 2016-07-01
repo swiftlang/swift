@@ -108,7 +108,7 @@ class PrintMetadataSource
     return OS;
   }
 
-  void printRec(const MetadataSource *MS) {
+  void printRec(const reflection::MetadataSource *MS) {
     OS << "\n";
 
     Indent += 2;
@@ -612,42 +612,47 @@ public:
       SourceMap.push_back({BindingType->getCanonicalType(), Source});
     }
 
-    PolymorphicConvention Convention(IGM, OrigCalleeType);
-
-    using SourceKind = PolymorphicConvention::SourceKind;
-
     // Check if any requirements were fulfilled by metadata stored inside a
     // captured value.
-    auto GenericSig = OrigCalleeType->getGenericSignature();
-    auto SubstMap = GenericSig->getSubstitutionMap(Subs);
-    auto Generics = GenericSig->getGenericParams();
 
-    for (auto GenericParam : Generics) {
-      auto GenericParamType = GenericParam->getCanonicalType();
+    auto SubstMap =
+      OrigCalleeType->getGenericSignature()->getSubstitutionMap(Subs);
 
-      auto Fulfillment
-        = Convention.getFulfillmentForTypeMetadata(GenericParamType);
+    enumerateGenericParamFulfillments(IGM, OrigCalleeType,
+        [&](CanType GenericParam,
+            const irgen::MetadataSource &Source,
+            const MetadataPath &Path) {
 
-      if (Fulfillment != nullptr) {
-        auto ConventionSource = Convention.getSource(Fulfillment->SourceIndex);
+      const reflection::MetadataSource *Root;
+      switch (Source.getKind()) {
+      case irgen::MetadataSource::Kind::SelfMetadata:
+      case irgen::MetadataSource::Kind::SelfWitnessTable:
+        // Handled as part of bindings
+        return;
 
-        if (ConventionSource.getKind() == SourceKind::SelfMetadata ||
-            ConventionSource.getKind() == SourceKind::SelfWitnessTable) {
-          // Handled as part of bindings
-          continue;
-        }
+      case irgen::MetadataSource::Kind::GenericLValueMetadata:
+        // FIXME?
+        return;
 
-        // The metadata might be reached via a non-trivial path (eg,
-        // dereferencing an isa pointer or a generic argument). Record
-        // the path. We assume captured values map 1-1 with function
-        // parameters.
-        auto Root = ConventionSource.getMetadataSource(SourceBuilder);
-        auto Src = Fulfillment->Path.getMetadataSource(SourceBuilder, Root);
+      case irgen::MetadataSource::Kind::ClassPointer:
+        Root = SourceBuilder.createReferenceCapture(Source.getParamIndex());
+        break;
 
-        auto SubstType = Caller.mapTypeOutOfContext(SubstMap[GenericParam]);
-        SourceMap.push_back({SubstType->getCanonicalType(), Src});
+      case irgen::MetadataSource::Kind::Metadata:
+        Root = SourceBuilder.createMetadataCapture(Source.getParamIndex());
+        break;
       }
-    }
+
+      // The metadata might be reached via a non-trivial path (eg,
+      // dereferencing an isa pointer or a generic argument). Record
+      // the path. We assume captured values map 1-1 with function
+      // parameters.
+      auto Src = Path.getMetadataSource(SourceBuilder, Root);
+
+      auto SubstType =
+        Caller.mapTypeOutOfContext(SubstMap[GenericParam.getPointer()]);
+      SourceMap.push_back({SubstType->getCanonicalType(), Src});
+    });
 
     return SourceMap;
   }
