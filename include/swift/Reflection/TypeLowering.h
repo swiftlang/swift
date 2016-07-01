@@ -36,11 +36,17 @@ class BuiltinTypeDescriptor;
 
 // Defined in TypeLowering.cpp, not public -- they're friends below
 class LowerType;
+class EnumTypeInfoBuilder;
 class RecordTypeInfoBuilder;
 class ExistentialTypeInfoBuilder;
 
 enum class RecordKind : unsigned {
+  Invalid,
+
+  // A Swift tuple type.
   Tuple,
+
+  // A Swift struct type.
   Struct,
 
   // An enum with no payload cases. The record will have no fields, but
@@ -50,6 +56,10 @@ enum class RecordKind : unsigned {
   // An enum with a single payload case. The record consists of a single
   // field, being the enum payload.
   SinglePayloadEnum,
+
+  // An enum with multiple payload cases. The record consists of a multiple
+  // fields, one for each enum payload.
+  MultiPayloadEnum,
 
   // A Swift-native function is always a function pointer followed by a
   // retainable, nullable context pointer.
@@ -237,6 +247,7 @@ public:
 
 private:
   friend class swift::reflection::LowerType;
+  friend class swift::reflection::EnumTypeInfoBuilder;
   friend class swift::reflection::RecordTypeInfoBuilder;
   friend class swift::reflection::ExistentialTypeInfoBuilder;
 
@@ -272,7 +283,7 @@ private:
 /// tuples, structs, thick functions, etc.
 class RecordTypeInfoBuilder {
   TypeConverter &TC;
-  unsigned Size, Alignment, Stride, NumExtraInhabitants;
+  unsigned Size, Alignment, NumExtraInhabitants;
   RecordKind Kind;
   std::vector<FieldInfo> Fields;
   bool Empty;
@@ -280,7 +291,7 @@ class RecordTypeInfoBuilder {
 
 public:
   RecordTypeInfoBuilder(TypeConverter &TC, RecordKind Kind)
-    : TC(TC), Size(0), Alignment(1), Stride(0), NumExtraInhabitants(0),
+    : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
       Kind(Kind), Empty(true), Invalid(false) {}
 
   bool isInvalid() const {
@@ -289,7 +300,10 @@ public:
 
   unsigned addField(unsigned fieldSize, unsigned fieldAlignment,
                     unsigned numExtraInhabitants);
+
+  // Add a field of a record type, such as a struct.
   void addField(const std::string &Name, const TypeRef *TR);
+
   const RecordTypeInfo *build();
 
   unsigned getNumFields() const {
@@ -298,13 +312,6 @@ public:
 
   unsigned getFieldOffset(unsigned Index) const {
     return Fields[Index].Offset;
-  }
-
-  void setNumExtraInhabitants(unsigned numExtraInhabitants) {
-    // We can only take away extra inhabitants while performing
-    // record layout, never add new ones.
-    assert(numExtraInhabitants <= NumExtraInhabitants);
-    NumExtraInhabitants = numExtraInhabitants;
   }
 };
 

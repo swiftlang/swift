@@ -42,6 +42,9 @@
 // CHECK: rect: __C.CGRect
 // CHECK: (struct __C.CGRect)
 
+// CHECK: TypesToReflect.OP
+// CHECK: -----------------
+
 // CHECK: __ObjC.Bundle
 // CHECK: ---------------
 // CHECK: __ObjC.NSURL

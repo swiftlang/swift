@@ -72,6 +72,10 @@ typedef enum swift_layout_kind {
   // field, being the enum payload.
   SWIFT_SINGLE_PAYLOAD_ENUM,
 
+  // An enum with multiple payload cases. The record consists of a multiple
+  // fields, one for each enum payload.
+  SWIFT_MULTI_PAYLOAD_ENUM,
+
   SWIFT_THICK_FUNCTION,
 
   SWIFT_OPAQUE_EXISTENTIAL,

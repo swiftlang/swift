@@ -24,6 +24,12 @@
 
 #include <iostream>
 
+#ifdef DEBUG_TYPE_LOWERING
+  #define DEBUG(expr) expr;
+#else
+  #define DEBUG(expr)
+#endif
+
 [[noreturn]]
 static void unreachable(const char *Message) {
   std::cerr << "fatal error: " << Message << "\n";
@@ -107,6 +113,9 @@ public:
     case TypeInfoKind::Record: {
       auto &RecordTI = cast<RecordTypeInfo>(TI);
       switch (RecordTI.getRecordKind()) {
+      case RecordKind::Invalid:
+        printHeader("invalid");
+        break;
       case RecordKind::Struct:
         printHeader("struct");
         break;
@@ -115,6 +124,9 @@ public:
         break;
       case RecordKind::SinglePayloadEnum:
         printHeader("single_payload_enum");
+        break;
+      case RecordKind::MultiPayloadEnum:
+        printHeader("multi_payload_enum");
         break;
       case RecordKind::Tuple:
         printHeader("tuple");
@@ -233,6 +245,7 @@ class ExistentialTypeInfoBuilder {
 
       const FieldDescriptor *FD = TC.getBuilder().getFieldTypeInfo(P);
       if (FD == nullptr) {
+        DEBUG(std::cerr << "No field descriptor: "; P->dump())
         Invalid = true;
         continue;
       }
@@ -252,6 +265,7 @@ class ExistentialTypeInfoBuilder {
         case FieldDescriptorKind::ObjCClass:
         case FieldDescriptorKind::Struct:
         case FieldDescriptorKind::Enum:
+        case FieldDescriptorKind::MultiPayloadEnum:
         case FieldDescriptorKind::Class:
           Invalid = true;
           continue;
@@ -268,6 +282,7 @@ public:
     if (auto *P = dyn_cast<const ProtocolTypeRef>(TR)) {
       Protocols.push_back(P);
     } else {
+      DEBUG(std::cerr << "Not a protocol: "; TR->dump())
       Invalid = true;
     }
   }
@@ -279,8 +294,10 @@ public:
       return nullptr;
 
     if (ObjC) {
-      if (WitnessTableCount > 0)
+      if (WitnessTableCount > 0) {
+        DEBUG(std::cerr << "@objc existential with witness tables\n");
         return nullptr;
+      }
 
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Unknown);
@@ -309,8 +326,10 @@ public:
       break;
     case ExistentialTypeRepresentation::Opaque: {
       auto *TI = TC.getTypeInfo(TC.getRawPointerTypeRef());
-      if (TI == nullptr)
+      if (TI == nullptr) {
+        DEBUG(std::cerr << "No TypeInfo for RawPointer\n");
         return nullptr;
+      }
 
       // Non-class existentials consist of a three-word buffer,
       // value metadata, and finally zero or more witness tables.
@@ -338,8 +357,10 @@ public:
       return nullptr;
 
     if (ObjC) {
-      if (WitnessTableCount > 0)
+      if (WitnessTableCount > 0) {
+        DEBUG(std::cerr << "@objc existential with witness tables\n");
         return nullptr;
+      }
 
       return TC.getAnyMetatypeTypeInfo();
     }
@@ -369,9 +390,6 @@ unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
   // Update the aggregate alignment
   Alignment = std::max(Alignment, fieldAlignment);
 
-  // Re-calculate the stride
-  Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
-
   // The extra inhabitants of a record are the same as the extra
   // inhabitants of the first field of the record.
   if (Empty) {
@@ -386,6 +404,7 @@ void RecordTypeInfoBuilder::addField(const std::string &Name,
                                      const TypeRef *TR) {
   const TypeInfo *TI = TC.getTypeInfo(TR);
   if (TI == nullptr) {
+    DEBUG(std::cerr << "No TypeInfo for field type: "; TR->dump());
     Invalid = true;
     return;
   }
@@ -399,6 +418,9 @@ void RecordTypeInfoBuilder::addField(const std::string &Name,
 const RecordTypeInfo *RecordTypeInfoBuilder::build() {
   if (Invalid)
     return nullptr;
+
+  // Calculate the stride
+  unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
 
   return TC.makeTypeInfo<RecordTypeInfo>(
       Size, Alignment, Stride,
@@ -429,8 +451,10 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
   // Weak references do not have any extra inhabitants.
 
   auto *BuiltinTI = Builder.getBuiltinTypeInfo(TR);
-  if (BuiltinTI == nullptr)
+  if (BuiltinTI == nullptr) {
+    DEBUG(std::cerr << "No TypeInfo for reference type: "; TR->dump());
     return nullptr;
+  }
 
   unsigned numExtraInhabitants = BuiltinTI->NumExtraInhabitants;
   if (Kind == ReferenceKind::Weak)
@@ -454,8 +478,10 @@ TypeConverter::getThinFunctionTypeInfo() {
 
   auto *descriptor = getBuilder().getBuiltinTypeInfo(
       getThinFunctionTypeRef());
-  if (descriptor == nullptr)
+  if (descriptor == nullptr) {
+    DEBUG(std::cerr << "No TypeInfo for function type\n");
     return nullptr;
+  }
 
   ThinFunctionTI = makeTypeInfo<BuiltinTypeInfo>(descriptor);
 
@@ -488,8 +514,10 @@ TypeConverter::getAnyMetatypeTypeInfo() {
 
   auto *descriptor = getBuilder().getBuiltinTypeInfo(
       getAnyMetatypeTypeRef());
-  if (descriptor == nullptr)
+  if (descriptor == nullptr) {
+    DEBUG(std::cerr << "No TypeInfo for metatype type\n");
     return nullptr;
+  }
 
   AnyMetatypeTI = makeTypeInfo<BuiltinTypeInfo>(descriptor);
 
@@ -811,6 +839,132 @@ static unsigned getNumTagBytes(size_t size, unsigned emptyCases,
           numTags < 65536 ? 2 : 4);
 }
 
+class EnumTypeInfoBuilder {
+  TypeConverter &TC;
+  unsigned Size, Alignment, NumExtraInhabitants;
+  RecordKind Kind;
+  std::vector<FieldInfo> Cases;
+  bool Invalid;
+
+  const TypeRef *getCaseTypeRef(FieldTypeInfo Case) {
+    // An indirect case is like a payload case with an agument type
+    // of Builtin.NativeObject.
+    if (Case.Indirect)
+      return TC.getNativeObjectTypeRef();
+
+    return Case.TR;
+  }
+
+  void addCase(const std::string &Name, const TypeRef *TR,
+               const TypeInfo *TI) {
+    if (TI == nullptr) {
+      DEBUG(std::cerr << "No TypeInfo for case type: "; TR->dump());
+      Invalid = true;
+      return;
+    }
+
+    Size = std::max(Size, TI->getSize());
+    Alignment = std::max(Alignment, TI->getAlignment());
+
+    Cases.push_back({Name, /*offset=*/0, TR, *TI});
+  }
+
+public:
+  EnumTypeInfoBuilder(TypeConverter &TC)
+    : TC(TC), Size(0), Alignment(0), NumExtraInhabitants(0),
+      Kind(RecordKind::Invalid), Invalid(false) {}
+
+  const TypeInfo *build(const TypeRef *TR, const FieldDescriptor *FD) {
+    // Sort enum into payload and no-payload cases.
+    unsigned NoPayloadCases = 0;
+    std::vector<FieldTypeInfo> PayloadCases;
+
+    for (auto Case : TC.getBuilder().getFieldTypeRefs(TR, FD)) {
+      if (Case.TR == nullptr) {
+        NoPayloadCases++;
+        continue;
+      }
+
+      PayloadCases.push_back(Case);
+    }
+
+    // NoPayloadEnumImplStrategy
+    if (PayloadCases.empty()) {
+      Kind = RecordKind::NoPayloadEnum;
+      Size += getNumTagBytes(/*payloadSize=*/0,
+                             NoPayloadCases,
+                             /*payloadCases=*/0);
+
+    // SinglePayloadEnumImplStrategy
+    } else if (PayloadCases.size() == 1) {
+      auto *CaseTR = getCaseTypeRef(PayloadCases[0]);
+      auto *CaseTI = TC.getTypeInfo(CaseTR);
+
+      // An enum consisting of a single payload case and nothing else
+      // is lowered as the payload type.
+      if (NoPayloadCases == 0)
+        return CaseTI;
+
+      Kind = RecordKind::SinglePayloadEnum;
+      addCase(PayloadCases[0].Name, CaseTR, CaseTI);
+
+      // Below logic should match the runtime function
+      // swift_initEnumValueWitnessTableSinglePayload().
+      NumExtraInhabitants = CaseTI->getNumExtraInhabitants();
+      if (NumExtraInhabitants >= NoPayloadCases) {
+        // Extra inhabitants can encode all no-payload cases.
+        NumExtraInhabitants -= NoPayloadCases;
+      } else {
+        // Not enough extra inhabitants for all cases. We have to add an
+        // extra tag field.
+        NumExtraInhabitants = 0;
+        Size += getNumTagBytes(Size,
+                               NoPayloadCases - NumExtraInhabitants,
+                               /*payloadCases=*/1);
+      }
+
+    // MultiPayloadEnumImplStrategy
+    } else {
+      Kind = RecordKind::MultiPayloadEnum;
+
+      // Check if this is a dynamic or static multi-payload enum
+      for (auto Case : PayloadCases) {
+        auto *CaseTR = getCaseTypeRef(Case);
+        auto *CaseTI = TC.getTypeInfo(CaseTR);
+        addCase(Case.Name, CaseTR, CaseTI);
+      }
+
+      // If we have a fixed descriptor for this type, it is a fixed-size
+      // multi-payload enum that possibly uses payload spare bits.
+      auto *FixedDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR);
+      if (FixedDescriptor) {
+        Size = FixedDescriptor->Size;
+        Alignment = FixedDescriptor->Alignment;
+        NumExtraInhabitants = FixedDescriptor->NumExtraInhabitants;
+      } else {
+        // Dynamic multi-payload enums do not have extra inhabitants
+        NumExtraInhabitants = 0;
+
+        // Dynamic multi-payload enums always use an extra tag to differentiate
+        // between cases
+        Size += getNumTagBytes(Size,
+                               NoPayloadCases,
+                               PayloadCases.size());
+      }
+    }
+
+    if (Invalid)
+      return nullptr;
+
+    // Calculate the stride
+    unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+
+    return TC.makeTypeInfo<RecordTypeInfo>(
+        Size, Alignment, Stride,
+        NumExtraInhabitants, Kind, Cases);
+  }
+};
+
 class LowerType
   : public TypeRefVisitor<LowerType, const TypeInfo *> {
   TypeConverter &TC;
@@ -835,83 +989,11 @@ public:
     /// Otherwise, get the fixed layout information from reflection
     /// metadata.
     auto *descriptor = TC.getBuilder().getBuiltinTypeInfo(B);
-    if (descriptor == nullptr)
+    if (descriptor == nullptr) {
+      DEBUG(std::cerr << "No TypeInfo for builtin type: "; B->dump());
       return nullptr;
+    }
     return TC.makeTypeInfo<BuiltinTypeInfo>(descriptor);
-  }
-
-  const TypeInfo *visitEnumTypeRef(const TypeRef *TR,
-                                   const FieldDescriptor *FD) {
-    // Sort enum into payload and no-payload cases.
-    unsigned NoPayloadCases = 0;
-    unsigned PayloadCases = 0;
-    const TypeRef *PayloadTR = nullptr;
-    FieldTypeInfo PayloadCase;
-
-    for (auto Case : TC.getBuilder().getFieldTypeRefs(TR, FD)) {
-      if (Case.TR == nullptr) {
-        NoPayloadCases++;
-        continue;
-      }
-
-      PayloadCases++;
-      PayloadCase = Case;
-
-      // An indirect case is like a payload case with an agument type
-      // of Builtin.NativeObject.
-      if (Case.Indirect)
-        PayloadTR = TC.getNativeObjectTypeRef();
-      else
-        PayloadTR = Case.TR;
-    }
-
-    if (PayloadCases == 0) {
-      RecordTypeInfoBuilder builder(TC, RecordKind::NoPayloadEnum);
-
-      unsigned tagBytes = getNumTagBytes(/*payloadSize=*/0,
-                                         NoPayloadCases,
-                                         /*payloadCases=*/0);
-      builder.addField(tagBytes, 1, 0);
-
-      return builder.build();
-    } else if (PayloadCases == 1) {
-      auto *PayloadTI = TC.getTypeInfo(PayloadTR);
-      if (PayloadTI == nullptr)
-        return nullptr;
-
-      // An enum consisting of a single payload case and nothing else
-      // is lowered as the payload type.
-      if (NoPayloadCases == 0)
-        return PayloadTI;
-
-      RecordTypeInfoBuilder builder(TC, RecordKind::SinglePayloadEnum);
-      builder.addField(PayloadCase.Name, PayloadTR);
-
-      // Below logic should match the runtime function
-      // swift_initEnumValueWitnessTableSinglePayload().
-
-      unsigned numExtraInhabitants = PayloadTI->getNumExtraInhabitants();
-
-      if (numExtraInhabitants >= NoPayloadCases) {
-        // Extra inhabitants can encode all no-payload cases.
-        unsigned unusedExtraInhabitants = numExtraInhabitants - NoPayloadCases;
-        builder.setNumExtraInhabitants(unusedExtraInhabitants);
-
-      } else {
-        // Not enough extra inhabitants for all cases. We have to add an
-        // extra tag field.
-        unsigned tagBytes = getNumTagBytes(PayloadTI->getSize(),
-                                           NoPayloadCases - numExtraInhabitants,
-                                           /*payloadCases=*/1);
-        builder.addField(tagBytes, 1, 0);
-      }
-
-      return builder.build();
-    } else {
-
-      // FIXME: Multi-payload enums are not supported right now
-      return nullptr;
-    }
   }
 
   const TypeInfo *visitAnyNominalTypeRef(const TypeRef *TR) {
@@ -924,6 +1006,7 @@ public:
         return TC.makeTypeInfo<BuiltinTypeInfo>(ImportedTypeDescriptor);
 
       // Otherwise, we're out of luck.
+      DEBUG(std::cerr << "No TypeInfo for nominal type: "; TR->dump());
       return nullptr;
     }
 
@@ -941,14 +1024,17 @@ public:
       return builder.build();
     }
     case FieldDescriptorKind::Enum:
-      return visitEnumTypeRef(TR, FD);
+    case FieldDescriptorKind::MultiPayloadEnum: {
+      EnumTypeInfoBuilder builder(TC);
+      return builder.build(TR, FD);
+    }
     case FieldDescriptorKind::ObjCClass:
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Unknown);
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
-      // Invalid field descriptor
+      DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
       return nullptr;
     }
   }
@@ -999,6 +1085,7 @@ public:
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
+      DEBUG(std::cerr << "Unknown metatype representation: "; M->dump());
       return nullptr;
     case MetatypeRepresentation::Thin:
       return TC.getEmptyTypeInfo();
@@ -1018,7 +1105,7 @@ public:
       for (auto *P : PC->getProtocols())
         builder.addProtocol(P);
     } else {
-      // Invalid TypeRef
+      DEBUG(std::cerr << "Invalid existential metatype: "; EM->dump());
       return nullptr;
     }
 
@@ -1053,8 +1140,10 @@ public:
   const TypeInfo *
   rebuildStorageTypeInfo(const TypeInfo *TI, ReferenceKind Kind) {
     // If we can't lower the original storage type, give up.
-    if (TI == nullptr)
+    if (TI == nullptr) {
+      DEBUG(std::cerr << "Invalid reference type");
       return nullptr;
+    }
 
     // Simple case: Just change the reference kind
     if (auto *ReferenceTI = dyn_cast<ReferenceTypeInfo>(TI))
@@ -1095,6 +1184,7 @@ public:
     }
 
     // Anything else -- give up
+    DEBUG(std::cerr << "Invalid reference type");
     return nullptr;
   }
 
@@ -1152,8 +1242,10 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
                                                         unsigned start,
                                                         unsigned align) {
   const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
-  if (FD == nullptr)
+  if (FD == nullptr) {
+    DEBUG(std::cerr << "No field descriptor: "; TR->dump());
     return nullptr;
+  }
 
   switch (FD->Kind) {
   case FieldDescriptorKind::Class:
@@ -1172,10 +1264,12 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   }
   case FieldDescriptorKind::Struct:
   case FieldDescriptorKind::Enum:
+  case FieldDescriptorKind::MultiPayloadEnum:
   case FieldDescriptorKind::ObjCProtocol:
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
     // Invalid field descriptor.
+    DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
     return nullptr;
   }
 }

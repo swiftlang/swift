@@ -685,6 +685,58 @@ V12TypeLowering14MetatypeStruct
 // CHECK-32-NEXT:       (field name=u offset=4
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096)))))
 
+V12TypeLowering10EnumStruct
+// CHECK-64: (struct TypeLowering.EnumStruct)
+// CHECK-64-NEXT: (struct size=81 alignment=8 stride=88 num_extra_inhabitants=0
+// CHECK-64-NEXT:   (field name=empty offset=0
+// CHECK-64-NEXT:     (no_payload_enum size=0 alignment=0 stride=0 num_extra_inhabitants=0))
+// CHECK-64-NEXT:   (field name=noPayload offset=0
+// CHECK-64-NEXT:     (no_payload_enum size=1 alignment=0 stride=0 num_extra_inhabitants=0))
+// CHECK-64-NEXT:   (field name=sillyNoPayload offset=0
+// CHECK-64-NEXT:     (no_payload_enum size=1 alignment=0 stride=0 num_extra_inhabitants=0))
+// CHECK-64-NEXT:   (field name=singleton offset=8
+// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
+// CHECK-64-NEXT:   (field name=singlePayload offset=16
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1]]
+// CHECK-64-NEXT:       (field name=Indirect offset=0
+// CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
+// CHECK-64-NEXT:   (field name=multiPayloadConcrete offset=24
+// CHECK-64-NEXT:     (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-64-NEXT:       (field name=Left offset=0
+// CHECK-64-NEXT:         (reference kind=strong refcounting=native))
+// CHECK-64-NEXT:       (field name=Right offset=0
+// CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
+// CHECK-64-NEXT:   (field name=multiPayloadGenericFixed offset=32
+// CHECK-64-NEXT:     (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0
+// CHECK-64-NEXT:       (field name=Left offset=0
+// CHECK-64-NEXT:         (reference kind=strong refcounting=native))
+// CHECK-64-NEXT:       (field name=Right offset=0
+// CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
+// CHECK-64-NEXT:   (field name=multiPayloadGenericDynamic offset=48
+// CHECK-64-NEXT:     (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0
+// CHECK-64-NEXT:       (field name=Left offset=0
+// CHECK-64-NEXT:         (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
+// CHECK-64-NEXT:           (field name=_value offset=0
+// CHECK-64-NEXT:             (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0))))
+// CHECK-64-NEXT:       (field name=Right offset=0
+// CHECK-64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-64-NEXT:           (field name=_value offset=0
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))))
+// CHECK-64-NEXT:   (field name=optionalOptionalRef offset=64
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_2:2147483645|2046]]
+// CHECK-64-NEXT:       (field name=some offset=0
+// CHECK-64-NEXT:         (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1]]
+// CHECK-64-NEXT:           (field name=some offset=0
+// CHECK-64-NEXT:             (reference kind=strong refcounting=native))))))
+// CHECK-64-NEXT:   (field name=optionalOptionalPtr offset=72
+// CHECK-64-NEXT:     (single_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0
+// CHECK-64-NEXT:       (field name=some offset=0
+// CHECK-64-NEXT:         (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-64-NEXT:           (field name=some offset=0
+// CHECK-64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
+// CHECK-64-NEXT:               (field name=_rawValue offset=0
+// CHECK-64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1)))))))))
+
 Bo
 // CHECK-64:      (builtin Builtin.NativeObject)
 // CHECK-64-NEXT: (reference kind=strong refcounting=native)

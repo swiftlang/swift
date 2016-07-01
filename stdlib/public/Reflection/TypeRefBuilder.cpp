@@ -109,8 +109,7 @@ TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
     auto FieldName = Field.getFieldName();
 
     // Empty cases of enums do not have a type
-    if (FD->Kind == FieldDescriptorKind::Enum &&
-        !Field.hasMangledTypeName()) {
+    if (FD->isEnum() && !Field.hasMangledTypeName()) {
       Fields.push_back(FieldTypeInfo::forEmptyCase(FieldName));
       continue;
     }
@@ -123,8 +122,7 @@ TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
 
     auto Substituted = Unsubstituted->subst(*this, Subs);
 
-    if (FD->Kind == FieldDescriptorKind::Enum &&
-        Field.isIndirectCase()) {
+    if (FD->isEnum() && Field.isIndirectCase()) {
       Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName, Substituted));
       continue;
     }

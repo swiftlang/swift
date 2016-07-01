@@ -5677,6 +5677,9 @@ namespace {
 /// the protocol descriptor, and for ObjC interop, references to the descriptor
 /// that the ObjC runtime uses for uniquing.
 void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
+  // Emit remote reflection metadata for the protocol.
+  emitFieldMetadataRecord(protocol);
+
   // If the protocol is Objective-C-compatible, go through the path that
   // produces an ObjC-compatible protocol_t.
   if (protocol->isObjC()) {
@@ -5706,8 +5709,6 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
                                                    init->getType()));
   var->setConstant(true);
   var->setInitializer(init);
-
-  emitFieldMetadataRecord(protocol);
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.

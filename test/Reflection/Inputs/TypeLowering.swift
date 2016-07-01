@@ -147,10 +147,46 @@ public enum SinglePayloadEnum {
   case Nothing
 }
 
+public enum MultiPayloadConcrete {
+  case Left(C)
+  case Right(C)
+  case Donkey
+  case Mule
+  case Horse
+}
+
+public enum MultiPayloadGenericFixed<T : C> {
+  case Left(T)
+  case Right(T)
+  case Donkey
+  case Mule
+  case Horse
+}
+
+public enum MultiPayloadGenericDynamic<T, U> {
+  case Left(T)
+  case Right(U)
+  case Donkey
+  case Mule
+  case Horse
+}
+
 public struct EnumStruct {
   public let empty: EmptyEnum
   public let noPayload: NoPayloadEnum
   public let sillyNoPayload: SillyNoPayloadEnum
   public let singleton: SingletonEnum
   public let singlePayload: SinglePayloadEnum
+
+  public let multiPayloadConcrete: MultiPayloadConcrete
+  public let multiPayloadGenericFixed: MultiPayloadGenericFixed<C>
+  public let multiPayloadGenericDynamic: MultiPayloadGenericDynamic<Int8, Int>
+
+  // Double-optional class reference does not need
+  // any extra storage
+  public let optionalOptionalRef: C??
+
+  // Double-optional raw pointer needs an extra
+  // tag byte
+  public let optionalOptionalPtr: UnsafePointer<Int>??
 }
