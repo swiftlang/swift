@@ -362,6 +362,12 @@ public:
                               Operands.begin(),
                               Operands.end()));
   }
+  hash_code visitMarkDependenceInst(MarkDependenceInst *X) {
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(
+        X->getKind(), X->getType(),
+        llvm::hash_combine_range(Operands.begin(), Operands.end()));
+  }
 };
 } // end anonymous namespace
 
@@ -680,6 +686,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     case ValueKind::BridgeObjectToWordInst:
     case ValueKind::ThinFunctionToPointerInst:
     case ValueKind::PointerToThinFunctionInst:
+    case ValueKind::MarkDependenceInst:
       return true;
     default:
       return false;
