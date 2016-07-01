@@ -3,6 +3,7 @@ set(swift_platform_flags)
 set(swift_platform_sources
     Platform.swift
     Misc.c
+    TiocConstants.swift
     tgmath.swift.gyb)
 
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
