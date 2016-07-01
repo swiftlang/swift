@@ -54,3 +54,9 @@
 // RUN:  FileCheck -input-file %t/Foundation.NSDateInterval.printed.txt -check-prefix=CHECK_NSDATEINTERVAL %s
 
 // CHECK_NSDATEINTERVAL: func intersection(with dateInterval: DateInterval) -> DateInterval?
+
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSCoder -function-definitions=false > %t/Foundation.NSCoder.printed.txt
+// RUN:  FileCheck -input-file %t/Foundation.NSCoder.printed.txt -check-prefix=CHECK_NSCODER %s
+
+// CHECK_NSCODER: func failWithError(_ error: ErrorProtocol)
+// CHECK_NSCODER: {{^}}  var error: ErrorProtocol? { get }

@@ -88,6 +88,9 @@ enum class ForeignRepresentableKind : uint8_t {
   Object,
   /// This type is representable in the foreign language via bridging.
   Bridged,
+  /// This type is representable in the foreign language via bridging
+  /// of ErrorProtocol.
+  BridgedError,
   /// This type is representable in the foreign language via static
   /// bridging code, only (which is not available at runtime).
   StaticBridged,

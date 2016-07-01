@@ -1715,8 +1715,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                       TC.Context.Id_CVarArg;
       }
       
-      if (isBridgeableTargetType && TC.getBridgedToObjC(DC, type1)) {
-        conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeToObjC);
+      // Check whether the source type is bridged to an Objective-C
+      // class type. This conversion is implicit unless the bridged
+      // value type is ErrorProtocol; this special rule is a subset of
+      // SE-0072 that breaks an implicit conversion cycle between
+      // NSError and ErrorProtocol.
+      if (isBridgeableTargetType) {
+        Type bridgedValueType;
+        if (auto bridgedToObjCClass =
+                   TC.Context.getBridgedToObjC(DC, type1, &TC,
+                                               &bridgedValueType)) {
+          if (*bridgedToObjCClass &&
+              (kind >= TypeMatchKind::ExplicitConversion ||
+               bridgedValueType->getAnyNominal() !=
+                 TC.Context.getErrorProtocolDecl()))
+            conversionsOrFixes.push_back(
+              ConversionRestrictionKind::BridgeToObjC);
+        }
       }
     }
 
@@ -1729,16 +1744,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
           allowsBridgingFromObjC(TC, DC, type2)) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
-      }
-      
-      // Bridging from an ErrorProtocol to an Objective-C NSError.
-      if (auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorProtocol)) {
-        if (TC.containsProtocol(type1, errorType, DC,
-                                ConformanceCheckFlags::InExpression))
-          if (auto NSErrorTy = TC.getNSErrorType(DC))
-            if (type2->isEqual(NSErrorTy))
-              conversionsOrFixes.push_back(
-                                    ConversionRestrictionKind::BridgeToNSError);
       }
     }
     
@@ -4070,7 +4075,9 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
   // U bridges to C and T < C ===> T <c U
   case ConversionRestrictionKind::BridgeFromObjC: {
-    auto objcClass = TC.getBridgedToObjC(DC, type2);
+    Type bridgedValueType;
+    auto objcClass = *TC.Context.getBridgedToObjC(DC, type2, &TC,
+                                                  &bridgedValueType);
     assert(objcClass && "type is not bridged to Objective-C?");
     addContextualScore();
     increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
@@ -4126,17 +4133,12 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       }
     }
 
-    return matchTypes(type1, objcClass, TypeMatchKind::Subtype, subFlags,
-                      locator);
-  }
+    // Make sure we have the bridged value type.
+    if (matchTypes(type2, bridgedValueType, TypeMatchKind::SameType, subFlags,
+                   locator) == ConstraintSystem::SolutionKind::Error)
+      return ConstraintSystem::SolutionKind::Error;
 
-  case ConversionRestrictionKind::BridgeToNSError: {
-    increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
-    
-    // The input type must be an ErrorProtocol subtype.
-    auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorProtocol)
-      ->getDeclaredType();
-    return matchTypes(type1, errorType, TypeMatchKind::Subtype, subFlags,
+    return matchTypes(type1, objcClass, TypeMatchKind::Subtype, subFlags,
                       locator);
   }
 

@@ -1760,6 +1760,16 @@ optimizeBridgedCasts(SILInstruction *Inst,
     return nullptr;
   }
 
+  if ((CanBridgedSourceTy &&
+       CanBridgedSourceTy->getAnyNominal() ==
+         M.getASTContext().getNSErrorDecl()) ||
+      (CanBridgedTargetTy &&
+       CanBridgedSourceTy->getAnyNominal() ==
+         M.getASTContext().getNSErrorDecl())) {
+    // FIXME: Can't optimize bridging with NSError.
+    return nullptr;
+  }
+      
   if (CanBridgedSourceTy || CanBridgedTargetTy) {
     // Check what kind of conversion it is? ObjC->Swift or Swift-ObjC?
     if (CanBridgedTargetTy != target) {
