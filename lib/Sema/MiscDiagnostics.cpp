@@ -1328,6 +1328,14 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     return labelStr.empty() ? Identifier() : TC.Context.getIdentifier(labelStr);
   });
 
+  if (auto args = dyn_cast<TupleShuffleExpr>(argExpr)) {
+    if (!args->getVariadicArgs().empty()) {
+      // FIXME: Support variadic arguments.
+      return;
+    }
+    argExpr = args->getSubExpr();
+  }
+
   if (auto args = dyn_cast<TupleExpr>(argExpr)) {
     if (argumentLabelIDs.size() != args->getNumElements()) {
       // Mismatched lengths; give up.
@@ -1354,7 +1362,12 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       }
     }
 
-  } else {
+  } else if (auto args = dyn_cast<ParenExpr>(argExpr)) {
+    if (args->hasTrailingClosure()) {
+      // The argument label for a trailing closure is ignored.
+      return;
+    }
+
     if (argumentLabelIDs.size() != 1) {
       // Mismatched lengths; give up.
       return;
@@ -1364,6 +1377,8 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       // Already matching (no labels).
       return;
     }
+  } else {
+    llvm_unreachable("Unexpected arg expression");
   }
 
   diagnoseArgumentLabelError(TC, argExpr, argumentLabelIDs, false, &diag);
