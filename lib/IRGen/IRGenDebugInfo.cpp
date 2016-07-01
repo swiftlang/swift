@@ -545,18 +545,21 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     return getOrCreateContext(DC->getParent());
   case DeclContextKind::GenericTypeDecl: {
     auto *TyDecl = cast<GenericTypeDecl>(DC);
-    if (auto *DITy = getTypeOrNull(TyDecl->getDeclaredType().getPointer()))
+    auto *Ty = TyDecl->getDeclaredType().getPointer();
+    if (auto *DITy = getTypeOrNull(Ty))
       return DITy;
 
     // Create a Forward-declared type.
     auto Loc = getDebugLoc(SM, TyDecl);
     auto File = getOrCreateFile(Loc.Filename);
     auto Line = Loc.Line;
-    auto FwdDecl = DBuilder.createForwardDecl(
+    auto FwdDecl = DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_structure_type, TyDecl->getName().str(),
         getOrCreateContext(DC->getParent()), File, Line,
         llvm::dwarf::DW_LANG_Swift, 0, 0);
-
+    ReplaceMap.emplace_back(
+        std::piecewise_construct, std::make_tuple(Ty),
+        std::make_tuple(static_cast<llvm::Metadata *>(FwdDecl)));
     return FwdDecl;
   }
   }
@@ -1792,6 +1795,17 @@ llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
 void IRGenDebugInfo::finalize() {
   assert(LocationStack.empty() && "Mismatch of pushLoc() and popLoc().");
 
+  // Finalize all replaceable forward declarations.
+  for (auto &Ty : ReplaceMap) {
+    llvm::TempMDNode FwdDecl(cast<llvm::MDNode>(Ty.second));
+    llvm::Metadata *Replacement;
+    if (auto *FullType = getTypeOrNull(Ty.first))
+      Replacement = FullType;
+    else
+      Replacement = Ty.second;
+    DBuilder.replaceTemporary(std::move(FwdDecl),
+                              cast<llvm::MDNode>(Replacement));
+  }
   // Finalize the DIBuilder.
   DBuilder.finalize();
 }

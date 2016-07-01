@@ -70,6 +70,9 @@ class IRGenDebugInfo {
   std::vector<std::pair<const SILDebugScope *, llvm::TrackingMDNodeRef>>
       LastInlineChain;
 
+  /// A list of replaceable fwddecls that need to be RAUWed at the end.
+  std::vector<std::pair<TypeBase *, llvm::TrackingMDRef>> ReplaceMap;
+
   llvm::BumpPtrAllocator DebugInfoNames;
   StringRef CWDName;                    /// The current working directory.
   llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
