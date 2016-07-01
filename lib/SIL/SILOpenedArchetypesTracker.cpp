@@ -1,4 +1,4 @@
-//==- SILOpenedArchetypeTracker.cpp - Track opened archetypes  ---*- C++ -*-==//
+//===- SILOpenedArchetypesTracker.cpp - Track opened archetypes -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
