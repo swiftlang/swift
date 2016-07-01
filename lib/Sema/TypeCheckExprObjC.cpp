@@ -212,17 +212,33 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     // Look for this component.
     LookupResult lookup = performLookup(idx, componentName, componentNameLoc);
 
-    // If we didn't find anything, complain and bail out.
+    // If we didn't find anything, try to apply typo-correction.
+    bool resultsAreFromTypoCorrection = false;
     if (!lookup) {
-      // FIXME: Typo correction.
+      performTypoCorrection(dc, DeclRefKind::Ordinary, currentType,
+                            componentName, componentNameLoc,
+                            (currentType ? defaultMemberTypeLookupOptions
+                                         : defaultUnqualifiedLookupOptions),
+                            lookup);
+
       if (currentType)
         diagnose(componentNameLoc, diag::could_not_find_type_member,
                  currentType, componentName);
       else
         diagnose(componentNameLoc, diag::use_unresolved_identifier,
                  componentName, false);
+
+      // Note all the correction candidates.
+      for (auto &result : lookup) {
+        noteTypoCorrection(componentName, DeclNameLoc(componentNameLoc),
+                           result);
+      }
+
       isInvalid = true;
-      break;
+      if (!lookup) break;
+
+      // Remember that these are from typo correction.
+      resultsAreFromTypoCorrection = true;
     }
 
     // If we have more than one result, filter out unavailable or
@@ -243,6 +259,10 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
     // If we *still* have more than one result, fail.
     if (lookup.size() > 1) {
+      // Don't diagnose ambiguities if the results are from typo correction.
+      if (resultsAreFromTypoCorrection)
+        break;
+
       if (currentType)
         diagnose(componentNameLoc, diag::ambiguous_member_overload_set,
                  componentName);
