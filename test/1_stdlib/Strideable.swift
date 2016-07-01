@@ -62,8 +62,41 @@ struct R : Strideable {
 }
 
 StrideTestSuite.test("Double") {
-  // Doubles are not yet ready for testing, since they still conform
-  // to RandomAccessIndex
+  func checkOpen(from start: Double, to end: Double, by stepSize: Double, sum: Double) {
+    // Work on Doubles
+    expectEqual(
+      sum,
+      stride(from: start, to: end, by: stepSize).reduce(0.0, combine: +))
+  }
+  
+  func checkClosed(from start: Double, through end: Double, by stepSize: Double, sum: Double) {
+    // Work on Doubles
+    expectEqual(
+      sum,
+      stride(from: start, through: end, by: stepSize).reduce(0.0, combine: +))
+  }
+  
+  checkOpen(from: 1.0, to: 15.0, by: 3.0, sum: 35.0)
+  checkOpen(from: 1.0, to: 16.0, by: 3.0, sum: 35.0)
+  checkOpen(from: 1.0, to: 17.0, by: 3.0, sum: 51.0)
+  
+  checkOpen(from: 1.0, to: -13.0, by: -3.0, sum: -25.0)
+  checkOpen(from: 1.0, to: -14.0, by: -3.0, sum: -25.0)
+  checkOpen(from: 1.0, to: -15.0, by: -3.0, sum: -39.0)
+  
+  checkOpen(from: 4.0, to: 16.0, by: -3.0, sum: 0.0)
+  checkOpen(from: 1.0, to: -16.0, by: 3.0, sum: 0.0)
+  
+  checkClosed(from: 1.0, through: 15.0, by: 3.0, sum: 35.0)
+  checkClosed(from: 1.0, through: 16.0, by: 3.0, sum: 51.0)
+  checkClosed(from: 1.0, through: 17.0, by: 3.0, sum: 51.0)
+  
+  checkClosed(from: 1.0, through: -13.0, by: -3.0, sum: -25.0)
+  checkClosed(from: 1.0, through: -14.0, by: -3.0, sum: -39.0)
+  checkClosed(from: 1.0, through: -15.0, by: -3.0, sum: -39.0)
+  
+  checkClosed(from: 4.0, through: 16.0, by: -3.0, sum: 0.0)
+  checkClosed(from: 1.0, through: -16.0, by: 3.0, sum: 0.0)
 }
 
 StrideTestSuite.test("HalfOpen") {
@@ -161,6 +194,14 @@ StrideTestSuite.test("FloatingPointStride") {
     result.append(i)
   }
   expectEqual([ 1.4, 2.4, 3.4 ], result)
+}
+
+StrideTestSuite.test("ErrorAccumulation") {
+  let a = Array(stride(from: Float(1.0), through: Float(2.0), by: Float(0.1)))
+  expectEqual(11, a.count)
+  expectEqual(Float(2.0), a.last)
+  let b = Array(stride(from: Float(1.0), to: Float(10.0), by: Float(0.9)))
+  expectEqual(10, b.count)
 }
 
 runAllTests()

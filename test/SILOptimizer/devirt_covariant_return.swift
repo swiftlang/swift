@@ -179,7 +179,7 @@ final class C2:C {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil hidden @_TTSf4dg___TF23devirt_covariant_return7driver1FCS_2C1Vs5Int32
+// CHECK-LABEL: sil hidden @_TTSf4d___TF23devirt_covariant_return7driver1FCS_2C1Vs5Int32
 // CHECK: integer_literal $Builtin.Int32, 2
 // CHECK: struct $Int32 (%{{.*}} : $Builtin.Int32)
 // CHECK-NOT: class_method
@@ -276,7 +276,7 @@ class EEE : CCC {
 
 // Check that c.foo() is devirtualized, because the optimizer can handle the casting the return type
 // correctly, i.e. it can cast (BBB, BBB) into (AAA, AAA)
-// CHECK-LABEL: sil hidden @_TTSf4g_n___TF23devirt_covariant_return37testDevirtOfMethodReturningTupleTypesFTCS_3CCC1bCS_2BB_TCS_2AAS2__
+// CHECK-LABEL: sil hidden @_TTSf4g_g___TF23devirt_covariant_return37testDevirtOfMethodReturningTupleTypesFTCS_3CCC1bCS_2BB_TCS_2AAS2__
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $CCC
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $DDD
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $EEE

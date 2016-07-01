@@ -901,27 +901,28 @@ namespace {
         return { importedType, ImportHint::ObjCPointer };
       }
 
-      // If this is id<P>, turn this into a protocol type.
-      // FIXME: What about Class<P>?
-      if (type->isObjCQualifiedIdType()) {
+      // If this is id<P> or Class<P>, turn this into a protocol type.
+      if (type->isObjCQualifiedIdType() || type->isObjCQualifiedClassType()) {
         SmallVector<Type, 4> protocols;
         for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
              cp != cpEnd; ++cp) {
-          auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp,
-                                                                  false));
+          auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp, false));
           if (!proto)
             return Type();
 
           protocols.push_back(proto->getDeclaredType());
         }
 
-        return { ProtocolCompositionType::get(Impl.SwiftContext, protocols),
-                 ImportHint::ObjCPointer };
+        Type result = ProtocolCompositionType::get(Impl.SwiftContext,
+                                                   protocols);
+        if (type->isObjCQualifiedClassType())
+          result = ExistentialMetatypeType::get(result);
+
+        return { result, ImportHint::ObjCPointer };
       }
       
       // Beyond here, we're using AnyObject.
-      auto proto = Impl.SwiftContext.getProtocol(
-                     KnownProtocolKind::AnyObject);
+      auto proto = Impl.SwiftContext.getProtocol(KnownProtocolKind::AnyObject);
       if (!proto)
         return Type();
 
@@ -931,7 +932,7 @@ namespace {
       }
 
       // Class maps to AnyObject.Type.
-      assert(type->isObjCClassType() || type->isObjCQualifiedClassType());
+      assert(type->isObjCClassType());
       return { ExistentialMetatypeType::get(proto->getDeclaredType()),
                ImportHint::ObjCPointer };
     }

@@ -78,12 +78,11 @@ public enum _DisabledRangeIndex_ {}
 ///     // Prints "0"
 ///
 /// - SeeAlso: `CountableClosedRange`, `Range`, `ClosedRange`
-public struct CountableRange<
-  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>
+public struct CountableRange<Bound> : RandomAccessCollection
   where
-  Bound.Stride : SignedInteger
-> : RandomAccessCollection {
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : SignedInteger {
 
   /// The range's lower bound.
   ///
@@ -116,26 +115,26 @@ public struct CountableRange<
   }
 
   public func index(after i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: tests.
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
     return i.advanced(by: 1)
   }
 
   public func index(before i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range check i: should allow `endIndex`.
-    //_failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+    _precondition(i > lowerBound)
+    _precondition(i <= upperBound)
 
     return i.advanced(by: -1)
   }
 
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    // FIXME: swift-3-indexing-model: tests.
-    return i.advanced(by: n)
+    let r = i.advanced(by: n)
+    _precondition(r >= lowerBound)
+    _precondition(r <= upperBound)
+    return r
   }
 
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    // FIXME: swift-3-indexing-model: tests.
     return start.distance(to: end)
   }
 
@@ -574,12 +573,14 @@ public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-// WORKAROUND rdar://25214598 - should be just Bound : Strideable
-public func ..< <
-  Bound : _Strideable where Bound : Comparable, Bound.Stride : Integer
-> (
+public func ..< <Bound>(
   minimum: Bound, maximum: Bound
-) -> CountableRange<Bound> {
+) -> CountableRange<Bound>
+  where
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : Integer {
+
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(minimum <= maximum,
     "Can't form Range with upperBound < lowerBound")
@@ -601,3 +602,30 @@ extension Range {
     Builtin.unreachable()
   }
 }
+
+extension ClosedRange {
+  @available(*, unavailable, message: "Call clamped(to:) and swap the argument and the receiver.  For example, x.clamp(y) becomes y.clamped(to: x) in Swift 3.")
+  public func clamp(
+    _ intervalToClamp: ClosedRange<Bound>
+  ) -> ClosedRange<Bound> {
+    Builtin.unreachable()
+  }
+}
+
+extension CountableClosedRange {
+  @available(*, unavailable, message: "Call clamped(to:) and swap the argument and the receiver.  For example, x.clamp(y) becomes y.clamped(to: x) in Swift 3.")
+  public func clamp(
+    _ intervalToClamp: CountableClosedRange<Bound>
+  ) -> CountableClosedRange<Bound> {
+    Builtin.unreachable()
+  }
+}
+
+@available(*, unavailable, message: "IntervalType has been removed in Swift 3. Use ranges instead.")
+public typealias IntervalType = Void
+
+@available(*, unavailable, renamed: "Range")
+public struct HalfOpenInterval<Bound> {}
+
+@available(*, unavailable, renamed: "ClosedRange")
+public struct ClosedInterval<Bound> {}

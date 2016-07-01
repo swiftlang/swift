@@ -324,22 +324,22 @@ class ConcreteContext3 {
 
 func genericContext1<T>(_: T) {
   @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{3-9=}}
-  class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
+  class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' cannot be nested in generic function 'genericContext1'}}
 
   @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{3-9=}}
-  class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{type 'subject_inGenericContext2' nested in generic function 'genericContext1' is not allowed}}
+  class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{type 'subject_inGenericContext2' cannot be nested in generic function 'genericContext1'}}
 
-  class subject_constructor_inGenericContext { // expected-error{{type 'subject_constructor_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
+  class subject_constructor_inGenericContext { // expected-error{{type 'subject_constructor_inGenericContext' cannot be nested in generic function 'genericContext1'}}
     @objc
     init() {} // no-error
   }
 
-  class subject_var_inGenericContext { // expected-error{{type 'subject_var_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
+  class subject_var_inGenericContext { // expected-error{{type 'subject_var_inGenericContext' cannot be nested in generic function 'genericContext1'}}
     @objc
     var subject_instanceVar: Int = 0 // no-error
   }
 
-  class subject_func_inGenericContext { // expected-error{{type 'subject_func_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
+  class subject_func_inGenericContext { // expected-error{{type 'subject_func_inGenericContext' cannot be nested in generic function 'genericContext1'}}
     @objc
     func f() {} // no-error
   }
@@ -1159,7 +1159,7 @@ class infer_instanceVar1 {
   var var_Optional_fail14: CBool?
   var var_Optional_fail20: AnyObject??
   var var_Optional_fail21: AnyObject.Type??
-  var var_Optional_fail22: NSComparisonResult? // a non-bridged imported value type
+  var var_Optional_fail22: ComparisonResult? // a non-bridged imported value type
   var var_Optional_fail23: NSRange? // a bridged struct imported from C
 // CHECK-NOT: @objc{{.*}}Optional_fail
 
@@ -1604,6 +1604,20 @@ class HasIBOutlet {
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}} {{3-13=}}
   // CHECK-LABEL: {{^}}  @IBOutlet var badOutlet: PlainStruct
+}
+
+//===---
+//===--- @IBAction implies @objc
+//===---
+
+// CHECK-LABEL: {{^}}class HasIBAction {
+class HasIBAction {
+  @IBAction func goodAction(_ sender: AnyObject?) { }
+  // CHECK: {{^}}  @IBAction @objc func goodAction(_ sender: AnyObject?) {
+
+  @IBAction func badAction(_ sender: PlainStruct?) { }
+  // expected-error@-1{{argument to @IBAction method cannot have non-object type 'PlainStruct?'}}
+  // expected-error@-2{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
 }
 
 //===---

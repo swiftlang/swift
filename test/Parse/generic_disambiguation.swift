@@ -4,11 +4,11 @@ struct A<B> { // expected-note{{generic type 'A' declared here}}
   init(x:Int) {}
   static func c() {}
 
-  struct C<D> { // expected-error{{generic type 'C' nested in type}}
+  struct C<D> { // expected-error{{generic type 'C' cannot be nested in type 'A'}}
     static func e() {}
   }
 
-  struct F {} // expected-error{{nested in generic type}}
+  struct F {} // expected-error{{type 'F' cannot be nested in generic type 'A'}}
 }
 struct B {}
 struct D {}

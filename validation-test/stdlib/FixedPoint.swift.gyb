@@ -1,6 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/FixedPoint.swift
-// RUN: %S/../../utils/line-directive %t/FixedPoint.swift -- %target-build-swift %t/FixedPoint.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/FixedPoint.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -118,7 +116,7 @@ FixedPoint.test("${Dst}(truncatingBitPattern:) from ${Src}(${bit_pattern})") {
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
 
   ${gyb.execute_template(
       truncating_bit_pattern_test_template,
@@ -190,7 +188,7 @@ FixedPoint.test("${Dst}(bitPattern:) from ${Src}(${bit_pattern})") {
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
 
   ${gyb.execute_template(
       bit_pattern_test_template,
@@ -248,7 +246,7 @@ FixedPoint.test("${Self}.hashValue") {
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
 
   ${gyb.execute_template(
       hash_value_test_template,
@@ -307,10 +305,17 @@ FixedPoint.test("OverflowCheck") {
 
 FixedPoint.test("String.init") {
   let x: UInt32 = 0xdeadbeef
+#if _endian(little)
   expectEqual("efbeadde", String(x.bigEndian, radix: 16))
 
   let y = UInt32(bigEndian: 0xdeadbeef)
   expectEqual("deadbeef", String(y.bigEndian, radix: 16))
+#else
+  expectEqual("efbeadde", String(x.littleEndian, radix: 16))
+
+  let y = UInt32(littleEndian: 0xdeadbeef)
+  expectEqual("deadbeef", String(y.littleEndian, radix: 16))
+#endif
 }
 
 FixedPoint.test("byteSwapped") {
@@ -427,4 +432,3 @@ BoolTestSuite.test("||") {
 }
 
 runAllTests()
-

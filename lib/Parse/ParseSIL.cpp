@@ -269,14 +269,14 @@ namespace {
     bool parseScopeRef(SILDebugScope *&DS);
     bool parseSILDebugLocation(SILLocation &L, SILBuilder &B,
                                bool parsedComma = false);
-    bool parseSILInstruction(SILBasicBlock *BB);
+    bool parseSILInstruction(SILBasicBlock *BB, SILBuilder &B);
     bool parseCallInstruction(SILLocation InstLoc,
                               ValueKind Opcode, SILBuilder &B,
                               ValueBase *&ResultVal);
     bool parseSILFunctionRef(SILLocation InstLoc,
                              SILBuilder &B, ValueBase *&ResultVal);
 
-    bool parseSILBasicBlock();
+    bool parseSILBasicBlock(SILBuilder &B);
     
     bool isStartOfSILInstruction();
 
@@ -1539,7 +1539,7 @@ bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B,
 
 /// sil-instruction-def ::= (sil-value-name '=')? sil-instruction
 ///                         (',' sil-scope-ref)? (',' sil-loc)?
-bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
+bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   // We require SIL instructions to be at the start of a line to assist
   // recovery.
   if (!P.Tok.isAtStartOfLine()) {
@@ -1567,7 +1567,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   if (parseSILOpcode(Opcode, OpcodeLoc, OpcodeName))
     return true;
 
-  SILBuilder B(BB);
+  B.setInsertionPoint(BB);
   SmallVector<SILValue, 4> OpList;
   SILValue Val;
 
@@ -2909,7 +2909,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     
     ResultVal = B.createWitnessMethod(InstLoc, LookupTy, Conformance, Member,
-                                        MethodTy, Operand, IsVolatile);
+                                      MethodTy, IsVolatile);
     break;
   }
   case ValueKind::CopyAddrInst: {
@@ -3487,15 +3487,22 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     Identifier invoke, type;
     SourceLoc invokeLoc, typeLoc;
     
-    SILValue invokeVal;
+    UnresolvedValueName invokeName;
+    SILType invokeTy;
+    GenericParamList *invokeGenericParams;
     
     SILType blockType;
+    SmallVector<ParsedSubstitution, 4> parsedSubs;
+
     
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILIdentifier(invoke, invokeLoc,
                            diag::expected_tok_in_sil_instr, "invoke") ||
-        parseTypedValueRef(invokeVal, B) ||
+        parseValueName(invokeName) ||
+        parseApplySubstitutions(parsedSubs) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(invokeTy, invokeGenericParams) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILIdentifier(type, typeLoc,
                            diag::expected_tok_in_sil_instr, "type") ||
@@ -3512,8 +3519,21 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     
+    auto invokeVal = getLocalValue(invokeName, invokeTy, InstLoc, B);
+    
+    SmallVector<Substitution, 4> subs;
+    if (!parsedSubs.empty()) {
+      if (!invokeGenericParams) {
+        P.diagnose(typeLoc, diag::sil_substitutions_on_non_polymorphic_type);
+        return true;
+      }
+      if (getApplySubstitutionsFromParsed(*this, invokeGenericParams,
+                                          parsedSubs, subs))
+        return true;
+    }
+    
     ResultVal = B.createInitBlockStorageHeader(InstLoc, Val, invokeVal,
-                                               blockType);
+                                               blockType, subs);
     break;
   }
   }
@@ -3716,7 +3736,7 @@ bool SILParser::isStartOfSILInstruction() {
 ///     identifier sil-bb-argument-list? ':' sil-instruction+
 ///   sil-bb-argument-list:
 ///     '(' sil-typed-valueref (',' sil-typed-valueref)+ ')'
-bool SILParser::parseSILBasicBlock() {
+bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   SILBasicBlock *BB;
 
   // The basic block name is optional.
@@ -3759,7 +3779,7 @@ bool SILParser::parseSILBasicBlock() {
   F->getBlocks().push_back(BB);
 
   do {
-    if (parseSILInstruction(BB))
+    if (parseSILInstruction(BB, B))
       return true;
   } while (isStartOfSILInstruction());
 
@@ -3851,8 +3871,14 @@ bool Parser::parseDeclSIL() {
       }
       
       // Parse the basic block list.
+      SILOpenedArchetypesTracker OpenedArchetypesTracker(*FunctionState.F);
+      SILBuilder B(*FunctionState.F);
+      // Track the archetypes just like SILGen. This
+      // is required for adding typedef operands to instrucitons.
+      B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
+
       do {
-        if (FunctionState.parseSILBasicBlock())
+        if (FunctionState.parseSILBasicBlock(B))
           return true;
       } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
 

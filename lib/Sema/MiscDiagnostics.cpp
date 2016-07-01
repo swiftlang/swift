@@ -102,6 +102,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// Keep track of InOutExprs
     SmallPtrSet<InOutExpr*, 2> AcceptableInOutExprs;
 
+    /// Keep track of the arguments to CallExprs.
+    SmallPtrSet<Expr *, 2> CallArgs;
+
     bool IsExprStmt;
 
   public:
@@ -223,6 +226,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       auto Base = E;
       while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
         Base = Conv->getSubExpr();
+
+      // Record call arguments.
+      if (auto Call = dyn_cast<CallExpr>(Base)) {
+        CallArgs.insert(Call->getArg());
+      }
 
       if (auto *DRE = dyn_cast<DeclRefExpr>(Base)) {
         // Verify metatype uses.
@@ -483,6 +491,16 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             isa<DotSyntaxBaseIgnoredExpr>(ParentExpr) ||
             isa<UnresolvedSpecializeExpr>(ParentExpr) ||
             isa<OpenExistentialExpr>(ParentExpr)) {
+          return;
+        }
+
+        // Note: as a specific hack, produce a warning + Fix-It for
+        // the missing ".self" as the subexpression of a parenthesized
+        // expression, which is a historical bug.
+        if (isa<ParenExpr>(ParentExpr) && CallArgs.count(ParentExpr) > 0) {
+          TC.diagnose(E->getEndLoc(), diag::warn_value_of_metatype_missing_self,
+                      E->getType()->getRValueInstanceType())
+            .fixItInsertAfter(E->getEndLoc(), ".self");
           return;
         }
       }
@@ -831,7 +849,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
     llvm::SmallString<16> str;
     // If the diagnostic is local, flush it before returning.
     // This makes sure it's emitted before 'str' is destroyed.
-    defer { diagOpt.reset(); };
+    SWIFT_DEFER { diagOpt.reset(); };
 
     if (newNames[0].empty()) {
       // This is probably a conversion from a value of labeled tuple type to
@@ -996,6 +1014,111 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
   diagOpt.reset();
   return true;
 }
+
+bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
+                                          InFlightDiagnostic &diag,
+                                          ValueDecl *decl,
+                                          const ValueDecl *base) {
+  // For now, just rewrite cases where the base uses a value type and the
+  // override uses a reference type, and the value type is bridged to the
+  // reference type. This is a way to migrate code that makes use of types
+  // that previously were not bridged to value types.
+  auto checkType = [&](Type overrideTy, Type baseTy,
+                       SourceRange typeRange) -> bool {
+    if (typeRange.isInvalid())
+      return false;
+
+    auto normalizeType = [](Type ty) -> Type {
+      ty = ty->getInOutObjectType();
+      if (Type unwrappedTy = ty->getAnyOptionalObjectType())
+        ty = unwrappedTy;
+      return ty;
+    };
+
+    // Is the base type bridged?
+    Type normalizedBaseTy = normalizeType(baseTy);
+    const DeclContext *DC = decl->getDeclContext();
+    Optional<Type> maybeBridged =
+        TC.Context.getBridgedToObjC(DC, normalizedBaseTy, &TC);
+
+    // ...and just knowing that it's bridged isn't good enough if we don't
+    // know what it's bridged /to/. Also, don't do this check for trivial
+    // bridging---that doesn't count.
+    Type bridged = maybeBridged.getValueOr(Type());
+    if (!bridged || bridged->isEqual(normalizedBaseTy))
+      return false;
+
+    // ...and is it bridged to the overridden type?
+    Type normalizedOverrideTy = normalizeType(overrideTy);
+    if (!bridged->isEqual(normalizedOverrideTy)) {
+      // If both are nominal types, check again, ignoring generic arguments.
+      auto *overrideNominal = normalizedOverrideTy->getAnyNominal();
+      if (!overrideNominal || bridged->getAnyNominal() != overrideNominal) {
+        return false;
+      }
+    }
+
+    Type newOverrideTy = baseTy;
+
+    // Preserve optionality if we're dealing with a simple type.
+    OptionalTypeKind OTK;
+    if (Type unwrappedTy = newOverrideTy->getAnyOptionalObjectType())
+      newOverrideTy = unwrappedTy;
+    if (overrideTy->getAnyOptionalObjectType(OTK))
+      newOverrideTy = OptionalType::get(OTK, newOverrideTy);
+
+    SmallString<32> baseTypeBuf;
+    llvm::raw_svector_ostream baseTypeStr(baseTypeBuf);
+    PrintOptions options;
+    options.SynthesizeSugarOnTypes = true;
+
+    newOverrideTy->print(baseTypeStr, options);
+    diag.fixItReplace(typeRange, baseTypeStr.str());
+    return true;
+  };
+
+  if (auto *var = dyn_cast<VarDecl>(decl)) {
+    SourceRange typeRange = var->getTypeSourceRangeForDiagnostics();
+    return checkType(var->getType(), base->getType(), typeRange);
+  }
+
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+    auto *baseFn = cast<AbstractFunctionDecl>(base);
+    bool fixedAny = false;
+    if (fn->getParameterLists().back()->size() ==
+        baseFn->getParameterLists().back()->size()) {
+      for_each(*fn->getParameterLists().back(),
+               *baseFn->getParameterLists().back(),
+               [&](ParamDecl *param, const ParamDecl *baseParam) {
+        fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
+      });
+    }
+    if (auto *method = dyn_cast<FuncDecl>(decl)) {
+      auto *baseMethod = cast<FuncDecl>(base);
+      fixedAny |= checkType(method->getBodyResultType(),
+                            baseMethod->getResultType(),
+                            method->getBodyResultTypeLoc().getSourceRange());
+    }
+    return fixedAny;
+  }
+
+  if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
+    auto *baseSubscript = cast<SubscriptDecl>(base);
+    bool fixedAny = false;
+    for_each(*subscript->getIndices(),
+             *baseSubscript->getIndices(),
+             [&](ParamDecl *param, const ParamDecl *baseParam) {
+      fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
+    });
+    fixedAny |= checkType(subscript->getElementType(),
+                          baseSubscript->getElementType(),
+                          subscript->getElementTypeLoc().getSourceRange());
+    return fixedAny;
+  }
+
+  llvm_unreachable("unknown overridable member");
+}
+
 
 
 //===----------------------------------------------------------------------===//
@@ -1205,6 +1328,14 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     return labelStr.empty() ? Identifier() : TC.Context.getIdentifier(labelStr);
   });
 
+  if (auto args = dyn_cast<TupleShuffleExpr>(argExpr)) {
+    if (!args->getVariadicArgs().empty()) {
+      // FIXME: Support variadic arguments.
+      return;
+    }
+    argExpr = args->getSubExpr();
+  }
+
   if (auto args = dyn_cast<TupleExpr>(argExpr)) {
     if (argumentLabelIDs.size() != args->getNumElements()) {
       // Mismatched lengths; give up.
@@ -1231,7 +1362,12 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       }
     }
 
-  } else {
+  } else if (auto args = dyn_cast<ParenExpr>(argExpr)) {
+    if (args->hasTrailingClosure()) {
+      // The argument label for a trailing closure is ignored.
+      return;
+    }
+
     if (argumentLabelIDs.size() != 1) {
       // Mismatched lengths; give up.
       return;
@@ -1241,6 +1377,8 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       // Already matching (no labels).
       return;
     }
+  } else {
+    llvm_unreachable("Unexpected arg expression");
   }
 
   diagnoseArgumentLabelError(TC, argExpr, argumentLabelIDs, false, &diag);
@@ -1455,6 +1593,10 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   case UnconditionalAvailabilityKind::None:
   case UnconditionalAvailabilityKind::Unavailable:
   case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
+  case UnconditionalAvailabilityKind::UnavailableInSwift: {
+    bool inSwift = (Attr->getUnconditionalAvailability() ==
+                    UnconditionalAvailabilityKind::UnavailableInSwift);
+
     if (!Attr->Rename.empty()) {
       SmallString<32> newNameBuf;
       Optional<ReplacementDeclKind> replaceKind =
@@ -1469,31 +1611,24 @@ bool TypeChecker::diagnoseExplicitUnavailability(
                              newName);
         attachRenameFixIts(diag);
       } else {
-        auto diag = diagnose(Loc,diag::availability_decl_unavailable_rename_msg,
+        auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename_msg,
                              Name, replaceKind.hasValue(), rawReplaceKind,
                              newName, Attr->Message);
         attachRenameFixIts(diag);
       }
     } else if (Attr->Message.empty()) {
-      diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
+      diagnose(Loc, inSwift ? diag::availability_decl_unavailable_in_swift
+                            : diag::availability_decl_unavailable,
+               Name).highlight(R);
     } else {
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
-               EncodedMessage.Message)
+      diagnose(Loc, inSwift ? diag::availability_decl_unavailable_in_swift_msg
+                            : diag::availability_decl_unavailable_msg,
+               Name, EncodedMessage.Message)
         .highlight(R);
     }
     break;
-
-  case UnconditionalAvailabilityKind::UnavailableInSwift:
-    if (Attr->Message.empty()) {
-      diagnose(Loc, diag::availability_decl_unavailable_in_swift, Name)
-        .highlight(R);
-    } else {
-      EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      diagnose(Loc, diag::availability_decl_unavailable_in_swift_msg, Name,
-                  EncodedMessage.Message).highlight(R);
-    }
-    break;
+  }
   }
 
   auto MinVersion = Context.LangOpts.getMinPlatformVersion();
@@ -2388,7 +2523,15 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
 
 /// Diagnose C style for loops.
 
-static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
+namespace {
+enum class OperatorKind : char {
+  Greater,
+  Smaller,
+  NotEqual,
+};
+
+static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS,
+                                        VarDecl *loopVar, OperatorKind &OpKind) {
   auto *Cond = FS->getCond().getPtrOrNull();
   if (!Cond)
     return nullptr;
@@ -2407,8 +2550,15 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS, VarD
 
   // Verify that the condition is a simple != or < comparison to the loop variable.
   auto comparisonOpName = binaryFuncExpr->getDecl()->getNameStr();
-  if (comparisonOpName != "!=" && comparisonOpName != "<")
+  if (comparisonOpName == "!=")
+    OpKind = OperatorKind::NotEqual;
+  else if (comparisonOpName == "<")
+    OpKind = OperatorKind::Smaller;
+  else if (comparisonOpName == ">")
+    OpKind = OperatorKind::Greater;
+  else
     return nullptr;
+
   auto args = binaryExpr->getArg()->getElements();
   auto loadExpr = dyn_cast<LoadExpr>(args[0]);
   if (!loadExpr)
@@ -2421,7 +2571,9 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS, VarD
   return args[1];
 }
 
-static bool unaryIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl *loopVar) {
+static bool unaryOperatorCheckForConvertingCStyleForLoop(const ForStmt *FS,
+                                                         VarDecl *loopVar,
+                                                         StringRef OpName) {
   auto *Increment = FS->getIncrement().getPtrOrNull();
   if (!Increment)
     return false;
@@ -2432,19 +2584,33 @@ static bool unaryIncrementForConvertingCStyleForLoop(const ForStmt *FS, VarDecl 
     return false;
   auto inoutExpr = dyn_cast<InOutExpr>(unaryExpr->getArg());
   if (!inoutExpr)
-   return false;
+    return false;
   auto incrementDeclRefExpr = dyn_cast<DeclRefExpr>(inoutExpr->getSubExpr());
   if (!incrementDeclRefExpr)
     return false;
   auto unaryFuncExpr = dyn_cast<DeclRefExpr>(unaryExpr->getFn());
   if (!unaryFuncExpr)
     return false;
-  if (unaryFuncExpr->getDecl()->getNameStr() != "++")
+  if (unaryFuncExpr->getDecl()->getNameStr() != OpName)
     return false;
-  return incrementDeclRefExpr->getDecl() == loopVar;    
+  return incrementDeclRefExpr->getDecl() == loopVar;
 }
 
-static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC, const ForStmt *FS, VarDecl *loopVar) {
+
+static bool unaryIncrementForConvertingCStyleForLoop(const ForStmt *FS,
+                                                     VarDecl *loopVar) {
+  return unaryOperatorCheckForConvertingCStyleForLoop(FS, loopVar, "++");
+}
+
+static bool unaryDecrementForConvertingCStyleForLoop(const ForStmt *FS,
+                                                     VarDecl *loopVar) {
+  return unaryOperatorCheckForConvertingCStyleForLoop(FS, loopVar, "--");
+}
+
+static bool binaryOperatorCheckForConvertingCStyleForLoop(TypeChecker &TC,
+                                                            const ForStmt *FS,
+                                                            VarDecl *loopVar,
+                                                            StringRef OpName) {
   auto *Increment = FS->getIncrement().getPtrOrNull();
   if (!Increment)
     return false;
@@ -2454,7 +2620,7 @@ static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC, con
   auto binaryFuncExpr = dyn_cast<DeclRefExpr>(binaryExpr->getFn());
   if (!binaryFuncExpr)
     return false;
-  if (binaryFuncExpr->getDecl()->getNameStr() != "+=")
+  if (binaryFuncExpr->getDecl()->getNameStr() != OpName)
     return false;
   auto argTupleExpr = dyn_cast<TupleExpr>(binaryExpr->getArg());
   if (!argTupleExpr)
@@ -2475,6 +2641,19 @@ static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC, con
   if (!declRefExpr)
     return false;
   return declRefExpr->getDecl() == loopVar;
+
+}
+
+static bool plusEqualOneIncrementForConvertingCStyleForLoop(TypeChecker &TC,
+                                                            const ForStmt *FS,
+                                                            VarDecl *loopVar) {
+  return binaryOperatorCheckForConvertingCStyleForLoop(TC, FS, loopVar, "+=");
+}
+
+static bool minusEqualOneDecrementForConvertingCStyleForLoop(TypeChecker &TC,
+                                                             const ForStmt *FS,
+                                                             VarDecl *loopVar) {
+  return binaryOperatorCheckForConvertingCStyleForLoop(TC, FS, loopVar, "-=");
 }
 
 static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
@@ -2496,13 +2675,18 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
 
   VarDecl *loopVar = dyn_cast<VarDecl>(initializers[1]);
   Expr *startValue = loopVarDecl->getInit(0);
-  Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar);
+  OperatorKind OpKind;
+  Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar, OpKind);
   bool strideByOne = unaryIncrementForConvertingCStyleForLoop(FS, loopVar) ||
                plusEqualOneIncrementForConvertingCStyleForLoop(TC, FS, loopVar);
+  bool strideBackByOne = unaryDecrementForConvertingCStyleForLoop(FS, loopVar) ||
+               minusEqualOneDecrementForConvertingCStyleForLoop(TC, FS, loopVar);
 
-  if (!loopVar || !startValue || !endValue || !strideByOne)
+  if (!loopVar || !startValue || !endValue || (!strideByOne && !strideBackByOne))
     return;
-    
+
+  assert(strideBackByOne != strideByOne && "cannot be both increment and decrement.");
+
   // Verify that the loop variable is invariant inside the body.
   VarDeclUsageChecker checker(TC, loopVar);
   checker.suppressDiagnostics();
@@ -2519,15 +2703,31 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   SourceLoc endOfIncrementLoc =
     Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                FS->getIncrement().getPtrOrNull()->getEndLoc());
-    
-  diagnostic
-   .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
-   .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
-   .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(),
-                      " ..< ")
-   .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
-}
 
+  if (strideByOne && OpKind != OperatorKind::Greater) {
+    diagnostic
+      .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
+      .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
+      .fixItReplaceChars(FS->getFirstSemicolonLoc(), endValue->getStartLoc(),
+                       " ..< ")
+      .fixItRemoveChars(FS->getSecondSemicolonLoc(), endOfIncrementLoc);
+    return;
+  } else if (strideBackByOne && OpKind != OperatorKind::Smaller) {
+    SourceLoc startValueEnd = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                         startValue->getEndLoc());
+
+    StringRef endValueStr = CharSourceRange(TC.Context.SourceMgr, endValue->getStartLoc(),
+      Lexer::getLocForEndOfToken(TC.Context.SourceMgr, endValue->getEndLoc())).str();
+
+    diagnostic
+      .fixItRemoveChars(loopVarDecl->getLoc(), loopVar->getLoc())
+      .fixItReplaceChars(loopPatternEnd, startValue->getStartLoc(), " in ")
+      .fixItInsert(startValue->getStartLoc(), (llvm::Twine("((") + endValueStr + " + 1)...").str())
+      .fixItInsert(startValueEnd, ").reversed()")
+      .fixItRemoveChars(FS->getFirstSemicolonLoc(), endOfIncrementLoc);
+  }
+}
+}// Anonymous namespace end.
 
 // Perform MiscDiagnostics on Switch Statements.
 static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
@@ -3197,8 +3397,11 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   return "";
 }
 
-Optional<DeclName> swift::omitNeedlessWords(AbstractFunctionDecl *afd) {
+Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
+
+  if (!afd->hasType())
+    validateDecl(afd);
 
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
@@ -3286,10 +3489,13 @@ Optional<DeclName> swift::omitNeedlessWords(AbstractFunctionDecl *afd) {
   return DeclName(Context, newBaseName, newArgNames);
 }
 
-Optional<Identifier> swift::omitNeedlessWords(VarDecl *var) {
+Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
-  if (var->isInvalid())
+  if (!var->hasType())
+    validateDecl(var);
+
+  if (var->isInvalid() || !var->hasType())
     return None;
 
   if (var->getName().empty())
@@ -3322,9 +3528,9 @@ Optional<Identifier> swift::omitNeedlessWords(VarDecl *var) {
   StringScratchSpace scratch;
   OmissionTypeName typeName = getTypeNameForOmission(var->getType());
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
-  if (omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
-                        /*returnsSelf=*/false, true, allPropertyNames,
-                        scratch)) {
+  if (::omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
+                          /*returnsSelf=*/false, true, allPropertyNames,
+                          scratch)) {
     return Context.getIdentifier(name);
   }
 

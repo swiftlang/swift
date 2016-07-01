@@ -984,7 +984,8 @@ public:
     if (llvm::sys::Process::StandardInIsUserInput())
       llvm::outs() <<
           "***  You are running Swift's integrated REPL,  ***\n"
-          "***  intended for testing purposes only.       ***\n"
+          "***  intended for compiler and stdlib          ***\n"
+          "***  development and testing purposes only.    ***\n"
           "***  The full REPL is built as part of LLDB.   ***\n"
           "***  Type ':help' for assistance.              ***\n";
   }

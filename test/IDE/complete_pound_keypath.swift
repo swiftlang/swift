@@ -36,7 +36,7 @@ func completeInKeyPath2() {
 
 // CHECK-AFTER_POUND: Keyword/ExprSpecific:               keyPath({#@objc property sequence#}); name=keyPath(@objc property sequence)
 
-// CHECK-KEYPATH_ARG: Keyword/ExprSpecific:               #keyPath({#@objc property sequence#}); name=#keyPath(@objc property sequence)
+// CHECK-KEYPATH_ARG: Keyword/None:                       #keyPath({#@objc property sequence#}); name=#keyPath(@objc property sequence)
 
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop1[#String#]; name=prop1
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop2[#ObjCClass?#]; name=prop2

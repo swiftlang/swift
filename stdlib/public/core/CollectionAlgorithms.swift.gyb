@@ -322,7 +322,7 @@ extension ${Self} where Self.Iterator.Element : Comparable {
   /// - Returns: A sorted array of the ${sequenceKind}'s elements.
   ///
   /// - SeeAlso: `sorted(isOrderedBefore:)`
-  @warn_unused_result(${'mutable_variant: "sort"' if Self == 'MutableCollection' else ''})
+  /// ${'- MutatingVariant: sort' if Self == 'MutableCollection' else ''}
   public func sorted() -> [Iterator.Element] {
     var result = ContiguousArray(self)
     result.sort()
@@ -396,7 +396,7 @@ ${orderingExplanation}
   /// - Returns: A sorted array of the ${sequenceKind}'s elements.
   ///
   /// - SeeAlso: `sorted()`
-  @warn_unused_result(${'mutable_variant: "sort"' if Self == 'MutableCollection' else ''})
+  /// ${'- MutatingVariant: sort' if Self == 'MutableCollection' else ''}
   public func sorted(
     isOrderedBefore:
       @noescape (${IElement}, ${IElement}) -> Bool

@@ -25,6 +25,7 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <string.h>
 #include "swift/Runtime/Config.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
@@ -1046,6 +1047,17 @@ static const uintptr_t ObjCReservedBitsMask =
 static const unsigned ObjCReservedLowBits =
   SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
 
+#elif defined(__s390x__)
+
+static const uintptr_t LeastValidPointerValue =
+  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
+static const uintptr_t SwiftSpareBitsMask =
+  SWIFT_ABI_S390X_SWIFT_SPARE_BITS_MASK;
+static const uintptr_t ObjCReservedBitsMask =
+  SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
+static const unsigned ObjCReservedLowBits =
+  SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
+
 #else
 
 static const uintptr_t LeastValidPointerValue =
@@ -1077,6 +1089,13 @@ template <typename Runtime> struct TargetOpaqueMetadata;
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
+
+extern uint64_t RelativeDirectPointerNullPtr;
+
+#define RelativeDirectPointerNullPtrRef                                        \
+  *reinterpret_cast<ConstTargetFarRelativeDirectPointer<                       \
+      Runtime, TargetNominalTypeDescriptor, /*nullable*/ true> *>(             \
+      &RelativeDirectPointerNullPtr)
 
 /// The common structure of all type metadata.
 template <typename Runtime>
@@ -1210,16 +1229,17 @@ public:
   
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
-  ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor,
-                                      /*nullable*/ true>
+  const ConstTargetFarRelativeDirectPointer<Runtime,
+                                            TargetNominalTypeDescriptor,
+                                            /*nullable*/ true> &
   getNominalTypeDescriptor() const {
     switch (getKind()) {
     case MetadataKind::Class: {
       const auto cls = static_cast<const TargetClassMetadata<Runtime> *>(this);
       if (!cls->isTypeMetadata())
-        return 0;
+        return RelativeDirectPointerNullPtrRef;
       if (cls->isArtificialSubclass())
-        return 0;
+        return RelativeDirectPointerNullPtrRef;
       return cls->getDescription();
     }
     case MetadataKind::Struct:
@@ -1237,7 +1257,7 @@ public:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
-      return 0;
+      return RelativeDirectPointerNullPtrRef;
     }
   }
   
@@ -1548,6 +1568,11 @@ struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
       Reserved(0), ClassSize(classSize), ClassAddressPoint(classAddressPoint),
       Description(nullptr), IVarDestroyer(ivarDestroyer) {}
 
+  TargetClassMetadata(const TargetClassMetadata& other): Description(other.getDescription().get()) {
+    memcpy(this, &other, sizeof(*this));
+    setDescription(other.getDescription().get());
+  }
+
   /// The metadata for the superclass.  This is null for the root class.
   ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> SuperClass;
 
@@ -1623,8 +1648,10 @@ private:
   //   - "tabulated" virtual methods
 
 public:
-  ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor,
-  /*nullable*/ true> getDescription() const {
+  const ConstTargetFarRelativeDirectPointer<Runtime,
+                                            TargetNominalTypeDescriptor,
+                                            /*nullable*/ true> &
+  getDescription() const {
     assert(isTypeMetadata());
     assert(!isArtificialSubclass());
     return Description;
@@ -1805,6 +1832,8 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
   using InitializationFunction_t =
     void (*)(TargetForeignTypeMetadata<Runtime> *selectedMetadata);
+  using RuntimeMetadataPointer =
+      ConstTargetMetadataPointer<Runtime, swift::TargetForeignTypeMetadata>;
 
   /// Foreign type metadata may have extra header fields depending on
   /// the flags.
@@ -1819,14 +1848,12 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
     /// The Swift-mangled name of the type. This is the uniquing key for the
     /// type.
     TargetPointer<Runtime, const char> Name;
-    
+
     /// A pointer to the actual, runtime-uniqued metadata for this
     /// type.  This is essentially an invasive cache for the lookup
     /// structure.
-    mutable std::atomic<
-      ConstTargetMetadataPointer<Runtime, swift::TargetForeignTypeMetadata>
-    > Unique;
-    
+    mutable std::atomic<RuntimeMetadataPointer> Unique;
+
     /// Various flags.
     enum : StoredSize {
       /// This metadata has an initialization callback function.  If
@@ -1845,9 +1872,8 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
     return reinterpret_cast<TargetPointer<Runtime, const char>>(
       asFullMetadata(this)->Name);
   }
-  
-  ConstTargetMetadataPointer<Runtime, swift::TargetForeignTypeMetadata>
-  getCachedUniqueMetadata() const {
+
+  RuntimeMetadataPointer getCachedUniqueMetadata() const {
 #if __alpha__
     // TODO: This can be a relaxed-order load if there is no initialization
     // function. On platforms we care about, consume is no more expensive than
@@ -1858,15 +1884,13 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
 #endif
     return asFullMetadata(this)->Unique.load(SWIFT_MEMORY_ORDER_CONSUME);
   }
-  
-  void
-  setCachedUniqueMetadata(
-    ConstTargetMetadataPointer<Runtime, swift::TargetForeignTypeMetadata> unique)
-  const {
-    assert((asFullMetadata(this)->Unique == nullptr
-            || asFullMetadata(this)->Unique == unique)
-           && "already set unique metadata");
-    
+
+  void setCachedUniqueMetadata(RuntimeMetadataPointer unique) const {
+    assert((static_cast<RuntimeMetadataPointer>(asFullMetadata(this)->Unique) ==
+                nullptr ||
+            asFullMetadata(this)->Unique == unique) &&
+           "already set unique metadata");
+
     // If there is no initialization function, this can be a relaxed store.
     if (!hasInitializationFunction())
       asFullMetadata(this)->Unique.store(unique, std::memory_order_relaxed);

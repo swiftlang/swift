@@ -9,7 +9,7 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
     Foundation)
 endif()
 
-add_swift_library(swiftStdlibCollectionUnittest SHARED IS_STDLIB
+add_swift_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   StdlibCollectionUnittest.swift
@@ -23,9 +23,9 @@ add_swift_library(swiftStdlibCollectionUnittest SHARED IS_STDLIB
   CheckSequenceType.swift
   LoggingWrappers.swift.gyb
   MinimalCollections.swift.gyb
+  RangeSelection.swift
   ../../public/core/WriteBackMutableSlice.swift
 
-  PRIVATE_LINK_LIBRARIES ${swift_stdlib_unittest_private_link_libraries}
   SWIFT_MODULE_DEPENDS StdlibUnittest
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags}
   FRAMEWORK_DEPENDS ${swift_stdlib_unittest_framework_depends}

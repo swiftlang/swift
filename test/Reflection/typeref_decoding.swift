@@ -131,13 +131,11 @@
 // CHECK:   (enum TypesToReflect.E)
 // CHECK:   (struct Swift.Int))
 
-// CHECK: Metatype: TypesToReflect.E.Type
-// CHECK: (metatype
-// CHECK:   (enum TypesToReflect.E))
-
 // CHECK: NestedStruct: TypesToReflect.S.NestedS
 // CHECK: (struct TypesToReflect.S.NestedS
 // CHECK:   (struct TypesToReflect.S))
+
+// CHECK: Metatype
 
 // CHECK: EmptyCase
 
@@ -582,23 +580,10 @@
 
 // CHECK: ASSOCIATED TYPES:
 // CHECK: =================
-// CHECK: - TypesToReflect.Box : Swift.AnyObject
-// CHECK: - TypesToReflect.C : Swift.AnyObject
-// CHECK: - TypesToReflect.C1 : Swift.AnyObject
 // CHECK: - TypesToReflect.C1 : TypesToReflect.ClassBoundP
 // CHECK: typealias Inner = A
 // CHECK: (generic_type_parameter depth=0 index=0)
 
-// CHECK: - TypesToReflect.C2 : Swift.AnyObject
-// CHECK: - TypesToReflect.C3 : Swift.AnyObject
-// CHECK: - TypesToReflect.C4 : TypesToReflect.P1
-// CHECK: typealias Inner = A
-// CHECK: (generic_type_parameter depth=0 index=0)
-
-// CHECK: - TypesToReflect.C4 : TypesToReflect.P2
-// CHECK: typealias Outer = A
-// CHECK: (generic_type_parameter depth=0 index=0)
-
 // CHECK: - TypesToReflect.C4 : TypesToReflect.P1
 // CHECK: typealias Inner = A
 // CHECK: (generic_type_parameter depth=0 index=0)
@@ -614,29 +599,6 @@
 // CHECK: - TypesToReflect.S4 : TypesToReflect.P2
 // CHECK: typealias Outer = A
 // CHECK: (generic_type_parameter depth=0 index=0)
-
-// CHECK: - TypesToReflect.S4 : TypesToReflect.P1
-// CHECK: typealias Inner = A
-// CHECK: (generic_type_parameter depth=0 index=0)
-
-// CHECK: - TypesToReflect.S4 : TypesToReflect.P2
-// CHECK: typealias Outer = A
-// CHECK: (generic_type_parameter depth=0 index=0)
-
-// CHECK: - TypesToReflect.E4 : TypesToReflect.P1
-// CHECK: typealias Inner = A
-// CHECK: (generic_type_parameter depth=0 index=0)
-
-// CHECK: - TypesToReflect.E4 : TypesToReflect.P2
-// CHECK: typealias Outer = B
-// CHECK: (generic_type_parameter depth=0 index=1)
-
-// CHECK: - TypesToReflect.E4 : TypesToReflect.P3
-// CHECK: typealias First = A
-// CHECK: (generic_type_parameter depth=0 index=0)
-
-// CHECK: typealias Second = B
-// CHECK: (generic_type_parameter depth=0 index=1)
 
 // CHECK: - TypesToReflect.E4 : TypesToReflect.P1
 // CHECK: typealias Inner = A

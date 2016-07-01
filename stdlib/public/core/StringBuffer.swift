@@ -83,14 +83,14 @@ public struct _StringBuffer {
       = ((_storage._capacity() - capacityBump) << 1) + elementShift
   }
 
-  static func fromCodeUnits<
-    Input : Collection, // Sequence?
-    Encoding : UnicodeCodec
-    where Input.Iterator.Element == Encoding.CodeUnit
-  >(
+  static func fromCodeUnits<Input, Encoding>(
     _ input: Input, encoding: Encoding.Type, repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0
-  ) -> (_StringBuffer?, hadError: Bool) {
+  ) -> (_StringBuffer?, hadError: Bool)
+    where
+    Input : Collection, // Sequence?
+    Encoding : UnicodeCodec,
+    Input.Iterator.Element == Encoding.CodeUnit {
     // Determine how many UTF-16 code units we'll need
     let inputStream = input.makeIterator()
     guard let (utf16Count, isAscii) = UTF16.transcodedLength(

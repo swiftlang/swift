@@ -169,15 +169,6 @@ class C7 {
   func f() -> Self { return self }
 }
 
-public class FooClass1 {
-  @warn_unused_result
-  public func fooFunc1() {}
-}
-
-func goo1(_ f : FooClass1) {
-  f.fooFunc1()
-}
-
 public protocol P4 {
   /// foo1 comment from P4
   func foo1()
@@ -204,6 +195,8 @@ func tupleInParam2(t: () -> ()) {}
 func tupleResult1() -> (Int, Int) {}
 func tupleResult2(f: () -> Void) {}
 typealias MyVoid = ()
+
+func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
@@ -648,33 +641,37 @@ typealias MyVoid = ()
 // CHECK76: <Declaration>func f() -&gt; <Type usr="s:C11cursor_info2C7">Self</Type></Declaration>
 // CHECK76: <decl.function.returntype><ref.class usr="s:C11cursor_info2C7">Self</ref.class></decl.function.returntype>
 
-// RUN: %sourcekitd-test -req=cursor -pos=178:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK77 %s
-// CHECK77-NOT: @warn_unused_result
+// RUN: %sourcekitd-test -req=cursor -pos=188:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK77 %s
+// RUN: %sourcekitd-test -req=cursor -pos=189:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK78 %s
 
-// RUN: %sourcekitd-test -req=cursor -pos=197:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK78 %s
-// RUN: %sourcekitd-test -req=cursor -pos=198:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK79 %s
+// CHECK77: foo1 comment from P4
+// CHECK78: foo2 comment from C1
 
-// CHECK78: foo1 comment from P4
-// CHECK79: foo2 comment from C1
+// RUN: %sourcekitd-test -req=cursor -pos=192:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK79 %s
+// CHECK79: <decl.var.parameter><decl.var.parameter.argument_label>t</decl.var.parameter.argument_label>:
+// CHECK79-SAME: <decl.var.parameter.type><tuple>(
+// CHECK79-SAME:   <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>,
+// CHECK79-SAME:   <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>
+// CHECK79-SAME: )</tuple></decl.var.parameter.type></decl.var.parameter>
 
-// RUN: %sourcekitd-test -req=cursor -pos=201:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK80 %s
-// CHECK80: <decl.var.parameter><decl.var.parameter.argument_label>t</decl.var.parameter.argument_label>: 
-// CHECK80-SAME: <decl.var.parameter.type><tuple>(
-// CHECK80-SAME:   <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>,
-// CHECK80-SAME:   <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>
-// CHECK80-SAME: )</tuple></decl.var.parameter.type></decl.var.parameter>
+// RUN: %sourcekitd-test -req=cursor -pos=193:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK80 %s
+// CHECK80: <decl.var.parameter.type><tuple>()</tuple>
 
-// RUN: %sourcekitd-test -req=cursor -pos=202:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK81 %s
-// CHECK81: <decl.var.parameter.type><tuple>()</tuple>
+// RUN: %sourcekitd-test -req=cursor -pos=194:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK81 %s
+// CHECK81: <decl.var.parameter.type>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type>
 
-// RUN: %sourcekitd-test -req=cursor -pos=203:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK82 %s
-// CHECK82: <decl.var.parameter.type>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type>
+// RUN: %sourcekitd-test -req=cursor -pos=195:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK82 %s
+// CHECK82: <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</tuple>
 
-// RUN: %sourcekitd-test -req=cursor -pos=204:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK83 %s
-// CHECK83: <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</tuple>
+// RUN: %sourcekitd-test -req=cursor -pos=196:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK83 %s
+// CHECK83: <decl.var.parameter.type>() -&gt; <decl.function.returntype><ref.typealias usr="s:s4Void">Void</ref.typealias>
 
-// RUN: %sourcekitd-test -req=cursor -pos=205:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK84 %s
-// CHECK84: <decl.var.parameter.type>() -&gt; <decl.function.returntype><ref.typealias usr="s:s4Void">Void</ref.typealias>
+// RUN: %sourcekitd-test -req=cursor -pos=197:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK84 %s
+// CHECK84: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyVoid</decl.name> = <tuple>()</tuple></decl.typealias>
 
-// RUN: %sourcekitd-test -req=cursor -pos=206:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK85 %s
-// CHECK85: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyVoid</decl.name> = <tuple>()</tuple></decl.typealias>
+// RUN: %sourcekitd-test -req=cursor -pos=199:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK85 %s
+// CHECK85-NOT: @rethrows
+// CHECK85: <Declaration>func rethrowingFunction1({{.*}}) rethrows</Declaration>
+// CHECK85-NOT: @rethrows
+// CHECK85: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>rethrowingFunction1</decl.name>({{.*}}) <syntaxtype.keyword>rethrows</syntaxtype.keyword></decl.function.free>
+// CHECK85-NOT: @rethrows

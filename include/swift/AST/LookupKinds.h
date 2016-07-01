@@ -62,6 +62,9 @@ enum NLOptions : unsigned {
   /// \see NL_KnownDependencyMask
   NL_KnownCascadingDependency = 0x80,
 
+  /// This lookup should only return type declarations.
+  NL_OnlyTypes = 0x100,
+
   /// This lookup is known to not add any additional dependencies to the
   /// primary source file.
   ///

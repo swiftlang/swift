@@ -84,6 +84,14 @@ extension String {
   public subscript(bounds: Range<Index>) -> String {
     return String(characters[bounds])
   }
+
+  /// Accesses the text in the given range.
+  ///
+  /// - Complexity: O(*n*) if the underlying string is bridged from
+  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
+  public subscript(bounds: ClosedRange<Index>) -> String {
+    return String(characters[bounds])
+  }
 }
 
 public func == (lhs: String.Index, rhs: String.Index) -> Bool {
@@ -103,15 +111,14 @@ extension String {
   ///     let str = "The rain in Spain stays mainly in the plain."
   ///
   ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-  ///     let disemvowelled = String(str.characters.lazy.filter { !vowels.contains($0) })
+  ///     let disemvoweled = String(str.characters.lazy.filter { !vowels.contains($0) })
   ///
-  ///     print(disemvowelled)
+  ///     print(disemvoweled)
   ///     // Prints "Th rn n Spn stys mnly n th pln."
   ///
   /// - Parameter characters: A sequence of characters.
-  public init<
-    S : Sequence where S.Iterator.Element == Character
-  >(_ characters: S) {
+  public init<S : Sequence>(_ characters: S)
+    where S.Iterator.Element == Character {
     self._core = CharacterView(characters)._core
   }
 
@@ -152,9 +159,8 @@ extension String {
   /// Appends the characters in the given sequence to the string.
   /// 
   /// - Parameter newElements: A sequence of characters.
-  public mutating func append<
-    S : Sequence where S.Iterator.Element == Character
-  >(contentsOf newElements: S) {
+  public mutating func append<S : Sequence>(contentsOf newElements: S)
+    where S.Iterator.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView) in v.append(contentsOf: newElements)
     }
@@ -175,12 +181,10 @@ extension String {
   ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
   ///   removes text at the end of the string, the complexity is O(*n*), where
   ///   *n* is equal to `bounds.count`.
-  public mutating func replaceSubrange<
-    C : Collection where C.Iterator.Element == Character
-  >(
-    _ bounds: ${Range}<Index>, with newElements: C
-  ) {
-    // FIXME: swift-3-indexing-model: tests.
+  public mutating func replaceSubrange<C>(
+    _ bounds: ${Range}<Index>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView)
       in v.replaceSubrange(bounds, with: newElements)
@@ -204,7 +208,6 @@ extension String {
   public mutating func replaceSubrange(
     _ bounds: ${Range}<Index>, with newElements: String
   ) {
-    // FIXME: swift-3-indexing-model: tests.
     replaceSubrange(bounds, with: newElements.characters)
   }
 % end
@@ -240,9 +243,9 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the combined length of the string and
   ///   `newElements`.
-  public mutating func insert<
-    S : Collection where S.Iterator.Element == Character
-  >(contentsOf newElements: S, at i: Index) {
+  public mutating func insert<S : Collection>(
+    contentsOf newElements: S, at i: Index
+  ) where S.Iterator.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView) in v.insert(contentsOf: newElements, at: i)
     }
@@ -288,7 +291,6 @@ extension String {
   ///   lower bounds of `bounds` must be valid indices of the string.
 % end
   public mutating func removeSubrange(_ bounds: ${Range}<Index>) {
-    // FIXME: swift-3-indexing-model: tests.
     withMutableCharacters {
       (v: inout CharacterView) in v.removeSubrange(bounds)
     }

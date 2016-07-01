@@ -20,7 +20,9 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
 
   archetype
     A placeholder for a generic parameter or an associated type within a
-    generic context.
+    generic context. Sometimes known as a "rigid type variable" in formal
+    CS literature. Directly stores its conforming protocols and nested 
+    archetypes, if any.
 
   canonical SIL
     SIL after the
@@ -37,6 +39,14 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     protocol. Represented in the compiler by the ProtocolConformance type at
     the AST level. See also `witness table`.
 
+  contextual type
+    1. The expected type for a Swift sub-expression based on the rest of the 
+       statement. For example, in the statement ``print(6 * 9)``, the contextual
+       type of the expression ``6 * 9`` is ``Any``.
+    2. The type of a value or declaration from inside a potentially generic
+       context. This type may contain `archetypes <archetype>` and cannot be 
+       used directly from outside the context. Compare with `interface type`.
+
   DI (definite initialization / definitive initialization)
     The feature that no uninitialized variables, constants, or properties will
     be read by a program, or the analysis pass that operates on SIL to
@@ -51,6 +61,20 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
   fragile
     Describes a type or function where making changes will break binary
     compatibility. See :doc:`LibraryEvolution.rst <LibraryEvolution>`.
+
+  iff
+    "`if and only if`__". This term comes from mathematics.
+    
+    __ https://en.wikipedia.org/wiki/If_and_only_if
+
+  interface type
+    The type of a value or declaration outside its generic context. These types
+    are written using "formal" generic types, which only have meaning when
+    combined with a particular generic declaration's "generic signature".
+    Unlike `contextual types <contextual type>`, interface types store
+    conformances and requirements in the generic signature and not in the types
+    themselves. They can be compared across declarations but cannot be used
+    directly from within the context.
 
   IUO (implicitly unwrapped optional)
     A type like Optional, but it implicitly converts to its wrapped type. If
@@ -128,6 +152,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     An `existential` value with its dynamic type pulled out, so that the 
     compiler can do something with it.
 
+  overlay
+    A library that is imported whenever a C library or framework by the same
+    name is imported. The purpose of an overlay is to augment and extend a
+    library on the system when the library on the system cannot be modified.
+    Apple has a number of overlays for its own SDKs in stdlib/public/SDK/.
+
   PR
     1. "Problem Report": An issue reported in `LLVM's bug tracker`__. 
        See also `SR`.
@@ -164,6 +194,11 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     Describes a type or function where making certain changes will not break
     binary compatibility. See :doc:`LibraryEvolution.rst <LibraryEvolution>`.
 
+  runtime
+    Code that implements a language's dynamic features that aren't just
+    compiled down to plain instructions. For example, Swift's runtime library
+    includes support for dynamic casting and for the Mirror-based reflection.
+
   script mode
     The parsing mode that allows top-level imperative code in a source file.
 
@@ -183,6 +218,11 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     idiomatic use of "PR" ("Problem Report") for its bugs. We didn't go with
     "PR" for Swift because we wanted to be able to unambiguously reference
     LLVM bugs.
+
+  stdlib
+    "Standard library". Sometimes this just means the "Swift" module (also
+    known as "swiftCore"); sometimes it means everything in the stdlib/
+    directory. Pronounced "stid-lib" or "ess-tee-dee-lib".
 
   trap
     A deterministic runtime failure. Can be used as both as a noun ("Using an

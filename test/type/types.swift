@@ -3,8 +3,9 @@
 var a : Int
 
 func test() {
-  var y : a   // expected-error {{use of undeclared type 'a'}} expected-note {{here}}
-  var z : y   // expected-error {{'y' is not a type}}
+  var y : a   // expected-error {{use of undeclared type 'a'}}
+  var z : y   // expected-error {{use of undeclared type 'y'}}
+  var w : Swift.print   // expected-error {{no type named 'print' in module 'Swift'}}
 }
 
 var b : (Int) -> Int = { $0 }

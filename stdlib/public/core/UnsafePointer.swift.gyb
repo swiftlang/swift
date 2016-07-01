@@ -172,8 +172,8 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The pointee is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
-  // FIXME: add tests (since the `count` has been added)
   public func initialize(with newValue: Pointee, count: Int = 1) {
+    // FIXME: add tests (since the `count` has been added)
     _debugPrecondition(count >= 0,
       "${Self}.initialize(with:): negative count")
     // Must not use `initializeFrom` with a `Collection` as that will introduce
@@ -207,11 +207,11 @@ public struct ${Self}<Pointee>
   ///
   /// - Precondition: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
-  public func assignFrom(_ source: ${Self}, count: Int) {
+  public func assignFrom(_ source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.assignFrom with negative count")
     _debugPrecondition(
-      self < source || self >= source + count,
+      UnsafePointer(self) < source || UnsafePointer(self) >= source + count,
       "assignFrom non-following overlapping range; use assignBackwardFrom")
     for i in 0..<count {
       self[i] = source[i]
@@ -232,11 +232,11 @@ public struct ${Self}<Pointee>
   ///
   /// - Precondition: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
-  public func assignBackwardFrom(_ source: ${Self}, count: Int) {
+  public func assignBackwardFrom(_ source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.assignBackwardFrom with negative count")
     _debugPrecondition(
-      source < self || source >= self + count,
+      source < UnsafePointer(self) || source >= UnsafePointer(self) + count,
       "${Self}.assignBackwardFrom non-preceding overlapping range; use assignFrom instead")
     var i = count-1
     while i >= 0 {
@@ -324,11 +324,12 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
-  public func initializeFrom(_ source: ${Self}, count: Int) {
+  public func initializeFrom(_ source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.initializeFrom with negative count")
     _debugPrecondition(
-      self + count <= source || source + count <= self,
+      UnsafePointer(self) + count <= source || 
+      source + count <= UnsafePointer(self),
       "${Self}.initializeFrom non-following overlapping range")
     Builtin.copyArray(
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
@@ -345,9 +346,8 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The `Pointee`s at `self..<self + count` are
   ///   initialized.
-  public func initializeFrom<
-    C : Collection where C.Iterator.Element == Pointee
-  >(_ source: C) {
+  public func initializeFrom<C : Collection>(_ source: C)
+    where C.Iterator.Element == Pointee {
     source._copyContents(initializing: self)
   }
 

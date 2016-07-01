@@ -1556,6 +1556,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
     declContextOrOffset = AFD;
   } else if (auto SD = dyn_cast<SubscriptDecl>(D)) {
     declContextOrOffset = SD;
+  } else if (auto TAD = dyn_cast<TypeAliasDecl>(D)) {
+    declContextOrOffset = TAD;
   } else {
     llvm_unreachable("Unknown Decl : DeclContext kind");
   }
@@ -2075,22 +2077,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
-      case decls_block::WarnUnusedResult_DECL_ATTR: {
-        bool isImplicit;
-        uint64_t endOfMessageIndex;
-        serialization::decls_block::WarnUnusedResultDeclAttrLayout::readRecord(
-          scratch, isImplicit, endOfMessageIndex);
-
-        StringRef message = blobData.substr(0, endOfMessageIndex);
-        StringRef mutableVariant = blobData.substr(endOfMessageIndex);
-        Attr = new (ctx) WarnUnusedResultAttr(SourceLoc(), SourceLoc(),
-                                              SourceLoc(),
-                                              ctx.AllocateCopy(message),
-                                              ctx.AllocateCopy(mutableVariant),
-                                              SourceLoc(), isImplicit);
-        break;
-      }
-
       case decls_block::Specialize_DECL_ATTR: {
         ArrayRef<uint64_t> rawTypeIDs;
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
@@ -2176,6 +2162,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                            SourceLoc(), underlyingType,
                                            genericParams, DC);
     declOrOffset = alias;
+
+    if (genericParams) {
+      SmallVector<GenericTypeParamType *, 4> paramTypes;
+      for (auto &genericParam : *genericParams) {
+        paramTypes.push_back(genericParam->getDeclaredType()
+                               ->castTo<GenericTypeParamType>());
+      }
+
+      // Read the generic requirements.
+      SmallVector<Requirement, 4> requirements;
+      readGenericRequirements(requirements);
+
+      auto sig = GenericSignature::get(paramTypes, requirements);
+      alias->setGenericSignature(sig);
+    }
 
     alias->computeType();
 
@@ -2869,7 +2870,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isObjC, requiresStoredPropertyInits, foreign;
+    bool isImplicit, isObjC, requiresStoredPropertyInits;
     TypeID superclassID;
     uint8_t rawAccessLevel;
     unsigned numConformances;
@@ -2877,7 +2878,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          requiresStoredPropertyInits,
-                                         foreign, superclassID, rawAccessLevel,
+                                         superclassID, rawAccessLevel,
                                          numConformances,
                                          rawInheritedIDs);
 
@@ -2906,8 +2907,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theClass->setSuperclass(getType(superclassID));
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
-    if (foreign)
-      theClass->setForeign();
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *theClass->getGenericParams()) {
@@ -3226,7 +3225,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     dtor->setSelfDecl(selfParams->get(0));
 
     dtor->setType(getType(signatureID));
-    dtor->setInterfaceType(getType(interfaceID));
+
+    auto interfaceType = getType(interfaceID);
+    if (auto genericFnType = interfaceType->getAs<GenericFunctionType>())
+      dtor->setGenericSignature(genericFnType->getGenericSignature());
+    dtor->setInterfaceType(interfaceType);
+
     if (isImplicit)
       dtor->setImplicit();
 
@@ -3913,6 +3917,7 @@ Type ModuleFile::getType(TypeID TID) {
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
     bool noreturn = false;
+    bool pseudogeneric = false;
     bool hasErrorResult;
     unsigned numParams;
     unsigned numResults;
@@ -3922,6 +3927,7 @@ Type ModuleFile::getType(TypeID TID) {
                                              rawCalleeConvention,
                                              rawRepresentation,
                                              noreturn,
+                                             pseudogeneric,
                                              hasErrorResult,
                                              numParams,
                                              numResults,
@@ -3934,7 +3940,7 @@ Type ModuleFile::getType(TypeID TID) {
       error();
       return nullptr;
     }
-    SILFunctionType::ExtInfo extInfo(*representation, noreturn);
+    SILFunctionType::ExtInfo extInfo(*representation, noreturn, pseudogeneric);
 
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);

@@ -18,9 +18,9 @@ public func getErrorDomain() -> ErrorDomain {
   return .one
 }
 
-// CHECK-LABEL: _TF7newtype6getFooFT_VSC18NSNotificationName
-public func getFoo() -> NSNotificationName {
-  return NSNotificationName.Foo
+// CHECK-LABEL: _TF7newtype6getFooFT_VCSo14NSNotification4Name
+public func getFoo() -> NSNotification.Name {
+  return NSNotification.Name.Foo
   // CHECK: load {{.*}} @FooNotification
   // CHECK: ret
 }
@@ -34,7 +34,7 @@ public func getGlobalNotification(_ x: Int) -> String {
     // CHECK: load {{.*}} @Notification
     case 3: return swiftNamedNotification
     // CHECK: load {{.*}} @kSNNotification
-    default: return NSNotificationName.bar.rawValue
+    default: return NSNotification.Name.bar.rawValue
     // CHECK: load {{.*}} @kBarNotification
   }
 // CHECK: ret
@@ -108,7 +108,7 @@ public func compareInits() -> Bool {
   let mfNoLabel = MyInt(1)
   let res = mf.rawValue == MyInt.one.rawValue 
         && mfNoLabel.rawValue == MyInt.one.rawValue
-  // OPT:  [[ONE:%.*]] = load i32, i32* @kMyIntOne, align 4
+  // OPT:  [[ONE:%.*]] = load i32, i32*{{.*}}@kMyIntOne{{.*}}, align 4
   // OPT-NEXT: [[COMP:%.*]] = icmp eq i32 [[ONE]], 1
 
   takesMyInt(mf)
@@ -117,7 +117,7 @@ public func compareInits() -> Bool {
   takesMyInt(MyInt(kRawInt))
   // OPT: tail call void @takesMyInt(i32 1)
   // OPT-NEXT: tail call void @takesMyInt(i32 1)
-  // OPT-NEXT: [[RAWINT:%.*]] = load i32, i32* @kRawInt, align 4
+  // OPT-NEXT: [[RAWINT:%.*]] = load i32, i32*{{.*}} @kRawInt{{.*}}, align 4
   // OPT-NEXT: tail call void @takesMyInt(i32 [[RAWINT]])
   // OPT-NEXT: tail call void @takesMyInt(i32 [[RAWINT]])
 

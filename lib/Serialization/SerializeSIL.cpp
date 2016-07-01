@@ -507,7 +507,7 @@ void SILSerializer::writeOneTypeOneOperandLayout(ValueKind valueKind,
 /// Write an instruction that looks exactly like a conversion: all
 /// important information is encoded in the operand and the result type.
 void SILSerializer::writeConversionLikeInstruction(const SILInstruction *I) {
-  assert(I->getNumOperands() == 1);
+  assert(I->getNumOperands() - I->getOpenedArchetypeOperands().size() == 1);
   writeOneTypeOneOperandLayout(I->getKind(), 0, I->getType(),
                                I->getOperand(0));
 }
@@ -1395,15 +1395,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     handleSILDeclRef(S, AMI->getMember(), ListOfValues);
 
     // Add an optional operand.
-    TypeID OperandTy =
-        AMI->hasOperand()
-            ? S.addTypeRef(AMI->getOperand()->getType().getSwiftRValueType())
-            : TypeID();
-    unsigned OperandTyCategory =
-        AMI->hasOperand() ? (unsigned)AMI->getOperand()->getType().getCategory()
-                          : 0;
-    SILValue OptionalOpenedExistential =
-        AMI->hasOperand() ? AMI->getOperand() : SILValue();
+    TypeID OperandTy = TypeID();
+    unsigned OperandTyCategory = 0;
+    SILValue OptionalOpenedExistential = SILValue();
     auto OperandValueId = addValueRef(OptionalOpenedExistential);
 
     SILInstWitnessMethodLayout::emitRecord(
@@ -1532,12 +1526,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(
        S.addTypeRef(IBSHI->getInvokeFunction()->getType().getSwiftRValueType()));
     // Always a value, don't need to save category
+    ListOfValues.push_back(IBSHI->getSubstitutions().size());
     
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
              S.addTypeRef(IBSHI->getType().getSwiftRValueType()),
              (unsigned)IBSHI->getType().getCategory(),
              ListOfValues);
+    S.writeSubstitutions(IBSHI->getSubstitutions(), SILAbbrCodes);
+
     break;
   }
   case ValueKind::MarkUninitializedBehaviorInst:
@@ -1822,6 +1819,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // serialize everything.
   // FIXME: Resilience: could write out vtable for fragile classes.
   const DeclContext *assocDC = SILMod->getAssociatedContext();
+  assert(assocDC && "cannot serialize SIL without an associated DeclContext");
   for (const SILVTable &vt : SILMod->getVTables()) {
     if (ShouldSerializeAll &&
         vt.getClass()->isChildContextOf(assocDC))

@@ -104,9 +104,9 @@ namespace {
     /// \param foundInType The type through which we found the
     /// declaration.
     void add(ValueDecl *found, ValueDecl *base, Type foundInType) {
-      // If we only want types and we didn't get one, bail out.
-      if (Options.contains(NameLookupFlags::OnlyTypes) && !isa<TypeDecl>(found))
-        return;
+      // If we only want types, AST name lookup should not yield anything else.
+      assert(!Options.contains(NameLookupFlags::OnlyTypes) ||
+             isa<TypeDecl>(found));
 
       ConformanceCheckOptions conformanceOptions;
       if (Options.contains(NameLookupFlags::KnownPrivate))
@@ -245,6 +245,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     subOptions |= NL_DynamicLookup;
   if (options.contains(NameLookupFlags::IgnoreAccessibility))
     subOptions |= NL_IgnoreAccessibility;
+  if (options.contains(NameLookupFlags::OnlyTypes))
+    subOptions |= NL_OnlyTypes;
 
   // Dig out the type that we'll actually be looking into, and determine
   // whether it is a nominal type.
@@ -327,7 +329,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
          
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
-  NLOptions subOptions = NL_QualifiedDefault;
+  NLOptions subOptions = NL_QualifiedDefault | NL_OnlyTypes;
+
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::ProtocolMembers))
@@ -342,41 +345,60 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   llvm::SmallPtrSet<CanType, 4> types;
   SmallVector<AssociatedTypeDecl *, 4> inferredAssociatedTypes;
   for (auto decl : decls) {
-    // Ignore non-types found by name lookup.
-    auto typeDecl = dyn_cast<TypeDecl>(decl);
-    if (!typeDecl)
-      continue;
+    auto *typeDecl = cast<TypeDecl>(decl);
 
     // FIXME: This should happen before we attempt shadowing checks.
     validateDecl(typeDecl);
     if (!typeDecl->hasType()) // FIXME: recursion-breaking hack
       continue;
-    
-    // If we found a member of a protocol type when looking into a non-protocol,
-    // non-archetype type, only include this member in the result set if
-    // this member was used as the default definition or otherwise inferred.
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-      if (!type->is<ArchetypeType>() && !type->isExistentialType()) {
-        inferredAssociatedTypes.push_back(assocType);
-        continue;
-      }
-    }
 
-    // Ignore typealiases found in protocol members.
-    if (auto alias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      auto aliasParent = alias->getParent();
-      if (aliasParent != dc && isa<ProtocolDecl>(aliasParent))
-        continue;
+    // If we're looking up a member of a protocol, we must take special care.
+    if (typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      // We don't allow lookups of an associated type or typealias of an
+      // existential type, because we have no way to represent such types.
+      //
+      // This is diagnosed further on down in resolveNestedIdentTypeComponent().
+      if (type->isExistentialType()) {
+        auto memberType = typeDecl->getInterfaceType()->getRValueInstanceType();
+
+        if (memberType->hasTypeParameter()) {
+          // If we haven't seen this type result yet, add it to the result set.
+          if (types.insert(memberType->getCanonicalType()).second)
+            result.Results.push_back({typeDecl, memberType});
+
+          continue;
+        }
+      }
+
+      // If we're looking up an associated type of a concrete type,
+      // record it later for conformance checking; we might find a more
+      // direct typealias with the same name later.
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+        if (!type->is<ArchetypeType>()) {
+          inferredAssociatedTypes.push_back(assocType);
+          continue;
+        }
+      }
+
+      // We are looking up an associated type of an archetype, or a
+      // protocol typealias or an archetype or concrete type.
+      //
+      // Proceed with the usual path below.
     }
 
     // Substitute the base into the member's type.
-    if (Type memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                                  typeDecl, type,
-                                                  /*isTypeReference=*/true)) {
-      // If we haven't seen this type result yet, add it to the result set.
-      if (types.insert(memberType->getCanonicalType()).second)
-        result.Results.push_back({typeDecl, memberType});
-    }
+    auto memberType = substMemberTypeWithBase(dc->getParentModule(),
+                                              typeDecl, type,
+                                              /*isTypeReference=*/true);
+
+    // FIXME: It is not clear why this substitution can fail, but the
+    // standard library won't build without this check.
+    if (!memberType)
+      continue;
+
+    // If we haven't seen this type result yet, add it to the result set.
+    if (types.insert(memberType->getCanonicalType()).second)
+      result.Results.push_back({typeDecl, memberType});
   }
 
   if (result.Results.empty()) {

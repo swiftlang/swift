@@ -13,13 +13,13 @@ import Foundation
 
 protocol TestableUnicodeCodec : UnicodeCodec {
   associatedtype CodeUnit : Integer
-  static func encodingId() -> NSStringEncoding
+  static func encodingId() -> String.Encoding
   static func name() -> NSString
 }
 
 extension UTF8 : TestableUnicodeCodec {
-  static func encodingId() -> NSStringEncoding {
-    return NSUTF8StringEncoding
+  static func encodingId() -> String.Encoding {
+    return .utf8
   }
   static func name() -> NSString {
     return "UTF8"
@@ -27,8 +27,8 @@ extension UTF8 : TestableUnicodeCodec {
 }
 
 extension UTF16 : TestableUnicodeCodec {
-  static func encodingId() -> NSStringEncoding {
-    return NSUTF16LittleEndianStringEncoding
+  static func encodingId() -> String.Encoding {
+    return .utf16LittleEndian
   }
   static func name() -> NSString {
     return "UTF16"
@@ -36,8 +36,8 @@ extension UTF16 : TestableUnicodeCodec {
 }
 
 extension UTF32 : TestableUnicodeCodec {
-  static func encodingId() -> NSStringEncoding {
-    return NSUTF32LittleEndianStringEncoding
+  static func encodingId() -> String.Encoding {
+    return .utf32LittleEndian
   }
   static func name() -> NSString {
     return "UTF32"
@@ -69,7 +69,7 @@ func nthUnicodeScalar(_ n: UInt32) -> UnicodeScalar {
 // `buffer` should have a length >= 4
 func nsEncode<CodeUnit>(
   _ c: UInt32,
-  _ encoding: NSStringEncoding,
+  _ encoding: String.Encoding,
   _ buffer: inout [CodeUnit],
   _ used: inout Int
 ) {
@@ -79,13 +79,13 @@ func nsEncode<CodeUnit>(
   let s = NSString(
     bytes: &c,
     length: 4,
-    encoding: NSUTF32LittleEndianStringEncoding)!
+    encoding: String.Encoding.utf32LittleEndian.rawValue)!
 
   s.getBytes(
     &buffer,
     maxLength: buffer.count,
     usedLength: &used,
-    encoding: encoding,
+    encoding: encoding.rawValue,
     options: [],
     range: NSRange(location: 0, length: s.length),
     remaining: nil)

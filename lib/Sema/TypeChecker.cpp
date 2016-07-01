@@ -747,13 +747,15 @@ static Optional<Type> getTypeOfCompletionContextExpr(
                         TypeChecker &TC,
                         DeclContext *DC,
                         CompletionTypeCheckKind kind,
-                        Expr *&parsedExpr) {
+                        Expr *&parsedExpr,
+                        ConcreteDeclRef &referencedDecl) {
   switch (kind) {
   case CompletionTypeCheckKind::Normal:
     // Handle below.
     break;
 
   case CompletionTypeCheckKind::ObjCKeyPath:
+    referencedDecl = nullptr;
     if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(parsedExpr))
       return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResulType=*/true);
 
@@ -762,7 +764,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
 
   CanType originalType = parsedExpr->getType().getCanonicalTypeOrNull();
   if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
-                                   FreeTypeVariableBinding::GenericParameters))
+                 referencedDecl, FreeTypeVariableBinding::GenericParameters))
     return T;
 
   // Try to recover if we've made any progress.
@@ -781,17 +783,20 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(
                         ASTContext &Ctx,
                         DeclContext *DC,
                         CompletionTypeCheckKind kind,
-                        Expr *&parsedExpr) {
+                        Expr *&parsedExpr,
+                        ConcreteDeclRef &referencedDecl) {
 
   if (Ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker *>(Ctx.getLazyResolver());
-    return ::getTypeOfCompletionContextExpr(*TC, DC, kind, parsedExpr);
+    return ::getTypeOfCompletionContextExpr(*TC, DC, kind, parsedExpr,
+                                            referencedDecl);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine diags(Ctx.SourceMgr);
     TypeChecker TC(Ctx, diags);
     // Try to solve for the actual type of the expression.
-    return ::getTypeOfCompletionContextExpr(TC, DC, kind, parsedExpr);
+    return ::getTypeOfCompletionContextExpr(TC, DC, kind, parsedExpr,
+                                            referencedDecl);
   }
 }
 

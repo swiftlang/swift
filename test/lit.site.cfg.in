@@ -1,3 +1,15 @@
+# lit.site.cfg.in - Local configuration for the 'lit' test runner -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# -----------------------------------------------------------------------------
+
 import os
 import platform
 import sys
@@ -18,6 +30,8 @@ config.variant_sdk = "@VARIANT_SDK@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
 config.swiftlib_dir = "@LIT_SWIFTLIB_DIR@"
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
+config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
+config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
 
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 
@@ -25,6 +39,14 @@ if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
 else:
     config.available_features.add('no_asan')
+
+if "@SWIFT_RUNTIME_ENABLE_LEAK_CHECKER@" == "TRUE":
+    config.available_features.add('leak-checker')
+
+if '@SWIFT_TOOLS_ENABLE_LTO@'.lower() in ['full', 'thin']:
+    config.available_features.add('lto')
+else:
+    config.available_features.add('no_lto')
 
 if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
     config.available_features.add('asserts')
@@ -44,6 +66,13 @@ if "@SWIFT_OPTIMIZED@" == "TRUE":
 
 if "@SWIFT_HAVE_WORKING_STD_REGEX@" == "FALSE":
     config.available_features.add('broken_std_regex')
+
+if "@CMAKE_GENERATOR@" == "Xcode":
+    xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
+                                 'bin')
+    lit_config.note('Adding to path: ' + xcode_bin_dir)
+    config.environment['PATH'] = \
+      os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
 
 # Let the main config do the real work.
 if config.test_exec_root is None:

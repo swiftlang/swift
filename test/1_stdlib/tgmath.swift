@@ -1,13 +1,13 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-#if os(Linux) || os(FreeBSD)
+#if os(Linux) || os(FreeBSD) || os(Android)
   import Glibc
   // FIXME: this is a quick hack for non Darwin platforms
   // where they doesn't have CoreGraphics module.
   #if arch(i386) || arch(arm)
     typealias CGFloat = Float
-  #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+  #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
     typealias CGFloat = Double
   #endif
 #else

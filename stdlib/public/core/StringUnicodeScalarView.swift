@@ -245,13 +245,13 @@ extension String {
         }
       }
 
-      /// Advances to the next element and returns it.
+      /// Advances to the next element and returns it, or `nil` if no next
+      /// element exists.
       ///
-      /// Do not call this method if a copy of the iterator has been advanced.
+      /// Once `nil` has been returned, all subsequent calls return `nil`.
       ///
-      /// - Returns: The next element in the collection if an element is
-      ///   available; otherwise, `nil`. After returning `nil` once, this
-      ///   method returns `nil` on every subsequent call.
+      /// - Precondition: `next()` has not been applied to a copy of `self`
+      ///   since the copy was made.
       public mutating func next() -> UnicodeScalar? {
         var result: UnicodeDecodingResult
         if _baseSet {
@@ -374,9 +374,8 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// - Parameter newElements: A sequence of Unicode scalar values.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting view.
-  public mutating func append<
-    S : Sequence where S.Iterator.Element == UnicodeScalar
-  >(contentsOf newElements: S) {
+  public mutating func append<S : Sequence>(contentsOf newElements: S)
+    where S.Iterator.Element == UnicodeScalar {
     _core.append(contentsOf: newElements.lazy.flatMap { $0.utf16 })
   }
   
@@ -395,11 +394,10 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
   ///   removes elements at the end of the string, the complexity is O(*n*),
   ///   where *n* is equal to `bounds.count`.
-  public mutating func replaceSubrange<
-    C: Collection where C.Iterator.Element == UnicodeScalar
-  >(
-    _ bounds: Range<Index>, with newElements: C
-  ) {
+  public mutating func replaceSubrange<C>(
+    _ bounds: Range<Index>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == UnicodeScalar {
     let rawSubRange: Range<Int> =
       bounds.lowerBound._position
       ..< bounds.upperBound._position
@@ -414,7 +412,7 @@ extension String.UnicodeScalarIndex {
   /// exactly to the specified `UTF16View` position.
   ///
   /// The following example finds the position of a space in a string's `utf16`
-  /// view and then converts that position to an index in the the string's
+  /// view and then converts that position to an index in the string's
   /// `unicodeScalars` view:
   ///
   ///     let cafe = "Café 🍵"

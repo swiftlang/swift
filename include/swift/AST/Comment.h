@@ -77,8 +77,14 @@ public:
   void operator delete(void *Data) = delete;
 };
 
-Optional<DocComment *>getDocComment(swift::markup::MarkupContext &Context,
-                                    const Decl *D);
+/// Get a parsed documentation comment for the declaration, if there is one.
+Optional<DocComment *>getSingleDocComment(swift::markup::MarkupContext &Context,
+                                          const Decl *D);
+
+/// Attempt to get a doc comment from the declaration, or other inherited
+/// sources, like from base classes or protocols.
+Optional<DocComment *> getCascadingDocComment(swift::markup::MarkupContext &MC,
+                                             const Decl *D);
 
 } // namespace swift
 

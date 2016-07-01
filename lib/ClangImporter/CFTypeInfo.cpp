@@ -89,10 +89,10 @@ CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
             isWhitelistedCFTypeName(typedefDecl->getName())) {
           return forRecord(isConst, record->getDecl());
         }
-      } else if (isConst && pointee->isVoidType()) {
+      } else if (pointee->isVoidType()) {
         if (typedefDecl->hasAttr<clang::ObjCBridgeAttr>() ||
             isWhitelistedCFTypeName(typedefDecl->getName())) {
-          return forConstVoid();
+          return isConst ? forConstVoid() : forVoid();
         }
       }
     }

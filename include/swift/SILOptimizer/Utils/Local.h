@@ -42,6 +42,12 @@ inline ValueBaseUserRange makeUserRange(
 
 using DeadInstructionSet = llvm::SmallSetVector<SILInstruction *, 8>;
 
+/// \brief Create a retain of \p Ptr before the \p InsertPt.
+SILInstruction *createIncrementBefore(SILValue Ptr, SILInstruction *InsertPt);
+
+/// \brief Create a release of \p Ptr before the \p InsertPt.
+SILInstruction *createDecrementBefore(SILValue Ptr, SILInstruction *InsertPt);
+
 /// \brief For each of the given instructions, if they are dead delete them
 /// along with their dead operands.
 ///

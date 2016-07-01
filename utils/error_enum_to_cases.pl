@@ -3,7 +3,7 @@
 use strict;
 use English;
 
-sub translateAvailability($) {
+sub translateAvailability {
   my $version = shift;
   $version =~ s/^\s+|\s+$//g;
   if ($version eq "NA") { return "unavailable"; }

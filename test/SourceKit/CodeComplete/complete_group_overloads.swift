@@ -1,3 +1,5 @@
+// XFAIL: broken_std_regex
+
 struct A {}
 struct B {}
 

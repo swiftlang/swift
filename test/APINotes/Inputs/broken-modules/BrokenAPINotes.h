@@ -9,3 +9,4 @@ void ZXSpectrumSetRegister(ZXSpectrum *self, int which, unsigned char newValue);
 unsigned char ZXSpectrumGetMisnamedRegister(const ZXSpectrum *self, int which);
 void ZXSpectrumSetMisnamedRegister(ZXSpectrum *self, int which, unsigned char newValue);
 
+void ZXSpectrumHelperReset(void);

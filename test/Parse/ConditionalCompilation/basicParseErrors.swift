@@ -61,3 +61,6 @@ struct S {
 
 #if arch(leg) // expected-warning {{unknown architecture for build configuration 'arch'}}
 #endif
+
+#if _endian(mid) // expected-warning {{unknown endianness for build configuration '_endian'}}
+#endif

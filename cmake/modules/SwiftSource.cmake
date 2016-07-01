@@ -79,8 +79,7 @@ function(handle_swift_sources
     # <rdar://problem/15972329>
     list(APPEND swift_compile_flags "-force-single-frontend-invocation")
 
-    # FIXME: Apply this on all platforms where the linker supports it.
-    if(SWIFTSOURCES_IS_STDLIB_CORE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    if(SWIFTSOURCES_IS_STDLIB_CORE)
       list(APPEND swift_compile_flags "-Xcc" "-D__SWIFT_CURRENT_DYLIB=swiftCore")
     endif()
 
@@ -370,6 +369,27 @@ function(_compile_swift_files dependency_target_out_var_name)
     set(swift_compiler_tool "${SWIFT_SOURCE_DIR}/utils/check-incremental" "${swift_compiler_tool}")
   endif()
 
+  set(outputs
+    ${SWIFTFILE_OUTPUT} "${module_file}" "${module_doc_file}"
+    ${apinote_files})
+
+  if(XCODE)
+    # HACK: work around an issue with CMake Xcode generator and the Swift
+    # driver.
+    #
+    # The Swift driver does not update the mtime of the output files if the
+    # existing output files on disk are identical to the ones that are about
+    # to be written.  This behavior confuses the makefiles used in CMake Xcode
+    # projects: the makefiles will not consider everything up to date after
+    # invoking the compiler.  As a result, the standard library gets rebuilt
+    # multiple times during a single build.
+    #
+    # To work around this issue we touch the output files so that their mtime
+    # always gets updated.
+    set(command_touch_outputs
+      COMMAND "${CMAKE_COMMAND}" -E touch ${outputs})
+  endif()
+
   add_custom_command_target(
       dependency_target
       ${command_create_dirs}
@@ -380,9 +400,8 @@ function(_compile_swift_files dependency_target_out_var_name)
         "${line_directive_tool}" "${source_files}" --
         "${swift_compiler_tool}" "${main_command}" ${swift_flags}
         ${output_option} "${source_files}"
-      OUTPUT
-        ${SWIFTFILE_OUTPUT} "${module_file}" "${module_doc_file}"
-        ${apinote_files}
+      ${command_touch_outputs}
+      OUTPUT ${outputs}
       DEPENDS
         ${swift_compiler_tool_dep}
         ${source_files} ${SWIFTFILE_DEPENDS}

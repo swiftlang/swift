@@ -13,6 +13,7 @@
 #include "sourcekitd/sourcekitd.h"
 
 #include "TestOptions.h"
+#include "SourceKit/Support/Concurrency.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
@@ -149,7 +150,7 @@ static sourcekitd_uid_t SemaDiagnosticStage;
 
 static sourcekitd_uid_t NoteDocUpdate;
 
-static dispatch_semaphore_t semaSemaphore;
+static SourceKit::Semaphore semaSemaphore(0);
 static sourcekitd_response_t semaResponse;
 static const char *semaName;
 
@@ -221,8 +222,6 @@ static int skt_main(int argc, const char **argv) {
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
   NoteDocUpdate = sourcekitd_uid_get_from_cstr("source.notification.editor.documentupdate");
-
-  semaSemaphore = dispatch_semaphore_create(0);
 
   RequestProtocolVersion = sourcekitd_uid_get_from_cstr("source.request.protocol_version");
   RequestDemangle = sourcekitd_uid_get_from_cstr("source.request.demangle");
@@ -864,8 +863,7 @@ static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename) {
 
   // Wait for the notification that semantic info is available.
   // But only for 1 min.
-  dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * 60);
-  bool expired = dispatch_semaphore_wait(semaSemaphore, when);
+  bool expired = semaSemaphore.wait(60 * 1000);
   if (expired) {
     llvm::report_fatal_error("Never got notification for semantic info");
   }
@@ -914,7 +912,7 @@ static void notification_receiver(sourcekitd_response_t resp) {
     sourcekitd_request_dictionary_set_string(edReq, KeySourceText, "");
     semaResponse = sourcekitd_send_request_sync(edReq);
     sourcekitd_request_release(edReq);
-    dispatch_semaphore_signal(semaSemaphore);
+    semaSemaphore.signal();
   }
 }
 

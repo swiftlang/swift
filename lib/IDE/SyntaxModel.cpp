@@ -84,9 +84,11 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       Length = Tok.getLength();
 
       if (LiteralStartLoc.hasValue() && Length.hasValue()) {
+        if (Tok.getKind() != tok::r_paren)
+          continue;
         Kind = SyntaxNodeKind::ObjectLiteral;
         Nodes.emplace_back(Kind, CharSourceRange(SM, LiteralStartLoc.getValue(),
-          Tok.getRange().getEnd()));
+                                                 Tok.getRange().getEnd()));
         LiteralStartLoc = Optional<SourceLoc>();
         continue;
       }
@@ -96,21 +98,18 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
 
-#define POUND_NORMAL_KEYWORD(Name) case tok::pound_##Name:
+#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) \
+      case tok::pound_##Name:
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:
-#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) case tok::pound_##Name:
-#include "swift/Parse/Tokens.def"    
+#include "swift/Parse/Tokens.def"
+        LiteralStartLoc = Loc;
+        continue;
+
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto)
+#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg)
+#define POUND_KEYWORD(Name) case tok::pound_##Name:
+#include "swift/Parse/Tokens.def"
         Kind = SyntaxNodeKind::Keyword;
-        break;
-
-#define POUND_CONFIG(Name) case tok::pound_##Name:
-#include "swift/Parse/Tokens.def"    
-        Kind = SyntaxNodeKind::BuildConfigKeyword;
-        break;
-
-      case tok::pound_line:
-        Kind = Tok.isAtStartOfLine() ? SyntaxNodeKind::BuildConfigKeyword :
-                                       SyntaxNodeKind::Keyword;
         break;
       case tok::identifier:
         if (Tok.getText().startswith("<#"))

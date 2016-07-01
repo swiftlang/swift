@@ -14,9 +14,11 @@
 #
 # ----------------------------------------------------------------------------
 
-import subprocess
+from __future__ import absolute_import
 
 from numbers import Number
+
+from . import shell
 
 
 class CMakeOptions(object):
@@ -113,6 +115,9 @@ class CMake(object):
             define("LLVM_VERSION_MINOR:STRING", minor)
             define("LLVM_VERSION_PATCH:STRING", patch)
 
+        if args.build_ninja and args.cmake_generator == 'Ninja':
+            define('CMAKE_MAKE_PROGRAM', toolchain.ninja)
+
         return options
 
     def build_args(self):
@@ -122,8 +127,8 @@ class CMake(object):
         toolchain = self.toolchain
         jobs = args.build_jobs
         if args.distcc:
-            jobs = str(subprocess.check_output(
-                [toolchain.distcc, '-j']).decode()).rstrip()
+            jobs = shell.capture([toolchain.distcc, '-j'],
+                                 dry_run=False, echo=False).rstrip()
 
         build_args = list(args.build_args)
 

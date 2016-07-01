@@ -99,7 +99,7 @@ public func test_devirt_protocol_method_invocation(_ c: C) -> Int {
 // In fact, the call is expected to be inlined and then constant-folded
 // into a single integer constant.
 
-// CHECK-LABEL: sil [noinline] @_TTSf4dg___TF34devirt_protocol_method_invocations48test_devirt_protocol_extension_method_invocationFCS_1CVs5Int32
+// CHECK-LABEL: sil [noinline] @_TTSf4d___TF34devirt_protocol_method_invocations48test_devirt_protocol_extension_method_invocationFCS_1CVs5Int32
 // CHECK-NOT: checked_cast
 // CHECK-NOT: open_existential
 // CHECK-NOT: witness_method

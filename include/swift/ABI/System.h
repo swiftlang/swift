@@ -97,4 +97,9 @@
 // Heap objects are pointer-aligned, so the low three bits are unused.
 #define SWIFT_ABI_POWERPC64_SWIFT_SPARE_BITS_MASK 0x0000000000000007ULL
 
+/*********************************** s390x ************************************/
+
+// Top byte of pointers is unused, and heap objects are eight-byte aligned.
+#define SWIFT_ABI_S390X_SWIFT_SPARE_BITS_MASK 0x0000000000000007ULL
+
 #endif /* SWIFT_ABI_SYSTEM_H */

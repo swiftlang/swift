@@ -404,6 +404,7 @@ enum class ObjCReason {
   ExplicitlyDynamic,
   ExplicitlyObjC,
   ExplicitlyIBOutlet,
+  ExplicitlyIBAction,
   ExplicitlyNSManaged,
   MemberOfObjCProtocol,
   ImplicitlyObjC,
@@ -510,6 +511,59 @@ public:
   /// as C function pointers when the function's captures have not yet been
   /// computed.
   llvm::DenseMap<AnyFunctionRef, std::vector<Expr*>> LocalCFunctionPointers;
+
+private:
+  /// Return statements with functions as return values.
+  llvm::DenseMap<AbstractFunctionDecl *, llvm::DenseSet<ReturnStmt *>>
+    FunctionAsReturnValue;
+
+  /// Function apply expressions with a certain function as an argument.
+  llvm::DenseMap<AbstractFunctionDecl *, llvm::DenseSet<ApplyExpr *>>
+    FunctionAsEscapingArg;
+
+public:
+  /// Record an occurrence of a function that captures inout values as an
+  /// argument.
+  ///
+  /// \param decl the function that occurs as an argument.
+  ///
+  /// \param apply the expression in which the function appears.
+  void addEscapingFunctionAsArgument(AbstractFunctionDecl *decl,
+                                     ApplyExpr *apply) {
+    FunctionAsEscapingArg[decl].insert(apply);
+  }
+
+  /// Find occurrences of a function that captures inout values as arguments.
+  ///
+  /// \param decl the function that occurs as an argument.
+  ///
+  /// \returns Expressions in which the function appears as arguments.
+  llvm::DenseSet<ApplyExpr *> &
+  getEscapingFunctionAsArgument(AbstractFunctionDecl *decl) {
+    return FunctionAsEscapingArg[decl];
+  }
+
+  /// Record an occurrence of  a function that captures inout values as a return
+  /// value
+  ///
+  /// \param decl the function that occurs as a return value.
+  ///
+  /// \param stmt the expression in which the function appears.
+  void addEscapingFunctionAsReturnValue(AbstractFunctionDecl *decl,
+                                        ReturnStmt *stmt) {
+    FunctionAsReturnValue[decl].insert(stmt);
+  }
+
+  /// Find occurrences of a function that captures inout values as return
+  /// values.
+  ///
+  /// \param decl the function that occurs as a return value.
+  ///
+  /// \returns Expressions in which the function appears as arguments.
+  llvm::DenseSet<ReturnStmt *> &
+  getEscapingFunctionAsReturnValue(AbstractFunctionDecl *decl) {
+    return FunctionAsReturnValue[decl];
+  }
 
 private:
   Type IntLiteralType;
@@ -720,6 +774,7 @@ public:
   /// to be in a correct and valid form.
   ///
   /// \param type The generic type to which to apply arguments.
+  /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param generic The arguments to apply with the angle bracket range for
@@ -732,8 +787,8 @@ public:
   /// error.
   ///
   /// \see applyUnboundGenericArguments
-  Type applyGenericArguments(Type type, SourceLoc loc, DeclContext *dc,
-                             GenericIdentTypeRepr *generic,
+  Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
+                             DeclContext *dc, GenericIdentTypeRepr *generic,
                              bool isGenericSignature,
                              GenericTypeResolver *resolver);
 
@@ -743,7 +798,8 @@ public:
   /// number of generic arguments given, whereas applyGenericArguments emits
   /// diagnostics in those cases.
   ///
-  /// \param unbound The unbound generic type to which to apply arguments.
+  /// \param type The unbound generic type to which to apply arguments.
+  /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param genericArgs The list of generic arguments to apply to the type.
@@ -755,8 +811,8 @@ public:
   /// error.
   ///
   /// \see applyGenericArguments
-  Type applyUnboundGenericArguments(UnboundGenericType *unbound, SourceLoc loc,
-                                    DeclContext *dc,
+  Type applyUnboundGenericArguments(Type type, GenericTypeDecl *decl,
+                                    SourceLoc loc, DeclContext *dc,
                                     MutableArrayRef<TypeLoc> genericArgs,
                                     bool isGenericSignature,
                                     GenericTypeResolver *resolver);
@@ -965,6 +1021,12 @@ public:
                       std::function<bool(ArchetypeBuilder &)> inferRequirements,
                       bool &invalid);
 
+  /// Finalize the given generic parameter list, assigning archetypes to
+  /// the generic parameters.
+  void finalizeGenericParamList(ArchetypeBuilder &builder,
+                                GenericParamList *genericParams,
+                                DeclContext *dc);
+
   /// Validate the signature of a generic type.
   ///
   /// \param nominal The generic type.
@@ -1154,6 +1216,9 @@ public:
   ///
   /// \param expr The expression to type-check.
   ///
+  /// \param referencedDecl Will be set to the declaration that is referenced by
+  /// the expression.
+  ///
   /// \param allowFreeTypeVariables Whether free type variables are allowed in
   /// the solution, and what to do with them.
   ///
@@ -1165,6 +1230,7 @@ public:
   /// FIXME: expr may still be modified...
   Optional<Type> getTypeOfExpressionWithoutApplying(
       Expr *&expr, DeclContext *dc,
+      ConcreteDeclRef &referencedDecl,
       FreeTypeVariableBinding allowFreeTypeVariables =
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
@@ -1777,8 +1843,7 @@ public:
   /// Checks an "ignored" expression to see if it's okay for it to be ignored.
   ///
   /// An ignored expression is one that is not nested within a larger
-  /// expression or statement. The warning from the \@warn_unused_result
-  /// attribute is produced here.
+  /// expression or statement.
   void checkIgnoredExpr(Expr *E);
 
   // Emits a diagnostic, if necessary, for a reference to a declaration
@@ -1872,6 +1937,12 @@ public:
                                               ConstructorDecl *ctorDecl,
                                               bool SuppressDiagnostics);
 
+  /// Attempt to omit needless words from the name of the given declaration.
+  Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
+
+  /// Attempt to omit needless words from the name of the given declaration.
+  Optional<Identifier> omitNeedlessWords(VarDecl *var);
+
   /// Check for needless words in the name of the given function/constructor.
   void checkOmitNeedlessWords(AbstractFunctionDecl *afd);
 
@@ -1933,12 +2004,6 @@ public:
   /// The unescaped message to display to the user.
   const StringRef Message;
 };
-
-/// Attempt to omit needless words from the name of the given declaration.
-Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
-
-/// Attempt to omit needless words from the name of the given declaration.
-Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
 } // end namespace swift
 

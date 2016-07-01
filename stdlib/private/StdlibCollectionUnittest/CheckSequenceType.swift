@@ -1450,11 +1450,6 @@ extension TestSuite {
   public func addSequenceTests<
     S : Sequence,
     SequenceWithEquatableElement : Sequence
-    where
-    SequenceWithEquatableElement.Iterator.Element : Equatable,
-    S.SubSequence : Sequence,
-    S.SubSequence.Iterator.Element == S.Iterator.Element,
-    S.SubSequence.SubSequence == S.SubSequence
   >(
     _ testNamePrefix: String = "",
     makeSequence: ([S.Iterator.Element]) -> S,
@@ -1466,7 +1461,12 @@ extension TestSuite {
     extractValueFromEquatable: ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
-  ) {
+  ) where
+    SequenceWithEquatableElement.Iterator.Element : Equatable,
+    S.SubSequence : Sequence,
+    S.SubSequence.Iterator.Element == S.Iterator.Element,
+    S.SubSequence.SubSequence == S.SubSequence {
+
     var testNamePrefix = testNamePrefix
 
     if checksAdded.contains(#function) {
@@ -1484,7 +1484,7 @@ extension TestSuite {
       return makeSequenceOfEquatable(elements.map(wrapValueIntoEquatable))
     }
 
-    testNamePrefix += String(S.Type)
+    testNamePrefix += String(S.Type.self)
 
     let isMultiPass = makeSequence([])
       ._preprocessingPass { true } ?? false

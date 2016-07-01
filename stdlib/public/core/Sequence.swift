@@ -178,16 +178,15 @@ public protocol IteratorProtocol {
   /// The type of element traversed by the iterator.
   associatedtype Element
 
-  /// Advances and returns the next element of the underlying sequence, or
-  /// `nil` if no next element exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// Repeatedly calling this method returns, in order, all the elements of the
-  /// underlying sequence. After the sequence has run out of elements, the
-  /// `next()` method returns `nil`.
+  /// underlying sequence.  As soon as the sequence has run out of elements, all
+  /// subsequent calls return `nil`.
   ///
-  /// You must not call this method if it has previously returned `nil` or if
-  /// any other copy of this iterator has been advanced with a call to its
-  /// `next()` method.
+  /// You must not call this method if any other copy of this iterator has been
+  /// advanced with a call to its `next()` method.
   ///
   /// The following example shows how an iterator can be used explicitly to
   /// emulate a `for`-`in` loop. First, retrieve a sequence's iterator, and
@@ -511,8 +510,11 @@ public protocol Sequence {
   func suffix(_ maxLength: Int) -> SubSequence
 
   /// Returns the longest possible subsequences of the sequence, in order, that
-  /// don't contain elements satisfying the given predicate. Elements that are
-  /// used to split the sequence are not returned as part of any subsequence.
+  /// don't contain elements satisfying the given predicate.
+  ///
+  /// The resulting array consists of at most `maxSplits + 1` subsequences.
+  /// Elements that are used to split the sequence are not returned as part of
+  /// any subsequence.
   ///
   /// The following examples show the effects of the `maxSplits` and
   /// `omittingEmptySubsequences` parameters when splitting a string using a
@@ -522,7 +524,7 @@ public protocol Sequence {
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
   ///     print(line.characters.split(isSeparator: { $0 == " " })
   ///                          .map(String.init))
-  ///     // Prints "["BLANCHE:", "I", "don't", "want", "realism.", "I", "want", "magic!"]"
+  ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
@@ -823,7 +825,7 @@ extension Sequence {
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
   ///     print(line.characters.split(isSeparator: { $0 == " " })
   ///                          .map(String.init))
-  ///     // Prints "["BLANCHE:", "I", "don't", "want", "realism.", "I", "want", "magic!"]"
+  ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
@@ -989,8 +991,11 @@ extension Sequence {
 
 extension Sequence where Iterator.Element : Equatable {
   /// Returns the longest possible subsequences of the sequence, in order,
-  /// around elements equal to the given element. Elements that are used to
-  /// split the sequence are not returned as part of any subsequence.
+  /// around elements equal to the given element.
+  ///
+  /// The resulting array consists of at most `maxSplits + 1` subsequences.
+  /// Elements that are used to split the sequence are not returned as part of
+  /// any subsequence.
   ///
   /// The following examples show the effects of the `maxSplits` and
   /// `omittingEmptySubsequences` parameters when splitting a string at each
@@ -1000,7 +1005,7 @@ extension Sequence where Iterator.Element : Equatable {
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
   ///     print(line.characters.split(separator: " ")
   ///                          .map(String.init))
-  ///     // Prints "["BLANCHE:", "I", "don't", "want", "realism.", "I", "want", "magic!"]"
+  ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
@@ -1196,12 +1201,13 @@ public struct IteratorSequence<
     _base = base
   }
 
-  /// Advances to the next element and returns it, or `nil` if no next
-  /// element exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made, and no preceding call to `self.next()`
-  ///   has returned `nil`.
+  ///   since the copy was made.
   public mutating func next() -> Base.Element? {
     return _base.next()
   }

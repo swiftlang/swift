@@ -285,21 +285,21 @@ enum r19997577Type {
   func reduce<Result>(_ initial: Result, _ combine: @noescape (Result, r19997577Type) -> Result) -> Result {
     let binary: @noescape (r19997577Type, r19997577Type) -> Result = { combine(combine(combine(initial, self), $0), $1) }
     switch self {
-    case Unit:
+    case .Unit:
       return combine(initial, self)
-    case let Function(t1, t2):
+    case let .Function(t1, t2):
       return binary(t1(), t2())
-    case let Sum(t1, t2):
+    case let .Sum(t1, t2):
       return binary(t1(), t2())
     }
   }
 }
 
 // type attribute and decl attribute
-func noescapeD(@noescape f: () -> Bool) {} // expected-warning {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape}}
+func noescapeD(@noescape f: () -> Bool) {} // expected-warning {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape }}
 func noescapeT(f: @noescape () -> Bool) {} // ok
-func autoclosureD(@autoclosure f: () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure}}
+func autoclosureD(@autoclosure f: () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure }}
 func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
 
 func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {}
-func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure}}
+func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure }}

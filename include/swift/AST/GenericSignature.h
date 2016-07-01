@@ -232,6 +232,11 @@ public:
   /// The type parameters must be known to not be concrete within the context.
   bool areSameTypeParameterInContext(Type type1, Type type2, ModuleDecl &mod);
 
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type, ModuleDecl &mod);
+  bool isCanonicalTypeInContext(Type type, ModuleDecl &mod);
+
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);

@@ -329,32 +329,6 @@ ArrayRef<Type> TypeBase::getAllGenericArgs(SmallVectorImpl<Type> &scratch) {
   return scratch;
 }
 
-ArrayRef<Substitution>
-TypeBase::gatherAllSubstitutions(Module *module,
-                                 LazyResolver *resolver,
-                                 DeclContext *gpContext) {
-  Type type(this);
-  while (type) {
-    // Skip to the parent of a nominal type.
-    if (auto nominal = type->getAs<NominalType>()) {
-      type = nominal->getParent();
-      if (gpContext)
-        gpContext = gpContext->getParent();
-      continue;
-    }
-
-    // Return the substitutions in a bound generic type.
-    // This walks any further parent types.
-    if (auto boundGeneric = type->getAs<BoundGenericType>())
-      return boundGeneric->getSubstitutions(module, resolver, gpContext);
-
-    llvm_unreachable("Not a nominal or bound generic type");
-  }
-
-  // Not a generic type.
-  return { };
-}
-
 bool TypeBase::isUnspecializedGeneric() {
   CanType CT = getCanonicalType();
   if (CT.getPointer() != this)
@@ -1129,29 +1103,15 @@ CanType TypeBase::getCanonicalType() {
     GenericSignature *sig = function->getGenericSignature()
       ->getCanonicalSignature();
     
-    // Canonicalize generic parameters.
-    SmallVector<GenericTypeParamType *, 4> genericParams;
-    for (auto param : function->getGenericParams()) {
-      auto newParam = param->getCanonicalType()->castTo<GenericTypeParamType>();
-      genericParams.push_back(newParam);
-    }
-
-    // Transform requirements.
-    SmallVector<Requirement, 4> requirements;
-    for (const auto &req : function->getRequirements()) {
-      auto firstType = req.getFirstType()->getCanonicalType();
-      auto secondType = req.getSecondType();
-      if (secondType)
-        secondType = secondType->getCanonicalType();
-      requirements.push_back(Requirement(req.getKind(), firstType, secondType));
-    }
-
-    // Transform input type.
-    auto inputTy = function->getInput()->getCanonicalType();
-    auto resultTy = function->getResult()->getCanonicalType();
+    // Transform the input and result types.
+    auto &ctx = function->getInput()->getASTContext();
+    auto &mod = *ctx.TheBuiltinModule;
+    auto inputTy = sig->getCanonicalTypeInContext(function->getInput(), mod);
+    auto resultTy = sig->getCanonicalTypeInContext(function->getResult(), mod);
 
     Result = GenericFunctionType::get(sig, inputTy, resultTy,
                                       function->getExtInfo());
+    assert(Result->isCanonical());
     break;
   }
       
@@ -1690,6 +1650,9 @@ bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
     }
     
     bool visitType(TypeBase *orig, CanType subst) {
+      if (CanType(orig) == subst)
+        return true;
+      
       llvm_unreachable("not a valid canonical type substitution");
     }
     
@@ -1811,11 +1774,10 @@ bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
         if (bgt->getDecl()->isInvalid())
           return false;
         
-        auto origSubs = bgt->getSubstitutions(bgt->getDecl()->getParentModule(),
-                                              Resolver);
-        auto substSubs = substBGT->getSubstitutions(
-                                              bgt->getDecl()->getParentModule(),
-                                              Resolver);
+        auto origSubs = bgt->gatherAllSubstitutions(
+            bgt->getDecl()->getParentModule(), Resolver);
+        auto substSubs = substBGT->gatherAllSubstitutions(
+            bgt->getDecl()->getParentModule(), Resolver);
         assert(origSubs.size() == substSubs.size());
         for (unsigned subi : indices(origSubs)) {
           if (!visit(origSubs[subi].getReplacement()->getCanonicalType(),
@@ -2104,6 +2066,10 @@ getForeignRepresentable(Type type, ForeignLanguage language,
                  : ForeignRepresentableKind::Trivial,
              nullptr };
   }
+
+  // In Objective-C, type parameters are always objects.
+  if (type->isTypeParameter() && language == ForeignLanguage::ObjectiveC)
+    return { ForeignRepresentableKind::Object, nullptr };
 
   auto nominal = type->getAnyNominal();
   if (!nominal)
@@ -2910,15 +2876,8 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
   if (dc->getAsProtocolOrProtocolExtensionContext()) {
-    // We only substitute into archetypes for now for protocols.
-    // FIXME: This seems like an odd restriction. Whatever is depending on
-    // this, shouldn't.
-    if (!baseTy->is<ArchetypeType>() && isa<ProtocolDecl>(dc))
-      return substitutions;
-
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
-    substitutions[dc->getProtocolSelf()->getArchetype()] = baseTy;
     substitutions[dc->getProtocolSelf()->getDeclaredType()
                     ->getCanonicalType()->castTo<GenericTypeParamType>()]
       = baseTy;

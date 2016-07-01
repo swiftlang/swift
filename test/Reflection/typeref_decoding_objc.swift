@@ -1,176 +1,79 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %S/Inputs/ObjectiveCTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/libTypesToReflect.%target-dylib-extension
-// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension | FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension | FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
 // REQUIRES: objc_interop
 
-// CHECK-32: FIELDS:
-// CHECK-32: =======
-// CHECK-32: TypesToReflect.OC
-// CHECK-32: -----------------
-// CHECK-32: TypesToReflect.GenericOC
-// CHECK-32: ------------------------
-// CHECK-32: TypesToReflect.HasObjCClasses
-// CHECK-32: -----------------------------
-// CHECK-32: url: __ObjC.NSURL
-// CHECK-32: (class __ObjC.NSURL)
+// CHECK: FIELDS:
+// CHECK: =======
+// CHECK: TypesToReflect.OC
+// CHECK: -----------------
+// CHECK: nsObject: __ObjC.NSObject
+// CHECK: (class __ObjC.NSObject)
 
-// CHECK-32: integer: Swift.Int
-// CHECK-32: (struct Swift.Int)
+// CHECK: nsString: __ObjC.NSString
+// CHECK: (class __ObjC.NSString)
 
-// CHECK-32: __ObjC.NSURL
-// CHECK-32: ------------
+// CHECK: cfString: __ObjC.CFString
+// CHECK: (class __ObjC.CFString)
 
-// CHECK-32: ASSOCIATED TYPES:
-// CHECK-32: =================
-// CHECK-32: - TypesToReflect.OC : Swift.AnyObject
-// CHECK-32: - TypesToReflect.OC : __ObjC.NSObjectProtocol
-// CHECK-32: - TypesToReflect.OC : Swift.Equatable
-// CHECK-32: - TypesToReflect.OC : Swift.Hashable
-// CHECK-32: - TypesToReflect.OC : Swift.CVarArg
-// CHECK-32: - TypesToReflect.OC : Swift.CustomStringConvertible
-// CHECK-32: - TypesToReflect.OC : Swift.CustomDebugStringConvertible
-// CHECK-32: - TypesToReflect.GenericOC : Swift.AnyObject
-// CHECK-32: - TypesToReflect.GenericOC : __ObjC.NSObjectProtocol
-// CHECK-32: - TypesToReflect.GenericOC : Swift.Equatable
-// CHECK-32: - TypesToReflect.GenericOC : Swift.Hashable
-// CHECK-32: - TypesToReflect.GenericOC : Swift.CVarArg
-// CHECK-32: - TypesToReflect.GenericOC : Swift.CustomStringConvertible
-// CHECK-32: - TypesToReflect.GenericOC : Swift.CustomDebugStringConvertible
-// CHECK-32: - TypesToReflect.HasObjCClasses : Swift.AnyObject
+// CHECK: aBlock: @convention(block) () -> ()
+// CHECK: (function convention=block
+// CHECK:   (tuple))
 
-// CHECK-32: BUILTIN TYPES:
-// CHECK-32: ==============
+// CHECK: ocnss: TypesToReflect.GenericOC<__ObjC.NSString>
+// CHECK: (bound_generic_class TypesToReflect.GenericOC
+// CHECK:   (class __ObjC.NSString))
 
-// CHECK-32: - __ObjC.NSURL:
-// CHECK-32: Size: 4
+// CHECK: occfs: TypesToReflect.GenericOC<__ObjC.CFString>
+// CHECK: (bound_generic_class TypesToReflect.GenericOC
+// CHECK:   (class __ObjC.CFString))
+
+// CHECK: TypesToReflect.GenericOC
+// CHECK: ------------------------
+
+// CHECK: TypesToReflect.HasObjCClasses
+// CHECK: -----------------------------
+// CHECK: url: __ObjC.NSURL
+// CHECK: (class __ObjC.NSURL)
+
+// CHECK: integer: Swift.Int
+// CHECK: (struct Swift.Int)
+
+// CHECK: rect: __C.CGRect
+// CHECK: (struct __C.CGRect)
+
+// CHECK: TypesToReflect.OP
+// CHECK: -----------------
+
+// CHECK: __ObjC.Bundle
+// CHECK: ---------------
+// CHECK: __ObjC.NSURL
+// CHECK: ------------
+// CHECK: __ObjC.NSCoding
+// CHECK: ---------------
+
+// CHECK: ASSOCIATED TYPES:
+// CHECK: =================
+
+// CHECK: BUILTIN TYPES:
+// CHECK: ==============
+
+// CHECK-32: - __C.CGRect:
+// CHECK-32: Size: 16
 // CHECK-32: Alignment: 4
-// CHECK-32: Stride: 4
-// CHECK-32: NumExtraInhabitants: 4096
+// CHECK-32: Stride: 16
+// CHECK-32: NumExtraInhabitants: 0
 
-// CHECK-32: CAPTURE DESCRIPTORS:
-// CHECK-32: ====================
-// CHECK-32: - Capture types:
-// CHECK-32: (struct Swift.StaticString)
-// CHECK-32: (struct Swift.StaticString)
-// CHECK-32: (struct Swift.UInt)
-// CHECK-32: (struct Swift.UInt)
-// CHECK-32: - Metadata sources:
-
-// CHECK-32: - Capture types:
-// CHECK-32: (function
-// CHECK-32:   (tuple))
-// CHECK-32: - Metadata sources:
-
-// CHECK-32: - Capture types:
-// CHECK-32: (struct Swift.StaticString)
-// CHECK-32: (bound_generic_struct Swift.UnsafeBufferPointer
-// CHECK-32:   (struct Swift.UInt8))
-// CHECK-32: (struct Swift.UInt)
-// CHECK-32: (struct Swift.UInt)
-// CHECK-32: - Metadata sources:
-
-// CHECK-32: - Capture types:
-// CHECK-32: (function
-// CHECK-32:   (tuple))
-// CHECK-32: - Metadata sources:
-
-// CHECK-32: - Capture types:
-// CHECK-32: (bound_generic_struct Swift.UnsafeBufferPointer
-// CHECK-32:   (struct Swift.UInt8))
-// CHECK-32: (bound_generic_struct Swift.UnsafeBufferPointer
-// CHECK-32:   (struct Swift.UInt8))
-// CHECK-32: (struct Swift.UInt)
-// CHECK-32: (struct Swift.UInt)
-// CHECK-32: - Metadata sources:
-
-// CHECK-32: - Capture types:
-// CHECK-32: (function
-// CHECK-32:   (tuple))
-// CHECK-32: - Metadata sources:
-
-
-// CHECK-64: FIELDS:
-// CHECK-64: =======
-// CHECK-64: TypesToReflect.OC
-// CHECK-64: -----------------
-// CHECK-64: TypesToReflect.GenericOC
-// CHECK-64: ------------------------
-// CHECK-64: TypesToReflect.HasObjCClasses
-// CHECK-64: -----------------------------
-// CHECK-64: url: __ObjC.NSURL
-// CHECK-64: (class __ObjC.NSURL)
-
-// CHECK-64: integer: Swift.Int
-// CHECK-64: (struct Swift.Int)
-
-// CHECK-64: __ObjC.NSURL
-// CHECK-64: ------------
-
-// CHECK-64: ASSOCIATED TYPES:
-// CHECK-64: =================
-// CHECK-64: - TypesToReflect.OC : Swift.AnyObject
-// CHECK-64: - TypesToReflect.OC : __ObjC.NSObjectProtocol
-// CHECK-64: - TypesToReflect.OC : Swift.Equatable
-// CHECK-64: - TypesToReflect.OC : Swift.Hashable
-// CHECK-64: - TypesToReflect.OC : Swift.CVarArg
-// CHECK-64: - TypesToReflect.OC : Swift.CustomStringConvertible
-// CHECK-64: - TypesToReflect.OC : Swift.CustomDebugStringConvertible
-// CHECK-64: - TypesToReflect.GenericOC : Swift.AnyObject
-// CHECK-64: - TypesToReflect.GenericOC : __ObjC.NSObjectProtocol
-// CHECK-64: - TypesToReflect.GenericOC : Swift.Equatable
-// CHECK-64: - TypesToReflect.GenericOC : Swift.Hashable
-// CHECK-64: - TypesToReflect.GenericOC : Swift.CVarArg
-// CHECK-64: - TypesToReflect.GenericOC : Swift.CustomStringConvertible
-// CHECK-64: - TypesToReflect.GenericOC : Swift.CustomDebugStringConvertible
-// CHECK-64: - TypesToReflect.HasObjCClasses : Swift.AnyObject
-
-// CHECK-64: BUILTIN TYPES:
-// CHECK-64: ==============
-
-// CHECK-64: - __ObjC.NSURL:
-// CHECK-64: Size: 8
+// CHECK-64: - __C.CGRect:
+// CHECK-64: Size: 32
 // CHECK-64: Alignment: 8
-// CHECK-64: Stride: 8
-// CHECK-64: NumExtraInhabitants: 2147483647
+// CHECK-64: Stride: 32
+// CHECK-64: NumExtraInhabitants: 0
 
-// CHECK-64: CAPTURE DESCRIPTORS:
-// CHECK-64: ====================
-// CHECK-64: - Capture types:
-// CHECK-64: (struct Swift.StaticString)
-// CHECK-64: (struct Swift.StaticString)
-// CHECK-64: (struct Swift.UInt)
-// CHECK-64: (struct Swift.UInt)
-// CHECK-64: - Metadata sources:
+// CHECK:      CAPTURE DESCRIPTORS:
+// CHECK-NEXT: ====================
 
-// CHECK-64: - Capture types:
-// CHECK-64: (function
-// CHECK-64:   (tuple))
-// CHECK-64: - Metadata sources:
-
-// CHECK-64: - Capture types:
-// CHECK-64: (struct Swift.StaticString)
-// CHECK-64: (bound_generic_struct Swift.UnsafeBufferPointer
-// CHECK-64:   (struct Swift.UInt8))
-// CHECK-64: (struct Swift.UInt)
-// CHECK-64: (struct Swift.UInt)
-// CHECK-64: - Metadata sources:
-
-// CHECK-64: - Capture types:
-// CHECK-64: (function
-// CHECK-64:   (tuple))
-// CHECK-64: - Metadata sources:
-
-// CHECK-64: - Capture types:
-// CHECK-64: (bound_generic_struct Swift.UnsafeBufferPointer
-// CHECK-64:   (struct Swift.UInt8))
-// CHECK-64: (bound_generic_struct Swift.UnsafeBufferPointer
-// CHECK-64:   (struct Swift.UInt8))
-// CHECK-64: (struct Swift.UInt)
-// CHECK-64: (struct Swift.UInt)
-// CHECK-64: - Metadata sources:
-
-// CHECK-64: - Capture types:
-// CHECK-64: (function
-// CHECK-64:   (tuple))
-// CHECK-64: - Metadata sources:
-
+// CHECK:      - Capture types:
+// CHECK-NEXT: (class __ObjC.Bundle)
+// CHECK-NEXT: (protocol __ObjC.NSCoding)
+// CHECK-NEXT: - Metadata sources:

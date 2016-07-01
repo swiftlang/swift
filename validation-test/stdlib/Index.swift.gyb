@@ -11,10 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/Index.swift
-// RUN: %S/../../utils/line-directive %t/Index.swift -- %target-build-swift %t/Index.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/Index.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -61,10 +58,11 @@ Index.test(
   "${Collection}/index(_:offsetBy:)/"
   + "avoidsSuccessorAndPredecessor/dispatch"
 ) {
-  for test in indexStepsFromTests.filter(
-    {$0.limit == nil && $0.distance >= 0}
+  let max = 10
+  for test in indexOffsetByTests.filter(
+    { $0.limit == nil && $0.distance >= 0 && ($0.expectedOffset ?? max) < max }
   ) {
-    let c = ${Collection}(Array(0..<10))
+    let c = ${Collection}(Array(0..<max))
 
     let i = c.nthIndex(test.startOffset)
     let result  = c.index(i, offsetBy: test.distance)
@@ -85,7 +83,7 @@ Index.test(
   "${Collection}/index(_:offsetBy:limitedBy:)/"
   + "avoidsSuccessorAndPredecessor/dispatch"
 ) {
-  for test in indexStepsFromTests.filter(
+  for test in indexOffsetByTests.filter(
     {$0.limit != nil}
   ) {
     let c = ${Collection}(Array(0..<10))

@@ -563,6 +563,9 @@ class d0170_TestAvailability {
 
   @IBInspectable var inspectableProp: Int = 0
 // PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBInspectable @objc var inspectableProp: Int{{$}}
+
+  @GKInspectable var inspectableProp2: Int = 0
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @GKInspectable @objc var inspectableProp2: Int{{$}}
 }
 
 struct d0190_LetVarDecls {
@@ -1283,33 +1286,6 @@ struct d2900_TypeSugar1 {
 }
 // PASS_COMMON-NEXT: {{^}}  init(){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
-
-// @warn_unused_result attribute
-public struct ArrayThingy {
-    // PASS_PRINT_AST: @warn_unused_result(mutable_variant: "sort")
-    // PASS_PRINT_AST-NEXT: public func sort() -> ArrayThingy
-    @warn_unused_result(mutable_variant: "sort")
-    public func sort() -> ArrayThingy { return self }
-
-    public mutating func sort() { }
-
-    // PASS_PRINT_AST: @warn_unused_result(message: "dummy", mutable_variant: "reverseInPlace")
-    // PASS_PRINT_AST-NEXT: public func reverse() -> ArrayThingy
-    @warn_unused_result(message: "dummy", mutable_variant: "reverseInPlace")
-    public func reverse() -> ArrayThingy { return self }
-
-    public mutating func reverseInPlace() { }
-
-    // PASS_PRINT_AST: @warn_unused_result
-    // PASS_PRINT_AST-NEXT: public func mineGold() -> Int
-    @warn_unused_result
-    public func mineGold() -> Int { return 0 }
-
-    // PASS_PRINT_AST: @warn_unused_result(message: "oops")
-    // PASS_PRINT_AST-NEXT: public func mineCopper() -> Int
-    @warn_unused_result(message: "oops")
-    public func mineCopper() -> Int { return 0 }
-}
 
 // @discardableResult attribute
 public struct DiscardableThingy {

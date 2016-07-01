@@ -385,7 +385,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   const SourceManager &SM = Ctx.SourceMgr;
   DebuggerClient *DebugClient = M.getDebugClient();
 
-  NamedDeclConsumer Consumer(Name, Results);
+  NamedDeclConsumer Consumer(Name, Results, IsTypeLookup);
 
   Optional<bool> isCascadingUse;
   if (IsKnownNonCascading)
@@ -530,6 +530,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         if (AllowProtocolMembers)
           options |= NL_ProtocolMembers;
+        if (IsTypeLookup)
+          options |= NL_OnlyTypes;
 
         if (!ExtendedType)
           ExtendedType = ErrorType::get(Ctx);
@@ -1060,7 +1062,7 @@ bool DeclContext::lookupQualified(Type type,
     return false;
 
   auto checkLookupCascading = [this, options]() -> Optional<bool> {
-    switch (options & NL_KnownDependencyMask) {
+    switch (static_cast<unsigned>(options & NL_KnownDependencyMask)) {
     case 0:
       return isCascadingContextForLookup(/*excludeFunctions=*/false);
     case NL_KnownNonCascadingDependency:
@@ -1123,9 +1125,13 @@ bool DeclContext::lookupQualified(Type type,
     llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
     decls.erase(std::remove_if(decls.begin(), decls.end(),
                                [&](ValueDecl *vd) -> bool {
-                                 return !knownDecls.insert(vd).second;
-                               }),
-                decls.end());
+      // If we're performing a type lookup, don't even attempt to validate
+      // the decl if its not a type.
+      if ((options & NL_OnlyTypes) && !isa<TypeDecl>(vd))
+        return true;
+
+      return !knownDecls.insert(vd).second;
+    }), decls.end());
 
     if (auto *debugClient = topLevelScope->getParentModule()->getDebugClient())
       filterForDiscriminator(decls, debugClient);
@@ -1262,6 +1268,11 @@ bool DeclContext::lookupQualified(Type type,
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
     for (auto decl : current->lookupDirect(member)) {
+      // If we're performing a type lookup, don't even attempt to validate
+      // the decl if its not a type.
+      if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
+        continue;
+
       // Resolve the declaration signature when we find the
       // declaration.
       if (typeResolver && !decl->isBeingTypeChecked()) {
@@ -1334,6 +1345,17 @@ bool DeclContext::lookupQualified(Type type,
     // already visited above, add it to the list of declarations.
     llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
     for (auto decl : allDecls) {
+      // If we're performing a type lookup, don't even attempt to validate
+      // the decl if its not a type.
+      if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
+        continue;
+
+      if (typeResolver && !decl->isBeingTypeChecked()) {
+        typeResolver->resolveDeclSignature(decl);
+        if (!decl->hasType())
+          continue;
+      }
+
       // If the declaration has an override, name lookup will also have
       // found the overridden method. Skip this declaration, because we
       // prefer the overridden method.

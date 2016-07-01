@@ -6,6 +6,7 @@
 // RUN: %target-run %t/OS_objects 2>&1 | FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: executable_test
 
 // Note: Test the use of the Clang objc_runtime_visible attribute via
 // known OS objects on Darwin.

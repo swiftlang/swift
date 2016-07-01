@@ -47,8 +47,10 @@ extension _StringCore {
         src: UnsafeMutablePointer(startASCII + i),
         size: numericCast(utf16Count))
 
-      return (i + utf16Count, result)
+      // Convert the _UTF8Chunk into host endianness.
+      return (i + utf16Count, _UTF8Chunk(littleEndian: result))
     } else if _fastPath(_baseAddress != nil) {
+      // Transcoding should return a _UTF8Chunk in host endianness.
       return _encodeSomeContiguousUTF16AsUTF8(from: i)
     } else {
 #if _runtime(_ObjC)
@@ -483,7 +485,7 @@ extension String.UTF8View.Index {
   /// specified `UTF16View` position.
   ///
   /// The following example finds the position of a space in a string's `utf16`
-  /// view and then converts that position to an index in the the string's
+  /// view and then converts that position to an index in the string's
   /// `utf8` view.
   ///
   ///     let cafe = "Café 🍵"

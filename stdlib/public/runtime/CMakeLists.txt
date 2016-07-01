@@ -17,15 +17,9 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
-set(swift_runtime_port_sources)
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
-  set(swift_runtime_port_sources
-      CygwinPort.cpp)
-endif()
-
 list(APPEND swift_runtime_compile_flags
      "-D__SWIFT_CURRENT_DYLIB=swiftCore")
-    
+
 set(swift_runtime_objc_sources)
 set(swift_runtime_unicode_normalization_sources)
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
@@ -39,9 +33,10 @@ endif()
 
 set(swift_runtime_sources
     Casting.cpp
+    CygwinPort.cpp
     Demangle.cpp
     Enum.cpp
-    ErrorObject.cpp
+    ErrorObjectNative.cpp
     Errors.cpp
     Heap.cpp
     HeapObject.cpp
@@ -49,73 +44,81 @@ set(swift_runtime_sources
     Metadata.cpp
     MetadataLookup.cpp
     MutexPThread.cpp
+    MutexWin32.cpp
     Once.cpp
     Portability.cpp
     ProtocolConformance.cpp
-    Reflection.cpp
+    ReflectionNative.cpp
     RuntimeEntrySymbols.cpp
-    SwiftObject.cpp)
+    SwiftObjectNative.cpp)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
     Remangle.cpp
     swift_sections.S
+    MutexPThread.cpp
+    MutexWin32.cpp
     CygwinPort.cpp
     ${swift_runtime_sources}
     ${swift_runtime_objc_sources}
     ${swift_runtime_leaks_sources})
 
-add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
+add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
-  ${swift_runtime_port_sources}
   C_COMPILE_FLAGS ${swift_runtime_compile_flags}
   INSTALL_IN_COMPONENT never_install)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-  add_swift_library(section_magic_begin IS_STDLIB IS_STDLIB_CORE
+set(ELFISH_SDKS)
+foreach(sdk ${SWIFT_CONFIGURED_SDKS})
+  if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF")
+    list(APPEND ELFISH_SDKS "${sdk}")
+  endif()
+endforeach()
+
+add_swift_library(section_magic_begin OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
     C_COMPILE_FLAGS ${swift_runtime_compile_flags} "-DSWIFT_BEGIN"
+    TARGET_SDKS "${ELFISH_SDKS}"
     INSTALL_IN_COMPONENT never_install)
-  add_swift_library(section_magic_end IS_STDLIB IS_STDLIB_CORE
+add_swift_library(section_magic_end OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
     C_COMPILE_FLAGS ${swift_runtime_compile_flags} "-DSWIFT_END"
+    TARGET_SDKS "${ELFISH_SDKS}"
     INSTALL_IN_COMPONENT never_install)
-endif()
 
 set(object_target_list)
-foreach(sdk ${SWIFT_CONFIGURED_SDKS})
-  if("${sdk}" STREQUAL "LINUX" OR "${sdk}" STREQUAL "FREEBSD" OR "${sdk}" STREQUAL "ANDROID")
-    foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-      set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
+foreach(sdk ${ELFISH_SDKS})
+  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+    set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
+    set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
 
-      set(section_magic_begin_name "section_magic_begin-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-      set(section_magic_end_name "section_magic_end-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-      add_custom_command_target(section_magic_o
-        COMMAND
-            "${CMAKE_COMMAND}" -E copy
-            "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_begin_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}"
-            "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
-        COMMAND
-            "${CMAKE_COMMAND}" -E copy
-            "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_end_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}"
-            "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-        OUTPUT
-            "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
-            "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-        DEPENDS
-            ${section_magic_begin_name}
-            ${section_magic_end_name})
+    set(section_magic_begin_name "section_magic_begin-${arch_suffix}")
+    set(section_magic_end_name "section_magic_end-${arch_suffix}")
 
-      list(APPEND object_target_list "${section_magic_o}")
+    add_custom_command_target(section_magic_${arch_suffix}_objects
+      COMMAND
+          "${CMAKE_COMMAND}" -E copy
+          "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_begin_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}"
+          "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
+      COMMAND
+          "${CMAKE_COMMAND}" -E copy
+          "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_end_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}"
+          "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
+      OUTPUT
+          "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
+          "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
+      DEPENDS
+          ${section_magic_begin_name}
+          ${section_magic_end_name})
 
-      swift_install_in_component(stdlib
-          FILES "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o" "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-          DESTINATION "lib/swift/${arch_subdir}")
+    list(APPEND object_target_list "${section_magic_${arch_suffix}_objects}")
 
-    endforeach()
-  endif()
+    swift_install_in_component(stdlib
+        FILES "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o" "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
+        DESTINATION "lib/swift/${arch_subdir}")
+  endforeach()
 endforeach()
 
 add_custom_target(section_magic ALL DEPENDS ${object_target_list})

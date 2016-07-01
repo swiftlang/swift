@@ -3,6 +3,91 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0060](https://github.com/apple/swift-evolution/blob/master/proposals/0060-defaulted-parameter-order.md):
+  Function parameters with default arguments must now be specified in
+  declaration order. A call site must always supply the arguments it provides
+  to a function in their declared order:
+
+    ```swift
+    func requiredArguments(a: Int, b: Int, c: Int) {}
+    func defaultArguments(a: Int = 0, b: Int = 0, c: Int = 0) {}
+
+    requiredArguments(a: 0, b: 1, c: 2)
+    requiredArguments(b: 0, a: 1, c: 2) // error
+    defaultArguments(a: 0, b: 1, c: 2)
+    defaultArguments(b: 0, a: 1, c: 2) // error
+    ```
+
+    Arbitrary labeled parameters with default arguments may still be elided, as
+    long as the specified arguments follow declaration order:
+
+    ```swift
+    defaultArguments(a: 0) // ok
+    defaultArguments(b: 1) // ok
+    defaultArguments(c: 2) // ok
+    defaultArguments(a: 1, c: 2) // ok
+    defaultArguments(b: 1, c: 2) // ok
+    defaultArguments(c: 1, b: 2) // error
+    ```
+
+* Traps from force-unwrapping nil `Optional`s now show the source location
+  of the force unwrap operator.
+
+* [SE-0093](https://github.com/apple/swift-evolution/blob/master/proposals/0093-slice-base.md): Slice types now have a `base` property that allows public readonly access to their base collections.
+
+* Nested generic functions may now capture bindings from the environment, for example:
+
+    ```swift
+    func outer<T>(t: T) -> T {
+      func inner<U>(u: U) -> (T, U) {
+        return (t, u)
+      }
+      return inner(u: (t, t)).0
+    }
+    ```
+
+* Initializers are now inherited even if the base class or derived class is generic:
+
+    ```swift
+    class Base<T> {
+      let t: T
+
+      init(t: T) {
+        self.t = t
+      }
+    }
+
+    class Derived<T> : Base<T> {
+      // init(t: T) is now synthesized to call super.init(t: t)
+    }
+    ```
+
+* [SE-0081](https://github.com/apple/swift-evolution/blob/master/proposals/0081-move-where-expression.md)
+  "Move 'where' clause to end of declaration" is implemented, allowing you to 
+  write 'where' clauses after the signature for a declaration, but before its
+  body.  For example, before:
+
+    ```swift
+    func anyCommonElements<T : SequenceType, U : SequenceType 
+                           where T.Generator.Element: Equatable, T.Generator.Element == U.Generator.Element>
+        (lhs: T, _ rhs: U) -> Bool
+    {
+        ...
+    }
+    ```
+
+  after:
+
+    ```swift
+    func anyCommonElements<T : SequenceType, U : SequenceType>(lhs: T, _ rhs: U) -> Bool
+        where T.Generator.Element: Equatable, T.Generator.Element == U.Generator.Element
+    {
+        ...
+    }
+    ```
+   
+  The old form is still accepted for compatibility, but will eventually be rejected.
+
 * [SE-0071](https://github.com/apple/swift-evolution/blob/master/proposals/0071-member-keywords.md):
   "Allow (most) keywords in member references" is implemented.  This allows the
   use of members after a dot without backticks, e.g. "foo.default".
@@ -184,7 +269,7 @@ Swift 3.0
 * Generic signatures can now contain superclass requirements with generic
   parameter types, for example:
 
-  ```
+  ```swift
   func f<Food : Chunks<Meat>, Meat : Molerat>(f: Food, m: Meat) {}
   ```
 
@@ -224,6 +309,9 @@ Swift 3.0
     ```swift
     person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
     ```
+
+**If you are adding a new entry, add it to the top of the file, not here!**
+
 
 Swift 2.2
 ---------

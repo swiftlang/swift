@@ -75,14 +75,21 @@ function(add_sourcekit_default_compiler_flags target)
     BUILD_TYPE "${build_type}"
     ENABLE_ASSERTIONS "${enable_assertions}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     RESULT_VAR_NAME c_compile_flags)
   _add_variant_link_flags(
     SDK "${sdk}"
     ARCH "${arch}"
     BUILD_TYPE "${build_type}"
     ENABLE_ASSERTIONS "${enable_assertions}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     RESULT_VAR_NAME link_flags)
+
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+    list(APPEND c_compile_flags "-fblocks")
+    list(APPEND link_flags "-lBlocksRuntime")
+  endif()
 
   # Convert variables to space-separated strings.
   _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
@@ -130,7 +137,7 @@ macro(add_sourcekit_library name)
         ${SOURCEKIT_SOURCE_DIR}/include/SourceKit/${lib_path}/*.td
       )
       source_group("TableGen descriptions" FILES ${tds})
-      set_source_files_properties(${tds}} PROPERTIES HEADER_FILE_ONLY ON)
+      set_source_files_properties(${tds} PROPERTIES HEADER_FILE_ONLY ON)
 
       set(srcs ${srcs} ${headers} ${tds})
     endif()

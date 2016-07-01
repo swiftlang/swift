@@ -27,6 +27,7 @@
 
 using llvm::cast;
 
+#include <climits>
 #include <iostream>
 
 namespace swift {
@@ -45,18 +46,17 @@ class MetadataSource {
                             const std::string::const_iterator &end,
                             unsigned &result) {
     auto begin = it;
-    while (it != end) {
-      if (*it >= '0' && *it <= '9')
-        ++it;
-      else
-        break;
-    }
+    for (; it < end && *it >= '0' && *it <= '9'; ++it)
+      ;
 
-    std::string natural(begin, it);
-    if (natural.empty())
+    if (std::distance(begin, it) == 0)
       return false;
 
-    result = std::stoi(natural);
+    long int decoded = std::strtol(&*begin, nullptr, 10);
+    if ((decoded == LONG_MAX || decoded == LONG_MIN) && errno == ERANGE)
+      return false;
+
+    result = static_cast<unsigned>(decoded);
     return true;
   }
 

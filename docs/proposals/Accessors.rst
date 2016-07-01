@@ -549,6 +549,140 @@ Notably, it breaks swapping two array elements::
   release(newArrayBuffer_j)
   release(newArrayBuffer_i)
 
+get- and setForMutation
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Some collections need finer-grained control over the entire mutation
+process. For instance, to support divide-and-conquer algorithms using
+slices, sliceable collections must "pin" and "unpin" their buffers
+while a slice is being mutated to grant permission for the slice
+to mutate the collection in-place while sharing ownership. This
+flexibility can be exposed by a pair of accessors that are called
+before and after a mutation. The "get" stage produces both the
+value to mutate and a state value (whose type must be declared) to
+forward to the "set" stage. A pinning accessor can then look something
+like this::
+
+  extension Array {
+    subscript(range: Range<Int>) -> Slice<Element> {
+      // `getForMutation` must declare its return value, a pair of both
+      // the value to mutate and a state value that is passed to
+      // `setForMutation`.
+      getForMutation() -> (Slice<Element>, PinToken) {
+        let slice = _makeSlice(range)
+        let pinToken = _pin()
+        return (slice, pinToken)
+      }
+      
+      // `setForMutation` receives two arguments--the result of the
+      // mutation to write back, and the state value returned by
+      // `getForMutation`.
+      setForMutation(slice, pinToken) {
+        _unpin(pinToken)
+        _writeSlice(slice, backToRange: range)
+      }
+    }
+  }
+
+``getForMutation`` and ``setForMutation`` must appear as a pair;
+neither one is valid on its own. A ``get`` and ``set`` accessor
+should also still be provided for simple read and write operations.
+When the compiler has visibility that storage is implemented in
+terms of ``getForMutation`` and ``setForMutation``, it lowers a mutable
+projection using those accessors as follows::
+
+  // A mutation like this (assume `reverse` is a mutating method):
+  array[0...99].reverse()
+  // Decomposes to:
+  let index = 0...99
+  (var slice, let state) = array.`subscript.getForMutation`(index)
+  slice.reverse()
+  array.`subscript.setForMutation`(index, slice, state)
+
+To support the conservative access pattern,
+a `materializeForSet` accessor can be generated from `getForMutation`
+and `setForMutation` in an obvious fashion: perform `getForMutation`
+and store the state result in its scratch space, and return a
+callback that loads the state and hands it off to `setForMutation`.
+
+The beacon of hope for a user-friendly future: Inversion of control
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Addressors and ``{get,set}ForMutation`` expose important optimizations
+to the standard library, but are undeniably fiddly and unsafe constructs
+to expose to users. A more natural model would be to
+recognize that a compound mutation is a composition of nested scopes, and
+express it in the language that way. A strawman model might look something
+like this::
+
+  var foo: T {
+    get { return getValue() }
+    set { setValue(newValue) }
+    
+    // Perform a full in-out mutation. The `next` continuation is of
+    // type `(inout T) -> ()` and must be called exactly once
+    // with the value to hand off to the nested mutation operation.
+    mutate(next) {
+      var value = getValue()
+      next(&value)
+      setValue(value)
+    }
+  }
+
+This presents a natural model for expressing the lifetime extension concerns
+of addressors, and the state maintenance necessary for pinning ``getForMutation``
+accessors::
+
+  // An addressing mutator
+  mutate(next) {
+    withUnsafePointer(&resource) {
+      next(&$0.memory)
+    }
+  }
+  
+  // A pinning mutator
+  mutate(next) {
+    var slice = makeSlice()
+    let token = pin()
+    next(&slice)
+    unpin(token)
+    writeBackSlice(slice)
+  }
+ 
+For various semantic and implementation efficiency reasons, we don't want to
+literally implement every access as a nesting of closures like this. Doing so
+would allow for semantic surprises (a mutate() operation never invoking its
+continuation, or doing so multiple times would be disastrous), and would
+interfere with the ability for `inout` and `mutating` functions to throw or
+otherwise nonlocally exit. However, we could present this model using
+*inversion of control*, similar to Python generators or async-await.
+A `mutate` operation could `yield` the `inout` reference to its inner value,
+and the compiler could enforce that a `yield` occurs exactly once on every
+control flow path::
+
+  // An addressing, yielding mutator
+  mutate {
+    withUnsafePointer(&resource) {
+      yield &$0.memory
+    }
+  }
+
+  // A pinning mutator
+  mutate {
+    var slice = makeSlice()
+    let token = pin()
+    yield &slice
+    unpin(token)
+    writeBackSlice(slice)
+  }
+  
+This obviously requires more implementation infrastructure than we currently
+have, and raises language and library design issues (in particular,
+lifetime-extending combinators like ``withUnsafePointer`` would need either
+a ``reyields`` kind of decoration, or to become macros), but represents a
+promising path toward exposing the full power of the accessor model to
+users in an elegant way.
+
 Acceptability
 -------------
 

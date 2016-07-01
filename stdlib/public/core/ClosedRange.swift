@@ -13,10 +13,11 @@
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
 // [Closed]Range and [Closed]CountableRange.
 
-// WORKAROUND rdar://25214598 - should be Bound : Strideable
-internal enum _ClosedRangeIndexRepresentation<
-  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
-> {
+internal enum _ClosedRangeIndexRepresentation<Bound>
+  where
+  // WORKAROUND rdar://25214598 - should be Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : Integer {
   case pastEnd
   case inRange(Bound)
 }
@@ -24,49 +25,19 @@ internal enum _ClosedRangeIndexRepresentation<
 // FIXME(ABI)(compiler limitation): should be a nested type in
 // `ClosedRange`.
 /// A position in a `CountableClosedRange` instance.
-public struct ClosedRangeIndex<
+public struct ClosedRangeIndex<Bound> : Comparable
+  where
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
-  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
   // swift-3-indexing-model: should conform to _Strideable, otherwise
   // CountableClosedRange is not interchangeable with CountableRange in all
   // contexts.
-> : Comparable {
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : SignedInteger {
   /// Creates the "past the end" position.
   internal init() { _value = .pastEnd }
 
   /// Creates a position `p` for which `r[p] == x`.
   internal init(_ x: Bound) { _value = .inRange(x) }
-
-  internal func _successor(upperBound limit: Bound) -> ClosedRangeIndex {
-    switch _value {
-    case .inRange(let x): return x == limit
-      ? ClosedRangeIndex() : ClosedRangeIndex(x.advanced(by: 1))
-    case .pastEnd: _preconditionFailure("Incrementing past end index")
-    }
-  }
-  
-  internal func _predecessor(upperBound limit: Bound) -> ClosedRangeIndex {
-    switch _value {
-    case .inRange(let x): return ClosedRangeIndex(x.advanced(by: -1))
-    case .pastEnd: return ClosedRangeIndex(limit)
-    }
-  }
-  
-  internal func _advanced(
-    by n: Bound.Stride, upperBound limit: Bound
-  ) -> ClosedRangeIndex {
-    switch _value {
-    case .inRange(let x):
-      let d = x.distance(to: limit)
-      if n <= d { return ClosedRangeIndex(x.advanced(by: n)) }
-      if d - -1 == n { return ClosedRangeIndex() }
-      _preconditionFailure("Advancing past end index")
-    case .pastEnd:
-      return n == 0
-      ? self :
-      ClosedRangeIndex(limit)._advanced(by: n, upperBound: limit)
-    }
-  }
   
   internal var _value: _ClosedRangeIndexRepresentation<Bound>
   internal var _dereferenced : Bound {
@@ -101,11 +72,11 @@ public func < <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
 
 // WORKAROUND: needed because of rdar://25584401
 /// An iterator over the elements of a `CountableClosedRange` instance.
-public struct ClosedRangeIterator<
-  Bound : protocol<_Strideable, Comparable>
+public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
   where
-  Bound.Stride : SignedInteger
-> : IteratorProtocol, Sequence {
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : SignedInteger {
 
   internal init(_range r: CountableClosedRange<Bound>) {
     _nextResult = r.lowerBound
@@ -175,12 +146,11 @@ public struct ClosedRangeIterator<
 /// `stride(from:through:by:)` function.
 ///
 /// - SeeAlso: `CountableRange`, `ClosedRange`, `Range`
-public struct CountableClosedRange<
-  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>
+public struct CountableClosedRange<Bound> : RandomAccessCollection
   where
-  Bound.Stride : SignedInteger
-> : RandomAccessCollection {
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : SignedInteger {
 
   /// The range's lower bound.
   public let lowerBound: Bound
@@ -219,17 +189,66 @@ public struct CountableClosedRange<
   }
 
   public func index(after i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range checks and tests.
-    return i._successor(upperBound: upperBound)
+    switch i._value {
+    case .inRange(let x):
+      return x == upperBound
+        ? ClosedRangeIndex() 
+        : ClosedRangeIndex(x.advanced(by: 1))
+    case .pastEnd: 
+      _preconditionFailure("Incrementing past end index")
+    }
   }
 
   public func index(before i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range checks and tests.
-    return i._predecessor(upperBound: upperBound)
+    switch i._value {
+    case .inRange(let x):
+      _precondition(x > lowerBound, "Incrementing past start index")
+      return ClosedRangeIndex(x.advanced(by: -1))
+    case .pastEnd: 
+      _precondition(upperBound >= lowerBound, "Incrementing past start index")
+      return ClosedRangeIndex(upperBound)
+    }
   }
 
-  // FIXME: swift-3-indexing-model: implement O(1) `index(_:offsetBy:)`
-  // and `distance(from:to:)`, and write tests for them.
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    switch i._value {
+    case .inRange(let x):
+      let d = x.distance(to: upperBound)
+      if n <= d {
+        let newPosition = x.advanced(by: n)
+        _precondition(newPosition >= lowerBound,
+          "Advancing past start index")
+        return ClosedRangeIndex(newPosition)
+      }
+      if d - -1 == n { return ClosedRangeIndex() }
+      _preconditionFailure("Advancing past end index")
+    case .pastEnd:
+      if n == 0 {
+        return i
+      } else if n > 0 {
+        _preconditionFailure("Advancing past end index")
+      } else {
+        return index(ClosedRangeIndex(upperBound), offsetBy: (n + 1))
+      }
+    }
+  }
+
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    switch (start._value, end._value) {
+    case let (.inRange(left), .inRange(right)):
+      // in range <--> in range
+      return left.distance(to: right)
+    case let (.inRange(left), .pastEnd):
+      // in range --> end
+      return 1 + left.distance(to: upperBound)
+    case let (.pastEnd, .inRange(right)):
+      // in range <-- end
+      return upperBound.distance(to: right) - 1
+    case (.pastEnd, .pastEnd):
+      // end <--> end
+      return 0
+    }
+  }
 
   /// Accesses the element at specified position.
   ///
@@ -387,14 +406,13 @@ public func ... <Bound : Comparable> (minimum: Bound, maximum: Bound)
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-public func ... <
-  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>
-  where
-  Bound.Stride : SignedInteger
-> (
+public func ... <Bound> (
   minimum: Bound, maximum: Bound
-) -> CountableClosedRange<Bound> {
+) -> CountableClosedRange<Bound>
+  where
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : SignedInteger {
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(
     minimum <= maximum, "Can't form Range with upperBound < lowerBound")

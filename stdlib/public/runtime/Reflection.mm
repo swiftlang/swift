@@ -24,7 +24,7 @@
 #include <cstring>
 #include <new>
 #include <string>
-#include <dlfcn.h>
+#include <tuple>
 
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
@@ -438,8 +438,7 @@ void swift_TupleMirror_subscript(String *outString,
   
   // The name is the stringized element number '.0'.
   char buf[32];
-  snprintf(buf, 31, ".%zd", i);
-  buf[31] = 0;
+  snprintf(buf, sizeof(buf), ".%zd", i);
   new (outString) String(buf, strlen(buf));
   
   // Get a Mirror for the nth element.

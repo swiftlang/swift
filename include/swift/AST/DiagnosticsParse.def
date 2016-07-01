@@ -141,7 +141,8 @@ ERROR(lex_editor_placeholder,none,
       "editor placeholder in source file", ())
 WARNING(lex_editor_placeholder_in_playground,none,
         "editor placeholder in source file", ())
-
+ERROR(lex_conflict_marker_in_file,none,
+      "source control conflict marker in source file", ())
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
@@ -174,8 +175,6 @@ ERROR(disallowed_var_multiple_getset,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
 
-ERROR(disallowed_type,none,
-      "type not allowed here", ())
 ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
 ERROR(var_init_self_referential,none,
@@ -652,6 +651,8 @@ ERROR(expected_langle_protocol,PointsToFirstBadToken,
       "expected '<' in protocol composition type", ())
 ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol composition type", ())
+ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
+      "protocol composition is neither allowed nor needed here", ())
 
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
@@ -771,6 +772,8 @@ ERROR(expected_close_after_else_directive,none,
       "further conditions after #else are unreachable", ())
 
 /// Associatedtype Statement
+WARNING(typealias_in_protocol_deprecated,none,
+      "use of 'typealias' to declare associated types is deprecated; use 'associatedtype' instead", ())
 ERROR(typealias_inside_protocol_without_type,none,
       "typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement", ())
 ERROR(associatedtype_outside_protocol,none,
@@ -1254,16 +1257,8 @@ ERROR(attr_unowned_expected_rparen,none,
       "expected ')' after specifier for 'unowned'", ())
 
 // warn_unused_result
-WARNING(attr_warn_unused_result_expected_name,none,
-        "expected parameter 'message' or 'mutable_variant'", ())
-WARNING(attr_warn_unused_result_duplicate_parameter,none,
-      "duplicate '%0' parameter; previous value will be ignored", (StringRef))
-ERROR(attr_warn_unused_result_expected_colon,none,
-      "expected ':' following '%0' parameter", (StringRef))
-ERROR(attr_warn_unused_result_expected_string,none,
-      "expected a string following ':' for '%0' parameter", (StringRef))
-WARNING(attr_warn_unused_result_unknown_parameter,none,
-        "unknown parameter '%0' in 'warn_unused_result' attribute", (StringRef))
+WARNING(attr_warn_unused_result_removed,none,
+        "'warn_unused_result' attribute behavior is now the default", ())
 ERROR(attr_warn_unused_result_expected_rparen,none,
       "expected ')' after 'warn_unused_result' attribute", ())
 
@@ -1292,6 +1287,10 @@ ERROR(redundant_class_requirement,none,
       "redundant 'class' requirement", ())
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
+ERROR(where_without_generic_params,none,
+      "'where' clause cannot be attached to "
+      "%select{a non-generic|a protocol|an associated type}0 "
+      "declaration", (unsigned))
 
 //------------------------------------------------------------------------------
 // Conditional compilation parsing diagnostics

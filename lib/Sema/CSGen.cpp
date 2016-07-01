@@ -661,39 +661,24 @@ namespace {
         }
       }
 
-      SmallVector<Constraint *, 4> favoredConstraints;
-      
-      TypeBase *favoredTy = nullptr;
-      
-      // Copy over the existing bindings, dividing the constraints up
-      // into "favored" and non-favored lists.
-      for (auto oldConstraint : oldConstraints) {
-        auto overloadChoice = oldConstraint->getOverloadChoice();
-        if (isFavored(overloadChoice.getDecl())) {
-          favoredConstraints.push_back(oldConstraint);
-          
-          favoredTy = overloadChoice.getDecl()->
-              getType()->getAs<AnyFunctionType>()->
-              getResult().getPointer();
-        }
-      }
-      
-      if (favoredConstraints.size() == 1) {
-        CS.setFavoredType(expr, favoredTy);
-      }
-      
       // If there might be replacement constraints, get them now.
       SmallVector<Constraint *, 4> replacementConstraints;
       if (createReplacements)
         createReplacements(tyvarType, oldConstraints, replacementConstraints);
-      
+
+      // Copy over the existing bindings, dividing the constraints up
+      // into "favored" and non-favored lists.
+      SmallVector<Constraint *, 4> favoredConstraints;
+      for (auto oldConstraint : oldConstraints)
+        if (isFavored(oldConstraint->getOverloadChoice().getDecl()))
+          favoredConstraints.push_back(oldConstraint);
+
       // If we did not find any favored constraints, just introduce
       // the replacement constraints (if they differ).
       if (favoredConstraints.empty()) {
         if (replacementConstraints.size() > oldConstraints.size()) {
           // Remove the old constraint.
           CS.removeInactiveConstraint(constraint);
-          
           CS.addConstraint(
                            Constraint::createDisjunction(CS,
                                                          replacementConstraints,
@@ -701,7 +686,14 @@ namespace {
         }
         break;
       }
-      
+
+      if (favoredConstraints.size() == 1) {
+        auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
+        auto overloadType = overloadChoice.getDecl()->getType();
+        auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
+        CS.setFavoredType(expr, resultType.getPointer());
+      }
+
       // Remove the original constraint from the inactive constraint
       // list and add the new one.
       CS.removeInactiveConstraint(constraint);
@@ -2553,9 +2545,14 @@ namespace {
                       Diag<> diag_no_base_class) {
       DeclContext *typeContext = selfDecl->getDeclContext()->getParent();
       assert(typeContext && "constructor without parent context?!");
+
+      // A DC can fail to have a declared type in context when it's invalid.
+      Type declaredType = typeContext->getDeclaredTypeInContext();
+      if (!declaredType)
+        return Type();
+
       auto &tc = CS.getTypeChecker();
-      ClassDecl *classDecl = typeContext->getDeclaredTypeInContext()
-                               ->getClassOrBoundGenericClass();
+      ClassDecl *classDecl = declaredType->getClassOrBoundGenericClass();
       if (!classDecl) {
         tc.diagnose(diagLoc, diag_not_in_class);
         return Type();
@@ -2565,8 +2562,7 @@ namespace {
         return Type();
       }
 
-      Type superclassTy = typeContext->getDeclaredTypeInContext()
-                            ->getSuperclass(&tc);
+      Type superclassTy = declaredType->getSuperclass(&tc);
       if (selfDecl->hasType() && selfDecl->getType()->is<AnyMetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
       return superclassTy;
@@ -2809,6 +2805,11 @@ namespace {
 
     Type visitOpenExistentialExpr(OpenExistentialExpr *expr) {
       llvm_unreachable("Already type-checked");
+    }
+    
+    Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
+      // Should already be type-checked.
+      return expr->getType();
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
@@ -3211,6 +3212,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   InferUnresolvedMemberConstraintGenerator MCG(E, CS);
   ConstraintWalker cw(MCG);
   Parent->walk(cw);
+
   SmallVector<Solution, 3> solutions;
   if (CS.solve(solutions, FreeTypeVariableBinding::Allow)) {
     return false;
@@ -3302,6 +3304,8 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
     CreatedTC.reset(new TypeChecker(DC.getASTContext()));
     TC = CreatedTC.get();
   }
+  if (ED->getAsProtocolExtensionContext())
+    return TC->isProtocolExtensionUsable(&DC, BaseTy, const_cast<ExtensionDecl*>(ED));
   ConstraintSystem CS(*TC, &DC, Options);
   auto Loc = CS.getConstraintLocator(nullptr);
   std::vector<Identifier> Scratch;
@@ -3455,7 +3459,7 @@ void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                                                     VD->getFullName());
     if (Result.OtherViables.empty())
       continue;
-    if (!Result.Favored->getDeclContext()->isGenericTypeContext())
+    if (!Result.Favored->getDeclContext()->isGenericContext())
       continue;
     for (ValueDecl *Default : Result.OtherViables) {
       if (Default->getDeclContext()->isExtensionContext()) {

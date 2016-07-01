@@ -6,6 +6,7 @@
 
 import InferImportAsMember
 let mine = IAMStruct1()
+let _ = mine.getCollisionNonProperty(1)
 
 // TODO: more cases, eventually exhaustive, as we start inferring the result we
 // want
@@ -75,6 +76,9 @@ let mine = IAMStruct1()
 // PRINT-NEXT:    init(fuzzy fuzzy: ())
 // PRINT-NEXT:    init(fuzzyWithFuzzyName fuzzyWithFuzzyName: ())
 // PRINT-NEXT:    init(fuzzyName fuzzyName: ())
+//
+// PRINT-NEXT:    func getCollisionNonProperty(_ _: Int32) -> Float
+//
 // PRINT-NEXT:  }
 //
 // PRINT-NEXT:  func __IAMStruct1IgnoreMe(_ s: IAMStruct1) -> Double

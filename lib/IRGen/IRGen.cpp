@@ -66,6 +66,16 @@ using namespace swift;
 using namespace irgen;
 using namespace llvm;
 
+namespace {
+// We need this to access IRGenOptions from extension functions
+class PassManagerBuilderWrapper : public PassManagerBuilder {
+public:
+  const IRGenOptions &IRGOpts;
+  PassManagerBuilderWrapper(const IRGenOptions &IRGOpts)
+      : PassManagerBuilder(), IRGOpts(IRGOpts) {}
+};
+}
+
 static void addSwiftARCOptPass(const PassManagerBuilder &Builder,
                                PassManagerBase &PM) {
   if (Builder.OptLevel > 0)
@@ -101,6 +111,14 @@ static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
   PM.add(createThreadSanitizerPass());
 }
 
+static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
+                                     legacy::PassManagerBase &PM) {
+  const PassManagerBuilderWrapper &BuilderWrapper =
+      static_cast<const PassManagerBuilderWrapper &>(Builder);
+  PM.add(createSanitizerCoverageModulePass(
+      BuilderWrapper.IRGOpts.SanitizeCoverage));
+}
+
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
 swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
   // Things that maybe we should collect from the command line:
@@ -129,7 +147,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
   SharedTimer timer("LLVM optimization");
 
   // Set up a pipeline.
-  PassManagerBuilder PMBuilder;
+  PassManagerBuilderWrapper PMBuilder(Opts);
 
   if (Opts.Optimize && !Opts.DisableLLVMOptzns) {
     PMBuilder.OptLevel = 3;
@@ -169,6 +187,15 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addThreadSanitizerPass);
   }
+
+  if (Opts.SanitizeCoverage.CoverageType !=
+      llvm::SanitizerCoverageOptions::SCK_None) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addSanitizerCoveragePass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addSanitizerCoveragePass);
+  }
+
   PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                          addSwiftMergeFunctionsPass);
 
@@ -885,7 +912,6 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   auto targetMachine = irgen.createTargetMachine();
   if (!targetMachine) return;
 
-  const llvm::Triple &Triple = Ctx.LangOpts.Target;
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
                   OutputPath, Opts.getSingleOutputFilename());
   initLLVMModule(IGM);
@@ -897,13 +923,19 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
                                           llvm::GlobalVariable::InternalLinkage,
                                           Data, "__Swift_AST");
   std::string Section;
-  if (Triple.isOSBinFormatMachO())
-    Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
-  else if (Triple.isOSBinFormatCOFF())
+  switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("unknown object format");
+  case llvm::Triple::COFF:
     Section = COFFASTSectionName;
-  else
+    break;
+  case llvm::Triple::ELF:
     Section = ELFASTSectionName;
-
+    break;
+  case llvm::Triple::MachO:
+    Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
+    break;
+  }
   ASTSym->setSection(Section);
   ASTSym->setAlignment(8);
   ::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, IGM.getModule(),

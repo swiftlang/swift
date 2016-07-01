@@ -106,13 +106,13 @@ struct TwoWordPair {
   // in registers, so cram the result into an unsigned long long.
   // Use an enum class with implicit conversions so we don't dirty C callers
   // too much.
-#if __arm__ || __i386__ || defined(__CYGWIN__)
+#if __arm__ || __i386__ || defined(__CYGWIN__) || defined(_MSC_VER)
 #if defined(__CYGWIN__)
   enum class Return : unsigned __int128 {};
 #else
   enum class Return : unsigned long long {};
 #endif
-  
+
   operator Return() const {
     union {
       TwoWordPair value;
@@ -157,10 +157,12 @@ using BoxPair = TwoWordPair<HeapObject *, OpaqueValue *>;
 /// The heap object has an initial retain count of 1, and its metadata is set
 /// such that destroying the heap object destroys the contained value.
 SWIFT_RUNTIME_EXPORT
-extern "C" BoxPair::Return swift_allocBox(Metadata const *type);
+extern "C" BoxPair::Return swift_allocBox(Metadata const *type)
+           SWIFT_CC(swift);
 
 SWIFT_RUNTIME_EXPORT
-extern "C" BoxPair::Return (*_swift_allocBox)(Metadata const *type);
+extern "C" BoxPair::Return (*_swift_allocBox)(Metadata const *type)
+           SWIFT_CC(swift);
 
 
 // Allocate plain old memory. This is the generalized entry point

@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 139,
+  key.length: 279,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.syntaxmap: [
     {
@@ -21,55 +21,42 @@
     {
       key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 116,
-      key.length: 1
-    },
-    {
-      key.kind: source.lang.swift.syntaxtype.identifier,
-      key.offset: 121,
       key.length: 5
     },
     {
-      key.kind: source.lang.swift.syntaxtype.identifier,
-      key.offset: 127,
-      key.length: 4
+      key.kind: source.lang.swift.syntaxtype.objectliteral,
+      key.offset: 124,
+      key.length: 40
     },
     {
       key.kind: source.lang.swift.syntaxtype.keyword,
-      key.offset: 133,
+      key.offset: 165,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 169,
+      key.length: 5
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.objectliteral,
+      key.offset: 177,
+      key.length: 50
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 228,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 232,
       key.length: 4
-    }
-  ],
-  key.diagnostics: [
-    {
-      key.line: 4,
-      key.column: 8,
-      key.filepath: syntaxmap-object-literals.swift,
-      key.severity: source.diagnostic.severity.error,
-      key.description: "consecutive statements on a line must be separated by ';'",
-      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
-      key.fixits: [
-        {
-          key.offset: 119,
-          key.length: 0,
-          key.sourcetext: ";"
-        }
-      ]
     },
     {
-      key.line: 4,
-      key.column: 9,
-      key.filepath: syntaxmap-object-literals.swift,
-      key.severity: source.diagnostic.severity.error,
-      key.description: "expected initial value after '='",
-      key.diagnostic_stage: source.diagnostic.stage.swift.parse
-    },
-    {
-      key.line: 4,
-      key.column: 9,
-      key.filepath: syntaxmap-object-literals.swift,
-      key.severity: source.diagnostic.severity.error,
-      key.description: "expected expression",
-      key.diagnostic_stage: source.diagnostic.stage.swift.parse
+      key.kind: source.lang.swift.syntaxtype.objectliteral,
+      key.offset: 239,
+      key.length: 38
     }
   ]
 }

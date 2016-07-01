@@ -274,6 +274,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     FunctionPtrTy,
     RefCountedPtrTy,
   });
+  WitnessFunctionPairTy = createStructType(*this, "swift.function", {
+    FunctionPtrTy,
+    WitnessTablePtrTy,
+  });
   
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
                   ->getPointerTo(DefaultAS);
@@ -777,18 +781,38 @@ static StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
   return os.str();
 }
 
+llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
+                                                      StringRef library) {
+  llvm::SmallString<32> buffer;
+
+  if (T.isWindowsMSVCEnvironment() || T.isWindowsItaniumEnvironment()) {
+    bool quote = library.find(' ') != StringRef::npos;
+
+    buffer += "/DEFAULTLIB:";
+    if (quote)
+      buffer += '"';
+    buffer += library;
+    if (!library.endswith_lower(".lib"))
+      buffer += ".lib";
+    if (quote)
+      buffer += '"';
+  } else {
+    buffer += "-l";
+    buffer += library;
+  }
+
+  return buffer;
+}
+
 void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   llvm::LLVMContext &ctx = Module.getContext();
 
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
-    // FIXME: Use target-independent linker option.
-    // Clang uses CGM.getTargetCodeGenInfo().getDependentLibraryOption(...).
-    llvm::SmallString<32> buf;
-    buf += "-l";
-    buf += linkLib.getName();
-    auto flag = llvm::MDString::get(ctx, buf);
-    AutolinkEntries.push_back(llvm::MDNode::get(ctx, flag));
+    llvm::SmallString<32> opt =
+        getTargetDependentLibraryOption(Triple, linkLib.getName());
+    AutolinkEntries.push_back(
+        llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
     break;
   }
   case LibraryKind::Framework: {
@@ -859,12 +883,9 @@ void IRGenModule::emitAutolinkInfo() {
 
   // Collect the linker options already in the module (from ClangCodeGen).
   auto *LinkerOptions = Module.getModuleFlag(LinkerOptionsFlagName);
-  if (LinkerOptions) {
-    for (auto &LinkOption : cast<llvm::MDNode>(LinkerOptions)->operands()) {
-      LinkOption->dump();
+  if (LinkerOptions)
+    for (const auto &LinkOption : cast<llvm::MDNode>(LinkerOptions)->operands())
       AutolinkEntries.push_back(LinkOption);
-    }
-  }
 
   // Remove duplicates.
   llvm::SmallPtrSet<llvm::Metadata*, 4> knownAutolinkEntries;
@@ -877,6 +898,9 @@ void IRGenModule::emitAutolinkInfo() {
                         AutolinkEntries.end());
 
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("unknown object format");
+  case llvm::Triple::COFF:
   case llvm::Triple::MachO: {
     llvm::LLVMContext &ctx = Module.getContext();
 
@@ -895,7 +919,6 @@ void IRGenModule::emitAutolinkInfo() {
     }
     break;
   }
-  case llvm::Triple::COFF:
   case llvm::Triple::ELF: {
     // Merge the entries into null-separated string.
     llvm::SmallString<64> EntriesString;
@@ -921,9 +944,6 @@ void IRGenModule::emitAutolinkInfo() {
     addUsedGlobal(var);
     break;
   }
-  default:
-    llvm_unreachable("Don't know how to emit autolink entries for "
-                     "the selected object format.");
   }
 
   if (!IRGen.Opts.ForceLoadSymbolName.empty()) {

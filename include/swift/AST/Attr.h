@@ -1079,59 +1079,6 @@ public:
   }
 };
 
-/// The @warn_unused_result attribute, which specifies that we should
-/// receive a warning if a function is called but its result is
-/// unused.
-///
-/// The @warn_unused_result attribute can optionally be provided with
-/// a message and a mutable variant. For example:
-///
-/// \code
-/// struct X {
-///   @warn_unused_result(message: "this string affects your health")
-///   func methodA() -> String { ... }
-///
-///   @warn_unused_result(mutable_variant: "jumpInPlace")
-///   func jump() -> X { ... }
-///
-///   mutating func jumpInPlace() { ... }
-/// }
-/// \endcode
-class WarnUnusedResultAttr : public DeclAttribute {
-  /// The optional message.
-  const StringRef Message;
-
-  /// An optional name of the mutable variant of the given method,
-  /// which will be suggested as a replacement if it can be called.
-  const StringRef MutableVariant;
-
-public:
-  /// A @warn_unused_result attribute with no options.
-  WarnUnusedResultAttr(SourceLoc atLoc, SourceLoc attrLoc, bool implicit)
-    : DeclAttribute(DAK_WarnUnusedResult, atLoc, SourceRange(atLoc, attrLoc),
-                    implicit),
-      Message(""), MutableVariant("") { }
-
-  /// A @warn_unused_result attribute with a message or mutable variant.
-  WarnUnusedResultAttr(SourceLoc atLoc, SourceLoc attrLoc, SourceLoc lParenLoc,
-                       StringRef message, StringRef mutableVariant,
-                       SourceLoc rParenLoc, bool implicit)
-    : DeclAttribute(DAK_WarnUnusedResult, attrLoc,
-                    SourceRange(atLoc, rParenLoc),
-                    implicit),
-      Message(message), MutableVariant(mutableVariant) { }
-
-  /// Retrieve the message associated with this attribute.
-  StringRef getMessage() const { return Message; }
-
-  /// Retrieve the name of the mutable variant of this method.
-  StringRef getMutableVariant() const { return MutableVariant; }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_WarnUnusedResult;
-  }
-};
-
 /// The @swift3_migration attribute which describes the transformations
 /// required to migrate the given Swift 2.x API to Swift 3.
 class Swift3MigrationAttr : public DeclAttribute {

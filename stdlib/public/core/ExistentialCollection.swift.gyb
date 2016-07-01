@@ -54,7 +54,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///         = lazyStrings.makeIterator()
   ///       return AnyIterator(iterator)
   ///     }
-  public init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
+  public init<I : IteratorProtocol>(_ base: I) where I.Element == Element {
     self._box = _IteratorBox(base)
   }
 
@@ -74,8 +74,10 @@ public struct AnyIterator<Element> : IteratorProtocol {
     self._box = _box
   }
 
-  /// Advances to the next element and returns it, or `nil` if no next
-  /// element exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   public func next() -> Element? {
     return _box.next()
   }
@@ -96,8 +98,10 @@ internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
 }
 
 internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
-  /// Advances to the next element and returns it, or `nil` if no next
-  /// element exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Note: Subclasses must override this method.
   internal func next() -> Element? { _abstract() }
@@ -303,8 +307,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 %     assert False, 'Unknown kind'
 %   end
 
-internal final class _${Kind}Box<
-  S : ${Kind}
+internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
   where
   S.SubSequence : ${Kind},
   S.SubSequence.Iterator.Element == S.Iterator.Element,
@@ -321,7 +324,7 @@ internal final class _${Kind}Box<
   S.Indices.Index == S.Index,
   S.Indices.SubSequence == S.Indices
 %   end
-> : _Any${Kind}Box<S.Iterator.Element> {
+{
   internal typealias Element = S.Iterator.Element
 
   internal override func _makeIterator() -> AnyIterator<Element> {
@@ -532,22 +535,20 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
 /// - SeeAlso: `AnyIterator`
 public struct AnySequence<Element> : Sequence {
   /// Creates a new sequence that wraps and forwards operations to `base`.
-  public init<
-    S : Sequence
+  public init<S : Sequence>(_ base: S)
     where
     S.Iterator.Element == Element,
     S.SubSequence : Sequence,
     S.SubSequence.Iterator.Element == Element,
-    S.SubSequence.SubSequence == S.SubSequence
-  >(_ base: S) {
+    S.SubSequence.SubSequence == S.SubSequence {
     self._box = _SequenceBox(_base: base)
   }
 
   /// Creates a sequence whose `makeIterator()` method forwards to
   /// `makeUnderlyingIterator`.
-  public init<I : IteratorProtocol where I.Element == Element>(
+  public init<I : IteratorProtocol>(
     _ makeUnderlyingIterator: () -> I
-  ) {
+  ) where I.Element == Element {
     self.init(_ClosureBasedSequence(makeUnderlyingIterator))
   }
 
@@ -812,8 +813,7 @@ public struct ${Self}<Element>
   /// stores `base` as its underlying collection.
   ///
   /// - Complexity: O(1).
-  public init<
-    C : ${SubProtocol}
+  public init<C : ${SubProtocol}>(_ base: C)
     where
     C.Iterator.Element == Element,
 
@@ -830,8 +830,7 @@ public struct ${Self}<Element>
     C.Indices : ${SubProtocol},
     C.Indices.Iterator.Element == C.Index,
     C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices
-  >(_ base: C) {
+    C.Indices.SubSequence == C.Indices {
     // Traversal: ${Traversal}
     // SubTraversal: ${SubTraversal}
     self._box = _${SubProtocol}Box<C>(
@@ -1036,3 +1035,8 @@ extension AnyCollectionProtocol {
     Builtin.unreachable()
   }
 }
+
+% for Traversal in TRAVERSALS:
+@available(*, unavailable, renamed: "AnyIndex")
+public typealias Any${Traversal}Index = AnyIndex
+% end

@@ -504,7 +504,7 @@ class FormatWalker : public SourceEntityWalker {
       if (auto TE = dyn_cast_or_null<TupleExpr>(Node.dyn_cast<Expr *>())) {
         // Trailing closures are not considered siblings to other args.
         unsigned EndAdjust = TE->hasTrailingClosure() ? 1 : 0;
-        for (unsigned I = 0, N = TE->getNumElements() - EndAdjust; I < N; I ++) {
+        for (unsigned I = 0, N = TE->getNumElements() - EndAdjust; I < N; I++) {
           auto EleStart = TE->getElementNameLoc(I);
           if (EleStart.isInvalid()) {
             EleStart = TE->getElement(I)->getStartLoc();
@@ -518,7 +518,7 @@ class FormatWalker : public SourceEntityWalker {
         // Generic type params are siblings to align.
         if (auto GPL = AFD->getGenericParams()) {
           const auto Params = GPL->getParams();
-          for (unsigned I = 0, N = Params.size(); I < N; I ++) {
+          for (unsigned I = 0, N = Params.size(); I < N; I++) {
             addPair(Params[I]->getEndLoc(), FindAlignLoc(Params[I]->getStartLoc()),
                     tok::comma);
           }
@@ -550,18 +550,19 @@ class FormatWalker : public SourceEntityWalker {
         // FIXME: We are going to revisit the behavior and the indentation we
         // want for dictionary/array literals.
         //
-        /* SourceLoc LBracketLoc = AE->getLBracketLoc();
+#if 0
+        SourceLoc LBracketLoc = AE->getLBracketLoc();
         if (isTargetImmediateAfter(LBracketLoc) &&
             !sameLineWithTarget(LBracketLoc)) {
           FoundSibling = LBracketLoc;
           NeedExtraIndentation = true;
-        }*/
-        for (unsigned I = 0, N = AE->getNumElements(); I < N;  I ++) {
+        }
+#endif
+        for (unsigned I = 0, N = AE->getNumElements(); I < N; I++) {
           addPair(AE->getElement(I)->getEndLoc(),
                   FindAlignLoc(AE->getElement(I)->getStartLoc()), tok::comma);
         }
       }
-
       // Case label items in a case statement are siblings.
       if (auto CS = dyn_cast_or_null<CaseStmt>(Node.dyn_cast<Stmt *>())) {
         for (const CaseLabelItem& Item : CS->getCaseLabelItems()) {
@@ -639,7 +640,7 @@ class FormatWalker : public SourceEntityWalker {
       return;
     for (auto InValid = Loc.isInvalid(); CurrentTokIt != Tokens.end() &&
          (InValid || SM.isBeforeInBuffer(CurrentTokIt->getLoc(), Loc));
-         CurrentTokIt ++) {
+         CurrentTokIt++) {
       if (CurrentTokIt->getKind() == tok::comment) {
         auto StartLine = SM.getLineNumber(CurrentTokIt->getRange().getStart());
         auto EndLine = SM.getLineNumber(CurrentTokIt->getRange().getEnd());

@@ -248,6 +248,8 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   // Compute the interface type.
   Type interfaceTy;
   if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
+    eqDecl->setGenericSignature(genericSig);
+
     auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
     TupleTypeElt ifaceParamElts[] = {
       enumIfaceTy, enumIfaceTy,
@@ -362,7 +364,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     return nullptr;
   }
   
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
+  auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC);
   
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
@@ -397,10 +399,11 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   // Compute the interface type of hashValue().
   Type interfaceType;
   Type selfIfaceType = getterDecl->computeInterfaceSelfType(false);
-  if (auto sig = parentDC->getGenericSignatureOfContext())
+  if (auto sig = parentDC->getGenericSignatureOfContext()) {
+    getterDecl->setGenericSignature(sig);
     interfaceType = GenericFunctionType::get(sig, selfIfaceType, methodType,
                                              AnyFunctionType::ExtInfo());
-  else
+  } else
     interfaceType = FunctionType::get(selfType, methodType);
   
   getterDecl->setInterfaceType(interfaceType);

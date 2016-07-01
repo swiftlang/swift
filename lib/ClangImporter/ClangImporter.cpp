@@ -316,22 +316,25 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
-  invocationArgStrs.insert(invocationArgStrs.end(), {
-    // Enable modules.
-    "-fmodules",
+  invocationArgStrs.insert(
+      invocationArgStrs.end(),
+      {
 
-    // Enable implicit module maps (this option is implied by "-fmodules").
-    "-fimplicit-module-maps",
+          // Enable modules
+          "-fmodules",
+          "-fmodules-validate-system-headers",
+          "-Werror=non-modular-include-in-framework-module",
+          // Enable implicit module maps (implied by "-fmodules")
+          "-fimplicit-module-maps",
+          "-Xclang", "-fmodule-feature", "-Xclang", "swift",
 
-    // Don't emit LLVM IR.
-    "-fsyntax-only",
+          // Don't emit LLVM IR.
+          "-fsyntax-only",
 
-    SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
-    "-fretain-comments-from-system-headers",
-    "-fmodules-validate-system-headers",
-    "-Werror=non-modular-include-in-framework-module",
-    "-Xclang", "-fmodule-feature", "-Xclang", "swift",
-  });
+          "-fretain-comments-from-system-headers",
+
+          SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
+      });
 
   // Set C language options.
   if (triple.isOSDarwin()) {
@@ -354,19 +357,22 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-D_ISO646_H_", "-D__ISO646_H",
 
       // Request new APIs from Foundation.
-      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=5",
+      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=7",
 
       // Request new APIs from SceneKit.
-      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=1",
-
-      // Request new APIs from SpriteKit.
-      "-DSWIFT_SDK_OVERLAY2_SPRITEKIT_EPOCH=1",
+      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=2",
 
       // Request new APIs from CoreImage.
-      "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=1",
+      "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=2",
 
       // Request new APIs from libdispatch.
-      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=0",
+      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=2",
+
+      // Request new APIs from libpthread
+      "-DSWIFT_SDK_OVERLAY_PTHREAD_EPOCH=1",
+
+      // Request new APIs from CoreGraphics.
+      "-DSWIFT_SDK_OVERLAY_COREGRAPHICS_EPOCH=0",
     });
 
     // Get the version of this compiler and pass it to
@@ -1888,12 +1894,49 @@ namespace {
   typedef ClangImporter::Implementation::ImportedName ImportedName;
 }
 
-void ClangImporter::Implementation::ImportedName::printSwiftName(
-       llvm::raw_ostream &os) const {
+/// Will recursively print out the fully qualified context for the given name.
+/// Ends with a trailing "."
+static void
+printFullContextPrefix(ClangImporter::Implementation::ImportedName name,
+                       llvm::raw_ostream &os,
+                       ClangImporter::Implementation &Impl) {
+  const clang::NamedDecl *newDeclContextNamed = nullptr;
+  switch (name.EffectiveContext.getKind()) {
+  case EffectiveClangContext::UnresolvedContext:
+    os << name.EffectiveContext.getUnresolvedName() << ".";
+    // And we're done!
+    return;
+
+  case EffectiveClangContext::DeclContext: {
+    auto namedDecl =
+        dyn_cast<clang::NamedDecl>(name.EffectiveContext.getAsDeclContext());
+    if (!namedDecl) {
+      // We're done
+      return;
+    }
+    newDeclContextNamed = cast<clang::NamedDecl>(namedDecl);
+    break;
+  }
+
+  case EffectiveClangContext::TypedefContext:
+    newDeclContextNamed = name.EffectiveContext.getTypedefName();
+    break;
+  }
+
+  // Now, let's print out the parent
+  assert(newDeclContextNamed && "should of been set");
+  auto parentName = Impl.importFullName(newDeclContextNamed);
+  printFullContextPrefix(parentName, os, Impl);
+  os << parentName.Imported << ".";
+}
+
+void ClangImporter::Implementation::printSwiftName(ImportedName name,
+                                                   bool fullyQualified,
+                                                   llvm::raw_ostream &os) {
   // Property accessors.
   bool isGetter = false;
   bool isSetter = false;
-  switch (AccessorKind) {
+  switch (name.AccessorKind) {
   case ImportedAccessorKind::None:
     break;
 
@@ -1910,45 +1953,27 @@ void ClangImporter::Implementation::ImportedName::printSwiftName(
     break;
   }
 
-  // If we're importing a global as a member, we need to provide the
-  // effective context.
-  if (ImportAsMember) {
-    switch (EffectiveContext.getKind()) {
-    case EffectiveClangContext::DeclContext:
-      os << SwiftLookupTable::translateDeclContext(
-              EffectiveContext.getAsDeclContext())->second;
-      break;
-
-    case EffectiveClangContext::TypedefContext:
-      os << EffectiveContext.getTypedefName()->getName();
-      break;
-
-    case EffectiveClangContext::UnresolvedContext:
-      os << EffectiveContext.getUnresolvedName();
-      break;
-    }
-
-    os << ".";
-  }
+  if (fullyQualified)
+    printFullContextPrefix(name, os, *this);
 
   // Base name.
-  os << Imported.getBaseName().str();
+  os << name.Imported.getBaseName().str();
 
   // Determine the number of argument labels we'll be producing.
-  auto argumentNames = Imported.getArgumentNames();
+  auto argumentNames = name.Imported.getArgumentNames();
   unsigned numArguments = argumentNames.size();
-  if (SelfIndex) ++numArguments;
+  if (name.SelfIndex) ++numArguments;
   if (isSetter) ++numArguments;
 
   // If the result is a simple name that is not a getter, we're done.
-  if (numArguments == 0 && Imported.isSimpleName() && !isGetter) return;
+  if (numArguments == 0 && name.Imported.isSimpleName() && !isGetter) return;
 
   // We need to produce a function name.
   os << "(";
   unsigned currentArgName = 0;
   for (unsigned i = 0; i != numArguments; ++i) {
     // The "self" parameter.
-    if (SelfIndex && *SelfIndex == i) {
+    if (name.SelfIndex && *name.SelfIndex == i) {
       os << "self:";
       continue;
     }
@@ -2328,6 +2353,12 @@ auto ClangImporter::Implementation::importFullName(
   if (isa<clang::ObjCCategoryDecl>(D))
     return result;
 
+  // Dig out the definition, if there is one.
+  if (auto def = getDefinitionForClangTypeDecl(D)) {
+    if (*def)
+      D = static_cast<const clang::NamedDecl *>(*def);
+  }
+
   // Compute the effective context.
   auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
 
@@ -2352,6 +2383,7 @@ auto ClangImporter::Implementation::importFullName(
   // Import onto a swift_newtype if present
   } else if (auto newtypeDecl = findSwiftNewtype(D, clangSema, swift2Name)) {
     result.EffectiveContext = newtypeDecl;
+    result.ImportAsMember = true;
   // Everything else goes into its redeclaration context.
   } else {
     result.EffectiveContext = dc->getRedeclContext();
@@ -2814,7 +2846,7 @@ auto ClangImporter::Implementation::importFullName(
           owningD = *def;
       }
 
-      std::string moduleName;
+      SmallString<32> moduleName;
       if (auto module = owningD->getImportedOwningModule())
         moduleName = module->getTopLevelModuleName();
       else
@@ -3251,7 +3283,8 @@ ClangImporter::Implementation::shouldSuppressGenericParamsImport(
   while (decl) {
     StringRef name = decl->getName();
     if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
-        name == "NSOrderedSet" || name == "NSEnumerator") {
+        name == "NSOrderedSet" || name == "NSEnumerator" ||
+        name == "NSMeasurement") {
       return true;
     }
     decl = decl->getSuperClass();

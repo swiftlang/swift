@@ -103,6 +103,13 @@ static void configurePowerPC64(IRGenModule &IGM, const llvm::Triple &triple,
             SWIFT_ABI_POWERPC64_SWIFT_SPARE_BITS_MASK);
 }
 
+/// Configures target-specific information for SystemZ platforms.
+static void configureSystemZ(IRGenModule &IGM, const llvm::Triple &triple,
+                             SwiftTargetInfo &target) {
+  setToMask(target.PointerSpareBits, 64,
+            SWIFT_ABI_S390X_SWIFT_SPARE_BITS_MASK);
+}
+
 /// Configure a default target.
 SwiftTargetInfo::SwiftTargetInfo(
   llvm::Triple::ObjectFormatType outputObjectFormat,
@@ -152,6 +159,10 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
   case llvm::Triple::ppc64:
   case llvm::Triple::ppc64le:
     configurePowerPC64(IGM, triple, target);
+    break;
+
+  case llvm::Triple::systemz:
+    configureSystemZ(IGM, triple, target);
     break;
 
   default:

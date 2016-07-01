@@ -23,7 +23,7 @@ UnsafeBitMapTests.test("wordIndex(_:), bitIndex(_:)") {
     expectEqual(3, _UnsafeBitMap.wordIndex(i), "i=\(i)")
     expectEqual(i - 96, Int(_UnsafeBitMap.bitIndex(i)), "i=\(i)")
   }
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   for i in 0...63 {
     expectEqual(0, _UnsafeBitMap.wordIndex(i), "i=\(i)")
     expectEqual(i, Int(_UnsafeBitMap.bitIndex(i)), "i=\(i)")
@@ -56,7 +56,7 @@ UnsafeBitMapTests.test("sizeInWords(forSizeInBits:)") {
   for i in 97...128 {
     expectEqual(4, _UnsafeBitMap.sizeInWords(forSizeInBits: i), "i=\(i)")
   }
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   for i in 1...64 {
     expectEqual(1, _UnsafeBitMap.sizeInWords(forSizeInBits: i), "i=\(i)")
   }

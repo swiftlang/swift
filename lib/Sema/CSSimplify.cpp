@@ -72,24 +72,55 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   return dist;
 }
 
-SmallVector<CallArgParam, 4> constraints::decomposeArgParamType(Type type) {
+SmallVector<CallArgParam, 4> constraints::decomposeArgType(Type type) {
+  return decomposeParamType(type, nullptr, /*level=*/0);
+}
+
+SmallVector<CallArgParam, 4>
+constraints::decomposeParamType(Type type, ValueDecl *paramOwner,
+                                unsigned level) {
+  // Find the corresponding parameter list.
+  ParameterList *paramList = nullptr;
+  if (paramOwner) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
+      if (level < func->getNumParameterLists())
+        paramList = func->getParameterList(level);
+    } else if (auto subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
+      if (level == 1)
+        paramList = subscript->getIndices();
+    }
+  }
+
   SmallVector<CallArgParam, 4> result;
   switch (type->getKind()) {
-  case TypeKind::Tuple:
-    for (const auto &elt : cast<TupleType>(type.getPointer())->getElements()) {
+  case TypeKind::Tuple: {
+    auto tupleTy = cast<TupleType>(type.getPointer());
+
+    // FIXME: In the weird case where we have a tuple type that should
+    // be wrapped in a ParenType but isn't, just... forget it happened.
+    if (paramList && tupleTy->getNumElements() != paramList->size() &&
+        paramList->size() == 1)
+      paramList = nullptr;
+
+    for (auto i : range(0, tupleTy->getNumElements())) {
+      const auto &elt = tupleTy->getElement(i);
+
       CallArgParam argParam;
       argParam.Ty = elt.isVararg() ? elt.getVarargBaseTy() : elt.getType();
       argParam.Label = elt.getName();
-      argParam.HasDefaultArgument
-        = elt.getDefaultArgKind() != DefaultArgumentKind::None;
+      argParam.HasDefaultArgument =
+        paramList && paramList->get(i)->isDefaultArgument();
       argParam.Variadic = elt.isVararg();
       result.push_back(argParam);
     }
     break;
+  }
 
   case TypeKind::Paren: {
     CallArgParam argParam;
     argParam.Ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
+    argParam.HasDefaultArgument =
+      paramList && paramList->get(0)->isDefaultArgument();
     result.push_back(argParam);
     break;
   }
@@ -302,7 +333,8 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     }
 
     // Missing a keyword argument name.
-    if (nextArgIdx != numArgs && !args[nextArgIdx].hasLabel()) {
+    if (nextArgIdx != numArgs && !args[nextArgIdx].hasLabel() &&
+       ignoreNameMismatch) {
       // Claim the next argument.
       return claim(name, nextArgIdx);
     }
@@ -508,19 +540,9 @@ matchCallArguments(ArrayRef<CallArgParam> args,
         continue;
       }
 
-      // The argument binds to a parameter that comes earlier than the
-      // previous argument. This is fine so long as this parameter and all of
-      // those parameters up to (and including) the previously-bound parameter
-      // are either variadic or have a default argument.
-      for (unsigned i = paramIdx; i != prevParamIdx + 1; ++i) {
-        const auto &param = params[i];
-        if (param.Variadic || param.HasDefaultArgument)
-          continue;
-
-        unsigned prevArgIdx = parameterBindings[prevParamIdx].front();
-        listener.outOfOrderArgument(argIdx, prevArgIdx);
-        return true;
-      }
+      unsigned prevArgIdx = parameterBindings[prevParamIdx].front();
+      listener.outOfOrderArgument(argIdx, prevArgIdx);
+      return true;
     }
   }
 
@@ -531,6 +553,97 @@ matchCallArguments(ArrayRef<CallArgParam> args,
 
   // The arguments were relabeled; notify the listener.
   return listener.relabelArguments(actualArgNames);
+}
+
+/// Find the callee declaration and uncurry level for a given call
+/// locator.
+static std::pair<ValueDecl *, unsigned>
+getCalleeDecl(ConstraintSystem &cs, ConstraintLocatorBuilder callLocator) {
+  // If the call locator is not just a call expression, there's
+  // nothing to do.
+  SmallVector<LocatorPathElt, 2> path;
+  auto callExpr = callLocator.getLocatorParts(path);
+  if (!callExpr) return { nullptr, 0 };
+
+  // Our remaining path can only be 'ApplyArgument'.
+  if (!path.empty() &&
+      !(path.size() == 1 &&
+        path.back().getKind() == ConstraintLocator::ApplyArgument))
+    return { nullptr, 0 };
+
+  // Dig out the callee.
+  Expr *calleeExpr;
+  if (auto call = dyn_cast<CallExpr>(callExpr))
+    calleeExpr = call->getDirectCallee();
+  else if (isa<UnresolvedMemberExpr>(callExpr))
+    calleeExpr = callExpr;
+  else
+    return { nullptr, 0 };
+
+  // Determine the target locator.
+  // FIXME: Check whether the callee is of an expression kind that
+  // could describe a declaration. This is an optimization.
+  ConstraintLocator *targetLocator = cs.getConstraintLocator(calleeExpr);
+
+  // Find the overload choice corresponding to the callee locator.
+  // FIXME: This linearly walks the list of resolved overloads, which is
+  // potentially very expensive.
+  Optional<OverloadChoice> choice;
+  for (auto resolved = cs.getResolvedOverloadSets(); resolved;
+       resolved = resolved->Previous) {
+    // FIXME: Workaround null locators.
+    if (!resolved->Locator) continue;
+
+    auto resolvedLocator = resolved->Locator;
+    SmallVector<LocatorPathElt, 4> resolvedPath(
+                                     resolvedLocator->getPath().begin(),
+                                     resolvedLocator->getPath().end());
+    if (!resolvedPath.empty() &&
+        (resolvedPath.back().getKind() == ConstraintLocator::SubscriptMember ||
+         resolvedPath.back().getKind() == ConstraintLocator::Member ||
+         resolvedPath.back().getKind() == ConstraintLocator::UnresolvedMember ||
+         resolvedPath.back().getKind() ==
+           ConstraintLocator::ConstructorMember)) {
+      resolvedPath.pop_back();
+      resolvedLocator = cs.getConstraintLocator(
+                          resolvedLocator->getAnchor(),
+                          resolvedPath,
+                          resolvedLocator->getSummaryFlags());
+    }
+
+    SourceRange range;
+    resolvedLocator = simplifyLocator(cs, resolvedLocator, range);
+
+    if (resolvedLocator == targetLocator) {
+      choice = resolved->Choice;
+      break;
+    }
+  }
+
+  // If we didn't find any matching overloads, we're done.
+  if (!choice) return { nullptr, 0 };
+
+  // If there's a declaration, return it.
+  if (choice->isDecl()) {
+    auto decl = choice->getDecl();
+    unsigned level = 0;
+    if (decl->getDeclContext()->isTypeContext()) {
+      if (auto function = dyn_cast<AbstractFunctionDecl>(decl)) {
+        // References to instance members on a metatype stay at level 0.
+        // Everything else is level 1.
+        if (!(function->isInstanceMember() &&
+              cs.simplifyType(choice->getBaseType())->is<AnyMetatypeType>()))
+          level = 1;
+      } else if (isa<SubscriptDecl>(decl)) {
+        // Subscript level 1 == the indices.
+        level = 1;
+      }
+    }
+
+    return { decl, level };
+  }
+
+  return { nullptr, 0 };
 }
 
 // Match the argument of a call to the parameter.
@@ -557,10 +670,13 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   }
 
   // Extract the arguments.
-  auto args = decomposeArgParamType(argType);
+  auto args = decomposeArgType(argType);
 
   // Extract the parameters.
-  auto params = decomposeArgParamType(paramType);
+  ValueDecl *callee;
+  unsigned calleeLevel;
+  std::tie(callee, calleeLevel) = getCalleeDecl(cs, locator);
+  auto params = decomposeParamType(paramType, callee, calleeLevel);
 
   // Match up the call arguments to the parameters.
   MatchCallArgumentListener listener;
@@ -1130,24 +1246,6 @@ static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
   return true;
 }
 
-/// Given that 'tupleTy' is the argument type of a function that's being
-/// invoked with a single unlabeled argument, return the type of the parameter
-/// that matches that argument, or the null type if such a match is impossible.
-static Type getTupleElementTypeForSingleArgument(TupleType *tupleTy) {
-  Type result;
-  for (auto &param : tupleTy->getElements()) {
-    bool mustClaimArg = !param.isVararg() &&
-                        param.getDefaultArgKind() == DefaultArgumentKind::None;
-    bool canClaimArg = !param.hasName();
-    if (!result && canClaimArg) {
-      result = param.isVararg() ? param.getVarargBaseTy() : param.getType();
-    } else if (mustClaimArg) {
-      return Type();
-    }
-  }
-  return result;
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
@@ -1299,34 +1397,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return SolutionKind::Unsolved;
     }
 
-    // We need to be careful about mapping 'raw' argument type variables to
-    // parameter tuples containing default args, or varargs in the first
-    // position. If we naively bind the type variable to the parameter tuple,
-    // we'll later end up looking to whatever expression created the type
-    // variable to find the declarations for default arguments. This can
-    // obviously be problematic if the expression in question is not an
-    // application. (For example, We don't want to introspect an 'if' expression
-    // to see if it has default arguments.) Instead, we should bind the type
-    // variable to the first element type of the tuple.
     case TypeMatchKind::ArgumentTupleConversion:
-      if (typeVar1 &&
-          !typeVar1->getImpl().literalConformanceProto &&
-          (flags & TMF_GenerateConstraints) &&
-          isa<ParenType>(type1.getPointer())) {
-        
-        if (auto tupleTy = type2->getAs<TupleType>()) {
-          if (auto tupleEltTy = getTupleElementTypeForSingleArgument(tupleTy)) {
-            addConstraint(getConstraintKind(kind),
-                          typeVar1,
-                          tupleEltTy,
-                          getConstraintLocator(locator));
-            return SolutionKind::Solved;
-          }
-        }
-
-      }
-      SWIFT_FALLTHROUGH;
-
     case TypeMatchKind::Conversion:
       if (typeVar1 && typeVar2) {
         auto rep1 = getRepresentative(typeVar1);
@@ -1373,7 +1444,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // different from normal conversions.
   if (kind == TypeMatchKind::ArgumentTupleConversion ||
       kind == TypeMatchKind::OperatorArgumentTupleConversion) {
-    if (concrete) {
+    if (!typeVar2) {
       return ::matchCallArguments(*this, kind, type1, type2, locator);
     }
 
@@ -1450,14 +1521,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         auto class2 = cast<ClassDecl>(nominal2->getDecl());
 
         // CF -> Objective-C via toll-free bridging.
-        if (class1->isForeign() && !class2->isForeign() &&
+        if (class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+            class2->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
             class1->getAttrs().hasAttribute<ObjCBridgedAttr>()) {
           conversionsOrFixes.push_back(
             ConversionRestrictionKind::CFTollFreeBridgeToObjC);
         }
 
         // Objective-C -> CF via toll-free bridging.
-        if (class2->isForeign() && !class1->isForeign() &&
+        if (class2->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+            class1->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
             class2->getAttrs().hasAttribute<ObjCBridgedAttr>()) {
           conversionsOrFixes.push_back(
             ConversionRestrictionKind::ObjCTollFreeBridgeToCF);
@@ -3424,7 +3497,7 @@ retry:
     if (isa<PrefixUnaryExpr>(anchor) || isa<PostfixUnaryExpr>(anchor) ||
         isa<BinaryExpr>(anchor))
       ArgConv = TypeMatchKind::OperatorArgumentTupleConversion;
-    
+
     // The argument type must be convertible to the input type.
     if (matchTypes(func1->getInput(), func2->getInput(),
                    ArgConv, flags,

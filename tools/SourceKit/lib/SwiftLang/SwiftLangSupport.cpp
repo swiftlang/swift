@@ -13,6 +13,7 @@
 #include "SwiftLangSupport.h"
 #include "SwiftASTManager.h"
 #include "SourceKit/Core/Context.h"
+#include "SourceKit/SwiftLang/Factory.h"
 #include "SourceKit/Support/UIdent.h"
 
 #include "swift/AST/AST.h"
@@ -151,7 +152,7 @@ static UIdent KindStructureElemTypeRef("source.lang.swift.structure.elem.typeref
 
 
 std::unique_ptr<LangSupport>
-LangSupport::createSwiftLangSupport(SourceKit::Context &SKCtx) {
+SourceKit::createSwiftLangSupport(SourceKit::Context &SKCtx) {
   return std::unique_ptr<LangSupport>(new SwiftLangSupport(SKCtx));
 }
 
@@ -638,6 +639,11 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
     case DAK_IBInspectable: {
       static UIdent Attr_IBInspectable("source.decl.attribute.ibinspectable");
       AttrUIDs.push_back(Attr_IBInspectable);
+      continue;
+    }
+    case DAK_GKInspectable: {
+      static UIdent Attr_GKInspectable("source.decl.attribute.gkinspectable");
+      AttrUIDs.push_back(Attr_GKInspectable);
       continue;
     }
     case DAK_ObjC: {

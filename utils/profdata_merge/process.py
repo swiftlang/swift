@@ -15,21 +15,22 @@ import logging
 import os
 import pipes
 import sys
+import time
+from datetime import timedelta
 
 from multiprocessing import Process
 
 
-# hack to import SwiftBuildSupport and swift_build_support
-parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-sys.path.append(parent_dir)
-support_dir = os.path.join(parent_dir, 'swift_build_support')
-sys.path.append(support_dir)
+# Allow importing swift_build_support.
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',
+                             'swift_build_support'))
+from swift_build_support import shell  # noqa (E402)
 from swift_build_support.toolchain import host_toolchain  # noqa (E402)
-from SwiftBuildSupport import check_output, check_call  # noqa (E402)
 
 toolchain = host_toolchain()
 LLVM_PROFDATA_PATH = toolchain.llvm_profdata
-_profdata_help = check_output([LLVM_PROFDATA_PATH, 'merge', '-help'])
+_profdata_help = shell.capture([LLVM_PROFDATA_PATH, 'merge', '-help'],
+                               echo=False)
 LLVM_PROFDATA_SUPPORTS_SPARSE = 'sparse' in _profdata_help
 
 
@@ -65,14 +66,26 @@ class ProfdataMergerProcess(Process):
             llvm_cmd.append("-sparse")
         llvm_cmd += cleaned_files
         self.report(llvm_cmd)
-        ret = check_call(llvm_cmd)
-        if ret != 0:
-            self.report("llvm profdata command failed -- Exited with code %d"
-                        % ret, level=logging.ERROR)
+        try:
+            start = time.time()
+            shell.call(llvm_cmd, echo=False)
+            end = time.time()
+            self.report("elapsed time for llvm-profdata: %s"
+                        % timedelta(seconds=(end-start)))
+        except SystemExit as e:
+            self.report("llvm profdata command failed: %s" % e,
+                        level=logging.ERROR)
         if self.config.remove_files:
             for f in self.filename_buffer:
                 if os.path.exists(f):
+                    self.report("removing '%s'" % f)
                     os.remove(f)
+                else:
+                    self.report("not removing '%s' because it does not exist"
+                                % f)
+        else:
+            self.report("not removing %d files because --no-remove is set"
+                        % len(self.filename_buffer))
         self.filename_buffer = []
 
     def run(self):

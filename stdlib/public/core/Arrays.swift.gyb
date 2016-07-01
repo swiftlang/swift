@@ -658,8 +658,6 @@ public struct ${Self}<Element>
 
   public typealias Indices = CountableRange<Int>
 
-%{
-SubscriptDocComment="""\
   /// Accesses the element at the specified position.
   ///
   /// For example:
@@ -674,19 +672,11 @@ SubscriptDocComment="""\
   ///
   /// - Complexity: Reading an element from an array is O(1). Writing is O(1)
   ///   unless the array's storage is shared with another array, in which case
-  ///   writing is O(*n*), where *n* is the length of the array.""" + ("""
+  ///   writing is O(*n*), where *n* is the length of the array.
+%if Self == 'Array':
   ///   If the array uses a bridged `NSArray` instance as its storage, the
-  ///   efficiency is unspecified.""" if Self == 'Array' else '')
-}%
-
-#if _runtime(_ObjC)
-  // FIXME: Code is duplicated here between the Objective-C and non-Objective-C
-  // runtimes because config blocks can't appear inside a subscript function
-  // without causing parse errors. When this is fixed, they should be merged
-  // as described in the comment below.
-  // rdar://problem/19553956
-
-${SubscriptDocComment}
+  ///   efficiency is unspecified.
+%end
   public subscript(index: Int) -> Element {
     get {
       // This call may be hoisted or eliminated by the optimizer.  If
@@ -709,34 +699,6 @@ ${SubscriptDocComment}
       return (_getElementAddress(index), Builtin.tryPin(_getOwner_native()))
     }
   }
-#else
-${SubscriptDocComment}
-  public subscript(index: Int) -> Element {
-    get {
-      // This call may be hoisted or eliminated by the optimizer.  If
-      // there is an inout violation, this value may be stale so needs to be
-      // checked again below.
-      let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
-
-      // Make sure the index is in range and wasNativeTypeChecked is
-      // still valid.
-      let token = _checkSubscript(
-        index, wasNativeTypeChecked: wasNativeTypeChecked)
-
-      return _getElement(
-        index, wasNativeTypeChecked: wasNativeTypeChecked,
-        matchingSubscriptCheck: token)
-    }
-
-    mutableAddressWithPinnedNativeOwner {
-      _makeMutableAndUniqueOrPinned()
-      _checkSubscript_native(index)
-      return (
-        _getElementAddress(index),
-        Builtin.tryPin(_getOwner_native()))
-    }
-  }
-#endif
 
   /// Accesses a contiguous subrange of the array's elements.
   ///
@@ -770,7 +732,7 @@ ${SubscriptDocComment}
     get {
       _checkIndex(bounds.lowerBound)
       _checkIndex(bounds.upperBound)
-      return ArraySlice(_buffer[bounds])
+      return ArraySlice(_buffer: _buffer[bounds])
     }
     set(rhs) {
       _checkIndex(bounds.lowerBound)
@@ -922,9 +884,19 @@ ${SubscriptDocComment}
 
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
-  public init(_ _buffer: _Buffer) {
+  public // @testable
+  init(_buffer: _Buffer) {
     self._buffer = _buffer
   }
+
+%if Self == 'ArraySlice':
+  /// Initialization from an existing buffer does not have "array.init"
+  /// semantics because the caller may retain an alias to buffer.
+  public // @testable
+  init(_buffer: _ContiguousArrayBuffer<Element>) {
+    self.init(_buffer: _Buffer(_buffer, shiftedToStartIndex: 0))
+  }
+%end
 
   public var _buffer: _Buffer
 }
@@ -964,7 +936,7 @@ extension ${Self} : ArrayLiteralConvertible {
   ///
   /// - Parameter elements: A variadic list of elements of the new array.
   public init(arrayLiteral elements: Element...) {
-    self.init(_extractOrCopyToNativeArrayBuffer(elements._buffer))
+    self.init(_buffer: _extractOrCopyToNativeArrayBuffer(elements._buffer))
   }
 %end
 }
@@ -1062,10 +1034,10 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ///     // Prints "["Gold", "Cerise", "Magenta", "Vermillion"]"
   ///
   /// - Parameter s: The sequence of elements to turn into an array.
-  public init<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ s: S) {
-    self = ${Self}(_Buffer(s._copyToNativeArrayBuffer(),
+  public init<S : Sequence>(_ s: S)
+    where S.Iterator.Element == Element {
+
+    self = ${Self}(_buffer: _Buffer(s._copyToNativeArrayBuffer(),
       shiftedToStartIndex: 0))
   }
 
@@ -1152,7 +1124,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
         storage, to: _ContiguousArrayStorage<Element>.self))
     
     return (
-      Array(_Buffer(innerBuffer, shiftedToStartIndex: 0)),
+      Array(_buffer: _Buffer(innerBuffer, shiftedToStartIndex: 0)),
         innerBuffer.firstElementAddress)
   }
 
@@ -1313,11 +1285,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Parameter newElements: The elements to append to the array.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
-  public mutating func append<
-    S : Sequence
-    where
-    S.Iterator.Element == Element
-  >(contentsOf newElements: S) {
+  public mutating func append<S : Sequence>(contentsOf newElements: S)
+    where S.Iterator.Element == Element {
     let oldCount = self.count
     let capacity = self.capacity
     let newCount = oldCount + newElements.underestimatedCount
@@ -1347,11 +1316,9 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Parameter newElements: The elements to append to the array.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
-  public mutating func append<
-    C : Collection
-    where
-    C.Iterator.Element == Element
-  >(contentsOf newElements: C) {
+  public mutating func append<C : Collection>(contentsOf newElements: C)
+    where C.Iterator.Element == Element {
+
     let newElementsCount = numericCast(newElements.count) as Int
 
     let oldCount = self.count
@@ -1662,14 +1629,17 @@ internal struct _InitializeMemoryFromCollection<
 
 // FIXME(ABI): add argument labels.
 @inline(never)
-internal func _arrayOutOfPlaceReplace<
-  B : _ArrayBufferProtocol, C : Collection
-  where
+internal func _arrayOutOfPlaceReplace<B, C>(
+  _ source: inout B,
+  _ bounds: Range<Int>,
+  _ newValues: C,
+  _ insertCount: Int
+) where
+  B : _ArrayBufferProtocol,
+  C : Collection,
   C.Iterator.Element == B.Element,
-  B.Index == Int
->(
-  _ source: inout B, _ bounds: Range<Int>, _ newValues: C, _ insertCount: Int
-) {
+  B.Index == Int {
+
   let growth = insertCount - bounds.count
   let newCount = source.count + growth
   var newBuffer = _forceCreateUniqueMutableBuffer(
@@ -1732,11 +1702,10 @@ extension ${Self} {
   ///   array with an empty collection; otherwise, O(*n*), where *n* is the
   ///   length of the array.
   @_semantics("array.mutate_unknown")
-  public mutating func replaceSubrange<
-    C: Collection where C.Iterator.Element == _Buffer.Element
-  >(
-    _ subrange: Range<Int>, with newElements: C
-  ) {
+  public mutating func replaceSubrange<C>(
+    _ subrange: Range<Int>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == _Buffer.Element {
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "${Self} replace: subrange start is negative")
 
@@ -1877,17 +1846,18 @@ internal protocol _PointerFunction {
 /// As an optimization, may move elements out of source rather than
 /// copying when it isUniquelyReferenced.
 @inline(never)
-internal func _arrayOutOfPlaceUpdate<
-  _Buffer : _ArrayBufferProtocol, Initializer : _PointerFunction
-  where Initializer.Element == _Buffer.Element,
-  _Buffer.Index == Int
->(
+internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
   _ source: inout _Buffer,
   _ dest: inout _ContiguousArrayBuffer<_Buffer.Element>,
   _ headCount: Int, // Count of initial source elements to copy/move
   _ newCount: Int,  // Number of new elements to insert
   _ initializeNewElements: Initializer
-) {
+) where
+  _Buffer : _ArrayBufferProtocol,
+  Initializer : _PointerFunction,
+  Initializer.Element == _Buffer.Element,
+  _Buffer.Index == Int {
+
   _sanityCheck(headCount >= 0)
   _sanityCheck(newCount >= 0)
 
@@ -1969,11 +1939,12 @@ internal struct _IgnorePointer<T> : _PointerFunction {
 
 @_versioned
 @inline(never)
-internal func _outlinedMakeUniqueBuffer<
-  _Buffer : _ArrayBufferProtocol where _Buffer.Index == Int
->(
+internal func _outlinedMakeUniqueBuffer<_Buffer>(
   _ buffer: inout _Buffer, bufferCount: Int
-) {
+) where
+  _Buffer : _ArrayBufferProtocol,
+  _Buffer.Index == Int {
+
   if _fastPath(
       buffer.requestUniqueMutableBackingBuffer(minimumCapacity: bufferCount) != nil) {
     return
@@ -1984,11 +1955,12 @@ internal func _outlinedMakeUniqueBuffer<
   _arrayOutOfPlaceUpdate(&buffer, &newBuffer, bufferCount, 0, _IgnorePointer())
 }
 
-internal func _arrayReserve<
-  _Buffer : _ArrayBufferProtocol where _Buffer.Index == Int
->(
+internal func _arrayReserve<_Buffer>(
   _ buffer: inout _Buffer, _ minimumCapacity: Int
-) {
+) where
+  _Buffer : _ArrayBufferProtocol,
+  _Buffer.Index == Int {
+
   let count = buffer.count
   let requiredCapacity = max(count, minimumCapacity)
 
@@ -2005,13 +1977,13 @@ internal func _arrayReserve<
 }
 
 public // SPI(Foundation)
-func _extractOrCopyToNativeArrayBuffer<
-  Buffer : _ArrayBufferProtocol
+func _extractOrCopyToNativeArrayBuffer<Buffer>(
+  _ source: Buffer
+) -> _ContiguousArrayBuffer<Buffer.Iterator.Element>
   where
-  Buffer.Iterator.Element == Buffer.Element
->(_ source: Buffer)
-  -> _ContiguousArrayBuffer<Buffer.Iterator.Element>
-{
+  Buffer : _ArrayBufferProtocol,
+  Buffer.Iterator.Element == Buffer.Element {
+
   if let n = source.requestNativeBuffer() {
     return n
   }
@@ -2019,15 +1991,14 @@ func _extractOrCopyToNativeArrayBuffer<
 }
 
 /// Append items from `newItems` to `buffer`.
-internal func _arrayAppendSequence<
-  Buffer : _ArrayBufferProtocol,
-  S : Sequence
-  where
-  S.Iterator.Element == Buffer.Element,
-  Buffer.Index == Int
->(
+internal func _arrayAppendSequence<Buffer, S>(
   _ buffer: inout Buffer, _ newItems: S
-) {
+) where
+  Buffer : _ArrayBufferProtocol,
+  S : Sequence,
+  S.Iterator.Element == Buffer.Element,
+  Buffer.Index == Int {
+
   var stream = newItems.makeIterator()
   var nextItem = stream.next()
 
@@ -2113,19 +2084,6 @@ public func != <Element : Equatable>(
 %end
 
 #if _runtime(_ObjC)
-/// Returns an `Array<Base>` containing the same elements as `a` in
-/// O(1).
-///
-/// - Precondition: `Base` is a base class or base `@objc` protocol (such
-///   as `AnyObject`) of `Derived`.
-public func _arrayUpCast<Derived, Base>(_ a: Array<Derived>) -> Array<Base> {
-  // FIXME: Dynamic casting is currently not possible without the objc runtime:
-  // rdar://problem/18801510
-  return Array(a._buffer.cast(toBufferOf: Base.self))
-}
-#endif
-
-#if _runtime(_ObjC)
 extension Array {
   /// Tries to downcast the source `NSArray` as our native buffer type.
   /// If it succeeds, creates a new `Array` around it and returns that.
@@ -2152,7 +2110,7 @@ extension Array {
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
   public init(_immutableCocoaArray: _NSArrayCore) {
-    self = Array(_ArrayBuffer(nsArray: _immutableCocoaArray))
+    self = Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
   }
 }
 #endif
@@ -2193,24 +2151,22 @@ extension ${Self} {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "remove")
+  @available(*, unavailable, renamed: "remove(at:)")
   public mutating func removeAtIndex(_ index: Int) -> Element {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "replaceSubrange")
-  public mutating func replaceRange<
-    C : Collection where C.Iterator.Element == _Buffer.Element
-  >(_ subRange: Range<Int>, with newElements: C) {
+  public mutating func replaceRange<C>(
+    _ subRange: Range<Int>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == _Buffer.Element {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
-  public mutating func appendContentsOf<
-    S : Sequence
-    where
-    S.Iterator.Element == Element
-  >(_ newElements: S) {
+  public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
+    where S.Iterator.Element == Element {
     Builtin.unreachable()
   }
 }

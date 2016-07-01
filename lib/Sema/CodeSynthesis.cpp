@@ -128,7 +128,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   // The implicit 'self' argument if in a type context.
   if (storage->getDeclContext()->isTypeContext())
-    getterParams.push_back(ParameterList::createSelf(loc,
+    getterParams.push_back(ParameterList::createUnboundSelf(loc,
                                                      storage->getDeclContext(),
                                                      /*isStatic*/false));
     
@@ -174,7 +174,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   // The implicit 'self' argument if in a type context.
   if (storage->getDeclContext()->isTypeContext()) {
-    params.push_back(ParameterList::createSelf(loc,
+    params.push_back(ParameterList::createUnboundSelf(loc,
                                                storage->getDeclContext(),
                                                /*isStatic*/false));
   }
@@ -240,7 +240,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   //  - The implicit 'self' argument if in a type context.
   auto DC = storage->getDeclContext();
   if (DC->isTypeContext())
-    params.push_back(ParameterList::createSelf(loc, DC, /*isStatic*/false));
+    params.push_back(ParameterList::createUnboundSelf(loc, DC, /*isStatic*/false));
 
   //  - The buffer parameter, (buffer: Builtin.RawPointer,
   //                           inout storage: Builtin.UnsafeValueBuffer,
@@ -1274,7 +1274,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   
   // Add the witnesses to the conformance.
   ArrayRef<Substitution> MemberSubs;
-  if (DC->isGenericTypeContext()) {
+  if (DC->isGenericContext()) {
     MemberSubs = DC->getGenericParamsOfContext()
                    ->getForwardingSubstitutions(Context);
   }
@@ -1304,7 +1304,9 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   auto ParameterTy = BehaviorParameter->getInterfaceType()
     ->castTo<AnyFunctionType>()
     ->getResult();
-  
+
+  GenericSignature *genericSig = nullptr;
+
   TypeSubstitutionMap interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
   auto SubstInterfaceTy = ParameterTy.subst(VD->getModuleContext(),
                                             interfaceMap, SubstOptions());
@@ -1321,7 +1323,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   // Add the Self type back to the interface and context types.
   if (DC->isTypeContext()) {
     if (DC->isGenericContext()) {
-      auto genericSig = DC->getGenericSignatureOfContext();
+      genericSig = DC->getGenericSignatureOfContext();
       SubstInterfaceTy = GenericFunctionType::get(genericSig,
                                                   DC->getSelfInterfaceType(),
                                                   SubstInterfaceTy,
@@ -1398,6 +1400,8 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
   Parameter->setInterfaceType(SubstInterfaceTy);
+  Parameter->setGenericSignature(genericSig);
+
   // Mark the method to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
   if (DC->getAsClassOrClassExtensionContext())
@@ -1444,7 +1448,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 
   // Add the witnesses to the conformance.
   ArrayRef<Substitution> MemberSubs;
-  if (DC->isGenericTypeContext()) {
+  if (DC->isGenericContext()) {
     MemberSubs = DC->getGenericParamsOfContext()
     ->getForwardingSubstitutions(Context);
   }
@@ -1689,6 +1693,8 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
   if (var->getGetter() || var->isBeingTypeChecked())
     return;
 
+  auto *dc = var->getDeclContext();
+
   assert(!var->hasAccessorFunctions());
 
   // Introduce accessors for a property with behaviors.
@@ -1696,14 +1702,13 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     assert(!var->getBehavior()->Conformance.hasValue());
     
     // The property should be considered computed by the time we're through.
-    defer {
+    SWIFT_DEFER {
       assert(!var->hasStorage() && "behavior var was not made computed");
     };
     
     var->setIsBeingTypeChecked();
 
     auto behavior = var->getMutableBehavior();
-    auto dc = var->getDeclContext();
     NormalProtocolConformance *conformance = nullptr;
     VarDecl *valueProp = nullptr;
 
@@ -1749,9 +1754,9 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       behavior->ValueDecl = valueProp;
       var->setIsBeingTypeChecked(false);
 
-      addMemberToContextIfNeeded(getter, var->getDeclContext());
+      addMemberToContextIfNeeded(getter, dc);
       if (setter)
-        addMemberToContextIfNeeded(setter, var->getDeclContext());
+        addMemberToContextIfNeeded(setter, dc);
     };
 
     // Try to resolve the behavior to a protocol.
@@ -1841,7 +1846,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
     auto *getter = createGetterPrototype(var, TC);
     // lazy getters are mutating on an enclosing value type.
-    if (!var->getDeclContext()->getAsClassOrClassExtensionContext())
+    if (!dc->getAsClassOrClassExtensionContext())
       getter->setMutating();
     getter->setAccessibility(var->getFormalAccess());
 
@@ -1854,33 +1859,43 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     TC.validateDecl(getter);
     TC.validateDecl(setter);
 
-    addMemberToContextIfNeeded(getter, var->getDeclContext());
-    addMemberToContextIfNeeded(setter, var->getDeclContext());
+    addMemberToContextIfNeeded(getter, dc);
+    addMemberToContextIfNeeded(setter, dc);
     return;
   }
 
   // Local variables don't otherwise get accessors.
-  if (var->getDeclContext()->isLocalContext())
+  if (dc->isLocalContext())
     return;
 
   // Implicit properties don't get accessors.
   if (var->isImplicit())
     return;
 
-  auto nominal = var->getDeclContext()
-                    ->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (!nominal) {
+  if (!dc->isTypeContext()) {
     // Fixed-layout global variables don't get accessors.
     if (var->hasFixedLayout())
       return;
 
-  // Stored properties in protocols are converted to computed
-  // elsewhere.
-  } else if (isa<ProtocolDecl>(nominal)) {
+  // In a protocol context, variables written as just "var x : Int" or
+  // "let x : Int" are errors and recovered by building a computed property
+  // with just a getter. Diagnose this and create the getter decl now.
+  } else if (isa<ProtocolDecl>(dc)) {
+    if (var->hasStorage()) {
+      if (var->isLet())
+        TC.diagnose(var->getLoc(),
+                    diag::protocol_property_must_be_computed_var);
+      else
+        TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
+
+      var->setIsBeingTypeChecked();
+      convertStoredVarInProtocolToComputed(var, TC);
+      var->setIsBeingTypeChecked(false);
+    }
     return;
 
   // NSManaged properties on classes require special handling.
-  } else if (isa<ClassDecl>(nominal)) {
+  } else if (dc->getAsClassOrClassExtensionContext()) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
       var->setIsBeingTypeChecked();
       convertNSManagedStoredVarToComputed(var, TC);
@@ -1889,13 +1904,13 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     }
 
   // Stored properties imported from Clang don't get accessors.
-  } else if (isa<StructDecl>(nominal)) {
-    if (nominal->hasClangNode())
+  } else if (auto *structDecl = dyn_cast<StructDecl>(dc)) {
+    if (structDecl->hasClangNode())
       return;
   }
 
   // Stored properties in SIL mode don't get accessors.
-  if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
+  if (auto sourceFile = dc->getParentSourceFile())
     if (sourceFile->Kind == SourceFileKind::SIL)
       return;
 
@@ -1963,7 +1978,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   
   // Create the constructor.
   DeclName name(context, context.Id_init, paramList);
-  auto *selfParam = ParamDecl::createSelf(Loc, decl,
+  auto *selfParam = ParamDecl::createUnboundSelf(Loc, decl,
                                           /*static*/false, /*inout*/true);
   auto *ctor =
     new (context) ConstructorDecl(name, Loc,
@@ -2044,11 +2059,26 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   if (superclassCtor->getGenericParams())
     return nullptr;
 
+  // Lookup will sometimes give us initializers that are from the ancestors of
+  // our immediate superclass.  So, from the superclass constructor, we look 
+  // one level up to the enclosing type context which will either be a class 
+  // or an extension.  We can use the type declared in that context to check
+  // if it's our immediate superclass and give up if we didn't.
+  // 
+  // FIXME: Remove this when lookup of initializers becomes restricted to our
+  // immediate superclass.
+  Type superclassTyInCtor = superclassCtor->getDeclContext()->getDeclaredTypeInContext();
+  Type superclassTy = classDecl->getSuperclass();
+  NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
+  if (superclassTyInCtor->getAnyNominal() != superclassDecl) {
+    return nullptr;
+  }
+
   // Determine the initializer parameters.
   auto &ctx = tc.Context;
 
   // Create the 'self' declaration and patterns.
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), classDecl);
+  auto *selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), classDecl);
 
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
@@ -2060,9 +2090,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   //
   // We might have to apply substitutions, if for example we have a declaration
   // like 'class A : B<Int>'.
-  auto superclassTy = classDecl->getSuperclass();
-  auto *superclassDecl = superclassTy->getAnyNominal();
-  if (superclassDecl->isGenericTypeContext()) {
+  if (superclassDecl->isGenericContext()) {
     if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
       auto *moduleDecl = classDecl->getParentModule();
       auto subs = superclassTy->gatherAllSubstitutions(
@@ -2110,7 +2138,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   auto selfType = configureImplicitSelf(tc, ctor);
 
   // Set the interface type of the initializer.
-  if (classDecl->isGenericTypeContext()) {
+  if (classDecl->isGenericContext()) {
     ctor->setGenericSignature(classDecl->getGenericSignatureOfContext());
     tc.configureInterfaceType(ctor);
   }
@@ -2138,7 +2166,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   // Wire up the overrides.
   ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*Implicit=*/true));
-  checkOverrides(tc, ctor);
+  ctor->setOverriddenDecl(superclassCtor);
 
   if (kind == DesignatedInitKind::Stub) {
     // Make this a stub implementation.
@@ -2188,7 +2216,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   if (CD->hasDestructor() || CD->isInvalid())
     return;
 
-  auto *selfDecl = ParamDecl::createSelf(CD->getLoc(), CD);
+  auto *selfDecl = ParamDecl::createUnboundSelf(CD->getLoc(), CD);
 
   auto *DD = new (Context) DestructorDecl(Context.Id_deinit, CD->getLoc(),
                                           selfDecl, CD);

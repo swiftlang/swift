@@ -737,7 +737,7 @@ namespace {
     
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type) {
       printCommon(D, Type, FuncColor);
-      if (!D->getCaptureInfo().empty()) {
+      if (!D->getCaptureInfo().isTrivial()) {
         OS << " ";
         D->getCaptureInfo().print(OS);
       }
@@ -1473,6 +1473,7 @@ static raw_ostream &operator<<(raw_ostream &os, AccessSemantics accessKind) {
   case AccessSemantics::Ordinary: return os;
   case AccessSemantics::DirectToStorage: return os << " direct_to_storage";
   case AccessSemantics::DirectToAccessor: return os << " direct_to_accessor";
+  case AccessSemantics::BehaviorInitialization: return os << " behavior_init";
   }
   llvm_unreachable("bad access kind");
 }
@@ -2013,7 +2014,7 @@ public:
   llvm::raw_ostream &printClosure(AbstractClosureExpr *E, char const *name) {
     printCommon(E, name);
     OS << " discriminator=" << E->getDiscriminator();
-    if (!E->getCaptureInfo().empty()) {
+    if (!E->getCaptureInfo().isTrivial()) {
       OS << " ";
       E->getCaptureInfo().print(OS);
     }
@@ -2159,6 +2160,12 @@ public:
     OS << '\n';
     printRec(E->getSrc());
     OS << ')';
+  }
+  void visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
+    printCommon(E, "enum_is_case_expr") << ' ' <<
+      E->getEnumElement()->getName() << "\n";
+    printRec(E->getSubExpr());
+    
   }
   void visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
     printCommon(E, "unresolved_pattern_expr") << '\n';

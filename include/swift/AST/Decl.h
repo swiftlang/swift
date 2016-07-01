@@ -458,8 +458,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// This is a value of \c StoredInheritsSuperclassInits.
     unsigned InheritsSuperclassInits : 2;
 
-    /// Whether this class is "foreign".
-    unsigned Foreign : 1;
+    /// \see ClassDecl::ForeignKind
+    unsigned RawForeignKind : 2;
     
     /// Whether this class contains a destructor decl.
     ///
@@ -468,7 +468,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// control inserting the implicit destructor.
     unsigned HasDestructorDecl : 1;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 7 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 8 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class StructDeclBitfields {
@@ -667,7 +667,7 @@ public:
   /// Retrieve the innermost declaration context corresponding to this
   /// declaration, which will either be the declaration itself (if it's
   /// also a declaration context) or its declaration context.
-  DeclContext *getInnermostDeclContext();
+  DeclContext *getInnermostDeclContext() const;
 
   /// \brief Retrieve the module in which this declaration resides.
   ModuleDecl *getModuleContext() const;
@@ -2144,6 +2144,10 @@ public:
   /// first slot.
   Optional<ObjCSelector> getObjCRuntimeName() const;
 
+  /// Determine whether the given declaration can infer @objc, or the
+  /// Objective-C name, if used to satisfy the given requirement.
+  bool canInferObjCFromRequirement(ValueDecl *requirement);
+
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
@@ -2407,14 +2411,14 @@ public:
     return GenericSig;
   }
   
-  void setIsValidatingGenericSignature(bool ivgs = true) {
-    ValidatingGenericSignature = ivgs;
+  void setIsValidatingGenericSignature(bool validating=true) {
+    ValidatingGenericSignature = validating;
   }
   
-  bool IsValidatingGenericSignature() {
+  bool isValidatingGenericSignature() const {
     return ValidatingGenericSignature;
   }
-  
+
   // Resolve ambiguity due to multiple base classes.
   using TypeDecl::getASTContext;
   using DeclContext::operator new;
@@ -2767,18 +2771,12 @@ protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
 
-  void setDeclaredType(Type declaredTy) {
-    assert(DeclaredTy.isNull() && "Already set declared type");
-    DeclaredTy = declaredTy;
-  }
-
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   SourceLoc NameLoc,
                   MutableArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams) :
     GenericTypeDecl(K, DC, name, NameLoc, inherited, GenericParams),
-    IterableDeclContext(IterableDeclContextKind::NominalTypeDecl),
-    DeclaredTy(nullptr)
+    IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     setGenericParams(GenericParams);
     NominalTypeDeclBits.HasDelayedMembers = false;
@@ -2849,12 +2847,15 @@ public:
     return SearchedForFailableInits;
   }
 
-  /// getDeclaredType - Retrieve the type declared by this entity.
-  Type getDeclaredType() const { return DeclaredTy; }
-
-  /// Compute the type (and declared type) of this nominal type.
+  /// Compute the type of this nominal type.
   void computeType();
 
+  /// getDeclaredType - Retrieve the type declared by this entity, without
+  /// any generic parameters bound if this is a generic type.
+  Type getDeclaredType() const;
+
+  /// getDeclaredType - Retrieve the type declared by this entity, with
+  /// context archetypes bound if this is a generic type.
   Type getDeclaredTypeInContext() const;
 
   /// Get the "interface" type of the given nominal type, which is the
@@ -3237,6 +3238,19 @@ public:
     ClassDeclBits.RequiresStoredPropertyInits = requiresInits;
   }
 
+  /// \see getForeignClassKind
+  enum class ForeignKind : uint8_t {
+    /// A normal Swift or Objective-C class.
+    Normal = 0,
+    /// An imported Core Foundation type. These are AnyObject-compatible but
+    /// do not have runtime metadata.
+    CFType,
+    /// An imported Objective-C type whose class and metaclass symbols are not
+    /// both available at link-time but can be accessed through the Objective-C
+    /// runtime.
+    RuntimeOnly
+  };
+
   /// Whether this class is "foreign", meaning that it is implemented
   /// by a runtime that Swift does not have first-class integration
   /// with.  This generally means that:
@@ -3247,11 +3261,18 @@ public:
   ///
   /// We may find ourselves wanting to break this bit into more
   /// precise chunks later.
-  bool isForeign() const {
-    return ClassDeclBits.Foreign;
+  ForeignKind getForeignClassKind() const {
+    return static_cast<ForeignKind>(ClassDeclBits.RawForeignKind);
   }
-  void setForeign(bool isForeign = true) {
-    ClassDeclBits.Foreign = isForeign;
+  void setForeignClassKind(ForeignKind kind) {
+    ClassDeclBits.RawForeignKind = static_cast<unsigned>(kind);
+  }
+
+  /// Returns true if this class is any kind of "foreign class".
+  ///
+  /// \see getForeignClassKind
+  bool isForeign() const {
+    return getForeignClassKind() != ForeignKind::Normal;
   }
 
   /// Find a method of a class that overrides a given method.
@@ -3293,10 +3314,6 @@ public:
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
-
-  /// Determine whether the class is only visible to the Objective-C runtime
-  /// and not to the linker.
-  bool isOnlyObjCRuntimeVisible() const;
 
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.
@@ -3439,7 +3456,8 @@ public:
   bool inheritsFrom(const ProtocolDecl *Super) const;
   
   ProtocolType *getDeclaredType() const {
-    return reinterpret_cast<ProtocolType *>(DeclaredTy.getPointer());
+    return reinterpret_cast<ProtocolType *>(
+      NominalTypeDecl::getDeclaredType().getPointer());
   }
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
@@ -3666,6 +3684,10 @@ enum class AccessStrategy : unsigned char {
   /// The decl is a VarDecl with its own backing storage; evaluate its
   /// address directly.
   Storage,
+  
+  /// The decl is a VarDecl with storage defined by a property behavior;
+  /// this access may initialize or reassign the storage based on dataflow.
+  BehaviorStorage,
 
   /// The decl has addressors; call the appropriate addressor for the
   /// access kind.  These calls are currently always direct.
@@ -3695,6 +3717,12 @@ struct BehaviorRecord {
   // Storage declaration and initializer for use by definite initialization.
   VarDecl *StorageDecl = nullptr;
   ConcreteDeclRef InitStorageDecl = nullptr;
+  
+  bool needsInitialization() const {
+    assert((bool)StorageDecl == (bool)InitStorageDecl
+           && "DI state not consistent");
+    return StorageDecl != nullptr;
+  }
   
   BehaviorRecord(TypeRepr *ProtocolName,
                  Expr *Param)
@@ -4142,6 +4170,15 @@ public:
     return BehaviorInfo.getPointer() != nullptr;
   }
   
+  /// Does the storage use a behavior, and require definite initialization
+  /// analysis.
+  bool hasBehaviorNeedingInitialization() const {
+    if (auto behavior = getBehavior()) {
+      return behavior->needsInitialization();
+    }
+    return false;
+  }
+  
   /// Get the behavior info.
   const BehaviorRecord *getBehavior() const {
     return BehaviorInfo.getPointer();
@@ -4189,7 +4226,8 @@ public:
     return VarDeclBits.IsUserAccessible;
   }
 
-  /// \brief Retrieve the source range of the variable type.
+  /// Retrieve the source range of the variable type, or an invalid range if the
+  /// variable's type is not explicitly written in the source.
   ///
   /// Only for use in diagnostics.  It is not always possible to always
   /// precisely point to the variable type because of type aliases.
@@ -4392,9 +4430,22 @@ public:
   /// Note that this decl is created, but it is returned with an incorrect
   /// DeclContext that needs to be set correctly.  This is automatically handled
   /// when a function is created with this as part of its argument list.
+  /// For a generic context, this also gives the parameter an unbound generic
+  /// type with the expectation that type-checking will fill in the context
+  /// generic parameters.
+  static ParamDecl *createUnboundSelf(SourceLoc loc, DeclContext *DC,
+                                      bool isStatic = false,
+                                      bool isInOut = false);
+
+  /// Create an implicit 'self' decl for a method in the specified decl context.
+  /// If 'static' is true, then this is self for a static method in the type.
   ///
+  /// Note that this decl is created, but it is returned with an incorrect
+  /// DeclContext that needs to be set correctly.  This is automatically handled
+  /// when a function is created with this as part of its argument list.
   static ParamDecl *createSelf(SourceLoc loc, DeclContext *DC,
-                               bool isStatic = false, bool isInOut = false);
+                               bool isStatic = false,
+                               bool isInOut = false);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 

@@ -80,7 +80,6 @@ public:
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(Versioned)
-  IGNORED_ATTR(WarnUnusedResult)
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(DiscardableResult)
 #undef IGNORED_ATTR
@@ -141,6 +140,7 @@ public:
   void visitLazyAttr(LazyAttr *attr);
   void visitIBDesignableAttr(IBDesignableAttr *attr);
   void visitIBInspectableAttr(IBInspectableAttr *attr);
+  void visitGKInspectableAttr(GKInspectableAttr *attr);
   void visitIBOutletAttr(IBOutletAttr *attr);
   void visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr);
   void visitNSManagedAttr(NSManagedAttr *attr);
@@ -189,9 +189,11 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
 void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   FuncDecl *FD = cast<FuncDecl>(D);
 
-  if (!FD->getDeclContext()->isTypeContext())
+  auto contextTy = FD->getDeclContext()->getDeclaredTypeInContext();
+  if (!contextTy)
     return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope);
-  if (FD->getDeclContext()->getDeclaredTypeInContext()->hasReferenceSemantics())
+
+  if (contextTy->hasReferenceSemantics())
     return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes);
   
   // Verify we don't have both mutating and nonmutating.
@@ -240,7 +242,17 @@ void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getAsClassOrClassExtensionContext() ||
       VD->isStatic())
-    return diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable);
+    return diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
+                                 attr->getAttrName());
+}
+
+void AttributeEarlyChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
+  // Only instance properties can be 'GKInspectable'.
+  auto *VD = cast<VarDecl>(D);
+  if (!VD->getDeclContext()->getAsClassOrClassExtensionContext() ||
+      VD->isStatic())
+    return diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
+                                 attr->getAttrName());
 }
 
 void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
@@ -623,6 +635,7 @@ public:
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Exported)
     IGNORED_ATTR(Convenience)
+    IGNORED_ATTR(GKInspectable)
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
@@ -692,7 +705,6 @@ public:
   void visitPostfixAttr(PostfixAttr *attr) { checkOperatorAttribute(attr); }
   void visitPrefixAttr(PrefixAttr *attr) { checkOperatorAttribute(attr); }
 
-  void visitWarnUnusedResultAttr(WarnUnusedResultAttr *attr);
   void visitSpecializeAttr(SpecializeAttr *attr);
 };
 } // end anonymous namespace
@@ -1344,43 +1356,6 @@ AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
   visitAbstractAccessibilityAttr(attr);
 }
 
-void AttributeChecker::visitWarnUnusedResultAttr(WarnUnusedResultAttr *attr) {
-  if (!attr->getMutableVariant().empty()) {
-    // mutable_variant only makes sense for non-mutating methods where
-    // it's possible to have a mutating variant.
-    auto func = dyn_cast<FuncDecl>(D);
-    if (!func) {
-      TC.diagnose(attr->getLocation(),
-                  diag::attr_warn_unused_result_mutable_variable, 0);
-      return;
-    }
-
-    if (!func->getDeclContext()->isTypeContext()) {
-      TC.diagnose(attr->getLocation(),
-                  diag::attr_warn_unused_result_mutable_variable, 1);
-      return;
-    }
-
-    if (!func->isInstanceMember()) {
-      TC.diagnose(attr->getLocation(),
-                  diag::attr_warn_unused_result_mutable_variable, 2);
-      return;
-    }
-
-    if (func->getExtensionType()->getClassOrBoundGenericClass()) {
-      TC.diagnose(attr->getLocation(),
-                  diag::attr_warn_unused_result_mutable_variable, 3);
-      return;      
-    }
-
-    if (func->isMutating()) {
-      TC.diagnose(attr->getLocation(),
-                  diag::attr_warn_unused_result_mutable_variable, 4);
-      return;      
-    }
-  }
-}
-
 /// Check that the @_specialize type list has the correct number of entries.
 /// Resolve each type in the list to a concrete type.
 /// Create a Substitution list mapping each nested archetype to a concrete
@@ -1560,7 +1535,7 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
     return;
 
   // This decl attribute has been moved to being a type attribute.
-  auto text = attr->isEscaping() ? "@autoclosure(escaping)" : "@autoclosure";
+  auto text = attr->isEscaping() ? "@autoclosure(escaping) " : "@autoclosure ";
   diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type,
            "@autoclosure")
     .fixItRemove(attr->getRangeWithAt())
@@ -1608,10 +1583,18 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   if (FTy->isNoEscape())
     return;
 
+  // This range can be implicit e.g. if we're in the middle of diagnosing
+  // @autoclosure.
+  auto attrRemovalRange = attr->getRangeWithAt();
+  if (attrRemovalRange.isValid()) {
+    // Take the attribute, the '@', and the trailing space.
+    attrRemovalRange.End = attrRemovalRange.End.getAdvancedLoc(1);
+  }
+  
   // This decl attribute has been moved to being a type attribute.
   diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type, "@noescape")
-    .fixItRemove(attr->getRangeWithAt())
-    .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape");
+    .fixItRemove(attrRemovalRange) 
+    .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape ");
 
   // Change the type to include the noescape bit.
   PD->overwriteType(FunctionType::get(FTy->getInput(), FTy->getResult(),

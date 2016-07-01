@@ -128,10 +128,18 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   case TypeInfoKind::Record: {
     auto &RecordTI = cast<RecordTypeInfo>(TI);
     switch (RecordTI.getRecordKind()) {
+    case RecordKind::Invalid:
+      return SWIFT_UNKNOWN;
     case RecordKind::Tuple:
       return SWIFT_TUPLE;
     case RecordKind::Struct:
       return SWIFT_STRUCT;
+    case RecordKind::NoPayloadEnum:
+      return SWIFT_NO_PAYLOAD_ENUM;
+    case RecordKind::SinglePayloadEnum:
+      return SWIFT_SINGLE_PAYLOAD_ENUM;
+    case RecordKind::MultiPayloadEnum:
+      return SWIFT_MULTI_PAYLOAD_ENUM;
     case RecordKind::ThickFunction:
       return SWIFT_THICK_FUNCTION;
     case RecordKind::OpaqueExistential:
@@ -254,10 +262,10 @@ swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
 }
 
 int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
-                                        addr_t ExistentialAddress,
+                                        swift_addr_t ExistentialAddress,
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *InstanceTypeRef,
-                                        addr_t *StartOfInstanceData) {
+                                        swift_addr_t *StartOfInstanceData) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
   auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);

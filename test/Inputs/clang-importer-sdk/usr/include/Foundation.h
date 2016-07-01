@@ -384,17 +384,29 @@ NS_ENUM(NSInteger, NSMalformedEnumMissingTypedef) {
   NSMalformedEnumMissingTypedefValue
 };
 
+@interface NSNumberFormatter : NSObject
+@end
+
 typedef NS_ENUM(NSUInteger, NSNumberFormatterBehavior) {
   NSNumberFormatterBehaviorDefault = 0,
   NSNumberFormatterBehavior10_0 = 1000,
   NSNumberFormatterBehavior10_4 = 1040,
 };
 
+@interface NSNotification : NSObject
+@end
+
+@interface NSNotificationQueue : NSObject
+@end
+
 typedef NS_ENUM(NSUInteger, NSPostingStyle) {
   NSPostWhenIdle = 1,
   NSPostASAP = 2,
   NSPostNow = 3
 };
+
+@interface NSXMLNode : NSObject
+@end
 
 typedef NS_ENUM(NSUInteger, NSXMLNodeKind) {
   NSXMLInvalidKind = 0,
@@ -480,6 +492,9 @@ typedef NS_OPTIONS(NSUInteger, NSKeyValueObservingOptions) {
   NSKeyValueObservingOptionInitial /*NS_ENUM_AVAILABLE(10_5, 2_0)*/ = 0x04,
   NSKeyValueObservingOptionPrior /*NS_ENUM_AVAILABLE(10_5, 2_0)*/ = 0x08
 };
+
+@interface NSCalendar : NSObject
+@end
 
 #define NS_CALENDAR_ENUM_DEPRECATED(osx_in, osx_out, ios_in, ios_out, msg) \
   __attribute__((availability(macosx, introduced=osx_in, deprecated=osx_out, message=msg))) \
@@ -1015,5 +1030,17 @@ extern NSString *NSHTTPRequestKey;
 -(void)messageSomeObject:(nonnull id)object selector:(SEL)selector;
 @end
 
+@interface NSSoapDispenser<Fragrance> : NSObject
+
+@end
+
 #define NSTimeIntervalSince1970 978307200.0
 #define NS_DO_SOMETHING 17
+
+typedef NS_ENUM(NSUInteger, NSClothingStyle) {
+  NSClothingStyleFormal = 0,
+  NSClothingStyleSemiFormal,
+  NSClothingStyleHipster,
+  NSClothingStyleHippie
+};
+static const NSClothingStyle NSClothingStyleOfficeCasual __attribute__((availability(swift,unavailable,replacement="NSClothingStyleSemiFormal"))) = NSClothingStyleSemiFormal;

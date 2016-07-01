@@ -353,6 +353,8 @@ public:
   /// into.
   SILGenBuilder B;
 
+  SILOpenedArchetypesTracker OpenedArchetypesTracker;
+
   struct BreakContinueDest {
     LabeledStmt *Target;
     JumpDest BreakDest;
@@ -1045,12 +1047,6 @@ public:
   SILValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
                                 SILConstantInfo constantInfo);  
 
-  /// Returns a reference to a constant in local context. This will return a
-  /// retained closure object reference if the constant refers to a local func
-  /// decl.
-  ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant,
-                               SILConstantInfo constantInfo);
-  
   /// Emit the specified VarDecl as an LValue if possible, otherwise return
   /// null.
   ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var,
@@ -1081,9 +1077,13 @@ public:
                     CaptureEmission purpose,
                     SmallVectorImpl<ManagedValue> &captures);
 
+  /// Produce a reference to a function, which may be a local function
+  /// with captures. If the function is generic, substitutions must be
+  /// given. The result is re-abstracted to the given expected type.
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
-                                AnyFunctionRef TheClosure);
+                                CanType expectedType,
+                                ArrayRef<Substitution> subs);
   
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,

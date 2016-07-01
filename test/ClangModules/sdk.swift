@@ -7,7 +7,7 @@ import Foundation
 // Swift and Foundation types should work.
 
 func available_Int(_ a: Int) {}
-func available_NSDateFormatter(_ a: NSDateFormatter) {}
+func available_DateFormatter(_ a: DateFormatter) {}
 
 
 // Some traditional Objective-C types should fail with fixits.

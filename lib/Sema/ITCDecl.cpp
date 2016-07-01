@@ -244,10 +244,6 @@ void IterativeTypeChecker::processInheritedProtocols(
   if (anyDependencies)
     return;
 
-  // FIXME: Hack to deal with recursion elsewhere.
-  if (protocol->isInheritedProtocolsValid())
-    return;
-
   // Check for circular inheritance.
   // FIXME: The diagnostics here should be improved... and this should probably
   // be handled by the normal cycle detection.
@@ -255,7 +251,8 @@ void IterativeTypeChecker::processInheritedProtocols(
   for (unsigned i = 0, n = allProtocols.size(); i != n; /*in loop*/) {
     if (allProtocols[i] == protocol ||
         allProtocols[i]->inheritsFrom(protocol)) {
-      if (!diagnosedCircularity) {
+      if (!diagnosedCircularity &&
+          !protocol->isInheritedProtocolsValid()) {
         diagnose(protocol,
                  diag::circular_protocol_def, protocol->getName().str());
         diagnosedCircularity = true;
@@ -268,6 +265,12 @@ void IterativeTypeChecker::processInheritedProtocols(
 
     ++i;
   }
+
+  // FIXME: Hack to deal with recursion elsewhere.
+  // We recurse through DeclContext::getLocalProtocols() -- this should be
+  // redone to use the IterativeDeclChecker also.
+  if (protocol->isInheritedProtocolsValid())
+    return;
 
   protocol->setInheritedProtocols(getASTContext().AllocateCopy(allProtocols));
 }
@@ -300,7 +303,7 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
 
   // Nominal types.
   auto nominal = cast<NominalTypeDecl>(typeDecl);
-  return !nominal->getDeclaredType().isNull();
+  return nominal->hasType();
 }
 
 void IterativeTypeChecker::processResolveTypeDecl(

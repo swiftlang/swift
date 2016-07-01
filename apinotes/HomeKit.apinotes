@@ -1,6 +1,34 @@
 ---
 Name: HomeKit
 Classes:
+- Name: HMCameraAudioControl
+  Methods:
+  - Selector: 'readOn:'
+    SwiftName: 'readOn(_:)'
+    MethodKind: Instance
+  - Selector: 'writeOn:completionHandler:'
+    SwiftName: 'writeOn(_:completionHandler:)'
+    MethodKind: Instance
+- Name: HMEventTrigger
+  Methods:
+  - Selector: 'predicateForEvaluatingTriggerOccurringBeforeSignificantEvent:applyingOffset:'
+    SwiftName: 'predicateForEvaluatingTrigger(occurringBefore:applyingOffset:)'
+    MethodKind: Class
+  - Selector: 'predicateForEvaluatingTriggerOccurringAfterSignificantEvent:applyingOffset:'
+    SwiftName: 'predicateForEvaluatingTrigger(occurringAfter:applyingOffset:)'
+    MethodKind: Class
+  - Selector: 'predicateForEvaluatingTriggerOccurringBeforeDateWithComponents:'
+    SwiftName: 'predicateForEvaluatingTrigger(occurringBefore:)'
+    MethodKind: Class
+  - Selector: 'predicateForEvaluatingTriggerOccurringOnDateWithComponents:'
+    SwiftName: 'predicateForEvaluatingTrigger(occurringOn:)'
+    MethodKind: Class
+  - Selector: 'predicateForEvaluatingTriggerOccurringAfterDateWithComponents:'
+    SwiftName: 'predicateForEvaluatingTrigger(occurringAfter:)'
+    MethodKind: Class
+  - Selector: 'predicateForEvaluatingTriggerWithCharacteristic:relatedBy:toValue:'
+    SwiftName: 'predicateForEvaluatingTrigger(_:relatedBy:toValue:)'
+    MethodKind: Class
 - Name: HMHome
   Methods:
   - Selector: 'servicesWithTypes:'
@@ -30,4 +58,7 @@ Classes:
     MethodKind: Instance
   - Selector: 'updateFireDate:completionHandler:'
     SwiftName: 'updateFireDate(_:completionHandler:)'
+    MethodKind: Instance
+  - Selector: 'initWithName:fireDate:timeZone:recurrences:'
+    SwiftName: 'init(name:fireDate:timeZone:recurrences:)'
     MethodKind: Instance

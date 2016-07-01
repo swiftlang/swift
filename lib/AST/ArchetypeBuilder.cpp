@@ -2018,8 +2018,8 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "\n";
 }
 
-Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type,
-                                         LazyResolver *resolver) {
+Type ArchetypeBuilder::mapTypeIntoContext(const DeclContext *dc, Type type,
+                                          LazyResolver *resolver) {
   // If the type is not dependent, there's nothing to map.
   if (!type->hasTypeParameter())
     return type;
@@ -2081,7 +2081,7 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
 }
 
 Type
-ArchetypeBuilder::mapTypeOutOfContext(DeclContext *dc, Type type) {
+ArchetypeBuilder::mapTypeOutOfContext(const DeclContext *dc, Type type) {
   GenericParamList *genericParams = dc->getGenericParamsOfContext();
   return mapTypeOutOfContext(dc->getParentModule(), genericParams, type);
 }
@@ -2157,6 +2157,9 @@ addRequirements(
     ArchetypeBuilder::PotentialArchetype *pa,
     llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> &knownPAs,
     SmallVectorImpl<Requirement> &requirements) {
+
+  auto &ctx = builder.getASTContext();
+
   // If the potential archetype has been bound away to a concrete type,
   // it needs no requirements.
   if (pa->isConcreteType())
@@ -2181,8 +2184,8 @@ addRequirements(
 
   ProtocolType::canonicalizeProtocols(protocols);
   for (auto proto : protocols) {
-    requirements.push_back(Requirement(RequirementKind::Conformance,
-                                       type, proto->getDeclaredType()));
+    requirements.push_back(Requirement(RequirementKind::Conformance, type,
+                                       ProtocolType::get(proto, ctx)));
   }
 }
 

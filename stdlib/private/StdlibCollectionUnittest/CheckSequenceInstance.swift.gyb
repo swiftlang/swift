@@ -26,14 +26,13 @@ import StdlibUnittest
 
 public func checkIterator<
   ${genericParam}, I : IteratorProtocol
-  where I.Element == ${Element}
 >(
   _ expected: ${Expected},
   _ iterator: I,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
-) {
+) where I.Element == ${Element} {
   // Copying a `IteratorProtocol` is allowed.
   var mutableGen = iterator
   var actual: [${Element}] = []
@@ -52,30 +51,27 @@ public func checkIterator<
 
 public func checkIterator<
   ${genericParam}, I : IteratorProtocol
-  where I.Element == ${Element}, ${Element} : Equatable
 >(
   _ expected: ${Expected},
   _ iterator: I,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
-) {
+) where I.Element == ${Element}, ${Element} : Equatable {
   checkIterator(
-    expected, iterator, ${trace},
-    resiliencyChecks: resiliencyChecks, showFrame: false
+    expected, iterator, ${trace}, showFrame: false,
+    resiliencyChecks: resiliencyChecks
   ) { $0 == $1 }
 }
 
 public func checkSequence<
   ${genericParam}, S : Sequence
-  where
-  S.Iterator.Element == ${Element}
 >(
   _ expected: ${Expected},
   _ sequence: S,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
-) {
+) where S.Iterator.Element == ${Element} {
   let expectedCount: Int = numericCast(expected.count)
   checkIterator(
     expected, sequence.makeIterator(), ${trace},
@@ -105,18 +101,18 @@ public func checkSequence<
 
 public func checkSequence<
   ${genericParam}, S : Sequence
-  where
-  S.Iterator.Element == ${Element},
-  S.Iterator.Element : Equatable
 >(
   _ expected: ${Expected},
   _ sequence: S,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
-) {
+) where
+  S.Iterator.Element == ${Element},
+  S.Iterator.Element : Equatable {
+
   checkSequence(
-    expected, sequence, ${trace},
-    resiliencyChecks: resiliencyChecks, showFrame: false
+    expected, sequence, ${trace}, showFrame: false,
+    resiliencyChecks: resiliencyChecks
   ) { $0 == $1 }
 }
 

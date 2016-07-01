@@ -59,7 +59,7 @@ public struct Selector : StringLiteralConvertible {
   }
 }
 
-public struct Zone {
+public struct NSZone {
   public var pointer : OpaquePointer
 }
 
@@ -71,16 +71,16 @@ internal func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
   return Bool(x)
 }
 
-public func ~=(x: Object, y: Object) -> Bool {
+public func ~=(x: NSObject, y: NSObject) -> Bool {
   return true
 }
 
-extension Object : Equatable, Hashable {
+extension NSObject : Equatable, Hashable {
   public var hashValue: Int {
     return hash
   }
 }
 
-public func == (lhs: Object, rhs: Object) -> Bool {
+public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }

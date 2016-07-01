@@ -300,22 +300,24 @@ public struct String {
 
 extension String {
   public // @testable
-  static func _fromWellFormedCodeUnitSequence<
-    Encoding: UnicodeCodec, Input: Collection
-    where Input.Iterator.Element == Encoding.CodeUnit
-  >(
+  static func _fromWellFormedCodeUnitSequence<Encoding, Input>(
     _ encoding: Encoding.Type, input: Input
-  ) -> String {
+  ) -> String
+    where
+    Encoding: UnicodeCodec,
+    Input: Collection,
+    Input.Iterator.Element == Encoding.CodeUnit {
     return String._fromCodeUnitSequence(encoding, input: input)!
   }
 
   public // @testable
-  static func _fromCodeUnitSequence<
-    Encoding: UnicodeCodec, Input: Collection
-    where Input.Iterator.Element == Encoding.CodeUnit
-  >(
+  static func _fromCodeUnitSequence<Encoding, Input>(
     _ encoding: Encoding.Type, input: Input
-  ) -> String? {
+  ) -> String?
+    where
+    Encoding: UnicodeCodec,
+    Input: Collection,
+    Input.Iterator.Element == Encoding.CodeUnit {
     let (stringBufferOptional, _) =
         _StringBuffer.fromCodeUnits(input, encoding: encoding,
             repairIllFormedSequences: false)
@@ -327,12 +329,14 @@ extension String {
   }
 
   public // @testable
-  static func _fromCodeUnitSequenceWithRepair<
-    Encoding: UnicodeCodec, Input: Collection
-    where Input.Iterator.Element == Encoding.CodeUnit
-  >(
+  static func _fromCodeUnitSequenceWithRepair<Encoding, Input>(
     _ encoding: Encoding.Type, input: Input
-  ) -> (String, hadError: Bool) {
+  ) -> (String, hadError: Bool)
+    where
+    Encoding: UnicodeCodec,
+    Input: Collection,
+    Input.Iterator.Element == Encoding.CodeUnit {
+
     let (stringBuffer, hadError) =
         _StringBuffer.fromCodeUnits(input, encoding: encoding,
             repairIllFormedSequences: true)
@@ -608,7 +612,7 @@ extension String {
 #if _runtime(_ObjC)
     // We only want to perform this optimization on objc runtimes. Elsewhere,
     // we will make it follow the unicode collation algorithm even for ASCII.
-    if (_core.isASCII && rhs._core.isASCII) {
+    if _core.isASCII && rhs._core.isASCII {
       return _compareASCII(rhs)
     }
 #endif
@@ -711,7 +715,7 @@ extension String : Hashable {
 @_semantics("string.concat")
 public func + (lhs: String, rhs: String) -> String {
   var lhs = lhs
-  if (lhs.isEmpty) {
+  if lhs.isEmpty {
     return rhs
   }
   lhs._core.append(rhs._core)
@@ -978,25 +982,22 @@ extension String {
   }
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
-  public mutating func appendContentsOf<
-    S : Sequence where S.Iterator.Element == Character
-  >(_ newElements: S) {
+  public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
+    where S.Iterator.Element == Character {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "insert(contentsOf:at:)")
-  public mutating func insertContentsOf<
-    S : Collection where S.Iterator.Element == Character
-  >(_ newElements: S, at i: Index) {
+  public mutating func insertContentsOf<S : Collection>(
+    _ newElements: S, at i: Index
+  ) where S.Iterator.Element == Character {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "replaceSubrange")
-  public mutating func replaceRange<
-    C : Collection where C.Iterator.Element == Character
-  >(
+  public mutating func replaceRange<C : Collection>(
     _ subRange: Range<Index>, with newElements: C
-  ) {
+  ) where C.Iterator.Element == Character {
     Builtin.unreachable()
   }
     
@@ -1007,7 +1008,7 @@ extension String {
     Builtin.unreachable()
   }
   
-  @available(*, unavailable, renamed: "removeAt")
+  @available(*, unavailable, renamed: "remove(at:)")
   public mutating func removeAtIndex(_ i: Index) -> Character {
     Builtin.unreachable()
   }
@@ -1029,7 +1030,7 @@ extension String {
 }
 
 extension Sequence where Iterator.Element == String {
-  @available(*, unavailable, renamed: "joined")
+  @available(*, unavailable, renamed: "joined(separator:)")
   public func joinWithSeparator(_ separator: String) -> String {
     Builtin.unreachable()
   }

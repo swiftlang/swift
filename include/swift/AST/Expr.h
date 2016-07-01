@@ -51,6 +51,7 @@ namespace swift {
   class TypeDecl;
   class PatternBindingDecl;
   class ParameterList;
+  class EnumElementDecl;
   
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -101,6 +102,12 @@ enum class AccessSemantics : unsigned char {
   /// On a property or subscript reference, this is a direct,
   /// non-polymorphic access to the getter/setter accessors.
   DirectToAccessor,
+  
+  /// On a property or subscript reference, this is an access to a property
+  /// behavior that may be an initialization. Reads always go through the
+  /// 'get' accessor on the property. Writes may go through the 'init' or
+  /// 'set' logic of the behavior based on its initialization state.
+  BehaviorInitialization,
 
   /// This is an ordinary access to a declaration, using whatever
   /// polymorphism is expected.
@@ -149,7 +156,7 @@ class alignas(8) Expr {
     unsigned IsSingleUnicodeScalar : 1;
     unsigned IsSingleExtendedGraphemeCluster : 1;
   };
-  enum { NumStringLiteralExprBits = NumLiteralExprBits + 2 };
+  enum { NumStringLiteralExprBits = NumLiteralExprBits + 4 };
   static_assert(NumStringLiteralExprBits <= 32, "fits in an unsigned");
 
   class DeclRefExprBitfields {
@@ -271,6 +278,7 @@ class alignas(8) Expr {
     unsigned IsSourceScalar : 1;
   };
   enum { NumTupleShuffleExprBits = NumImplicitConversionExprBits + 1 };
+  static_assert(NumTupleShuffleExprBits <= 32, "fits in an unsigned");
 
   class ApplyExprBitfields {
     friend class ApplyExpr;
@@ -287,7 +295,7 @@ class alignas(8) Expr {
     unsigned : NumExprBits;
     unsigned CastKind : NumCheckedCastKindBits;
   };
-  enum { NumCheckedCastExprBits = NumExprBits + 4 };
+  enum { NumCheckedCastExprBits = NumExprBits + NumCheckedCastKindBits };
   static_assert(NumCheckedCastExprBits <= 32, "fits in an unsigned");
   static_assert(unsigned(CheckedCastKind::Last_CheckedCastKind)
                   < (1 << NumCheckedCastKindBits),
@@ -387,7 +395,7 @@ public:
   /// getStartLoc - Return the location of the start of the expression.
   SourceLoc getStartLoc() const;
 
-  /// \brief Retrieve the location of the end of the expression.
+  /// \brief Retrieve the location of the last token of the expression.
   SourceLoc getEndLoc() const;
   
   /// getLoc - Return the caret location of this expression.
@@ -486,7 +494,11 @@ public:
   ///   has an access kind
   void propagateLValueAccessKind(AccessKind accessKind,
                                  bool allowOverwrite = false);
-  
+
+  /// Retrieves the declaration that is being referenced by this
+  /// expression, if any.
+  ConcreteDeclRef getReferencedDecl() const;
+
   /// Determine whether this expression is 'super', possibly converted to
   /// a base class.
   bool isSuperExpr() const;
@@ -3194,7 +3206,15 @@ public:
     SourceLoc FnLoc = getFn()->getLoc(); 
     return FnLoc.isValid() ? FnLoc : getArg()->getLoc();
   }
-  
+
+  /// Retrieve the expression that direct represents the callee.
+  ///
+  /// The "direct" callee is the expression representing the callee
+  /// after looking through top-level constructs that don't affect the
+  /// identity of the callee, e.g., extra parentheses, optional
+  /// unwrapping (?)/forcing (!), etc.
+  Expr *getDirectCallee() const;
+
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Call; }
 };
   
@@ -3651,6 +3671,33 @@ public:
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::If;
+  }
+};
+
+/// EnumIsCaseExpr - A boolean expression that is true if an enum value is of
+/// a particular case.
+class EnumIsCaseExpr : public Expr {
+  Expr *SubExpr;
+  EnumElementDecl *Element;
+  
+public:
+  EnumIsCaseExpr(Expr *SubExpr, EnumElementDecl *Element)
+    : Expr(ExprKind::EnumIsCase, /*implicit*/ true),
+      SubExpr(SubExpr), Element(Element)
+  {}
+  
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *e) { SubExpr = e; }
+  
+  EnumElementDecl *getEnumElement() const { return Element; }
+  void setEnumElement(EnumElementDecl *elt) { Element = elt; }
+  
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceLoc getEndLoc() const { return SubExpr->getEndLoc(); }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::EnumIsCase;
   }
 };
 

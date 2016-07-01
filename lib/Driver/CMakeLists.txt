@@ -14,7 +14,7 @@ set(swiftDriver_sources
 
 set(swiftDriver_targetDefines)
 
-add_swift_library(swiftDriver
+add_swift_library(swiftDriver STATIC
   ${swiftDriver_sources}
   DEPENDS SwiftOptions
   LINK_LIBRARIES swiftAST swiftBasic swiftFrontend swiftOption)

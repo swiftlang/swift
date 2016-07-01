@@ -880,8 +880,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     if (kind == AllowedBindingKind::Supertypes &&
         constraint->getKind() >= ConstraintKind::Conversion &&
         constraint->getKind() <= ConstraintKind::OperatorArgumentConversion) {
+      auto innerType = type->getLValueOrInOutObjectType();
       if (auto objectType =
-          cs.lookThroughImplicitlyUnwrappedOptionalType(type)) {
+          cs.lookThroughImplicitlyUnwrappedOptionalType(innerType)) {
         type = OptionalType::get(objectType);
         alternateType = objectType;
       }

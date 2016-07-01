@@ -405,6 +405,7 @@ public:
   llvm::PointerType *UnownedReferencePtrTy;/// %swift.unowned_reference*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
+  llvm::StructType *WitnessFunctionPairTy;    /// { i8*, %witness.table* }
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
@@ -618,24 +619,6 @@ public:
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
-  void emitReflectionMetadata(const NominalTypeDecl *Decl);
-  void emitAssociatedTypeMetadataRecord(const NominalTypeDecl *Decl);
-  void emitAssociatedTypeMetadataRecord(const ExtensionDecl *Ext);
-  void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
-  void emitBuiltinReflectionMetadata();
-  llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
-  llvm::Constant *getAddrOfFieldName(StringRef Name);
-  llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
-                                             CanSILFunctionType origCalleeType,
-                                             CanSILFunctionType substCalleeType,
-                                             ArrayRef<Substitution> subs,
-                                             HeapLayout &layout);
-  std::string getBuiltinTypeMetadataSectionName();
-  std::string getFieldTypeMetadataSectionName();
-  std::string getAssociatedTypeMetadataSectionName();
-  std::string getCaptureDescriptorMetadataSectionName();
-  std::string getReflectionStringsSectionName();
-  std::string getReflectionTypeRefSectionName();
 
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
@@ -691,9 +674,6 @@ private:
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
   SmallVector<CanType, 4> RuntimeResolvableTypes;
-  /// Builtin types referenced by types in this module when emitting
-  /// reflection metadata.
-  llvm::SetVector<CanType> BuiltinTypes;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -733,6 +713,42 @@ private:
   void emitGlobalLists();
   void emitAutolinkInfo();
   void cleanupClangCodeGenMetadata();
+
+//--- Remote reflection metadata --------------------------------------------
+public:
+  /// Builtin types referenced by types in this module when emitting
+  /// reflection metadata.
+  llvm::SetVector<CanType> BuiltinTypes;
+  /// Opaque but fixed-size types for which we also emit builtin type
+  /// descriptors, allowing the reflection library to layout these types
+  /// without knowledge of their contents. This includes imported structs
+  /// and fixed-size multi-payload enums.
+  llvm::SetVector<const NominalTypeDecl *> OpaqueTypes;
+  /// Imported classes referenced by types in this module when emitting
+  /// reflection metadata.
+  llvm::SetVector<const ClassDecl *> ImportedClasses;
+  /// Imported protocols referenced by types in this module when emitting
+  /// reflection metadata.
+  llvm::SetVector<const ProtocolDecl *> ImportedProtocols;
+
+  llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
+  llvm::Constant *getAddrOfFieldName(StringRef Name);
+  llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
+                                             CanSILFunctionType origCalleeType,
+                                             CanSILFunctionType substCalleeType,
+                                             ArrayRef<Substitution> subs,
+                                             const HeapLayout &layout);
+  llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
+
+  void emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance);
+  void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
+  void emitBuiltinReflectionMetadata();
+  std::string getBuiltinTypeMetadataSectionName();
+  std::string getFieldTypeMetadataSectionName();
+  std::string getAssociatedTypeMetadataSectionName();
+  std::string getCaptureDescriptorMetadataSectionName();
+  std::string getReflectionStringsSectionName();
+  std::string getReflectionTypeRefSectionName();
 
 //--- Runtime ---------------------------------------------------------------
 public:

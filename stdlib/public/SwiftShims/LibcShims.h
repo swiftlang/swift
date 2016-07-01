@@ -30,9 +30,17 @@ namespace swift { extern "C" {
 // This declaration is not universally correct.  We verify its correctness for
 // the current platform in the runtime code.
 #if defined(__linux__) && defined (__arm__) && !defined(__android__)
-typedef      int __swift_ssize_t;
+typedef           int __swift_ssize_t;
+#elif defined(_MSC_VER)
+#if defined(_M_ARM) || defined(_M_IX86)
+typedef           int __swift_ssize_t;
+#elif defined(_M_X64)
+typedef long long int __swift_ssize_t;
 #else
-typedef long int __swift_ssize_t;
+#error unsupported machine type
+#endif
+#else
+typedef      long int __swift_ssize_t;
 #endif
 
 // General utilities <stdlib.h>

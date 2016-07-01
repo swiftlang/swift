@@ -1,6 +1,4 @@
-set(swift_private_private_link_libraries)
-
-add_swift_library(swiftSwiftPrivate SHARED IS_STDLIB
+add_swift_library(swiftSwiftPrivate ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   SwiftPrivate.swift
@@ -9,6 +7,5 @@ add_swift_library(swiftSwiftPrivate SHARED IS_STDLIB
   ShardedAtomicCounter.swift
 
   SWIFT_COMPILE_FLAGS ${STDLIB_SIL_SERIALIZE_ALL}
-  PRIVATE_LINK_LIBRARIES ${swift_private_private_link_libraries}
   INSTALL_IN_COMPONENT stdlib-experimental)
 

@@ -262,25 +262,25 @@ func classAnyObject(_ obj: NSObject) {
 }
 
 // Protocol conformances
-class Wobbler : NSWobbling { // expected-note{{candidate has non-matching type '()'}}
+class Wobbler : Wobbling { // expected-note{{candidate has non-matching type '()'}}
   @objc func wobble() { }
 
-  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'NSWobbling'}}{{3-3=@objc }}
+  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'Wobbling'}}{{none}}
   // expected-error@-1{{method cannot be an implementation of an @objc requirement because its result type cannot be represented in Objective-C}}
 }
 
-extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'NSMaybeInitWobble'}}
+extension Wobbler : MaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'MaybeInitWobble'}}
 }
 
-@objc class Wobbler2 : NSObject, NSWobbling { // expected-note{{candidate has non-matching type '()'}}
+@objc class Wobbler2 : NSObject, Wobbling { // expected-note{{candidate has non-matching type '()'}}
   func wobble() { }
   func returnMyself() -> Self { return self }
 }
 
-extension Wobbler2 : NSMaybeInitWobble { // expected-error{{type 'Wobbler2' does not conform to protocol 'NSMaybeInitWobble'}}
+extension Wobbler2 : MaybeInitWobble { // expected-error{{type 'Wobbler2' does not conform to protocol 'MaybeInitWobble'}}
 }
 
-func optionalMemberAccess(_ w: NSWobbling) {
+func optionalMemberAccess(_ w: Wobbling) {
   w.wobble()
   w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}} {{11-11=!}}
   var x: AnyObject = w[5] // expected-error{{value of optional type 'AnyObject!?' not unwrapped; did you mean to use '!' or '?'?}} {{26-26=!}}
@@ -305,7 +305,7 @@ class NSObjectable : NSObjectProtocol {
 // Properties with custom accessors
 func customAccessors(_ hive: Hive, bee: Bee) {
   markUsed(hive.isMakingHoney)
-  markUsed(hive.makingHoney()) // expected-error{{cannot call value of non-function type 'Bool'}}
+  markUsed(hive.makingHoney()) // expected-error{{cannot call value of non-function type 'Bool'}}{{28-30=}}
   hive.setMakingHoney(true) // expected-error{{value of type 'Hive' has no member 'setMakingHoney'}}
 
   _ = hive.`guard`.description // okay
@@ -314,7 +314,7 @@ func customAccessors(_ hive: Hive, bee: Bee) {
 }
 
 // instancetype/Dynamic Self invocation.
-func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
+func testDynamicSelf(_ queen: Bee, wobbler: Wobbling) {
   var hive = Hive()
 
   // Factory method with instancetype result.
@@ -329,7 +329,7 @@ func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
 
   // Instance method on a protocol with instancetype result.
   var wobbler2 = wobbler.returnMyself()!
-  var wobbler: NSWobbling = wobbler2
+  var wobbler: Wobbling = wobbler2
   wobbler2 = wobbler
 
   // Instance method on a base class with instancetype result, called on the
@@ -549,7 +549,7 @@ extension Printing {
 func testSetInitializers() {
   let a: [AnyObject] = [NSObject()]
 
-  let _ = NSCountedSet(array: a)
+  let _ = CountedSet(array: a)
   let _ = NSMutableSet(array: a)
 }
 
@@ -597,8 +597,4 @@ func testNSUInteger(_ obj: NSUIntegerTests, uint: UInt, int: Int) {
   let num = NSNumber(value: uint)
   let _: String = num.uintValue // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
 }
-
-
-// <rdar://problem/25168818> Don't import None members in NS_OPTIONS types
-let _ = NSRuncingOptions.none // expected-error {{'none' is unavailable: use [] to construct an empty option set}}
 

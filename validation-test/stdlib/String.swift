@@ -205,6 +205,22 @@ StringTests.test("ForeignIndexes/subscript(Index)/OutOfBoundsTrap") {
   acceptor[i]
 }
 
+StringTests.test("String/subscript(_:Range)") {
+  let s = "foobar"
+  let from = s.startIndex
+  let to = s.index(before: s.endIndex)
+  let actual = s[from..<to]
+  expectEqual("fooba", actual)
+}
+
+StringTests.test("String/subscript(_:ClosedRange)") {
+  let s = "foobar"
+  let from = s.startIndex
+  let to = s.index(before: s.endIndex)
+  let actual = s[from...to]
+  expectEqual(s, actual)
+}
+
 StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/1") {
   let donor = "abcdef"
   let acceptor = "uvw"
@@ -1126,10 +1142,10 @@ StringTests.test("indexConversion")
   .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
-  let re : NSRegularExpression
+  let re : RegularExpression
   do {
-    re = try NSRegularExpression(
-      pattern: "([^ ]+)er", options: NSRegularExpressionOptions())
+    re = try RegularExpression(
+      pattern: "([^ ]+)er", options: RegularExpression.Options())
   } catch { fatalError("couldn't build regexp: \(error)") }
 
   let s = "go further into the larder to barter."
@@ -1137,7 +1153,7 @@ StringTests.test("indexConversion")
   var matches: [String] = []
   
   re.enumerateMatches(
-    in: s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.count)
+    in: s, options: RegularExpression.MatchingOptions(), range: NSRange(0..<s.utf16.count)
   ) {
     result, flags, stop
   in
@@ -1236,5 +1252,295 @@ StringTests.test("String.append(_: Character)") {
   }
 }
 
-runAllTests()
+internal func decodeCString<
+  C : UnicodeCodec
+  where
+  C.CodeUnit : UnsignedInteger
+>(_ s: String, as codec: C.Type)
+  -> (result: String, repairsMade: Bool)? {
+  let units = s.unicodeScalars.map({ $0.value }) + [0]
+  return units.map({ C.CodeUnit(numericCast($0)) }).withUnsafeBufferPointer {
+    String.decodeCString($0.baseAddress, as: C.self)
+  }
+}
 
+StringTests.test("String.decodeCString/UTF8") {
+  let actual = decodeCString("foobar", as: UTF8.self)
+  expectFalse(actual!.repairsMade)
+  expectEqual("foobar", actual!.result)
+}
+
+StringTests.test("String.decodeCString/UTF16") {
+  let actual = decodeCString("foobar", as: UTF16.self)
+  expectFalse(actual!.repairsMade)
+  expectEqual("foobar", actual!.result)
+}
+
+StringTests.test("String.decodeCString/UTF32") {
+  let actual = decodeCString("foobar", as: UTF32.self)
+  expectFalse(actual!.repairsMade)
+  expectEqual("foobar", actual!.result)
+}
+
+internal struct ReplaceSubrangeTest {
+  let original: String
+  let newElements: String
+  let rangeSelection: RangeSelection
+  let expected: String
+  let closedExpected: String?
+  let loc: SourceLoc
+
+  internal init(
+    original: String, newElements: String,
+    rangeSelection: RangeSelection, expected: String, closedExpected: String? = nil,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.original = original
+    self.newElements = newElements
+    self.rangeSelection = rangeSelection
+    self.expected = expected
+    self.closedExpected = closedExpected
+    self.loc = SourceLoc(file, line, comment: "replaceSubrange() test data")
+  }
+}
+
+internal struct RemoveSubrangeTest {
+  let original: String
+  let rangeSelection: RangeSelection
+  let expected: String
+  let closedExpected: String
+  let loc: SourceLoc
+
+  internal init(
+    original: String, rangeSelection: RangeSelection, expected: String,
+    closedExpected: String? = nil,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.original = original
+    self.rangeSelection = rangeSelection
+    self.expected = expected
+    self.closedExpected = closedExpected ?? expected
+    self.loc = SourceLoc(file, line, comment: "replaceSubrange() test data")
+  }
+}
+
+let replaceSubrangeTests = [
+  ReplaceSubrangeTest(
+    original: "",
+    newElements: "",
+    rangeSelection: .emptyRange,
+    expected: ""
+  ),
+  ReplaceSubrangeTest(
+    original: "",
+    newElements: "meela",
+    rangeSelection: .emptyRange,
+    expected: "meela"
+  ),
+  ReplaceSubrangeTest(
+    original: "eela",
+    newElements: "m",
+    rangeSelection: .leftEdge,
+    expected: "meela",
+    closedExpected: "mela"
+  ),
+  ReplaceSubrangeTest(
+    original: "meel",
+    newElements: "a",
+    rangeSelection: .rightEdge,
+    expected: "meela",
+    closedExpected: "meea"
+  ),
+  ReplaceSubrangeTest(
+    original: "a",
+    newElements: "meel",
+    rangeSelection: .leftEdge,
+    expected: "meela",
+    closedExpected: "meel"
+  ),
+  ReplaceSubrangeTest(
+    original: "m",
+    newElements: "eela",
+    rangeSelection: .rightEdge,
+    expected: "meela",
+    closedExpected: "eela"
+  ),
+  ReplaceSubrangeTest(
+    original: "alice",
+    newElements: "bob",
+    rangeSelection: .offsets(1, 1),
+    expected: "aboblice",
+    closedExpected: "abobice"
+  ),
+  ReplaceSubrangeTest(
+    original: "alice",
+    newElements: "bob",
+    rangeSelection: .offsets(1, 2),
+    expected: "abobice",
+    closedExpected: "abobce"
+  ),
+  ReplaceSubrangeTest(
+    original: "alice",
+    newElements: "bob",
+    rangeSelection: .offsets(1, 3),
+    expected: "abobce",
+    closedExpected: "abobe"
+  ),
+  ReplaceSubrangeTest(
+    original: "alice",
+    newElements: "bob",
+    rangeSelection: .offsets(1, 4),
+    expected: "abobe",
+    closedExpected: "abob"
+  ),
+  ReplaceSubrangeTest(
+    original: "alice",
+    newElements: "bob",
+    rangeSelection: .offsets(1, 5),
+    expected: "abob"
+  ),
+  ReplaceSubrangeTest(
+    original: "bob",
+    newElements: "meela",
+    rangeSelection: .offsets(1, 2),
+    expected: "bmeelab",
+    closedExpected: "bmeela"
+  ),
+]
+
+let removeSubrangeTests = [
+  RemoveSubrangeTest(
+    original: "",
+    rangeSelection: .emptyRange,
+    expected: ""
+  ),
+  RemoveSubrangeTest(
+    original: "a",
+    rangeSelection: .middle,
+    expected: ""
+  ),
+  RemoveSubrangeTest(
+    original: "perdicus",
+    rangeSelection: .leftHalf,
+    expected: "icus"
+  ),
+  RemoveSubrangeTest(
+    original: "perdicus",
+    rangeSelection: .rightHalf,
+    expected: "perd"
+  ),
+  RemoveSubrangeTest(
+    original: "alice",
+    rangeSelection: .middle,
+    expected: "ae"
+  ),
+  RemoveSubrangeTest(
+    original: "perdicus",
+    rangeSelection: .middle,
+    expected: "pes"
+  ),
+  RemoveSubrangeTest(
+    original: "perdicus",
+    rangeSelection: .offsets(1, 2),
+    expected: "prdicus",
+    closedExpected: "pdicus"
+  ),
+  RemoveSubrangeTest(
+    original: "perdicus",
+    rangeSelection: .offsets(3, 6),
+    expected: "perus",
+    closedExpected: "pers"
+  )
+]
+
+StringTests.test("String.replaceSubrange()/characters/range") {
+  for test in replaceSubrangeTests {
+    var theString = test.original
+    let c = test.original.characters
+    let rangeToReplace = test.rangeSelection.range(in: c)
+    let newCharacters : [Character] = test.newElements.characters.map { $0 }
+    theString.replaceSubrange(rangeToReplace, with: newCharacters)
+    expectEqual(
+      test.expected,
+      theString,
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+StringTests.test("String.replaceSubrange()/string/range") {
+  for test in replaceSubrangeTests {
+    var theString = test.original
+    let c = test.original.characters
+    let rangeToReplace = test.rangeSelection.range(in: c)
+    theString.replaceSubrange(rangeToReplace, with: test.newElements)
+    expectEqual(
+      test.expected,
+      theString,
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+StringTests.test("String.replaceSubrange()/characters/closedRange") {
+  for test in replaceSubrangeTests {
+    guard let closedExpected = test.closedExpected else {
+      continue
+    }
+    var theString = test.original
+    let c = test.original.characters
+    let rangeToReplace = test.rangeSelection.closedRange(in: c)
+    let newCharacters = Array(test.newElements.characters)
+    theString.replaceSubrange(rangeToReplace, with: newCharacters)
+    expectEqual(
+      closedExpected,
+      theString,
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+StringTests.test("String.replaceSubrange()/string/closedRange") {
+  for test in replaceSubrangeTests {
+    guard let closedExpected = test.closedExpected else {
+      continue
+    }
+    var theString = test.original
+    let c = test.original.characters
+    let rangeToReplace = test.rangeSelection.closedRange(in: c)
+    theString.replaceSubrange(rangeToReplace, with: test.newElements)
+    expectEqual(
+      closedExpected,
+      theString,
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+StringTests.test("String.removeSubrange()/range") {
+  for test in removeSubrangeTests {
+    var theString = test.original
+    let c = test.original.characters
+    let rangeToRemove = test.rangeSelection.range(in: c)
+    theString.removeSubrange(rangeToRemove)
+    expectEqual(
+      test.expected,
+      theString,
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+StringTests.test("String.removeSubrange()/closedRange") {
+  for test in removeSubrangeTests {
+    switch test.rangeSelection {
+      case .emptyRange: continue
+      default: break
+    }
+    var theString = test.original
+    let c = test.original.characters
+    let rangeToRemove = test.rangeSelection.closedRange(in: c)
+    theString.removeSubrange(rangeToRemove)
+    expectEqual(
+      test.closedExpected,
+      theString,
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+runAllTests()

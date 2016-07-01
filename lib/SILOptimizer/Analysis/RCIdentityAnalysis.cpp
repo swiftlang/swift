@@ -453,6 +453,11 @@ SILValue RCIdentityFunctionInfo::getRCIdentityRootInner(SILValue V,
 }
 
 SILValue RCIdentityFunctionInfo::getRCIdentityRoot(SILValue V) {
+  // Do we have it in the RCCache ?
+  auto Iter = RCCache.find(V);
+  if (Iter != RCCache.end())
+    return Iter->second;
+
   SILValue Root = getRCIdentityRootInner(V, 0);
   VisitedArgs.clear();
 
@@ -460,7 +465,12 @@ SILValue RCIdentityFunctionInfo::getRCIdentityRoot(SILValue V) {
   if (!Root)
     return V;
 
-  return Root;
+  // Make sure the cache does not grow too big.
+  if (RCCache.size() > MaxRCIdentityCacheSize)
+    RCCache.clear();
+
+  // Return and cache it.
+  return RCCache[V] = Root;
 }
 
 //===----------------------------------------------------------------------===//

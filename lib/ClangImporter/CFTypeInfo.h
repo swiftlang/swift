@@ -59,6 +59,14 @@ class CFPointeeInfo {
     return info;
   }
 
+  static CFPointeeInfo forVoid() {
+    CFPointeeInfo info;
+    info.IsValid = true;
+    info.IsConst = false;
+    info.Decl = nullptr;
+    return info;
+  }
+
   static CFPointeeInfo forInvalid() {
     CFPointeeInfo info;
     info.IsValid = false;
@@ -73,7 +81,7 @@ public:
 
   bool isConst() const { return IsConst; }
 
-  bool isConstVoid() const {
+  bool isVoid() const {
     assert(isValid());
     return Decl.isNull();
   }

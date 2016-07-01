@@ -67,13 +67,16 @@ class IRGenDebugInfo {
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
   TrackingDIRefMap DIRefMap;
+  std::vector<std::pair<const SILDebugScope *, llvm::TrackingMDNodeRef>>
+      LastInlineChain;
 
   llvm::BumpPtrAllocator DebugInfoNames;
   StringRef CWDName;                    /// The current working directory.
   llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
   llvm::DIFile *MainFile = nullptr;     /// The main file.
   llvm::DIModule *MainModule = nullptr; /// The current module.
-  llvm::MDNode *EntryPointFn = nullptr; /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
+  llvm::DIScope *EntryPointFn =
+      nullptr;                          /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
   TypeAliasDecl *MetadataTypeDecl;      /// The type decl for swift.type.
   llvm::DIType *InternalType; /// Catch-all type for opaque internal types.
 
@@ -128,6 +131,12 @@ public:
     Builder.SetCurrentDebugLocation(DL);
   }
 
+  /// Set the location for SWIFT_ENTRY_POINT_FUNCTION.
+  void setEntryPointLoc(IRBuilder &Builder);
+
+  /// Return the scope for  SWIFT_ENTRY_POINT_FUNCTION.
+  llvm::DIScope *getEntryPointFn();
+  
   /// Emit debug info for an import declaration.
   ///
   /// The DWARF output for import decls is similar to that of a using
@@ -181,9 +190,10 @@ public:
                         const SILDebugScope *DS);
 
   /// Create debug metadata for a global variable.
-  void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage, StringRef Name,
+  void emitGlobalVariableDeclaration(llvm::Constant *Storage, StringRef Name,
                                      StringRef LinkageName,
                                      DebugTypeInfo DebugType,
+                                     bool IsLocalToUnit,
                                      Optional<SILLocation> Loc);
 
   /// Emit debug metadata for type metadata (for generic types). So meta.
@@ -212,6 +222,8 @@ private:
   /// local reference to the type.
   llvm::DIType *createType(DebugTypeInfo DbgTy, StringRef MangledName,
                            llvm::DIScope *Scope, llvm::DIFile *File);
+  /// Get a previously created type from the cache.
+  llvm::DIType *getTypeOrNull(TypeBase *Ty);
   /// Get the DIType corresponding to this DebugTypeInfo from the cache,
   /// or build a fresh DIType otherwise.  There is the underlying
   /// assumption that no two types that share the same canonical type

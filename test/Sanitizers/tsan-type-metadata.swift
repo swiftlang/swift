@@ -8,9 +8,9 @@
 
 // We expect not to report any races on this testcase.
 
-// This test excercises accesses to type metadata, which uses lockless
-// syncronization in the runtime that is relied upon by the direct accesses in the IR.
-// We have to make sure TSan does not see the acesses to the metadata from the IR.
+// This test exercises accesses to type metadata, which uses lockless
+// synchronization in the runtime that is relied upon by the direct accesses in the IR.
+// We have to make sure TSan does not see the accesses to the metadata from the IR.
 // Otherwise, it will report a race.
 
 // Generic classes.

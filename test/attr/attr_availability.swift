@@ -42,6 +42,11 @@ extension MyCollection {
   func append(element: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{24-25=Element}}
 }
 
+@available(*, unavailable, renamed: "MyCollection")
+typealias YourCollection<Element> = MyCollection<Element> // expected-note {{'YourCollection' has been explicitly marked unavailable here}}
+
+var x : YourCollection<Int> // expected-error {{'YourCollection' has been renamed to 'MyCollection'}}{{9-23=MyCollection}}
+
 var x : int // expected-error {{'int' is unavailable: oh no you don't}}
 var y : float // expected-error {{'float' has been renamed to 'Float'}}{{9-14=Float}}
 
@@ -122,9 +127,6 @@ let _: Int
 @available(*, renamed: "bad name") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
 let _: Int
 
-@available(*, renamed: "Overly.Nested.Name") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
-let _: Int
-
 @available(*, renamed: "_") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
 let _: Int
 
@@ -142,6 +144,12 @@ let _: Int
 
 @available(*, deprecated, unavailable, message: "message") // expected-error{{'available' attribute cannot be both unconditionally 'unavailable' and 'deprecated'}}
 struct BadUnconditionalAvailability { };
+
+@available(*, unavailable, message="oh no you don't") // expected-error {{'=' has been replaced with ':' in attribute arguments}} {{35-36=: }}
+typealias EqualFixIt1 = Int
+@available(*, unavailable, message = "oh no you don't") // expected-error {{'=' has been replaced with ':' in attribute arguments}} {{36-37=:}}
+typealias EqualFixIt2 = Int
+
 
 // Encoding in messages
 @available(*, deprecated, message: "Say \"Hi\"")
@@ -244,6 +252,8 @@ func testOperators(x: DummyType, y: DummyType) {
 func unavailableMember() {} // expected-note {{here}}
 @available(*, deprecated, renamed: "DummyType.bar")
 func deprecatedMember() {}
+@available(*, unavailable, renamed: "DummyType.Inner.foo")
+func unavailableNestedMember() {} // expected-note {{here}}
 
 @available(*, unavailable, renamed: "DummyType.Foo")
 struct UnavailableType {} // expected-note {{here}}
@@ -253,6 +263,7 @@ typealias DeprecatedType = Int
 func testGlobalToMembers() {
   unavailableMember() // expected-error {{'unavailableMember()' has been renamed to 'DummyType.foo'}} {{3-20=DummyType.foo}}
   deprecatedMember() // expected-warning {{'deprecatedMember()' is deprecated: renamed to 'DummyType.bar'}} expected-note {{use 'DummyType.bar' instead}} {{3-19=DummyType.bar}}
+  unavailableNestedMember() // expected-error {{'unavailableNestedMember()' has been renamed to 'DummyType.Inner.foo'}} {{3-26=DummyType.Inner.foo}}
   let x: UnavailableType? = nil // expected-error {{'UnavailableType' has been renamed to 'DummyType.Foo'}} {{10-25=DummyType.Foo}}
   _ = x
   let y: DeprecatedType? = nil // expected-warning {{'DeprecatedType' is deprecated: renamed to 'DummyType.Bar'}} expected-note {{use 'DummyType.Bar' instead}} {{10-24=DummyType.Bar}}
@@ -298,6 +309,8 @@ func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-note {{here}}
 
 @available(*, unavailable, renamed: "Int.init(other:)")
 func unavailableInit(a: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "Foo.Bar.init(other:)")
+func unavailableNestedInit(a: Int) {} // expected-note 2 {{here}}
 
 
 func testArgNames() {
@@ -324,6 +337,10 @@ func testArgNames() {
   unavailableInit(a: 0) // expected-error {{'unavailableInit(a:)' has been replaced by 'Int.init(other:)'}} {{3-18=Int}} {{19-20=other}}
   let fn = unavailableInit // expected-error {{'unavailableInit(a:)' has been replaced by 'Int.init(other:)'}} {{12-27=Int.init}}
   fn(a: 1)
+
+  unavailableNestedInit(a: 0) // expected-error {{'unavailableNestedInit(a:)' has been replaced by 'Foo.Bar.init(other:)'}} {{3-24=Foo.Bar}} {{25-26=other}}
+  let fn2 = unavailableNestedInit // expected-error {{'unavailableNestedInit(a:)' has been replaced by 'Foo.Bar.init(other:)'}} {{13-34=Foo.Bar.init}}
+  fn2(a: 1)
 }
 
 @available(*, unavailable, renamed: "shinyLabeledArguments()")
@@ -363,6 +380,9 @@ func deprecatedInstance(a: Int) {}
 @available(*, deprecated, renamed: "Int.foo(self:)", message: "blah")
 func deprecatedInstanceMessage(a: Int) {}
 
+@available(*, unavailable, renamed: "Foo.Bar.foo(self:)")
+func unavailableNestedInstance(a: Int) {} // expected-note {{here}}
+
 func testRenameInstance() {
   unavailableInstance(a: 0) // expected-error{{'unavailableInstance(a:)' has been replaced by instance method 'Int.foo()'}} {{3-22=0.foo}} {{23-27=}}
   unavailableInstanceUnlabeled(0) // expected-error{{'unavailableInstanceUnlabeled' has been replaced by instance method 'Int.foo()'}} {{3-31=0.foo}} {{32-33=}}
@@ -375,6 +395,8 @@ func testRenameInstance() {
   unavailableInstanceMessage(a: 0) // expected-error{{'unavailableInstanceMessage(a:)' has been replaced by instance method 'Int.foo()': blah}} {{3-29=0.foo}} {{30-34=}}
   deprecatedInstance(a: 0) // expected-warning{{'deprecatedInstance(a:)' is deprecated: replaced by instance method 'Int.foo()'}} expected-note{{use 'Int.foo()' instead}} {{3-21=0.foo}} {{22-26=}}
   deprecatedInstanceMessage(a: 0) // expected-warning{{'deprecatedInstanceMessage(a:)' is deprecated: blah}} expected-note{{use 'Int.foo()' instead}} {{3-28=0.foo}} {{29-33=}}
+
+  unavailableNestedInstance(a: 0) // expected-error{{'unavailableNestedInstance(a:)' has been replaced by instance method 'Foo.Bar.foo()'}} {{3-28=0.foo}} {{29-33=}}
 }
 
 @available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)")
@@ -657,4 +679,76 @@ class Sub : Base {
   override func unavailableTooMany(a: Int) {} // expected-error {{'unavailableTooMany(a:)' has been renamed to 'shinyLabeledArguments(x:b:)'}} {{none}}
   override func unavailableNoArgsTooMany() {} // expected-error {{'unavailableNoArgsTooMany()' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}}
   override func unavailableHasType() {} // expected-error {{'unavailableHasType()' has been replaced by 'Base.shinyLabeledArguments()'}} {{none}}
+}
+
+// U: Unnamed, L: Labeled
+@available(*, unavailable, renamed: "after(fn:)")
+func closure_U_L(_ x: () -> Int) {} // expected-note 3 {{here}}
+@available(*, unavailable, renamed: "after(fn:)")
+func closure_L_L(x: () -> Int) {} // expected-note 3 {{here}}
+@available(*, unavailable, renamed: "after(_:)")
+func closure_L_U(x: () -> Int) {} // expected-note 3 {{here}}
+
+@available(*, unavailable, renamed: "after(arg:fn:)")
+func closure_UU_LL(_ x: Int, _ y: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:fn:)")
+func closure_LU_LL(x: Int, _ y: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:fn:)")
+func closure_LL_LL(x: Int, y: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:fn:)")
+func closure_UU_LL_ne(_ x: Int, _ y: @noescape () -> Int) {} // expected-note 2 {{here}}
+
+@available(*, unavailable, renamed: "after(arg:_:)")
+func closure_UU_LU(_ x: Int, _ closure: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:_:)")
+func closure_LU_LU(x: Int, _ closure: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:_:)")
+func closure_LL_LU(x: Int, y: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:_:)")
+func closure_UU_LU_ne(_ x: Int, _ y: @noescape () -> Int) {} // expected-note 2 {{here}}
+
+func testTrailingClosure() {
+  closure_U_L { 0 } // expected-error {{'closure_U_L' has been renamed to 'after(fn:)'}} {{3-14=after}} {{none}}
+  closure_U_L() { 0 } // expected-error {{'closure_U_L' has been renamed to 'after(fn:)'}} {{3-14=after}} {{none}}
+  closure_U_L({ 0 }) // expected-error {{'closure_U_L' has been renamed to 'after(fn:)'}} {{3-14=after}} {{15-15=fn: }} {{none}}
+
+  closure_L_L { 0 } // expected-error {{'closure_L_L(x:)' has been renamed to 'after(fn:)'}} {{3-14=after}} {{none}}
+  closure_L_L() { 0 } // expected-error {{'closure_L_L(x:)' has been renamed to 'after(fn:)'}} {{3-14=after}} {{none}}
+  closure_L_L(x: { 0 }) // expected-error {{'closure_L_L(x:)' has been renamed to 'after(fn:)'}} {{3-14=after}} {{15-16=fn}} {{none}}
+
+  closure_L_U { 0 } // expected-error {{'closure_L_U(x:)' has been renamed to 'after(_:)'}} {{3-14=after}} {{none}}
+  closure_L_U() { 0 } // expected-error {{'closure_L_U(x:)' has been renamed to 'after(_:)'}} {{3-14=after}} {{none}}
+  closure_L_U(x: { 0 }) // expected-error {{'closure_L_U(x:)' has been renamed to 'after(_:)'}} {{3-14=after}} {{15-18=}} {{none}}
+
+  closure_UU_LL(0) { 0 } // expected-error {{'closure_UU_LL' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-17=arg: }} {{none}}
+  closure_UU_LL(0, { 0 }) // expected-error {{'closure_UU_LL' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-17=arg: }} {{20-20=fn: }} {{none}}
+
+  closure_LU_LL(x: 0) { 0 } // expected-error {{'closure_LU_LL(x:_:)' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-18=arg}} {{none}}
+  closure_LU_LL(x: 0, { 0 }) // expected-error {{'closure_LU_LL(x:_:)' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-18=arg}} {{23-23=fn: }} {{none}}
+
+  closure_LL_LL(x: 1) { 1 } // expected-error {{'closure_LL_LL(x:y:)' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-18=arg}} {{none}}
+  closure_LL_LL(x: 1, y: { 0 }) // expected-error {{'closure_LL_LL(x:y:)' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-18=arg}} {{23-24=fn}} {{none}}
+
+  closure_UU_LL_ne(1) { 1 } // expected-error {{'closure_UU_LL_ne' has been renamed to 'after(arg:fn:)'}} {{3-19=after}} {{20-20=arg: }} {{none}}
+  closure_UU_LL_ne(1, { 0 }) // expected-error {{'closure_UU_LL_ne' has been renamed to 'after(arg:fn:)'}} {{3-19=after}} {{20-20=arg: }} {{23-23=fn: }} {{none}}
+
+  closure_UU_LU(0) { 0 } // expected-error {{'closure_UU_LU' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-17=arg: }} {{none}}
+  closure_UU_LU(0, { 0 }) // expected-error {{'closure_UU_LU' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-17=arg: }} {{none}}
+
+  closure_LU_LU(x: 0) { 0 } // expected-error {{'closure_LU_LU(x:_:)' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-18=arg}} {{none}}
+  closure_LU_LU(x: 0, { 0 }) // expected-error {{'closure_LU_LU(x:_:)' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-18=arg}} {{none}}
+
+  closure_LL_LU(x: 1) { 1 } // expected-error {{'closure_LL_LU(x:y:)' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-18=arg}} {{none}}
+  closure_LL_LU(x: 1, y: { 0 }) // expected-error {{'closure_LL_LU(x:y:)' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-18=arg}} {{23-26=}} {{none}}
+
+  closure_UU_LU_ne(1) { 1 } // expected-error {{'closure_UU_LU_ne' has been renamed to 'after(arg:_:)'}} {{3-19=after}} {{20-20=arg: }} {{none}}
+  closure_UU_LU_ne(1, { 0 }) // expected-error {{'closure_UU_LU_ne' has been renamed to 'after(arg:_:)'}} {{3-19=after}} {{20-20=arg: }} {{none}}
+}
+
+@available(*, unavailable, renamed: "after(x:y:)")
+func variadic1(a: Int ..., b: Int = 0) {} // expected-note {{here}}
+
+func testVariadic() {
+  // FIXME: fix-it should be: {{1-9=newFn7}} {{10-11=x}} {{none}}
+  variadic1(a: 1, 1) // expected-error {{'variadic1(a:b:)' has been renamed to 'after(x:y:)'}} {{3-12=after}} {{none}}
 }

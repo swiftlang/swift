@@ -1541,26 +1541,6 @@ public:
   /// Retrieve the set of generic arguments provided at this level.
   ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
 
-  /// \brief Retrieve the set of substitutions used to produce this bound
-  /// generic type from the underlying generic type.
-  ///
-  /// \param module The module in which we should compute the substitutions.
-  /// FIXME: We currently don't account for this properly, so it can be null.
-  ///
-  /// \param resolver The resolver that handles lazy type checking, where
-  /// required. This can be null for a fully-type-checked AST.
-  ///
-  /// \param gpContext The context from which the generic parameters will be
-  /// extracted, which will be either the nominal type declaration or an
-  /// extension thereof. If null, will be set to the nominal type declaration.
-  ArrayRef<Substitution> getSubstitutions(ModuleDecl *module,
-                                          LazyResolver *resolver,
-                                          DeclContext *gpContext = nullptr);
-
-  /// Retrieves the generic parameter context to use with substitutions for
-  /// this bound generic type, using the given context if possible.
-  DeclContext *getGenericParamContext(DeclContext *gpContext) const;
-
   void Profile(llvm::FoldingSetNodeID &ID) {
     RecursiveTypeProperties properties;
     Profile(ID, TheDecl, Parent, GenericArgs, properties);
@@ -2363,6 +2343,10 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   typedef AnyFunctionType::ExtInfo ExtInfo;
   PROXY_CAN_TYPE_SIMPLE_GETTER(getInput)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getResult)
+  
+  CanAnyFunctionType withExtInfo(ExtInfo info) const {
+    return CanAnyFunctionType(getPointer()->withExtInfo(info));
+  }
 END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 
 /// FunctionType - A monomorphic function type, specified with an arrow.
@@ -2395,6 +2379,10 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   static CanFunctionType get(CanType input, CanType result,
                              const ExtInfo &info) {
     return CanFunctionType(FunctionType::get(input, result, info));
+  }
+  
+  CanFunctionType withExtInfo(ExtInfo info) const {
+    return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   
@@ -2506,8 +2494,10 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
   static CanGenericFunctionType get(CanGenericSignature sig,
                                     CanType input, CanType result,
                                     const ExtInfo &info) {
-    return CanGenericFunctionType(
-              GenericFunctionType::get(sig, input, result, info));
+    // Knowing that the argument types are independently canonical is
+    // not sufficient to guarantee that the function type will be canonical.
+    auto fnType = GenericFunctionType::get(sig, input, result, info);
+    return cast<GenericFunctionType>(fnType->getCanonicalType());
   }
   
   CanGenericSignature getGenericSignature() const {
@@ -2516,6 +2506,11 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
   
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const {
     return getGenericSignature().getGenericParams();
+  }
+
+  CanGenericFunctionType withExtInfo(ExtInfo info) const {
+    return CanGenericFunctionType(
+                    cast<GenericFunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 
@@ -2856,11 +2851,12 @@ public:
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |representation|noReturn|
-    //   |    0 .. 3    |   4    |
+    //   |representation|noReturn|pseudogeneric|
+    //   |    0 .. 3    |   4    |      5      |
     //
     enum : uint16_t { RepresentationMask = 0x00F };
     enum : uint16_t { NoReturnMask       = 0x010 };
+    enum : uint16_t { PseudogenericMask  = 0x020 };
 
     uint16_t Bits;
 
@@ -2873,12 +2869,20 @@ public:
     ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation Rep, bool IsNoReturn) {
-      Bits = ((unsigned) Rep) |
-             (IsNoReturn ? NoReturnMask : 0);
+    ExtInfo(Representation rep, bool isNoReturn, bool isPseudogeneric) {
+      Bits = ((unsigned) rep) |
+             (isNoReturn ? NoReturnMask : 0) |
+             (isPseudogeneric ? PseudogenericMask : 0);
     }
 
+    /// Is this function pseudo-generic?  A pseudo-generic function
+    /// is not permitted to dynamically depend on its type arguments.
+    bool isPseudogeneric() const { return Bits & PseudogenericMask; }
+
+    /// Do functions of this type return normally?
     bool isNoReturn() const { return Bits & NoReturnMask; }
+
+    /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
       return Representation(Bits & RepresentationMask);
     }
@@ -2940,6 +2944,12 @@ public:
         return ExtInfo(Bits | NoReturnMask);
       else
         return ExtInfo(Bits & ~NoReturnMask);
+    }
+    ExtInfo withIsPseudogeneric(bool isPseudogeneric = true) const {
+      if (isPseudogeneric)
+        return ExtInfo(Bits | PseudogenericMask);
+      else
+        return ExtInfo(Bits & ~PseudogenericMask);
     }
 
     uint16_t getFuncAttrKey() const {
@@ -3184,6 +3194,10 @@ public:
     return getExtInfo().isNoReturn();
   }
 
+  bool isPseudogeneric() const {
+    return getExtInfo().isPseudogeneric();
+  }
+
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       ModuleDecl *astModule,
                                       ArrayRef<Substitution> subs);
@@ -3391,7 +3405,7 @@ public:
 
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
-class ProtocolType : public NominalType {
+class ProtocolType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// \brief Retrieve the type when we're referencing the given protocol.
   /// declaration.
@@ -3422,6 +3436,11 @@ public:
   /// use in sorting.
   static int compareProtocols(ProtocolDecl * const* PP1,
                               ProtocolDecl * const* PP2);
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getDecl(), getParent());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D, Type Parent);
 
 private:
   friend class NominalTypeDecl;

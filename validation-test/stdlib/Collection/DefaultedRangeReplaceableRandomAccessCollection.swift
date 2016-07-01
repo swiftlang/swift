@@ -5,23 +5,11 @@
 // Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %S/../../../utils/gyb %s -o %t/main.swift
-// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-build-swift %t/main.swift -o %t/DefaultedRangeReplaceableRandomAccessCollection.swift.a.out
-// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-run %t/DefaultedRangeReplaceableRandomAccessCollection.swift.a.out
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
 import StdlibCollectionUnittest
-
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var CollectionTests = TestSuite("Collection")
 

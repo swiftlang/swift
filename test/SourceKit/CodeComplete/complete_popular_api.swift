@@ -17,6 +17,7 @@ struct Foo {
   var zmeh: Int
 }
 
+// REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=complete.open -pos=2:1 -req-opts=hidelowpriority=0 %s -- %s > %t.nopopular.top
 // RUN: %sourcekitd-test -req=complete.open -pos=3:5 %s -- %s > %t.nopopular.foo
 // RUN: FileCheck %s -check-prefix=NOPOP_TOP < %t.nopopular.top

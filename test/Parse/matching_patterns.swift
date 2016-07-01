@@ -13,7 +13,7 @@ var x:Int
 func square(_ x: Int) -> Int { return x*x }
 
 struct A<B> {
-  struct C<D> { } // expected-error{{generic type 'C' nested in type}}
+  struct C<D> { } // expected-error{{generic type 'C' cannot be nested in type 'A'}}
 }
 
 switch x {
@@ -82,26 +82,26 @@ enum Voluntary<T> : Equatable {
     case other:
       ()
 
-    case Naught,
-         Naught(),
-         Naught(_, _): // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
+    case .Naught,
+         .Naught(),
+         .Naught(_, _): // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
       ()
 
-    case Mere,
-         Mere(), // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
-         Mere(_),
-         Mere(_, _): // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
+    case .Mere,
+         .Mere(), // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
+         .Mere(_),
+         .Mere(_, _): // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
       ()
 
-    case Twain(), // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
-         Twain(_),
-         Twain(_, _),
-         Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
+    case .Twain(), // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
+         .Twain(_),
+         .Twain(_, _),
+         .Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
       ()
     }
 
     switch foo {
-    case Naught: // expected-error{{enum case 'Naught' is not a member of type 'Foo'}}
+    case .Naught: // expected-error{{enum case 'Naught' not found in type 'Foo'}}
       ()
     case .A, .B, .C:
       ()
@@ -143,7 +143,7 @@ case .Foo: // expected-error{{enum case 'Foo' not found in type 'Int'}}
 }
 
 struct ContainsEnum {
-  enum Possible<T> { // expected-error{{generic type 'Possible' nested in type}}
+  enum Possible<T> { // expected-error{{generic type 'Possible' cannot be nested in type 'ContainsEnum'}}
     case Naught
     case Mere(T)
     case Twain(T, T)

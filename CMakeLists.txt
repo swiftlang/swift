@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 2.8.12)
 
+if(POLICY CMP0051)
+  cmake_policy(SET CMP0051 NEW)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -44,17 +48,39 @@ option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
 
-option(SWIFT_BUILD_STDLIB
-    "Build the Swift standard library (independent of the SDK headers)"
-    TRUE)
-
-option(SWIFT_BUILD_SDK_OVERLAY
-    "Build Swift SDK overlay"
+option(SWIFT_BUILD_DYNAMIC_STDLIB
+    "Build dynamic variants of the Swift standard library"
     TRUE)
 
 option(SWIFT_BUILD_STATIC_STDLIB
-    "Build static variants of the Swift standard library and SDK overlay"
+    "Build static variants of the Swift standard library"
     FALSE)
+
+option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
+    "Build dynamic variants of the Swift SDK overlay"
+    TRUE)
+
+option(SWIFT_BUILD_STATIC_SDK_OVERLAY
+    "Build static variants of the Swift SDK overlay"
+    FALSE)
+
+# In many cases, the CMake build system needs to determine whether to include
+# a directory, or perform other actions, based on whether the stdlib or SDK is
+# being built at all -- statically or dynamically. Please note that these
+# flags are not related to the deprecated build-script-impl arguments
+# 'build-swift-stdlib' and 'build-swift-sdk-overlay'. These are not flags that
+# the build script should be able to set.
+if(SWIFT_BUILD_DYNAMIC_STDLIB OR SWIFT_BUILD_STATIC_STDLIB)
+  set(SWIFT_BUILD_STDLIB TRUE)
+else()
+  set(SWIFT_BUILD_STDLIB FALSE)
+endif()
+
+if(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY OR SWIFT_BUILD_STATIC_SDK_OVERLAY)
+  set(SWIFT_BUILD_SDK_OVERLAY TRUE)
+else()
+  set(SWIFT_BUILD_SDK_OVERLAY FALSE)
+endif()
 
 option(SWIFT_BUILD_PERF_TESTSUITE
     "Create targets for swift performance benchmarks."
@@ -83,6 +109,10 @@ set(SWIFT_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Swift compiler")
 set(CLANG_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Clang compiler")
+
+# Indicate whether Swift should attempt to use the lld linker.
+set(SWIFT_ENABLE_LLD_LINKER FALSE CACHE BOOL
+    "Enable using the lld linker when available")
 
 # Indicate whether Swift should attempt to use the gold linker.
 # This is not used on Darwin.
@@ -136,8 +166,10 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
     "Path to the directory that contains Swift tools that are executable on the build machine")
 
-option(SWIFT_ENABLE_LTO
-  "If set to true, build the swift compiler with link time optimization enabled" FALSE)
+set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
+    must specify the form of LTO by setting this to one of: 'full', 'thin'. This
+    option only affects the tools that run on the host (the compiler), and has
+    no effect on the target libraries (the standard library and the runtime).")
 
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
@@ -148,14 +180,19 @@ set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
   "The GCC version to use when building for Android. Currently only 4.9 is supported.")
 set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android SDK tools that will be passed to the swiftc frontend")
-set(SWIFT_ANDROID_ICU_UC "" CACHE STRING
-  "Path to a directory containing libicuuc.so")
-set(SWIFT_ANDROID_ICU_UC_INCLUDE "" CACHE STRING
-  "Path to a directory containing headers for libicuuc")
-set(SWIFT_ANDROID_ICU_I18N "" CACHE STRING
-  "Path to a directory containing libicui18n.so")
-set(SWIFT_ANDROID_ICU_I18N_INCLUDE "" CACHE STRING
-  "Path to a directory containing headers libicui18n")
+set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
+  "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
+
+foreach(sdk ANDROID;FREEBSD;LINUX)
+  set(SWIFT_${sdk}_ICU_UC "" CACHE STRING
+      "Path to a directory containing the icuuc library for ${sdk}")
+  set(SWIFT_${sdk}_ICU_UC_INCLUDE "" CACHE STRING
+      "Path to a directory containing headers for icuuc for ${sdk}")
+  set(SWIFT_${sdk}_ICU_I18N "" CACHE STRING
+      "Path to a directory containing the icui18n library for ${sdk}")
+  set(SWIFT_${sdk}_ICU_I18N_INCLUDE "" CACHE STRING
+      "Path to a directory containing headers icui18n for ${sdk}")
+endforeach()
 
 #
 # User-configurable Darwin-specific options.
@@ -272,6 +309,19 @@ endif()
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
     ${SWIFT_BUILD_SOURCEKIT_default})
+
+#
+# Assume a new enough ar to generate the index at construction time.  This avois
+# having to invoke ranlib as a secondary command.
+#
+
+set(CMAKE_C_ARCHIVE_CREATE "<CMAKE_AR> crs <TARGET> <LINK_FLAGS> <OBJECTS>")
+set(CMAKE_C_ARCHIVE_APPEND "<CMAKE_AR> qs <TARGET> <LINK_FLAGS> <OBJECTS>")
+set(CMAKE_C_ARCHIVE_FINISH "")
+
+set(CMAKE_CXX_ARCHIVE_CREATE "<CMAKE_AR> crs <TARGET> <LINK_FLAGS> <OBJECTS>")
+set(CMAKE_CXX_ARCHIVE_APPEND "<CMAKE_AR> qs <TARGET> <LINK_FLAGS> <OBJECTS>")
+set(CMAKE_CXX_ARCHIVE_FINISH "")
 
 #
 # Include CMake modules
@@ -439,6 +489,8 @@ else()
     set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64le")
     set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64le")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "s390x")
+    set(SWIFT_HOST_VARIANT_ARCH_default "s390x")
   # FIXME: Only matches v6l/v7l - by far the most common variants
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv6l")
     set(SWIFT_HOST_VARIANT_ARCH_default "armv6")
@@ -467,18 +519,21 @@ function(is_sdk_requested name result_var_name)
   if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${name}")
     set("${result_var_name}" "TRUE" PARENT_SCOPE)
   else()
-    if("${SWIFT_SDKS}" STREQUAL "")
-      set("${result_var_name}" "TRUE" PARENT_SCOPE)
+    list(FIND SWIFT_SDKS "${name}" sdk_index)
+    if(${sdk_index} EQUAL -1)
+      set("${result_var_name}" "FALSE" PARENT_SCOPE)
     else()
-      list(FIND SWIFT_SDKS "${name}" sdk_index)
-      if(${sdk_index} EQUAL -1)
-        set("${result_var_name}" "FALSE" PARENT_SCOPE)
-      else()
-        set("${result_var_name}" "TRUE" PARENT_SCOPE)
-      endif()
+      set("${result_var_name}" "TRUE" PARENT_SCOPE)
     endif()
   endif()
 endfunction()
+
+if(XCODE)
+  # FIXME: Cannot cross-compile the standard library using Xcode.  Xcode
+  # insists on passing -mmacosx-version-min to the compiler, and we need
+  # to pass -mios-version-min.  Clang sees both options and complains.
+  set(SWIFT_SDKS "OSX")
+endif()
 
 # FIXME: the parameters we specify in SWIFT_SDKS are lacking architecture specifics,
 # so we need to hard-code it. For example, the SDK for Android is just 'ANDROID', 
@@ -507,6 +562,8 @@ if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
       set(SWIFT_HOST_TRIPLE "aarch64-unknown-linux-gnu")
     elseif("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "(powerpc64|powerpc64le)")
       set(SWIFT_HOST_TRIPLE "${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu")
+    elseif("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "s390x")
+      set(SWIFT_HOST_TRIPLE "s390x-unknown-linux-gnu")
     elseif("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "(armv6|armv7)")
       set(SWIFT_HOST_TRIPLE "${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnueabihf")
     else()
@@ -592,17 +649,8 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   # Compatible cross-compile SDKS for Darwin OSes: IOS, IOS_SIMULATOR, TVOS,
   #   TVOS_SIMULATOR, WATCHOS, WATCHOS_SIMULATOR (archs hardcoded below).
 
-  if(XCODE)
-    # FIXME: Cannot cross-compile stdlib using Xcode.  Xcode insists on
-    # passing -mmacosx-version-min to the compiler, and we want to pass
-    # -mios-version-min.  Clang sees both options and complains.
-    set(swift_can_crosscompile_stdlib FALSE)
-  else()
-    set(swift_can_crosscompile_stdlib TRUE)
-  endif()
-
   is_sdk_requested(IOS swift_build_ios)
-  if(swift_build_ios AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_ios)
     configure_sdk_darwin(
         IOS "iOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}"
         iphoneos ios ios "armv7;armv7s;arm64")
@@ -612,7 +660,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   endif()
 
   is_sdk_requested(IOS_SIMULATOR swift_build_ios_simulator)
-  if(swift_build_ios_simulator AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_ios_simulator)
     configure_sdk_darwin(
         IOS_SIMULATOR "iOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}"
         iphonesimulator ios-simulator ios "i386;x86_64")
@@ -625,7 +673,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   endif()
 
   is_sdk_requested(TVOS swift_build_tvos)
-  if(swift_build_tvos AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_tvos)
     configure_sdk_darwin(
         TVOS "tvOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
         appletvos tvos tvos "arm64")
@@ -635,7 +683,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   endif()
 
   is_sdk_requested(TVOS_SIMULATOR swift_build_tvos_simulator)
-  if(swift_build_tvos_simulator AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_tvos_simulator)
     configure_sdk_darwin(
         TVOS_SIMULATOR "tvOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
         appletvsimulator tvos-simulator tvos "x86_64")
@@ -648,7 +696,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   endif()
 
   is_sdk_requested(WATCHOS swift_build_watchos)
-  if(swift_build_watchos AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_watchos)
     configure_sdk_darwin(
         WATCHOS "watchOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
         watchos watchos watchos "armv7k")
@@ -658,7 +706,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   endif()
 
   is_sdk_requested(WATCHOS_SIMULATOR swift_build_watchos_simulator)
-  if(swift_build_watchos_simulator AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_watchos_simulator)
     configure_sdk_darwin(
         WATCHOS_SIMULATOR "watchOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
         watchsimulator watchos-simulator watchos "i386")
@@ -741,7 +789,7 @@ endif()
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
-message(STATUS "  LTO:        ${SWIFT_ENABLE_LTO}")
+message(STATUS "  LTO:        ${SWIFT_TOOLS_ENABLE_LTO}")
 message(STATUS "")
 
 message(STATUS "Building Swift standard library and SDK overlays for SDKs: ${SWIFT_SDKS}")
@@ -771,21 +819,11 @@ endif()
 #
 # Set up global CMake variables for API notes.
 #
-# API notes version 1.0.0
-#
-# Change the above comment to 'touch' this file and keep incremental builds
-# working when adding a new apinotes file.
-#
 set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
-if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
+include("${SWIFT_API_NOTES_PATH}/CMakeLists.txt")
+if(NOT DEFINED SWIFT_API_NOTES_INPUTS)
   message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
 endif()
-
-file(GLOB SWIFT_API_NOTES_INPUT_FILES "${SWIFT_API_NOTES_PATH}/*.apinotes")
-foreach(file ${SWIFT_API_NOTES_INPUT_FILES})
-  get_filename_component(name "${file}" NAME_WE)
-  list(APPEND SWIFT_API_NOTES_INPUTS ${name})
-endforeach()
 
 # Add all of the subdirectories, where we actually do work.
 if(SWIFT_BUILD_TOOLS)
@@ -802,7 +840,7 @@ endif()
 add_subdirectory(utils)
 add_subdirectory(stdlib)
 
-if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS)
   add_subdirectory(tools/swift-reflection-test)
 endif()
 

@@ -34,7 +34,9 @@
 #include "../SwiftShims/RuntimeShims.h"
 #include "Private.h"
 #include "swift/Runtime/Debug.h"
+#if SWIFT_OBJC_INTEROP
 #include <dlfcn.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unordered_map>
@@ -1510,7 +1512,7 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
 
 using ClassExtents = TwoWordPair<size_t, size_t>;
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 extern "C"
 ClassExtents::Return
 swift_class_getInstanceExtents(const Metadata *c) {

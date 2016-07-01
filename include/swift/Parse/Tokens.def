@@ -38,12 +38,6 @@
 #define POUND_KEYWORD(kw)
 #endif
 
-/// POUND_NORMAL_KEYWORD(kw)
-///   Keywords except object and config keywords in the #foo namespace.
-#ifndef POUND_NORMAL_KEYWORD
-#define POUND_NORMAL_KEYWORD(kw) POUND_KEYWORD(kw)
-#endif
-
 /// POUND_OBJECT_LITERAL(kw, desc, proto)
 ///   Every keyword in the #foo namespace representing an object literal.
 #ifndef POUND_OBJECT_LITERAL
@@ -150,7 +144,6 @@ KEYWORD(__LINE__)
 KEYWORD(__COLUMN__)
 KEYWORD(__FUNCTION__)
 KEYWORD(__DSO_HANDLE__)
-KEYWORD(__behavior)
 
 // Pattern keywords.
 KEYWORD(_)
@@ -227,7 +220,6 @@ POUND_KEYWORD(dsohandle)
 #undef SIL_KEYWORD
 #undef PUNCTUATOR
 #undef POUND_KEYWORD
-#undef POUND_NORMAL_KEYWORD
 #undef POUND_OBJECT_LITERAL
 #undef POUND_OLD_OBJECT_LITERAL
 #undef POUND_CONFIG

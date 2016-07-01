@@ -18,7 +18,7 @@ struct MyError : ErrorProtocol {
 // args/result, which is expected in the returned closure.
 
 // CHECK-LABEL: sil shared [noinline] @_TTSg5Si___TF4test16generic_get_funcurFTxSb_Fxx : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSr5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericfQ_Q_ : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSr5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericurfxx : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int
 // CHECK: [[PA:%[0-9]+]] = partial_apply [[F]](%1, %{{[0-9]+}}) : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int
 // CHECK: return [[PA]] : $@callee_owned (@in Int) -> @out Int
 @inline(never)
@@ -89,7 +89,7 @@ func testit3(_ b: Bool) -> Int {
 // args/result, which is expected in the returned closure.
 
 // CHECK-LABEL: sil shared [noinline] @_TTSg5Si___TF4test25generic_get_func_throwingurFSbFzxx : $@convention(thin) (Bool) -> @owned @callee_owned (@in Int) -> (@out Int, @error ErrorProtocol) {
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSr5Si___TFF4test25generic_get_func_throwingurFSbFzxxL_7genericfzQ_Q_ : $@convention(thin) (@in Int, Bool) -> (@out Int, @error ErrorProtocol)
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSr5Si___TFF4test25generic_get_func_throwingurFSbFzxxL_7genericurfzxx : $@convention(thin) (@in Int, Bool) -> (@out Int, @error ErrorProtocol)
 // CHECK: [[PA:%[0-9]+]] = partial_apply [[F]](%0) : $@convention(thin) (@in Int, Bool) -> (@out Int, @error ErrorProtocol)
 // CHECK: return [[PA]] : $@callee_owned (@in Int) -> (@out Int, @error ErrorProtocol)
 @inline(never)
@@ -168,18 +168,18 @@ func testit3_throwing(_ b: Bool) -> Int {
 	}
 }
 
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSr5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericfQ_Q_ : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int {
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSr5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericurfxx : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int {
 // CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : $Bool, %3 : $@box Int):
 // CHECK: [[LD:%[0-9]+]] = load %1 : $*Int
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericfQ_Q_ : $@convention(thin) (Int, Bool, @owned @box Int) -> Int
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericurfxx : $@convention(thin) (Int, Bool, @owned @box Int) -> Int
 // CHECK: [[RET:%[0-9]+]] = apply [[F]]([[LD]], %2, %3) : $@convention(thin) (Int, Bool, @owned @box Int) -> Int
 // CHECK: store [[RET]] to %0 : $*Int
 // CHECK: return %{{[0-9]*}} : $()
 
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSr5Si___TFF4test25generic_get_func_throwingurFSbFzxxL_7genericfzQ_Q_ : $@convention(thin) (@in Int, Bool) -> (@out Int, @error ErrorProtocol) {
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSr5Si___TFF4test25generic_get_func_throwingurFSbFzxxL_7genericurfzxx : $@convention(thin) (@in Int, Bool) -> (@out Int, @error ErrorProtocol) {
 // CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : $Bool):
 // CHECK: [[LD:%[0-9]+]] = load %1 : $*Int
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TFF4test25generic_get_func_throwingurFSbFzxxL_7genericfzQ_Q_ : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol)
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TFF4test25generic_get_func_throwingurFSbFzxxL_7genericurfzxx : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol)
 // CHECK: try_apply [[F]]([[LD]], %2) : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol), normal bb1, error bb2
 // CHECK: bb1([[NORMAL:%[0-9]+]] : $Int):
 // CHECK: store [[NORMAL]] to %0 : $*Int

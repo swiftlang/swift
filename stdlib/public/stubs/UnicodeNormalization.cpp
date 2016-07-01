@@ -93,7 +93,7 @@ private:
     for (unsigned char c = 0; c < 128; ++c) {
       UErrorCode ErrorCode = U_ZERO_ERROR;
       intptr_t NumCollationElts = 0;
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(_MSC_VER)
       UChar Buffer[1];
 #else
       uint16_t Buffer[1];
@@ -134,7 +134,7 @@ swift::_swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
                                                  int32_t LeftLength,
                                                  const uint16_t *RightString,
                                                  int32_t RightLength) {
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(_MSC_VER)
   // ICU UChar type is platform dependent. In Cygwin, it is defined
   // as wchar_t which size is 2. It seems that the underlying binary
   // representation is same with swift utf16 representation.
@@ -163,7 +163,7 @@ swift::_swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
   uiter_setUTF8(&LeftIterator, LeftString, LeftLength);
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(_MSC_VER)
   uiter_setString(&RightIterator, reinterpret_cast<const UChar *>(RightString),
                   RightLength);
 #else
@@ -220,7 +220,7 @@ swift::_swift_stdlib_unicode_compare_utf8_utf8(const char *LeftString,
 static intptr_t hashChunk(const UCollator *Collator, intptr_t HashState,
                           const uint16_t *Str, uint32_t Length,
                           UErrorCode *ErrorCode) {
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(_MSC_VER)
   UCollationElements *CollationIterator = ucol_openElements(
     Collator, reinterpret_cast<const UChar *>(Str), Length, ErrorCode);
 #else
@@ -300,7 +300,7 @@ swift::_swift_stdlib_unicode_strToUpper(uint16_t *Destination,
                                         const uint16_t *Source,
                                         int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(_MSC_VER)
   uint32_t OutputLength = u_strToUpper(reinterpret_cast<UChar *>(Destination),
                                        DestinationCapacity,
                                        reinterpret_cast<const UChar *>(Source),
@@ -327,7 +327,7 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
                                         const uint16_t *Source,
                                         int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(_MSC_VER)
   uint32_t OutputLength = u_strToLower(reinterpret_cast<UChar *>(Destination),
                                        DestinationCapacity,
                                        reinterpret_cast<const UChar *>(Source),

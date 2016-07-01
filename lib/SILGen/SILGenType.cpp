@@ -91,9 +91,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);
   auto thunk =
-      M.createFunction(makeModuleFragile
-                           ? SILLinkage::Public
-                           : SILLinkage::Private,
+      M.createFunction(SILLinkage::Private,
                        name, overrideInfo.SILFnType,
                        derivedDecl->getGenericParams(), loc, IsBare,
                        IsNotTransparent, IsNotFragile);
@@ -243,8 +241,9 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    // Stub constructors don't get an entry.
-    if (cd->hasStubImplementation())
+    // Stub constructors don't get an entry, unless they were synthesized to
+    // override a non-required designated initializer in the superclass.
+    if (cd->hasStubImplementation() && !cd->getOverriddenDecl())
       return;
 
     // Required constructors (or overrides thereof) have their allocating entry

@@ -123,3 +123,12 @@ static int _value = 0;
 
 #endif
 
+@implementation BridgedInitializer
+- (id) initWithArray: (NSArray*) array {
+  _objects = array;
+  return self;
+}
+- (NSInteger) count {
+  return _objects.count;
+}
+@end

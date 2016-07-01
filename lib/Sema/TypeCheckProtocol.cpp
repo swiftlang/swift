@@ -1718,7 +1718,7 @@ diagnoseMatch(TypeChecker &tc, Module *module,
     fixDeclarationName(diag, match.Witness, req->getFullName());
 
     // Also fix the Objective-C name, if needed.
-    if (req->isObjC())
+    if (!match.Witness->canInferObjCFromRequirement(req))
       fixDeclarationObjCName(diag, match.Witness, req->getObjCRuntimeName());
     break;
   }
@@ -1733,11 +1733,14 @@ diagnoseMatch(TypeChecker &tc, Module *module,
     // about them.
     break;
 
-  case MatchKind::TypeConflict:
-    tc.diagnose(match.Witness, diag::protocol_witness_type_conflict,
-                getTypeForDisplay(tc, module, match.Witness),
-                withAssocTypes);
+  case MatchKind::TypeConflict: {
+    auto diag = tc.diagnose(match.Witness, diag::protocol_witness_type_conflict,
+                            getTypeForDisplay(tc, module, match.Witness),
+                            withAssocTypes);
+    if (!isa<TypeDecl>(req))
+      fixItOverrideDeclarationTypes(tc, diag, match.Witness, req);
     break;
+  }
 
   case MatchKind::ThrowsConflict:
     tc.diagnose(match.Witness, diag::protocol_witness_throws_conflict);
@@ -1804,15 +1807,21 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   SmallVector<ProtocolConformanceRef, 4> conformances;
 
   bool isError = replacement->is<ErrorType>();
-  for (auto proto : archetype->getConformsTo()) {
-    ProtocolConformance *conformance = nullptr;
-    bool conforms = tc.conformsToProtocol(replacement, proto, dc, None,
-                                          &conformance);
-    assert((conforms || isError) &&
-           "Conformance should already have been verified");
-    (void)isError;
-    (void)conforms;
-    conformances.push_back(ProtocolConformanceRef(proto, conformance));
+  assert((archetype != nullptr || isError) &&
+         "Should have built archetypes already");
+
+  // FIXME: Turn the nullptr check into an assertion
+  if (archetype != nullptr) {
+    for (auto proto : archetype->getConformsTo()) {
+      ProtocolConformance *conformance = nullptr;
+      bool conforms = tc.conformsToProtocol(replacement, proto, dc, None,
+                                            &conformance);
+      assert((conforms || isError) &&
+             "Conformance should already have been verified");
+      (void)isError;
+      (void)conforms;
+      conformances.push_back(ProtocolConformanceRef(proto, conformance));
+    }
   }
 
   return Substitution{
@@ -2805,9 +2814,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // Track when we are checking type witnesses.
   ProtocolConformanceState initialState = Conformance->getState();
   Conformance->setState(ProtocolConformanceState::CheckingTypeWitnesses);
-  defer {
-    Conformance->setState(initialState);
-  };
+  SWIFT_DEFER { Conformance->setState(initialState); };
 
   for (auto member : Proto->getMembers()) {
     auto assocType = dyn_cast<AssociatedTypeDecl>(member);
@@ -3134,7 +3141,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
       valueWitnesses.push_back({inferredReq.first, witnessReq.Witness});
       if (witnessReq.Witness->getDeclContext()->getAsProtocolExtensionContext())
         ++numValueWitnessesInProtocolExtensions;
-      defer {
+      SWIFT_DEFER {
         if (witnessReq.Witness->getDeclContext()->getAsProtocolExtensionContext())
           --numValueWitnessesInProtocolExtensions;
         valueWitnesses.pop_back();
@@ -3518,7 +3525,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   // Note that we're resolving this witness.
   assert(ResolvingWitnesses.count(requirement) == 0 && "Currently resolving");
   ResolvingWitnesses.insert(requirement);
-  defer { ResolvingWitnesses.erase(requirement); };
+  SWIFT_DEFER { ResolvingWitnesses.erase(requirement); };
 
   // Make sure we've validated the requirement.
   if (!requirement->hasType())
@@ -3645,6 +3652,10 @@ void ConformanceChecker::checkConformance() {
     if (isa<TypeAliasDecl>(requirement))
       continue;
 
+    // Nominal types nested inside protocols are not requirements.
+    if (isa<NominalTypeDecl>(requirement))
+      continue;
+
     /// Local function to finalize the witness.
     auto finalizeWitness = [&] {
       // Find the witness.
@@ -3653,6 +3664,7 @@ void ConformanceChecker::checkConformance() {
 
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&
+          requirement->getFullName() == witness->getFullName() &&
           !requirement->getAttrs().isUnavailable(TC.Context)) {
         // The witness must also be @objc.
         if (!witness->isObjC()) {
@@ -3665,9 +3677,11 @@ void ConformanceChecker::checkConformance() {
                                                : diag::witness_non_objc,
                                     diagInfo.first, diagInfo.second,
                                     Proto->getFullName());
-            fixDeclarationObjCName(
-              diag, witness,
-              cast<AbstractFunctionDecl>(requirement)->getObjCSelector());
+            if (!witness->canInferObjCFromRequirement(requirement)) {
+              fixDeclarationObjCName(
+                diag, witness,
+                cast<AbstractFunctionDecl>(requirement)->getObjCSelector());
+            }
           } else if (isa<VarDecl>(witness)) {
             auto diag = TC.diagnose(witness,
                                     isOptional
@@ -3676,10 +3690,13 @@ void ConformanceChecker::checkConformance() {
                                     /*isSubscript=*/false,
                                     witness->getFullName(),
                                     Proto->getFullName());
-            fixDeclarationObjCName(
-               diag, witness,
-               ObjCSelector(requirement->getASTContext(), 0,
-                            cast<VarDecl>(requirement)->getObjCPropertyName()));
+            if (!witness->canInferObjCFromRequirement(requirement)) {
+              fixDeclarationObjCName(
+                 diag, witness,
+                 ObjCSelector(requirement->getASTContext(), 0,
+                              cast<VarDecl>(requirement)
+                                ->getObjCPropertyName()));
+            }
           } else if (isa<SubscriptDecl>(witness)) {
             TC.diagnose(witness,
                         isOptional
@@ -3912,7 +3929,7 @@ checkConformsToProtocol(TypeChecker &TC,
 
   // Note that we are checking this conformance now.
   conformance->setState(ProtocolConformanceState::Checking);
-  defer { conformance->setState(ProtocolConformanceState::Complete); };
+  SWIFT_DEFER { conformance->setState(ProtocolConformanceState::Complete); };
 
   // If the protocol itself is invalid, there's nothing we can do.
   if (Proto->isInvalid()) {
@@ -3931,14 +3948,26 @@ checkConformsToProtocol(TypeChecker &TC,
   // Foreign classes cannot conform to objc protocols.
   if (Proto->isObjC() &&
       !Proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-    if (auto clas = canT->getClassOrBoundGenericClass())
-      if (clas->isForeign()) {
-        TC.diagnose(ComplainLoc,
-                    diag::foreign_class_cannot_conform_to_objc_protocol,
+    if (auto clas = canT->getClassOrBoundGenericClass()) {
+      Optional<decltype(diag::cf_class_cannot_conform_to_objc_protocol)>
+          diagKind;
+      switch (clas->getForeignClassKind()) {
+      case ClassDecl::ForeignKind::Normal:
+        break;
+      case ClassDecl::ForeignKind::CFType:
+        diagKind = diag::cf_class_cannot_conform_to_objc_protocol;
+        break;
+      case ClassDecl::ForeignKind::RuntimeOnly:
+        diagKind = diag::objc_runtime_visible_cannot_conform_to_objc_protocol;
+        break;
+      }
+      if (diagKind) {
+        TC.diagnose(ComplainLoc, diagKind.getValue(),
                     T, Proto->getDeclaredType());
         conformance->setInvalid();
         return conformance;
       }
+    }
   }
 
   // If the protocol contains missing requirements, it can't be conformed to
@@ -4235,11 +4264,11 @@ static unsigned scorePotentiallyMatchingNames(DeclName lhs, DeclName rhs,
 }
 
 /// Apply omit-needless-words to the given declaration, if possible.
-static Optional<DeclName> omitNeedlessWords(ValueDecl *value) {
+static Optional<DeclName> omitNeedlessWords(TypeChecker &tc, ValueDecl *value) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    return swift::omitNeedlessWords(func);
+    return tc.omitNeedlessWords(func);
   if (auto var = dyn_cast<VarDecl>(value)) {
-    if (auto newName = swift::omitNeedlessWords(var))
+    if (auto newName = tc.omitNeedlessWords(var))
       return DeclName(*newName);
     return None;
   }
@@ -4247,15 +4276,15 @@ static Optional<DeclName> omitNeedlessWords(ValueDecl *value) {
 }
 
 /// Determine the score between two potentially-matching declarations.
-static unsigned scorePotentiallyMatching(ValueDecl *req, ValueDecl *witness,
-                                         unsigned limit) {
+static unsigned scorePotentiallyMatching(TypeChecker &tc, ValueDecl *req,
+                                         ValueDecl *witness, unsigned limit) {
   DeclName reqName = req->getFullName();
   DeclName witnessName = witness->getFullName();
 
   // Apply the omit-needless-words heuristics to both names.
-  if (auto adjustedReqName = ::omitNeedlessWords(req))
+  if (auto adjustedReqName = ::omitNeedlessWords(tc, req))
     reqName = *adjustedReqName;
-  if (auto adjustedWitnessName = ::omitNeedlessWords(witness))
+  if (auto adjustedWitnessName = ::omitNeedlessWords(tc, witness))
     witnessName = *adjustedWitnessName;
 
   return scorePotentiallyMatchingNames(reqName, witnessName, isa<FuncDecl>(req),
@@ -4412,7 +4441,8 @@ static void diagnosePotentialWitness(TypeChecker &tc,
     // Special case: note to add @objc.
     auto diag = tc.diagnose(witness,
                             diag::optional_req_nonobjc_near_match_add_objc);
-    fixDeclarationObjCName(diag, witness, req->getObjCRuntimeName());
+    if (!witness->canInferObjCFromRequirement(req))
+      fixDeclarationObjCName(diag, witness, req->getObjCRuntimeName());
   } else {
     diagnoseMatch(tc, conformance->getDeclContext()->getParentModule(),
                   conformance, req, match);
@@ -4576,7 +4606,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         if (req->getAttrs().isUnavailable(Context)) continue;
 
         // Score this particular optional requirement.
-        auto score = scorePotentiallyMatching(req, value, bestScore);
+        auto score = scorePotentiallyMatching(*this, req, value, bestScore);
 
         // If the score is better than the best we've seen, update the best
         // and clear out the list.
@@ -4864,9 +4894,9 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
   auto genericSig = protocolExtension->getGenericSignature();
   
-  cs.openGeneric(protocolExtension, genericSig->getGenericParams(),
+  cs.openGeneric(protocolExtension, protocolExtension,
+                 genericSig->getGenericParams(),
                  genericSig->getRequirements(), false,
-                 protocolExtension->getGenericTypeContextDepth(),
                  ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type variable to the provided type.

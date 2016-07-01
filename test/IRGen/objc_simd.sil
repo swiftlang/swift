@@ -22,6 +22,7 @@ func forceStuff(x: float4, y: float3) -> (Float, Float, Float, Float) {
 // armv7k-LABEL: define{{( protected)?}} <4 x float> @simd_c_args(<4 x float>)
 // powerpc64-LABEL: define{{( protected)?}} <4 x float> @simd_c_args(<4 x float>)
 // powerpc64le-LABEL: define{{( protected)?}} <4 x float> @simd_c_args(<4 x float>)
+// s390x-LABEL: define{{( protected)?}} <4 x float> @simd_c_args(<4 x float>)
 sil @simd_c_args : $@convention(c) (float4) -> float4 {
 entry(%x : $float4):
   return %x : $float4
@@ -36,6 +37,7 @@ entry(%x : $float4):
 // armv7k-LABEL: define{{( protected)?}} <3 x float> @simd_c_args_float3(<4 x i32>)
 // powerpc64-LABEL: define{{( protected)?}} <3 x float> @simd_c_args_float3(<3 x float>)
 // powerpc64le-LABEL: define{{( protected)?}} <3 x float> @simd_c_args_float3(<3 x float>)
+// s390x-LABEL: define{{( protected)?}} <3 x float> @simd_c_args_float3(<3 x float>)
 sil @simd_c_args_float3 : $@convention(c) (float3) -> float3 {
 entry(%x : $float3):
 // x86_64: [[COERCE:%.*]] = alloca <3 x float>, align 16
@@ -53,6 +55,7 @@ entry(%x : $float3):
 // armv7k-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
 // powerpc64-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
 // powerpc64le-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
+// s390x-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
 sil @simd_native_args : $@convention(thin) (float4) -> float4 {
 entry(%x : $float4):
   %f = function_ref @simd_c_args : $@convention(c) (float4) -> float4
@@ -69,6 +72,7 @@ entry(%x : $float4):
 // armv7k-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
 // powerpc64-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
 // powerpc64le-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
+// s390x-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
 sil @simd_native_args_float3 : $@convention(thin) (float3) -> float3 {
 entry(%x : $float3):
   %f = function_ref @simd_c_args_float3 : $@convention(c) (float3) -> float3

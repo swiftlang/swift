@@ -1,9 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/ArrayTraps.swift
-// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out
-//
-// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -555,7 +550,6 @@ final class EvilSequence : Sequence {
     return _count
   }
 
-  @warn_unused_result
   func makeIterator() -> AnyIterator<LifetimeTracked> {
     var i = 0
     return AnyIterator {

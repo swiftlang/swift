@@ -1,11 +1,11 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/FixedPointArithmeticTraps.swift
-// RUN: %S/../../utils/line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Debug
-// RUN: %S/../../utils/line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Release -O
+// RUN: %gyb %s -o %t/FixedPointArithmeticTraps.swift
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Debug
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Release -O
 //
-// RUN: %S/../../utils/line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Debug
-// RUN: %S/../../utils/line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Release
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Debug
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Release
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -298,70 +298,6 @@ FixedPointArithmeticTraps.test("${description}/${IntTy}/Max") {
 // <rdar://problem/17548877> gyb miscompiles a certain for loop
 
 % end
-
-// FIXME: these tests should be more thorough, and test all combinations of
-// types and error conditions.
-var FixedPointTruncationTraps = TestSuite("FixedPointTruncationTraps")
-
-FixedPointTruncationTraps.test("SignedToSignedTruncation/dest=sign-overflow") {
-  // Test that we check if we overflow on the sign bit.
-  var x = getInt16(128)
-  expectCrashLater()
-  var result = Int8(x)
-  _blackHole(result)
-}
-
-FixedPointTruncationTraps.test("SignedToUnsignedTruncation/src=-1") {
-  var x = getInt32(-1)
-  expectCrashLater()
-  var result = UInt8(x)
-  _blackHole(result)
-}
-
-FixedPointTruncationTraps.test("SignedToUnsignedSameSize/src=min") {
-  var x = getInt8(-128)
-  expectCrashLater()
-  var result = UInt16(x)
-  _blackHole(result)
-}
-
-
-FixedPointTruncationTraps.test("SignedToUnsignedTruncation/src=max") {
-  var x = getInt32(0xFFFFFFF)
-  expectCrashLater()
-  var result = UInt16(x)
-  _blackHole(result)
-}
-
-FixedPointTruncationTraps.test("UnsignedToSignedTruncation/dest=sign-overflow") {
-  // Test that we check if we overflow on the sign bit.
-  var x = getUInt16(128)
-  expectCrashLater()
-  var result = Int8(x)
-  _blackHole(result)
-}
-
-FixedPointTruncationTraps.test("UnsignedToUnsignedTruncation/src=max") {
-  var x = getUInt32(0xFFFFFFFF)
-  expectCrashLater()
-  var result = UInt16(x)
-  _blackHole(result)
-}
-
-// Same size conversions.
-FixedPointTruncationTraps.test("SignedToUnsignedSameSize") {
-  var x = getInt8(-2)
-  expectCrashLater()
-  var result = UInt8(x)
-  _blackHole(result)
-}
-
-FixedPointTruncationTraps.test("UnsignedToSignedSameSize") {
-  var x = getUInt8(128)
-  expectCrashLater()
-  var result = Int8(x)
-  _blackHole(result)
-}
 
 runAllTests()
 

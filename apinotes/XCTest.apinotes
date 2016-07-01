@@ -1,0 +1,27 @@
+---
+Name: XCTest
+Classes:
+- Name: XCTestSuiteRun
+  Methods:
+  - Selector: 'addTestRun:'
+    MethodKind: Instance
+    SwiftName: 'addTestRun(_:)'
+- Name: XCUIElementQuery
+  Methods:
+  - Selector: 'matchingPredicate:'
+    MethodKind: Instance
+    SwiftName: 'matching(_:)'
+  - Selector: 'matchingType:identifier:'
+    MethodKind: Instance
+    SwiftName: 'matching(_:identifier:)'
+  - Selector: 'matchingIdentifier:'
+    MethodKind: Instance
+    SwiftName: 'matching(identifier:)'
+- Name: XCTestCase
+  Methods:
+  - Selector: 'waitForExpectationsWithTimeout:handler:'
+    MethodKind: Instance
+    SwiftName: 'waitForExpectations(timeout:handler:)'
+  - Selector: 'expectationWithDescription:'
+    MethodKind: Instance
+    SwiftName: 'expectation(description:)'

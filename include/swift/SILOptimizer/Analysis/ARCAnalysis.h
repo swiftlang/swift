@@ -189,6 +189,9 @@ private:
   ExitKind Kind;
   llvm::SmallMapVector<SILArgument *, ReleaseList, 8> ArgInstMap;
 
+  /// Set to true if we found some releases but not all for the argument.
+  llvm::DenseSet<SILArgument *> FoundSomeReleases;
+
   /// Eventually this will be used in place of HasBlock.
   SILBasicBlock *ProcessedBlock;
 
@@ -238,6 +241,12 @@ public:
         return true;
     }
     return false;
+  }
+
+  /// Return true if we've found some epilogue releases for the argument
+  /// but not all.
+  bool hasSomeReleasesForArgument(SILArgument *Arg) {
+    return FoundSomeReleases.find(Arg) != FoundSomeReleases.end();
   }
 
   bool isSingleRelease(SILArgument *Arg) const {

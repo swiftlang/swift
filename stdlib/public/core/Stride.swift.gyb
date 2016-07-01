@@ -44,6 +44,12 @@ public protocol ${Self} : ${Conformance} {
   /// - Complexity: O(1).
   func advanced(by n: Stride) -> Self
 
+  /// `_step` is an implementation detail of Strideable; do not use it directly.
+  static func _step(
+    after current: (index: Int?, value: Self),
+    from start: Self, by distance: Self.Stride
+  ) -> (index: Int?, value: Self)
+
   associatedtype _DisabledRangeIndex = _DisabledRangeIndex_
 }
 
@@ -125,20 +131,54 @@ public func -= <T : UnsignedInteger>(
 
 //===----------------------------------------------------------------------===//
 
-/// An iterator for the result of `stride(from:to:)`.
+extension Strideable {
+  public static func _step(
+    after current: (index: Int?, value: Self),
+    from start: Self, by distance: Self.Stride
+  ) -> (index: Int?, value: Self) {
+    return (nil, current.value + distance)
+  }
+}
+
+extension Strideable where Stride : FloatingPoint {
+  public static func _step(
+    after current: (index: Int?, value: Self),
+    from start: Self, by distance: Self.Stride
+  ) -> (index: Int?, value: Self) {
+    if let i = current.index {
+      return (i + 1, start + Stride(i + 1) * distance)
+    }
+    // If current.index == nil, either we're just starting out (in which case
+    // the next index is 1), or we should proceed without an index just as
+    // though this floating point specialization doesn't exist.
+    return (current.value == start ? 1 : nil, current.value + distance)
+  }
+}
+
+/// An iterator for `StrideTo<Element>`.
 public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
-  internal var _current: Element
+  internal let _start: Element
   internal let _end: Element
   internal let _stride: Element.Stride
+  internal var _current: (index: Int?, value: Element)
 
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
+  internal init(_start: Element, end: Element, stride: Element.Stride) {
+    self._start = _start
+    _end = end
+    _stride = stride
+    _current = (nil, _start)
+  }
+
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
-    if _stride > 0 ? _current >= _end : _current <= _end {
+    let result = _current.value
+    if _stride > 0 ? result >= _end : result <= _end {
       return nil
     }
-    let result = _current
-    _current += _stride
+    _current = Element._step(after: _current, from: _start, by: _stride)
     return result
   }
 }
@@ -151,12 +191,12 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   ///
   /// - Complexity: O(1).
   public func makeIterator() -> StrideToIterator<Element> {
-    return StrideToIterator(_current: _start, _end: _end, _stride: _stride)
+    return StrideToIterator(_start: _start, end: _end, stride: _stride)
   }
 
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "stride size must not be zero")
-    // Unreachable endpoints are allowed; they just make for an
+    // At start, striding away from end is allowed; it just makes for an
     // already-empty Sequence.
     self._start = _start
     self._end = end
@@ -173,36 +213,46 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
 }
 
 /// Returns the sequence of values (`self`, `self + stride`, `self +
-/// stride + stride`, ... *last*) where *last* is the last value in
-/// the progression that is less than `end`.
+/// 2 * stride`, ... *last*) where *last* is the last value in the
+/// progression that is less than `end`.
 public func stride<T : Strideable>(
   from start: T, to end: T, by stride: T.Stride
 ) -> StrideTo<T> {
   return StrideTo(_start: start, end: end, stride: stride)
 }
 
-/// An `IteratorProtocol` for `StrideThrough<Element>`.
+/// An iterator for `StrideThrough<Element>`.
 public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
-  internal var _current: Element
+  internal let _start: Element
   internal let _end: Element
   internal let _stride: Element.Stride
+  internal var _current: (index: Int?, value: Element)
   internal var _done: Bool = false
 
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
+  internal init(_start: Element, end: Element, stride: Element.Stride) {
+    self._start = _start
+    _end = end
+    _stride = stride
+    _current = (nil, _start)
+  }
+
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
     if _done {
       return nil
     }
-    if _stride > 0 ? _current >= _end : _current <= _end {
-      if _current == _end {
+    let result = _current.value
+    if _stride > 0 ? result >= _end : result <= _end {
+      if result == _end {
         _done = true
-        return _current
+        return result
       }
       return nil
     }
-    let result = _current
-    _current += _stride
+    _current = Element._step(after: _current, from: _start, by: _stride)
     return result
   }
 }
@@ -217,8 +267,7 @@ public struct StrideThrough<
   ///
   /// - Complexity: O(1).
   public func makeIterator() -> StrideThroughIterator<Element> {
-    return StrideThroughIterator(
-      _current: _start, _end: _end, _stride: _stride, _done: false)
+    return StrideThroughIterator(_start: _start, end: _end, stride: _stride)
   }
 
   internal init(_start: Element, end: Element, stride: Element.Stride) {
@@ -239,8 +288,8 @@ public struct StrideThrough<
 }
 
 /// Returns the sequence of values (`self`, `self + stride`, `self +
-/// stride + stride`, ... *last*) where *last* is the last value in
-/// the progression less than or equal to `end`.
+/// 2 * stride`, ... *last*) where *last* is the last value in the
+/// progression less than or equal to `end`.
 ///
 /// - Note: There is no guarantee that `end` is an element of the sequence.
 public func stride<T : Strideable>(

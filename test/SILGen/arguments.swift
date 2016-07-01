@@ -52,7 +52,6 @@ func arg_default_tuple(x x: Int = i, y: Float = f) {}
 arg_default_tuple()
 arg_default_tuple(x:i)
 arg_default_tuple(y:f)
-arg_default_tuple(y:f, x:i)
 arg_default_tuple(x:i, y:f)
 
 

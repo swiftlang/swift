@@ -98,7 +98,7 @@ internal func _roundUp<T, DestinationType>(
   return UnsafeMutablePointer<DestinationType>(
     bitPattern: _roundUpImpl(
       UInt(bitPattern: pointer),
-      toAlignment: alignof(DestinationType))
+      toAlignment: alignof(DestinationType.self))
   ).unsafelyUnwrapped
 }
 
@@ -393,6 +393,19 @@ internal var _objectPointerLowSpareBitShift: UInt {
 @_versioned
 internal var _objCTaggedPointerBits: UInt {
     @inline(__always) get { return 0 }
+}
+#elseif arch(s390x)
+internal var _objectPointerSpareBits: UInt {
+  @inline(__always) get { return 0x0000_0000_0000_0007 }
+}
+internal var _objectPointerIsObjCBit: UInt {
+  @inline(__always) get { return 0x0000_0000_0000_0002 }
+}
+internal var _objectPointerLowSpareBitShift: UInt {
+  @inline(__always) get { return 0 }
+}
+internal var _objCTaggedPointerBits: UInt {
+  @inline(__always) get { return 0 }
 }
 #endif
 

@@ -3,7 +3,7 @@
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
-#if os(Linux) || os(FreeBSD)
+#if os(Linux) || os(FreeBSD) || os(Android)
   import Glibc
 #else
   import Darwin

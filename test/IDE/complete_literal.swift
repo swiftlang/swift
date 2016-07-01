@@ -3,6 +3,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL3 | FileCheck %s -check-prefix=LITERAL3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL4 | FileCheck %s -check-prefix=LITERAL4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL5 | FileCheck %s -check-prefix=LITERAL5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL6 | FileCheck %s -check-prefix=LITERAL6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL7 | FileCheck %s -check-prefix=LITERAL7
 
 {
   1.#^LITERAL1^#
@@ -59,3 +61,19 @@ func giveMeAString() -> Int {
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#contentsOf: S#})[#Void#]{{; name=.+$}}
+
+struct MyColor: _ColorLiteralConvertible {
+  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) { red = colorLiteralRed }
+  var red: Float
+}
+public typealias _ColorLiteralType = MyColor
+func testColor11() {
+  let y: MyColor
+  y = #colorLiteral(red: 1.0, green: 0.1, blue: 0.5, alpha: 1.0).#^LITERAL6^#
+}
+// LITERAL6: Decl[InstanceVar]/CurrNominal:      red[#Float#]; name=red
+func testColor12() {
+  let y: MyColor
+  y = #colorLiteral(red: 1.0, green: 0.1, blue: 0.5, alpha: 1.0) #^LITERAL7^#
+}
+// LITERAL7: Decl[InstanceVar]/CurrNominal:      .red[#Float#]; name=red

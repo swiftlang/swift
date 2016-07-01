@@ -1732,13 +1732,12 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
 GenericParamList *
 TypeConverter::getEffectiveGenericParams(AnyFunctionRef fn,
                                          CaptureInfo captureInfo) {
-  auto dc = fn.getAsDeclContext()->getParent();
+  auto dc = fn.getAsDeclContext();
 
-  if (dc->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures()) {
+  if (dc->getParent()->isLocalContext() &&
+      !captureInfo.hasGenericParamCaptures())
     return nullptr;
-  }
-  
+
   return dc->getGenericParamsOfContext();
 }
 
@@ -1747,14 +1746,9 @@ TypeConverter::getEffectiveGenericSignature(AnyFunctionRef fn,
                                             CaptureInfo captureInfo) {
   auto dc = fn.getAsDeclContext();
 
-  // If this is a non-generic local function that does not capture any
-  // generic type parameters from the outer context, don't need a
-  // signature at all.
-  if (!dc->isInnermostContextGeneric() &&
-      dc->getParent()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures()) {
+  if (dc->getParent()->isLocalContext() &&
+      !captureInfo.hasGenericParamCaptures())
     return nullptr;
-  }
 
   if (auto sig = dc->getGenericSignatureOfContext())
     return sig->getCanonicalSignature();
@@ -1773,33 +1767,41 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   CanGenericSignature genericSig = getEffectiveGenericSignature(theClosure,
                                                                 captureInfo);
 
+  auto innerExtInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
+                                               funcType->isNoReturn(),
+                                               funcType->throws());
+
   // If we don't have any local captures (including function captures),
   // there's no context to apply.
   if (!theClosure.getCaptureInfo().hasLocalCaptures()) {
     if (!genericSig)
-      return adjustFunctionType(funcType,
-                                FunctionType::Representation::Thin);
+      return CanFunctionType::get(funcType.getInput(),
+                                  funcType.getResult(),
+                                  innerExtInfo);
     
-    auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                            funcType->isNoReturn(),
-                                            funcType->throws());
-
     return CanGenericFunctionType::get(genericSig,
                                        funcType.getInput(),
                                        funcType.getResult(),
-                                       extInfo);
+                                       innerExtInfo);
   }
+
+  // Strip the generic signature off the inner type; we will add it to the
+  // outer type with captures.
+  funcType = CanFunctionType::get(funcType.getInput(),
+                                  funcType.getResult(),
+                                  innerExtInfo);
 
   // Add an extra empty tuple level to represent the captures. We'll append the
   // lowered capture types here.
   auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
                                           /*noreturn*/ false,
-                                          funcType->throws());
+                                          /*throws*/ false);
 
-  if (genericSig)
+  if (genericSig) {
     return CanGenericFunctionType::get(genericSig,
                                        Context.TheEmptyTupleType, funcType,
                                        extInfo);
+  }
   
   return CanFunctionType::get(Context.TheEmptyTupleType, funcType, extInfo);
 }
@@ -1824,8 +1826,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
-      // TODO: Substitute out archetypes from the enclosing context with generic
-      // parameters.
+      // FIXME: Closures could have an interface type computed by Sema.
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       funcTy = cast<AnyFunctionType>(
           ArchetypeBuilder::mapTypeOutOfContext(ACE->getParent(), funcTy)
@@ -1836,10 +1837,6 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     FuncDecl *func = cast<FuncDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
                                   func->getInterfaceType()->getCanonicalType());
-    if (func->getParent() && func->getParent()->isLocalContext())
-      funcTy = cast<AnyFunctionType>(
-          ArchetypeBuilder::mapTypeOutOfContext(func->getParent(), funcTy)
-              ->getCanonicalType());
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
@@ -1901,22 +1898,6 @@ TypeConverter::getConstantContextGenericParams(SILDeclRef c) {
     FuncDecl *func = cast<FuncDecl>(vd);
     auto captureInfo = getLoweredLocalCaptures(func);
 
-    // FIXME: This is really weird:
-    // 1) For generic functions, generic methods and generic
-    // local functions, we return the function's generic
-    // parameter list twice.
-    // 2) For non-generic methods inside generic types, we
-    // return the generic type's parameters and nullptr.
-    // 3) For non-generic local functions, we return the
-    // outer function's parameters and nullptr.
-    //
-    // Local generic functions could probably be modeled better
-    // at the SIL level.
-    if (func->isInnermostContextGeneric() ||
-        func->getDeclContext()->isGenericTypeContext()) {
-      if (auto GP = func->getGenericParamsOfContext())
-        return {GP, func->getGenericParams()};
-    }
     return {getEffectiveGenericParams(func, captureInfo),
             func->getGenericParams()};
   }
@@ -2093,13 +2074,14 @@ getAnyFunctionRefFromCapture(CapturedValue capture) {
 CaptureInfo
 TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   // First, bail out if there are no local captures at all.
-  if (!fn.getCaptureInfo().hasLocalCaptures()) {
+  if (!fn.getCaptureInfo().hasLocalCaptures() &&
+      !fn.getCaptureInfo().hasDynamicSelfCapture()) {
     CaptureInfo info;
     info.setGenericParamCaptures(
         fn.getCaptureInfo().hasGenericParamCaptures());
     return info;
   };
-  
+
   // See if we've cached the lowered capture list for this function.
   auto found = LoweredCaptures.find(fn);
   if (found != LoweredCaptures.end())
@@ -2108,7 +2090,13 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
   llvm::SetVector<CapturedValue> captures;
+
+  // If there is a capture of 'self' with dynamic 'Self' type, it goes last so
+  // that IRGen can pass dynamic 'Self' metadata.
+  Optional<CapturedValue> selfCapture;
+
   bool capturesGenericParams = false;
+  DynamicSelfType *capturesDynamicSelf = nullptr;
   
   std::function<void (AnyFunctionRef)> collectFunctionCaptures
   = [&](AnyFunctionRef curFn) {
@@ -2117,6 +2105,8 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   
     if (curFn.getCaptureInfo().hasGenericParamCaptures())
       capturesGenericParams = true;
+    if (curFn.getCaptureInfo().hasDynamicSelfCapture())
+      capturesDynamicSelf = curFn.getCaptureInfo().getDynamicSelfType();
 
     SmallVector<CapturedValue, 4> localCaptures;
     curFn.getCaptureInfo().getLocalCaptures(localCaptures);
@@ -2127,7 +2117,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
         collectFunctionCaptures(*capturedFn);
         continue;
       }
-      
+
       // If the capture is of a computed property, grab the transitive captures
       // of its accessors.
       if (auto capturedVar = dyn_cast<VarDecl>(capture.getDecl())) {
@@ -2146,10 +2136,10 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           // Directly capture storage if we're supposed to.
           if (capture.isDirect())
             goto capture_value;
-            
+
           // Otherwise, transitively capture the accessors.
           SWIFT_FALLTHROUGH;
-          
+
         case VarDecl::Computed: {
           collectFunctionCaptures(capturedVar->getGetter());
           if (auto setter = capturedVar->getSetter())
@@ -2157,9 +2147,26 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           continue;
         }
 
-        case VarDecl::Stored:
+        case VarDecl::Stored: {
           // We can always capture the storage in these cases.
+          Type captureType;
+          if (auto *selfType = capturedVar->getType()->getAs<DynamicSelfType>()) {
+            captureType = selfType->getSelfType();
+            if (auto *metatypeType = captureType->getAs<MetatypeType>())
+              captureType = metatypeType->getInstanceType();
+
+            // We're capturing a 'self' value with dynamic 'Self' type;
+            // handle it specially.
+            if (!selfCapture &&
+                captureType->getClassOrBoundGenericClass()) {
+              selfCapture = capture;
+              continue;
+            }
+          }
+
+          // Otherwise just fall through.
           goto capture_value;
+        }
         }
       }
       
@@ -2169,12 +2176,23 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
     }
   };
   collectFunctionCaptures(fn);
-  
+
+  // If we captured the dynamic 'Self' type and we have a 'self' value also,
+  // add it as the final capture. Otherwise, add a fake hidden capture for
+  // the dynamic 'Self' metatype.
+  if (selfCapture.hasValue()) {
+    captures.insert(*selfCapture);
+  } else if (capturesDynamicSelf) {
+    selfCapture = CapturedValue::getDynamicSelfMetadata();
+    captures.insert(*selfCapture);
+  }
+
   // Cache the uniqued set of transitive captures.
   auto inserted = LoweredCaptures.insert({fn, CaptureInfo()});
   assert(inserted.second && "already in map?!");
   auto &cachedCaptures = inserted.first->second;
   cachedCaptures.setGenericParamCaptures(capturesGenericParams);
+  cachedCaptures.setDynamicSelfType(capturesDynamicSelf);
   cachedCaptures.setCaptures(Context.AllocateCopy(captures));
   
   return cachedCaptures;

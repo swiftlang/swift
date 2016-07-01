@@ -299,6 +299,12 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     }
 
     diagnose(Tok, diag::expected_identifier_for_type);
+
+    // If there is a keyword at the start of a new line, we won't want to
+    // skip it as a recovery but rather keep it.
+    if (Tok.isKeyword() && !Tok.isAtStartOfLine())
+      consumeToken();
+
     return nullptr;
   }
 
@@ -362,7 +368,8 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     // Lookup element #0 through our current scope chains in case it is some
     // thing local (this returns null if nothing is found).
     if (auto Entry = lookupInScope(ComponentsR[0]->getIdentifier()))
-      ComponentsR[0]->setValue(Entry);
+      if (isa<TypeDecl>(Entry))
+        ComponentsR[0]->setValue(Entry);
 
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }

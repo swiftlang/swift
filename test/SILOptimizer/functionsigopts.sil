@@ -42,7 +42,63 @@ struct lotsoffield {
   init()
 }
 
+struct goo {
+  var left : foo
+  var right : foo
+  var top : foo
+  var bottom : foo
+}
+
 sil @use_Int : $@convention(thin) (Int) -> ()
+
+
+// CHECK-LABEL: sil [thunk] [always_inline] @argument_with_incomplete_epilogue_release
+// CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $goo, #goo.top
+// CHECK: function_ref @_TTSf4g_n___TTSf4s__argument_with_incomplete_epilogue_release : $@convention(thin) (@guaranteed foo, @owned foo) -> ()
+// CHECK: release_value [[IN2]]
+sil @argument_with_incomplete_epilogue_release : $@convention(thin) (@owned goo) -> () {
+bb0(%0 : $goo):
+  // make inline costs = 2
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+
+
+  %1 = struct_extract %0 : $goo, #goo.top
+  %2 = ref_element_addr %1 : $foo, #foo.a
+  %3 = load %2 : $*Int
+  %4 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %4(%3) : $@convention(thin) (Int) -> ()
+
+  %5 = struct_extract %0 : $goo, #goo.bottom
+  %6 = ref_element_addr %5 : $foo, #foo.a
+  %7 = load %6 : $*Int
+  apply %4(%7) : $@convention(thin) (Int) -> ()
+
+  release_value %1 : $foo
+  %8 = tuple ()
+  return %8 : $()
+}
 
 // We do this check separately to ensure that this does not occur anywhere in
 // the output for the file. (Maybe this is an interesting enough feature to add to FileCheck?).
@@ -174,6 +230,7 @@ bb0(%0 : $boo):
   return %4 : $(Int, Int)
 }
 
+
 // CHECK-LABEL: sil [fragile] @dead_arg_no_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 // CHECK-NOT: function_ref @_TTSf4d_n__dead_arg_no_callsites
 sil [fragile] @dead_arg_no_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
@@ -221,7 +278,7 @@ bb3:
 //
 // CHECK-LABEL: sil [thunk] [always_inline] @exploded_release_to_dead_argument
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
-// CHECK: [[IN1:%.*]] = function_ref @_TTSf4dg__exploded_release_to_dead_argument 
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4d__exploded_release_to_dead_argument
 // CHECK: apply [[IN1]]()
 // CHECK: release_value [[INPUT_ARG0]] 
 sil @exploded_release_to_dead_argument : $@convention(thin) (@owned boo) -> () {
@@ -720,7 +777,13 @@ bb0(%0 : $boo):
   return %5 : $()
 }
 
-
+sil [fragile] @argument_with_incomplete_epilogue_release_callsite : $@convention(thin) (@owned goo) -> () {
+bb0(%0 : $goo):
+  %2 = function_ref @argument_with_incomplete_epilogue_release : $@convention(thin) (@owned goo) -> ()
+  %4 = apply %2(%0) : $@convention(thin) (@owned goo) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
 
 
 //========================================
@@ -1096,8 +1159,8 @@ bb3:
 
 // CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[INPUT_PTR1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR2:%.*]] : $Builtin.NativeObject):
-// CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
 // CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
+// CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   // make it a non-trivial function
@@ -1141,8 +1204,8 @@ bb2:
 
 // CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[INPUT_PTR1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR2:%.*]] : $Builtin.NativeObject):
-// CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
 // CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
+// CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   // make it a non-trivial function
@@ -1199,21 +1262,21 @@ bb2(%5 : $Builtin.NativeObject):
 // CHECK-NEXT: release_value [[INPUT_PTR_1]] : $Builtin.NativeObject
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
-// CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: release_value [[INPUT_PTR_2]]
+// CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
-// CHECK: release_value [[INPUT_PTR_2]]
 // CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: release_value [[INPUT_PTR_2]]
 
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
-// CHECK: release_value [[INPUT_PTR_2]]
 // CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: release_value [[INPUT_PTR_2]]
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
-// CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: release_value [[INPUT_PTR_2]]
+// CHECK: release_value [[INPUT_PTR_1]]
 
 sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
@@ -1369,8 +1432,6 @@ bb0(%0 : $Builtin.Int32):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @_TTSf4dg__exploded_release_to_dead_argument
-
 // CHECK-LABEL: sil @_TTSf4gs__exploded_release_to_guaranteed_param
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Int):
 // CHECK-NOT: strong_release
@@ -1387,9 +1448,6 @@ bb0(%0 : $Builtin.Int32):
 // CHECK: bb0
 // CHECK-NOT: retain_value
 // CHECK: return
-
-// CHECK-LABEL: sil [thunk] [always_inline] @_TTSf4s__single_owned_return_value_with_interfering_release : $@convention(thin) (@owned foo, @owned foo, Int) -> boo {
-// CHECK: retain_value
 
 // CHECK-LABEL: @_TTSfq4n_g_owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (boo, @error ErrorProtocol) {
 // CHECK: bb2

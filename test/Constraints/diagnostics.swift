@@ -164,7 +164,7 @@ func rdar20142523() {
 // <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, IntegerLiteralConvertible)' is not convertible to 'IntegerLiteralConvertible
 func rdar21080030() {
   var s = "Hello"
-  if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'IndexDistance'}}
+  if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'IndexDistance'}}{{24-26=}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -213,7 +213,7 @@ class r20201968C {
 
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(_ a : Int) {
-  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{value of type 'Int' can never be nil, comparison isn't allowed}}
+  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{type 'Int' is not optional, value can never be nil}}
 }
 
 
@@ -290,7 +290,7 @@ _ = { $0 }  // expected-error {{unable to infer closure return type in current c
 
 
 
-_ = 4()   // expected-error {{cannot call value of non-function type 'Int'}}
+_ = 4()   // expected-error {{cannot call value of non-function type 'Int'}}{{6-8=}}
 _ = 4(1)  // expected-error {{cannot call value of non-function type 'Int'}}
 
 
@@ -590,7 +590,7 @@ func r21684487() {
 func r18397777(_ d : r21447318?) {
   let c = r21447318()
 
-  if c != nil { // expected-error {{value of type 'r21447318' can never be nil, comparison isn't allowed}}
+  if c != nil { // expected-error {{type 'r21447318' is not optional, value can never be nil}}
   }
   
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
@@ -765,3 +765,19 @@ func r21523291(_ bytes : UnsafeMutablePointer<UInt8>) {
 }
 
 
+// SR-1594: Wrong error description when using === on non-class types
+class SR1594 {
+  func sr1594(bytes : UnsafeMutablePointer<Int>, _ i : Int?) {
+    _ = (i === nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15===}}
+    _ = (bytes === nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
+    _ = (self === nil) // expected-error {{type 'SR1594' is not optional, value can never be nil}}
+    _ = (i !== nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15=!=}}
+    _ = (bytes !== nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
+    _ = (self !== nil) // expected-error {{type 'SR1594' is not optional, value can never be nil}}
+  }
+}
+
+// FIXME: Bad diagnostic
+func secondArgumentNotLabeled(a:Int, _ b: Int) { }
+secondArgumentNotLabeled(10, 20)
+// expected-error@-1 {{unnamed parameter #1 must precede unnamed parameter #0}}

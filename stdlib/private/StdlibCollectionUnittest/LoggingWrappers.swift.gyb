@@ -463,9 +463,8 @@ public struct ${Self}<
     Log.initRepeating[selfType] += 1
   }
 
-  public init<
-    S : Sequence where S.Iterator.Element == Iterator.Element
-  >(_ elements: S) {
+  public init<S : Sequence>(_ elements: S)
+    where S.Iterator.Element == Iterator.Element {
     self.base = Base(elements)
     Log.initWithSequence[selfType] += 1
   }
@@ -485,9 +484,9 @@ public struct ${Self}<
     base.append(newElement)
   }
 
-  public mutating func append<
-    S : Sequence where S.Iterator.Element == Base.Iterator.Element
-  >(contentsOf newElements: S) {
+  public mutating func append<S : Sequence>(
+    contentsOf newElements: S
+  ) where S.Iterator.Element == Base.Iterator.Element {
     Log.appendContentsOf[selfType] += 1
     base.append(contentsOf: newElements)
   }
@@ -499,9 +498,9 @@ public struct ${Self}<
     base.insert(newElement, at: i)
   }
 
-  public mutating func insert<
-    C : Collection where C.Iterator.Element == Base.Iterator.Element
-  >(contentsOf newElements: C, at i: Index) {
+  public mutating func insert<C : Collection>(
+    contentsOf newElements: C, at i: Index
+  ) where C.Iterator.Element == Base.Iterator.Element {
     Log.insertContentsOf[selfType] += 1
     base.insert(contentsOf: newElements, at: i)
   }
@@ -534,11 +533,9 @@ public struct ${Self}<
     base.removeSubrange(bounds)
   }
 
-  public mutating func replaceSubrange<
-    C : Collection where C.Iterator.Element == Base.Iterator.Element
-  >(
+  public mutating func replaceSubrange<C : Collection>(
     _ bounds: Range<Index>, with newElements: C
-  ) {
+  ) where C.Iterator.Element == Base.Iterator.Element {
     Log.replaceSubrange[selfType] += 1
     base.replaceSubrange(bounds, with: newElements)
   }
@@ -572,36 +569,34 @@ public struct ${Self}<
 // Custom assertions
 //===----------------------------------------------------------------------===//
 
-public func expectCustomizable<
-  T : Wrapper where
-  T : LoggingType,
-  T.Base : Wrapper, T.Base : LoggingType,
-  T.Log == T.Base.Log
->(_: T, _ counters: TypeIndexed<Int>,
+public func expectCustomizable<T : Wrapper>(
+  _: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line
-) {
+) where
+  T : LoggingType,
+  T.Base : Wrapper, T.Base : LoggingType,
+  T.Log == T.Base.Log {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
   expectNotEqual(0, counters[T.self], message(), stackTrace: newTrace)
   expectEqual(
     counters[T.self], counters[T.Base.self], message(), stackTrace: newTrace)
 }
 
-public func expectNotCustomizable<
-  T : Wrapper where
-  T : LoggingType,
-  T.Base : Wrapper, T.Base : LoggingType,
-  T.Log == T.Base.Log
->(_: T, _ counters: TypeIndexed<Int>,
+public func expectNotCustomizable<T : Wrapper>(
+  _: T, _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line
-) {
+) where
+  T : LoggingType,
+  T.Base : Wrapper, T.Base : LoggingType,
+  T.Log == T.Base.Log {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
   expectNotEqual(0, counters[T.self], message(), stackTrace: newTrace)
   expectEqual(0, counters[T.Base.self], message(), stackTrace: newTrace)

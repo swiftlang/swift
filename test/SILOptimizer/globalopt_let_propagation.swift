@@ -36,6 +36,13 @@ struct IntWrapper4 {
   let val2: IntWrapper1
 }
 
+// Test with an initializer, where a SIL debug_value instruction might block
+// analysis of the initializer and inhibit optimization of the let.
+struct IntWrapper5 {
+  let val: Int
+  init(val: Int) { self.val = val }
+  static let Five = IntWrapper5(val: 5)
+}
 
 var PROP1: Double {
    return PI
@@ -307,11 +314,12 @@ public func test_static_struct_let_wrapped_int() -> Int {
 // CHECK: bb0:
 // CHECK-NOT: global_addr
 // CHECK: integer_literal
+// CHECK-NOT: global_addr
 // CHECK: struct
 // CHECK: return
 @inline(never)
 public func test_static_struct_let_struct_wrapped_multiple_ints() -> Int {
-  return B.IW4.val.val.val + B.IW4.val2.val + 1
+  return B.IW4.val.val.val + B.IW4.val2.val + IntWrapper5.Five.val + 1
 }
 
 // Test accessing multiple Int fields wrapped into multiple structs, where each struct may have
@@ -320,11 +328,12 @@ public func test_static_struct_let_struct_wrapped_multiple_ints() -> Int {
 // CHECK: bb0:
 // CHECK-NOT: global_addr
 // CHECK: integer_literal
+// CHECK-NOT: global_addr
 // CHECK: struct
 // CHECK: return
 @inline(never)
 public func test_static_class_let_struct_wrapped_multiple_ints() -> Int {
-  return C.IW4.val.val.val + C.IW4.val2.val + 1
+  return C.IW4.val.val.val + C.IW4.val2.val + IntWrapper5.Five.val + 1
 }
 
 // Test accessing multiple Int fields wrapped into multiple tuples, where each tuple may have

@@ -376,7 +376,7 @@ extension String.UTF16View.Index {
   /// specified `UTF8View` position.
   ///
   /// The following example finds the position of a space in a string's `utf8`
-  /// view and then converts that position to an index in the the string's
+  /// view and then converts that position to an index in the string's
   /// `utf16` view.
   ///
   ///     let cafe = "Café 🍵"
@@ -417,7 +417,7 @@ extension String.UTF16View.Index {
   /// specified `UnicodeScalarView` position.
   ///
   /// The following example finds the position of a space in a string's `utf8`
-  /// view and then converts that position to an index in the the string's
+  /// view and then converts that position to an index in the string's
   /// `utf16` view.
   ///
   ///     let cafe = "Café 🍵"
@@ -443,7 +443,7 @@ extension String.UTF16View.Index {
   /// specified `CharacterView` position.
   ///
   /// The following example finds the position of a space in a string's `characters`
-  /// view and then converts that position to an index in the the string's
+  /// view and then converts that position to an index in the string's
   /// `utf16` view.
   ///
   ///     let cafe = "Café 🍵"

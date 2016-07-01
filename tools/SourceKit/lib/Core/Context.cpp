@@ -16,10 +16,12 @@
 
 using namespace SourceKit;
 
-SourceKit::Context::Context(StringRef RuntimeLibPath)
-  : RuntimeLibPath(RuntimeLibPath),
-    SwiftLang(LangSupport::createSwiftLangSupport(*this)),
+SourceKit::Context::Context(StringRef RuntimeLibPath,
+    llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
+    LangSupportFactoryFn) : RuntimeLibPath(RuntimeLibPath),
     NotificationCtr(new NotificationCenter()) {
+  // Should be called last after everything is initialized.
+  SwiftLang = LangSupportFactoryFn(*this);
 }
 
 SourceKit::Context::~Context() {

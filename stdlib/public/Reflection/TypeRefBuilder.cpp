@@ -97,21 +97,20 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
   return nullptr;
 }
 
-std::vector<std::pair<std::string, const TypeRef *>> TypeRefBuilder::
-getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
+std::vector<FieldTypeInfo>
+TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
   if (FD == nullptr)
     return {};
 
   auto Subs = TR->getSubstMap();
 
-  std::vector<std::pair<std::string, const TypeRef *>> Fields;
+  std::vector<FieldTypeInfo> Fields;
   for (auto &Field : *FD) {
     auto FieldName = Field.getFieldName();
 
     // Empty cases of enums do not have a type
-    if (FD->Kind == FieldDescriptorKind::Enum &&
-        !Field.hasMangledTypeName()) {
-      Fields.push_back({FieldName, nullptr});
+    if (FD->isEnum() && !Field.hasMangledTypeName()) {
+      Fields.push_back(FieldTypeInfo::forEmptyCase(FieldName));
       continue;
     }
 
@@ -122,7 +121,13 @@ getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
       return {};
 
     auto Substituted = Unsubstituted->subst(*this, Subs);
-    Fields.push_back({FieldName, Substituted});
+
+    if (FD->isEnum() && Field.isIndirectCase()) {
+      Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName, Substituted));
+      continue;
+    }
+
+    Fields.push_back(FieldTypeInfo::forField(FieldName, Substituted));
   }
   return Fields;
 }

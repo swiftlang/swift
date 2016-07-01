@@ -1,0 +1,9 @@
+---
+Name: StoreKind
+Classes:
+- Name: SKPaymentQueue
+  Methods:
+  - Selector: 'resumeDownloads:'
+    MethodKind: Instance
+    SwiftName: 'resume(_:)'
+

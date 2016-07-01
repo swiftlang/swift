@@ -1,11 +1,14 @@
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/FloatingPoint.swift
-// RUN: %S/../../utils/line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %t/FloatingPoint.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
+// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/FloatingPoint.swift
+// RUN: %line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib %t/FloatingPoint.swift -o %t/a.out
+// RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
+
+%{
+from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
+}%
 
 import Swift
 import StdlibUnittest
-
 
 #if arch(i386) || arch(x86_64)
 
@@ -19,7 +22,7 @@ struct Float80Bits : Equatable, CustomStringConvertible {
   }
 
   var description: String {
-    return "(\(String(signAndExponent, radix: 16)) \(String(significand, radix: 16))))"
+    return "(\(String(signAndExponent, radix: 16)) \(String(significand, radix: 16)))"
   }
 }
 
@@ -51,6 +54,29 @@ extension Float80 {
 
 #endif
 
+% for (FloatTy, BitPatternTy) in [
+%   ('Float', 'UInt32'),
+%   ('Double', 'UInt64'),
+%   ('Float80', 'Float80Bits')
+% ]:
+%   if FloatTy == 'Float80':
+#if arch(i386) || arch(x86_64)
+%   end
+func expectBitwiseEqual(
+  _ expected: ${FloatTy}, _ actual: ${FloatTy}, ${TRACE}
+) {
+  expectEqual(expected.bitPattern, actual.bitPattern, ${trace})
+}
+func expectBitwiseEqual(
+  bitPattern expected: ${BitPatternTy}, _ actual: ${FloatTy}, ${TRACE}
+) {
+  expectBitwiseEqual(${FloatTy}(bitPattern: expected), actual, ${trace})
+}
+%   if FloatTy == 'Float80':
+#endif
+%   end
+% end
+
 var FloatingPoint = TestSuite("FloatingPoint")
 
 func positiveOne<T: IntegerLiteralConvertible>() -> T {
@@ -63,6 +89,33 @@ func negativeOne<T: IntegerLiteralConvertible>() -> T {
 FloatingPoint.test("Float/IntegerLiteralConvertible") {
   expectEqual(positiveOne(),  1.0 as Float)
   expectEqual(negativeOne(), -1.0 as Float)
+}
+
+FloatingPoint.test("Float/FloatLiteralConvertible") {
+  let x: Float = -0.0
+  expectBitwiseEqual(bitPattern: 0x8000_0000, x)
+}
+
+FloatingPoint.test("Float/staticProperties") {
+  typealias Ty = Float
+  // From the FloatingPoint protocol.
+  expectEqual(2, Ty.radix)
+  expectBitwiseEqual(bitPattern: 0x7fc0_0000, Ty.nan)
+  expectBitwiseEqual(bitPattern: 0x7fa0_0000, Ty.signalingNaN)
+  expectBitwiseEqual(bitPattern: 0x7f80_0000, Ty.infinity)
+  expectBitwiseEqual(0x1.ffff_fe__p127, Ty.greatestFiniteMagnitude)
+  expectBitwiseEqual(0x1.921f_b4__p1, Ty.pi)
+  expectBitwiseEqual(0x1.0p-23, Ty.ulpOfOne)
+  expectBitwiseEqual(0x1.0p-126, Ty.leastNormalMagnitude)
+#if arch(arm)
+  expectBitwiseEqual(0x1.0p-126, Ty.leastNonzeroMagnitude)
+#else
+  expectBitwiseEqual(0x1.0p-149, Ty.leastNonzeroMagnitude)
+#endif
+
+  // From the BinaryFloatingPoint protocol.
+  expectEqual(8, Ty.exponentBitCount)
+  expectEqual(23, Ty.significandBitCount)
 }
 
 // Tests the float and int conversions work correctly. Each case is special.
@@ -113,6 +166,33 @@ FloatingPoint.test("Float/Int64") {
 FloatingPoint.test("Double/IntegerLiteralConvertible") {
   expectEqual(positiveOne(),  1.0 as Double)
   expectEqual(negativeOne(), -1.0 as Double)
+}
+
+FloatingPoint.test("Double/FloatLiteralConvertible") {
+  let x: Double = -0.0
+  expectBitwiseEqual(bitPattern: 0x8000_0000_0000_0000, x)
+}
+
+FloatingPoint.test("Double/staticProperties") {
+  typealias Ty = Double
+  // From the FloatingPoint protocol.
+  expectEqual(2, Ty.radix)
+  expectBitwiseEqual(bitPattern: 0x7ff8_0000_0000_0000, Ty.nan)
+  expectBitwiseEqual(bitPattern: 0x7ff4_0000_0000_0000, Ty.signalingNaN)
+  expectBitwiseEqual(bitPattern: 0x7ff0_0000_0000_0000, Ty.infinity)
+  expectBitwiseEqual(0x1.ffff_ffff_ffff_f__p1023, Ty.greatestFiniteMagnitude)
+  expectBitwiseEqual(0x1.921f_b544_42d1_8__p1, Ty.pi)
+  expectBitwiseEqual(0x1.0p-52, Ty.ulpOfOne)
+  expectBitwiseEqual(0x1.0p-1022, Ty.leastNormalMagnitude)
+#if arch(arm)
+  expectBitwiseEqual(0x1.0p-1022, Ty.leastNonzeroMagnitude)
+#else
+  expectBitwiseEqual(0x1.0p-1074, Ty.leastNonzeroMagnitude)
+#endif
+
+  // From the BinaryFloatingPoint protocol.
+  expectEqual(11, Ty.exponentBitCount)
+  expectEqual(52, Ty.significandBitCount)
 }
 
 FloatingPoint.test("Double/UInt8") {
@@ -171,6 +251,72 @@ FloatingPoint.test("Double/HashValueZero") {
   expectEqual(zero.hashValue, negativeZero.hashValue)
 }
 
+#if arch(arm)
+% for FloatSelf in ['Float32', 'Float64']:
+func testSubNormalFlush(_ f: ${FloatSelf}) {
+  if !f.isSubnormal {
+    return
+  }
+  switch f.sign {
+  case .plus:
+    expectBitwiseEqual(.leastNonzeroMagnitude, f.nextUp)
+    expectBitwiseEqual(0.0, f.nextDown)
+  case .minus:
+    expectBitwiseEqual(-0.0, f.nextUp)
+    expectBitwiseEqual(-.leastNonzeroMagnitude, f.nextDown)
+  }
+}
+% end
+#endif
+
+let floatNextUpDownTests: [(Float, Float)] = [
+  (.nan, .nan),
+  (.greatestFiniteMagnitude, .infinity),
+  (0x1.ffff_fe__p-1, 1.0), (1.0, 0x1.0000_02__p+0),
+  (0.0, .leastNonzeroMagnitude),
+  (0x1.efff_fe__p-1, 0x1.fp-1), (0x1.fp-1, 0x1.f000_02__p-1),
+]
+
+FloatingPoint.test("Float.nextUp, .nextDown")
+  .forEach(in: floatNextUpDownTests) {
+  (prev, succ) in
+#if arch(arm)
+  if prev.isSubnormal || succ.isSubnormal {
+    testSubNormalFlush(prev)
+    testSubNormalFlush(succ)
+    return
+  }
+#endif
+  expectBitwiseEqual(succ, prev.nextUp)
+  expectBitwiseEqual(prev, succ.nextDown)
+  expectBitwiseEqual(-succ, (-prev).nextDown)
+  expectBitwiseEqual(-prev, (-succ).nextUp)
+}
+
+let doubleNextUpDownTests: [(Double, Double)] = [
+  (.nan, .nan),
+  (.greatestFiniteMagnitude, .infinity),
+  (0x1.ffff_ffff_ffff_fp-1, 1.0), (1.0, 0x1.0000_0000_0000_1p+0),
+  (0.0, .leastNonzeroMagnitude),
+  (0x1.efff_ffff_ffff_fp-1, 0x1.fp-1), (0x1.fp-1, 0x1.f000_0000_0000_1p-1),
+]
+
+FloatingPoint.test("Double.nextUp, .nextDown")
+  .forEach(in: doubleNextUpDownTests) {
+  (prev, succ) in
+#if arch(arm)
+  if prev.isSubnormal || succ.isSubnormal {
+    testSubNormalFlush(prev)
+    testSubNormalFlush(succ)
+    return
+  }
+#endif
+  expectBitwiseEqual(succ, prev.nextUp)
+  expectBitwiseEqual(prev, succ.nextDown)
+  expectBitwiseEqual(-succ, (-prev).nextDown)
+  expectBitwiseEqual(-prev, (-succ).nextUp)
+}
+
 #if arch(i386) || arch(x86_64)
 
 FloatingPoint.test("Float80/IntegerLiteralConvertible") {
@@ -178,11 +324,53 @@ FloatingPoint.test("Float80/IntegerLiteralConvertible") {
   expectEqual(negativeOne(), -1.0 as Float80)
 }
 
+FloatingPoint.test("Float80/FloatLiteralConvertible") {
+  let x: Float80 = -0.0
+  expectBitwiseEqual(bitPattern: Float80Bits(0x8000, 0), x)
+}
+
+FloatingPoint.test("Float80/staticProperties") {
+  typealias Ty = Double
+  // From the FloatingPoint protocol.
+  expectEqual(2, Ty.radix)
+  expectBitwiseEqual(bitPattern: 0x7ff8_0000_0000_0000, Ty.nan)
+  expectBitwiseEqual(bitPattern: 0x7ff4_0000_0000_0000, Ty.signalingNaN)
+  expectBitwiseEqual(bitPattern: 0x7ff0_0000_0000_0000, Ty.infinity)
+  expectBitwiseEqual(0x1.ffff_ffff_ffff_f__p1023, Ty.greatestFiniteMagnitude)
+  expectBitwiseEqual(0x1.921f_b544_42d1_8__p1, Ty.pi)
+  expectBitwiseEqual(0x1.0p-52, Ty.ulpOfOne)
+  expectBitwiseEqual(0x1.0p-1022, Ty.leastNormalMagnitude)
+  expectBitwiseEqual(0x1.0p-1074, Ty.leastNonzeroMagnitude)
+
+  // From the BinaryFloatingPoint protocol.
+  expectEqual(11, Ty.exponentBitCount)
+  expectEqual(52, Ty.significandBitCount)
+}
+
 FloatingPoint.test("Float80/HashValueZero") {
   let zero: Float80 = getFloat80(0.0)
   let negativeZero: Float80 = getFloat80(-0.0)
   expectNotEqual(zero.bitPattern, negativeZero.bitPattern)
   expectEqual(zero.hashValue, negativeZero.hashValue)
+}
+
+let float80NextUpDownTests: [(Float80, Float80)] = [
+  (.nan, .nan),
+  (.greatestFiniteMagnitude, .infinity),
+  (0x1.ffff_ffff_ffff_fffep-1, 1.0), (1.0, 0x1.0000_0000_0000_0002p+0),
+  (0.0, .leastNonzeroMagnitude),
+  (0x1.efff_ffff_ffff_fffep-1, 0x1.fp-1),
+  (0x1.fp-1, 0x1.f000_0000_0000_0002p-1),
+]
+
+FloatingPoint.test("Float80.nextUp, .nextDown")
+  .forEach(in: float80NextUpDownTests) {
+  (prev, succ) in
+
+  expectBitwiseEqual(succ, prev.nextUp)
+  expectBitwiseEqual(prev, succ.nextDown)
+  expectBitwiseEqual(-succ, (-prev).nextDown)
+  expectBitwiseEqual(-prev, (-succ).nextUp)
 }
 
 #endif
@@ -623,6 +811,192 @@ FloatingPoint.test("Float80/Literals") {
   do {
     let f: Float80 = -1.18973149535723176515e+4932
     expectEqual(Float80Bits(0xffff, 0x8000_0000_0000_0000), f.bitPattern)
+  }
+}
+
+#endif
+
+FloatingPoint.test("Float32/quietNaN") {
+  do {
+    let f: Float32 = .nan
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(0x7fc0_0000, f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float32 = Float32(bitPattern: 0x7fc0_0000)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float32 = Float32(bitPattern: 0x7fff_ffff)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float32 = Float32(nan: 0x1f_ffff, signaling: false)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(0x7fdf_ffff, f.bitPattern)
+  }
+  do {
+    // Payload overflow
+    expectCrashLater()
+    _ = Float32(nan: 0x20_0000, signaling: false)
+  }
+}
+
+FloatingPoint.test("Float64/quietNaN") {
+  do {
+    let f: Float64 = .nan
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(0x7ff8_0000_0000_0000, f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float64 = Float64(bitPattern: 0x7ff8_0000_0000_0000)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float64 = Float64(bitPattern: 0x7fff_ffff_ffff_ffff)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float64 = Float64(nan: 0x3_ffff_ffff_ffff, signaling: false)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(0x7ffb_ffff_ffff_ffff, f.bitPattern)
+  }
+  do {
+    // Payload overflow
+    expectCrashLater()
+    _ = Float64(nan: 0x4_0000_0000_0000, signaling: false)
+  }
+}
+
+#if arch(i386) || arch(x86_64)
+
+FloatingPoint.test("Float80/quietNaN") {
+  do {
+    let f: Float80 = .nan
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(Float80Bits(0x7fff, 0xc000_0000_0000_0000), f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float80 = Float80(bitPattern: Float80Bits(0x7fff, 0xc000_0000_0000_0000))
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float80 = Float80(bitPattern: Float80Bits(0x7fff, 0xffff_ffff_ffff_ffff))
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float80 = Float80(nan: 0x1fff_ffff_ffff_ffff, signaling: false)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(Float80Bits(0x7fff, 0xdfff_ffff_ffff_ffff), f.bitPattern)
+  }
+  do {
+    // Payload overflow
+    expectCrashLater()
+    _ = Float80(nan: 0x2000_0000_0000_0000, signaling: false)
+  }
+}
+
+#endif
+
+#if !arch(i386)
+
+FloatingPoint.test("Float32/signalingNaN") {
+  do {
+    let f: Float32 = .signalingNaN
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(0x7fa0_0000, f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float32 = Float32(bitPattern: 0x7fa0_0000)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float32 = Float32(bitPattern: 0x7fbf_ffff)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float32 = Float32(nan: 0x1f_ffff, signaling: true)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(0x7fbf_ffff, f.bitPattern)
+  }
+  do {
+    // payload overflow
+    expectCrashLater()
+    _ = Float32(nan: 0x20_0000, signaling: true)
+  }
+}
+
+FloatingPoint.test("Float64/signalingNaN") {
+  do {
+    let f: Float64 = .signalingNaN
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(0x7ff4_0000_0000_0000, f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float64 = Float64(bitPattern: 0x7ff4_0000_0000_0000)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float64 = Float64(bitPattern: 0x7ff7_ffff_ffff_ffff)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float64 = Float64(nan: 0x3_ffff_ffff_ffff, signaling: true)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(0x7ff7_ffff_ffff_ffff, f.bitPattern)
+  }
+  do {
+    // payload overflow
+    expectCrashLater()
+    _ = Float64(nan: 0x4_0000_0000_0000, signaling: true)
+  }
+}
+
+#endif
+
+#if arch(i386) || arch(x86_64)
+
+FloatingPoint.test("Float80/signalingNaN") {
+  do {
+    let f: Float80 = .signalingNaN
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(Float80Bits(0x7fff, 0xa000_0000_0000_0000), f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float80 = Float80(bitPattern: Float80Bits(0x7fff, 0xa000_0000_0000_0000))
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float80 = Float80(bitPattern: Float80Bits(0x7fff, 0xbfff_ffff_ffff_ffff))
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float80 = Float80(nan: 0x1fff_ffff_ffff_ffff, signaling: true)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(Float80Bits(0x7fff, 0xbfff_ffff_ffff_ffff), f.bitPattern)
+  }
+  do {
+    // payload overflow
+    expectCrashLater()
+    _ = Float80(nan: 0x2000_0000_0000_0000, signaling: true)
   }
 }
 

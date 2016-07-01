@@ -495,9 +495,10 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 }
 
 /// Append the elements of `rhs` to `lhs`.
-public func += <
-  Element, C : Collection where C.Iterator.Element == Element
-> (lhs: inout _ContiguousArrayBuffer<Element>, rhs: C) {
+public func += <Element, C : Collection>(
+  lhs: inout _ContiguousArrayBuffer<Element>, rhs: C
+) where C.Iterator.Element == Element {
+
   let oldCount = lhs.count
   let newCount = oldCount + numericCast(rhs.count)
 

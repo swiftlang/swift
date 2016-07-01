@@ -140,6 +140,9 @@ namespace swift {
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 
+    /// \brief Enable experimental nested generic types feature.
+    bool EnableExperimentalNestedGenericTypes = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
@@ -152,10 +155,13 @@ namespace swift {
     bool InferImportAsMember = false;
 
     /// Whether we are stripping the "NS" prefix from Foundation et al.
-    bool StripNSPrefix = false;
+    bool StripNSPrefix = true;
 
     /// Enable the Swift 3 migration via Fix-Its.
     bool Swift3Migration = false;
+
+    /// Enable typealiases in protocols.
+    bool EnableProtocolTypealiases = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -232,6 +238,10 @@ namespace swift {
     /// Returns true if the 'arch' platform condition argument represents
     /// a supported target architecture.
     static bool isPlatformConditionArchSupported(StringRef ArchName);
+
+    /// Returns true if the 'endian' platform condition argument represents
+    /// a supported target endianness.
+    static bool isPlatformConditionEndiannessSupported(StringRef endianness);
 
   private:
     llvm::SmallVector<std::pair<std::string, std::string>, 3>

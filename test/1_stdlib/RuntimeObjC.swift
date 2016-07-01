@@ -451,8 +451,8 @@ Runtime.test("Generic class ObjC runtime names") {
 
   expectEqual("_TtGC1a12GenericClassCSo7CFArray_",
               NSStringFromClass(GenericClass<CFArray>.self))
-  expectEqual("_TtGC1a12GenericClassVSC9NSDecimal_",
-              NSStringFromClass(GenericClass<NSDecimal>.self))
+  expectEqual("_TtGC1a12GenericClassVSC7Decimal_",
+              NSStringFromClass(GenericClass<Decimal>.self))
   expectEqual("_TtGC1a12GenericClassCSo8NSObject_",
               NSStringFromClass(GenericClass<NSObject>.self))
   expectEqual("_TtGC1a12GenericClassCSo8NSObject_",

@@ -25,6 +25,12 @@ for var e = 3; e > 4; e++ { // expected-error {{C-style for statement has been r
 for var f = 3; f < 4; f-- { // expected-error {{C-style for statement has been removed in Swift 3}} {{none}}
 }
 
+for var i = 6; i > 0; i-=1 { // expected-error {{C-style for statement has been removed in Swift 3}} {{5-9=}} {{10-13= in }} {{13-13=((0 + 1)...}} {{14-14=).reversed()}} {{14-27=}}
+}
+
+for var i = 100; i != 0; i-=1 { // expected-error {{C-style for statement has been removed in Swift 3}} {{5-9=}} {{10-13= in }} {{13-13=((0 + 1)...}} {{16-16=).reversed()}} {{16-30=}}
+}
+
 let start = Int8(4)
 let count = Int8(10)
 var other = Int8(2)

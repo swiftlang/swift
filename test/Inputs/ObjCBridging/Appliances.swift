@@ -33,3 +33,41 @@ extension Refrigerator : _ObjectiveCBridgeable {
     return Refrigerator(temperature: source!.temperature)
   }
 }
+
+public struct ManufacturerInfo<DataType: AnyObject> {
+  private var impl: APPManufacturerInfo<DataType>
+  public var value: DataType {
+    return impl.value
+  }
+}
+
+extension ManufacturerInfo : _ObjectiveCBridgeable {
+  public typealias _ObjectiveCType = APPManufacturerInfo<DataType>
+
+  public static func _isBridgedToObjectiveC() -> Bool { return true }
+
+  public func _bridgeToObjectiveC() -> _ObjectiveCType {
+    return impl
+  }
+
+  public static func _forceBridgeFromObjectiveC(
+    _ source: _ObjectiveCType,
+    result: inout ManufacturerInfo?
+  ) {
+    result = ManufacturerInfo(impl: source)
+  }
+
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ source: _ObjectiveCType,
+    result: inout ManufacturerInfo?
+  ) -> Bool {
+    result = ManufacturerInfo(impl: source)
+    return true
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ source: _ObjectiveCType?
+  ) -> ManufacturerInfo {
+    return ManufacturerInfo(impl: source!)
+  }
+}

@@ -797,25 +797,42 @@ static bool isTestCandidate(ValueDecl *D) {
   if (!D->hasName())
     return false;
 
-  // A 'test candidate' is a class instance method that returns void, has no
-  // parameters and starts with 'test'.
-  // FIXME: Also test if it is ObjC exportable ?
-  if (auto FD = dyn_cast<FuncDecl>(D)) {
-    if (FD->isStatic())
-      return false;
-    if (!D->getDeclContext()->isTypeContext())
-      return false;
-    auto NTD = getNominalParent(D);
-    if (!NTD)
-      return false;
-    Type RetTy = FD->getResultType();
-    if (FD->getParameterLists().size() != 2)
-      return false;
-    auto paramList = FD->getParameterList(1);
-    if (RetTy && RetTy->isVoid() && isa<ClassDecl>(NTD) &&
-        paramList->size() == 0 && FD->getName().str().startswith("test"))
-      return true;
-  }
+  // A 'test candidate' is:
+  // 1. An instance method...
+  auto FD = dyn_cast<FuncDecl>(D);
+  if (!FD)
+    return false;
+  if (!D->isInstanceMember())
+    return false;
+
+  // 2. ...on a class or extension (not a struct)...
+  auto parentNTD = getNominalParent(D);
+  if (!parentNTD)
+    return false;
+  if (!isa<ClassDecl>(parentNTD))
+    return false;
+
+  // 3. ...that returns void...
+  Type RetTy = FD->getResultType();
+  if (RetTy && !RetTy->isVoid())
+    return false;
+
+  // 4. ...takes no parameters...
+  if (FD->getParameterLists().size() != 2)
+    return false;
+  if (FD->getParameterList(1)->size() != 0)
+    return false;
+
+  // 5. ...is of at least 'internal' accessibility (unless we can use
+  //    Objective-C reflection)...
+  if (!D->getASTContext().LangOpts.EnableObjCInterop &&
+      (D->getFormalAccess() < Accessibility::Internal ||
+      parentNTD->getFormalAccess() < Accessibility::Internal))
+    return false;
+
+  // 6. ...and starts with "test".
+  if (FD->getName().str().startswith("test"))
+    return true;
 
   return false;
 }
@@ -1052,6 +1069,7 @@ void index::indexSourceFile(SourceFile *SF, StringRef hash,
   unsigned bufferID = SF->getBufferID().getValue();
   IndexSwiftASTWalker walker(consumer, SF->getASTContext(), bufferID);
   walker.visitModule(*SF->getParentModule(), hash);
+  consumer.finish();
 }
 
 void index::indexModule(ModuleDecl *module, StringRef hash,
@@ -1060,4 +1078,5 @@ void index::indexModule(ModuleDecl *module, StringRef hash,
   IndexSwiftASTWalker walker(consumer, module->getASTContext(),
                              /*bufferID*/ -1);
   walker.visitModule(*module, hash);
+  consumer.finish();
 }

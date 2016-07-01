@@ -1,4 +1,8 @@
 %{
+# This is a template of validation-test/stdlib/Collection/*.swift
+#
+# cd validation-test/stdlib/Collection
+# ../../../utils/gyb --line-directive="" Inputs/Template.swift.gyb | ../../../utils/split_file.py
 
 from gyb_stdlib_support import (
     TRAVERSALS,
@@ -54,7 +58,7 @@ def test_methods(test):
 }%
 
 % for test in all_tests():
-// Start of file: ${test.name}
+// BEGIN ${test.name}
 // -*- swift -*-
 
 //===----------------------------------------------------------------------===//
@@ -62,23 +66,11 @@ def test_methods(test):
 // Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %S/../../../utils/gyb %s -o %t/main.swift
-// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-build-swift %t/main.swift -o %t/${test.name}.a.out
-// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-run %t/${test.name}.a.out
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
 import StdlibCollectionUnittest
-
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var CollectionTests = TestSuite("Collection")
 
@@ -155,6 +147,4 @@ do {
 }
 
 runAllTests()
-// End of file: ${test.name}
 % end
-

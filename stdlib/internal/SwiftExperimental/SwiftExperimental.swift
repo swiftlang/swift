@@ -63,51 +63,44 @@ infix operator ⊇ { associativity left precedence 130 }
 infix operator ⊉ { associativity left precedence 130 }
 
 /// - Returns: The relative complement of `lhs` with respect to `rhs`.
-public func ∖ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Set<T> {
+public func ∖ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Set<T>
+  where S.Iterator.Element == T {
   return lhs.subtracting(rhs)
 }
 
 /// Assigns the relative complement between `lhs` and `rhs` to `lhs`.
-public func ∖= <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: inout Set<T>, rhs: S) {
+public func ∖= <T, S: Sequence>(lhs: inout Set<T>, rhs: S)
+  where S.Iterator.Element == T {
   lhs.subtract(rhs)
 }
 
 /// - Returns: The union of `lhs` and `rhs`.
-public func ∪ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Set<T> {
+public func ∪ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Set<T>
+  where S.Iterator.Element == T {
   return lhs.union(rhs)
 }
 
 /// Assigns the union of `lhs` and `rhs` to `lhs`.
-public func ∪= <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: inout Set<T>, rhs: S) {
+public func ∪= <T, S: Sequence>(lhs: inout Set<T>, rhs: S)
+  where S.Iterator.Element == T {
   lhs.formUnion(rhs)
 }
 
 /// - Returns: The intersection of `lhs` and `rhs`.
-public func ∩ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Set<T> {
+public func ∩ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Set<T>
+  where S.Iterator.Element == T {
   return lhs.intersection(rhs)
 }
 
 /// Assigns the intersection of `lhs` and `rhs` to `lhs`.
-public func ∩= <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: inout Set<T>, rhs: S) {
+public func ∩= <T, S: Sequence>(lhs: inout Set<T>, rhs: S)
+  where S.Iterator.Element == T {
   lhs.formIntersection(rhs)
 }
 
 /// - Returns: A set with elements in `lhs` or `rhs` but not in both.
-public func ⨁ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Set<T> {
+public func ⨁ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Set<T>
+  where S.Iterator.Element == T {
   return lhs.symmetricDifference(rhs)
 }
 
@@ -129,57 +122,49 @@ public func ∉ <T>(x: T, rhs: Set<T>) -> Bool {
 }
 
 /// - Returns: True if `lhs` is a strict subset of `rhs`.
-public func ⊂ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
+public func ⊂ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
   return lhs.isStrictSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a strict subset of `rhs`.
-public func ⊄ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
+public func ⊄ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
   return !lhs.isStrictSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is a subset of `rhs`.
-public func ⊆ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
+public func ⊆ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
   return lhs.isSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a subset of `rhs`.
-public func ⊈ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
+public func ⊈ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
   return !lhs.isSubset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is a strict superset of `rhs`.
-public func ⊃ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
+public func ⊃ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
   return lhs.isStrictSuperset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a strict superset of `rhs`.
-public func ⊅ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
+public func ⊅ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
   return !lhs.isStrictSuperset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is a superset of `rhs`.
-public func ⊇ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
+public func ⊇ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
   return lhs.isSuperset(of: rhs)
 }
 
 /// - Returns: True if `lhs` is not a superset of `rhs`.
-public func ⊉ <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: Set<T>, rhs: S) -> Bool {
+public func ⊉ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Bool
+  where S.Iterator.Element == T {
   return !lhs.isSuperset(of: rhs)
 }

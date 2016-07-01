@@ -157,7 +157,6 @@ namespace {
   /// the fill operations that the compiler emits for the bound decl.
   ///
   /// FIXME: Rework to use GenericSignature instead of AllArchetypes
-  /// FIXME: Rework for nested generics
   struct GenericArguments {
     /// The values to use to initialize the arguments structure.
     SmallVector<llvm::Value *, 8> Values;
@@ -190,15 +189,27 @@ namespace {
       }
     }
 
-    void collect(IRGenFunction &IGF, CanBoundGenericType type) {
-      GenericTypeRequirements requirements(IGF.IGM, type->getDecl());
+    void collect(IRGenFunction &IGF, CanType type) {
+      NominalTypeDecl *decl;
+      CanType parentType;
+
+      if (auto nominalType = dyn_cast<NominalType>(type)) {
+        decl = nominalType->getDecl();
+        parentType = nominalType.getParent();
+      } else {
+        auto boundType = cast<BoundGenericType>(type);
+        decl = boundType->getDecl();
+        parentType = boundType.getParent();
+      }
+
+      GenericTypeRequirements requirements(IGF.IGM, decl);
 
       if (requirements.hasParentType()) {
-        Values.push_back(IGF.emitTypeMetadataRef(type.getParent()));
+        Values.push_back(IGF.emitTypeMetadataRef(parentType));
       }
 
       auto subs =
-        type->getSubstitutions(IGF.IGM.getSwiftModule(), nullptr);
+        type->gatherAllSubstitutions(IGF.IGM.getSwiftModule(), nullptr);
       requirements.enumerateFulfillments(IGF.IGM, subs,
                                 [&](unsigned reqtIndex, CanType type,
                                     Optional<ProtocolConformanceRef> conf) {
@@ -209,7 +220,7 @@ namespace {
         }
       });
 
-      collectTypes(IGF.IGM, type->getDecl());
+      collectTypes(IGF.IGM, decl);
       assert(Types.size() == Values.size());
     }
   };
@@ -281,10 +292,8 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
     if (doesClassMetadataRequireDynamicInitialization(IGM, theDecl))
       return nullptr;
 
-  // Otherwise, just respect genericity and Objective-C runtime visibility.
-  } else if ((theDecl->isGenericContext()
-              && !isTypeErasedGenericClass(theDecl))
-             || theDecl->isOnlyObjCRuntimeVisible()) {
+  // Otherwise, just respect genericity.
+  } else if (theDecl->isGenericContext() && !isTypeErasedGenericClass(theDecl)){
     return nullptr;
   }
 
@@ -320,12 +329,14 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
                                             bool allowUninitialized) {
   // If the class is visible only through the Objective-C runtime, form the
   // appropriate runtime call.
-  if (theClass->isOnlyObjCRuntimeVisible()) {
+  if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::RuntimeOnly) {
     SmallString<64> scratch;
     auto className =
         IGF.IGM.getAddrOfGlobalString(theClass->getObjCRuntimeName(scratch));
     return IGF.Builder.CreateCall(IGF.IGM.getLookUpClassFn(), className);
   }
+
+  assert(!theClass->isForeign());
 
   Address classRef = IGF.IGM.getAddrOfObjCClassRef(theClass);
   auto classObject = IGF.Builder.CreateLoad(classRef);
@@ -373,8 +384,8 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   }
 
   // We are applying generic parameters to a generic type.
-  auto boundGeneric = cast<BoundGenericType>(theType);
-  assert(boundGeneric->getDecl() == theDecl);
+  assert(theType->isSpecialized() &&
+         theType->getAnyNominal() == theDecl);
 
   // Check to see if we've maybe got a local reference already.
   if (auto cache = IGF.tryGetLocalTypeData(theType,
@@ -383,7 +394,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
 
   // Grab the substitutions.
   GenericArguments genericArgs;
-  genericArgs.collect(IGF, boundGeneric);
+  genericArgs.collect(IGF, theType);
   assert(genericArgs.Values.size() > 0 && "no generic args?!");
 
   // Call the generic metadata accessor function.
@@ -452,8 +463,6 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   // access if it contains a resilient type.
   if (isa<StructType>(type) || isa<EnumType>(type)) {
     auto nominalType = cast<NominalType>(type);
-    assert(!nominalType->getDecl()->isGenericContext() &&
-           "shouldn't be called for a generic type");
 
     // Imported type metadata always requires an accessor.
     if (nominalType->getDecl()->hasClangNode())
@@ -530,9 +539,9 @@ irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type) {
     // Metadata accessors for fully-substituted generic types are
     // emitted with shared linkage.
     if (nominal->isGenericContext() && !nominal->isObjC()) {
-      if (isa<BoundGenericType>(type))
+      if (type->isSpecialized())
         return MetadataAccessStrategy::NonUniqueAccessor;
-      assert(isa<UnboundGenericType>(type));
+      assert(type->hasUnboundGenericType());
     }
 
     // If the type doesn't guarantee that it has an access function,
@@ -1072,7 +1081,6 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   accessor->setDoesNotAccessMemory();
 
   IRGenFunction IGF(IGM, accessor);
-
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
 
@@ -1226,7 +1234,7 @@ createInPlaceMetadataInitializationFunction(IRGenModule &IGM,
     IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
   // Skip instrumentation when building for TSan to avoid false positives.
-  // The syncronization for this happens in the Runtime and we do not see it.
+  // The synchronization for this happens in the Runtime and we do not see it.
   if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
     fn->removeFnAttr(llvm::Attribute::SanitizeThread);
 
@@ -1989,11 +1997,16 @@ llvm::Value *IRGenFunction::emitTypeLayoutRef(SILType type) {
 
 void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("unknown object format");
   case llvm::Triple::MachO:
-    var->setSection("__TEXT, __const");
+    var->setSection("__TEXT,__const");
     break;
-  // TODO: ELF?
-  default:
+  case llvm::Triple::ELF:
+    var->setSection(".rodata");
+    break;
+  case llvm::Triple::COFF:
+    var->setSection(".rdata");
     break;
   }
 }
@@ -2890,7 +2903,7 @@ namespace {
       IRGenFunction IGF(IGM, f);
 
       // Skip instrumentation when building for TSan to avoid false positives.
-      // The syncronization for this happens in the Runtime and we do not see it.
+      // The synchronization for this happens in the Runtime and we do not see it.
       if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
         f->removeFnAttr(llvm::Attribute::SanitizeThread);
 
@@ -3240,7 +3253,7 @@ namespace {
         addWord(flags);
       } else {
         // On non-objc platforms just fill it with a null, there
-        // is no objective-c metaclass.
+        // is no Objective-C metaclass.
         // FIXME: Remove this to save metadata space.
         // rdar://problem/18801263
         addWord(llvm::ConstantExpr::getNullValue(IGM.IntPtrTy));
@@ -3370,7 +3383,7 @@ namespace {
 
     void addClassDataPointer() {
       if (!IGM.ObjCInterop) {
-        // with no objective-c runtime, just give an empty pointer with the
+        // with no Objective-C runtime, just give an empty pointer with the
         // swift bit set.
         addWord(llvm::ConstantInt::get(IGM.IntPtrTy, 1));
         return;
@@ -4338,16 +4351,20 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
          && "didn't find size or alignment in metadata?!");
   Address metadataAsBytes(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
                           IGF.IGM.getPointerAlignment());
-  auto loadZExtInt32AtOffset = [&](Size offset) {
-    Address slot = IGF.Builder.CreateConstByteArrayGEP(metadataAsBytes, offset);
-    slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int32Ty->getPointerTo());
-    llvm::Value *result = IGF.Builder.CreateLoad(slot);
-    if (IGF.IGM.SizeTy != IGF.IGM.Int32Ty)
-      result = IGF.Builder.CreateZExt(result, IGF.IGM.SizeTy);
-    return result;
-  };
-  llvm::Value *size = loadZExtInt32AtOffset(scanner.InstanceSize);
-  llvm::Value *alignMask = loadZExtInt32AtOffset(scanner.InstanceAlignMask);
+
+  Address slot = IGF.Builder.CreateConstByteArrayGEP(metadataAsBytes,
+                                                     scanner.InstanceSize);
+  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int32Ty->getPointerTo());
+  llvm::Value *size = IGF.Builder.CreateLoad(slot);
+  if (IGF.IGM.SizeTy != IGF.IGM.Int32Ty)
+    size = IGF.Builder.CreateZExt(size, IGF.IGM.SizeTy);
+
+  slot = IGF.Builder.CreateConstByteArrayGEP(metadataAsBytes,
+                                             scanner.InstanceAlignMask);
+  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int16Ty->getPointerTo());
+  llvm::Value *alignMask = IGF.Builder.CreateLoad(slot);
+  alignMask = IGF.Builder.CreateZExt(alignMask, IGF.IGM.SizeTy);
+
   return {size, alignMask};
 }
 
@@ -5660,6 +5677,9 @@ namespace {
 /// the protocol descriptor, and for ObjC interop, references to the descriptor
 /// that the ObjC runtime uses for uniquing.
 void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
+  // Emit remote reflection metadata for the protocol.
+  emitFieldMetadataRecord(protocol);
+
   // If the protocol is Objective-C-compatible, go through the path that
   // produces an ObjC-compatible protocol_t.
   if (protocol->isObjC()) {
@@ -5689,8 +5709,6 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
                                                    init->getType()));
   var->setConstant(true);
   var->setInitializer(init);
-
-  emitReflectionMetadata(protocol);
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.

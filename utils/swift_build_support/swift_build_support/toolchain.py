@@ -17,9 +17,9 @@ Represent toolchain - the versioned executables.
 from __future__ import absolute_import
 
 import platform
-import subprocess
 
 from . import cache_util
+from . import shell
 from . import xcrun
 from .which import which
 
@@ -147,17 +147,17 @@ class FreeBSD(GenericUnix):
         super(FreeBSD, self).__init__(suffixes)
 
     @cache_util.reify
-    def _release_date():
+    def _release_date(self):
         """Return the release date for FreeBSD operating system on this host.
         If the release date cannot be ascertained, return None.
         """
-        try:
-            # For details on `sysctl`, see:
-            # http://www.freebsd.org/cgi/man.cgi?sysctl(8)
-            out = subprocess.check_output(['sysctl', '-n', 'kern.osreldate'])
-            return int(out)
-        except subprocess.CalledProcessError:
+        # For details on `sysctl`, see:
+        # http://www.freebsd.org/cgi/man.cgi?sysctl(8)
+        out = shell.capture(['sysctl', '-n', 'kern.osreldate'],
+                            dry_run=False, echo=False, optional=True)
+        if out is None:
             return None
+        return int(out)
 
 
 class Cygwin(Linux):

@@ -224,14 +224,11 @@ static SILLocation::DebugLoc getDebugLocation(Optional<SILLocation> OptLoc,
 
 
 /// Determine whether this debug scope belongs to an explicit closure.
-static bool isExplicitClosure(const SILDebugScope *DS) {
-  if (DS) {
-    auto *SILFn = DS->getInlinedFunction();
-    if (SILFn && SILFn->hasLocation())
-      if (Expr *E = SILFn->getLocation().getAsASTNode<Expr>())
-        if (isa<ClosureExpr>(E))
-          return true;
-  }
+static bool isExplicitClosure(const SILFunction *SILFn) {
+  if (SILFn && SILFn->hasLocation())
+    if (Expr *E = SILFn->getLocation().getAsASTNode<Expr>())
+      if (isa<ClosureExpr>(E))
+        return true;
   return false;
 }
 
@@ -246,7 +243,19 @@ static bool isAbstractClosure(const SILLocation &Loc) {
 llvm::MDNode *IRGenDebugInfo::createInlinedAt(const SILDebugScope *DS) {
   llvm::MDNode *InlinedAt = nullptr;
   if (DS) {
-    for (auto *CS : DS->flattenedInlineTree()) {
+    // The inlined-at chain, starting with the innermost (noninlined) scope.
+    auto Scopes = DS->flattenedInlineTree();
+
+    // See if we share a common prefix with the last chain of inline scopes.
+    unsigned N = 0;
+    while (N < LastInlineChain.size() && N < Scopes.size() &&
+           LastInlineChain[N].first == Scopes[N])
+      InlinedAt = LastInlineChain[N++].second;
+    LastInlineChain.resize(N);
+
+    // Construct the new suffix.
+    for (; N < Scopes.size(); ++N) {
+      auto *CS = Scopes[N];
       // In SIL the inlined-at information is part of the scopes, in
       // LLVM IR it is part of the location. Transforming the inlined-at
       // SIL scope to a location means skipping the inlined-at scope.
@@ -254,6 +263,9 @@ llvm::MDNode *IRGenDebugInfo::createInlinedAt(const SILDebugScope *DS) {
       auto *ParentScope = getOrCreateScope(Parent);
       auto L = CS->Loc.decodeDebugLoc(SM);
       InlinedAt = llvm::DebugLoc::get(L.Line, L.Column, ParentScope, InlinedAt);
+
+      // Cache the suffix.
+      LastInlineChain.push_back({CS, llvm::TrackingMDNodeRef(InlinedAt)});
     }
   }
   return InlinedAt;
@@ -316,8 +328,9 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   //
   // The actual closure has a closure expression as scope.
   if (Loc && isAbstractClosure(*Loc) && DS && !isAbstractClosure(DS->Loc)
-      && !Loc->is<ImplicitReturnLocation>())
-    return;
+      && !Loc->is<ImplicitReturnLocation>()) {
+    L.Line = L.Column = 0;
+  }
 
   if (L.Line == 0 && DS == LastScope) {
     // Reuse the last source location if we are still in the same
@@ -337,6 +350,11 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   auto DL = llvm::DebugLoc::get(L.Line, L.Column, Scope, InlinedAt);
   // TODO: Write a strongly-worded letter to the person that came up
   // with a pair of functions spelled "get" and "Set".
+  Builder.SetCurrentDebugLocation(DL);
+}
+
+void IRGenDebugInfo::setEntryPointLoc(IRBuilder &Builder) {
+  auto DL = llvm::DebugLoc::get(0, 0, getEntryPointFn(), nullptr);
   Builder.SetCurrentDebugLocation(DL);
 }
 
@@ -485,6 +503,17 @@ static CanSILFunctionType getFunctionType(SILType SILTy) {
   return FnTy;
 }
 
+llvm::DIScope *IRGenDebugInfo::getEntryPointFn() {
+  // Lazily create EntryPointFn.
+  if (!EntryPointFn) {
+    EntryPointFn = DBuilder.createReplaceableCompositeType(
+      llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
+        MainFile, MainFile, 0);
+  }
+  return EntryPointFn;
+}
+
+
 llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   if (!DC)
     return TheCU;
@@ -507,17 +536,7 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     return getOrCreateContext(DC->getParent());
 
   case DeclContextKind::TopLevelCodeDecl:
-    // Lazily create EntryPointFn.
-    if (!EntryPointFn) {
-      auto main = IGM.getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
-      assert(main && "emitting TopLevelCodeDecl in module without "
-                     SWIFT_ENTRY_POINT_FUNCTION "?");
-      EntryPointFn = DBuilder.createReplaceableCompositeType(
-            llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
-            MainFile, MainFile, 0);
-    }
-
-    return cast<llvm::DIScope>(EntryPointFn);
+    return getEntryPointFn();
 
   case DeclContextKind::Module:
     return getOrCreateModule({Module::AccessPathTy(), cast<ModuleDecl>(DC)});
@@ -525,16 +544,11 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     // A module may contain multiple files.
     return getOrCreateContext(DC->getParent());
   case DeclContextKind::GenericTypeDecl: {
-    auto CachedType = DITypeCache.find(
-        cast<GenericTypeDecl>(DC)->getDeclaredType().getPointer());
-    if (CachedType != DITypeCache.end()) {
-      // Verify that the information still exists.
-      if (llvm::Metadata *Val = CachedType->second)
-        return cast<llvm::DIType>(Val);
-    }
+    auto *TyDecl = cast<GenericTypeDecl>(DC);
+    if (auto *DITy = getTypeOrNull(TyDecl->getDeclaredType().getPointer()))
+      return DITy;
 
     // Create a Forward-declared type.
-    auto *TyDecl = cast<NominalTypeDecl>(DC);
     auto Loc = getDebugLoc(SM, TyDecl);
     auto File = getOrCreateFile(Loc.Filename);
     auto Line = Loc.Line;
@@ -681,10 +695,10 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   // Mark everything that is not visible from the source code (i.e.,
   // does not have a Swift name) as artificial, so the debugger can
   // ignore it. Explicit closures are exempt from this rule. We also
-  // make an exception for main, which, albeit it does not
+  // make an exception for toplevel code, which, although it does not
   // have a Swift name, does appear prominently in the source code.
   if ((Name.empty() && LinkageName != SWIFT_ENTRY_POINT_FUNCTION &&
-       !isExplicitClosure(DS)) ||
+       !isExplicitClosure(SILFn)) ||
       // ObjC thunks should also not show up in the linetable, because we
       // never want to set a breakpoint there.
       (Rep == SILFunctionTypeRepresentation::ObjCMethod) ||
@@ -949,8 +963,9 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
   // Emit locationless intrinsic for variables that were optimized away.
   if (Storage.size() == 0) {
-    auto *undef = llvm::UndefValue::get(DbgTy.StorageType);
-    emitDbgIntrinsic(BB, undef, Var, DBuilder.createExpression(), Line,
+    auto Zero =
+        llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
+    emitDbgIntrinsic(BB, Zero, Var, DBuilder.createExpression(), Line,
                      Loc.Column, Scope, DS);
   }
 }
@@ -973,19 +988,18 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
   // the variable that is live throughout the function. With SIL
   // optimizations this is not guaranteed and a variable can end up in
   // two allocas (for example, one function inlined twice).
-  if (!Opts.Optimize &&
-      (isa<llvm::AllocaInst>(Storage) ||
-       isa<llvm::UndefValue>(Storage)))
+  if (isa<llvm::AllocaInst>(Storage))
     DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
   else
     DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
 }
 
 
-void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
+void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::Constant *Var,
                                                    StringRef Name,
                                                    StringRef LinkageName,
                                                    DebugTypeInfo DbgTy,
+                                                   bool IsLocalToUnit,
                                                    Optional<SILLocation> Loc) {
   if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
     return;
@@ -1003,7 +1017,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
 
   // Emit it as global variable of the current module.
   DBuilder.createGlobalVariable(MainModule, Name, LinkageName, File, L.Line, Ty,
-                                Var->hasInternalLinkage(), Var, nullptr);
+                                IsLocalToUnit, Var, nullptr);
 }
 
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
@@ -1259,12 +1273,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // to emit the (target!) size of the underlying basic type.
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   uint64_t SizeInBits = DbgTy.size.getValue() * SizeOfByte;
-  // Prefer the actual storage size over the DbgTy.
-  if (DbgTy.StorageType && DbgTy.StorageType->isSized()) {
-    uint64_t Storage = IGM.DataLayout.getTypeSizeInBits(DbgTy.StorageType);
-    if (Storage)
-      SizeInBits = Storage;
-  }
   uint64_t AlignInBits = DbgTy.align.getValue() * SizeOfByte;
   unsigned Encoding = 0;
   unsigned Flags = 0;
@@ -1711,14 +1719,8 @@ static bool canMangle(TypeBase *Ty) {
   }
 }
 
-llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
-  // Is this an empty type?
-  if (DbgTy.isNull())
-    // We can't use the empty type as an index into DenseMap.
-    return createType(DbgTy, "", TheCU, MainFile);
-
-  // Look in the cache first.
-  auto CachedType = DITypeCache.find(DbgTy.getType());
+llvm::DIType *IRGenDebugInfo::getTypeOrNull(TypeBase *Ty) {
+  auto CachedType = DITypeCache.find(Ty);
   if (CachedType != DITypeCache.end()) {
     // Verify that the information still exists.
     if (llvm::Metadata *Val = CachedType->second) {
@@ -1726,6 +1728,18 @@ llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
       return DITy;
     }
   }
+  return nullptr;
+}
+
+llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
+  // Is this an empty type?
+  if (DbgTy.isNull())
+    // We can't use the empty type as an index into DenseMap.
+    return createType(DbgTy, "", TheCU, MainFile);
+
+  // Look in the cache first.
+  if (auto *DITy = getTypeOrNull(DbgTy.getType()))
+    return DITy;
 
   // Second line of defense: Look up the mangled name. TypeBase*'s are
   // not necessarily unique, but name mangling is too expensive to do

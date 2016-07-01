@@ -782,6 +782,11 @@ Globals
   global ::= 'TV' global                 // vtable override thunk
   global ::= 'TW' protocol-conformance entity
                                          // protocol witness thunk
+  global ::= 'TB' identifier context identifier
+                                         // property behavior initializer thunk
+  global ::= 'Tb' identifier context identifier
+                                         // property behavior setter thunk
+
   entity ::= nominal-type                // named type declaration
   entity ::= static? entity-kind context entity-name
   entity-kind ::= 'F'                    // function (ctor, accessor, etc.)
@@ -1016,6 +1021,7 @@ mangled in to disambiguate.
   impl-function-attribute ::= 'Cw'            // compatible with protocol witness
   impl-function-attribute ::= 'N'             // noreturn
   impl-function-attribute ::= 'G'             // generic
+  impl-function-attribute ::= 'g'             // pseudogeneric
   impl-parameter ::= impl-convention type
   impl-result ::= impl-convention type
 
@@ -1025,7 +1031,8 @@ implementation details of a function type.
 
 Any ``<impl-function-attribute>`` productions must appear in the order
 in which they are specified above: e.g. a noreturn C function is
-mangled with ``CcN``.
+mangled with ``CcN``.  ``g`` and ``G`` are exclusive and mark the presence
+of a generic signature immediately following.
 
 Note that the convention and function-attribute productions do not
 need to be disambiguated from the start of a ``<type>``.

@@ -40,6 +40,7 @@
 #include "GenProto.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
@@ -739,7 +740,8 @@ static CanSILFunctionType getAllocObjectFormalType(ASTContext &ctx,
   };
   auto result = SILResultInfo(classType, ResultConvention::Owned);
   auto extInfo = SILFunctionType::ExtInfo(SILFunctionType::Representation::ObjCMethod,
-                                          /*noreturn*/ false);
+                                          /*noreturn*/ false,
+                                          /*pseudogeneric*/ true);
 
   return SILFunctionType::get(nullptr, extInfo,
                               /*callee*/ ParameterConvention::Direct_Unowned,
@@ -809,6 +811,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   fwd->setAttributes(updatedAttrs);
   
   IRGenFunction subIGF(IGM, fwd);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(subIGF, fwd);
   
   // Do we need to lifetime-extend self?
   bool lifetimeExtendsSelf;

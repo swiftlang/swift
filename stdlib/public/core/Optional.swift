@@ -153,13 +153,16 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
   ///     print(noSquare)
   ///     // Prints "nil"
   ///
-  /// - Parameter f: A closure that takes the unwrapped value of the instance.
+  /// - Parameter transform: A closure that takes the unwrapped value
+  ///   of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  public func map<U>(_ f: @noescape (Wrapped) throws -> U) rethrows -> U? {
+  public func map<U>(
+    _ transform: @noescape (Wrapped) throws -> U
+  ) rethrows -> U? {
     switch self {
     case .some(let y):
-      return .some(try f(y))
+      return .some(try transform(y))
     case .none:
       return .none
     }
@@ -180,13 +183,16 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
   ///     print(nonOverflowingSquare)
   ///     // Prints "Optional(1746)"
   ///
-  /// - Parameter f: A closure that takes the unwrapped value of the instance.
+  /// - Parameter transform: A closure that takes the unwrapped value
+  ///   of the instance.  
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  public func flatMap<U>(_ f: @noescape (Wrapped) throws -> U?) rethrows -> U? {
+  public func flatMap<U>(
+    _ transform: @noescape (Wrapped) throws -> U?
+  ) rethrows -> U? {
     switch self {
     case .some(let y):
-      return try f(y)
+      return try transform(y)
     case .none:
       return .none
     }
@@ -286,27 +292,16 @@ extension Optional : CustomReflectable {
 
 @_transparent
 public // COMPILER_INTRINSIC
-func _stdlib_Optional_isSome<Wrapped>(_ `self`: Wrapped?) -> Bool {
-  return `self` != nil
-}
-
-@_transparent
-public // COMPILER_INTRINSIC
-func _stdlib_Optional_unwrapped<Wrapped>(_ `self`: Wrapped?) -> Wrapped {
-  switch `self` {
-  case let wrapped?:
-    return wrapped
-  case .none:
-    _preconditionFailure(
-      "unexpectedly found nil while unwrapping an Optional value")
-  }
-}
-
-@_transparent
-public // COMPILER_INTRINSIC
-func _diagnoseUnexpectedNilOptional() {
+func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
+                                    _filenameLength: Builtin.Word,
+                                    _filenameIsASCII: Builtin.Int1,
+                                    _line: Builtin.Word) {
   _preconditionFailure(
-    "unexpectedly found nil while unwrapping an Optional value")
+    "unexpectedly found nil while unwrapping an Optional value",
+    file: StaticString(_start: _filenameStart,
+                       utf8CodeUnitCount: _filenameLength,
+                       isASCII: _filenameIsASCII),
+    line: UInt(_line))
 }
 
 public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
@@ -345,6 +340,7 @@ public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 
 // Enable equality comparisons against the nil literal, even if the
 // element type isn't equatable
+@_transparent
 public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
   case .some(_):
@@ -354,6 +350,7 @@ public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   }
 }
 
+@_transparent
 public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
   case .some(_):
@@ -363,6 +360,7 @@ public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   }
 }
 
+@_transparent
 public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
   case .some(_):
@@ -372,6 +370,7 @@ public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
+@_transparent
 public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
   case .some(_):
@@ -518,11 +517,11 @@ public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T?)
 extension Optional {
   @available(*, unavailable, renamed: "none")
   public static var None: Optional<Wrapped> {
-    Builtin.unreachable()
+    return .none
   }
   @available(*, unavailable, renamed: "some")
-  public static func Some(_: Wrapped) -> Optional<Wrapped> {
-    Builtin.unreachable()
+  public static func Some(_ x: Wrapped) -> Optional<Wrapped> {
+    return .some(x)
   }
 
 }

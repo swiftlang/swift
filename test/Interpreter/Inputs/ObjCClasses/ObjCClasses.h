@@ -1,7 +1,7 @@
 #ifndef SWIFT_TEST_OBJC_CLASSES_H
 #define SWIFT_TEST_OBJC_CLASSES_H
 
-#import <Foundation/NSObject.h>
+#import <Foundation/NSArray.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -87,6 +87,12 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 #endif // __has_feature(objc_class_property)
+
+@interface BridgedInitializer<T> : NSObject
+@property (readwrite) NSArray<T> *objects;
+@property (readonly) NSInteger count;
+- (id) initWithArray: (NSArray<T>*) array;
+@end
 
 NS_ASSUME_NONNULL_END
 

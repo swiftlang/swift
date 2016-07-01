@@ -4670,10 +4670,8 @@ namespace {
   };
 } // end anonymous namespace
 
-EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
-                                        SILType type,
-                                        EnumDecl *theEnum)
-{
+std::unique_ptr<EnumImplStrategy>
+EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   unsigned numElements = 0;
   TypeInfoKind tik = Loadable;
   IsFixedSize_t alwaysFixedSize = IsFixedSize;
@@ -4779,43 +4777,49 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
          && "not all elements accounted for");
 
   if (isResilient) {
-    return new ResilientEnumImplStrategy(TC.IGM,
+    return std::unique_ptr<EnumImplStrategy>(
+            new ResilientEnumImplStrategy(TC.IGM,
                                          numElements,
                                          std::move(elementsWithPayload),
-                                         std::move(elementsWithNoPayload));
+                                         std::move(elementsWithNoPayload)));
   }
 
   // Enums imported from Clang or marked with @objc use C-compatible layout.
   if (theEnum->hasClangNode() || theEnum->isObjC()) {
     assert(elementsWithPayload.size() == 0 && "C enum with payload?!");
     assert(alwaysFixedSize == IsFixedSize && "C enum with resilient payload?!");
-    return new CCompatibleEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
+    return std::unique_ptr<EnumImplStrategy>(
+           new CCompatibleEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
                                            numElements,
                                            std::move(elementsWithPayload),
-                                           std::move(elementsWithNoPayload));
+                                           std::move(elementsWithNoPayload)));
   }
 
   if (numElements <= 1)
-    return new SingletonEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
+    return std::unique_ptr<EnumImplStrategy>(
+          new SingletonEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
                                          numElements,
                                          std::move(elementsWithPayload),
-                                         std::move(elementsWithNoPayload));
+                                         std::move(elementsWithNoPayload)));
   if (elementsWithPayload.size() > 1)
-    return new MultiPayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
+    return std::unique_ptr<EnumImplStrategy>(
+           new MultiPayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
                                             allowFixedLayoutOptimizations,
                                             numElements,
                                             std::move(elementsWithPayload),
-                                            std::move(elementsWithNoPayload));
+                                            std::move(elementsWithNoPayload)));
   if (elementsWithPayload.size() == 1)
-    return new SinglePayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
+    return std::unique_ptr<EnumImplStrategy>(
+           new SinglePayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
                                              numElements,
                                              std::move(elementsWithPayload),
-                                             std::move(elementsWithNoPayload));
+                                             std::move(elementsWithNoPayload)));
 
-  return new NoPayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
+  return std::unique_ptr<EnumImplStrategy>(
+         new NoPayloadEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
                                        numElements,
                                        std::move(elementsWithPayload),
-                                       std::move(elementsWithNoPayload));
+                                       std::move(elementsWithNoPayload)));
 }
 
 namespace {
@@ -4828,6 +4832,10 @@ namespace {
     template<typename...AA>
     EnumTypeInfoBase(EnumImplStrategy &strategy, AA &&...args)
       : BaseTypeInfo(std::forward<AA>(args)...), Strategy(strategy) {}
+
+    ~EnumTypeInfoBase() {
+      delete &Strategy;
+    }
 
     llvm::StructType *getStorageType() const {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
@@ -5502,11 +5510,12 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   SILType loweredTy = SILType::getPrimitiveAddressType(type);
 
   // Determine the implementation strategy.
-  EnumImplStrategy *strategy = EnumImplStrategy::get(*this, loweredTy, theEnum);
+  auto strategy = EnumImplStrategy::get(*this, loweredTy, theEnum).release();
 
-  // Create the TI.
-  auto *ti = strategy->completeEnumTypeLayout(*this, loweredTy,
-                                              theEnum, storageType);
+  // Create the TI.  The TI will delete the strategy in its destructor.
+  auto *ti =
+    strategy->completeEnumTypeLayout(*this, loweredTy, theEnum, storageType);
+
   // Assert that the layout query functions for fixed-layout enums work, for
   // LLDB's sake.
 #ifndef NDEBUG
@@ -5562,7 +5571,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
   emitEnumMetadata(*this, theEnum);
   emitNestedTypeDecls(theEnum->getMembers());
-  emitReflectionMetadata(theEnum);
+  emitFieldMetadataRecord(theEnum);
 }
 
 void irgen::emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,

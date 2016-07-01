@@ -347,11 +347,10 @@ extension String.CharacterView : RangeReplaceableCollection {
   ///   view and `newElements`. If the call to `replaceSubrange(_:with:)`
   ///   simply removes characters at the end of the view, the complexity is
   ///   O(*n*), where *n* is equal to `bounds.count`.
-  public mutating func replaceSubrange<
-    C: Collection where C.Iterator.Element == Character
-  >(
-    _ bounds: Range<Index>, with newElements: C
-  ) {
+  public mutating func replaceSubrange<C>(
+    _ bounds: Range<Index>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == Character {
     let rawSubRange: Range<Int> =
       bounds.lowerBound._base._position
       ..< bounds.upperBound._base._position
@@ -391,9 +390,8 @@ extension String.CharacterView : RangeReplaceableCollection {
   /// Appends the characters in the given sequence to the character view.
   /// 
   /// - Parameter newElements: A sequence of characters.
-  public mutating func append<
-    S : Sequence where S.Iterator.Element == Character
-  >(contentsOf newElements: S) {
+  public mutating func append<S : Sequence>(contentsOf newElements: S)
+    where S.Iterator.Element == Character {
     reserveCapacity(_core.count + newElements.underestimatedCount)
     for c in newElements {
       self.append(c)
@@ -404,9 +402,8 @@ extension String.CharacterView : RangeReplaceableCollection {
   /// sequence.
   ///
   /// - Parameter characters: A sequence of characters.
-  public init<
-    S : Sequence where S.Iterator.Element == Character
-  >(_ characters: S) {
+  public init<S : Sequence>(_ characters: S)
+    where S.Iterator.Element == Character {
     self = String.CharacterView()
     self.append(contentsOf: characters)
   }
@@ -437,18 +434,16 @@ extension String.CharacterView {
 
 extension String.CharacterView {
   @available(*, unavailable, renamed: "replaceSubrange")
-  public mutating func replaceRange<
-    C : Collection where C.Iterator.Element == Character
-  >(
-    _ subRange: Range<Index>, with newElements: C
-  ) {
+  public mutating func replaceRange<C>(
+    _ subRange: Range<Index>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == Character {
     Builtin.unreachable()
   }
     
   @available(*, unavailable, renamed: "append(contentsOf:)")
-  public mutating func appendContentsOf<
-    S : Sequence where S.Iterator.Element == Character
-  >(_ newElements: S) {
+  public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
+    where S.Iterator.Element == Character {
     Builtin.unreachable()
   }
 }

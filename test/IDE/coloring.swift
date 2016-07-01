@@ -3,12 +3,12 @@
 // XFAIL: broken_std_regex
 
 #line 17 "abc.swift"
-// CHECK: <#kw>#line</#kw> <int>17</int> <str>"abc.swift"</str>
+// CHECK: <kw>#line</kw> <int>17</int> <str>"abc.swift"</str>
 
 @available(iOS 8.0, OSX 10.10, *)
 // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <float>8.0</float>, <kw>OSX</kw> <float>10.10</float>, *)
 func foo() {
-// CHECK: <kw>if</kw> <#kw>#available</#kw> (<kw>OSX</kw> <float>10.10</float>, <kw>iOS</kw> <float>8.01</float>, *) {<kw>let</kw> <kw>_</kw> = <str>"iOS"</str>}
+// CHECK: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> <float>10.10</float>, <kw>iOS</kw> <float>8.01</float>, *) {<kw>let</kw> <kw>_</kw> = <str>"iOS"</str>}
   if #available (OSX 10.10, iOS 8.01, *) {let _ = "iOS"}
 }
 
@@ -261,7 +261,7 @@ func test3(o: AnyObject) {
 
 // CHECK: <kw>func</kw> test4(<kw>inout</kw> a: <type>Int</type>) {{{$}}
 func test4(inout a: Int) {
-  // CHECK: <kw>if</kw> <#kw>#available</#kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
+  // CHECK: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
   if #available (OSX >= 10.10, iOS >= 8.01) {let OSX = "iOS"}}
 
 // CHECK: <kw>class</kw> MySubClass : <type>MyCls</type> {
@@ -467,10 +467,25 @@ _ = -3.1e-5
 
 /** aaa
 
-
  - returns: something
  */
 // CHECK:  - <doc-comment-field>returns</doc-comment-field>: something
+
+let filename = #file
+// CHECK: <kw>let</kw> filename = <kw>#file</kw>
+let line = #line
+// CHECK: <kw>let</kw> line = <kw>#line</kw>
+let column = #column
+// CHECK: <kw>let</kw> column = <kw>#column</kw>
+let function = #function
+// CHECK: <kw>let</kw> function = <kw>#function</kw>
+
+let image = #imageLiteral(resourceName: "cloud.png")
+// CHECK: <kw>let</kw> image = <object-literal>#imageLiteral(resourceName: "cloud.png")</object-literal>
+let file = #fileLiteral(resourceName: "cloud.png")
+// CHECK: <kw>let</kw> file = <object-literal>#fileLiteral(resourceName: "cloud.png")</object-literal>
+let black = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)
+// CHECK: <kw>let</kw> black = <object-literal>#colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)</object-literal>
 
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>

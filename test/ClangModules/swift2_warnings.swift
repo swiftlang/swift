@@ -8,10 +8,12 @@ import ImportAsMember.A
 import AppKit
 
 func testOldTypeNames() {
-  var ps: NSPostingStyle? // expected-error{{'NSPostingStyle' has been renamed to 'PostingStyle'}}{{11-25=PostingStyle}}
+  var ps: NSPostingStyle? // expected-error{{'NSPostingStyle' has been renamed to 'NotificationQueue.PostingStyle'}}{{11-25=NotificationQueue.PostingStyle}}
 
 
-  _ = NSPostingStyle(rawValue: 1) // expected-error{{'NSPostingStyle' has been renamed to 'PostingStyle'}}{{7-21=PostingStyle}}
+  _ = NSPostingStyle(rawValue: 1) // expected-error{{'NSPostingStyle' has been renamed to 'NotificationQueue.PostingStyle'}}{{7-21=NotificationQueue.PostingStyle}}
+
+  _ = NSSoapDispenser<AnyObject>() // expected-error{{'NSSoapDispenser' has been renamed to 'SoapDispenser'}}{{7-22=SoapDispenser}}
 }
 
 func testOldMethodNames(array: NSArray) {
@@ -25,16 +27,18 @@ func testOldPropertyNames(hive: Hive) {
 func testOldInitializerNames(array: NSArray) {
 }
 
-func testOldEnumCaseNames(i: Int) -> XMLNodeKind {
+func testOldEnumCaseNames(i: Int) -> XMLNode.Kind {
   switch i {
   case 0:
-    return .InvalidKind // expected-error{{'InvalidKind' has been renamed to 'invalidKind'}}{{13-24=invalidKind}}
+    // FIXME: Bad diagnostic.
+    return .InvalidKind // expected-error{{type 'XMLNode.Kind' has no member 'InvalidKind'}}
 
   case 1:
-    return XMLNodeKind.InvalidKind // expected-error{{InvalidKind' has been renamed to 'invalidKind'}}{{24-35=invalidKind}}
+    // FIXME: Bad diagnostic.
+    return XMLNode.Kind.InvalidKind // expected-error{{type 'XMLNode.Kind' has no member 'InvalidKind'}}
 
   default:
-    return .invalidKind
+    return .invalid
   }
 }
 
@@ -93,3 +97,10 @@ class X : NSDocument {
 }
 
 func makeCopy<T: NSWobbling>(thing: T) {} // expected-error {{'NSWobbling' has been renamed to 'Wobbling'}} {{18-28=Wobbling}} 
+
+func useLowercasedEnumCase(x: RuncingMode) {
+  switch x {
+    case .Mince: return // expected-error {{'Mince' has been renamed to 'mince'}} {{11-16=mince}}
+    case .Quince: return // expected-error {{'Quince' has been renamed to 'quince'}} {{11-17=quince}}
+  }
+}

@@ -16,9 +16,8 @@
 
 from __future__ import absolute_import
 
-import subprocess
-
 from . import cache_util
+from . import shell
 
 
 @cache_util.cached
@@ -35,11 +34,25 @@ def find(tool, sdk=None, toolchain=None):
     if toolchain is not None:
         command += ['--toolchain', toolchain]
 
-    try:
-        # `xcrun --find` prints to stderr when it fails to find the
-        # given tool. We swallow that output with a pipe.
-        out = subprocess.check_output(command,
-                                      stderr=subprocess.PIPE)
-        return str(out.rstrip().decode())
-    except subprocess.CalledProcessError:
+    # `xcrun --find` prints to stderr when it fails to find the
+    # given tool. We swallow that output with a pipe.
+    out = shell.capture(
+        command,
+        stderr=shell.DEVNULL, dry_run=False, echo=False, optional=True)
+    if out is None:
         return None
+    return out.rstrip()
+
+
+@cache_util.cached
+def sdk_path(sdk):
+    """
+    Return the path string for given SDK, according to `xcrun --show-sdk-path`.
+
+    If `xcrun --show-sdk-path` cannot find the SDK, return None.
+    """
+    command = ['xcrun', '--sdk', sdk, '--show-sdk-path']
+    out = shell.capture(command, dry_run=False, echo=False, optional=True)
+    if out is None:
+        return None
+    return out.rstrip()
