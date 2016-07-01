@@ -198,3 +198,5 @@ protocol NonObjCProtocol {}
 }
 
 @IBDesignable extension SomeProt {}
+
+func attrNowOnType(foo: @noescape ()->()) {}
