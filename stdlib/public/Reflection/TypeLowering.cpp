@@ -24,6 +24,12 @@
 
 #include <iostream>
 
+#ifdef DEBUG_TYPE_LOWERING
+  #define DEBUG(expr) expr;
+#else
+  #define DEBUG(expr)
+#endif
+
 [[noreturn]]
 static void unreachable(const char *Message) {
   std::cerr << "fatal error: " << Message << "\n";
@@ -239,6 +245,7 @@ class ExistentialTypeInfoBuilder {
 
       const FieldDescriptor *FD = TC.getBuilder().getFieldTypeInfo(P);
       if (FD == nullptr) {
+        DEBUG(std::cerr << "No field descriptor: "; P->dump())
         Invalid = true;
         continue;
       }
@@ -275,6 +282,7 @@ public:
     if (auto *P = dyn_cast<const ProtocolTypeRef>(TR)) {
       Protocols.push_back(P);
     } else {
+      DEBUG(std::cerr << "Not a protocol: "; TR->dump())
       Invalid = true;
     }
   }
@@ -286,8 +294,10 @@ public:
       return nullptr;
 
     if (ObjC) {
-      if (WitnessTableCount > 0)
+      if (WitnessTableCount > 0) {
+        DEBUG(std::cerr << "@objc existential with witness tables\n");
         return nullptr;
+      }
 
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Unknown);
@@ -316,8 +326,10 @@ public:
       break;
     case ExistentialTypeRepresentation::Opaque: {
       auto *TI = TC.getTypeInfo(TC.getRawPointerTypeRef());
-      if (TI == nullptr)
+      if (TI == nullptr) {
+        DEBUG(std::cerr << "No TypeInfo for RawPointer\n");
         return nullptr;
+      }
 
       // Non-class existentials consist of a three-word buffer,
       // value metadata, and finally zero or more witness tables.
@@ -345,8 +357,10 @@ public:
       return nullptr;
 
     if (ObjC) {
-      if (WitnessTableCount > 0)
+      if (WitnessTableCount > 0) {
+        DEBUG(std::cerr << "@objc existential with witness tables\n");
         return nullptr;
+      }
 
       return TC.getAnyMetatypeTypeInfo();
     }
@@ -390,6 +404,7 @@ void RecordTypeInfoBuilder::addField(const std::string &Name,
                                      const TypeRef *TR) {
   const TypeInfo *TI = TC.getTypeInfo(TR);
   if (TI == nullptr) {
+    DEBUG(std::cerr << "No TypeInfo for field type: "; TR->dump());
     Invalid = true;
     return;
   }
@@ -436,8 +451,10 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
   // Weak references do not have any extra inhabitants.
 
   auto *BuiltinTI = Builder.getBuiltinTypeInfo(TR);
-  if (BuiltinTI == nullptr)
+  if (BuiltinTI == nullptr) {
+    DEBUG(std::cerr << "No TypeInfo for reference type: "; TR->dump());
     return nullptr;
+  }
 
   unsigned numExtraInhabitants = BuiltinTI->NumExtraInhabitants;
   if (Kind == ReferenceKind::Weak)
@@ -461,8 +478,10 @@ TypeConverter::getThinFunctionTypeInfo() {
 
   auto *descriptor = getBuilder().getBuiltinTypeInfo(
       getThinFunctionTypeRef());
-  if (descriptor == nullptr)
+  if (descriptor == nullptr) {
+    DEBUG(std::cerr << "No TypeInfo for function type\n");
     return nullptr;
+  }
 
   ThinFunctionTI = makeTypeInfo<BuiltinTypeInfo>(descriptor);
 
@@ -495,8 +514,10 @@ TypeConverter::getAnyMetatypeTypeInfo() {
 
   auto *descriptor = getBuilder().getBuiltinTypeInfo(
       getAnyMetatypeTypeRef());
-  if (descriptor == nullptr)
+  if (descriptor == nullptr) {
+    DEBUG(std::cerr << "No TypeInfo for metatype type\n");
     return nullptr;
+  }
 
   AnyMetatypeTI = makeTypeInfo<BuiltinTypeInfo>(descriptor);
 
@@ -837,6 +858,7 @@ class EnumTypeInfoBuilder {
   void addCase(const std::string &Name, const TypeRef *TR,
                const TypeInfo *TI) {
     if (TI == nullptr) {
+      DEBUG(std::cerr << "No TypeInfo for case type: "; TR->dump());
       Invalid = true;
       return;
     }
@@ -967,8 +989,10 @@ public:
     /// Otherwise, get the fixed layout information from reflection
     /// metadata.
     auto *descriptor = TC.getBuilder().getBuiltinTypeInfo(B);
-    if (descriptor == nullptr)
+    if (descriptor == nullptr) {
+      DEBUG(std::cerr << "No TypeInfo for builtin type: "; B->dump());
       return nullptr;
+    }
     return TC.makeTypeInfo<BuiltinTypeInfo>(descriptor);
   }
 
@@ -982,6 +1006,7 @@ public:
         return TC.makeTypeInfo<BuiltinTypeInfo>(ImportedTypeDescriptor);
 
       // Otherwise, we're out of luck.
+      DEBUG(std::cerr << "No TypeInfo for nominal type: "; TR->dump());
       return nullptr;
     }
 
@@ -1009,7 +1034,7 @@ public:
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
-      // Invalid field descriptor
+      DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
       return nullptr;
     }
   }
@@ -1060,6 +1085,7 @@ public:
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
+      DEBUG(std::cerr << "Unknown metatype representation: "; M->dump());
       return nullptr;
     case MetatypeRepresentation::Thin:
       return TC.getEmptyTypeInfo();
@@ -1079,7 +1105,7 @@ public:
       for (auto *P : PC->getProtocols())
         builder.addProtocol(P);
     } else {
-      // Invalid TypeRef
+      DEBUG(std::cerr << "Invalid existential metatype: "; EM->dump());
       return nullptr;
     }
 
@@ -1114,8 +1140,10 @@ public:
   const TypeInfo *
   rebuildStorageTypeInfo(const TypeInfo *TI, ReferenceKind Kind) {
     // If we can't lower the original storage type, give up.
-    if (TI == nullptr)
+    if (TI == nullptr) {
+      DEBUG(std::cerr << "Invalid reference type");
       return nullptr;
+    }
 
     // Simple case: Just change the reference kind
     if (auto *ReferenceTI = dyn_cast<ReferenceTypeInfo>(TI))
@@ -1156,6 +1184,7 @@ public:
     }
 
     // Anything else -- give up
+    DEBUG(std::cerr << "Invalid reference type");
     return nullptr;
   }
 
@@ -1213,8 +1242,10 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
                                                         unsigned start,
                                                         unsigned align) {
   const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
-  if (FD == nullptr)
+  if (FD == nullptr) {
+    DEBUG(std::cerr << "No field descriptor: "; TR->dump());
     return nullptr;
+  }
 
   switch (FD->Kind) {
   case FieldDescriptorKind::Class:
@@ -1238,6 +1269,7 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
     // Invalid field descriptor.
+    DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
     return nullptr;
   }
 }
