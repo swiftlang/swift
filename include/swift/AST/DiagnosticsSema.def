@@ -2082,10 +2082,6 @@ ERROR(string_literal_broken_proto,none,
 ERROR(bool_type_broken,none,
       "could not find a Bool type defined for 'is'", ())
 
-NOTE(convert_to_trailing_closure,none,
-"use trailing closure to simplify arguments", ())
-
-
 // Array literals
 ERROR(array_protocol_broken,none,
       "ArrayLiteralConvertible protocol definition is broken", ())
