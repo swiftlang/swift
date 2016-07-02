@@ -190,7 +190,6 @@ POUND_KEYWORD(elseif)
 POUND_KEYWORD(endif)
 POUND_KEYWORD(keyPath)
 POUND_KEYWORD(line)
-POUND_KEYWORD(setline)
 POUND_KEYWORD(sourceLocation)
 POUND_KEYWORD(selector)
 

@@ -1736,7 +1736,6 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_var:
   case tok::pound_if:
   case tok::identifier:
-  case tok::pound_setline:
   case tok::pound_sourceLocation:
     return true;
   case tok::pound_line:
@@ -2158,7 +2157,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       Status = parseLineDirective(false);
       break;
     case tok::pound_line:
-    case tok::pound_setline:
       Status = parseLineDirective(true);
       break;
 

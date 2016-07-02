@@ -708,8 +708,8 @@ public:
                                                  DeclAttributes &Attributes);
   
   ParserResult<IfConfigDecl> parseDeclIfConfig(ParseDeclOptions Flags);
-  /// Parse a #line/#setline directive.
-  /// 'isLine = true' indicates parsing #line instead of #setline
+  /// Parse a #line/#sourceLocation directive.
+  /// 'isLine = true' indicates parsing #line instead of #sourcelocation
   ParserStatus parseLineDirective(bool isLine = false);
 
   void setLocalDiscriminator(ValueDecl *D);
