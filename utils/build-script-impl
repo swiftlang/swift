@@ -1825,13 +1825,18 @@ for host in "${ALL_HOSTS[@]}"; do
                 native_llvm_tools_path=""
                 native_clang_tools_path=""
                 native_swift_tools_path=""
+
+                if [[ $(is_cross_tools_host ${host}) ]] ||
+                   [[ $(true_false ${BUILD_RUNTIME_WITH_HOST_COMPILER}) == true ]] ; then
+                    native_llvm_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
+                fi
+
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
 
                     # Don't build benchmarks and tests when building cross compiler.
                     build_perf_testsuite_this_time=false
                     build_tests_this_time=false
 
-                    native_llvm_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
                     native_clang_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
                     native_swift_tools_path="$(build_directory "${LOCAL_HOST}" swift)/bin"
                 else
