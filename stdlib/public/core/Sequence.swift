@@ -165,7 +165,7 @@
 /// finished returning elements of the sequence.
 ///
 /// Creating and iterating over a `Countdown` sequence uses a
-/// `CountdownGenerator` to handle the iteration.
+/// `CountdownIterator` to handle the iteration.
 ///
 ///     let threeTwoOne = Countdown(start: 3)
 ///     for count in threeTwoOne {
