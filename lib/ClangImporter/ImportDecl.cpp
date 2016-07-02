@@ -6064,9 +6064,35 @@ namespace {
 
     Decl *
     VisitObjCCompatibleAliasDecl(const clang::ObjCCompatibleAliasDecl *decl) {
-      // Like C++ using declarations, name lookup simply looks through
-      // Objective-C compatibility aliases. They are not imported directly.
-      return nullptr;
+      // Import Objective-C’s @compatibility_alias as typealias.
+      EffectiveClangContext effectiveContext(decl->getDeclContext()->getRedeclContext());
+      auto dc = Impl.importDeclContextOf(decl, effectiveContext);
+      if (!dc) return nullptr;
+
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(decl, swift3Name);
+      auto name = importedName.Imported.getBaseName();
+
+      if (name.empty()) return nullptr;
+
+      auto importedDecl = Impl.importDecl(decl->getClassInterface(),
+                                          /*useSwift2Name=*/false);
+      auto typeDecl = dyn_cast_or_null<TypeDecl>(importedDecl);
+      if (!typeDecl) return nullptr;
+
+      // Create typealias.
+      TypeAliasDecl *typealias = nullptr;
+      typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
+                    decl,
+                    Impl.importSourceLoc(decl->getLocStart()),
+                    name,
+                    Impl.importSourceLoc(decl->getLocation()),
+                    TypeLoc::withoutLoc(typeDecl->getDeclaredType()),
+                    /*genericparams=*/nullptr, dc);
+
+      typealias->computeType();
+
+      return typealias;
     }
 
     Decl *VisitLinkageSpecDecl(const clang::LinkageSpecDecl *decl) {
