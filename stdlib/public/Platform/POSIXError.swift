@@ -2,7 +2,7 @@
 
 #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing POSIX error codes.
-@objc public enum POSIXError : CInt {
+@objc public enum POSIXError : Int32 {
   // FIXME: These are the values for Darwin. We need to get the Linux
   // values as well.
   /// Operation not permitted.

@@ -33,7 +33,7 @@ public enum Process {
   }
 
   @_versioned
-  internal static var _argc: CInt = CInt()
+  internal static var _argc: Int32 = Int32()
 
   @_versioned
   internal static var _unsafeArgv:
@@ -41,7 +41,7 @@ public enum Process {
     = nil
 
   /// Access to the raw argc value from C.
-  public static var argc: CInt {
+  public static var argc: Int32 {
     return _argc
   }
 
@@ -82,6 +82,6 @@ func _stdlib_didEnterMain(
 ) {
   // Initialize the Process.argc and Process.unsafeArgv variables with the
   // values that were passed in to main.
-  Process._argc = CInt(argc)
+  Process._argc = Int32(argc)
   Process._unsafeArgv = argv
 }

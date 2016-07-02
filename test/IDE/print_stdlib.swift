@@ -24,7 +24,7 @@
 // CHECK-UNDERSCORED-PROT: public protocol _SignedInteger
 // CHECK-UNDERSCORED-PROT-NOT: protocol _
 
-// CHECK-ARGC: static var argc: CInt { get }
+// CHECK-ARGC: static var argc: Int32 { get }
 
 // CHECK-NOT: @rethrows
 // CHECK-NOT: {{^}}import
