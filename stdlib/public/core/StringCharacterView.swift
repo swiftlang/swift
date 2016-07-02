@@ -156,10 +156,10 @@ extension String.CharacterView : BidirectionalCollection {
   ///     // Prints "[72, 101, 97, 114, 116, 115]"
   public struct Index : Comparable, CustomPlaygroundQuickLookable {
     public // SPI(Foundation)    
-    init(_base: String.UnicodeScalarView.Index) {
+	init(_base: String.UnicodeScalarView.Index, in storage: String.UnicodeScalarView) {
       self._base = _base
       self._countUTF16 =
-          Index._measureExtendedGraphemeClusterForward(from: _base)
+		Index._measureExtendedGraphemeClusterForward(from: _base, in: storage)
     }
 
     internal init(_base: UnicodeScalarView.Index, _countUTF16: Int) {
@@ -178,27 +178,19 @@ extension String.CharacterView : BidirectionalCollection {
       return _base._position
     }
 
-    /// The one past end index for this extended grapheme cluster in Unicode
-    /// scalars.
-    internal var _endBase: UnicodeScalarView.Index {
-      return UnicodeScalarView.Index(
-          _utf16Index + _countUTF16, _base._core)
-    }
-
     /// Returns the length of the first extended grapheme cluster in UTF-16
     /// code units.
     @inline(never)
-    internal static func _measureExtendedGraphemeClusterForward(
-        from start: UnicodeScalarView.Index
-    ) -> Int {
-      var start = start
-      let end = start._viewEndIndex
+    internal static func _measureExtendedGraphemeClusterForward(from start: UnicodeScalarView.Index,
+                                                                in unicodeScalars: UnicodeScalarView) -> Int {
+
+	  var start = start
+      let end = unicodeScalars.endIndex
       if start == end {
         return 0
       }
 
       let startIndexUTF16 = start._position
-      let unicodeScalars = UnicodeScalarView(start._core)
       let graphemeClusterBreakProperty =
           _UnicodeGraphemeClusterBreakPropertyTrie()
       let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
@@ -229,16 +221,14 @@ extension String.CharacterView : BidirectionalCollection {
     /// Returns the length of the previous extended grapheme cluster in UTF-16
     /// code units.
     @inline(never)
-    internal static func _measureExtendedGraphemeClusterBackward(
-        from end: UnicodeScalarView.Index
-    ) -> Int {
-      let start = end._viewStartIndex
+    internal static func _measureExtendedGraphemeClusterBackward(from end: UnicodeScalarView.Index,
+                                                                 in unicodeScalars: UnicodeScalarView) -> Int {
+      let start = unicodeScalars.startIndex
       if start == end {
         return 0
       }
 
       let endIndexUTF16 = end._position
-      let unicodeScalars = UnicodeScalarView(start._core)
       let graphemeClusterBreakProperty =
           _UnicodeGraphemeClusterBreakPropertyTrie()
       let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
@@ -276,7 +266,7 @@ extension String.CharacterView : BidirectionalCollection {
   /// 
   /// In an empty character view, `startIndex` is equal to `endIndex`.
   public var startIndex: Index {
-    return Index(_base: unicodeScalars.startIndex)
+	return Index(_base: unicodeScalars.startIndex, in: unicodeScalars)
   }
 
   /// A character view's "past the end" position---that is, the position one
@@ -284,29 +274,26 @@ extension String.CharacterView : BidirectionalCollection {
   ///
   /// In an empty character view, `endIndex` is equal to `startIndex`.
   public var endIndex: Index {
-    return Index(_base: unicodeScalars.endIndex)
+	return Index(_base: unicodeScalars.endIndex, in: unicodeScalars)
   }
 
   /// Returns the next consecutive position after `i`.
   ///
   /// - Precondition: The next position is valid.
   public func index(after i: Index) -> Index {
-    _precondition(i._base != i._base._viewEndIndex, "cannot increment endIndex")
-    return Index(_base: i._endBase)
+    _precondition(i._base != endIndex._base, "cannot increment endIndex")
+	return Index(_base: UnicodeScalarView.Index(i._utf16Index + i._countUTF16, _core), in: unicodeScalars)
   }
 
   /// Returns the previous consecutive position before `i`.
   ///
   /// - Precondition: The previous position is valid.
   public func index(before i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range check i?
-    _precondition(i._base != i._base._viewStartIndex,
+    _precondition(i._base != startIndex._base,
         "cannot decrement startIndex")
     let predecessorLengthUTF16 =
-        Index._measureExtendedGraphemeClusterBackward(from: i._base)
-    return Index(
-      _base: UnicodeScalarView.Index(
-        i._utf16Index - predecessorLengthUTF16, i._base._core))
+		Index._measureExtendedGraphemeClusterBackward(from: i._base, in: unicodeScalars)
+	return Index(_base: UnicodeScalarView.Index(i._utf16Index - predecessorLengthUTF16, _core), in: unicodeScalars)
   }
 
   /// Accesses the character at the given position.
@@ -323,7 +310,7 @@ extension String.CharacterView : BidirectionalCollection {
   /// - Parameter position: A valid index of the character view. `position`
   ///   must be less than the view's end index.
   public subscript(i: Index) -> Character {
-    return Character(String(unicodeScalars[i._base..<i._endBase]))
+    return Character(String(unicodeScalars[i._base...i._base]))
   }
 }
 

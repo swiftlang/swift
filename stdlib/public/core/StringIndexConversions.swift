@@ -51,7 +51,7 @@ extension String.Index {
     if !unicodeScalarIndex._isOnGraphemeClusterBoundary {
       return nil
     }
-    self.init(_base: unicodeScalarIndex)
+	self.init(_base: unicodeScalarIndex, in: String.UnicodeScalarView(unicodeScalarIndex._core))
   }
 
   /// Creates an index in the given string that corresponds exactly to the
