@@ -23,7 +23,5 @@ add_swift_library(swiftClangImporter STATIC
     swiftParse
 )
 
-# Include the current binary dir since we rely on gybed files.
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_dependencies(swiftClangImporter "${generated_include_targets}")
