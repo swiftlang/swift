@@ -1178,7 +1178,7 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
     for (auto C : str->getChunks().slice(*FirstTextChunk)) {
 
       if (C.is(ChunkKind::BraceStmtWithCursor))
-        break;
+        break; // Don't include brace-stmt in filter name.
 
       if (C.is(ChunkKind::Equal)) {
         OS << C.getText();
@@ -1222,8 +1222,6 @@ void CompletionBuilder::getDescription(SwiftResult *result, raw_ostream &OS,
   if (FirstTextChunk.hasValue()) {
     for (auto C : str->getChunks().slice(*FirstTextChunk)) {
       using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
-      if (C.is(ChunkKind::BraceStmtWithCursor))
-        break;
 
       // FIXME: we need a more uniform way to handle operator completions.
       if (C.is(ChunkKind::Equal))

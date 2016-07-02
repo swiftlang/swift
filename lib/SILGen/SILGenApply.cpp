@@ -547,18 +547,12 @@ public:
       auto proto = Constant.getDecl()->getDeclContext()
                                      ->getAsProtocolOrProtocolExtensionContext();
       auto archetype = getWitnessMethodSelfType();
-      // Get the openend existential value if the archetype is an opened
-      // existential type.
-      SILValue OpenedExistential;
-      if (!archetype->getOpenedExistentialType().isNull())
-        OpenedExistential = SelfValue;
 
       SILValue fn = gen.B.createWitnessMethod(Loc,
                                   archetype,
                                   ProtocolConformanceRef(proto),
                                   *constant,
                                   constantInfo.getSILType(),
-                                  OpenedExistential,
                                   constant->isForeign);
       mv = ManagedValue::forUnmanaged(fn);
       break;
@@ -3028,34 +3022,79 @@ namespace {
     void emitDirect(ArgumentSource &&arg, SILType loweredSubstArgType,
                     AbstractionPattern origParamType,
                     SILParameterInfo param) {
-      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
-      if (arg.isRValue()) {
-        emitDirect(arg.getKnownRValueLocation(), std::move(arg).asKnownRValue(),
-                   origParamType, param, contexts.ForReabstraction);
-      } else {
-        Expr *e = std::move(arg).asKnownExpr();
-        emitDirect(e, SGF.emitRValue(e, contexts.ForEmission),
-                   origParamType, param, contexts.ForReabstraction);
-      }
-    }
-
-    void emitDirect(SILLocation loc, RValue &&arg,
-                    AbstractionPattern origParamType,
-                    SILParameterInfo param, SGFContext ctxt) {
-      auto value = std::move(arg).getScalarValue();
+      ManagedValue value;
+      
       switch (getSILFunctionLanguage(Rep)) {
       case SILFunctionLanguage::Swift:
-        value = SGF.emitSubstToOrigValue(loc, value, origParamType,
-                                         arg.getType(), ctxt);
+        value = emitSubstToOrigArgument(std::move(arg), loweredSubstArgType,
+                                        origParamType, param);
         break;
       case SILFunctionLanguage::C:
-        value = SGF.emitNativeToBridgedValue(loc, value, Rep,
-                                             param.getType());
+        value = emitNativeToBridgedArgument(std::move(arg), loweredSubstArgType,
+                                            origParamType, param);
         break;
       }
       Args.push_back(value);
     }
-
+    
+    ManagedValue emitSubstToOrigArgument(ArgumentSource &&arg,
+                                         SILType loweredSubstArgType,
+                                         AbstractionPattern origParamType,
+                                         SILParameterInfo param) {
+      // TODO: We should take the opportunity to peephole certain abstraction
+      // changes here, for instance, directly emitting a closure literal at the
+      // callee's expected abstraction level instead of emitting it maximally
+      // substituted and thunking.
+      auto emitted = emitArgumentFromSource(std::move(arg), loweredSubstArgType,
+                                            origParamType, param);
+      return SGF.emitSubstToOrigValue(emitted.loc,
+                                      std::move(emitted.value).getScalarValue(),
+                                      origParamType, emitted.value.getType(),
+                                      emitted.contextForReabstraction);
+    }
+    
+    ManagedValue emitNativeToBridgedArgument(ArgumentSource &&arg,
+                                             SILType loweredSubstArgType,
+                                             AbstractionPattern origParamType,
+                                             SILParameterInfo param) {
+      // TODO: We should take the opportunity to peephole certain sequences
+      // here. For instance, when going from concrete type -> Any -> id, we
+      // can skip the intermediate 'Any' boxing and directly bridge the concrete
+      // type to its object representation. Similarly, when bridging from
+      // NSFoo -> Foo -> NSFoo, we should elide the bridge altogether and pass
+      // the original object.
+      auto emitted = emitArgumentFromSource(std::move(arg), loweredSubstArgType,
+                                            origParamType, param);
+      
+      return SGF.emitNativeToBridgedValue(emitted.loc,
+                                      std::move(emitted.value).getScalarValue(),
+                                      Rep, param.getType());
+                                      
+    }
+    
+    struct EmittedArgument {
+      SILLocation loc;
+      RValue value;
+      SGFContext contextForReabstraction;
+    };
+    EmittedArgument emitArgumentFromSource(ArgumentSource &&arg,
+                                           SILType loweredSubstArgType,
+                                           AbstractionPattern origParamType,
+                                           SILParameterInfo param) {
+      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+      Optional<SILLocation> loc;
+      RValue rv;
+      if (arg.isRValue()) {
+        loc = arg.getKnownRValueLocation();
+        rv = std::move(arg).asKnownRValue();
+      } else {
+        Expr *e = std::move(arg).asKnownExpr();
+        loc = e;
+        rv = SGF.emitRValue(e, contexts.ForEmission);
+      }
+      return {*loc, std::move(rv), contexts.ForReabstraction};
+    }
+    
     void maybeEmitForeignErrorArgument() {
       if (!ForeignError ||
           ForeignError->getErrorParameterIndex() != Args.size())

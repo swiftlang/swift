@@ -357,10 +357,14 @@ bool swift::hasDynamicSelfTypes(ArrayRef<Substitution> Subs) {
 
 bool swift::computeMayBindDynamicSelf(SILFunction *F) {
   for (auto &BB : *F)
-    for (auto &I : BB)
-      if (auto Apply = FullApplySite::isa(&I))
-        if (hasDynamicSelfTypes(Apply.getSubstitutions()))
+    for (auto &I : BB) {
+      if (auto AI = FullApplySite::isa(&I))
+        if (hasDynamicSelfTypes(AI.getSubstitutions()))
           return true;
+      if (auto MI = dyn_cast<MetatypeInst>(&I))
+        if (MI->getType().getSwiftRValueType()->hasDynamicSelfType())
+          return true;
+    }
   return false;
 }
 

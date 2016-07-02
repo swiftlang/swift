@@ -537,8 +537,9 @@ void IRGenModule::emitRuntimeRegistration() {
   SILFunction *EntryPoint =
     getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
   
-  // If we're debugging, we probably don't have a main. Find a
-  // function marked with the LLDBDebuggerFunction attribute instead.
+  // If we're debugging (and not in the REPL), we don't have a
+  // main. Find a function marked with the LLDBDebuggerFunction
+  // attribute instead.
   if (!EntryPoint && Context.LangOpts.DebuggerSupport) {
     for (SILFunction &SF : getSILModule()) {
       if (SF.hasLocation()) {
@@ -573,12 +574,17 @@ void IRGenModule::emitRuntimeRegistration() {
   {
     llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
     llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
-    IRBuilder Builder(getLLVMContext());
+    IRBuilder Builder(getLLVMContext(),
+                      DebugInfo && !Context.LangOpts.DebuggerSupport);
     Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+    if (DebugInfo && !Context.LangOpts.DebuggerSupport)
+      DebugInfo->setEntryPointLoc(Builder);
     Builder.CreateCall(RegistrationFunction, {});
   }
   
   IRGenFunction RegIGF(*this, RegistrationFunction);
+  if (DebugInfo && !Context.LangOpts.DebuggerSupport)
+    DebugInfo->emitArtificialFunction(RegIGF, RegistrationFunction);
   
   // Register ObjC protocols, classes, and extensions we added.
   if (ObjCInterop) {
@@ -1004,12 +1010,17 @@ void IRGenModule::emitTypeVerifier() {
   {
     llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
     llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
-    IRBuilder Builder(getLLVMContext());
+    IRBuilder Builder(getLLVMContext(), DebugInfo);
     Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+    if (DebugInfo)
+      DebugInfo->setEntryPointLoc(Builder);
     Builder.CreateCall(VerifierFunction, {});
   }
 
   IRGenFunction VerifierIGF(*this, VerifierFunction);
+  if (DebugInfo)
+    DebugInfo->emitArtificialFunction(VerifierIGF, VerifierFunction);
+
   emitTypeLayoutVerifier(VerifierIGF, TypesToVerify);
   VerifierIGF.Builder.CreateRetVoid();
 }
@@ -2261,6 +2272,7 @@ Address IRGenModule::getAddrOfObjCClassRef(ClassDecl *theClass) {
 llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass,
                                                 ForDefinition_t forDefinition) {
   assert(ObjCInterop && "getting address of ObjC class in no-interop mode");
+  assert(!theClass->isForeign());
   LinkEntity entity = LinkEntity::forObjCClass(theClass);
   DebugTypeInfo DbgTy(theClass, ObjCClassPtrTy,
                       getPointerSize(), getPointerAlignment());
@@ -2274,6 +2286,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass,
 llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass,
                                                 ForDefinition_t forDefinition) {
   assert(ObjCInterop && "getting address of ObjC metaclass in no-interop mode");
+  assert(!theClass->isForeign());
   LinkEntity entity = LinkEntity::forObjCMetaclass(theClass);
   DebugTypeInfo DbgTy(theClass, ObjCClassPtrTy,
                       getPointerSize(), getPointerAlignment());
@@ -2834,7 +2847,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
 
   if (shouldEmitCategory(*this, ext)) {
     assert(origClass && !origClass->isForeign() &&
-           "CF types cannot have categories emitted");
+           "foreign types cannot have categories emitted");
     llvm::Constant *category = emitCategoryData(*this, ext);
     category = llvm::ConstantExpr::getBitCast(category, Int8PtrTy);
     ObjCCategories.push_back(category);

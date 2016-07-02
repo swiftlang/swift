@@ -377,7 +377,7 @@ extension UnicodeScalar {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "escaped")
+  @available(*, unavailable, renamed: "escaped(asASCII:)")
   public func escape(asASCII forceASCII: Bool) -> String {
     Builtin.unreachable()
   }

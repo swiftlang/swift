@@ -1243,7 +1243,7 @@ namespace {
       theClass->setSuperclass(superclass);
       theClass->setCheckedInheritanceClause();
       theClass->setAddedImplicitInitializers(); // suppress all initializers
-      theClass->setForeign(true);
+      theClass->setForeignClassKind(ClassDecl::ForeignKind::CFType);
       addObjCAttribute(theClass, None);
       Impl.registerExternalDecl(theClass);
 
@@ -5660,7 +5660,7 @@ namespace {
           nsObjectTy->getClassOrBoundGenericClass();
 
         auto result = createRootClass(nsObjectDecl->getDeclContext());
-        result->setForeign(true);
+        result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
         return result;
       }
 
@@ -5731,6 +5731,8 @@ namespace {
 
       if (declaredNative)
         markMissingSwiftDecl(result);
+      if (decl->getAttr<clang::ObjCRuntimeVisibleAttr>())
+        result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
 
       // If this Objective-C class has a supertype, import it.
       SmallVector<TypeLoc, 4> inheritedTypes;

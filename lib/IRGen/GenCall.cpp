@@ -1914,7 +1914,7 @@ Address IRGenFunction::getErrorResultSlot(SILType errorType) {
   if (!ErrorResultSlot) {
     auto &errorTI = cast<FixedTypeInfo>(getTypeInfo(errorType));
 
-    IRBuilder builder(IGM.getLLVMContext());
+    IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo);
     builder.SetInsertPoint(AllocaIP->getParent(), AllocaIP->getIterator());
 
     // Create the alloca.  We don't use allocateStack because we're

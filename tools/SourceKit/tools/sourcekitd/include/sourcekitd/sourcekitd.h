@@ -377,7 +377,7 @@ sourcekitd_variant_dictionary_get_int64(sourcekitd_variant_t dict,
                                         sourcekitd_uid_t key);
 
 /// The underlying \c bool value for the specified key. false if the
-/// the value for the specified key is not a Boolean value or if there is no
+/// value for the specified key is not a Boolean value or if there is no
 /// value for the specified key.
 SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL SOURCEKITD_WARN_RESULT
 bool

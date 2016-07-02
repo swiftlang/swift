@@ -152,6 +152,51 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T1]] : $OptionalResult to $OptionalResultInheritor
 // CHECK-NEXT: enum $Optional<OptionalResultInheritor>, #Optional.some!enumelt.1, [[T4]]
 
+class Z {
+
+  // CHECK-LABEL: sil hidden @_TFC12dynamic_self1Z23testDynamicSelfCapturesfT1xSi_DS0_
+  func testDynamicSelfCaptures(x: Int) -> Self {
+
+    // Single capture of 'self' type
+
+    // CHECK:      [[FN:%.*]] = function_ref @_TFFC12dynamic_self1Z23testDynamicSelfCapturesFT1xSi_DS0_U_FT_T_ : $@convention(thin) (@owned Z) -> ()
+    // CHECK-NEXT: strong_retain %1 : $Z
+    // CHECK-NEXT: partial_apply [[FN]](%1)
+    let fn1 = { _ = self }
+    fn1()
+
+    // Capturing 'self', but it's not the last capture. Make sure it ends
+    // up at the end of the list anyway
+
+    // CHECK:      [[FN:%.*]] = function_ref @_TFFC12dynamic_self1Z23testDynamicSelfCapturesFT1xSi_DS0_U0_FT_T_ : $@convention(thin) (Int, @owned Z) -> ()
+    // CHECK-NEXT: strong_retain %1 : $Z
+    // CHECK-NEXT: partial_apply [[FN]](%0, %1)
+    let fn2 = {
+      _ = self
+      _ = x
+    }
+    fn2()
+
+    // Capturing 'self' weak, so we have to pass in a metatype explicitly
+    // so that IRGen can recover metadata.
+
+    // CHECK:      [[WEAK_SELF:%.*]] = alloc_box $@sil_weak Optional<Z>
+    // CHECK:      [[FN:%.*]] = function_ref @_TFFC12dynamic_self1Z23testDynamicSelfCapturesFT1xSi_DS0_U1_FT_T_ : $@convention(thin) (@owned @box @sil_weak Optional<Z>, @thick Z.Type) -> ()
+    // CHECK:      strong_retain [[WEAK_SELF]] : $@box @sil_weak Optional<Z>
+    // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick Self.Type
+    // CHECK-NEXT: [[STATIC_SELF:%.*]] = upcast [[DYNAMIC_SELF]] : $@thick Self.Type to $@thick Z.Type
+    // CHECK:      partial_apply [[FN]]([[WEAK_SELF]], [[STATIC_SELF]]) : $@convention(thin) (@owned @box @sil_weak Optional<Z>, @thick Z.Type) -> ()
+    let fn3 = {
+      [weak self] in
+      _ = self
+    }
+    fn3()
+
+    return self
+  }
+
+}
+
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
 // CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1f
 

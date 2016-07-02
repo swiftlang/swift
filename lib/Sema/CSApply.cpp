@@ -2886,7 +2886,8 @@ namespace {
       case CheckedCastKind::ValueCast:
         // Check the cast target is a non-foreign type
         if (auto cls = toType->getAs<ClassType>()) {
-          if (cls->getDecl()->isForeign()) {
+          if (cls->getDecl()->getForeignClassKind() ==
+                ClassDecl::ForeignKind::CFType) {
             tc.diagnose(expr->getLoc(), diag::isa_is_foreign_check, toType);
           }
         }
@@ -2975,7 +2976,8 @@ namespace {
         if (auto metaTy = destObjectType->getAs<MetatypeType>())
           destObjectType = metaTy->getInstanceType();
         if (auto destClass = destObjectType->getClassOrBoundGenericClass()) {
-          if (destClass->isForeign()) {
+          if (destClass->getForeignClassKind() ==
+                ClassDecl::ForeignKind::CFType) {
             if (SuppressDiagnostics)
               return nullptr;
 

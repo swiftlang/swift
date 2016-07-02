@@ -338,6 +338,10 @@ std::string getSwiftFullVersion() {
   printFullRevisionString(OS);
   OS << ")";
 #endif
+
+  // Suppress unused function warning
+  (void) printFullRevisionString;
+
   return OS.str();
 }
 

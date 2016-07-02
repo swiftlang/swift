@@ -306,6 +306,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
   case DAK_ObjCBridged:
   case DAK_SynthesizedProtocol:
   case DAK_ShowInInterface:
+  case DAK_Rethrows:
     return false;
   default:
     break;
@@ -342,7 +343,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
   }
 
   Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-  defer { Printer.printStructurePost(PrintStructureKind::BuiltinAttribute); };
+  SWIFT_DEFER {
+    Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+  };
 
   switch (getKind()) {
   case DAK_Semantics:

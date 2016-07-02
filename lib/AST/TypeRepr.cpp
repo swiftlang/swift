@@ -98,7 +98,7 @@ void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
   // The type part of a NamedTypeRepr will get the callback.
   if (!isa<NamedTypeRepr>(this))
     Printer.printTypePre(TypeLoc(const_cast<TypeRepr *>(this)));
-  defer {
+  SWIFT_DEFER {
     if (!isa<NamedTypeRepr>(this))
       Printer.printTypePost(TypeLoc(const_cast<TypeRepr *>(this)));
   };
@@ -397,7 +397,7 @@ TupleTypeRepr *TupleTypeRepr::create(ASTContext &C,
 void TupleTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
   Printer.callPrintStructurePre(PrintStructureKind::TupleType);
-  defer { Printer.printStructurePost(PrintStructureKind::TupleType); };
+  SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
 
   Printer << "(";
 

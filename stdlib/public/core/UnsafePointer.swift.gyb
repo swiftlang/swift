@@ -534,6 +534,7 @@ extension ${Self} {
     Builtin.unreachable()
   }
 
+% if mutable:
   @available(*, unavailable, message: "use the '${Self}(allocatingCapacity:)' initializer")
   public static func alloc(_ num: Int) -> ${Self} {
     Builtin.unreachable()
@@ -543,17 +544,21 @@ extension ${Self} {
   public func dealloc(_ num: Int) {
     Builtin.unreachable()
   }
+% end
 
   @available(*, unavailable, renamed: "pointee")
   public var memory: Pointee {
     get {
       Builtin.unreachable()
     }
+% if mutable:
     set {
       Builtin.unreachable()
     }
+% end
   }
 
+% if mutable:
   @available(*, unavailable, renamed: "initialize(with:)")
   public func initialize(_ newvalue: Pointee) {
     Builtin.unreachable()
@@ -568,6 +573,7 @@ extension ${Self} {
   public func destroy(_ count: Int) {
     Builtin.unreachable()
   }
+% end
 }
 
 extension Int {

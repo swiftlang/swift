@@ -252,6 +252,7 @@ private:
                                                SILValue NewSelf,
                                                SILValue Self,
                                                CanType ConcreteType,
+                                               SILValue ConcreteTypeDef,
                                                ProtocolConformanceRef Conformance,
                                                CanType OpenedArchetype);
   SILInstruction *

@@ -1959,6 +1959,7 @@ public:
   /// Check for a typo correction.
   void performTypoCorrection(DeclContext *DC,
                              DeclRefKind refKind,
+                             Type baseTypeOrNull,
                              DeclName name,
                              SourceLoc lookupLoc,
                              NameLookupOptions lookupOptions,

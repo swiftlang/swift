@@ -3,6 +3,36 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0060](https://github.com/apple/swift-evolution/blob/master/proposals/0060-defaulted-parameter-order.md):
+  Function parameters with default arguments must now be specified in
+  declaration order. A call site must always supply the arguments it provides
+  to a function in their declared order:
+
+    ```swift
+    func requiredArguments(a: Int, b: Int, c: Int) {}
+    func defaultArguments(a: Int = 0, b: Int = 0, c: Int = 0) {}
+
+    requiredArguments(a: 0, b: 1, c: 2)
+    requiredArguments(b: 0, a: 1, c: 2) // error
+    defaultArguments(a: 0, b: 1, c: 2)
+    defaultArguments(b: 0, a: 1, c: 2) // error
+    ```
+
+    Arbitrary labeled parameters with default arguments may still be elided, as
+    long as the specified arguments follow declaration order:
+
+    ```swift
+    defaultArguments(a: 0) // ok
+    defaultArguments(b: 1) // ok
+    defaultArguments(c: 2) // ok
+    defaultArguments(a: 1, c: 2) // ok
+    defaultArguments(b: 1, c: 2) // ok
+    defaultArguments(c: 1, b: 2) // error
+    ```
+
+* Traps from force-unwrapping nil `Optional`s now show the source location
+  of the force unwrap operator.
+
 * [SE-0093](https://github.com/apple/swift-evolution/blob/master/proposals/0093-slice-base.md): Slice types now have a `base` property that allows public readonly access to their base collections.
 
 * Nested generic functions may now capture bindings from the environment, for example:
@@ -280,8 +310,7 @@ Swift 3.0
     person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
     ```
 
-* Traps from force-unwrapping nil `Optional`s now show the source location
-  of the force unwrap operator.
+**If you are adding a new entry, add it to the top of the file, not here!**
 
 
 Swift 2.2
@@ -5021,15 +5050,15 @@ Swift 2.2
     var x = Int8(-129)
     // error: integer literal overflows when stored into 'Int8'
 
-    var y : Int = 0xFFFF_FFFF_FFFF_FFFF_F
+    var y: Int = 0xFFFF_FFFF_FFFF_FFFF_F
     // error: integer literal overflows when stored into 'Int'
     ```
 
   Overflows in constant integer expressions are also reported by the compiler.
 
     ```swift
-    var x : Int8 = 125
-    var y : Int8 = x + 125
+    var x: Int8 = 125
+    var y: Int8 = x + 125
     // error: arithmetic operation '125 + 125' (on type 'Int8') results in
     //        an overflow
     ```

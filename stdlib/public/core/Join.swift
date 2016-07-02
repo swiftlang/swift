@@ -182,7 +182,7 @@ public struct JoinGenerator<Base : IteratorProtocol>
   where Base.Element : Sequence {}
 
 extension JoinedSequence {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> JoinedIterator<Base.Iterator> {
     Builtin.unreachable()
   }

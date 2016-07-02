@@ -778,6 +778,93 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
+SmallVector<CallArgParam, 4> swift::decomposeArgType(Type type) {
+  return decomposeParamType(type, nullptr, /*level=*/0);
+}
+
+SmallVector<CallArgParam, 4>
+swift::decomposeParamType(Type type, const ValueDecl *paramOwner,
+                          unsigned level) {
+  // Find the corresponding parameter list.
+  const ParameterList *paramList = nullptr;
+  if (paramOwner) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
+      if (level < func->getNumParameterLists())
+        paramList = func->getParameterList(level);
+    } else if (auto subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
+      if (level == 1)
+        paramList = subscript->getIndices();
+    }
+  }
+
+  SmallVector<CallArgParam, 4> result;
+  switch (type->getKind()) {
+  case TypeKind::Tuple: {
+    auto tupleTy = cast<TupleType>(type.getPointer());
+
+    // FIXME: In the weird case where we have a tuple type that should
+    // be wrapped in a ParenType but isn't, just... forget it happened.
+    if (paramList && tupleTy->getNumElements() != paramList->size() &&
+        paramList->size() == 1)
+      paramList = nullptr;
+
+    for (auto i : range(0, tupleTy->getNumElements())) {
+      const auto &elt = tupleTy->getElement(i);
+
+      CallArgParam argParam;
+      argParam.Ty = elt.isVararg() ? elt.getVarargBaseTy() : elt.getType();
+      argParam.Label = elt.getName();
+      argParam.HasDefaultArgument =
+          paramList && paramList->get(i)->isDefaultArgument();
+      argParam.Variadic = elt.isVararg();
+      result.push_back(argParam);
+    }
+    break;
+  }
+
+  case TypeKind::Paren: {
+    CallArgParam argParam;
+    argParam.Ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
+    argParam.HasDefaultArgument =
+        paramList && paramList->get(0)->isDefaultArgument();
+    result.push_back(argParam);
+    break;
+  }
+
+  default: {
+    CallArgParam argParam;
+    argParam.Ty = type;
+    result.push_back(argParam);
+    break;
+  }
+  }
+
+  return result;
+}
+
+/// Turn a param list into a symbolic and printable representation that does not
+/// include the types, something like (_:, b:, c:)
+std::string swift::getParamListAsString(ArrayRef<CallArgParam> params) {
+  std::string result = "(";
+
+  bool isFirst = true;
+  for (auto &param : params) {
+    if (isFirst)
+      isFirst = false;
+    else
+      result += ", ";
+
+    if (param.hasLabel())
+      result += param.Label.str();
+    else
+      result += "_";
+    result += ":";
+  }
+
+  result += ')';
+  return result;
+}
+
 /// Rebuilds the given 'self' type using the given object type as the
 /// replacement for the object type of self.
 static Type rebuildSelfTypeWithObjectType(Type selfTy, Type objectTy) {

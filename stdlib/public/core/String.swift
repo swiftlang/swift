@@ -612,7 +612,7 @@ extension String {
 #if _runtime(_ObjC)
     // We only want to perform this optimization on objc runtimes. Elsewhere,
     // we will make it follow the unicode collation algorithm even for ASCII.
-    if (_core.isASCII && rhs._core.isASCII) {
+    if _core.isASCII && rhs._core.isASCII {
       return _compareASCII(rhs)
     }
 #endif
@@ -715,7 +715,7 @@ extension String : Hashable {
 @_semantics("string.concat")
 public func + (lhs: String, rhs: String) -> String {
   var lhs = lhs
-  if (lhs.isEmpty) {
+  if lhs.isEmpty {
     return rhs
   }
   lhs._core.append(rhs._core)
@@ -976,7 +976,7 @@ extension String {
 }
 
 extension String {
-  @available(*, unavailable, renamed: "append")
+  @available(*, unavailable, renamed: "append(_:)")
   public mutating func appendContentsOf(_ other: String) {
     Builtin.unreachable()
   }

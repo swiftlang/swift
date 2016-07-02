@@ -136,7 +136,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///  }
   ///
   ///  class Owner {
-  ///    final var owned : Owned
+  ///    final var owned: Owned
   ///
   ///    func foo() {
   ///        withExtendedLifetime(self) {
@@ -168,7 +168,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///   }
   ///
   ///  class Owner {
-  ///    final var owned : Owned
+  ///    final var owned: Owned
   ///
   ///    func foo() {
   ///        withExtendedLifetime(self) {

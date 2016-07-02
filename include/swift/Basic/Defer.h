@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines a 'defer' macro for performing a cleanup on any exit out
-// of a scope.
+// This file defines a 'SWIFT_DEFER' macro for performing a cleanup on any exit
+// out of a scope.
 //
 //===----------------------------------------------------------------------===//
 
@@ -45,17 +45,15 @@ namespace swift {
 #define DEFER_CONCAT_IMPL(x, y) x##y
 #define DEFER_MACRO_CONCAT(x, y) DEFER_CONCAT_IMPL(x, y)
 
-#define defer_impl \
-  auto DEFER_MACRO_CONCAT(defer_func, __COUNTER__) = \
-       ::swift::detail::DeferTask() + [&]()
-
 /// This macro is used to register a function / lambda to be run on exit from a
 /// scope.  Its typical use looks like:
 ///
-///   defer {
+///   SWIFT_DEFER {
 ///     stuff
 ///   };
 ///
-#define defer defer_impl
+#define SWIFT_DEFER                                                            \
+  auto DEFER_MACRO_CONCAT(defer_func, __COUNTER__) =                           \
+      ::swift::detail::DeferTask() + [&]()
 
 #endif // SWIFT_BASIC_DEFER_H

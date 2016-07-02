@@ -415,7 +415,7 @@ public struct FlattenGenerator<
 > {}
 
 extension FlattenSequence {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> FlattenIterator<Base.Iterator> {
     Builtin.unreachable()
   }

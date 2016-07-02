@@ -155,7 +155,7 @@ public func == <Element>(
 public struct EmptyGenerator<Element> {}
 
 extension EmptyIterator {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> EmptyIterator<Element> {
     Builtin.unreachable()
   }

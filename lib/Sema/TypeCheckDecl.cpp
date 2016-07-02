@@ -356,7 +356,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     {
       bool iBTC = decl->isBeingTypeChecked();
       decl->setIsBeingTypeChecked();
-      defer {decl->setIsBeingTypeChecked(iBTC); };
+      SWIFT_DEFER { decl->setIsBeingTypeChecked(iBTC); };
 
       // Validate the type.
       if (validateType(inherited, DC, options, resolver)) {
@@ -988,9 +988,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 
   // On any path out of this function, make sure to mark the binding as done
   // being type checked.
-  defer {
-    binding->setIsBeingTypeChecked(false);
-  };
+  SWIFT_DEFER { binding->setIsBeingTypeChecked(false); };
 
   // Resolve the pattern.
   auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
@@ -1934,8 +1932,8 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // as @objc, don't diagnose.
   Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
   if (auto classDecl = contextTy->getClassOrBoundGenericClass()) {
-    // One cannot define @objc members of Objective-C runtime visible classes.
-    if (classDecl->isOnlyObjCRuntimeVisible())
+    // One cannot define @objc members of any foreign classes.
+    if (classDecl->isForeign())
       return None;
 
     if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
@@ -3722,9 +3720,17 @@ public:
                       Super->getName());
         }
 
-        if (Super->isOnlyObjCRuntimeVisible()) {
+        switch (Super->getForeignClassKind()) {
+        case ClassDecl::ForeignKind::Normal:
+          break;
+        case ClassDecl::ForeignKind::CFType:
+          TC.diagnose(CD, diag::inheritance_from_cf_class,
+                      Super->getName());
+          break;
+        case ClassDecl::ForeignKind::RuntimeOnly:
           TC.diagnose(CD, diag::inheritance_from_objc_runtime_visible_class,
                       Super->getName());
+          break;
         }
       }
 
@@ -5662,7 +5668,7 @@ public:
     }
 
     {
-      defer { EED->setIsBeingTypeChecked(false); };
+      SWIFT_DEFER { EED->setIsBeingTypeChecked(false); };
 
       // Now that we have an argument type we can set the element's declared
       // type.
@@ -6815,7 +6821,7 @@ static Type checkExtensionGenericParams(
   };
 
   ext->setIsBeingTypeChecked(true);
-  defer { ext->setIsBeingTypeChecked(false); };
+  SWIFT_DEFER { ext->setIsBeingTypeChecked(false); };
 
   // Validate the generic type signature.
   bool invalid = false;

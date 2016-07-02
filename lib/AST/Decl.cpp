@@ -2231,7 +2231,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   ClassDeclBits.RequiresStoredPropertyInits = 0;
   ClassDeclBits.InheritsSuperclassInits
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Unchecked);
-  ClassDeclBits.Foreign = false;
+  ClassDeclBits.RawForeignKind = 0;
   ClassDeclBits.HasDestructorDecl = 0;
 }
 
@@ -2396,19 +2396,6 @@ StringRef ClassDecl::getObjCRuntimeName(
 
   // Produce the mangled name for this class.
   return mangleObjCRuntimeName(this, buffer);
-}
-
-bool ClassDecl::isOnlyObjCRuntimeVisible() const {
-  auto clangDecl = getClangDecl();
-  if (!clangDecl) return false;
-
-  auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl);
-  if (!objcClass) return false;
-
-  if (auto def = objcClass->getDefinition())
-    objcClass = def;
-
-  return objcClass->hasAttr<clang::ObjCRuntimeVisibleAttr>();
 }
 
 ArtificialMainKind ClassDecl::getArtificialMainKind() const {
@@ -3235,14 +3222,9 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
     }
   }
 
-  // If the Swift name starts with the word "is", use that Swift name as the
-  // getter name.
-  auto var = cast<VarDecl>(this);
-  if (camel_case::getFirstWord(var->getName().str()) == "is")
-    return ObjCSelector(ctx, 0, { var->getName() });
-
   // The getter selector is the property name itself.
-  return ObjCSelector(ctx, 0, { var->getObjCPropertyName() });
+  auto var = cast<VarDecl>(this);
+  return VarDecl::getDefaultObjCGetterSelector(ctx, var->getObjCPropertyName());
 }
 
 ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
@@ -3528,25 +3510,21 @@ Identifier VarDecl::getObjCPropertyName() const {
       return name->getSelectorPieces()[0];
   }
 
-  // If the Swift property name starts with the word "is", strip the
-  // "is" and lowercase the rest when forming the Objective-C property
-  // name.
-  ASTContext &ctx = getASTContext();
-  StringRef nameStr = getName().str();
-  if (camel_case::getFirstWord(nameStr) == "is") {
-    SmallString<16> scratch;
-    return ctx.getIdentifier(camel_case::toLowercaseWord(nameStr.substr(2),
-                                                         scratch));
-  }
-
   return getName();
 }
+
+ObjCSelector VarDecl::getDefaultObjCGetterSelector(ASTContext &ctx,
+                                                   Identifier propertyName) {
+  return ObjCSelector(ctx, 0, propertyName);
+}
+
 
 ObjCSelector VarDecl::getDefaultObjCSetterSelector(ASTContext &ctx,
                                                    Identifier propertyName) {
   llvm::SmallString<16> scratch;
   scratch += "set";
   camel_case::appendSentenceCase(scratch, propertyName.str());
+
   return ObjCSelector(ctx, 1, ctx.getIdentifier(scratch));
 }
 

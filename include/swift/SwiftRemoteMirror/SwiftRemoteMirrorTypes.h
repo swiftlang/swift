@@ -63,7 +63,21 @@ typedef enum swift_layout_kind {
   // Value types consisting of zero or more fields.
   SWIFT_TUPLE,
   SWIFT_STRUCT,
+
+  // An enum with no payload cases. The record will have no fields, but
+  // will have the correct size.
+  SWIFT_NO_PAYLOAD_ENUM,
+
+  // An enum with a single payload case. The record consists of a single
+  // field, being the enum payload.
+  SWIFT_SINGLE_PAYLOAD_ENUM,
+
+  // An enum with multiple payload cases. The record consists of a multiple
+  // fields, one for each enum payload.
+  SWIFT_MULTI_PAYLOAD_ENUM,
+
   SWIFT_THICK_FUNCTION,
+
   SWIFT_OPAQUE_EXISTENTIAL,
   SWIFT_CLASS_EXISTENTIAL,
   SWIFT_ERROR_EXISTENTIAL,

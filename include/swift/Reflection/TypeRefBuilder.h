@@ -92,6 +92,28 @@ struct ClosureContextInfo {
   void dump(std::ostream &OS) const;
 };
 
+struct FieldTypeInfo {
+  std::string Name;
+  const TypeRef *TR;
+  bool Indirect;
+
+  FieldTypeInfo() : Name(""), TR(nullptr), Indirect(false) {}
+  FieldTypeInfo(const std::string &Name, const TypeRef *TR, bool Indirect)
+      : Name(Name), TR(TR), Indirect(Indirect) {}
+
+  static FieldTypeInfo forEmptyCase(std::string Name) {
+    return FieldTypeInfo(Name, nullptr, false);
+  }
+
+  static FieldTypeInfo forIndirectCase(std::string Name, const TypeRef *TR) {
+    return FieldTypeInfo(Name, TR, true);
+  }
+
+  static FieldTypeInfo forField(std::string Name, const TypeRef *TR) {
+    return FieldTypeInfo(Name, TR, false);
+  }
+};
+
 /// An implementation of MetadataReader's BuilderType concept for
 /// building TypeRefs, and parsing field metadata from any images
 /// it has been made aware of.
@@ -286,7 +308,7 @@ public:
   const FieldDescriptor *getFieldTypeInfo(const TypeRef *TR);
 
   /// Get the parsed and substituted field types for a nominal type.
-  std::vector<std::pair<std::string, const TypeRef *>>
+  std::vector<FieldTypeInfo>
   getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD);
 
   /// Get the primitive type lowering for a builtin type.

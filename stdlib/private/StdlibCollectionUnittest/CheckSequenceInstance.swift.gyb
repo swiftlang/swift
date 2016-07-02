@@ -58,8 +58,8 @@ public func checkIterator<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where I.Element == ${Element}, ${Element} : Equatable {
   checkIterator(
-    expected, iterator, ${trace},
-    resiliencyChecks: resiliencyChecks, showFrame: false
+    expected, iterator, ${trace}, showFrame: false,
+    resiliencyChecks: resiliencyChecks
   ) { $0 == $1 }
 }
 
@@ -111,8 +111,8 @@ public func checkSequence<
   S.Iterator.Element : Equatable {
 
   checkSequence(
-    expected, sequence, ${trace},
-    resiliencyChecks: resiliencyChecks, showFrame: false
+    expected, sequence, ${trace}, showFrame: false,
+    resiliencyChecks: resiliencyChecks
   ) { $0 == $1 }
 }
 

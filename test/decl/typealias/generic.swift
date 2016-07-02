@@ -201,12 +201,12 @@ func takesSugaredType1(m: ConcreteClass.TA<Float>) {
   takesUnsugaredType1(m: m)
 }
 
-// FIXME: Something's wrong with SpecializeExpr here
+// FIXME: Something is wrong with SpecializeExpr here
 let _ = ConcreteStruct.O<Int>(123) // expected-error {{cannot invoke value of type 'Optional<Int>.Type' with argument list '(Int)'}}
 
 // Qualified lookup of generic typealiases nested inside generic contexts
 
-// FIXME: Something's wrong with SpecializeExpr here
+// FIXME: Something is wrong with SpecializeExpr here
 let _ = GenericClass<Int>.TA<Float>(a: 4.0, b: 1)  // expected-error {{'Int' is not convertible to 'Float'}}
 let _ = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)  // expected-error {{'Int' is not convertible to 'Float'}}
 

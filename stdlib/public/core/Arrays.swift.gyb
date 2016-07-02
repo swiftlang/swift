@@ -732,7 +732,7 @@ public struct ${Self}<Element>
     get {
       _checkIndex(bounds.lowerBound)
       _checkIndex(bounds.upperBound)
-      return ArraySlice(_buffer[bounds])
+      return ArraySlice(_buffer: _buffer[bounds])
     }
     set(rhs) {
       _checkIndex(bounds.lowerBound)
@@ -884,9 +884,19 @@ public struct ${Self}<Element>
 
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
-  public init(_ _buffer: _Buffer) {
+  public // @testable
+  init(_buffer: _Buffer) {
     self._buffer = _buffer
   }
+
+%if Self == 'ArraySlice':
+  /// Initialization from an existing buffer does not have "array.init"
+  /// semantics because the caller may retain an alias to buffer.
+  public // @testable
+  init(_buffer: _ContiguousArrayBuffer<Element>) {
+    self.init(_buffer: _Buffer(_buffer, shiftedToStartIndex: 0))
+  }
+%end
 
   public var _buffer: _Buffer
 }
@@ -926,7 +936,7 @@ extension ${Self} : ArrayLiteralConvertible {
   ///
   /// - Parameter elements: A variadic list of elements of the new array.
   public init(arrayLiteral elements: Element...) {
-    self.init(_extractOrCopyToNativeArrayBuffer(elements._buffer))
+    self.init(_buffer: _extractOrCopyToNativeArrayBuffer(elements._buffer))
   }
 %end
 }
@@ -1027,7 +1037,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   public init<S : Sequence>(_ s: S)
     where S.Iterator.Element == Element {
 
-    self = ${Self}(_Buffer(s._copyToNativeArrayBuffer(),
+    self = ${Self}(_buffer: _Buffer(s._copyToNativeArrayBuffer(),
       shiftedToStartIndex: 0))
   }
 
@@ -1114,7 +1124,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
         storage, to: _ContiguousArrayStorage<Element>.self))
     
     return (
-      Array(_Buffer(innerBuffer, shiftedToStartIndex: 0)),
+      Array(_buffer: _Buffer(innerBuffer, shiftedToStartIndex: 0)),
         innerBuffer.firstElementAddress)
   }
 
@@ -2074,19 +2084,6 @@ public func != <Element : Equatable>(
 %end
 
 #if _runtime(_ObjC)
-/// Returns an `Array<Base>` containing the same elements as `a` in
-/// O(1).
-///
-/// - Precondition: `Base` is a base class or base `@objc` protocol (such
-///   as `AnyObject`) of `Derived`.
-public func _arrayUpCast<Derived, Base>(_ a: Array<Derived>) -> Array<Base> {
-  // FIXME: Dynamic casting is currently not possible without the objc runtime:
-  // rdar://problem/18801510
-  return Array(a._buffer.cast(toBufferOf: Base.self))
-}
-#endif
-
-#if _runtime(_ObjC)
 extension Array {
   /// Tries to downcast the source `NSArray` as our native buffer type.
   /// If it succeeds, creates a new `Array` around it and returns that.
@@ -2113,7 +2110,7 @@ extension Array {
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
   public init(_immutableCocoaArray: _NSArrayCore) {
-    self = Array(_ArrayBuffer(nsArray: _immutableCocoaArray))
+    self = Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
   }
 }
 #endif
@@ -2159,7 +2156,7 @@ extension ${Self} {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "replaceSubrange")
+  @available(*, unavailable, renamed: "replaceSubrange(_:with:)")
   public mutating func replaceRange<C>(
     _ subRange: Range<Int>,
     with newElements: C

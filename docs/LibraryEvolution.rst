@@ -1694,6 +1694,7 @@ document that affect language semantics:
 - (planned) Default implementations in protocols
 - (planned) Generalized existentials (values of protocol type)
 - (planned) Open and closed enums
+- (planned) Removing the "constant" guarantee for 'let' across module boundaries
 - (planned) Syntax for declaring "versioned" entities and their features
 - (planned) Syntax for declaring inlineable code
 - (planned) Syntax for declaring fixed-contents structs

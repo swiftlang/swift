@@ -661,39 +661,24 @@ namespace {
         }
       }
 
-      SmallVector<Constraint *, 4> favoredConstraints;
-      
-      TypeBase *favoredTy = nullptr;
-      
-      // Copy over the existing bindings, dividing the constraints up
-      // into "favored" and non-favored lists.
-      for (auto oldConstraint : oldConstraints) {
-        auto overloadChoice = oldConstraint->getOverloadChoice();
-        if (isFavored(overloadChoice.getDecl())) {
-          favoredConstraints.push_back(oldConstraint);
-          
-          favoredTy = overloadChoice.getDecl()->
-              getType()->getAs<AnyFunctionType>()->
-              getResult().getPointer();
-        }
-      }
-      
-      if (favoredConstraints.size() == 1) {
-        CS.setFavoredType(expr, favoredTy);
-      }
-      
       // If there might be replacement constraints, get them now.
       SmallVector<Constraint *, 4> replacementConstraints;
       if (createReplacements)
         createReplacements(tyvarType, oldConstraints, replacementConstraints);
-      
+
+      // Copy over the existing bindings, dividing the constraints up
+      // into "favored" and non-favored lists.
+      SmallVector<Constraint *, 4> favoredConstraints;
+      for (auto oldConstraint : oldConstraints)
+        if (isFavored(oldConstraint->getOverloadChoice().getDecl()))
+          favoredConstraints.push_back(oldConstraint);
+
       // If we did not find any favored constraints, just introduce
       // the replacement constraints (if they differ).
       if (favoredConstraints.empty()) {
         if (replacementConstraints.size() > oldConstraints.size()) {
           // Remove the old constraint.
           CS.removeInactiveConstraint(constraint);
-          
           CS.addConstraint(
                            Constraint::createDisjunction(CS,
                                                          replacementConstraints,
@@ -701,7 +686,14 @@ namespace {
         }
         break;
       }
-      
+
+      if (favoredConstraints.size() == 1) {
+        auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
+        auto overloadType = overloadChoice.getDecl()->getType();
+        auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
+        CS.setFavoredType(expr, resultType.getPointer());
+      }
+
       // Remove the original constraint from the inactive constraint
       // list and add the new one.
       CS.removeInactiveConstraint(constraint);
@@ -3220,6 +3212,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   InferUnresolvedMemberConstraintGenerator MCG(E, CS);
   ConstraintWalker cw(MCG);
   Parent->walk(cw);
+
   SmallVector<Solution, 3> solutions;
   if (CS.solve(solutions, FreeTypeVariableBinding::Allow)) {
     return false;

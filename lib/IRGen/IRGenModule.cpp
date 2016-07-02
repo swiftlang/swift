@@ -781,18 +781,47 @@ static StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
   return os.str();
 }
 
+llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
+                                                      StringRef library) {
+  llvm::SmallString<32> buffer;
+
+  if (T.isWindowsMSVCEnvironment() || T.isWindowsItaniumEnvironment()) {
+    bool quote = library.find(' ') != StringRef::npos;
+
+    buffer += "/DEFAULTLIB:";
+    if (quote)
+      buffer += '"';
+    buffer += library;
+    if (!library.endswith_lower(".lib"))
+      buffer += ".lib";
+    if (quote)
+      buffer += '"';
+  } else if (T.isPS4()) {
+    bool quote = library.find(' ') != StringRef::npos;
+
+    buffer += "\01";
+    if (quote)
+      buffer += '"';
+    buffer += library;
+    if (quote)
+      buffer += '"';
+  } else {
+    buffer += "-l";
+    buffer += library;
+  }
+
+  return buffer;
+}
+
 void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   llvm::LLVMContext &ctx = Module.getContext();
 
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
-    // FIXME: Use target-independent linker option.
-    // Clang uses CGM.getTargetCodeGenInfo().getDependentLibraryOption(...).
-    llvm::SmallString<32> buf;
-    buf += "-l";
-    buf += linkLib.getName();
-    auto flag = llvm::MDString::get(ctx, buf);
-    AutolinkEntries.push_back(llvm::MDNode::get(ctx, flag));
+    llvm::SmallString<32> opt =
+        getTargetDependentLibraryOption(Triple, linkLib.getName());
+    AutolinkEntries.push_back(
+        llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
     break;
   }
   case LibraryKind::Framework: {
@@ -877,11 +906,9 @@ void IRGenModule::emitAutolinkInfo() {
                                        }),
                         AutolinkEntries.end());
 
-  switch (TargetInfo.OutputObjectFormat) {
-  case llvm::Triple::UnknownObjectFormat:
-    llvm_unreachable("unknown object format");
-  case llvm::Triple::COFF:
-  case llvm::Triple::MachO: {
+  if (TargetInfo.OutputObjectFormat == llvm::Triple::COFF ||
+      TargetInfo.OutputObjectFormat == llvm::Triple::MachO ||
+      Triple.isPS4()) {
     llvm::LLVMContext &ctx = Module.getContext();
 
     if (!LinkerOptions) {
@@ -897,9 +924,10 @@ void IRGenModule::emitAutolinkInfo() {
       (void)FoundOldEntry;
       assert(FoundOldEntry && "Could not replace old linker options entry?");
     }
-    break;
-  }
-  case llvm::Triple::ELF: {
+  } else {
+    assert(TargetInfo.OutputObjectFormat == llvm::Triple::ELF &&
+           "expected ELF output format");
+
     // Merge the entries into null-separated string.
     llvm::SmallString<64> EntriesString;
     for (auto &EntryNode : AutolinkEntries) {
@@ -911,19 +939,16 @@ void IRGenModule::emitAutolinkInfo() {
       }
     }
     auto EntriesConstant = llvm::ConstantDataArray::getString(
-      LLVMContext, EntriesString, /*AddNull=*/false);
+        LLVMContext, EntriesString, /*AddNull=*/false);
 
-    auto var = new llvm::GlobalVariable(*getModule(), 
-                                        EntriesConstant->getType(), true,
-                                        llvm::GlobalValue::PrivateLinkage,
-                                        EntriesConstant, 
-                                        "_swift1_autolink_entries");
+    auto var =
+        new llvm::GlobalVariable(*getModule(), EntriesConstant->getType(), true,
+                                 llvm::GlobalValue::PrivateLinkage,
+                                 EntriesConstant, "_swift1_autolink_entries");
     var->setSection(".swift1_autolink_entries");
     var->setAlignment(getPointerAlignment().getValue());
 
     addUsedGlobal(var);
-    break;
-  }
   }
 
   if (!IRGen.Opts.ForceLoadSymbolName.empty()) {

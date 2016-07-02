@@ -1186,7 +1186,7 @@ public typealias UnicodeCodecType = UnicodeCodec
 public func transcode<Input, InputEncoding, OutputEncoding>(
   _ inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
   _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
-  stoppingOnError stopOnError: Bool
+  stopOnError: Bool
 ) -> Bool
   where
   Input : IteratorProtocol,

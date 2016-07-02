@@ -459,7 +459,8 @@ ManagedValue Transform::transform(ManagedValue v,
     auto class2 = outputSubstType->getClassOrBoundGenericClass();
 
     // CF <-> Objective-C via toll-free bridging.
-    if (class1->isForeign() != class2->isForeign()) {
+    if ((class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType) ^
+        (class2->getForeignClassKind() == ClassDecl::ForeignKind::CFType)) {
        return ManagedValue(SGF.B.createUncheckedRefCast(Loc,
                                                         v.getValue(),
                                                         loweredResultTy),

@@ -1,26 +1,26 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG1 | FileCheck %s -check-prefix=EXPECT_OINT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG2 | FileCheck %s -check-prefix=ARG-NAME1
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG1 | FileCheck %s -check-prefix=EXPECT_OINT
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG2 | FileCheck %s -check-prefix=ARG-NAME1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG3 | FileCheck %s -check-prefix=ARG-NAME2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG4 | FileCheck %s -check-prefix=EXPECT_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG5 | FileCheck %s -check-prefix=EXPECT_OSTRING
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG6 | FileCheck %s -check-prefix=ARG-NAME2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG7 | FileCheck %s -check-prefix=ARG-NAME1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG8 | FileCheck %s -check-prefix=EXPECT_STRING
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG7 | FileCheck %s -check-prefix=ARG-NAME1
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG8 | FileCheck %s -check-prefix=EXPECT_STRING
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD1 | FileCheck %s -check-prefix=OVERLOAD1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD2 | FileCheck %s -check-prefix=OVERLOAD2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | FileCheck %s -check-prefix=OVERLOAD3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | FileCheck %s -check-prefix=OVERLOAD4
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD1 | FileCheck %s -check-prefix=OVERLOAD1
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD2 | FileCheck %s -check-prefix=OVERLOAD2
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | FileCheck %s -check-prefix=OVERLOAD3
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | FileCheck %s -check-prefix=OVERLOAD4
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | FileCheck %s -check-prefix=MEMBER1
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | FileCheck %s -check-prefix=MEMBER1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER2 | FileCheck %s -check-prefix=MEMBER2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER3 | FileCheck %s -check-prefix=MEMBER3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER4 | FileCheck %s -check-prefix=MEMBER4
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER4 | FileCheck %s -check-prefix=MEMBER4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER5 | FileCheck %s -check-prefix=MEMBER2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER6 | FileCheck %s -check-prefix=MEMBER4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER7 | FileCheck %s -check-prefix=MEMBER7
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER8 | FileCheck %s -check-prefix=MEMBER8
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER9 | FileCheck %s -check-prefix=MEMBER1
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER7 | FileCheck %s -check-prefix=MEMBER7
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER8 | FileCheck %s -check-prefix=MEMBER8
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER9 | FileCheck %s -check-prefix=MEMBER1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG1 | FileCheck %s -check-prefix=EXPECT_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG2 | FileCheck %s -check-prefix=EXPECT_STRING

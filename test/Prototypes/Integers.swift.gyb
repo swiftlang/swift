@@ -12,7 +12,7 @@
 // RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
 // RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone
 // RUN: %line-directive %t/out.swift -- %target-run %t/a.out
-// --stdlib-unittest-filter DoubleWidth/
+// --stdlib-unittest-filter minBitsRequired
 
 // REQUIRES: executable_test
 
@@ -134,18 +134,24 @@ public func _log(_ message: @autoclosure () -> String) {
 //===--- Arithmetic -------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// Arithmetic protocol declares methods backing binary arithmetic operators,
-/// such as  `+`, `-` and `*`; and their mutating counterparts. These methods
-/// operate on arguments of the same type.
+/// Declares methods backing binary arithmetic operators, such as `+`, `-` and
+/// `*`; and their mutating counterparts.
 ///
-/// Both mutating and non-mutating operations are declared in the protocol, but
-/// only the mutating ones are required. Should conforming type omit
-/// non-mutating implementations, they will be provided by a protocol extension.
-/// Implementation in that case will copy `self`, perform a mutating operation
-/// on it and return the resulting value.
+/// It provides a suitable basis for arithmetic on scalars such as integers and
+/// floating point numbers.
+///
+/// Both mutating and non-mutating operations are declared in the protocol,
+/// however only the mutating ones are required, as non-mutating are provided
+/// by the protocol extension.
 public protocol Arithmetic : Equatable, IntegerLiteralConvertible {
-  /// Initialize to zero
-  init()
+  // Since `Arithmetic` extends `IntegerLiteralConvertible` it is logical for
+  // it to be initializable from instances of `Integer` as well as from integer
+  // literals. Failable exact initializers from other `Arithmetic` types should
+  // be defined on child protocols.
+
+  /// Initializes to the value of `source` if it is representable exactly,
+  /// returns `nil` otherwise.
+  init?<T : Integer>(exactly source: T)
 
 % for x in binaryArithmetic['Arithmetic']:
   // defaulted using an in-place counterpart, but can be used as an
@@ -155,6 +161,13 @@ public protocol Arithmetic : Equatable, IntegerLiteralConvertible {
   // implementation hook
   mutating func ${x.mutatingName}(${x.firstArg} rhs: Self)
 % end
+}
+
+extension Arithmetic {
+  @_transparent
+  public init() {
+    self = 0
+  }
 }
 
 % for Protocol in binaryArithmetic:
@@ -176,12 +189,16 @@ extension ${Protocol} {
 /// The only method of this protocol has the default implementation in an
 /// extension, that uses a parameterless initializer and subtraction.
 public protocol SignedArithmetic : Arithmetic {
-  func negate() -> Self
+  func negated() -> Self
+  mutating func negate()
 }
 
 extension SignedArithmetic {
-  public func negate() -> Self {
+  public func negated() -> Self {
     return Self() - self
+  }
+  public mutating func negate() {
+    self = negated()
   }
 }
 
@@ -202,7 +219,7 @@ public func ${x.operator}= <T: ${Protocol}>(lhs: inout T, rhs: T) {
 
 @_transparent
 public prefix func -<T: SignedArithmetic>(x: T) -> T {
-  return x.negate()
+  return x.negated()
 }
 
 //===----------------------------------------------------------------------===//
@@ -234,7 +251,7 @@ public typealias UWord = UInt${word_bits}
 ///     `Self` respectively
 public protocol Integer : ${IntegerBase} {
 
-  // FIXME(compiler limitation): Ideally, this constraint would just be :
+  // FIXME(ABI): Ideally, this constraint would just be :
   // Integer.  Until we get recursive protocol requirements, that isn't
   // possible.
 
@@ -263,6 +280,13 @@ public protocol Integer : ${IntegerBase} {
   func isEqual(to rhs: Self) -> Bool
   func isLess(than rhs: Self) -> Bool
 
+  /// Creates an instance of `Self` that has the exact value of `source`,
+  /// returns `nil` otherwise.
+  init?<T : FloatingPoint>(exactly source: T)
+
+  /// Truncates the `source` to the closest representable value of `Self`.
+  init<T : FloatingPoint>(_ source: T)
+
   /// Creates an instance of `Self` from the value of any other `Integer`,
   /// trapping if value of `source` cannot be represented by `Self`.
   init<T : Integer>(_ source: T)
@@ -286,11 +310,10 @@ public protocol Integer : ${IntegerBase} {
   /// Will be constant for fixed-width integer types.
   var bitWidth : Word { get }
 
-  /// If `self` is negative, returns the index of the least significant bit of
-  /// our representation such that all more-significant bits are 1.
-  /// Has the value -1 if `self` is 0.
-  /// Has the value equal to `bitWidth - 1` for fixed width integers.
-  var signBitIndex: Word { get }
+  /// Returns the number of bits required to represent the value of `self` in a
+  /// signed type using two's complement representation.
+  /// The minimum value for this property should naturally be 1.
+  var minBitsRequiredForSignedRepresentation: Word { get }
 
 % for x in binaryArithmetic['Integer']:
   // defaulted using an in-place counterpart, but can be used as an
@@ -311,6 +334,14 @@ public protocol Integer : ${IntegerBase} {
 }
 
 extension Integer {
+  public init?<T : FloatingPoint>(exactly source: T) {
+    fatalError()
+  }
+
+  public init<T : FloatingPoint>(_ source: T) {
+    fatalError()
+  }
+
   public var countRepresentedWords: Word {
     return (self.bitWidth + ${word_bits} - 1) / ${word_bits}
   }
@@ -599,11 +630,6 @@ extension FixedWidthInteger {
 % end
 
   @_transparent
-  public init() {
-    self = 0
-  }
-
-  @_transparent
   public init<T : Integer>(extendingOrTruncating source: T) {
     if Self.bitWidth <= ${word_bits} {
       self = Self.init(_truncatingBits: source.nthWord(0))
@@ -681,11 +707,22 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   public init<T : Integer>(_ source: T) {
     _assertCond(
       source >= 0, "negative value \(source) not representable by \(Self.self)")
-    let requiredBits = source.signBitIndex + 1
+    let requiredBits = source.minBitsRequiredForSignedRepresentation - 1
     _assertCond(
       requiredBits <= Self.bitWidth,
       "\(Self.self) cannot store all \(requiredBits)  bits "
       + "needed for unsigned representation of \(source)")
+    self.init(extendingOrTruncating: source)
+  }
+
+  @_transparent
+  public init?<T : Integer>(exactly source: T) {
+    _assertCond(
+      source >= 0, "negative value \(source) not representable by \(Self.self)")
+    let requiredBits = source.minBitsRequiredForSignedRepresentation - 1
+    if requiredBits > Self.bitWidth {
+      return nil
+    }
     self.init(extendingOrTruncating: source)
   }
 
@@ -722,11 +759,20 @@ extension SignedInteger {
 extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : Integer>(_ source: T) {
-    let requiredBits = source.signBitIndex + (source >= 0 ? 2 : 1)
+    let requiredBits = source.minBitsRequiredForSignedRepresentation
     _assertCond(
       requiredBits <= Self.bitWidth,
       "\(Self.self) cannot store all \(requiredBits) bits "
       + "needed for signed representation of \(source)")
+    self.init(extendingOrTruncating: source)
+  }
+
+  @_transparent
+  public init?<T : Integer>(exactly source: T) {
+    let requiredBits = source.minBitsRequiredForSignedRepresentation
+    if requiredBits > Self.bitWidth {
+      return nil
+    }
     self.init(extendingOrTruncating: source)
   }
 
@@ -841,12 +887,12 @@ public struct ${Self}
   public var bitWidth: Word { return ${bits} }
 
   @_transparent
-  public var signBitIndex: Word {
+  public var minBitsRequiredForSignedRepresentation: Word {
 % if signed:
     let x = self < 0 ? ~self : self
-    return ${Self}.bitWidth - 1 - x.countLeadingZeros()
+    return (x == 0) ? 1 : (${Self}.bitWidth - x.countLeadingZeros() + 1)
 % else:
-    return ${Self}.bitWidth - 1 - self.countLeadingZeros()
+    return (self == 0) ? 1 : (${Self}.bitWidth - self.countLeadingZeros() + 1)
 % end
   }
 
@@ -974,6 +1020,10 @@ public struct DoubleWidth<
     fatalError()
   }
 
+  public init?<T : Arithmetic>(exactly source: T) {
+    fatalError()
+  }
+
   public init<T : Integer>(extendingOrTruncating source: T) {
     fatalError()
   }
@@ -997,7 +1047,8 @@ public struct DoubleWidth<
     return 2 * T.bitWidth
   }
 
-  public var signBitIndex: Word {
+  public var minBitsRequiredForSignedRepresentation: Word {
+    // FIXME: WRONG !!!!!!!!!!!!!!!!!!!!!!
     return (self == DoubleWidth<T>()) ? -1 : (bitWidth - 1)
   }
 
@@ -1129,9 +1180,9 @@ public struct DoubleWidth<
 
 //===--- Int128/UInt128 ---------------------------------------------------===//
 
-% for Self in ['Int129', 'UInt129']:
+% for Self in ['Int128_', 'UInt128_']:
 %   signed = 'U' not in Self
-%   Half = Self[:-3] + '64'
+%   Half = Self[:-4] + '64'
 %   Unsigned = 'Signed' if signed else 'Unsigned'
 %   u = 's' if signed else 'u'
 %   U = 'U' if signed else ''
@@ -1194,8 +1245,8 @@ public struct ${Self}
 
   public var bitWidth: Word { return 128 }
 
-  public var signBitIndex: Word {
-    return _storage.signBitIndex
+  public var minBitsRequiredForSignedRepresentation: Word {
+    return _storage.minBitsRequiredForSignedRepresentation
   }
 
   public func countLeadingZeros() -> Word {
@@ -1282,8 +1333,8 @@ import StdlibUnittest
 func expectEqual<T : FixedWidthInteger>(
   _ expected: T, _ actual: T,
   _ message: @autoclosure () -> String = "",
-  showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) {
   if expected != actual {
@@ -1302,15 +1353,15 @@ func expectEqual<T : FixedWidthInteger>(
 func expectEqual<T : FixedWidthInteger>(
   _ expected: (T, ArithmeticOverflow), _ actual: (T, ArithmeticOverflow),
   _ message: @autoclosure () -> String = "",
-  showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) {
 % for i in 0, 1:
   expectEqual(
     expected.${i}, actual.${i}, message(),
-    showFrame: false,
-    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
+    showFrame: false)
 % end
 }
 
@@ -1435,12 +1486,12 @@ tests.test("CountLeadingZeros") {
   expectEqual(0, Int8.min.countLeadingZeros())
 }
 
-tests.test("signBitIndex") {
-  expectEqual(7, UInt8.max.signBitIndex)
-  expectEqual(-1, UInt8.min.signBitIndex)
-  expectEqual(6, Int8.max.signBitIndex)
-  expectEqual(-1, (0 as Int8).signBitIndex)
-  expectEqual(6, Int8.min.signBitIndex)
+tests.test("minBitsRequiredForSignedRepresentation") {
+  expectEqual(9, UInt8.max.minBitsRequiredForSignedRepresentation)
+  expectEqual(1, UInt8.min.minBitsRequiredForSignedRepresentation)
+  expectEqual(8, Int8.max.minBitsRequiredForSignedRepresentation)
+  expectEqual(1, (0 as Int8).minBitsRequiredForSignedRepresentation)
+  expectEqual(8, Int8.min.minBitsRequiredForSignedRepresentation)
 }
 
 tests.test("Conversion8to16") {
@@ -1814,9 +1865,9 @@ tests.test("DoubleWidth/${SType}/subtracting beyond min") {
 %   end
 % end
 
-tests.test("DoubleWidth/signBitIndex") {
-  expectEqual(15, DoubleWidth<UInt8>.max.signBitIndex)
-  expectEqual(-1, DoubleWidth<UInt8>.min.signBitIndex)
+tests.test("DoubleWidth/minBitsRequiredForSignedRepresentation") {
+  expectEqual(15, DoubleWidth<UInt8>.max.minBitsRequiredForSignedRepresentation)
+  expectEqual(-1, DoubleWidth<UInt8>.min.minBitsRequiredForSignedRepresentation)
 }
 
 tests.test("DoubleWidth/UInt64/nthWord") {

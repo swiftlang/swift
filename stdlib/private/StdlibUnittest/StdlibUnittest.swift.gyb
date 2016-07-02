@@ -20,7 +20,7 @@ import SwiftPrivateLibcExtras
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
 #endif
 
@@ -1167,6 +1167,15 @@ public func runAllTests() {
   }
 }
 
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+
+@_silgen_name("swift_leaks_startTrackingObjects")
+func startTrackingObjects(_: UnsafePointer<CChar>)
+@_silgen_name("swift_leaks_stopTrackingObjects")
+func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
+
+#endif
+
 public final class TestSuite {
   public init(_ name: String) {
     self.name = name
@@ -1225,6 +1234,11 @@ public final class TestSuite {
       f()
     }
     let test = _testByName(testName)
+
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    startTrackingObjects(name)
+#endif
+
     switch test.code {
     case .single(let code):
       precondition(
@@ -1234,6 +1248,11 @@ public final class TestSuite {
     case .parameterized(code: let code, _):
       code(parameter!)
     }
+
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    _ = stopTrackingObjects(name)
+#endif
+
     if let f = _testTearDownCode {
       f()
     }
@@ -1387,6 +1406,7 @@ public enum OSVersion : CustomStringConvertible {
   case linux
   case freeBSD
   case android
+  case ps4
 
   public var description: String {
     switch self {
@@ -1408,6 +1428,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Linux"
     case .freeBSD:
       return "FreeBSD"
+    case .ps4:
+      return "PS4"
     case .android:
       return "Android"
     }
@@ -1444,6 +1466,8 @@ func _getOSVersion() -> OSVersion {
   return .linux
 #elseif os(FreeBSD)
   return .freeBSD
+#elseif os(PS4)
+  return .ps4
 #elseif os(Android)
   return .android
 #else
@@ -1519,6 +1543,8 @@ public enum TestRunPredicate : CustomStringConvertible {
   case linuxAny(reason: String)
 
   case freeBSDAny(reason: String)
+
+  case ps4Any(reason: String)
 
   case androidAny(reason: String)
 
@@ -1604,6 +1630,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case .freeBSDAny(reason: let reason):
       return "freeBSDAny(*, reason: \(reason))"
+
+    case .ps4Any(reason: let reason):
+      return "ps4Any(*, reason: \(reason))"
 
     case .objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
@@ -1857,6 +1886,14 @@ public enum TestRunPredicate : CustomStringConvertible {
     case .freeBSDAny:
       switch _getRunningOSVersion() {
       case .freeBSD:
+        return true
+      default:
+        return false
+      }
+
+    case .ps4Any:
+      switch _getRunningOSVersion() {
+      case .ps4:
         return true
       default:
         return false

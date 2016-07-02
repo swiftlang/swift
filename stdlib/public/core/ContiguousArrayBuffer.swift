@@ -177,7 +177,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   typealias Manager = ManagedBufferPointer<_ArrayBody, Element>
 
   internal // private
-  var __manager : Manager {
+  var __manager: Manager {
     return Manager(_uncheckedUnsafeBufferObject: self)
   }
 }
@@ -246,7 +246,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   /// True, if the array is native and does not need a deferred type check.
-  var arrayPropertyIsNativeTypeChecked : Bool {
+  var arrayPropertyIsNativeTypeChecked: Bool {
     return true
   }
 

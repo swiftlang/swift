@@ -518,6 +518,7 @@ namespace {
 }
 
 void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
+                                        Type baseTypeOrNull,
                                         DeclName targetDeclName,
                                         SourceLoc nameLoc,
                                         NameLookupOptions lookupOptions,
@@ -554,7 +555,13 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   });
 
   TypoCorrectionResolver resolver(*this, nameLoc);
-  lookupVisibleDecls(consumer, DC, &resolver, /*top level*/ true, nameLoc);
+  if (baseTypeOrNull) {
+    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, &resolver,
+                             /*include instance members*/
+                               !(lookupOptions & NameLookupFlags::OnlyTypes));
+  } else {
+    lookupVisibleDecls(consumer, DC, &resolver, /*top level*/ true, nameLoc);
+  }
 
   // Impose a maximum distance from the best score.
   entries.filterMaxScoreRange(MaxCallEditDistanceFromBestCandidate);

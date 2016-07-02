@@ -31,8 +31,8 @@ var words=[
 
 // This is a phone book record.
 struct Record : Comparable {
-  var first : String
-  var last : String
+  var first: String
+  var last: String
 
   init(_ first_ : String,_ last_ : String) {
     first = first_

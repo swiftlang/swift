@@ -1709,7 +1709,7 @@ extension Collection {
   @available(*, unavailable, renamed: "Iterator")
   public typealias Generator = Iterator
 
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> Iterator {
     Builtin.unreachable()
   }

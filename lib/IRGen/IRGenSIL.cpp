@@ -344,7 +344,6 @@ public:
       StackSlotKey;
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
-  llvm::SmallDenseMap<llvm::Type *, Address, 8> DebugScratchpads;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
   llvm::SmallVector<std::pair<DominancePoint, llvm::Instruction *>, 8>
       ValueVariables;
@@ -1258,6 +1257,10 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   assert(params.empty() && "didn't claim all parameters!");
 
+  // emitPolymorphicParameters() may create function calls, so we need
+  // to initialize the debug location here.
+  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo, IGF.Builder);
+  
   // Bind polymorphic arguments. This can only be done after binding
   // all the value parameters, and must be done even for non-polymorphic
   // functions because of imported Objective-C generics.

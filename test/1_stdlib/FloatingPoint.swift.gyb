@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/FloatingPoint.swift
-// RUN: %line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %t/FloatingPoint.swift -o %t/a.out
+// RUN: %line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib %t/FloatingPoint.swift -o %t/a.out
 // RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
@@ -104,7 +104,7 @@ FloatingPoint.test("Float/staticProperties") {
   expectBitwiseEqual(bitPattern: 0x7fa0_0000, Ty.signalingNaN)
   expectBitwiseEqual(bitPattern: 0x7f80_0000, Ty.infinity)
   expectBitwiseEqual(0x1.ffff_fe__p127, Ty.greatestFiniteMagnitude)
-  expectBitwiseEqual(0x1.921f_b6__p1, Ty.pi)
+  expectBitwiseEqual(0x1.921f_b4__p1, Ty.pi)
   expectBitwiseEqual(0x1.0p-23, Ty.ulpOfOne)
   expectBitwiseEqual(0x1.0p-126, Ty.leastNormalMagnitude)
 #if arch(arm)

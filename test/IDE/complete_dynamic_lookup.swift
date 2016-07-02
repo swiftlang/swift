@@ -237,6 +237,8 @@ protocol Bar { func bar() }
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .topLevelObjcClass_InstanceFunc1()[#Void#]{{; name=.+$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#Int8#}][#Int#]{{; name=.+$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    .topLevelObjcClass_Property1[#Int#]{{; name=.+$}}
+// TLOC_MEMBERS_NO_DOT-NEXT: Decl[InfixOperatorFunction]/OtherModule[Swift]: === {#AnyObject?#}[#Bool#];
+// TLOC_MEMBERS_NO_DOT-NEXT: Decl[InfixOperatorFunction]/OtherModule[Swift]: !== {#AnyObject?#}[#Bool#];
 // TLOC_MEMBERS_NO_DOT-NEXT: End completions
 
 // TLOC_MEMBERS_DOT: Begin completions

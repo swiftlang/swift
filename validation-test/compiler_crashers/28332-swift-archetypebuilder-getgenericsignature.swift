@@ -6,5 +6,18 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -parse
-func a{{String($0}{u
-return{
+// REQUIRES: asserts
+class A{var b=a
+struct Q<h{
+enum a<T{
+extension{
+{{
+}}
+protocol c:a{
+extension{
+{
+}
+protocol A{
+func<
+typealias e:
+Q

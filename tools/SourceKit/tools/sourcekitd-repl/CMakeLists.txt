@@ -18,11 +18,10 @@ if(HAVE_UNICODE_LIBEDIT)
     set_target_properties(sourcekitd-repl
       PROPERTIES
       LINK_FLAGS "-Wl,-rpath -Wl,@executable_path/../lib")
-
-    if(SWIFT_ANALYZE_CODE_COVERAGE)
-      set_property(TARGET sourcekitd-repl APPEND_STRING PROPERTY
-        LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
-    endif()
+  endif()
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
+    set_property(TARGET sourcekitd-repl APPEND_STRING PROPERTY
+      LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
   endif()
 
   swift_install_in_component(tools

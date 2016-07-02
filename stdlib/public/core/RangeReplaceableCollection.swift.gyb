@@ -1151,7 +1151,7 @@ public func +<
 public typealias RangeReplaceableCollectionType = RangeReplaceableCollection
 
 extension RangeReplaceableCollection {
-  @available(*, unavailable, renamed: "replaceSubrange")
+  @available(*, unavailable, renamed: "replaceSubrange(_:with:)")
   public mutating func replaceRange<C>(
     _ subrange: Range<Index>,
     with newElements: C

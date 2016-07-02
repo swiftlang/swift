@@ -12,8 +12,6 @@ else()
   find_package(ICU REQUIRED COMPONENTS uc i18n)
   set(swift_stubs_unicode_normalization_sources
       UnicodeNormalization.cpp)
-  include_directories(
-      ${ICU_UC_INCLUDE_DIR} ${ICU_I18N_INCLUDE_DIR})
 endif()
 
 add_swift_library(swiftStdlibStubs OBJECT_LIBRARY TARGET_LIBRARY

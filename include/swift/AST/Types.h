@@ -2385,7 +2385,42 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
     return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  
+
+/// A call argument or parameter.
+struct CallArgParam {
+  /// The type of the argument or parameter. For a variadic parameter,
+  /// this is the element type.
+  Type Ty;
+
+  // The label associated with the argument or parameter, if any.
+  Identifier Label;
+
+  /// Whether the parameter has a default argument.  Not valid for arguments.
+  bool HasDefaultArgument = false;
+
+  /// Whether the parameter is variadic. Not valid for arguments.
+  bool Variadic = false;
+
+  /// Whether the argument or parameter has a label.
+  bool hasLabel() const { return !Label.empty(); }
+};
+
+/// Break an argument type into an array of \c CallArgParams.
+///
+/// \param type The type to decompose.
+SmallVector<CallArgParam, 4> decomposeArgType(Type type);
+
+/// Break a parameter type into an array of \c CallArgParams.
+///
+/// \param paramOwner The declaration that owns this parameter.
+/// \param level The level of parameters that are being decomposed.
+SmallVector<CallArgParam, 4>
+decomposeParamType(Type type, const ValueDecl *paramOwner, unsigned level);
+
+/// Turn a param list into a symbolic and printable representation that does not
+/// include the types, something like (: , b:, c:)
+std::string getParamListAsString(ArrayRef<CallArgParam> parameters);
+
 /// PolymorphicFunctionType - A polymorphic function type.
 class PolymorphicFunctionType : public AnyFunctionType {
   // TODO: storing a GenericParamList* here is really the wrong solution;

@@ -17,6 +17,7 @@
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/DebugUtils.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -30,13 +31,23 @@ static bool isProjection(ValueBase *V) {
     case ValueKind::TupleElementAddrInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
     case ValueKind::StructExtractInst:
-    case ValueKind::TupleExtractInst:
     case ValueKind::UncheckedEnumDataInst:
     case ValueKind::MarkDependenceInst:
     case ValueKind::PointerToAddressInst:
     case ValueKind::AddressToPointerInst:
     case ValueKind::InitEnumDataAddrInst:
       return true;
+    case ValueKind::TupleExtractInst: {
+      auto *TEI = cast<TupleExtractInst>(V);
+      // Special handling for extracting the pointer-result from an
+      // array construction. We handle this like a ref_element_addr
+      // rather than a projection. See the handling of tuple_extract
+      // in analyzeInstruction().
+      if (TEI->getFieldNo() == 1 &&
+          ArraySemanticsCall(TEI->getOperand(), "array.uninitialized", false))
+        return false;
+      return true;
+    }
     default:
       return false;
   }
@@ -1095,6 +1106,15 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
         FInfo->Graph.F->getName() << '\n');
 }
 
+/// Returns true if all uses of \p I are tuple_extract instructions.
+static bool onlyUsedInTupleExtract(SILInstruction *I) {
+  for (Operand *Use : getNonDebugUses(I)) {
+    if (!isa<TupleExtractInst>(Use->getUser()))
+      return false;
+  }
+  return true;
+}
+
 void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
                                         FunctionInfo *FInfo,
                                         FunctionOrder &BottomUpOrder,
@@ -1113,13 +1133,20 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         // These array semantics calls do not capture anything.
         return;
       case ArrayCallKind::kArrayUninitialized:
-        // array.uninitialized may have a first argument which is the
-        // allocated array buffer. The call is like a struct(buffer)
-        // instruction.
-        if (CGNode *BufferNode = ConGraph->getNode(FAS.getArgument(0), this)) {
-          ConGraph->defer(ConGraph->getNode(I, this), BufferNode);
+        // Check if the result is used in the usual way: extracting the
+        // array and the element pointer with tuple_extract.
+        if (onlyUsedInTupleExtract(I)) {
+          // array.uninitialized may have a first argument which is the
+          // allocated array buffer. The call is like a struct(buffer)
+          // instruction.
+          if (CGNode *BufferNode = ConGraph->getNode(FAS.getArgument(0), this)) {
+            CGNode *ArrayNode = ConGraph->getNode(I, this);
+            CGNode *ArrayContent = ConGraph->getContentNode(ArrayNode);
+            ConGraph->defer(ArrayContent, BufferNode);
+          }
+          return;
         }
-        return;
+        break;
       case ArrayCallKind::kGetArrayOwner:
         if (CGNode *BufferNode = ConGraph->getNode(ASC.getSelf(), this)) {
           ConGraph->defer(ConGraph->getNode(I, this), BufferNode);
@@ -1386,6 +1413,21 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
           }
         }
       }
+      return;
+    }
+    case ValueKind::TupleExtractInst: {
+      // This is a tuple_extract which extracts the second result of an
+      // array.uninitialized call. The first result is the array itself.
+      // The second result (which is a pointer to the array elements) must be
+      // the content node of the first result. It's just like a ref_element_addr
+      // instruction.
+      auto *TEI = cast<TupleExtractInst>(I);
+      assert(TEI->getFieldNo() == 1 &&
+          ArraySemanticsCall(TEI->getOperand(), "array.uninitialized", false)
+             && "tuple_extract should be handled as projection");
+      CGNode *ArrayNode = ConGraph->getNode(TEI->getOperand(), this);
+      CGNode *ArrayElements = ConGraph->getContentNode(ArrayNode);
+      ConGraph->setNode(I, ArrayElements);
       return;
     }
     case ValueKind::UncheckedRefCastInst:

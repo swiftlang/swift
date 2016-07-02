@@ -1010,7 +1010,7 @@ public struct ${Self}<Element>
 public struct AnyGenerator<Element> {}
 
 extension AnyIterator {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> AnyIterator<Element> {
     Builtin.unreachable()
   }
@@ -1020,7 +1020,7 @@ extension AnyIterator {
 extension Any${Kind} {
 
   @available(*, unavailable, message: "Please use underestimatedCount property instead.")
-  public var underestimateCount: Int {
+  public func underestimateCount() -> Int {
     Builtin.unreachable()
   }
 }
@@ -1030,7 +1030,7 @@ extension Any${Kind} {
 public typealias AnyCollectionType = AnyCollectionProtocol
 
 extension AnyCollectionProtocol {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> AnyIterator<Iterator.Element> {
     Builtin.unreachable()
   }

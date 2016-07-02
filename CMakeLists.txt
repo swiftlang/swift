@@ -110,6 +110,10 @@ set(SWIFT_COMPILER_VERSION "" CACHE STRING
 set(CLANG_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Clang compiler")
 
+# Indicate whether Swift should attempt to use the lld linker.
+set(SWIFT_ENABLE_LLD_LINKER FALSE CACHE BOOL
+    "Enable using the lld linker when available")
+
 # Indicate whether Swift should attempt to use the gold linker.
 # This is not used on Darwin.
 set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
@@ -176,16 +180,19 @@ set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
   "The GCC version to use when building for Android. Currently only 4.9 is supported.")
 set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android SDK tools that will be passed to the swiftc frontend")
-set(SWIFT_ANDROID_ICU_UC "" CACHE STRING
-  "Path to a directory containing libicuuc.so")
-set(SWIFT_ANDROID_ICU_UC_INCLUDE "" CACHE STRING
-  "Path to a directory containing headers for libicuuc")
-set(SWIFT_ANDROID_ICU_I18N "" CACHE STRING
-  "Path to a directory containing libicui18n.so")
-set(SWIFT_ANDROID_ICU_I18N_INCLUDE "" CACHE STRING
-  "Path to a directory containing headers libicui18n")
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
+
+foreach(sdk ANDROID;FREEBSD;LINUX)
+  set(SWIFT_${sdk}_ICU_UC "" CACHE STRING
+      "Path to a directory containing the icuuc library for ${sdk}")
+  set(SWIFT_${sdk}_ICU_UC_INCLUDE "" CACHE STRING
+      "Path to a directory containing headers for icuuc for ${sdk}")
+  set(SWIFT_${sdk}_ICU_I18N "" CACHE STRING
+      "Path to a directory containing the icui18n library for ${sdk}")
+  set(SWIFT_${sdk}_ICU_I18N_INCLUDE "" CACHE STRING
+      "Path to a directory containing headers icui18n for ${sdk}")
+endforeach()
 
 #
 # User-configurable Darwin-specific options.
@@ -304,6 +311,19 @@ option(SWIFT_BUILD_SOURCEKIT
     ${SWIFT_BUILD_SOURCEKIT_default})
 
 #
+# Assume a new enough ar to generate the index at construction time. This avoids
+# having to invoke ranlib as a secondary command.
+#
+
+set(CMAKE_C_ARCHIVE_CREATE "<CMAKE_AR> crs <TARGET> <LINK_FLAGS> <OBJECTS>")
+set(CMAKE_C_ARCHIVE_APPEND "<CMAKE_AR> qs <TARGET> <LINK_FLAGS> <OBJECTS>")
+set(CMAKE_C_ARCHIVE_FINISH "")
+
+set(CMAKE_CXX_ARCHIVE_CREATE "<CMAKE_AR> crs <TARGET> <LINK_FLAGS> <OBJECTS>")
+set(CMAKE_CXX_ARCHIVE_APPEND "<CMAKE_AR> qs <TARGET> <LINK_FLAGS> <OBJECTS>")
+set(CMAKE_CXX_ARCHIVE_FINISH "")
+
+#
 # Include CMake modules
 #
 
@@ -363,12 +383,6 @@ endif()
 if(NOT EXISTS "${CLANG_MAIN_INCLUDE_DIR}/clang/AST/Decl.h")
   message(FATAL_ERROR "Clang is missing from llvm/tools subdirectory.")
 endif()
-
-# This could be computed using ${CMAKE_CFG_INTDIR} if we want to link Swift
-# against a matching LLVM build configuration.  However, we usually want to be
-# flexible and allow linking a debug Swift against optimized LLVM.
-set(LLVM_RUNTIME_OUTPUT_INTDIR "${LLVM_BINARY_DIR}")
-set(LLVM_LIBRARY_OUTPUT_INTDIR "${LLVM_LIBRARY_DIR}")
 
 set(SWIFT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(SWIFT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")

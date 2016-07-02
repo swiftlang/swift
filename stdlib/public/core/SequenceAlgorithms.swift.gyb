@@ -666,33 +666,33 @@ extension Sequence {
 }
 
 extension Sequence {
-  @available(*, unavailable, renamed: "enumerated")
+  @available(*, unavailable, renamed: "enumerated()")
   public func enumerate() -> EnumeratedSequence<Self> {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "min")
+  @available(*, unavailable, renamed: "min(isOrderedBefore:)")
   public func minElement(
     _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "max")
+  @available(*, unavailable, renamed: "max(isOrderedBefore:)")
   public func maxElement(
     _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "reversed")
+  @available(*, unavailable, renamed: "reversed()")
   public func reverse() -> [Iterator.Element] {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "starts")
+  @available(*, unavailable, renamed: "starts(with:isEquivalent:)")
   public func startsWith<PossiblePrefix>(
-    with possiblePrefix: PossiblePrefix,
+    _ possiblePrefix: PossiblePrefix,
     isEquivalent: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows-> Bool
     where
@@ -701,7 +701,7 @@ extension Sequence {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "lexicographicallyPrecedes")
+  @available(*, unavailable, renamed: "lexicographicallyPrecedes(_:isOrderedBefore:)")
   public func lexicographicalCompare<
     OtherSequence
   >(
@@ -716,19 +716,19 @@ extension Sequence {
 }
 
 extension Sequence where Iterator.Element : Comparable {
-  @available(*, unavailable, renamed: "min")
+  @available(*, unavailable, renamed: "min()")
   public func minElement() -> Iterator.Element? {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "max")
+  @available(*, unavailable, renamed: "max()")
   public func maxElement() -> Iterator.Element? {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "starts")
+  @available(*, unavailable, renamed: "starts(with:)")
   public func startsWith<PossiblePrefix>(
-    with possiblePrefix: PossiblePrefix
+    _ possiblePrefix: PossiblePrefix
   ) -> Bool
     where
     PossiblePrefix : Sequence,

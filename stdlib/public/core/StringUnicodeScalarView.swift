@@ -330,7 +330,7 @@ extension String {
 
 extension String {
   /// The string's value represented as a collection of Unicode scalar values.
-  public var unicodeScalars : UnicodeScalarView {
+  public var unicodeScalars: UnicodeScalarView {
     get {
       return UnicodeScalarView(_core)
     }

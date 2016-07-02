@@ -37,6 +37,14 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_AVAIL_1 | FileCheck %s -check-prefix=ENUM_AVAIL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OPTIONS_AVAIL_1 | FileCheck %s -check-prefix=OPTIONS_AVAIL_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_LITERAL_1 | FileCheck %s -check-prefix=WITH_LITERAL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_LITERAL_2 | FileCheck %s -check-prefix=WITH_LITERAL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_LITERAL_3 | FileCheck %s -check-prefix=WITH_LITERAL_1
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INVALID_1
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OTHER_FILE_1 %S/Inputs/EnumFromOtherFile.swift | FileCheck %s -check-prefix=OTHER_FILE_1
+
 enum SomeEnum1 {
   case South
   case North
@@ -268,3 +276,55 @@ func testAvail2(x: OptionsAvail1) {
 // OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/NotRecommended: BBB[#OptionsAvail1#];
 // ENUM_AVAIL_1-NOT: AAA
 // OPTIONS_AVAIL_1: End completions
+
+func testWithLiteral1() {
+  struct S {
+    enum MyEnum { case myCase }
+    enum Thing { case thingCase }
+    var thing: Thing
+    func takeEnum(thing: MyEnum, other: Double) {}
+  }
+  let s: S
+  _ = s.takeEnum(thing: .#^WITH_LITERAL_1^#, other: 1.0)
+// WITH_LITERAL_1: Begin completions, 1 items
+// WITH_LITERAL_1-NEXT: Decl[EnumElement]/ExprSpecific:     myCase[#S.MyEnum#];
+// WITH_LITERAL_1-NEXT: End completions
+}
+func testWithLiteral2() {
+  struct S {
+    enum MyEnum { case myCase }
+    enum Thing { case thingCase }
+    var thing: Thing
+    func takeEnum(thing: MyEnum, other: Int) {}
+    func takeEnum(thing: MyEnum, other: Double) {}
+  }
+  let s: S
+  _ = s.takeEnum(thing: .#^WITH_LITERAL_2^#, other: 1.0)
+}
+func testWithLiteral3() {
+  struct S {
+    enum MyEnum { case myCase }
+    enum Thing { case thingCase }
+    var thing: Thing
+    func takeEnum(thing: MyEnum, other: Int) {}
+    func takeEnum(thing: MyEnum, other: Double) {}
+    func test(s: S) {
+      _ = s.takeEnum(thing: .#^WITH_LITERAL_3^#, other: 1.0)
+    }
+  }
+}
+
+func testInvalid1() {
+  func invalid() -> NoSuchEnum {
+    return .#^INVALID_1^# // Don't crash.
+  }
+}
+
+func enumFromOtherFile() -> EnumFromOtherFile {
+  return .#^OTHER_FILE_1^# // Don't crash.
+}
+// OTHER_FILE_1: Begin completions
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     b({#String#})[#(String) -> EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     a({#Int#})[#(Int) -> EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     c[#EnumFromOtherFile#];
+// OTHER_FILE_1: End completions

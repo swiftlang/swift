@@ -1,3 +1,5 @@
+include(SwiftList)
+
 # SWIFTLIB_DIR is the directory in the build tree where Swift resource files
 # should be placed.  Note that $CMAKE_CFG_INTDIR expands to "." for
 # single-configuration builds.
@@ -5,23 +7,6 @@ set(SWIFTLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")
 set(SWIFTSTATICLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift_static")
-
-function(_list_add_string_suffix input_list suffix result_var_name)
-  set(result)
-  foreach(element ${input_list})
-    list(APPEND result "${element}${suffix}")
-  endforeach()
-  set("${result_var_name}" "${result}" PARENT_SCOPE)
-endfunction()
-
-function(_list_escape_for_shell input_list result_var_name)
-  set(result "")
-  foreach(element ${input_list})
-    string(REPLACE " " "\\ " element "${element}")
-    set(result "${result}${element} ")
-  endforeach()
-  set("${result_var_name}" "${result}" PARENT_SCOPE)
-endfunction()
 
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
@@ -74,15 +59,6 @@ function(is_darwin_based_sdk sdk_name out_var)
   else()
     set(${out_var} FALSE PARENT_SCOPE)
   endif()
-endfunction()
-
-function(is_windows_based_sdk sdk_name out_var)
-  if("${sdk_name}" STREQUAL "WINDOWS" OR
-     "${sdk_name}" STREQUAL "CYGWIN")
-   set(${out_var} TRUE PARENT_SCOPE)
- else()
-   set(${out_var} FALSE PARENT_SCOPE)
- endif()
 endfunction()
 
 # Usage:
@@ -140,11 +116,11 @@ function(_add_variant_c_compile_link_flags)
       "-arch" "${CFLAGS_ARCH}"
       "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks"
       "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
+  endif()
       
-    if(CFLAGS_ANALYZE_CODE_COVERAGE)
-      list(APPEND result "-fprofile-instr-generate"
-                         "-fcoverage-mapping")
-    endif()
+  if(CFLAGS_ANALYZE_CODE_COVERAGE)
+    list(APPEND result "-fprofile-instr-generate"
+                       "-fcoverage-mapping")
   endif()
 
   _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
@@ -291,10 +267,16 @@ function(_add_variant_link_flags)
     list(APPEND result
         "-ldl"
         "-L${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/${SWIFT_ANDROID_NDK_GCC_VERSION}.x"
-        "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so"
-        "-L${SWIFT_ANDROID_ICU_UC}" "-L${SWIFT_ANDROID_ICU_I18N}")
+        "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so")
   else()
     list(APPEND result "-lobjc")
+  endif()
+
+  if(NOT "${SWIFT_${LFLAGS_SDK}_ICU_UC}" STREQUAL "")
+    list(APPEND result "-L${SWIFT_${sdk}_ICU_UC}")
+  endif()
+  if(NOT "${SWIFT_${LFLAGS_SDK}_ICU_I18N}" STREQUAL "")
+    list(APPEND result "-L${SWIFT_${sdk}_ICU_I18N}")
   endif()
 
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -513,7 +495,7 @@ function(_add_swift_library_single target name)
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
-  
+
   # Determine the subdirectory where this library will be installed.
   set(SWIFTLIB_SINGLE_SUBDIR
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
@@ -655,6 +637,17 @@ function(_add_swift_library_single target name)
       ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
       ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES}
       ${SWIFT_SECTIONS_OBJECT_END})
+
+  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
+    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "")
+      set_property(TARGET "${target}" APPEND_STRING
+          PROPERTY INCLUDE_DIRECTORIES "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}")
+    endif()
+    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "")
+      set_property(TARGET "${target}" APPEND_STRING
+          PROPERTY INCLUDE_DIRECTORIES "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}")
+    endif()
+  endif()
 
   # The section metadata objects are generated sources, and we need to tell CMake
   # not to expect to find them prior to their generation.
@@ -887,6 +880,9 @@ function(_add_swift_library_single target name)
   if(SWIFT_ENABLE_GOLD_LINKER AND
      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     list(APPEND link_flags "-fuse-ld=gold")
+  endif()
+  if (SWIFT_ENABLE_LLD_LINKER)
+    list(APPEND link_flags "-fuse-ld=lld")
   endif()
 
   # Configure plist creation for OS X.
@@ -1529,6 +1525,9 @@ function(_add_swift_executable_single name)
   if(SWIFT_ENABLE_GOLD_LINKER AND
      "${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     list(APPEND link_flags "-fuse-ld=gold")
+  endif()
+  if(SWIFT_ENABLE_LLD_LINKER)
+    list(APPEND link_flags "-fuse-ld=lld")
   endif()
 
   # Find the names of dependency library targets.

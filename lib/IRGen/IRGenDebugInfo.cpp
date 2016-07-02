@@ -224,14 +224,11 @@ static SILLocation::DebugLoc getDebugLocation(Optional<SILLocation> OptLoc,
 
 
 /// Determine whether this debug scope belongs to an explicit closure.
-static bool isExplicitClosure(const SILDebugScope *DS) {
-  if (DS) {
-    auto *SILFn = DS->getInlinedFunction();
-    if (SILFn && SILFn->hasLocation())
-      if (Expr *E = SILFn->getLocation().getAsASTNode<Expr>())
-        if (isa<ClosureExpr>(E))
-          return true;
-  }
+static bool isExplicitClosure(const SILFunction *SILFn) {
+  if (SILFn && SILFn->hasLocation())
+    if (Expr *E = SILFn->getLocation().getAsASTNode<Expr>())
+      if (isa<ClosureExpr>(E))
+        return true;
   return false;
 }
 
@@ -246,7 +243,19 @@ static bool isAbstractClosure(const SILLocation &Loc) {
 llvm::MDNode *IRGenDebugInfo::createInlinedAt(const SILDebugScope *DS) {
   llvm::MDNode *InlinedAt = nullptr;
   if (DS) {
-    for (auto *CS : DS->flattenedInlineTree()) {
+    // The inlined-at chain, starting with the innermost (noninlined) scope.
+    auto Scopes = DS->flattenedInlineTree();
+
+    // See if we share a common prefix with the last chain of inline scopes.
+    unsigned N = 0;
+    while (N < LastInlineChain.size() && N < Scopes.size() &&
+           LastInlineChain[N].first == Scopes[N])
+      InlinedAt = LastInlineChain[N++].second;
+    LastInlineChain.resize(N);
+
+    // Construct the new suffix.
+    for (; N < Scopes.size(); ++N) {
+      auto *CS = Scopes[N];
       // In SIL the inlined-at information is part of the scopes, in
       // LLVM IR it is part of the location. Transforming the inlined-at
       // SIL scope to a location means skipping the inlined-at scope.
@@ -254,6 +263,9 @@ llvm::MDNode *IRGenDebugInfo::createInlinedAt(const SILDebugScope *DS) {
       auto *ParentScope = getOrCreateScope(Parent);
       auto L = CS->Loc.decodeDebugLoc(SM);
       InlinedAt = llvm::DebugLoc::get(L.Line, L.Column, ParentScope, InlinedAt);
+
+      // Cache the suffix.
+      LastInlineChain.push_back({CS, llvm::TrackingMDNodeRef(InlinedAt)});
     }
   }
   return InlinedAt;
@@ -316,8 +328,9 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   //
   // The actual closure has a closure expression as scope.
   if (Loc && isAbstractClosure(*Loc) && DS && !isAbstractClosure(DS->Loc)
-      && !Loc->is<ImplicitReturnLocation>())
-    return;
+      && !Loc->is<ImplicitReturnLocation>()) {
+    L.Line = L.Column = 0;
+  }
 
   if (L.Line == 0 && DS == LastScope) {
     // Reuse the last source location if we are still in the same
@@ -337,6 +350,11 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   auto DL = llvm::DebugLoc::get(L.Line, L.Column, Scope, InlinedAt);
   // TODO: Write a strongly-worded letter to the person that came up
   // with a pair of functions spelled "get" and "Set".
+  Builder.SetCurrentDebugLocation(DL);
+}
+
+void IRGenDebugInfo::setEntryPointLoc(IRBuilder &Builder) {
+  auto DL = llvm::DebugLoc::get(0, 0, getEntryPointFn(), nullptr);
   Builder.SetCurrentDebugLocation(DL);
 }
 
@@ -485,6 +503,17 @@ static CanSILFunctionType getFunctionType(SILType SILTy) {
   return FnTy;
 }
 
+llvm::DIScope *IRGenDebugInfo::getEntryPointFn() {
+  // Lazily create EntryPointFn.
+  if (!EntryPointFn) {
+    EntryPointFn = DBuilder.createReplaceableCompositeType(
+      llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
+        MainFile, MainFile, 0);
+  }
+  return EntryPointFn;
+}
+
+
 llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   if (!DC)
     return TheCU;
@@ -507,17 +536,7 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     return getOrCreateContext(DC->getParent());
 
   case DeclContextKind::TopLevelCodeDecl:
-    // Lazily create EntryPointFn.
-    if (!EntryPointFn) {
-      auto main = IGM.getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
-      assert(main && "emitting TopLevelCodeDecl in module without "
-                     SWIFT_ENTRY_POINT_FUNCTION "?");
-      EntryPointFn = DBuilder.createReplaceableCompositeType(
-            llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
-            MainFile, MainFile, 0);
-    }
-
-    return cast<llvm::DIScope>(EntryPointFn);
+    return getEntryPointFn();
 
   case DeclContextKind::Module:
     return getOrCreateModule({Module::AccessPathTy(), cast<ModuleDecl>(DC)});
@@ -526,18 +545,21 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     return getOrCreateContext(DC->getParent());
   case DeclContextKind::GenericTypeDecl: {
     auto *TyDecl = cast<GenericTypeDecl>(DC);
-    if (auto *DITy = getTypeOrNull(TyDecl->getDeclaredType().getPointer()))
+    auto *Ty = TyDecl->getDeclaredType().getPointer();
+    if (auto *DITy = getTypeOrNull(Ty))
       return DITy;
 
     // Create a Forward-declared type.
     auto Loc = getDebugLoc(SM, TyDecl);
     auto File = getOrCreateFile(Loc.Filename);
     auto Line = Loc.Line;
-    auto FwdDecl = DBuilder.createForwardDecl(
+    auto FwdDecl = DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_structure_type, TyDecl->getName().str(),
         getOrCreateContext(DC->getParent()), File, Line,
         llvm::dwarf::DW_LANG_Swift, 0, 0);
-
+    ReplaceMap.emplace_back(
+        std::piecewise_construct, std::make_tuple(Ty),
+        std::make_tuple(static_cast<llvm::Metadata *>(FwdDecl)));
     return FwdDecl;
   }
   }
@@ -676,10 +698,10 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   // Mark everything that is not visible from the source code (i.e.,
   // does not have a Swift name) as artificial, so the debugger can
   // ignore it. Explicit closures are exempt from this rule. We also
-  // make an exception for main, which, albeit it does not
+  // make an exception for toplevel code, which, although it does not
   // have a Swift name, does appear prominently in the source code.
   if ((Name.empty() && LinkageName != SWIFT_ENTRY_POINT_FUNCTION &&
-       !isExplicitClosure(DS)) ||
+       !isExplicitClosure(SILFn)) ||
       // ObjC thunks should also not show up in the linetable, because we
       // never want to set a breakpoint there.
       (Rep == SILFunctionTypeRepresentation::ObjCMethod) ||
@@ -1773,6 +1795,17 @@ llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
 void IRGenDebugInfo::finalize() {
   assert(LocationStack.empty() && "Mismatch of pushLoc() and popLoc().");
 
+  // Finalize all replaceable forward declarations.
+  for (auto &Ty : ReplaceMap) {
+    llvm::TempMDNode FwdDecl(cast<llvm::MDNode>(Ty.second));
+    llvm::Metadata *Replacement;
+    if (auto *FullType = getTypeOrNull(Ty.first))
+      Replacement = FullType;
+    else
+      Replacement = Ty.second;
+    DBuilder.replaceTemporary(std::move(FwdDecl),
+                              cast<llvm::MDNode>(Replacement));
+  }
   // Finalize the DIBuilder.
   DBuilder.finalize();
 }

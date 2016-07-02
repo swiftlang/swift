@@ -480,7 +480,6 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 ///     expr-postfix(Mode)
 ///     operator-prefix expr-unary(Mode)
 ///     '&' expr-unary(Mode)
-///     expr-selector
 ///
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   UnresolvedDeclRefExpr *Operator;
@@ -503,9 +502,6 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
   case tok::pound_keyPath:
     return parseExprKeyPath();
-
-  case tok::pound_selector:
-    return parseExprSelector();
 
   case tok::oper_postfix:
     // Postfix operators cannot start a subexpression, but can happen
@@ -1030,6 +1026,7 @@ getMagicIdentifierLiteralKind(tok Kind) {
 ///     expr-paren
 ///     expr-super
 ///     expr-discard
+///     expr-selector
 ///
 ///   expr-delayed-identifier:
 ///     '.' identifier
@@ -1189,6 +1186,10 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   case tok::kw__:
     Result = makeParserResult(
       new (Context) DiscardAssignmentExpr(consumeToken(), /*Implicit=*/false));
+    break;
+
+  case tok::pound_selector: // expr-selector
+    Result = parseExprSelector();
     break;
 
   case tok::l_brace:     // expr-closure

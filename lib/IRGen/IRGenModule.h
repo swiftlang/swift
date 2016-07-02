@@ -719,12 +719,17 @@ public:
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
+  /// Opaque but fixed-size types for which we also emit builtin type
+  /// descriptors, allowing the reflection library to layout these types
+  /// without knowledge of their contents. This includes imported structs
+  /// and fixed-size multi-payload enums.
+  llvm::SetVector<const NominalTypeDecl *> OpaqueTypes;
   /// Imported classes referenced by types in this module when emitting
   /// reflection metadata.
-  llvm::SetVector<ClassDecl *> ImportedClasses;
+  llvm::SetVector<const ClassDecl *> ImportedClasses;
   /// Imported protocols referenced by types in this module when emitting
   /// reflection metadata.
-  llvm::SetVector<ProtocolDecl *> ImportedProtocols;
+  llvm::SetVector<const ProtocolDecl *> ImportedProtocols;
 
   llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
   llvm::Constant *getAddrOfFieldName(StringRef Name);

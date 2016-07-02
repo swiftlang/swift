@@ -1,5 +1,4 @@
 // This source file is part of the Swift.org open source project
-//
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
@@ -8,13 +7,15 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-
-// Issue found by https://github.com/robrix (Rob Rix)
-// http://www.openradar.me/19924870
-
-func unit<T>(x: T) -> T? {
-    return x
+{
+enum S<H:A{
+protocol c{
+{
 }
-func f() -> Int? {
-    return unit(1) ?? unit(2).map { 1 } ?? nil
+class A
+class B:A{
+}}
 }
+protocol A{
+typealias e:A
+typealias d

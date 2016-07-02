@@ -58,7 +58,7 @@ extension String {
   }
 
   /// A Boolean value indicating whether a string has no characters.
-  public var isEmpty : Bool {
+  public var isEmpty: Bool {
     return _core.count == 0
   }
 }

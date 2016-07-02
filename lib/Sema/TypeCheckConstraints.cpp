@@ -458,8 +458,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // one, but we should also try to propagate labels into this.
     DeclNameLoc nameLoc = UDRE->getNameLoc();
 
-    performTypoCorrection(DC, UDRE->getRefKind(), Name, Loc, LookupOptions,
-                          Lookup);
+    performTypoCorrection(DC, UDRE->getRefKind(), Type(), Name, Loc,
+                          LookupOptions, Lookup);
 
     diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
       .highlight(UDRE->getSourceRange());
@@ -2856,7 +2856,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
   auto clas = toType->getClassOrBoundGenericClass();
-  if (clas && clas->isForeign())
+  if (clas && clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return CheckedCastKind::ValueCast;
   
   // Don't warn on casts that change the generic parameters of ObjC generic

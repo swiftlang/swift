@@ -1,6 +1,5 @@
 // Check interface produced for the standard library.
 //
-// REQUIRES: long_test
 // REQUIRES: nonexecutable_test
 //
 // RUN: %target-swift-frontend -parse %s
@@ -36,6 +35,7 @@
 // DONT_CHECK-NOT: {{([^I]|$)([^n]|$)([^d]|$)([^e]|$)([^x]|$)([^a]|$)([^b]|$)([^l]|$)([^e]|$)}}
 // CHECK-NOT: buffer: _ArrayBuffer
 // CHECK-NOT: func ~>
+// CHECK-NOT: _builtin
 // CHECK-NOT: Builtin.
 // CHECK-NOT: RawPointer
 // CHECK-NOT: extension [
@@ -76,25 +76,3 @@ func foo(x: _Pointer) {} // Checks that this protocol actually exists.
 // CHECK-GROUPS1-DAG: Collection/Type-erased
 // CHECK-GROUPS1-NOT: <NULL>
 // CHECK-GROUPS1: Module groups end.
-
-// RUN: %target-swift-ide-test -print-module -module-group "Pointer" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "C" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Protocols" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Optional" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Collection/Lazy Views" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Math" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Math/Floating" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Math/Integers" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Reflection" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Misc" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Collection" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-COLLECTION-GROUP
-// RUN: %target-swift-ide-test -print-module -module-group "Bool" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Assert" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "String" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Collection/Array" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Collection/Type-erased" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-// RUN: %target-swift-ide-test -print-module -module-group "Collection/HashedCollections" -synthesize-extension -module-to-print=Swift -source-filename %s -print-interface | FileCheck %s -check-prefix=CHECK-FREQUENT-WORD
-
-// CHECK-FREQUENT-WORD: ///
-// CHECK-FREQUENT-WORD-NOT: where Slice<Dictionary<Key, Value>> == Slice<Self>
-// CHECK-COLLECTION-GROUP: extension MutableCollection

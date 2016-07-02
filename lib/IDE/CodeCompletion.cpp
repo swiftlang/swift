@@ -11,8 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletion.h"
-#include "swift/IDE/CodeCompletionCache.h"
-#include "swift/IDE/Utils.h"
 #include "CodeCompletionResultBuilder.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
@@ -20,18 +18,16 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/IDE/CodeCompletionCache.h"
+#include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Comment.h"
@@ -39,6 +35,11 @@
 #include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
 #include "clang/Index/USRGeneration.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <string>
 
@@ -257,7 +258,7 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
   if (!Interested)
     return;
   static swift::markup::MarkupContext MC;
-  auto DC = getDocComment(MC, D);
+  auto DC = getSingleDocComment(MC, D);
   if (!DC.hasValue())
     return;
   SwiftDocWordExtractor Extractor(Words);
@@ -378,6 +379,42 @@ static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
   // FIXME(thread-safety): the walker is mutating the AST.
   const_cast<AbstractFunctionDecl *>(AFD)->walk(Finder);
   return Finder.getFoundStmt();
+}
+
+/// Erase any ErrorType types on the given expression, allowing later
+/// type-checking to make progress.
+///
+/// FIXME: this is fundamentally a workaround for the fact that we may end up
+/// typechecking parts of an expression more than once - first for checking
+/// the context, and later for checking more-specific things like unresolved
+/// members.  We should restructure code-completion type-checking so that we
+/// never typecheck more than once (or find a more principled way to do it).
+static void eraseErrorTypes(Expr *E) {
+  assert(E);
+  struct Eraser : public ASTWalker {
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (expr && expr->getType() && expr->getType()->is<ErrorType>())
+        expr->setType(Type());
+      return { true, expr };
+    }
+    bool walkToTypeLocPre(TypeLoc &TL) override {
+      if (TL.getType() && TL.getType()->is<ErrorType>())
+        TL.setType(Type(), /*was validated*/false);
+      return true;
+    }
+
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      if (P && P->hasType() && P->getType()->is<ErrorType>()) {
+        P->setType(Type());
+      }
+      return { true, P };
+    }
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+  };
+
+  E->walk(Eraser());
 }
 
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
@@ -1138,8 +1175,6 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
   if (FirstTextChunk.hasValue()) {
     for (auto C : getChunks().slice(*FirstTextChunk)) {
       using ChunkKind = Chunk::ChunkKind;
-      if (C.getKind() == ChunkKind::BraceStmtWithCursor)
-        break;
 
       bool shouldPrint = !C.isAnnotation();
       switch (C.getKind()) {
@@ -1327,6 +1362,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       return std::make_pair(ParsedExpr->getType(),
                             ParsedExpr->getReferencedDecl());
 
+    eraseErrorTypes(ParsedExpr);
+
     ConcreteDeclRef ReferencedDecl = nullptr;
     Expr *ModifiedExpr = ParsedExpr;
     if (auto T = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
@@ -1336,6 +1373,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       // modify the original expression. We should understand what effect that
       // may have on code completion.
       ParsedExpr = ModifiedExpr;
+
       return std::make_pair(*T, ReferencedDecl);
     }
     return None;
@@ -1523,6 +1561,29 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
   case CodeCompletionLiteralKind::Tuple:
     llvm_unreachable("no such protocol kind");
   }
+}
+
+/// Whether funcType has a single argument (not including defaulted arguments)
+/// that is of type () -> ().
+static bool hasTrivialTrailingClosure(const FuncDecl *FD,
+                                      AnyFunctionType *funcType) {
+  unsigned level = FD->isInstanceMember() ? 1 : 0;
+  auto Args = decomposeParamType(funcType->getInput(), FD, level);
+  bool OneArg = Args.size() == 1;
+  if (Args.size() > 1) {
+    unsigned NonDefault =
+        std::count_if(Args.begin(), Args.end() - 1, [](const CallArgParam &P) {
+          return !P.HasDefaultArgument;
+        });
+
+    OneArg = NonDefault == 0;
+  }
+
+  if (OneArg)
+    if (auto Fn = Args.back().Ty->getAs<AnyFunctionType>())
+      return Fn->getInput()->isVoid() && Fn->getResult()->isVoid();
+
+  return false;
 }
 
 /// Build completions by doing visible decl lookup from a context.
@@ -2321,8 +2382,15 @@ public:
     if (FirstIndex != 0 && !FunctionType->is<ErrorType>())
       FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
 
+    bool trivialTrailingClosure = false;
+    if (!IsImplicitlyCurriedInstanceMethod && !FunctionType->is<ErrorType>()) {
+      trivialTrailingClosure = hasTrivialTrailingClosure(
+          FD, FunctionType->castTo<AnyFunctionType>());
+    }
+
     // Add the method, possibly including any default arguments.
-    auto addMethodImpl = [&](bool includeDefaultArgs = true) {
+    auto addMethodImpl = [&](bool includeDefaultArgs = true,
+                             bool trivialTrailingClosure = false) {
       CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Declaration,
@@ -2355,6 +2423,8 @@ public:
         Builder.addCallParameter(Ctx.Id_self, FirstInputType,
                                  /*IsVarArg*/ false, true);
         Builder.addRightParen();
+      } else if (trivialTrailingClosure) {
+        Builder.addBraceStmtWithCursor(" { code }");
       } else {
         Builder.addLeftParen();
         auto AFT = FunctionType->castTo<AnyFunctionType>();
@@ -2386,6 +2456,10 @@ public:
     if (!FunctionType->is<ErrorType>() &&
         hasInterestingDefaultValues(FD)) {
       addMethodImpl(/*includeDefaultArgs*/ false);
+    }
+    if (trivialTrailingClosure) {
+      addMethodImpl(/*includeDefaultArgs=*/false,
+                    /*trivialTrailingClosure=*/true);
     }
     addMethodImpl();
   }
@@ -2579,6 +2653,7 @@ public:
         (EED->hasAccessibility() && !EED->isAccessibleFrom(CurrDeclContext)) ||
         shouldHideDeclFromCompletionResults(EED))
       return;
+
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2591,14 +2666,18 @@ public:
     Builder.addTextChunk(EED->getName().str());
     if (EED->hasArgumentType())
       addPatternFromType(Builder, EED->getArgumentType());
-    Type EnumType = EED->getType();
 
     // Enum element is of function type such as EnumName.type -> Int ->
     // EnumName; however we should show Int -> EnumName as the type
-    if (auto FuncType = EED->getType()->getAs<AnyFunctionType>()) {
-      EnumType = FuncType->getResult();
+    Type EnumType;
+    if (EED->hasType()) {
+      EnumType = EED->getType();
+      if (auto FuncType = EnumType->getAs<AnyFunctionType>()) {
+        EnumType = FuncType->getResult();
+      }
     }
-    addTypeAnnotation(Builder, EnumType);
+    if (EnumType)
+      addTypeAnnotation(Builder, EnumType);
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation,
@@ -2894,7 +2973,10 @@ public:
     }
   }
 
-  bool handleEnumElement(Decl *D, DeclVisibilityKind Reason) {
+  bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason) {
+    if (!D->hasType())
+      TypeResolver->resolveDeclSignature(D);
+
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
       addEnumElementRef(EED, Reason, /*HasTypeContext=*/true);
       return true;
@@ -2902,6 +2984,8 @@ public:
       llvm::DenseSet<EnumElementDecl *> Elements;
       ED->getAllElements(Elements);
       for (auto *Ele : Elements) {
+        if (!Ele->hasType())
+          TypeResolver->resolveDeclSignature(Ele);
         addEnumElementRef(Ele, Reason, /*HasTypeContext=*/true);
       }
       return true;
@@ -3125,7 +3209,8 @@ public:
   }
 
   void tryPostfixOperator(Expr *expr, PostfixOperatorDecl *op) {
-    assert(expr->getType());
+    if (!expr->getType())
+      return;
     // We allocate these expressions on the stack because we know they can't
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::PostfixOperator,
@@ -3194,8 +3279,8 @@ public:
     // FIXME: these checks should apply to the LHS of the operator, not the
     // immediately left expression.  Move under the type-checking.
     Expr *LHS = sequence.drop_back(2).back();
-    if (LHS->getType()->is<MetatypeType>() ||
-        LHS->getType()->is<AnyFunctionType>())
+    if (LHS->getType() && (LHS->getType()->is<MetatypeType>() ||
+                           LHS->getType()->is<AnyFunctionType>()))
       return;
 
     // We allocate these expressions on the stack because we know they can't
@@ -3205,6 +3290,13 @@ public:
     sequence.drop_back(1).back() = &UDRE;
     CodeCompletionExpr CCE((SourceRange()));
     sequence.back() = &CCE;
+
+    SWIFT_DEFER {
+      // Reset sequence.
+      SE->setElement(SE->getNumElements() - 1, nullptr);
+      SE->setElement(SE->getNumElements() - 2, nullptr);
+      eraseErrorTypes(SE);
+    };
 
     Expr *expr = SE;
     if (!typeCheckCompletionSequence(const_cast<DeclContext *>(CurrDeclContext),
@@ -3245,6 +3337,7 @@ public:
   void typeCheckLeadingSequence(SmallVectorImpl<Expr *> &sequence) {
     Expr *expr =
         SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
+    eraseErrorTypes(expr);
     // Take advantage of the fact the type-checker leaves the types on the AST.
     if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
                              expr)) {
@@ -3282,6 +3375,7 @@ public:
     sequence.push_back(nullptr); // operator
     sequence.push_back(nullptr); // RHS
     auto *SE = SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
+    eraseErrorTypes(SE);
 
     for (auto op : operators) {
       switch (op->getKind()) {
@@ -3294,12 +3388,8 @@ public:
           tryPostfixOperator(LHS, cast<PostfixOperatorDecl>(op));
         break;
       case DeclKind::InfixOperator:
-        if (seenInfixOperators.insert(op->getName()).second) {
+        if (seenInfixOperators.insert(op->getName()).second)
           tryInfixOperatorCompletion(cast<InfixOperatorDecl>(op), SE);
-          // Reset sequence.
-          SE->setElement(SE->getNumElements() - 1, nullptr);
-          SE->setElement(SE->getNumElements() - 2, nullptr);
-        }
         break;
       default:
         llvm_unreachable("unexpected operator kind");
@@ -3313,8 +3403,9 @@ public:
     }
 
     // FIXME: unify this with the ?.member completions.
-    if (auto T = LHS->getType()->getRValueType()->getOptionalObjectType())
-      addPostfixBang(T);
+    if (auto T = LHS->getType())
+      if (auto ValueT = T->getRValueType()->getOptionalObjectType())
+        addPostfixBang(ValueT);
   }
 
   void addValueLiteralCompletions() {
@@ -3606,7 +3697,8 @@ public:
     LookupByName Lookup(*this, FuncNames);
     lookupVisibleDecls(Lookup, CurrDeclContext, TypeResolver.get(), true);
     if (HasReturn)
-      Lookup.unboxType(getReturnTypeFromContext(CurrDeclContext));
+      if (auto ReturnType = getReturnTypeFromContext(CurrDeclContext))
+        Lookup.unboxType(ReturnType);
   }
 
   static bool getPositionInTupleExpr(DeclContext &DC, Expr *Target,
@@ -5056,6 +5148,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     CurDeclContext->walkContext(Walker);
     bool Success = false;
     if (auto PE = Walker.ParentFarthest.get<Expr *>()) {
+      eraseErrorTypes(PE);
       Success = typeCheckUnresolvedExpr(*CurDeclContext, UnresolvedExpr, PE,
                                         PossibleTypes);
       Lookup.getUnresolvedMemberCompletions(

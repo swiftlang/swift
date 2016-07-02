@@ -7,4 +7,11 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-struct a{var f={H:{}}}init
+if{
+protocol A{
+func c
+protocol c{
+typealias e:c
+protocol c{
+class a
+class B:a
