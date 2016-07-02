@@ -112,6 +112,9 @@ func _ExistentialCollection<T>(i: AnyIterator<T>) {
   func fn3(_: AnyForwardIndex) {} // expected-error {{'AnyForwardIndex' has been renamed to 'AnyIndex'}} {{15-30=AnyIndex}} {{none}}
   func fn4(_: AnyBidirectionalIndex) {} // expected-error {{'AnyBidirectionalIndex' has been renamed to 'AnyIndex'}} {{15-36=AnyIndex}} {{none}}
   func fn5(_: AnyRandomAccessIndex) {} // expected-error {{'AnyRandomAccessIndex' has been renamed to 'AnyIndex'}} {{15-35=AnyIndex}} {{none}}
+
+  _ = anyGenerator(i) // expected-error {{'anyGenerator' has been replaced by 'AnyIterator.init(_:)'}} {{7-19=AnyIterator}} {{none}}
+  _ = anyGenerator { i.next() } // expected-error {{'anyGenerator' has been replaced by 'AnyIterator.init(_:)'}} {{7-19=AnyIterator}} {{none}}
 }
 func _ExistentialCollection<T>(s: AnySequence<T>) {
   _ = s.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Please use underestimatedCount property instead.}} {{none}}

@@ -1040,3 +1040,14 @@ extension AnyCollectionProtocol {
 @available(*, unavailable, renamed: "AnyIndex")
 public typealias Any${Traversal}Index = AnyIndex
 % end
+
+
+@available(*, unavailable, renamed: "AnyIterator.init(_:)")
+public func anyGenerator<G : IteratorProtocol>(_ base: G) -> AnyIterator<G.Element> {
+    Builtin.unreachable()
+}
+
+@available(*, unavailable, renamed: "AnyIterator.init(_:)")
+public func anyGenerator<Element>(_ body: () -> Element?) -> AnyIterator<Element> {
+  Builtin.unreachable()
+}
