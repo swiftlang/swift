@@ -555,6 +555,8 @@ ERROR(use_undeclared_type_did_you_mean,none,
       "use of undeclared type %0; did you mean to use '%1'?", (Identifier, StringRef))
 NOTE(note_typo_candidate,none,
      "did you mean '%0'?", (StringRef))
+NOTE(note_typo_candidate_implicit_member,none,
+     "did you mean the implicitly-synthesized %1 '%0'?", (StringRef, StringRef))
 NOTE(note_remapped_type,none,
      "did you mean to use '%0'?", (StringRef))
 ERROR(identifier_init_failure,none,

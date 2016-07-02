@@ -2229,6 +2229,14 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
   
   // If we found no results at all, mention that fact.
   if (result.UnviableCandidates.empty()) {
+    LookupResult correctionResults;
+    auto tryTypoCorrection = [&] {
+      CS->TC.performTypoCorrection(CS->DC, DeclRefKind::Ordinary, baseObjTy,
+                                   memberName, nameLoc.getBaseNameLoc(),
+                                   defaultMemberLookupOptions,
+                                   correctionResults);
+    };
+
     // TODO: This should handle tuple member lookups, like x.1231 as well.
     if (memberName.isSimpleName("subscript")) {
       diagnose(loc, diag::type_not_subscriptable, baseObjTy)
@@ -2237,18 +2245,29 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       diagnose(loc, diag::could_not_find_type_member,
                MTT->getInstanceType(), memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      tryTypoCorrection();
     } else {
       diagnose(loc, diag::could_not_find_value_member,
                baseObjTy, memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      tryTypoCorrection();
       
       // Check for a few common cases that can cause missing members.
       if (baseObjTy->is<EnumType>() && memberName.isSimpleName("rawValue")) {
         auto loc = baseObjTy->castTo<EnumType>()->getDecl()->getNameLoc();
-        if (loc.isValid())
+        if (loc.isValid()) {
           diagnose(loc, diag::did_you_mean_raw_type);
+          return; // Always prefer this over typo corrections.
+        }
       }
     }
+
+    // Note all the correction candidates.
+    for (auto &correction : correctionResults) {
+      CS->TC.noteTypoCorrection(memberName, nameLoc, correction);
+    }
+
+    // TODO: recover?
     return;
   }
 
