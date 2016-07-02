@@ -11,7 +11,7 @@ func useString(_ s: String) {}
 accepts_block { }
 someNSString.enumerateLines {(s:String?) in }
 someNSString.enumerateLines {s in }
-someNSString.enumerateLines({ useString($0) })
+someNSString.enumerateLines({ useString($0) }) // expected-note {{use trailing closure to simplify arguments}}
 
 accepts_block(/*not a block=*/()) // expected-error{{cannot convert value of type '()' to expected argument type 'my_block_t' (aka '() -> ()'}}
 

@@ -1984,6 +1984,141 @@ static void diagAvailability(TypeChecker &TC, const Expr *E,
   const_cast<Expr*>(E)->walk(walker);
 }
 
+namespace {
+
+static ClosureExpr* getLastArgAsClosure(Expr* Arg) {
+  if (auto Paren = dyn_cast<ParenExpr>(Arg)) {
+
+    // If the argument is paren expression, get the sub expression as closure.
+    if (!Paren->hasTrailingClosure())
+      return dyn_cast_or_null<ClosureExpr>(Paren->getSubExpr());
+  } else if (auto Tuple = dyn_cast<TupleExpr>(Arg)) {
+
+    // If the argument is tuple expression, get the last expression in the tuple
+    // as closure.
+    if (!Tuple->hasTrailingClosure() && Tuple->getNumElements() > 0)
+      return dyn_cast<ClosureExpr>(Tuple->getElement(Tuple->getNumElements() - 1));
+  }
+  return nullptr;
+}
+
+static bool areIdentifiersSame(Identifier Left, Identifier Right) {
+
+  // If both are anonymous, returns true.
+  if (Left.empty() && Right.empty())
+    return true;
+
+  // If one is anonymous and the other is not, returns false.
+  if (Left.empty() || Right.empty())
+    return false;
+
+  // If both are not anonymous, compare the content.
+  return Left.str() == Right.str();
+}
+
+static bool willCauseAmbiguity(TypeChecker &TC, FuncDecl *SelectedFD) {
+  auto SelectedArgNames = SelectedFD->getEffectiveFullName().getArgumentNames();
+  auto SelectedArgNameExcludingClosure = SelectedArgNames.slice(0,
+    SelectedArgNames.size() - 1);
+
+  // Consider all decls from the same context with the simple
+  // identifier with SelectedFD.
+  for (ValueDecl *VD : TC.lookupUnqualified(SelectedFD->getDeclContext(),
+                                            SelectedFD->getName(), SourceLoc())) {
+
+    // Make sure the overload is not the selected function.
+    if (VD == SelectedFD)
+      continue;
+
+    // Make sure the overload is a function.
+    FuncDecl *FD = dyn_cast<FuncDecl>(VD);
+    if (!FD)
+      continue;
+    auto ArgNames = FD->getEffectiveFullName().getArgumentNames();
+
+    // If the overload requires more arguments than the selected; there are no
+    // chance of conflicts.
+    if (ArgNames.size() < SelectedArgNames.size())
+      continue;
+
+    // Assuming there is a conflict.
+    bool Conflict = true;
+    for (unsigned I = 0; I < SelectedArgNameExcludingClosure.size(); I ++) {
+      if (!areIdentifiersSame(ArgNames[I], SelectedArgNameExcludingClosure[I])) {
+        // Different argument names disprove our assumption.
+        Conflict = false;
+      }
+    }
+    if (Conflict)
+      return true;
+  }
+  return false;
+}
+
+static FuncDecl* digForFuncDecl(Expr *Fn) {
+  auto FD = dyn_cast_or_null<FuncDecl>(Fn->getReferencedDecl().getDecl());
+  if (FD)
+    return FD;
+  if (auto DE = dyn_cast<DotSyntaxCallExpr>(Fn)) {
+    return digForFuncDecl(DE->getFn());
+  }
+  return nullptr;
+}
+
+static void
+applyConvertToTrailingClosureFixit(TypeChecker &TC, SourceManager &SM,
+                                   ClosureExpr *Closure, Expr *Arg) {
+  if (auto *Paren = dyn_cast<ParenExpr>(Arg)) {
+    SourceRange LRemove(Paren->getLParenLoc(),
+                        Paren->getLParenLoc().getAdvancedLoc(1));
+    SourceRange RRemove(Paren->getRParenLoc(),
+                        Paren->getRParenLoc().getAdvancedLoc(1));
+
+    // Remove the left and right paren.
+    TC.diagnose(Closure->getStartLoc(), diag::convert_to_trailing_closure).
+      fixItRemove(LRemove).fixItRemove(RRemove);
+  } else if (auto *Tuple = dyn_cast<TupleExpr>(Arg)) {
+    if (Tuple->getNumElements() > 1) {
+      SourceLoc ReplaceStart = Lexer::getLocForEndOfToken(SM,
+        Tuple->getElement(Tuple->getNumElements() - 2)->getEndLoc());
+      SourceRange Replace(ReplaceStart, Closure->getStartLoc());
+      SourceRange ToRemove(Tuple->getRParenLoc(),
+                           Tuple->getRParenLoc().getAdvancedLoc(1));
+
+      // Closing the tuple before the closure; and remove the right paren after the
+      // closure.
+      TC.diagnose(Closure->getStartLoc(), diag::convert_to_trailing_closure).
+        fixItReplace(Replace, ") ").fixItRemove(ToRemove);
+    } else {
+      SourceRange LRemove(Tuple->getLParenLoc(), Closure->getStartLoc());
+      SourceRange RRemove(Lexer::getLocForEndOfToken(SM,Closure->getEndLoc()),
+                          Lexer::getLocForEndOfToken(SM, Tuple->getEndLoc()));
+      TC.diagnose(Closure->getStartLoc(), diag::convert_to_trailing_closure).
+        fixItRemove(LRemove).fixItRemove(RRemove);
+    }
+  }
+}
+}
+
+static void diagConvertToTrailingClosure(TypeChecker &TC, const Expr *E,
+                                      DeclContext *DC) {
+  auto* AE = dyn_cast<ApplyExpr>(E);
+  if (!AE)
+    return;
+
+  auto* Closure = getLastArgAsClosure(AE->getArg());
+  if (!Closure)
+    return;
+  if (auto* FD = digForFuncDecl(AE->getFn())) {
+    // Check the condition whether converting will cause ambiguity.
+    if (!willCauseAmbiguity(TC, FD))
+      // Without ambiguity, we can proceed to fix.
+      applyConvertToTrailingClosureFixit(TC, DC->getASTContext().SourceMgr,
+                                         Closure, AE->getArg());
+  }
+}
+
+
 //===----------------------------------------------------------------------===//
 // Per func/init diagnostics
 //===----------------------------------------------------------------------===//
@@ -3210,6 +3345,7 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
   diagAvailability(TC, E, const_cast<DeclContext*>(DC));
+  diagConvertToTrailingClosure(TC, E, const_cast<DeclContext*>(DC));
   if (TC.Context.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(TC, DC, E);
 }
