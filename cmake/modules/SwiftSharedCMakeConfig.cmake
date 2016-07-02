@@ -376,32 +376,6 @@ function(swift_common_llvm_config target)
   if((SWIFT_BUILT_STANDALONE OR SOURCEKIT_BUILT_STANDALONE) AND NOT "${CMAKE_CFG_INTDIR}" STREQUAL ".")
     llvm_map_components_to_libnames(libnames ${link_components})
 
-    # Collect dependencies.
-    set(new_libnames)
-    foreach(lib ${libnames})
-      list(APPEND new_libnames "${lib}")
-      get_target_property(extra_libraries "${lib}" INTERFACE_LINK_LIBRARIES)
-      foreach(dep ${extra_libraries})
-        if(NOT "${new_libnames}" STREQUAL "")
-          list(REMOVE_ITEM new_libnames "${dep}")
-        endif()
-        list(APPEND new_libnames "${dep}")
-      endforeach()
-    endforeach()
-    set(libnames "${new_libnames}")
-
-    # Translate library names into full path names.
-    set(new_libnames)
-    foreach(dep ${libnames})
-      if("${dep}" MATCHES "^LLVM")
-        list(APPEND new_libnames
-            "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-      else()
-        list(APPEND new_libnames "${dep}")
-      endif()
-    endforeach()
-    set(libnames "${new_libnames}")
-
     get_target_property(target_type "${target}" TYPE)
     if("${target_type}" STREQUAL "STATIC_LIBRARY")
       target_link_libraries("${target}" INTERFACE ${libnames})
