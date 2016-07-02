@@ -251,10 +251,6 @@ public struct StaticString
   public var debugDescription: String {
     return self.description.debugDescription
   }
-
-  public func _getMirror() -> _Mirror {
-    return _reflect(self.description)
-  }
 }
 
 extension StaticString {
