@@ -5,17 +5,17 @@ func takeIntIntToInt(_ f: (Int, Int) -> Int) { }
 
 // Simple closures with anonymous arguments
 func simple() {
-  takeIntToInt({$0 + 1})
-  takeIntIntToInt({$0 + $1 + 1})
+  takeIntToInt({$0 + 1}) // expected-note {{use trailing closure to simplify arguments}}
+  takeIntIntToInt({$0 + $1 + 1}) // expected-note {{use trailing closure to simplify arguments}}
 }
 
 // Anonymous arguments with inference
 func myMap<T, U>(_ array: [T], _ f: (T) -> U) -> [U] {}
 
 func testMap(_ array: [Int]) {
-  var farray = myMap(array, { Float($0) })
+  var farray = myMap(array, { Float($0) }) // expected-note {{use trailing closure to simplify arguments}}
   var _ : Float = farray[0]
-  let farray2 = myMap(array, { (x : Int) in Float(x) })
+  let farray2 = myMap(array, { (x : Int) in Float(x) }) // expected-note {{use trailing closure to simplify arguments}}
   farray = farray2
   _ = farray
 }

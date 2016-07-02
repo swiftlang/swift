@@ -34,8 +34,8 @@ func protocolConformance(ac1: @autoclosure () -> CustomStringConvertible,
   f2 = f1 // expected-error{{cannot assign value of type '(fp: FormattedPrintable) -> CustomStringConvertible' to type '(p: CustomStringConvertible) -> FormattedPrintable'}}
 
   accept_creates_Printable(ac1)
-  accept_creates_Printable({ ac2() })
-  accept_creates_Printable({ ip1() })
+  accept_creates_Printable({ ac2() }) // expected-note {{use trailing closure to simplify arguments}}
+  accept_creates_Printable({ ip1() }) // expected-note {{use trailing closure to simplify arguments}}
   accept_creates_FormattedPrintable(ac1) // expected-error{{cannot convert value of type '@autoclosure () -> CustomStringConvertible' to expected argument type '@noescape () -> FormattedPrintable'}}
   accept_creates_FormattedPrintable(ac2)
   accept_creates_FormattedPrintable(ip1) // expected-error{{cannot convert value of type '@autoclosure () -> IsPrintable1' to expected argument type '@noescape () -> FormattedPrintable'}}

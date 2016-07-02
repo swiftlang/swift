@@ -13,7 +13,7 @@ f2(1,2)
 f2(1,2,3)
 
 func f3(_ a: (String) -> Void) { }
-f3({ print($0) })
+f3({ print($0) }) // expected-note {{use trailing closure to simplify arguments}}
 
 
 func f4(_ a: Int..., b: Int) { }
