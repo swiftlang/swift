@@ -45,7 +45,7 @@ class C {
 	var a = A()
 
 	func act() {
-		a.dispatch({() -> Void in  // expected-note {{use trailing closure to simplify arguments}}
+		a.dispatch({() -> Void in
                   self.prop // expected-warning {{expression of type 'Int' is unused}}
                 })
 	}

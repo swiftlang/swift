@@ -91,7 +91,7 @@ func unlabeledClosureArgument() {
 
 // rdar://11935352 - closure with no body.
 func closure_no_body(_ p: () -> ()) {
-  return closure_no_body({}) // expected-note {{use trailing closure to simplify arguments}}
+  return closure_no_body({})
 }
 
 
@@ -136,9 +136,9 @@ class ExplicitSelfRequiredTest {
   var x = 42
   func method() -> Int {
     // explicit closure requires an explicit "self." base.
-    doVoidStuff({ self.x += 1 }) // expected-note {{use trailing closure to simplify arguments}}
-    doStuff({ x+1 })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{15-15=self.}} // expected-note {{use trailing closure to simplify arguments}}
-    doVoidStuff({ x += 1 })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{19-19=self.}} // expected-note {{use trailing closure to simplify arguments}}
+    doVoidStuff({ self.x += 1 })
+    doStuff({ x+1 })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{15-15=self.}}
+    doVoidStuff({ x += 1 })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{19-19=self.}}
 
     // Methods follow the same rules as properties, uses of 'self' must be marked with "self."
     doStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}} {{15-15=self.}}
@@ -245,7 +245,7 @@ func takesVoidFunc(_ f: () -> ()) {}
 var i: Int = 1
 
 // expected-warning @+1 {{expression of type 'Int' is unused}}
-takesVoidFunc({i}) // expected-note {{use trailing closure to simplify arguments}}
+takesVoidFunc({i})
 // expected-warning @+1 {{expression of type 'Int' is unused}}
 var f1: () -> () = {i}
 var x = {return $0}(1)
@@ -293,7 +293,7 @@ class TestClassWithStaticMethod {
 func genericOne<T>(_ a: () -> T) {}
 func genericTwo<T>(_ a: () -> T, _ b: () -> T) {}
 genericOne {}
-genericTwo({}, {}) // expected-note {{use trailing closure to simplify arguments}}
+genericTwo({}, {})
 
 
 // <rdar://problem/22344208> QoI: Warning for unused capture list variable should be customized

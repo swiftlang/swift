@@ -831,7 +831,7 @@ struct WillSetDidSetDisambiguate2Attr {
 // No need to disambiguate -- this is clearly a function call.
 func willSet(_: () -> Int) {}
 struct WillSetDidSetDisambiguate3 {
-  var x: Int = takeTrailingClosure({ // expected-note {{use trailing closure to simplify arguments}}
+  var x: Int = takeTrailingClosure({
     willSet { 42 }
   })
 }

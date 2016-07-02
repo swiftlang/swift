@@ -5,10 +5,10 @@ func takeIntIntToInt(_ f: (Int, Int) -> Int) { }
 
 // Simple closures
 func simple() {
-  takeIntToInt({(x: Int) -> Int in // expected-note {{use trailing closure to simplify arguments}}
+  takeIntToInt({(x: Int) -> Int in
     return x + 1
   })
-  takeIntIntToInt({(x: Int, y: Int) -> Int in // expected-note {{use trailing closure to simplify arguments}}
+  takeIntIntToInt({(x: Int, y: Int) -> Int in
     return x + y
   })
 }

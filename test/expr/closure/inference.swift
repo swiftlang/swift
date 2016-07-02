@@ -7,28 +7,28 @@ func takeIntIntToInt(_ f: (Int, Int) -> Int) { }
 func myMap<T, U>(_ array: [T], _ f: (T) -> U) -> [U] {}
 
 func testMap(_ array: [Int]) {
-  var farray = myMap(array, { Float($0) }) // expected-note {{use trailing closure to simplify arguments}}
+  var farray = myMap(array, { Float($0) })
   var _ : Float = farray[0]
-  let farray2 = myMap(array, { x in Float(x) }) // expected-note {{use trailing closure to simplify arguments}}
+  let farray2 = myMap(array, { x in Float(x) })
   farray = farray2
   _ = farray
 }
 
 // Infer result type.
 func testResultType() {
-  takeIntToInt({x in // expected-note {{use trailing closure to simplify arguments}}
+  takeIntToInt({x in
     return x + 1
   })
 
-  takeIntIntToInt({x, y in // expected-note {{use trailing closure to simplify arguments}}
+  takeIntIntToInt({x, y in
     return 2 + 3
   })
 }
 
 // Closures with unnamed parameters
 func unnamed() {
-  takeIntToInt({_ in return 1}) // expected-note {{use trailing closure to simplify arguments}}
-  takeIntIntToInt({_, _ in return 1}) // expected-note {{use trailing closure to simplify arguments}}
+  takeIntToInt({_ in return 1})
+  takeIntIntToInt({_, _ in return 1})
 }
 
 // Regression tests.
