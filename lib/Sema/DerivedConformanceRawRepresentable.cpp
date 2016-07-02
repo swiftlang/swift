@@ -141,8 +141,9 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
     = declareDerivedReadOnlyProperty(tc, parentDecl, enumDecl,
-                                     C.Id_rawValue, rawType,
+                                     C.Id_rawValue,
                                      rawInterfaceType,
+                                     rawType,
                                      getterDecl);
   
   auto dc = cast<IterableDeclContext>(parentDecl);

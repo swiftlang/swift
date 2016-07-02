@@ -372,9 +372,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       continue;
 
     // Retrieve the interface type for this inherited type.
-    if (DC->isGenericContext() && DC->isTypeContext()) {
+    if (inheritedTy->hasArchetype())
       inheritedTy = ArchetypeBuilder::mapTypeOutOfContext(DC, inheritedTy);
-    }
 
     // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
@@ -4075,7 +4074,8 @@ public:
       return false;
     }
 
-    // 'Self' is only a dynamic self on class methods.
+    // 'Self' is only a dynamic self on class methods and
+    // protocol requirements.
     auto declaredType = dc->getDeclaredTypeOfContext();
     if (declaredType->is<ErrorType>())
       return false;

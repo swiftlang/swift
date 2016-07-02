@@ -131,22 +131,53 @@ Type ParameterList::getType(const ASTContext &C) const {
   return TupleType::get(argumentInfo, C);
 }
 
+/// Hack to deal with the fact that Sema/CodeSynthesis.cpp creates ParamDecls
+/// containing contextual types.
+Type ParameterList::getInterfaceType(DeclContext *DC) const {
+  auto &C = DC->getASTContext();
+
+  if (size() == 0)
+    return TupleType::getEmpty(C);
+
+  SmallVector<TupleTypeElt, 8> argumentInfo;
+
+  for (auto P : *this) {
+    assert(P->hasType());
+
+    Type type;
+    if (P->hasInterfaceType())
+      type = P->getInterfaceType();
+    else if (!P->getTypeLoc().hasLocation())
+      type = ArchetypeBuilder::mapTypeOutOfContext(DC, P->getType());
+    else
+      type = P->getType();
+    assert(!type->hasArchetype());
+
+    argumentInfo.push_back({
+      type, P->getArgumentName(),
+      P->getDefaultArgumentKind(), P->isVariadic()
+    });
+  }
+
+  return TupleType::get(argumentInfo, C);
+}
+
 
 /// Return the full function type for a set of curried parameter lists that
 /// returns the specified result type.  This returns a null type if one of the
 /// ParamDecls does not have a type set for it yet.
 ///
-Type ParameterList::getFullType(Type resultType, ArrayRef<ParameterList*> PLL) {
+Type ParameterList::getFullInterfaceType(Type resultType,
+                                         ArrayRef<ParameterList*> PLL,
+                                         DeclContext *DC) {
   auto result = resultType;
-  auto &C = result->getASTContext();
-  
   for (auto PL : reversed(PLL)) {
-    auto paramType = PL->getType(C);
-    if (!paramType) return Type();
+    auto paramType = PL->getInterfaceType(DC);
     result = FunctionType::get(paramType, result);
   }
   return result;
 }
+
 
 /// Return the full source range of this parameter list.
 SourceRange ParameterList::getSourceRange() const {

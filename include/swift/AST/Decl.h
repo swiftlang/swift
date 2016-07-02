@@ -3212,9 +3212,7 @@ public:
   ClassDecl *getSuperclassDecl() const;
 
   /// Set the superclass of this class.
-  void setSuperclass(Type superclass) {
-    LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
-  }
+  void setSuperclass(Type superclass);
 
   /// Retrieve the status of circularity checking for class inheritance.
   CircularityCheck getCircularityCheck() const {

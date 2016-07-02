@@ -347,7 +347,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto enumTy = enumDecl->getDeclaredTypeInContext();
   auto metaTy = MetatypeType::get(enumTy);
   
-  auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), enumDecl,
+  auto selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl,
                                         /*static*/false, /*inout*/true);
 
   auto param = new (C) ParamDecl(/*let*/ true, SourceLoc(),
@@ -413,7 +413,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                                         VarDecl *rawValueDecl) {
   ASTContext &C = Impl.SwiftContext;
   
-  auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), enumDecl);
+  auto selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl);
   
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
@@ -428,8 +428,8 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      /*GenericParams=*/nullptr, params, Type(),
                      TypeLoc::withoutLoc(enumDecl->getRawType()), enumDecl);
   getterDecl->setImplicit();
-  getterDecl->setType(ParameterList::getFullType(enumDecl->getRawType(),
-                                                 params));
+  getterDecl->setType(ParameterList::getFullInterfaceType(enumDecl->getRawType(),
+                                                          params, enumDecl));
   getterDecl->setBodyResultType(enumDecl->getRawType());
   getterDecl->setAccessibility(Accessibility::Public);
 
@@ -470,7 +470,7 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
                    VarDecl *storedVar) {
   ASTContext &C = Impl.SwiftContext;
   
-  auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), structDecl);
+  auto selfDecl = ParamDecl::createSelf(SourceLoc(), structDecl);
   
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
@@ -488,7 +488,8 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
                      params, Type(),
                      TypeLoc::withoutLoc(computedType), structDecl);
   getterDecl->setImplicit();
-  getterDecl->setType(ParameterList::getFullType(computedType, params));
+  getterDecl->setType(ParameterList::getFullInterfaceType(computedType, params,
+                                                          structDecl));
   getterDecl->setBodyResultType(computedType);
   getterDecl->setAccessibility(Accessibility::Public);
 
@@ -517,7 +518,7 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                                      VarDecl *importedFieldDecl,
                                      ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
-  auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), importedDecl);
+  auto selfDecl = ParamDecl::createSelf(SourceLoc(), importedDecl);
 
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
@@ -534,7 +535,8 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      /*GenericParams=*/nullptr, params, Type(),
                      TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
   getterDecl->setAccessibility(Accessibility::Public);
-  getterDecl->setType(ParameterList::getFullType(getterType, params));
+  getterDecl->setType(ParameterList::getFullInterfaceType(getterType, params,
+                                                          importedDecl));
   getterDecl->setBodyResultType(getterType);
 
   return getterDecl;
@@ -545,7 +547,7 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                                      VarDecl *importedFieldDecl,
                                      ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
-  auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), importedDecl,
+  auto selfDecl = ParamDecl::createSelf(SourceLoc(), importedDecl,
                                         /*isStatic*/false, /*isInOut*/true);
   auto newValueDecl = new (C) ParamDecl(/*isLet */ true,SourceLoc(),SourceLoc(),
                                         Identifier(), SourceLoc(), C.Id_value,
@@ -567,7 +569,8 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      /*GenericParams=*/nullptr, params, Type(),
                      TypeLoc::withoutLoc(voidTy), importedDecl, clangNode);
 
-  setterDecl->setType(ParameterList::getFullType(voidTy, params));
+  setterDecl->setType(ParameterList::getFullInterfaceType(voidTy, params,
+                                                          importedDecl));
   setterDecl->setBodyResultType(voidTy);
   setterDecl->setAccessibility(Accessibility::Public);
   setterDecl->setMutating();
@@ -946,9 +949,10 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
       DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
   ParameterList *params[] = {
       ParameterList::createWithoutLoc(
-          ParamDecl::createUnboundSelf(SourceLoc(), swiftDecl, isStatic)),
+          ParamDecl::createSelf(SourceLoc(), swiftDecl, isStatic)),
       ParameterList::createEmpty(C)};
-  auto toStringTy = ParameterList::getFullType(stringTy, params);
+  auto toStringTy = ParameterList::getFullInterfaceType(stringTy, params,
+                                                        swiftDecl);
 
   FuncDecl *getterDecl =
     FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
@@ -1666,7 +1670,7 @@ namespace {
       auto &context = Impl.SwiftContext;
       
       // Create the 'self' declaration.
-      auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), structDecl,
+      auto selfDecl = ParamDecl::createSelf(SourceLoc(), structDecl,
                                             /*static*/false, /*inout*/true);
       
       // self & param.
@@ -1907,7 +1911,7 @@ namespace {
       auto &context = Impl.SwiftContext;
 
       // Create the 'self' declaration.
-      auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), structDecl,
+      auto selfDecl = ParamDecl::createSelf(SourceLoc(), structDecl,
                                             /*static*/false, /*inout*/true);
 
       // Construct the set of parameters from the list of members.
@@ -2799,9 +2803,9 @@ namespace {
     }
 
     ParameterList *getNonSelfParamList(
-        const clang::FunctionDecl *decl, Optional<unsigned> selfIdx,
-        ArrayRef<Identifier> argNames, bool allowNSUIntegerAsInt,
-        bool isAccessor) {
+        DeclContext *dc, const clang::FunctionDecl *decl,
+        Optional<unsigned> selfIdx, ArrayRef<Identifier> argNames,
+        bool allowNSUIntegerAsInt, bool isAccessor) {
       if (bool(selfIdx)) {
         assert(((decl->getNumParams() == argNames.size() + 1) || isAccessor) &&
                (*selfIdx < decl->getNumParams()) && "where's self?");
@@ -2815,7 +2819,7 @@ namespace {
           continue;
         nonSelfParams.push_back(decl->getParamDecl(i));
       }
-      return Impl.importFunctionParameterList(decl, nonSelfParams,
+      return Impl.importFunctionParameterList(dc, decl, nonSelfParams,
                                               decl->isVariadic(),
                                               allowNSUIntegerAsInt, argNames);
     }
@@ -2852,20 +2856,20 @@ namespace {
                 argNames.front(), Impl.SwiftContext.TheEmptyTupleType, dc));
       } else {
         parameterList = Impl.importFunctionParameterList(
-            decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),
-            allowNSUIntegerAsInt, argNames);
+            dc, decl, {decl->param_begin(), decl->param_end()},
+            decl->isVariadic(), allowNSUIntegerAsInt, argNames);
       }
       if (!parameterList)
         return nullptr;
 
       bool selfIsInOut =
-          !dc->getDeclaredTypeOfContext()->hasReferenceSemantics();
-      auto selfParam = ParamDecl::createUnboundSelf(SourceLoc(), dc, /*static=*/false,
+          !dc->getDeclaredInterfaceType()->hasReferenceSemantics();
+      auto selfParam = ParamDecl::createSelf(SourceLoc(), dc, /*static=*/false,
                                              /*inout=*/selfIsInOut);
 
       OptionalTypeKind initOptionality;
       auto resultType = Impl.importFunctionReturnType(
-          decl, decl->getReturnType(), allowNSUIntegerAsInt);
+          dc, decl, decl->getReturnType(), allowNSUIntegerAsInt);
       (void)resultType->getAnyOptionalObjectType(initOptionality);
 
       auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
@@ -2927,14 +2931,15 @@ namespace {
       }
 
       bodyParams.push_back(ParameterList::createWithoutLoc(
-          ParamDecl::createUnboundSelf(SourceLoc(), dc, !selfIdx.hasValue(),
+          ParamDecl::createSelf(SourceLoc(), dc, !selfIdx.hasValue(),
                                 selfIsInOut)));
       bodyParams.push_back(getNonSelfParamList(
-          decl, selfIdx, name.getArgumentNames(), allowNSUIntegerAsInt, !name));
+          dc, decl, selfIdx, name.getArgumentNames(), allowNSUIntegerAsInt, !name));
 
       auto swiftResultTy = Impl.importFunctionReturnType(
-          decl, decl->getReturnType(), allowNSUIntegerAsInt);
-      auto fnType = ParameterList::getFullType(swiftResultTy, bodyParams);
+          dc, decl, decl->getReturnType(), allowNSUIntegerAsInt);
+      auto fnType = ParameterList::getFullInterfaceType(swiftResultTy, bodyParams,
+                                                        dc);
 
       auto loc = Impl.importSourceLoc(decl->getLocation());
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
@@ -2949,7 +2954,7 @@ namespace {
       if (auto proto = dc->getAsProtocolOrProtocolExtensionContext()) {
         Type interfaceType;
         std::tie(fnType, interfaceType) =
-            getProtocolMethodType(proto, fnType->castTo<AnyFunctionType>());
+            getGenericMethodType(proto, fnType->castTo<AnyFunctionType>());
         result->setType(fnType);
         result->setInterfaceType(interfaceType);
         result->setGenericSignature(proto->getGenericSignature());
@@ -3214,7 +3219,8 @@ namespace {
       // Import the function type. If we have parameters, make sure their names
       // get into the resulting function type.
       ParameterList *bodyParams = nullptr;
-      Type type = Impl.importFunctionType(decl,
+      Type type = Impl.importFunctionType(dc,
+                                          decl,
                                           decl->getReturnType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
@@ -3644,14 +3650,9 @@ namespace {
       auto selfVar =
         ParamDecl::createSelf(SourceLoc(), dc, /*isStatic*/!isInstance);
       bodyParams.push_back(ParameterList::createWithoutLoc(selfVar));
-      Type selfContextType;
-      if (dc->getAsProtocolOrProtocolExtensionContext()) {
-        selfContextType = dc->getProtocolSelf()->getArchetype();
-      } else {
-        selfContextType = dc->getDeclaredTypeInContext();
-      }
+      Type selfInterfaceType = dc->getSelfInterfaceType();
       if (!isInstance) {
-        selfContextType = MetatypeType::get(selfContextType);
+        selfInterfaceType = MetatypeType::get(selfInterfaceType);
       }
 
       SpecialMethodKind kind = SpecialMethodKind::Regular;
@@ -3709,7 +3710,7 @@ namespace {
       // in Swift as DynamicSelf, do so.
       if (decl->hasRelatedResultType()) {
         result->setDynamicSelf(true);
-        resultTy = result->getDynamicSelf();
+        resultTy = result->getDynamicSelfInterface();
         assert(resultTy && "failed to get dynamic self");
 
         Type dynamicSelfTy = result->getDynamicSelfInterface();
@@ -3728,23 +3729,14 @@ namespace {
         auto methodTy = type->castTo<FunctionType>();
         type = FunctionType::get(methodTy->getInput(), resultTy, 
                                  methodTy->getExtInfo());
-
-        // Create the interface type of the method.
-        interfaceType = FunctionType::get(methodTy->getInput(), dynamicSelfTy,
-                                          methodTy->getExtInfo());
-        interfaceType = FunctionType::get(selfVar->getType(), interfaceType);
       }
 
       // Add the 'self' parameter to the function type.
-      type = FunctionType::get(selfContextType, type);
+      type = FunctionType::get(selfInterfaceType, type);
 
-      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
-        std::tie(type, interfaceType)
-          = getProtocolMethodType(proto, type->castTo<AnyFunctionType>());
-      } else if (dc->isGenericContext()) {
+      if (dc->isGenericContext()) {
         std::tie(type, interfaceType)
           = getGenericMethodType(dc, type->castTo<AnyFunctionType>());
-        selfVar->overwriteType(type->castTo<AnyFunctionType>()->getInput());
       }
 
       result->setBodyResultType(resultTy);
@@ -3920,9 +3912,9 @@ namespace {
       }
 
       bool redundant;
-      auto result =  importConstructor(objcMethod, dc, implicit, kind, required,
-                                       selector, importedName, params,
-                                       variadic, redundant);
+      auto result = importConstructor(objcMethod, dc, implicit, kind, required,
+                                      selector, importedName, params,
+                                      variadic, redundant);
 
       // If this is a Swift 2 stub, mark it as such.
       if (result && swift3Name)
@@ -4044,13 +4036,12 @@ namespace {
       redundant = false;
 
       // Figure out the type of the container.
-      auto containerTy = dc->getDeclaredTypeInContext();
-      assert(containerTy && "Method in non-type context?");
-      auto nominalOwner = containerTy->getAnyNominal();
+      auto ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+      assert(ownerNominal && "Method in non-type context?");
 
       // Find the interface, if we can.
       const clang::ObjCInterfaceDecl *interface = nullptr;
-      if (auto classDecl = containerTy->getClassOrBoundGenericClass()) {
+      if (auto classDecl = dyn_cast<ClassDecl>(ownerNominal)) {
         interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
                       classDecl->getClangDecl());
       }
@@ -4079,8 +4070,8 @@ namespace {
 
       // Add the implicit 'self' parameter patterns.
       SmallVector<ParameterList*, 4> bodyParams;
-      auto selfMetaVar = ParamDecl::createUnboundSelf(SourceLoc(), dc, /*static*/true);
-      auto selfTy = dc->getDeclaredTypeInContext();
+      auto selfMetaVar = ParamDecl::createSelf(SourceLoc(), dc, /*static*/true);
+      auto selfTy = dc->getSelfInterfaceType();
       auto selfMetaTy = MetatypeType::get(selfTy);
       bodyParams.push_back(ParameterList::createWithoutLoc(selfMetaVar));
 
@@ -4124,7 +4115,7 @@ namespace {
       // the same name.
       Type allocParamType = allocType->castTo<AnyFunctionType>()->getResult()
                               ->castTo<AnyFunctionType>()->getInput();
-      for (auto other : nominalOwner->lookupDirect(name)) {
+      for (auto other : ownerNominal->lookupDirect(name)) {
         auto ctor = dyn_cast<ConstructorDecl>(other);
         if (!ctor || ctor->isInvalid() ||
             ctor->getAttrs().isUnavailable(Impl.SwiftContext) ||
@@ -4197,7 +4188,7 @@ namespace {
       if (known != Impl.Constructors.end())
         return known->second;
 
-      auto *selfVar = ParamDecl::createUnboundSelf(SourceLoc(), dc);
+      auto *selfVar = ParamDecl::createSelf(SourceLoc(), dc);
 
       // Create the actual constructor.
       auto result = Impl.createDeclWithClangNode<ConstructorDecl>(objcMethod,
@@ -4211,23 +4202,12 @@ namespace {
 
       // Make the constructor declaration immediately visible in its
       // class or protocol type.
-      nominalOwner->makeMemberVisible(result);
+      ownerNominal->makeMemberVisible(result);
 
       addObjCAttribute(result, selector);
 
-      // Fix the types when we've imported into a protocol.
-      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
-        Type interfaceAllocType;
-        Type interfaceInitType;
-        std::tie(allocType, interfaceAllocType)
-          = getProtocolMethodType(proto, allocType->castTo<AnyFunctionType>());
-        std::tie(initType, interfaceInitType)
-          = getProtocolMethodType(proto, initType->castTo<AnyFunctionType>());
-
-        result->setInitializerInterfaceType(interfaceInitType);
-        result->setInterfaceType(interfaceAllocType);
-        result->setGenericSignature(dc->getGenericSignatureOfContext());
-      } else if (dc->isGenericContext()) {
+      // Calculate the function type of the result.
+      if (dc->isGenericContext()) {
         Type interfaceAllocType;
         Type interfaceInitType;
         std::tie(allocType, interfaceAllocType)
@@ -4238,7 +4218,6 @@ namespace {
         result->setInitializerInterfaceType(interfaceInitType);
         result->setInterfaceType(interfaceAllocType);
         result->setGenericSignature(dc->getGenericSignatureOfContext());
-        selfVar->overwriteType(initType->castTo<AnyFunctionType>()->getInput());
       }
 
       result->setType(allocType);
@@ -4322,62 +4301,22 @@ namespace {
       return cast<NamedPattern>(pattern)->getDecl();
     }
 
-    /// Retrieves the type and interface type for a protocol or
-    /// protocol extension method given the computed type of that
-    /// method.
-    std::pair<Type, Type> getProtocolMethodType(DeclContext *dc,
-                                                AnyFunctionType *fnType) {
-      Type type = PolymorphicFunctionType::get(fnType->getInput(),
-                                               fnType->getResult(),
-                                               dc->getGenericParamsOfContext());
-
-      // Figure out the curried 'self' type for the interface type. It's always
-      // either the generic parameter type 'Self' or a metatype thereof.
-      auto selfDecl = dc->getProtocolSelf();
-      auto selfTy = selfDecl->getDeclaredType();
-      auto interfaceInputTy = selfTy;
-      auto inputTy = fnType->getInput();
-      if (auto tupleTy = inputTy->getAs<TupleType>()) {
-        if (tupleTy->getNumElements() == 1)
-          inputTy = tupleTy->getElementType(0);
-      }
-      if (inputTy->is<MetatypeType>())
-        interfaceInputTy = MetatypeType::get(interfaceInputTy);
-
-      auto selfArchetype = selfDecl->getArchetype();
-      auto interfaceResultTy = fnType->getResult().transform(
-        [&](Type type) -> Type {
-          if (type->is<DynamicSelfType>() || type->isEqual(selfArchetype)) {
-            return DynamicSelfType::get(selfTy, Impl.SwiftContext);
-          }
-
-          return type;
-        });
-
-      Type interfaceType = GenericFunctionType::get(
-                             dc->getGenericSignatureOfContext(),
-                             interfaceInputTy,
-                             interfaceResultTy,
-                             AnyFunctionType::ExtInfo());
-      return { type, interfaceType };
-    }
-
-    /// Retrieves the type and interface type for a generic class or class
-    /// extension method, given the computed type of that method.
     std::pair<Type, Type> getGenericMethodType(DeclContext *dc,
                                                AnyFunctionType *fnType) {
-      Type inputType = fnType->getInput();
-      Type interfaceInputType =
-        ArchetypeBuilder::mapTypeOutOfContext(dc, inputType);
-      Type resultType = fnType->getResult();
-      Type interfaceResultType =
-        ArchetypeBuilder::mapTypeOutOfContext(dc, resultType);
+      assert(!fnType->hasArchetype());
 
-      Type interfaceType = GenericFunctionType::get(
-          dc->getGenericSignatureOfContext(), interfaceInputType,
-          interfaceResultType, AnyFunctionType::ExtInfo());
+      Type inputType = ArchetypeBuilder::mapTypeIntoContext(
+          dc, fnType->getInput());
+      Type resultType = ArchetypeBuilder::mapTypeIntoContext(
+          dc, fnType->getResult());
       Type type = PolymorphicFunctionType::get(inputType, resultType,
                                                dc->getGenericParamsOfContext());
+
+      Type interfaceType = GenericFunctionType::get(
+          dc->getGenericSignatureOfContext(),
+          fnType->getInput(), fnType->getResult(),
+          AnyFunctionType::ExtInfo());
+
       return { type, interfaceType };
     }
 
@@ -4395,18 +4334,13 @@ namespace {
       };
 
       // Form the type of the getter.
-      auto getterType = ParameterList::getFullType(elementTy, getterArgs);
+      auto getterType =
+          ParameterList::getFullInterfaceType(elementTy, getterArgs, dc);
 
-      // If we're in a protocol, the getter thunk will be polymorphic.
       Type interfaceType;
-      if (dc->getAsProtocolOrProtocolExtensionContext()) {
-        std::tie(getterType, interfaceType)
-          = getProtocolMethodType(dc, getterType->castTo<AnyFunctionType>());
-      } else if (dc->isGenericContext()) {
+      if (dc->isGenericContext()) {
         std::tie(getterType, interfaceType)
           = getGenericMethodType(dc, getterType->castTo<AnyFunctionType>());
-        getterArgs[0]->get(0)->overwriteType(
-            getterType->castTo<AnyFunctionType>()->getInput());
       }
 
       // Create the getter thunk.
@@ -4432,7 +4366,7 @@ namespace {
     }
 
       /// Build a declaration for an Objective-C subscript setter.
-    FuncDecl *buildSubscriptSetterDecl(const FuncDecl *setter, Type elementTy,
+    FuncDecl *buildSubscriptSetterDecl(const FuncDecl *setter, Type elementInterfaceTy,
                                        DeclContext *dc, ParamDecl *index) {
       auto &C = Impl.SwiftContext;
       auto loc = setter->getLoc();
@@ -4448,13 +4382,15 @@ namespace {
 
       // 'self'
       auto selfDecl = ParamDecl::createSelf(SourceLoc(), dc);
+      auto elementTy = ArchetypeBuilder::mapTypeIntoContext(
+          dc, elementInterfaceTy);
 
       auto paramVarDecl = new (C) ParamDecl(/*isLet=*/false, SourceLoc(),
                                             SourceLoc(), Identifier(),loc,
                                             valueIndex->get(0)->getName(),
                                             elementTy, dc);
-      
-      
+      paramVarDecl->setInterfaceType(elementInterfaceTy);
+
       auto valueIndicesPL = ParameterList::create(C, {
         paramVarDecl,
         index
@@ -4467,20 +4403,15 @@ namespace {
       };
       
       // Form the type of the setter.
-      Type setterType = ParameterList::getFullType(TupleType::getEmpty(C),
-                                                   setterArgs);
+      Type setterType =
+          ParameterList::getFullInterfaceType(TupleType::getEmpty(C),
+                                              setterArgs,
+                                              dc);
 
-      // If we're in a protocol or extension thereof, the setter thunk
-      // will be polymorphic.
       Type interfaceType;
-      if (dc->getAsProtocolOrProtocolExtensionContext()) {
-        std::tie(setterType, interfaceType)
-          = getProtocolMethodType(dc, setterType->castTo<AnyFunctionType>());
-      } else if (dc->isGenericContext()) {
+      if (dc->isGenericContext()) {
         std::tie(setterType, interfaceType)
           = getGenericMethodType(dc, setterType->castTo<AnyFunctionType>());
-        selfDecl->overwriteType(
-            setterType->castTo<AnyFunctionType>()->getInput());
       }
 
       // Create the setter thunk.
@@ -5746,6 +5677,8 @@ namespace {
                                          isInSystemModule(dc),
                                          /*isFullyBridgeable*/false);
         if (superclassType) {
+          superclassType =
+              ArchetypeBuilder::mapTypeOutOfContext(result, superclassType);
           assert(superclassType->is<ClassType>() ||
                  superclassType->is<BoundGenericClassType>());
           inheritedTypes.push_back(TypeLoc::withoutLoc(superclassType));
@@ -6945,7 +6878,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   
   // 'self'
   if (dc->isTypeContext()) {
-    auto *selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), dc, isStatic);
+    auto *selfDecl = ParamDecl::createSelf(SourceLoc(), dc, isStatic);
     getterArgs.push_back(ParameterList::createWithoutLoc(selfDecl));
   }
   
@@ -6953,7 +6886,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   getterArgs.push_back(ParameterList::createEmpty(C));
 
   // Form the type of the getter.
-  auto getterType = ParameterList::getFullType(type, getterArgs);
+  auto getterType = ParameterList::getFullInterfaceType(type, getterArgs, dc);
 
   // Create the getter function declaration.
   auto func =

@@ -716,7 +716,7 @@ public:
     }
 
     // Does it make sense to substitute types?
-    bool shouldSubst = !isa<UnboundGenericType>(BaseTy.getPointer()) &&
+    bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
                        !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
                        !BaseTy->isAnyExistentialType();
     ModuleDecl *M = DC->getParentModule();
@@ -831,7 +831,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         DC = DC->getParent();
 
         if (DC->getAsProtocolExtensionContext())
-          ExtendedType = DC->getProtocolSelf()->getArchetype();
+          ExtendedType = DC->getSelfTypeInContext();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())

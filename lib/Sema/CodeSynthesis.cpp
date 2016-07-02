@@ -67,7 +67,7 @@ static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
 }
 
 static ParamDecl *buildLetArgument(SourceLoc loc, DeclContext *DC,
-                                  StringRef name, Type type) {
+                                   StringRef name, Type type) {
   return buildArgument(loc, DC, name, type, /*isLet*/ true);
 }
 
@@ -182,8 +182,8 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   // Add a "(value : T, indices...)" argument list.
   auto storageType = getTypeOfStorage(storage, TC);
   valueDecl = buildLetArgument(storage->getLoc(),
-                                     storage->getDeclContext(), "value",
-                                     storageType);
+                               storage->getDeclContext(), "value",
+                               storageType);
   params.push_back(buildIndexForwardingParamList(storage, valueDecl));
 
   Type setterRetTy = TupleType::getEmpty(TC.Context);
@@ -2060,15 +2060,17 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     return nullptr;
 
   // Lookup will sometimes give us initializers that are from the ancestors of
-  // our immediate superclass.  So, from the superclass constructor, we look 
-  // one level up to the enclosing type context which will either be a class 
+  // our immediate superclass.  So, from the superclass constructor, we look
+  // one level up to the enclosing type context which will either be a class
   // or an extension.  We can use the type declared in that context to check
   // if it's our immediate superclass and give up if we didn't.
-  // 
+  //
   // FIXME: Remove this when lookup of initializers becomes restricted to our
   // immediate superclass.
-  Type superclassTyInCtor = superclassCtor->getDeclContext()->getDeclaredTypeInContext();
+  Type superclassTyInCtor = superclassCtor->getDeclContext()->getDeclaredTypeOfContext();
   Type superclassTy = classDecl->getSuperclass();
+  Type superclassTyInContext = ArchetypeBuilder::mapTypeIntoContext(
+      classDecl, superclassTy);
   NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
   if (superclassTyInCtor->getAnyNominal() != superclassDecl) {
     return nullptr;
@@ -2093,7 +2095,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   if (superclassDecl->isGenericContext()) {
     if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
       auto *moduleDecl = classDecl->getParentModule();
-      auto subs = superclassTy->gatherAllSubstitutions(
+      auto subs = superclassTyInContext->gatherAllSubstitutions(
           moduleDecl, nullptr, nullptr);
       auto subsMap = superclassSig->getSubstitutionMap(subs);
 
@@ -2103,12 +2105,14 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
         auto paramTy = ArchetypeBuilder::mapTypeOutOfContext(
             superclassDecl, decl->getType());
 
-        // Apply the superclass substitutions to produce an interface
-        // type in terms of the class generic signature.
+        // Apply the superclass substitutions to produce a contextual
+        // type in terms of the derived class archetypes.
         auto paramSubstTy = paramTy.subst(moduleDecl, subsMap, SubstOptions());
+        decl->overwriteType(paramSubstTy);
 
-        // Map it to a contextual type in terms of the class's archetypes.
-        decl->overwriteType(ArchetypeBuilder::mapTypeIntoContext(
+        // Map it to an interface type in terms of the derived class
+        // generic signature.
+        decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
             classDecl, paramSubstTy));
       }
     }

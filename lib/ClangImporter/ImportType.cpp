@@ -1415,6 +1415,7 @@ static OptionalTypeKind getParamOptionality(
 }
 
 Type ClangImporter::Implementation::importFunctionReturnType(
+    DeclContext *dc,
     const clang::FunctionDecl *clangDecl, clang::QualType resultType,
     bool allowNSUIntegerAsInt) {
  // CF function results can be managed if they are audited or
@@ -1434,14 +1435,20 @@ Type ClangImporter::Implementation::importFunctionReturnType(
   }
 
   // Import the result type.
-  return importType(resultType, (isAuditedResult ? ImportTypeKind::AuditedResult
-                                                 : ImportTypeKind::Result),
-                    allowNSUIntegerAsInt,
-                    /*isFullyBridgeable*/ true, OptionalityOfReturn);
+  auto type = importType(resultType,
+                         (isAuditedResult ? ImportTypeKind::AuditedResult
+                                          : ImportTypeKind::Result),
+                         allowNSUIntegerAsInt,
+                         /*isFullyBridgeable*/ true, OptionalityOfReturn);
+  if (!type)
+    return type;
+
+  return ArchetypeBuilder::mapTypeOutOfContext(dc, type);
 }
 
 Type ClangImporter::Implementation::
-importFunctionType(const clang::FunctionDecl *clangDecl,
+importFunctionType(DeclContext *dc,
+                   const clang::FunctionDecl *clangDecl,
                    clang::QualType resultType,
                    ArrayRef<const clang::ParmVarDecl *> params,
                    bool isVariadic, bool isNoReturn,
@@ -1452,12 +1459,12 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
       shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
 
   auto swiftResultTy =
-      importFunctionReturnType(clangDecl, resultType, allowNSUIntegerAsInt);
+      importFunctionReturnType(dc, clangDecl, resultType, allowNSUIntegerAsInt);
   if (!swiftResultTy)
     return Type();
 
   ArrayRef<Identifier> argNames = name.getArgumentNames();
-  parameterList = importFunctionParameterList(clangDecl, params, isVariadic,
+  parameterList = importFunctionParameterList(dc, clangDecl, params, isVariadic,
                                               allowNSUIntegerAsInt, argNames);
   if (!parameterList)
     return Type();
@@ -1471,7 +1478,7 @@ importFunctionType(const clang::FunctionDecl *clangDecl,
 }
 
 ParameterList *ClangImporter::Implementation::importFunctionParameterList(
-    const clang::FunctionDecl *clangDecl,
+    DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
     bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames) {
   // Import the parameters.
@@ -1523,17 +1530,19 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     // It doesn't actually matter which DeclContext we use, so just use the
     // imported header unit.
-    auto bodyVar = createDeclWithClangNode<ParamDecl>(
+    auto paramInfo = createDeclWithClangNode<ParamDecl>(
         param,
         /*IsLet*/ true, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName, swiftParamTy,
         ImportedHeaderUnit);
+    paramInfo->setInterfaceType(
+        ArchetypeBuilder::mapTypeOutOfContext(dc, swiftParamTy));
 
     if (addNoEscapeAttr)
-      bodyVar->getAttrs().add(new (SwiftContext)
+      paramInfo->getAttrs().add(new (SwiftContext)
                                   NoEscapeAttr(/*IsImplicit=*/false));
 
-    parameters.push_back(bodyVar);
+    parameters.push_back(paramInfo);
     ++index;
   }
 
@@ -2117,14 +2126,20 @@ Type ClangImporter::Implementation::importMethodType(
     }
   }
 
+  // The member was defined in 'origDC', but is being imported into 'dc'.
+  // 'dc' must be a subclass or a type conforming to protocol.
   DeclContext *origDC = importDeclContextOf(clangDecl,
                                             clangDecl->getDeclContext());
   assert(origDC);
   auto mapTypeIntoContext = [&](Type type) -> Type {
     if (dc != origDC) {
+      // Replace origDC's archetypes with interface types.
       type = ArchetypeBuilder::mapTypeOutOfContext(origDC, type);
+      // Get the substitutions that we need to access a member of
+      // 'origDC' on 'dc', and apply them to the interface type
+      // to produce the final substituted type.
       type = dc->getDeclaredTypeInContext()->getTypeOfMember(
-          dc->getParentModule(), type, origDC);
+                dc->getParentModule(), type, origDC);
     }
     return type;
   };
@@ -2302,21 +2317,23 @@ Type ClangImporter::Implementation::importMethodType(
 
     // It doesn't actually matter which DeclContext we use, so just use the
     // imported header unit.
-    auto bodyVar
+    swiftParamTy = mapTypeIntoContext(swiftParamTy);
+
+    // Set up the parameter info.
+    auto paramInfo
       = createDeclWithClangNode<ParamDecl>(param, /*IsLet*/ true,
-                                     SourceLoc(), SourceLoc(), name,
-                                     importSourceLoc(param->getLocation()),
-                                     bodyName, mapTypeIntoContext(swiftParamTy), 
-                                     ImportedHeaderUnit);
+                                           SourceLoc(), SourceLoc(), name,
+                                           importSourceLoc(param->getLocation()),
+                                           bodyName, swiftParamTy,
+                                           ImportedHeaderUnit);
+    paramInfo->setInterfaceType(
+        ArchetypeBuilder::mapTypeOutOfContext(dc, swiftParamTy));
 
     if (addNoEscapeAttr) {
-      bodyVar->getAttrs().add(
+      paramInfo->getAttrs().add(
         new (SwiftContext) NoEscapeAttr(/*IsImplicit=*/false));
     }
 
-    // Set up the parameter info.
-    auto paramInfo = bodyVar;
-    
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||
         kind == SpecialMethodKind::Constructor) {
@@ -2375,10 +2392,13 @@ Type ClangImporter::Implementation::importMethodType(
     // Mark that the function type throws.
     extInfo = extInfo.withThrows(true);
   }
-  
+ 
+  swiftResultTy = ArchetypeBuilder::mapTypeOutOfContext(dc, swiftResultTy);
+
   // Form the function type.
-  return FunctionType::get((*bodyParams)->getType(SwiftContext),
-                           swiftResultTy, extInfo);
+  return FunctionType::get(
+      (*bodyParams)->getInterfaceType(const_cast<DeclContext*>(dc)),
+      swiftResultTy, extInfo);
 }
 
 

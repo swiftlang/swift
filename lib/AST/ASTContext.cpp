@@ -2622,8 +2622,6 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
   RecursiveTypeProperties properties;
-  if (Parent)
-    properties |= Parent->getRecursiveProperties();
   BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs, properties);
 
   auto arena = getArena(properties);
@@ -2657,8 +2655,8 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   } else {
     auto theEnum = cast<EnumDecl>(TheDecl);
     newType = new (C, arena) BoundGenericEnumType(theEnum, Parent, ArgsCopy,
-                                                   IsCanonical ? &C : 0,
-                                                   properties);
+                                                  IsCanonical ? &C : 0,
+                                                  properties);
   }
   C.Impl.getArena(arena).BoundGenericTypes.InsertNode(newType, InsertPos);
 

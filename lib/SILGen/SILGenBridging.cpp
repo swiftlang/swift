@@ -353,8 +353,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // thunks, which is what we are in spirit.
   auto thunk = SGM.getOrCreateReabstractionThunk(F.getContextGenericParams(),
                                                  invokeTy,
-                                                 fnInterfaceTy,
-                                                 blockInterfaceTy,
+                                                 fnTy,
+                                                 blockTy,
                                                  F.isFragile());
 
   // Build it if necessary.
@@ -772,7 +772,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   // Emit the indirect result arguments, if any.
   // FIXME: we're just assuming that these match up exactly?
   for (auto indirectResult : objcFnTy->getIndirectResults()) {
-    SILType argTy = gen.F.mapTypeIntoContext(indirectResult.getSILType());
+    SILType argTy = indirectResult.getSILType();
     auto arg = new (gen.F.getModule()) SILArgument(gen.F.begin(), argTy);
     args.push_back(arg);
   }
@@ -783,7 +783,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   assert(inputs.size() ==
            nativeInputs.size() + unsigned(foreignError.hasValue()));
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
-    SILType argTy = gen.F.mapTypeIntoContext(inputs[i].getSILType());
+    SILType argTy = inputs[i].getSILType();
     SILValue arg = new(gen.F.getModule()) SILArgument(gen.F.begin(), argTy);
 
     // If this parameter is the foreign error slot, pull it out.
@@ -832,8 +832,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   Scope scope(gen.Cleanups, CleanupLocation::get(loc));
   assert(bridgedArgs.size() == nativeInputs.size());
   for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
-    SILType argTy = gen.F.mapTypeIntoContext(
-                           swiftFnTy->getParameters()[i].getSILType());
+    SILType argTy = swiftFnTy->getParameters()[i].getSILType();
     ManagedValue native =
       gen.emitBridgedToNativeValue(loc,
                                    bridgedArgs[i],
@@ -869,8 +868,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   auto nativeInfo = getConstantInfo(native);
   auto swiftResultTy =
     F.mapTypeIntoContext(nativeInfo.SILFnType->getSILResult());
-  auto objcResultTy =
-    F.mapTypeIntoContext(objcFnTy->getSILResult());
+  auto objcResultTy = objcFnTy->getSILResult();
 
   // Call the native entry point.
   SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);

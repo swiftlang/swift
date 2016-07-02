@@ -1690,10 +1690,9 @@ Type ValueDecl::getInterfaceType() const {
 
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(this)) {
     auto proto = cast<ProtocolDecl>(getDeclContext());
-    if (!proto->getProtocolSelf())
+    auto selfTy = proto->getSelfInterfaceType();
+    if (!selfTy)
       return Type();
-    auto selfTy = proto->getProtocolSelf()->getDeclaredType();
-    assert(selfTy);
     auto &ctx = getASTContext();
     InterfaceTy = DependentMemberType::get(
                     selfTy,
@@ -2584,7 +2583,7 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
 /// Determine whether the given type is the 'Self' generic parameter
 /// of a protocol.
 static bool isProtocolSelf(const ProtocolDecl *proto, Type type) {
-  return proto->getProtocolSelf()->getDeclaredType()->isEqual(type);
+  return proto->getSelfInterfaceType()->isEqual(type);
 }
 
 /// Classify usages of Self in the given type.
@@ -3600,6 +3599,8 @@ ParamDecl::ParamDecl(ParamDecl *PD)
 
 /// \brief Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
+  assert(isTypeContext());
+
   // For a protocol or extension thereof, the type is 'Self'.
   if (getAsProtocolOrProtocolExtensionContext()) {
     // In the parser, generic parameters won't be wired up yet, just give up on
@@ -3613,6 +3614,8 @@ Type DeclContext::getSelfTypeInContext() const {
 
 /// \brief Retrieve the interface type of 'self' for the given context.
 Type DeclContext::getSelfInterfaceType() const {
+  assert(isTypeContext());
+
   // For a protocol or extension thereof, the type is 'Self'.
   if (getAsProtocolOrProtocolExtensionContext()) {
     // In the parser, generic parameters won't be wired up yet, just give up on
@@ -3684,21 +3687,28 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
                                  bool isStaticMethod, bool isInOut) {
   ASTContext &C = DC->getASTContext();
   auto selfType = DC->getSelfTypeInContext();
+  auto selfInterfaceType = DC->getSelfInterfaceType();
+
+  assert(!!selfType == !!selfInterfaceType);
 
   // If we have a selfType (i.e. we're not in the parser before we know such
   // things, configure it.
-  if (selfType) {
-    if (isStaticMethod)
+  if (selfType && selfInterfaceType) {
+    if (isStaticMethod) {
       selfType = MetatypeType::get(selfType);
+      selfInterfaceType = MetatypeType::get(selfInterfaceType);
+    }
     
-    if (isInOut)
+    if (isInOut) {
       selfType = InOutType::get(selfType);
+      selfInterfaceType = InOutType::get(selfInterfaceType);
+    }
   }
-    
+
   auto *selfDecl = new (C) ParamDecl(/*IsLet*/!isInOut, SourceLoc(),SourceLoc(),
                                      Identifier(), loc, C.Id_self, selfType,DC);
   selfDecl->setImplicit();
-  selfDecl->setInterfaceType(DC->getSelfInterfaceType());
+  selfDecl->setInterfaceType(selfInterfaceType);
   return selfDecl;
 }
 
@@ -3876,12 +3886,10 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
     // For a protocol, the type of 'self' is the parameter type 'Self', not
     // the protocol itself.
     if (containerTy->is<ProtocolType>()) {
-      if (auto self = dc->getProtocolSelf()) {
-        if (wantInterfaceType)
-          selfTy = self->getDeclaredType();
-        else
-          selfTy = self->getArchetype();
-      }
+      if (wantInterfaceType)
+        selfTy = dc->getSelfInterfaceType();
+      else
+        selfTy = dc->getSelfTypeInContext();
     } else
       selfTy = containerTy;
   }
@@ -4419,26 +4427,16 @@ DynamicSelfType *FuncDecl::getDynamicSelf() const {
   if (!hasDynamicSelf())
     return nullptr;
 
-  auto extType = getExtensionType();
-  if (extType->is<ProtocolType>())
-    return DynamicSelfType::get(getDeclContext()->getProtocolSelf()
-                                  ->getArchetype(),
-                                getASTContext());
-
-  return DynamicSelfType::get(extType, getASTContext());
+  return DynamicSelfType::get(getDeclContext()->getSelfTypeInContext(),
+                              getASTContext());
 }
 
 DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
   if (!hasDynamicSelf())
     return nullptr;
 
-  auto extType = getDeclContext()->getDeclaredInterfaceType();
-  if (extType->is<ProtocolType>())
-    return DynamicSelfType::get(getDeclContext()->getProtocolSelf()
-                                  ->getDeclaredType(),
-                                getASTContext());
-
-  return DynamicSelfType::get(extType, getASTContext());
+  return DynamicSelfType::get(getDeclContext()->getSelfInterfaceType(),
+                              getASTContext());
 }
 
 SourceRange FuncDecl::getSourceRange() const {
@@ -4770,4 +4768,10 @@ ClassDecl *ClassDecl::getSuperclassDecl() const {
   if (auto superclass = getSuperclass())
     return superclass->getClassOrBoundGenericClass();
     return nullptr;
+}
+
+void ClassDecl::setSuperclass(Type superclass) {
+  assert((!superclass || !superclass->hasArchetype())
+         && "superclass must be interface type");
+  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
 }

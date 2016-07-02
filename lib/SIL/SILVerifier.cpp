@@ -1720,12 +1720,19 @@ public:
   // Get the expected type of a dynamic method reference.
   SILType getDynamicMethodType(SILType selfType, SILDeclRef method) {
     auto &C = F.getASTContext();
-    
+
     // The type of the dynamic method must match the usual type of the method,
     // but with the more opaque Self type.
-    auto methodTy = F.getModule().Types.getConstantType(method)
-      .castTo<SILFunctionType>();
-    
+    auto constantInfo = F.getModule().Types.getConstantInfo(method);
+    auto methodTy = constantInfo.SILFnType;
+
+    // Map interface types to archetypes.
+    if (auto *params = constantInfo.ContextGenericParams)
+      methodTy = methodTy->substGenericArgs(F.getModule(), M,
+                                            params->getForwardingSubstitutions(C));
+    assert(!methodTy->isPolymorphic());
+
+    // Replace Self parameter with type of 'self' at the call site.
     auto params = methodTy->getParameters();
     SmallVector<SILParameterInfo, 4>
       dynParams(params.begin(), params.end() - 1);
@@ -1756,10 +1763,7 @@ public:
                                      dynResults,
                                      methodTy->getOptionalErrorResult(),
                                      F.getASTContext());
-    auto boundFnTy = ArchetypeBuilder::mapTypeIntoContext(
-        method.getDecl()->getDeclContext(), fnTy)
-      ->getCanonicalType();
-    return SILType::getPrimitiveObjectType(boundFnTy);
+    return SILType::getPrimitiveObjectType(fnTy);
   }
   
   void checkDynamicMethodInst(DynamicMethodInst *EMI) {

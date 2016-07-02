@@ -925,7 +925,7 @@ matchWitness(TypeChecker &tc,
     // the required type and the witness type.
     cs.emplace(tc, dc, ConstraintSystemOptions());
 
-    Type selfIfaceTy = proto->getProtocolSelf()->getDeclaredType();
+    Type selfIfaceTy = proto->getSelfInterfaceType();
     Type selfTy;
 
     // For a concrete conformance, use the conforming type as the
@@ -1889,17 +1889,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            TypeDecl *typeDecl,
                                            DeclContext *fromDC,
                                            bool performRedeclarationCheck) {
-  // If the declaration context from which the type witness was determined
-  // differs from that of the conformance, adjust the type so that it is
-  // based on the declaration context of the conformance.
-  if (fromDC != DC && DC->getGenericSignatureOfContext() &&
-      fromDC->getGenericSignatureOfContext() && !isa<ProtocolDecl>(fromDC)) {
-    // Map the type to an interface type.
-    type = ArchetypeBuilder::mapTypeOutOfContext(fromDC, type);
-
-    // Map the type into the conformance's context.
-    type = Adoptee->getTypeOfMember(DC->getParentModule(), type, fromDC);
-  }
 
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
@@ -2882,7 +2871,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     // Create a set of type substitutions for all known associated type.
     // FIXME: Base this on dependent types rather than archetypes?
     TypeSubstitutionMap substitutions;
-    substitutions[Proto->getProtocolSelf()->getArchetype()] = Adoptee;
+    substitutions[Proto->getSelfTypeInContext().getPointer()] = Adoptee;
     for (auto member : Proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         if (Conformance->hasTypeWitness(assocType)) {

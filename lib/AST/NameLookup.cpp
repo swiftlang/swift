@@ -436,8 +436,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         if (AFD->getExtensionType()) {
           if (AFD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
-            ExtendedType = AFD->getDeclContext()->getProtocolSelf()
-                             ->getArchetype();
+            ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
 
             // Fallback path.
             if (!ExtendedType)
@@ -481,11 +480,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (!isCascadingUse.hasValue())
           isCascadingUse = ACE->isCascadingContextForLookup(false);
       } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
-        if (ED->getAsProtocolOrProtocolExtensionContext()) {
-          ExtendedType = ED->getProtocolSelf()->getArchetype();
-        } else {
-          ExtendedType = ED->getExtendedType();
-        }
+        ExtendedType = ED->getSelfTypeInContext();
 
         BaseDecl = ED->getAsNominalTypeOrNominalTypeExtensionContext();
         MetaBaseDecl = BaseDecl;
