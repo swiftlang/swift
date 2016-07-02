@@ -44,7 +44,7 @@ class Box<T : Hashable where T : Equatable> : Hashable {
     value = v
   }
 
-  var hashValue : Int {
+  var hashValue: Int {
     return value.hashValue
   }
 }

@@ -306,7 +306,7 @@ public func swap<T>(_ a: inout T, _ b: inout T) {
     "swapping a location with itself is not supported")
 
   // Take from P1.
-  let tmp : T = Builtin.take(p1)
+  let tmp: T = Builtin.take(p1)
   // Transfer P2 into P1.
   Builtin.initialize(Builtin.take(p2) as T, p1)
   // Initialize P2.

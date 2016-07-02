@@ -195,7 +195,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   }
 
   /// True, if the array is native and does not need a deferred type check.
-  var arrayPropertyIsNativeTypeChecked : Bool {
+  var arrayPropertyIsNativeTypeChecked: Bool {
     return _hasNativeBuffer
   }
 

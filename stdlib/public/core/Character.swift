@@ -304,7 +304,7 @@ public struct Character :
     /// The position of the first element in a non-empty collection.
     ///
     /// In an empty collection, `startIndex == endIndex`.
-    var startIndex : Int {
+    var startIndex: Int {
       return 0
     }
 
@@ -313,7 +313,7 @@ public struct Character :
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
     /// `successor()`.
-    var endIndex : Int {
+    var endIndex: Int {
       return Int(count)
     }
 

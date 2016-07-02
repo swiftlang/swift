@@ -43,8 +43,8 @@ func genEnumArray() {
 }
 
 struct S {
-  var x : Int
-  var y : Int
+  var x: Int
+  var y: Int
 }
 @inline(never)
 func genStructArray() {
