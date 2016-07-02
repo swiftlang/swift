@@ -96,7 +96,7 @@ extension String {
   /// Return an `Index` corresponding to the given offset in our UTF-16
   /// representation.
   func _index(_ utf16Index: Int) -> Index {
-    return Index(_base: String.UnicodeScalarView.Index(utf16Index, _core))
+	return Index(_base: String.UnicodeScalarView.Index(utf16Index, _core), in: unicodeScalars)
   }
 
   /// Return a `Range<Index>` corresponding to the given `NSRange` of
