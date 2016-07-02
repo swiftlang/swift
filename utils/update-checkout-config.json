@@ -55,12 +55,11 @@
                 "swift": "master-next",
                 "lldb": "master-next",
                 "cmark": "master",
-                "llbuild": "master",
-                "swiftpm": "master",
-                "compiler-rt": "stable-next",
-                "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
-                "swift-corelibs-libdispatch": "master",
+                "llbuild": "master-next",
+                "swiftpm": "master-next",
+                "swift-corelibs-xctest": "master-next",
+                "swift-corelibs-foundation": "master-next",
+                "swift-corelibs-libdispatch": "master-next",
                 "swift-integration-tests": "master"
             }
         },
