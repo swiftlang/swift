@@ -16,6 +16,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Stmt.h"
+#include "swift/SIL/FormalLinkage.h"
 
 namespace swift {
 
@@ -26,12 +27,7 @@ namespace Lowering {
 class SILGenModule;
 class SILGenBuilder;
 
-/// RAII object to set up profiling for a function.
-struct ProfilerRAII {
-  SILGenModule &SGM;
-  ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D);
-  ~ProfilerRAII();
-};
+struct ProfilerRAII;
 
 /// Profiling state.
 class SILGenProfiling {
@@ -41,6 +37,8 @@ private:
 
   // The current function's name and counter data.
   std::string CurrentFuncName;
+  StringRef CurrentFileName;
+  FormalLinkage CurrentFuncLinkage;
   unsigned NumRegionCounters;
   uint64_t FunctionHash;
   llvm::DenseMap<ASTNode, unsigned> RegionCounterMap;
@@ -54,11 +52,23 @@ public:
 
   bool hasRegionCounters() const { return NumRegionCounters != 0; }
 
+  /// Emit SIL to increment the counter for \c Node.
+  void emitCounterIncrement(SILGenBuilder &Builder, ASTNode Node);
+
+private:
   /// Map counters to ASTNodes and set them up for profiling the given function.
   void assignRegionCounters(AbstractFunctionDecl *Root);
 
-  /// Emit SIL to increment the counter for \c Node.
-  void emitCounterIncrement(SILGenBuilder &Builder, ASTNode Node);
+  friend struct ProfilerRAII;
+};
+
+/// RAII object to set up profiling for a function.
+struct ProfilerRAII {
+  SILGenModule &SGM;
+  std::unique_ptr<SILGenProfiling> PreviousProfiler;
+
+  ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D);
+  ~ProfilerRAII();
 };
 
 } // end namespace Lowering

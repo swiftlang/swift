@@ -379,6 +379,11 @@ function set_deployment_target_based_options() {
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_HOST_TRIPLE:STRING="${llvm_host_triple}"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
+                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_COMPILER_RT})"
+                -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_COMPILER_RT})"
+                -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
             )
             swift_cmake_options=(
                 "${swift_cmake_options[@]}"
@@ -632,6 +637,17 @@ if [[ "${CMAKE_GENERATOR}" == "Ninja" && \
     BUILD_NINJA=1
 fi
 
+# FIXME: We currently do not support building compiler-rt with the
+# Xcode generator.
+if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
+    SKIP_COMPILER_RT=1
+fi
+
+# FIXME: We currently do not support cross-compiling swift with compiler-rt.
+if [[ "${CROSS_COMPILE_HOSTS}" ]]; then
+    SKIP_COMPILER_RT=1
+fi
+
 # WORKSPACE, BUILD_DIR and INSTALLABLE_PACKAGE must be absolute paths
 case "${WORKSPACE}" in
     /*) ;;
@@ -716,6 +732,19 @@ function true_false() {
 #
 # Set default values for command-line parameters.
 #
+function false_true() {
+    if [ -z "$1" ]; then
+        echo "TRUE"
+    elif [[ $(true_false "$1") = "TRUE" ]]; then
+        echo "FALSE"
+    else
+        echo "TRUE"
+    fi
+}
+
+function cmake_version() {
+    echo $("${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " ")
+}
 
 if [[ "${INSTALL_PREFIX}" == "" ]] ; then
     if [[ "$(uname -s)" == "Darwin" ]] ; then
@@ -914,6 +943,14 @@ if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
     ln -sf "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
 fi
 
+# Symlink compiler-rt into the llvm tree, if it exists.
+COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
+if [ -e "${WORKSPACE}/compiler-rt" ] ; then
+    if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
+        ln -sf "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
+    fi
+fi
+
 PRODUCTS=(cmark llvm swift)
 if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" lldb)
@@ -1091,6 +1128,9 @@ case "${CMAKE_GENERATOR}" in
               -DSWIFT_XCODE_GENERATE_FOR_IDE_ONLY=ON
           )
         fi
+        # FIXME: We currently do not support building compiler-rt with the
+        # Xcode generator.
+        SKIP_COMPILER_RT=1
         ;;
 esac
 

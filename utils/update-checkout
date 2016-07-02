@@ -30,6 +30,7 @@ REPOSITORIES = {
     'swift': 'apple/swift-swift',
     'lldb': 'apple/swift-lldb',
     'cmark': 'apple/swift-cmark',
+    'compiler-rt': 'apple/swift-compiler-rt',
     'swift-integration-tests': 'apple/swift-integration-tests',
 }
 
