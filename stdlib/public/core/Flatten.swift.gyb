@@ -190,7 +190,7 @@ public func < <BaseElements> (
     return lhs._outer < rhs._outer
   }
 
-  if let lhsInner = lhs._inner, rhsInner = rhs._inner {
+  if let lhsInner = lhs._inner, let rhsInner = rhs._inner {
     return lhsInner < rhsInner
   }
 

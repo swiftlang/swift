@@ -182,8 +182,8 @@ public struct Character :
       _representation = .small(Builtin.trunc_Int64_Int63(initialUTF8._value))
     }
     else {
-      if let native = s._core.nativeBuffer
-              where native.start == UnsafeMutablePointer(s._core._baseAddress!){
+      if let native = s._core.nativeBuffer,
+         native.start == UnsafeMutablePointer(s._core._baseAddress!) {
         _representation = .large(native._storage)
         return
       }

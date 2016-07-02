@@ -218,7 +218,8 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
   _dumpPrint_unlocked(value, mirror, &target)
 
   let id: ObjectIdentifier?
-  if let classInstance = value as? AnyObject where value.dynamicType is AnyObject.Type {
+  if let classInstance = value as? AnyObject,
+     value.dynamicType is AnyObject.Type {
     // Object is a class (but not an ObjC-bridged struct)
     id = ObjectIdentifier(classInstance)
   } else if let metatypeInstance = value as? Any.Type {

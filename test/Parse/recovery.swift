@@ -542,19 +542,23 @@ func f1() {
 
 // <rdar://problem/20489838> QoI: Nonsensical error and fixit if "let" is missing between 'if let ... where' clauses
 func testMultiPatternConditionRecovery(x: Int?) {
-  // expected-error@+1 {{binding ended by previous 'where' clause; use 'let' to introduce a new one}} {{30-30=let }}
-  if let y = x where y == 0, z = x {
+  // expected-warning@+1 {{expected ',' joining parts of a multi-clause condition}} {{16-21=,}}
+  if let y = x where y == 0, let z = x {
     _ = y
     _ = z
   }
 
-  // expected-error@+1 {{binding ended by previous 'where' clause; use 'var' to introduce a new one}} {{30-30=var }}
-  if var y = x where y == 0, z = x {
+  if var y = x, y == 0, var z = x {
     z = y; y = z
   }
 
+  if var y = x, z = x { // expected-warning {{expected 'var' in conditional}} {{17-17=var }}
+    z = y; y = z
+  }
+
+
   // <rdar://problem/20883210> QoI: Following a "let" condition with boolean condition spouts nonsensical errors
-  guard let x: Int? = 1, x == 1 else {  } // expected-error {{boolean condition requires 'where' to separate it from variable binding}} {{24-25= where}}
+  guard let x: Int? = 1, x == 1 else {  }
 }
 
 // rdar://20866942

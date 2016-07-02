@@ -797,29 +797,27 @@ ERROR(expected_lbrace_after_defer,PointsToFirstBadToken,
       "expected '{' after 'defer'", ())
 
 // If/While/Guard Conditions
-ERROR(expected_expr_conditional_letbinding,none,
-      "expected 'let' or 'var' in conditional", ())
-ERROR(expected_expr_conditional_letbinding_bool_conditions,none,
-      "expected 'let' or 'var' in conditional; "
-      "use '&&' to join boolean conditions", ())
 ERROR(expected_comma_stmtcondition,none,
       "expected ',' joining parts of a multi-clause condition", ())
 
+ERROR(expected_expr_conditional,PointsToFirstBadToken,
+      "expected expression in conditional", ())
+
+// FIXME: Upgrade these two diagnostics to errors in Swift 3.
+WARNING(expected_binding_keyword,none,
+      "expected '%0' in conditional", (StringRef))
+// FIXME: just replace with expected_comma_stmtcondition
+WARNING(expected_comma_stmtcondition_w,none,
+        "expected ',' joining parts of a multi-clause condition", ())
+
+
 ERROR(expected_expr_conditional_var,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
-ERROR(expected_expr_conditional_where,PointsToFirstBadToken,
-      "expected expression in conditional binding 'where' clause", ())
 ERROR(conditional_var_initializer_required,none,
       "variable binding in a condition requires an initializer", ())
 ERROR(wrong_condition_case_location,none,
       "pattern matching binding is spelled with 'case %0', not '%0 case'",
       (StringRef))
-ERROR(where_end_of_binding_use_letvar,none,
-      "binding ended by previous 'where' clause; "
-      "use '%0' to introduce a new one", (StringRef))
-ERROR(comma_should_be_where,none,
-      "boolean condition requires 'where' to separate it from variable binding",
-      ())
 
 // If Statement
 ERROR(expected_condition_if,PointsToFirstBadToken,

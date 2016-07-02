@@ -1154,40 +1154,25 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   return Status;
 }
 
-
-/// Return true if the specified token looks like the start of a clause in a
-/// stmt-condition.
-static bool isStartOfStmtConditionClause(const Token &Tok) {
-  return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_case,tok::pound_available);
-}
-
-
 /// Parse the condition of an 'if' or 'while'.
 ///
 ///   condition:
+///     condition-clause (',' condition-clause)*
+///   condition-clause:
 ///     expr-basic
-///     expr-basic ',' bind-or-available (',' bind-or-available)*
-///     bind-or-available (',' bind-or-available)*
-///   bind-or-available:
-///     ('var' | 'let') condition-bind (',' condition-bind)* condition-where
-///     'case' condition-bind
+///     ('var' | 'let' | 'case') pattern '=' expr-basic
 ///     '#available' '(' availability-spec (',' availability-spec)* ')'
-///   condition-bind:
-///     pattern '=' expr-basic
-///   condition-where:
-///     'where' expr-basic
 ///
 /// The use of expr-basic here disallows trailing closures, which are
 /// problematic given the curly braces around the if/while body.
 ///
 ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
-                                        Diag<> ID, StmtKind ParentKind) {
+                                        Diag<> DefaultID, StmtKind ParentKind) {
   ParserStatus Status;
   Condition = StmtCondition();
 
   SmallVector<StmtConditionElement, 4> result;
 
-  
   // This little helper function is used to consume a separator comma if
   // present, it returns false if it isn't there.  It also gracefully handles
   // the case when the user used && instead of comma, since that is a common
@@ -1198,8 +1183,17 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     if (Tok.isAny(tok::oper_binary_spaced, tok::oper_binary_unspaced) &&
         Tok.getText() == "&&") {
       diagnose(Tok, diag::expected_comma_stmtcondition)
-        .fixItReplace(Tok.getLoc(), ",");
+      .fixItReplace(Tok.getLoc(), ",");
       consumeToken();
+      return true;
+    }
+
+    // Boolean conditions are separated by commas, not the 'where' keyword, as
+    // they were in Swift 2 and earlier.
+    SourceLoc whereLoc;
+    if (consumeIf(tok::kw_where, whereLoc)) {
+      diagnose(whereLoc, diag::expected_comma_stmtcondition_w)
+        .fixItReplace(whereLoc, ",");
       return true;
     }
     
@@ -1207,274 +1201,177 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     return consumeIf(tok::comma);
   };
   
-  
-  if (Tok.is(tok::pound) && peekToken().is(tok::code_complete)) {
-    auto PoundPos = consumeToken();
-    auto CodeCompletionPos = consumeToken();
-    auto Expr = new (Context) CodeCompletionExpr(CharSourceRange(SourceMgr,
-      PoundPos, CodeCompletionPos));
-    if (CodeCompletion) {
-      CodeCompletion->completeAfterPound(Expr, ParentKind);
-    }
-    result.push_back(Expr);
-    Status.setHasCodeCompletion();
-  }
-
-  // Parse a leading #available condition if present.
-  if (Tok.is(tok::pound_available)) {
-    auto res = parseStmtConditionPoundAvailable();
-    if (res.isNull() || res.hasCodeCompletion()) {
-      Status |= res;
-      return Status;
-    }
-
-    result.push_back({res.get()});
-
-    if (!consumeSeparatorComma()) {
-      Condition = Context.AllocateCopy(result);
-      return Status;
-    }
-  }
-
-  // Parse the leading boolean condition if present.
-  if (!isStartOfStmtConditionClause(Tok)) {
-    ParserResult<Expr> CondExpr = parseExprBasic(ID);
-    Status |= CondExpr;
-    result.push_back(CondExpr.getPtrOrNull());
-    
-    // If there is a comma after the expression, parse a list of let/var
-    // bindings.
-    SourceLoc CommaLoc = Tok.getLoc();
-    
-    // If there is no comma then we're done.
-    if (!consumeSeparatorComma()) {
-      Condition = Context.AllocateCopy(result);
-      return Status;
-    }
-    
-    // If a let-binding doesn't follow, diagnose the problem with a tailored
-    // error message.
-    if (!isStartOfStmtConditionClause(Tok)) {
-      // If an { exists after the comma, assume it is a stray comma and this is
-      // the start of the if/while body.  If a non-expression thing exists after
-      // the comma, then we don't know what is going on.
-      if (Tok.is(tok::l_brace) || isStartOfDecl() || isStartOfStmt()) {
-        diagnose(Tok, diag::expected_expr_conditional_letbinding);
-        Condition = Context.AllocateCopy(result);
-        if (Tok.isNot(tok::l_brace)) Status.setIsParseError();
-        return Status;
-      }
-     
-      // If an expression follows the comma, then it is a second boolean
-      // condition.  Produce a fix-it hint to rewrite the comma to &&.
-      diagnose(CommaLoc,
-               diag::expected_expr_conditional_letbinding_bool_conditions)
-        .fixItReplace(CommaLoc, " &&");
-      do {
-        ParserResult<Expr> CondExpr = parseExprBasic(ID);
-        Status |= CondExpr;
-        result.push_back(CondExpr.getPtrOrNull());
-      } while (consumeIf(tok::comma) && !isStartOfStmtConditionClause(Tok));
-      
-      if (!isStartOfStmtConditionClause(Tok)) {
-        Condition = Context.AllocateCopy(result);
-        return Status;
-      }
-    }
-  }
-
-  // We're parsing a conditional binding.
-  assert(CurDeclContext->isLocalContext() &&
-         "conditional binding in non-local context?!");
-
-  // For error recovery purposes, keep track of the disposition of the last
-  // pattern binding we saw ('let' vs 'var') in multiple PBD cases.
-  enum BK_BindingKind {
-    BK_Let, BK_Var, BK_Case, BK_LetCase, BK_VarCase
-  } BindingKind = BK_Let;
-  StringRef BindingKindStr = "let";
  
-  // Parse the list of condition-bindings, each of which can have a 'where'.
-  do {
-    // Parse a #available condition if present.
+  // For error recovery purposes, keep track of the disposition of the last
+  // pattern binding we saw ('let', 'var', or 'case').
+  StringRef BindingKindStr;
+  
+  // We have a simple comma separated list of clauses, but also need to handle
+  // a variety of common errors situations (including migrating from Swift 2
+  // syntax).
+  bool isFirstIteration = true;
+  while (isFirstIteration || consumeSeparatorComma()) {
+    isFirstIteration = false;
+    
+    // Parse a leading #available condition if present.
     if (Tok.is(tok::pound_available)) {
       auto res = parseStmtConditionPoundAvailable();
       if (res.isNull() || res.hasCodeCompletion()) {
         Status |= res;
         return Status;
       }
-
+      
       result.push_back({res.get()});
+      BindingKindStr = StringRef();
       continue;
     }
-
-    // Otherwise it must be a pattern binding.
-    SourceLoc VarLoc;
     
-    if (Tok.isAny(tok::kw_let, tok::kw_var, tok::kw_case)) {
-      BindingKind =
-        Tok.is(tok::kw_let) ? BK_Let : Tok.is(tok::kw_var) ? BK_Var : BK_Case;
-      BindingKindStr = Tok.getText();
-      VarLoc = consumeToken();
+    // Handle code completion after the #.
+    if (Tok.is(tok::pound) && peekToken().is(tok::code_complete)) {
+      auto PoundPos = consumeToken();
+      auto CodeCompletionPos = consumeToken();
+      auto Expr = new (Context) CodeCompletionExpr(CharSourceRange(SourceMgr,
+                                           PoundPos, CodeCompletionPos));
+      if (CodeCompletion)
+        CodeCompletion->completeAfterPound(Expr, ParentKind);
+      result.push_back(Expr);
+      Status.setHasCodeCompletion();
+      return Status;
+    }
+    
+    // Parse the basic expression case.  If we have a leading let/var/case
+    // keyword or an assignment, then we know this is a binding.
+    if (Tok.isNot(tok::kw_let, tok::kw_var, tok::kw_case)) {
+      // If we lack it, then this is theoretically a boolean condition.
+      // However, we also need to handle migrating from Swift 2 syntax, in
+      // which a comma followed by an expression could actually be a pattern
+      // clause followed by a binding.  Determine what we have by checking for a
+      // syntactically valid pattern followed by an '=', which can never be a
+      // boolean condition.
+      //
+      // However, if this is the first clause, and we see "x = y", then this is
+      // almost certainly a typo for '==' and definitely not a continuation of
+      // another clause, so parse it as an expression.  This also avoids
+      // lookahead + backtracking on simple if conditions that are obviously
+      // boolean conditions.
+      auto isBooleanExpr = [&]() -> bool {
+        Parser::BacktrackingScope Backtrack(*this);
+        return !canParseTypedPattern() || Tok.isNot(tok::equal);
+      };
 
+      if (BindingKindStr.empty() || isBooleanExpr()) {
+        auto diagID = result.empty() ? DefaultID :
+              diag::expected_expr_conditional;
+        auto BoolExpr = parseExprBasic(diagID);
+        Status |= BoolExpr;
+        if (BoolExpr.isNull() || BoolExpr.hasCodeCompletion())
+          return Status;
+        result.push_back(BoolExpr.get());
+        BindingKindStr = StringRef();
+        continue;
+      }
+    }
+    
+    SourceLoc IntroducerLoc;
+    if (Tok.isAny(tok::kw_let, tok::kw_var, tok::kw_case)) {
+      BindingKindStr = Tok.getText();
+      IntroducerLoc = consumeToken();
+    } else {
+      // If we lack the leading let/var/case keyword, then we're here because
+      // the user wrote something like "if let x = foo(), y = bar() {".  Fix
+      // this by inserting a new 'let' keyword before y.
+      IntroducerLoc = Tok.getLoc();
+      assert(!BindingKindStr.empty() &&
+             "Shouldn't get here without a leading binding");
+      diagnose(Tok.getLoc(), diag::expected_binding_keyword, BindingKindStr)
+        .fixItInsert(Tok.getLoc(), BindingKindStr.str()+" ");
+    }
+
+    
+    // We're parsing a conditional binding.
+    assert(CurDeclContext->isLocalContext() &&
+           "conditional binding in non-local context?!");
+    
+    ParserResult<Pattern> ThePattern;
+    
+    if (BindingKindStr == "case") {
+      // In our recursive parse, remember that we're in a matching pattern.
+      llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+        T(InVarOrLetPattern, IVOLP_InMatchingPattern);
+      ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
+    } else if ((BindingKindStr == "let" || BindingKindStr == "var") &&
+               Tok.is(tok::kw_case)) {
       // If will probably be a common typo to write "if let case" instead of
       // "if case let" so detect this and produce a nice fixit.
-      if ((BindingKind == BK_Let || BindingKind == BK_Var) &&
-          Tok.is(tok::kw_case)) {
-        diagnose(VarLoc, diag::wrong_condition_case_location, BindingKindStr)
-          .fixItRemove(VarLoc)
-          .fixItInsertAfter(Tok.getLoc(), " " + BindingKindStr.str());
+      diagnose(IntroducerLoc, diag::wrong_condition_case_location,
+               BindingKindStr)
+      .fixItRemove(IntroducerLoc)
+      .fixItInsertAfter(Tok.getLoc(), " " + BindingKindStr.str());
 
-        BindingKindStr = "case";
-        BindingKind = BindingKind == BK_Let ? BK_LetCase : BK_VarCase;
-        VarLoc = consumeToken(tok::kw_case);
+      consumeToken(tok::kw_case);
+      
+      bool wasLet = BindingKindStr == "let";
+      
+      // In our recursive parse, remember that we're in a var/let pattern.
+      llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+        T(InVarOrLetPattern, wasLet ? IVOLP_InLet : IVOLP_InVar);
+      
+      BindingKindStr = "case";
+      ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
+      
+      if (ThePattern.isNonNull()) {
+        auto *P = new (Context) VarPattern(IntroducerLoc, wasLet,
+                                           ThePattern.get(), /*impl*/false);
+        ThePattern = makeParserResult(P);
       }
 
     } else {
-      // We get here with erroneous code like:
-      //    if let x = foo() where cond(), y? = bar()
-      // which is a common typo for:
-      //    if let x = foo() where cond(),
-      //       LET y? = bar()
-      // diagnose this specifically and produce a nice fixit.
-      diagnose(Tok, diag::where_end_of_binding_use_letvar, BindingKindStr)
-        .fixItInsert(Tok.getLoc(), BindingKindStr.str() + " ");
-      VarLoc = Tok.getLoc();
+      // Otherwise, this is an implicit optional binding "if let".
+      ThePattern = parseMatchingPatternAsLetOrVar(BindingKindStr == "let",
+                                                  IntroducerLoc,
+                                                  /*isExprBasic*/ true);
+      // The let/var pattern is part of the statement.
+      if (Pattern *P = ThePattern.getPtrOrNull())
+        P->setImplicit();
     }
 
-    // The first pattern entry we parse will record the location of the
-    // let/var/case into the StmtCondition.
-    SourceLoc IntroducerLoc = VarLoc;
-    bool hadIncorrectlyWrittenWhereClause = false;
+    ThePattern = parseOptionalPatternTypeAnnotation(ThePattern,
+                                                    BindingKindStr != "case");
+    Status |= ThePattern;
+    
+    if (ThePattern.isNull() || ThePattern.hasCodeCompletion())
+      return Status;
 
-    // Parse the list of name bindings within a let/var clauses.
-    while (1) {
-      ParserResult<Pattern> ThePattern;
-
-      if (BindingKind == BK_Case) {
-        // In our recursive parse, remember that we're in a matching pattern.
-        llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-          T(InVarOrLetPattern, IVOLP_InMatchingPattern);
-        ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
-      } else if (BindingKind == BK_LetCase || BindingKind == BK_VarCase) {
-        // Recover from the 'if let case' typo gracefully.
-
-        // In our recursive parse, remember that we're in a var/let pattern.
-        llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-        T(InVarOrLetPattern,
-          BindingKind == BK_LetCase ? IVOLP_InLet : IVOLP_InVar);
-        ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
-
-        if (ThePattern.isNonNull()) {
-          auto *P = new (Context) VarPattern(VarLoc, BindingKind == BK_LetCase,
-                                             ThePattern.get(), /*impl*/false);
-          ThePattern = makeParserResult(P);
-        }
-      } else {
-        // Otherwise, this is an implicit optional binding "if let".
-        ThePattern =
-          parseMatchingPatternAsLetOrVar(BindingKind == BK_Let, VarLoc,
-                                         /*isExprBasic*/ true);
-        // The let/var pattern is part of the statement.
-        if (Pattern *P = ThePattern.getPtrOrNull())
-          P->setImplicit();
-      }
-
-      ThePattern = parseOptionalPatternTypeAnnotation(ThePattern,
-                                                      BindingKind != BK_Case);
-      Status |= ThePattern;
-
-      if (ThePattern.isNull() || ThePattern.hasCodeCompletion())
+    // Conditional bindings must have an initializer.
+    Expr *Init;
+    if (consumeIf(tok::equal)) {
+      ParserResult<Expr> InitExpr
+        = parseExprBasic(diag::expected_expr_conditional_var);
+      Status |= InitExpr;
+      if (InitExpr.isNull() || InitExpr.hasCodeCompletion())
         return Status;
-
-      Expr *Init;
-      // Conditional bindings must have an initializer.
-      if (consumeIf(tok::equal)) {
-        ParserResult<Expr> InitExpr
-          = parseExprBasic(diag::expected_expr_conditional_var);
-        Status |= InitExpr;
-        if (InitExpr.isNull() || InitExpr.hasCodeCompletion())
-          return Status;
-        Init = InitExpr.get();
-        
-      } else {
-        // Although we require an initializer, recover by parsing as if it were
-        // merely omitted.
-        diagnose(Tok, diag::conditional_var_initializer_required);
-        Init = new (Context) ErrorExpr(Tok.getLoc());
-      }
-
-      result.push_back({IntroducerLoc, ThePattern.get(), Init});
-      IntroducerLoc = SourceLoc();
-
-      // Add variable bindings from the pattern to our current scope and mark
-      // them as being having a non-pattern-binding initializer.
-      ThePattern.get()->forEachVariable([&](VarDecl *VD) {
-        if (VD->hasName())
-          addToScope(VD);
-        VD->setHasNonPatternBindingInit();
-      });
-
-      // We're done if there is a 'where' clause, 'else' or any other noncomma.
-      if (Tok.isNot(tok::comma)) break;
-
-      // If we have a comma, we could be continuing to another pattern as in:
-      //    let x = foo(), y = bar()
-      // Alternatively, this could be start of another clause, as in:
-      //    let x = foo(), let y = bar()
-      if (isStartOfStmtConditionClause(peekToken()))
-        break;
-
-      // At this point, we know that the next thing should be a pattern to
-      // follow in the series.  However, it is fairly common for people to
-      // forget a 'where' clause and write something like:
-      //
-      //   let x = foo(), x != 42
-      //
-      // instead of:
-      //
-      //   let x = foo() where x != 42
-      //
-      // It is hard to tell whether the next clause is a pattern or an invalid
-      // expression, because 'case' patterns can have expressions embedded in
-      // them.  As such, if we're continuing a non-case pattern, do a bit more
-      // lookahead to disambiguate this.
-      if (BindingKind == BK_Let || BindingKind == BK_Var) {
-        // Determine whether this was an invalid pattern or if the pattern has
-        // no trailing "=".
-        {
-          Parser::BacktrackingScope Backtrack(*this);
-          consumeToken(tok::comma);
-          hadIncorrectlyWrittenWhereClause =
-            !canParseTypedPattern() || Tok.isNot(tok::equal);
-        }
-
-        if (hadIncorrectlyWrittenWhereClause) {
-          diagnose(Tok, diag::comma_should_be_where)
-            .fixItReplace(Tok.getLoc(), " where");
-          consumeToken(tok::comma);
-          break;
-        }
-      }
-
-      // Otherwise, it really does look like this comma continues the pattern
-      // clause, so eat it and parse the next clause.
-      consumeToken(tok::comma);
+      Init = InitExpr.get();
+      
+    } else {
+      // Although we require an initializer, recover by parsing as if it were
+      // merely omitted.
+      diagnose(Tok, diag::conditional_var_initializer_required);
+      Init = new (Context) ErrorExpr(Tok.getLoc());
     }
-
-    // If there is a where clause on this let/var specification, parse and
-    // remember it.
-    if (hadIncorrectlyWrittenWhereClause || consumeIf(tok::kw_where)) {
-      ParserResult<Expr> WhereExpr
-        = parseExprBasic(diag::expected_expr_conditional_where);
-      Status |= WhereExpr;
-      if (WhereExpr.isNull() || WhereExpr.hasCodeCompletion())
-        return Status;
-      result.push_back(WhereExpr.get());
-    }
-
+    
+    result.push_back({IntroducerLoc, ThePattern.get(), Init});
+    IntroducerLoc = SourceLoc();
+    
+    // Add variable bindings from the pattern to our current scope and mark
+    // them as being having a non-pattern-binding initializer.
+    ThePattern.get()->forEachVariable([&](VarDecl *VD) {
+      if (VD->hasName())
+        addToScope(VD);
+      VD->setHasNonPatternBindingInit();
+    });
+    
   } while (consumeSeparatorComma());
-
+  
   Condition = Context.AllocateCopy(result);
   return Status;
 }

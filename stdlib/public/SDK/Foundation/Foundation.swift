@@ -1201,7 +1201,7 @@ internal func NS_Swift_NSCoder_decodeObjectOfClassesForKey(
 
 @available(OSX 10.11, iOS 9.0, *)
 internal func resolveError(_ error: NSError?) throws {
-  if let error = error where error.code != NSCoderValueNotFoundError {
+  if let error = error, error.code != NSCoderValueNotFoundError {
     throw error
   }
 }

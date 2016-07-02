@@ -91,7 +91,7 @@ public struct SourceLocStack {
 }
 
 func _printStackTrace(_ stackTrace: SourceLocStack?) {
-  guard let s = stackTrace where !s.locs.isEmpty else { return }
+  guard let s = stackTrace, !s.locs.isEmpty else { return }
   print("stacktrace:")
   for (i, loc) in s.locs.reversed().enumerated() {
     let comment = (loc.comment != nil) ? " ; \(loc.comment!)" : ""
@@ -1003,8 +1003,8 @@ struct _ParentProcess {
             testName += String(testParameter)
           }
           let fullTestName = "\(testSuite.name).\(testName)"
-          if let filter = _filter
-            where findSubstring(fullTestName, filter) == nil {
+          if let filter = _filter,
+             findSubstring(fullTestName, filter) == nil {
 
             continue
           }
