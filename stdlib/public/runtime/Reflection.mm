@@ -306,23 +306,12 @@ const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
  
 static std::tuple<const Metadata *, const OpaqueValue *>
 getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
-recur:
   // If the value is an existential container, look through it to reflect the
   // contained value.
-  switch (T->getKind()) {
-  case MetadataKind::Tuple:
-  case MetadataKind::Struct:
-  case MetadataKind::ForeignClass:
-  case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::Class:
-  case MetadataKind::Opaque:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-  case MetadataKind::Function:
-  case MetadataKind::Metatype:
-    break;
-      
-  case MetadataKind::Existential: {
+  // TODO: Should look through existential metatypes too, but it doesn't
+  // really matter yet since we don't have any special mirror behavior for
+  // concrete metatypes yet.
+  while (T->getKind() == MetadataKind::Existential) {
     auto existential
       = static_cast<const ExistentialTypeMetadata *>(T);
 
@@ -331,22 +320,8 @@ recur:
     Value = existential->projectValue(Value);
 
     // Existential containers can end up nested in some cases due to generic
-    // abstraction barriers. Recur in case we have a nested existential.
-    goto recur;
+    // abstraction barriers.  Repeat in case we have a nested existential.
   }
-  case MetadataKind::ExistentialMetatype:
-    // TODO: Should look through existential metatypes too, but it doesn't
-    // really matter yet since we don't have any special mirror behavior for
-    // concrete metatypes yet.
-    break;
-      
-  // Types can't have these kinds.
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-  case MetadataKind::ErrorObject:
-    swift::crash("Swift mirror lookup failure");
-  }
-
   return std::make_tuple(T, Value);
 }
 
