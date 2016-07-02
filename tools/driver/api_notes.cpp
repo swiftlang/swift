@@ -61,10 +61,12 @@ int apinotes_main(ArrayRef<const char *> Args) {
   // Hide unrelated options.
   StringMap<cl::Option *> &Options =
       cl::getRegisteredOptions(*cl::TopLevelSubCommand);
-  for (auto &Option : Options)
+  for (auto &Option : Options) {
     if (Option.second->Category != &APINotesCategory &&
-        Option.first() != "help" && Option.first() != "version")
+        Option.first() != "help" && Option.first() != "version") {
       Option.second->setHiddenFlag(cl::ReallyHidden);
+    }
+  }
 
   cl::ParseCommandLineOptions(Args.size(),
                               Args.data(),
