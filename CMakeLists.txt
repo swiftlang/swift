@@ -393,6 +393,17 @@ if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 endif()
 
+# This setting causes all CMakeLists.txt to automatically have
+# ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CURRENT_SOURCE_DIR} as an
+# include_directories path. This is done for developer
+# convenience. Additionally, LLVM/Clang build with this option enabled, so we
+# should match them unless it is removed from LLVM/Clang as well.
+#
+# *NOTE* Even though these directories are added to the include path for a
+# specific CMakeLists.txt, these include paths are not propagated down to
+# subdirectories.
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
 # We'll need this once we have generated headers
 include_directories(BEFORE
   ${CMAKE_CURRENT_BINARY_DIR}/include
