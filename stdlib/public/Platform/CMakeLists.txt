@@ -22,6 +22,11 @@ add_swift_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     TARGET_SDKS ANDROID CYGWIN FREEBSD LINUX
     DEPENDS glibc_modulemap)
 
+add_swift_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    msvcrt.swift
+    ${swift_platform_sources}
+    TARGET_SDKS WINDOWS)
+
 set(glibc_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})
   if("${sdk}" STREQUAL "LINUX" OR

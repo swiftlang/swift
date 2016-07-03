@@ -18,7 +18,8 @@ import Glibc
 #endif
 
 
-// posix_spawn is not available on Android.
+#if !os(Windows) || CYGWIN
+// posix_spawn is not available on Android or Windows.
 #if !os(Android)
 // swift_posix_spawn isn't available in the public watchOS SDK, we sneak by the
 // unavailable attribute declaration here of the APIs that we need.
@@ -293,3 +294,5 @@ internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?
   return __environ
 #endif
 }
+#endif
+
