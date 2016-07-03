@@ -8,7 +8,7 @@ import errors
 // CHECK: sil hidden @_TF14foreign_errors5test0FzT_T_ : $@convention(thin) () -> @error ErrorProtocol
 func test0() throws {
   // CHECK: [[SELF:%.*]] = metatype $@thick ErrorProne.Type
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $@thick ErrorProne.Type, #ErrorProne.fail!1.foreign : ErrorProne.Type -> () throws -> () , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Bool
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $@thick ErrorProne.Type, #ErrorProne.fail!1.foreign : (ErrorProne.Type) -> () throws -> () , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Bool
   // CHECK: [[OBJC_SELF:%.*]] = thick_to_objc_metatype [[SELF]]
 
   //   Create a strong temporary holding nil.
@@ -133,7 +133,7 @@ let fn = ErrorProne.fail
 
 // CHECK-LABEL: sil shared [thunk] @_TTOZFCSo10ErrorProne4fail{{.*}} : $@convention(method) (@thick ErrorProne.Type) -> @error ErrorProtocol {
 // CHECK:      [[SELF:%.*]] = thick_to_objc_metatype %0 : $@thick ErrorProne.Type to $@objc_metatype ErrorProne.Type
-// CHECK:      [[METHOD:%.*]] = class_method [volatile] [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!1.foreign : ErrorProne.Type -> () throws -> () , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Bool
+// CHECK:      [[METHOD:%.*]] = class_method [volatile] [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!1.foreign : (ErrorProne.Type) -> () throws -> () , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Bool
 // CHECK:      [[TEMP:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]({{%.*}}, [[SELF]])
 // CHECK:      cond_br
@@ -146,13 +146,13 @@ func testArgs() throws {
   try ErrorProne.consume(nil)
 }
 // CHECK: sil hidden @_TF14foreign_errors8testArgsFzT_T_ : $@convention(thin) () -> @error ErrorProtocol
-// CHECK:   class_method [volatile] %0 : $@thick ErrorProne.Type, #ErrorProne.consume!1.foreign : ErrorProne.Type -> (AnyObject!) throws -> () , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AnyObject>, ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Bool
+// CHECK:   class_method [volatile] %0 : $@thick ErrorProne.Type, #ErrorProne.consume!1.foreign : (ErrorProne.Type) -> (AnyObject!) throws -> () , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AnyObject>, ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Bool
 
 func testBridgedResult() throws {
   let array = try ErrorProne.collection(withCount: 0)
 }
 // CHECK: sil hidden @_TF14foreign_errors17testBridgedResultFzT_T_ : $@convention(thin) () -> @error ErrorProtocol {
-// CHECK:   class_method [volatile] %0 : $@thick ErrorProne.Type, #ErrorProne.collection!1.foreign : ErrorProne.Type -> (withCount: Int) throws -> [AnyObject] , $@convention(objc_method) (Int, ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> @autoreleased Optional<NSArray>
+// CHECK:   class_method [volatile] %0 : $@thick ErrorProne.Type, #ErrorProne.collection!1.foreign : (ErrorProne.Type) -> (withCount: Int) throws -> [AnyObject] , $@convention(objc_method) (Int, ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> @autoreleased Optional<NSArray>
 
 // rdar://20861374
 // Clear out the self box before delegating.
@@ -167,7 +167,7 @@ class VeryErrorProne : ErrorProne {
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
 // CHECK:      [[T0:%.*]] = load [[MARKED_BOX]]
 // CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $VeryErrorProne to $ErrorProne
-// CHECK-NEXT: [[T2:%.*]] = super_method [volatile] [[T0]] : $VeryErrorProne, #ErrorProne.init!initializer.1.foreign : ErrorProne.Type -> (one: AnyObject?) throws -> ErrorProne , $@convention(objc_method) (Optional<AnyObject>, ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
+// CHECK-NEXT: [[T2:%.*]] = super_method [volatile] [[T0]] : $VeryErrorProne, #ErrorProne.init!initializer.1.foreign : (ErrorProne.Type) -> (one: AnyObject?) throws -> ErrorProne , $@convention(objc_method) (Optional<AnyObject>, ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
 // CHECK:      {{$}}
 // CHECK-NOT:  [[BOX]]{{^[0-9]}}
 // CHECK-NOT:  [[MARKED_BOX]]{{^[0-9]}}
@@ -200,7 +200,7 @@ func testNonNilError() throws -> Float {
 }
 // CHECK: sil hidden @_TF14foreign_errors15testNonNilErrorFzT_Sf :
 // CHECK:   [[T0:%.*]] = metatype $@thick ErrorProne.Type
-// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.bounce!1.foreign : ErrorProne.Type -> () throws -> Float , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Float
+// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.bounce!1.foreign : (ErrorProne.Type) -> () throws -> Float , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Float
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
 // CHECK:   assign {{%.*}} to [[OPTERR]]
@@ -216,7 +216,7 @@ func testPreservedResult() throws -> CInt {
 }
 // CHECK: sil hidden @_TF14foreign_errors19testPreservedResultFzT_Vs5Int32
 // CHECK:   [[T0:%.*]] = metatype $@thick ErrorProne.Type
-// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.ounce!1.foreign : ErrorProne.Type -> () throws -> Int32 , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int32
+// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.ounce!1.foreign : (ErrorProne.Type) -> () throws -> Int32 , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int32
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
 // CHECK:   [[T0:%.*]] = struct_extract [[RESULT]]

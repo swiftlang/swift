@@ -75,8 +75,8 @@ func specializedOnFuncType2(_ x: X<(String) -> Int>) { }
 func testSpecializedOnFuncType(_ xThrows: X<(String) throws -> Int>,
                                xNonThrows: X<(String) -> Int>) {
   specializedOnFuncType1(xThrows) // ok
-  specializedOnFuncType1(xNonThrows) // expected-error{{cannot convert value of type 'X<(String) -> Int>' (aka 'X<String -> Int>') to expected argument type 'X<(String) throws -> Int>' (aka 'X<String throws -> Int>')}}
-  specializedOnFuncType2(xThrows)  // expected-error{{cannot convert value of type 'X<(String) throws -> Int>' (aka 'X<String throws -> Int>') to expected argument type 'X<(String) -> Int>' (aka 'X<String -> Int>')}}
+  specializedOnFuncType1(xNonThrows) // expected-error{{cannot convert value of type 'X<(String) -> Int>' to expected argument type 'X<(String) throws -> Int>'}}
+  specializedOnFuncType2(xThrows)  // expected-error{{cannot convert value of type 'X<(String) throws -> Int>' to expected argument type 'X<(String) -> Int>'}}
   specializedOnFuncType2(xNonThrows) // ok
 }
 

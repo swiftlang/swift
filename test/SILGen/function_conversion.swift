@@ -351,12 +351,12 @@ func convFuncExistential(_ f1: (Any) -> (Int) -> Int) {
 // CHECK:         alloc_stack $protocol<>
 // CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK-NEXT:    partial_apply
-// CHECK-NEXT:    init_existential_addr %3 : $*protocol<>, $Int -> Int
+// CHECK-NEXT:    init_existential_addr %3 : $*protocol<>, $(Int) -> Int
 // CHECK-NEXT:    store
 // CHECK-NEXT:    apply
 // CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK-NEXT:    partial_apply
-// CHECK-NEXT:    init_existential_addr %0 : $*protocol<>, $Int -> Int
+// CHECK-NEXT:    init_existential_addr %0 : $*protocol<>, $(Int) -> Int
 // CHECK-NEXT:    store {{.*}} to {{.*}} : $*@callee_owned (@in Int) -> @out Int
 // CHECK:         return
 

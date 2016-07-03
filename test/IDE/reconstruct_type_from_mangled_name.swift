@@ -45,7 +45,7 @@ func f1() {
 
   s1ins.s1f1()
 // CHECK: type: Mystruct1
-// CHECK: type: Mystruct1 -> () -> Int
+// CHECK: type: (Mystruct1) -> () -> Int
 
   if let ifletf1 = Int?(1) {
 // FIXME: lookup incorrect for if let binding.
@@ -65,21 +65,21 @@ class Myclass2 {
     arr1.append(1)
 // FIXME: missing append()
 // CHECK: dref: FAILURE	for 'append' usr=s:FSa6appendFxT_
-// CHECK: type: @lvalue Array<Int> -> Int -> ()
+// CHECK: type: (@lvalue Array<Int>) -> (Int) -> ()
 
     var arr2 : [Mystruct1]
 // CHECK: decl: var arr2: [Mystruct1]
 // CHECK: type: Array<Mystruct1>
 
     arr2.append(Mystruct1())
-// CHECK: type: @lvalue Array<Mystruct1> -> Mystruct1 -> ()
+// CHECK: type: (@lvalue Array<Mystruct1>) -> (Mystruct1) -> ()
 
     var arr3 : [Myclass1]
 // CHECK: decl: var arr3: [Myclass1]
 // CHECK: type: Array<Myclass1>
 
     arr3.append(Myclass1())
-// CHECK: type: @lvalue Array<Myclass1> -> Myclass1 -> ()
+// CHECK: type: (@lvalue Array<Myclass1>) -> (Myclass1) -> ()
 
     _ = Myclass2.init()
 // CHECK: dref: init()

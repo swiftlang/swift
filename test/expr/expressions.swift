@@ -159,7 +159,7 @@ func test4() -> ((arg1: Int, arg2: Int) -> Int) {
 func test5() {
   let a: (Int, Int) = (1,2)
   var
-     _: ((Int) -> Int, Int) = a  // expected-error {{cannot convert value of type '(Int, Int)' to specified type '((Int) -> Int, Int)' (aka '(Int -> Int, Int)')}}
+     _: ((Int) -> Int, Int) = a  // expected-error {{cannot convert value of type '(Int, Int)' to specified type '((Int) -> Int, Int)'}}
 
 
   let c: (a: Int, b: Int) = (1,2)

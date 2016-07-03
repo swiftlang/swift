@@ -145,12 +145,12 @@ struct CArray<T> {
 
 func id_int(_ i: Int32) -> Int32 { return i }
 
-// CHECK-LABEL: sil hidden @_TF10addressors11test_carrayFRGVS_6CArrayFVs5Int32S1__S1_ : $@convention(thin) (@inout CArray<Int32 -> Int32>) -> Int32 {
-// CHECK: bb0([[ARRAY:%.*]] : $*CArray<Int32 -> Int32>):
+// CHECK-LABEL: sil hidden @_TF10addressors11test_carrayFRGVS_6CArrayFVs5Int32S1__S1_ : $@convention(thin) (@inout CArray<(Int32) -> Int32>) -> Int32 {
+// CHECK: bb0([[ARRAY:%.*]] : $*CArray<(Int32) -> Int32>):
 func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors6CArrayau9subscriptFSix :
 // CHECK:   [[T1:%.*]] = apply [[T0]]<(Int32) -> Int32>({{%.*}}, [[ARRAY]])
-// CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32 -> Int32>, #UnsafeMutablePointer._rawValue
+// CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<(Int32) -> Int32>, #UnsafeMutablePointer._rawValue
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*@callee_owned (@in Int32) -> @out Int32
 // CHECK:   store {{%.*}} to [[T3]] :
   array[0] = id_int
@@ -158,7 +158,7 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T0:%.*]] = load [[ARRAY]]
 // CHECK:   [[T1:%.*]] = function_ref @_TFV10addressors6CArraylu9subscriptFSix :
 // CHECK:   [[T2:%.*]] = apply [[T1]]<(Int32) -> Int32>({{%.*}}, [[T0]])
-// CHECK:   [[T3:%.*]] = struct_extract [[T2]] : $UnsafePointer<Int32 -> Int32>, #UnsafePointer._rawValue
+// CHECK:   [[T3:%.*]] = struct_extract [[T2]] : $UnsafePointer<(Int32) -> Int32>, #UnsafePointer._rawValue
 // CHECK:   [[T4:%.*]] = pointer_to_address [[T3]] : $Builtin.RawPointer to $*@callee_owned (@in Int32) -> @out Int32
 // CHECK:   [[T5:%.*]] = load [[T4]]
   return array[1](5)

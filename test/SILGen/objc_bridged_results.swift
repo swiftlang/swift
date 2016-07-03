@@ -9,7 +9,7 @@ import Foundation
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results11testNonnullFCSo4TestGSaPs9AnyObject__
 func testNonnull(_ obj: Test) -> [AnyObject] {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullArray!getter.1.foreign : Test -> () -> [AnyObject] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullArray!getter.1.foreign : (Test) -> () -> [AnyObject] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSa36_unconditionallyBridgeFromObjectiveCfGSqCSo7NSArray_GSax_
   // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type
@@ -21,7 +21,7 @@ func testNonnull(_ obj: Test) -> [AnyObject] {
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results12testNullableFCSo4TestGSqGSaPs9AnyObject___
 func testNullable(_ obj: Test) -> [AnyObject]? {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullableArray!getter.1.foreign : Test -> () -> [AnyObject]? , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullableArray!getter.1.foreign : (Test) -> () -> [AnyObject]? , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   
   // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $Optional<NSArray>
@@ -48,7 +48,7 @@ func testNullable(_ obj: Test) -> [AnyObject]? {
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results19testNullUnspecifiedFCSo4TestGSQGSaPs9AnyObject___
 func testNullUnspecified(_ obj: Test) -> [AnyObject]! {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : Test -> () -> [AnyObject]! , $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : (Test) -> () -> [AnyObject]! , $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
   // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $ImplicitlyUnwrappedOptional<NSArray>
   // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
@@ -75,7 +75,7 @@ func testNullUnspecified(_ obj: Test) -> [AnyObject]! {
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results21testNonnullDictionaryFCSo4TestGVs10DictionaryCSo8NSObjectPs9AnyObject__
 func testNonnullDictionary(_ obj: Test) -> [NSObject: AnyObject] {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullDictionary!getter.1.foreign : Test -> () -> [NSObject : AnyObject] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullDictionary!getter.1.foreign : (Test) -> () -> [NSObject : AnyObject] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationVs10Dictionary36_unconditionallyBridgeFromObjectiveCfGSqCSo12NSDictionary_GS0_xq__
   // CHECK: [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<NSObject, AnyObject>.Type
@@ -87,7 +87,7 @@ func testNonnullDictionary(_ obj: Test) -> [NSObject: AnyObject] {
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results14testNonnullSetFCSo4TestGVs3SetCSo8NSObject_
 func testNonnullSet(_ obj: Test) -> Set<NSObject> {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullSet!getter.1.foreign : Test -> () -> Set<NSObject> , $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullSet!getter.1.foreign : (Test) -> () -> Set<NSObject> , $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationVs3Set36_unconditionallyBridgeFromObjectiveCfGSqCSo5NSSet_GS0_x_
   // CHECK: [[SET_META:%[0-9]+]] = metatype $@thin Set<NSObject>.Type
@@ -99,7 +99,7 @@ func testNonnullSet(_ obj: Test) -> Set<NSObject> {
 
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results17testNonnullStringFCSo4TestSS
 func testNonnullString(_ obj: Test) -> String {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullString!getter.1.foreign : Test -> () -> String , $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullString!getter.1.foreign : (Test) -> () -> String , $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
   // CHECK: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
@@ -112,7 +112,7 @@ func testNonnullString(_ obj: Test) -> String {
 // CHECK-LABEL: sil hidden @_TF20objc_bridged_results13testClassPropFT_SS
 func testClassProp() -> String {
   // CHECK: [[CLASS:%.+]] = metatype $@thick Test.Type
-  // CHECK: [[METHOD:%.+]] = class_method [volatile] [[CLASS]] : $@thick Test.Type, #Test.nonnullSharedString!getter.1.foreign : Test.Type -> () -> String , $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
+  // CHECK: [[METHOD:%.+]] = class_method [volatile] [[CLASS]] : $@thick Test.Type, #Test.nonnullSharedString!getter.1.foreign : (Test.Type) -> () -> String , $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
   // CHECK: [[OBJC_CLASS:%.+]] = thick_to_objc_metatype [[CLASS]] : $@thick Test.Type to $@objc_metatype Test.Type
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[OBJC_CLASS]]) : $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS

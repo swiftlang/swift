@@ -3734,8 +3734,19 @@ public:
     };
 
     printFunctionExtInfo(T->getExtInfo());
-    printWithParensIfNotSimple(T->getInput());
-
+    
+    bool needsParens =
+      !isa<ParenType>(T->getInput().getPointer()) &&
+      !T->getInput()->is<TupleType>();
+    
+    if (needsParens)
+      Printer << "(";
+    
+    visit(T->getInput());
+    
+    if (needsParens)
+      Printer << ")";
+    
     if (T->throws())
       Printer << " " << tok::kw_throws;
 

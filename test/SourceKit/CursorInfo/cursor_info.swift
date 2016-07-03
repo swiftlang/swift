@@ -265,7 +265,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK8:      source.lang.swift.ref.function.constructor (18:3-18:15)
 // CHECK8-NEXT: init
 // CHECK8-NEXT: s:FC11cursor_info2CCcFT1xSi_S0_
-// CHECK8-NEXT: CC.Type -> (x: Int) -> CC
+// CHECK8-NEXT: (CC.Type) -> (x: Int) -> CC
 // CHECK8-NEXT: <Declaration>convenience init(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK8-NEXT: <decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -369,7 +369,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK29: source.lang.swift.decl.function.destructor (74:3-74:9)
 // CHECK29-NEXT: deinit
 // CHECK29-NEXT: s:FC11cursor_info2C3d
-// CHECK29-NEXT: C3 -> ()
+// CHECK29-NEXT: (C3) -> ()
 // CHECK29-NEXT: <Declaration>deinit</Declaration>
 // CHECK29-NEXT: <decl.function.destructor><syntaxtype.keyword>deinit</syntaxtype.keyword></decl.function.destructor>
 
@@ -377,7 +377,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK30: source.lang.swift.decl.function.constructor (75:3-75:16)
 // CHECK30-NEXT: init(x:)
 // CHECK30-NEXT: s:FC11cursor_info2C3cFT1xSi_GSQS0__
-// CHECK30-NEXT: C3.Type -> (x: Int) -> C3!
+// CHECK30-NEXT: (C3.Type) -> (x: Int) -> C3!
 // CHECK30-NEXT: <Declaration>init!(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK30-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>!(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -385,7 +385,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK31: source.lang.swift.decl.function.constructor (76:3-76:16)
 // CHECK31-NEXT: init(y:)
 // CHECK31-NEXT: s:FC11cursor_info2C3cFT1ySi_GSqS0__
-// CHECK31-NEXT: C3.Type -> (y: Int) -> C3?
+// CHECK31-NEXT: (C3.Type) -> (y: Int) -> C3?
 // CHECK31-NEXT: <Declaration>init?(y: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK31-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>?(<decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -393,7 +393,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK32: source.lang.swift.decl.function.constructor (77:3-77:15)
 // CHECK32-NEXT: init(z:)
 // CHECK32-NEXT: s:FC11cursor_info2C3cFzT1zSi_S0_
-// CHECK32-NEXT: C3.Type -> (z: Int) throws -> C3
+// CHECK32-NEXT: (C3.Type) -> (z: Int) throws -> C3
 // CHECK32-NEXT: <Declaration>init(z: <Type usr="s:Si">Int</Type>) throws</Declaration>
 // CHECK32-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>z</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>throws</syntaxtype.keyword></decl.function.constructor>
 
@@ -444,7 +444,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK39: source.lang.swift.decl.enumelement (91:8-91:10)
 // CHECK39-NEXT: C1
 // CHECK39-NEXT: s:FO11cursor_info2E22C1FMS0_S0_
-// CHECK39-NEXT: E2.Type -> E2
+// CHECK39-NEXT: (E2.Type) -> E2
 // CHECK39-NEXT: <Declaration>case C1</Declaration>
 // CHECK39-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C1</decl.name></decl.enumelement>
 
@@ -452,7 +452,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK40: source.lang.swift.decl.enumelement (92:8-92:10)
 // CHECK40-NEXT: C2
 // CHECK40-NEXT: s:FO11cursor_info2E22C2FMS0_FT1xSi1ySS_S0_
-// CHECK40-NEXT: E2.Type -> (x: Int, y: String) -> E2
+// CHECK40-NEXT: (E2.Type) -> (x: Int, y: String) -> E2
 // CHECK40-NEXT: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
 // CHECK40-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name><tuple>(<tuple.element><tuple.element.argument_label>x</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>y</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:SS">String</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.enumelement>
 
@@ -460,7 +460,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK41: source.lang.swift.decl.enumelement (92:31-92:33)
 // CHECK41-NEXT: C3
 // CHECK41-NEXT: s:FO11cursor_info2E22C3FMS0_FSiS0_
-// CHECK41-NEXT: E2.Type -> (Int) -> E2
+// CHECK41-NEXT: (E2.Type) -> (Int) -> E2
 // CHECK41-NEXT: <Declaration>case C3(<Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK41-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C3</decl.name>(<ref.struct usr="s:Si">Int</ref.struct>)</decl.enumelement>
 // FIXME: Wrap parameters in <decl.var.parameter>
@@ -469,7 +469,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK42: source.lang.swift.decl.enumelement (96:8-96:9)
 // CHECK42-NEXT: C
 // CHECK42-NEXT: s:FO11cursor_info2E31CFMS0_S0_
-// CHECK42-NEXT: E3.Type -> E3
+// CHECK42-NEXT: (E3.Type) -> E3
 // CHECK42-NEXT: <Declaration>case C = &quot;a&quot;</Declaration>
 // CHECK42-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C</decl.name> = <syntaxtype.string>&quot;a&quot;</syntaxtype.string></decl.enumelement>
 
