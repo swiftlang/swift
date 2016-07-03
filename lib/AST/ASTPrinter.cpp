@@ -2741,7 +2741,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       auto &Context = decl->getASTContext();
       Type ResultTy = decl->getResultType();
-      if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
+      if (ResultTy && !ResultTy->isVoid()) {
         Printer << " -> ";
         // Use the non-repr external type, but reuse the TypeLoc printing code.
         Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
@@ -3766,8 +3766,19 @@ public:
     printFunctionExtInfo(T->getExtInfo());
     printGenericParams(&T->getGenericParams());
     Printer << " ";
-    printWithParensIfNotSimple(T->getInput());
+    
+    bool needsParens =
+      !isa<ParenType>(T->getInput().getPointer()) &&
+      !T->getInput()->is<TupleType>();
+      
+    if (needsParens)
+      Printer << "(";
 
+    visit(T->getInput());
+
+    if (needsParens)
+      Printer << ")";
+    
     if (T->throws())
       Printer << " " << tok::kw_throws;
 
@@ -3922,7 +3933,18 @@ public:
     printFunctionExtInfo(T->getExtInfo());
     printGenericSignature(T->getGenericParams(), T->getRequirements());
     Printer << " ";
-    printWithParensIfNotSimple(T->getInput());
+
+    bool needsParens =
+      !isa<ParenType>(T->getInput().getPointer()) &&
+      !T->getInput()->is<TupleType>();
+      
+    if (needsParens)
+      Printer << "(";
+
+    visit(T->getInput());
+
+    if (needsParens)
+      Printer << ")";
 
     if (T->throws())
       Printer << " " << tok::kw_throws;
