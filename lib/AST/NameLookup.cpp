@@ -174,6 +174,13 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
     signature = decl->getType()->getCanonicalType();
 
+    // FIXME: The type of a variable or subscript doesn't include
+    // enough context to distinguish entities from different
+    // constrained extensions, so use the overload signature's
+    // type. This is layering a partial fix upon a total hack.
+    if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
+      signature = asd->getOverloadSignature().InterfaceType;
+
     // If we've seen a declaration with this signature before, note it.
     auto &knownDecls =
         CollidingDeclGroups[std::make_pair(signature, decl->getName())];

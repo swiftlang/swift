@@ -1564,13 +1564,14 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
     // consider the generic signature of the extension.
     if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
       if (auto genericSig = ext->getGenericSignature()) {
-        auto funcTy = signature.InterfaceType->castTo<AnyFunctionType>();
-        signature.InterfaceType
-          = GenericFunctionType::get(genericSig,
-                                     funcTy->getInput(),
-                                     funcTy->getResult(),
-                                     funcTy->getExtInfo())
-              ->getCanonicalType();
+        if (auto funcTy = signature.InterfaceType->getAs<AnyFunctionType>()) {
+          signature.InterfaceType
+            = GenericFunctionType::get(genericSig,
+                                       funcTy->getInput(),
+                                       funcTy->getResult(),
+                                       funcTy->getExtInfo())
+                ->getCanonicalType();
+        }
       }
     }
   } else if (isa<VarDecl>(this)) {
