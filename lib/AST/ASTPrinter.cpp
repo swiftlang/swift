@@ -2739,7 +2739,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           printFunctionParameters(decl);
         });
 
-      auto &Context = decl->getASTContext();
       Type ResultTy = decl->getResultType();
       if (ResultTy && !ResultTy->isVoid()) {
         Printer << " -> ";
