@@ -1237,6 +1237,19 @@ function(add_swift_library name)
         elseif("${sdk}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
           list(APPEND swiftlib_swift_compile_flags_all
               ${SWIFTLIB_SWIFT_COMPILE_FLAGS_WATCHOS})
+        elseif("${sdk}" STREQUAL "WINDOWS")
+          # FIXME(SR2005) static and shared are not mutually exclusive; however
+          # since we do a single build of the sources, this doesnt work for
+          # building both simultaneously.  Effecitvely, only shared builds are
+          # supported on windows currently.
+          if(SWIFTLIB_SHARED)
+            list(APPEND swiftlib_swift_compile_flags_all -D_USRDLL)
+            if(SWIFTLIB_IS_STDLIB_CORE)
+              list(APPEND swiftlib_swift_compile_flags_all -DswiftCore_EXPORTS)
+            endif()
+          elseif(SWIFTLIB_STATIC)
+            list(APPEND swiftlib_swift_compile_flags_all -D_LIB)
+          endif()
         endif()
 
         # Add this library variant.

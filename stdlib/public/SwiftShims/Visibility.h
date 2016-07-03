@@ -63,10 +63,10 @@
 # if defined(__CYGWIN__)
 #  define SWIFT_RUNTIME_EXPORT
 # else
-#  if defined(__SWIFT_CURRENT_DYLIB)
+#  if defined(swiftCore_EXPORTS)
 #   define SWIFT_RUNTIME_EXPORT __declspec(dllexport)
 #  else
-#   define SWIFT_RUNTIME_EXPORT
+#   define SWIFT_RUNTIME_EXPORT __declspec(dllimport)
 #  endif
 # endif
 #endif
