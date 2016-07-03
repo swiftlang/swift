@@ -1174,7 +1174,9 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
 
       TypeSubstitutionMap archetypesMap;
       bool matched;
-      if (paramType->hasUnresolvedType() || rArgType->hasTypeVariable())
+      if (paramType->hasUnresolvedType())
+        matched = true;
+      else if (rArgType->hasTypeVariable())
         matched = false;
       else {
         auto matchType = paramType;
@@ -4451,7 +4453,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Diagnose some simple and common errors.
   if (calleeInfo.diagnoseSimpleErrors(callExpr))
     return true;
-  
   
   // A common error is to apply an operator that only has inout forms (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this

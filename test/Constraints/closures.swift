@@ -192,7 +192,7 @@ struct S<T> {
 
   func subscribe<Object: AnyObject where Object: Hashable>(object: Object?, method: (Object, T) -> ()) {
     let wrappedMethod = { (object: AnyObject, value: T) in }
-    // expected-error @+1 {{cannot convert value of type '(AnyObject, T) -> ()' to expected argument type '(AnyObject, _) -> ()'}}
+    // expected-error @+1 {{value of optional type 'Object?' not unwrapped; did you mean to use '!' or '?'?}}
     cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }
   }
 }
