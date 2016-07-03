@@ -108,7 +108,7 @@ public struct LazyFilterSequence<Base : Sequence>
 ///   depends on how sparsely the filtering predicate is satisfied,
 ///   and may not offer the usual performance given by models of
 ///   `Collection`.
-public struct LazyFilterIndex<Base : Collection> : Comparable {
+public struct LazyFilterIndex<Base : Collection> : Equatable {
 
   /// The position corresponding to `self` in the underlying collection.
   public let base: Base.Index
@@ -119,41 +119,6 @@ public func == <Base : Collection>(
   rhs: LazyFilterIndex<Base>
 ) -> Bool {
   return lhs.base == rhs.base
-}
-
-public func != <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
-) -> Bool {
-  return lhs.base != rhs.base
-}
-
-public func < <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
-) -> Bool {
-  return lhs.base < rhs.base
-}
-
-public func <= <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
-) -> Bool {
-  return lhs.base <= rhs.base
-}
-
-public func >= <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
-) -> Bool {
-  return lhs.base >= rhs.base
-}
-
-public func > <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
-) -> Bool {
-  return lhs.base > rhs.base
 }
 
 // FIXME(ABI)(compiler limitation): `LazyFilter*Collection` types should be

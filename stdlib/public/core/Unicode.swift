@@ -282,9 +282,9 @@ public struct UTF8 : UnicodeCodec {
   ///     recommends to skip these bytes and replace them by a single
   ///     replacement character (U+FFFD).
   ///
-  /// - Requires: There is at least one used byte in `buffer`, and the unused
-  ///   space in `buffer` is filled with some value not matching the UTF-8
-  ///   continuation byte form (`0b10xxxxxx`).
+  /// - Precondition: There is at least one used byte in `buffer`, and
+  ///   the unused space in `buffer` is filled with some value not
+  ///   matching the UTF-8 continuation byte form (`0b10xxxxxx`).
   public // @testable
   static func _decodeOne(_ buffer: UInt32) -> (result: UInt32?, length: UInt8) {
     // Note the buffer is read least significant byte first: [ #3 #2 #1 #0 ].

@@ -21,6 +21,21 @@ public protocol RandomAccessIndexable : BidirectionalIndexable {
   //
   // This protocol is almost an implementation detail of the standard
   // library.
+  
+  /// A type that represents a position in the collection.
+  ///
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript
+  /// argument.
+  ///
+  /// - Precondition: the ordering of indices in the Collection
+  ///   corresponds to their order via '<', i.e.  `(i < j) ==
+  ///   (distance(from: i, to: j) > 0)` for any `i` and `j` of type
+  ///   `Index`.
+  ///
+  /// - SeeAlso: endIndex
+  associatedtype Index : Comparable
+  var startIndex : Index { get }
 }
 
 /// A collection that supports efficient random-access index traversal.

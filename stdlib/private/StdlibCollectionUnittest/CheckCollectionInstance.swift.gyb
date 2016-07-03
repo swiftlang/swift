@@ -230,6 +230,7 @@ public func checkAdvancesAndDistances<Instances, Distances, BaseCollection>(
 ) where
   Instances : Collection,
   Distances : Collection,
+  Instances.Iterator.Element : Comparable,
   BaseCollection : Indexable,
   Instances.Iterator.Element == BaseCollection.Index,
   Distances.Iterator.Element == BaseCollection.IndexDistance,

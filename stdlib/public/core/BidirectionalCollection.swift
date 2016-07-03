@@ -142,26 +142,6 @@ extension BidirectionalIndexable {
     }
     return i
   }
-
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
-    var start = start
-    var count: IndexDistance = 0
-
-    if start < end {
-      while start != end {
-        count += 1 as IndexDistance
-        formIndex(after: &start)
-      }
-    }
-    else if start > end {
-      while start != end {
-        count -= 1 as IndexDistance
-        formIndex(before: &start)
-      }
-    }
-
-    return count
-  }
 }
 
 /// Supply the default "slicing" `subscript` for `BidirectionalCollection`

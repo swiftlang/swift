@@ -17,17 +17,15 @@ from gyb_stdlib_support import (
     collectionForTraversal
 )
 
+def AnyIndex(t):
+  return 'AnyComparableIndex' if 'RandomAccess' in t else 'AnyIndex'
+
 }%
 
 // TODO: swift-3-indexing-model: perform type erasure on the associated
 // `Indices` type.
 
 import SwiftShims
-
-@noreturn @inline(never)
-internal func _abstract(_ file: StaticString = #file, line: UInt = #line) {
-  fatalError("Method must be overridden", file: file, line: line)
-}
 
 //===--- Iterator ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -104,7 +102,7 @@ internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
   /// Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Note: Subclasses must override this method.
-  internal func next() -> Element? { _abstract() }
+  internal func next() -> Element? { Builtin.unreachable() }
 }
 
 internal final class _IteratorBox<
@@ -140,108 +138,108 @@ internal class _AnyRandomAccessCollectionBox<Element>
 {
 
 %   if Kind == 'Sequence':
-  internal func _makeIterator() -> AnyIterator<Element> { _abstract() }
+  internal func _makeIterator() -> AnyIterator<Element> { Builtin.unreachable() }
 
-  internal var _underestimatedCount: Int { _abstract() }
+  internal var _underestimatedCount: Int { Builtin.unreachable() }
 
   internal func _map<T>(
     _ transform: @noescape (Element) throws -> T
   ) rethrows -> [T] {
-    _abstract()
+    Builtin.unreachable()
   }
 
   internal func _filter(
     _ includeElement: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
-    _abstract()
+    Builtin.unreachable()
   }
 
   internal func _forEach(
     _ body: @noescape (Element) throws -> Void
   ) rethrows {
-    _abstract()
+    Builtin.unreachable()
   }
 
   internal func __customContainsEquatableElement(
     _ element: Element
   ) -> Bool? {
-    _abstract()
+    Builtin.unreachable()
   }
 
   internal func __preprocessingPass<R>(
     _ preprocess: @noescape () throws -> R
   ) rethrows -> R? {
-    _abstract()
+    Builtin.unreachable()
   }
 
   internal func __copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
-    _abstract()
+    Builtin.unreachable()
   }
 
   internal func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
-    _abstract()
+    Builtin.unreachable()
   }
 
 %   end
 
 %   override = 'override' if Kind != 'Sequence' else ''
   internal ${override} func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
-    _abstract()
+    Builtin.unreachable()
   }
 
   internal ${override} func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
-    _abstract()
+    Builtin.unreachable()
   }
 
   internal ${override} func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
-    _abstract()
+    Builtin.unreachable()
   }
 
   internal ${override} func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
-    _abstract()
+    Builtin.unreachable()
   }
 
   internal func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
     isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
-    _abstract()
+    Builtin.unreachable()
   }
 
 %   if Kind == 'Collection':
-  internal subscript(i: _AnyIndexBox) -> Element { _abstract() }
+  internal subscript(i: _AnyIndexBox) -> Element { Builtin.unreachable() }
   
-  internal func _index(after i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
+  internal func _index(after i: _AnyIndexBox) -> _AnyIndexBox { Builtin.unreachable() }
   
-  internal func _formIndex(after i: _AnyIndexBox) { _abstract() }
+  internal func _formIndex(after i: _AnyIndexBox) { Builtin.unreachable() }
   
   internal func _index(
     _ i: _AnyIndexBox, offsetBy n: IntMax
   ) -> _AnyIndexBox {
-    _abstract()
+    Builtin.unreachable()
   }
   
   internal func _index(
     _ i: _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox? {
-    _abstract()
+    Builtin.unreachable()
   }
   
   internal func _formIndex(_ i: inout _AnyIndexBox, offsetBy n: IntMax) {
-    _abstract()
+    Builtin.unreachable()
   }
   
   internal func _formIndex(
     _ i: inout _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
   ) -> Bool {
-    _abstract()
+    Builtin.unreachable()
   }
   
   internal func _distance(
     from start: _AnyIndexBox, to end: _AnyIndexBox
   ) -> IntMax {
-    _abstract()
+    Builtin.unreachable()
   }
 
   // TODO: swift-3-indexing-model: forward the following methods.
@@ -257,14 +255,14 @@ internal class _AnyRandomAccessCollectionBox<Element>
   var isEmpty: Bool { get }
   */
 
-  internal var _count: IntMax { _abstract() }
+  internal var _count: IntMax { Builtin.unreachable() }
 
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
   func _customIndexOfEquatableElement(element: Iterator.Element) -> Index??
   */
 
-  internal var _first: Element? { _abstract() }
+  internal var _first: Element? { Builtin.unreachable() }
 
   internal init(
     _startIndex: _AnyIndexBox,
@@ -283,13 +281,13 @@ internal class _AnyRandomAccessCollectionBox<Element>
   internal ${override} subscript(
     start start: _AnyIndexBox,
     end end: _AnyIndexBox
-  ) -> _Any${Kind}Box<Element> { _abstract() }
+  ) -> _Any${Kind}Box<Element> { Builtin.unreachable() }
 %   end
 
 %   if Kind == 'BidirectionalCollection':
-  internal func _index(before i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  internal func _formIndex(before i: _AnyIndexBox) { _abstract() }
-  internal var _last: Element? { _abstract() }
+  internal func _index(before i: _AnyIndexBox) -> _AnyIndexBox { Builtin.unreachable() }
+  internal func _formIndex(before i: _AnyIndexBox) { Builtin.unreachable() }
+  internal var _last: Element? { Builtin.unreachable() }
 %   end
 }
 % end
@@ -641,26 +639,16 @@ extension Any${Kind} {
 //===--- Index ------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal protocol _AnyIndexBox : class {
-  var _typeID: ObjectIdentifier { get }
+internal class _AnyIndexBox {
+  var _typeID: ObjectIdentifier { Builtin.unreachable() }
 
-  func _unbox<T : Comparable>() -> T?
-
-  func _equal(to rhs: _AnyIndexBox) -> Bool
-
-  func _notEqual(to rhs: _AnyIndexBox) -> Bool
-
-  func _less(than rhs: _AnyIndexBox) -> Bool
-
-  func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool
-
-  func _greater(than rhs: _AnyIndexBox) -> Bool
-
-  func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool
+  func _unbox<T : Equatable>() -> T? { Builtin.unreachable() }
+  func _equal(to rhs: _AnyIndexBox) -> Bool { Builtin.unreachable() }
+  func _less(than rhs: _AnyIndexBox) -> Bool { Builtin.unreachable() }
 }
 
 internal final class _IndexBox<
-  BaseIndex : Comparable
+  BaseIndex : Equatable
 > : _AnyIndexBox {
   internal var _base: BaseIndex
 
@@ -672,36 +660,20 @@ internal final class _IndexBox<
     return unsafeDowncast(other, to: _IndexBox.self)._base
   }
 
-  internal var _typeID: ObjectIdentifier {
+  internal override var _typeID: ObjectIdentifier {
     return Swift._typeID(self)
   }
 
-  internal func _unbox<T : Comparable>() -> T? {
+  internal func _unbox<T : Equatable>() -> T? {
     return (self as _AnyIndexBox as? _IndexBox<T>)?._base
   }
 
-  internal func _equal(to rhs: _AnyIndexBox) -> Bool {
+  internal override func _equal(to rhs: _AnyIndexBox) -> Bool {
     return _base == _unsafeUnbox(rhs)
   }
-
-  internal func _notEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base != _unsafeUnbox(rhs)
-  }
-
-  internal func _less(than rhs: _AnyIndexBox) -> Bool {
-    return _base < _unsafeUnbox(rhs)
-  }
-
-  internal func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base <= _unsafeUnbox(rhs)
-  }
-
-  internal func _greater(than rhs: _AnyIndexBox) -> Bool {
-    return _base > _unsafeUnbox(rhs)
-  }
-
-  internal func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base >= _unsafeUnbox(rhs)
+  
+  internal override func _less(than rhs: _AnyIndexBox) -> Bool {
+    return _unsafeUnbox(rhs)._isKnownToExceed(_base)
   }
 }
 
@@ -709,7 +681,28 @@ internal final class _IndexBox<
 /// the specific underlying type.
 ///
 /// - SeeAlso: `AnyCollection`
-public struct AnyIndex : Comparable {
+public struct AnyIndex : Equatable {
+  /// Creates a new index wrapping `base`.
+  public init<BaseIndex : Equatable>(_ base: BaseIndex) {
+    self._box = _IndexBox(_base: base)
+  }
+
+  internal init(_box: _AnyIndexBox) {
+    self._box = _box
+  }
+
+  internal var _typeID: ObjectIdentifier {
+    return _box._typeID
+  }
+
+  internal var _box: _AnyIndexBox
+}
+
+/// A wrapper over an underlying index that hides
+/// the specific underlying type.
+///
+/// - SeeAlso: `AnyRandomAccessCollection`
+public struct AnyComparableIndex : Comparable {
   /// Creates a new index wrapping `base`.
   public init<BaseIndex : Comparable>(_ base: BaseIndex) {
     self._box = _IndexBox(_base: base)
@@ -735,29 +728,14 @@ public func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   return lhs._box._equal(to: rhs._box)
 }
 
-public func != (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+public func == (lhs: AnyComparableIndex, rhs: AnyComparableIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._notEqual(to: rhs._box)
+  return lhs._box._equal(to: rhs._box)
 }
 
-public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+public func < (lhs: AnyComparableIndex, rhs: AnyComparableIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._less(than: rhs._box)
-}
-
-public func <= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._lessOrEqual(to: rhs._box)
-}
-
-public func > (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._greater(than: rhs._box)
-}
-
-public func >= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._greaterOrEqual(to: rhs._box)
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -868,14 +846,14 @@ public struct ${Self}<Element>
   }
 %   end
 
-  public typealias Index = AnyIndex
+  public typealias Index = ${AnyIndex(Traversal)}
   public typealias IndexDistance = IntMax
 
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  public var startIndex: AnyIndex {
-    return AnyIndex(_box: _box._startIndex)
+  public var startIndex: Index {
+    return Index(_box: _box._startIndex)
   }
 
   /// The collection's "past the end" position---that is, the position one
@@ -883,24 +861,24 @@ public struct ${Self}<Element>
   ///
   /// `endIndex` is always reachable from `startIndex` by zero or more
   /// applications of `index(after:)`.
-  public var endIndex: AnyIndex {
-    return AnyIndex(_box: _box._endIndex)
+  public var endIndex: Index {
+    return Index(_box: _box._endIndex)
   }
 
   /// Accesses the element indicated by `position`.
   ///
   /// - Precondition: `position` indicates a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: AnyIndex) -> Element {
+  public subscript(position: Index) -> Element {
     return _box[position._box]
   }
 
-  public subscript(bounds: Range<AnyIndex>) -> ${Self}<Element> {
+  public subscript(bounds: Range<Index>) -> ${Self}<Element> {
     return ${Self}(_box:
       _box[start: bounds.lowerBound._box, end: bounds.upperBound._box])
   }
 
-  public func _failEarlyRangeCheck(_ index: AnyIndex, bounds: Range<AnyIndex>) {
+  public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     // Do nothing.  Doing a range check would involve unboxing indices,
     // performing dynamic dispatch etc.  This seems to be too costly for a fast
     // range check for QoI purposes.
@@ -912,11 +890,11 @@ public struct ${Self}<Element>
     // range check for QoI purposes.
   }
 
-  public func index(after i: AnyIndex) -> AnyIndex {
-    return AnyIndex(_box: _box._index(after: i._box))
+  public func index(after i: Index) -> Index {
+    return Index(_box: _box._index(after: i._box))
   }
 
-  public func formIndex(after i: inout AnyIndex) {
+  public func formIndex(after i: inout Index) {
     if _isUnique(&i._box) {
       _box._formIndex(after: i._box)
     }
@@ -925,20 +903,20 @@ public struct ${Self}<Element>
     }
   }
 
-  public func index(_ i: AnyIndex, offsetBy n: IntMax) -> AnyIndex {
-    return AnyIndex(_box: _box._index(i._box, offsetBy: n))
+  public func index(_ i: Index, offsetBy n: IntMax) -> Index {
+    return Index(_box: _box._index(i._box, offsetBy: n))
   }
 
   public func index(
-    _ i: AnyIndex,
+    _ i: Index,
     offsetBy n: IntMax,
-    limitedBy limit: AnyIndex
-  ) -> AnyIndex? {
+    limitedBy limit: Index
+  ) -> Index? {
     return _box._index(i._box, offsetBy: n, limitedBy: limit._box)
-      .map { AnyIndex(_box:$0) }
+      .map { Index(_box:$0) }
   }
 
-  public func formIndex(_ i: inout AnyIndex, offsetBy n: IntMax) {
+  public func formIndex(_ i: inout Index, offsetBy n: IntMax) {
     if _isUnique(&i._box) {
       return _box._formIndex(&i._box, offsetBy: n)
     } else {
@@ -947,9 +925,9 @@ public struct ${Self}<Element>
   }
 
   public func formIndex(
-    _ i: inout AnyIndex,
+    _ i: inout Index,
     offsetBy n: IntMax,
-    limitedBy limit: AnyIndex
+    limitedBy limit: Index
   ) -> Bool {
     if _isUnique(&i._box) {
       return _box._formIndex(&i._box, offsetBy: n, limitedBy: limit._box)
@@ -962,7 +940,7 @@ public struct ${Self}<Element>
     return false
   }
 
-  public func distance(from start: AnyIndex, to end: AnyIndex) -> IntMax {
+  public func distance(from start: Index, to end: Index) -> IntMax {
     return _box._distance(from: start._box, to: end._box)
   }
 
@@ -978,11 +956,11 @@ public struct ${Self}<Element>
   }
 
 %   if Traversal == 'Bidirectional' or Traversal == 'RandomAccess':
-  public func index(before i: AnyIndex) -> AnyIndex {
-    return AnyIndex(_box: _box._index(before: i._box))
+  public func index(before i: Index) -> Index {
+    return Index(_box: _box._index(before: i._box))
   }
 
-  public func formIndex(before i: inout AnyIndex) {
+  public func formIndex(before i: inout Index) {
     if _isUnique(&i._box) {
       _box._formIndex(before: i._box)
     }
@@ -1036,9 +1014,8 @@ extension AnyCollectionProtocol {
   }
 }
 
-% for Traversal in TRAVERSALS:
 @available(*, unavailable, renamed: "AnyIndex")
-public typealias Any${Traversal}Index = AnyIndex
+public typealias Any${Traversal}Index = ${AnyIndex(Traversal)}
 % end
 
 

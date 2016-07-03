@@ -301,7 +301,7 @@ extension CountableRange
 /// - SeeAlso: `CountableRange`, `ClosedRange`, `CountableClosedRange`
 @_fixed_layout
 public struct Range<
-  Bound : Comparable
+  Bound : Equatable
 > {
   /// Creates an instance with the given bounds.
   ///
@@ -327,7 +327,9 @@ public struct Range<
   /// In an empty range, `upperBound` is equal to `lowerBound`. A `Range`
   /// instance does not contain its upper bound.
   public let upperBound: Bound
+}
 
+extension Range where Bound : Comparable {
   /// Returns a Boolean value indicating whether the given element is contained
   /// within the range.
   ///
@@ -341,7 +343,9 @@ public struct Range<
   public func contains(_ element: Bound) -> Bool {
     return lowerBound <= element && element < upperBound
   }
+}
 
+extension Range {
   /// A Boolean value indicating whether the range contains no elements.
   ///
   /// An empty `Range` instance has equal lower and upper bounds.
@@ -388,7 +392,7 @@ def get_init_warning(Self, OtherSelf):
 extension ${Self}
 %   if 'Countable' in Self or 'Countable' in OtherSelf or 'Closed' in Self or 'Closed' in OtherSelf:
   where
-  Bound : _Strideable, Bound.Stride : SignedInteger
+  Bound : _Strideable, Bound : Comparable, Bound.Stride : SignedInteger
 %   end
 {
   /// Creates an instance equivalent to the given range.
@@ -411,10 +415,9 @@ ${get_init_warning(Self, OtherSelf)}
   }
 }
 
-extension ${Self}
+extension ${Self} where Bound : Comparable
 %   if 'Countable' in Self or 'Countable' in OtherSelf:
-  where
-  Bound : _Strideable, Bound.Stride : SignedInteger
+  , Bound : _Strideable, Bound.Stride : SignedInteger
 %   end
 {
   /// Returns a Boolean value indicating whether this range and the given range
@@ -437,7 +440,7 @@ extension ${Self}
 }
 %   end
 
-extension ${Self} {
+extension ${Self} where Bound : Comparable {
   /// Returns a copy of this range clamped to the given limiting range.
   ///
   /// The bounds of the result are always limited to the bounds of `limits`.
@@ -508,7 +511,9 @@ public func == <Bound>(lhs: ${Self}<Bound>, rhs: ${Self}<Bound>) -> Bool {
     lhs.upperBound == rhs.upperBound
 }
 
-public func ~= <Bound> (pattern: ${Self}<Bound>, value: Bound) -> Bool {
+public func ~= <
+  Bound : Comparable
+> (pattern: ${Self}<Bound>, value: Bound) -> Bool {
   return pattern.contains(value)
 }
 % end
@@ -553,9 +558,9 @@ extension ${Self} where Bound : _Strideable, Bound.Stride : SignedInteger {
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
+public func ..< <Bound : Equatable> (minimum: Bound, maximum: Bound)
   -> Range<Bound> {
-  _precondition(minimum <= maximum,
+  _precondition(!minimum._isKnownToExceed(maximum),
     "Can't form Range with upperBound < lowerBound")
   return Range(uncheckedBounds: (lower: minimum, upper: maximum))
 }

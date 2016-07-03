@@ -30,8 +30,14 @@ public protocol IndexableBase {
   /// "past the end" position that's not valid for use as a subscript
   /// argument.
   ///
+  /// - Precondition: if `Index` conforms to `Comparable`, then the
+  ///   ordering of indices in the Collection corresponds to their
+  ///   ordering via `<`. In other words, for any collection `c` with
+  ///   valid indices `i` and `j`, `i < j` implies `j` is reachable
+  ///   from `i` by successive applications of `c.index(after:)`.
+  ///
   /// - SeeAlso: endIndex
-  associatedtype Index : Comparable
+  associatedtype Index : Equatable
 
   /// The position of the first element in a nonempty collection.
   ///
@@ -149,6 +155,13 @@ public protocol IndexableBase {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   func formIndex(after i: inout Index)
+}
+
+extension IndexableBase {
+  public func _failEarlyRangeCheck(
+    _ index: Index, bounds: Range<Index>) {}
+  public func _failEarlyRangeCheck(
+    _ range: Range<Index>, bounds: Range<Index>) {}
 }
 
 /// A type that provides subscript access to its elements, with forward index
@@ -875,7 +888,9 @@ extension Indexable {
   public func formIndex(after i: inout Index) {
     i = index(after: i)
   }
+}
 
+extension IndexableBase where Index : Comparable {
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
@@ -901,7 +916,9 @@ extension Indexable {
       range.upperBound <= bounds.upperBound,
       "out of bounds: range begins after bounds.upperBound")
   }
+}
 
+extension Indexable {
   /// Returns an index that is the specified distance from the given index.
   ///
   /// The following example obtains an index advanced four positions from a
@@ -1047,16 +1064,20 @@ extension Indexable {
   ///   - start: A valid index of the collection.
   ///   - end: Another valid index of the collection. If `end` is equal to
   ///     `start`, the result is zero.
+  ///
   /// - Returns: The distance between `start` and `end`. The result can be
-  ///   negative only if the collection conforms to the
-  ///   `BidirectionalCollection` protocol.
+  ///   negative only if `Index` conforms to `Comparable`.
+  ///
+  /// - Precondition: Either `Index` conforms to `Comparable`, or `end` is
+  ///   reachable from `start` by successive applications of `index(after:)`.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    _precondition(start <= end,
-      "Only BidirectionalCollections can have end come before start")
+    if start._isKnownToExceed(end) {
+      return -distance(from: end, to: start)
+    }
 
     var start = start
     var count: IndexDistance = 0
@@ -1067,11 +1088,11 @@ extension Indexable {
     return count
   }
 
-  /// Do not use this method directly; call advanced(by: n) instead.
+  // Implementation of index(_:offsetBy:)
   @inline(__always)
   internal func _advanceForward(_ i: Index, by n: IndexDistance) -> Index {
     _precondition(n >= 0,
-      "Only BidirectionalCollections can be advanced by a negative amount")
+      "Only BidirectionalCollections can offset indices by a negative amount")
 
     var i = i
     for _ in stride(from: 0, to: n, by: 1) {
@@ -1080,14 +1101,14 @@ extension Indexable {
     return i
   }
 
-  /// Do not use this method directly; call advanced(by: n, limit) instead.
+  // Implementation of index(_:offsetBy:limitedBy:)
   @inline(__always)
   internal
   func _advanceForward(
     _ i: Index, by n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     _precondition(n >= 0,
-      "Only BidirectionalCollections can be advanced by a negative amount")
+      "Only BidirectionalCollections can offset indices by a negative amount")
 
     var i = i
     for _ in stride(from: 0, to: n, by: 1) {

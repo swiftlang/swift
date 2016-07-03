@@ -80,7 +80,7 @@ public struct ${Self}<
     // FIXME: swift-3-indexing-model: range check.
     _elements.formIndex(after: &i)
   }
-
+  
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   public func index(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.

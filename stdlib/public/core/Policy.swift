@@ -539,6 +539,15 @@ public protocol Equatable {
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
   func == (lhs: Self, rhs: Self) -> Bool
+
+  /// Returns `true` iff `Self` conforms to `Comparable` and `self >
+  /// other`.
+  func _isKnownToExceed(_ other: Self) -> Bool
+}
+
+extension Equatable {
+  @inline(__always)
+  public func _isKnownToExceed(_ other: Self) -> Bool { return false }
 }
 
 /// Returns a Boolean value indicating whether two values are not equal.
@@ -761,6 +770,11 @@ public protocol Comparable : Equatable {
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
   func > (lhs: Self, rhs: Self) -> Bool
+}
+
+extension Comparable {
+  @inline(__always)
+  public func _isKnownToExceed(_ other: Self) -> Bool { return self > other }
 }
 
 /// A type that supports standard bitwise arithmetic operators.

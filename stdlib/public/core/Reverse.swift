@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension MutableCollection where Self : BidirectionalCollection {
+extension MutableCollection
+  where Self : BidirectionalCollection, Index : Comparable {
   /// Reverses the elements of the collection in place.
   ///
   ///     var characters: [Character] = ["C", "a", "f", "é"]
@@ -32,6 +33,29 @@ extension MutableCollection where Self : BidirectionalCollection {
   }
 }
 
+extension MutableCollection where Self : BidirectionalCollection {
+  /// Reverses the elements of the collection in place.
+  ///
+  ///     var characters: [Character] = ["C", "a", "f", "é"]
+  ///     characters.reverse()
+  ///     print(cafe.characters)
+  ///     // Prints "["é", "f", "a", "C"]
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of elements in the
+  ///   collection.
+  public mutating func reverse() {
+    if isEmpty { return }
+    var f = startIndex
+    var l = index(before: endIndex)
+    while f != l {
+      swap(&self[f], &self[l])
+      formIndex(after: &f)
+      if f == l { break }
+      formIndex(before: &l)
+    }
+  }
+}
+
 // FIXME(ABI)(compiler limitation): we should have just one type,
 // `ReversedCollection`, that has conditional conformances to
 // `RandomAccessCollection`, and possibly `MutableCollection` and
@@ -41,7 +65,7 @@ extension MutableCollection where Self : BidirectionalCollection {
 
 /// An index that traverses the same positions as an underlying index,
 /// with inverted traversal direction.
-public struct ReversedIndex<Base : Collection> : Comparable {
+public struct ReversedIndex<Base : Collection> : Equatable {
   public init(_ base: Base.Index) {
     self.base = base
   }
@@ -57,7 +81,7 @@ public func == <Base : Collection>(
   return lhs.base == rhs.base
 }
 
-public func < <Base : Collection>(
+public func < <Base : Collection where Base.Index : Comparable>(
   lhs: ReversedIndex<Base>,
   rhs: ReversedIndex<Base>
 ) -> Bool {
@@ -153,6 +177,7 @@ public struct ReversedCollection<
 public struct ReversedRandomAccessIndex<
   Base : RandomAccessCollection
 > : Comparable {
+  
   public init(_ base: Base.Index) {
     self.base = base
   }
@@ -185,8 +210,8 @@ public func < <Base : Collection>(
 public struct ReversedRandomAccessCollection<
   Base : RandomAccessCollection
 > : RandomAccessCollection {
-  // FIXME: swift-3-indexing-model: tests for ReverseRandomAccessIndex and
-  // ReverseRandomAccessCollection.
+  // FIXME: swift-3-indexing-model: tests for ReversedRandomAccessIndex and
+  // ReversedRandomAccessCollection.
 
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
@@ -201,7 +226,6 @@ public struct ReversedRandomAccessCollection<
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ReversedRandomAccessIndex<Base>
-
   public typealias IndexDistance = Base.IndexDistance
 
   /// A type that provides the sequence's iteration interface and
@@ -252,6 +276,12 @@ public struct ReversedRandomAccessCollection<
     return _base[_base.index(before: position.base)]
   }
 
+  public subscript(
+    bounds: Range<Index>
+  ) -> RandomAccessSlice<ReversedRandomAccessCollection> {
+    return RandomAccessSlice(base: self, bounds: bounds)
+  }
+
   // FIXME: swift-3-indexing-model: the rest of methods.
 
   public let _base: Base
@@ -294,7 +324,7 @@ extension RandomAccessCollection {
   ///
   /// You can reverse a collection without allocating new space for its
   /// elements by calling this `reversed()` method. A
-  /// `ReverseRandomAccessCollection` instance wraps an underlying collection
+  /// `ReversedRandomAccessCollection` instance wraps an underlying collection
   /// and provides access to its elements in reverse order. This example
   /// prints the elements of an array in reverse order:
   ///

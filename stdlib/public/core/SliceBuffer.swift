@@ -15,7 +15,8 @@ public // @testable
 struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
-
+  public typealias Index = Int
+  
   init(
     owner: AnyObject, subscriptBaseAddress: UnsafeMutablePointer<Element>,
     indices: Range<Int>, hasNativeBuffer: Bool
