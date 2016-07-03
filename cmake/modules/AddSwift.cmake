@@ -578,20 +578,16 @@ function(_add_swift_library_single target name)
     set(SWIFTLIB_SINGLE_API_NOTES "${module_name}")
   endif()
 
-  # On platforms that use ELF binaries (for now that is Linux and FreeBSD)
-  # we add markers for metadata sections in the shared libraries using 
-  # these object files.  This wouldn't be necessary if the link was done by
-  # the swift binary: rdar://problem/19007002
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX" OR
-     "${SWIFTLIB_SINGLE_SDK}" STREQUAL "FREEBSD")
-
+  # On platforms that use ELF binaries we add markers for metadata sections in
+  # the shared libraries using these object files.  This wouldn't be necessary
+  # if the link was done by the swift binary: rdar://problem/19007002
+  if("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     if("${libkind}" STREQUAL "SHARED")
       set(arch_subdir "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
 
       set(SWIFT_SECTIONS_OBJECT_BEGIN "${arch_subdir}/swift_begin.o")
       set(SWIFT_SECTIONS_OBJECT_END   "${arch_subdir}/swift_end.o")
     endif()
-
   endif()
 
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_LINK_LIBRARIES,
