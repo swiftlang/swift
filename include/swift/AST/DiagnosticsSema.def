@@ -2669,7 +2669,7 @@ ERROR(objc_invalid_with_generic_params,none,
 ERROR(objc_convention_invalid,none,
       "%0 is not representable in Objective-C, so it cannot be used"
       " with '@convention(%1)'", (Type, StringRef))
-WARNING(function_type_no_parens,none,
+ERROR(function_type_no_parens,none,
       "single argument function types require parentheses", ())
 NOTE(not_objc_empty_protocol_composition,none,
      "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
