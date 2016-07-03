@@ -1949,10 +1949,19 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   if (!isa<TupleTypeRepr>(repr->getArgsTypeRepr()) &&
       !repr->isWarnedAbout()) {
     auto args = repr->getArgsTypeRepr();
-    TC.diagnose(args->getStartLoc(), diag::function_type_no_parens)
-      .highlight(args->getSourceRange())
-      .fixItInsert(args->getStartLoc(), "(")
-    .fixItInsertAfter(args->getEndLoc(), ")");
+    
+    bool isInSILMode = false;
+    if (auto sourceFile = DC->getParentSourceFile())
+      isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
+    
+    // The SIL printer is still printing function types with no parens in some
+    // cases.  Don't warn for now.
+    if (!isInSILMode) {
+      TC.diagnose(args->getStartLoc(), diag::function_type_no_parens)
+        .highlight(args->getSourceRange())
+        .fixItInsert(args->getStartLoc(), "(")
+      .fixItInsertAfter(args->getEndLoc(), ")");
+    }
     // Don't emit this warning three times when in generics.
     repr->setWarned();
   }
