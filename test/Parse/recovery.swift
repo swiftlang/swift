@@ -405,7 +405,6 @@ struct MissingInitializer1 {
 
 func exprPostfix1(x : Int) {
   x. // expected-error {{expected member name following '.'}}
-    // expected-warning @-1 {{expression of type 'Int' is unused}}
 }
 
 func exprPostfix2() {
@@ -424,7 +423,7 @@ class ExprSuper1 {
 
 class ExprSuper2 {
   init() {
-    super. // expected-error {{expected member name following '.'}} expected-error {{expected '.' or '[' after 'super'}}
+    super. // expected-error {{expected member name following '.'}} 
   }
 }
 
@@ -651,7 +650,6 @@ func postfixDot(a : String) {
   _ = a.   utf8  // expected-error {{extraneous whitespace after '.' is not permitted}} {{9-12=}}
   _ = a.       // expected-error {{expected member name following '.'}}
     a.         // expected-error {{expected member name following '.'}}
-  // expected-warning @-1 {{expression of type 'String' is unused}}
 }
 
 // <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics
@@ -663,4 +661,10 @@ func r23036383(arr : [Int]?) {
   for _ in numbers.filter {$0 > 4} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{12-12=(}} {{35-35=)}}
   }
 }
+
+// <rdar://problem/22290244> QoI: "UIColor." gives two issues, should only give one
+func f() {
+  _ = ClassWithStaticDecls.  // expected-error {{expected member name following '.'}}
+}
+
 

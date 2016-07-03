@@ -1392,7 +1392,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // FIXME: Better recovery.
     if (Result.isNull())
       return Result;
-
+    
     // Check for a .foo suffix.
     SourceLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::period) || consumeIf(tok::period_prefix)) {
@@ -1618,6 +1618,16 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionResult<Expr>();
     }
+    
+    // If we end up with an unknown token on this line, return an ErrorExpr
+    // covering the range of the token.
+    if (!Tok.isAtStartOfLine() && consumeIf(tok::unknown)) {
+      Result = makeParserResult(
+                                new (Context) ErrorExpr(Result.get()->getSourceRange()));
+      continue;
+    }
+    
+    // Otherwise, we don't know what this token is, it must end the expression.
     break;
   }
 
