@@ -53,6 +53,7 @@ TypeNameTests.test("Prints") {
   expectEqual("protocol<main.P, main.P2>",
     _typeName(PP2.self))
   expectEqual("protocol<>", _typeName(Any.self))
+  expectEqual("protocol<main.P, main.P2>", _typeName((P & P2).self))
 
   typealias F = () -> ()
   typealias F2 = () -> () -> ()
@@ -61,7 +62,8 @@ TypeNameTests.test("Prints") {
   expectEqual("(()) -> ()", _typeName(F.self))
   expectEqual("(()) -> (()) -> ()", _typeName(F2.self))
   expectEqual("(((()) -> ())) -> ()", _typeName(F3.self))
-
+  expectEqual("(()) -> ()", _typeName((() -> ()).self))
+  
   #if _runtime(_ObjC)
   typealias B = @convention(block) () -> ()
   typealias B2 = () -> @convention(block) () -> ()

@@ -90,7 +90,7 @@ public struct ExistentialStruct {
 
   public let anyClassBoundProtoComposition2: P1 & CP2
   public let optionalAnyClassBoundProtoComposition2: (P1 & CP2)?
-
+  
   public weak var weakAnyObject: AnyObject?
   public weak var weakAnyClassBoundProto: CP1?
 }

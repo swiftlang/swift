@@ -230,7 +230,7 @@ func test_lambda() {
 
 func test_lambda2() {
   { () -> protocol<Int> in
-    // expected-warning @-1 {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
+    // expected-warning @-1 {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
     // expected-error @-2 {{non-protocol type 'Int' cannot be used within a protocol composition}}
     // expected-warning @-3 {{result of call is unused}}
     return 1

@@ -802,24 +802,6 @@ TypeAliasDecl *ASTContext::getVoidDecl() const {
   return Impl.VoidDecl;
 }
 
-TypeAliasDecl *ASTContext::getAnyDecl() const {
-  if (Impl.VoidDecl) {
-    return Impl.VoidDecl;
-  }
-
-  // Go find 'Void' in the Swift module.
-  SmallVector<ValueDecl *, 1> results;
-  lookupInSwiftModule("Any", results);
-  for (auto result : results) {
-    if (auto typeAlias = dyn_cast<TypeAliasDecl>(result)) {
-      Impl.VoidDecl = typeAlias;
-      return typeAlias;
-    }
-  }
-
-  return Impl.VoidDecl;
-}
-
 StructDecl *ASTContext::getObjCBoolDecl() {
   if (!Impl.ObjCBoolDecl) {
     SmallVector<ValueDecl *, 1> results;

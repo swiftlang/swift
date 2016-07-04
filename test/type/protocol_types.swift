@@ -45,15 +45,16 @@ struct CompoAliasTypeRequirement<T: Compo> {}
 struct CompoTypeWhereRequirement<T where T: HasSelfRequirements & Bar> {}
 struct CompoAliasTypeWhereRequirement<T where T: Compo> {}
 
+struct Struct1<T> { }
 struct Struct2<T : Pub & Bar> { }
 struct Struct3<T : Pub & Bar & P3> { } // expected-error {{use of undeclared type 'P3'}}
 struct Struct4<T where T : Pub & Bar> { }
 
-struct Struct5<T : protocol<Pub, Bar>> { } // expected-warning {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
-struct Struct6<T where T : protocol<Pub, Bar>> { } // expected-warning {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
+struct Struct5<T : protocol<Pub, Bar>> { } // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+struct Struct6<T where T : protocol<Pub, Bar>> { } // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
 
 typealias T1 = Pub & Bar
-typealias T2 = protocol<Pub , Bar> // expected-warning {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
+typealias T2 = protocol<Pub , Bar> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
 
 // rdar://problem/20593294
 protocol HasAssoc {
@@ -88,4 +89,6 @@ func testHasMoreAssoc(_ x: Any) {
   }
 }
 
-
+typealias Any = Int // expected-error {{invalid redeclaration of 'Any'; cannot overload type keyword}}
+typealias X = Struct1<Pub & Bar>
+_ = Struct1<Pub & Bar>.self

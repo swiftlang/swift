@@ -868,13 +868,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   if (!currentFile || currentDC->isLocalContext())
     return;
 
-  // Cannot define a global type called 'Any'
-  if (current->getFullName() == tc.Context.getIdentifier("Any")) {
-    // TODO: Diagnose this as an error; current workaround needs this capability though
-//    tc.diagnose(current, diag::invalid_redecl_any);
-//    return;
+  // Cannot define a type called 'Any'
+  if (current->getFullName() == tc.Context.Id_Any) {
+      tc.diagnose(current, diag::invalid_redecl_any);
+      return;
   }
-
+  
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
   bool isCascading = true;
   if (current->hasAccessibility())

@@ -73,7 +73,7 @@ class Zim<T> {
 
 // Don't crash mangling single-protocol "composition" types.
 // CHECK-LABEL: sil hidden @_TF8mangling27single_protocol_compositionFT1xPS_3Foo__T_
-func single_protocol_composition(x x: protocol<Foo>) {} // expected-warning {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
+func single_protocol_composition(x x: protocol<Foo>) {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
 
 // Clang-imported classes and protocols get mangled into a magic 'So' context
 // to make collisions into link errors. <rdar://problem/14221244>
