@@ -1603,9 +1603,8 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
     }
 
     if (!fnName.equals("arch") && !fnName.equals("os") &&
-        !fnName.equals("_endian") &&
-        !fnName.equals("_runtime") &&
-        !fnName.equals("swift") &&
+        !fnName.equals("_endian") && !fnName.equals("_environment") &&
+        !fnName.equals("_runtime") && !fnName.equals("swift") &&
         !fnName.equals("_compiler_version")) {
       diagnose(CE->getLoc(), diag::unsupported_platform_condition_expression);
       return ConditionalCompilationExprState::error();
@@ -1698,6 +1697,11 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
           if (!LangOptions::isPlatformConditionEndiannessSupported(argument)) {
             diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
                      "endianness", fnName);
+          }
+        } else if (fnName == "_environment") {
+          if (!LangOptions::isPlatformConditionEnvironmentSupported(argument)) {
+            diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
+                     "environment", fnName);
           }
         }
         auto target = Context.LangOpts.getPlatformConditionValue(fnName);
