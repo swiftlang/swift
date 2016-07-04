@@ -50,27 +50,23 @@ static const StringRef SupportedConditionalCompilationEndianness[] = {
   "big"
 };
 
+template <typename Type, size_t N>
+bool contains(const Type (&Array)[N], const Type &V) {
+  return std::find(std::begin(Array), std::end(Array), V) != std::end(Array);
+}
+
 bool LangOptions::isPlatformConditionOSSupported(StringRef OSName) {
-  auto foundIt = std::find(std::begin(SupportedConditionalCompilationOSs),
-                           std::end(SupportedConditionalCompilationOSs),
-                           OSName);
-  return foundIt != std::end(SupportedConditionalCompilationOSs);
+  return contains(SupportedConditionalCompilationOSs, OSName);
 }
 
 bool
 LangOptions::isPlatformConditionArchSupported(StringRef ArchName) {
-  auto foundIt = std::find(std::begin(SupportedConditionalCompilationArches),
-                           std::end(SupportedConditionalCompilationArches),
-                           ArchName);
-  return foundIt != std::end(SupportedConditionalCompilationArches);
+  return contains(SupportedConditionalCompilationArches, ArchName);
 }
 
 bool
 LangOptions::isPlatformConditionEndiannessSupported(StringRef Endianness) {
-  auto foundIt = std::find(std::begin(SupportedConditionalCompilationEndianness),
-                           std::end(SupportedConditionalCompilationEndianness),
-                           Endianness);
-  return foundIt != std::end(SupportedConditionalCompilationEndianness);
+  return contains(SupportedConditionalCompilationEndianness, Endianness);
 }
 
 StringRef
