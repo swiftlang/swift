@@ -1994,10 +1994,8 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
     return DeclaredTyInContext;
 
   auto *decl = const_cast<NominalTypeDecl *>(this);
-  auto Ty = computeNominalType(decl, DeclTypeKind::DeclaredTypeInContext);
-  if (!Ty)
-    Ty = ErrorType::get(getASTContext());
-  decl->DeclaredTyInContext = Ty;
+  decl->DeclaredTyInContext = computeNominalType(decl,
+                                                 DeclTypeKind::DeclaredTypeInContext);
   return DeclaredTyInContext;
 }
 
