@@ -186,13 +186,13 @@ ParserResult<Expr> Parser::parseExprArrow() {
   if (Tok.is(tok::kw_throws)) {
     throwsLoc = consumeToken(tok::kw_throws);
     if (!Tok.is(tok::arrow)) {
-      diagnose(throwsLoc, diag::throws_after_function_result);
+      diagnose(throwsLoc, diag::throws_in_wrong_position);
       return nullptr;
     }
   }
   arrowLoc = consumeToken(tok::arrow);
   if (Tok.is(tok::kw_throws)) {
-    diagnose(Tok.getLoc(), diag::throws_after_function_result);
+    diagnose(Tok.getLoc(), diag::throws_in_wrong_position);
     throwsLoc = consumeToken(tok::kw_throws);
   }
   auto arrow = new (Context) ArrowExpr(throwsLoc, arrowLoc);

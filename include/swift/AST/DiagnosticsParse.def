@@ -604,9 +604,9 @@ ERROR(generic_non_function,PointsToFirstBadToken,
       "only syntactic function types can be generic", ())
 ERROR(rethrowing_function_type,PointsToFirstBadToken,
       "only function declarations may be marked 'rethrows'", ())
-ERROR(throws_after_function_result,none,
+ERROR(throws_in_wrong_position,none,
       "'throws' may only occur before '->'", ())
-ERROR(rethrows_after_function_result,none,
+ERROR(rethrows_in_wrong_position,none,
       "'rethrows' may only occur before '->'", ())
 ERROR(throw_in_function_type,none,
       "expected throwing specifier; did you mean 'throws'?", ())
