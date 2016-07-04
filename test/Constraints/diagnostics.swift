@@ -781,3 +781,44 @@ class SR1594 {
 func secondArgumentNotLabeled(a:Int, _ b: Int) { }
 secondArgumentNotLabeled(10, 20)
 // expected-error@-1 {{unnamed parameter #1 must precede unnamed parameter #0}}
+
+// <rdar://problem/23709100> QoI: incorrect ambiguity error due to implicit conversion
+func testImplConversion(a : Float?) -> Bool {}
+func testImplConversion(a : Int?) -> Bool {
+  let someInt = 42
+  let a : Int = testImplConversion(someInt) // expected-error {{'testImplConversion' produces 'Bool', not the expected contextual result type 'Int'}}
+}
+
+// <rdar://problem/23752537> QoI: Bogus error message: Binary operator '&&' cannot be applied to two 'Bool' operands
+class Foo23752537 {
+  var title: String?
+  var message: String?
+}
+
+extension Foo23752537 {
+  func isEquivalent(other: Foo23752537) {
+    // expected-error @+1 {{'&&' produces 'Bool', not the expected contextual result type '()'}}
+    return (self.title != other.title && self.message != other.message)
+  }
+}
+
+
+// <rdar://problem/22276040> QoI: not great error message with "withUnsafePointer" sametype constraints
+func read2(_ p: UnsafeMutablePointer<Void>, maxLength: Int) {}
+func read<T : Integer>() -> T? {
+  var buffer : T 
+  let n = withUnsafePointer(&buffer) { (p) in
+    read2(UnsafePointer(p), maxLength: sizeof(T)) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
+  }
+}
+
+func f23213302() {
+  var s = Set<Int>()
+  s.subtractInPlace(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Set<Int>'}}
+}
+
+// <rdar://problem/24202058> QoI: Return of call to overloaded function in void-return context
+func rdar24202058(a : Int) {
+  return a <= 480 // expected-error {{'<=' produces 'Bool', not the expected contextual result type '()'}}
+}
+
