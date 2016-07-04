@@ -189,6 +189,10 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
 <decl:Var>var <loc>FOO_MACRO_5</loc>: <ref:Struct>UInt64</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_6</loc>: <ref:TypeAlias>typedef_int_t</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_7</loc>: <ref:TypeAlias>typedef_int_t</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_8</loc>: <ref:Struct>Int8</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_9</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_10</loc>: <ref:Struct>Int16</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_11</loc>: <ref:Struct>Int</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_OR</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_AND</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_REDEF_1</loc>: <ref:Struct>Int32</ref> { get }</decl>
