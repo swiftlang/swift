@@ -2412,24 +2412,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       ctor->setInterfaceType(interfaceType);
     }
 
-    // Set the initializer type of the constructor.
-    auto allocType = ctor->getType();
-    auto selfTy = ctor->computeSelfType();
-    if (auto polyFn = allocType->getAs<PolymorphicFunctionType>()) {
-      ctor->setInitializerType(
-        PolymorphicFunctionType::get(selfTy, polyFn->getResult(),
-                                     &polyFn->getGenericParams(),
-                                     polyFn->getExtInfo()));
-    } else {
-      auto fn = allocType->castTo<FunctionType>();
-      ctor->setInitializerType(FunctionType::get(selfTy,
-                                                 fn->getResult(),
-                                                 fn->getExtInfo()));
-    }
-
     // Set the initializer interface type of the constructor.
-    allocType = ctor->getInterfaceType();
-    selfTy = ctor->computeInterfaceSelfType(/*isInitializingCtor=*/true);
+    auto allocType = ctor->getInterfaceType();
+    auto selfTy = ctor->computeInterfaceSelfType(/*isInitializingCtor=*/true);
     if (auto polyFn = allocType->getAs<GenericFunctionType>()) {
       ctor->setInitializerInterfaceType(
               GenericFunctionType::get(polyFn->getGenericSignature(),

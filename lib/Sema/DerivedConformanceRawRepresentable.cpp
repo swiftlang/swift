@@ -305,16 +305,11 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   Type selfMetatype = MetatypeType::get(selfType->getInOutObjectType());
   
   Type allocType;
-  Type initType;
-  if (genericParams) {
+  if (genericParams)
     allocType = PolymorphicFunctionType::get(selfMetatype, type, genericParams);
-    initType = PolymorphicFunctionType::get(selfType, type, genericParams);
-  } else {
+  else
     allocType = FunctionType::get(selfMetatype, type);
-    initType = FunctionType::get(selfType, type);
-  }
   initDecl->setType(allocType);
-  initDecl->setInitializerType(initType);
 
   // Compute the interface type of the initializer.
   Type retInterfaceType

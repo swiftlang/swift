@@ -562,6 +562,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
   if (invalid) {
     func->overwriteType(ErrorType::get(Context));
+    func->setInterfaceType(ErrorType::get(Context));
     return true;
   }
 

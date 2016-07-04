@@ -5508,9 +5508,6 @@ class ConstructorDecl : public AbstractFunctionDecl {
 
   ParameterList *ParameterLists[2];
 
-  /// The type of the initializing constructor.
-  Type InitializerType;
-
   /// The interface type of the initializing constructor.
   Type InitializerInterfaceType;
 
@@ -5541,10 +5538,6 @@ public:
 
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
-
-  /// Get the type of the initializing constructor.
-  Type getInitializerType() const { return InitializerType; }
-  void setInitializerType(Type t) { InitializerType = t; }
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();

@@ -373,7 +373,8 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto allocFnTy = FunctionType::get(metaTy, fnTy);
   auto initFnTy = FunctionType::get(enumTy, fnTy);
   ctorDecl->setType(allocFnTy);
-  ctorDecl->setInitializerType(initFnTy);
+  ctorDecl->setInterfaceType(allocFnTy);
+  ctorDecl->setInitializerInterfaceType(initFnTy);
 
   // Don't bother synthesizing the body if we've already finished type-checking.
   if (Impl.hasFinishedTypeChecking())
@@ -428,8 +429,13 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      /*GenericParams=*/nullptr, params, Type(),
                      TypeLoc::withoutLoc(enumDecl->getRawType()), enumDecl);
   getterDecl->setImplicit();
-  getterDecl->setType(ParameterList::getFullInterfaceType(enumDecl->getRawType(),
-                                                          params, enumDecl));
+
+  auto type = ParameterList::getFullInterfaceType(enumDecl->getRawType(),
+                                                  params, enumDecl);
+
+  getterDecl->setType(type);
+  getterDecl->setInterfaceType(type);
+
   getterDecl->setBodyResultType(enumDecl->getRawType());
   getterDecl->setAccessibility(Accessibility::Public);
 
@@ -488,8 +494,13 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
                      params, Type(),
                      TypeLoc::withoutLoc(computedType), structDecl);
   getterDecl->setImplicit();
-  getterDecl->setType(ParameterList::getFullInterfaceType(computedType, params,
-                                                          structDecl));
+
+  auto type = ParameterList::getFullInterfaceType(computedType, params,
+                                                  structDecl);
+
+  getterDecl->setType(type);
+  getterDecl->setInterfaceType(type);
+
   getterDecl->setBodyResultType(computedType);
   getterDecl->setAccessibility(Accessibility::Public);
 
@@ -535,8 +546,12 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      /*GenericParams=*/nullptr, params, Type(),
                      TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
   getterDecl->setAccessibility(Accessibility::Public);
-  getterDecl->setType(ParameterList::getFullInterfaceType(getterType, params,
-                                                          importedDecl));
+
+  auto type = ParameterList::getFullInterfaceType(getterType, params,
+                                                  importedDecl);
+  getterDecl->setType(type);
+  getterDecl->setInterfaceType(type);
+
   getterDecl->setBodyResultType(getterType);
 
   return getterDecl;
@@ -569,8 +584,11 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      /*GenericParams=*/nullptr, params, Type(),
                      TypeLoc::withoutLoc(voidTy), importedDecl, clangNode);
 
-  setterDecl->setType(ParameterList::getFullInterfaceType(voidTy, params,
-                                                          importedDecl));
+  auto type = ParameterList::getFullInterfaceType(voidTy, params,
+                                                  importedDecl);
+  setterDecl->setType(type);
+  setterDecl->setInterfaceType(type);
+
   setterDecl->setBodyResultType(voidTy);
   setterDecl->setAccessibility(Accessibility::Public);
   setterDecl->setMutating();
@@ -961,6 +979,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params, toStringTy,
                      TypeLoc::withoutLoc(stringTy), swiftDecl);
+  getterDecl->setInterfaceType(toStringTy);
 
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
@@ -1693,7 +1712,8 @@ namespace {
       auto allocFnTy = FunctionType::get(selfMetatype, fnTy);
       auto initFnTy = FunctionType::get(selfType, fnTy);
       constructor->setType(allocFnTy);
-      constructor->setInitializerType(initFnTy);
+      constructor->setInterfaceType(allocFnTy);
+      constructor->setInitializerInterfaceType(initFnTy);
       
       constructor->setAccessibility(Accessibility::Public);
 
@@ -1949,7 +1969,8 @@ namespace {
       auto allocFnTy = FunctionType::get(selfMetatype, fnTy);
       auto initFnTy = FunctionType::get(selfType, fnTy);
       constructor->setType(allocFnTy);
-      constructor->setInitializerType(initFnTy);
+      constructor->setInterfaceType(allocFnTy);
+      constructor->setInitializerInterfaceType(initFnTy);
       
       constructor->setAccessibility(Accessibility::Public);
 
@@ -2885,9 +2906,12 @@ namespace {
       Type argType = parameterList->getType(Impl.SwiftContext);
       Type fnType = FunctionType::get(argType, resultType);
       Type selfType = selfParam->getType();
-      result->setInitializerType(FunctionType::get(selfType, fnType));
+      Type initType = FunctionType::get(selfType, fnType);
+      result->setInitializerInterfaceType(initType);
       Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
-      result->setType(FunctionType::get(selfMetaType, fnType));
+      Type allocType = FunctionType::get(selfMetaType, fnType);
+      result->setType(allocType);
+      result->setInterfaceType(allocType);
 
       finishFuncDecl(decl, result);
       return result;
@@ -2951,16 +2975,12 @@ namespace {
                          /*GenericParams=*/nullptr, bodyParams, Type(),
                          TypeLoc::withoutLoc(swiftResultTy), dc, decl);
 
-      if (auto proto = dc->getAsProtocolOrProtocolExtensionContext()) {
-        Type interfaceType;
-        std::tie(fnType, interfaceType) =
-            getGenericMethodType(proto, fnType->castTo<AnyFunctionType>());
-        result->setType(fnType);
-        result->setInterfaceType(interfaceType);
-        result->setGenericSignature(proto->getGenericSignature());
-      } else {
-        result->setType(fnType);
-      }
+      Type interfaceType;
+      std::tie(fnType, interfaceType) =
+          getGenericMethodType(dc, fnType->castTo<AnyFunctionType>());
+      result->setType(fnType);
+      result->setInterfaceType(interfaceType);
+      result->setGenericSignature(dc->getGenericSignatureOfContext());
 
       result->setBodyResultType(swiftResultTy);
       result->setAccessibility(Accessibility::Public);
@@ -3250,6 +3270,7 @@ namespace {
           /*GenericParams=*/nullptr, bodyParams, type,
           TypeLoc::withoutLoc(resultTy), dc, decl);
 
+      result->setInterfaceType(type);
       result->setBodyResultType(resultTy);
 
       result->setAccessibility(Accessibility::Public);
@@ -3734,10 +3755,8 @@ namespace {
       // Add the 'self' parameter to the function type.
       type = FunctionType::get(selfInterfaceType, type);
 
-      if (dc->isGenericContext()) {
-        std::tie(type, interfaceType)
-          = getGenericMethodType(dc, type->castTo<AnyFunctionType>());
-      }
+      std::tie(type, interfaceType)
+        = getGenericMethodType(dc, type->castTo<AnyFunctionType>());
 
       result->setBodyResultType(resultTy);
       result->setType(type);
@@ -4207,21 +4226,18 @@ namespace {
       addObjCAttribute(result, selector);
 
       // Calculate the function type of the result.
-      if (dc->isGenericContext()) {
-        Type interfaceAllocType;
-        Type interfaceInitType;
-        std::tie(allocType, interfaceAllocType)
-          = getGenericMethodType(dc, allocType->castTo<AnyFunctionType>());
-        std::tie(initType, interfaceInitType)
-          = getGenericMethodType(dc, initType->castTo<AnyFunctionType>());
+      Type interfaceAllocType;
+      Type interfaceInitType;
+      std::tie(allocType, interfaceAllocType)
+        = getGenericMethodType(dc, allocType->castTo<AnyFunctionType>());
+      std::tie(initType, interfaceInitType)
+        = getGenericMethodType(dc, initType->castTo<AnyFunctionType>());
 
-        result->setInitializerInterfaceType(interfaceInitType);
-        result->setInterfaceType(interfaceAllocType);
-        result->setGenericSignature(dc->getGenericSignatureOfContext());
-      }
+      result->setInitializerInterfaceType(interfaceInitType);
+      result->setInterfaceType(interfaceAllocType);
+      result->setGenericSignature(dc->getGenericSignatureOfContext());
 
       result->setType(allocType);
-      result->setInitializerType(initType);
 
       if (implicit)
         result->setImplicit();
@@ -4305,6 +4321,10 @@ namespace {
                                                AnyFunctionType *fnType) {
       assert(!fnType->hasArchetype());
 
+      auto *sig = dc->getGenericSignatureOfContext();
+      if (!sig)
+        return { fnType, fnType };
+
       Type inputType = ArchetypeBuilder::mapTypeIntoContext(
           dc, fnType->getInput());
       Type resultType = ArchetypeBuilder::mapTypeIntoContext(
@@ -4313,7 +4333,7 @@ namespace {
                                                dc->getGenericParamsOfContext());
 
       Type interfaceType = GenericFunctionType::get(
-          dc->getGenericSignatureOfContext(),
+          sig,
           fnType->getInput(), fnType->getResult(),
           AnyFunctionType::ExtInfo());
 
@@ -4338,10 +4358,8 @@ namespace {
           ParameterList::getFullInterfaceType(elementTy, getterArgs, dc);
 
       Type interfaceType;
-      if (dc->isGenericContext()) {
-        std::tie(getterType, interfaceType)
-          = getGenericMethodType(dc, getterType->castTo<AnyFunctionType>());
-      }
+      std::tie(getterType, interfaceType)
+        = getGenericMethodType(dc, getterType->castTo<AnyFunctionType>());
 
       // Create the getter thunk.
       FuncDecl *thunk = FuncDecl::create(
@@ -4409,10 +4427,8 @@ namespace {
                                               dc);
 
       Type interfaceType;
-      if (dc->isGenericContext()) {
-        std::tie(setterType, interfaceType)
-          = getGenericMethodType(dc, setterType->castTo<AnyFunctionType>());
-      }
+      std::tie(setterType, interfaceType)
+        = getGenericMethodType(dc, setterType->castTo<AnyFunctionType>());
 
       // Create the setter thunk.
       FuncDecl *thunk = FuncDecl::create(
@@ -4769,8 +4785,12 @@ namespace {
       subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
                               SourceLoc());
       auto indicesType = bodyParams->getType(C);
-      
-      subscript->setType(FunctionType::get(indicesType, elementTy)); // TODO: no good when generics are around
+
+      // TODO: no good when generics are around
+      auto fnType = FunctionType::get(indicesType, elementTy);
+      subscript->setType(fnType);
+      subscript->setInterfaceType(fnType);
+
       addObjCAttribute(subscript, None);
 
       // Optional subscripts in protocols.
@@ -6898,6 +6918,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                      /*GenericParams=*/nullptr, getterArgs,
                      getterType, TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
+  func->setInterfaceType(getterType);
   func->setBodyResultType(type);
   func->setAccessibility(Accessibility::Public);
 
