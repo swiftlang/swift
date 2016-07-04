@@ -7,8 +7,10 @@ protocol SomeProtocol {
   func static_method()
 }
 
-protocol Any {}
-struct SomeStruct : Any {}
+
+protocol A {}
+struct SomeStruct : A {}
+
 
 class SomeClass : SomeProtocol {
   func method() {}

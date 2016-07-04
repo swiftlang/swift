@@ -3,6 +3,20 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md):
+The `protocol<...>` composition construct has been removed. In its place, an infix type operator `&` has been introduced.
+
+```swift
+let a: Foo & Bar
+let b = value as? A & B & C
+func foo<T : Foo & Bar>(x: T) { … }
+func bar(x: Foo & Bar) { … }
+typealias G = GenericStruct<Foo & Bar>
+```
+
+The empty protocol composition, the `Any` type, was previously defined as being `protocol<>`. This has been removed from the standard library and `Any` is now a keyword with the same behaviour.
+
+
 * [SE-0099](https://github.com/apple/swift-evolution/blob/master/proposals/0099-conditionclauses.md):
   Condition clauses in `if`, `guard`, and `while` statements now use a more
   regular syntax. Each pattern or optional binding must be prefixed with `case`
@@ -65,6 +79,7 @@ Swift 3.0
 
   Similarly, the new `RecoverableError` and `CustomNSError` protocols
   allow additional control over the handling of the error.
+
 
 * [SE-0060](https://github.com/apple/swift-evolution/blob/master/proposals/0060-defaulted-parameter-order.md):
   Function parameters with default arguments must now be specified in

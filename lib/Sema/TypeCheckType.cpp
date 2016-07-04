@@ -824,7 +824,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     
     // if it is an 'Any' type, return the unbounded composition type
   } else if (comp->getIdentifier() == TC.Context.Id_Any) {
-    return ProtocolCompositionType::get(TC.Context, ArrayRef<Type>());
+    return TC.Context.TheAnyType;
   }
 
   // Resolve the first component, which is the only one that requires

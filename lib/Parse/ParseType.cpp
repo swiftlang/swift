@@ -419,8 +419,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
     // Check for empty protocol composition.
     if (startsWithGreater(Tok)) {
       SourceLoc RAngleLoc = consumeStartingGreater();
-      
-      auto AnyRange = SourceRange(LAngleLoc, RAngleLoc);
+      auto AnyRange = SourceRange(ProtocolLoc, RAngleLoc);
       
       // warn that 'protocol<>' is depreacted and offer to
       // repalace with the 'Any' keyword
@@ -470,10 +469,9 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
 
     Diag.highlight({ProtocolLoc, RAngleLoc});
     for (auto Comma : Commas)          // remove commas and '<'
-      Diag.fixItReplace(Comma, " & ");
-    Diag // remove 'protocol<'
-      .fixItRemove(ProtocolLoc)
-      .fixItRemove(LAngleLoc)
+      Diag.fixItReplace(Comma, " &");
+    Diag
+      .fixItRemove({ProtocolLoc, LAngleLoc}) // remove 'protocol<'
       .fixItRemove(RAngleLoc); // remove '>'
 
     return makeParserResult(Status, composition);
@@ -501,7 +499,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
         Protocols.push_back(Protocol.get());
     };
     
-    return makeParserResult(Status, ProtocolCompositionTypeRepr::create(Context, Protocols, FirstTypeLoc, {FirstTypeLoc, Tok.getLoc()}));
+    return makeParserResult(Status, ProtocolCompositionTypeRepr::create(Context, Protocols, FirstTypeLoc, {FirstTypeLoc, PreviousLoc}));
   }
 }
 

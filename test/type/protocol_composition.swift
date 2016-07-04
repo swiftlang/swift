@@ -112,7 +112,7 @@ func testConversion() {
   accept_manyPrintable(sp)
 
   // Conversions among existential types.
-  var x2 : protocol<SuperREPLPrintable, FooProtocol> // expected-warning {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
+  var x2 : protocol<SuperREPLPrintable, FooProtocol> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
   x2 = x // expected-error{{value of type 'protocol<FooProtocol, REPLPrintable>' does not conform to 'protocol<FooProtocol, SuperREPLPrintable>' in assignment}}
   x = x2
 
@@ -120,11 +120,14 @@ func testConversion() {
   var _ : () -> FooProtocol & SuperREPLPrintable = return_superPrintable
 
   // FIXME: closures make ABI conversions explicit. rdar://problem/19517003
-  var _ : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable() } // expected-warning {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
+  var _ : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable() } // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
 }
 
 // Test the parser's splitting of >= into > and =.
-var x : protocol<P5>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated; use infix '&' instead}}
+var x : protocol<P5>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+
+typealias A = protocol<> // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}} {{15-25=Any}}
+typealias B = protocol<P1, P2> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{15-24=}} {{26-27= &}} {{30-31=}}
 
 
 

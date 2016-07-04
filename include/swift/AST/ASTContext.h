@@ -443,8 +443,6 @@ public:
   /// Retrieve the declaration of Swift.Void.
   TypeAliasDecl *getVoidDecl() const;
 
-  TypeAliasDecl *getAnyDecl() const;
-
   /// Retrieve the declaration of ObjectiveC.ObjCBool.
   StructDecl *getObjCBoolDecl();
 

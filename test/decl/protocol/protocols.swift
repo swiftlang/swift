@@ -39,7 +39,6 @@ func test1() {
 protocol Bogus : Int {} // expected-error{{inheritance from non-protocol type 'Int'}}
 
 // Explicit conformance checks (successful).
-protocol Any { }
 
 protocol CustomStringConvertible { func print() } // expected-note{{protocol requires function 'print()' with type '() -> ()'}} expected-note{{protocol requires}} expected-note{{protocol requires}} expected-note{{protocol requires}}
 

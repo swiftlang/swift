@@ -98,8 +98,6 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 // Standard protocols
 //===----------------------------------------------------------------------===//
 
-public typealias Any = protocol<>
-
 #if _runtime(_ObjC)
 /// The protocol to which all classes implicitly conform.
 ///
