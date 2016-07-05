@@ -12,7 +12,7 @@ func _Arrays<T>(e: T) {
   // _ = ContiguousArray(count: 1, repeatedValue: e) // xpected-error {{Please use init(repeating:count:) instead}} {{none}}
   // _ = ArraySlice(count: 1, repeatedValue: e) // xpected-error {{Please use init(repeating:count:) instead}} {{none}}
   // _ = Array(count: 1, repeatedValue: e) // xpected-error {{Please use init(repeating:count:) instead}} {{none}}
-  // The acutall error is: {{argument 'repeatedValue' must precede argument 'count'}}
+  // The actual error is: {{argument 'repeatedValue' must precede argument 'count'}}
 
   var a = ContiguousArray<T>()
   _ = a.removeAtIndex(0) // expected-error {{'removeAtIndex' has been renamed to 'remove(at:)'}} {{9-22=remove}} {{23-23=at: }} {{none}}
