@@ -1302,6 +1302,35 @@ IRGenDebugInfo::createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
   return DITy;
 }
 
+llvm::DIType *IRGenDebugInfo::createTuple(DebugTypeInfo DbgTy,
+                                          llvm::DIScope *Scope,
+                                          unsigned SizeInBits,
+                                          unsigned AlignInBits, unsigned Flags,
+                                          StringRef MangledName) {
+  TypeBase *BaseTy = DbgTy.getType();
+  auto *TupleTy = BaseTy->castTo<TupleType>();
+  auto FwdDecl = llvm::TempDINode(DBuilder.createReplaceableCompositeType(
+      llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, MainFile, 0,
+      llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags, MangledName));
+
+  DITypeCache[DbgTy.getType()] = llvm::TrackingMDNodeRef(FwdDecl.get());
+
+  unsigned RealSize;
+  auto Elements = getTupleElements(TupleTy, Scope, MainFile, Flags,
+                                   DbgTy.getDeclContext(), RealSize);
+  // FIXME: Handle %swift.opaque members and make this into an assertion.
+  if (!RealSize)
+    RealSize = SizeInBits;
+
+  auto DITy = DBuilder.createStructType(
+      Scope, MangledName, MainFile, 0, RealSize, AlignInBits, Flags,
+      nullptr, // DerivedFrom
+      Elements, llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+
+  DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+  return DITy;
+}
+
 llvm::DIType *
 IRGenDebugInfo::createOpaqueStruct(llvm::DIScope *Scope, StringRef Name,
                                    llvm::DIFile *File, unsigned Line,
@@ -1514,29 +1543,13 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::Tuple: {
-    auto *TupleTy = BaseTy->castTo<TupleType>();
     // Tuples are also represented as structs.
-    auto FwdDecl = llvm::TempDINode(
-      DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, 0,
-          llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
-          MangledName));
-
-    DITypeCache[DbgTy.getType()] = llvm::TrackingMDNodeRef(FwdDecl.get());
-
-    unsigned RealSize;
-    auto Elements = getTupleElements(TupleTy, Scope, MainFile, Flags,
-                                     DbgTy.getDeclContext(), RealSize);
-    // FIXME: Handle %swift.opaque members and make this into an assertion.
-    if (!RealSize)
-      RealSize = SizeInBits;
-    auto DITy = DBuilder.createStructType(
-        Scope, MangledName, File, 0, RealSize, AlignInBits, Flags,
-        nullptr, // DerivedFrom
-        Elements, llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
-
-    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
-    return DITy;
+    if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes)
+      return createTuple(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
+                         MangledName);
+    else
+      return createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
+                                AlignInBits, Flags, MangledName);
   }
 
   case TypeKind::InOut: {

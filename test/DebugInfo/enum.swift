@@ -78,11 +78,10 @@ public enum Tuple<P> {
 
 func bar<T>(_ x : Tuple<T>) -> Tuple<T> { return x }
 
-// CHECK: ![[LIST:.*]] = !DICompositeType({{.*}}identifier: "_TtGO4enum4ListQq_S0__"
+// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+5]], type: ![[LIST:.*]], flags: DIFlagArtificial)
+// CHECK: ![[LIST]] = !DICompositeType({{.*}}identifier: "_TtGO4enum4ListQq_S0__"
 public enum List<T> {
        indirect case Tail(List, T)
        case End
-
-// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+1]], type: ![[LIST]], flags: DIFlagArtificial)
        func fooMyList() {}
 }
