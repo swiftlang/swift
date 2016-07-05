@@ -190,6 +190,10 @@ typedef int typedef_int_t;
 #define FOO_MACRO_5 0xffffffffffffffffull
 #define FOO_MACRO_6 ((typedef_int_t) 42)
 #define FOO_MACRO_7 ((typedef_int_t) -1)
+#define FOO_MACRO_8 ((char) 8)
+#define FOO_MACRO_9 ((int) 9)
+#define FOO_MACRO_10 ((short) 10)
+#define FOO_MACRO_11 ((long) 11)
 #define FOO_MACRO_OR (FOO_MACRO_2 | FOO_MACRO_6)
 #define FOO_MACRO_AND (FOO_MACRO_2 & FOO_MACRO_6)
 #define FOO_MACRO_BITWIDTH (FOO_MACRO_4 & FOO_MACRO_5)
