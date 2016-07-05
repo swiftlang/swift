@@ -90,9 +90,16 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   autoreleasepool {
+    let underlyingError = NSCocoaError(.fileLockingError)
+      as ErrorProtocol as NSError
     let ns = NSError(domain: NSCocoaErrorDomain,
                      code: NSFileNoSuchFileError,
-                     userInfo: nil)
+                     userInfo: [
+                       NSFilePathErrorKey : "/dev/null",
+                       NSStringEncodingErrorKey: /*ASCII=*/1,
+                       NSUnderlyingErrorKey: underlyingError,
+                       NSURLErrorKey: URL(string: "https://swift.org")!
+                     ])
 
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
@@ -104,16 +111,15 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     case let x as NSCocoaError:
       cocoaCode = x._code
       expectTrue(x.isFileError)
-      expectEqual(x, NSCocoaError.fileNoSuchFileError)
-      expectEqual(x.hashValue, NSFileNoSuchFileError)
+      expectEqual(x.code, NSCocoaError.fileNoSuchFileError)
     default:
       cocoaCode = nil
     }
 
-    expectEqual(cocoaCode, NSFileNoSuchFileError)
+    expectEqual(NSFileNoSuchFileError, cocoaCode)
 
     let cocoaCode2: Int? = (ns as? NSCocoaError)?._code
-    expectEqual(cocoaCode2, NSFileNoSuchFileError)
+    expectEqual(NSFileNoSuchFileError, cocoaCode2)
 
     let isNoSuchFileError: Bool
     switch e {
@@ -124,6 +130,13 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     }
 
     expectTrue(isNoSuchFileError)
+
+    // Check the contents of the error.
+    let cocoaError = e as! NSCocoaError
+    expectOptionalEqual("/dev/null", cocoaError.filePath)
+    expectOptionalEqual(String.Encoding.ascii, cocoaError.stringEncoding)
+    expectOptionalEqual(underlyingError, cocoaError.underlying)
+    expectOptionalEqual(URL(string: "https://swift.org")!, cocoaError.url)
 
     // NSURLError domain
     let nsURL = NSError(domain: NSURLErrorDomain,
