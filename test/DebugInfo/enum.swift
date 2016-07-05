@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -gdwarf-types -o - | FileCheck %s --check-prefix=DWARF
 
 // CHECK: ![[EMPTY:.*]] = !{}
 
@@ -62,8 +63,7 @@ public func foo(_ empty : Nothing) { }
 // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum4Rosex_")
 enum Rose<A> {
 	case MkRose(() -> A, () -> [Rose<A>])
-  // CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS]],
-  // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum4RoseQq_S0__")
+  // DWARF: !DICompositeType({{.*}}name: "Rose",{{.*}}identifier: "_TtGO4enum4RoseQq_S0__")
 	case IORose(() -> Rose<A>)
 }
 
@@ -72,8 +72,7 @@ func foo<T>(_ x : Rose<T>) -> Rose<T> { return x }
 // CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
 // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5Tuplex_")
 public enum Tuple<P> {
-  // CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS]],
-  // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5TupleQq_S0__")
+  // DWARF: !DICompositeType({{.*}}name: "Tuple",{{.*}}identifier: "_TtGO4enum5TupleQq_S0__")
 	case C(P, () -> Tuple)
 }
 

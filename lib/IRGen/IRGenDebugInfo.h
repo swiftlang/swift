@@ -318,6 +318,12 @@ private:
   llvm::DIType *createDoublePointerSizedStruct(
       llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
       llvm::DIFile *File, unsigned Line, unsigned Flags, StringRef MangledName);
+
+  /// Create DWARF debug info for a function pointer type.
+  llvm::DIType *createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
+                                      unsigned SizeInBits, unsigned AlignInBits,
+                                      unsigned Flags, StringRef MangledName);
+
   /// Create an opaque struct with a mangled name.
   llvm::DIType *createOpaqueStruct(llvm::DIScope *Scope, StringRef Name,
                                    llvm::DIFile *File, unsigned Line,

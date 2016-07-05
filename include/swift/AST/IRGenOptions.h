@@ -50,7 +50,7 @@ enum class IRGenDebugInfoKind : unsigned {
   LineTables, /// Line tables only.
   ASTTypes,   /// Line tables + AST type references.
   DwarfTypes, /// Line tables + AST type references + DWARF types.
-  Normal = DwarfTypes /// The setting LLDB prefers.
+  Normal = ASTTypes /// The setting LLDB prefers.
 };
 
 enum class IRGenEmbedMode : unsigned {

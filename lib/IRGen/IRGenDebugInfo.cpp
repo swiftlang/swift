@@ -1254,6 +1254,55 @@ llvm::DIType *IRGenDebugInfo::createDoublePointerSizedStruct(
 }
 
 llvm::DIType *
+IRGenDebugInfo::createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
+                                      unsigned SizeInBits, unsigned AlignInBits,
+                                      unsigned Flags, StringRef MangledName) {
+  auto FwdDecl = llvm::TempDINode(DBuilder.createReplaceableCompositeType(
+      llvm::dwarf::DW_TAG_subroutine_type, MangledName, Scope, MainFile, 0,
+      llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags, MangledName));
+
+  auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
+  DITypeCache[DbgTy.getType()] = TH;
+
+  CanSILFunctionType FunTy;
+  TypeBase *BaseTy = DbgTy.getType();
+  if (auto *SILFnTy = dyn_cast<SILFunctionType>(BaseTy))
+    FunTy = CanSILFunctionType(SILFnTy);
+  // FIXME: Handling of generic parameters in SIL type lowering is in flux.
+  // DebugInfo doesn't appear to care about the generic context, so just
+  // throw it away before lowering.
+  else if (isa<GenericFunctionType>(BaseTy) ||
+           isa<PolymorphicFunctionType>(BaseTy)) {
+    auto *fTy = cast<AnyFunctionType>(BaseTy);
+    auto *nongenericTy =
+        FunctionType::get(fTy->getInput(), fTy->getResult(), fTy->getExtInfo());
+
+    FunTy = IGM.getLoweredType(nongenericTy).castTo<SILFunctionType>();
+  } else
+    FunTy = IGM.getLoweredType(BaseTy).castTo<SILFunctionType>();
+  auto Params = createParameterTypes(FunTy, DbgTy.getDeclContext());
+
+  auto FnTy = DBuilder.createSubroutineType(Params, Flags);
+  llvm::DIType *DITy;
+  if (FunTy->getRepresentation() == SILFunctionType::Representation::Thick) {
+    if (SizeInBits == 2 * CI.getTargetInfo().getPointerWidth(0))
+      // This is a FunctionPairTy: { i8*, %swift.refcounted* }.
+      DITy = createDoublePointerSizedStruct(Scope, MangledName, FnTy, MainFile,
+                                            0, Flags, MangledName);
+    else
+      // This is a generic function as noted above.
+      DITy = createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
+                                AlignInBits, Flags, MangledName);
+  } else {
+    assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+    DITy = createPointerSizedStruct(Scope, MangledName, FnTy, MainFile, 0,
+                                    Flags, MangledName);
+  }
+  DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+  return DITy;
+}
+
+llvm::DIType *
 IRGenDebugInfo::createOpaqueStruct(llvm::DIScope *Scope, StringRef Name,
                                    llvm::DIFile *File, unsigned Line,
                                    unsigned SizeInBits, unsigned AlignInBits,
@@ -1545,51 +1594,13 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::SILFunction:
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
-  case TypeKind::GenericFunction: {
-    auto FwdDecl = llvm::TempDINode(DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_subroutine_type, MangledName, Scope, File, 0,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
-        MangledName));
-
-    auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
-    DITypeCache[DbgTy.getType()] = TH;
-
-    CanSILFunctionType FunTy;
-    if (auto *SILFnTy = dyn_cast<SILFunctionType>(BaseTy))
-      FunTy = CanSILFunctionType(SILFnTy);
-    // FIXME: Handling of generic parameters in SIL type lowering is in flux.
-    // DebugInfo doesn't appear to care about the generic context, so just
-    // throw it away before lowering.
-    else if (isa<GenericFunctionType>(BaseTy) ||
-             isa<PolymorphicFunctionType>(BaseTy)) {
-      auto *fTy = cast<AnyFunctionType>(BaseTy);
-      auto *nongenericTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
-                                             fTy->getExtInfo());
-
-      FunTy = IGM.getLoweredType(nongenericTy).castTo<SILFunctionType>();
-    } else
-      FunTy =
-          IGM.getLoweredType(BaseTy).castTo<SILFunctionType>();
-    auto Params = createParameterTypes(FunTy, DbgTy.getDeclContext());
-
-    auto FnTy = DBuilder.createSubroutineType(Params, Flags);
-    llvm::DIType *DITy;
-    if (FunTy->getRepresentation() == SILFunctionType::Representation::Thick) {
-      if (SizeInBits == 2 * CI.getTargetInfo().getPointerWidth(0))
-        // This is a FunctionPairTy: { i8*, %swift.refcounted* }.
-        DITy = createDoublePointerSizedStruct(Scope, MangledName, FnTy,
-                                              MainFile, 0, Flags, MangledName);
-      else
-        // This is a generic function as noted above.
-        DITy = createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
-                                  AlignInBits, Flags, MangledName);
-    } else {
-      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
-      DITy = createPointerSizedStruct(Scope, MangledName, FnTy, MainFile, 0,
-                                      Flags, MangledName);
-    }
-    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
-    return DITy;
+ case TypeKind::GenericFunction: {
+    if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes)
+      return createFunctionPointer(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
+                                   MangledName);
+    else
+      return createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
+                                AlignInBits, Flags, MangledName);
   }
 
   case TypeKind::Enum: {
