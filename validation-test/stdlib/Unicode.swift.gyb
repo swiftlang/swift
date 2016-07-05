@@ -88,25 +88,6 @@ UTF16APIs.test("trailSurrogate/trap/U+FFFF") {
   _ = UTF16.trailSurrogate(us)
 }
 
-class EOFCountingIterator<T> : IteratorProtocol {
-  var array: [T]
-  var index: Int = 0
-  var numTimesReturnedEOF: Int = 0
-
-  init(_ array: [T]) {
-    self.array = array
-  }
-
-  func next() -> T? {
-    if index == array.count {
-      numTimesReturnedEOF += 1
-      return .none
-    }
-    index += 1
-    return array[index - 1]
-  }
-}
-
 func checkDecodeUTF<Codec : UnicodeCodec>(
     _ codec: Codec.Type, _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
@@ -114,14 +95,13 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
   do {
     var decoded = [UInt32]()
     let output: (UInt32) -> Void = { decoded.append($0) }
-    let iterator = EOFCountingIterator(utfStr)
+    let iterator = utfStr.makeIterator()
     transcode(
       iterator,
       from: codec,
       to: UTF32.self,
       stoppingOnError: true,
       sendingOutputTo: output)
-    expectGE(1, iterator.numTimesReturnedEOF)
     if expectedHead != decoded {
       return assertionFailure()
           .withDescription("\n")
@@ -136,14 +116,13 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
 
     var decoded = [UInt32]()
     let output: (UInt32) -> Void = { decoded.append($0) }
-    let iterator = EOFCountingIterator(utfStr)
+    let iterator = utfStr.makeIterator()
     transcode(
       iterator,
       from: codec,
       to: UTF32.self,
       stoppingOnError: false,
       sendingOutputTo: output)
-    expectEqual(1, iterator.numTimesReturnedEOF)
     if expected != decoded {
       return assertionFailure()
           .withDescription("\n")
@@ -182,7 +161,7 @@ func checkEncodeUTF8(_ expected: [UInt8],
                      _ scalars: [UInt32]) -> AssertionResult {
   var encoded = [UInt8]()
   let output: (UInt8) -> Void = { encoded.append($0) }
-  let iterator = EOFCountingIterator(scalars)
+  let iterator = scalars.makeIterator()
   let hadError = transcode(
     iterator,
     from: UTF32.self,
@@ -190,7 +169,6 @@ func checkEncodeUTF8(_ expected: [UInt8],
     stoppingOnError: true,
     sendingOutputTo: output)
   expectFalse(hadError)
-  expectGE(1, iterator.numTimesReturnedEOF)
   if expected != encoded {
     return assertionFailure()
         .withDescription("\n")
