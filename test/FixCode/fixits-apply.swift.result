@@ -200,3 +200,10 @@ protocol NonObjCProtocol {}
 @IBDesignable extension SomeProt {}
 
 func attrNowOnType(foo: @noescape ()->()) {}
+
+class InitDynType {
+  init() {}
+  func notInit() {
+    self.init()
+  }
+}

@@ -580,6 +580,10 @@ private:
         Info.ID == diag::invalid_ibinspectable.ID ||
         Info.ID == diag::invalid_ibaction_decl.ID)
       return false;
+    // Adding .dynamicType interacts poorly with the swift migrator by
+    // invalidating some inits with type errors.
+    if (Info.ID == diag::init_not_instance_member.ID)
+      return false;
 
     if (Kind == DiagnosticKind::Error)
       return true;
