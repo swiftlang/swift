@@ -1,4 +1,3 @@
-// REQUIRES: rdar26121117
 import ImportsImportsFoo
 import FooHelper.FooHelperExplicit
 func test() {

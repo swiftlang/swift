@@ -1,4 +1,3 @@
-// REQUIRES: rdar26121117
 import Foo
 
 // REQUIRES: objc_interop
