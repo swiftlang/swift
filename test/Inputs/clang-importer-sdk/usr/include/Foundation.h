@@ -1034,6 +1034,14 @@ extern NSString *NSHTTPRequestKey;
 
 @end
 
+@interface NSIdLover: NSObject
+
+- (id _Nonnull)makesId;
+- (void)takesId:(id _Nonnull)x;
+- (void)takesArrayOfId:(const id _Nonnull * _Nonnull)x;
+
+@end
+
 #define NSTimeIntervalSince1970 978307200.0
 #define NS_DO_SOMETHING 17
 

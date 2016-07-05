@@ -1523,6 +1523,16 @@ namespace {
 
       Type SwiftType;
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
+        // Ignore the 'id' typedef. We want to bridge the underlying
+        // ObjCId type.
+        //
+        // When we remove the EnableIdAsAny staging flag, the 'id' entry
+        // should be removed from MappedTypes.def, and this conditional should
+        // become unnecessary.
+        if (Name.str() == "id" && Impl.SwiftContext.LangOpts.EnableIdAsAny) {
+          return nullptr;
+        }
+      
         bool IsError;
         StringRef StdlibTypeName;
         MappedTypeNameKind NameMapping;
