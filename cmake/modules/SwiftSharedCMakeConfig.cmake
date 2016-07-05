@@ -40,6 +40,15 @@ function(escape_llvm_path_for_xcode path outvar)
   set(${outvar} "${path}" PARENT_SCOPE)
 endfunction()
 
+function(get_imported_library_prefix outvar target prefix)
+  string(FIND "${target}" "${prefix}" ALREADY_HAS_PREFIX)
+  if (ALREADY_HAS_PREFIX)
+    set(${outvar} "" PARENT_SCOPE)
+  else()
+    set(${outvar} "${prefix}" PARENT_SCOPE)
+  endif()
+endfunction()
+
 # What this function does is go through each of the passed in imported targets
 # from LLVM/Clang and changes them to use the appropriate fully expanded paths.
 #
@@ -52,14 +61,29 @@ function(fix_imported_target_locations_for_xcode targets)
 
     get_target_property(TARGET_TYPE ${t} TYPE)
 
-    # We only want to do this for static libraries for now.
-    if (NOT ${TARGET_TYPE} STREQUAL "STATIC_LIBRARY")
+    if (NOT "${TARGET_TYPE}" STREQUAL "STATIC_LIBRARY" AND
+        NOT "${TARGET_TYPE}" STREQUAL "SHARED_LIBRARY" AND
+        NOT "${TARGET_TYPE}" STREQUAL "EXECUTABLE")
+      message(FATAL_ERROR "Unsupported imported target type ${TARGET_TYPE}")
+    endif()
+
+    # Ok, so at this point, we know that we have an executable, static library,
+    # or shared library.
+    #
+    # First we handle the executables.
+    if ("${TARGET_TYPE}" STREQUAL "EXECUTABLE")
+      set_target_properties(${t} PROPERTIES
+        IMPORTED_LOCATION_DEBUG "${LLVM_BINARY_OUTPUT_INTDIR}/${t}"
+        IMPORTED_LOCATION_RELEASE "${LLVM_BINARY_OUTPUT_INTDIR}/${t}")
       continue()
     endif()
 
+    # Otherwise, we have libraries. Since libclang has an extra lib prefix in
+    # its target name, we have to handle it specially.
+    get_imported_library_prefix(PREFIX "${t}" "${CMAKE_${TARGET_TYPE}_PREFIX}")
     set_target_properties(${t} PROPERTIES
-      IMPORTED_LOCATION_DEBUG "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${t}.a"
-      IMPORTED_LOCATION_RELEASE "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${t}.a")
+      IMPORTED_LOCATION_DEBUG "${LLVM_LIBRARY_OUTPUT_INTDIR}/${PREFIX}${t}.${CMAKE_${TARGET_TYPE}_SUFFIX}"
+      IMPORTED_LOCATION_RELEASE "${LLVM_LIBRARY_OUTPUT_INTDIR}/${PREFIX}${t}.${CMAKE_${TARGET_TYPE}_SUFFIX}")
   endforeach()
 endfunction()
 
@@ -119,6 +143,7 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   # against a matching LLVM build configuration.  However, we usually want to be
   # flexible and allow linking a debug Swift against optimized LLVM.
   set(LLVM_RUNTIME_OUTPUT_INTDIR "${LLVM_BINARY_DIR}")
+  set(LLVM_BINARY_OUTPUT_INTDIR "${LLVM_TOOLS_BINARY_DIR}")
   set(LLVM_LIBRARY_OUTPUT_INTDIR "${LLVM_LIBRARY_DIR}")
 
   if (XCODE)
