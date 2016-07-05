@@ -21,7 +21,8 @@ public struct Generic<T : P> {
 // CHECK: !DISubprogram({{.*}}linkageName: "_TFV4main8Concrete3getfT_GSqSi_",
 // CHECK-SAME:          scope: ![[CONC:[0-9]+]],
 // CHECK: ![[CONC]] = !DICompositeType({{.*}}, name: "Concrete",
-// CHECK-SAME-NOT: DIFlagFwdDecl
+// CHECK-NOT: DIFlagFwdDecl
+// CHECK-NEXT: =
 public struct Concrete {
   public func get() -> Int? {
     return nil
