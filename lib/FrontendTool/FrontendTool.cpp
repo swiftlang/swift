@@ -595,7 +595,9 @@ private:
         Info.ID == diag::function_type_no_parens.ID ||
         Info.ID == diag::convert_let_to_var.ID ||
         Info.ID == diag::parameter_extraneous_double_up.ID ||
-        Info.ID == diag::attr_decl_attr_now_on_type.ID)
+        Info.ID == diag::attr_decl_attr_now_on_type.ID ||
+        Info.ID == diag::selector_construction_suggest.ID ||
+        Info.ID == diag::selector_literal_deprecated_suggest.ID)
       return true;
     return false;
   }
