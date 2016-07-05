@@ -1,3 +1,5 @@
+// REQUIRE: rdar27144738
+
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 

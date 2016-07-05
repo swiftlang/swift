@@ -5,6 +5,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
+// REQUIRES: rdar27144738
 
 import AppKit
 import NotificationCenter

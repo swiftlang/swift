@@ -1,3 +1,4 @@
+// REQUIRES: rdar27144738
 // RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s -verify
 // RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 //

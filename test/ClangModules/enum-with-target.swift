@@ -2,6 +2,7 @@
 // RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.52 -parse %s -verify
 
 // REQUIRES: OS=macosx
+// REQUIRES: rdar27144738
 import Foundation
 import user_objc
 

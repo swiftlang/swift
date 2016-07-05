@@ -1,3 +1,5 @@
+// REQUIRES: rdar27144738
+
 import Foo
 
 var x: FooClassBase

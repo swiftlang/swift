@@ -2,6 +2,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
+// REQUIRES: rdar27144738
 // FIXME: <rdar://problem/19452886> test/ClangModules/objc_init.swift should not require REQUIRES: OS=macosx
 
 import AppKit
