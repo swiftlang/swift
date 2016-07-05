@@ -1306,3 +1306,16 @@ bb2:                                              // Preds: bb0 bb1
   return %19 : $()                                // id: %20
 }
 
+// CHECK-LABEL: sil @cse_mark_dependence
+// CHECK: mark_dependence
+// CHECK-NOT: mark_dependence
+// CHECK: return
+sil @cse_mark_dependence : $@convention(thin) (@inout Builtin.Int64, @guaranteed Builtin.NativeObject) -> (Builtin.Int64, Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64, %1 : $Builtin.NativeObject):
+  %2 = mark_dependence %0 : $*Builtin.Int64 on %1 : $Builtin.NativeObject
+  %3 = mark_dependence %0 : $*Builtin.Int64 on %1 : $Builtin.NativeObject
+  %4 = load %2 : $*Builtin.Int64
+  %5 = load %3 : $*Builtin.Int64
+  %6 = tuple(%4 : $Builtin.Int64, %5 : $Builtin.Int64)
+  return %6 : $(Builtin.Int64, Builtin.Int64)
+}

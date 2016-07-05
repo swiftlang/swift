@@ -619,6 +619,10 @@ namespace {
       return true;
     }
 
+    bool visitMarkDependenceInst(const MarkDependenceInst *RHS) {
+      return true;
+    }
+
   private:
     const SILInstruction *LHS;
   };
