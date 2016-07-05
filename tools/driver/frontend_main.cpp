@@ -556,7 +556,9 @@ private:
       return true;
     if (Info.ID == diag::forced_downcast_coercion.ID ||
         Info.ID == diag::forced_downcast_noop.ID ||
-        Info.ID == diag::variable_never_mutated.ID)
+        Info.ID == diag::variable_never_mutated.ID ||
+        Info.ID == diag::selector_construction_suggest.ID ||
+        Info.ID == diag::selector_literal_deprecated_suggest.ID)
       return true;
     return false;
   }
