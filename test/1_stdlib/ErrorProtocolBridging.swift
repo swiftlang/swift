@@ -89,6 +89,8 @@ ErrorProtocolBridgingTests.test("NSCoding") {
 ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
+  let testURL = URL(string: "http://swift.org")!
+
   autoreleasepool {
     let underlyingError = NSCocoaError(.fileLockingError)
       as ErrorProtocol as NSError
@@ -98,7 +100,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
                        NSFilePathErrorKey : "/dev/null",
                        NSStringEncodingErrorKey: /*ASCII=*/1,
                        NSUnderlyingErrorKey: underlyingError,
-                       NSURLErrorKey: URL(string: "https://swift.org")!
+                       NSURLErrorKey: testURL
                      ])
 
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
@@ -136,12 +138,12 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     expectOptionalEqual("/dev/null", cocoaError.filePath)
     expectOptionalEqual(String.Encoding.ascii, cocoaError.stringEncoding)
     expectOptionalEqual(underlyingError, cocoaError.underlying)
-    expectOptionalEqual(URL(string: "https://swift.org")!, cocoaError.url)
+    expectOptionalEqual(testURL, cocoaError.url)
 
     // NSURLError domain
     let nsURL = NSError(domain: NSURLErrorDomain,
                         code: NSURLErrorBadURL,
-                        userInfo: nil)
+                        userInfo: [NSURLErrorFailingURLErrorKey : testURL])
     let eURL: ErrorProtocol = nsURL
     let isBadURLError: Bool
     switch eURL {
@@ -152,6 +154,10 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     }
 
     expectTrue(isBadURLError)
+
+    let urlError = eURL as! NSURLError
+    expectOptionalEqual(testURL, urlError.failingURL)
+    expectEmpty(urlError.failureURLPeerTrust)
 
     // CoreLocation error domain
     let nsCL = NSError(domain: kCLErrorDomain,
