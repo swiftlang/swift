@@ -38,8 +38,8 @@ public extension DispatchIO {
 		}
 	}
 
-	public class func write(fromFileDescriptor: Int32, data: DispatchData, runningHandlerOn queue: DispatchQueue, handler: (data: DispatchData?, error: Int32) -> Void) {
-		__dispatch_write(fromFileDescriptor, data as __DispatchData, queue) { (data: __DispatchData?, error: Int32) in
+	public class func write(toFileDescriptor: Int32, data: DispatchData, runningHandlerOn queue: DispatchQueue, handler: (data: DispatchData?, error: Int32) -> Void) {
+		__dispatch_write(toFileDescriptor, data as __DispatchData, queue) { (data: __DispatchData?, error: Int32) in
 			handler(data: data.flatMap { DispatchData(data: $0) }, error: error)
 		}
 	}
