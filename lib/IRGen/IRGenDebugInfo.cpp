@@ -1408,11 +1408,15 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto *StructTy = BaseTy->castTo<StructType>();
     auto *Decl = StructTy->getDecl();
     auto L = getDebugLoc(SM, Decl);
-    return createStructType(DbgTy, Decl, StructTy, Scope,
-                            getOrCreateFile(L.Filename), L.Line, SizeInBits,
-                            AlignInBits, Flags,
-                            nullptr, // DerivedFrom
-                            llvm::dwarf::DW_LANG_Swift, MangledName);
+    auto *File = getOrCreateFile(L.Filename);
+    if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes)
+      return createStructType(DbgTy, Decl, StructTy, Scope, File, L.Line,
+                              SizeInBits, AlignInBits, Flags,
+                              nullptr, // DerivedFrom
+                              llvm::dwarf::DW_LANG_Swift, MangledName);
+    else
+      return createOpaqueStruct(Scope, Decl->getName().str(), File, L.Line,
+                                SizeInBits, AlignInBits, Flags, MangledName);
   }
 
   case TypeKind::Class: {
