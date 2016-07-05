@@ -95,7 +95,7 @@ switch PlaygroundQuickLook(reflecting: somesubclassofnsstring) {
 // CHECK-NEXT: got the expected quick look attributed string
 let astr = NSAttributedString(string: "yizzle pizzle")
 switch PlaygroundQuickLook(reflecting: astr) {
-case .attributedString(let astr2)
+case .attributedString(let astr2 as NSAttributedString)
 where astr == astr2:
   print("got the expected quick look attributed string")
 case _:
