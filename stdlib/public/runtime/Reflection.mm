@@ -305,7 +305,7 @@ const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
 }
  
 static std::tuple<const Metadata *, const OpaqueValue *>
-getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
+unwrapExistential(const Metadata *T, const OpaqueValue *Value) {
   // If the value is an existential container, look through it to reflect the
   // contained value.
   // TODO: Should look through existential metatypes too, but it doesn't
@@ -336,7 +336,7 @@ static Mirror reflect(HeapObject *owner,
                       const Metadata *T) {
   const Metadata *mirrorType;
   const OpaqueValue *mirrorValue;
-  std::tie(mirrorType, mirrorValue) = getReflectableConformance(T, value);
+  std::tie(mirrorType, mirrorValue) = unwrapExistential(T, value);
 
   // Use MagicMirror.
   // Consumes 'owner'.
@@ -510,7 +510,7 @@ const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *type) {
   // Build a magic mirror. Unconditionally destroy the value at the end.
   const Metadata *mirrorType;
   const OpaqueValue *cMirrorValue;
-  std::tie(mirrorType, cMirrorValue) = getReflectableConformance(type, value);
+  std::tie(mirrorType, cMirrorValue) = unwrapExistential(type, value);
 
   OpaqueValue *mirrorValue = const_cast<OpaqueValue*>(cMirrorValue);
   Mirror mirror;
@@ -1097,7 +1097,7 @@ MagicMirror::MagicMirror(HeapObject *owner,
 MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   const Metadata *mirrorType;
   const OpaqueValue *cMirrorValue;
-  std::tie(mirrorType, cMirrorValue) = getReflectableConformance(T, value);
+  std::tie(mirrorType, cMirrorValue) = unwrapExistential(T, value);
 
   OpaqueValue *mirrorValue = const_cast<OpaqueValue*>(cMirrorValue);
 
