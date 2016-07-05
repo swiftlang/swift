@@ -344,18 +344,34 @@ public protocol _BridgedStoredNSError :
 
 /// Various helper implementations for _BridgedStoredNSError
 public extension _BridgedStoredNSError
-    where Code: RawRepresentable, Code.RawValue == Int {
-  // FIXME: Generalize based on the Integer protocol once SE-0104 is
-  // implemented.
+    where Code: RawRepresentable, Code.RawValue: SignedInteger {
+  // FIXME: Generalize to Integer.
   public var code: Code {
-    return Code(rawValue: _nsError.code)!
+    return Code(rawValue: numericCast(_nsError.code))!
   }
 
   /// Initialize an error within this domain with the given ``code``
   /// and ``userInfo``.
   public init(_ code: Code, userInfo: [String : AnyObject] = [:]) {
     self.init(_nsError: NSError(domain: Self._nsErrorDomain,
-                                code: code.rawValue,
+                                code: numericCast(code.rawValue),
+                                userInfo: userInfo))
+  }
+}
+
+/// Various helper implementations for _BridgedStoredNSError
+public extension _BridgedStoredNSError
+    where Code: RawRepresentable, Code.RawValue: UnsignedInteger {
+  // FIXME: Generalize to Integer.
+  public var code: Code {
+    return Code(rawValue: numericCast(_nsError.code))!
+  }
+
+  /// Initialize an error within this domain with the given ``code``
+  /// and ``userInfo``.
+  public init(_ code: Code, userInfo: [String : AnyObject] = [:]) {
+    self.init(_nsError: NSError(domain: Self._nsErrorDomain,
+                                code: numericCast(code.rawValue),
                                 userInfo: userInfo))
   }
 }
