@@ -1,6 +1,6 @@
 #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing Mach error codes.
-@objc public enum MachError : Int32 {
+@objc public enum MachErrorCode : Int32 {
   case KERN_SUCCESS                   = 0
 
   /// Specified address is not currently valid.

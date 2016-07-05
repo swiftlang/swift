@@ -2199,8 +2199,316 @@ extension POSIXError {
   }
 }
 
-extension MachError : _BridgedNSError {
+/// Describes an error in the Mach error domain.
+public struct MachError : _BridgedStoredNSError {
+  public let _nsError: NSError
+
+  public init(_nsError error: NSError) {
+    precondition(error.domain == NSMachErrorDomain)
+    self._nsError = error
+  }
+
   public static var _nsErrorDomain: String { return NSMachErrorDomain }
+
+  public typealias Code = MachErrorCode
+}
+
+extension MachErrorCode : _ErrorCodeProtocol {
+  public typealias ErrorType = MachError
+}
+
+extension MachError {
+  public static var KERN_SUCCESS: MachError.Code {
+    return .KERN_SUCCESS
+  }
+
+  /// Specified address is not currently valid.
+  public static var KERN_INVALID_ADDRESS: MachError.Code {
+    return .KERN_INVALID_ADDRESS
+  }
+
+  /// Specified memory is valid, but does not permit the required
+  /// forms of access.
+  public static var KERN_PROTECTION_FAILURE: MachError.Code {
+    return .KERN_PROTECTION_FAILURE
+  }
+
+  /// The address range specified is already in use, or no address
+  /// range of the size specified could be found.  
+  public static var KERN_NO_SPACE: MachError.Code {
+    return .KERN_NO_SPACE
+  }
+
+  /// The function requested was not applicable to this type of
+  /// argument, or an argument is invalid.
+  public static var KERN_INVALID_ARGUMENT: MachError.Code {
+    return .KERN_INVALID_ARGUMENT
+  }
+
+  /// The function could not be performed.  A catch-all.
+  public static var KERN_FAILURE: MachError.Code {
+    return .KERN_FAILURE
+  }
+
+  /// A system resource could not be allocated to fulfill this
+  /// request.  This failure may not be permanent.
+  public static var KERN_RESOURCE_SHORTAGE: MachError.Code {
+    return .KERN_RESOURCE_SHORTAGE
+  }
+
+  /// The task in question does not hold receive rights for the port
+  /// argument.
+  public static var KERN_NOT_RECEIVER: MachError.Code {
+    return .KERN_NOT_RECEIVER
+  }
+
+  /// Bogus access restriction.
+  public static var KERN_NO_ACCESS: MachError.Code {
+    return .KERN_NO_ACCESS
+  }
+
+  /// During a page fault, the target address refers to a memory
+  /// object that has been destroyed.  This failure is permanent.
+  public static var KERN_MEMORY_FAILURE: MachError.Code {
+    return .KERN_MEMORY_FAILURE
+  }
+
+  /// During a page fault, the memory object indicated that the data
+  /// could not be returned.  This failure may be temporary; future
+  /// attempts to access this same data may succeed, as defined by the
+  /// memory object.
+  public static var KERN_MEMORY_ERROR: MachError.Code {
+    return .KERN_MEMORY_ERROR
+  }
+
+  /// The receive right is already a member of the portset.
+  public static var KERN_ALREADY_IN_SET: MachError.Code {
+    return .KERN_ALREADY_IN_SET
+  }
+
+  /// The receive right is not a member of a port set.
+  public static var KERN_NOT_IN_SET: MachError.Code {
+    return .KERN_NOT_IN_SET
+  }
+
+  /// The name already denotes a right in the task.
+  public static var KERN_NAME_EXISTS: MachError.Code {
+    return .KERN_NAME_EXISTS
+  }
+
+  /// The operation was aborted.  Ipc code will catch this and reflect
+  /// it as a message error.
+  public static var KERN_ABORTED: MachError.Code {
+    return .KERN_ABORTED
+  }
+
+  /// The name doesn't denote a right in the task.
+  public static var KERN_INVALID_NAME: MachError.Code {
+    return .KERN_INVALID_NAME
+  }
+
+  /// Target task isn't an active task.
+  public static var KERN_INVALID_TASK: MachError.Code {
+    return .KERN_INVALID_TASK
+  }
+
+  /// The name denotes a right, but not an appropriate right.
+  public static var KERN_INVALID_RIGHT: MachError.Code {
+    return .KERN_INVALID_RIGHT
+  }
+
+  /// A blatant range error.
+  public static var KERN_INVALID_VALUE: MachError.Code {
+    return .KERN_INVALID_VALUE
+  }
+
+  /// Operation would overflow limit on user-references.
+  public static var KERN_UREFS_OVERFLOW: MachError.Code {
+    return .KERN_UREFS_OVERFLOW
+  }
+
+  /// The supplied (port) capability is improper.
+  public static var KERN_INVALID_CAPABILITY: MachError.Code {
+    return .KERN_INVALID_CAPABILITY
+  }
+
+  /// The task already has send or receive rights for the port under
+  /// another name.
+  public static var KERN_RIGHT_EXISTS: MachError.Code {
+    return .KERN_RIGHT_EXISTS
+  }
+
+  /// Target host isn't actually a host.
+  public static var KERN_INVALID_HOST: MachError.Code {
+    return .KERN_INVALID_HOST
+  }
+
+  /// An attempt was made to supply "precious" data for memory that is
+  /// already present in a memory object.
+  public static var KERN_MEMORY_PRESENT: MachError.Code {
+    return .KERN_MEMORY_PRESENT
+  }
+
+  /// A page was requested of a memory manager via
+  /// memory_object_data_request for an object using a
+  /// MEMORY_OBJECT_COPY_CALL strategy, with the VM_PROT_WANTS_COPY
+  /// flag being used to specify that the page desired is for a copy
+  /// of the object, and the memory manager has detected the page was
+  /// pushed into a copy of the object while the kernel was walking
+  /// the shadow chain from the copy to the object. This error code is
+  /// delivered via memory_object_data_error and is handled by the
+  /// kernel (it forces the kernel to restart the fault). It will not
+  /// be seen by users.
+  public static var KERN_MEMORY_DATA_MOVED: MachError.Code {
+    return .KERN_MEMORY_DATA_MOVED
+  }
+
+  /// A strategic copy was attempted of an object upon which a quicker
+  /// copy is now possible.  The caller should retry the copy using
+  /// vm_object_copy_quickly. This error code is seen only by the
+  /// kernel.
+  public static var KERN_MEMORY_RESTART_COPY: MachError.Code {
+    return .KERN_MEMORY_RESTART_COPY
+  }
+
+  /// An argument applied to assert processor set privilege was not a
+  /// processor set control port.
+  public static var KERN_INVALID_PROCESSOR_SET: MachError.Code {
+    return .KERN_INVALID_PROCESSOR_SET
+  }
+
+  /// The specified scheduling attributes exceed the thread's limits.
+  public static var KERN_POLICY_LIMIT: MachError.Code {
+    return .KERN_POLICY_LIMIT
+  }
+
+  /// The specified scheduling policy is not currently enabled for the
+  /// processor set.
+  public static var KERN_INVALID_POLICY: MachError.Code {
+    return .KERN_INVALID_POLICY
+  }
+
+  /// The external memory manager failed to initialize the memory object.
+  public static var KERN_INVALID_OBJECT: MachError.Code {
+    return .KERN_INVALID_OBJECT
+  }
+
+  /// A thread is attempting to wait for an event for which there is
+  /// already a waiting thread.
+  public static var KERN_ALREADY_WAITING: MachError.Code {
+    return .KERN_ALREADY_WAITING
+  }
+
+  /// An attempt was made to destroy the default processor set.
+  public static var KERN_DEFAULT_SET: MachError.Code {
+    return .KERN_DEFAULT_SET
+  }
+
+  /// An attempt was made to fetch an exception port that is
+  /// protected, or to abort a thread while processing a protected
+  /// exception.
+  public static var KERN_EXCEPTION_PROTECTED: MachError.Code {
+    return .KERN_EXCEPTION_PROTECTED
+  }
+
+  /// A ledger was required but not supplied.
+  public static var KERN_INVALID_LEDGER: MachError.Code {
+    return .KERN_INVALID_LEDGER
+  }
+
+  /// The port was not a memory cache control port.
+  public static var KERN_INVALID_MEMORY_CONTROL: MachError.Code {
+    return .KERN_INVALID_MEMORY_CONTROL
+  }
+
+  /// An argument supplied to assert security privilege was not a host
+  /// security port.
+  public static var KERN_INVALID_SECURITY: MachError.Code {
+    return .KERN_INVALID_SECURITY
+  }
+
+  /// thread_depress_abort was called on a thread which was not
+  /// currently depressed.
+  public static var KERN_NOT_DEPRESSED: MachError.Code {
+    return .KERN_NOT_DEPRESSED
+  }
+
+  /// Object has been terminated and is no longer available.
+  public static var KERN_TERMINATED: MachError.Code {
+    return .KERN_TERMINATED
+  }
+
+  /// Lock set has been destroyed and is no longer available.
+  public static var KERN_LOCK_SET_DESTROYED: MachError.Code {
+    return .KERN_LOCK_SET_DESTROYED
+  }
+
+  /// The thread holding the lock terminated before releasing the lock.
+  public static var KERN_LOCK_UNSTABLE: MachError.Code {
+    return .KERN_LOCK_UNSTABLE
+  }
+
+  /// The lock is already owned by another thread.
+  public static var KERN_LOCK_OWNED: MachError.Code {
+    return .KERN_LOCK_OWNED
+  }
+
+  /// The lock is already owned by the calling thread.
+  public static var KERN_LOCK_OWNED_SELF: MachError.Code {
+    return .KERN_LOCK_OWNED_SELF
+  }
+
+  /// Semaphore has been destroyed and is no longer available.
+  public static var KERN_SEMAPHORE_DESTROYED: MachError.Code {
+    return .KERN_SEMAPHORE_DESTROYED
+  }
+
+  /// Return from RPC indicating the target server was terminated
+  /// before it successfully replied.
+  public static var KERN_RPC_SERVER_TERMINATED: MachError.Code {
+    return .KERN_RPC_SERVER_TERMINATED
+  }
+
+  /// Terminate an orphaned activation.
+  public static var KERN_RPC_TERMINATE_ORPHAN: MachError.Code {
+    return .KERN_RPC_TERMINATE_ORPHAN
+  }
+
+  /// Allow an orphaned activation to continue executing.
+  public static var KERN_RPC_CONTINUE_ORPHAN: MachError.Code {
+    return .KERN_RPC_CONTINUE_ORPHAN
+  }
+
+  /// Empty thread activation (No thread linked to it).
+  public static var KERN_NOT_SUPPORTED: MachError.Code {
+    return .KERN_NOT_SUPPORTED
+  }
+
+  /// Remote node down or inaccessible.
+  public static var KERN_NODE_DOWN: MachError.Code {
+    return .KERN_NODE_DOWN
+  }
+
+  /// A signalled thread was not actually waiting.
+  public static var KERN_NOT_WAITING: MachError.Code {
+    return .KERN_NOT_WAITING
+  }
+
+  /// Some thread-oriented operation (semaphore_wait) timed out.
+  public static var KERN_OPERATION_TIMED_OUT: MachError.Code {
+    return .KERN_OPERATION_TIMED_OUT
+  }
+
+  /// During a page fault, indicates that the page was rejected as a
+  /// result of a signature check.
+  public static var KERN_CODESIGN_ERROR: MachError.Code {
+    return .KERN_CODESIGN_ERROR
+  }
+
+  /// The requested property cannot be changed at this time.
+  public static var KERN_POLICY_STATIC: MachError.Code {
+    return .KERN_POLICY_STATIC
+  }
 }
 
 public struct ErrorUserInfoKey : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
