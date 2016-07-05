@@ -15,15 +15,27 @@ import Foundation
 
 #if os(iOS)
 @available(iOS 10.0, *)
-extension INSearchForPhotosIntentResponse {
+extension INSetProfileInCarIntent {
   @nonobjc
-  public final var searchResultsCount: Int? {
-    get {
-      return __searchResultsCount?.intValue
-    }
-    set {
-      __searchResultsCount = newValue.map { NSNumber(value: $0) }
-    }
+  public convenience init(
+    profileNumber: Int? = nil,
+    profileLabel: String? = nil,
+    defaultProfile: Int? = nil
+  ) {
+    self.init(
+      __profileNumber: profileNumber.map { NSNumber(value: $0) },
+      profileLabel: profileLabel,
+      defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+  }
+
+  @nonobjc  
+  public final var profileNumber: Int? {
+    return __profileNumber?.intValue
+  }
+
+  @nonobjc  
+  public final var defaultProfile: Int? {
+    return __defaultProfile?.intValue
   }
 }
 #endif

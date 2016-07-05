@@ -143,13 +143,13 @@ extension String {
   //===--- Class Methods --------------------------------------------------===//
   //===--------------------------------------------------------------------===//
 
-  // + (const NSStringEncoding *)availableStringEncodings
+  // @property (class) const NSStringEncoding *availableStringEncodings;
 
   /// Returns an Array of the encodings string objects support
   /// in the application's environment.
-  public static func availableStringEncodings() -> [Encoding] {
+  public static var availableStringEncodings: [Encoding] {
     var result = [Encoding]()
-    var p = NSString.availableStringEncodings()
+    var p = NSString.availableStringEncodings
     while p.pointee != 0 {
       result.append(Encoding(rawValue: p.pointee))
       p += 1
@@ -157,12 +157,12 @@ extension String {
     return result
   }
 
-  // + (NSStringEncoding)defaultCStringEncoding
+  // @property (class) NSStringEncoding defaultCStringEncoding;
 
   /// Returns the C-string encoding assumed for any method accepting
   /// a C string as an argument.
-  public static func defaultCStringEncoding() -> Encoding {
-    return Encoding(rawValue: NSString.defaultCStringEncoding())
+  public static var defaultCStringEncoding: Encoding {
+    return Encoding(rawValue: NSString.defaultCStringEncoding)
   }
 
   // + (NSString *)localizedNameOfStringEncoding:(NSStringEncoding)encoding
@@ -182,7 +182,7 @@ extension String {
   public static func localizedStringWithFormat(
     _ format: String, _ arguments: CVarArg...
   ) -> String {
-    return String(format: format, locale: Locale.current(),
+    return String(format: format, locale: Locale.current,
       arguments: arguments)
   }
 
@@ -1678,10 +1678,10 @@ extension String {
   ///
   ///     self.rangeOf(
   ///       other, options: .CaseInsensitiveSearch,
-  ///       locale: Locale.current()) != nil
+  ///       locale: Locale.current) != nil
   public func localizedCaseInsensitiveContains(_ other: String) -> Bool {
     let r = self.range(
-      of: other, options: .caseInsensitive, locale: Locale.current()
+      of: other, options: .caseInsensitive, locale: Locale.current
     ) != nil
     if #available(OSX 10.10, iOS 8.0, *) {
       _sanityCheck(r == _ns.localizedCaseInsensitiveContains(other))

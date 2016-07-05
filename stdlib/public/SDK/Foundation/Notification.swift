@@ -140,12 +140,3 @@ extension Notification : _ObjectiveCBridgeable {
         return result!
     }
 }
-
-extension NotificationCenter {
-  // Note: rdar://problem/26177286
-  // Note: should be removed with Foundation epoch 8 along with the signature
-  // below.
-  @nonobjc public final func addObserver(_ observer: AnyObject, selector aSelector: Selector, name aName: Notification.Name, object anObject: AnyObject?) {
-    self.addObserver(observer, selector: aSelector, name: aName.rawValue, object: anObject)
-  }
-}

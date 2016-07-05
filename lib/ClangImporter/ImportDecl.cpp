@@ -5888,7 +5888,8 @@ namespace {
         if (auto var = dyn_cast<VarDecl>(result)) {
           // If the selectors of the getter match in Objective-C, we have an
           // override.
-          if (var->getObjCGetterSelector() ==
+          if (var->isInstanceMember() == decl->isInstanceProperty() &&
+              var->getObjCGetterSelector() ==
                 Impl.importSelector(decl->getGetterName()))
             overridden = var;
         }

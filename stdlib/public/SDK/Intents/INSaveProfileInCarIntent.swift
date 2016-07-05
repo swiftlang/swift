@@ -13,8 +13,20 @@
 @_exported import Intents
 import Foundation
 
-// @available(iOS, introduced: 10.0)
-// @available(OSX, introduced: 10.12)
-extension INIntentErrorCode : _BridgedNSError {
-  public static var _nsErrorDomain: String { return INIntentErrorDomain }
+#if os(iOS)
+@available(iOS 10.0, *)
+extension INSaveProfileInCarIntent {
+  @nonobjc
+  public convenience init(
+    profileNumber: Int? = nil, profileLabel: String? = nil
+  ) {
+    self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) },
+      profileLabel: profileLabel)
+  }
+
+  @nonobjc  
+  public final var profileNumber: Int? {
+    return __profileNumber?.intValue
+  }
 }
+#endif

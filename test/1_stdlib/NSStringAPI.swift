@@ -66,10 +66,10 @@ func createNSStringTemporaryFile()
 var NSStringAPIs = TestSuite("NSStringAPIs")
 
 NSStringAPIs.test("Encodings") {
-  let availableEncodings: [String.Encoding] = String.availableStringEncodings()
+  let availableEncodings: [String.Encoding] = String.availableStringEncodings
   expectNotEqual(0, availableEncodings.count)
 
-  let defaultCStringEncoding = String.defaultCStringEncoding()
+  let defaultCStringEncoding = String.defaultCStringEncoding
   expectTrue(availableEncodings.contains(defaultCStringEncoding))
 
   expectNotEqual("", String.localizedName(of: .utf8))
@@ -195,7 +195,7 @@ NSStringAPIs.test("init(contentsOf:usedEncoding:error:)") {
 NSStringAPIs.test("init(cString_:encoding:)") {
   expectOptionalEqual("foo, a basmati bar!",
       String(cString: 
-          "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
+          "foo, a basmati bar!", encoding: String.defaultCStringEncoding))
 }
 
 NSStringAPIs.test("init(utf8String:)") {
@@ -272,14 +272,14 @@ func expectLocalizedEquality(
 
   let locale = localeID.map {
     Locale(localeIdentifier: $0)
-  } ?? Locale.current()
+  } ?? Locale.current
   
   expectEqual(
     expected, op(locale),
     message(), stackTrace: trace)
   
   expectEqual(
-    op(Locale.system()), op(nil),
+    op(Locale.system), op(nil),
     message(), stackTrace: trace)
 }
 
@@ -363,9 +363,9 @@ NSStringAPIs.test("compare(_:options:range:locale:)") {
   }
 
   expectEqual(ComparisonResult.orderedSame,
-      "abc".compare("abc", locale: Locale.current()))
+      "abc".compare("abc", locale: Locale.current))
   expectEqual(ComparisonResult.orderedSame,
-      "абв".compare("абв", locale: Locale.current()))
+      "абв".compare("абв", locale: Locale.current))
 }
 
 NSStringAPIs.test("completePath(into:caseSensitive:matchesInto:filterTypes)") {
@@ -583,7 +583,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
 }
 
 NSStringAPIs.test("fastestEncoding") {
-  let availableEncodings: [String.Encoding] = String.availableStringEncodings()
+  let availableEncodings: [String.Encoding] = String.availableStringEncodings
   expectTrue(availableEncodings.contains("abc".fastestEncoding))
 }
 
@@ -838,7 +838,7 @@ NSStringAPIs.test("init(format:locale:_:...)") {
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, world, 42))
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: Locale.system(), world, 42))
+      locale: Locale.system, world, 42))
 }
 
 NSStringAPIs.test("init(format:locale:arguments:)") {
@@ -847,7 +847,7 @@ NSStringAPIs.test("init(format:locale:arguments:)") {
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, arguments: args))
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: Locale.system(), arguments: args))
+      locale: Locale.system, arguments: args))
 }
 
 NSStringAPIs.test("lastPathComponent") {
@@ -1330,7 +1330,7 @@ NSStringAPIs.test("localizedStandardRange(of:)") {
 }
 
 NSStringAPIs.test("smallestEncoding") {
-  let availableEncodings: [String.Encoding] = String.availableStringEncodings()
+  let availableEncodings: [String.Encoding] = String.availableStringEncodings
   expectTrue(availableEncodings.contains("abc".smallestEncoding))
 }
 
