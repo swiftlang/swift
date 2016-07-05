@@ -15,32 +15,18 @@ import Foundation
 
 #if os(iOS)
 @available(iOS 10.0, *)
-extension INSetRadioStationIntent {
+extension INSaveProfileInCarIntent {
   @nonobjc
   public convenience init(
-    radioType: INRadioType = .Unknown,
-    frequency: Double? = nil,
-    stationName: String? = nil,
-    channel: String? = nil,
-    presetNumber: Int? = nil
+    profileNumber: Int? = nil, profileLabel: String? = nil
   ) {
-    self.init(__radioType: radioType,
-      frequency: frequency.map { NSNumber(double: $0) },
-      stationName: stationName,
-      channel: channel,
-      presetNumber: presetNumber.map { NSNumber(long: $0) })
+    self.init(__profileNumber: profileNumber.map { NSNumber(long: $0) },
+      profileLabel: profileLabel)
   }
 
-  @nonobjc
-  public final var frequency: Double? {
-    return __frequency?.doubleValue
+  @nonobjc  
+  public final var profileNumber: Int? {
+    return __profileNumber?.longValue
   }
-
-  @nonobjc
-  public final var presetNumber: Int? {
-    return __presetNumber?.longValue
-  }
-
 }
-
 #endif

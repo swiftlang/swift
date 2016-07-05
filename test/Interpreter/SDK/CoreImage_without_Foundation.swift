@@ -1,3 +1,4 @@
+// REQUIRES: disabled
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 

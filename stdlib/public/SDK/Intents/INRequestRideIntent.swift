@@ -16,29 +16,32 @@ import Foundation
 #if os(iOS)
 @available(iOS 10.0, *)
 extension INRequestRideIntent {
-    public convenience init(pickupLocation: CLPlacemark?, dropOffLocation: CLPlacemark?, rideOptionName: String?, partySize: Int?, paymentMethodName: String?, usesApplePayForPayment: Bool?) {
-        self.init(__pickupLocation: pickupLocation,
-                  dropOffLocation: dropOffLocation,
-                  rideOptionName: rideOptionName,
-                  partySize: partySize.map { NSNumber(long: $0) },
-                  paymentMethodName: paymentMethodName,
-                  usesApplePayForPayment: usesApplePayForPayment.map {
-                    NSNumber(bool: $0)
-                  })
-    }
+  @nonobjc
+  public convenience init(
+    pickupLocation: CLPlacemark? = nil,
+    dropOffLocation: CLPlacemark? = nil,
+    rideOptionName: INSpeakableString? = nil,
+    partySize: Int? = nil,
+    paymentMethodName: INSpeakableString? = nil,
+    usesApplePayForPayment: Bool? = nil
+  ) {
+    self.init(__pickupLocation: pickupLocation,
+      dropOffLocation: dropOffLocation,
+      rideOptionName: rideOptionName,
+      partySize: partySize.map { NSNumber(long: $0) },
+      paymentMethodName: paymentMethodName,
+      usesApplePayForPayment:
+        usesApplePayForPayment.map { NSNumber(bool: $0) })
+  }
 
-    @nonobjc  
-    public final var partySize: Int? {
-        get {
-            return __partySize?.longValue
-        }
-    }
+  @nonobjc
+  public final var partySize: Int? {
+    return __partySize?.longValue
+  }
 
-    @nonobjc
-    public final var usesApplePayForPayment: Bool? {
-        get {
-            return __usesApplePayForPayment?.boolValue
-        }
-    }
+  @nonobjc
+  public final var usesApplePayForPayment: Bool? {
+    return __usesApplePayForPayment?.boolValue
+  }
 }
 #endif

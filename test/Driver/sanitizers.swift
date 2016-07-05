@@ -1,4 +1,3 @@
-// REQUIRES: disabled
 // RUN: not %swiftc_driver -driver-print-jobs -sanitize=address -target x86_64-apple-macosx10.9 %s 2>&1 | FileCheck -check-prefix=ASAN %s
 // RUN: not %swiftc_driver -driver-print-jobs -sanitize=address -target x86_64-apple-ios7.1 %s 2>&1 | FileCheck -check-prefix=ASAN %s
 // RUN: not %swiftc_driver -driver-print-jobs -sanitize=address -target arm64-apple-ios7.1 %s 2>&1 | FileCheck -check-prefix=ASAN %s

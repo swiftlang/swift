@@ -3713,11 +3713,13 @@ public:
       NameOffset = Printer.NameOffset.getValue();
     }
 
+    auto typeContext = CurrDeclContext->getInnermostTypeContext();
+    assert(typeContext);
     Accessibility AccessibilityOfContext;
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(CurrDeclContext))
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(typeContext))
       AccessibilityOfContext = NTD->getFormalAccess();
     else
-      AccessibilityOfContext = cast<ExtensionDecl>(CurrDeclContext)
+      AccessibilityOfContext = cast<ExtensionDecl>(typeContext)
                                    ->getExtendedType()
                                    ->getAnyNominal()
                                    ->getFormalAccess();
@@ -3851,6 +3853,13 @@ public:
 
   void getOverrideCompletions(SourceLoc Loc) {
     if (auto TypeContext = CurrDeclContext->getInnermostTypeContext()){
+      // FIXME: if (!TypeContext->getAsGenericTypeOrGenericTypeExtensionContext())
+      if (!isa<NominalTypeDecl>(TypeContext) &&
+          (!isa<ExtensionDecl>(TypeContext) ||
+           !cast<ExtensionDecl>(TypeContext)->getExtendedType() ||
+           !cast<ExtensionDecl>(TypeContext)->getExtendedType()->getAnyNominal()))
+          return;
+
       if (Type CurrTy = TypeContext->getDeclaredTypeInContext()) {
         lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
                                  TypeResolver.get());

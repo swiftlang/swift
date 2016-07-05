@@ -15,32 +15,15 @@ import Foundation
 
 #if os(iOS)
 @available(iOS 10.0, *)
-extension INSetRadioStationIntent {
+extension INTemperature {
   @nonobjc
-  public convenience init(
-    radioType: INRadioType = .Unknown,
-    frequency: Double? = nil,
-    stationName: String? = nil,
-    channel: String? = nil,
-    presetNumber: Int? = nil
-  ) {
-    self.init(__radioType: radioType,
-      frequency: frequency.map { NSNumber(double: $0) },
-      stationName: stationName,
-      channel: channel,
-      presetNumber: presetNumber.map { NSNumber(long: $0) })
+  public convenience init(value: Double, unit: NSUnitTemperature) {
+    self.init(__unit: unit, value: NSNumber(double: value))
   }
 
   @nonobjc
-  public final var frequency: Double? {
-    return __frequency?.doubleValue
+  public final var value: Double? {
+    return __value?.doubleValue
   }
-
-  @nonobjc
-  public final var presetNumber: Int? {
-    return __presetNumber?.longValue
-  }
-
 }
-
 #endif

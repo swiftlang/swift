@@ -13,12 +13,8 @@
 @_exported import Intents
 import Foundation
 
-// FIXME: update the availability attributes, when
-//        the underlying framework has them in ObjC
 // @available(iOS, introduced: 10.0)
 // @available(OSX, introduced: 10.12)
-// @available(tvOS, introduced: 10.0)
-// @available(watchOS, introduced: 3.0)
 extension INIntentErrorCode : _BridgedNSError {
   public static var _NSErrorDomain: String { return INIntentErrorDomain }
 }

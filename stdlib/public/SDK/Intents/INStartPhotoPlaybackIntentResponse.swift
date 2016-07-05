@@ -16,14 +16,14 @@ import Foundation
 #if os(iOS)
 @available(iOS 10.0, *)
 extension INStartPhotoPlaybackIntentResponse {
-    @nonobjc
-    public final var searchResultsCount: Int? {
-        get {
-            return __searchResultsCount?.longValue
-        }
-        set {
-            __searchResultsCount = newValue.map { NSNumber(long: $0) }
-        }
+  @nonobjc
+  public final var searchResultsCount: Int? {
+    get {
+      return __searchResultsCount?.longValue
     }
+    set {
+      __searchResultsCount = newValue.map { NSNumber(long: $0) }
+    }
+  }
 }
 #endif
