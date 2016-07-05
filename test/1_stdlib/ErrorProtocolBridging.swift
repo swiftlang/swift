@@ -335,7 +335,6 @@ ErrorProtocolBridgingTests.test("Thrown NSError identity is preserved") {
 
 // Check errors customized via protocol.
 struct MyCustomizedError : ErrorProtocol {
-  let domain: String
   let code: Int
 }
 
@@ -358,8 +357,8 @@ extension MyCustomizedError : LocalizedError {
 }
 
 extension MyCustomizedError : CustomNSError {
-  var errorDomain: String {
-    return domain
+  static var errorDomain: String {
+    return "custom"
   }
 
   /// The error code within the given domain.
@@ -418,7 +417,7 @@ class RecoveryDelegate {
 }
 
 ErrorProtocolBridgingTests.test("Customizing NSError via protocols") {
-  let error = MyCustomizedError(domain: "custom", code: 12345)
+  let error = MyCustomizedError(code: 12345)
   let nsError = error as NSError
 
   // CustomNSError

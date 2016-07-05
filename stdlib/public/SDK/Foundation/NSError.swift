@@ -118,7 +118,7 @@ public extension RecoverableError {
 /// and user-info dictionary.
 public protocol CustomNSError : ErrorProtocol {
   /// The domain of the error.
-  var errorDomain: String { get }
+  static var errorDomain: String { get }
 
   /// The error code within the given domain.
   var errorCode: Int { get }
@@ -129,7 +129,7 @@ public protocol CustomNSError : ErrorProtocol {
 
 public extension ErrorProtocol where Self : CustomNSError {
   /// Default implementation for customized NSErrors.
-  var _domain: String { return self.errorDomain }
+  var _domain: String { return Self.errorDomain }
 
   /// Default implementation for customized NSErrors.
   var _code: Int { return self.errorCode }
@@ -378,7 +378,7 @@ public extension _BridgedStoredNSError {
   // FIXME: Would prefer to have a clear "extract an NSError
   // directly" operation.
 
-  var errorDomain: String { return _nsError.domain }
+  static var errorDomain: String { return _nsErrorDomain }
 
   var errorCode: Int { return _nsError.code }
 
@@ -428,6 +428,7 @@ public struct NSCocoaError : _BridgedStoredNSError {
   public let _nsError: NSError
 
   public init(_nsError error: NSError) {
+    precondition(error.domain == NSCocoaErrorDomain)
     self._nsError = error
   }
 
@@ -1168,6 +1169,7 @@ public struct NSURLError : _BridgedStoredNSError {
   public let _nsError: NSError
 
   public init(_nsError error: NSError) {
+    precondition(error.domain == NSURLErrorDomain)
     self._nsError = error
   }
 
