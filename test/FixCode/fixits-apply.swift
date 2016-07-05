@@ -79,3 +79,7 @@ func ancientPast() {
 func deprecated() {
   _ = ancientPast()
 }
+
+func cStyleForLoop() {
+  for var i = 0; i < 10; i++ {}
+}

@@ -79,3 +79,7 @@ func ancientPast() {
 func deprecated() {
   _ = braveNewWorld()
 }
+
+func cStyleForLoop() {
+  for i in 0 ..< 10 {}
+}

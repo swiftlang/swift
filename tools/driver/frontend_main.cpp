@@ -562,7 +562,8 @@ private:
         Info.ID == diag::availability_deprecated.ID ||
         Info.ID == diag::availability_deprecated_msg.ID ||
         Info.ID == diag::availability_deprecated_rename.ID ||
-        Info.ID == diag::note_deprecated_rename.ID)
+        Info.ID == diag::note_deprecated_rename.ID ||
+        Info.ID == diag::deprecated_c_style_for_stmt.ID)
       return true;
     return false;
   }
