@@ -39,7 +39,7 @@ class Y : P {
   init() {} 
 
   @objc func foo(_ s: String) { }
-  @objc func wibble() { }
+  @objc func wibble() { } // expected-note 2 {{did you mean 'wibble'?}}
 
   @objc func ovl1() -> A { }
 

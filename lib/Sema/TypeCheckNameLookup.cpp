@@ -557,8 +557,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   TypoCorrectionResolver resolver(*this, nameLoc);
   if (baseTypeOrNull) {
     lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, &resolver,
-                             /*include instance members*/
-                               !(lookupOptions & NameLookupFlags::OnlyTypes));
+                             /*include instance members*/ true);
   } else {
     lookupVisibleDecls(consumer, DC, &resolver, /*top level*/ true, nameLoc);
   }
@@ -578,6 +577,21 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
     if (var->isSelfParameter())
       return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
                          decl->getName().str());
+  }
+
+  if (!decl->getLoc().isValid() && decl->getDeclContext()->isTypeContext()) {
+    Decl *parentDecl = dyn_cast<ExtensionDecl>(decl->getDeclContext());
+    if (!parentDecl) parentDecl = cast<NominalTypeDecl>(decl->getDeclContext());
+
+    if (parentDecl->getLoc().isValid()) {
+      StringRef kind = (isa<VarDecl>(decl) ? "property" :
+                        isa<ConstructorDecl>(decl) ? "initializer" :
+                        isa<FuncDecl>(decl) ? "method" :
+                        "member");
+
+      return tc.diagnose(parentDecl, diag::note_typo_candidate_implicit_member,
+                         decl->getName().str(), kind);
+    }
   }
 
   return tc.diagnose(decl, diag::note_typo_candidate, decl->getName().str());

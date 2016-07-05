@@ -492,7 +492,7 @@ func rdar20868864(_ s: String) {
 
 // <rdar://problem/20491794> Error message does not tell me what the problem is
 enum Color {
-  case Red
+  case Red // expected-note 2 {{did you mean 'Red'?}}
   case Unknown(description: String)
 
   static func rainbow() -> Color {}
