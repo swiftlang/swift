@@ -1242,7 +1242,7 @@ Tags:
 - Name: NSCalculationError
   SwiftName: NSDecimalNumber.CalculationError
 - Name: NSAttributedStringEnumerationOptions
-  SwiftName: AttributedString.EnumerationOptions
+  SwiftName: NSAttributedString.EnumerationOptions
 - Name: NSDateComponentsFormatterUnitsStyle
   SwiftName: DateComponentsFormatter.UnitsStyle
 - Name: NSDateComponentsFormatterZeroFormattingBehavior
