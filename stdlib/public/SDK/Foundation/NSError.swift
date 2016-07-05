@@ -135,6 +135,13 @@ public extension ErrorProtocol where Self : CustomNSError {
   var _code: Int { return self.errorCode }
 }
 
+public extension ErrorProtocol {
+  /// Retrieve the localized description for this error.
+  var localizedDescription: String {
+    return (self as! NSError).localizedDescription
+  }
+}
+
 /// Retrieve the default userInfo dictionary for a given error.
 @_silgen_name("swift_Foundation_getErrorDefaultUserInfo")
 public func _swift_Foundation_getErrorDefaultUserInfo(_ error: ErrorProtocol)

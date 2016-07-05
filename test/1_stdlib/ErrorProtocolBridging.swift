@@ -417,6 +417,8 @@ ErrorProtocolBridgingTests.test("Customizing NSError via protocols") {
     nsError.userInfo[NSLocalizedRecoverySuggestionErrorKey] as? String)
   expectOptionalEqual("there is no help when writing tests",
     nsError.userInfo[NSHelpAnchorErrorKey] as? String)
+  expectEqual(nsError.localizedDescription, "something went horribly wrong")
+  expectEqual(error.localizedDescription, "something went horribly wrong")
 
   // RecoverableError
   expectOptionalEqual(["Delete 'throw'", "Disable the test" ],
