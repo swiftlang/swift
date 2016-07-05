@@ -1,4 +1,3 @@
-// REQUIRES: rdar27179298
 // RUN: %target-swift-frontend -g -emit-ir %s | FileCheck %s
 
 public protocol P {
