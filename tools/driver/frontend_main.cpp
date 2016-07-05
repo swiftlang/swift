@@ -558,7 +558,11 @@ private:
         Info.ID == diag::forced_downcast_noop.ID ||
         Info.ID == diag::variable_never_mutated.ID ||
         Info.ID == diag::selector_construction_suggest.ID ||
-        Info.ID == diag::selector_literal_deprecated_suggest.ID)
+        Info.ID == diag::selector_literal_deprecated_suggest.ID ||
+        Info.ID == diag::availability_deprecated.ID ||
+        Info.ID == diag::availability_deprecated_msg.ID ||
+        Info.ID == diag::availability_deprecated_rename.ID ||
+        Info.ID == diag::note_deprecated_rename.ID)
       return true;
     return false;
   }
