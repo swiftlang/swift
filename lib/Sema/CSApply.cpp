@@ -1309,8 +1309,8 @@ namespace {
 
       // Compute the concrete reference.
       ConcreteDeclRef ref;
-      Type resultTy;
-      if (ctor->getInterfaceType()->is<GenericFunctionType>()) {
+      Type resultTy = ctor->getInitializerInterfaceType();
+      if (resultTy->is<GenericFunctionType>()) {
         // Compute the reference to the generic constructor.
         SmallVector<Substitution, 4> substitutions;
         resultTy = solution.computeSubstitutions(
@@ -1333,7 +1333,6 @@ namespace {
                                      resultFnTy->getExtInfo());
       } else {
         ref = ConcreteDeclRef(ctor);
-        resultTy = ctor->getInitializerType();
       }
 
       // Build the constructor reference.
@@ -2183,7 +2182,8 @@ namespace {
     }
 
     Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *expr) {
-      expr->setType(expr->getDecl()->getInitializerType());
+      assert(!expr->getDeclRef().isSpecialized());
+      expr->setType(expr->getDecl()->getInitializerInterfaceType());
       return expr;
     }
 

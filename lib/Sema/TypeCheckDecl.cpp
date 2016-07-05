@@ -1131,7 +1131,6 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
                                      Type argType) {
   Type fnType;
   Type allocFnType;
-  Type initFnType;
   Type resultType = selfType->getInOutObjectType();
   if (ctor->getFailability() != OTK_None) {
     resultType = OptionalType::get(ctor->getFailability(), resultType);
@@ -1156,14 +1155,10 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
   if (ctor->getDeclContext()->isGenericContext()) {
     allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
                                                outerGenericParams);
-    initFnType = PolymorphicFunctionType::get(selfType, fnType,
-                                              outerGenericParams);
   } else {
     allocFnType = FunctionType::get(selfMetaType, fnType);
-    initFnType = FunctionType::get(selfType, fnType);
   }
   ctor->setType(allocFnType);
-  ctor->setInitializerType(initFnType);
 }
 
 namespace {
@@ -3807,9 +3802,9 @@ public:
     return hadError;
   }
 
-  void semaFuncDecl(FuncDecl *FD, GenericTypeResolver *resolver) {
+  bool semaFuncDecl(FuncDecl *FD, GenericTypeResolver *resolver) {
     if (FD->hasType())
-      return;
+      return true;
 
     TC.checkForForbiddenPrefix(FD);
 
@@ -3835,12 +3830,13 @@ public:
     // Checking the function parameter patterns might (recursively)
     // end up setting the type.
     if (FD->hasType())
-      return;
+      return true;
 
     if (badType) {
       FD->setType(ErrorType::get(TC.Context));
+      FD->setInterfaceType(ErrorType::get(TC.Context));
       FD->setInvalid();
-      return;
+      return true;
     }
 
     Type funcTy = FD->getBodyResultTypeLoc().getType();
@@ -3863,8 +3859,9 @@ public:
       Type argTy = paramLists[e - i - 1]->getType(TC.Context);
       if (!argTy) {
         FD->setType(ErrorType::get(TC.Context));
+        FD->setInterfaceType(ErrorType::get(TC.Context));
         FD->setInvalid();
-        return;
+        return true;
       }
 
       // Determine the appropriate generic parameters at this level.
@@ -3886,19 +3883,7 @@ public:
     FD->setType(funcTy);
     FD->setBodyResultType(bodyResultType);
 
-    // For a non-generic method that returns dynamic Self, we need to
-    // provide an interface type where the 'self' argument is the
-    // nominal type.
-    if (FD->hasDynamicSelf() && !genericParams && !outerGenericParams) {
-      auto fnType = FD->getType()->castTo<FunctionType>();
-      auto inputType = fnType->getInput().transform([&](Type type) -> Type {
-        if (type->is<DynamicSelfType>())
-          return FD->getExtensionType();
-        return type;
-      });
-      FD->setInterfaceType(FunctionType::get(inputType, fnType->getResult(),
-                                             fnType->getExtInfo()));
-    }
+    return false;
   }
 
   /// Bind the given function declaration, which declares an operator, to
@@ -4238,7 +4223,11 @@ public:
 
     // Type check the parameters and return type again, now with archetypes.
     GenericTypeToArchetypeResolver resolver;
-    semaFuncDecl(FD, &resolver);
+    if (semaFuncDecl(FD, &resolver))
+      return;
+
+    if (!FD->isGenericContext())
+      TC.configureInterfaceType(FD);
 
     if (FD->isInvalid())
       return;
@@ -5757,6 +5746,7 @@ public:
   void visitConstructorDecl(ConstructorDecl *CD) {
     if (CD->isInvalid()) {
       CD->overwriteType(ErrorType::get(TC.Context));
+      CD->setInterfaceType(ErrorType::get(TC.Context));
       return;
     }
 
@@ -5855,10 +5845,14 @@ public:
     // Type check the constructor parameters.
     if (CD->isInvalid() || semaFuncParamPatterns(CD)) {
       CD->overwriteType(ErrorType::get(TC.Context));
+      CD->setInterfaceType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
       configureConstructorType(CD, SelfTy,
                                CD->getParameterList(1)->getType(TC.Context));
+
+      if (!CD->isGenericContext())
+        TC.configureInterfaceType(CD);
     }
 
     validateAttributes(TC, CD);
@@ -5964,6 +5958,7 @@ public:
   void visitDestructorDecl(DestructorDecl *DD) {
     if (DD->isInvalid()) {
       DD->overwriteType(ErrorType::get(TC.Context));
+      DD->setInterfaceType(ErrorType::get(TC.Context));
       return;
     }
 
@@ -5992,8 +5987,12 @@ public:
 
     if (semaFuncParamPatterns(DD)) {
       DD->overwriteType(ErrorType::get(TC.Context));
+      DD->setInterfaceType(ErrorType::get(TC.Context));
       DD->setInvalid();
     }
+
+    if (!DD->isGenericContext())
+      TC.configureInterfaceType(DD);
 
     if (!DD->hasType()) {
       Type FnTy;

@@ -902,7 +902,8 @@ static CanType stripImmediateLabels(CanType type) {
 /// Check whether the given function is non-generic.
 static bool isNonGenericIntrinsic(FuncDecl *fn, CanType &input,
                                   CanType &output) {
-  auto fnType = dyn_cast<FunctionType>(fn->getType()->getCanonicalType());
+  auto fnType = dyn_cast<FunctionType>(fn->getInterfaceType()
+                                         ->getCanonicalType());
   if (!fnType)
     return false;
 

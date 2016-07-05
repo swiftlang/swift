@@ -2142,10 +2142,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   auto selfType = configureImplicitSelf(tc, ctor);
 
   // Set the interface type of the initializer.
-  if (classDecl->isGenericContext()) {
-    ctor->setGenericSignature(classDecl->getGenericSignatureOfContext());
-    tc.configureInterfaceType(ctor);
-  }
+  ctor->setGenericSignature(classDecl->getGenericSignatureOfContext());
+  tc.configureInterfaceType(ctor);
 
   // Set the contextual type of the initializer. This will go away one day.
   configureConstructorType(ctor, selfType, bodyParams->getType(ctx));

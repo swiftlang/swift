@@ -3825,6 +3825,7 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   auto flagInvalidAccessor = [&](FuncDecl *&func) {
     if (func) {
       func->setType(ErrorType::get(P.Context));
+      func->setInterfaceType(ErrorType::get(P.Context));
       func->setInvalid();
     }
   };

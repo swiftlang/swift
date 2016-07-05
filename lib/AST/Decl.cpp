@@ -1705,6 +1705,9 @@ Type ValueDecl::getInterfaceType() const {
   if (!hasType())
     return Type();
 
+  assert(!isa<AbstractFunctionDecl>(this) &&
+         "functions should have an interface type");
+
   // If the type involves a type variable, don't cache it.
   auto type = getType();
   assert((type.isNull() || !type->is<PolymorphicFunctionType>())
@@ -4550,17 +4553,6 @@ Type ConstructorDecl::getResultType() const {
 }
 
 Type ConstructorDecl::getInitializerInterfaceType() {
-  if (!InitializerInterfaceType) {
-    assert((!InitializerType || !InitializerType->is<PolymorphicFunctionType>())
-           && "polymorphic function type is invalid interface type");
-    
-    // Don't cache type variable types.
-    if (InitializerType->hasTypeVariable())
-      return InitializerType;
-    
-    InitializerInterfaceType = InitializerType;
-  }
-  
   return InitializerInterfaceType;
 }
 
