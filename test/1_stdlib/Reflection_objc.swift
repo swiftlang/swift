@@ -93,10 +93,10 @@ switch PlaygroundQuickLook(reflecting: somesubclassofnsstring) {
 }
 
 // CHECK-NEXT: got the expected quick look attributed string
-let astr = AttributedString(string: "yizzle pizzle")
-switch PlaygroundQuickLook(reflecting: astr as AttributedString) {
-case .attributedString(let astr2 as AttributedString)
-where astr === astr2:
+let astr = NSAttributedString(string: "yizzle pizzle")
+switch PlaygroundQuickLook(reflecting: astr) {
+case .attributedString(let astr2)
+where astr == astr2:
   print("got the expected quick look attributed string")
 case _:
   print("got something else")
@@ -242,7 +242,7 @@ class HasNumberQLO : CanaryBase {
 
 class HasAttributedQLO : CanaryBase {
   @objc var debugQuickLookObject: AnyObject {
-    let str = AttributedString(string: "attributed string")
+    let str = NSAttributedString(string: "attributed string")
     objc_setAssociatedObject(str, &CanaryHandle, CanaryBase(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     return str

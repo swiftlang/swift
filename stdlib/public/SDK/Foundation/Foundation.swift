@@ -715,7 +715,7 @@ extension NSSet : Sequence {
   }
 }
 
-extension OrderedSet : Sequence {
+extension NSOrderedSet : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -1058,7 +1058,7 @@ extension NSArray {
   }
 }
 
-extension OrderedSet {
+extension NSOrderedSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
   public convenience init(objects elements: AnyObject...) {
     self.init(array: elements)
@@ -1078,7 +1078,7 @@ extension NSSet : ArrayLiteralConvertible {
   }
 }
 
-extension OrderedSet : ArrayLiteralConvertible {
+extension NSOrderedSet : ArrayLiteralConvertible {
   public required convenience init(arrayLiteral elements: AnyObject...) {
     self.init(array: elements)
   }
