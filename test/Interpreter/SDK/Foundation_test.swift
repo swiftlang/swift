@@ -181,7 +181,7 @@ FoundationTestSuite.test("patternMatching") {
 // Type checker used to crash on this.
 class ClassWithDtor : NSObject {
   deinit {
-    let noteCenter = NotificationCenter.`default`()
+    let noteCenter = NotificationCenter.default
     noteCenter.removeObserver(self, name: Notification.Name(rawValue: "ReceivedContentNotification"), object: nil)
   }
 }
@@ -391,11 +391,12 @@ if #available(OSX 10.11, iOS 9.0, *) {
 
 FoundationTestSuite.test("NotificationCenter/addObserver(_:selector:name:object:)") {
   let obj: AnyObject = "Hello"
-  NotificationCenter.default().addObserver(obj, selector: Selector("blah:"),
-                                           name: nil, object: nil)
+  NotificationCenter.default.addObserver(obj, selector: Selector("blah:"),
+                                         name: nil, object: nil)
   let name = "hello"
-  NotificationCenter.default().addObserver(obj, selector: Selector("blarg:"),
-                                           name: name, object: nil)
+  NotificationCenter.default.addObserver(obj, selector: Selector("blarg:"),
+                                         name: Notification.Name(name),
+                                         object: nil)
 }
 
 runAllTests()

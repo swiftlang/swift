@@ -13,8 +13,23 @@
 @_exported import Intents
 import Foundation
 
-// @available(iOS, introduced: 10.0)
-// @available(OSX, introduced: 10.12)
-extension INIntentErrorCode : _BridgedNSError {
-  public static var _nsErrorDomain: String { return INIntentErrorDomain }
+#if os(iOS)
+@available(iOS 10.0, *)
+extension INTemperature {
+  @nonobjc
+  public convenience init(value: Double, unit: UnitTemperature) {
+    self.init(__unit: unit, value: NSNumber(value: value))
+  }
+
+  @nonobjc
+  public convenience init(_ measurement: Measurement<UnitTemperature>) {
+    self.init(__unit: measurement.unit,
+      value: NSNumber(value: measurement.value))
+  }
+
+  @nonobjc
+  public final var value: Double? {
+    return __value?.doubleValue
+  }
 }
+#endif

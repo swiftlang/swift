@@ -15,49 +15,36 @@ Classes:
 - Name: NSCharacterSet
   SwiftName: NSCharacterSet
   SwiftBridge: CharacterSet
+  Properties:
+  - Name: controlCharacterSet
+    SwiftName: controlCharacters
+  - Name: whitespaceCharacterSet
+    SwiftName: whitespaces
+  - Name: whitespaceAndNewlineCharacterSet
+    SwiftName: whitespacesAndNewlines
+  - Name: decimalDigitCharacterSet
+    SwiftName: decimalDigits
+  - Name: letterCharacterSet
+    SwiftName: letters
+  - Name: lowercaseLetterCharacterSet
+    SwiftName: lowercaseLetters
+  - Name: uppercaseLetterCharacterSet
+    SwiftName: uppercaseLetters
+  - Name: nonBaseCharacterSet
+    SwiftName: nonBaseCharacters
+  - Name: alphanumericCharacterSet
+    SwiftName: alphanumerics
+  - Name: decomposableCharacterSet
+    SwiftName: decomposables
+  - Name: illegalCharacterSet
+    SwiftName: illegalCharacters
+  - Name: capitalizedLetterCharacterSet
+    SwiftName: capitalizedLetters
+  - Name: symbolCharacterSet
+    SwiftName: symbols
+  - Name: newlineCharacterSet
+    SwiftName: newlines
   Methods:
-  - Selector: controlCharacterSet
-    SwiftName: controlCharacters()
-    MethodKind: Class
-  - Selector: whitespaceCharacterSet
-    SwiftName: whitespaces()
-    MethodKind: Class
-  - Selector: whitespaceAndNewlineCharacterSet
-    SwiftName: whitespacesAndNewlines()
-    MethodKind: Class
-  - Selector: decimalDigitCharacterSet
-    SwiftName: decimalDigits()
-    MethodKind: Class
-  - Selector: letterCharacterSet
-    SwiftName: letters()
-    MethodKind: Class
-  - Selector: lowercaseLetterCharacterSet
-    SwiftName: lowercaseLetters()
-    MethodKind: Class
-  - Selector: uppercaseLetterCharacterSet
-    SwiftName: uppercaseLetters()
-    MethodKind: Class
-  - Selector: nonBaseCharacterSet
-    SwiftName: nonBaseCharacters()
-    MethodKind: Class
-  - Selector: alphanumericCharacterSet
-    SwiftName: alphanumerics()
-    MethodKind: Class
-  - Selector: decomposableCharacterSet
-    SwiftName: decomposables()
-    MethodKind: Class
-  - Selector: illegalCharacterSet
-    SwiftName: illegalCharacters()
-    MethodKind: Class
-  - Selector: capitalizedLetterCharacterSet
-    SwiftName: capitalizedLetters()
-    MethodKind: Class
-  - Selector: symbolCharacterSet
-    SwiftName: symbols()
-    MethodKind: Class
-  - Selector: newlineCharacterSet
-    SwiftName: newlines()
-    MethodKind: Class
   - Selector: 'hasMemberInPlane:'
     SwiftName: hasMemberInPlane(_:)
     MethodKind: Instance

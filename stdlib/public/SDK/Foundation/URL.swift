@@ -1023,7 +1023,7 @@ extension URL : CustomPlaygroundQuickLookable {
 
 extension URL : _FileReferenceLiteralConvertible {
   public init(fileReferenceLiteralResourceName name: String) {
-    self = Bundle.main().url(forResource: name, withExtension: nil)!
+    self = Bundle.main.urlForResource(name, withExtension: nil)!
   }
 }
 

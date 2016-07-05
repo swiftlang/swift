@@ -64,7 +64,7 @@ class TestUserInfo : TestUserInfoSuper {
         ]
         let note = Notification(name: notifName, userInfo: info)
         expectNotEmpty(note.userInfo)
-        let nc = NotificationCenter.`default`()
+        let nc = NotificationCenter.default
         nc.addObserver(self, selector: #selector(TestUserInfo.notification(_:)), name: notifName, object: nil)
         nc.post(note)
         expectNotEmpty(posted)

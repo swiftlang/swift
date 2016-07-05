@@ -250,11 +250,11 @@ class TestData : TestDataSuper {
         
         // Create a home for our test data
         let dirPath = (NSTemporaryDirectory() as NSString).appendingPathComponent(NSUUID().uuidString)
-        try! FileManager.`default`().createDirectory(atPath: dirPath, withIntermediateDirectories: true, attributes: nil)
+        try! FileManager.default.createDirectory(atPath: dirPath, withIntermediateDirectories: true, attributes: nil)
         let filePath = (dirPath as NSString).appendingPathComponent("temp_file")
-        guard FileManager.`default`().createFile(atPath: filePath, contents: nil, attributes: nil) else { expectTrue(false, "Unable to create temporary file"); return}
+        guard FileManager.default.createFile(atPath: filePath, contents: nil, attributes: nil) else { expectTrue(false, "Unable to create temporary file"); return}
         guard let fh = FileHandle(forWritingAtPath: filePath) else { expectTrue(false, "Unable to open temporary file"); return }
-        defer { try! FileManager.`default`().removeItem(atPath: dirPath) }
+        defer { try! FileManager.default.removeItem(atPath: dirPath) }
         
         // Now use this data with some Objective-C code that takes NSData arguments
         fh.write(data)
@@ -615,7 +615,7 @@ class TestData : TestDataSuper {
         }
         
         do {
-            try FileManager.`default`().removeItem(at: url)
+            try FileManager.default.removeItem(at: url)
         } catch {
             // ignore
         }
