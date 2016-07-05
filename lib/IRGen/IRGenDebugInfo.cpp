@@ -1624,16 +1624,26 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto *EnumTy = BaseTy->castTo<EnumType>();
     auto *Decl = EnumTy->getDecl();
     auto L = getDebugLoc(SM, Decl);
-    return createEnumType(DbgTy, Decl, MangledName, Scope,
-                          getOrCreateFile(L.Filename), L.Line, Flags);
+    auto *File = getOrCreateFile(L.Filename);
+    if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes)
+      return createEnumType(DbgTy, Decl, MangledName, Scope, File, L.Line,
+                            Flags);
+    else
+      return createOpaqueStruct(Scope, Decl->getName().str(), File, L.Line,
+                                SizeInBits, AlignInBits, Flags, MangledName);
   }
 
   case TypeKind::BoundGenericEnum: {
     auto *EnumTy = BaseTy->castTo<BoundGenericEnumType>();
     auto *Decl = EnumTy->getDecl();
     auto L = getDebugLoc(SM, Decl);
-    return createEnumType(DbgTy, Decl, MangledName, Scope,
-                          getOrCreateFile(L.Filename), L.Line, Flags);
+    auto *File = getOrCreateFile(L.Filename);
+    if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes)
+      return createEnumType(DbgTy, Decl, MangledName, Scope, File, L.Line,
+                            Flags);
+    else
+      return createOpaqueStruct(Scope, Decl->getName().str(), File, L.Line,
+                                SizeInBits, AlignInBits, Flags, MangledName);
   }
 
   case TypeKind::BuiltinVector: {
