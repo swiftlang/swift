@@ -390,6 +390,11 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       //
       // Just use the most feature-rich C language mode.
       "-x", "c", "-std=gnu11",
+
+      // Define macros that Swift bridging headers use.
+
+      // Request new APIs from libdispatch.
+      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=2",
     });
 
     // The module map used for Glibc depends on the target we're compiling for,
