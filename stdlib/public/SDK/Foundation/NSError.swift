@@ -249,17 +249,18 @@ public func _stdlib_bridgeNSErrorToErrorProtocol<
 
 /// Helper protocol for _BridgedNSError, which used to provide
 /// default implementations.
-public protocol __BridgedNSError : RawRepresentable, ErrorProtocol {
+public protocol __BridgedNSError : ErrorProtocol {
   static var _nsErrorDomain: String { get }
 }
 
 // Allow two bridged NSError types to be compared.
 public func ==<T: __BridgedNSError>(lhs: T, rhs: T) -> Bool
-  where T.RawValue: SignedInteger {
+  where T: RawRepresentable, T.RawValue: SignedInteger {
   return lhs.rawValue.toIntMax() == rhs.rawValue.toIntMax()
 }
 
-public extension __BridgedNSError where RawValue: SignedInteger {
+public extension __BridgedNSError 
+    where Self: RawRepresentable, Self.RawValue: SignedInteger {
   public final var _domain: String { return Self._nsErrorDomain }
   public final var _code: Int { return Int(rawValue.toIntMax()) }
 
@@ -280,12 +281,13 @@ public extension __BridgedNSError where RawValue: SignedInteger {
 
 // Allow two bridged NSError types to be compared.
 public func ==<T: __BridgedNSError>(lhs: T, rhs: T) -> Bool
-  where T.RawValue: UnsignedInteger {
+  where T: RawRepresentable, T.RawValue: UnsignedInteger {
   return lhs.rawValue.toUIntMax() == rhs.rawValue.toUIntMax()
 }
 
 
-public extension __BridgedNSError where RawValue: UnsignedInteger {
+public extension __BridgedNSError
+    where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
   public final var _domain: String { return Self._nsErrorDomain }
   public final var _code: Int {
     return Int(bitPattern: UInt(rawValue.toUIntMax()))
@@ -312,14 +314,14 @@ public extension __BridgedNSError where RawValue: UnsignedInteger {
 /// This protocol is used primarily to generate the conformance to
 /// _ObjectiveCBridgeableErrorProtocol for such an enum.
 public protocol _BridgedNSError : __BridgedNSError,
+                                  RawRepresentable,
                                   _ObjectiveCBridgeableErrorProtocol,
                                   Hashable {
   /// The NSError domain to which this type is bridged.
   static var _nsErrorDomain: String { get }
 }
 
-/// Enumeration that describes the error codes within the Cocoa error
-/// domain.
+/// Describes errors within the Cocoa error domain.
 public struct NSCocoaError : RawRepresentable, _BridgedNSError {
   public let rawValue: Int
 
