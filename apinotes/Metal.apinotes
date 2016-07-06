@@ -1,0 +1,5 @@
+---
+Name: Metal
+Enumerators:
+- Name: MTLTextureUsageUnknown
+  SwiftName: unknown
