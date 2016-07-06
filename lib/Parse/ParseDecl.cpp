@@ -170,40 +170,6 @@ namespace {
       P.markWasHandled(D);
     }
   };
-
-  /// An RAII type to exclude tokens contributing to private decls from the
-  /// interface hash of the source file. On destruct, it checks if the set of
-  /// attributes includes the "private" attribute; if so, it resets the MD5
-  /// hash of the source file to what it was when the IgnorePrivateDeclTokens
-  /// instance was created, thus excluding from the interface hash all tokens
-  /// parsed in the meantime.
-  struct IgnorePrivateDeclTokens {
-    Parser &TheParser;
-    DeclAttributes &Attributes;
-    Optional<llvm::MD5> SavedHashState;
-
-    IgnorePrivateDeclTokens(Parser &P, DeclAttributes &Attrs)
-      : TheParser(P), Attributes(Attrs) {
-      // NOTE: It's generally not safe to ignore private decls in nominal
-      // types. Such private decls may affect the data layout of a class/struct
-      // or the vtable layout of a class. So only ignore global private decls.
-      if (TheParser.IsParsingInterfaceTokens &&
-          TheParser.CurDeclContext->isModuleScopeContext()) {
-        SavedHashState = TheParser.SF.getInterfaceHashState();
-      }
-    }
-
-    ~IgnorePrivateDeclTokens() {
-      if (!SavedHashState)
-        return;
-
-      if (auto *attr = Attributes.getAttribute<AbstractAccessibilityAttr>()) {
-        if (attr->getAccess() == Accessibility::Private) {
-          TheParser.SF.setInterfaceHashState(*SavedHashState);
-        }
-      }
-    }
-  };
 }
 
 /// \brief Main entrypoint for the parser.
@@ -1905,6 +1871,7 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     LastDecl = D;
     Handler(D);
   };
+
   ParserPosition BeginParserPosition;
   if (isCodeCompletionFirstPass())
     BeginParserPosition = getParserPosition();
@@ -1917,7 +1884,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
                                   StructureMarkerKind::Declaration);
 
   DeclAttributes Attributes;
-  IgnorePrivateDeclTokens IgnoreTokens(*this, Attributes);
   if (Tok.hasComment())
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
   bool FoundCCTokenInAttr;

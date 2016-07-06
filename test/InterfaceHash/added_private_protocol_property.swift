@@ -5,20 +5,14 @@
 // RUN: not cmp %t/a.hash %t/b.hash
 
 // BEGIN a.swift
-private struct S {
-  func f2() -> Int {
-    return 0
-  }
-
-  var y: Int = 0
+private protocol P {
+  func f2() -> Int
+  var y: Int { get set }
 }
 
 // BEGIN b.swift
-private struct S {
-  func f2() -> Int {
-    return 0
-  }
-
-  var x: Int = 0
-  var y: Int = 0
+private protocol P {
+  func f2() -> Int
+  var x: Int { get set }
+  var y: Int { get set }
 }
