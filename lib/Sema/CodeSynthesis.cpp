@@ -1625,6 +1625,7 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
 
   // Now that we've got the storage squared away, synthesize the getter.
   auto *Get = completeLazyPropertyGetter(VD, Storage, *this);
+  validateDecl(Get);
 
   // The setter just forwards on to storage without materializing the initial
   // value.
@@ -1643,12 +1644,6 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   Storage->setImplicit();
   Storage->setAccessibility(Accessibility::Private);
   Storage->setSetterAccessibility(Accessibility::Private);
-
-  typeCheckDecl(Get, true);
-  typeCheckDecl(Get, false);
-
-  typeCheckDecl(Set, true);
-  typeCheckDecl(Set, false);
 }
 
 
