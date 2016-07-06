@@ -117,6 +117,7 @@ ${orderingExplanation}
   ///
   /// - SeeAlso: `min(isOrderedBefore:)`
 %   end
+  @warn_unqualified_access
   public func min(
 %   if preds:
     isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
@@ -169,6 +170,7 @@ ${orderingExplanation}
   ///
   /// - SeeAlso: `max(isOrderedBefore:)`
 %   end
+  @warn_unqualified_access
   public func max(
 %   if preds:
     isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
