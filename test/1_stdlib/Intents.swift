@@ -4,6 +4,8 @@
 // Intents is only public on OS X and iOS
 // UNSUPPORTED: OS=watchos, OS=tvos
 
+// XFAIL: OS=macosx
+
 import Intents
 import StdlibUnittest
 
