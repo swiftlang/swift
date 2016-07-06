@@ -63,3 +63,23 @@ func ftest1() {
   // Don't replace the variable name with '_'
   let myvar = 0
 }
+
+func testPlusPlus() {
+  var x = 1
+  x++
+  --x
+  var y = "".startIndex
+  y++
+  --y
+}
+
+@available(*, deprecated, renamed="braveNewWorld")
+func ancientPast() {
+}
+func deprecated() {
+  _ = ancientPast()
+}
+
+func cStyleForLoop() {
+  for var i = 0; i < 10; i++ {}
+}
