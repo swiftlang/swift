@@ -1212,11 +1212,18 @@ uint64_t IRGenDebugInfo::getSizeOfBasicType(DebugTypeInfo DbgTy) {
 llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
     llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
     unsigned Flags, StringRef MangledName) {
-  auto FwdDecl = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
-                                            Name, Scope, File, Line,
-                                            llvm::dwarf::DW_LANG_Swift, 0, 0);
-  return createPointerSizedStruct(Scope, Name, FwdDecl, File, Line, Flags,
-                                  MangledName);
+  if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes) {
+    auto FwdDecl = DBuilder.createForwardDecl(
+        llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
+        llvm::dwarf::DW_LANG_Swift, 0, 0);
+    return createPointerSizedStruct(Scope, Name, FwdDecl, File, Line, Flags,
+                                    MangledName);
+  } else {
+    unsigned SizeInBits = CI.getTargetInfo().getPointerWidth(0);
+    unsigned AlignInBits = CI.getTargetInfo().getPointerAlign(0);
+    return createOpaqueStruct(Scope, Name, File, Line, SizeInBits, AlignInBits,
+                              Flags, MangledName);
+  }
 }
 
 llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
@@ -1557,10 +1564,14 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // DW_TAG_reference_type types, but LLDB can deal better with pointer-sized
     // struct that has the appropriate mangled name.
     auto ObjectTy = BaseTy->castTo<InOutType>()->getObjectType();
-    auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
-    return createPointerSizedStruct(Scope, MangledName, DT, File, 0, Flags,
-                                    BaseTy->isUnspecializedGeneric()
-                                    ? StringRef() : MangledName);
+    if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes) {
+      auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
+      return createPointerSizedStruct(
+          Scope, MangledName, DT, File, 0, Flags,
+          BaseTy->isUnspecializedGeneric() ? StringRef() : MangledName);
+    } else
+      return createOpaqueStruct(Scope, MangledName, File, 0, SizeInBits,
+                                AlignInBits, Flags, MangledName);
   }
 
   case TypeKind::Archetype: {

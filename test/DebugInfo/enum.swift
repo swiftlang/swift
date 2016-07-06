@@ -70,7 +70,9 @@ enum Rose<A> {
 func foo<T>(_ x : Rose<T>) -> Rose<T> { return x }
 
 // CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
-// CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5Tuplex_")
+// CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5TupleQq_FS_3barurFGS0_x_GS0_x__")
+// DWARF: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
+// DWARF-SAME:             {{.*}}identifier: "_TtGO4enum5Tuplex_")
 public enum Tuple<P> {
   // DWARF: !DICompositeType({{.*}}name: "Tuple",{{.*}}identifier: "_TtGO4enum5TupleQq_S0__")
 	case C(P, () -> Tuple)
