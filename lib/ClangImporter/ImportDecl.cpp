@@ -1008,9 +1008,11 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
 /// As addErrorDomain above, but performs a lookup
 static bool addErrorDomain(NominalTypeDecl *swiftDecl,
-                           clang::IdentifierInfo *errorDomainDeclName,
+                           StringRef errorDomainName,
                            ClangImporter::Implementation &importer) {
   auto &clangSema = importer.getClangSema();
+  clang::IdentifierInfo *errorDomainDeclName =
+    &clangSema.getASTContext().Idents.get(errorDomainName);
   clang::LookupResult lookupResult(
       clangSema, clang::DeclarationName(errorDomainDeclName),
       clang::SourceLocation(), clang::Sema::LookupNameKind::LookupOrdinaryName);

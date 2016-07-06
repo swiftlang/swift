@@ -20,3 +20,6 @@ Protocols:
   - Selector: 'locationManager:didChangeAuthorizationStatus:'
     SwiftName: 'locationManager(_:didChangeAuthorization:)'
     MethodKind: Instance
+Tags:
+- Name: CLError
+  NSErrorDomain: kCLErrorDomain

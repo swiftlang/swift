@@ -354,7 +354,6 @@ namespace {
     bool SuppressDiagnostics;
     bool SkipClosures;
 
-  private:
     /// Recognize used conformances from an imported type when we must emit
     /// the witness table.
     ///
@@ -6226,7 +6225,10 @@ namespace {
     }
 
     Expr *walkToExprPost(Expr *expr) override {
-      return Rewriter.walkToExprPost(expr);
+      Expr *result = Rewriter.walkToExprPost(expr);
+      if (result && result->getType())
+        Rewriter.checkForImportedUsedConformances(result->getType());
+      return result;
     }
 
     /// \brief Ignore statements.

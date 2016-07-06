@@ -1,6 +1,6 @@
 // REQUIRES: OS=macosx
 
-// RUN: %target-swift-frontend -DNONE -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=NONE
+// RUN: %target-swift-frontend -DVALUE -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=VALUE
 // RUN: %target-swift-frontend -DEMPTYCATCH -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=EMPTYCATCH
 // RUN: %target-swift-frontend -DASQEXPR -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=ASQEXPR
 // RUN: %target-swift-frontend -DASBANGEXPR -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=ASBANGEXPR
@@ -19,14 +19,14 @@ func testError() {
                                  userInfo: nil)
 
 // Below are a number of test cases to make sure that various pattern and cast
-// expression forms are sufficient in pulling in th _NSBridgedError
+// expression forms are sufficient in pulling in the _NSBridgedError
 // conformance.
-#if NONE
-// NONE-NOT: TestError: _BridgedNSError
+#if VALUE
+// VALUE: TestError: _BridgedNSError
   let terr = getErr(); terr
 
 #elseif EMPTYCATCH
-// EMPTYCATCH-NOT: TestError: _BridgedNSError
+// EMPTYCATCH: TestError: _BridgedNSError
   do {
     throw TestError.TENone
   } catch {}
@@ -63,8 +63,7 @@ func testError() {
   } catch {}
 
 #elseif GENERICONLY
-// FIXME: THE BELOW IS WRONG! This alone doesn't pull in the conformance, but it should.
-// GENERICONLY-NOT: TestError: _BridgedNSError
+// GENERICONLY: TestError: _BridgedNSError
   func dyncast<T, U>(_ x: T) -> U {
     return x as! U
   }

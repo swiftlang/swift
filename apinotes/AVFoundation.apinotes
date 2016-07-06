@@ -243,3 +243,6 @@ Functions:
 Enumerators:
 - Name: AVMovieWritingAddMovieHeaderToDestination
   SwiftName: addMovieHeaderToDestination
+Tags:
+- Name: AVError
+  NSErrorDomain: AVFoundationErrorDomain

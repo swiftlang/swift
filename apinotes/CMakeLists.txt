@@ -3,15 +3,20 @@ set(SWIFT_API_NOTES_INPUTS
   AppKit
   AudioToolbox
   CloudKit
+  CoreBluetooth
   CoreData
   CoreGraphics
   CoreLocation
   CoreText
   Dispatch
+  EventKit
   Foundation
   GameKit
   HomeKit
+  Intents
+  LocalAuthentication
   MediaPlayer
+  MultipeerConnectivity
   NotificationCenter
   ObjectiveC
   PassKit
@@ -22,6 +27,7 @@ set(SWIFT_API_NOTES_INPUTS
   TVMLKit
   TVServices
   UIKit
+  WatchConnectivity
   WatchKit
   WebKit
   XCTest
