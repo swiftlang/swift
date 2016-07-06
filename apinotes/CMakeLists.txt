@@ -16,6 +16,7 @@ set(SWIFT_API_NOTES_INPUTS
   Intents
   LocalAuthentication
   MediaPlayer
+  Metal
   MultipeerConnectivity
   NotificationCenter
   ObjectiveC
