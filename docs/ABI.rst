@@ -259,9 +259,9 @@ enum in declaration order.
 Existential Container Layout
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Values of protocol type, protocol composition type, or "any" type
-(``protocol<>``) are laid out using **existential containers** (so-called
-because these types are "existential types" in type theory). 
+Values of protocol type, protocol composition type, or ``Any`` type are laid
+out using **existential containers** (so-called because these types are
+"existential types" in type theory).
 
 Opaque Existential Containers
 `````````````````````````````
@@ -346,8 +346,7 @@ All metadata records share a common header, with the following fields:
   * `Tuple metadata`_ has a kind of **9**.
   * `Function metadata`_ has a kind of **10**.
   * `Protocol metadata`_ has a kind of **12**. This is used for
-    protocol types, for protocol compositions, and for the "any" type
-    ``protocol<>``.
+    protocol types, for protocol compositions, and for the ``Any`` type.
   * `Metatype metadata`_ has a kind of **13**.
   * `Class metadata`_, instead of a kind, has an *isa pointer* in its kind slot,
     pointing to the class's metaclass record. This isa pointer is guaranteed
@@ -462,9 +461,9 @@ contain the following fields:
   `protocol descriptor`_ records, but are pre-calculated for convenience.
 
 - The **number of protocols** that make up the protocol composition is stored at
-  **offset 2**. For the "any" types ``protocol<>`` or ``protocol<class>``, this
+  **offset 2**. For the "any" types ``Any`` or ``Any : Class``, this
   is zero. For a single-protocol type ``P``, this is one. For a protocol
-  composition type ``protocol<P, Q, ...>``, this is the number of protocols.
+  composition type ``P & Q & ...``, this is the number of protocols.
 
 - The **protocol descriptor vector** begins at **offset 3**. This is an inline
   array of pointers to the `protocol descriptor`_ for every protocol in the
@@ -564,7 +563,7 @@ for ``T``, ``U``, and ``V`` in succession, as if laid out in a C struct::
   };
 
 If we add protocol requirements to the parameters, for example,
-``<T: Runcible, U: protocol<Fungible, Ansible>, V>``, then the type's generic
+``<T: Runcible, U: Fungible & Ansible, V>``, then the type's generic
 parameter vector contains witness tables for those protocols, as if laid out::
 
   struct GenericParameterVector {
