@@ -5,20 +5,37 @@
 // RUN: not cmp %t/a.hash %t/b.hash
 
 // BEGIN a.swift
-private struct S {
+struct A {
   func f2() -> Int {
     return 0
   }
+}
 
-  var y: Int = 0
+enum B {
+  case x, y
+  func f2() -> Int {
+    return 0
+  }
 }
 
 // BEGIN b.swift
-private struct S {
+struct A {
   func f2() -> Int {
     return 0
   }
 
-  var x: Int = 0
-  var y: Int = 0
+  private func f3() -> Int {
+    return 1
+  }
+}
+
+enum B {
+  case x, y
+  func f2() -> Int {
+    return 0
+  }
+
+  private func f3() -> Int {
+    return 1
+  }
 }
