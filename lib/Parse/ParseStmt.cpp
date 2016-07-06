@@ -1390,7 +1390,23 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
   // by a conditional binding. The else branch does *not* see these variables.
   {
     Scope S(this, ScopeKind::IfVars);
-  
+
+    auto recoverWithCond = [&](ParserStatus Status,
+                               StmtCondition Condition) -> ParserResult<Stmt> {
+      if (Condition.empty()) {
+        SmallVector<StmtConditionElement, 1> ConditionElems;
+        ConditionElems.emplace_back(new (Context) ErrorExpr(IfLoc));
+        Condition = Context.AllocateCopy(ConditionElems);
+      }
+      auto EndLoc = Condition.back().getEndLoc();
+      return makeParserResult(
+          Status,
+          new (Context) IfStmt(
+              LabelInfo, IfLoc, Condition,
+              BraceStmt::create(Context, EndLoc, {}, EndLoc, /*implicit=*/true),
+              SourceLoc(), nullptr));
+    };
+
     if (Tok.is(tok::l_brace)) {
       SourceLoc LBraceLoc = Tok.getLoc();
       diagnose(IfLoc, diag::missing_condition_after_if)
@@ -1401,17 +1417,14 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
     } else {
       Status |= parseStmtCondition(Condition, diag::expected_condition_if,
                                    StmtKind::If);
-      if (Status.isError() || Status.hasCodeCompletion()) {
-        // FIXME: better recovery
-        return makeParserResult<Stmt>(Status, nullptr);
-      }
+      if (Status.isError() || Status.hasCodeCompletion())
+        return recoverWithCond(Status, Condition);
     }
 
     NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
-    if (NormalBody.isNull())
-      return nullptr; // FIXME: better recovery
-
     Status |= NormalBody;
+    if (NormalBody.isNull())
+      return recoverWithCond(Status, Condition);
   }
 
   // The else branch, if any, is outside of the scope of the condition.
@@ -1441,7 +1454,22 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
   ParserStatus Status;
   StmtCondition Condition;
   ParserResult<BraceStmt> Body;
-  
+
+  auto recoverWithCond = [&](ParserStatus Status,
+                             StmtCondition Condition) -> ParserResult<Stmt> {
+    if (Condition.empty()) {
+      SmallVector<StmtConditionElement, 1> ConditionElems;
+      ConditionElems.emplace_back(new (Context) ErrorExpr(GuardLoc));
+      Condition = Context.AllocateCopy(ConditionElems);
+    }
+    auto EndLoc = Condition.back().getEndLoc();
+    return makeParserResult(
+        Status,
+        new (Context) GuardStmt(
+            GuardLoc, Condition,
+            BraceStmt::create(Context, EndLoc, {}, EndLoc, /*implicit=*/true)));
+  };
+
   if (Tok.is(tok::l_brace)) {
     SourceLoc LBraceLoc = Tok.getLoc();
     diagnose(GuardLoc, diag::missing_condition_after_guard)
@@ -1454,7 +1482,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
                                  StmtKind::Guard);
     if (Status.isError() || Status.hasCodeCompletion()) {
       // FIXME: better recovery
-      return makeParserResult<Stmt>(Status, nullptr);
+      return recoverWithCond(Status, Condition);
     }
   }
 
@@ -1462,7 +1490,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
   // then the parser is hopelessly lost - just give up instead of spewing.
   if (parseToken(tok::kw_else, diag::expected_else_after_guard) &&
       Tok.isNot(tok::l_brace))
-    return makeParserError();
+    return recoverWithCond(Status, Condition);
 
   // Before parsing the body, disable all of the bound variables so that they
   // cannot be used unbound.
@@ -1479,8 +1507,8 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
 
   Body = parseBraceItemList(diag::expected_lbrace_after_guard);
   if (Body.isNull())
-    return nullptr; // FIXME: better recovery
-  
+    return recoverWithCond(Status, Condition);
+
   Status |= Body;
   
   return makeParserResult(Status,
@@ -1810,6 +1838,21 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
   ParserStatus Status;
   StmtCondition Condition;
 
+  auto recoverWithCond = [&](ParserStatus Status,
+                             StmtCondition Condition) -> ParserResult<Stmt> {
+    if (Condition.empty()) {
+      SmallVector<StmtConditionElement, 1> ConditionElems;
+      ConditionElems.emplace_back(new (Context) ErrorExpr(WhileLoc));
+      Condition = Context.AllocateCopy(ConditionElems);
+    }
+    auto EndLoc = Condition.back().getEndLoc();
+    return makeParserResult(
+        Status,
+        new (Context) WhileStmt(
+            LabelInfo, WhileLoc, Condition,
+            BraceStmt::create(Context, EndLoc, {}, EndLoc, /*implicit=*/true)));
+  };
+
   if (Tok.is(tok::l_brace)) {
     SourceLoc LBraceLoc = Tok.getLoc();
     diagnose(WhileLoc, diag::missing_condition_after_while)
@@ -1820,18 +1863,15 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
   } else {
     Status |= parseStmtCondition(Condition, diag::expected_condition_while,
                                  StmtKind::While);
-    if (Status.isError() || Status.hasCodeCompletion()) {
-      // FIXME: better recovery
-      return makeParserResult<Stmt>(Status, nullptr);
-    }
+    if (Status.isError() || Status.hasCodeCompletion())
+      return recoverWithCond(Status, Condition);
   }
 
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::expected_lbrace_after_while);
-  if (Body.isNull())
-    return nullptr; // FIXME: better recovery
-
   Status |= Body;
+  if (Body.isNull())
+    return recoverWithCond(Status, Condition);
 
   return makeParserResult(
       Status, new (Context) WhileStmt(LabelInfo, WhileLoc, Condition,
