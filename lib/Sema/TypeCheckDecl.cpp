@@ -4047,18 +4047,21 @@ public:
     if (simpleRepr->getIdentifier() != TC.Context.Id_Self)
       return false;
 
+    // 'Self' in protocol extensions is not dynamic 'Self'.
+    DeclContext *dc = func->getDeclContext();
+    for (auto parentDC = dc; !parentDC->isModuleScopeContext();
+         parentDC = parentDC->getParent()) {
+      if (parentDC->getAsProtocolExtensionContext()) {
+        return false;
+      }
+    }
+
     // Dynamic 'Self' is only permitted on methods.
-    auto dc = func->getDeclContext();
     if (!dc->isTypeContext()) {
       TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_non_method,
                   dc->isLocalContext());
       simpleRepr->setInvalid();
       return true;
-    }
-
-    // 'Self' in protocol extensions is not dynamic 'Self'.
-    if (dc->getAsProtocolExtensionContext()) {
-      return false;
     }
 
     // 'Self' is only a dynamic self on class methods and
