@@ -332,40 +332,36 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
 
   /// The minimum of `x` and `y`.  Implements the IEEE 754 `minNum` operation.
   ///
-  /// Returns `x` if `x <= y`, `y` if `y < x`, and whichever of `x` or `y`
-  /// is a number if the other is NaN.  The result is NaN only if both
-  /// arguments are NaN.
-  ///
-  /// This function is an implementation hook to be used by the free function
-  /// min(Self, Self) -> Self so that we get the IEEE 754 behavior with regard
-  /// to NaNs.
+  /// If either of `x` or `y` is a signaling NaN, the result is a quiet NaN.
+  /// Otherwise, the result is `x` if x <= y, `y` if x > y, and whichever
+  /// is a number if the other is a quiet NaN.  If both `x` and `y` are quiet
+  /// NaNs, a quiet NaN is returned.
   static func minimum(_ x: Self, _ y: Self) -> Self
 
   /// The maximum of `x` and `y`.  Implements the IEEE 754 `maxNum` operation.
   ///
-  /// Returns `x` if `x >= y`, `y` if `y > x`, and whichever of `x` or `y`
-  /// is a number if the other is NaN.  The result is NaN only if both
-  /// arguments are NaN.
-  ///
-  /// This function is an implementation hook to be used by the free function
-  /// max(Self, Self) -> Self so that we get the IEEE 754 behavior with regard
-  /// to NaNs.
+  /// If either of `x` or `y` is a signaling NaN, the result is a quiet NaN.
+  /// Otherwise, the result is `x` if x > y, `y` if x <= y, and whichever
+  /// is a number if the other is a quiet NaN.  If both `x` and `y` are quiet
+  /// NaNs, a quiet NaN is returned.
   static func maximum(_ x: Self, _ y: Self) -> Self
 
   /// Whichever of `x` or `y` has lesser magnitude.  Implements the IEEE 754
   /// `minNumMag` operation.
   ///
-  /// Returns `x` if abs(x) <= abs(y), `y` if abs(y) < abs(x), and whichever of
-  /// `x` or `y` is a number if the other is NaN.  The result is NaN
-  /// only if both arguments are NaN.
+  /// If either of `x` or `y` is a signaling NaN, the result is a quiet NaN.
+  /// Otherwise, the result is `x` if abs(x) <= abs(y), `y` if abs(x) > abs(y),
+  /// and whichever  is a number if the other is a quiet NaN.  If both `x` and
+  /// `y` are quiet NaNs, a quiet NaN is returned.
   static func minimumMagnitude(_ x: Self, _ y: Self) -> Self
 
   /// Whichever of `x` or `y` has greater magnitude.  Implements the IEEE 754
   /// `maxNumMag` operation.
   ///
-  /// Returns `x` if abs(x) >= abs(y), `y` if abs(y) > abs(x), and whichever of
-  /// `x` or `y` is a number if the other is NaN.  The result is NaN
-  /// only if both arguments are NaN.
+  /// If either of `x` or `y` is a signaling NaN, the result is a quiet NaN.
+  /// Otherwise, the result is `x` if abs(x) > abs(y), `y` if abs(x) <= abs(y),
+  /// and whichever  is a number if the other is a quiet NaN.  If both `x` and
+  /// `y` are quiet NaNs, a quiet NaN is returned.
   static func maximumMagnitude(_ x: Self, _ y: Self) -> Self
 
   /// The least representable value that compares greater than `self`.
@@ -710,22 +706,38 @@ extension FloatingPoint {
   */
 
   public static func minimum(_ left: Self, _ right: Self) -> Self {
+    if left.isSignalingNaN || right.isSignalingNaN {
+      //  Produce a quiet NaN matching platform arithmetic behavior.
+      return left + right
+    }
     if left <= right || right.isNaN { return left }
     return right
   }
   
   public static func maximum(_ left: Self, _ right: Self) -> Self {
-    if left >= right || right.isNaN { return left }
+    if left.isSignalingNaN || right.isSignalingNaN {
+      //  Produce a quiet NaN matching platform arithmetic behavior.
+      return left + right
+    }
+    if left > right || right.isNaN { return left }
     return right
   }
   
   public static func minimumMagnitude(_ left: Self, _ right: Self) -> Self {
+    if left.isSignalingNaN || right.isSignalingNaN {
+      //  Produce a quiet NaN matching platform arithmetic behavior.
+      return left + right
+    }
     if abs(left) <= abs(right) || right.isNaN { return left }
     return right
   }
   
   public static func maximumMagnitude(_ left: Self, _ right: Self) -> Self {
-    if abs(left) >= abs(right) || right.isNaN { return left }
+    if left.isSignalingNaN || right.isSignalingNaN {
+      //  Produce a quiet NaN matching platform arithmetic behavior.
+      return left + right
+    }
+    if abs(left) > abs(right) || right.isNaN { return left }
     return right
   }
 
