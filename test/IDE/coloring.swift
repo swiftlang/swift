@@ -490,6 +490,19 @@ let black = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>
 
+func keywordAsLabel1(in: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel1(in: <type>Int</type>) {}
+func keywordAsLabel2(for: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel2(for: <type>Int</type>) {}
+
+func foo1() {
+// CHECK: <kw>func</kw> foo1() {
+  keywordAsLabel1(in: 1)
+// CHECK: keywordAsLabel1(in: <int>1</int>)
+  keywordAsLabel2(for: 1)
+// CHECK: keywordAsLabel2(for: <int>1</int>)
+}
+
 // Keep this as the last test
 /**
   Trailing off ...
