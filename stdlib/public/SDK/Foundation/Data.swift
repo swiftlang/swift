@@ -266,20 +266,11 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
         }
     }
 
-    @available(*, unavailable, renamed: "count")
-    public var length : Int {
-        get {
-            fatalError()
-        }
-        set {
-            fatalError()
-        }
-    }
 
     private func _getUnsafeBytesPointer() -> UnsafePointer<Void> {
         return _mapUnmanaged { return $0.bytes }
     }
-
+    
     /// Access the bytes in the data.
     ///
     /// - warning: The byte pointer argument should not be stored and used outside of the lifetime of the call to the closure.
@@ -638,6 +629,21 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     public func makeIterator() -> Data.Iterator {
         return IndexingIterator(_elements: self)
     }
+    
+    // MARK: -
+    //
+    
+    @available(*, unavailable, renamed: "count")
+    public var length : Int {
+        get { fatalError() }
+        set { fatalError() }
+    }
+    
+    @available(*, unavailable, message: "use withUnsafeBytes instead")
+    public var bytes: UnsafePointer<Void> { fatalError() }
+    
+    @available(*, unavailable, message: "use withUnsafeMutableBytes instead")
+    public var mutableBytes: UnsafeMutablePointer<Void> { fatalError() }
 }
 
 /// Returns `true` if the two `Data` arguments are equal.
