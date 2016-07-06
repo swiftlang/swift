@@ -10,11 +10,4 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import Intents
-import Foundation
-
-// @available(iOS, introduced: 10.0)
-// @available(OSX, introduced: 10.12)
-extension INIntentErrorCode : _BridgedNSError {
-  public static var _nsErrorDomain: String { return INIntentErrorDomain }
-}
+// IMPORTANT: This file is required by the build system. Don't remove it.
