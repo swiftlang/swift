@@ -172,7 +172,7 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
                 tgts += StdlibDeploymentTarget.AppleWatchSimulator.targets
 
         build_script_opts.append("--stdlib-deployment-targets=" +
-                                     " ".join([tgt.name for tgt in tgts]))
+                                 " ".join([tgt.name for tgt in tgts]))
 
     # Filter the swift-sdks parameter
     build_script_impl_opts = [opt for opt in build_script_impl_opts
