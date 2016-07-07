@@ -67,7 +67,7 @@ add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
-  C_COMPILE_FLAGS ${swift_runtime_compile_flags}
+  C_COMPILE_FLAGS ${swift_runtime_compile_flags} -DswiftCore_EXPORTS
   INSTALL_IN_COMPONENT never_install)
 
 set(ELFISH_SDKS)
