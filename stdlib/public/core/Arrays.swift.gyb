@@ -1332,7 +1332,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       Swift.max(newCount, _growArrayCapacity(capacity))
       : newCount)
 
-    (self._buffer.firstElementAddress + oldCount).initializeFrom(newElements)
+    (self._buffer.firstElementAddress + oldCount).initialize(from: newElements)
     self._buffer.count = newCount
   }
 

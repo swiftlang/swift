@@ -355,8 +355,8 @@ UnsafeMutablePointerTestSuite.test("moveInitializeFrom") {
   }
 }
 
-UnsafeMutablePointerTestSuite.test("initializeFrom") {
-  let check = checkPtr(UnsafeMutablePointer.initializeFrom, false)
+UnsafeMutablePointerTestSuite.test("initialize:from") {
+  let check = checkPtr(UnsafeMutablePointer.initialize(from:count:), false)
   check(Check.Disjoint)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
@@ -365,8 +365,8 @@ UnsafeMutablePointerTestSuite.test("initializeFrom") {
   }
 }
 
-UnsafeMutablePointerTestSuite.test("initializeFrom.Right") {
-  let check = checkPtr(UnsafeMutablePointer.initializeFrom, false)
+UnsafeMutablePointerTestSuite.test("initialize:from.Right") {
+  let check = checkPtr(UnsafeMutablePointer.initialize(from:count:), false)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -374,7 +374,7 @@ UnsafeMutablePointerTestSuite.test("initializeFrom.Right") {
   }
 }
 
-UnsafeMutablePointerTestSuite.test("initializeFrom/immutable") {  
+UnsafeMutablePointerTestSuite.test("initialize:from/immutable") {
   var ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 3)
   defer {
     ptr.deinitialize(count: 3)
@@ -382,7 +382,7 @@ UnsafeMutablePointerTestSuite.test("initializeFrom/immutable") {
   }
   let source = (0..<3).map(Missile.init)
   source.withUnsafeBufferPointer { bufferPtr in
-    ptr.initializeFrom(bufferPtr.baseAddress!, count: 3)
+    ptr.initialize(from: bufferPtr.baseAddress!, count: 3)
     expectEqual(0, ptr[0].number)
     expectEqual(1, ptr[1].number)
     expectEqual(2, ptr[2].number)

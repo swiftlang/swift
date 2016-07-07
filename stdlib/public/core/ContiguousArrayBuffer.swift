@@ -383,7 +383,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     _sanityCheck(bounds.upperBound <= count)
 
     let initializedCount = bounds.upperBound - bounds.lowerBound
-    target.initializeFrom(
+    target.initialize(from: 
       firstElementAddress + bounds.lowerBound,
       count: initializedCount)
     _fixLifetime(owner)
@@ -504,7 +504,7 @@ public func += <Element, C : Collection>(
 
   if _fastPath(newCount <= lhs.capacity) {
     lhs.count = newCount
-    (lhs.firstElementAddress + oldCount).initializeFrom(rhs)
+    (lhs.firstElementAddress + oldCount).initialize(from: rhs)
   }
   else {
     var newLHS = _ContiguousArrayBuffer<Element>(
@@ -515,7 +515,7 @@ public func += <Element, C : Collection>(
       lhs.firstElementAddress, count: oldCount)
     lhs.count = 0
     swap(&lhs, &newLHS)
-    (lhs.firstElementAddress + oldCount).initializeFrom(rhs)
+    (lhs.firstElementAddress + oldCount).initialize(from: rhs)
   }
 }
 

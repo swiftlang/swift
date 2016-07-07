@@ -315,8 +315,8 @@ public struct ${Self}<Pointee>
   ///
   /// - Precondition: `count >= 0`
   ///
-  /// - Precondition: `self` either precedes `source` or follows `source +
-  ///   count - 1`.
+  /// - Precondition: The memory regions `source..<source + count`
+  ///   and `self..<self + count` are disjoint.
   ///
   /// - Precondition: The memory at `self..<self + count` is uninitialized
   ///   and the `Pointees` at `source..<source + count` are
@@ -324,13 +324,13 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
-  public func initializeFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+  public func initialize(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
-      count >= 0, "${Self}.initializeFrom with negative count")
+      count >= 0, "${Self}.initialize with negative count")
     _debugPrecondition(
       UnsafePointer(self) + count <= source || 
       source + count <= UnsafePointer(self),
-      "${Self}.initializeFrom non-following overlapping range")
+      "${Self}.initialize overlapping range")
     Builtin.copyArray(
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
@@ -346,7 +346,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The `Pointee`s at `self..<self + count` are
   ///   initialized.
-  public func initializeFrom<C : Collection>(_ source: C)
+  public func initialize<C : Collection>(from source: C)
     where C.Iterator.Element == Pointee {
     source._copyContents(initializing: self)
   }

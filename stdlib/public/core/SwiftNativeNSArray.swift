@@ -84,7 +84,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 
       // These objects are "returned" at +0, so treat them as values to
       // avoid retains.
-      UnsafeMutablePointer<Int>(aBuffer).initializeFrom(
+      UnsafeMutablePointer<Int>(aBuffer).initialize(from: 
         UnsafeMutablePointer(objects.baseAddress! + range.location),
         count: range.length)
     }
