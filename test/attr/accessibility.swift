@@ -14,9 +14,19 @@ public // expected-error {{duplicate modifier}}
 internal // expected-error {{duplicate modifier}}
 func triplicateAttrChanged() {}
 
+private // expected-note 3 {{modifier already specified here}}
+public // expected-error {{duplicate modifier}}
+internal // expected-error {{duplicate modifier}}
+fileprivate // expected-error {{duplicate modifier}}
+func quadruplicateAttrChanged() {}
+
 private(set)
 public
 var customSetter = 0
+
+fileprivate(set)
+public
+var customSetter2 = 0
 
 private(set) // expected-note {{modifier already specified here}}
 public(set) // expected-error {{duplicate modifier}}
