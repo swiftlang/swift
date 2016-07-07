@@ -168,6 +168,18 @@ func foo(n: Float) -> Int {
     return 100009
 }
 
+///- returns: single-line, no space
+// CHECK: ///- <doc-comment-field>returns</doc-comment-field>: single-line, no space
+
+/// - returns: single-line, 1 space
+// CHECK: /// - <doc-comment-field>returns</doc-comment-field>: single-line, 1 space
+
+///  - returns: single-line, 2 spaces
+// CHECK: ///  - <doc-comment-field>returns</doc-comment-field>: single-line, 2 spaces
+
+///       - returns: single-line, more spaces
+// CHECK: ///       - <doc-comment-field>returns</doc-comment-field>: single-line, more spaces
+
 // CHECK: <kw>protocol</kw> Prot {
 protocol Prot {
   // CHECK: <kw>typealias</kw> Blarg

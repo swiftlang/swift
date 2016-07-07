@@ -245,7 +245,7 @@ static const char *const RegexStrURL =
 #define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
   #Keyword "|"
 static const char *const RegexStrDocCommentField =
-  "^[ ]?- ("
+  "^[ ]*- ("
 #include "swift/Markup/SimpleFields.def"
   "returns):";
 
