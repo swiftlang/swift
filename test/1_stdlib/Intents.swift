@@ -1,8 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: objc_interop
 
-// Intents is only public on OS X and iOS
-// UNSUPPORTED: OS=watchos, OS=tvos
+// UNSUPPORTED: OS=watchos
+// UNSUPPORTED: OS=tvos
 
 // XFAIL: OS=macosx
 
