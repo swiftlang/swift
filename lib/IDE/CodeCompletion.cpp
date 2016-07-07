@@ -4062,8 +4062,9 @@ public:
 
     bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
     bool missingAccess = !isKeywordSpecified("private") &&
-                         !isKeywordSpecified("public") &&
-                         !isKeywordSpecified("internal");
+                         !isKeywordSpecified("fileprivate") &&
+                         !isKeywordSpecified("internal") &&
+                         !isKeywordSpecified("public");
     bool missingOverride = Reason == DeclVisibilityKind::MemberOfSuper &&
                            !isKeywordSpecified("override");
 
