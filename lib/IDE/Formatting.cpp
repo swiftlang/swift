@@ -477,7 +477,7 @@ class FormatWalker : public SourceEntityWalker {
         return;
       SourceLoc PrevLoc;
       auto FindAlignLoc = [&](SourceLoc Loc) {
-        if (PrevLoc.isValid() &&
+        if (PrevLoc.isValid() && Loc.isValid() &&
             SM.getLineNumber(PrevLoc) == SM.getLineNumber(Loc))
           return PrevLoc;
         return PrevLoc = Loc;
