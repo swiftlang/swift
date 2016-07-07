@@ -448,9 +448,15 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       SN.Kind = SyntaxStructureKind::Parameter;
       SN.NameRange = NR;
       SN.BodyRange = charSourceRangeFromSourceRange(SM, E->getSourceRange());
-      if (NR.isValid())
+      if (NR.isValid()) {
         SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
                                                                   E->getEndLoc()));
+        passTokenNodesUntil(NR.getStart(),
+                            PassNodesBehavior::ExcludeNodeAtLocation);
+        if (!TokenNodes.empty())
+          const_cast<SyntaxNode&>(TokenNodes.front()).Kind = SyntaxNodeKind::
+            Identifier;
+      }
       else
         SN.Range = SN.BodyRange;
 
@@ -515,6 +521,17 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     }
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
+  } else if (auto *Tup = dyn_cast<TupleExpr>(E)) {
+    for (unsigned I = 0; I < Tup->getNumElements(); ++ I) {
+      SourceLoc NameLoc = Tup->getElementNameLoc(I);
+      if (NameLoc.isValid()) {
+        passTokenNodesUntil(NameLoc, PassNodesBehavior::ExcludeNodeAtLocation);
+        if (!TokenNodes.empty()) {
+          const_cast<SyntaxNode&>(TokenNodes.front()).Kind = SyntaxNodeKind::
+            Identifier;
+        }
+      }
+    }
   }
 
   return { true, E };
