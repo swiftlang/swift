@@ -452,7 +452,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     ///
     /// This will resize the data if required, to fit the entire contents of `data`.
     ///
-    /// - precondition: The bounds of `subrange` must be valid indicies of the collection.
+    /// - precondition: The bounds of `subrange` must be valid indices of the collection.
     /// - parameter subrange: The range in the data to replace. If `subrange.lowerBound == data.count && subrange.count == 0` then this operation is an append.
     /// - parameter data: The replacement data.
     public mutating func replaceSubrange(_ subrange: Range<Index>, with data: Data) {
@@ -469,7 +469,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     ///
     /// This will resize the data if required, to fit the entire contents of `buffer`.
     ///
-    /// - precondition: The bounds of `subrange` must be valid indicies of the collection.
+    /// - precondition: The bounds of `subrange` must be valid indices of the collection.
     /// - parameter subrange: The range in the data to replace.
     /// - parameter buffer: The replacement bytes.
     public mutating func replaceSubrange<SourceType>(_ subrange: Range<Index>, with buffer: UnsafeBufferPointer<SourceType>) {
@@ -486,7 +486,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     ///
     /// This will resize the data if required, to fit the entire contents of `newElements`.
     ///
-    /// - precondition: The bounds of `subrange` must be valid indicies of the collection.
+    /// - precondition: The bounds of `subrange` must be valid indices of the collection.
     /// - parameter subrange: The range in the data to replace.
     /// - parameter newElements: The replacement bytes.
     public mutating func replaceSubrange<ByteCollection : Collection where ByteCollection.Iterator.Element == Data.Iterator.Element>(_ subrange: Range<Index>, with newElements: ByteCollection) {

@@ -1251,8 +1251,8 @@ function(add_swift_library name)
               ${SWIFTLIB_SWIFT_COMPILE_FLAGS_WATCHOS})
         elseif("${sdk}" STREQUAL "WINDOWS")
           # FIXME(SR2005) static and shared are not mutually exclusive; however
-          # since we do a single build of the sources, this doesnt work for
-          # building both simultaneously.  Effecitvely, only shared builds are
+          # since we do a single build of the sources, this doesn't work for
+          # building both simultaneously.  Effectively, only shared builds are
           # supported on windows currently.
           if(SWIFTLIB_SHARED)
             list(APPEND swiftlib_swift_compile_flags_all -D_USRDLL)
