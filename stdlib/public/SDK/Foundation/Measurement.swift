@@ -296,3 +296,15 @@ extension Measurement : _ObjectiveCBridgeable {
         return Measurement(value: source!.doubleValue, unit: u)
     }
 }
+
+// This workaround is required for the time being, because Swift doesn't support covariance for Measurement (26607639)
+@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+extension MeasurementFormatter {
+    public func string<UnitType: Unit>(from measurement: Measurement<UnitType>) -> String {
+        if let result = string(for: measurement) {
+            return result
+        } else {
+            return ""
+        }
+    }
+}
