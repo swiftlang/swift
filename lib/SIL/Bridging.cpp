@@ -170,6 +170,11 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     }
   }
   
+  // `Any` can bridge to `AnyObject` (`id` in ObjC).
+  if (Context.LangOpts.EnableIdAsAny && t->isAny()) {
+    return Context.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType();
+  }
+  
   if (auto funTy = t->getAs<FunctionType>()) {
     switch (funTy->getExtInfo().getSILRepresentation()) {
     // Functions that are already represented as blocks or C function pointers

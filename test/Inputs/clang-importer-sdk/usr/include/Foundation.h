@@ -1039,6 +1039,9 @@ extern NSString *NSHTTPRequestKey;
 - (id _Nonnull)makesId;
 - (void)takesId:(id _Nonnull)x;
 - (void)takesArrayOfId:(const id _Nonnull * _Nonnull)x;
+- (void)takesNullableId:(id _Nullable)x;
+
+@property (strong) id propertyOfId;
 
 @end
 
