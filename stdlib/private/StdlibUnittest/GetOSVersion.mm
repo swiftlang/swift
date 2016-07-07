@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(__APPLE__)
 #include <Foundation/Foundation.h>
 
 #include "swift/Runtime/Config.h"
@@ -33,4 +34,5 @@ swift_stdlib_getSystemVersionPlistProperty(const char *PropertyName) {
   [SystemVersion release];
   return Result;
 }
+#endif
 
