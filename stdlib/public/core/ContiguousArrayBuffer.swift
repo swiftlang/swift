@@ -383,9 +383,8 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     _sanityCheck(bounds.upperBound <= count)
 
     let initializedCount = bounds.upperBound - bounds.lowerBound
-    target.initialize(from: 
-      firstElementAddress + bounds.lowerBound,
-      count: initializedCount)
+    target.initialize(
+      from: firstElementAddress + bounds.lowerBound, count: initializedCount)
     _fixLifetime(owner)
     return target + initializedCount
   }
@@ -511,8 +510,8 @@ public func += <Element, C : Collection>(
       uninitializedCount: newCount,
       minimumCapacity: _growArrayCapacity(lhs.capacity))
 
-    newLHS.firstElementAddress.moveInitializeFrom(
-      lhs.firstElementAddress, count: oldCount)
+    newLHS.firstElementAddress.moveInitialize(
+      from: lhs.firstElementAddress, count: oldCount)
     lhs.count = 0
     swap(&lhs, &newLHS)
     (lhs.firstElementAddress + oldCount).initialize(from: rhs)
@@ -652,9 +651,8 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
         uninitializedCount: newCapacity, minimumCapacity: 0)
       p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
-      newResult.firstElementAddress.moveInitializeFrom(
-        result.firstElementAddress,
-        count: result.capacity)
+      newResult.firstElementAddress.moveInitialize(
+        from: result.firstElementAddress, count: result.capacity)
       result.count = 0
       swap(&result, &newResult)
     }

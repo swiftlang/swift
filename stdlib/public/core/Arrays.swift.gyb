@@ -1885,7 +1885,7 @@ internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
     backingStart.deinitialize(count: sourceOffset)
 
     // Move the head items
-    destStart.moveInitializeFrom(sourceStart, count: headCount)
+    destStart.moveInitialize(from: sourceStart, count: headCount)
 
     // Destroy unused source items
     oldStart.deinitialize(count: oldCount)
@@ -1893,7 +1893,7 @@ internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
     initializeNewElements.call(newStart, count: newCount)
 
     // Move the tail items
-    newEnd.moveInitializeFrom(oldStart + oldCount, count: tailCount)
+    newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
 
     // Destroy any items that may be lurking in a _SliceBuffer after
     // its real last element

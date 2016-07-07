@@ -291,20 +291,8 @@ func checkPtr(
   }
 }
 
-UnsafeMutablePointerTestSuite.test("moveInitializeBackwardFrom") {
-  let check = checkPtr(UnsafeMutablePointer.moveInitializeBackwardFrom, false)
-  check(Check.RightOverlap)
-  check(Check.Disjoint)
-
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-    check(Check.LeftOverlap)
-  }
-}
-
-UnsafeMutablePointerTestSuite.test("moveAssignFrom") {
-  let check = checkPtr(UnsafeMutablePointer.moveAssignFrom, true)
+UnsafeMutablePointerTestSuite.test("moveAssign:from") {
+  let check = checkPtr(UnsafeMutablePointer.moveAssign, true)
   check(Check.Disjoint)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
@@ -313,8 +301,8 @@ UnsafeMutablePointerTestSuite.test("moveAssignFrom") {
   }
 }
 
-UnsafeMutablePointerTestSuite.test("moveAssignFrom.Right") {
-  let check = checkPtr(UnsafeMutablePointer.moveAssignFrom, true)
+UnsafeMutablePointerTestSuite.test("moveAssign:from.Right") {
+  let check = checkPtr(UnsafeMutablePointer.moveAssign, true)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -322,37 +310,18 @@ UnsafeMutablePointerTestSuite.test("moveAssignFrom.Right") {
   }
 }
 
-UnsafeMutablePointerTestSuite.test("assignFrom") {
-  let check = checkPtr(UnsafeMutablePointer.assignFrom, true)
+UnsafeMutablePointerTestSuite.test("assign:from") {
+  let check = checkPtr(UnsafeMutablePointer.assign, true)
   check(Check.LeftOverlap)
   check(Check.Disjoint)
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-    check(Check.RightOverlap)
-  }
-}
-
-UnsafeMutablePointerTestSuite.test("assignBackwardFrom") {
-  let check = checkPtr(UnsafeMutablePointer.assignBackwardFrom, true)
   check(Check.RightOverlap)
-  check(Check.Disjoint)
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-    check(Check.LeftOverlap)
-  }
 }
 
-UnsafeMutablePointerTestSuite.test("moveInitializeFrom") {
-  let check = checkPtr(UnsafeMutablePointer.moveInitializeFrom, false)
+UnsafeMutablePointerTestSuite.test("moveInitialize:from") {
+  let check = checkPtr(UnsafeMutablePointer.moveInitialize, false)
   check(Check.LeftOverlap)
   check(Check.Disjoint)
-  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-    check(Check.RightOverlap)
-  }
+  check(Check.RightOverlap)
 }
 
 UnsafeMutablePointerTestSuite.test("initialize:from") {
@@ -389,9 +358,7 @@ UnsafeMutablePointerTestSuite.test("initialize:from/immutable") {
   }
 }
 
-% for assign in ['assignFrom', 'assignBackwardFrom']:
-
-UnsafeMutablePointerTestSuite.test("${assign}/immutable") {  
+UnsafeMutablePointerTestSuite.test("assign/immutable") {
   var ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 2)
   defer {
     ptr.deinitialize(count: 2)
@@ -401,13 +368,11 @@ UnsafeMutablePointerTestSuite.test("${assign}/immutable") {
   (ptr + 1).initialize(with: Missile(2))
   let source = (3..<5).map(Missile.init)
   source.withUnsafeBufferPointer { bufferPtr in
-    ptr.${assign}(bufferPtr.baseAddress!, count: 2)
+    ptr.assign(from: bufferPtr.baseAddress!, count: 2)
     expectEqual(3, ptr[0].number)
     expectEqual(4, ptr[1].number)
   }
 }
-
-% end
 
 UnsafePointerTestSuite.test("customMirror") {
   // Ensure that the custom mirror works properly, including when the raw value
