@@ -3086,18 +3086,39 @@ namespace {
                                       
     }
     
+    Expr *lookThroughExistentialErasures(Expr *argExpr) {
+      argExpr = argExpr->getSemanticsProvidingExpr();
+
+      // When converting from an existential type to a more general existential,
+      // the inner existential is opened first. Look through this pattern.
+      if (auto open = dyn_cast<OpenExistentialExpr>(argExpr)) {
+        auto subExpr = open->getSubExpr()->getSemanticsProvidingExpr();
+        while (auto erasure = dyn_cast<ErasureExpr>(subExpr)) {
+          subExpr = erasure->getSubExpr()->getSemanticsProvidingExpr();
+        }
+        // If we drilled down to the underlying opened existential, look
+        // through it.
+        if (subExpr == open->getOpaqueValue())
+          return open->getExistentialValue();
+        // TODO: Maybe there are other peepholes we could attempt on opened
+        // existentials?
+        return open;
+      }
+      
+      // Look through ErasureExprs and try to bridge the underlying
+      // concrete value instead.
+      while (auto erasure = dyn_cast<ErasureExpr>(argExpr))
+        argExpr = erasure->getSubExpr()->getSemanticsProvidingExpr();
+      return argExpr;
+    }
+    
     /// Emit an argument expression that we know will be bridged to an
     /// Objective-C object.
     ManagedValue emitNativeToBridgedObjectArgument(Expr *argExpr,
                                                SILType loweredSubstArgType,
                                                AbstractionPattern origParamType,
                                                SILParameterInfo param) {
-      argExpr = argExpr->getSemanticsProvidingExpr();
-      
-      // Look through ErasureExprs and try to bridge the underlying
-      // concrete value instead.
-      while (auto erasure = dyn_cast<ErasureExpr>(argExpr))
-        argExpr = erasure->getSubExpr();
+      argExpr = lookThroughExistentialErasures(argExpr);
       
       // Emit the argument.
       auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
