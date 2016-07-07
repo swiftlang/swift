@@ -95,6 +95,9 @@ llvm::cl::opt<bool> SILVerifyWithoutInvalidation(
     "sil-verify-without-invalidation", llvm::cl::init(false),
     llvm::cl::desc("Verify after passes even if the pass has not invalidated"));
 
+llvm::cl::opt<bool> SILDisableSkippingPasses(
+    "sil-disable-skipping-passes", llvm::cl::init(false),
+    llvm::cl::desc("Do not skip passes even if nothing was changed"));
 
 static llvm::ManagedStatic<std::vector<unsigned>> DebugPassNumbers;
 
@@ -290,7 +293,8 @@ void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
 
     // If nothing changed since the last run of this pass, we can skip this
     // pass.
-    if (completedPasses.test((size_t)SFT->getPassKind())) {
+    if (completedPasses.test((size_t)SFT->getPassKind()) &&
+        !SILDisableSkippingPasses) {
       if (SILPrintPassName)
         llvm::dbgs() << "(Skip) Stage: " << StageName
                      << " Pass: " << SFT->getName()
