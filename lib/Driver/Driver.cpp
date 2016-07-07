@@ -975,6 +975,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.DebugInfoKind = IRGenDebugInfoKind::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
       OI.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+    else if (A->getOption().matches(options::OPT_gdwarf_types))
+      OI.DebugInfoKind = IRGenDebugInfoKind::DwarfTypes;
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
@@ -985,7 +987,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     // top-level output.
     OI.ShouldGenerateModule = true;
     OI.ShouldTreatModuleAsTopLevelOutput = true;
-  } else if ((OI.DebugInfoKind == IRGenDebugInfoKind::Normal &&
+  } else if ((OI.DebugInfoKind > IRGenDebugInfoKind::LineTables &&
               OI.shouldLink()) ||
              Args.hasArg(options::OPT_emit_objc_header,
                          options::OPT_emit_objc_header_path)) {

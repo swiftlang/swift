@@ -60,11 +60,7 @@ var g = foo(1.0);
 // Tuple types.
 var tuple: (Int, Bool) = (1, true)
 // CHECK-DAG: !DIGlobalVariable(name: "tuple", linkageName: "_Tv{{9variables|4main}}5tupleTSiSb_",{{.*}} type: ![[TUPTY:[^,)]+]]
-// CHECK-DAG: ![[TUPTY]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} elements: ![[ELEMS:[0-9]+]]
-// CHECK-DAG: ![[ELEMS]] = !{![[MI64:[0-9]+]], ![[MB:[0-9]+]]}
-// CHECK-DAG: ![[INTTY:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int"
-// CHECK-DAG: ![[MI64]] = !DIDerivedType(tag: DW_TAG_member,{{.*}} baseType: ![[INTTY]]
-// CHECK-DAG: ![[MB]] = !DIDerivedType(tag: DW_TAG_member,{{.*}} baseType: ![[B]]
+// CHECK-DAG: ![[TUPTY]] = !DICompositeType({{.*}}identifier: "_TtTSiSb_"
 func myprint(_ p: (i: Int, b: Bool)) {
      print("\(p.i) -> \(p.b)")
 }
@@ -106,7 +102,7 @@ enum TriValue {
   case top
 }
 // CHECK-DAG: !DIGlobalVariable(name: "unknown",{{.*}} type: ![[TRIVAL:[0-9]+]]
-// CHECK-DAG: ![[TRIVAL]] = !DICompositeType(tag: DW_TAG_union_type, name: "TriValue",
+// CHECK-DAG: ![[TRIVAL]] = !DICompositeType({{.*}}name: "TriValue",
 var unknown = TriValue.top
 func myprint(_ value: TriValue) {
      switch value {
