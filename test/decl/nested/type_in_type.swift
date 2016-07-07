@@ -128,7 +128,7 @@ struct AnyStream<T : Sequence> {
   // Conform to the enumerable protocol.
   typealias Elements = StreamRange<T.Iterator>
   func getElements() -> Elements {
-    return Elements(index: 0, elements: input.makeIterator())
+    return Elements(index: 0, elements: input.makeIterator()) // expected-error {{'AnyStream<T>.StreamRange<T.Iterator>' cannot be constructed because it has no accessible initializers}}
   }
 }
 
@@ -177,7 +177,7 @@ extension Bar {
 class X6<T> {
   let d: D<T>
   init(_ value: T) {
-    d = D(value)
+    d = D(value) // expected-error{{'<<error type>>' cannot be constructed because it has no accessible initializers}}
   }
   class D<T2> { // expected-error{{generic type 'D' cannot be nested in type 'X6'}}
     init(_ value: T2) {}
@@ -203,7 +203,7 @@ struct GS<T> {
   struct NestedGeneric<U> { // expected-note{{generic type 'NestedGeneric' declared here}} // expected-error{{generic type 'NestedGeneric' cannot be nested in type 'GS'}}
     func fff() -> (GS, NestedGeneric) {
       let gs = GS()
-      let ns = NestedGeneric()
+      let ns = NestedGeneric() // expected-error {{'GS<T>.NestedGeneric<U>' cannot be constructed because it has no accessible initializers}}
       return (gs, ns)
     }
   }
@@ -245,7 +245,7 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   typealias InnerI = HasNested<Int>.Inner
   var innerI = InnerI(5)
   typealias InnerF = HasNested<Float>.Inner
-  var innerF : InnerF = innerI // expected-error{{cannot convert value of type 'InnerI' (aka 'HasNested<Int>.Inner') to specified type 'InnerF' (aka 'HasNested<Float>.Inner')}}
+  var innerF : InnerF = innerI
 
   _ = innerI.identity(i)
   i = innerI.identity(i)
@@ -265,6 +265,6 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   var ids = xis.g(1, u: "Hello", v: 3.14159)
   ids = (2, "world", 2.71828)
 
-  xis = xfs // expected-error{{cannot assign value of type 'HasNested<Float>.InnerGeneric<String>' to type 'HasNested<Int>.InnerGeneric<String>'}}
+  xis = xfs
 }
 

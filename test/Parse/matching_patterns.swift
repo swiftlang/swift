@@ -151,7 +151,7 @@ struct ContainsEnum {
 
   func member(_ n: Possible<Int>) {
     switch n {
-    case ContainsEnum.Possible<Int>.Naught,
+    case ContainsEnum.Possible<Int>.Naught, // expected-error{{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
          ContainsEnum.Possible.Naught,
          Possible<Int>.Naught,
          Possible.Naught,
@@ -163,7 +163,7 @@ struct ContainsEnum {
 
 func nonmemberAccessesMemberType(_ n: ContainsEnum.Possible<Int>) {
   switch n {
-  case ContainsEnum.Possible<Int>.Naught,
+  case ContainsEnum.Possible<Int>.Naught, // expected-error{{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
        .Naught:
     ()
   }

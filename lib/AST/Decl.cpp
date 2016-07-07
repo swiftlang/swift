@@ -4757,7 +4757,7 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 ClassDecl *ClassDecl::getSuperclassDecl() const {
   if (auto superclass = getSuperclass())
     return superclass->getClassOrBoundGenericClass();
-    return nullptr;
+  return nullptr;
 }
 
 void ClassDecl::setSuperclass(Type superclass) {

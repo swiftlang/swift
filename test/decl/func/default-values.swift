@@ -48,9 +48,9 @@ struct Outer<T> {
     }
   }
 }
-Outer<Int>.Inner.VeryInner() // expected-warning{{unused}}
-Outer<Int>.Inner.VeryInner(i: 12) // expected-warning{{unused}}
-Outer<Int>.Inner.VeryInner(f:12.5) // expected-warning{{unused}}
+Outer<Int>.Inner.VeryInner()
+Outer<Int>.Inner.VeryInner(i: 12)
+Outer<Int>.Inner.VeryInner(f:12.5)
 Outer<Int>.Inner.VeryInner.f()
 Outer<Int>.Inner.VeryInner.f(i: 12)
 Outer<Int>.Inner.VeryInner.f(f:12.5)
