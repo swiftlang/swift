@@ -1204,7 +1204,7 @@ function(add_swift_library name)
         elseif("${sdk}" STREQUAL "FREEBSD")
           list(APPEND swiftlib_module_depends_flattened
                ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FREEBSD})
-        elseif("${sdk}" STREQUAL "LINUX")
+        elseif("${sdk}" STREQUAL "LINUX" OR "${sdk}" STREQUAL "ANDROID")
           list(APPEND swiftlib_module_depends_flattened
               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
         endif()
