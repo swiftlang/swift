@@ -12,22 +12,22 @@
 
 #define DEBUG_TYPE "sil-passmanager"
 
-#include "swift/Basic/DemangleWrappers.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/Basic/DemangleWrappers.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "swift/SILOptimizer/Analysis/FunctionOrder.h"
-#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/TimeValue.h"
-#include "llvm/Support/GraphWriter.h"
 
 using namespace swift;
 
