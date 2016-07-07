@@ -5,7 +5,10 @@
 // UNSUPPORTED: OS=watchos
 // UNSUPPORTED: OS=tvos
 
-// XFAIL: OS=macosx
+// FIXME: due to the lack of availability attributes in the SDK this test does
+//        not fail on macOS Sierra, but does fail on El Capitan. Marking macOS
+//        as unsupported for now.
+// UNSUPPORTED: OS=macosx
 
 import Intents
 import StdlibUnittest
