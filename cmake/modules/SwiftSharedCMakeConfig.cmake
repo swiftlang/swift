@@ -42,11 +42,31 @@ endfunction()
 
 function(get_imported_library_prefix outvar target prefix)
   string(FIND "${target}" "${prefix}" ALREADY_HAS_PREFIX)
-  if (ALREADY_HAS_PREFIX)
+  if (ALREADY_HAS_PREFIX EQUAL 0)
     set(${outvar} "" PARENT_SCOPE)
   else()
     set(${outvar} "${prefix}" PARENT_SCOPE)
   endif()
+endfunction()
+
+function(get_imported_library_path outvar target target_type)
+  if ("${target_type}" STREQUAL "EXECUTABLE")
+    set(${outvar} "${LLVM_BINARY_OUTPUT_INTDIR}/${target}" PARENT_SCOPE)
+    return()
+  endif()
+
+  # LLVM compiles module libraries as
+  # ${MODULE_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX} on both Linux and macOS.
+  if ("${target_type}" STREQUAL "MODULE_LIBRARY")
+    set(${outvar} "${LLVM_LIBRARY_OUTPUT_INTDIR}/${target}${CMAKE_SHARED_LIBRARY_SUFFIX}" PARENT_SCOPE)
+    return()
+  endif()
+
+  # Otherwise, we have a static library or shared library. Since libclang has
+  # an extra lib prefix in its target name, we have to handle its prefix
+  # especially.
+  get_imported_library_prefix(PREFIX "${target}" "${CMAKE_${target_type}_PREFIX}")
+  set(PATH "${LLVM_LIBRARY_OUTPUT_INTDIR}/${PREFIX}${target}${CMAKE_${target_type}_SUFFIX}" PARENT_SCOPE)
 endfunction()
 
 # What this function does is go through each of the passed in imported targets
@@ -63,27 +83,22 @@ function(fix_imported_target_locations_for_xcode targets)
 
     if (NOT "${TARGET_TYPE}" STREQUAL "STATIC_LIBRARY" AND
         NOT "${TARGET_TYPE}" STREQUAL "SHARED_LIBRARY" AND
-        NOT "${TARGET_TYPE}" STREQUAL "EXECUTABLE")
-      message(FATAL_ERROR "Unsupported imported target type ${TARGET_TYPE}")
+        NOT "${TARGET_TYPE}" STREQUAL "EXECUTABLE" AND
+        NOT "${TARGET_TYPE}" STREQUAL "MODULE_LIBRARY")
+      message(FATAL_ERROR "Target ${t} has unsupported imported target type ${TARGET_TYPE}")
     endif()
 
-    # Ok, so at this point, we know that we have an executable, static library,
-    # or shared library.
-    #
-    # First we handle the executables.
-    if ("${TARGET_TYPE}" STREQUAL "EXECUTABLE")
-      set_target_properties(${t} PROPERTIES
-        IMPORTED_LOCATION_DEBUG "${LLVM_BINARY_OUTPUT_INTDIR}/${t}"
-        IMPORTED_LOCATION_RELEASE "${LLVM_BINARY_OUTPUT_INTDIR}/${t}")
-      continue()
-    endif()
+    # Get the path to our library.
+    get_imported_library_path(PATH "${t}" "${TARGET_TYPE}")
 
-    # Otherwise, we have libraries. Since libclang has an extra lib prefix in
-    # its target name, we have to handle it specially.
-    get_imported_library_prefix(PREFIX "${t}" "${CMAKE_${TARGET_TYPE}_PREFIX}")
+    # Set the target location properties.
+    if (NOT EXISTS "${PATH}")
+      message(WARNING "Target ${t} has an import location where no file "
+        "exists. Location: ${PATH}")
+    endif()
     set_target_properties(${t} PROPERTIES
-      IMPORTED_LOCATION_DEBUG "${LLVM_LIBRARY_OUTPUT_INTDIR}/${PREFIX}${t}.${CMAKE_${TARGET_TYPE}_SUFFIX}"
-      IMPORTED_LOCATION_RELEASE "${LLVM_LIBRARY_OUTPUT_INTDIR}/${PREFIX}${t}.${CMAKE_${TARGET_TYPE}_SUFFIX}")
+      IMPORTED_LOCATION_DEBUG "${PATH}"
+      IMPORTED_LOCATION_RELEASE "${PATH}")
   endforeach()
 endfunction()
 
