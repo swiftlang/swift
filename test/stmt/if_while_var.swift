@@ -28,8 +28,6 @@ class D : B {}// expected-note * {{did you mean 'D'?}}
 if let {} // expected-error {{expected '{' after 'if' condition}} expected-error {{pattern matching in a condition requires the 'case' keyword}}
 if let x = {} // expected-error{{'{' after 'if'}} expected-error {{variable binding in a condition requires an initializer}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
 
-/Users/blangmuir/src/s/swift/test/stmt/if_while_var.swift
-
 if let x = foo() {
 } else {
   // TODO: more contextual error? "x is only available on the true branch"?
