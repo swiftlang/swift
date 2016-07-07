@@ -1794,9 +1794,15 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
 
 SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
   if (auto var = dyn_cast<VarDecl>(this)) {
-    if (auto pbd = var->getParentPatternBinding()) {
-      SourceLoc resultLoc = pbd->getAttrs().getStartLoc(forModifier);
-      return resultLoc.isValid() ? resultLoc : pbd->getStartLoc();
+    // [attrs] var ...
+    // The attributes are part of the VarDecl, but the 'var' is part of the PBD.
+    SourceLoc resultLoc = var->getAttrs().getStartLoc(forModifier);
+    if (resultLoc.isValid()) {
+      return resultLoc;
+    } else if (auto pbd = var->getParentPatternBinding()) {
+      return pbd->getStartLoc();
+    } else {
+      return var->getStartLoc();
     }
   }
 
