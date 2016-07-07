@@ -102,8 +102,8 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 
   deinit {
     __manager._elementPointer.deinitialize(
-      count: __manager._valuePointer.pointee.count)
-    __manager._valuePointer.deinitialize()
+      count: __manager._headerPointer.pointee.count)
+    __manager._headerPointer.deinitialize()
     _fixLifetime(__manager)
   }
 
@@ -114,7 +114,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> Void
   ) rethrows {
     if _isBridgedVerbatimToObjectiveC(Element.self) {
-      let count = __manager.value.count
+      let count = __manager.header.count
       let elements = UnsafePointer<AnyObject>(__manager._elementPointer)
       defer { _fixLifetime(__manager) }
       try body(UnsafeBufferPointer(start: elements, count: count))
@@ -128,7 +128,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(Element.self),
       "Verbatim bridging should be handled separately")
-    return __manager.value.count
+    return __manager.header.count
   }
 
   /// Bridge array elements and return a new buffer that owns them.
@@ -139,7 +139,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(Element.self),
       "Verbatim bridging should be handled separately")
-    let count = __manager.value.count
+    let count = __manager.header.count
     let result = _HeapBuffer<Int, AnyObject>(
       _HeapBufferStorage<Int, AnyObject>.self, count, count)
     let resultPtr = result.baseAddress
@@ -238,7 +238,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     let verbatim = false
 #endif
 
-    __bufferPointer._valuePointer.initialize(with: 
+    __bufferPointer._headerPointer.initialize(with: 
       _ArrayBody(
         count: count,
         capacity: capacity,
@@ -342,7 +342,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// The number of elements the buffer stores.
   public var count: Int {
     get {
-      return __bufferPointer.value.count
+      return __bufferPointer.header.count
     }
     nonmutating set {
       _sanityCheck(newValue >= 0)
@@ -351,7 +351,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
         newValue <= capacity,
         "Can't grow an array buffer past its capacity")
 
-      __bufferPointer._valuePointer.pointee.count = newValue
+      __bufferPointer._headerPointer.pointee.count = newValue
     }
   }
 
@@ -360,14 +360,14 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   @inline(__always)
   func _checkValidSubscript(_ index : Int) {
     _precondition(
-      (index >= 0) && (index < __bufferPointer.value.count),
+      (index >= 0) && (index < __bufferPointer.header.count),
       "Index out of range"
     )
   }
 
   /// The number of elements the buffer can store without reallocation.
   public var capacity: Int {
-    return __bufferPointer.value.capacity
+    return __bufferPointer.header.capacity
   }
 
   /// Copy the elements in `bounds` from this buffer into uninitialized
