@@ -549,12 +549,13 @@ void ModelASTWalker::handleStmtCondition(StmtCondition cond) {
   for (const auto &elt : cond) {
     if (elt.getKind() != StmtConditionElement::CK_Availability) continue;
 
-    SmallVector<CharSourceRange, 5> PlatformRanges;
-    elt.getAvailability()->getPlatformKeywordRanges(PlatformRanges);
-    std::for_each(PlatformRanges.begin(), PlatformRanges.end(),
-                  [&](CharSourceRange &Range) {
-                    passNonTokenNode({SyntaxNodeKind::Keyword, Range});
-                  });
+    SmallVector<SourceLoc, 5> PlatformLocs;
+    elt.getAvailability()->getPlatformKeywordLocs(PlatformLocs);
+    std::for_each(PlatformLocs.begin(), PlatformLocs.end(),
+                  [&](SourceLoc loc) {
+      auto range = charSourceRangeFromSourceRange(SM, loc);
+      passNonTokenNode({SyntaxNodeKind::Keyword, range});
+    });
   }
 }
 
