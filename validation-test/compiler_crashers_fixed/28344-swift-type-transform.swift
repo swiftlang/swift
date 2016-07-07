@@ -5,5 +5,6 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-let:{{class a{enum S<U:a{class B:a{init}}class a
+// RUN: not %target-swift-frontend %s -parse
+// REQUIRES: asserts
+func a{protocol A{class b<T=class d:A.b

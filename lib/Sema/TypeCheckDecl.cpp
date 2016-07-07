@@ -3418,6 +3418,7 @@ public:
                       NTD->getName(),
                       proto->getName());
         }
+        NTD->setInvalid();
         return true;
       }
 
@@ -3432,6 +3433,7 @@ public:
                         diag::unsupported_type_nested_in_generic_type,
                         NTD->getName(),
                         parent->getName());
+          NTD->setInvalid();
           return true;
         } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
           auto *parent = ED->getAsNominalTypeOrNominalTypeExtensionContext();

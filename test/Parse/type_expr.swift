@@ -105,8 +105,8 @@ func genQualifiedType() {
   let _ : () = Gen<Foo>.Bar.meth()
   _ = Gen<Foo>.Bar.instMeth
 
-  _ = Gen<Foo>.Bar // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} {{19-19=()}} expected-note{{use '.self'}} {{19-19=.self}}
-  _ = Gen<Foo>.Bar.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}} {{20-31=self}}
+  _ = Gen<Foo>.Bar
+  _ = Gen<Foo>.Bar.dynamicType
 }
 
 func archetype<T: Zim>(_: T) {
