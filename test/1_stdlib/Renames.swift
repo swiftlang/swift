@@ -504,6 +504,20 @@ func _UnsafePointer<T>(x: UnsafeMutablePointer<T>, e: T) {
   x.initialize(e) // expected-error {{'initialize' has been renamed to 'initialize(with:)'}} {{5-15=initialize}} {{16-16=with: }} {{none}}
   x.destroy() // expected-error {{'destroy()' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{none}}
   x.destroy(1) // expected-error {{'destroy' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{13-13=count: }} {{none}}
+
+  let ptr1 = UnsafeMutablePointer<T>(allocatingCapacity: 1)
+  ptr1.initialize(with: e, count: 1)
+  let ptr2 = UnsafeMutablePointer<T>(allocatingCapacity: 1)
+  ptr2.initializeFrom(ptr1, count: 1) // expected-error {{'initializeFrom(_:count:)' has been renamed to 'initialize(from:count:)'}}
+  ptr1.assignFrom(ptr2, count: 1) // expected-error {{'assignFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
+  ptr1.assignFrom(ptr2, count: 1) // expected-error {{'assignFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
+  ptr2.assignBackwardFrom(ptr1, count: 1) // expected-error {{'assignBackwardFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
+  ptr1.moveAssignFrom(ptr2, count: 1) // expected-error {{'moveAssignFrom(_:count:)' has been renamed to 'moveAssign(from:count:)'}}
+  ptr2.moveInitializeFrom(ptr1, count: 1) // expected-error {{'moveInitializeFrom(_:count:)' has been renamed to 'moveInitialize(from:count:)'}}
+  ptr1.moveInitializeBackwardFrom(ptr1, count: 1) // expected-error {{'moveInitializeBackwardFrom(_:count:)' has been renamed to 'moveInitialize(from:count:)'}}
+  ptr1.deinitialize(count:1)
+  ptr1.deallocateCapacity(1)
+  ptr2.deallocateCapacity(1)
 }
 
 func _VarArgs() {
