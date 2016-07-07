@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
 
@@ -63,8 +64,7 @@ static const UCollator *MakeRootCollator() {
 // const here to make sure we don't misuse it.
 // http://sourceforge.net/p/icu/mailman/message/27427062/
 static const UCollator *GetRootCollator() {
-  static const UCollator *RootCollator = MakeRootCollator();
-  return RootCollator;
+  return SWIFT_LAZY_CONSTANT(MakeRootCollator());
 }
 
 /// This class caches the collation element results for the ASCII subset of
@@ -72,12 +72,11 @@ static const UCollator *GetRootCollator() {
 class ASCIICollation {
   int32_t CollationTable[128];
 public:
+  friend class swift::Lazy<ASCIICollation>;
 
+  static swift::Lazy<ASCIICollation> theTable;
   static const ASCIICollation *getTable() {
-    // We are reallying on C++11's guaranteed of thread safe static variable
-    // initialization.
-    static ASCIICollation collation;
-    return &collation;
+    return &theTable.get();
   }
 
   /// Maps an ASCII character to a collation element priority as would be
@@ -343,3 +342,5 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
   }
   return OutputLength;
 }
+
+swift::Lazy<ASCIICollation> ASCIICollation::theTable;

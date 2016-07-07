@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "swift/Basic/Lazy.h"
 #include "../SwiftShims/LibcShims.h"
 #include "llvm/Support/DataTypes.h"
 
@@ -105,9 +106,10 @@ size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
 #error No malloc_size analog known for this platform/libc.
 #endif
 
+static Lazy<std::mt19937> theGlobalMT19937;
+
 static std::mt19937 &getGlobalMT19937() {
-  static std::mt19937 MersenneRandom;
-  return MersenneRandom;
+  return theGlobalMT19937.get();
 }
 
 __swift_uint32_t swift::_swift_stdlib_cxx11_mt19937() {
