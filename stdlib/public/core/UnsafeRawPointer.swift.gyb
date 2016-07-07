@@ -182,7 +182,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   public func initialize<T>(_: T.Type, with value: T, count: Int = 1)
     -> UnsafeMutablePointer<T> {
     _debugPrecondition(count >= 0,
-      "UnsafeMutableRawPointer.initialize(with:): negative count")
+      "UnsafeMutableRawPointer.initialize(to:): negative count")
 
     var nextPtr = self
     for _ in 0..<count {
@@ -314,7 +314,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
       T.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initialize(with: (source + i).move())
+    //   (self + i).initialize(to: (source + i).move())
     // }
     return UnsafeMutablePointer(_rawValue)
   }
@@ -354,7 +354,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     // var src = source + count
     // var dst = self + count
     // while dst != self {
-    //   (--dst).initialize(with: (--src).move())
+    //   (--dst).initialize(to: (--src).move())
     // }
     return UnsafeMutablePointer(_rawValue)
   }

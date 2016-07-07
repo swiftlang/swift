@@ -232,40 +232,40 @@ func checkPointerCorrectness(_ check: Check,
   let ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 4)
   switch check {
   case .RightOverlap:
-    ptr.initialize(with: Missile(1))
-    (ptr + 1).initialize(with: Missile(2))
+    ptr.initialize(to: Missile(1))
+    (ptr + 1).initialize(to: Missile(2))
     if withMissiles {
-      (ptr + 2).initialize(with: Missile(3))
+      (ptr + 2).initialize(to: Missile(3))
     }
     f(ptr + 1)(ptr, count: 2)
     expectEqual(1, ptr[1].number)
     expectEqual(2, ptr[2].number)
   case .LeftOverlap:
     if withMissiles {
-      ptr.initialize(with: Missile(1))
+      ptr.initialize(to: Missile(1))
     }
-    (ptr + 1).initialize(with: Missile(2))
-    (ptr + 2).initialize(with: Missile(3))
+    (ptr + 1).initialize(to: Missile(2))
+    (ptr + 2).initialize(to: Missile(3))
     f(ptr)(ptr + 1, count: 2)
     expectEqual(2, ptr[0].number)
     expectEqual(3, ptr[1].number)
   case .Disjoint:
     if withMissiles {
-      ptr.initialize(with: Missile(0))
-      (ptr + 1).initialize(with: Missile(1))
+      ptr.initialize(to: Missile(0))
+      (ptr + 1).initialize(to: Missile(1))
     }
-    (ptr + 2).initialize(with: Missile(2))
-    (ptr + 3).initialize(with: Missile(3))
+    (ptr + 2).initialize(to: Missile(2))
+    (ptr + 3).initialize(to: Missile(3))
     f(ptr)(ptr + 2, count: 2)
     expectEqual(2, ptr[0].number)
     expectEqual(3, ptr[1].number)
     // backwards
     let ptr2 = UnsafeMutablePointer<Missile>(allocatingCapacity: 4)
-    ptr2.initialize(with: Missile(0))
-    (ptr2 + 1).initialize(with: Missile(1))
+    ptr2.initialize(to: Missile(0))
+    (ptr2 + 1).initialize(to: Missile(1))
     if withMissiles {
-      (ptr2 + 2).initialize(with: Missile(2))
-      (ptr2 + 3).initialize(with: Missile(3))
+      (ptr2 + 2).initialize(to: Missile(2))
+      (ptr2 + 3).initialize(to: Missile(3))
     }
     f(ptr2 + 2)(ptr2, count: 2)
     expectEqual(0, ptr2[2].number)
@@ -364,8 +364,8 @@ UnsafeMutablePointerTestSuite.test("assign/immutable") {
     ptr.deinitialize(count: 2)
     ptr.deallocateCapacity(2)
   }
-  ptr.initialize(with: Missile(1))
-  (ptr + 1).initialize(with: Missile(2))
+  ptr.initialize(to: Missile(1))
+  (ptr + 1).initialize(to: Missile(2))
   let source = (3..<5).map(Missile.init)
   source.withUnsafeBufferPointer { bufferPtr in
     ptr.assign(from: bufferPtr.baseAddress!, count: 2)

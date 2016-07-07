@@ -501,7 +501,7 @@ func _UnsafePointer<T>(x: UnsafeMutablePointer<T>, e: T) {
   _ = UnsafeMutablePointer<T>.alloc(1) // expected-error {{'alloc' is unavailable: use the 'UnsafeMutablePointer(allocatingCapacity:)' initializer}} {{none}}
   x.dealloc(1) // expected-error {{'dealloc' has been renamed to 'deallocateCapacity'}} {{5-12=deallocateCapacity}} {{none}}
   x.memory = e // expected-error {{'memory' has been renamed to 'pointee'}} {{5-11=pointee}} {{none}}
-  x.initialize(e) // expected-error {{'initialize' has been renamed to 'initialize(with:)'}} {{5-15=initialize}} {{16-16=with: }} {{none}}
+  x.initialize(e) // expected-error {{'initialize' has been renamed to 'initialize(to:)'}} {{5-15=initialize}} {{16-16=to: }} {{none}}
   x.destroy() // expected-error {{'destroy()' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{none}}
   x.destroy(1) // expected-error {{'destroy' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{13-13=count: }} {{none}}
 }

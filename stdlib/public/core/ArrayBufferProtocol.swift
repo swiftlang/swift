@@ -163,7 +163,7 @@ extension _ArrayBufferProtocol where Index == Int {
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(with: newValues[i])
+        (elements + j).initialize(to: newValues[i])
         newValues.formIndex(after: &i)
       }
       _expectEnd(i, newValues)

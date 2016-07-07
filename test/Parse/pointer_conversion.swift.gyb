@@ -203,7 +203,7 @@ func pointerArithmetic(_ x: UnsafeMutablePointer<Int>, y: UnsafeMutablePointer<I
 
 func genericPointerArithmetic<T>(_ x: UnsafeMutablePointer<T>, i: Int, t: T) -> UnsafeMutablePointer<T> {
   let p = x + i
-  p.initialize(with: t)
+  p.initialize(to: t)
 }
 
 func passPointerToClosure(_ f: (UnsafeMutablePointer<Float>) -> Int) -> Int { }

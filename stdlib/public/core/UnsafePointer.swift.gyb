@@ -172,10 +172,10 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The pointee is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
-  public func initialize(with newValue: Pointee, count: Int = 1) {
+  public func initialize(to newValue: Pointee, count: Int = 1) {
     // FIXME: add tests (since the `count` has been added)
     _debugPrecondition(count >= 0,
-      "${Self}.initialize(with:): negative count")
+      "${Self}.initialize(to:): negative count")
     // Must not use `initializeFrom` with a `Collection` as that will introduce
     // a cycle.
     for offset in 0..<count {
@@ -244,7 +244,7 @@ public struct ${Self}<Pointee>
         Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
       // This builtin is equivalent to:
       // for i in 0..<count {
-      //   (self + i).initialize(with: (source + i).move())
+      //   (self + i).initialize(to: (source + i).move())
       // }
     }
     else {
@@ -255,7 +255,7 @@ public struct ${Self}<Pointee>
       // var src = source + count
       // var dst = self + count
       // while dst != self {
-      //   (--dst).initialize(with: (--src).move())
+      //   (--dst).initialize(to: (--src).move())
       // }
     }
   }
@@ -286,7 +286,7 @@ public struct ${Self}<Pointee>
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initialize(with: source[i])
+    //   (self + i).initialize(to: source[i])
     // }
   }
 
@@ -513,7 +513,7 @@ extension ${Self} {
   }
 
 % if mutable:
-  @available(*, unavailable, renamed: "initialize(with:)")
+  @available(*, unavailable, renamed: "initialize(to:)")
   public func initialize(_ newvalue: Pointee) {
     Builtin.unreachable()
   }

@@ -2719,7 +2719,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal func initializeKey(_ k: Key, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
 
-    (keys + i).initialize(with: k)
+    (keys + i).initialize(to: k)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -2727,7 +2727,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func moveInitializeEntry(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
-    (keys + toEntryAt).initialize(with: (from.keys + at).move())
+    (keys + toEntryAt).initialize(to: (from.keys + at).move())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }
@@ -2745,8 +2745,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal func initializeKey(_ k: Key, value v: Value, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
 
-    (keys + i).initialize(with: k)
-    (values + i).initialize(with: v)
+    (keys + i).initialize(to: k)
+    (values + i).initialize(to: v)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -2754,8 +2754,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func moveInitializeEntry(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
-    (keys + toEntryAt).initialize(with: (from.keys + at).move())
-    (values + toEntryAt).initialize(with: (from.values + at).move())
+    (keys + toEntryAt).initialize(to: (from.keys + at).move())
+    (values + toEntryAt).initialize(to: (from.values + at).move())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }
@@ -3093,7 +3093,7 @@ internal struct _BridgedNative${Self}Storage {
   internal func initializeKey(_ k: AnyObject, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
 
-    (keys + i).initialize(with: k)
+    (keys + i).initialize(to: k)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -3103,8 +3103,8 @@ internal struct _BridgedNative${Self}Storage {
   ) {
     _sanityCheck(!isInitializedEntry(at: i))
 
-    (keys + i).initialize(with: k)
-    (values + i).initialize(with: v)
+    (keys + i).initialize(to: k)
+    (values + i).initialize(to: v)
     initializedEntries[i] = true
     _fixLifetime(self)
   }

@@ -8,7 +8,7 @@
 // Test AddressSanitizer execution end-to-end.
 
 var a = UnsafeMutablePointer<Int>(allocatingCapacity: 1)
-a.initialize(with: 5)
+a.initialize(to: 5)
 a.deinitialize(count: 1)
 a.deallocateCapacity(1)
 print(a.pointee)

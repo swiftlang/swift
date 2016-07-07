@@ -182,7 +182,7 @@ dump(randomUnsafeMutablePointerString)
 
 // CHECK-NEXT: Hello panda
 var sanePointerString = UnsafeMutablePointer<String>(allocatingCapacity: 1)
-sanePointerString.initialize(with: "Hello panda")
+sanePointerString.initialize(to: "Hello panda")
 dump(sanePointerString.pointee)
 sanePointerString.deinitialize()
 sanePointerString.deallocateCapacity(1)
