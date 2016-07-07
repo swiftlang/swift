@@ -108,6 +108,9 @@ def print_clang_stats : Flag<["-"], "print-clang-stats">,
 def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
   HelpText<"Always serialize options for debugging (default: only for apps)">;
 
+def autolink_library : Separate<["-"], "autolink-library">,
+  HelpText<"Add dependent library">, Flags<[FrontendOption]>;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;

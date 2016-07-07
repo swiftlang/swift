@@ -272,9 +272,6 @@ def Xlinker : Separate<["-"], "Xlinker">,
   Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies an option which should be passed to the linker">;
 
-def autolink_library : Joined<["-"], "autolink-library=">,
-  HelpText<"Add dependent library">, Flags<[FrontendOption]>;
-
 // Optimization levels
 
 def O_Group : OptionGroup<"<optimization level options>">;
