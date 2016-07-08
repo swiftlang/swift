@@ -32,18 +32,6 @@ option(SWIFT_STDLIB_ASSERTIONS
     "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
     "${SWIFT_STDLIB_ASSERTIONS_default}")
 
-option(SWIFT_SERIALIZE_STDLIB_UNITTEST
-    "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
-    FALSE)
-
-option(SWIFT_STDLIB_SIL_DEBUGGING
-    "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
-    FALSE)
-
-option(SWIFT_CHECK_INCREMENTAL_COMPILATION
-    "Check if incremental compilation works when compiling the Swift libraries"
-    FALSE)
-
 option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
@@ -253,6 +241,18 @@ endif()
 option(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
     "Overwrite memory for deallocated Swift objects"
     "${SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_default}")
+
+option(SWIFT_SERIALIZE_STDLIB_UNITTEST
+    "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
+    FALSE)
+
+option(SWIFT_STDLIB_SIL_DEBUGGING
+    "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    FALSE)
+
+option(SWIFT_CHECK_INCREMENTAL_COMPILATION
+    "Check if incremental compilation works when compiling the Swift libraries"
+    FALSE)
 
 #
 # User-configurable experimental options.  Do not use in production builds.
