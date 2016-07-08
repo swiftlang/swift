@@ -1845,7 +1845,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [ "${SKIP_BUILD_LLVM}" ] ; then
                     # We can't skip the build completely because the standalone
                     # build of Swift depend on these.
-                    build_targets=(llvm-config llvm-tblgen clang-headers)
+                    build_targets=(llvm-tblgen clang-headers)
                 fi
 
                 # Note: we set the variable:
