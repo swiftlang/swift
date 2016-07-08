@@ -25,6 +25,7 @@ using namespace swift;
 
 static const StringRef SupportedConditionalCompilationOSs[] = {
   "OSX",
+  "macOS",
   "tvOS",
   "watchOS",
   "iOS",
@@ -109,8 +110,10 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   bool UnsupportedOS = false;
 
   // Set the "os" platform condition.
-  if (Target.isMacOSX())
+  if (Target.isMacOSX()) {
     addPlatformConditionValue("os", "OSX");
+    addPlatformConditionValue("os", "macOS");
+  }
   else if (triple.isTvOS())
     addPlatformConditionValue("os", "tvOS");
   else if (triple.isWatchOS())
