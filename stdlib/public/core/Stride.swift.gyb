@@ -227,7 +227,7 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
   internal let _end: Element
   internal let _stride: Element.Stride
   internal var _current: (index: Int?, value: Element)
-  internal var _done: Bool = false
+  internal var _didReturnEnd: Bool = false
 
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     self._start = _start
@@ -241,13 +241,13 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
-    if _done {
-      return nil
-    }
     let result = _current.value
     if _stride > 0 ? result >= _end : result <= _end {
-      if result == _end {
-        _done = true
+      // This check is needed because if we just changed the above operators
+      // to > and <, respectively, we might advance current past the end
+      // and throw it out of bounds (e.g. above Int.max) unnecessarily.
+      if result == _end && !_didReturnEnd {
+        _didReturnEnd = true
         return result
       }
       return nil
