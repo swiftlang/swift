@@ -4648,6 +4648,15 @@ static void addExprKeywords(CodeCompletionResultSink &Sink) {
   AddKeyword("#dsohandle", "UnsafeMutablePointer<Void>", CodeCompletionKeywordKind::pound_dsohandle);
 }
 
+static void addAnyTypeKeyword(CodeCompletionResultSink &Sink) {
+  CodeCompletionResultBuilder Builder(
+      Sink, CodeCompletionResult::ResultKind::Keyword,
+      SemanticContextKind::None, {});
+  // pretend 'Any' is from another module
+  Builder.setKeywordKind(CodeCompletionKeywordKind::None);
+  Builder.addTextChunk("Any");
+}
+
 
 void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
                                               bool MaybeFuncBody) {
@@ -4676,19 +4685,23 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addSuperKeyword(Sink);
     addLetVarKeywords(Sink);
     addExprKeywords(Sink);
+    addAnyTypeKeyword(Sink);
     break;
 
   case CompletionKind::PostfixExpr:
   case CompletionKind::PostfixExprParen:
   case CompletionKind::SuperExpr:
   case CompletionKind::SuperExprDot:
-  case CompletionKind::TypeSimpleBeginning:
-  case CompletionKind::TypeIdentifierWithDot:
-  case CompletionKind::TypeIdentifierWithoutDot:
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::CaseStmtDotPrefix:
+  case CompletionKind::TypeIdentifierWithDot:
+  case CompletionKind::TypeIdentifierWithoutDot:
     break;
 
+  case CompletionKind::TypeSimpleBeginning:
+    addAnyTypeKeyword(Sink);
+    break;
+      
   case CompletionKind::NominalMemberBeginning:
     addDeclKeywords(Sink);
     addLetVarKeywords(Sink);
