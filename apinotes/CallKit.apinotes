@@ -1,0 +1,16 @@
+---
+Name: CallKit
+Classes:
+- Name: CXProviderConfiguration
+  Properties:
+  - Name: 'supportedHandleTypes'
+    SwiftPrivate: true
+Tags:
+- Name: CXErrorCode
+  NSErrorDomain: CXErrorDomain
+- Name: CXErrorCodeIncomingCallError
+  NSErrorDomain: CXErrorDomainIncomingCall
+- Name: CXErrorCodeRequestTransactionError
+  NSErrorDomain: CXErrorDomainRequestTransaction
+- Name: CXErrorCodeCallDirectoryManagerError
+  NSErrorDomain: CXErrorDomainCallDirectoryManager
