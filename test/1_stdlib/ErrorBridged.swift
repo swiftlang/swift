@@ -140,14 +140,14 @@ ErrorBridgingTests.test("NSError-to-enum bridging") {
     expectOptionalEqual(underlyingError, cocoaError.underlying)
     expectOptionalEqual(testURL, cocoaError.url)
 
-    // NSURLError domain
+    // URLError domain
     let nsURL = NSError(domain: NSURLErrorDomain,
                         code: NSURLErrorBadURL,
                         userInfo: [NSURLErrorFailingURLErrorKey : testURL])
     let eURL: Error = nsURL
     let isBadURLError: Bool
     switch eURL {
-    case NSURLError.badURL:
+    case URLError.badURL:
       isBadURLError = true
     default:
       isBadURLError = false
@@ -155,7 +155,7 @@ ErrorBridgingTests.test("NSError-to-enum bridging") {
 
     expectTrue(isBadURLError)
 
-    let urlError = eURL as! NSURLError
+    let urlError = eURL as! URLError
     expectOptionalEqual(testURL, urlError.failingURL)
     expectEmpty(urlError.failureURLPeerTrust)
 

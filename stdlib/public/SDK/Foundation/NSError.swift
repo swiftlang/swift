@@ -1186,7 +1186,7 @@ extension CocoaError.Code {
 }
 
 /// Describes errors in the URL error domain.
-public struct NSURLError : _BridgedStoredNSError {
+public struct URLError : _BridgedStoredNSError {
   public let _nsError: NSError
 
   public init(_nsError error: NSError) {
@@ -1197,7 +1197,7 @@ public struct NSURLError : _BridgedStoredNSError {
   public static var _nsErrorDomain: String { return NSURLErrorDomain }
 
   @objc public enum Code : Int, _ErrorCodeProtocol {
-    public typealias _ErrorType = NSURLError
+    public typealias _ErrorType = URLError
 
     case unknown = -1
     case cancelled = -999
@@ -1268,7 +1268,7 @@ public struct NSURLError : _BridgedStoredNSError {
   }
 }
 
-public extension NSURLError {
+public extension URLError {
   private var _userInfo: [NSObject : AnyObject] {
     return (self as NSError).userInfo
   }
@@ -1293,180 +1293,180 @@ public extension NSURLError {
   }
 }
 
-public extension NSURLError {
-  public static var unknown: NSURLError.Code {
+public extension URLError {
+  public static var unknown: URLError.Code {
     return .unknown
   }
 
-  public static var cancelled: NSURLError.Code {
+  public static var cancelled: URLError.Code {
     return .cancelled
   }
 
-  public static var badURL: NSURLError.Code {
+  public static var badURL: URLError.Code {
     return .badURL
   }
 
-  public static var timedOut: NSURLError.Code {
+  public static var timedOut: URLError.Code {
     return .timedOut
   }
 
-  public static var unsupportedURL: NSURLError.Code {
+  public static var unsupportedURL: URLError.Code {
     return .unsupportedURL
   }
 
-  public static var cannotFindHost: NSURLError.Code {
+  public static var cannotFindHost: URLError.Code {
     return .cannotFindHost
   }
 
-  public static var cannotConnectToHost: NSURLError.Code {
+  public static var cannotConnectToHost: URLError.Code {
     return .cannotConnectToHost
   }
 
-  public static var networkConnectionLost: NSURLError.Code {
+  public static var networkConnectionLost: URLError.Code {
     return .networkConnectionLost
   }
 
-  public static var dnsLookupFailed: NSURLError.Code {
+  public static var dnsLookupFailed: URLError.Code {
     return .dnsLookupFailed
   }
 
-  public static var httpTooManyRedirects: NSURLError.Code {
+  public static var httpTooManyRedirects: URLError.Code {
     return .httpTooManyRedirects
   }
 
-  public static var resourceUnavailable: NSURLError.Code {
+  public static var resourceUnavailable: URLError.Code {
     return .resourceUnavailable
   }
 
-  public static var notConnectedToInternet: NSURLError.Code {
+  public static var notConnectedToInternet: URLError.Code {
     return .notConnectedToInternet
   }
 
-  public static var redirectToNonExistentLocation: NSURLError.Code {
+  public static var redirectToNonExistentLocation: URLError.Code {
     return .redirectToNonExistentLocation
   }
 
-  public static var badServerResponse: NSURLError.Code {
+  public static var badServerResponse: URLError.Code {
     return .badServerResponse
   }
 
-  public static var userCancelledAuthentication: NSURLError.Code {
+  public static var userCancelledAuthentication: URLError.Code {
     return .userCancelledAuthentication
   }
 
-  public static var userAuthenticationRequired: NSURLError.Code {
+  public static var userAuthenticationRequired: URLError.Code {
     return .userAuthenticationRequired
   }
 
-  public static var zeroByteResource: NSURLError.Code {
+  public static var zeroByteResource: URLError.Code {
     return .zeroByteResource
   }
 
-  public static var cannotDecodeRawData: NSURLError.Code {
+  public static var cannotDecodeRawData: URLError.Code {
     return .cannotDecodeRawData
   }
 
-  public static var cannotDecodeContentData: NSURLError.Code {
+  public static var cannotDecodeContentData: URLError.Code {
     return .cannotDecodeContentData
   }
 
-  public static var cannotParseResponse: NSURLError.Code {
+  public static var cannotParseResponse: URLError.Code {
     return .cannotParseResponse
   }
 
-  public static var fileDoesNotExist: NSURLError.Code {
+  public static var fileDoesNotExist: URLError.Code {
     return .fileDoesNotExist
   }
 
-  public static var fileIsDirectory: NSURLError.Code {
+  public static var fileIsDirectory: URLError.Code {
     return .fileIsDirectory
   }
 
-  public static var noPermissionsToReadFile: NSURLError.Code {
+  public static var noPermissionsToReadFile: URLError.Code {
     return .noPermissionsToReadFile
   }
 
-  public static var secureConnectionFailed: NSURLError.Code {
+  public static var secureConnectionFailed: URLError.Code {
     return .secureConnectionFailed
   }
 
-  public static var serverCertificateHasBadDate: NSURLError.Code {
+  public static var serverCertificateHasBadDate: URLError.Code {
     return .serverCertificateHasBadDate
   }
 
-  public static var serverCertificateUntrusted: NSURLError.Code {
+  public static var serverCertificateUntrusted: URLError.Code {
     return .serverCertificateUntrusted
   }
 
-  public static var serverCertificateHasUnknownRoot: NSURLError.Code {
+  public static var serverCertificateHasUnknownRoot: URLError.Code {
     return .serverCertificateHasUnknownRoot
   }
 
-  public static var serverCertificateNotYetValid: NSURLError.Code {
+  public static var serverCertificateNotYetValid: URLError.Code {
     return .serverCertificateNotYetValid
   }
 
-  public static var clientCertificateRejected: NSURLError.Code {
+  public static var clientCertificateRejected: URLError.Code {
     return .clientCertificateRejected
   }
 
-  public static var clientCertificateRequired: NSURLError.Code {
+  public static var clientCertificateRequired: URLError.Code {
     return .clientCertificateRequired
   }
 
-  public static var cannotLoadFromNetwork: NSURLError.Code {
+  public static var cannotLoadFromNetwork: URLError.Code {
     return .cannotLoadFromNetwork
   }
 
-  public static var cannotCreateFile: NSURLError.Code {
+  public static var cannotCreateFile: URLError.Code {
     return .cannotCreateFile
   }
 
-  public static var cannotOpenFile: NSURLError.Code {
+  public static var cannotOpenFile: URLError.Code {
     return .cannotOpenFile
   }
 
-  public static var cannotCloseFile: NSURLError.Code {
+  public static var cannotCloseFile: URLError.Code {
     return .cannotCloseFile
   }
 
-  public static var cannotWriteToFile: NSURLError.Code {
+  public static var cannotWriteToFile: URLError.Code {
     return .cannotWriteToFile
   }
 
-  public static var cannotRemoveFile: NSURLError.Code {
+  public static var cannotRemoveFile: URLError.Code {
     return .cannotRemoveFile
   }
 
-  public static var cannotMoveFile: NSURLError.Code {
+  public static var cannotMoveFile: URLError.Code {
     return .cannotMoveFile
   }
 
-  public static var downloadDecodingFailedMidStream: NSURLError.Code {
+  public static var downloadDecodingFailedMidStream: URLError.Code {
     return .downloadDecodingFailedMidStream
   }
 
-  public static var downloadDecodingFailedToComplete: NSURLError.Code {
+  public static var downloadDecodingFailedToComplete: URLError.Code {
     return .downloadDecodingFailedToComplete
   }
 
   @available(OSX, introduced: 10.7) @available(iOS, introduced: 3.0)
-  public static var internationalRoamingOff: NSURLError.Code {
+  public static var internationalRoamingOff: URLError.Code {
     return .internationalRoamingOff
   }
 
   @available(OSX, introduced: 10.7) @available(iOS, introduced: 3.0)
-  public static var callIsActive: NSURLError.Code {
+  public static var callIsActive: URLError.Code {
     return .callIsActive
   }
 
   @available(OSX, introduced: 10.7) @available(iOS, introduced: 3.0)
-  public static var dataNotAllowed: NSURLError.Code {
+  public static var dataNotAllowed: URLError.Code {
     return .dataNotAllowed
   }
 
   @available(OSX, introduced: 10.7) @available(iOS, introduced: 3.0)
-  public static var requestBodyStreamExhausted: NSURLError.Code {
+  public static var requestBodyStreamExhausted: URLError.Code {
     return .requestBodyStreamExhausted
   }
 
@@ -1486,234 +1486,234 @@ public extension NSURLError {
   }
 }
 
-extension NSURLError {
+extension URLError {
   @available(*, unavailable, renamed: "unknown")
-  public static var Unknown: NSURLError.Code {
+  public static var Unknown: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cancelled")
-  public static var Cancelled: NSURLError.Code {
+  public static var Cancelled: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "badURL")
-  public static var BadURL: NSURLError.Code {
+  public static var BadURL: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "timedOut")
-  public static var TimedOut: NSURLError.Code {
+  public static var TimedOut: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "unsupportedURL")
-  public static var UnsupportedURL: NSURLError.Code {
+  public static var UnsupportedURL: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotFindHost")
-  public static var CannotFindHost: NSURLError.Code {
+  public static var CannotFindHost: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotConnectToHost")
-  public static var CannotConnectToHost: NSURLError.Code {
+  public static var CannotConnectToHost: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "networkConnectionLost")
-  public static var NetworkConnectionLost: NSURLError.Code {
+  public static var NetworkConnectionLost: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "dnsLookupFailed")
-  public static var DNSLookupFailed: NSURLError.Code {
+  public static var DNSLookupFailed: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "httpTooManyRedirects")
-  public static var HTTPTooManyRedirects: NSURLError.Code {
+  public static var HTTPTooManyRedirects: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "resourceUnavailable")
-  public static var ResourceUnavailable: NSURLError.Code {
+  public static var ResourceUnavailable: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "notConnectedToInternet")
-  public static var NotConnectedToInternet: NSURLError.Code {
+  public static var NotConnectedToInternet: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "redirectToNonExistentLocation")
-  public static var RedirectToNonExistentLocation: NSURLError.Code {
+  public static var RedirectToNonExistentLocation: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "badServerResponse")
-  public static var BadServerResponse: NSURLError.Code {
+  public static var BadServerResponse: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "userCancelledAuthentication")
-  public static var UserCancelledAuthentication: NSURLError.Code {
+  public static var UserCancelledAuthentication: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "userAuthenticationRequired")
-  public static var UserAuthenticationRequired: NSURLError.Code {
+  public static var UserAuthenticationRequired: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "zeroByteResource")
-  public static var ZeroByteResource: NSURLError.Code {
+  public static var ZeroByteResource: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotDecodeRawData")
-  public static var CannotDecodeRawData: NSURLError.Code {
+  public static var CannotDecodeRawData: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotDecodeContentData")
-  public static var CannotDecodeContentData: NSURLError.Code {
+  public static var CannotDecodeContentData: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotParseResponse")
-  public static var CannotParseResponse: NSURLError.Code {
+  public static var CannotParseResponse: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "fileDoesNotExist")
-  public static var FileDoesNotExist: NSURLError.Code {
+  public static var FileDoesNotExist: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "fileIsDirectory")
-  public static var FileIsDirectory: NSURLError.Code {
+  public static var FileIsDirectory: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "noPermissionsToReadFile")
-  public static var NoPermissionsToReadFile: NSURLError.Code {
+  public static var NoPermissionsToReadFile: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "secureConnectionFailed")
-  public static var SecureConnectionFailed: NSURLError.Code {
+  public static var SecureConnectionFailed: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "serverCertificateHasBadDate")
-  public static var ServerCertificateHasBadDate: NSURLError.Code {
+  public static var ServerCertificateHasBadDate: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "serverCertificateUntrusted")
-  public static var ServerCertificateUntrusted: NSURLError.Code {
+  public static var ServerCertificateUntrusted: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "serverCertificateHasUnknownRoot")
-  public static var ServerCertificateHasUnknownRoot: NSURLError.Code {
+  public static var ServerCertificateHasUnknownRoot: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "serverCertificateNotYetValid")
-  public static var ServerCertificateNotYetValid: NSURLError.Code {
+  public static var ServerCertificateNotYetValid: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "clientCertificateRejected")
-  public static var ClientCertificateRejected: NSURLError.Code {
+  public static var ClientCertificateRejected: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "clientCertificateRequired")
-  public static var ClientCertificateRequired: NSURLError.Code {
+  public static var ClientCertificateRequired: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotLoadFromNetwork")
-  public static var CannotLoadFromNetwork: NSURLError.Code {
+  public static var CannotLoadFromNetwork: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotCreateFile")
-  public static var CannotCreateFile: NSURLError.Code {
+  public static var CannotCreateFile: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotOpenFile")
-  public static var CannotOpenFile: NSURLError.Code {
+  public static var CannotOpenFile: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotCloseFile")
-  public static var CannotCloseFile: NSURLError.Code {
+  public static var CannotCloseFile: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotWriteToFile")
-  public static var CannotWriteToFile: NSURLError.Code {
+  public static var CannotWriteToFile: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotRemoveFile")
-  public static var CannotRemoveFile: NSURLError.Code {
+  public static var CannotRemoveFile: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "cannotMoveFile")
-  public static var CannotMoveFile: NSURLError.Code {
+  public static var CannotMoveFile: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "downloadDecodingFailedMidStream")
-  public static var DownloadDecodingFailedMidStream: NSURLError.Code {
+  public static var DownloadDecodingFailedMidStream: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "downloadDecodingFailedToComplete")
-  public static var DownloadDecodingFailedToComplete: NSURLError.Code {
+  public static var DownloadDecodingFailedToComplete: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "internationalRoamingOff")
-  public static var InternationalRoamingOff: NSURLError.Code {
+  public static var InternationalRoamingOff: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "callIsActive")
-  public static var CallIsActive: NSURLError.Code {
+  public static var CallIsActive: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "dataNotAllowed")
-  public static var DataNotAllowed: NSURLError.Code {
+  public static var DataNotAllowed: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "requestBodyStreamExhausted")
-  public static var RequestBodyStreamExhausted: NSURLError.Code {
+  public static var RequestBodyStreamExhausted: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "backgroundSessionRequiresSharedContainer")
-  public static var BackgroundSessionRequiresSharedContainer: NSURLError.Code {
+  public static var BackgroundSessionRequiresSharedContainer: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "backgroundSessionInUseByAnotherProcess")
-  public static var BackgroundSessionInUseByAnotherProcess: NSURLError.Code {
+  public static var BackgroundSessionInUseByAnotherProcess: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
   @available(*, unavailable, renamed: "backgroundSessionWasDisconnected")
-  public static var BackgroundSessionWasDisconnected: NSURLError.Code {
+  public static var BackgroundSessionWasDisconnected: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 }
