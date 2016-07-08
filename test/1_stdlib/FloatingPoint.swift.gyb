@@ -496,7 +496,6 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
       //  IEEE 754 basic operations, this property is critical to ensure
       //  that clamping to a valid range behaves as expected.
       else if lhs.isNaN && !rhs.isNaN {
-        print("lhs is \(lhs.bitPattern).  rhs is \(rhs.bitPattern).")
         expectEqual(min.bitPattern, rhs.bitPattern)
         expectEqual(max.bitPattern, rhs.bitPattern)
         expectEqual(minMag.bitPattern, rhs.bitPattern)
