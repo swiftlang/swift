@@ -218,6 +218,8 @@ func strideIteratorTest<
 
 StrideTestSuite.test("StrideThroughIterator/past end") {
   strideIteratorTest(stride(from: 0, through: 3, by: 1), nonNilResults: 4)
+  strideIteratorTest(
+    stride(from: UInt8(0), through: 255, by: 5), nonNilResults: 52)
 }
 
 StrideTestSuite.test("StrideThroughIterator/past end/backward") {
