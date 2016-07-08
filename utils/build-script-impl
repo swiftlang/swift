@@ -406,7 +406,7 @@ function set_build_options_for_host() {
                         --foundation "$(build_directory ${host} foundation)"
                         --build-dir "$(build_directory ${host} playgroundlogger)"
                         --swift-build-dir "$(build_directory ${host} swift)"
-                        --`python -c 'import sys; print sys.argv[1].lower()' ${PLAYGROUNDLOGGER_BUILD_TYPE}`
+                        --$(python -c 'import sys; print sys.argv[1].lower()' ${PLAYGROUNDLOGGER_BUILD_TYPE})
                     )
                     ;;
                 linux-armv6)
