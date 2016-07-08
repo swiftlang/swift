@@ -440,7 +440,7 @@ public struct UTF16 : UnicodeCodec {
   public init() {}
 
   /// A lookahead buffer for one UTF-16 code unit.
-  internal var _decodeLookahead: UInt32?
+  internal var _decodeLookahead: UInt16?
 
   /// Starts or continues decoding a UTF-16 sequence.
   ///
@@ -490,10 +490,10 @@ public struct UTF16 : UnicodeCodec {
     // length 1.  Length 0 does not make sense.  Neither does length 2 -- in
     // that case the sequence is valid.
 
-    let unit0: UInt32
+    let unit0: UInt16
     if _fastPath(_decodeLookahead == nil) {
       guard let next = input.next() else { return .emptyInput }
-      unit0 = UInt32(next)
+      unit0 = next
     } else { // Consume lookahead first.
       unit0 = _decodeLookahead!
       _decodeLookahead = nil
@@ -505,15 +505,14 @@ public struct UTF16 : UnicodeCodec {
 
     // Common case first, non-surrogate -- just a sequence of 1 code unit.
     if _fastPath((unit0 >> 11) != 0b1101_1) {
-      return .scalarValue(UnicodeScalar(_unchecked: unit0))
+      return .scalarValue(UnicodeScalar(_unchecked: UInt32(unit0)))
     }
 
     // Ensure `unit0` is a high-surrogate.
     guard _fastPath((unit0 >> 10) == 0b1101_10) else { return .error }
 
     // We already have a high-surrogate, so there should be a next code unit.
-    guard let next = input.next() else { return .error }
-    let unit1 = UInt32(next)
+    guard let unit1 = input.next() else { return .error }
 
     // `unit0` is a high-surrogate, so `unit1` should be a low-surrogate.
     guard _fastPath((unit1 >> 10) == 0b1101_11) else {
@@ -523,7 +522,7 @@ public struct UTF16 : UnicodeCodec {
     }
 
     // We have a well-formed surrogate pair, decode it.
-    let result = 0x10000 + (((unit0 & 0x03ff) << 10) | (unit1 & 0x03ff))
+    let result = 0x10000 + ((UInt32(unit0 & 0x03ff) << 10) | UInt32(unit1 & 0x03ff))
     return .scalarValue(UnicodeScalar(_unchecked: result))
   }
 
