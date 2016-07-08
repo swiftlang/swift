@@ -8,29 +8,13 @@ endif()
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-include(SwiftBuildType)
-
 #
-# User-configurable options.
+# User-configurable options that control the inclusion and default build
+# behavior for components which may not strictly be necessary (tools, examples,
+# and tests).
 #
-# Instead of invoking CMake directly and configuring these options manually,
-# consider using build-script instead.
+# This is primarily to support building smaller or faster project files.
 #
-
-set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
-    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
-set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
-    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
-
-is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
-if(swift_optimized)
-  set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
-else()
-  set(SWIFT_STDLIB_ASSERTIONS_default TRUE)
-endif()
-option(SWIFT_STDLIB_ASSERTIONS
-    "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
-    "${SWIFT_STDLIB_ASSERTIONS_default}")
 
 option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
@@ -83,6 +67,28 @@ option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
 option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
+
+#
+# Miscellaneous User-configurable options.
+#
+# TODO: Please categorize these!
+#
+
+set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
+    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
+set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
+    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
+
+include(SwiftBuildType)
+is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
+if(swift_optimized)
+  set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
+else()
+  set(SWIFT_STDLIB_ASSERTIONS_default TRUE)
+endif()
+option(SWIFT_STDLIB_ASSERTIONS
+    "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
+    "${SWIFT_STDLIB_ASSERTIONS_default}")
 
 option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
        "Use the host compiler and not the internal clang to build the swift runtime"
