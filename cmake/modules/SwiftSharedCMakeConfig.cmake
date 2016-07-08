@@ -40,26 +40,90 @@ function(escape_llvm_path_for_xcode path outvar)
   set(${outvar} "${path}" PARENT_SCOPE)
 endfunction()
 
-# What this function does is go through each of the passed in imported targets
-# from LLVM/Clang and changes them to use the appropriate fully expanded paths.
-#
-# TODO: This function needs a better name.
-function(fix_imported_target_locations_for_xcode targets)
-  foreach(t ${targets})
-    if (NOT TARGET ${t})
-      message(FATAL_ERROR "${t} is not a target?!")
-    endif()
+function(get_imported_library_prefix outvar target prefix)
+  string(FIND "${target}" "${prefix}" ALREADY_HAS_PREFIX)
+  if (ALREADY_HAS_PREFIX)
+    set(${outvar} "" PARENT_SCOPE)
+  else()
+    set(${outvar} "${prefix}" PARENT_SCOPE)
+  endif()
+endfunction()
 
-    get_target_property(TARGET_TYPE ${t} TYPE)
+function(check_imported_target_has_imported_configuration target config)
+  get_target_property(IMPORTED_CONFIGS_LIST ${target} IMPORTED_CONFIGURATIONS)
+  if ("${IMPORTED_CONFIGS_LIST}" STREQUAL "NOTFOUND")
+    message(FATAL_ERROR "No import configuration of ${target} specified?!")
+  endif()
 
-    # We only want to do this for static libraries for now.
-    if (NOT ${TARGET_TYPE} STREQUAL "STATIC_LIBRARY")
+  list(FIND "${IMPORTED_CONFIGS_LIST}" "${config}" FOUND_CONFIG)
+  if (NOT FOUND_CONFIG)
+    message(FATAL_ERROR "${target} does not have imported config '${config}'?! \
+Instead: ${IMPORTED_CONFIGS_LIST}")
+  endif()
+endfunction()
+
+function(fixup_imported_target_property_for_xcode target property real_build_type)
+  set(FULL_PROP_NAME "${property}_${real_build_type}")
+
+  # First try to lookup the value associated with the "real build type".
+  get_target_property(PROP_VALUE ${target} ${FULL_PROP_NAME})
+
+  # If the property is unspecified, return.
+  if ("${PROP_VALUE}" STREQUAL "NOTFOUND")
+    return()
+  endif()
+
+  # Otherwise for each cmake configuration that is not real_build_type, hardcode
+  # its value to be PROP_VALUE.
+  foreach(c ${CMAKE_CONFIGURATION_TYPES})
+    if ("${c}" STREQUAL "${real_build_type}")
       continue()
     endif()
+    set_target_properties(${target} PROPERTIES ${FULL_PROP_NAME} "${PROP_VALUE}")
+  endforeach()
+endfunction()
 
-    set_target_properties(${t} PROPERTIES
-      IMPORTED_LOCATION_DEBUG "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${t}.a"
-      IMPORTED_LOCATION_RELEASE "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${t}.a")
+# When building with Xcode, we only support compiling against the LLVM
+# configuration that was specified by build-script. This becomes a problem since
+# if we compile LLVM-Release and Swift-Debug, Swift is going to look in the
+# Debug, not the Release folder for LLVM's code and thus will be compiling
+# against an unintended set of libraries, if those libraries exist at all.
+#
+# Luckily, via LLVMConfig.cmake, we know the configuration that LLVM was
+# compiled in, so we can grab the imported location for that configuration and
+# splat it across the other configurations as well.
+function(fix_imported_targets_for_xcode imported_targets)
+  # This is the set of configuration specific cmake properties that are
+  # supported for imported targets in cmake 3.4.3. Sadly, beyond hacks, it seems
+  # that there is no way to dynamically query the list of set properties of a
+  # target.
+  #
+  # *NOTE* In fixup_imported_target_property_for_xcode, we add the _${CONFIG}
+  # *suffix.
+  set(imported_target_properties
+    IMPORTED_IMPLIB
+    IMPORTED_LINK_DEPENDENT_LIBRARIES
+    IMPORTED_LINK_INTERFACE_LANGUAGES
+    IMPORTED_LINK_INTERFACE_LIBRARIES
+    IMPORTED_LINK_INTERFACE_MULTIPLICITY
+    IMPORTED_LOCATION
+    IMPORTED_NO_SONAME
+    IMPORTED_SONAME)
+
+  foreach(target ${imported_targets})
+    if (NOT TARGET ${target})
+      message(FATAL_ERROR "${target} is not a target?!")
+    endif()
+
+    # First check that we actually imported the configuration that LLVM said
+    # that we did. This is just a sanity check.
+    check_imported_target_has_imported_configuration(${target} ${LLVM_BUILD_TYPE})
+
+    # Then loop through all of the imported properties and translate.
+    foreach(property ${imported_properties})
+      fixup_imported_target_property_for_xcode(
+        ${target} ${property} ${LLVM_BUILD_TYPE})
+    endforeach()
   endforeach()
 endfunction()
 
@@ -119,10 +183,11 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   # against a matching LLVM build configuration.  However, we usually want to be
   # flexible and allow linking a debug Swift against optimized LLVM.
   set(LLVM_RUNTIME_OUTPUT_INTDIR "${LLVM_BINARY_DIR}")
+  set(LLVM_BINARY_OUTPUT_INTDIR "${LLVM_TOOLS_BINARY_DIR}")
   set(LLVM_LIBRARY_OUTPUT_INTDIR "${LLVM_LIBRARY_DIR}")
 
   if (XCODE)
-    fix_imported_target_locations_for_xcode("${LLVM_EXPORTED_TARGETS}")
+    fix_imported_targets_for_xcode("${LLVM_EXPORTED_TARGETS}")
   endif()
 
   if(NOT ${is_cross_compiling})
@@ -215,7 +280,7 @@ macro(swift_common_standalone_build_config_clang product is_cross_compiling)
   set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
 
   if (XCODE)
-    fix_imported_target_locations_for_xcode("${CLANG_EXPORTED_TARGETS}")
+    fix_imported_targets_for_xcode("${CLANG_EXPORTED_TARGETS}")
   endif()
 
   include_directories("${CLANG_BUILD_INCLUDE_DIR}"

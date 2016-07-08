@@ -5,13 +5,16 @@ add_swift_library(swiftIntents ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_O
   INIntegerResolutionResult.swift
   INListRideOptionsIntentResponse.swift
   INRequestRideIntent.swift
+  INSaveProfileInCarIntent.swift
+  INSearchForPhotosIntentResponse.swift
   INSetClimateSettingsInCarIntent.swift
   INSetDefrosterSettingsInCarIntent.swift
+  INSetProfileInCarIntent.swift
   INSetRadioStationIntent.swift
-  INSetSeatTemperatureInCarIntent.swift
-  INSearchForPhotosIntentResponse.swift
+  INSetSeatSettingsInCarIntent.swift
   INStartPhotoPlaybackIntentResponse.swift
   INStartWorkoutIntent.swift
+  INTemperature.swift
 
   TARGET_SDKS OSX IOS IOS_SIMULATOR
   SWIFT_MODULE_DEPENDS Foundation

@@ -201,7 +201,7 @@ extension MutableCollection
       }
       if beforeI == startIndex {
         // All elements are in non-increasing order.  Reverse to form the first
-        // pemutation, where all elements are sorted (in non-increasing order).
+        // permutation, where all elements are sorted (in non-increasing order).
         reverse()
         return .formedFirstPermutation
       }

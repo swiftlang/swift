@@ -7,4 +7,4 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-func a{protocol A{class b<T=class d:A.b
+func B<T{associatedtype B<T{}class A:B<T.B>class B<T

@@ -6,5 +6,4 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
-var d{protocol A{{}class a:A{}typealias e:A.E{{}}class A:a
+extension A{{}protocol A}protocol A:class{protocol A{}typealias e:A

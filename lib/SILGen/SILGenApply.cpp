@@ -3053,16 +3053,30 @@ namespace {
                                       emitted.contextForReabstraction);
     }
     
+    CanType getAnyObjectType() {
+      return SGF.getASTContext()
+        .getProtocol(KnownProtocolKind::AnyObject)
+        ->getDeclaredType()
+        ->getCanonicalType();
+    }
+    bool isAnyObjectType(CanType t) {
+      return t == getAnyObjectType();
+    }
+    
     ManagedValue emitNativeToBridgedArgument(ArgumentSource &&arg,
                                              SILType loweredSubstArgType,
                                              AbstractionPattern origParamType,
                                              SILParameterInfo param) {
-      // TODO: We should take the opportunity to peephole certain sequences
-      // here. For instance, when going from concrete type -> Any -> id, we
-      // can skip the intermediate 'Any' boxing and directly bridge the concrete
-      // type to its object representation. Similarly, when bridging from
-      // NSFoo -> Foo -> NSFoo, we should elide the bridge altogether and pass
-      // the original object.
+      // If we're bridging a concrete type to `id` via Any, skip the Any
+      // boxing.
+      // TODO: Generalize. Similarly, when bridging from NSFoo -> Foo -> NSFoo,
+      // we should elide the bridge altogether and pass the original object.
+      if (isAnyObjectType(param.getType()) && !arg.isRValue()) {
+        return emitNativeToBridgedObjectArgument(std::move(arg).asKnownExpr(),
+                                                 loweredSubstArgType,
+                                                 origParamType, param);
+      }
+      
       auto emitted = emitArgumentFromSource(std::move(arg), loweredSubstArgType,
                                             origParamType, param);
       
@@ -3070,6 +3084,88 @@ namespace {
                                       std::move(emitted.value).getScalarValue(),
                                       Rep, param.getType());
                                       
+    }
+    
+    Expr *lookThroughExistentialErasures(Expr *argExpr) {
+      argExpr = argExpr->getSemanticsProvidingExpr();
+
+      // When converting from an existential type to a more general existential,
+      // the inner existential is opened first. Look through this pattern.
+      if (auto open = dyn_cast<OpenExistentialExpr>(argExpr)) {
+        auto subExpr = open->getSubExpr()->getSemanticsProvidingExpr();
+        while (auto erasure = dyn_cast<ErasureExpr>(subExpr)) {
+          subExpr = erasure->getSubExpr()->getSemanticsProvidingExpr();
+        }
+        // If we drilled down to the underlying opened existential, look
+        // through it.
+        if (subExpr == open->getOpaqueValue())
+          return open->getExistentialValue();
+        // TODO: Maybe there are other peepholes we could attempt on opened
+        // existentials?
+        return open;
+      }
+      
+      // Look through ErasureExprs and try to bridge the underlying
+      // concrete value instead.
+      while (auto erasure = dyn_cast<ErasureExpr>(argExpr))
+        argExpr = erasure->getSubExpr()->getSemanticsProvidingExpr();
+      return argExpr;
+    }
+    
+    /// Emit an argument expression that we know will be bridged to an
+    /// Objective-C object.
+    ManagedValue emitNativeToBridgedObjectArgument(Expr *argExpr,
+                                               SILType loweredSubstArgType,
+                                               AbstractionPattern origParamType,
+                                               SILParameterInfo param) {
+      argExpr = lookThroughExistentialErasures(argExpr);
+      
+      // Emit the argument.
+      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+      ManagedValue emittedArg = SGF.emitRValue(argExpr, contexts.ForEmission)
+        .getScalarValue();
+      
+      // If the argument is not already a class instance, bridge it.
+      if (!argExpr->getType()->mayHaveSuperclass()
+          && !argExpr->getType()->isClassExistentialType()) {
+        emittedArg = SGF.emitNativeToBridgedValue(argExpr, emittedArg,
+                                                  Rep, param.getType());
+      }
+      auto emittedArgTy = emittedArg.getType().getSwiftRValueType();
+      assert(emittedArgTy->mayHaveSuperclass()
+        || emittedArgTy->isClassExistentialType());
+      
+      // Upcast reference types to AnyObject.
+      if (!isAnyObjectType(emittedArgTy)) {
+        // Open class existentials first to upcast the reference inside.
+        if (emittedArgTy->isClassExistentialType()) {
+          emittedArgTy = ArchetypeType::getOpened(emittedArgTy);
+          auto opened = SGF.B.createOpenExistentialRef(argExpr,
+                                 emittedArg.getValue(),
+                                 SILType::getPrimitiveObjectType(emittedArgTy));
+          emittedArg = ManagedValue(opened, emittedArg.getCleanup());
+        }
+        
+        // Erase to AnyObject.
+        auto conformance = SGF.SGM.SwiftModule->lookupConformance(
+          emittedArgTy,
+          SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject),
+          nullptr);
+        assert(conformance &&
+               "no AnyObject conformance for class?!");
+        
+        ArrayRef<ProtocolConformanceRef> conformances(*conformance);
+        auto ctxConformances = SGF.getASTContext().AllocateCopy(conformances);
+        
+        auto erased = SGF.B.createInitExistentialRef(argExpr,
+                           SILType::getPrimitiveObjectType(getAnyObjectType()),
+                           emittedArgTy, emittedArg.getValue(),
+                           ctxConformances);
+        emittedArg = ManagedValue(erased, emittedArg.getCleanup());
+      }
+      
+      assert(isAnyObjectType(emittedArg.getSwiftType()));
+      return emittedArg;
     }
     
     struct EmittedArgument {

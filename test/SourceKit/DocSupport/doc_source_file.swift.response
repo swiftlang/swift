@@ -2586,9 +2586,19 @@
         key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>Element</decl.name> = <ref.struct usr=\"s:Si\">Int</ref.struct></decl.typealias>",
         key.conforms: [
           {
-            key.kind: source.lang.swift.ref.associatedtype,
-            key.name: "Element",
-            key.usr: "s:P8__main__5Prot27Element"
+            key.kind: source.lang.swift.ref.protocol,
+            key.name: "SignedInteger",
+            key.usr: "s:Ps13SignedInteger"
+          },
+          {
+            key.kind: source.lang.swift.ref.protocol,
+            key.name: "Comparable",
+            key.usr: "s:Ps10Comparable"
+          },
+          {
+            key.kind: source.lang.swift.ref.protocol,
+            key.name: "Equatable",
+            key.usr: "s:Ps9Equatable"
           }
         ]
       },

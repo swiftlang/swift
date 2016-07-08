@@ -117,18 +117,25 @@ class TestMeasurement : TestMeasurementSuper {
         expectEqual(MyDimensionalUnit.unitA, MyDimensionalUnit.unitA)
         expectTrue(MyDimensionalUnit.unitA == MyDimensionalUnit.unitA)
     }
+    
+    func testMeasurementFormatter() {
+        let formatter = MeasurementFormatter()
+        let measurement = Measurement(value: 100, unit: UnitLength.kilometers)
+        let result = formatter.string(from: measurement)
+        
+        // Just make sure we get a result at all here
+        expectFalse(result.isEmpty)
+    }
 }
 
 #if !FOUNDATION_XCTEST
 if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
-    // Temporarily disabled (26345468)
-    /*
     var MeasurementTests = TestSuite("TestMeasurement")
     MeasurementTests.test("testBasicConstruction") { TestMeasurement().testBasicConstruction() }
     MeasurementTests.test("testConversion") { TestMeasurement().testConversion() }
     MeasurementTests.test("testOperators") { TestMeasurement().testOperators() }
     MeasurementTests.test("testUnits") { TestMeasurement().testUnits() }
+    MeasurementTests.test("testMeasurementFormatter") { TestMeasurement().testMeasurementFormatter() }
     runAllTests()
-    */
 }
 #endif

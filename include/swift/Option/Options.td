@@ -293,12 +293,16 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
 def g_Group : OptionGroup<"<debug info options>">;
 
 def g : Flag<["-"], "g">, Group<g_Group>, Flags<[FrontendOption]>,
-  HelpText<"Emit debug info">;
+  HelpText<"Emit debug info. "
+           "This is the preferred setting for debugging with LLDB.">;
 def gnone : Flag<["-"], "gnone">, Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Don't emit debug info">;
 def gline_tables_only : Flag<["-"], "gline-tables-only">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit minimal debug info for backtraces only">;
+def gdwarf_types : Flag<["-"], "gdwarf-types">,
+  Group<g_Group>, Flags<[FrontendOption]>,
+  HelpText<"Emit full DWARF type info.">;
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,

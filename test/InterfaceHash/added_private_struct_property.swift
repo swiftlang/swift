@@ -5,7 +5,7 @@
 // RUN: not cmp %t/a.hash %t/b.hash
 
 // BEGIN a.swift
-struct S {
+private struct S {
   func f2() -> Int {
     return 0
   }
@@ -14,11 +14,11 @@ struct S {
 }
 
 // BEGIN b.swift
-struct S {
+private struct S {
   func f2() -> Int {
     return 0
   }
 
-  private var x: Int = 0
+  var x: Int = 0
   var y: Int = 0
 }

@@ -357,7 +357,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-D_ISO646_H_", "-D__ISO646_H",
 
       // Request new APIs from Foundation.
-      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=7",
+      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=8",
 
       // Request new APIs from SceneKit.
       "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=2",
@@ -3262,12 +3262,11 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
 
     if (objcClass) {
       if (auto objcSuperclass = objcClass->getSuperClass()) {
-        if (auto getterMethod
-              = objcSuperclass->lookupInstanceMethod(
-                  objcProperty->getGetterName())) {
-          if (!shouldSuppressDeclImport(getterMethod))
-            return true;
-        }
+        auto getterMethod =
+            objcSuperclass->lookupMethod(objcProperty->getGetterName(),
+                                         objcProperty->isInstanceProperty());
+        if (getterMethod && !shouldSuppressDeclImport(getterMethod))
+          return true;
       }
     }
 

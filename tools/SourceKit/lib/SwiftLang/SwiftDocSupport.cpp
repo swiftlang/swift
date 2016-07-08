@@ -445,6 +445,14 @@ static void passExtends(const ValueDecl *D, DocInfoConsumer &Consumer) {
   Consumer.handleExtendsEntity(EntInfo);
 }
 
+static void passInheritsAndConformancesForValueDecl(const ValueDecl *VD,
+                                                    DocInfoConsumer &Consumer) {
+  if (auto Overridden = VD->getOverriddenDecl())
+    passInherits(Overridden, Consumer);
+  passConforms(VD->getSatisfiedProtocolRequirements(/*Sorted=*/true),
+               Consumer);
+}
+
 static void reportRelated(ASTContext &Ctx,
                           const Decl *D,
                           const Decl* SynthesizedTarget,
@@ -461,15 +469,28 @@ static void reportRelated(ASTContext &Ctx,
 
     passInherits(ED->getInherited(), Consumer);
 
+  } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
+
+    // If underlying type exists, report the inheritance and conformance of the
+    // underlying type.
+    auto Ty = TAD->getUnderlyingType();
+    if (Ty) {
+      if (auto NM = Ty->getCanonicalType()->getAnyNominal()) {
+        passInherits(NM->getInherited(), Consumer);
+        passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
+                     Consumer);
+        return;
+      }
+    }
+
+    // Otherwise, report the inheritance of the type alias itself.
+    passInheritsAndConformancesForValueDecl(TAD, Consumer);
   } else if (const TypeDecl *TD = dyn_cast<TypeDecl>(D)) {
     passInherits(TD->getInherited(), Consumer);
     passConforms(TD->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                  Consumer);
   } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (auto Overridden = VD->getOverriddenDecl())
-      passInherits(Overridden, Consumer);
-    passConforms(VD->getSatisfiedProtocolRequirements(/*Sorted=*/true),
-                 Consumer);
+    passInheritsAndConformancesForValueDecl(VD, Consumer);
   }
 }
 

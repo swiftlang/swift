@@ -8,44 +8,20 @@ endif()
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-include(SwiftBuildType)
-
 #
-# User-configurable options.
+# User-configurable options that control the inclusion and default build
+# behavior for components which may not strictly be necessary (tools, examples,
+# and tests).
 #
-# Instead of invoking CMake directly and configuring these options manually,
-# consider using build-script instead.
+# This is primarily to support building smaller or faster project files.
 #
-
-set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
-    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
-set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
-    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
-
-is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
-if(swift_optimized)
-  set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
-else()
-  set(SWIFT_STDLIB_ASSERTIONS_default TRUE)
-endif()
-option(SWIFT_STDLIB_ASSERTIONS
-    "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
-    "${SWIFT_STDLIB_ASSERTIONS_default}")
-
-option(SWIFT_SERIALIZE_STDLIB_UNITTEST
-    "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
-    FALSE)
-
-option(SWIFT_STDLIB_SIL_DEBUGGING
-    "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
-    FALSE)
-
-option(SWIFT_CHECK_INCREMENTAL_COMPILATION
-    "Check if incremental compilation works when compiling the Swift libraries"
-    FALSE)
 
 option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
+    TRUE)
+
+option(SWIFT_BUILD_REMOTE_MIRROR
+    "Build the Swift Remote Mirror Library"
     TRUE)
 
 option(SWIFT_BUILD_DYNAMIC_STDLIB
@@ -92,6 +68,28 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
+#
+# Miscellaneous User-configurable options.
+#
+# TODO: Please categorize these!
+#
+
+set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
+    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
+set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
+    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
+
+include(SwiftBuildType)
+is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
+if(swift_optimized)
+  set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
+else()
+  set(SWIFT_STDLIB_ASSERTIONS_default TRUE)
+endif()
+option(SWIFT_STDLIB_ASSERTIONS
+    "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
+    "${SWIFT_STDLIB_ASSERTIONS_default}")
+
 option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
        "Use the host compiler and not the internal clang to build the swift runtime"
        FALSE)
@@ -120,7 +118,7 @@ set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror-headers")
+    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
 # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
@@ -174,6 +172,11 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
+
+#
+# User-configurable Android specific options.
+#
+
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
 set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
@@ -182,6 +185,10 @@ set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android SDK tools that will be passed to the swiftc frontend")
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
+
+#
+# User-configurable ICU specific options for Android, FreeBSD, Linux.
+#
 
 foreach(sdk ANDROID;FREEBSD;LINUX)
   set(SWIFT_${sdk}_ICU_UC "" CACHE STRING
@@ -249,6 +256,18 @@ endif()
 option(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
     "Overwrite memory for deallocated Swift objects"
     "${SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_default}")
+
+option(SWIFT_SERIALIZE_STDLIB_UNITTEST
+    "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
+    FALSE)
+
+option(SWIFT_STDLIB_SIL_DEBUGGING
+    "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    FALSE)
+
+option(SWIFT_CHECK_INCREMENTAL_COMPILATION
+    "Check if incremental compilation works when compiling the Swift libraries"
+    FALSE)
 
 #
 # User-configurable experimental options.  Do not use in production builds.

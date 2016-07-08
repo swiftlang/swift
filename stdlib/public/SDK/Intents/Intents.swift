@@ -10,5 +10,4 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import Intents
-import Foundation
+// IMPORTANT: This file is required by the build system. Don't remove it.

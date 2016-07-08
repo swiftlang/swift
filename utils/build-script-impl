@@ -85,6 +85,8 @@ KNOWN_SETTINGS=(
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
+    playgroundlogger-build-type "Debug"          "the build variant for PlaygroundLogger"
+    playgroundsupport-build-type "Debug"         "the build variant for PlaygroundSupport"
     xctest-build-type           "Debug"          "the build variant for xctest"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
@@ -108,6 +110,7 @@ KNOWN_SETTINGS=(
     swift-primary-variant-arch  ""               "default arch for target binaries"
     skip-build-cmark            ""               "set to skip building CommonMark"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
+    skip-build-compiler-rt      ""               "set to skip building Compiler-RT"
     skip-build-swift            ""               "set to skip building Swift"
     skip-build-linux            ""               "set to skip building Swift stdlibs for Linux"
     skip-build-freebsd          ""               "set to skip building Swift stdlibs for FreeBSD"
@@ -127,6 +130,8 @@ KNOWN_SETTINGS=(
     skip-build-foundation       ""               "set to skip building foundation"
     skip-build-libdispatch      ""               "set to skip building libdispatch"
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
+    skip-build-playgroundlogger ""               "set to skip building PlaygroundLogger"
+    skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
@@ -135,6 +140,8 @@ KNOWN_SETTINGS=(
     skip-test-xctest            ""               "set to skip testing xctest"
     skip-test-foundation        ""               "set to skip testing foundation"
     skip-test-libdispatch       ""               "set to skip testing libdispatch"
+    skip-test-playgroundlogger  ""               "set to skip testing PlaygroundLogger"
+    skip-test-playgroundsupport ""               "set to skip testing PlaygroundSupport"
     skip-test-linux             ""               "set to skip testing Swift stdlibs for Linux"
     skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
     skip-test-cygwin            ""               "set to skip testing Swift stdlibs for Cygwin"
@@ -161,6 +168,7 @@ KNOWN_SETTINGS=(
     build-swift-dynamic-sdk-overlay   ""         "set to 1 to build dynamic variants of the Swift SDK overlay"
     build-swift-static-sdk-overlay    ""         "set to 1 to build static variants of the Swift SDK overlay"
     build-swift-examples        "1"              "set to 1 to build examples"
+    build-swift-remote-mirror   "1"              "set to 1 to build the Swift Remote Mirror library"
     build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     check-incremental-compilation "0"            "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
@@ -184,6 +192,8 @@ KNOWN_SETTINGS=(
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
     install-libdispatch         ""               "whether to install libdispatch"
+    install-playgroundlogger    ""               "whether to install PlaygroundLogger"
+    install-playgroundsupport   ""               "whether to install PlaygroundSupport"
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
     host-target                 ""               "The host target. LLVM, Clang, and Swift will be built for this target. The built LLVM and Clang will be used to compile Swift for the cross-compilation targets. **This argument is required**"
     stdlib-deployment-targets   ""               "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
@@ -225,6 +235,7 @@ KNOWN_SETTINGS=(
     # TODO: Remove this some time later.
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
+    llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
 )
 
 # Centralized access point for traced command invocation.
@@ -389,6 +400,14 @@ function set_build_options_for_host() {
             case ${host} in
                 linux-x86_64)
                     SWIFT_HOST_VARIANT_ARCH="x86_64"
+                    playgroundlogger_build_cmd="${PLAYGROUNDLOGGER_SOURCE_DIR}/build.py"
+                    playgroundlogger_build_options=(
+                        --swiftc "$(build_directory_bin ${host} swift)"
+                        --foundation "$(build_directory ${host} foundation)"
+                        --build-dir "$(build_directory ${host} playgroundlogger)"
+                        --swift-build-dir "$(build_directory ${host} swift)"
+                        --`python -c 'import sys; print sys.argv[1].lower()' ${PLAYGROUNDLOGGER_BUILD_TYPE}`
+                    )
                     ;;
                 linux-armv6)
                     SWIFT_HOST_VARIANT_ARCH="armv6"
@@ -436,6 +455,9 @@ function set_build_options_for_host() {
                     swiftpm_bootstrap_options=(
                         --sysroot="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_TestDriver")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="MacOSX.platform"
                     ;;
                 iphonesimulator-i386)
                     xcrun_sdk_name="iphonesimulator"
@@ -451,6 +473,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_iOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="iPhoneSimulator.platform"
                     ;;
                 iphonesimulator-x86_64)
                     xcrun_sdk_name="iphonesimulator"
@@ -466,6 +491,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_iOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="iPhoneSimulator.platform"
                     ;;
                 iphoneos-armv7)
                     xcrun_sdk_name="iphoneos"
@@ -481,6 +509,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_iOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="iPhoneOS.platform"
                     ;;
                 iphoneos-armv7s)
                     xcrun_sdk_name="iphoneos"
@@ -496,6 +527,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_iOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="iPhoneOS.platform"
                     ;;
                 iphoneos-arm64)
                     xcrun_sdk_name="iphoneos"
@@ -511,6 +545,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_iOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="iPhoneOS.platform"
                     ;;
                 appletvsimulator-x86_64)
                     xcrun_sdk_name="appletvsimulator"
@@ -526,6 +563,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_tvOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="AppleTVSimulator.platform"
                     ;;
                 appletvos-arm64)
                     xcrun_sdk_name="appletvos"
@@ -541,6 +581,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_tvOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="AppleTVOS.platform"
                     ;;
                 watchsimulator-i386)
                     xcrun_sdk_name="watchsimulator"
@@ -582,8 +625,8 @@ function set_build_options_for_host() {
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
-                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_COMPILER_RT})"
-                -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_COMPILER_RT})"
+                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+                -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
@@ -651,6 +694,15 @@ function set_build_options_for_host() {
         -DSWIFT_HOST_VARIANT_SDK="${SWIFT_HOST_VARIANT_SDK}"
         -DSWIFT_HOST_VARIANT_ARCH="${SWIFT_HOST_VARIANT_ARCH}"
     )
+
+    if [[ "${LLVM_LIT_ARGS}" ]]; then
+        llvm_cmake_options+=(
+            -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS}"
+        )
+        swift_cmake_options+=(
+            -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS}"
+        )
+    fi
 }
 
 function configure_default_options() {
@@ -804,12 +856,12 @@ fi
 # FIXME: We currently do not support building compiler-rt with the
 # Xcode generator.
 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
-    SKIP_COMPILER_RT=1
+    SKIP_BUILD_COMPILER_RT=1
 fi
 
 # FIXME: We currently do not support cross-compiling swift with compiler-rt.
 if [[ "${CROSS_COMPILE_HOSTS}" ]]; then
-    SKIP_COMPILER_RT=1
+    SKIP_BUILD_COMPILER_RT=1
 fi
 
 # WORKSPACE, BUILD_DIR and INSTALLABLE_PACKAGE must be absolute paths
@@ -1076,6 +1128,8 @@ SWIFTPM_SOURCE_DIR="${WORKSPACE}/swiftpm"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
+PLAYGROUNDLOGGER_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundLogger"
+PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundSupport"
 
 if [[ ! -d ${CMARK_SOURCE_DIR} ]]; then
     echo "Couldn't find cmark source directory."
@@ -1104,6 +1158,16 @@ fi
 
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" && ! -d ${LIBDISPATCH_SOURCE_DIR} ]]; then
     echo "Couldn't find libdispatch source directory."
+    exit 1
+fi
+
+if [[ ! "${SKIP_BUILD_PLAYGROUNDLOGGER}" && ! -d ${PLAYGROUNDLOGGER_SOURCE_DIR} ]]; then
+    echo "Couldn't find PlaygroundLogger source directory."
+    exit 1
+fi
+
+if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
+    echo "Couldn't find PlaygroundSupport source directory."
     exit 1
 fi
 
@@ -1142,6 +1206,12 @@ fi
 # added to the list of build products first.
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
+fi
+if [[ ! "${SKIP_BUILD_PLAYGROUNDLOGGER}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" playgroundlogger)
+fi
+if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" playgroundsupport)
 fi
 # SwiftPM is dependent on XCTest, so XCTest must be added to the list of
 # build products first.
@@ -1404,6 +1474,13 @@ function build_directory_bin() {
             libdispatch)
                 echo "${root}/bin"
                 ;;
+            playgroundlogger)
+                # FIXME: var name for build type
+                echo "${root}/${PLAYGROUNDLOGGER_BUILD_TYPE}/bin"
+                ;;
+            playgroundsupport)
+                echo "${root}/${PLAYGROUNDSUPPORT_BUILD_TYPE}/bin"
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1514,6 +1591,13 @@ function cmake_config_opt() {
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
                 ;;            
             libdispatch)
+                ;;
+            playgroundlogger)
+                # FIXME: var name
+                echo "--config ${PLAYGROUNDLOGGER_BUILD_TYPE}"
+                ;;
+            playgroundsupport)
+                echo "--config ${PLAYGROUNDSUPPORT_BUILD_TYPE}"
                 ;;
             *)
                 echo "error: unknown product: ${product}"
@@ -1761,7 +1845,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [ "${SKIP_BUILD_LLVM}" ] ; then
                     # We can't skip the build completely because the standalone
                     # build of Swift depend on these.
-                    build_targets=(llvm-config llvm-tblgen clang-headers)
+                    build_targets=(llvm-tblgen clang-headers)
                 fi
 
                 # Note: we set the variable:
@@ -1873,6 +1957,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
                     -DSWIFT_BUILD_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
+                    -DSWIFT_BUILD_REMOTE_MIRROR:BOOL=$(true_false "${BUILD_SWIFT_REMOTE_MIRROR}")
                     -DSWIFT_SERIALIZE_STDLIB_UNITTEST:BOOL=$(true_false "${BUILD_SERIALIZED_STDLIB_UNITTEST}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_CHECK_INCREMENTAL_COMPILATION:BOOL=$(true_false "${CHECK_INCREMENTAL_COMPILATION}")
@@ -2193,6 +2278,30 @@ for host in "${ALL_HOSTS[@]}"; do
                 # libdispatch builds itself and doesn't use cmake
                 continue
                 ;;
+            playgroundlogger)
+                PLAYGROUNDLOGGER_BUILD_DIR=$(build_directory ${host} ${product})
+                SWIFTC_BIN="$(build_directory_bin ${host} swift)/swiftc"
+
+                set -x
+                pushd "${PLAYGROUNDLOGGER_SOURCE_DIR}"
+                mkdir -p "${PLAYGROUNDLOGGER_BUILD_DIR}"
+                "${playgroundlogger_build_cmd}" -configuration "${PLAYGROUNDLOGGER_BUILD_TYPE}" -target "${playgroundlogger_build_target}" install SWIFT_EXEC="${SWIFTC_BIN}" DSTROOT=${build_dir} INSTALL_PATH="/" SKIP_INSTALL=NO
+                popd
+                { set +x; } 2>/dev/null
+                continue
+                ;;
+            playgroundsupport)
+                PLAYGROUNDSUPPORT_BUILD_DIR=$(build_directory ${host} ${product})
+                SWIFTC_BIN="$(build_directory_bin ${host} swift)/swiftc"
+
+                set -x
+                pushd "${PLAYGROUNDSUPPORT_SOURCE_DIR}"
+                mkdir -p "${PLAYGROUNDSUPPORT_BUILD_DIR}"
+                "xcodebuild" -configuration "${PLAYGROUNDSUPPORT_BUILD_TYPE}" -target AllProducts SWIFT_EXEC="${SWIFTC_BIN}" DSTROOT="$(get_host_install_destdir ${host})"
+                popd
+                { set +x; } 2>/dev/null
+                continue
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -2462,6 +2571,19 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
+           playgroundlogger)
+               SWIFT_DYLIB_PATH=$(build_directory ${host} swift)/lib/swift/macosx/
+               PLAYGROUNDLOGGER_FRAMEWORK_PATH=$(build_directory ${host} ${product})
+               set -x
+               pushd "${PLAYGROUNDLOGGER_FRAMEWORK_PATH}"
+               DYLD_LIBRARY_PATH=$SWIFT_DYLIB_PATH DYLD_FRAMEWORK_PATH=$PLAYGROUNDLOGGER_FRAMEWORK_PATH ./PlaygroundLogger_TestDriver
+               popd
+               { set +x; } 2>/dev/null
+               continue
+               ;;
+           playgroundsupport)
+               continue
+               ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -2678,6 +2800,64 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # As libdispatch installation is self-contained, we break early here.
                 continue
+                ;;
+            playgroundlogger)
+                if [[ -z "${INSTALL_PLAYGROUNDLOGGER}" ]] ; then
+                    continue
+                fi
+                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                    echo "--install-destdir is required to install products."
+                    exit 1
+                fi
+
+                echo "--- Installing ${product} ---"
+                PLAYGROUNDLOGGER_BUILD_DIR=$(build_directory ${host} playgroundlogger)
+                PLAYGROUNDLOGGER_INSTALL_PREFIX="${INSTALL_DESTDIR}"
+                # Note that installing directly to /usr/lib/swift usually
+                # requires root permissions.
+                set -x
+                case "$(uname -s)" in
+                    Linux)
+                        PLAYGROUNDLOGGER_INSTALL_DIR="$(get_host_install_destdir ${host})/$(get_host_install_prefix ${host})/lib/swift/linux"
+                        mkdir -p "${PLAYGROUNDLOGGER_INSTALL_DIR}"
+                        cp -R "${PLAYGROUNDLOGGER_BUILD_DIR}"/libPlaygroundLogger.so "${PLAYGROUNDLOGGER_INSTALL_DIR}"
+                        ;;
+                    Darwin)
+                        pushd "${PLAYGROUNDLOGGER_SOURCE_DIR}"
+                        xcodebuild -target "All Platforms Logger" -configuration Toolchain_${PLAYGROUNDLOGGER_BUILD_TYPE} install SWIFT_EXEC="${SWIFTC_BIN}" DT_TOOLCHAIN_DIR="${TOOLCHAIN_PREFIX}" DSTROOT="$(get_host_install_destdir ${host})"
+                        popd
+                        continue
+                        ;;
+                    *)
+                        echo "error: --install-playgroundlogger is not supported on this platform"
+                        exit 1
+                        ;;
+                esac
+                { set +x; } 2>/dev/null
+
+                # As XCTest installation is self-contained, we break early here.
+                continue
+                ;;
+            playgroundsupport)
+                set -x
+                if [[ -z "${INSTALL_PLAYGROUNDSUPPORT}" ]] ; then
+                    continue
+                fi
+                case "$(uname -s)" in
+                    Linux)
+                        ;;
+                    FreeBSD)
+                        ;;
+                    CYGWIN_NT-10.0)
+                        ;;
+                    Darwin)
+                        pushd "${PLAYGROUNDSUPPORT_SOURCE_DIR}"
+                        xcodebuild -target AllProducts -configuration ${PLAYGROUNDSUPPORT_BUILD_TYPE} install SWIFT_EXEC="${SWIFTC_BIN}" DT_TOOLCHAIN_DIR="${TOOLCHAIN_PREFIX}" DSTROOT="$(get_host_install_destdir ${host})"
+                        popd
+                        continue
+                        ;;
+                esac
+                { set +x; } 2>/dev/null
                 ;;
             *)
                 echo "error: unknown product: ${product}"

@@ -18,7 +18,7 @@ FoundationExtrasTests.test("withOverriddenLocaleCurrentLocale(Locale)") {
     let result = withOverriddenLocaleCurrentLocale(
       Locale(localeIdentifier: "en_US")) {
       () -> Int in
-      expectEqual("en_US", Locale.current().localeIdentifier)
+      expectEqual("en_US", Locale.current.localeIdentifier)
       return 42
     }
     expectEqual(42, result)
@@ -27,7 +27,7 @@ FoundationExtrasTests.test("withOverriddenLocaleCurrentLocale(Locale)") {
     let result = withOverriddenLocaleCurrentLocale(
       Locale(localeIdentifier: "uk")) {
       () -> Int in
-      expectEqual("uk", Locale.current().localeIdentifier)
+      expectEqual("uk", Locale.current.localeIdentifier)
       return 42
     }
     expectEqual(42, result)
@@ -56,7 +56,7 @@ FoundationExtrasTests.test("withOverriddenLocaleCurrentLocale(String)") {
   do {
     let result = withOverriddenLocaleCurrentLocale("en_US") {
       () -> Int in
-      expectEqual("en_US", Locale.current().localeIdentifier)
+      expectEqual("en_US", Locale.current.localeIdentifier)
       return 42
     }
     expectEqual(42, result)
@@ -64,7 +64,7 @@ FoundationExtrasTests.test("withOverriddenLocaleCurrentLocale(String)") {
   do {
     let result = withOverriddenLocaleCurrentLocale("uk") {
       () -> Int in
-      expectEqual("uk", Locale.current().localeIdentifier)
+      expectEqual("uk", Locale.current.localeIdentifier)
       return 42
     }
     expectEqual(42, result)

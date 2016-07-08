@@ -204,5 +204,35 @@ StrideTestSuite.test("ErrorAccumulation") {
   expectEqual(10, b.count)
 }
 
+func strideIteratorTest<
+  Stride : Sequence
+>(_ stride: Stride, nonNilResults: Int) {
+  var i = stride.makeIterator()
+  for _ in 0..<nonNilResults {
+     expectNotEmpty(i.next())
+  }
+  for _ in 0..<10 {
+    expectEmpty(i.next())
+  }
+}
+
+StrideTestSuite.test("StrideThroughIterator/past end") {
+  strideIteratorTest(stride(from: 0, through: 3, by: 1), nonNilResults: 4)
+  strideIteratorTest(
+    stride(from: UInt8(0), through: 255, by: 5), nonNilResults: 52)
+}
+
+StrideTestSuite.test("StrideThroughIterator/past end/backward") {
+  strideIteratorTest(stride(from: 3, through: 0, by: -1), nonNilResults: 4)
+}
+
+StrideTestSuite.test("StrideToIterator/past end") {
+  strideIteratorTest(stride(from: 0, to: 3, by: 1), nonNilResults: 3)
+}
+
+StrideTestSuite.test("StrideToIterator/past end/backward") {
+  strideIteratorTest(stride(from: 3, to: 0, by: -1), nonNilResults: 3)
+}
+
 runAllTests()
 

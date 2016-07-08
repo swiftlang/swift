@@ -461,8 +461,6 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
          "SILFunction to be deserialized starts being empty.");
 
   fn->setBare(IsBare);
-  if (!fn->hasLocation()) fn->setLocation(loc);
-
   const SILDebugScope *DS = fn->getDebugScope();
   if (!DS) {
     DS = new (SILMod) SILDebugScope(loc, fn);

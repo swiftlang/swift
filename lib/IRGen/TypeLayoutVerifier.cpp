@@ -42,8 +42,11 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
                                               verifierArgTys,
                                               /*var arg*/ false);
   auto verifierFn = IGF.IGM.Module.getOrInsertFunction(
-                                       "_swift_debug_verifyTypeLayoutAttribute",
-                                       verifierFnTy);
+      "_swift_debug_verifyTypeLayoutAttribute", verifierFnTy);
+  if (IGF.IGM.Triple.isOSBinFormatCOFF())
+    if (auto *F = dyn_cast<llvm::Function>(verifierFn))
+      F->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+
   struct VerifierArgumentBuffers {
     Address runtimeBuf, staticBuf;
   };

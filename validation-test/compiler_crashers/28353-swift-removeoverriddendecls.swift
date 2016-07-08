@@ -6,4 +6,9 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -parse
-let:{{class a{enum S<U:a{class B:a{init}}class a
+// REQUIRES: asserts
+let E{enum
+C{{
+}
+protocol E{
+typealias B<>:A}}class A:A{init()

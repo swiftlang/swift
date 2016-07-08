@@ -228,7 +228,7 @@ func testBridgedVerbatim() {
   // CHECK-NEXT: Swift.{{.*}}Array
   debugPrint(basesConvertedToNSArray.dynamicType)
   // CHECK-NEXT: true
-  print(basesConvertedToNSArray.dynamicType.supportsSecureCoding())
+  print(basesConvertedToNSArray.dynamicType.supportsSecureCoding)
 
   //===--- Up- and Down-casts -----------------------------------------------===//
   var derived: [Derived] = [Derived(11), Derived(22)]

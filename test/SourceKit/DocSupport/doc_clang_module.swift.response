@@ -6049,7 +6049,24 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Typedef file=Foo.h line=\"59\" column=\"13\"><Name>FooTypedef1</Name><USR>c:Foo.h@T@FooTypedef1</USR><Declaration>typealias FooTypedef1 = Int32</Declaration><Abstract><Para> Aaa.  FooTypedef1.  Bbb.</Para></Abstract></Typedef>",
     key.offset: 3022,
     key.length: 29,
-    key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>FooTypedef1</decl.name> = <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.typealias>"
+    key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>FooTypedef1</decl.name> = <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.typealias>",
+    key.conforms: [
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "SignedInteger",
+        key.usr: "s:Ps13SignedInteger"
+      },
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "Comparable",
+        key.usr: "s:Ps10Comparable"
+      },
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "Equatable",
+        key.usr: "s:Ps9Equatable"
+      }
+    ]
   },
   {
     key.kind: source.lang.swift.decl.var.global,

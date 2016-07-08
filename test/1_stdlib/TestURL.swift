@@ -113,7 +113,7 @@ class TestURL : TestURLSuper {
         }
         
         do {
-            try FileManager.`default`().removeItem(at: file)
+            try FileManager.default.removeItem(at: file)
         } catch {
             expectTrue(false, "Unable to remove file")
         }

@@ -26,6 +26,6 @@ let _: Optional = Empty()
 // CHECK: Optional(REPL.Empty())
 let _: Optional = CGPoint.zero
 // CHECK: Optional((0.0, 0.0))
-let _: Optional = NSString.availableStringEncodings()
+let _: Optional = NSString.availableStringEncodings
 // CHECK: Optional(0x{{[0-9a-fA-F]+}})
 

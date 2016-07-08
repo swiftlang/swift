@@ -25,8 +25,8 @@ class B {} // expected-note * {{did you mean 'B'?}}
 class D : B {}// expected-note * {{did you mean 'D'?}}
 
 // TODO poor recovery in these cases
-if let {} // expected-error {{expected '{' after 'if' condition}}
-if let x = {} // expected-error{{'{' after 'if'}} expected-error {{variable binding in a condition requires an initializer}}
+if let {} // expected-error {{expected '{' after 'if' condition}} expected-error {{pattern matching in a condition requires the 'case' keyword}}
+if let x = {} // expected-error{{'{' after 'if'}} expected-error {{variable binding in a condition requires an initializer}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
 
 if let x = foo() {
 } else {
@@ -72,13 +72,13 @@ if 1 != 2, let x : Int? = opt {}
 
 // Test error recovery.
 // <rdar://problem/19939746> Improve error recovery for malformed if statements
-if 1 != 2, {  
+if 1 != 2, { // expected-error {{type '() -> ()' does not conform to protocol 'Boolean'}}
 } // expected-error {{expected '{' after 'if' condition}}
 if 1 != 2, 4 == 57 {}
 if 1 != 2, 4 == 57, let x = opt {}
 
 // Test that these don't cause the parser to crash.
-if true { if a == 0; {} }   // expected-error {{expected '{' after 'if' condition}} expected-error 2{{}}
+if true { if a == 0; {} }   // expected-error {{expected '{' after 'if' condition}} expected-error 3{{}}
 if a == 0, where b == 0 {}  // expected-error 4{{}} expected-note {{}} {{25-25=_ = }}
 
 

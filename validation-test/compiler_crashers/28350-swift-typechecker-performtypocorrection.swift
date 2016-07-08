@@ -7,15 +7,4 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-{
-enum S<H:A{
-protocol c{
-{
-}
-class A
-class B:A{
-}}
-}
-protocol A{
-typealias e:A
-typealias d
+struct c{class A:A{}var f=A.s

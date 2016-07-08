@@ -7,11 +7,4 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-if{
-protocol A{
-func c
-protocol c{
-typealias e:c
-protocol c{
-class a
-class B:a
+class c<a{protocol A<>:B{}typealias B<T>:T

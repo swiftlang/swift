@@ -116,6 +116,22 @@
 // RUN: FileCheck %s -check-prefix=WITH_I_INT_LOCAL < %t.where.txt
 // RUN: FileCheck %s -check-prefix=WITH_J_INT < %t.where.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_IF_1 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_IF_2 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_IF_3 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_IF_4 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_WHILE_1 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_WHILE_2 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_WHILE_3 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_WHILE_4 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_GUARD_1 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_GUARD_2 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_GUARD_3 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_GUARD_4 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_GUARD_5 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_GUARD_6 | FileCheck %s -check-prefix=UNRESOLVED_B
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_GUARD_7 | FileCheck %s -check-prefix=UNRESOLVED_B
+
 
 struct FooStruct {
   var instanceVar : Int
@@ -496,3 +512,63 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 
 // WITH_I_E_EXPR_SPECIFIC: Decl[LocalVar]/ExprSpecific: i[#Int#]{{; name=.+$}}
 // WITH_I_E_EXPR_SPECIFIC: Decl[LocalVar]/Local:        e[#Int#]{{; name=.+$}}
+
+enum A { case aaa }
+enum B { case bbb }
+// UNRESOLVED_B-NOT: aaa
+// UNRESOLVED_B: Decl[EnumElement]/ExprSpecific:     bbb[#B#]; name=bbb
+// UNRESOLVED_B-NOT: aaa
+
+struct AA {
+  func takeEnum(_: A) {}
+}
+struct BB {
+  func takeEnum(_: B) {}
+}
+func testUnresolvedIF1(x: BB) {
+  if x.takeEnum(.#^UNRESOLVED_IF_1^#)
+}
+func testUnresolvedIF2(x: BB) {
+  if true, x.takeEnum(.#^UNRESOLVED_IF_2^#)
+}
+func testUnresolvedIF3(x: BB) {
+  if true, x.takeEnum(.#^UNRESOLVED_IF_3^#) {}
+}
+func testUnresolvedIF4(x: BB) {
+  if let x.takeEnum(.#^UNRESOLVED_IF_4^#)
+}
+
+func testUnresolvedWhile1(x: BB) {
+  while x.takeEnum(.#^UNRESOLVED_WHILE_1^#)
+}
+func testUnresolvedWhile2(x: BB) {
+  while true, x.takeEnum(.#^UNRESOLVED_WHILE_2^#)
+}
+func testUnresolvedWhile3(x: BB) {
+  while let x.takeEnum(.#^UNRESOLVED_WHILE_3^#)
+}
+func testUnresolvedWhile4(x: BB) {
+  while true, x.takeEnum(.#^UNRESOLVED_WHILE_4^#) {}
+}
+
+func testUnresolvedGuard1(x: BB) {
+  guard x.takeEnum(.#^UNRESOLVED_GUARD_1^#)
+}
+func testUnresolvedGuard2(x: BB) {
+  guard x.takeEnum(.#^UNRESOLVED_GUARD_2^#) {}
+}
+func testUnresolvedGuard3(x: BB) {
+  guard x.takeEnum(.#^UNRESOLVED_GUARD_3^#) else
+}
+func testUnresolvedGuard4(x: BB) {
+  guard x.takeEnum(.#^UNRESOLVED_GUARD_4^#) else {}
+}
+func testUnresolvedGuard5(x: BB) {
+  guard true, x.takeEnum(.#^UNRESOLVED_GUARD_5^#)
+}
+func testUnresolvedGuard6(x: BB) {
+  guard let x.takeEnum(.#^UNRESOLVED_GUARD_6^#)
+}
+func testUnresolvedGuard7(x: BB) {
+  guard let x.takeEnum(.#^UNRESOLVED_GUARD_7^#) else {}
+}

@@ -27,7 +27,7 @@ public func withOverriddenLocaleCurrentLocale<Result>(
   _ body: @noescape () -> Result
 ) -> Result {
   let oldMethod = class_getClassMethod(
-    Locale.self, #selector(Locale.current))
+    Locale.self, #selector(getter: Locale.current))
   precondition(oldMethod != nil, "could not find +[Locale currentLocale]")
 
   let newMethod = class_getClassMethod(
@@ -51,7 +51,7 @@ public func withOverriddenLocaleCurrentLocale<Result>(
   _ body: @noescape () -> Result
 ) -> Result {
   precondition(
-    Locale.availableLocaleIdentifiers().contains(temporaryLocaleIdentifier),
+    Locale.availableLocaleIdentifiers.contains(temporaryLocaleIdentifier),
     "requested locale \(temporaryLocaleIdentifier) is not available")
 
   return withOverriddenLocaleCurrentLocale(

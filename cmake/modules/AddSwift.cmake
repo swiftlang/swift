@@ -1012,6 +1012,12 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_WATCHOS
 #   Swift modules this library depends on when built for watchOS.
 #
+# SWIFT_MODULE_DEPENDS_FREEBSD
+#   Swift modules this library depends on when built for FreeBSD.
+#
+# SWIFT_MODULE_DEPENDS_LINUX
+#   Swift modules this library depends on when built for Linux.
+#
 # FRAMEWORK_DEPENDS
 #   System frameworks this library depends on.
 #
@@ -1076,7 +1082,7 @@ function(add_swift_library name)
   cmake_parse_arguments(SWIFTLIB
     "${SWIFTLIB_options}"
     "INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_IOS"
-    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS;SWIFT_MODULE_DEPENDS_TVOS;SWIFT_MODULE_DEPENDS_WATCHOS;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_WEAK;FRAMEWORK_DEPENDS_OSX;FRAMEWORK_DEPENDS_IOS_TVOS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS_OSX;SWIFT_COMPILE_FLAGS_IOS;SWIFT_COMPILE_FLAGS_TVOS;SWIFT_COMPILE_FLAGS_WATCHOS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INCORPORATE_OBJECT_LIBRARIES"
+    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS;SWIFT_MODULE_DEPENDS_TVOS;SWIFT_MODULE_DEPENDS_WATCHOS;SWIFT_MODULE_DEPENDS_FREEBSD;SWIFT_MODULE_DEPENDS_LINUX;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_WEAK;FRAMEWORK_DEPENDS_OSX;FRAMEWORK_DEPENDS_IOS_TVOS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS_OSX;SWIFT_COMPILE_FLAGS_IOS;SWIFT_COMPILE_FLAGS_TVOS;SWIFT_COMPILE_FLAGS_WATCHOS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INCORPORATE_OBJECT_LIBRARIES"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_UNPARSED_ARGUMENTS})
 
@@ -1105,6 +1111,8 @@ function(add_swift_library name)
   if("${SWIFTLIB_TARGET_SDKS}" STREQUAL "")
     set(SWIFTLIB_TARGET_SDKS ${SWIFT_SDKS})
   endif()
+  list_replace(SWIFTLIB_TARGET_SDKS ALL_POSIX_PLATFORMS "ALL_APPLE_PLATFORMS;ANDROID;CYGWIN;FREEBSD;LINUX")
+  list_replace(SWIFTLIB_TARGET_SDKS ALL_APPLE_PLATFORMS "IOS;IOS_SIMULATOR;TVOS;TVOS_SIMULATOR;WATCHOS;WATCHOS_SIMULATOR;OSX")
 
   # All Swift code depends on the standard library, except for the standard
   # library itself.
@@ -1195,6 +1203,12 @@ function(add_swift_library name)
         elseif("${sdk}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
           list(APPEND swiftlib_module_depends_flattened
               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WATCHOS})
+        elseif("${sdk}" STREQUAL "FREEBSD")
+          list(APPEND swiftlib_module_depends_flattened
+               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FREEBSD})
+        elseif("${sdk}" STREQUAL "LINUX" OR "${sdk}" STREQUAL "ANDROID")
+          list(APPEND swiftlib_module_depends_flattened
+              ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
         endif()
 
         set(swiftlib_module_dependency_targets)
@@ -1237,6 +1251,19 @@ function(add_swift_library name)
         elseif("${sdk}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
           list(APPEND swiftlib_swift_compile_flags_all
               ${SWIFTLIB_SWIFT_COMPILE_FLAGS_WATCHOS})
+        elseif("${sdk}" STREQUAL "WINDOWS")
+          # FIXME(SR2005) static and shared are not mutually exclusive; however
+          # since we do a single build of the sources, this doesn't work for
+          # building both simultaneously.  Effectively, only shared builds are
+          # supported on windows currently.
+          if(SWIFTLIB_SHARED)
+            list(APPEND swiftlib_swift_compile_flags_all -D_USRDLL)
+            if(SWIFTLIB_IS_STDLIB_CORE)
+              list(APPEND swiftlib_swift_compile_flags_all -DswiftCore_EXPORTS)
+            endif()
+          elseif(SWIFTLIB_STATIC)
+            list(APPEND swiftlib_swift_compile_flags_all -D_LIB)
+          endif()
         endif()
 
         # Add this library variant.

@@ -375,6 +375,11 @@ FloatingPoint.test("Float80.nextUp, .nextDown")
 
 #endif
 
+
+extension FloatingPoint {
+  public var isQuietNaN: Bool { return isNaN && !isSignalingNaN }
+}
+
 % for FloatSelf in ['Float32', 'Float64']:
 
 func checkFloatingPointComparison_${FloatSelf}(
@@ -417,6 +422,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
     ${FloatSelf}.greatestFiniteMagnitude,
     ${FloatSelf}.infinity,
     ${FloatSelf}.nan,
+    ${FloatSelf}.signalingNaN,
   ]
 #else
   let interestingValues: [${FloatSelf}] = [
@@ -438,6 +444,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
     ${FloatSelf}.greatestFiniteMagnitude,
     ${FloatSelf}.infinity,
     ${FloatSelf}.nan,
+    ${FloatSelf}.signalingNaN,
   ]
 #endif
 
@@ -469,6 +476,60 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
               ExpectedComparisonResult.eq :
               ExpectedComparisonResult.gt),
           lhs, rhs)
+      }
+
+      //  Check minimum, maximum, minimumMagnitude and maximumMagnitude.
+      let min = ${FloatSelf}.minimum(lhs, rhs)
+      let max = ${FloatSelf}.maximum(lhs, rhs)
+      let minMag = ${FloatSelf}.minimumMagnitude(lhs, rhs)
+      let maxMag = ${FloatSelf}.maximumMagnitude(lhs, rhs)
+      //  If either lhs or rhs is signaling, or if both are quiet NaNs, the
+      //  result is a quiet NaN.
+      if lhs.isSignalingNaN || rhs.isSignalingNaN || (lhs.isNaN && rhs.isNaN) {
+        expectTrue(min.isQuietNaN)
+        expectTrue(max.isQuietNaN)
+        expectTrue(minMag.isQuietNaN)
+        expectTrue(maxMag.isQuietNaN)
+      }
+      //  If only one of lhs and rhs is NaN, the result of the min/max
+      //  operations is always the other value.  While contrary to all other
+      //  IEEE 754 basic operations, this property is critical to ensure
+      //  that clamping to a valid range behaves as expected.
+      else if lhs.isNaN && !rhs.isNaN {
+        expectEqual(min.bitPattern, rhs.bitPattern)
+        expectEqual(max.bitPattern, rhs.bitPattern)
+        expectEqual(minMag.bitPattern, rhs.bitPattern)
+        expectEqual(maxMag.bitPattern, rhs.bitPattern)
+      }
+      else if rhs.isNaN && !lhs.isNaN {
+        expectEqual(min.bitPattern, lhs.bitPattern)
+        expectEqual(max.bitPattern, lhs.bitPattern)
+        expectEqual(minMag.bitPattern, lhs.bitPattern)
+        expectEqual(maxMag.bitPattern, lhs.bitPattern)
+      }
+      //  If lhs and rhs are equal, min is lhs and max is rhs.  This ensures
+      //  that the set {lhs, rhs} is the same as the set {min, max} so long
+      //  as lhs and rhs are non-NaN.  This is less important for min/max than
+      //  it is for minMag and maxMag, but it makes sense to define this way.
+      if lhs <= rhs {
+        expectEqual(min.bitPattern, lhs.bitPattern)
+        expectEqual(max.bitPattern, rhs.bitPattern)
+      } else if lhs > rhs {
+        expectEqual(max.bitPattern, lhs.bitPattern)
+        expectEqual(min.bitPattern, rhs.bitPattern)
+      }
+      //  If lhs and rhs have equal magnitude, minMag is lhs and maxMag is rhs.
+      //  This ensures that the set {lhs, rhs} is the same as the set
+      //  {minMag, maxMag} so long as lhs and rhs are non-NaN; this is a
+      //  restriction of the IEEE 754 rules, but it makes good sense and also
+      //  makes this primitive more useful for building head-tail arithmetic
+      //  operations.
+      if abs(lhs) <= abs(rhs) {
+        expectEqual(minMag.bitPattern, lhs.bitPattern)
+        expectEqual(maxMag.bitPattern, rhs.bitPattern)
+      } else if abs(lhs) > abs(rhs) {
+        expectEqual(maxMag.bitPattern, lhs.bitPattern)
+        expectEqual(minMag.bitPattern, rhs.bitPattern)
       }
     }
   }
@@ -1022,4 +1083,3 @@ FloatingPointClassification.test("FloatingPointClassification/Equatable") {
 }
 
 runAllTests()
-
