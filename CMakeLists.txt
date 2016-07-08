@@ -166,6 +166,11 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
+
+#
+# User-configurable Android specific options.
+#
+
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
 set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
@@ -174,6 +179,10 @@ set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android SDK tools that will be passed to the swiftc frontend")
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
+
+#
+# User-configurable ICU specific options for Android, FreeBSD, Linux.
+#
 
 foreach(sdk ANDROID;FREEBSD;LINUX)
   set(SWIFT_${sdk}_ICU_UC "" CACHE STRING
