@@ -1,4 +1,5 @@
 include(SwiftList)
+include(SwiftXcodeSupport)
 
 # SWIFTLIB_DIR is the directory in the build tree where Swift resource files
 # should be placed.  Note that $CMAKE_CFG_INTDIR expands to "." for

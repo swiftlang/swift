@@ -356,7 +356,6 @@ include(AddSwift)
 include(SwiftConfigureSDK)
 include(SwiftInstallComponents)
 include(SwiftGetConfigurationTypes)
-include(SwiftApplyXcodeSubstitutions)
 include(SwiftList)
 
 swift_configure_install_components("${SWIFT_INSTALL_COMPONENTS}")
