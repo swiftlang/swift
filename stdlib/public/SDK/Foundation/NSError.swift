@@ -85,14 +85,14 @@ public protocol RecoverableError : ErrorProtocol {
   var recoveryOptions: [String] { get }
 
   /// Attempt to recover from this error when the user selected the
-  /// option at the given index. This routine must call resultHandler and
+  /// option at the given index. This routine must call handler and
   /// indicate whether recovery was successful (or not).
   ///
   /// This entry point is used for recovery of errors handled at a
   /// "document" granularity, that do not affect the entire
   /// application.
   func attemptRecovery(optionIndex recoveryOptionIndex: Int,
-                       andThen resultHandler: (recovered: Bool) -> Void)
+                       resultHandler handler: (recovered: Bool) -> Void)
 
   /// Attempt to recover from this error when the user selected the
   /// option at the given index. Returns true to indicate
@@ -106,11 +106,12 @@ public protocol RecoverableError : ErrorProtocol {
 }
 
 public extension RecoverableError {
-  /// By default, implements document-modal recovery via application-model
-  /// recovery.
+  /// Default implementation that uses the application-model recovery
+  /// mechanism (``attemptRecovery(optionIndex:)``) to implement
+  /// document-modal recovery.
   func attemptRecovery(optionIndex recoveryOptionIndex: Int,
-                       andThen resultHandler: (recovered: Bool) -> Void) {
-    resultHandler(recovered: attemptRecovery(optionIndex: recoveryOptionIndex))
+                       resultHandler handler: (recovered: Bool) -> Void) {
+    handler(recovered: attemptRecovery(optionIndex: recoveryOptionIndex))
   }
 }
 
