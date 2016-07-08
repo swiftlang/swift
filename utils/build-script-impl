@@ -110,6 +110,7 @@ KNOWN_SETTINGS=(
     swift-primary-variant-arch  ""               "default arch for target binaries"
     skip-build-cmark            ""               "set to skip building CommonMark"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
+    skip-build-compiler-rt      ""               "set to skip building Compiler-RT"
     skip-build-swift            ""               "set to skip building Swift"
     skip-build-linux            ""               "set to skip building Swift stdlibs for Linux"
     skip-build-freebsd          ""               "set to skip building Swift stdlibs for FreeBSD"
@@ -624,8 +625,8 @@ function set_build_options_for_host() {
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
-                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_COMPILER_RT})"
-                -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_COMPILER_RT})"
+                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+                -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
@@ -855,12 +856,12 @@ fi
 # FIXME: We currently do not support building compiler-rt with the
 # Xcode generator.
 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
-    SKIP_COMPILER_RT=1
+    SKIP_BUILD_COMPILER_RT=1
 fi
 
 # FIXME: We currently do not support cross-compiling swift with compiler-rt.
 if [[ "${CROSS_COMPILE_HOSTS}" ]]; then
-    SKIP_COMPILER_RT=1
+    SKIP_BUILD_COMPILER_RT=1
 fi
 
 # WORKSPACE, BUILD_DIR and INSTALLABLE_PACKAGE must be absolute paths
