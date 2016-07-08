@@ -16,29 +16,34 @@ func passingToId<T: CP, U>(receiver: IdLover,
                            generic: U,
                            existential: P,
                            any: Any) {
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF:%.*]] : $IdLover,
+  // CHECK: bb0([[SELF:%.*]] : $IdLover, [[STRING:%.*]] : $String, [[NSSTRING:%.*]] : $NSString, [[OBJECT:%.*]] : $AnyObject, [[CLASS_GENERIC:%.*]] : $T, [[CLASS_EXISTENTIAL:%.*]] : $CP
+
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]]
   // CHECK: [[BRIDGE_STRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveC
-  // CHECK: [[NSSTRING:%.*]] = apply [[BRIDGE_STRING]]
-  // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[NSSTRING]] : $NSString : $NSString, $AnyObject
+  // CHECK: [[BRIDGED:%.*]] = apply [[BRIDGE_STRING]]([[STRING]])
+  // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[BRIDGED]] : $NSString : $NSString, $AnyObject
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(string)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF:%.*]] : $IdLover,
-  // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref {{%.*}} : $NSString : $NSString, $AnyObject
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[NSSTRING]] : $NSString : $NSString, $AnyObject
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(nsString)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF:%.*]] : $IdLover,
-  // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref {{%.*}} : $T : $T, $AnyObject
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[CLASS_GENERIC]] : $T : $T, $AnyObject
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(classGeneric)
 
-  // TODO: Need to look through an (open_existential (erasure)) combo to upcast
-  // an existential to Any.
-  /*
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: apply [[METHOD]]([[OBJECT]], [[SELF]])
   receiver.takesId(object)
+
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[OPENED:%.*]] = open_existential_ref [[CLASS_EXISTENTIAL]] : $CP
+  // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[OPENED]]
+  // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(classExistential)
-   */
 
   // TODO: These cases need to perform a (to-be-implemented) universal
   // bridging conversion.
