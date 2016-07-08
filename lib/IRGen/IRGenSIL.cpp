@@ -617,6 +617,20 @@ public:
     }
   }
 
+  /// Account for bugs in LLVM.
+  ///
+  /// - The LLVM type legalizer currently doesn't update debug
+  ///   intrinsics when a large value is split up into smaller
+  ///   pieces. Note that this heuristic as a bit too conservative
+  ///   on 32-bit targets as it will also fire for doubles.
+  ///
+  /// - CodeGen Prepare may drop dbg.values pointing to PHI instruction.
+  bool needsShadowCopy(llvm::Value *Storage) {
+    return (IGM.DataLayout.getTypeSizeInBits(Storage->getType()) >
+            IGM.getClangASTContext().getTargetInfo().getRegisterWidth()) ||
+           isa<llvm::PHINode>(Storage);
+  }
+
   /// At -Onone, emit a shadow copy of an Address in an alloca, so the
   /// register allocator doesn't elide the dbg.value intrinsic when
   /// register pressure is high.  There is a trade-off to this: With
@@ -626,28 +640,22 @@ public:
                               StringRef Name, unsigned ArgNo,
                               Alignment Align = Alignment(0)) {
     auto Ty = Storage->getType();
+    // Never emit shadow copies when optimizing, or if already on the stack.
     if (IGM.IRGen.Opts.Optimize ||
         isa<llvm::AllocaInst>(Storage) ||
         isa<llvm::UndefValue>(Storage) ||
         Ty == IGM.RefCountedPtrTy) // No debug info is emitted for refcounts.
       return Storage;
-    if (ArgNo == 0) {
-      // Account for bugs in LLVM.
-      //
-      // - The LLVM type legalizer currently doesn't update debug
-      //   intrinsics when a large value is split up into smaller
-      //   pieces. Note that this heuristic as a bit too conservative
-      //   on 32-bit targets as it will also fire for doubles.
-      //
-      // - CodeGen Prepare may drop dbg.values pointing to PHI instruction.
-      if (IGM.DataLayout.getTypeSizeInBits(Storage->getType()) <=
-          IGM.getClangASTContext().getTargetInfo().getRegisterWidth() &&
-          !isa<llvm::PHINode>(Storage)) {
+
+    // Always emit shadow copies for function arguments.
+    if (ArgNo == 0)
+      // Otherwise only if debug value range extension is not feasible.
+      if (!needsShadowCopy(Storage)) {
+        // Mark for debug value range extension unless this is a constant.
         if (auto *Value = dyn_cast<llvm::Instruction>(Storage))
           ValueVariables.push_back({getActiveDominancePoint(), Value});
         return Storage;
       }
-    }
 
     if (Align.isZero())
       Align = IGM.getPointerAlignment();
