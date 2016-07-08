@@ -55,7 +55,9 @@ bool contains(const Type (&Array)[N], const Type &V) {
   return std::find(std::begin(Array), std::end(Array), V) != std::end(Array);
 }
 
-bool LangOptions::isPlatformConditionOSSupported(StringRef OSName) {
+bool LangOptions::checkPlatformConditionOS(StringRef &OSName) {
+  if (OSName == "macOS")
+    OSName = "OSX";
   return contains(SupportedConditionalCompilationOSs, OSName);
 }
 
