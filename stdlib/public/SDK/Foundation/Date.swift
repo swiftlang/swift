@@ -56,7 +56,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
         self.init(timeIntervalSinceReferenceDate: date.timeIntervalSinceReferenceDate + timeInterval)
     }
 
-    /// Returns an `Date` initialized relative to 00:00:00 UTC on 1 January 2001 by a given number of seconds.
+    /// Returns a `Date` initialized relative to 00:00:00 UTC on 1 January 2001 by a given number of seconds.
     public init(timeIntervalSinceReferenceDate ti: TimeInterval) {
         _time = ti
     }
