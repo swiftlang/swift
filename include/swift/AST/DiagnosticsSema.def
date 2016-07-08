@@ -941,10 +941,6 @@ ERROR(access_control_setter_more,none,
       "%select{variable|property|subscript}1 cannot have "
       "%select{PRIVATE|an internal|a public}2 setter",
       (Accessibility, unsigned, Accessibility))
-WARNING(access_control_member_more,none,
-    "declaring %select{PRIVATE|an internal|a public}0 %1 for "
-    "%select{a private|an internal|PUBLIC}2 %3",
-    (Accessibility, DescriptiveDeclKind, Accessibility, DescriptiveDeclKind))
 WARNING(access_control_ext_member_more,none,
     "declaring %select{PRIVATE|an internal|a public}0 %1 in "
     "%select{a private|an internal|PUBLIC}2 extension",

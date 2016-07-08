@@ -34,7 +34,7 @@ internal struct InternalStruct: PublicProto, InternalProto, FilePrivateProto, Pr
   private func filePrivateReq() {}
   private func privateReq() {}
 
-  public var publicVar = 0 // expected-warning {{declaring a public var for an internal struct}} {{3-9=internal}}
+  public var publicVar = 0
 }
 
 // expected-note@+1 * {{type declared here}}
@@ -44,7 +44,7 @@ fileprivate struct FilePrivateStruct: PublicProto, InternalProto, FilePrivatePro
   private func filePrivateReq() {}
   private func privateReq() {}
 
-  public var publicVar = 0 // expected-warning {{declaring a public var for a private struct}} {{3-9=private}}
+  public var publicVar = 0
 }
 
 // expected-note@+1 * {{type declared here}}
@@ -54,7 +54,7 @@ private struct PrivateStruct: PublicProto, InternalProto, FilePrivateProto, Priv
   private func filePrivateReq() {}
   private func privateReq() {}
 
-  public var publicVar = 0 // expected-warning {{declaring a public var for a private struct}} {{3-9=private}}
+  public var publicVar = 0
 }
 
 extension PublicStruct {
@@ -62,15 +62,15 @@ extension PublicStruct {
 }
 
 extension InternalStruct {
-  public init(x: Int) { self.init() } // expected-warning {{declaring a public initializer for an internal struct}} {{3-9=internal}}
+  public init(x: Int) { self.init() }
 }
 
 extension FilePrivateStruct {
-  public init(x: Int) { self.init() } // expected-warning {{declaring a public initializer for a private struct}} {{3-9=private}}
+  public init(x: Int) { self.init() }
 }
 
 extension PrivateStruct {
-  public init(x: Int) { self.init() } // expected-warning {{declaring a public initializer for a private struct}} {{3-9=private}}
+  public init(x: Int) { self.init() }
 }
 
 public extension PublicStruct {
@@ -90,7 +90,7 @@ fileprivate extension PublicStruct {
   private func extImplFilePrivate() {}
 }
 public extension InternalStruct { // expected-error {{extension of internal struct cannot be declared public}} {{1-8=}}
-  public func extMemberPublic() {} // expected-warning {{declaring a public instance method for an internal struct}} {{3-9=internal}}
+  public func extMemberPublic() {}
   private func extImplPublic() {}
 }
 internal extension InternalStruct {
@@ -106,7 +106,7 @@ private extension InternalStruct {
   private func extImplPrivate() {}
 }
 public extension FilePrivateStruct { // expected-error {{extension of private struct cannot be declared public}} {{1-8=}}
-  public func extMemberPublic() {} // expected-warning {{declaring a public instance method for a private struct}} {{3-9=private}}
+  public func extMemberPublic() {}
   private func extImplPublic() {}
 }
 internal extension FilePrivateStruct { // expected-error {{extension of private struct cannot be declared internal}} {{1-10=}}
@@ -122,7 +122,7 @@ private extension FilePrivateStruct {
   private func extImplPrivate() {}
 }
 public extension PrivateStruct { // expected-error {{extension of private struct cannot be declared public}} {{1-8=}}
-  public func extMemberPublic() {} // expected-warning {{declaring a public instance method for a private struct}} {{3-9=private}}
+  public func extMemberPublic() {}
   private func extImplPublic() {}
 }
 internal extension PrivateStruct { // expected-error {{extension of private struct cannot be declared internal}} {{1-10=}}
@@ -422,7 +422,7 @@ public protocol PublicReadOnlyOperations {
 }
 
 internal struct PrivateSettersForReadOnlyInternal : PublicReadOnlyOperations {
-  public private(set) var size = 0 // expected-warning {{declaring a public var for an internal struct}} {{3-9=internal}}
+  public private(set) var size = 0
   internal private(set) subscript (_: Int) -> Int { // no-warning
     get { return 42 }
     set {}

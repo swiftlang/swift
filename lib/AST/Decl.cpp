@@ -44,23 +44,6 @@
 
 using namespace swift;
 
-bool impl::isInternalDeclEffectivelyPublic(const ValueDecl *VD) {
-  assert(VD->getFormalAccess() == Accessibility::Internal);
-
-  if (VD->getAttrs().hasAttribute<VersionedAttr>())
-    return true;
-
-  if (auto *fn = dyn_cast<FuncDecl>(VD))
-    if (auto *ASD = fn->getAccessorStorageDecl())
-      if (ASD->getAttrs().hasAttribute<VersionedAttr>())
-        return true;
-
-  if (VD->getModuleContext()->isTestingEnabled())
-    return true;
-
-  return false;
-}
-
 clang::SourceLocation ClangNode::getLocation() const {
   if (auto D = getAsDecl())
     return D->getLocation();
@@ -1802,6 +1785,64 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 
   SourceLoc resultLoc = getAttrs().getStartLoc(forModifier);
   return resultLoc.isValid() ? resultLoc : getStartLoc();
+}
+
+/// Returns true if \p VD needs to be treated as publicly-accessible at the SIL,
+/// LLVM, and machine levels.
+///
+/// The most common causes of this are -enable-testing and versioned non-public
+/// declarations.
+static bool isInternalDeclEffectivelyPublic(const ValueDecl *VD) {
+  assert(VD->getFormalAccess() == Accessibility::Internal);
+
+  if (VD->getAttrs().hasAttribute<VersionedAttr>())
+    return true;
+
+  if (auto *fn = dyn_cast<FuncDecl>(VD))
+    if (auto *ASD = fn->getAccessorStorageDecl())
+      if (ASD->getAttrs().hasAttribute<VersionedAttr>())
+        return true;
+
+  if (VD->getModuleContext()->isTestingEnabled())
+    return true;
+
+  return false;
+}
+
+Accessibility ValueDecl::getEffectiveAccess() const {
+  Accessibility effectiveAccess = getFormalAccess();
+
+  // Handle @testable.
+  switch (effectiveAccess) {
+  case Accessibility::Public:
+    break;
+  case Accessibility::Internal:
+    if (isInternalDeclEffectivelyPublic(this))
+      effectiveAccess = Accessibility::Public;
+    break;
+  case Accessibility::Private:
+    break;
+  }
+
+  if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(getDeclContext())) {
+    effectiveAccess = std::min(effectiveAccess,
+                               enclosingNominal->getEffectiveAccess());
+
+  } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(getDeclContext())) {
+    // Just check the base type. If it's a constrained extension, Sema should
+    // have already enforced access more strictly.
+    if (auto extendedTy = enclosingExt->getExtendedType()) {
+      if (auto nominal = extendedTy->getAnyNominal()) {
+        effectiveAccess = std::min(effectiveAccess,
+                                   nominal->getEffectiveAccess());
+      }
+    }
+
+  } else if (getDeclContext()->isLocalContext()) {
+    effectiveAccess = Accessibility::Private;
+  }
+
+  return effectiveAccess;
 }
 
 

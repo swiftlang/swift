@@ -683,7 +683,6 @@ public:
   void visitRequiredAttr(RequiredAttr *attr);
   void visitRethrowsAttr(RethrowsAttr *attr);
 
-  bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
   void visitAccessibilityAttr(AccessibilityAttr *attr);
   void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
 
@@ -1267,25 +1266,6 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   attr->setInvalid();
 }
 
-bool AttributeChecker::visitAbstractAccessibilityAttr(
-    AbstractAccessibilityAttr *attr) {
-  DeclContext *dc = D->getDeclContext();
-  if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
-    Accessibility typeAccess = nominal->getFormalAccess();
-    if (attr->getAccess() > typeAccess) {
-      auto diag = TC.diagnose(attr->getLocation(),
-                              diag::access_control_member_more,
-                              attr->getAccess(),
-                              D->getDescriptiveKind(),
-                              typeAccess,
-                              nominal->getDescriptiveKind());
-      swift::fixItAccessibility(diag, cast<ValueDecl>(D), typeAccess);
-      return true;
-    }
-  }
-  return false;
-}
-
 void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
   if (auto extension = dyn_cast<ExtensionDecl>(D)) {
     Type extendedTy = extension->getExtendedType();
@@ -1327,8 +1307,6 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
       return;
     }
   }
-
-  visitAbstractAccessibilityAttr(attr);
 }
 
 void
@@ -1352,8 +1330,6 @@ AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
     attr->setInvalid();
     return;
   }
-
-  visitAbstractAccessibilityAttr(attr);
 }
 
 /// Check that the @_specialize type list has the correct number of entries.
