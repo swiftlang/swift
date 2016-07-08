@@ -529,6 +529,11 @@ extension ${Self} {
     Builtin.unreachable()
   }
 
+  @available(*, unavailable, renamed: "initialize(to:count:)")
+  public func initialize(with newvalue: Pointee, count: Int = 1) {
+    Builtin.unreachable()
+  }
+
   @available(*, unavailable, renamed: "deinitialize(count:)")
   public func destroy() {
     Builtin.unreachable()
@@ -536,6 +541,37 @@ extension ${Self} {
 
   @available(*, unavailable, renamed: "deinitialize(count:)")
   public func destroy(_ count: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "initialize(to:count:)")
+  public func initializeFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "assign(from:count:)")
+  public func assignFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "assign(from:count:)")
+  public func assignBackwardFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "moveInitialize(from:count:)")
+  public func moveInitializeFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "moveInitialize(from:count:)")
+  public func moveInitializeBackwardFrom(_ source: UnsafePointer<Pointee>,
+    count: Int) {
+    Builtin.unreachable()
+  }
+  
+  @available(*, unavailable, renamed: "moveAssign(from:count:)")
+  public func moveAssignFrom(_ source: UnsafePointer<Pointee>, count: Int) {
     Builtin.unreachable()
   }
 % end
