@@ -29,7 +29,7 @@ func test_composition_erasure(_ x: HairType & Error) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials24test_composition_erasureFPs5ErrorS_8HairType_PS0__
-// CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr [[OLD_EXISTENTIAL:%.*]] : $*protocol<Error, HairType> to $*[[VALUE_TYPE:@opened\(.*\) protocol<Error, HairType>]]
+// CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr [[OLD_EXISTENTIAL:%.*]] : $*Error & HairType to $*[[VALUE_TYPE:@opened\(.*\) Error & HairType]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
 // CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[ADDR]]
@@ -42,7 +42,7 @@ func test_class_composition_erasure(_ x: HairClass & Error) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPs5ErrorS_9HairClass_PS0__
-// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $protocol<Error, HairClass> to $[[VALUE_TYPE:@opened\(.*\) protocol<Error, HairClass>]]
+// CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $Error & HairClass to $[[VALUE_TYPE:@opened\(.*\) Error & HairClass]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
 // CHECK:         store [[VALUE]] to [[ADDR]]
@@ -173,7 +173,7 @@ func test_open_existential_semantics(_ guaranteed: Error,
 }
 
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials14erasure_to_anyFTPs5Error_PS0___P_
-// CHECK:       bb0([[OUT:%.*]] : $*protocol<>, [[GUAR:%.*]] : $Error,
+// CHECK:       bb0([[OUT:%.*]] : $*Any, [[GUAR:%.*]] : $Error,
 func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
   var immediate = immediate
   // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box $Error

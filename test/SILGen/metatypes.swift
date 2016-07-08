@@ -79,24 +79,24 @@ func generic_metatypes<T>(x: T)
 
 // rdar://16610078
 
-// CHECK-LABEL: sil hidden @_TF9metatypes30existential_metatype_from_thinFT_PMP_ : $@convention(thin) () -> @thick protocol<>.Type
+// CHECK-LABEL: sil hidden @_TF9metatypes30existential_metatype_from_thinFT_PMP_ : $@convention(thin) () -> @thick Any.Type
 // CHECK:      [[T0:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
-// CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type, $@thick protocol<>.Type
-// CHECK-NEXT: return [[T2]] : $@thick protocol<>.Type
+// CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type, $@thick Any.Type
+// CHECK-NEXT: return [[T2]] : $@thick Any.Type
 func existential_metatype_from_thin() -> Any.Type {
   return SomeStruct.self
 }
 
-// CHECK-LABEL: sil hidden @_TF9metatypes36existential_metatype_from_thin_valueFT_PMP_ : $@convention(thin) () -> @thick protocol<>.Type
+// CHECK-LABEL: sil hidden @_TF9metatypes36existential_metatype_from_thin_valueFT_PMP_ : $@convention(thin) () -> @thick Any.Type
 // CHECK:      [[T0:%.*]] = function_ref @_TFV9metatypes10SomeStructC
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: debug_value [[T2]] : $SomeStruct, let, name "s"
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
-// CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type, $@thick protocol<>.Type
-// CHECK-NEXT: return [[T2]] : $@thick protocol<>.Type
+// CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type, $@thick Any.Type
+// CHECK-NEXT: return [[T2]] : $@thick Any.Type
 func existential_metatype_from_thin_value() -> Any.Type {
   let s = SomeStruct()
   return s.dynamicType

@@ -63,10 +63,10 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols32class_bound_protocol_composition
 func class_bound_protocol_composition(x: ClassBound & NotClassBound)
--> protocol<ClassBound, NotClassBound> {
+-> ClassBound & NotClassBound {
   var x = x
-  // CHECK: bb0([[X:%.*]] : $protocol<ClassBound, NotClassBound>):
-  // CHECK:   [[X_ADDR:%.*]] = alloc_box $protocol<ClassBound, NotClassBound>
+  // CHECK: bb0([[X:%.*]] : $ClassBound & NotClassBound):
+  // CHECK:   [[X_ADDR:%.*]] = alloc_box $ClassBound & NotClassBound
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
   // CHECK:   store [[X]] to [[PB]]
   return x
@@ -86,7 +86,7 @@ func class_bound_erasure(x: ConcreteClass) -> ClassBound {
 func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 -> ClassBound {
   return x
-  // CHECK: [[OPENED:%.*]] = open_existential_ref {{%.*}} : $protocol<ClassBound, ClassBound2> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, ClassBound2>]]
+  // CHECK: [[OPENED:%.*]] = open_existential_ref {{%.*}} : $ClassBound & ClassBound2 to [[OPENED_TYPE:\$@opened(.*) ClassBound & ClassBound2]]
   // CHECK: [[PROTO:%.*]] = init_existential_ref [[OPENED]] : [[OPENED_TYPE]] : [[OPENED_TYPE]], $ClassBound
   // CHECK: return [[PROTO]]
 }
@@ -95,7 +95,7 @@ func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 func class_bound_to_unbound_existential_upcast
 (x: ClassBound & NotClassBound) -> NotClassBound {
   return x
-  // CHECK: [[X_OPENED:%.*]] = open_existential_ref %1 : $protocol<ClassBound, NotClassBound> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, NotClassBound>]]
+  // CHECK: [[X_OPENED:%.*]] = open_existential_ref %1 : $ClassBound & NotClassBound to [[OPENED_TYPE:\$@opened(.*) ClassBound & NotClassBound]]
   // CHECK: [[PAYLOAD_ADDR:%.*]] = init_existential_addr %0 : $*NotClassBound, [[OPENED_TYPE]]
   // CHECK: store [[X_OPENED]] to [[PAYLOAD_ADDR]]
 }

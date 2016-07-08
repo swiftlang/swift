@@ -110,8 +110,8 @@ protocol QuxProtocol { associatedtype Qux }
 struct GenericStruct<A, B : FooProtocol> {}
 
 func testInGenericFunc1<A, B : FooProtocol, C : FooProtocol & BarProtocol>(_ a: A, b: B, c: C) {
-// CHECK: FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, b: B, c: C) -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, b: B, c: C) -> (){{$}}
+// CHECK: FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : FooProtocol & BarProtocol> (A, b: B, c: C) -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : FooProtocol & BarProtocol> (A, b: B, c: C) -> (){{$}}
 
   var a1 = a
   _ = a1; a1 = a

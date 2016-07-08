@@ -41,8 +41,8 @@ f0(f)
 f0(b)
 f1(i)
 
-f1(f) // expected-error{{argument type 'Float' does not conform to expected type 'protocol<Barable, Fooable>'}}
-f1(b) // expected-error{{argument type 'Barable' does not conform to expected type 'protocol<Barable, Fooable>'}}
+f1(f) // expected-error{{argument type 'Float' does not conform to expected type 'Barable & Fooable'}}
+f1(b) // expected-error{{argument type 'Barable' does not conform to expected type 'Barable & Fooable'}}
 
 //===----------------------------------------------------------------------===//
 // Subtyping
@@ -50,7 +50,7 @@ f1(b) // expected-error{{argument type 'Barable' does not conform to expected ty
 g(f0) // okay (subtype)
 g(f1) // okay (exact match)
 
-g(f2) // expected-error{{cannot convert value of type '(Float) -> ()' to expected argument type '(protocol<Barable, Fooable>) -> ()'}}
+g(f2) // expected-error{{cannot convert value of type '(Float) -> ()' to expected argument type '(Barable & Fooable) -> ()'}}
 
 // FIXME: Workaround for ?? not playing nice with function types.
 infix operator ??* {}
@@ -60,7 +60,7 @@ g(nilFunc ??* f0)
 gc(fc0) // okay
 gc(fc1) // okay
 gc(fc2) // okay
-gc(fc3) // expected-error{{cannot convert value of type '(SomeArbitraryClass) -> ()' to expected argument type '(protocol<Classable, Fooable>) -> ()'}}
+gc(fc3) // expected-error{{cannot convert value of type '(SomeArbitraryClass) -> ()' to expected argument type '(Classable & Fooable) -> ()'}}
 
 // rdar://problem/19600325
 func getAnyObject() -> AnyObject? {

@@ -133,7 +133,7 @@ func class_bounded_archetype_to_not_class_bounded
 
 /* TODO Abstraction remapping to non-class-bounded witnesses
 func class_and_not_class_bounded_archetype_methods
-<T:protocol<ClassBound, NotClassBound>>(_ x:T, y:T) {
+<T: ClassBound & NotClassBound>(_ x:T, y:T) {
   x.classBoundMethod()
   x.classBoundBinaryMethod(y)
   x.notClassBoundMethod()

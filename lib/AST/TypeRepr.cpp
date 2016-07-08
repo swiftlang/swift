@@ -434,16 +434,18 @@ ProtocolCompositionTypeRepr::create(ASTContext &C,
 
 void ProtocolCompositionTypeRepr::printImpl(ASTPrinter &Printer,
                                             const PrintOptions &Opts) const {
-  Printer << "protocol<";
-  bool First = true;
-  for (auto Proto : Protocols) {
-    if (First)
-      First = false;
-    else
-      Printer << ", ";
-    printTypeRepr(Proto, Printer, Opts);
+  if (Protocols.empty()) {
+    Printer << "Any";
+  } else {
+    bool First = true;
+    for (auto Proto : Protocols) {
+      if (First)
+        First = false;
+      else
+        Printer << " & ";
+      printTypeRepr(Proto, Printer, Opts);
+    }
   }
-  Printer << ">";
 }
 
 void MetatypeTypeRepr::printImpl(ASTPrinter &Printer,

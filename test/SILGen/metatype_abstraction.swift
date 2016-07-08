@@ -129,7 +129,7 @@ func generic_metatype_of_metatype<T>(_ x: T) -> T.Type.Type {
 
 // FIXME rdar://problem/18419772
 /*
-func existential_metatype_of_metatype(_ x: protocol<>) -> protocol<>.Type.Type {
+func existential_metatype_of_metatype(_ x: Any) -> Any.Type.Type {
   return x.dynamicType.dynamicType
 }
  */
