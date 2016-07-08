@@ -49,7 +49,7 @@ func _XCTRunThrowableBlockBridge(_: @noescape @convention(block) () -> Void) -> 
 /// The Swift-style result of evaluating a block which may throw an exception.
 enum _XCTThrowableBlockResult {
   case success
-  case failedWithError(error: ErrorProtocol)
+  case failedWithError(error: Error)
   case failedWithException(className: String, name: String, reason: String)
   case failedWithUnknownException
 }
@@ -57,7 +57,7 @@ enum _XCTThrowableBlockResult {
 /// Asks some Objective-C code to evaluate a block which may throw an exception or error,
 /// and if it does consume the exception and return information about it.
 func _XCTRunThrowableBlock(_ block: @noescape () throws -> Void) -> _XCTThrowableBlockResult {
-  var blockErrorOptional: ErrorProtocol?
+  var blockErrorOptional: Error?
   
   let d = _XCTRunThrowableBlockBridge({
     do {
@@ -996,9 +996,9 @@ public func XCTAssertLessThanOrEqual<T : Comparable>(_ expression1: @autoclosure
   }
 }
 
-public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, _ errorHandler: (error: ErrorProtocol) -> Void = { _ in }) -> Void {
+public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, _ errorHandler: (error: Error) -> Void = { _ in }) -> Void {
   // evaluate expression exactly once
-  var caughtErrorOptional: ErrorProtocol?
+  var caughtErrorOptional: Error?
   
   let result = _XCTRunThrowableBlock {
     do {

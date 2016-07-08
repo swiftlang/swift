@@ -1341,8 +1341,8 @@ namespace {
     Expr *bridgeErrorToObjectiveC(Expr *value) {
       auto &tc = cs.getTypeChecker();
 
-      // Use _bridgeErrorProtocolToNSError to conver to an NSError.
-      auto fn = tc.Context.getBridgeErrorProtocolToNSError(&tc);
+      // Use _bridgeErrorToNSError to conver to an NSError.
+      auto fn = tc.Context.getBridgeErrorToNSError(&tc);
       SourceLoc loc = value->getLoc();
       if (!fn) {
         tc.diagnose(loc, diag::missing_nserror_bridging_function);
@@ -1360,7 +1360,7 @@ namespace {
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
     
-      // The return type of _bridgeErrorProtocolToNSError is formally
+      // The return type of _bridgeErrorToNSError is formally
       // 'AnyObject' to avoid stdlib-to-Foundation dependencies, but it's
       // really NSError.  Abuse CovariantReturnConversionExpr to fix this.
       auto nsErrorDecl = tc.Context.getNSErrorDecl();

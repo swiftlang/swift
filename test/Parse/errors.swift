@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-enum MSV : ErrorProtocol {
+enum MSV : Error {
   case Foo, Bar, Baz
   case CarriesInt(Int)
 
@@ -8,7 +8,7 @@ enum MSV : ErrorProtocol {
   var code: Int { return 0 }
 }
 
-func opaque_error() -> ErrorProtocol { return MSV.Foo }
+func opaque_error() -> Error { return MSV.Foo }
 
 func one() {
   do {
@@ -37,7 +37,7 @@ func one() {
 
   do {
     throw opaque_error()
-  } catch is ErrorProtocol {  // expected-warning {{'is' test is always true}}
+  } catch is Error {  // expected-warning {{'is' test is always true}}
   }
   
   func foo() throws {}

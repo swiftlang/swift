@@ -673,14 +673,14 @@ bool TypeBase::isEmptyExistentialComposition() {
   return false;
 }
 
-bool TypeBase::isExistentialWithErrorProtocol() {
+bool TypeBase::isExistentialWithError() {
   // FIXME: Compute this as a bit in TypeBase so this operation isn't
   // overly expensive.
   SmallVector<ProtocolDecl *, 4> protocols;
   if (!getCanonicalType()->isExistentialType(protocols)) return false;
 
   auto errorProto =
-    getASTContext().getProtocol(KnownProtocolKind::ErrorProtocol);
+    getASTContext().getProtocol(KnownProtocolKind::Error);
   if (!errorProto) return false;
 
   for (auto proto : protocols) {
@@ -1984,7 +1984,7 @@ bool TypeBase::isPotentiallyBridgedValueType() {
       return true;
   }
 
-  return isExistentialWithErrorProtocol();
+  return isExistentialWithError();
 }
 
 /// Determine whether this is a representable Objective-C object type.
@@ -2236,10 +2236,10 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     }
   }
 
-  // In Objective-C, existentials involving ErrorProtocol are bridged
+  // In Objective-C, existentials involving Error are bridged
   // to NSError.
   if (language == ForeignLanguage::ObjectiveC &&
-      type->isExistentialWithErrorProtocol()) {
+      type->isExistentialWithError()) {
     return { ForeignRepresentableKind::BridgedError, nullptr };
   }
 

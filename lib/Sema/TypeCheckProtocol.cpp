@@ -4802,8 +4802,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::Hashable:
     return DerivedConformance::deriveHashable(*this, Decl, TypeDecl, Requirement);
     
-  case KnownProtocolKind::ErrorProtocol:
-    return DerivedConformance::deriveErrorProtocol(*this, Decl, TypeDecl, Requirement);
+  case KnownProtocolKind::Error:
+    return DerivedConformance::deriveError(*this, Decl, TypeDecl, Requirement);
 
   case KnownProtocolKind::BridgedNSError:
     return DerivedConformance::deriveBridgedNSError(*this, Decl, TypeDecl,

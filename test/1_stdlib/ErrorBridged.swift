@@ -9,7 +9,7 @@ import Foundation
 import CoreLocation
 import Darwin
 
-var ErrorProtocolBridgingTests = TestSuite("ErrorProtocolBridging")
+var ErrorBridgingTests = TestSuite("ErrorBridging")
 
 var NoisyErrorLifeCount = 0
 var NoisyErrorDeathCount = 0
@@ -23,7 +23,7 @@ protocol OtherClassProtocol : class {
   var otherClassProperty: String { get }
 }
 
-class NoisyError : ErrorProtocol, OtherProtocol, OtherClassProtocol {
+class NoisyError : Error, OtherProtocol, OtherClassProtocol {
   init() { NoisyErrorLifeCount += 1 }
   deinit { NoisyErrorDeathCount += 1 }
 
@@ -34,12 +34,12 @@ class NoisyError : ErrorProtocol, OtherProtocol, OtherClassProtocol {
   let otherClassProperty = "otherClassProperty"
 }
 
-@objc enum EnumError : Int, ErrorProtocol {
+@objc enum EnumError : Int, Error {
   case BadError = 9000
   case ReallyBadError = 9001
 }
 
-ErrorProtocolBridgingTests.test("NSError") {
+ErrorBridgingTests.test("NSError") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   autoreleasepool {
@@ -48,7 +48,7 @@ ErrorProtocolBridgingTests.test("NSError") {
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
-    let e: ErrorProtocol = ns
+    let e: Error = ns
     expectEqual(e._domain, "SomeDomain")
     expectEqual(e._code, 321)
 
@@ -60,7 +60,7 @@ ErrorProtocolBridgingTests.test("NSError") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
-ErrorProtocolBridgingTests.test("NSCopying") {
+ErrorBridgingTests.test("NSCopying") {
   autoreleasepool {
     let orig = EnumError.ReallyBadError as NSError
     let copy = orig.copy() as! NSError
@@ -77,7 +77,7 @@ func archiveAndUnarchiveObject<T: NSCoding where T: NSObject>(
   unarchiver.requiresSecureCoding = true
   return unarchiver.decodeObjectOfClass(T.self, forKey: "root")
 }
-ErrorProtocolBridgingTests.test("NSCoding") {
+ErrorBridgingTests.test("NSCoding") {
   autoreleasepool {
     let orig = EnumError.ReallyBadError as NSError
     let unarchived = archiveAndUnarchiveObject(orig)!
@@ -86,14 +86,14 @@ ErrorProtocolBridgingTests.test("NSCoding") {
   }
 }
 
-ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
+ErrorBridgingTests.test("NSError-to-enum bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   let testURL = URL(string: "http://swift.org")!
 
   autoreleasepool {
     let underlyingError = CocoaError(.fileLockingError)
-      as ErrorProtocol as NSError
+      as Error as NSError
     let ns = NSError(domain: NSCocoaErrorDomain,
                      code: NSFileNoSuchFileError,
                      userInfo: [
@@ -106,7 +106,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
   
-    let e: ErrorProtocol = ns
+    let e: Error = ns
 
     let cocoaCode: Int?
     switch e {
@@ -144,7 +144,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     let nsURL = NSError(domain: NSURLErrorDomain,
                         code: NSURLErrorBadURL,
                         userInfo: [NSURLErrorFailingURLErrorKey : testURL])
-    let eURL: ErrorProtocol = nsURL
+    let eURL: Error = nsURL
     let isBadURLError: Bool
     switch eURL {
     case NSURLError.badURL:
@@ -163,7 +163,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     let nsCL = NSError(domain: kCLErrorDomain,
                        code: CLError.headingFailure.rawValue,
                        userInfo: [NSURLErrorKey: testURL])
-    let eCL: ErrorProtocol = nsCL
+    let eCL: Error = nsCL
     let isHeadingFailure: Bool
     switch eCL {
     case CLError.headingFailure:
@@ -187,7 +187,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     let nsPOSIX = NSError(domain: NSPOSIXErrorDomain,
                           code: Int(EDEADLK),
                           userInfo: [:])
-    let ePOSIX: ErrorProtocol = nsPOSIX
+    let ePOSIX: Error = nsPOSIX
     let isDeadlock: Bool
     switch ePOSIX {
     case POSIXError.EDEADLK:
@@ -202,7 +202,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     let nsMach = NSError(domain: NSMachErrorDomain,
                          code: Int(KERN_MEMORY_FAILURE),
                          userInfo: [:])
-    let eMach: ErrorProtocol = nsMach
+    let eMach: Error = nsMach
     let isMemoryFailure: Bool
     switch eMach {
     case MachError.memoryFailure:
@@ -221,23 +221,23 @@ func opaqueUpcastToAny<T>(_ x: T) -> Any {
   return x
 }
 
-struct StructError: ErrorProtocol {
+struct StructError: Error {
   var _domain: String { return "StructError" }
   var _code: Int { return 4812 }
 }
 
-ErrorProtocolBridgingTests.test("ErrorProtocol-to-NSError bridging") {
+ErrorBridgingTests.test("Error-to-NSError bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   autoreleasepool {
-    let e: ErrorProtocol = NoisyError()
+    let e: Error = NoisyError()
     let ns = e as NSError
     let ns2 = e as NSError
     expectTrue(ns === ns2)
     expectEqual(ns._domain, "NoisyError")
     expectEqual(ns._code, 123)
 
-    let e3: ErrorProtocol = ns
+    let e3: Error = ns
     expectEqual(e3._domain, "NoisyError")
     expectEqual(e3._code, 123)
     let ns3 = e3 as NSError
@@ -250,7 +250,7 @@ ErrorProtocolBridgingTests.test("ErrorProtocol-to-NSError bridging") {
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
-    let nativeE: ErrorProtocol = nativeNS
+    let nativeE: Error = nativeNS
     let nativeNS2 = nativeE as NSError
     expectTrue(nativeNS === nativeNS2)
     expectEqual(nativeNS2._domain, NSCocoaErrorDomain)
@@ -274,7 +274,7 @@ ErrorProtocolBridgingTests.test("ErrorProtocol-to-NSError bridging") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
-ErrorProtocolBridgingTests.test("enum-to-NSError round trip") {
+ErrorBridgingTests.test("enum-to-NSError round trip") {
   autoreleasepool {
     // Emulate throwing an error from Objective-C.
     func throwNSError(_ error: EnumError) throws {
@@ -314,7 +314,7 @@ ErrorProtocolBridgingTests.test("enum-to-NSError round trip") {
 class SomeNSErrorSubclass: NSError {}
 
 
-ErrorProtocolBridgingTests.test("Thrown NSError identity is preserved") {
+ErrorBridgingTests.test("Thrown NSError identity is preserved") {
   do {
     let e = NSError(domain: "ClericalError", code: 219,
                     userInfo: ["yeah": "yeah"])
@@ -343,7 +343,7 @@ ErrorProtocolBridgingTests.test("Thrown NSError identity is preserved") {
 }
 
 // Check errors customized via protocol.
-struct MyCustomizedError : ErrorProtocol {
+struct MyCustomizedError : Error {
   let code: Int
 }
 
@@ -396,14 +396,14 @@ extension MyCustomizedError : RecoverableError {
 /// produced for a RecoverableError.
 @objc protocol FakeNSErrorRecoveryAttempting {
   @objc(attemptRecoveryFromError:optionIndex:delegate:didRecoverSelector:contextInfo:)
-  func attemptRecovery(fromError nsError: ErrorProtocol,
+  func attemptRecovery(fromError nsError: Error,
                        optionIndex recoveryOptionIndex: Int,
                        delegate: AnyObject?,
                        didRecoverSelector: Selector,
                        contextInfo: UnsafeMutablePointer<Void>?)
 
   @objc(attemptRecoveryFromError:optionIndex:)
-  func attemptRecovery(fromError nsError: ErrorProtocol,
+  func attemptRecovery(fromError nsError: Error,
                        optionIndex recoveryOptionIndex: Int) -> Bool
 }
 
@@ -425,7 +425,7 @@ class RecoveryDelegate {
   }
 }
 
-ErrorProtocolBridgingTests.test("Customizing NSError via protocols") {
+ErrorBridgingTests.test("Customizing NSError via protocols") {
   let error = MyCustomizedError(code: 12345)
   let nsError = error as NSError
 

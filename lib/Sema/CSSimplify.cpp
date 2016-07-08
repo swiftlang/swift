@@ -1717,9 +1717,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       
       // Check whether the source type is bridged to an Objective-C
       // class type. This conversion is implicit unless the bridged
-      // value type is ErrorProtocol; this special rule is a subset of
+      // value type is Error; this special rule is a subset of
       // SE-0072 that breaks an implicit conversion cycle between
-      // NSError and ErrorProtocol.
+      // NSError and Error.
       if (isBridgeableTargetType) {
         Type bridgedValueType;
         if (auto bridgedToObjCClass =
@@ -1728,7 +1728,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           if (*bridgedToObjCClass &&
               (kind >= TypeMatchKind::ExplicitConversion ||
                bridgedValueType->getAnyNominal() !=
-                 TC.Context.getErrorProtocolDecl()))
+                 TC.Context.getErrorDecl()))
             conversionsOrFixes.push_back(
               ConversionRestrictionKind::BridgeToObjC);
         }

@@ -67,7 +67,7 @@ sil @blocker : $@convention(thin) () -> ()
 sil @get_object : $@convention(thin) () -> Builtin.NativeObject
 sil @foo_init : $@convention(thin) (@thin foo.Type) -> foo
 sil [fragile] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol
+sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
 
 // CHECK-LABEL: sil @sink_retains_from_preds : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb1:
@@ -291,7 +291,7 @@ bb3:
   return %5 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
+// CHECK-LABEL: sil [fragile] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 // CHECK: bb0(
 // CHECK: strong_retain
 // CHECK: try_apply
@@ -299,21 +299,21 @@ bb3:
 // CHECK: strong_release
 // CHECK: bb2(
 // CHECK: strong_release
-sil [fragile] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
+sil [fragile] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
   %1 = function_ref @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  %2 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol
-  try_apply %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol, normal bb1, error bb2
+  %2 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
+  try_apply %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error, normal bb1, error bb2
 
 bb1(%3 : $()):
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 
-bb2(%4 : $ErrorProtocol):
+bb2(%4 : $Error):
   strong_release %0 : $Builtin.NativeObject
-  throw %4 : $ErrorProtocol
+  throw %4 : $Error
 }
 
 

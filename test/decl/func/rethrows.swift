@@ -364,7 +364,7 @@ func rt2(_ predicate: () throws -> ()) rethrows { }
 rt2 { }
 
 
-enum SomeError : ErrorProtocol {
+enum SomeError : Error {
   case Badness
 }
 

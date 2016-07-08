@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-enum PizzaError : ErrorProtocol {
+enum PizzaError : Error {
   case Pepperoni, Olives, Anchovy
 }
 

@@ -229,13 +229,13 @@ extension NSRange : _ObjectiveCBridgeable {
   }
 }
 
-extension NSError : ErrorProtocol {
+extension NSError : Error {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }
 
-@_silgen_name("swift_convertNSErrorToErrorProtocol")
-func _convertNSErrorToErrorProtocol(_ string: NSError?) -> ErrorProtocol
+@_silgen_name("swift_convertNSErrorToError")
+func _convertNSErrorToError(_ string: NSError?) -> Error
 
-@_silgen_name("swift_convertErrorProtocolToNSError")
-func _convertErrorProtocolToNSError(_ string: ErrorProtocol) -> NSError
+@_silgen_name("swift_convertErrorToNSError")
+func _convertErrorToNSError(_ string: Error) -> NSError

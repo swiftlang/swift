@@ -14,7 +14,7 @@ class Noisy {
   init() { NoisyCount += 1 }
   deinit { NoisyCount -= 1 }
 }
-enum SillyError : ErrorProtocol { case JazzHands }
+enum SillyError : Error { case JazzHands }
 
 var ErrorHandlingTests = TestSuite("ErrorHandling")
 

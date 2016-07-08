@@ -69,7 +69,7 @@ func testError() {
   }
 
   do {
-    enum LocalError : ErrorProtocol { case Err }
+    enum LocalError : Error { case Err }
     throw LocalError.Err
   } catch let error as TestError {
     printError(error)

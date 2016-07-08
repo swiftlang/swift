@@ -2603,7 +2603,7 @@ struct ASTNodeBase {};
     }
 
     Type checkExceptionTypeExists(const char *where) {
-      auto exn = Ctx.getErrorProtocolDecl();
+      auto exn = Ctx.getErrorDecl();
       if (exn) return exn->getDeclaredType();
 
       Out << "exception type does not exist in " << where << "\n";

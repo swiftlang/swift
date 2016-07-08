@@ -12,7 +12,7 @@
 
 import StdlibUnittest
 
-internal enum TestError : ErrorProtocol {
+internal enum TestError : Error {
   case error1
   case error2
 }
@@ -1825,7 +1825,7 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
   for test in forEachTests {
     let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
     var wasInvoked = false
-    var caughtError: ErrorProtocol? = nil
+    var caughtError: Error? = nil
     var result: OpaqueValue<Int>? = nil
     do {
       result = try s._preprocessingPass {

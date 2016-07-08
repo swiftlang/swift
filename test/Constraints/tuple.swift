@@ -115,7 +115,7 @@ class Paws {
   init() throws {}
 }
 
-func scruff() -> (AnyObject?, ErrorProtocol?) {
+func scruff() -> (AnyObject?, Error?) {
   do {
     return try (Paws(), nil)
   } catch {

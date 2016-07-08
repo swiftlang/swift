@@ -3,7 +3,7 @@
 // RUN: %target-run %t/a.out | FileCheck %s
 // REQUIRES: executable_test
 
-enum testError: ErrorProtocol {
+enum testError: Error {
   case C1
   case C2(Int, String)
 }

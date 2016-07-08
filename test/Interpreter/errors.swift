@@ -8,7 +8,7 @@
 import StdlibUnittest
 
 
-enum Excuse : ErrorProtocol { case CatAteHomework(LifetimeTracked) }
+enum Excuse : Error { case CatAteHomework(LifetimeTracked) }
 
 var ErrorHandlingTests = TestSuite("ErrorHandling")
 

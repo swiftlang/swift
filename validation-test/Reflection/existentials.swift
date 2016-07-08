@@ -14,7 +14,7 @@
    - Existentials whose contained type fits in the 3-word buffer
    - Existentials whose contained type has to be allocated into a
      raw heap buffer.
-   - Error existentials, a.k.a. `ErrorProtocol`.
+   - Error existentials, a.k.a. `Error`.
 
    - See also: SwiftReflectionTest.reflect(any:)
    - See also: SwiftReflectionTest.reflect(error:)
@@ -38,16 +38,16 @@ struct MyStruct<T, U, V> {
 }
 
 protocol MyProtocol {}
-protocol MyErrorProtocol : ErrorProtocol {}
+protocol MyErrorProtocol : Error {}
 
-struct MyError : MyProtocol, ErrorProtocol {
+struct MyError : MyProtocol, Error {
   let i = 0xFEDCBA
 }
 struct MyCustomError : MyProtocol, MyErrorProtocol {}
 
 struct HasError {
-  let singleError: ErrorProtocol
-  let errorInComposition: protocol<MyProtocol, ErrorProtocol>
+  let singleError: Error
+  let errorInComposition: protocol<MyProtocol, Error>
   let customError: MyErrorProtocol
   let customErrorInComposition: protocol<MyErrorProtocol, MyProtocol>
 }

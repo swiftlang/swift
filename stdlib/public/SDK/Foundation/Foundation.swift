@@ -971,21 +971,21 @@ public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>?
 public typealias ErrorPointer = NSErrorPointer
 
 public // COMPILER_INTRINSIC
-let _nilObjCError: ErrorProtocol = _GenericObjCError.nilError
+let _nilObjCError: Error = _GenericObjCError.nilError
 
-@_silgen_name("swift_convertNSErrorToErrorProtocol")
+@_silgen_name("swift_convertNSErrorToError")
 public // COMPILER_INTRINSIC
-func _convertNSErrorToErrorProtocol(_ error: NSError?) -> ErrorProtocol {
+func _convertNSErrorToError(_ error: NSError?) -> Error {
   if let error = error {
     return error
   }
   return _nilObjCError
 }
 
-@_silgen_name("swift_convertErrorProtocolToNSError")
+@_silgen_name("swift_convertErrorToNSError")
 public // COMPILER_INTRINSIC
-func _convertErrorProtocolToNSError(_ error: ErrorProtocol) -> NSError {
-  return unsafeDowncast(_bridgeErrorProtocolToNSError(error), to: NSError.self)
+func _convertErrorToNSError(_ error: Error) -> NSError {
+  return unsafeDowncast(_bridgeErrorToNSError(error), to: NSError.self)
 }
 
 //===----------------------------------------------------------------------===//

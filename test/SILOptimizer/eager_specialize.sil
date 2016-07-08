@@ -35,7 +35,7 @@ public struct G<Container : HasElt> {
 @_specialize(S)
 public func getGenericContainer<T where T : HasElt, T.Elt : AnElt>(g: G<T>, e: T.Elt) -> T
 
-enum ArithmeticError : ErrorProtocol {
+enum ArithmeticError : Error {
   case DivByZero
   var hashValue: Int { get }
   var _code: Int { get }
@@ -133,7 +133,7 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 // CHECK:   %22 = unchecked_trivial_bit_cast %21 : $() to $()
 // CHECK:   br bb2
 
-sil_scope 9 { parent @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <τ_0_0 where τ_0_0 : SignedInteger, τ_0_0.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, τ_0_0.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, τ_0_0.Stride : SignedNumber, τ_0_0.Stride.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @error ErrorProtocol) }
+sil_scope 9 { parent @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <τ_0_0 where τ_0_0 : SignedInteger, τ_0_0.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, τ_0_0.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, τ_0_0.Stride : SignedNumber, τ_0_0.Stride.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @error Error) }
 sil_scope 10 { parent 9 }
 sil_scope 11 { parent 10 }
 
@@ -159,7 +159,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // divideNum<A where ...> (A, den : A) throws -> A
-sil [_specialize <Int, Int, Int, Int, Int>] @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger, T.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, T.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, T.Stride : SignedNumber, T.Stride.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@in T, @in T) -> (@out T, @error ErrorProtocol) {
+sil [_specialize <Int, Int, Int, Int, Int>] @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger, T.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, T.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, T.Stride : SignedNumber, T.Stride.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@in T, @in T) -> (@out T, @error Error) {
 // %0                                             // user: %19
 // %1                                             // users: %3, %19, %23
 // %2                                             // users: %4, %7, %19, %22
@@ -182,11 +182,11 @@ bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 bb1:                                              // Preds: bb0
   destroy_addr %2 : $*T, scope 10 // id: %22
   destroy_addr %1 : $*T, scope 10 // id: %23
-  %24 = alloc_existential_box $ErrorProtocol, $ArithmeticError, scope 11 // users: %25, %28
-  %25 = project_existential_box $ArithmeticError in %24 : $ErrorProtocol, scope 11 // user: %27
+  %24 = alloc_existential_box $Error, $ArithmeticError, scope 11 // users: %25, %28
+  %25 = project_existential_box $ArithmeticError in %24 : $Error, scope 11 // user: %27
   %26 = enum $ArithmeticError, #ArithmeticError.DivByZero!enumelt, scope 11 // user: %27
   store %26 to %25 : $*ArithmeticError, scope 11 // id: %27
-  throw %24 : $ErrorProtocol, scope 10 // id: %28
+  throw %24 : $Error, scope 10 // id: %28
 
 bb2:                                              // Preds: bb0
   %18 = witness_method $T, #IntegerArithmetic."/"!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : IntegerArithmetic> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0, scope 10 // user: %19
@@ -196,14 +196,14 @@ bb2:                                              // Preds: bb0
 }
 
 // specialized divideNum<A where ...> (A, den : A) throws -> A
-// CHECK-LABEL: sil shared @_TTSg5SiSis13SignedIntegers___TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol) {
+// CHECK-LABEL: sil shared @_TTSg5SiSis13SignedIntegers___TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error Error) {
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: return %{{.*}}
 // CHECK: throw %{{.*}}
 
 // Generic with specialized dispatch. No more [specialize] attribute.
 // 
-// CHECK-LABEL: sil @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger, T.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, T.Stride : SignedNumber, T.Stride.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@in T, @in T) -> (@out T, @error ErrorProtocol) {
+// CHECK-LABEL: sil @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger, T.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, T.Stride : SignedNumber, T.Stride.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@in T, @in T) -> (@out T, @error Error) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK:   %3 = metatype $@thick T.Type
 // CHECK:   %4 = metatype $@thick Int.Type
@@ -217,10 +217,10 @@ bb2:                                              // Preds: bb0
 // CHECK:   cond_br %{{.*}}, bb4, bb2
 
 // CHECK: bb2:                                              // Preds: bb1
-// CHECK:   br bb3(%{{.*}} : $ErrorProtocol)
+// CHECK:   br bb3(%{{.*}} : $Error)
 
-// CHECK: bb3(%{{.*}} : $ErrorProtocol):                        // Preds: bb2 bb7
-// CHECK:   throw %{{.*}} : $ErrorProtocol
+// CHECK: bb3(%{{.*}} : $Error):                        // Preds: bb2 bb7
+// CHECK:   throw %{{.*}} : $Error
 
 // CHECK: bb4:                                              // Preds: bb1
 // CHECK:   %{{.*}} = witness_method $T, #IntegerArithmetic."/"!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : IntegerArithmetic> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
@@ -238,12 +238,12 @@ bb2:                                              // Preds: bb0
 // CHECK:   %{{.*}} = unchecked_addr_cast %2 : $*T to $*Int
 // CHECK:   %{{.*}} = load %{{.*}} : $*Int
 // CHECK:   // function_ref specialized divideNum<A where ...> (A, den : A) throws -> A
-// CHECK:   %{{.*}} = function_ref @_TTSg5SiSis13SignedIntegers___TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol)
-// CHECK:   try_apply %{{.*}}(%{{.*}}, %{{.*}}) : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol), normal bb8, error bb7
+// CHECK:   %{{.*}} = function_ref @_TTSg5SiSis13SignedIntegers___TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error Error)
+// CHECK:   try_apply %{{.*}}(%{{.*}}, %{{.*}}) : $@convention(thin) (Int, Int) -> (Int, @error Error), normal bb8, error bb7
 
-// CHECK: bb7(%{{.*}} : $ErrorProtocol):                        // Preds: bb6
-// CHECK:   %{{.*}} = builtin "willThrow"(%{{.*}} : $ErrorProtocol) : $()
-// CHECK:   br bb3(%{{.*}} : $ErrorProtocol)
+// CHECK: bb7(%{{.*}} : $Error):                        // Preds: bb6
+// CHECK:   %{{.*}} = builtin "willThrow"(%{{.*}} : $Error) : $()
+// CHECK:   br bb3(%{{.*}} : $Error)
 
 // CHECK: bb8(%{{.*}} : $Int):                                  // Preds: bb6
 // CHECK:   store %{{.*}} to %{{.*}} : $*Int

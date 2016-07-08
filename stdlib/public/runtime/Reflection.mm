@@ -289,7 +289,7 @@ void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
       new (result) String("(Heap Generic Local Variable)");
       break;
     case MetadataKind::ErrorObject:
-      new (result) String("(ErrorProtocol Object)");
+      new (result) String("(Error Object)");
       break;
   }
 }

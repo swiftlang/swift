@@ -886,8 +886,8 @@ public:
   bool isEmptyExistentialComposition();
 
   /// Whether this is an existential composition containing
-  /// ErrorProtocol.
-  bool isExistentialWithErrorProtocol();
+  /// Error.
+  bool isExistentialWithError();
 
   void dump() const LLVM_ATTRIBUTE_USED;
   void dump(raw_ostream &os, unsigned indent = 0) const;

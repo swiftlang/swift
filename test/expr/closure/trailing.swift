@@ -121,7 +121,7 @@ class Foo23036383 {
   func meth2(_: Int, y: () -> Int) -> Bool {}
   func filter(by: (Int) -> Bool) -> [Int] {}
 }
-enum MyErr : ErrorProtocol {
+enum MyErr : Error {
   case A
 }
 

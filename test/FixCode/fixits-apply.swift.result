@@ -83,10 +83,10 @@ enum MyEnumType : UInt32 {
 }
 _ = MyEnumType.invalid
 
-func goo(e : ErrorProtocol) {
+func goo(e : Error) {
     var e = e
 }
-func goo2(e: ErrorProtocol) { var e = e }
+func goo2(e: Error) { var e = e }
 func goo3(e: Int) { var e = e; e = 3 }
 protocol A {
   func bar(s: Int)

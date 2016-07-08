@@ -119,8 +119,8 @@ public:
   Optional<SILDeclRef> ObjCBoolToBoolFn;
   Optional<SILDeclRef> BoolToDarwinBooleanFn;
   Optional<SILDeclRef> DarwinBooleanToBoolFn;
-  Optional<SILDeclRef> NSErrorToErrorProtocolFn;
-  Optional<SILDeclRef> ErrorProtocolToNSErrorFn;
+  Optional<SILDeclRef> NSErrorToErrorFn;
+  Optional<SILDeclRef> ErrorToNSErrorFn;
 
   Optional<ProtocolDecl*> PointerProtocol;
 
@@ -350,8 +350,8 @@ public:
   SILDeclRef getObjCBoolToBoolFn();
   SILDeclRef getBoolToDarwinBooleanFn();
   SILDeclRef getDarwinBooleanToBoolFn();
-  SILDeclRef getNSErrorToErrorProtocolFn();
-  SILDeclRef getErrorProtocolToNSErrorFn();
+  SILDeclRef getNSErrorToErrorFn();
+  SILDeclRef getErrorToNSErrorFn();
   
   /// Retrieve the _ObjectiveCBridgeable protocol definition.
   ProtocolDecl *getObjectiveCBridgeable(SILLocation loc);

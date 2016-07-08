@@ -15,7 +15,7 @@ import Darwin
 
 /// Describes an error that provides localized messages describing why
 /// an error occurred and provides more information about the error.
-public protocol LocalizedError : ErrorProtocol {
+public protocol LocalizedError : Error {
   /// A localized message describing what error occurred.
   var errorDescription: String? { get }
 
@@ -80,7 +80,7 @@ class _NSErrorRecoveryAttempter {
 
 /// Describes an error that may be recoverably by presenting several
 /// potential recovery options to the user.
-public protocol RecoverableError : ErrorProtocol {
+public protocol RecoverableError : Error {
   /// Provides a set of possible recovery options to present to the user.
   var recoveryOptions: [String] { get }
 
@@ -117,7 +117,7 @@ public extension RecoverableError {
 
 /// Describes an error type that specifically provides a domain, code,
 /// and user-info dictionary.
-public protocol CustomNSError : ErrorProtocol {
+public protocol CustomNSError : Error {
   /// The domain of the error.
   static var errorDomain: String { get }
 
@@ -128,7 +128,7 @@ public protocol CustomNSError : ErrorProtocol {
   var errorUserInfo: [String : AnyObject] { get }
 }
 
-public extension ErrorProtocol where Self : CustomNSError {
+public extension Error where Self : CustomNSError {
   /// Default implementation for customized NSErrors.
   var _domain: String { return Self.errorDomain }
 
@@ -136,7 +136,7 @@ public extension ErrorProtocol where Self : CustomNSError {
   var _code: Int { return self.errorCode }
 }
 
-public extension ErrorProtocol {
+public extension Error {
   /// Retrieve the localized description for this error.
   var localizedDescription: String {
     return (self as! NSError).localizedDescription
@@ -145,7 +145,7 @@ public extension ErrorProtocol {
 
 /// Retrieve the default userInfo dictionary for a given error.
 @_silgen_name("swift_Foundation_getErrorDefaultUserInfo")
-public func _swift_Foundation_getErrorDefaultUserInfo(_ error: ErrorProtocol)
+public func _swift_Foundation_getErrorDefaultUserInfo(_ error: Error)
   -> AnyObject? {
   // If the OS supports user info value providers, use those
   // to lazily populate the user-info dictionary for this domain.
@@ -192,17 +192,17 @@ public func _swift_Foundation_getErrorDefaultUserInfo(_ error: ErrorProtocol)
   return result as AnyObject
 }
 
-// NSError and CFError conform to the standard ErrorProtocol protocol. Compiler
+// NSError and CFError conform to the standard Error protocol. Compiler
 // magic allows this to be done as a "toll-free" conversion when an NSError
-// or CFError is used as an ErrorProtocol existential.
+// or CFError is used as an Error existential.
 
-extension NSError : ErrorProtocol {
+extension NSError : Error {
   public var _domain: String { return domain }
   public var _code: Int { return code }
   public var _userInfo: AnyObject? { return userInfo as AnyObject }
 }
 
-extension CFError : ErrorProtocol {
+extension CFError : Error {
   public var _domain: String {
     return CFErrorGetDomain(self) as String
   }
@@ -218,27 +218,27 @@ extension CFError : ErrorProtocol {
 
 // An error value to use when an Objective-C API indicates error
 // but produces a nil error object.
-public enum _GenericObjCError : ErrorProtocol {
+public enum _GenericObjCError : Error {
   case nilError
 }
 
 /// An internal protocol to represent Swift error enums that map to standard
 /// Cocoa NSError domains.
-public protocol _ObjectiveCBridgeableErrorProtocol : ErrorProtocol {
+public protocol _ObjectiveCBridgeableError : Error {
   /// Produce a value of the error type corresponding to the given NSError,
   /// or return nil if it cannot be bridged.
   init?(_bridgedNSError: NSError)
 }
 
-/// A hook for the runtime to use _ObjectiveCBridgeableErrorProtocol in order to
+/// A hook for the runtime to use _ObjectiveCBridgeableError in order to
 /// attempt an "errorTypeValue as? SomeError" cast.
 ///
 /// If the bridge succeeds, the bridged value is written to the uninitialized
 /// memory pointed to by 'out', and true is returned. Otherwise, 'out' is
 /// left uninitialized, and false is returned.
-@_silgen_name("swift_stdlib_bridgeNSErrorToErrorProtocol")
-public func _stdlib_bridgeNSErrorToErrorProtocol<
-  T : _ObjectiveCBridgeableErrorProtocol
+@_silgen_name("swift_stdlib_bridgeNSErrorToError")
+public func _stdlib_bridgeNSErrorToError<
+  T : _ObjectiveCBridgeableError
 >(_ error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
   if let bridged = T(_bridgedNSError: error) {
     out.initialize(with: bridged)
@@ -250,7 +250,7 @@ public func _stdlib_bridgeNSErrorToErrorProtocol<
 
 /// Helper protocol for _BridgedNSError, which used to provide
 /// default implementations.
-public protocol __BridgedNSError : ErrorProtocol {
+public protocol __BridgedNSError : Error {
   static var _nsErrorDomain: String { get }
 }
 
@@ -313,10 +313,10 @@ public extension __BridgedNSError
 /// NSError domain.
 ///
 /// This protocol is used primarily to generate the conformance to
-/// _ObjectiveCBridgeableErrorProtocol for such an enum.
+/// _ObjectiveCBridgeableError for such an enum.
 public protocol _BridgedNSError : __BridgedNSError,
                                   RawRepresentable,
-                                  _ObjectiveCBridgeableErrorProtocol,
+                                  _ObjectiveCBridgeableError,
                                   Hashable {
   /// The NSError domain to which this type is bridged.
   static var _nsErrorDomain: String { get }
@@ -325,7 +325,7 @@ public protocol _BridgedNSError : __BridgedNSError,
 /// Describes a bridged error that stores the underlying NSError, so
 /// it can be queried.
 public protocol _BridgedStoredNSError :
-     __BridgedNSError, _ObjectiveCBridgeableErrorProtocol, CustomNSError,
+     __BridgedNSError, _ObjectiveCBridgeableError, CustomNSError,
      Hashable {
   /// The type of an error code.
   associatedtype Code: _ErrorCodeProtocol
@@ -427,7 +427,7 @@ public protocol _ErrorCodeProtocol : Equatable {
 }
 
 /// Allow one to match an error code against an arbitrary error.
-public func ~= <Code: _ErrorCodeProtocol>(match: Code, error: ErrorProtocol)
+public func ~= <Code: _ErrorCodeProtocol>(match: Code, error: Error)
     -> Bool
     where Code._ErrorType: _BridgedStoredNSError {
   guard let specificError = error as? Code._ErrorType else { return false }
@@ -484,8 +484,8 @@ public extension CocoaError {
   }
 
   /// The underlying error behind this error, if any.
-  var underlying: ErrorProtocol? {
-    return _userInfo[NSUnderlyingErrorKey] as? ErrorProtocol
+  var underlying: Error? {
+    return _userInfo[NSUnderlyingErrorKey] as? Error
   }
 
   /// The URL associated with this error, if any.

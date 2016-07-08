@@ -132,11 +132,11 @@ extension Set : _ObjectiveCBridgeable {
   }
 }
 
-extension NSError: ErrorProtocol {
+extension NSError: Error {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }
 
-public func _convertErrorProtocolToNSError(_ x: ErrorProtocol) -> NSError {
+public func _convertErrorToNSError(_ x: Error) -> NSError {
   return x as NSError
 }

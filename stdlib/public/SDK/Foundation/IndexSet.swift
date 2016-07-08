@@ -676,7 +676,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     public func filteredIndexSet(in range : Range<Element>, includeInteger: @noescape (Element) throws -> Bool) rethrows -> IndexSet {
         let r : NSRange = _toNSRange(range)
         return try _handle.map {
-            var error : ErrorProtocol? = nil
+            var error : Error? = nil
             let result = $0.indexes(in: r, options: [], passingTest: { (i, stop) -> Bool in
                 do {
                     let include = try includeInteger(i)

@@ -103,7 +103,7 @@ func _EmptyCollection<T>(i: EmptyIterator<T>) {
 }
 
 func _ErrorType() {
-  func fn(_: ErrorType) {} // expected-error {{'ErrorType' has been renamed to 'ErrorProtocol'}} {{14-23=ErrorProtocol}}
+  func fn(_: ErrorType) {} // expected-error {{'ErrorType' has been renamed to 'Error'}} {{14-23=Error}}
 }
 
 func _ExistentialCollection<T>(i: AnyIterator<T>) {

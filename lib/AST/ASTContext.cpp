@@ -570,7 +570,7 @@ NominalTypeDecl *ASTContext::getStringDecl() const {
 }
 
 CanType ASTContext::getExceptionType() const {
-  if (auto exn = getErrorProtocolDecl()) {
+  if (auto exn = getErrorDecl()) {
     return exn->getDeclaredType()->getCanonicalType();
   } else {
     // Use Builtin.NativeObject just as a stand-in.
@@ -578,8 +578,8 @@ CanType ASTContext::getExceptionType() const {
   }
 }
 
-NominalTypeDecl *ASTContext::getErrorProtocolDecl() const {
-  return getProtocol(KnownProtocolKind::ErrorProtocol);
+NominalTypeDecl *ASTContext::getErrorDecl() const {
+  return getProtocol(KnownProtocolKind::Error);
 }
 
 NominalTypeDecl *ASTContext::getArrayDecl() const {
@@ -3823,8 +3823,8 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
       }
     }
 
-    // ErrorProtocol is bridged to NSError, when it's available.
-    if (nominal == getErrorProtocolDecl() && getNSErrorDecl())
+    // Error is bridged to NSError, when it's available.
+    if (nominal == getErrorDecl() && getNSErrorDecl())
       result = ForeignRepresentationInfo::forBridgedError();
 
     // If we didn't find anything, mark the result as "None".
@@ -3878,7 +3878,7 @@ bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
           nominal == getDictionaryDecl() ||
           nominal == getSetDecl() ||
           nominal == getStringDecl() ||
-          nominal == getErrorProtocolDecl() ||
+          nominal == getErrorDecl() ||
           // Weird one-off case where CGFloat is bridged to NSNumber.
           nominal->getName() == Id_CGFloat);
 }
@@ -3925,12 +3925,12 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       return type;
 
   // Check whether the type is an existential that contains
-  // ErrorProtocol. If so, it's bridged to NSError.
-  if (type->isExistentialWithErrorProtocol()) {
+  // Error. If so, it's bridged to NSError.
+  if (type->isExistentialWithError()) {
     if (auto nsErrorDecl = getNSErrorDecl()) {
-      // The corresponding value type is ErrorProtocol.
+      // The corresponding value type is Error.
       if (bridgedValueType)
-        *bridgedValueType = getErrorProtocolDecl()->getDeclaredInterfaceType();
+        *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
 
       return nsErrorDecl->getDeclaredInterfaceType();
     }
@@ -3959,11 +3959,11 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
              resolver);
   }
 
-  // Do we conform to ErrorProtocol?
-  if (findConformance(KnownProtocolKind::ErrorProtocol)) {
-    // The corresponding value type is ErrorProtocol.
+  // Do we conform to Error?
+  if (findConformance(KnownProtocolKind::Error)) {
+    // The corresponding value type is Error.
     if (bridgedValueType)
-      *bridgedValueType = getErrorProtocolDecl()->getDeclaredInterfaceType();
+      *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
 
     // Bridge to NSError.
     if (auto nsErrorDecl = getNSErrorDecl())

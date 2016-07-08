@@ -361,8 +361,8 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
-  /// Retrieve the declaration of Swift.ErrorProtocol.
-  NominalTypeDecl *getErrorProtocolDecl() const;
+  /// Retrieve the declaration of Swift.Error.
+  NominalTypeDecl *getErrorDecl() const;
   CanType getExceptionType() const;
   
   /// Retrieve the declaration of Swift.Bool.
