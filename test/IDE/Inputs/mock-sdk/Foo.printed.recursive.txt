@@ -3,7 +3,7 @@
 
 
 /// Aaa.  FooEnum1.  Bbb.
-struct FooEnum1 : RawRepresentable, Equatable {
+struct FooEnum1: RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
   init(rawValue: UInt32)
   var rawValue: UInt32
@@ -11,14 +11,14 @@ struct FooEnum1 : RawRepresentable, Equatable {
 
 /// Aaa.  FooEnum1X.  Bbb.
 var FooEnum1X: FooEnum1 { get }
-struct FooEnum2 : RawRepresentable, Equatable {
+struct FooEnum2: RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
   init(rawValue: UInt32)
   var rawValue: UInt32
 }
 var FooEnum2X: FooEnum2 { get }
 var FooEnum2Y: FooEnum2 { get }
-struct FooEnum3 : RawRepresentable, Equatable {
+struct FooEnum3: RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
   init(rawValue: UInt32)
   var rawValue: UInt32
@@ -27,7 +27,7 @@ var FooEnum3X: FooEnum3 { get }
 var FooEnum3Y: FooEnum3 { get }
 
 /// Aaa.  FooComparisonResult.  Bbb.
-enum FooComparisonResult : Int {
+enum FooComparisonResult: Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
   case orderedAscending
@@ -36,7 +36,7 @@ enum FooComparisonResult : Int {
 }
 
 /// Aaa.  FooRuncingOptions.  Bbb.
-struct FooRuncingOptions : OptionSet {
+struct FooRuncingOptions: OptionSet {
   init(rawValue: Int)
   let rawValue: Int
   static var enableMince: FooRuncingOptions { get }
@@ -136,7 +136,7 @@ protocol FooProtocolBase {
   var fooProperty2: Int32 { get set }
   var fooProperty3: Int32 { get }
 }
-protocol FooProtocolDerived : FooProtocolBase {
+protocol FooProtocolDerived: FooProtocolBase {
 }
 class FooClassBase {
   class func fooBaseInstanceFunc0()
@@ -154,7 +154,7 @@ class FooClassBase {
 }
 
 /// Aaa.  FooClassDerived.  Bbb.
-class FooClassDerived : FooClassBase, FooProtocolDerived {
+class FooClassDerived: FooClassBase, FooProtocolDerived {
   var fooProperty1: Int32
   var fooProperty2: Int32
   var fooProperty3: Int32 { get }
@@ -220,9 +220,9 @@ extension FooClassBase {
 }
 protocol _InternalProt {
 }
-class ClassWithInternalProt : _InternalProt {
+class ClassWithInternalProt: _InternalProt {
 }
-class FooClassPropertyOwnership : FooClassBase {
+class FooClassPropertyOwnership: FooClassBase {
   unowned(unsafe) var assignable: @sil_unmanaged AnyObject!
   unowned(unsafe) var unsafeAssignable: @sil_unmanaged AnyObject!
   var retainable: AnyObject!
@@ -233,7 +233,7 @@ class FooClassPropertyOwnership : FooClassBase {
   init!()
   convenience init!(float f: Float)
 }
-class FooClassWithClassProperties : FooClassBase {
+class FooClassWithClassProperties: FooClassBase {
   unowned(unsafe) class var assignable: @sil_unmanaged AnyObject!
   unowned(unsafe) class var unsafeAssignable: @sil_unmanaged AnyObject!
   class var retainable: AnyObject!
@@ -246,7 +246,7 @@ class FooClassWithClassProperties : FooClassBase {
 }
 @available(*, unavailable, message: "use 'nil' instead of this imported macro")
 var FOO_NIL: ()
-class FooUnavailableMembers : FooClassBase {
+class FooUnavailableMembers: FooClassBase {
   convenience init!(int i: Int32)
   @available(*, unavailable, message: "use object construction 'FooUnavailableMembers(int:)'")
   class func withInt(_ i: Int32) -> Self!
@@ -279,7 +279,7 @@ class FooCFType {
 }
 @available(*, unavailable, message: "Core Foundation objects are automatically memory managed")
 func FooCFTypeRelease(_: FooCFType!)
-class FooRepeatedMembers : FooClassBase {
+class FooRepeatedMembers: FooClassBase {
   func repeatedMethod()
   func anotherMethod()
   init!()
@@ -293,7 +293,7 @@ extension FooRepeatedMembers {
   var repeatedPropertyFromCategory: Int32
   func repeatedMethodFromCategory()
 }
-enum SCNFilterMode : Int {
+enum SCNFilterMode: Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
   case none
@@ -303,7 +303,7 @@ enum SCNFilterMode : Int {
   case SCNNoFiltering
 }
 func fooSubFunc1(_ a: Int32) -> Int32
-struct FooSubEnum1 : RawRepresentable, Equatable {
+struct FooSubEnum1: RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
   init(rawValue: UInt32)
   var rawValue: UInt32

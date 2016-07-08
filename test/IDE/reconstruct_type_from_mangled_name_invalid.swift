@@ -27,8 +27,8 @@ protocol P {
 // CHECK: decl: FAILURE for 'foo'
 }
 struct SP: P {
-// CHECK: decl: struct SP : P for 'SP'
+// CHECK: decl: struct SP: P for 'SP'
   typealias TT = Self.T
 // FIXME: should be the typealias decl
-// CHECK: decl: struct SP : P for 'TT' usr=s:V14swift_ide_test2SP2TT
+// CHECK: decl: struct SP: P for 'TT' usr=s:V14swift_ide_test2SP2TT
 }

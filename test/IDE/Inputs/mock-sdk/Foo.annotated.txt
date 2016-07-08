@@ -3,7 +3,7 @@
 
 
 <decl:Struct>/// Aaa.  FooEnum1.  Bbb.
-struct <loc>FooEnum1</loc> : <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
+struct <loc>FooEnum1</loc>: <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
   <decl:Constructor><loc>init(<decl:Param>_ rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
   <decl:Constructor><loc>init(<decl:Param>rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
   <decl:Var>var <loc>rawValue</loc>: <ref:Struct>UInt32</ref></decl>
@@ -11,14 +11,14 @@ struct <loc>FooEnum1</loc> : <ref:Protocol>RawRepresentable</ref>, <ref:Protocol
 
 <decl:Var>/// Aaa.  FooEnum1X.  Bbb.
 var <loc>FooEnum1X</loc>: <ref:Struct>FooEnum1</ref> { get }</decl>
-<decl:Struct>struct <loc>FooEnum2</loc> : <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
+<decl:Struct>struct <loc>FooEnum2</loc>: <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
   <decl:Constructor><loc>init(<decl:Param>_ rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
   <decl:Constructor><loc>init(<decl:Param>rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
   <decl:Var>var <loc>rawValue</loc>: <ref:Struct>UInt32</ref></decl>
 }</decl>
 <decl:Var>var <loc>FooEnum2X</loc>: <ref:Struct>FooEnum2</ref> { get }</decl>
 <decl:Var>var <loc>FooEnum2Y</loc>: <ref:Struct>FooEnum2</ref> { get }</decl>
-<decl:Struct>struct <loc>FooEnum3</loc> : <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
+<decl:Struct>struct <loc>FooEnum3</loc>: <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
   <decl:Constructor><loc>init(<decl:Param>_ rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
   <decl:Constructor><loc>init(<decl:Param>rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
   <decl:Var>var <loc>rawValue</loc>: <ref:Struct>UInt32</ref></decl>
@@ -27,7 +27,7 @@ var <loc>FooEnum1X</loc>: <ref:Struct>FooEnum1</ref> { get }</decl>
 <decl:Var>var <loc>FooEnum3Y</loc>: <ref:Struct>FooEnum3</ref> { get }</decl>
 
 <decl:Enum>/// Aaa.  FooComparisonResult.  Bbb.
-enum <loc>FooComparisonResult</loc> : <ref:Struct>Int</ref> {
+enum <loc>FooComparisonResult</loc>: <ref:Struct>Int</ref> {
   <decl:Constructor><loc>init?(<decl:Param>rawValue: <ref:Struct>Int</ref></decl>)</loc></decl>
   <decl:Var>var <loc>rawValue</loc>: <ref:Struct>Int</ref> { get }</decl>
   <decl:EnumElement>case <loc>orderedAscending</loc></decl>
@@ -36,7 +36,7 @@ enum <loc>FooComparisonResult</loc> : <ref:Struct>Int</ref> {
 }</decl>
 
 <decl:Struct>/// Aaa.  FooRuncingOptions.  Bbb.
-struct <loc>FooRuncingOptions</loc> : <ref:Protocol>OptionSet</ref> {
+struct <loc>FooRuncingOptions</loc>: <ref:Protocol>OptionSet</ref> {
   <decl:Constructor><loc>init(<decl:Param>rawValue: <ref:Struct>Int</ref></decl>)</loc></decl>
   <decl:Var>let <loc>rawValue</loc>: <ref:Struct>Int</ref></decl>
   <decl:Var>static var <loc>enableMince</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
@@ -136,7 +136,7 @@ protocol <loc>FooProtocolBase</loc> {
   <decl:Var>var <loc>fooProperty2</loc>: <ref:Struct>Int32</ref> { get set }</decl>
   <decl:Var>var <loc>fooProperty3</loc>: <ref:Struct>Int32</ref> { get }</decl>
 }</decl>
-<decl:Protocol>protocol <loc>FooProtocolDerived</loc> : <ref:Protocol>FooProtocolBase</ref> {
+<decl:Protocol>protocol <loc>FooProtocolDerived</loc>: <ref:Protocol>FooProtocolBase</ref> {
 }</decl>
 <decl:Class>class <loc>FooClassBase</loc> {
   <decl:Func>class func <loc>fooBaseInstanceFunc0()</loc></decl>
@@ -154,7 +154,7 @@ protocol <loc>FooProtocolBase</loc> {
 }</decl>
 
 <decl:Class>/// Aaa.  FooClassDerived.  Bbb.
-class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref> {
+class <loc>FooClassDerived</loc>: <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref> {
   <decl:Var>var <loc>fooProperty1</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Var>var <loc>fooProperty2</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Var>var <loc>fooProperty3</loc>: <ref:Struct>Int32</ref> { get }</decl>
@@ -220,9 +220,9 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
 }</decl>
 <decl:Protocol>protocol <loc>_InternalProt</loc> {
 }</decl>
-<decl:Class>class <loc>ClassWithInternalProt</loc> : <ref:Protocol>_InternalProt</ref> {
+<decl:Class>class <loc>ClassWithInternalProt</loc>: <ref:Protocol>_InternalProt</ref> {
 }</decl>
-<decl:Class>class <loc>FooClassPropertyOwnership</loc> : <ref:Class>FooClassBase</ref> {
+<decl:Class>class <loc>FooClassPropertyOwnership</loc>: <ref:Class>FooClassBase</ref> {
   <decl:Var>unowned(unsafe) var <loc>assignable</loc>: @sil_unmanaged <ref:Protocol>AnyObject</ref>!</decl>
   <decl:Var>unowned(unsafe) var <loc>unsafeAssignable</loc>: @sil_unmanaged <ref:Protocol>AnyObject</ref>!</decl>
   <decl:Var>var <loc>retainable</loc>: <ref:Protocol>AnyObject</ref>!</decl>
@@ -233,7 +233,7 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
   <decl:Constructor><loc>init!()</loc></decl>
   <decl:Constructor>convenience <loc>init!(<decl:Param>float f: <ref:Struct>Float</ref></decl>)</loc></decl>
 }</decl>
-<decl:Class>class <loc>FooClassWithClassProperties</loc> : <ref:Class>FooClassBase</ref> {
+<decl:Class>class <loc>FooClassWithClassProperties</loc>: <ref:Class>FooClassBase</ref> {
   <decl:Var>unowned(unsafe) class var <loc>assignable</loc>: @sil_unmanaged <ref:Protocol>AnyObject</ref>!</decl>
   <decl:Var>unowned(unsafe) class var <loc>unsafeAssignable</loc>: @sil_unmanaged <ref:Protocol>AnyObject</ref>!</decl>
   <decl:Var>class var <loc>retainable</loc>: <ref:Protocol>AnyObject</ref>!</decl>
@@ -246,7 +246,7 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
 }</decl>
 <decl:Var>@available(*, unavailable, message: "use 'nil' instead of this imported macro")
 var <loc>FOO_NIL</loc>: ()</decl>
-<decl:Class>class <loc>FooUnavailableMembers</loc> : <ref:Class>FooClassBase</ref> {
+<decl:Class>class <loc>FooUnavailableMembers</loc>: <ref:Class>FooClassBase</ref> {
   <decl:Constructor>convenience <loc>init!(<decl:Param>int i: <ref:Struct>Int32</ref></decl>)</loc></decl>
   <decl:Func>@available(*, unavailable, message: "use object construction 'FooUnavailableMembers(int:)'")
   class func <loc>withInt(<decl:Param>_ i: <ref:Struct>Int32</ref></decl>)</loc> -> <ref:Class>Self</ref>!</decl>
@@ -279,7 +279,7 @@ var <loc>FOO_NIL</loc>: ()</decl>
 }</decl>
 <decl:Func>@available(*, unavailable, message: "Core Foundation objects are automatically memory managed")
 func <loc>FooCFTypeRelease(<decl:Param>_: <ref:Class>FooCFType</ref>!</decl>)</loc></decl>
-<decl:Class>class <loc>FooRepeatedMembers</loc> : <ref:Class>FooClassBase</ref> {
+<decl:Class>class <loc>FooRepeatedMembers</loc>: <ref:Class>FooClassBase</ref> {
   <decl:Func>func <loc>repeatedMethod()</loc></decl>
   <decl:Func>func <loc>anotherMethod()</loc></decl>
   <decl:Constructor><loc>init!()</loc></decl>
@@ -293,7 +293,7 @@ func <loc>FooCFTypeRelease(<decl:Param>_: <ref:Class>FooCFType</ref>!</decl>)</l
   <decl:Var>var <loc>repeatedPropertyFromCategory</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Func>func <loc>repeatedMethodFromCategory()</loc></decl>
 }</decl>
-<decl:Enum>enum <loc>SCNFilterMode</loc> : <ref:Struct>Int</ref> {
+<decl:Enum>enum <loc>SCNFilterMode</loc>: <ref:Struct>Int</ref> {
   <decl:Constructor><loc>init?(<decl:Param>rawValue: <ref:Struct>Int</ref></decl>)</loc></decl>
   <decl:Var>var <loc>rawValue</loc>: <ref:Struct>Int</ref> { get }</decl>
   <decl:EnumElement>case <loc>none</loc></decl>

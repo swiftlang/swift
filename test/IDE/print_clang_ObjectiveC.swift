@@ -19,7 +19,7 @@
 // CHECK-WITH-FORWARD-DECLS-DAG: var description: String { get }
 // CHECK: {{^[}]$}}
 
-// CHECK-LABEL: class NSObject : NSObjectProtocol {
+// CHECK-LABEL: class NSObject: NSObjectProtocol {
 // CHECK-DAG: func copy() -> AnyObject
 // CHECK-DAG: class func hash() -> Int
 // CHECK-WITH-FORWARD-DECLS-DAG: class func description() -> String

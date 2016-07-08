@@ -366,7 +366,7 @@ void DictionaryTypeRepr::printImpl(ASTPrinter &Printer,
                                    const PrintOptions &Opts) const {
   Printer << "[";
   printTypeRepr(Key, Printer, Opts);
-  Printer << " : ";
+  Printer << ": ";
   printTypeRepr(Value, Printer, Opts);
   Printer << "]";
 }

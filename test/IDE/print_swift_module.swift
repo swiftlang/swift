@@ -17,7 +17,7 @@ public class C1 : P1 {
 	}
 }
 
-// CHECK1: 			public class C1 : P1 {
+// CHECK1: 			public class C1: P1 {
 // CHECK1-NEXT:		/// foo1 comment from P1
 // CHECK1-NEXT:  	public func foo1()
 // CHECK1-NEXT:  	/// foo2 comment from C1

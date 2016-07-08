@@ -2160,7 +2160,7 @@
     key.usr: "s:C8__main__5SubCC",
     key.offset: 764,
     key.length: 18,
-    key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>SubCC</decl.name> : <ref.class usr=\"s:C8__main__2CC\">CC</ref.class></decl.class>",
+    key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>SubCC</decl.name>: <ref.class usr=\"s:C8__main__2CC\">CC</ref.class></decl.class>",
     key.inherits: [
       {
         key.kind: source.lang.swift.ref.class,
@@ -2259,7 +2259,7 @@
     key.usr: "s:C8__main__5SubC2",
     key.offset: 1047,
     key.length: 65,
-    key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>SubC2</decl.name> : <ref.class usr=\"s:C8__main__3BC2\">BC2</ref.class>, <ref.protocol usr=\"s:P8__main__4Prot\">Prot</ref.protocol></decl.class>",
+    key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>SubC2</decl.name>: <ref.class usr=\"s:C8__main__3BC2\">BC2</ref.class>, <ref.protocol usr=\"s:P8__main__4Prot\">Prot</ref.protocol></decl.class>",
     key.inherits: [
       {
         key.kind: source.lang.swift.ref.class,
@@ -2458,7 +2458,7 @@
     key.usr: "s:C8__main__3SB1",
     key.offset: 1549,
     key.length: 86,
-    key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>SB1</decl.name> : <ref.class usr=\"s:C8__main__2B1\">B1</ref.class></decl.class>",
+    key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>SB1</decl.name>: <ref.class usr=\"s:C8__main__2B1\">B1</ref.class></decl.class>",
     key.inherits: [
       {
         key.kind: source.lang.swift.ref.class,
@@ -2568,7 +2568,7 @@
     key.usr: "s:V8__main__2S1",
     key.offset: 1813,
     key.length: 80,
-    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name> : <ref.protocol usr=\"s:P8__main__5Prot2\">Prot2</ref.protocol></decl.struct>",
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name>: <ref.protocol usr=\"s:P8__main__5Prot2\">Prot2</ref.protocol></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
@@ -2639,7 +2639,7 @@
     ],
     key.offset: 1896,
     key.length: 55,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>genfoo</decl.name>&lt;<decl.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\"><decl.generic_type_param.name>T</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr=\"s:P8__main__5Prot2\">Prot2</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\">T</ref.generic_type_param>.<ref.associatedtype usr=\"s:P8__main__5Prot27Element\">Element</ref.associatedtype> == <ref.struct usr=\"s:Si\">Int</ref.struct></decl.generic_type_requirement>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\">T</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>genfoo</decl.name>&lt;<decl.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\"><decl.generic_type_param.name>T</decl.generic_type_param.name>: <decl.generic_type_param.constraint><ref.protocol usr=\"s:P8__main__5Prot2\">Prot2</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\">T</ref.generic_type_param>.<ref.associatedtype usr=\"s:P8__main__5Prot27Element\">Element</ref.associatedtype> == <ref.struct usr=\"s:Si\">Int</ref.struct></decl.generic_type_requirement>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx\">T</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,

@@ -9,7 +9,7 @@
 @_exported import Foundation
 
 
-class Test : NSObject {
+class Test: NSObject {
   
   // "Factory methods" that we'd rather have as initializers.
   @available(*, unavailable, message: "superseded by import of -[NSObject init]")
@@ -43,7 +43,7 @@ class Test : NSObject {
   init()
 }
 
-class TestError : NSObject {
+class TestError: NSObject {
   // Factory methods with NSError.
   convenience init(error: ()) throws
   @available(*, unavailable, message: "use object construction 'TestError(error:)'")
@@ -76,7 +76,7 @@ class TestError : NSObject {
   init()
 }
 
-class TestSub : Test {
+class TestSub: Test {
   @available(*, unavailable, message: "superseded by import of -[NSObject init]")
   convenience init()
   convenience init(dummyParam: ())
@@ -86,7 +86,7 @@ class TestSub : Test {
   init()
 }
 
-class TestErrorSub : TestError {
+class TestErrorSub: TestError {
   convenience init(error: ()) throws
   convenience init(aa x: AnyObject?, error: ()) throws
   convenience init(aa x: AnyObject?, error: (), block: () -> Void) throws

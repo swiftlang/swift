@@ -1487,7 +1487,7 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
         Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
         Printer << std::get<0>(E);
         Printer << (RequirementReprKind::SameType == std::get<2>(E) ? " == " :
-                                                                      " : ");
+                                                                      ": ");
         Printer << std::get<1>(E);
         Printer.printStructurePost(PrintStructureKind::GenericRequirement);
       }
@@ -1514,7 +1514,7 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
     switch (req.getKind()) {
     case RequirementReprKind::TypeConstraint:
       printTypeLoc(req.getSubjectLoc());
-      Printer << " : ";
+      Printer << ": ";
       printTypeLoc(req.getConstraintLoc());
       break;
     case RequirementReprKind::SameType:
@@ -1974,7 +1974,7 @@ void PrintAST::printInherited(const Decl *decl,
     bool PrintedInherited = false;
 
     if (explicitClass) {
-      Printer << " : " << tok::kw_class;
+      Printer << ": " << tok::kw_class;
       PrintedInherited = true;
     } else if (superclass) {
       bool ShouldPrintSuper = true;
@@ -1982,7 +1982,7 @@ void PrintAST::printInherited(const Decl *decl,
         ShouldPrintSuper = shouldPrint(NTD);
       }
       if (ShouldPrintSuper) {
-        Printer << " : ";
+        Printer << ": ";
         superclass.print(Printer, Options);
         PrintedInherited = true;
       }
@@ -1991,7 +1991,7 @@ void PrintAST::printInherited(const Decl *decl,
     bool UseProtocolCompositionSyntax =
         PrintAsProtocolComposition && protos.size() > 1;
     if (UseProtocolCompositionSyntax) {
-      Printer << " : " << tok::kw_protocol << "<";
+      Printer << ": " << tok::kw_protocol << "<";
       PrintedColon = true;
     }
     for (auto Proto : protos) {
@@ -2015,7 +2015,7 @@ void PrintAST::printInherited(const Decl *decl,
       if (PrintedInherited)
         Printer << ", ";
       else if (!PrintedColon)
-        Printer << " : ";
+        Printer << ": ";
       Proto->getDeclaredType()->print(Printer, Options);
       PrintedInherited = true;
       PrintedColon = true;
@@ -2035,7 +2035,7 @@ void PrintAST::printInherited(const Decl *decl,
     if (TypesToPrint.empty())
       return;
 
-    Printer << " : ";
+    Printer << ": ";
 
     if (explicitClass)
       Printer << " " << tok::kw_class << ", ";
@@ -3553,7 +3553,7 @@ public:
       if (NT == Ctx.getDictionaryDecl()) {
         Printer << "[";
         visit(T->getGenericArgs()[0]);
-        Printer << " : ";
+        Printer << ": ";
         visit(T->getGenericArgs()[1]);
         Printer << "]";
         return;
@@ -3908,7 +3908,7 @@ public:
       switch (req.getKind()) {
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
-        Printer << " : ";
+        Printer << ": ";
         break;
 
       case RequirementKind::SameType:
@@ -4033,7 +4033,7 @@ public:
   void visitDictionaryType(DictionaryType *T) {
     Printer << "[";
     visit(T->getKeyType());
-    Printer << " : ";
+    Printer << ": ";
     visit(T->getValueType());
     Printer << "]";
   }

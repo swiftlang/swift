@@ -47,9 +47,9 @@
 // CHECK-NOT: _FileReferenceLiteralConvertible
 // CHECK-NOT: _ImageLiteralConvertible
 
-// CHECK-SUGAR: extension Array :
-// CHECK-SUGAR: extension ImplicitlyUnwrappedOptional :
-// CHECK-SUGAR: extension Optional :
+// CHECK-SUGAR: extension Array:
+// CHECK-SUGAR: extension ImplicitlyUnwrappedOptional:
+// CHECK-SUGAR: extension Optional:
 
 // CHECK-MUTATING-ATTR: mutating func
 

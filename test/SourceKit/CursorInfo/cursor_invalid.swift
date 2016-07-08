@@ -32,7 +32,7 @@ func resyncParser2() {}
 // RUN: %sourcekitd-test -req=cursor -pos=13:10 %s -- %s | FileCheck -check-prefix=CHECK2 %s
 // CHECK2: source.lang.swift.decl.class (13:9-13:20)
 // CHECK2: MyCoolClass
-// CHECK2: <Declaration>class MyCoolClass : Undeclared</Declaration>
+// CHECK2: <Declaration>class MyCoolClass: Undeclared</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=7:7 %s -- %s | FileCheck -check-prefix=CHECK3 %s
 // CHECK3: source.lang.swift.decl.var.instance (7:7-7:11)

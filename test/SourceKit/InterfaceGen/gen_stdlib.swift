@@ -8,7 +8,7 @@ var x: Int
 
 // Just check a small part, mainly to make sure we can print the interface of the stdlib.
 // CHECK-STDLIB-NOT: extension _SwiftNSOperatingSystemVersion
-// CHECK-STDLIB: struct Int : SignedInteger, Comparable, Equatable {
+// CHECK-STDLIB: struct Int: SignedInteger, Comparable, Equatable {
 // CHECK-STDLIB:   static var max: Int { get }
 // CHECK-STDLIB:   static var min: Int { get }
 // CHECK-STDLIB: }
@@ -37,7 +37,7 @@ var x: Int
 // CHECK1-NEXT: <Group>Math/Integers</Group>
 // CHECK1-NEXT: /<interface-gen>{{$}}
 // CHECK1-NEXT: SYSTEM
-// CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:Ps13SignedInteger">SignedInteger</Type>{{.*}}{{.*}}<Type usr="s:Ps10Comparable">Comparable</Type>{{.*}}<Type usr="s:Ps9Equatable">Equatable</Type>{{.*}}</Declaration>
+// CHECK1-NEXT: <Declaration>struct Int: <Type usr="s:Ps13SignedInteger">SignedInteger</Type>{{.*}}{{.*}}<Type usr="s:Ps10Comparable">Comparable</Type>{{.*}}<Type usr="s:Ps9Equatable">Equatable</Type>{{.*}}</Declaration>
 
 // RUN: %sourcekitd-test -req=module-groups -module Swift | FileCheck -check-prefix=GROUP1 %s
 // GROUP1: <GROUPS>
@@ -46,8 +46,8 @@ var x: Int
 
 // RUN: %sourcekitd-test -req=interface-gen -module Swift -group-name Bool > %t.Bool.response
 // RUN: FileCheck -check-prefix=CHECK-BOOL -input-file %t.Bool.response %s
-// CHECK-BOOL-DAG: extension Bool : Boolean {
-// CHECK-BOOL-DAG: extension Bool : BooleanLiteralConvertible {
+// CHECK-BOOL-DAG: extension Bool: Boolean {
+// CHECK-BOOL-DAG: extension Bool: BooleanLiteralConvertible {
 
 // These are not in the bool group:
 // CHECK-BOOL-NOT: Zip2Iterator

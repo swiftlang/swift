@@ -8,7 +8,7 @@
 
 // REQUIRES: objc_interop
 
-// PRINT: class UsesGenericClassA : NSObject {
+// PRINT: class UsesGenericClassA: NSObject {
 // PRINT:   func takeEnumValues(_ values: GenericClassA<NSString>)
 // PRINT:   func takeEnumValuesArray(_ values: [ClosedEnum])
 // PRINT: }

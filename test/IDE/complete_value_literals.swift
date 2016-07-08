@@ -182,7 +182,7 @@ func testDict1() {
 func testDict2() {
   let x: [MyInt1: MyString1] = #^DICT_2^#
 }
-// DICT_2: Literal[Dictionary]/None/TypeRelation[Identical]: [{#(key)#}: {#(value)#}][#[MyInt1 : MyString1]#];
+// DICT_2: Literal[Dictionary]/None/TypeRelation[Identical]: [{#(key)#}: {#(value)#}][#[MyInt1: MyString1]#];
 
 func testTuple0() {
   let x: Int = #^TUPLE_0^#

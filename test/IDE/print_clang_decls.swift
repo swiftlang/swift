@@ -85,11 +85,11 @@
 // NEGATIVE-NOT: typealias FooStructTypedef2
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}class NSArray : NSObject {{{$}}
+// FOUNDATION-NEXT: {{^}}class NSArray: NSObject {{{$}}
 // FOUNDATION-NEXT: subscript(idx: Int) -> AnyObject { get }
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}enum RuncingMode : UInt {{{$}}
+// FOUNDATION-NEXT: {{^}}enum RuncingMode: UInt {{{$}}
 // FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  case mince{{$}}
@@ -97,7 +97,7 @@
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}struct RuncingOptions : OptionSet {{{$}}
+// FOUNDATION-NEXT: {{^}}struct RuncingOptions: OptionSet {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  @available(*, unavailable, message: "use [] to construct an empty option set"){{$}}

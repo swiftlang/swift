@@ -31,7 +31,7 @@ public class FooOverlayClassDerived : FooOverlayClassBase {
 // declarations from both of them.
 
 // PASS_WITH_OVERLAY-LABEL: {{^}}class FooClassBase {
-// PASS_WITH_OVERLAY-LABEL: {{^}}class FooOverlayClassDerived : FooOverlayClassBase {
+// PASS_WITH_OVERLAY-LABEL: {{^}}class FooOverlayClassDerived: FooOverlayClassBase {
 // PASS_WITH_OVERLAY-NEXT:  {{^}}  override func f()
 // PASS_WITH_OVERLAY: {{^}}func overlay_func(){{$}}
 

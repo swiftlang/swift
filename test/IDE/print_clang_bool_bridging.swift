@@ -54,7 +54,7 @@ var globalCBoolBlock: @convention(block) (Bool) -> Bool
 var globalObjCBoolBlock: @convention(block) (ObjCBool) -> ObjCBool
 var globalDarwinBooleanBlock: @convention(block) (DarwinBoolean) -> DarwinBoolean
 
-class Test : NSObject {
+class Test: NSObject {
   var propCBool: Bool
   var propObjCBool: Bool
   var propDarwinBoolean: Bool

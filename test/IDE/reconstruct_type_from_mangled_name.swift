@@ -49,7 +49,7 @@ func f1() {
 
   if let ifletf1 = Int?(1) {
 // FIXME: lookup incorrect for if let binding.
-// CHECK: decl: struct Int : {{.*}} for 'ifletf1' usr=s:vF14swift_ide_test2f1FT_T_L_7ifletf1Si
+// CHECK: decl: struct Int: {{.*}} for 'ifletf1' usr=s:vF14swift_ide_test2f1FT_T_L_7ifletf1Si
   }
 }
 
@@ -87,7 +87,7 @@ class Myclass2 {
 }
 
 struct MyGenStruct1<T, U: StringLiteralConvertible, V: Sequence> {
-// CHECK: decl: struct MyGenStruct1<T, U : StringLiteralConvertible, V : Sequence>
+// CHECK: decl: struct MyGenStruct1<T, U: StringLiteralConvertible, V: Sequence>
 // FIXME: why are these references to the base type?
 // CHECK: decl: struct MyGenStruct1<{{.*}}> for 'T' usr=s:tV14swift_ide_test12MyGenStruct11TMx
 // CHECK: decl: struct MyGenStruct1<{{.*}}> for 'U' usr=s:tV14swift_ide_test12MyGenStruct11UMq_
@@ -119,7 +119,7 @@ func test001() {
 // CHECK: type: MyGenStruct1<Int, String, Array<Float>>
 
   var genstruct2: MyGenStruct1<Int, String, [Int: Int]>
-// CHECK: decl: var genstruct2: MyGenStruct1<Int, String, [Int : Int]>
+// CHECK: decl: var genstruct2: MyGenStruct1<Int, String, [Int: Int]>
   _ = genstruct2
 // CHECK: type: MyGenStruct1<Int, String, Dictionary<Int, Int>>
   _ = genstruct2.x

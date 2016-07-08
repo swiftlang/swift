@@ -42,10 +42,10 @@
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSPotentiallyUnavailableOptions.  Bbb.
 // FOUNDATION-NEXT: {{^}}@available(OSX 10.51, *){{$}}
-// FOUNDATION-NEXT: {{^}}struct PotentiallyUnavailableOptions : OptionSet {{{$}}
+// FOUNDATION-NEXT: {{^}}struct PotentiallyUnavailableOptions: OptionSet {{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSOptionsWithUnavailableElement.  Bbb.
-// FOUNDATION-NEXT: {{^}}struct OptionsWithUnavailableElement : OptionSet {{{$}}
+// FOUNDATION-NEXT: {{^}}struct OptionsWithUnavailableElement: OptionSet {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  static var first: OptionsWithUnavailableElement { get }{{$}}
@@ -55,10 +55,10 @@
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSUnavailableEnum.  Bbb.
 // FOUNDATION-NEXT: {{^}}@available(OSX 10.51, *){{$}}
-// FOUNDATION-NEXT: {{^}}enum UnavailableEnum : UInt {{{$}}
+// FOUNDATION-NEXT: {{^}}enum UnavailableEnum: UInt {{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSEnumWithUnavailableElement.  Bbb.
-// FOUNDATION-NEXT: {{^}}enum EnumWithUnavailableElement : UInt {{{$}}
+// FOUNDATION-NEXT: {{^}}enum EnumWithUnavailableElement: UInt {{{$}}
 // FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  case first{{$}}
@@ -90,7 +90,7 @@
 // FOUNDATION-NEXT: {{^}}  func returnSomething() -> AnnotatedFrameworkClass?{{$}}
 
 // FOUNDATION-LABEL: /// Aaa.  FrameworkClassConformingToUnannotatedFrameworkProtocol.  Bbb.
-// FOUNDATION-NEXT: {{^}}class FrameworkClassConformingToUnannotatedFrameworkProtocol : NSObject, UnannotatedFrameworkProtocol {{{$}}
+// FOUNDATION-NEXT: {{^}}class FrameworkClassConformingToUnannotatedFrameworkProtocol: NSObject, UnannotatedFrameworkProtocol {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(){{$}}
 // FOUNDATION-NEXT: {{^}}  @available(OSX 10.51, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomething(with k: AnnotatedFrameworkClass?){{$}}
@@ -110,7 +110,7 @@
 
 // FOUNDATION-LABEL: /// Aaa.  LaterFrameworkClassConformingToUnannotatedFrameworkProtocol.  Bbb.
 // FOUNDATION-NEXT: {{^}}@available(OSX 10.52, *){{$}}
-// FOUNDATION-NEXT: {{^}}class LaterFrameworkClassConformingToUnannotatedFrameworkProtocol : NSObject, UnannotatedFrameworkProtocol {{{$}}
+// FOUNDATION-NEXT: {{^}}class LaterFrameworkClassConformingToUnannotatedFrameworkProtocol: NSObject, UnannotatedFrameworkProtocol {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(){{$}}
 // FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomething(with k: AnnotatedFrameworkClass?){{$}}
@@ -131,7 +131,7 @@
 }
 
 // FOUNDATION-LABEL: /// Aaa.  FrameworkClassConformingToLaterAnnotatedFrameworkProtocol.  Bbb.
-// FOUNDATION-NEXT: {{^}}class FrameworkClassConformingToLaterAnnotatedFrameworkProtocol : NSObject, LaterAnnotatedFrameworkProtocol {
+// FOUNDATION-NEXT: {{^}}class FrameworkClassConformingToLaterAnnotatedFrameworkProtocol: NSObject, LaterAnnotatedFrameworkProtocol {
 // FOUNDATION-NEXT: {{^}}  init()
 // FOUNDATION-NEXT: {{^}}  @available(OSX 10.52, *)
 // FOUNDATION-NEXT: {{^}}  func returnSomething() -> AnnotatedFrameworkClass?

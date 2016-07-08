@@ -15,7 +15,7 @@ public class FooOverlayClassBase {
     internal var Range: Int
 }
 
-public class FooOverlayClassDerived : FooOverlayClassBase {
+public class FooOverlayClassDerived: FooOverlayClassBase {
 
     override public func f()
 }
@@ -161,167 +161,167 @@ internal enum Colors {
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 292,
+    key.offset: 291,
     key.length: 19
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 319,
+    key.offset: 318,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 328,
+    key.offset: 327,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 335,
+    key.offset: 334,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 340,
+    key.offset: 339,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 348,
+    key.offset: 347,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 357,
+    key.offset: 356,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 363,
+    key.offset: 362,
     key.length: 20
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 389,
+    key.offset: 388,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 398,
+    key.offset: 397,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 404,
+    key.offset: 403,
     key.length: 22
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 432,
+    key.offset: 431,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 441,
+    key.offset: 440,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 447,
+    key.offset: 446,
     key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 473,
+    key.offset: 472,
     key.length: 22
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 499,
+    key.offset: 498,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 508,
+    key.offset: 507,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 512,
+    key.offset: 511,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 518,
+    key.offset: 517,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 527,
+    key.offset: 526,
     key.length: 19
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 550,
+    key.offset: 549,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 559,
+    key.offset: 558,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 564,
+    key.offset: 563,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 568,
+    key.offset: 567,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 574,
+    key.offset: 573,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 579,
+    key.offset: 578,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 587,
+    key.offset: 586,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 596,
+    key.offset: 595,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 601,
+    key.offset: 600,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 615,
+    key.offset: 614,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 620,
+    key.offset: 619,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 629,
+    key.offset: 628,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 634,
+    key.offset: 633,
     key.length: 4
   }
 ]
@@ -344,24 +344,24 @@ internal enum Colors {
   },
   {
     key.kind: source.lang.swift.ref.class,
-    key.offset: 292,
+    key.offset: 291,
     key.length: 19
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 518,
+    key.offset: 517,
     key.length: 3,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 574,
+    key.offset: 573,
     key.length: 3,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 579,
+    key.offset: 578,
     key.length: 3,
     key.is_system: 1
   }
@@ -418,11 +418,11 @@ internal enum Colors {
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "FooOverlayClassDerived",
     key.offset: 261,
-    key.length: 84,
+    key.length: 83,
     key.runtime_name: "_TtC4main22FooOverlayClassDerived",
     key.nameoffset: 267,
     key.namelength: 22,
-    key.bodyoffset: 313,
+    key.bodyoffset: 312,
     key.bodylength: 31,
     key.inheritedtypes: [
       {
@@ -432,7 +432,7 @@ internal enum Colors {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 292,
+        key.offset: 291,
         key.length: 19
       }
     ],
@@ -441,9 +441,9 @@ internal enum Colors {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "f()",
-        key.offset: 335,
+        key.offset: 334,
         key.length: 8,
-        key.nameoffset: 340,
+        key.nameoffset: 339,
         key.namelength: 3,
         key.attributes: [
           {
@@ -457,36 +457,36 @@ internal enum Colors {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "InternalClassVisible",
-    key.offset: 357,
+    key.offset: 356,
     key.length: 30,
     key.runtime_name: "_TtC4main20InternalClassVisible",
-    key.nameoffset: 363,
+    key.nameoffset: 362,
     key.namelength: 20,
-    key.bodyoffset: 385,
+    key.bodyoffset: 384,
     key.bodylength: 1
   },
   {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "IgnoreBigWhiteSpaceGap",
-    key.offset: 398,
+    key.offset: 397,
     key.length: 32,
     key.runtime_name: "_TtC4main22IgnoreBigWhiteSpaceGap",
-    key.nameoffset: 404,
+    key.nameoffset: 403,
     key.namelength: 22,
-    key.bodyoffset: 428,
+    key.bodyoffset: 427,
     key.bodylength: 1
   },
   {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "PropWithDocComment",
-    key.offset: 441,
+    key.offset: 440,
     key.length: 144,
     key.runtime_name: "_TtC4main18PropWithDocComment",
-    key.nameoffset: 447,
+    key.nameoffset: 446,
     key.namelength: 18,
-    key.bodyoffset: 467,
+    key.bodyoffset: 466,
     key.bodylength: 117,
     key.substructure: [
       {
@@ -494,10 +494,10 @@ internal enum Colors {
         key.accessibility: source.lang.swift.accessibility.internal,
         key.setter_accessibility: source.lang.swift.accessibility.internal,
         key.name: "prop",
-        key.offset: 508,
+        key.offset: 507,
         key.length: 13,
         key.typename: "Int",
-        key.nameoffset: 512,
+        key.nameoffset: 511,
         key.namelength: 4
       },
       {
@@ -505,10 +505,10 @@ internal enum Colors {
         key.accessibility: source.lang.swift.accessibility.internal,
         key.setter_accessibility: source.lang.swift.accessibility.internal,
         key.name: "p1",
-        key.offset: 559,
+        key.offset: 558,
         key.length: 24,
         key.typename: "(Int, Int)",
-        key.nameoffset: 564,
+        key.nameoffset: 563,
         key.namelength: 2
       }
     ]
@@ -517,16 +517,16 @@ internal enum Colors {
     key.kind: source.lang.swift.decl.enum,
     key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "Colors",
-    key.offset: 596,
+    key.offset: 595,
     key.length: 44,
-    key.nameoffset: 601,
+    key.nameoffset: 600,
     key.namelength: 6,
-    key.bodyoffset: 609,
+    key.bodyoffset: 608,
     key.bodylength: 30,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.enumcase,
-        key.offset: 615,
+        key.offset: 614,
         key.length: 8,
         key.nameoffset: 0,
         key.namelength: 0,
@@ -535,16 +535,16 @@ internal enum Colors {
             key.kind: source.lang.swift.decl.enumelement,
             key.accessibility: source.lang.swift.accessibility.internal,
             key.name: "Red",
-            key.offset: 620,
+            key.offset: 619,
             key.length: 3,
-            key.nameoffset: 620,
+            key.nameoffset: 619,
             key.namelength: 3
           }
         ]
       },
       {
         key.kind: source.lang.swift.decl.enumcase,
-        key.offset: 629,
+        key.offset: 628,
         key.length: 9,
         key.nameoffset: 0,
         key.namelength: 0,
@@ -553,9 +553,9 @@ internal enum Colors {
             key.kind: source.lang.swift.decl.enumelement,
             key.accessibility: source.lang.swift.accessibility.internal,
             key.name: "Blue",
-            key.offset: 634,
+            key.offset: 633,
             key.length: 4,
-            key.nameoffset: 634,
+            key.nameoffset: 633,
             key.namelength: 4
           }
         ]

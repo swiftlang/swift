@@ -84,7 +84,7 @@
 // CHECK-FOUNDATION: class func withString(_: String!) -> Self!
 
 // Note: lowercasing enum constants.
-// CHECK-FOUNDATION: enum CountStyle : Int {
+// CHECK-FOUNDATION: enum CountStyle: Int {
 // CHECK-FOUNDATION: case file
 // CHECK-FOUNDATION-NEXT: case memory
 // CHECK-FOUNDATION-NEXT: case decimal
@@ -207,7 +207,7 @@
 // CHECK-APPKIT: func drawInAir(at: Point3D)
 
 // Note: with<something> -> <something>
-// CHECK-APPKIT: func draw(at: Point3D, withAttributes: [String : AnyObject]? = [:])
+// CHECK-APPKIT: func draw(at: Point3D, withAttributes: [String: AnyObject]? = [:])
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
 // CHECK-APPKIT: func setTextColor(_: NSColor?)
@@ -216,8 +216,8 @@
 // CHECK-APPKIT: func draw(in: NSView?)
 
 // Note: NSDictionary default arguments for "options"
-// CHECK-APPKIT: func drawAnywhere(in: NSView?, options: [NSObject : AnyObject] = [:])
-// CHECK-APPKIT: func drawAnywhere(options: [NSObject : AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(in: NSView?, options: [NSObject: AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(options: [NSObject: AnyObject] = [:])
 
 // Note: no lowercasing of initialisms when there might be a prefix.
 // CHECK-CORECOOLING: func CFBottom() ->

@@ -15,7 +15,7 @@
 // CHECK_NSARRAY: convenience init?(contentsOf url: URL)
 
 
-// CHECK_NSARRAY: class NSMutableArray : NSArray
+// CHECK_NSARRAY: class NSMutableArray: NSArray
 // CHECK_NSARRAY:   func setArray(_ otherArray: [AnyObject])
 
 // RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSKeyValueCoding -function-definitions=false -print-regular-comments > %t/Foundation.NSKeyValueCoding.printed.txt
@@ -30,7 +30,7 @@
 // Make sure that we don't qualify 'NSErrorPointer'.
 // CHECK_NSSTRING: init(contentsOfFile path: String, encoding enc: UInt) throws
 
-// CHECK_DICTIONARY: func propertyListFromStringsFileFormat() -> [NSObject : AnyObject]
+// CHECK_DICTIONARY: func propertyListFromStringsFileFormat() -> [NSObject: AnyObject]
 
 // RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation -function-definitions=false > %t/Foundation.printed.txt
 // RUN: FileCheck -input-file %t/Foundation.printed.txt -check-prefix=CHECK_DUP %s

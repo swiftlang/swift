@@ -2,10 +2,10 @@
 
 // RUN: FileCheck %s -check-prefix=PRINT-PROTO -strict-whitespace < %t.printed.Proto.txt
 
-// PRINT-PROTO-LABEL: protocol ImportedProtocolBase : NSObjectProtocol {
+// PRINT-PROTO-LABEL: protocol ImportedProtocolBase: NSObjectProtocol {
 // PRINT-PROTO-NEXT:  }
 // PRINT-PROTO-NEXT:  typealias ImportedProtocolBase_t = ImportedProtocolBase
-// PRINT-PROTO-NEXT:  protocol IAMProto : ImportedProtocolBase {
+// PRINT-PROTO-NEXT:  protocol IAMProto: ImportedProtocolBase {
 // PRINT-PROTO-NEXT:  }
 // PRINT-PROTO-NEXT:  typealias IAMProto_t = IAMProto
 // PRINT-PROTO-NEXT:  extension IAMProto {
@@ -19,13 +19,13 @@
 
 // RUN: FileCheck %s -check-prefix=PRINT-CLASS -strict-whitespace < %t.printed.Class.txt
 
-// PRINT-CLASS-LABEL: class SomeClass : NSObject {
+// PRINT-CLASS-LABEL: class SomeClass: NSObject {
 // PRINT-CLASS-NEXT:   init()
 // PRINT-CLASS-NEXT: }
 // PRINT-CLASS-NEXT: extension SomeClass {
 // PRINT-CLASS-NEXT:   /*not inherited*/ init(value x: Double)
 // PRINT-CLASS-NEXT:   func applyOptions(_ options: SomeClass.Options)
-// PRINT-CLASS-NEXT:   struct Options : OptionSet {
+// PRINT-CLASS-NEXT:   struct Options: OptionSet {
 // PRINT-CLASS-NEXT:     init(rawValue rawValue: Int)
 // PRINT-CLASS-NEXT:     let rawValue: Int
 // PRINT-CLASS-NEXT:     static var fuzzyDice: SomeClass.Options { get }
@@ -45,7 +45,7 @@ import IAMError
 ErrorStruct.hasPrototype();
 
 // Protocols
-@objc class Foo : NSObject, IAMProto {}
+@objc class Foo: NSObject, IAMProto {}
 
 struct Bar : IAMProto {}
   // expected-error@-1{{non-class type 'Bar' cannot conform to class protocol 'IAMProto'}}

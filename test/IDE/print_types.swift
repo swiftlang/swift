@@ -19,7 +19,7 @@ func testVariableTypes(_ param: Int, param2: inout Double) {
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
   a1 = 17; _ = a1
 
-  
+
   var a2 : Int = 42
 // CHECK: VarDecl '''a2''' Int{{$}}
 // CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
@@ -110,8 +110,8 @@ protocol QuxProtocol { associatedtype Qux }
 struct GenericStruct<A, B : FooProtocol> {}
 
 func testInGenericFunc1<A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>>(_ a: A, b: B, c: C) {
-// CHECK: FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, b: B, c: C) -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, b: B, c: C) -> (){{$}}
+// CHECK: FuncDecl '''testInGenericFunc1''' <A, B: FooProtocol, C: protocol<FooProtocol, BarProtocol>> (A, b: B, c: C) -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc1''' <A, B: FooProtocol, C: protocol<FooProtocol, BarProtocol>> (A, b: B, c: C) -> (){{$}}
 
   var a1 = a
   _ = a1; a1 = a
@@ -135,6 +135,6 @@ func testInGenericFunc1<A, B : FooProtocol, C : protocol<FooProtocol, BarProtoco
 }
 
 func testInGenericFunc2<T : QuxProtocol, U : QuxProtocol where T.Qux == U.Qux>() {}
-// CHECK: FuncDecl '''testInGenericFunc2''' <T : QuxProtocol, U : QuxProtocol where T.Qux == U.Qux> () -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc2''' <T : QuxProtocol, U : QuxProtocol where T.Qux == U.Qux> () -> (){{$}}
+// CHECK: FuncDecl '''testInGenericFunc2''' <T: QuxProtocol, U: QuxProtocol where T.Qux == U.Qux> () -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc2''' <T: QuxProtocol, U: QuxProtocol where T.Qux == U.Qux> () -> (){{$}}
 
