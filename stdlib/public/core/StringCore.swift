@@ -623,8 +623,8 @@ extension _StringCore : RangeReplaceableCollection {
       let tailStart = rangeStart + (replacedCount << elementShift)
 
       if growth > 0 {
-        (tailStart + (growth << elementShift)).assignBackwardFrom(
-          tailStart, count: tailCount << elementShift)
+        (tailStart + (growth << elementShift)).assign(
+          from: tailStart, count: tailCount << elementShift)
       }
 
       if _fastPath(elementWidth == 1) {
@@ -643,8 +643,8 @@ extension _StringCore : RangeReplaceableCollection {
       }
 
       if growth < 0 {
-        (tailStart + (growth << elementShift)).assignFrom(
-          tailStart, count: tailCount << elementShift)
+        (tailStart + (growth << elementShift)).assign(
+          from: tailStart, count: tailCount << elementShift)
       }
     }
     else {
