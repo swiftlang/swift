@@ -307,6 +307,13 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         _handle = _MutablePairHandle(NSIndexSet(indexesIn: _toNSRange(range)), copying: false)
     }
     
+    /// Initialize an `IndexSet` with a range of integers.
+    public init(integersIn range: ClosedRange<Element>) { self.init(integersIn: Range(range)) }
+    /// Initialize an `IndexSet` with a range of integers.
+    public init(integersIn range: CountableClosedRange<Element>) { self.init(integersIn: Range(range)) }
+    /// Initialize an `IndexSet` with a range of integers.
+    public init(integersIn range: CountableRange<Element>) { self.init(integersIn: Range(range)) }
+    
     /// Initialize an `IndexSet` with a single integer.
     public init(integer: Element) {
         _handle = _MutablePairHandle(NSIndexSet(index: integer), copying: false)
@@ -329,13 +336,34 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     public func makeIterator() -> IndexingIterator<IndexSet> {
         return IndexingIterator(_elements: self)
     }
+
+    /// Returns a `Range`-based view of the entire contents of `self`.
+    ///
+    /// - seealso: rangeView(of:)
+    public var rangeView : RangeView {
+        return RangeView(indexSet: self, intersecting: nil)
+    }
+
+    /// Returns a `Range`-based view of `self`.
+    ///
+    /// - parameter range: A subrange of `self` to view.
+    public func rangeView(of range : Range<Element>) -> RangeView {
+        return RangeView(indexSet: self, intersecting: range)
+    }
     
     /// Returns a `Range`-based view of `self`.
     ///
-    /// - parameter range: A subrange of `self` to view. The default value is `nil`, which means that the entire `IndexSet` is used.
-    public func rangeView(of range : Range<Element>? = nil) -> RangeView {
-        return RangeView(indexSet: self, intersecting: range)
-    }
+    /// - parameter range: A subrange of `self` to view.
+    public func rangeView(of range : ClosedRange<Element>) -> RangeView { return self.rangeView(of: Range(range)) }
+    /// Returns a `Range`-based view of `self`.
+    ///
+    /// - parameter range: A subrange of `self` to view.
+    public func rangeView(of range : CountableClosedRange<Element>) -> RangeView { return self.rangeView(of: Range(range)) }
+    /// Returns a `Range`-based view of `self`.
+    ///
+    /// - parameter range: A subrange of `self` to view.
+    public func rangeView(of range : CountableRange<Element>) -> RangeView { return self.rangeView(of: Range(range)) }
+
     
     private func _indexOfRange(containing integer : Element) -> RangeView.Index? {
         let result = _handle.map { 
@@ -440,12 +468,39 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         let resultLast = Index(indexSet: self, index: integerLessThanOrEqualTo(range.upperBound - 1))
         return resultFirst..<resultLast.successor()
     }
+    
+    /// Return a `Range<IndexSet.Index>` which can be used to subscript the index set.
+    ///
+    /// The resulting range is the range of the intersection of the integers in `range` with the index set.
+    ///
+    /// - parameter range: The range of integers to include.
+    public func indexRange(in range: CountableRange<Element>) -> Range<Index> { return self.indexRange(in: Range(range)) }
+    /// Return a `Range<IndexSet.Index>` which can be used to subscript the index set.
+    ///
+    /// The resulting range is the range of the intersection of the integers in `range` with the index set.
+    ///
+    /// - parameter range: The range of integers to include.
+    public func indexRange(in range: ClosedRange<Element>) -> Range<Index> { return self.indexRange(in: Range(range)) }
+    /// Return a `Range<IndexSet.Index>` which can be used to subscript the index set.
+    ///
+    /// The resulting range is the range of the intersection of the integers in `range` with the index set.
+    ///
+    /// - parameter range: The range of integers to include.
+    public func indexRange(in range: CountableClosedRange<Element>) -> Range<Index> { return self.indexRange(in: Range(range)) }
+
 
     /// Returns the count of integers in `self` that intersect `range`.
     public func count(in range: Range<Element>) -> Int {
         return _handle.map { $0.countOfIndexes(in: _toNSRange(range)) }
     }
-    
+
+    /// Returns the count of integers in `self` that intersect `range`.
+    public func count(in range: CountableRange<Element>) -> Int { return self.count(in: Range(range)) }
+    /// Returns the count of integers in `self` that intersect `range`.
+    public func count(in range: ClosedRange<Element>) -> Int { return self.count(in: Range(range)) }
+    /// Returns the count of integers in `self` that intersect `range`.
+    public func count(in range: CountableClosedRange<Element>) -> Int { return self.count(in: Range(range)) }
+
     /// Returns `true` if `self` contains `integer`.
     public func contains(_ integer: Element) -> Bool {
         return _handle.map { $0.contains(integer) }
@@ -455,6 +510,14 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     public func contains(integersIn range: Range<Element>) -> Bool {
         return _handle.map { $0.contains(in: _toNSRange(range)) }
     }
+
+    /// Returns `true` if `self` contains all of the integers in `range`.
+    public func contains(integersIn range: CountableRange<Element>) -> Bool { return self.contains(integersIn: Range(range)) }
+    /// Returns `true` if `self` contains all of the integers in `range`.
+    public func contains(integersIn range: ClosedRange<Element>) -> Bool { return self.contains(integersIn: Range(range)) }
+    /// Returns `true` if `self` contains all of the integers in `range`.
+    public func contains(integersIn range: CountableClosedRange<Element>) -> Bool { return self.contains(integersIn: Range(range)) }
+
     
     /// Returns `true` if `self` contains any of the integers in `indexSet`.
     public func contains(integersIn indexSet: IndexSet) -> Bool {
@@ -465,7 +528,14 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     public func intersects(integersIn range: Range<Element>) -> Bool {
         return _handle.map { $0.intersects(in: _toNSRange(range)) }
     }
-    
+
+    /// Returns `true` if `self` intersects any of the integers in `range`.
+    public func intersects(integersIn range: CountableRange<Element>) -> Bool { return self.intersects(integersIn: Range(range)) }
+    /// Returns `true` if `self` intersects any of the integers in `range`.
+    public func intersects(integersIn range: ClosedRange<Element>) -> Bool { return self.intersects(integersIn: Range(range)) }
+    /// Returns `true` if `self` intersects any of the integers in `range`.
+    public func intersects(integersIn range: CountableClosedRange<Element>) -> Bool { return self.intersects(integersIn: Range(range)) }
+
     // MARK: -
     // Indexable
     
@@ -498,11 +568,11 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         // This algorithm is naïve but it works. We could avoid calling insert in some cases.
         
         var result = IndexSet()
-        for r in self.rangeView() {
+        for r in self.rangeView {
             result.insert(integersIn: Range(r))
         }
         
-        for r in other.rangeView() {
+        for r in other.rangeView {
             result.insert(integersIn: Range(r))
         }
         return result
@@ -610,12 +680,26 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     public mutating func insert(integersIn range: Range<Element>) {
         _applyMutation { $0.add(in: _toNSRange(range)) }
     }
-    
+
+    /// Insert a range of integers into the `IndexSet`.
+    public mutating func insert(integersIn range: CountableRange<Element>) { self.insert(integersIn: Range(range)) }
+    /// Insert a range of integers into the `IndexSet`.
+    public mutating func insert(integersIn range: ClosedRange<Element>) { self.insert(integersIn: Range(range)) }
+    /// Insert a range of integers into the `IndexSet`.
+    public mutating func insert(integersIn range: CountableClosedRange<Element>) { self.insert(integersIn: Range(range)) }
+
     /// Remove a range of integers from the `IndexSet`.
     public mutating func remove(integersIn range: Range<Element>) {
         _applyMutation { $0.remove(in: _toNSRange(range)) }
     }
     
+    /// Remove a range of integers from the `IndexSet`.
+    public mutating func remove(integersIn range: CountableRange<Element>) { self.remove(integersIn: Range(range)) }
+    /// Remove a range of integers from the `IndexSet`.
+    public mutating func remove(integersIn range: ClosedRange<Element>) { self.remove(integersIn: Range(range)) }
+    /// Remove a range of integers from the `IndexSet`.
+    public mutating func remove(integersIn range: CountableClosedRange<Element>) { self.remove(integersIn: Range(range)) }
+
     /// Returns `true` if self contains no values.
     public var isEmpty : Bool {
         return self.count == 0
@@ -623,10 +707,10 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     
     /// Returns an IndexSet filtered according to the result of `includeInteger`.
     ///
-    /// - parameter range: A range of integers. For each integer in the range that intersects the integers in the IndexSet, then the `includeInteger predicate will be invoked. Pass `nil` (the default) to use the entire range.
+    /// - parameter range: A range of integers. For each integer in the range that intersects the integers in the IndexSet, then the `includeInteger` predicate will be invoked.
     /// - parameter includeInteger: The predicate which decides if an integer will be included in the result or not.
-    public func filteredIndexSet(in range : Range<Element>? = nil, includeInteger: @noescape (Element) throws -> Bool) rethrows -> IndexSet {
-        let r : NSRange = range != nil ? _toNSRange(range!) : NSMakeRange(0, NSNotFound - 1) 
+    public func filteredIndexSet(in range : Range<Element>, includeInteger: @noescape (Element) throws -> Bool) rethrows -> IndexSet {
+        let r : NSRange = _toNSRange(range)
         return try _handle.map {
             var error : ErrorProtocol? = nil
             let result = $0.indexes(in: r, options: [], passingTest: { (i, stop) -> Bool in
@@ -647,6 +731,29 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         }
     }
     
+    /// Returns an IndexSet filtered according to the result of `includeInteger`.
+    ///
+    /// - parameter range: A range of integers. For each integer in the range that intersects the integers in the IndexSet, then the `includeInteger` predicate will be invoked.
+    /// - parameter includeInteger: The predicate which decides if an integer will be included in the result or not.
+    public func filteredIndexSet(in range : CountableRange<Element>, includeInteger: @noescape (Element) throws -> Bool) rethrows -> IndexSet { return try self.filteredIndexSet(in: Range(range), includeInteger: includeInteger) }
+    /// Returns an IndexSet filtered according to the result of `includeInteger`.
+    ///
+    /// - parameter range: A range of integers. For each integer in the range that intersects the integers in the IndexSet, then the `includeInteger` predicate will be invoked.
+    /// - parameter includeInteger: The predicate which decides if an integer will be included in the result or not.
+    public func filteredIndexSet(in range : ClosedRange<Element>, includeInteger: @noescape (Element) throws -> Bool) rethrows -> IndexSet { return try self.filteredIndexSet(in: Range(range), includeInteger: includeInteger) }
+    /// Returns an IndexSet filtered according to the result of `includeInteger`.
+    ///
+    /// - parameter range: A range of integers. For each integer in the range that intersects the integers in the IndexSet, then the `includeInteger` predicate will be invoked.
+    /// - parameter includeInteger: The predicate which decides if an integer will be included in the result or not.
+    public func filteredIndexSet(in range : CountableClosedRange<Element>, includeInteger: @noescape (Element) throws -> Bool) rethrows -> IndexSet { return try self.filteredIndexSet(in: Range(range), includeInteger: includeInteger) }
+    
+    /// Returns an IndexSet filtered according to the result of `includeInteger`.
+    ///
+    /// - parameter includeInteger: The predicate which decides if an integer will be included in the result or not.
+    public func filteredIndexSet(includeInteger: @noescape (Element) throws -> Bool) rethrows -> IndexSet {
+        return try self.filteredIndexSet(in: 0..<NSNotFound-1, includeInteger: includeInteger)
+    }
+
     /// For a positive delta, shifts the indexes in [index, INT_MAX] to the right, thereby inserting an "empty space" [index, delta], for a negative delta, shifts the indexes in [index, INT_MAX] to the left, thereby deleting the indexes in the range [index - delta, delta].
     public mutating func shift(startingAt integer: Element, by delta: IndexSet.IndexDistance) {
         _applyMutation { $0.shiftIndexesStarting(at: integer, by: delta) }
@@ -716,8 +823,8 @@ private struct IndexSetBoundaryIterator : IteratorProtocol {
     private var i2UsedFirst : Bool
     
     private init(_ is1 : IndexSet, _ is2 : IndexSet) {
-        i1 = is1.rangeView().makeIterator()
-        i2 = is2.rangeView().makeIterator()
+        i1 = is1.rangeView.makeIterator()
+        i2 = is2.rangeView.makeIterator()
         
         i1Range = i1.next()
         i2Range = i2.next()

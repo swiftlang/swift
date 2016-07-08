@@ -23,7 +23,7 @@ class TestIndexSetSuper { }
 class TestIndexSet : TestIndexSetSuper {
     
     func testEnumeration() {
-        let someIndexes = IndexSet(integersIn: 3..<5)
+        let someIndexes = IndexSet(integersIn: 3...4)
         let first = someIndexes.startIndex
         let last = someIndexes.endIndex
         
@@ -99,6 +99,62 @@ class TestIndexSet : TestIndexSetSuper {
         someIndexes.insert(11)
         
         expectEqual(someIndexes.count, 7)
+        
+        someIndexes.remove(11)
+        
+        expectEqual(someIndexes.count, 6)
+        
+        someIndexes.insert(integersIn: 100...101)
+        expectEqual(8, someIndexes.count)
+        expectEqual(2, someIndexes.count(in: 100...101))
+        
+        someIndexes.remove(integersIn: 100...101)
+        expectEqual(6, someIndexes.count)
+        expectEqual(0, someIndexes.count(in: 100...101))
+
+        someIndexes.insert(integersIn: 200..<202)
+        expectEqual(8, someIndexes.count)
+        expectEqual(2, someIndexes.count(in: 200..<202))
+        
+        someIndexes.remove(integersIn: 200..<202)
+        expectEqual(6, someIndexes.count)
+        expectEqual(0, someIndexes.count(in: 200..<202))
+    }
+    
+    func testContainsAndIntersects() {
+        let someIndexes = IndexSet(integersIn: 1..<10)
+
+        expectTrue(someIndexes.contains(integersIn: 1..<10))
+        expectTrue(someIndexes.contains(integersIn: 1...9))
+        expectTrue(someIndexes.contains(integersIn: 2..<10))
+        expectTrue(someIndexes.contains(integersIn: 2...9))
+        expectTrue(someIndexes.contains(integersIn: 1..<9))
+        expectTrue(someIndexes.contains(integersIn: 1...8))
+
+        expectFalse(someIndexes.contains(integersIn: 0..<10))
+        expectFalse(someIndexes.contains(integersIn: 0...9))
+        expectFalse(someIndexes.contains(integersIn: 2..<11))
+        expectFalse(someIndexes.contains(integersIn: 2...10))
+        expectFalse(someIndexes.contains(integersIn: 0..<9))
+        expectFalse(someIndexes.contains(integersIn: 0...8))
+        
+        expectTrue(someIndexes.intersects(integersIn: 1..<10))
+        expectTrue(someIndexes.intersects(integersIn: 1...9))
+        expectTrue(someIndexes.intersects(integersIn: 2..<10))
+        expectTrue(someIndexes.intersects(integersIn: 2...9))
+        expectTrue(someIndexes.intersects(integersIn: 1..<9))
+        expectTrue(someIndexes.intersects(integersIn: 1...8))
+        
+        expectTrue(someIndexes.intersects(integersIn: 0..<10))
+        expectTrue(someIndexes.intersects(integersIn: 0...9))
+        expectTrue(someIndexes.intersects(integersIn: 2..<11))
+        expectTrue(someIndexes.intersects(integersIn: 2...10))
+        expectTrue(someIndexes.intersects(integersIn: 0..<9))
+        expectTrue(someIndexes.intersects(integersIn: 0...8))
+
+        expectFalse(someIndexes.intersects(integersIn: 0..<0))
+        expectFalse(someIndexes.intersects(integersIn: 10...12))
+        expectFalse(someIndexes.intersects(integersIn: 10..<12))
     }
     
     func testIteration() {
@@ -148,7 +204,7 @@ class TestIndexSet : TestIndexSetSuper {
         someIndexes.insert(15)
         
         var count = 0
-        for r in someIndexes.rangeView() {
+        for r in someIndexes.rangeView {
             // print("\(r)")
             count += 1
             if count == 3 {
@@ -159,7 +215,7 @@ class TestIndexSet : TestIndexSetSuper {
         
         // Backwards
         count = 0
-        for r in someIndexes.rangeView().reversed() {
+        for r in someIndexes.rangeView.reversed() {
             // print("\(r)")
             count += 1
             if count == 3 {
@@ -177,7 +233,7 @@ class TestIndexSet : TestIndexSetSuper {
         someIndexes.insert(integersIn: 60..<80)
         
         var count = 0
-        for _ in someIndexes.rangeView() {
+        for _ in someIndexes.rangeView {
             count += 1
         }
         expectEqual(5, count)
@@ -196,7 +252,7 @@ class TestIndexSet : TestIndexSetSuper {
         expectEqual(3, count)
         
         count = 0
-        for r in someIndexes.rangeView(of: 0..<35) {
+        for r in someIndexes.rangeView(of: 0...34) {
             if count == 0 {
                 expectEqual(r, 2..<5)
             }
@@ -249,7 +305,7 @@ class TestIndexSet : TestIndexSetSuper {
         expectEqual(8, someIndexes.count(in: 5..<25))
         expectEqual(8, count)
         
-        r = someIndexes.indexRange(in: 100..<200)
+        r = someIndexes.indexRange(in: 100...199)
         expectTrue(r.isEmpty)
         
         let emptySlice = someIndexes[r]
@@ -280,7 +336,7 @@ class TestIndexSet : TestIndexSetSuper {
         expectEqual(count, 0)
         
         count = 0
-        for _ in empty.rangeView() {
+        for _ in empty.rangeView {
             count += 1
         }
         
@@ -337,7 +393,7 @@ class TestIndexSet : TestIndexSetSuper {
         someIndexes.insert(integersIn: 8..<11)
         someIndexes.insert(15)
 
-        let resultArray = someIndexes.rangeView().filter { $0.count > 1 }
+        let resultArray = someIndexes.rangeView.filter { $0.count > 1 }
         expectEqual(resultArray.count, 2)
     }
     
@@ -701,6 +757,7 @@ IndexSetTests.test("testEnumeration") { TestIndexSet().testEnumeration() }
 IndexSetTests.test("testSubsequence") { TestIndexSet().testSubsequence() }
 IndexSetTests.test("testIndexRange") { TestIndexSet().testIndexRange() }
 IndexSetTests.test("testMutation") { TestIndexSet().testMutation() }
+IndexSetTests.test("testContainsAndIntersects") { TestIndexSet().testContainsAndIntersects() }
 IndexSetTests.test("testIteration") { TestIndexSet().testIteration() }
 IndexSetTests.test("testRangeIteration") { TestIndexSet().testRangeIteration() }
 IndexSetTests.test("testSubrangeIteration") { TestIndexSet().testSubrangeIteration() }
