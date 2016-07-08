@@ -57,14 +57,14 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
 
   precondition(LLVM_TOOLS_BINARY_DIR)
-  escape_llvm_path_for_xcode("${LLVM_TOOLS_BINARY_DIR}" LLVM_TOOLS_BINARY_DIR)
+  escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_TOOLS_BINARY_DIR}" LLVM_TOOLS_BINARY_DIR)
   precondition_translate_flag(LLVM_BUILD_LIBRARY_DIR LLVM_LIBRARY_DIR)
-  escape_llvm_path_for_xcode("${LLVM_LIBRARY_DIR}" LLVM_LIBRARY_DIR)
+  escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_LIBRARY_DIR}" LLVM_LIBRARY_DIR)
   precondition_translate_flag(LLVM_BUILD_MAIN_INCLUDE_DIR LLVM_MAIN_INCLUDE_DIR)
   precondition_translate_flag(LLVM_BUILD_BINARY_DIR LLVM_BINARY_DIR)
   precondition_translate_flag(LLVM_BUILD_MAIN_SRC_DIR LLVM_MAIN_SRC_DIR)
   precondition(LLVM_LIBRARY_DIRS)
-  escape_llvm_path_for_xcode("${LLVM_LIBRARY_DIRS}" LLVM_LIBRARY_DIRS)
+  escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_LIBRARY_DIRS}" LLVM_LIBRARY_DIRS)
 
   # This could be computed using ${CMAKE_CFG_INTDIR} if we want to link Swift
   # against a matching LLVM build configuration.  However, we usually want to be
@@ -102,7 +102,7 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
     "Version number that will be placed into the libclang library , in the form XX.YY")
 
   foreach (INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
-    escape_llvm_path_for_xcode("${INCLUDE_DIR}" INCLUDE_DIR)
+    escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${INCLUDE_DIR}" INCLUDE_DIR)
     include_directories(${INCLUDE_DIR})
   endforeach ()
 

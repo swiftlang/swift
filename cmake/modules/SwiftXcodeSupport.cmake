@@ -1,15 +1,6 @@
 # This file contains cmake configuration specifically related to support for the
 # Xcode generator in CMake.
 
-function(apply_xcode_substitutions config path result_var_name)
-  # Hack to deal with the fact that paths contain the build-time
-  # variables. Note that this fix is Xcode-specific.
-  string(REPLACE "$(CONFIGURATION)" "${config}" result "${path}")
-  string(REPLACE "$(EFFECTIVE_PLATFORM_NAME)" "" result "${result}")
-
-  set("${result_var_name}" "${result}" PARENT_SCOPE)
-endfunction()
-
 function(get_effective_platform_for_triple triple output)
   string(FIND "${triple}" "macos" IS_MACOS)
   if (IS_MACOS)
@@ -19,23 +10,19 @@ function(get_effective_platform_for_triple triple output)
   message(FATAL_ERROR "Not supported")
 endfunction()
 
-# Eliminate $(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME) from a path.
-#
-# We do not support compiling llvm with an Xcode setting beyond the one that was
-# used with build-script. This allows us to remove those paths. Right now,
-# nothing here is tested for cross compiling with Xcode, but it is in principal
-# possible.
-function(escape_llvm_path_for_xcode path outvar)
-  # First check if we are using Xcode. If not, return early.
+function(escape_path_for_xcode config path result_var_name)
+  # If we are not using the Xcode generator, be defensive and early exit.
   if (NOT XCODE)
-    set(${outvar} "${path}" PARENT_SCOPE)
+    set(${result_var_name} "${path}" PARENT_SCOPE)
     return()
   endif()
 
   get_effective_platform_for_triple("${SWIFT_HOST_TRIPLE}" SWIFT_EFFECTIVE_PLATFORM_NAME)
-  string(REPLACE "$(CONFIGURATION)" "${LLVM_BUILD_TYPE}" path "${path}")
-  string(REPLACE "$(EFFECTIVE_PLATFORM_NAME)" "${SWIFT_EFFECTIVE_PLATFORM_NAME}" path "${path}")
-  set(${outvar} "${path}" PARENT_SCOPE)
+  # Hack to deal with the fact that paths contain the build-time
+  # variables. Note that this fix is Xcode-specific.
+  string(REPLACE "$(CONFIGURATION)" "${config}" result "${path}")
+  string(REPLACE "$(EFFECTIVE_PLATFORM_NAME)" "${SWIFT_EFFECTIVE_PLATFORM_NAME}" result "${result}")
+  set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
 function(get_imported_library_prefix outvar target prefix)
