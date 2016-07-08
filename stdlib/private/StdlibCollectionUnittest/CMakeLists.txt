@@ -9,6 +9,8 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
     Foundation)
 endif()
 
+# TODO: support this on non-POSIX platforms.  It cannot be currently as it
+# depends on pthreads.
 add_swift_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
@@ -28,6 +30,7 @@ add_swift_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
 
   SWIFT_MODULE_DEPENDS StdlibUnittest
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags}
+  TARGET_SDKS ALL_POSIX_PLATFORMS
   FRAMEWORK_DEPENDS ${swift_stdlib_unittest_framework_depends}
   INSTALL_IN_COMPONENT stdlib-experimental)
 
