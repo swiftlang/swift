@@ -1188,10 +1188,10 @@ struct GenericParams1<
     StructGenericFooX : FooClass,
     StructGenericBar : FooProtocol & BarProtocol,
     StructGenericBaz> {
-// PASS_ONE_LINE_TYPE-DAG: {{^}}struct GenericParams1<StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : protocol<BarProtocol, FooProtocol>, StructGenericBaz> {{{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}struct GenericParams1<StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : BarProtocol & FooProtocol, StructGenericBaz> {{{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
 //
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}struct GenericParams1<StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : protocol<FooProtocol, BarProtocol>, StructGenericBaz> {{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}struct GenericParams1<StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : FooProtocol & BarProtocol, StructGenericBaz> {{{$}}
   init<
       GenericFoo : FooProtocol,
       GenericFooX : FooClass,
@@ -1199,10 +1199,10 @@ struct GenericParams1<
       GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz,
                   d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz)
   {}
-// PASS_ONE_LINE_TYPE-DAG: {{^}}  init<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<BarProtocol, FooProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}  init<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : BarProtocol & FooProtocol, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
 //
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  init<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<FooProtocol, BarProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  init<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : FooProtocol & BarProtocol, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
 
   func genericParams1<
       GenericFoo : FooProtocol,
@@ -1211,10 +1211,10 @@ struct GenericParams1<
       GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz,
                   d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz)
   {}
-// PASS_ONE_LINE_TYPE-DAG: {{^}}  func genericParams1<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<BarProtocol, FooProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}  func genericParams1<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : BarProtocol & FooProtocol, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
 //
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  func genericParams1<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<FooProtocol, BarProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  func genericParams1<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : FooProtocol & BarProtocol, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz){{$}}
 }
 
 struct GenericParams2<T : FooProtocol where T : BarProtocol> {}
@@ -1227,10 +1227,10 @@ struct GenericParams4<T : QuxProtocol where T.Qux : FooProtocol> {}
 // PASS_ONE_LINE-DAG: {{^}}struct GenericParams4<T : QuxProtocol where T.Qux : FooProtocol> {{{$}}
 
 struct GenericParams5<T : QuxProtocol where T.Qux : FooProtocol & BarProtocol> {}
-// PREFER_TYPE_PRINTING: {{^}}struct GenericParams5<T : QuxProtocol where T.Qux : protocol<BarProtocol, FooProtocol>> {{{$}}
+// PREFER_TYPE_PRINTING: {{^}}struct GenericParams5<T : QuxProtocol where T.Qux : BarProtocol & FooProtocol> {{{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
 //
-// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams5<T : QuxProtocol where T.Qux : protocol<FooProtocol, BarProtocol>> {{{$}}
+// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams5<T : QuxProtocol where T.Qux : FooProtocol & BarProtocol> {{{$}}
 
 struct GenericParams6<T : QuxProtocol, U : QuxProtocol where T.Qux == U.Qux> {}
 // Because of the same type conformance, 'T.Qux' and 'U.Qux' types are

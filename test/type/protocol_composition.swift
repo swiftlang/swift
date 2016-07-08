@@ -25,9 +25,8 @@ protocol P4 : P3 {
 typealias Any1 = protocol<> // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}}
 typealias Any2 = protocol< > // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}}
 
-// Not okay to inherit a typealias for Any type.
+// Okay to inherit a typealias for Any type.
 protocol P5 : Any { }
-// Not okay to inherit a typealias for protocol<> type.
 protocol P6 : protocol<> { } // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}}
                              // expected-error@-1 {{protocol composition is neither allowed nor needed here}}
 typealias P7 = Any & Any1
@@ -58,7 +57,7 @@ func testEquality() {
 
   let x7 : (_ : P1 & P3) -> ()
   let x8 : (_ : P2) -> ()
-  x7 = x8 // expected-error{{cannot assign value of type '(P2) -> ()' to type '(protocol<P1, P3>) -> ()'}}
+  x7 = x8 // expected-error{{cannot assign value of type '(P2) -> ()' to type '(P1 & P3) -> ()'}}
   _ = x7
 }
 
@@ -113,7 +112,7 @@ func testConversion() {
 
   // Conversions among existential types.
   var x2 : protocol<SuperREPLPrintable, FooProtocol> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
-  x2 = x // expected-error{{value of type 'protocol<FooProtocol, REPLPrintable>' does not conform to 'protocol<FooProtocol, SuperREPLPrintable>' in assignment}}
+  x2 = x // expected-error{{value of type 'FooProtocol & REPLPrintable' does not conform to 'FooProtocol & SuperREPLPrintable' in assignment}}
   x = x2
 
   // Subtyping

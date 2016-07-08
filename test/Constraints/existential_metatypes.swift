@@ -22,8 +22,8 @@ qt = pqt
 
 
 var pqp: (P & Q).Protocol
-pp = pqp // expected-error{{cannot assign value of type 'protocol<P, Q>.Protocol' to type 'P.Protocol'}}
-qp = pqp // expected-error{{cannot assign value of type 'protocol<P, Q>.Protocol' to type 'Q.Protocol'}}
+pp = pqp // expected-error{{cannot assign value of type '(P & Q).Protocol' to type 'P.Protocol'}}
+qp = pqp // expected-error{{cannot assign value of type '(P & Q).Protocol' to type 'Q.Protocol'}}
 
 var ppp: PP.Protocol
 pp = ppp // expected-error{{cannot assign value of type 'PP.Protocol' to type 'P.Protocol'}}
@@ -35,8 +35,8 @@ var at: Any.Type
 at = pt
 
 var ap: Any.Protocol
-ap = pp // expected-error{{cannot assign value of type 'P.Protocol' to type 'protocol<>.Protocol'}}
-ap = pt // expected-error{{cannot assign value of type 'P.Type' to type 'protocol<>.Protocol'}}
+ap = pp // expected-error{{cannot assign value of type 'P.Protocol' to type 'Any.Protocol'}}
+ap = pt // expected-error{{cannot assign value of type 'P.Type' to type 'Any.Protocol'}}
 
 // Meta-metatypes
 
@@ -47,7 +47,7 @@ class HairDryer {}
 
 let a: Toaster.Type.Protocol = Toaster.Type.self
 let b: Any.Type.Type = Toaster.Type.self
-let c: Any.Type.Protocol = Toaster.Type.self // expected-error {{cannot convert value of type 'Toaster.Type.Protocol' to specified type 'protocol<>.Type.Protocol'}}
+let c: Any.Type.Protocol = Toaster.Type.self // expected-error {{cannot convert value of type 'Toaster.Type.Protocol' to specified type 'Any.Type.Protocol'}}
 let d: Toaster.Type.Type = WashingMachine.Type.self
 let e: Any.Type.Type = WashingMachine.Type.self
 let f: Toaster.Type.Type = Dryer.Type.self

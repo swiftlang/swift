@@ -11,14 +11,15 @@ import gizmo
 
 // rdar://16621578
 
-sil @init_opaque_existential : $@convention(thin) <T where T : Gizmo> (@owned T) -> @out protocol<> {
-bb0(%0 : $*protocol<>, %1 : $T):
-  %2 = init_existential_addr %0 : $*protocol<>, $T
+sil @init_opaque_existential : $@convention(thin) <T where T : Gizmo> (@owned T) -> @out Any {
+bb0(%0 : $*Any, %1 : $T):
+  %2 = init_existential_addr %0 : $*Any, $T
   store %1 to %2 : $*T
   %3 = tuple ()
   return %3 : $()
 }
-// CHECK-DAG:   define{{( protected)?}} void @init_opaque_existential([[ANY:%"protocol<>"]]* noalias nocapture sret, [[GIZMO:%.*]]*, [[TYPE:%.*]]* %T)
+
+// CHECK-DAG:   define{{( protected)?}} void @init_opaque_existential([[ANY:%swift.Any]]* noalias nocapture sret, [[GIZMO:%.*]]*, [[TYPE:%.*]]* %T) {{.*}} {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 1
 // CHECK-NEXT:    store [[TYPE]]* %T, [[TYPE]]** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 0
@@ -26,14 +27,14 @@ bb0(%0 : $*protocol<>, %1 : $T):
 // CHECK-NEXT:    store [[GIZMO]]* %1, [[GIZMO]]** [[T1]], align 8
 // CHECK-NEXT:    ret void
 
-sil @take_opaque_existential : $@convention(thin) (@in protocol <>) -> @out protocol<> {
-bb0(%0 : $*protocol<>, %1 : $*protocol<>):
-  copy_addr [take] %1 to [initialization] %0 : $*protocol<>
+sil @take_opaque_existential : $@convention(thin) (@in Any) -> @out Any {
+bb0(%0 : $*Any, %1 : $*Any):
+  copy_addr [take] %1 to [initialization] %0 : $*Any
   %3 = tuple ()
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} void @take_opaque_existential([[ANY:%"protocol<>"]]* noalias nocapture sret, %"protocol<>"* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} void @take_opaque_existential([[ANY:%swift.Any]]* noalias nocapture sret, %swift.Any* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC:%1]], i32 0, i32 1
 // CHECK-NEXT:    [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST:%0]], i32 0, i32 1

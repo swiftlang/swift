@@ -767,9 +767,8 @@ Reflection.test("MetatypeMirror") {
     dump(objcProtocolConcreteMetatype, to: &output)
     expectEqual(expectedObjCProtocolConcrete, output)
 
-    typealias Composition = SomeNativeProto & SomeObjCProto
-    let compositionConcreteMetatype = Composition.self
-    let expectedComposition = "- protocol<a.SomeNativeProto, a.SomeObjCProto> #0\n"
+    let compositionConcreteMetatype = (SomeNativeProto & SomeObjCProto).self
+    let expectedComposition = "- a.SomeNativeProto & a.SomeObjCProto> #0\n"
     output = ""
     dump(compositionConcreteMetatype, to: &output)
     expectEqual(expectedComposition, output)

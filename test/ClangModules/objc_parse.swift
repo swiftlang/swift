@@ -192,7 +192,7 @@ func testProtocols(_ b: B, bp: BProto) {
   var c1 : Cat1Proto = b
   var bcat1 = b.getAsProtoWithCat()!
   c1 = bcat1
-  bcat1 = c1 // expected-error{{value of type 'Cat1Proto' does not conform to 'protocol<BProto, Cat1Proto>' in assignment}}
+  bcat1 = c1 // expected-error{{value of type 'Cat1Proto' does not conform to 'BProto & Cat1Proto' in assignment}}
 }
 
 // Methods only defined in a protocol
@@ -505,17 +505,17 @@ func testCStyle() {
 
 func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
                            plainObj: NSObject, plainCell: SomeCell) {
-  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>') is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
+  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
   _ = obj as NSObjectProtocol
   _ = obj as NSCopying
-  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>') is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
+  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
 
   _ = cell as NSObject
   _ = cell as NSObjectProtocol
   _ = cell as NSCopying // expected-error {{'CopyableSomeCell' (aka 'SomeCell') is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
   _ = cell as SomeCell
   
-  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
+  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
   _ = plainCell as CopyableSomeCell // FIXME: This is not really typesafe.
 }
 

@@ -971,7 +971,7 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc var var_AnyObject2: AnyObject.Type
 
   var var_Existential0: Any
-// CHECK-LABEL: {{^}}  var var_Existential0: protocol<>
+// CHECK-LABEL: {{^}}  var var_Existential0: Any
 
   @objc var var_Existential0_: Any
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
@@ -992,14 +992,14 @@ class infer_instanceVar1 {
   // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
 
   var var_Existential3: PlainProtocol & Protocol_Class1
-// CHECK-LABEL: {{^}}  var var_Existential3: protocol<PlainProtocol, Protocol_Class1>
+// CHECK-LABEL: {{^}}  var var_Existential3: PlainProtocol & Protocol_Class1
 
   @objc var var_Existential3_: PlainProtocol & Protocol_Class1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
 
   var var_Existential4: PlainProtocol & Protocol_ObjC1
-// CHECK-LABEL: {{^}}  var var_Existential4: protocol<PlainProtocol, Protocol_ObjC1>
+// CHECK-LABEL: {{^}}  var var_Existential4: PlainProtocol & Protocol_ObjC1
 
   @objc var var_Existential4_: PlainProtocol & Protocol_ObjC1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
@@ -1013,14 +1013,14 @@ class infer_instanceVar1 {
   // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
 
   var var_Existential6: Protocol_Class1 & Protocol_Class2
-// CHECK-LABEL: {{^}}  var var_Existential6: protocol<Protocol_Class1, Protocol_Class2>
+// CHECK-LABEL: {{^}}  var var_Existential6: Protocol_Class1 & Protocol_Class2
 
   @objc var var_Existential6_: Protocol_Class1 & Protocol_Class2
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
 
   var var_Existential7: Protocol_Class1 & Protocol_ObjC1
-// CHECK-LABEL: {{^}}  var var_Existential7: protocol<Protocol_Class1, Protocol_ObjC1>
+// CHECK-LABEL: {{^}}  var var_Existential7: Protocol_Class1 & Protocol_ObjC1
 
   @objc var var_Existential7_: Protocol_Class1 & Protocol_ObjC1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
@@ -1032,7 +1032,7 @@ class infer_instanceVar1 {
   @objc var var_Existential8_: Protocol_ObjC1 // no-error
 
   var var_Existential9: Protocol_ObjC1 & Protocol_ObjC2
-// CHECK-LABEL: @objc var var_Existential9: protocol<Protocol_ObjC1, Protocol_ObjC2>
+// CHECK-LABEL: @objc var var_Existential9: Protocol_ObjC1 & Protocol_ObjC2
 
   @objc var var_Existential9_: Protocol_ObjC1 & Protocol_ObjC2 // no-error
 
@@ -1047,16 +1047,16 @@ class infer_instanceVar1 {
   var var_ExistentialMetatype7: (Protocol_Class1 & Protocol_ObjC1).Type
   var var_ExistentialMetatype8: Protocol_ObjC1.Type
   var var_ExistentialMetatype9: (Protocol_ObjC1 & Protocol_ObjC2).Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype0: protocol<>.Type
+// CHECK-LABEL: {{^}}  var var_ExistentialMetatype0: Any.Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype1: PlainProtocol.Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype2: PlainProtocol.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype3: protocol<PlainProtocol, Protocol_Class1>.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype4: protocol<PlainProtocol, Protocol_ObjC1>.Type
+// CHECK-LABEL: {{^}}  var var_ExistentialMetatype3: (PlainProtocol & Protocol_Class1).Type
+// CHECK-LABEL: {{^}}  var var_ExistentialMetatype4: (PlainProtocol & Protocol_ObjC1).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype5: Protocol_Class1.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype6: protocol<Protocol_Class1, Protocol_Class2>.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype7: protocol<Protocol_Class1, Protocol_ObjC1>.Type
+// CHECK-LABEL: {{^}}  var var_ExistentialMetatype6: (Protocol_Class1 & Protocol_Class2).Type
+// CHECK-LABEL: {{^}}  var var_ExistentialMetatype7: (Protocol_Class1 & Protocol_ObjC1).Type
 // CHECK-LABEL: @objc var var_ExistentialMetatype8: Protocol_ObjC1.Type
-// CHECK-LABEL: @objc var var_ExistentialMetatype9: protocol<Protocol_ObjC1, Protocol_ObjC2>.Type
+// CHECK-LABEL: @objc var var_ExistentialMetatype9: (Protocol_ObjC1 & Protocol_ObjC2).Type
 
 
   var var_UnsafeMutablePointer1: UnsafeMutablePointer<Int>
@@ -1116,8 +1116,8 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc var var_Optional7: String?
 // CHECK-LABEL: @objc var var_Optional8: Protocol_ObjC1?
 // CHECK-LABEL: @objc var var_Optional9: Protocol_ObjC1.Type?
-// CHECK-LABEL: @objc var var_Optional10: protocol<Protocol_ObjC1, Protocol_ObjC2>?
-// CHECK-LABEL: @objc var var_Optional11: protocol<Protocol_ObjC1, Protocol_ObjC2>.Type?
+// CHECK-LABEL: @objc var var_Optional10: (Protocol_ObjC1 & Protocol_ObjC2)?
+// CHECK-LABEL: @objc var var_Optional11: (Protocol_ObjC1 & Protocol_ObjC2).Type?
 // CHECK-LABEL: @objc var var_Optional12: OpaquePointer?
 // CHECK-LABEL: @objc var var_Optional13: UnsafeMutablePointer<Int>?
 // CHECK-LABEL: @objc var var_Optional14: UnsafeMutablePointer<Class_ObjC1>?
@@ -1141,7 +1141,7 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional6: AnyObject.Type!
 // CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional7: String!
 // CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional8: Protocol_ObjC1!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional9: protocol<Protocol_ObjC1, Protocol_ObjC2>!
+// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional9: (Protocol_ObjC1 & Protocol_ObjC2)!
 
   var var_Optional_fail1: PlainClass?
   var var_Optional_fail2: PlainClass.Type?
@@ -1187,7 +1187,7 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc weak var var_Weak2: @sil_weak Protocol_ObjC1
 // CHECK-LABEL: @objc weak var var_Weak5: @sil_weak AnyObject
 // CHECK-LABEL: @objc weak var var_Weak7: @sil_weak Protocol_ObjC1
-// CHECK-LABEL: @objc weak var var_Weak8: @sil_weak protocol<Protocol_ObjC1, Protocol_ObjC2>
+// CHECK-LABEL: @objc weak var var_Weak8: @sil_weak Protocol_ObjC1 & Protocol_ObjC2
 
   weak var var_Weak_fail1: PlainClass?
   weak var var_Weak_bad2: PlainStruct?
@@ -1214,7 +1214,7 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc unowned var var_Unowned2: @sil_unowned Protocol_ObjC1
 // CHECK-LABEL: @objc unowned var var_Unowned5: @sil_unowned AnyObject
 // CHECK-LABEL: @objc unowned var var_Unowned7: @sil_unowned Protocol_ObjC1
-// CHECK-LABEL: @objc unowned var var_Unowned8: @sil_unowned protocol<Protocol_ObjC1, Protocol_ObjC2>
+// CHECK-LABEL: @objc unowned var var_Unowned8: @sil_unowned Protocol_ObjC1 & Protocol_ObjC2
 
 
   unowned var var_Unowned_fail1: PlainClass
@@ -1361,13 +1361,13 @@ class infer_instanceVar1 {
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType9: [Protocol_ObjC1 & PlainProtocol]
-  // CHECK-LABEL: {{^}}  var var_ArrayType9: [protocol<{{.+}}>]
+  // CHECK-LABEL: {{^}}  var var_ArrayType9: [Protocol_ObjC1 & PlainProtocol]
 
   @objc var var_ArrayType9_: [Protocol_ObjC1 & PlainProtocol]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType10: [Protocol_ObjC1 & Protocol_ObjC2]
-  // CHECK-LABEL: {{^}}  @objc var var_ArrayType10: [protocol<{{.+}}>]
+  // CHECK-LABEL: {{^}}  @objc var var_ArrayType10: [Protocol_ObjC1 & Protocol_ObjC2]
 
   @objc var var_ArrayType10_: [Protocol_ObjC1 & Protocol_ObjC2]
   // no-error

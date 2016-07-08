@@ -31,9 +31,9 @@ func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, 
   fAOE(cp)
   fT(cp)
 
-  fP(opp) // expected-error{{cannot invoke 'fP' with an argument list of type '(protocol<OP, P>)'}} // expected-note{{expected an argument list of type '(T)'}}
-  fOP(opp) // expected-error{{cannot invoke 'fOP' with an argument list of type '(protocol<OP, P>)'}} // expected-note{{expected an argument list of type '(T)'}}
-  fAO(opp) // expected-error{{cannot invoke 'fAO' with an argument list of type '(protocol<OP, P>)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fP(opp) // expected-error{{cannot invoke 'fP' with an argument list of type '(OP & P)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fOP(opp) // expected-error{{cannot invoke 'fOP' with an argument list of type '(OP & P)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fAO(opp) // expected-error{{cannot invoke 'fAO' with an argument list of type '(OP & P)'}} // expected-note{{expected an argument list of type '(T)'}}
   fAOE(opp)
   fT(opp)
 

@@ -60,7 +60,7 @@ any = (label: 4)
 
 // Scalars don't have .0/.1/etc
 i = j.0 // expected-error{{value of type 'Int' has no member '0'}}
-any.1 // expected-error{{value of type 'protocol<>' has no member '1'}}
+any.1 // expected-error{{value of type 'Any' has no member '1'}}
 
 // Fun with tuples
 protocol PosixErrorReturn {

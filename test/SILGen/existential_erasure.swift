@@ -24,7 +24,7 @@ func throwingFunc() throws -> Bool { return true }
 
 // CHECK-LABEL: sil hidden @_TF19existential_erasure5PQtoPFT_T_ : $@convention(thin) () -> () {
 func PQtoP() {
-  // CHECK: [[PQ_PAYLOAD:%.*]] = open_existential_addr [[PQ:%.*]] : $*protocol<P, Q> to $*[[OPENED_TYPE:@opened(.*) protocol<P, Q>]]
+  // CHECK: [[PQ_PAYLOAD:%.*]] = open_existential_addr [[PQ:%.*]] : $*P & Q to $*[[OPENED_TYPE:@opened(.*) P & Q]]
   // CHECK: [[P_PAYLOAD:%.*]] = init_existential_addr [[P:%.*]] : $*P, $[[OPENED_TYPE]]
   // CHECK: copy_addr [take] [[PQ_PAYLOAD]] to [initialization] [[P_PAYLOAD]]
   // CHECK: deinit_existential_addr [[PQ]]
@@ -123,8 +123,8 @@ class EraseDynamicSelf {
   required init() {}
 
 // CHECK-LABEL: sil hidden @_TZFC19existential_erasure16EraseDynamicSelf7factoryfT_DS0_ : $@convention(method) (@thick EraseDynamicSelf.Type) -> @owned EraseDynamicSelf
-// CHECK:  [[ANY:%.*]] = alloc_stack $protocol<>
-// CHECK:  init_existential_addr [[ANY]] : $*protocol<>, $Self
+// CHECK:  [[ANY:%.*]] = alloc_stack $Any
+// CHECK:  init_existential_addr [[ANY]] : $*Any, $Self
 //
   class func factory() -> Self {
     let instance = self.init()
