@@ -4,6 +4,7 @@
 add_subdirectory(AppKit)
 add_subdirectory(AVFoundation)
 add_subdirectory(AssetsLibrary)
+add_subdirectory(CallKit)
 add_subdirectory(CloudKit)
 add_subdirectory(Contacts)
 add_subdirectory(CoreAudio)
