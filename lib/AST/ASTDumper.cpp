@@ -2899,6 +2899,7 @@ namespace {
       printFlag(T->isNoReturn(), "noreturn");
       printFlag(T->isAutoClosure(), "autoclosure");
       printFlag(T->isNoEscape(), "noescape");
+      printFlag(T->isExplicitlyEscaping(), "escaping");
       printFlag(T->throws(), "throws");
 
       printRec("input", T->getInput());

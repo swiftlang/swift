@@ -2,6 +2,8 @@
 
 @noescape var fn : () -> Int = { 4 }  // expected-error {{@noescape may only be used on 'parameter' declarations}} {{1-11=}}
 
+func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{@escaping conflicts with @noescape}}
+
 func doesEscape(_ fn : () -> Int) {}
 
 func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {}

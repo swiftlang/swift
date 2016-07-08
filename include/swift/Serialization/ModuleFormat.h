@@ -590,6 +590,7 @@ namespace decls_block {
     BCFixed<1>,  // auto-closure?
     BCFixed<1>,  // noreturn?
     BCFixed<1>,  // noescape?
+    BCFixed<1>,  // explicitlyEscaping?
     BCFixed<1>   // throws?
   >;
 
