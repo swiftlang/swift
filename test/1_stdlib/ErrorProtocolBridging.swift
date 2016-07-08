@@ -92,7 +92,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
   let testURL = URL(string: "http://swift.org")!
 
   autoreleasepool {
-    let underlyingError = NSCocoaError(.fileLockingError)
+    let underlyingError = CocoaError(.fileLockingError)
       as ErrorProtocol as NSError
     let ns = NSError(domain: NSCocoaErrorDomain,
                      code: NSFileNoSuchFileError,
@@ -110,22 +110,22 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
 
     let cocoaCode: Int?
     switch e {
-    case let x as NSCocoaError:
+    case let x as CocoaError:
       cocoaCode = x._code
       expectTrue(x.isFileError)
-      expectEqual(x.code, NSCocoaError.fileNoSuchFileError)
+      expectEqual(x.code, CocoaError.fileNoSuchFileError)
     default:
       cocoaCode = nil
     }
 
     expectEqual(NSFileNoSuchFileError, cocoaCode)
 
-    let cocoaCode2: Int? = (ns as? NSCocoaError)?._code
+    let cocoaCode2: Int? = (ns as? CocoaError)?._code
     expectEqual(NSFileNoSuchFileError, cocoaCode2)
 
     let isNoSuchFileError: Bool
     switch e {
-    case NSCocoaError.fileNoSuchFileError:
+    case CocoaError.fileNoSuchFileError:
       isNoSuchFileError = true
     default:
       isNoSuchFileError = false
@@ -134,7 +134,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     expectTrue(isNoSuchFileError)
 
     // Check the contents of the error.
-    let cocoaError = e as! NSCocoaError
+    let cocoaError = e as! CocoaError
     expectOptionalEqual("/dev/null", cocoaError.filePath)
     expectOptionalEqual(String.Encoding.ascii, cocoaError.stringEncoding)
     expectOptionalEqual(underlyingError, cocoaError.underlying)
