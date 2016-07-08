@@ -205,7 +205,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     let eMach: ErrorProtocol = nsMach
     let isMemoryFailure: Bool
     switch eMach {
-    case MachError.KERN_MEMORY_FAILURE:
+    case MachError.memoryFailure:
       isMemoryFailure = true
     default:
       isMemoryFailure = false
