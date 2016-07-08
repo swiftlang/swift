@@ -928,13 +928,12 @@ namespace {
 
       // id maps to Any in bridgeable contexts, AnyObject otherwise.
       if (type->isObjCIdType()) {
-        if (Impl.SwiftContext.LangOpts.EnableIdAsAny) {
-          return { proto->getDeclaredType(),
-                 ImportHint(ImportHint::ObjCBridged,
-                         ProtocolCompositionType::get(Impl.SwiftContext, {})) };
-        } else {
-          return { proto->getDeclaredType(), ImportHint::ObjCPointer };
-        }
+        if (Impl.SwiftContext.LangOpts.EnableIdAsAny)
+          return {
+              proto->getDeclaredType(),
+              ImportHint(ImportHint::ObjCBridged,
+                         Impl.SwiftContext.getAnyDecl()->getDeclaredType())};
+        return {proto->getDeclaredType(), ImportHint::ObjCPointer};
       }
 
       // Class maps to AnyObject.Type.
