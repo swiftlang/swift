@@ -327,16 +327,18 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   //  })
   //
   // The actual closure has a closure expression as scope.
-  if (Loc && isAbstractClosure(*Loc) && DS && !isAbstractClosure(DS->Loc)
-      && !Loc->is<ImplicitReturnLocation>()) {
+  if (Loc && isAbstractClosure(*Loc) && DS && !isAbstractClosure(DS->Loc) &&
+      !Loc->is<ImplicitReturnLocation>())
     L.Line = L.Column = 0;
-  }
 
-  if (L.Line == 0 && DS == LastScope) {
-    // Reuse the last source location if we are still in the same
-    // scope to get a more contiguous line table.
+  if (auto *Fn = DS->getInlinedFunction())
+    if (Fn->isThunk())
+      L.Line = L.Column = 0;
+
+  // Reuse the last source location if we are still in the same
+  // scope to get a more contiguous line table.
+  if (L.Line == 0 && DS == LastScope)
     L = LastDebugLoc;
-  }
 
   // FIXME: Enable this assertion.
   //assert(lineNumberIsSane(Builder, L.Line) &&
