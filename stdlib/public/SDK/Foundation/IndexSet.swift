@@ -164,136 +164,22 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         
     }
     
-    /// The mechanism for getting to the integers stored in an IndexSet.
+    /// The mechanism for accessing the integers stored in an IndexSet.
     public struct Index : CustomStringConvertible, Comparable {
-        private let indexSet : IndexSet
         private var value : IndexSet.Element
         private var extent : Range<IndexSet.Element>
         private var rangeIndex : Int
         private let rangeCount : Int
         
-        private init(firstIn indexSet : IndexSet) {
-            self.indexSet = indexSet
-            self.rangeCount = indexSet._rangeCount
-            self.rangeIndex = 0
-            self.extent =  indexSet._range(at: 0)
-            self.value = extent.lowerBound
-        }
-        
-        private init(lastIn indexSet : IndexSet) {
-            self.indexSet = indexSet
-            let rangeCount = indexSet._rangeCount
-            self.rangeIndex = rangeCount - 1
-            if rangeCount > 0 {
-                self.extent = indexSet._range(at: rangeCount - 1)
-                self.value = extent.upperBound // "1 past the end" position is the last range, 1 + the end of that range's extent
-            } else {
-                self.extent = 0..<0
-                self.value = 0
-            }
-            self.rangeCount = rangeCount
-        }
-        
-        private init(indexSet: IndexSet, index: Int) {
-            self.indexSet = indexSet
-            self.rangeCount = self.indexSet._rangeCount
-            self.value = index
-            if let rangeIndex = self.indexSet._indexOfRange(containing: index) {
-                self.extent = self.indexSet._range(at: rangeIndex)
-                self.rangeIndex = rangeIndex
-            } else {
-                self.extent = 0..<0
-                self.rangeIndex = 0
-            }
-        }
-        
-        // First or last value in a specified range
-        private init(indexSet: IndexSet, rangeIndex: Int, rangeCount: Int, first : Bool) {
-            self.indexSet = indexSet
-            let extent = indexSet._range(at: rangeIndex)
-            if first {
-                self.value = extent.lowerBound
-            } else {
-                self.value = extent.upperBound-1
-            }
-            self.extent = extent
-            self.rangeCount = rangeCount
-            self.rangeIndex = rangeIndex
-        }
-        
-        private init(indexSet: IndexSet, value: Int, extent: Range<Int>, rangeIndex: Int, rangeCount: Int) {
-            self.indexSet = indexSet
+        private init(value: Int, extent: Range<Int>, rangeIndex: Int, rangeCount: Int) {
             self.value = value
             self.extent = extent
             self.rangeCount = rangeCount
             self.rangeIndex = rangeIndex
         }
         
-        private func successor() -> Index {
-            if value + 1 == extent.upperBound {
-                // Move to the next range
-                if rangeIndex + 1 == rangeCount {
-                    // We have no more to go; return a 'past the end' index
-                    return Index(indexSet: indexSet, value: value + 1, extent: extent, rangeIndex: rangeIndex, rangeCount: rangeCount)
-                } else {
-                    return Index(indexSet: indexSet, rangeIndex: rangeIndex + 1, rangeCount: rangeCount, first: true)
-                }
-            } else {
-                // Move to the next value in this range
-                return Index(indexSet: indexSet, value: value + 1, extent: extent, rangeIndex: rangeIndex, rangeCount: rangeCount)
-            }
-        }
-        
-        private mutating func _successorInPlace() {
-            if value + 1 == extent.upperBound {
-                // Move to the next range
-                if rangeIndex + 1 == rangeCount {
-                    // We have no more to go; return a 'past the end' index
-                    value += 1
-                } else {
-                    rangeIndex += 1
-                    extent = indexSet._range(at: rangeIndex)
-                    value = extent.lowerBound
-                }
-            } else {
-                // Move to the next value in this range
-                value += 1
-            }
-        }
-        
-        private func predecessor() -> Index {
-            if value == extent.lowerBound {
-                // Move to the next range
-                if rangeIndex == 0 {
-                    // We have no more to go
-                    return Index(indexSet: indexSet, value: value, extent: extent, rangeIndex: rangeIndex, rangeCount: rangeCount)
-                } else {
-                    return Index(indexSet: indexSet, rangeIndex: rangeIndex - 1, rangeCount: rangeCount, first: false)
-                }
-            } else {
-                // Move to the previous value in this range
-                return Index(indexSet: indexSet, value: value - 1, extent: extent, rangeIndex: rangeIndex, rangeCount: rangeCount)
-            }
-        }
-        
         public var description: String {
             return "index \(value) in a range of \(extent) [range #\(rangeIndex + 1)/\(rangeCount)]"
-        }
-        
-        private mutating func _predecessorInPlace() {
-            if value == extent.lowerBound {
-                // Move to the next range
-                if rangeIndex == 0 {
-                    // We have no more to go
-                } else {
-                    rangeIndex -= 1
-                    extent = indexSet._range(at: rangeIndex)
-                    value = extent.upperBound - 1
-                }
-            } else {
-                // Move to the previous value in this range
-                value -= 1
-            }
         }
     }
 
@@ -392,16 +278,25 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     }
     
     public var startIndex: Index {
-        // TODO: We should cache this result
-        
         // If this winds up being NSNotFound, that's ok because then endIndex is also NSNotFound, and empty collections have startIndex == endIndex
-        return Index(firstIn: self)
+        let extent = _range(at: 0)
+        return Index(value: extent.lowerBound, extent: extent, rangeIndex: 0, rangeCount: _rangeCount)
     }
 
     public var endIndex: Index {
-        // TODO: We should cache this result
+        let rangeCount = _rangeCount
+        let rangeIndex = rangeCount - 1
+        let extent : Range<Int>
+        let value : Int
+        if rangeCount > 0 {
+            extent = _range(at: rangeCount - 1)
+            value = extent.upperBound // "1 past the end" position is the last range, 1 + the end of that range's extent
+        } else {
+            extent = 0..<0
+            value = 0
+        }
         
-        return Index(lastIn: self)
+        return Index(value: value, extent: extent, rangeIndex: rangeIndex, rangeCount: rangeCount)
     }
     
     public subscript(index : Index) -> Element {
@@ -455,18 +350,18 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     /// - parameter range: The range of integers to include.
     public func indexRange(in range: Range<Element>) -> Range<Index> {
         if range.isEmpty {
-            let i = Index(indexSet: self, index: 0)
+            let i = _index(ofInteger: 0)
             return i..<i
         }
         
         if range.lowerBound > last || (range.upperBound - 1) < first {
-            let i = Index(indexSet: self, index: 0)
+            let i = _index(ofInteger: 0)
             return i..<i
         }
         
-        let resultFirst = Index(indexSet: self, index: integerGreaterThanOrEqualTo(range.lowerBound))
-        let resultLast = Index(indexSet: self, index: integerLessThanOrEqualTo(range.upperBound - 1))
-        return resultFirst..<resultLast.successor()
+        let resultFirst = _index(ofInteger: integerGreaterThanOrEqualTo(range.lowerBound))
+        let resultLast = _index(ofInteger: integerLessThanOrEqualTo(range.upperBound - 1))
+        return resultFirst..<index(after: resultLast)
     }
     
     /// Return a `Range<IndexSet.Index>` which can be used to subscript the index set.
@@ -540,19 +435,88 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     // Indexable
     
     public func index(after i: Index) -> Index {
-        return i.successor()
+        if i.value + 1 == i.extent.upperBound {
+            // Move to the next range
+            if i.rangeIndex + 1 == i.rangeCount {
+                // We have no more to go; return a 'past the end' index
+                return Index(value: i.value + 1, extent: i.extent, rangeIndex: i.rangeIndex, rangeCount: i.rangeCount)
+            } else {
+                let rangeIndex = i.rangeIndex + 1
+                let rangeCount = i.rangeCount
+                let extent = _range(at: rangeIndex)
+                let value = extent.lowerBound
+                return Index(value: value, extent: extent, rangeIndex: rangeIndex, rangeCount: rangeCount)
+            }
+        } else {
+            // Move to the next value in this range
+            return Index(value: i.value + 1, extent: i.extent, rangeIndex: i.rangeIndex, rangeCount: i.rangeCount)
+        }
     }
     
     public func formIndex(after i: inout Index) {
-        i._successorInPlace()
+        if i.value + 1 == i.extent.upperBound {
+            // Move to the next range
+            if i.rangeIndex + 1 == i.rangeCount {
+                // We have no more to go; return a 'past the end' index
+                i.value += 1
+            } else {
+                i.rangeIndex += 1
+                i.extent = _range(at: i.rangeIndex)
+                i.value = i.extent.lowerBound
+            }
+        } else {
+            // Move to the next value in this range
+            i.value += 1
+        }
     }
     
     public func index(before i: Index) -> Index {
-        return i.predecessor()
+        if i.value == i.extent.lowerBound {
+            // Move to the next range
+            if i.rangeIndex == 0 {
+                // We have no more to go
+                return Index(value: i.value, extent: i.extent, rangeIndex: i.rangeIndex, rangeCount: i.rangeCount)
+            } else {
+                let rangeIndex = i.rangeIndex - 1
+                let rangeCount = i.rangeCount
+                let extent = _range(at: rangeIndex)
+                let value = extent.upperBound - 1
+                return Index(value: value, extent: extent, rangeIndex: rangeIndex, rangeCount: rangeCount)
+            }
+        } else {
+            // Move to the previous value in this range
+            return Index(value: i.value - 1, extent: i.extent, rangeIndex: i.rangeIndex, rangeCount: i.rangeCount)
+        }
     }
     
     public func formIndex(before i: inout Index) {
-        i._predecessorInPlace()
+        if i.value == i.extent.lowerBound {
+            // Move to the next range
+            if i.rangeIndex == 0 {
+                // We have no more to go
+            } else {
+                i.rangeIndex -= 1
+                i.extent = _range(at: i.rangeIndex)
+                i.value = i.extent.upperBound - 1
+            }
+        } else {
+            // Move to the previous value in this range
+            i.value -= 1
+        }
+    }
+    
+    private func _index(ofInteger integer: Element) -> Index {
+        let rangeCount = _rangeCount
+        let value = integer
+        if let rangeIndex = _indexOfRange(containing: integer) {
+            let extent = _range(at: rangeIndex)
+            let rangeIndex = rangeIndex
+            return Index(value: value, extent: extent, rangeIndex: rangeIndex, rangeCount: rangeCount)
+        } else {
+            let extent = 0..<0
+            let rangeIndex = 0
+            return Index(value: value, extent: Range(extent), rangeIndex: rangeIndex, rangeCount: rangeCount)
+        }
     }
     
     // MARK: -
