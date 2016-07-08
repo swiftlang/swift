@@ -374,8 +374,6 @@ UnsafeMutablePointerTestSuite.test("assign/immutable") {
   }
 }
 
-% end
-
 % for (SelfName, SelfType) in [
 %         ('UnsafePointer', 'UnsafePointer<Float>'),
 %         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),

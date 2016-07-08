@@ -164,27 +164,38 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 
 %  if mutable:
-  /// Initialize this memory location with `count` consecutive copies
-  /// of `newValue` of type `T`.
+  /// Initialize this memory location `self + strideof(T) * index`
+  /// with `count` consecutive copies `value`, and bind the
+  /// initialized memory to type `T`.
   ///
   /// Returns an `UnsafeMutablePointer<T>` to this memory.
   ///
-  /// - Precondition: The memory is not initialized.
+  /// - Precondition: The memory at
+  ///  `self + index * strideof(T)..<self + (index + count) * strideof(T)`
+  ///  is uninitialized.
   ///
   /// - Precondition: The underlying pointer is properly aligned for
   ///                 accessing `T`.
   ///
+  /// - Precondition: `index` is non-negative.
+  ///
   /// - Precondition: `count` is non-negative.
   ///
-  /// - Postcondition: The memory is initialized; the value should eventually
-  ///   be destroyed or moved from to avoid leaks.
+  /// - Postcondition: The memory at
+  ///  `(self + strideof(T) * index)..<(self + strideof(T) * index) + count`
+  ///  is bound to type `T` and initialized; the value should eventually be
+  ///  destroyed or moved from to avoid leaks.
   @discardableResult
-  public func initialize<T>(_: T.Type, with value: T, count: Int = 1)
+  public func initializeMemory<T>(as type: T.Type, at index: Int = 0,
+    count: Int = 1, to value: T)
     -> UnsafeMutablePointer<T> {
+    _debugPrecondition(index >= 0,
+      "UnsafeMutableRawPointer.initializeMemory: negative index")
     _debugPrecondition(count >= 0,
-      "UnsafeMutableRawPointer.initialize(to:): negative count")
+      "UnsafeMutableRawPointer.initializeMemory: negative count")
 
-    var nextPtr = self
+    // FIXME: Call a builtin to bind memory before initializing.
+    var nextPtr = self + index * strideof(T.self)
     for _ in 0..<count {
       Builtin.initialize(value, nextPtr._rawValue)
       nextPtr += strideof(T.self)
@@ -192,228 +203,153 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     return UnsafeMutablePointer(_rawValue)
   }
 
-  /// Initialize the memory location at `index` with `newValue` as if this
-  /// memory holds at least `index` + 1 contiguous values of type `T`.
-  ///
-  /// Returns an `UnsafeMutablePointer<T>` the single intialized
-  /// in-memory element.
-  ///
-  /// - Precondition: The memory at `index` is not initialized.
-  ///
-  /// - Precondition: The underlying pointer is properly aligned for
-  ///                 accessing `T`.
-  ///
-  /// - Postcondition: The memory is initialized; the value should eventually
-  ///   be destroyed or moved from to avoid leaks.
-  @discardableResult
-  public func initialize<T>(toContiguous _: T.Type, atIndex index: Int,
-    with value: T)
-    -> UnsafeMutablePointer<T> {
-    return (self + strideof(T.self) * index).initialize(T.self, with: value)
-  }
-
   /// Initialize memory starting at `self` with `count` `T` values
-  /// beginning at `from`, proceeding forward from `self` to `self +
-  /// count - 1`.
+  /// beginning at `source`, and bind the initialized memory to type
+  /// `T`.
   ///
   /// Returns an `UnsafeMutablePointer<T>` this memory.
   ///
   /// - Precondition: `count >= 0`
   ///
-  /// - Precondition: `self` either precedes `source` or follows `source +
-  ///   count - 1`.
+  /// - Precondition: The memory regions `source..<source + count` and
+  ///   `self..<self + count * strideof(T.self)` do not overlap.
   ///
-  /// - Precondition: The memory at `self..<self + count` is uninitialized
-  ///   and the `T` values at `source..<source + count` are
+  /// - Precondition: The memory at `self..<self + count * strideof(T.self)`
+  ///   is uninitialized, and the `T` values at `source..<source + count` are
   ///   initialized.
   ///
   /// - Precondition: The underlying pointer is properly aligned for
   ///                 accessing `T`.
   ///
-  /// - Postcondition: The `T` values at `self..<self + count` and
-  ///   `source..<source + count` are initialized.
+  /// - Postcondition: The memory at `self..<self + count * strideof(T.self)`
+  ///   is bound to type `T`.
+  ///
+  /// - Postcondition: The `T` values at `self..<self + count *
+  ///   strideof(T.self)` and `source..<source + count` are initialized.
   @discardableResult
-  public func initialize<T>(from source: UnsafePointer<T>, count: Int)
-    -> UnsafeMutablePointer<T> {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutableRawPointer.initialize with negative count")
-    _debugPrecondition(
-      UnsafeRawPointer(self) < UnsafeRawPointer(source)
-      || UnsafeRawPointer(source + count) <= UnsafeRawPointer(self),
-      "UnsafeMutableRawPointer.initialize non-following overlapping range")
-    Builtin.copyArray(
-      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
-    return UnsafeMutablePointer(_rawValue)
-  }
-
-  /// Initialize memory starting at `self` with the `count` `T` values
-  /// at `source`, proceeding backward from `self + count - 1` to
-  /// `self`.
-  ///
-  /// Returns an `UnsafeMutablePointer<T>` this memory.
-  ///
-  /// Use `initializeBackwardFrom` when copying elements into later memory
-  /// that may overlap with the source range.
-  ///
-  /// - Precondition: `count >= 0`
-  ///
-  /// - Precondition: `source` either precedes `self` or follows
-  ///   `self + count - 1`.
-  ///
-  /// - Precondition: The `T` values at `self..<self + count` and
-  ///   `source..<source + count` are initialized.
-  @discardableResult
-  public func initializeBackward<T>(from source: UnsafePointer<T>,
+  public func initializeMemory<T>(as: T.Type, from source: UnsafePointer<T>,
     count: Int)
     -> UnsafeMutablePointer<T> {
     _debugPrecondition(
-      count >= 0, "UnsafeMutableRawPointer.initializeBackwardFrom with negative count")
+      count >= 0,
+      "UnsafeMutableRawPointer.initializeMemory with negative count")
     _debugPrecondition(
-      UnsafeRawPointer(source) < UnsafeRawPointer(self)
-      || UnsafeRawPointer(source)
-         >= UnsafeRawPointer(self) + (count * strideof(T.self)),
-      "UnsafeMutableRawPointer.initializeBackwardFrom non-preceding overlapping range; use initialize(from:) instead")
-    var i = count - strideof(T.self)
-    while i >= 0 {
-      (self + i).initialize(T.self, with: source[i])
-      i -= strideof(T.self)
+      (UnsafeRawPointer(self + count * strideof(T.self))
+        <= UnsafeRawPointer(source))
+      || UnsafeRawPointer(source + count) <= UnsafeRawPointer(self),
+      "UnsafeMutableRawPointer.initializeMemory overlapping range")
+
+    // FIXME: Call a builtin to bind memory before initializing.
+    Builtin.copyArray(
+      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
+    // This builtin is equivalent to:
+    // for i in 0..<count {
+    //   (self.assumingMemoryBound(to: T.self) + i).initialize(to: source[i])
+    // }
+    return UnsafeMutablePointer(_rawValue)
+  }
+
+  /// Initialize memory starting at `self` with the elements of
+  /// `source`, and bind the initialized memory to type `T`.
+  ///
+  /// Returns an `UnsafeMutablePointer<T>` this memory.
+  ///
+  /// - Precondition: The memory at `self..<self + source.count *
+  ///   strideof(T.self)` is uninitialized.
+  ///
+  /// - Postcondition: The memory at `self..<self + source.count *
+  ///   strideof(T.self)` is bound to type `T`.
+  ///
+  /// - Postcondition: The `T` values at `self..<self + source.count *
+  ///   strideof(T.self)` are initialized.
+  ///
+  /// TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
+  @discardableResult
+  public func initializeMemory<C : Collection>(
+    as: C.Iterator.Element.Type, from source: C)
+    -> UnsafeMutablePointer<C.Iterator.Element> {
+    // Initialize and bind each element of the container.
+    for (index, element) in source.enumerated() {
+      self.initializeMemory(as: C.Iterator.Element.self, at: index, to: element)
     }
     return UnsafeMutablePointer(_rawValue)
   }
 
   /// Initialize memory starting at `self` with `count` `T` values
-  /// beginning at `source`, proceeding forward from `self` to `self +
-  /// count - 1`, and returning the source memory to an uninitialized
-  /// state.
+  /// beginning at `source`, bind the initialized memory to type `T`,
+  /// and return the source memory to an uninitialized state.
   ///
   /// Returns an `UnsafeMutablePointer<T>` this memory.
   ///
   /// - Precondition: `count >= 0`
   ///
-  /// - Precondition: `self` either precedes `source` or follows `source +
-  ///   count - 1`.
+  /// - Precondition: The memory at `self..<self + count *
+  ///   strideof(T.self)` is uninitialized and the `T` values at
+  ///   `source..<source + count` are initialized.
   ///
-  /// - Precondition: The memory at `self..<self + count` is uninitialized
-  ///   and the `Pointees` at `source..<source + count` are
-  ///   initialized.
+  /// - Postcondition: The memory at `self..<self + count *
+  ///   strideof(T.self)` is bound to type `T`.
   ///
-  /// - Postcondition: The `T` values at `self..<self + count` are
-  ///   initialized and the memory at `source..<source + count` is
-  ///   uninitialized.
+  /// - Postcondition: The `T` values at `self..<self + count *
+  ///   strideof(T.self)` are initialized and the memory at
+  ///   `source..<source + count` is uninitialized.
   @discardableResult
-  public func moveInitialize<T>(from source: UnsafeMutablePointer<T>,
-    count: Int)
+  public func moveInitializeMemory<T>(
+    as: T.Type, from source: UnsafeMutablePointer<T>, count: Int)
     -> UnsafeMutablePointer<T> {
     _debugPrecondition(
-      count >= 0, "UnsafeMutableRawPointer.moveInitialize with negative count")
-    _debugPrecondition(
-      self < UnsafeMutableRawPointer(source)
-      || self >= UnsafeMutableRawPointer(source) + count,
-      "UnsafeMutableRawPointer.moveInitialize(from:) non-following overlapping range; use moveInitializeBackwardFrom")
-    Builtin.takeArrayFrontToBack(
-      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
-    // This builtin is equivalent to:
-    // for i in 0..<count {
-    //   (self + i).initialize(to: (source + i).move())
-    // }
-    return UnsafeMutablePointer(_rawValue)
-  }
+      count >= 0,
+      "UnsafeMutableRawPointer.moveInitializeMemory with negative count")
 
-  /// Initialize memory starting at `self` with `count` `T` values
-  /// beginning at `source`, proceeding backward from `self + count - 1`
-  /// to `self`, and returning the source memory to an uninitialized
-  /// state.
-  ///
-  /// Returns an `UnsafeMutablePointer<T>` this memory.
-  ///
-  /// - Precondition: `count >= 0`
-  ///
-  /// - Precondition: `source` either precedes `self` or follows
-  ///   `self + count - 1`.
-  ///
-  /// - Precondition: The memory at `self..<self + count` is uninitialized
-  ///   and the `Pointees` at `source..<source + count` are
-  ///   initialized.
-  ///
-  /// - Postcondition: The `T` values at `self..<self + count` are
-  ///   initialized and the memory at `source..<source + count` is
-  ///   uninitialized.
-  @discardableResult
-  public func moveInitializeBackward<T>(from source: UnsafeMutablePointer<T>,
-    count: Int)
-    -> UnsafeMutablePointer<T> {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutableRawPointer.moveInitializeBackward with negative count")
-    _debugPrecondition(
-      UnsafeMutableRawPointer(source) < self
-      || UnsafeMutableRawPointer(source) >= self + count,
-      "UnsafeMutableRawPointer.moveInitializeBackward non-preceding overlapping range; use moveInitialize(from:) instead")
-    Builtin.takeArrayBackToFront(
-      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
-    // This builtin is equivalent to:
-    // var src = source + count
-    // var dst = self + count
-    // while dst != self {
-    //   (--dst).initialize(to: (--src).move())
-    // }
+    // FIXME: Call a builtin to bind memory before initializing.
+    if self < UnsafeMutableRawPointer(source)
+       || self >= UnsafeMutableRawPointer(source + count) {
+      // initialize forward from a disjoint or following overlapping range.
+      Builtin.takeArrayFrontToBack(
+        T.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      // This builtin is equivalent to:
+      // for i in 0..<count {
+      //   (self.assumingMemoryBound(to: T.self) + i)
+      //   .initialize(to: (source + i).move())
+      // }
+    }
+    else {
+      // initialize backward from a non-following overlapping range.
+      Builtin.takeArrayBackToFront(
+        T.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      // This builtin is equivalent to:
+      // var src = source + count
+      // var dst = self.assumingMemoryBound(to: T.self) + count
+      // while dst != self {
+      //   (--dst).initialize(to: (--src).move())
+      // }
+    }
     return UnsafeMutablePointer(_rawValue)
   }
 %  end # mutable
 
-  /// Load a single value of type `T` from raw memory.
+  /// Read raw bytes from memory at `self + offset` and construct a
+  /// value of type `T`.
   ///
-  /// - Precondition: The underlying pointer is properly aligned for
-  ///   accessing `T`.
+  /// - Precondition: The underlying pointer plus `offset` is properly
+  /// aligned for accessing `T`.
   ///
   /// - Precondition: The memory is initialized to a value of some type, `U`,
   ///   such that `T` is layout compatible with `U`.
-  ///
-  /// - Note: The converse of loading a value, storing a value `T`
-  ///   into initialized memory requires the user to know the
-  ///   previously initialized value's type. Full 'store' semantics
-  ///   can be achieved with:
-  ///   `deinitialize(PreviousType)`
-  ///   `initialize(NewType, with: value)`
-  ///   If the previosly initialized type is trivial, then the
-  ///   `deinitialize` call can be skipped.
-  public func load<T>(_ : T.Type) -> T {
-    return Builtin.load(_rawValue)
-  }
-
-  /// Load a single value of type `T` from memory at the given byte offset.
-  ///
-  /// - Precondition: The underlying pointer plus `offset` is properly
-  ///   aligned for accessing `T`.
-  ///
-  /// - Precondition: The memory at `offset` is initialized to a value
-  ///   of some type, `U`, such that `T` is layout compatible with `U`.
-  public func load<T>(_ ty : T.Type, atByteOffset offset: Int) -> T {
-    return (self + offset).load(ty)
-  }
-
-  /// Load a single value of type `T` at the specified `index` from
-  /// this memory as if it contains at least `index` + 1 contiguous
-  /// values of type `T`.
-  ///
-  /// - Precondition: The underlying pointer is properly aligned for
-  ///                 accessing `T`.
-  ///
-  /// - Precondition: The memory at `index` is initialized to a value
-  ///   of some type, `U`, such that `T` is layout compatible with `U`.
-  public func load<T>(fromContiguous: T.Type, atIndex index: Int) -> T {
-    return (self + strideof(T.self) * index).load(T.self)
+  public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
+    return Builtin.load((self + offset)._rawValue)
   }
 
 %  if mutable:
-  /// Store a value's bytes into raw memory at `self`.
+  /// Store a value's bytes into raw memory at `self + offset`.
   ///  
-  /// - Precondition: The underlying pointer is properly aligned for storing
-  ///   type `T`.
+  /// - Precondition: The underlying pointer plus `offset` is properly
+  /// aligned for storing type `T`.
   ///
   /// - Precondition: `T` is a trivial type.
   ///
-  /// - Precondition: The memory is uninitialized, or initialized some
-  ///   trivial type `U` such that `T` and `U` are mutually layout
+  /// - Precondition: The memory is uninitialized, or initialized to
+  ///   some trivial type `U` such that `T` and `U` are mutually layout
   ///   compatible.
   /// 
   /// - Postcondition: The memory is initialized to raw bytes. If the
@@ -425,104 +361,64 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   Generally, native Swift types that do not contain strong or
   ///   weak references or other forms of indirection are trivial, as
   ///   are imported C structs and enums.
-  public func storeRaw<T>(_: T.Type, with value: T) {
+  ///
+  /// - Note: Storing a copy of a nontrivial value into memory
+  ///   requires that the user know the type of value previously in
+  ///   memory, and requires initialization or assignment of the
+  ///   memory. This can be acheived via a typed `UnsafeMutablePointer`
+  ///   or via a raw pointer `self`, as follows, where `U` is the
+  ///   previous type and `T` is the copied value's type:
+  ///   `let typedPtr = self.bindMemory(to: U.self, capacity: 1)`
+  ///   `typedPtr.deinitialize(count: 1)`
+  ///   `self.initializeMemory(as: T.self, to: newValue)`
+  public func storeBytes<T>(
+    of value: T, toByteOffset offset: Int = 0, as: T.Type) {
     var temp = value
     withUnsafeMutablePointer(&temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
-        _rawValue, rawSrc, sizeof(T.self)._value,
+        (self + offset)._rawValue, rawSrc, sizeof(T.self)._value,
         /*alignment:*/ Int32(0)._value,
         /*volatile:*/ false._value)
     }
   }
   
-  /// Store a value's bytes into raw memory at the specified `index` from
-  /// this memory as if it contains at least `index` + 1 contiguous
-  /// values of type `T`.
+  /// Copy `count` bytes from `source` into memory at `self`.
   ///  
-  /// - Precondition: The underlying pointer is properly aligned for storing
-  ///   type `T`.
+  /// - Precondition: The memory at `source..<source + count` is
+  ///   initialized to some trivial type `T`.
   ///
-  /// - Precondition: `T` is a trivial type.
+  /// - Precondition: If the memory at `self..<self+count` is bound to
+  ///   a type `U`, then `U` is a trivial type, the underlying
+  ///   pointers `source` and `self` are properly aligned for type
+  ///   `U`, and `count` is a multiple of `strideof(U.self)`.
   ///
-  /// - Precondition: The memory is uninitialized, or initialized some
-  ///   trivial type `U` such that `T` and `U` are mutually layout
-  ///   compatible.
-  /// 
-  /// - Postcondition: The memory is initialized to raw bytes. If the
-  ///   memory is bound to type `U`, then it now contains a value of
-  ///   type `U`.
-  public func storeRaw<T>(toContiguous: T.Type, atIndex index: Int,
-    with value: T) {
-    (self + (strideof(T.self) * index)).storeRaw(T.self, with: value)
-  }
-  
-  /// Read `count` contiguous values from of type `T` from `source` and
-  /// store their raw bytes into memory at `self.
-  ///  
-  /// - Precondition: The underlying pointer is properly aligned for storing
-  ///   type `T`.
-  ///
-  /// - Precondition: `T` is a trivial type.
-  ///
-  /// - Precondition: The memory is uninitialized, or initialized some
-  ///   trivial type `U` such that `T` and `U` are mutually layout
-  ///   compatible.
-  /// 
-  /// - Postcondition: The memory is initialized to raw bytes. If the
-  ///   memory is bound to type `U`, then it now contains a value of
-  ///   type `U`.
-  public func storeRaw<T>(contiguous: T.Type, from source: UnsafeRawPointer,
-    count: Int) {
+  /// - Postcondition: The memory at `self..<self+count` is
+  ///   initialized to raw bytes. If the memory is bound to type `U`,
+  ///   then it contains values of type `U`.
+  public func copyBytes(from source: UnsafeRawPointer, count: Int) {
     _debugPrecondition(
-      count >= 0, "UnsafeMutableRawPointer.storeRaw with negative count")
-    _debugPrecondition(
-      UnsafeRawPointer(self) < source
-      || source + (count * strideof(T.self)) <= UnsafeRawPointer(self),
-      "UnsafeMutableRawPointer.storeRaw non-following overlapping range")
-
-    Builtin.int_memcpy_RawPointer_RawPointer_Int64(
-      _rawValue, source._rawValue, (count * strideof(T.self))._value,
-      /*alignment:*/ Int32(0)._value,
-      /*volatile:*/ false._value)
-  }
-
-  /// Read `count` contiguous values from of type `T` from `source`
-  /// and store their raw bytes into memory at `self. Memory is
-  /// processed from the highest to lowest address.
-  ///  
-  /// - Precondition: The underlying pointer is properly aligned for storing
-  ///   type `T`.
-  ///
-  /// - Precondition: `T` is a trivial type.
-  ///
-  /// - Precondition: The memory is uninitialized, or initialized some
-  ///   trivial type `U` such that `T` and `U` are mutually layout
-  ///   compatible.
-  /// 
-  /// - Postcondition: The memory is initialized to raw bytes. If the
-  ///   memory is bound to type `U`, then it now contains a value of
-  ///   type `U`.
-  public func storeRawBackward<T>(contiguous: T.Type,
-    from source: UnsafeRawPointer,
-    count: Int) {
-    _debugPrecondition(
-      count >= 0,
-      "UnsafeMutableRawPointer.storeRawBackward with negative count")
-    _debugPrecondition(
-      source < UnsafeRawPointer(self)
-      || source >= UnsafeRawPointer(self) + (count * strideof(T.self)),
-      "UnsafeMutableRawPointer.storeRawBackward non-preceding overlapping range; use initialize(from:) instead")
-
-    var destPtr = self + ((count - 1) * strideof(T.self))
-    var srcPtr = source + ((count - 1) * strideof(T.self))
-    while destPtr >= self {
+      count >= 0, "UnsafeMutableRawPointer.copyBytes with negative count")
+    if UnsafeRawPointer(self) < source
+       || (source + count) <= UnsafeRawPointer(self) {
+      // copy forward from a disjoint or following overlapping range.
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
-        destPtr._rawValue, srcPtr._rawValue, strideof(T.self)._value,
+        _rawValue, source._rawValue, count._value,
         /*alignment:*/ Int32(0)._value,
         /*volatile:*/ false._value)
-      destPtr -= strideof(T.self)
-      srcPtr -= strideof(T.self)
+    }
+    else {
+      // copy backward from a non-following overlapping range.
+      var destPtr = self + (count - 1)
+      var srcPtr = source + (count - 1)
+      while destPtr >= self {
+        Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+          destPtr._rawValue, srcPtr._rawValue, Int64(1)._value,
+          /*alignment:*/ Int32(0)._value,
+          /*volatile:*/ false._value)
+        destPtr -= 1
+        srcPtr -= 1
+      }
     }
   }
 %  end # mutable

@@ -128,6 +128,7 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The pointee is allocated, but not initialized.
   static public func allocate(capacity count: Int)
     -> UnsafeMutablePointer<Pointee> {
+    // FIXME: call a builtin to bind the allocated memory to Pointee.
     let size = strideof(Pointee.self) * count
     return UnsafeMutablePointer(
       Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self)))
@@ -262,8 +263,7 @@ public struct ${Self}<Pointee>
   }
 
   /// Initialize memory starting at `self` with `count` `Pointee`s
-  /// beginning at `source`, proceeding forward from `self` to `self +
-  /// count - 1`.
+  /// beginning at `source`.
   ///
   /// - Precondition: `count >= 0`
   ///
