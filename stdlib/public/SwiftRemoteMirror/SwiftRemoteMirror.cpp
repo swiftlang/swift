@@ -22,6 +22,11 @@ using namespace swift::remote;
 using NativeReflectionContext
   = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
 
+uint16_t
+swift_reflection_getSupportedMetadataVersion() {
+  return SWIFT_REFLECTION_METADATA_VERSION;
+}
+
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
                                          PointerSizeFunction getPointerSize,
