@@ -8,8 +8,24 @@
 
 import Foundation
 
-func printError(_ err: TestError) {
+func printErrorCode(_ err: TestError.Code) {
   switch (err) {
+    case .TENone:
+    print("TestError: TENone")
+    break
+
+    case .TEOne:
+    print("TestError: TEOne")
+    break
+
+    case .TETwo:
+    print("TestError: TETwo")
+    break
+  }
+}
+
+func printError(_ err: TestError) {
+  switch (err.code) {
     case .TENone:
     print("TestError: TENone")
     break
@@ -27,11 +43,11 @@ func printError(_ err: TestError) {
 func testError() {
   let terr = getErr()
   switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
-  printError(terr)
+  printErrorCode(terr)
     // CHECK: TestError: TEOne
 
   do {
-    throw TestError.TETwo
+    throw TestError(.TETwo)
   } catch let error as TestError {
     printError(error)
     // CHECK-NEXT: TestError: TETwo

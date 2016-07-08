@@ -162,7 +162,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
     // CoreLocation error domain
     let nsCL = NSError(domain: kCLErrorDomain,
                        code: CLError.headingFailure.rawValue,
-                       userInfo: [:])
+                       userInfo: [NSURLErrorKey: testURL])
     let eCL: ErrorProtocol = nsCL
     let isHeadingFailure: Bool
     switch eCL {
@@ -172,7 +172,16 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
       isHeadingFailure = false
     }
 
-    expectTrue(isHeadingFailure)
+    let isCLError: Bool
+    switch eCL {
+    case let error as CLError:
+      isCLError = true
+      expectOptionalEqual(testURL, (error as NSError).userInfo[NSURLErrorKey] as? URL)
+    default:
+      isCLError = false
+    }
+
+    expectTrue(isCLError)
 
     // NSPOSIXError domain
     let nsPOSIX = NSError(domain: NSPOSIXErrorDomain,

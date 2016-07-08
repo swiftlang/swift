@@ -324,7 +324,8 @@ public protocol _BridgedNSError : __BridgedNSError,
 /// Describes a bridged error that stores the underlying NSError, so
 /// it can be queried.
 public protocol _BridgedStoredNSError :
-     __BridgedNSError, _ObjectiveCBridgeableErrorProtocol, CustomNSError {
+     __BridgedNSError, _ObjectiveCBridgeableErrorProtocol, CustomNSError,
+     Hashable {
   /// The type of an error code.
   associatedtype Code: _ErrorCodeProtocol
 
@@ -418,24 +419,24 @@ public extension _BridgedStoredNSError {
 /// Describes the code of an error.
 public protocol _ErrorCodeProtocol : Equatable {
   /// The corresponding error code.
-  associatedtype ErrorType
+  associatedtype _ErrorType
 
-  // FIXME: We want ErrorType to be _BridgedStoredNSError and have its
+  // FIXME: We want _ErrorType to be _BridgedStoredNSError and have its
   // Code match Self, but we cannot express those requirements yet.
 }
 
 /// Allow one to match an error code against an arbitrary error.
 public func ~= <Code: _ErrorCodeProtocol>(match: Code, error: ErrorProtocol)
     -> Bool
-    where Code.ErrorType: _BridgedStoredNSError {
-  guard let specificError = error as? Code.ErrorType else { return false }
+    where Code._ErrorType: _BridgedStoredNSError {
+  guard let specificError = error as? Code._ErrorType else { return false }
 
-  // FIXME: Work around IRGen crash when we set Code == Code.ErrorType.Code.
+  // FIXME: Work around IRGen crash when we set Code == Code._ErrorType.Code.
   let specificCode = specificError.code as! Code
   return match == specificCode
 }
 
-func == <T: _BridgedStoredNSError>(lhs: T, rhs: T) -> Bool {
+public func == <T: _BridgedStoredNSError>(lhs: T, rhs: T) -> Bool {
   return lhs._nsError.isEqual(rhs._nsError)
 }
 
@@ -452,7 +453,7 @@ public struct NSCocoaError : _BridgedStoredNSError {
 
   /// The error code itself.
   public struct Code : RawRepresentable, _ErrorCodeProtocol {
-    public typealias ErrorType = NSCocoaError
+    public typealias _ErrorType = NSCocoaError
 
     public let rawValue: Int
 
@@ -1192,7 +1193,7 @@ public struct NSURLError : _BridgedStoredNSError {
   public static var _nsErrorDomain: String { return NSURLErrorDomain }
 
   @objc public enum Code : Int, _ErrorCodeProtocol {
-    public typealias ErrorType = NSURLError
+    public typealias _ErrorType = NSURLError
 
     case unknown = -1
     case cancelled = -999
@@ -1728,7 +1729,7 @@ public struct POSIXError : _BridgedStoredNSError {
 }
 
 extension POSIXErrorCode : _ErrorCodeProtocol {
-  public typealias ErrorType = POSIXError
+  public typealias _ErrorType = POSIXError
 }
 
 extension POSIXError {
@@ -2214,7 +2215,7 @@ public struct MachError : _BridgedStoredNSError {
 }
 
 extension MachErrorCode : _ErrorCodeProtocol {
-  public typealias ErrorType = MachError
+  public typealias _ErrorType = MachError
 }
 
 extension MachError {

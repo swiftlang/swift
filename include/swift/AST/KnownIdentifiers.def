@@ -111,6 +111,10 @@ IDENTIFIER(dictionaryLiteral)
 IDENTIFIER_(getBuiltinLogicValue)
 IDENTIFIER(className)
 
+IDENTIFIER_(ErrorType)
+IDENTIFIER(Code)
+IDENTIFIER_(nsError)
+
 #undef IDENTIFIER
 #undef IDENTIFIER_
 #undef IDENTIFIER_WITH_NAME

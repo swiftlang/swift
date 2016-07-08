@@ -1250,10 +1250,10 @@ private:
   template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
     ToAttributeKind() {}
 
-    Optional<const DeclAttribute *>
+    Optional<const ATTR *>
     operator()(const DeclAttribute *Attr) const {
       if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
-        return Attr;
+        return cast<ATTR>(Attr);
       return None;
     }
   };

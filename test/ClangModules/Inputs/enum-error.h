@@ -1,3 +1,5 @@
+#import <Foundation/Foundation.h>
+
 #define NS_ERROR_ENUM(_type, _name, _domain)                                   \
   enum _name : _type _name;                                                    \
   enum __attribute__((ns_error_domain(_domain))) _name : _type

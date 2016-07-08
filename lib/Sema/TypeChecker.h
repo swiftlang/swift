@@ -1594,6 +1594,10 @@ public:
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
 
+  /// Mark any _BridgedNSError/_BridgedStoredNSError/related
+  /// conformances in the given type as "used".
+  void useBridgedNSErrorConformances(DeclContext *dc, Type type);
+
   /// If this bound-generic type is bridged, mark any
   /// _ObjectiveCBridgeable conformances in the generic arguments of
   /// the given type as "used".

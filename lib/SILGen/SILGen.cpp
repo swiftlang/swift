@@ -1127,11 +1127,12 @@ static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
 
 void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   // We don't need to emit dependent conformances.
-  if (conformanceRef.isAbstract())
+  if (conformanceRef.isAbstract()) 
     return;
 
   auto conformance = conformanceRef.getConcrete();
   auto root = conformance->getRootNormalConformance();
+
   // If we already emitted this witness table, we don't need to track the fact
   // we need it.
   if (emittedWitnessTables.count(root))

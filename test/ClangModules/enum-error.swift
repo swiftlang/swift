@@ -10,6 +10,10 @@
 
 // RUN: %target-swift-frontend -emit-sil %s -import-objc-header %S/Inputs/enum-error.h -verify
 
+// RUN: echo '#include "enum-error.h"' > %t.m
+// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h -print-regular-comments --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t.txt
+// RUN: FileCheck -check-prefix=HEADER %s < %t.txt
+
 import Foundation
 
 
@@ -22,25 +26,25 @@ func testError() {
 // expression forms are sufficient in pulling in the _NSBridgedError
 // conformance.
 #if VALUE
-// VALUE: TestError: _BridgedNSError
+// VALUE: TestError: _BridgedStoredNSError
   let terr = getErr(); terr
 
 #elseif EMPTYCATCH
-// EMPTYCATCH: TestError: _BridgedNSError
+// EMPTYCATCH: TestError: _BridgedStoredNSError
   do {
-    throw TestError.TENone
+    throw TestError(.TENone)
   } catch {}
 
 #elseif ASQEXPR
-// ASQEXPR: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
+// ASQEXPR: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
   let wasTestError = testErrorNSError as? TestError; wasTestError
 
 #elseif ASBANGEXPR
-// ASBANGEXPR: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
+// ASBANGEXPR: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
   let terr2 = testErrorNSError as! TestError; terr2
 
 #elseif ISEXPR
-// ISEXPR: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
+// ISEXPR: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
   if (testErrorNSError is TestError) {
     print("true")
   } else {
@@ -48,42 +52,60 @@ func testError() {
   }
 
 #elseif CATCHIS
-// CATCHIS: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
+// CATCHIS: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
   do {
-    throw TestError.TETwo
+    throw TestError(.TETwo)
   } catch is TestError {
   } catch {}
 
 #elseif CATCHAS
-// CATCHAS: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
+// CATCHAS: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
   do {
-    throw TestError.TETwo
+    throw TestError(.TETwo)
   } catch let err as TestError {
     err
   } catch {}
 
 #elseif GENERICONLY
-// GENERICONLY: TestError: _BridgedNSError
+// GENERICONLY: TestError: _BridgedStoredNSError
   func dyncast<T, U>(_ x: T) -> U {
     return x as! U
   }
   let _ : TestError = dyncast(testErrorNSError)
 
 #else
-// CHECK: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
+// CHECK: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
   let terr = getErr()
   switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
 
   switch (terr) { case .TENone, .TEOne: break }
     // expected-error@-1 {{switch must be exhaustive, consider adding a default clause}}
 
-  let _ = TestError(rawValue: 2)!
+  let _ = TestError.Code(rawValue: 2)!
 
   do {
-    throw TestError.TEOne
+    throw TestError(.TEOne)
   } catch is TestError {
   } catch {}
 
 #endif
 
 }
+
+// HEADER: struct TestError : _BridgedStoredNSError {
+// HEADER:   let _nsError: NSError
+// HEADER:   init(_nsError: NSError)
+// HEADER:   static var _nsErrorDomain: String { get }
+// HEADER:   enum Code : Int32, _ErrorCodeProtocol {
+// HEADER:     init?(rawValue: Int32)
+// HEADER:     var rawValue: Int32 { get }
+// HEADER:     typealias _ErrorType = TestError
+// HEADER:     case TENone
+// HEADER:     case TEOne
+// HEADER:     case TETwo
+// HEADER:   }
+// HEADER:   static var TENone: TestError.Code { get }
+// HEADER:   static var TEOne: TestError.Code { get }
+// HEADER:   static var TETwo: TestError.Code { get }
+// HEADER: }
+// HEADER: func getErr() -> TestError.Code

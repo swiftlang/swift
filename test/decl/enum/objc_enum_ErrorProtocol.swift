@@ -6,12 +6,6 @@ import Foundation
 
 func acceptBridgeableNSError<E : _ObjectiveCBridgeableErrorProtocol>(_ e: E) { }
 
-@objc enum E1 : Int, ErrorProtocol, _BridgedNSError {
-  case A = 1
-}
-
-acceptBridgeableNSError(E1.A)
-
 @objc enum E2 : Int, ErrorProtocol {
   case A = 1
 }

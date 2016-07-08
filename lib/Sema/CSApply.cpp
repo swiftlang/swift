@@ -357,15 +357,13 @@ namespace {
     /// Recognize used conformances from an imported type when we must emit
     /// the witness table.
     ///
-    /// This arises in _BridgedNSError, where we wouldn't otherwise pull in
-    /// the witness table, causing dynamic casts to perform incorrectly.
+    /// This arises in _BridgedStoredNSError, where we wouldn't
+    /// otherwise pull in the witness table, causing dynamic casts to
+    /// perform incorrectly, and _ErrorCodeProtocol, where we need to
+    /// check for _BridgedStoredNSError conformances on the
+    /// corresponding ErrorType.
     void checkForImportedUsedConformances(Type toType) {
-      if (auto bridgedNSErrorProtocol = cs.getASTContext().getProtocol(
-              KnownProtocolKind::BridgedNSError)) {
-        // Force it as "Used", if it conforms
-        cs.getTypeChecker().conformsToProtocol(toType, bridgedNSErrorProtocol,
-                                               dc, ConformanceCheckFlags::Used);
-      }
+      cs.getTypeChecker().useBridgedNSErrorConformances(dc, toType);
     }
 
     /// \brief Coerce the given tuple to another tuple type.
