@@ -83,7 +83,7 @@ public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
 extension _ArrayBuffer {
   /// Adopt the storage of `source`.
-  public init(_buffer source: NativeBuffer, shiftedToStartIndex: Int) {
+  internal init(_buffer source: NativeBuffer, shiftedToStartIndex: Int) {
     _sanityCheck(shiftedToStartIndex == 0, "shiftedToStartIndex must be 0")
     _storage = _ArrayBridgeStorage(native: source._storage)
   }
