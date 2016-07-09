@@ -2050,7 +2050,7 @@ Type ClangImporter::Implementation::importMethodType(
   const clang::ObjCPropertyDecl *property = nullptr;
   bool isPropertyGetter = false;
   bool isPropertySetter = false;
-  if (clangDecl->isPropertyAccessor()) {
+  if (clangDecl->isPropertyAccessor() && clangDecl->isInstanceMethod()) {
     property = clangDecl->findPropertyDecl();
     if (property) {
       if (property->getGetterMethodDecl() == clangDecl) {

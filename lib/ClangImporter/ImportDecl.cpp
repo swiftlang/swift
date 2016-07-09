@@ -2849,7 +2849,7 @@ namespace {
 
       SpecialMethodKind kind = SpecialMethodKind::Regular;
       // FIXME: This doesn't handle implicit properties.
-      if (decl->isPropertyAccessor())
+      if (decl->isPropertyAccessor() && decl->isInstanceMethod())
         kind = SpecialMethodKind::PropertyAccessor;
       else if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
@@ -4776,6 +4776,9 @@ namespace {
       if (Impl.isAccessibilityDecl(decl))
         return nullptr;
 
+      if (!decl->isInstanceProperty())
+        return nullptr;
+
       // Check whether there is a function with the same name as this
       // property. If so, suppress the property; the user will have to use
       // the methods directly, to avoid ambiguities.
@@ -4786,7 +4789,8 @@ namespace {
                           NL_QualifiedDefault | NL_KnownNoDependency,
                           Impl.getTypeResolver(), lookup);
       for (auto result : lookup) {
-        if (isa<FuncDecl>(result) && result->isInstanceMember() &&
+        if (isa<FuncDecl>(result) &&
+            result->isInstanceMember() == decl->isInstanceProperty() &&
             result->getFullName().getArgumentNames().empty())
           return nullptr;
 

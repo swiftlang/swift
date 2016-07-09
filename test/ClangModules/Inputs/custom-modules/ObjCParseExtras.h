@@ -8,28 +8,36 @@ __attribute__((objc_root_class))
 
 @interface PropertyAndMethodCollisionBase
 - (void)object:(id)obj doSomething:(SEL)selector;
++ (void)classRef:(id)obj doSomething:(SEL)selector;
 @end
 
 @interface PropertyAndMethodCollision : PropertyAndMethodCollisionBase
 @property id object;
+@property (class) id classRef;
 @end
 
 @interface PropertyAndMethodReverseCollisionBase
 @property id object;
+@property (class) id classRef;
 @end
 
 @interface PropertyAndMethodReverseCollision : PropertyAndMethodReverseCollisionBase
 - (void)object:(id)obj doSomething:(SEL)selector;
++ (void)classRef:(id)obj doSomething:(SEL)selector;
 @end
 
 @protocol PropertyProto
 @property id protoProp;
 @property(readonly) id protoPropRO;
+@property(class) id protoClassProp;
+@property(class, readonly) id protoClassPropRO;
 @end
 
 @interface PropertyAndMethodCollision () <PropertyProto>
 - (id)protoProp;
 - (id)protoPropRO;
++ (id)protoClassProp;
++ (id)protoClassPropRO;
 @end
 
 

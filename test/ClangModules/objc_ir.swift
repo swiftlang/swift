@@ -70,6 +70,12 @@ func propertyAccess(b b: B) {
    // CHECK: load i8*, i8** @"\01L_selector(counter)"
    // CHECK: load i8*, i8** @"\01L_selector(setCounter:)"
    b.counter = b.counter + 1
+
+   // CHECK: call %swift.type* @_TMaCSo1B()
+   // CHECK: bitcast %swift.type* {{%.+}} to %objc_class*
+   // CHECK: load i8*, i8** @"\01L_selector(sharedCounter)"
+   // CHECK: load i8*, i8** @"\01L_selector(setSharedCounter:)"
+   B.setSharedCounter(B.sharedCounter() + 1)
 }
 
 // CHECK: define hidden [[B]]* @_TF7objc_ir8downcastFT1aCSo1A_CSo1B(

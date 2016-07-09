@@ -61,6 +61,7 @@
 - performMultiplyWithValue:(int)x value:(int)y;
 - moveFor:(int)x;
 @property (readonly) int readCounter;
+@property (class) int sharedCounter;
 
 @property int informalMadeFormal;
 

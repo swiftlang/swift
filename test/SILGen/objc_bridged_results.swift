@@ -100,6 +100,18 @@ func testNonnullString(obj: Test) -> String {
   return obj.nonnullString
 } // CHECK: {{^}$}}
 
+// CHECK-LABEL: sil hidden @_TF20objc_bridged_results13testClassPropFT_SS
+func testClassProp() -> String {
+  // CHECK: [[CLASS:%.+]] = metatype $@thick Test.Type
+  // CHECK: [[METHOD:%.+]] = class_method [volatile] [[CLASS]] : $@thick Test.Type, #Test.nonnullSharedString!1.foreign : Test.Type -> () -> String , $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
+  // CHECK: [[OBJC_CLASS:%.+]] = thick_to_objc_metatype [[CLASS]] : $@thick Test.Type to $@objc_metatype Test.Type
+  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[OBJC_CLASS]]) : $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @swift_NSStringToString : $@convention(thin) (@owned Optional<NSString>) -> @owned String
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]]) : $@convention(thin) (@owned Optional<NSString>) -> @owned String
+  // CHECK: return [[RESULT]] : $String
+  return Test.nonnullSharedString()
+} // CHECK: {{^}$}}
+
 
 // Note: This doesn't really "work" in that it doesn't accept a nil value the
 // way the others do, because subscripts are thunked. But the main thing is

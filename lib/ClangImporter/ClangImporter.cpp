@@ -3090,6 +3090,9 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
     // getter/setter pairs instead.
     if (isAccessibilityDecl(objcProperty))
       return true;
+    // Class properties are imported as methods in Swift 2.3.
+    if (objcProperty->isClassProperty())
+      return true;
 
     // Check whether there is a superclass method for the getter that
     // is *not* suppressed, in which case we will need to suppress
@@ -3896,7 +3899,7 @@ void ClangModuleUnit::lookupObjCMethods(
     if (owningClangModule != clangModule) continue;
 
     // If we found a property accessor, import the property.
-    if (objcMethod->isPropertyAccessor())
+    if (objcMethod->isPropertyAccessor() && objcMethod->isInstanceMethod())
       (void)owner.Impl.importDecl(objcMethod->findPropertyDecl(true));
 
     // Import it.
