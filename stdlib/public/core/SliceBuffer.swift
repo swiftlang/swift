@@ -14,9 +14,9 @@
 public // @testable
 struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
-  public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
+  internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
-  init(
+  internal init(
     owner: AnyObject, subscriptBaseAddress: UnsafeMutablePointer<Element>,
     indices: Range<Int>, hasNativeBuffer: Bool
   ) {
@@ -28,7 +28,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     _invariantCheck()
   }
 
-  public init() {
+  internal init() {
     let empty = _ContiguousArrayBuffer<Element>()
     self.owner = empty.owner
     self.subscriptBaseAddress = empty.firstElementAddress
@@ -37,7 +37,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     _invariantCheck()
   }
 
-  public init(_buffer buffer: NativeBuffer, shiftedToStartIndex: Int) {
+  internal init(_buffer buffer: NativeBuffer, shiftedToStartIndex: Int) {
     let shift = buffer.startIndex - shiftedToStartIndex
     self.init(
       owner: buffer.owner,
@@ -46,7 +46,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
       hasNativeBuffer: true)
   }
 
-  func _invariantCheck() {
+  internal func _invariantCheck() {
     let isNative = _hasNativeBuffer
     let isNativeStorage: Bool = (owner as? _ContiguousArrayStorageBase) != nil
     _sanityCheck(isNativeStorage == isNative)
@@ -55,17 +55,17 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     }
   }
 
-  var _hasNativeBuffer: Bool {
+  internal var _hasNativeBuffer: Bool {
     return (endIndexAndFlags & 1) != 0
   }
 
-  var nativeBuffer: NativeBuffer {
+  internal var nativeBuffer: NativeBuffer {
     _sanityCheck(_hasNativeBuffer)
     return NativeBuffer(
       owner as? _ContiguousArrayStorageBase ?? _emptyArrayStorage)
   }
 
-  public var nativeOwner: AnyObject {
+  internal var nativeOwner: AnyObject {
     _sanityCheck(_hasNativeBuffer, "Expect a native array")
     return owner
   }
@@ -76,7 +76,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   /// - Precondition: This buffer is backed by a uniquely-referenced
   ///   `_ContiguousArrayBuffer` and
   ///   `insertCount <= numericCast(newValues.count)`.
-  public mutating func replace<C>(
+  internal mutating func replace<C>(
     subRange: Range<Int>,
     with insertCount: Int,
     elementsOf newValues: C
@@ -116,23 +116,23 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   }
 
   /// An object that keeps the elements stored in this buffer alive.
-  public var owner: AnyObject
-  public let subscriptBaseAddress: UnsafeMutablePointer<Element>
+  internal var owner: AnyObject
+  internal let subscriptBaseAddress: UnsafeMutablePointer<Element>
 
-  public var firstElementAddress: UnsafeMutablePointer<Element> {
+  internal var firstElementAddress: UnsafeMutablePointer<Element> {
     return subscriptBaseAddress + startIndex
   }
 
-  public var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
+  internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
     return firstElementAddress
   }
 
   /// [63:1: 63-bit index][0: has a native buffer]
-  var endIndexAndFlags: UInt
+  internal var endIndexAndFlags: UInt
 
   //===--- Non-essential bits ---------------------------------------------===//
 
-  public mutating func requestUniqueMutableBackingBuffer(
+  internal mutating func requestUniqueMutableBackingBuffer(
     minimumCapacity: Int
   ) -> NativeBuffer? {
     _invariantCheck()
@@ -161,18 +161,18 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     return nil
   }
 
-  public mutating func isMutableAndUniquelyReferenced() -> Bool {
+  internal mutating func isMutableAndUniquelyReferenced() -> Bool {
     return _hasNativeBuffer && isUniquelyReferenced()
   }
 
-  public mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
+  internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
     return _hasNativeBuffer && isUniquelyReferencedOrPinned()
   }
 
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
-  public func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
+  internal func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer && nativeBuffer.count == count) {
       return nativeBuffer
@@ -181,7 +181,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   }
 
   @discardableResult
-  public func _copyContents(
+  internal func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
@@ -195,12 +195,11 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   }
 
   /// True, if the array is native and does not need a deferred type check.
-  var arrayPropertyIsNativeTypeChecked: Bool {
+  internal var arrayPropertyIsNativeTypeChecked: Bool {
     return _hasNativeBuffer
   }
 
-  public
-  var count: Int {
+  public var count: Int {
     get {
       return endIndex - startIndex
     }
@@ -221,7 +220,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
       index >= startIndex && index < endIndex, "Index out of bounds")
   }
 
-  public var capacity: Int {
+  internal var capacity: Int {
     let count = self.count
     if _slowPath(!_hasNativeBuffer) {
       return count
@@ -234,16 +233,16 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     return count
   }
 
-  mutating func isUniquelyReferenced() -> Bool {
+  internal mutating func isUniquelyReferenced() -> Bool {
     return isUniquelyReferencedNonObjC(&owner)
   }
 
-  mutating func isUniquelyReferencedOrPinned() -> Bool {
+  internal mutating func isUniquelyReferencedOrPinned() -> Bool {
     return isUniquelyReferencedOrPinnedNonObjC(&owner)
   }
 
   @_versioned
-  func getElement(_ i: Int) -> Element {
+  internal func getElement(_ i: Int) -> Element {
     _sanityCheck(i >= startIndex, "negative slice index is out of range")
     _sanityCheck(i < endIndex, "slice index out of range")
     return subscriptBaseAddress[i]
@@ -305,8 +304,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   //===--- misc -----------------------------------------------------------===//
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
-  public
-  func withUnsafeBufferPointer<R>(
+  internal func withUnsafeBufferPointer<R>(
     _ body: @noescape (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
@@ -316,8 +314,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
-  public
-  mutating func withUnsafeMutableBufferPointer<R>(
+  internal mutating func withUnsafeMutableBufferPointer<R>(
     _ body: @noescape (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
