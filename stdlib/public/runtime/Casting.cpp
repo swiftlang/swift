@@ -2515,6 +2515,38 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   return success;
 }
 
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C"
+id _swift_bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
+                                                const Metadata *srcType) {
+  // We can always bridge objects verbatim.
+  if (srcType->isAnyClass()) {
+    return *(id*)src;
+  }
+  
+  // TODO: Look through existential containers.
+  
+  if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
+    // Check whether the source is bridged to Objective-C.
+    if (!srcBridgeWitness->isBridgedToObjectiveC(srcType, srcType,
+                                                 srcBridgeWitness)) {
+      return nil;
+    }
+
+    // Bridge the source value to an object.
+    auto srcBridgedObject =
+      srcBridgeWitness->bridgeToObjectiveC(src, srcType, srcBridgeWitness);
+
+    // The source object was passed in +1.
+    srcType->vw_destroy(src);
+
+    return (id)srcBridgedObject;
+  }
+
+  // TODO: Fall back to boxing here.
+  crash("unimplemented universal bridging conversion");
+}
+
 //===--- Bridging helpers for the Swift stdlib ----------------------------===//
 // Functions that must discover and possibly use an arbitrary type's
 // conformance to a given protocol.  See ../core/BridgeObjectiveC.swift for
