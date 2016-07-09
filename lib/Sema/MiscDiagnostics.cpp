@@ -2856,7 +2856,7 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
     DiagnoseWalker(TypeChecker &tc) : TC(tc) { }
 
     virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      // Dig into implict expression.
+      // Dig into implicit expression.
       if (E->isImplicit()) return { true, E };
       // Diagnose call expression.
       if (auto CE = dyn_cast<CallExpr>(E))
