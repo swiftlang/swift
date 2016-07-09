@@ -704,12 +704,9 @@ func invalidDictionaryLiteral() {
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
 Int.self == nil // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
-nil == Int.self // expected-error {{binary operator '==' cannot be applied to operands}}
-// expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists}}
+nil == Int.self // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
 Int.self != nil // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
-nil != Int.self // expected-error {{binary operator '!=' cannot be applied to operands}}
-// expected-note @-1 {{overloads for '!=' exist with these partially matching parameter lists}}
-
+nil != Int.self // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {

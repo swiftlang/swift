@@ -777,6 +777,24 @@ class SR1594 {
   }
 }
 
+func nilComparison(i: Int, o: AnyObject) {
+  _ = i == nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil == i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i != nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil != i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i < nil   // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil < i   // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i <= nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil <= i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i > nil   // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil > i   // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i >= nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil >= i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+
+  _ = o === nil // expected-error {{type 'AnyObject' is not optional, value can never be nil}}
+  _ = o !== nil // expected-error {{type 'AnyObject' is not optional, value can never be nil}}
+}
+
 // FIXME: Bad diagnostic
 func secondArgumentNotLabeled(a:Int, _ b: Int) { }
 secondArgumentNotLabeled(10, 20)
