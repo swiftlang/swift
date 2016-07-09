@@ -11,8 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 /// Buffer type for `ArraySlice<Element>`.
-public // @testable
-struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
+internal struct _SliceBuffer<Element>
+  : _ArrayBufferProtocol,
+    RandomAccessCollection
+{
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
@@ -111,7 +113,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
-  public var identity: UnsafePointer<Void> {
+  internal var identity: UnsafePointer<Void> {
     return UnsafePointer(firstElementAddress)
   }
 
@@ -199,7 +201,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     return _hasNativeBuffer
   }
 
-  public var count: Int {
+  internal var count: Int {
     get {
       return endIndex - startIndex
     }
@@ -252,7 +254,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: Int) -> Element {
+  internal subscript(position: Int) -> Element {
     get {
       return getElement(position)
     }
@@ -263,7 +265,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     }
   }
 
-  public subscript(bounds: Range<Int>) -> _SliceBuffer {
+  internal subscript(bounds: Range<Int>) -> _SliceBuffer {
     get {
       _sanityCheck(bounds.lowerBound >= startIndex)
       _sanityCheck(bounds.upperBound >= bounds.lowerBound)
@@ -283,14 +285,14 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  public var startIndex: Int
+  internal var startIndex: Int
 
   /// The collection's "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
   ///
   /// `endIndex` is always reachable from `startIndex` by zero or more
   /// applications of `index(after:)`.
-  public var endIndex: Int {
+  internal var endIndex: Int {
     get {
       return Int(endIndexAndFlags >> 1)
     }
@@ -299,7 +301,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     }
   }
 
-  public typealias Indices = CountableRange<Int>
+  internal typealias Indices = CountableRange<Int>
 
   //===--- misc -----------------------------------------------------------===//
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
@@ -324,7 +326,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
 }
 
 extension _SliceBuffer {
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  internal func _copyToContiguousArray() -> ContiguousArray<Element> {
     if _hasNativeBuffer {
       let n = nativeBuffer
       if count == n.count {

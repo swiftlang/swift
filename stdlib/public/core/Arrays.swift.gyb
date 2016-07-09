@@ -873,33 +873,31 @@ public struct ${Self}<Element>
 
 %if Self == 'Array':
 #if _runtime(_ObjC)
-  public typealias _Buffer = _ArrayBuffer<Element>
+  internal typealias _Buffer = _ArrayBuffer<Element>
 #else
-  public typealias _Buffer = _ContiguousArrayBuffer<Element>
+  internal typealias _Buffer = _ContiguousArrayBuffer<Element>
 #endif
 %elif Self == 'ArraySlice':
-  public typealias _Buffer = _SliceBuffer<Element>
+  internal typealias _Buffer = _SliceBuffer<Element>
 %else:
-  public typealias _Buffer = _${Self.strip('_')}Buffer<Element>
+  internal typealias _Buffer = _${Self.strip('_')}Buffer<Element>
 %end
 
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
-  public // @testable
-  init(_buffer: _Buffer) {
+  internal init(_buffer: _Buffer) {
     self._buffer = _buffer
   }
 
 %if Self == 'ArraySlice':
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
-  public // @testable
-  init(_buffer buffer: _ContiguousArrayBuffer<Element>) {
+  internal init(_buffer buffer: _ContiguousArrayBuffer<Element>) {
     self.init(_buffer: _Buffer(_buffer: buffer, shiftedToStartIndex: 0))
   }
 %end
 
-  public var _buffer: _Buffer
+  internal var _buffer: _Buffer
 }
 
 extension ${Self} : ExpressibleByArrayLiteral {
