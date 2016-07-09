@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include <memory>
+#include <string>
 
 namespace swift {
 class Decl;
