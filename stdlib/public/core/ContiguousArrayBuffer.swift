@@ -184,8 +184,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 }
 
 @_fixed_layout
-public // @testable
-struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
+internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the `count` elements at the
@@ -396,7 +395,7 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Returns a `_SliceBuffer` containing the given `bounds` of values
   /// from this buffer.
-  public subscript(bounds: Range<Int>) -> _SliceBuffer<Element> {
+  internal subscript(bounds: Range<Int>) -> _SliceBuffer<Element> {
     get {
       return _SliceBuffer(
         owner: __bufferPointer.buffer,
@@ -414,14 +413,14 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// - Note: This does not mean the buffer is mutable.  Other factors
   ///   may need to be considered, such as whether the buffer could be
   ///   some immutable Cocoa container.
-  public mutating func isUniquelyReferenced() -> Bool {
+  internal mutating func isUniquelyReferenced() -> Bool {
     return __bufferPointer.isUniqueReference()
   }
 
   /// Returns `true` iff this buffer's storage is either
   /// uniquely-referenced or pinned.  NOTE: this does not mean
   /// the buffer is mutable; see the comment on isUniquelyReferenced.
-  public mutating func isUniquelyReferencedOrPinned() -> Bool {
+  internal mutating func isUniquelyReferencedOrPinned() -> Bool {
     return __bufferPointer._isUniqueOrPinnedReference()
   }
 
@@ -431,7 +430,7 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// - Precondition: `Element` is bridged to Objective-C.
   ///
   /// - Complexity: O(1).
-  public func _asCocoaArray() -> _NSArrayCore {
+  internal func _asCocoaArray() -> _NSArrayCore {
     if count == 0 {
       return _emptyArrayStorage
     }
@@ -443,12 +442,12 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 #endif
 
   /// An object that keeps the elements stored in this buffer alive.
-  public var owner: AnyObject {
+  internal var owner: AnyObject {
     return _storage
   }
 
   /// An object that keeps the elements stored in this buffer alive.
-  public var nativeOwner: AnyObject {
+  internal var nativeOwner: AnyObject {
     return _storage
   }
 
@@ -456,7 +455,7 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// Two buffers address the same elements when they have the same
   /// identity and count.
-  public var identity: UnsafeRawPointer {
+  internal var identity: UnsafeRawPointer {
     return UnsafeRawPointer(firstElementAddress)
   }
   
@@ -498,7 +497,7 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 }
 
 /// Append the elements of `rhs` to `lhs`.
-public func += <Element, C : Collection>(
+internal func += <Element, C : Collection>(
   lhs: inout _ContiguousArrayBuffer<Element>, rhs: C
 ) where C.Iterator.Element == Element {
 
