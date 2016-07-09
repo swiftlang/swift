@@ -47,31 +47,23 @@ func getTooLargeMessage() -> String {
 int_to_int_conversion_template = gyb.parse_template("int_to_int_conversion",
 """
 %{
-from SwiftIntTypes import all_integer_types
+from SwiftIntTypes import all_integer_types, int_max, int_min
 
 floatNameToSignificandBits = { 'Float32':24, 'Float64':53, 'Float80':64 }
 
-def intMax(bits, signed): 
-    bits = bits - 1 if signed else bits 
-    return (1 << bits) - 1
-    
-def intMin(bits, signed):
-  return -1 * intMax(bits, signed) - 1 if signed else 0
-  
 }%
-
 % for self_ty in all_integer_types(word_bits):
 %   selfBits = self_ty.bits
 %   selfSigned = self_ty.is_signed
-%   selfMin = intMin(selfBits, selfSigned)
-%   selfMax = intMax(selfBits, selfSigned)
+%   selfMin = self_ty.min
+%   selfMax = self_ty.max
 %   Self = self_ty.stdlib_name
 
 %   for other_ty in all_integer_types(word_bits):
 %     otherBits = other_ty.bits
 %     otherSigned = other_ty.is_signed
-%     otherMin = intMin(otherBits, otherSigned)
-%     otherMax = intMax(otherBits, otherSigned)
+%     otherMin = other_ty.min
+%     otherMax = other_ty.max
 %     Other = other_ty.stdlib_name
 
 %     for testValue in [selfMin, selfMax, selfMin - 1, selfMax + 1, otherMin, otherMax]:
@@ -85,8 +77,7 @@ def intMin(bits, signed):
 FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") {
   // Test that nothing interesting happens and we end up with the same result after converting.
   let input = get${Other}(${testValue})
-  let result = ${Self}(input)
-  expectEqual(${testValue}, result)
+  expectEqual(${testValue}, ${Self}(input))
 }
 
 /// Never-nil failable conversion from ${Other}(${testValue}) to ${Self}.
@@ -120,8 +111,8 @@ FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}"
 %   end # for in all_integer_types (Other)
 
 %   for Other, otherSignificandBits in floatNameToSignificandBits.iteritems():
-%    otherMin = intMin(otherSignificandBits, False)
-%    otherMax = intMax(otherSignificandBits, False)
+%    otherMin = int_min(bits=otherSignificandBits, signed=False)
+%    otherMax = int_max(bits=otherSignificandBits, signed=False)
 
 %    if Other == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
@@ -149,11 +140,13 @@ FloatingPointConversionFailures.test("${Other}To${Self}FailableConversion/dest=$
 %     else:
 
 %      if testValue > selfMax:
-FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}").crashOutputMatches(getTooLargeMessage()).code {
-expectCrashLater()
+FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
+.crashOutputMatches(getTooLargeMessage()).code {
+  expectCrashLater()
 %      elif testValue < selfMin:
-FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}").crashOutputMatches(getTooSmallMessage()).code {
-expectCrashLater()
+FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
+.crashOutputMatches(getTooSmallMessage()).code {
+  expectCrashLater()
 %      else:
 FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
 %      end
@@ -180,10 +173,9 @@ FloatingPointConversionTraps.test("${Self}/${Other}/negative")
   _blackHole(${Self}(get${Other}(-123.0)))
 }
 
-FloatingPointConversionFailures.test("${Self}/${Other}/negative")
-expectEmpty(${Self}(exactly: get${Other}(-123.0)))
+FloatingPointConversionFailures.test("${Self}/${Other}/negative") {
+  expectEmpty(${Self}(exactly: get${Other}(-123.0)))
 }
-
 
 %   end
 
@@ -204,8 +196,7 @@ FloatingPointConversionTraps.test("${Self}/${Other}/-inf")
 }
 
 FloatingPointConversionFailures.test("${Self}/${Other}/-inf") {
-  let result = ${Self}(exactly: get${Other}(-${Other}.infinity))
-  expectEmpty(result)
+  expectEmpty(${Self}(exactly: get${Other}(-${Other}.infinity)))
 }
 
 FloatingPointConversionTraps.test("${Self}/${Other}/NaN")
@@ -215,8 +206,7 @@ FloatingPointConversionTraps.test("${Self}/${Other}/NaN")
 }
 
 FloatingPointConversionFailures.test("${Self}/${Other}/NaN") {
-  let result = ${Self}(exactly: get${Other}(${Other}.nan))
-  expectEmpty(result)
+  expectEmpty(${Self}(exactly: get${Other}(${Other}.nan)))
 }
 
 %   if Other == 'Float80':
