@@ -919,10 +919,10 @@ static bool isStartOfGetSetAccessor(Parser &P) {
          P.Tok.isContextualKeyword("willSet");
 }
 
-/// Disambiguate and diagnose invalid uses of trailing closures in a situation
+/// Recover invalid uses of trailing closures in a situation
 /// where the parser requires an expr-basic (which does not allow them).  We
-/// handle this by doing some lookahead in common situations and emitting a
-/// diagnostic with a fixit to add wrapping parens.
+/// handle this by doing some lookahead in common situations. And later, Sema
+/// will emit a diagnostic with a fixit to add wrapping parens.
 static bool isValidTrailingClosure(bool isExprBasic, Expr *baseExpr, Parser &P){
   assert(P.Tok.is(tok::l_brace) && "Couldn't be a trailing closure");
   
@@ -955,21 +955,19 @@ static bool isValidTrailingClosure(bool isExprBasic, Expr *baseExpr, Parser &P){
   
   
   // Determine if the {} goes with the expression by eating it, and looking
-  // to see if it is immediately followed by another {.  If so, we consider it
-  // to be part of the proceeding expression.
+  // to see if it is immediately followed by '{', 'where', or comma.  If so,
+  // we consider it to be part of the proceeding expression.
   Parser::BacktrackingScope backtrack(P);
-  auto startLoc = P.consumeToken(tok::l_brace);
+  P.consumeToken(tok::l_brace);
   P.skipUntil(tok::r_brace);
   SourceLoc endLoc;
   if (!P.consumeIf(tok::r_brace, endLoc) ||
-      P.Tok.isNot(tok::l_brace))
+      P.Tok.isNot(tok::l_brace, tok::kw_where, tok::comma)) {
     return false;
-  
-  // Diagnose the bad case and return true so that the caller parses this as a
-  // trailing closure.
-  P.diagnose(startLoc, diag::trailing_closure_requires_parens)
-    .fixItInsert(baseExpr->getStartLoc(), "(")
-    .fixItInsertAfter(endLoc, ")");
+  }
+
+  // Recoverable case. Just return true here and Sema will emit a diagnostic
+  // later. see: Sema/MiscDiagnostics.cpp#checkStmtConditionTrailingClosure
   return true;
 }
 

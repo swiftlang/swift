@@ -652,19 +652,7 @@ func postfixDot(a : String) {
     a.         // expected-error {{expected member name following '.'}}
 }
 
-// <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics
-func r23036383(arr : [Int]?) {
-  if let _ = arr?.map {$0+1} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{14-14=(}} {{29-29=)}}
-  }
-
-  let numbers = [1, 2]
-  for _ in numbers.filter {$0 > 4} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{12-12=(}} {{35-35=)}}
-  }
-}
-
 // <rdar://problem/22290244> QoI: "UIColor." gives two issues, should only give one
 func f() {
   _ = ClassWithStaticDecls.  // expected-error {{expected member name following '.'}}
 }
-
-

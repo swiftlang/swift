@@ -2342,6 +2342,10 @@ NOTE(add_where_newline, none,
 NOTE(duplicate_where, none,
      "duplicate the 'where' on both patterns to check both patterns",())
 
+ERROR(trailing_closure_requires_parens,none,
+      "trailing closure requires parentheses for disambiguation in this"
+      " context", ())
+
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
