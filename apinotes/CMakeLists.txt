@@ -24,6 +24,7 @@ set(SWIFT_API_NOTES_INPUTS
   PassKit
   QuartzCore
   QuickLook
+  SceneKit
   SpriteKit
   StoreKit
   TVMLKit
