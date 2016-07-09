@@ -687,6 +687,14 @@ tests.test("UTF8 indexes") {
   }
 }
 
+tests.test("index/Comparable")
+  .forEach(in: [summer, winter]) { str in
+  checkComparable(str.characters.indices, oracle: <=>)
+  checkComparable(str.unicodeScalars.indices, oracle: <=>)
+  checkComparable(str.utf16.indices, oracle: <=>)
+  checkComparable(str.utf8.indices, oracle: <=>)
+}
+
 tests.test("UTF16->String") {
   let s = summer + winter + winter + summer
   let v = s.utf16
