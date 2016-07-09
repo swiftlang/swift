@@ -299,8 +299,8 @@ ${SelfName}TestSuite.test("nilBaseAddress") {
 }
 
 ${SelfName}TestSuite.test("nonNilButEmpty") {
-  let emptyAllocated = UnsafeMutablePointer<Float>(allocatingCapacity: 0)
-  defer { emptyAllocated.deallocateCapacity(0) }
+  let emptyAllocated = UnsafeMutablePointer<Float>.allocate(capacity: 0)
+  defer { emptyAllocated.deallocate(capacity: 0) }
 
   let emptyBuffer = ${SelfType}(start: ${PointerType}(emptyAllocated), count: 0)
   expectEqual(emptyAllocated, emptyBuffer.baseAddress)
@@ -315,8 +315,8 @@ ${SelfName}TestSuite.test("nonNilButEmpty") {
 
 ${SelfName}TestSuite.test("nonNilNonEmpty") {
   let count = 4
-  let allocated = UnsafeMutablePointer<Float>(allocatingCapacity: count)
-  defer { allocated.deallocateCapacity(count) }
+  let allocated = UnsafeMutablePointer<Float>.allocate(capacity: count)
+  defer { allocated.deallocate(capacity: count) }
   allocated.initialize(to: 1.0, count: count)
   allocated[count - 1] = 2.0
 
@@ -348,8 +348,8 @@ ${SelfName}TestSuite.test("badCount")
   .code {
   expectCrashLater()
 
-  let emptyAllocated = UnsafeMutablePointer<Float>(allocatingCapacity: 0)
-  defer { emptyAllocated.deallocateCapacity(0) }
+  let emptyAllocated = UnsafeMutablePointer<Float>.allocate(capacity: 0)
+  defer { emptyAllocated.deallocate(capacity: 0) }
 
   let buffer = ${SelfType}(start: ${PointerType}(emptyAllocated), count: -1)
   _ = buffer
@@ -382,9 +382,9 @@ ${SelfName}TestSuite.test("subscript/${RangeName}/get").forEach(in: subscriptGet
 
   let elementCount = SubscriptGetTest.elementCount
 
-  var memory = UnsafeMutablePointer<OpaqueValue<Int>>(allocatingCapacity: elementCount)
+  var memory = UnsafeMutablePointer<OpaqueValue<Int>>.allocate(capacity: elementCount)
   let buffer = test.create${SelfName}(from: memory)
-  defer { memory.deallocateCapacity(elementCount) }
+  defer { memory.deallocate(capacity: elementCount) }
 
   let range = test.rangeSelection.${RangeName}(in: buffer)
 
@@ -419,14 +419,14 @@ UnsafeMutableBufferPointerTestSuite.test("subscript/${RangeName}/set")
 
   let elementCount = SubscriptSetTest.elementCount
 
-  var memory = UnsafeMutablePointer<OpaqueValue<Int>>(
-    allocatingCapacity: elementCount)
-  var sliceMemory = UnsafeMutablePointer<OpaqueValue<Int>>(
-    allocatingCapacity: replacementValues.count)
+  var memory = UnsafeMutablePointer<OpaqueValue<Int>>.allocate(
+    capacity: elementCount)
+  var sliceMemory = UnsafeMutablePointer<OpaqueValue<Int>>.allocate(
+    capacity: replacementValues.count)
   var buffer = test.createUnsafeMutableBufferPointer(from: memory)
   defer { 
-    memory.deallocateCapacity(elementCount) 
-    sliceMemory.deallocateCapacity(replacementValues.count)
+    memory.deallocate(capacity: elementCount) 
+    sliceMemory.deallocate(capacity: replacementValues.count)
   }
 
   let range = test.rangeSelection.${RangeName}(in: buffer)
@@ -446,8 +446,8 @@ UnsafeMutableBufferPointerTestSuite.test("subscript/${RangeName}/set")
 
 UnsafeMutableBufferPointerTestSuite.test("changeElementViaBuffer") {
   let count = 4
-  let allocated = UnsafeMutablePointer<Float>(allocatingCapacity: count)
-  defer { allocated.deallocateCapacity(count) }
+  let allocated = UnsafeMutablePointer<Float>.allocate(capacity: count)
+  defer { allocated.deallocate(capacity: count) }
   allocated.initialize(to: 1.0, count: count)
   allocated[count-1] = -1.0
 

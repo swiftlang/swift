@@ -126,10 +126,11 @@ public struct ${Self}<Pointee>
   /// instances of `Pointee`.
   ///
   /// - Postcondition: The pointee is allocated, but not initialized.
-  public init(allocatingCapacity count: Int) {
+  static public func allocate(capacity count: Int)
+    -> UnsafeMutablePointer<Pointee> {
     let size = strideof(Pointee.self) * count
-    self._rawValue =
-      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self))
+    return UnsafeMutablePointer(
+      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self)))
   }
 
   /// Deallocate uninitialized memory allocated for `count` instances
@@ -138,8 +139,8 @@ public struct ${Self}<Pointee>
   /// - Precondition: The memory is not initialized.
   ///
   /// - Postcondition: The memory has been deallocated.
-  public func deallocateCapacity(_ num: Int) {
-    let size = strideof(Pointee.self) * num
+  public func deallocate(capacity: Int) {
+    let size = strideof(Pointee.self) * capacity
     Builtin.deallocRaw(
       _rawValue, size._builtinWordValue, Builtin.alignof(Pointee.self))
   }
@@ -489,13 +490,23 @@ extension ${Self} {
   }
 
 % if mutable:
-  @available(*, unavailable, message: "use the '${Self}(allocatingCapacity:)' initializer")
+  @available(*, unavailable, renamed: "allocate(capacity:)")
   public static func alloc(_ num: Int) -> ${Self} {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "deallocateCapacity")
+  @available(*, unavailable, message: "use '${Self}.allocate(capacity:)'")
+  public init(allocatingCapacity: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "deallocate(capacity:)")
   public func dealloc(_ num: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "deallocate(capacity:)")
+  public func deallocateCapacity(_ num: Int) {
     Builtin.unreachable()
   }
 % end

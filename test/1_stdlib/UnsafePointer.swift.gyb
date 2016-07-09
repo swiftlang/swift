@@ -229,7 +229,7 @@ func checkPointerCorrectness(_ check: Check,
   _ withMissiles: Bool = false,
   _ f: (UnsafeMutablePointer<Missile>) ->
     (UnsafeMutablePointer<Missile>, count: Int) -> Void) {
-  let ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 4)
+  let ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 4)
   switch check {
   case .RightOverlap:
     ptr.initialize(to: Missile(1))
@@ -260,7 +260,7 @@ func checkPointerCorrectness(_ check: Check,
     expectEqual(2, ptr[0].number)
     expectEqual(3, ptr[1].number)
     // backwards
-    let ptr2 = UnsafeMutablePointer<Missile>(allocatingCapacity: 4)
+    let ptr2 = UnsafeMutablePointer<Missile>.allocate(capacity: 4)
     ptr2.initialize(to: Missile(0))
     (ptr2 + 1).initialize(to: Missile(1))
     if withMissiles {
@@ -344,10 +344,10 @@ UnsafeMutablePointerTestSuite.test("initialize:from.Right") {
 }
 
 UnsafeMutablePointerTestSuite.test("initialize:from/immutable") {
-  var ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 3)
+  var ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 3)
   defer {
     ptr.deinitialize(count: 3)
-    ptr.deallocateCapacity(3)
+    ptr.deallocate(capacity: 3)
   }
   let source = (0..<3).map(Missile.init)
   source.withUnsafeBufferPointer { bufferPtr in
@@ -359,10 +359,10 @@ UnsafeMutablePointerTestSuite.test("initialize:from/immutable") {
 }
 
 UnsafeMutablePointerTestSuite.test("assign/immutable") {
-  var ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 2)
+  var ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 2)
   defer {
     ptr.deinitialize(count: 2)
-    ptr.deallocateCapacity(2)
+    ptr.deallocate(capacity: 2)
   }
   ptr.initialize(to: Missile(1))
   (ptr + 1).initialize(to: Missile(2))

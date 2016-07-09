@@ -498,12 +498,13 @@ func _UnsafePointer<T>(x: UnsafeMutablePointer<T>, e: T) {
   _ = UnsafeMutablePointer<T>.Memory.self // expected-error {{'Memory' has been renamed to 'Pointee'}} {{31-37=Pointee}} {{none}}
   _ = UnsafeMutablePointer<T>() // expected-error {{'init()' is unavailable: use 'nil' literal}} {{none}}
   _ = x.memory // expected-error {{'memory' has been renamed to 'pointee'}} {{9-15=pointee}} {{none}}
-  _ = UnsafeMutablePointer<T>.alloc(1) // expected-error {{'alloc' is unavailable: use the 'UnsafeMutablePointer(allocatingCapacity:)' initializer}} {{none}}
-  x.dealloc(1) // expected-error {{'dealloc' has been renamed to 'deallocateCapacity'}} {{5-12=deallocateCapacity}} {{none}}
+  _ = UnsafeMutablePointer<T>.alloc(1) // expected-error {{'alloc' has been renamed to 'allocate(capacity:)'}} {{31-36=allocate}} {{37-37=capacity: }} {{none}}
+  x.dealloc(1) // expected-error {{'dealloc' has been renamed to 'deallocate(capacity:)'}} {{5-12=deallocate}} {{13-13=capacity: }} {{none}}
   x.memory = e // expected-error {{'memory' has been renamed to 'pointee'}} {{5-11=pointee}} {{none}}
   x.initialize(e) // expected-error {{'initialize' has been renamed to 'initialize(to:)'}} {{5-15=initialize}} {{16-16=to: }} {{none}}
   x.destroy() // expected-error {{'destroy()' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{none}}
   x.destroy(1) // expected-error {{'destroy' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{13-13=count: }} {{none}}
+  x.initialize(with: e) // expected-error {{'initialize(with:count:)' has been renamed to 'initialize(to:count:)'}} {{5-15=initialize}}
 }
 
 func _VarArgs() {
