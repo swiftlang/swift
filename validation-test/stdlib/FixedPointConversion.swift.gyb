@@ -48,8 +48,7 @@ int_to_int_conversion_template = gyb.parse_template("int_to_int_conversion",
 """
 %{
 from SwiftIntTypes import all_integer_types, int_max, int_min
-
-floatNameToSignificandBits = { 'Float32':24, 'Float64':53, 'Float80':64 }
+from SwiftFloatingPointTypes import all_floating_point_types
 
 }%
 % for self_ty in all_integer_types(word_bits):
@@ -110,9 +109,10 @@ FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}"
 %     end # for testValue in ...
 %   end # for in all_integer_types (Other)
 
-%   for Other, otherSignificandBits in floatNameToSignificandBits.iteritems():
-%    otherMin = int_min(bits=otherSignificandBits, signed=False)
-%    otherMax = int_max(bits=otherSignificandBits, signed=False)
+%   for other_type in all_floating_point_types():
+%    Other = "Float" + str(other_type.bits)
+%    otherMin = -int_max(bits=other_type.explicit_significand_bits, signed=False)
+%    otherMax = int_max(bits=other_type.explicit_significand_bits, signed=False)
 
 %    if Other == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
@@ -123,7 +123,7 @@ FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}"
 %     if testValue < otherMin or testValue > otherMax: 
 %       # Can't construct `other` value to test from, do nothing and continue.
 
-%     elif testValue >= selfMin and testValue <= selfMax and testValue % 1 == 0:
+%     elif testValue >= selfMin and testValue <= selfMax and testValue % 1 == 0 and testValue != -0.0:
 
 FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
   let input = get${Other}(${testValue})
@@ -213,7 +213,7 @@ FloatingPointConversionFailures.test("${Self}/${Other}/NaN") {
 #endif
 %   end
 
-%  end # for in floatNameToSignificandBits (Other)
+%  end # for in all_floating_point_types (Other)
 % end # for in all_integer_types (Self)
 
 """)

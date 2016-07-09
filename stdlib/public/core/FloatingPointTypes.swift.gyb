@@ -13,14 +13,11 @@
 import SwiftShims
 
 %{
+from SwiftFloatingPointTypes import all_floating_point_types
+
 #
 # Utility code for later in this template
 #
-
-# // Bit counts for all floating point types. 
-# // 80-bit floating point types are only permitted on x86 architectures. This
-# // restriction is handled via #if's in the generated code.
-allFloatBits = [32, 64, 80]
 
 # Bit counts for all int types
 allIntBits = [8, 16, 32, 64, 'Int']
@@ -30,12 +27,6 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
-
-# Mapping from float bits to significand bits
-explicitSignificandBits = { 32:24, 64:53, 80:64 }
-SignificandSizes = { 32:32, 64:64, 80:64 }
-SignificandBitCounts = { 32:23, 64:52, 80:63 }
-ExponentBitCounts = { 32:8, 64:11, 80:15 }
 
 def allInts():
     for bits in allIntBits:
@@ -50,21 +41,6 @@ def builtinIntName(name):
 
 def intName(name, signed):
     return ('' if signed else 'U') + baseIntName(name)
-
-floatName = { 32:'Float', 64:'Double', 80:'Float80' }
-
-def cFuncSuffix(bits):
-    if bits == 32:
-        return 'f'
-    if bits == 64:
-        return ''
-    if bits == 80:
-        return 'l'
-        
-def intFormatFix(bits):
-    if bits == 'Int':
-        return int(CMAKE_SIZEOF_VOID_P) * 8
-    return bits
 }%
 
 //  TODO: remove once integer proposal is available ----------------------------
@@ -79,12 +55,13 @@ extension UInt${bits} {
 }
 %end
 
-% for bits in allFloatBits:
+% for self_type in all_floating_point_types():
 %{
-Self = floatName[bits]
-SignificandSize = SignificandSizes[bits]
-SignificandBitCount = SignificandBitCounts[bits]
-ExponentBitCount = ExponentBitCounts[bits]
+Self = self_type.stdlib_name
+bits = self_type.bits
+SignificandSize = self_type.significand_size
+SignificandBitCount = self_type.significand_bits
+ExponentBitCount = self_type.exponent_bits
 RawSignificand = 'UInt' + str(SignificandSize)
 
 if Self == 'Float':
@@ -867,8 +844,9 @@ extension ${Self} {
 // Construction from other floating point numbers.
 @_transparent
 extension ${Self} {
-% for srcBits in allFloatBits:
-%   That = floatName[srcBits]
+% for src_type in all_floating_point_types():
+%   srcBits = src_type.bits
+%   That = src_type.stdlib_name
 
 %   if srcBits == 80:
 #if !os(Windows) && (arch(i386) || arch(x86_64))
@@ -1080,4 +1058,4 @@ public postfix func -- (lhs: inout ${Self}) -> ${Self} {
 % if bits == 80:
 #endif
 % end
-% end # for bits in allFloatBits
+% end # for bits in all_floating_point_types

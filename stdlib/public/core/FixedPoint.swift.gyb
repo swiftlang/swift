@@ -13,6 +13,7 @@
 %{
 
 from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
+from SwiftFloatingPointTypes import all_floating_point_types, getFtoIBounds
 
 #
 # Utility code for later in this template
@@ -32,21 +33,6 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
-
-# Mapping from float bits to significand bits
-allFloatBits = [32, 64, 80]
-floatName = { 32:'Float', 64:'Double', 80:'Float80' }
-explicitFloatSignificandBits = { 32:24, 64:53, 80:64 }
-
-
-def getFtoIBounds(floatBits, intBits, signed):
-  if not signed:
-    return (-1, 1 << intBits)
-  upper = 1 << intBits - 1
-  if intBits <= explicitFloatSignificandBits[floatBits]:
-    return (-upper - 1, upper)
-  ulp = 1 << intBits - explicitFloatSignificandBits[floatBits]
-  return (-upper - ulp, upper)
 
 def maskBits(n):
     """Return an n-bit mask in hex"""
@@ -540,8 +526,9 @@ extension ${Self} {
 
 extension ${Self} {
 // Construction of integers from floating point numbers.
-%   for srcBits in allFloatBits:
-%     Src = floatName[srcBits]
+%   for src_type in all_floating_point_types():
+%     Src = src_type.stdlib_name
+%     srcBits = src_type.bits
 %     (lower, upper) = getFtoIBounds(floatBits=srcBits, intBits=int(bits), signed=signed)
 
 %     if srcBits == 80:
