@@ -190,7 +190,10 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// method, you must either initialize the `count` elements at the
   /// result's `.firstElementAddress` or set the result's `.count`
   /// to zero.
-  public init(uninitializedCount: Int, minimumCapacity: Int) {
+  internal init(
+    _uninitializedCount uninitializedCount: Int,
+    minimumCapacity: Int
+  ) {
     let realMinimumCapacity = Swift.max(uninitializedCount, minimumCapacity)
     if realMinimumCapacity == 0 {
       self = _ContiguousArrayBuffer<Element>()
@@ -247,16 +250,16 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   /// True, if the array is native and does not need a deferred type check.
-  var arrayPropertyIsNativeTypeChecked: Bool {
+  internal var arrayPropertyIsNativeTypeChecked: Bool {
     return true
   }
 
   /// A pointer to the first element.
-  public var firstElementAddress: UnsafeMutablePointer<Element> {
+  internal var firstElementAddress: UnsafeMutablePointer<Element> {
     return __bufferPointer._elementPointer
   }
 
-  public var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
+  internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
     return firstElementAddress
   }
 
@@ -511,7 +514,7 @@ public func += <Element, C : Collection>(
   }
   else {
     var newLHS = _ContiguousArrayBuffer<Element>(
-      uninitializedCount: newCount,
+      _uninitializedCount: newCount,
       minimumCapacity: _growArrayCapacity(lhs.capacity))
 
     newLHS.firstElementAddress.moveInitializeFrom(
@@ -602,7 +605,7 @@ internal func _copyCollectionToContiguousArray<
   }
 
   let result = _ContiguousArrayBuffer<C.Iterator.Element>(
-    uninitializedCount: count,
+    _uninitializedCount: count,
     minimumCapacity: 0)
 
   var p = result.firstElementAddress
@@ -635,7 +638,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       result = _ContiguousArrayBuffer()
     } else {
       result = _ContiguousArrayBuffer(
-        uninitializedCount: initialCapacity,
+        _uninitializedCount: initialCapacity,
         minimumCapacity: 0)
     }
 
@@ -650,7 +653,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       // Reallocate.
       let newCapacity = max(_growArrayCapacity(result.capacity), 1)
       var newResult = _ContiguousArrayBuffer<Element>(
-        uninitializedCount: newCapacity, minimumCapacity: 0)
+        _uninitializedCount: newCapacity, minimumCapacity: 0)
       p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
       newResult.firstElementAddress.moveInitializeFrom(

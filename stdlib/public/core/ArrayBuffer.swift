@@ -256,7 +256,7 @@ extension _ArrayBuffer {
 
       // No contiguous storage found; we must allocate
       let result = _ContiguousArrayBuffer<Element>(
-        uninitializedCount: boundsCount, minimumCapacity: 0)
+        _uninitializedCount: boundsCount, minimumCapacity: 0)
 
       // Tell Cocoa to copy the objects into our storage
       cocoa.buffer.getObjects(

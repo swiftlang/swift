@@ -333,7 +333,7 @@ extension _SliceBuffer {
     }
 
     let result = _ContiguousArrayBuffer<Element>(
-      uninitializedCount: count,
+      _uninitializedCount: count,
       minimumCapacity: 0)
     result.firstElementAddress.initializeFrom(
       firstElementAddress, count: count)

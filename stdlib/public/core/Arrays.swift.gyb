@@ -790,7 +790,7 @@ public struct ${Self}<Element>
   // FIXME(ABI): move to an initializer on _Buffer.
   static internal func _copyBuffer(_ buffer: inout _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
-      uninitializedCount: buffer.count, minimumCapacity: buffer.count)
+      _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
     buffer._copyContents(
       subRange: Range(buffer.indices),
       initializing: newBuffer.firstElementAddress)
@@ -1073,7 +1073,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     minimumCapacity: Int
   ) -> _Buffer {
     let newBuffer = _ContiguousArrayBuffer<Element>(
-      uninitializedCount: 0, minimumCapacity: minimumCapacity)
+      _uninitializedCount: 0, minimumCapacity: minimumCapacity)
     return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
@@ -1208,7 +1208,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       minimumCapacity: minimumCapacity) == nil {
 
       let newBuffer = _ContiguousArrayBuffer<Element>(
-        uninitializedCount: count, minimumCapacity: minimumCapacity)
+        _uninitializedCount: count, minimumCapacity: minimumCapacity)
 
       _buffer._copyContents(
         subRange: Range(_buffer.indices),
@@ -1856,7 +1856,7 @@ internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferProtocol
       ? _growArrayCapacity(source.capacity) : source.capacity)
 
   return _ContiguousArrayBuffer(
-    uninitializedCount: countForBuffer, minimumCapacity: minimumCapacity)
+    _uninitializedCount: countForBuffer, minimumCapacity: minimumCapacity)
 }
 
 internal protocol _PointerFunction {
