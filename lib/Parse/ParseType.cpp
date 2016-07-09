@@ -467,7 +467,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
                                   /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
-    // If this is an deprecated use of the inout marker in an argument list,
+    // If this is a deprecated use of the inout marker in an argument list,
     // consume the inout.
     SourceLoc InOutLoc;
     bool hasAnyInOut = false;
