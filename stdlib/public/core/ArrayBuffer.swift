@@ -83,7 +83,7 @@ public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
 extension _ArrayBuffer {
   /// Adopt the storage of `source`.
-  public init(_ source: NativeBuffer, shiftedToStartIndex: Int) {
+  public init(_buffer source: NativeBuffer, shiftedToStartIndex: Int) {
     _sanityCheck(shiftedToStartIndex == 0, "shiftedToStartIndex must be 0")
     _storage = _ArrayBridgeStorage(native: source._storage)
   }
@@ -236,7 +236,7 @@ extension _ArrayBuffer {
       let boundsCount = bounds.count
       if boundsCount == 0 {
         return _SliceBuffer(
-          _ContiguousArrayBuffer<Element>(),
+          _buffer: _ContiguousArrayBuffer<Element>(),
           shiftedToStartIndex: bounds.lowerBound)
       }
 
@@ -263,7 +263,8 @@ extension _ArrayBuffer {
         UnsafeMutablePointer(result.firstElementAddress),
         range: _SwiftNSRange(location: bounds.lowerBound, length: boundsCount))
 
-      return _SliceBuffer(result, shiftedToStartIndex: bounds.lowerBound)
+      return _SliceBuffer(
+        _buffer: result, shiftedToStartIndex: bounds.lowerBound)
     }
     set {
       fatalError("not implemented")

@@ -24,7 +24,7 @@ public protocol _ArrayBufferProtocol
   init()
 
   /// Adopt the entire buffer, presenting it at the provided `startIndex`.
-  init(_ buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
+  init(_buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
 
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer "past the end" of the

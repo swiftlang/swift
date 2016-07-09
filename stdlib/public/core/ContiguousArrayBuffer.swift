@@ -287,7 +287,7 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
       _uncheckedUnsafeBufferObject: _emptyArrayStorage)
   }
 
-  public init(_ buffer: _ContiguousArrayBuffer, shiftedToStartIndex: Int) {
+  public init(_buffer buffer: _ContiguousArrayBuffer, shiftedToStartIndex: Int) {
     _sanityCheck(shiftedToStartIndex == 0, "shiftedToStartIndex must be 0")
     self = buffer
   }

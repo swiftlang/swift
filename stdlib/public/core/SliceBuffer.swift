@@ -37,7 +37,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     _invariantCheck()
   }
 
-  public init(_ buffer: NativeBuffer, shiftedToStartIndex: Int) {
+  public init(_buffer buffer: NativeBuffer, shiftedToStartIndex: Int) {
     let shift = buffer.startIndex - shiftedToStartIndex
     self.init(
       owner: buffer.owner,
