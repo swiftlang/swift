@@ -274,6 +274,18 @@ class FooClassPropertyOwnership : FooClassBase {
   convenience init!(float f: Float)
 }
 
+class FooClassWithClassProperties : FooClassBase {
+  unowned(unsafe) class var assignable: @sil_unmanaged AnyObject!
+  unowned(unsafe) class var unsafeAssignable: @sil_unmanaged AnyObject!
+  class var retainable: AnyObject!
+  class var strongRef: AnyObject!
+  @NSCopying class var copyable: AnyObject!
+  weak class var weakRef: @sil_weak AnyObject!
+  class var scalar: Int32
+  init!()
+  convenience init!(float f: Float)
+}
+
 class FooUnavailableMembers : FooClassBase {
   convenience init!(int i: Int32)
   @available(*, unavailable, message="use object construction 'FooUnavailableMembers(int:)'")

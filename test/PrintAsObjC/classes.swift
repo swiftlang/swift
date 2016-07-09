@@ -360,6 +360,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic) NSInteger computed;
 // CHECK-NEXT: + (Properties * _Nonnull)shared;
 // CHECK-NEXT: + (void)setShared:(Properties * _Nonnull)newValue;
+// CHECK-NEXT: + (Properties * _Nonnull)sharedRO;
 // CHECK-NEXT: @property (nonatomic, weak) Properties * _Nullable weakOther;
 // CHECK-NEXT: @property (nonatomic, assign) Properties * _Nonnull unownedOther;
 // CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * _Nonnull unmanagedOther;
@@ -416,6 +417,10 @@ public class NonObjCClass { }
   class var shared: Properties {
     get { return Properties() }
     set { }
+  }
+
+  class var sharedRO: Properties {
+    get { return Properties() }
   }
 
   weak var weakOther: Properties?
