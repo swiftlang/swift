@@ -786,7 +786,8 @@ public struct ${Self}<Element>
     buffer._copyContents(
       subRange: Range(buffer.indices),
       initializing: newBuffer.firstElementAddress)
-    buffer = _Buffer(newBuffer, shiftedToStartIndex: buffer.startIndex)
+    buffer = _Buffer(
+      _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
   }
 
   @_semantics("array.make_mutable")
@@ -885,8 +886,8 @@ public struct ${Self}<Element>
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
   public // @testable
-  init(_buffer: _ContiguousArrayBuffer<Element>) {
-    self.init(_buffer: _Buffer(_buffer, shiftedToStartIndex: 0))
+  init(_buffer buffer: _ContiguousArrayBuffer<Element>) {
+    self.init(_buffer: _Buffer(_buffer: buffer, shiftedToStartIndex: 0))
   }
 %end
 
@@ -1031,7 +1032,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
     self = ${Self}(
       _buffer: _Buffer(
-        s._copyToContiguousArray()._buffer,
+        _buffer: s._copyToContiguousArray()._buffer,
         shiftedToStartIndex: 0))
   }
 
@@ -1065,7 +1066,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ) -> _Buffer {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       uninitializedCount: 0, minimumCapacity: minimumCapacity)
-    return _Buffer(newBuffer, shiftedToStartIndex: 0)
+    return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
   /// Construct a ${Self} of `count` uninitialized elements.
@@ -1118,7 +1119,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
         storage, to: _ContiguousArrayStorage<Element>.self))
     
     return (
-      Array(_buffer: _Buffer(innerBuffer, shiftedToStartIndex: 0)),
+      Array(
+        _buffer: _Buffer(_buffer: innerBuffer, shiftedToStartIndex: 0)),
         innerBuffer.firstElementAddress)
   }
 
@@ -1203,7 +1205,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       _buffer._copyContents(
         subRange: Range(_buffer.indices),
         initializing: newBuffer.firstElementAddress)
-      _buffer = _Buffer(newBuffer, shiftedToStartIndex: _buffer.startIndex)
+      _buffer = _Buffer(
+        _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
     }
     _sanityCheck(capacity >= minimumCapacity)
   }
@@ -1933,7 +1936,7 @@ internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
     let tailEnd = source.endIndex
     source._copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
   }
-  source = _Buffer(dest, shiftedToStartIndex: source.startIndex)
+  source = _Buffer(_buffer: dest, shiftedToStartIndex: source.startIndex)
 }
 
 internal struct _InitializePointer<T> : _PointerFunction {
@@ -2159,7 +2162,7 @@ extension ArraySlice {
   init(_startIndex: Int) {
     self.init(
       _buffer: _Buffer(
-        ContiguousArray()._buffer,
+        _buffer: ContiguousArray()._buffer,
         shiftedToStartIndex: _startIndex))
   }
 }
