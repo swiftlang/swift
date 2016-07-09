@@ -209,7 +209,7 @@ func _bridgeNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject?
 ///   the boxed value, but is otherwise opaque.
 ///
 /// TODO: This should subsume `_bridgeToObjectiveC` above.
-func _bridgeAnythingToObjectiveC<T>(_: T) -> AnyObject {
+func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, to: AnyObject.self)
   }
