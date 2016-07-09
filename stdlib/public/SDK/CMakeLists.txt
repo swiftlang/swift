@@ -11,6 +11,7 @@ endif()
 # Please keep this list sorted.
 add_subdirectory(AppKit)
 add_subdirectory(AssetsLibrary)
+add_subdirectory(CallKit)
 add_subdirectory(CoreAudio)
 add_subdirectory(CoreData)
 add_subdirectory(CoreGraphics)
