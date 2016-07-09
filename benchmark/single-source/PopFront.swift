@@ -35,7 +35,7 @@ public func run_PopFrontArray(_ N: Int) {
 @inline(never)
 public func run_PopFrontUnsafePointer(_ N: Int) {
   var orig = Array(repeating: 1, count: arrayCount)
-  let a = UnsafeMutablePointer<Int>(allocatingCapacity: arrayCount)
+  let a = UnsafeMutablePointer<Int>.allocate(capacity: arrayCount)
   for _ in 1...100*N {
     for _ in 1...reps {
       for i in 0..<arrayCount {
@@ -51,6 +51,6 @@ public func run_PopFrontUnsafePointer(_ N: Int) {
       CheckResults(result == arrayCount, "IncorrectResults in StringInterpolation: \(result) != \(arrayCount)")
     }
   }
-  a.deallocateCapacity(arrayCount)
+  a.deallocate(capacity: arrayCount)
 }
 

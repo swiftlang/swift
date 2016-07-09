@@ -219,7 +219,7 @@ struct _ForkJoinMutex {
   var _mutex: UnsafeMutablePointer<pthread_mutex_t>
 
   init() {
-    _mutex = UnsafeMutablePointer(allocatingCapacity: 1)
+    _mutex = UnsafeMutablePointer.allocate(capacity: 1)
     if pthread_mutex_init(_mutex, nil) != 0 {
       fatalError("pthread_mutex_init")
     }
@@ -230,7 +230,7 @@ struct _ForkJoinMutex {
       fatalError("pthread_mutex_init")
     }
     _mutex.deinitialize()
-    _mutex.deallocateCapacity(1)
+    _mutex.deallocate(capacity: 1)
   }
 
   func withLock<Result>(_ body: @noescape () -> Result) -> Result {
@@ -249,7 +249,7 @@ struct _ForkJoinCond {
   var _cond: UnsafeMutablePointer<pthread_cond_t>
 
   init() {
-    _cond = UnsafeMutablePointer(allocatingCapacity: 1)
+    _cond = UnsafeMutablePointer.allocate(capacity: 1)
     if pthread_cond_init(_cond, nil) != 0 {
       fatalError("pthread_cond_init")
     }
@@ -260,7 +260,7 @@ struct _ForkJoinCond {
       fatalError("pthread_cond_destroy")
     }
     _cond.deinitialize()
-    _cond.deallocateCapacity(1)
+    _cond.deallocate(capacity: 1)
   }
 
   func signal() {
