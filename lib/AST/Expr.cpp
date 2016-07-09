@@ -1345,14 +1345,12 @@ Type TypeExpr::getInstanceType() const {
 
 /// Return a TypeExpr for a simple identifier and the specified location.
 TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
-                                  bool isImplicit,
-                                  bool isPromotedInstanceRef) {
+                                  bool isImplicit) {
   ASTContext &C = Decl->getASTContext();
   assert(Loc.isValid());
   auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->getName());
   Repr->setValue(Decl);
   auto result = new (C) TypeExpr(TypeLoc(Repr, Type()));
-  result->IsPromotedInstanceRef = isPromotedInstanceRef;
   if (isImplicit)
     result->setImplicit();
   return result;

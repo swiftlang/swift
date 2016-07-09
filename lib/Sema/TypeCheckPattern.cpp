@@ -72,21 +72,13 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
 ///
 /// If there are no enum elements but there are properties, attempts to map
 /// an arbitrary property to an enum element using extractEnumElement.
-///
-/// \param isPromoted If set to anything but the \c nullptr, this will be set to
-///        \c true if the found enum element is referenced as on an instance
-///        but the lookup has been promoted to be on the type instead
-///        This is purely transitional and will be removed when referencing enum
-///        elements on instance members becomes an error
-
 static EnumElementDecl *
 filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
-                     LookupResult foundElements, bool *isPromoted = nullptr) {
+                     LookupResult foundElements) {
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
 
-  for (LookupResult::Result result : foundElements) {
-    ValueDecl *e = result.Decl;
+  for (ValueDecl *e : foundElements) {
     assert(e);
     if (e->isInvalid()) {
       continue;
@@ -96,9 +88,6 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
       // Ambiguities should be ruled out by parsing.
       assert(!foundElement && "ambiguity in enum case name lookup?!");
       foundElement = oe;
-      if (isPromoted != nullptr) {
-        *isPromoted = result.IsPromotedInstanceRef;
-      }
       continue;
     }
 
@@ -115,20 +104,13 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
 }
 
 /// Find an unqualified enum element.
-///
-/// \param IsPromoted If set to anything but the \c nullptr, this will be set to
-///        \c true if the found enum element is referenced as on an instance
-///        but the lookup has been promoted to be on the type instead
-///        This is purely transitional and will be removed when referencing enum
-///        elements on instance members becomes an error
 static EnumElementDecl *
 lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
-                                   Identifier name, SourceLoc UseLoc,
-                                   bool *IsPromoted = nullptr) {
+                                   Identifier name, SourceLoc UseLoc) {
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto lookup = TC.lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
-  return filterForEnumElement(TC, DC, UseLoc, lookup, IsPromoted);
+  return filterForEnumElement(TC, DC, UseLoc, lookup);
 }
 
 /// Find an enum element in an enum type.
@@ -502,22 +484,10 @@ public:
     // rdar://20879992 is addressed.
     //
     // Try looking up an enum element in context.
-
-    // Check if the enum element was actually accessed on an instance and was
-    // promoted to be looked up on a type. If so, provide a warning
-    bool isPromotedInstance = false;
-
     if (EnumElementDecl *referencedElement
         = lookupUnqualifiedEnumMemberElement(TC, DC,
                                              ude->getName().getBaseName(),
-                                             ude->getLoc(),
-                                             &isPromotedInstance)) {
-      if (isPromotedInstance) {
-        TC.diagnose(ude->getLoc(), diag::could_not_use_enum_element_on_instance,
-                                ude->getName())
-          .fixItInsert(ude->getLoc(), ".");
-      }
-
+                                             ude->getLoc())) {
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
       TypeLoc loc = TypeLoc::withoutLoc(enumTy);
@@ -600,21 +570,9 @@ public:
     // If we had a single component, try looking up an enum element in context.
     if (auto compId = dyn_cast<ComponentIdentTypeRepr>(repr)) {
       // Try looking up an enum element in context.
-
-      // Check if the enum element was actually accessed on an instance and was
-      // promoted to be looked up on a type. If so, provide a warning
-      bool isPromoted = false;
       EnumElementDecl *referencedElement
         = lookupUnqualifiedEnumMemberElement(TC, DC, compId->getIdentifier(),
-                                             repr->getLoc(), &isPromoted);
-
-      if (isPromoted) {
-        TC.diagnose(compId->getLoc(),
-                    diag::could_not_use_enum_element_on_instance,
-                    compId->getIdentifier())
-          .fixItInsert(compId->getLoc(), ".");
-      }
-
+                                             repr->getLoc());
       
       if (!referencedElement)
         return nullptr;

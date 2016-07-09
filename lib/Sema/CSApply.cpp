@@ -2545,24 +2545,6 @@ namespace {
     
   public:
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
-      if (auto ty = dyn_cast<TypeExpr>(expr->getBase())) {
-        if (ty->IsPromotedInstanceRef) {
-          // An enum element was looked up on an instance. Issue a warning
-          auto enumMetatype = ty->getType()->castTo<AnyMetatypeType>();
-          auto enumType = enumMetatype->getInstanceType()->castTo<EnumType>();
-
-          SmallString<32> enumTypeName;
-          llvm::raw_svector_ostream typeNameStream(enumTypeName);
-          typeNameStream << enumType->getDecl()->getName();
-          typeNameStream << ".";
-
-          TypeChecker &tc = cs.getTypeChecker();
-          tc.diagnose(expr->getLoc(),
-                      diag::could_not_use_enum_element_on_instance,
-                      expr->getName())
-            .fixItInsert(expr->getLoc(), typeNameStream.str());
-        }
-      }
       return applyMemberRefExpr(expr, expr->getBase(), expr->getDotLoc(),
                                 expr->getNameLoc(), expr->isImplicit());
     }
