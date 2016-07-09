@@ -2839,7 +2839,7 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
       if (auto TT = argsTy->getAs<TupleType>()) {
         assert(TT->getNumElements() != 0 && "Unexpected empty TupleType");
         auto closureLabel = TT->getElement(TT->getNumElements() - 1).getName();
-        if(!closureLabel.empty()) {
+        if (!closureLabel.empty()) {
           replacement += closureLabel.str();
           replacement += ": ";
         }
