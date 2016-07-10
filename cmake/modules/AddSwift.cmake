@@ -1,4 +1,5 @@
 include(SwiftList)
+include(SwiftXcodeSupport)
 
 # SWIFTLIB_DIR is the directory in the build tree where Swift resource files
 # should be placed.  Note that $CMAKE_CFG_INTDIR expands to "." for
@@ -677,7 +678,7 @@ function(_add_swift_library_single target name)
 
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
-      apply_xcode_substitutions("${config}" "${SWIFTLIB_DIR}" config_lib_dir)
+      escape_path_for_xcode("${config}" "${SWIFTLIB_DIR}" config_lib_dir)
       set_target_properties(${target} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
         ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
@@ -731,7 +732,7 @@ function(_add_swift_library_single target name)
 
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
-      apply_xcode_substitutions(
+      escape_path_for_xcode(
           "${config}" "${SWIFTSTATICLIB_DIR}" config_lib_dir)
       set_target_properties(${target_static} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
