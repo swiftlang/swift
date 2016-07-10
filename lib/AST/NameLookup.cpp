@@ -556,7 +556,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             if (FD->isStatic() && !isMetatypeType)
               continue;
           } else if (isa<EnumElementDecl>(Result)) {
-            Results.push_back(UnqualifiedLookupResult(MetaBaseDecl, Result));
+            auto lookupRes = UnqualifiedLookupResult(MetaBaseDecl, Result);
+            if (!BaseDecl->getType()->is<MetatypeType>()) {
+              lookupRes.IsPromotedInstanceRef = true;
+            }
+            Results.push_back(lookupRes);
             continue;
           }
 

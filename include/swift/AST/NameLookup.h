@@ -41,6 +41,13 @@ private:
   ValueDecl *Value;
 
 public:
+  /// Whether this should actually reference an instance but has been promoted
+  /// to a type reference to access an enum element
+  ///
+  /// This is purely transitional and will be removed when referencing enum
+  /// elements on instance members becomes an error
+  bool IsPromotedInstanceRef = false;
+
   UnqualifiedLookupResult(ValueDecl *value) : Base(nullptr), Value(value) { }
 
   UnqualifiedLookupResult(ValueDecl *base, ValueDecl *value)
