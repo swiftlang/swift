@@ -584,7 +584,7 @@ public protocol Sequence {
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Iterator.Element>
+  func _copyToContiguousArray() -> ContiguousArray<Iterator.Element>
 
   /// Copy a Sequence into an array, returning one past the last
   /// element initialized.

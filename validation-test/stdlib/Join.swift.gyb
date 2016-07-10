@@ -288,7 +288,7 @@ JoinTestSuite.test("${Base}.join()") {
   }
 }
 
-JoinTestSuite.test("${Base}.join()/_copyToNativeArrayBuffer()") {
+JoinTestSuite.test("${Base}.join()/_copyToContiguousArray()") {
   for test in joinWithSeparatorTests {
     let elements = ${Base}(${label} test.elements.map {
       ${Base}(${label} $0)

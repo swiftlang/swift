@@ -110,9 +110,9 @@ extension Sequence
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
-    return _base._copyToNativeArrayBuffer()
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element> {
+    return _base._copyToContiguousArray()
   }
 
   /// Copy a Sequence into an array, returning one past the last

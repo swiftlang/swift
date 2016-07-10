@@ -936,7 +936,7 @@ extension ${Self} : ArrayLiteralConvertible {
   ///
   /// - Parameter elements: A variadic list of elements of the new array.
   public init(arrayLiteral elements: Element...) {
-    self.init(_buffer: _extractOrCopyToNativeArrayBuffer(elements._buffer))
+    self.init(_buffer: _extractOrCopyToContiguousArray(elements._buffer)._buffer)
   }
 %end
 }
@@ -1037,7 +1037,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   public init<S : Sequence>(_ s: S)
     where S.Iterator.Element == Element {
 
-    self = ${Self}(_buffer: _Buffer(s._copyToNativeArrayBuffer(),
+    self = ${Self}(
+      _buffer: _Buffer(s._copyToContiguousArray()._buffer,
       shiftedToStartIndex: 0))
   }
 
@@ -1426,8 +1427,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     }
   }
 
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
-    return _extractOrCopyToNativeArrayBuffer(self._buffer)
+  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+    return _extractOrCopyToContiguousArray(self._buffer)
   }
 }
 
@@ -1976,18 +1977,27 @@ internal func _arrayReserve<_Buffer>(
   _arrayOutOfPlaceUpdate(&buffer, &newBuffer, count, 0, _IgnorePointer())
 }
 
-public // SPI(Foundation)
-func _extractOrCopyToNativeArrayBuffer<Buffer>(
+internal func _extractOrCopyToContiguousArray<Buffer>(
+  _ source: Buffer
+) -> ContiguousArray<Buffer.Iterator.Element>
+  where
+  Buffer : _ArrayBufferProtocol,
+  Buffer.Iterator.Element == Buffer.Element {
+
+  if let n = source.requestNativeBuffer() {
+    return ContiguousArray(_buffer: n)
+  }
+  return _copyCollectionToContiguousArray(source)
+}
+
+internal func _extractOrCopyToNativeArrayBuffer<Buffer>(
   _ source: Buffer
 ) -> _ContiguousArrayBuffer<Buffer.Iterator.Element>
   where
   Buffer : _ArrayBufferProtocol,
   Buffer.Iterator.Element == Buffer.Element {
 
-  if let n = source.requestNativeBuffer() {
-    return n
-  }
-  return _copyCollectionToNativeArrayBuffer(source)
+  return _extractOrCopyToContiguousArray(source)._buffer
 }
 
 /// Append items from `newItems` to `buffer`.
