@@ -1316,19 +1316,15 @@ private:
       // spec is useless. If so, report this.
       if (CurrentInfo.isContainedIn(NewConstraint)) {
         DiagnosticEngine &Diags = TC.Diags;
-        if (CurrentTRC->getReason() == TypeRefinementContext::Reason::Root) {
-          // Diagnose for checks that are useless because the minimum deployment
-          // target ensures they will never be false. We suppress this warning
-          // when compiling for playgrounds because the developer cannot
-          // cannot explicitly set the minimum deployment target to silence
-          // the alarm. We also suppress in script mode (where setting the
-          // minimum deployment target requires a target triple).
-          if (!TC.getLangOpts().Playground && !TC.getInImmediateMode()) {
-            Diags.diagnose(Query->getLoc(),
-                           diag::availability_query_useless_min_deployment,
-                           platformString(targetPlatform(TC.getLangOpts())));
-          }
-        } else {
+        // Some availability checks will always pass because the minimum
+        // deployment target gurantees they will never be false. We don't
+        // diagnose these checks as useless because the source file may
+        // be shared with other projects/targets having older deployment
+        // targets. We don't currently have a mechanism for the user to
+        // suppress these warnings (for example, by indicating when the
+        // required compatibility version is different than the deployment
+        // target).
+        if (CurrentTRC->getReason() != TypeRefinementContext::Reason::Root) {
           Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_enclosing_scope,
                          platformString(targetPlatform(TC.getLangOpts())));
