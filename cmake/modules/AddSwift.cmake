@@ -1763,3 +1763,11 @@ function(add_swift_executable name)
       ${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
       ${SWIFTEXE_DISABLE_ASLR_FLAG})
 endfunction()
+
+macro(add_swift_tool_subdirectory name)
+  add_llvm_subdirectory(SWIFT TOOL ${name})
+endmacro()
+
+macro(add_swift_lib_subdirectory name)
+  add_llvm_subdirectory(SWIFT LIB ${name})
+endmacro()
