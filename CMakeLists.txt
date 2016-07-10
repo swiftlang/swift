@@ -93,6 +93,9 @@ option(SWIFT_STDLIB_ASSERTIONS
 option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
        "Use the host compiler and not the internal clang to build the swift runtime"
        FALSE)
+option(SWIFT_BUILD_RUNTIME_WITH_HOST_LIBLTO
+       "Use the host liblto and not the internal liblto to build the swift runtime"
+       FALSE)
 
 set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
     "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
