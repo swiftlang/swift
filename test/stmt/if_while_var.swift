@@ -61,7 +61,7 @@ if let x = opt, let y = opt, x != y,
 
 // Leading boolean conditional.
 if 1 != 2, let x = opt,
-   y = opt,  // expected-warning {{expected 'let' in conditional}} {{4-4=let }}
+   y = opt,  // expected-error {{expected 'let' in conditional}} {{4-4=let }}
    x != y,
    let a = opt, var b = opt {
 }

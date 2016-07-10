@@ -803,13 +803,8 @@ ERROR(expected_comma_stmtcondition,none,
 ERROR(expected_expr_conditional,PointsToFirstBadToken,
       "expected expression in conditional", ())
 
-// FIXME: Upgrade these two diagnostics to errors in Swift 3.
-WARNING(expected_binding_keyword,none,
+ERROR(expected_binding_keyword,none,
       "expected '%0' in conditional", (StringRef))
-// FIXME: just replace with expected_comma_stmtcondition
-WARNING(expected_comma_stmtcondition_w,none,
-        "expected ',' joining parts of a multi-clause condition", ())
-
 
 ERROR(expected_expr_conditional_var,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
