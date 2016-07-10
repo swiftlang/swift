@@ -14,7 +14,7 @@
 // for performance measuring.
 import TestsUtils
 
-var words=[
+var words = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
   "Charles", "Thomas", "Christopher", "Daniel", "Matthew", "Donald", "Anthony",
   "Paul", "Mark", "George", "Steven", "Kenneth", "Andrew", "Edward", "Brian",
@@ -27,7 +27,8 @@ var words=[
   "Terry", "Joe", "Sean", "Willie", "Jesse", "Ralph", "Billy", "Austin", "Bruce",
   "Christian", "Roy", "Bryan", "Eugene", "Louis", "Harry", "Wayne", "Ethan",
   "Jordan", "Russell", "Alan", "Philip", "Randy", "Juan", "Howard", "Vincent",
-  "Bobby", "Dylan", "Johnny", "Phillip", "Craig"]
+  "Bobby", "Dylan", "Johnny", "Phillip", "Craig"
+]
 
 // This is a phone book record.
 struct Record : Comparable {
