@@ -710,8 +710,10 @@ class Code(ASTNode):
         # If we got a result, the code was an expression, so append
         # its value
         if result is not None and result != '':
+            from numbers import Number, Integral
+            result_string = repr(result) if isinstance(result, Number) and not isinstance(result, Integral) else str(result)
             context.append_text(
-                str(result), self.filename, self.start_line_number)
+                result_string, self.filename, self.start_line_number)
 
     def __str__(self, indent=''):
         source_lines = re.sub(r'^\n', '', strip_trailing_nl(
