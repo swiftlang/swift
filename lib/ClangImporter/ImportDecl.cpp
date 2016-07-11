@@ -2848,8 +2848,8 @@ namespace {
       bodyParams.push_back(ParameterList::createWithoutLoc(selfVar));
 
       SpecialMethodKind kind = SpecialMethodKind::Regular;
-      // FIXME: This doesn't handle implicit properties.
-      if (decl->isPropertyAccessor())
+      // Swift 2.2 does not import class properties as properties.
+      if (decl->isPropertyAccessor() && decl->isInstanceMethod())
         kind = SpecialMethodKind::PropertyAccessor;
       else if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
@@ -4147,9 +4147,10 @@ namespace {
 
         for (auto member : proto->getMembers()) {
           if (auto prop = dyn_cast<VarDecl>(member)) {
+            // Swift 2.2 does not import class properties as properties.
             auto objcProp =
               dyn_cast_or_null<clang::ObjCPropertyDecl>(prop->getClangDecl());
-            if (!objcProp)
+            if (!objcProp || objcProp->isClassProperty())
               continue;
 
             // We can't import a property if there's already a method with this
@@ -4688,6 +4689,9 @@ namespace {
     }
 
     Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl) {
+      // Swift 2.2 does not import class properties as properties.
+      if (decl->isClassProperty()) return nullptr;
+
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
@@ -4768,6 +4772,9 @@ namespace {
     Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl,
                                 DeclContext *dc) {
       assert(dc);
+
+      // Swift 2.2 does not import class properties as properties.
+      if (decl->isClassProperty()) return nullptr;
 
       auto name = Impl.importFullName(decl).Imported.getBaseName();
       if (name.empty())
@@ -5335,9 +5342,12 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
               == clang::ObjCMethodDecl::Required)
           hasMissingRequiredMember = true;
       } else if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(ClangDecl)) {
-        if (prop->getPropertyImplementation()
-              == clang::ObjCPropertyDecl::Required)
-          hasMissingRequiredMember = true;
+        // Swift 2.2 does not import class properties as properties.
+        if (!prop->isClassProperty()) {
+          if (prop->getPropertyImplementation()
+                == clang::ObjCPropertyDecl::Required)
+            hasMissingRequiredMember = true;
+        }
       }
 
       if (hasMissingRequiredMember) {
