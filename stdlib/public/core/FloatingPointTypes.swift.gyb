@@ -513,32 +513,32 @@ extension ${Self}: BinaryFloatingPoint {
 %if bits == 80:
     switch rule {
     case .toNearestOrAwayFromZero:
-      _swift_roundl(&self)
+      _swift_stdlib_roundl(&self)
     case .toNearestOrEven:
-      _swift_roundevenl(&self)
+      _swift_stdlib_roundevenl(&self)
     case .towardZero:
-      _swift_truncl(&self)
+      _swift_stdlib_truncl(&self)
     case .awayFromZero:
-      _swift_roundawayl(&self)
+      _swift_stdlib_roundawayl(&self)
     case .up:
-      _swift_ceill(&self)
+      _swift_stdlib_ceill(&self)
     case .down:
-      _swift_floorl(&self)
+      _swift_stdlib_floorl(&self)
     }
 %else:
     switch rule {
     case .toNearestOrAwayFromZero:
-      self = _swift_round${cFuncSuffix(bits)}(self)
+      self = _swift_stdlib_round${cFuncSuffix(bits)}(self)
     case .toNearestOrEven:
-      self = _swift_roundeven${cFuncSuffix(bits)}(self)
+      self = _swift_stdlib_roundeven${cFuncSuffix(bits)}(self)
     case .towardZero:
-      self = _swift_trunc${cFuncSuffix(bits)}(self)
+      self = _swift_stdlib_trunc${cFuncSuffix(bits)}(self)
     case .awayFromZero:
-      self = _swift_roundaway${cFuncSuffix(bits)}(self)
+      self = _swift_stdlib_roundaway${cFuncSuffix(bits)}(self)
     case .up:
-      self = _swift_ceil${cFuncSuffix(bits)}(self)
+      self = _swift_stdlib_ceil${cFuncSuffix(bits)}(self)
     case .down:
-      self = _swift_floor${cFuncSuffix(bits)}(self)
+      self = _swift_stdlib_floor${cFuncSuffix(bits)}(self)
     }
 %end
   }
@@ -572,9 +572,9 @@ extension ${Self}: BinaryFloatingPoint {
   public mutating func formRemainder(dividingBy other: ${Self}) {
 %if bits == 80:
     var other = other
-    _swift_remainderl(&self, &other)
+    _swift_stdlib_remainderl(&self, &other)
 %else:
-    self = _swift_remainder${cFuncSuffix(bits)}(self, other)
+    self = _swift_stdlib_remainder${cFuncSuffix(bits)}(self, other)
 %end
   }
 
@@ -586,9 +586,9 @@ extension ${Self}: BinaryFloatingPoint {
   @_transparent
   public mutating func formSquareRoot( ) {
 %if bits == 80:
-    _swift_squareRootl(&self)
+    _swift_stdlib_squareRootl(&self)
 %else:
-    self = _swift_squareRoot${cFuncSuffix(bits)}(self)
+    self = _swift_stdlib_squareRoot${cFuncSuffix(bits)}(self)
 %end
   }
 
@@ -597,9 +597,9 @@ extension ${Self}: BinaryFloatingPoint {
 %if bits == 80:
     var lhs = lhs
     var rhs = rhs
-    _swift_addProductl(&self, &lhs, &rhs)
+    _swift_stdlib_addProductl(&self, &lhs, &rhs)
 %else:
-    self = _swift_addProduct${cFuncSuffix(bits)}(self, lhs, rhs)
+    self = _swift_stdlib_addProduct${cFuncSuffix(bits)}(self, lhs, rhs)
 %end
   }
 
