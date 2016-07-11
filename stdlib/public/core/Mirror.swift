@@ -129,7 +129,7 @@ public struct Mirror {
   ///     }
   public typealias Children = AnyCollection<Child>
 
-  /// A suggestion of how a `Mirror`'s is to be interpreted.
+  /// A suggestion of how a `Mirror`'s `subject` is to be interpreted.
   ///
   /// Playgrounds and the debugger will show a representation similar
   /// to the one used for instances of the kind indicated by the
