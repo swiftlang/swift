@@ -620,6 +620,10 @@ namespace {
     }
 
     bool visitMarkDependenceInst(const MarkDependenceInst *RHS) {
+       return true;
+    }
+
+    bool visitOpenExistentialRefInst(const OpenExistentialRefInst *RHS) {
       return true;
     }
 
