@@ -42,7 +42,7 @@ if #available(macOS 10.52, *) {
 // CHECK: [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK: [[QUERY_FUNC:%.*]] = function_ref @_TFs26_stdlib_isOSVersionAtLeastFTBwBwBw_Bi1_ : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK: [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
-if #available(OSX 10, *) { // expected-warning {{minimum deployment target ensures guard will always be true}}
+if #available(OSX 10, *) {
 }
 
 // CHECK: }
@@ -50,7 +50,7 @@ if #available(OSX 10, *) { // expected-warning {{minimum deployment target ensur
 func doThing() {}
 
 func testUnreachableVersionAvailable(condition: Bool) {
-  if #available(OSX 10.0, *) { // expected-warning {{minimum deployment target ensures guard will always be true}}
+  if #available(OSX 10.0, *) {
     doThing() // no-warning
     return
   } else {
