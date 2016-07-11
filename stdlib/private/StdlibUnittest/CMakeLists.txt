@@ -8,12 +8,6 @@ if(SWIFT_SERIALIZE_STDLIB_UNITTEST)
   list(APPEND swift_stdlib_unittest_compile_flags "-Xfrontend" "-sil-serialize-all")
 endif()
 
-# TODO: extend this through a similar mechanism to SWIFT_MODULE_DEPENDS
-set(swift_stdlib_unittest_framework_depends)
-if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
-  list(APPEND swift_stdlib_unittest_framework_depends Foundation)
-endif()
-
 # TODO: support this on non-POSIX platforms.  It cannot be currently as it
 # depends on pthreads.
 add_swift_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
@@ -43,6 +37,5 @@ add_swift_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags}
   TARGET_SDKS ALL_POSIX_PLATFORMS
-  FRAMEWORK_DEPENDS ${swift_stdlib_unittest_framework_depends}
   INSTALL_IN_COMPONENT stdlib-experimental)
 
