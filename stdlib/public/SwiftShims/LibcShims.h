@@ -88,23 +88,11 @@ SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_remainderf(float, float);
 SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_squareRootf(float);
 SWIFT_RUNTIME_STDLIB_INTERFACE
 float _swift_stdlib_addProductf(float, float, float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_roundf(float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_roundevenf(float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_truncf(float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_roundawayf(float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_ceilf(float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_floorf(float);
   
 SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_remainder(double, double);
 SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_squareRoot(double);
 SWIFT_RUNTIME_STDLIB_INTERFACE
 double _swift_stdlib_addProduct(double, double, double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_round(double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_roundeven(double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_trunc(double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_roundaway(double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_ceil(double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_floor(double);
   
 // TODO: Remove horrible workaround when importer does Float80 <-> long double.
 #if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER

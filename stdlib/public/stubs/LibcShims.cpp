@@ -135,25 +135,6 @@ float swift::_swift_stdlib_addProductf(float addend, float lhs, float rhs) {
   return std::fma(lhs, rhs, addend);
 }
 
-float swift::_swift_stdlib_roundf(float x) { return std::round(x); }
-
-float swift::_swift_stdlib_roundevenf(float x) {
-  //  TODO: switch to roundevenf( ) when available in backing C libraries, or
-  //  open-code here to correctly handle non-default fenv.
-  return std::rint(x);
-}
-
-float swift::_swift_stdlib_truncf(float x) { return std::trunc(x); }
-
-float swift::_swift_stdlib_roundawayf(float x) {
-  //  No corresponding C function, but trivial to fake.
-  return x < 0 ? std::floor(x) : std::ceil(x);
-}
-
-float swift::_swift_stdlib_ceilf(float x) { return std::ceil(x); }
-
-float swift::_swift_stdlib_floorf(float x) { return std::floor(x); }
-
 double swift::_swift_stdlib_remainder(double dividend, double divisor) {
   return std::remainder(dividend, divisor);
 }
@@ -163,25 +144,6 @@ double swift::_swift_stdlib_squareRoot(double x) { return std::sqrt(x); }
 double swift::_swift_stdlib_addProduct(double addend, double lhs, double rhs) {
   return std::fma(lhs, rhs, addend);
 }
-
-double swift::_swift_stdlib_round(double x) { return std::round(x); }
-
-double swift::_swift_stdlib_roundeven(double x) {
-  //  TODO: switch to roundevenf( ) when available in backing C libraries, or
-  //  open-code here to correctly handle non-default fenv.
-  return std::rint(x);
-}
-
-double swift::_swift_stdlib_trunc(double x) { return std::trunc(x); }
-
-double swift::_swift_stdlib_roundaway(double x) {
-  //  No corresponding C function, but trivial to fake.
-  return x < 0 ? std::floor(x) : std::ceil(x);
-}
-
-double swift::_swift_stdlib_ceil(double x) { return std::ceil(x); }
-
-double swift::_swift_stdlib_floor(double x) { return std::floor(x); }
 
 #if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
 void swift::_swift_stdlib_remainderl(void *_self, const void *_other) {
