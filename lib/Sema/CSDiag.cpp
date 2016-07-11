@@ -4558,10 +4558,16 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
     if (callExpr->isImplicit() && overloadName == "~=") {
       // This binop was synthesized when typechecking an expression pattern.
-      diagnose(lhsExpr->getLoc(),
-               diag::cannot_match_expr_pattern_with_value, lhsType, rhsType)
-        .highlight(lhsExpr->getSourceRange())
-        .highlight(rhsExpr->getSourceRange());
+      auto diag = diagnose(lhsExpr->getLoc(),
+                    diag::cannot_match_expr_pattern_with_value,
+                           lhsType, rhsType);
+      diag.highlight(lhsExpr->getSourceRange());
+      diag.highlight(rhsExpr->getSourceRange());
+      if (auto optUnwrappedType = rhsType->getOptionalObjectType()) {
+        if (lhsType->isEqual(optUnwrappedType)) {
+          diag.fixItInsert(lhsExpr->getEndLoc(), "?");
+        }
+      }
       return true;
     }
 

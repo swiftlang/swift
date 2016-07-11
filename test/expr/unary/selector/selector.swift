@@ -126,7 +126,7 @@ case #selector(C1.method1)?:
 }
 
 switch optionalSel {
-case #selector(SR1827.bar): // expected-error{{expression pattern of type 'Selector' cannot match values of type 'Selector?'}}
+case #selector(SR1827.bar): // expected-error{{expression pattern of type 'Selector' cannot match values of type 'Selector?'}} {{26-26=?}}
   break
 case #selector(SR1827.bar)!: // expected-error{{cannot force unwrap value of non-optional type 'Selector'}}
   break
