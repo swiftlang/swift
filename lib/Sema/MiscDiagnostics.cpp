@@ -2315,7 +2315,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         VarPattern *foundVP = nullptr;
         pattern->forEachNode([&](Pattern *P) {
           if (auto *VP = dyn_cast<VarPattern>(P))
-            foundVP = VP;
+            if (VP->getSingleVar() == var)
+              foundVP = VP;
         });
         
         if (foundVP && !foundVP->isLet())
