@@ -186,7 +186,7 @@ extension PublicProto where Assoc == InternalStruct {
   public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
 }
 extension InternalProto {
-  public func foo() {} // expected-warning {{declaring a public instance method for an internal protocol}} {{3-9=internal}}
+  public func foo() {} // no effect, but no warning
 }
 extension InternalProto where Assoc == PublicStruct {
   public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}

@@ -5942,24 +5942,6 @@ inline bool ValueDecl::isSettable(const DeclContext *UseDC,
     return false;
 }
 
-namespace impl {
-  bool isInternalDeclEffectivelyPublic(const ValueDecl *VD);
-}
-
-inline Accessibility ValueDecl::getEffectiveAccess() const {
-  switch (getFormalAccess()) {
-  case Accessibility::Public:
-    return Accessibility::Public;
-  case Accessibility::Internal:
-    if (impl::isInternalDeclEffectivelyPublic(this)) {
-      return Accessibility::Public;
-    }
-    return Accessibility::Internal;
-  case Accessibility::Private:
-    return Accessibility::Private;
-  }
-}
-
 inline Optional<VarDecl *>
 NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
   if (auto var = dyn_cast<VarDecl>(decl)) {
