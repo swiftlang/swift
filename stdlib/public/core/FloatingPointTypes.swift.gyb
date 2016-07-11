@@ -578,22 +578,12 @@ extension ${Self}: BinaryFloatingPoint {
 
   @_transparent
   public mutating func formSquareRoot( ) {
-%if bits == 80:
-    _swift_stdlib_squareRootl(&self)
-%else:
-    self = _swift_stdlib_squareRoot${cFuncSuffix(bits)}(self)
-%end
+    _value = Builtin.int_sqrt_FPIEEE${bits}(_value)
   }
 
   @_transparent
   public mutating func addProduct(_ lhs: ${Self}, _ rhs: ${Self}) {
-%if bits == 80:
-    var lhs = lhs
-    var rhs = rhs
-    _swift_stdlib_addProductl(&self, &lhs, &rhs)
-%else:
-    self = _swift_stdlib_addProduct${cFuncSuffix(bits)}(self, lhs, rhs)
-%end
+    _value = Builtin.int_fma_FPIEEE${bits}(lhs._value, rhs._value, _value)
   }
 
   @_transparent

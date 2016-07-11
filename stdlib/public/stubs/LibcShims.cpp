@@ -129,37 +129,13 @@ float swift::_swift_stdlib_remainderf(float dividend, float divisor) {
   return std::remainder(dividend, divisor);
 }
 
-float swift::_swift_stdlib_squareRootf(float x) { return std::sqrt(x); }
-
-float swift::_swift_stdlib_addProductf(float addend, float lhs, float rhs) {
-  return std::fma(lhs, rhs, addend);
-}
-
 double swift::_swift_stdlib_remainder(double dividend, double divisor) {
   return std::remainder(dividend, divisor);
-}
-
-double swift::_swift_stdlib_squareRoot(double x) { return std::sqrt(x); }
-
-double swift::_swift_stdlib_addProduct(double addend, double lhs, double rhs) {
-  return std::fma(lhs, rhs, addend);
 }
 
 #if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
 void swift::_swift_stdlib_remainderl(void *_self, const void *_other) {
   *(long double *)_self = std::remainder(*(long double *)_self,
                                          *(const long double *)_other);
-}
-
-void swift::_swift_stdlib_squareRootl(void *_self) {
-  *(long double *)_self = std::sqrt(*(long double *)_self);
-}
-
-void
-swift::_swift_stdlib_addProductl(void *_self,
-                                 const void *_lhs, const void *_rhs) {
-  *(long double *)_self = std::fma(*(const long double *)_lhs,
-                                   *(const long double *)_rhs,
-                                   *(long double *)_self);
 }
 #endif // Have Float80
