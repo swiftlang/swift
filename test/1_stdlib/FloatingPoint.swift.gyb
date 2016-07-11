@@ -333,7 +333,42 @@ FloatingPoint.test("${Self}.round") {
 }
 
 FloatingPoint.test("${Self}.remainder") {
+  //  Basic sanity tests only; these are only sufficient to provide reassurance
+  //  that a known-good remainder function (e.g. from the C stdlib) has been
+  //  shimmed correctly.  They are not sufficient for development of such a
+  //  function, and should not be employed for that purpose.
+  expectTrue(${Self}(0).remainder(dividingBy: 0).isNaN)
+  expectTrue(${Self}(1).remainder(dividingBy: 0).isNaN)
+  expectTrue(${Self}.infinity.remainder(dividingBy: 0).isNaN)
+  expectTrue(${Self}.infinity.remainder(dividingBy: 1).isNaN)
+  expectEqual(0, ${Self}(0).remainder(dividingBy: .infinity))
+  expectEqual(1, ${Self}(1).remainder(dividingBy: .infinity))
+  expectEqual(-1, ${Self}(2).remainder(dividingBy: 3))
+  expectEqual(-1, ${Self}(3).remainder(dividingBy: 2))
+  expectEqual(1, ${Self}(5).remainder(dividingBy: 2))
+}
 
+FloatingPoint.test("${Self}.squareRoot") {
+  //  Basic sanity tests only; these are only sufficient to provide reassurance
+  //  that a known-good square root function (e.g. from the C stdlib) has been
+  //  shimmed correctly.  They are not sufficient for development of such a
+  //  function, and should not be employed for that purpose.
+  expectTrue(${Self}(-1).squareRoot().isNaN)
+  expectTrue(${Self}.nan.squareRoot().isNaN)
+  expectEqual(-0, ${Self}(-0).squareRoot())
+  expectEqual(0, ${Self}(0).squareRoot())
+  expectEqual(1, ${Self}(1).squareRoot())
+  expectEqual(2, ${Self}(4).squareRoot())
+  expectEqual(.infinity, ${Self}.infinity.squareRoot())
+}
+
+FloatingPoint.test("${Self}.addingProduct") {
+  //  Fails if fma( ) is incorrectly implemented using separate + and *,
+  //  and validates that we have the argument order right for the shimmed
+  //  function.
+  let one = ${Self}(1)
+  let ulp = ${Self}.ulpOfOne
+  expectEqual(ulp*ulp, one.addingProduct(ulp + one, ulp - one))
 }
 % if Self == 'Float80':
 #endif
