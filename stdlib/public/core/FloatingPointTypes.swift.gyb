@@ -510,47 +510,30 @@ extension ${Self}: BinaryFloatingPoint {
 
   @_transparent
   public mutating func round(_ rule: FloatingPointRoundingRule) {
-%if bits == 80:
     switch rule {
     case .toNearestOrAwayFromZero:
-      _swift_stdlib_roundl(&self)
-    case .toNearestOrEven:
-      _swift_stdlib_roundevenl(&self)
-    case .towardZero:
-      _swift_stdlib_truncl(&self)
-    case .awayFromZero:
-      _swift_stdlib_roundawayl(&self)
-    case .up:
-      _swift_stdlib_ceill(&self)
-    case .down:
-      _swift_stdlib_floorl(&self)
-    }
-%else:
-    switch rule {
-    case .toNearestOrAwayFromZero:
-      self._value = Builtin.int_round_FPIEEE${bits}(self._value)
+      _value = Builtin.int_round_FPIEEE${bits}(_value)
     case .toNearestOrEven:
       //  TODO: switch to roundeven( ) or corresponding builtin when
       //  available; rint assumes default floating-point environment.
       //  This is pretty OK at present, since there's no Swifty way
       //  to fuss with the environment, but we should fix it in the
       //  long term.
-      self._value = Builtin.int_rint_FPIEEE${bits}(self._value)
+      _value = Builtin.int_rint_FPIEEE${bits}(_value)
     case .towardZero:
-      self._value = Builtin.int_trunc_FPIEEE${bits}(self._value)
+      _value = Builtin.int_trunc_FPIEEE${bits}(_value)
     case .awayFromZero:
-      if self < 0 {
-        self._value = Builtin.int_floor_FPIEEE${bits}(self._value)
+      if sign == .minus {
+        _value = Builtin.int_floor_FPIEEE${bits}(_value)
       }
       else {
-        self._value = Builtin.int_ceil_FPIEEE${bits}(self._value)
+        _value = Builtin.int_ceil_FPIEEE${bits}(_value)
       }
     case .up:
-      self._value = Builtin.int_ceil_FPIEEE${bits}(self._value)
+      _value = Builtin.int_ceil_FPIEEE${bits}(_value)
     case .down:
-      self._value = Builtin.int_floor_FPIEEE${bits}(self._value)
+      _value = Builtin.int_floor_FPIEEE${bits}(_value)
     }
-%end
   }
 
   @_transparent

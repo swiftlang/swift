@@ -102,12 +102,6 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 void _swift_stdlib_squareRootl(void *_self);
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void _swift_stdlib_addProductl(void *_self, const void *_lhs, const void *_rhs);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_roundl(void *_self);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_roundevenl(void *_self);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_truncl(void *_self);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_roundawayl(void *_self);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_ceill(void *_self);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_floorl(void *_self);
 #endif
 
 #ifdef __cplusplus

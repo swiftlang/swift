@@ -162,29 +162,4 @@ swift::_swift_stdlib_addProductl(void *_self,
                                    *(const long double *)_rhs,
                                    *(long double *)_self);
 }
-
-void swift::_swift_stdlib_roundl(void *_self) {
-  *(long double *)_self = std::round(*(long double *)_self);
-}
-
-void swift::_swift_stdlib_roundevenl(void *_self) {
-  *(long double *)_self = std::rint(*(long double *)_self);
-}
-
-void swift::_swift_stdlib_truncl(void *_self) {
-  *(long double *)_self = std::trunc(*(long double *)_self);
-}
-
-void swift::_swift_stdlib_roundawayl(void *_self) {
-  long double *ptr = (long double *)_self;
-  *ptr =  *ptr < 0 ? std::floor(*ptr) : std::ceil(*ptr);
-}
-
-void swift::_swift_stdlib_ceill(void *_self) {
-  *(long double *)_self = std::ceil(*(long double *)_self);
-}
-
-void swift::_swift_stdlib_floorl(void *_self) {
-  *(long double *)_self = std::floor(*(long double *)_self);
-}
 #endif // Have Float80
