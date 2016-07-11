@@ -2009,7 +2009,20 @@ commit_to_conversions:
     // If we have an optional type, try to force-unwrap it.
     // FIXME: Should we also try '?'?
     if (objectType1->getOptionalObjectType()) {
-      conversionsOrFixes.push_back(FixKind::ForceOptional);
+      bool forceUnwrapPossible = true;
+      if (auto declRefExpr =
+            dyn_cast_or_null<DeclRefExpr>(locator.trySimplifyToExpr())) {
+        if (declRefExpr->getDecl()->isImplicit()) {
+          // The expression that provides the first type is implicit and never
+          // spelled out in source code, e.g. $match in an expression pattern.
+          // Thus we cannot force unwrap the first type
+          forceUnwrapPossible = false;
+        }
+      }
+
+      if (forceUnwrapPossible) {
+        conversionsOrFixes.push_back(FixKind::ForceOptional);
+      }
     }
 
     // If we have a value of type AnyObject that we're trying to convert to
