@@ -183,7 +183,8 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 }
 
 @_fixed_layout
-public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
+public // @testable
+struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the `count` elements at the
@@ -539,15 +540,14 @@ extension _ContiguousArrayBuffer : RandomAccessCollection {
 }
 
 extension Sequence {
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Iterator.Element> {
-    return _copySequenceToNativeArrayBuffer(self)
+  public func _copyToContiguousArray() -> ContiguousArray<Iterator.Element> {
+    return _copySequenceToContiguousArray(self)
   }
 }
 
-internal func _copySequenceToNativeArrayBuffer<
+internal func _copySequenceToContiguousArray<
   S : Sequence
->(_ source: S) -> _ContiguousArrayBuffer<S.Iterator.Element> {
+>(_ source: S) -> ContiguousArray<S.Iterator.Element> {
   let initialCapacity = source.underestimatedCount
   var builder =
     _UnsafePartiallyInitializedContiguousArrayBuffer<S.Iterator.Element>(
@@ -571,19 +571,18 @@ internal func _copySequenceToNativeArrayBuffer<
 }
 
 extension Collection {
-  public func _copyToNativeArrayBuffer(
-  ) -> _ContiguousArrayBuffer<Iterator.Element> {
-    return _copyCollectionToNativeArrayBuffer(self)
+  public func _copyToContiguousArray() -> ContiguousArray<Iterator.Element> {
+    return _copyCollectionToContiguousArray(self)
   }
 }
 
 extension _ContiguousArrayBuffer {
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
-    return self
+  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+    return ContiguousArray(_buffer: self)
   }
 }
 
-/// This is a fast implementation of _copyToNativeArrayBuffer() for collections.
+/// This is a fast implementation of _copyToContiguousArray() for collections.
 ///
 /// It avoids the extra retain, release overhead from storing the
 /// ContiguousArrayBuffer into
@@ -591,13 +590,13 @@ extension _ContiguousArrayBuffer {
 /// ARC loops, the extra retain, release overhead cannot be eliminated which
 /// makes assigning ranges very slow. Once this has been implemented, this code
 /// should be changed to use _UnsafePartiallyInitializedContiguousArrayBuffer.
-internal func _copyCollectionToNativeArrayBuffer<
+internal func _copyCollectionToContiguousArray<
   C : Collection
->(_ source: C) -> _ContiguousArrayBuffer<C.Iterator.Element>
+>(_ source: C) -> ContiguousArray<C.Iterator.Element>
 {
   let count: Int = numericCast(source.count)
   if count == 0 {
-    return _ContiguousArrayBuffer()
+    return ContiguousArray()
   }
 
   let result = _ContiguousArrayBuffer<C.Iterator.Element>(
@@ -613,7 +612,7 @@ internal func _copyCollectionToNativeArrayBuffer<
     p += 1
   }
   _expectEnd(i, source)
-  return result
+  return ContiguousArray(_buffer: result)
 }
 
 /// A "builder" interface for initializing array buffers.
@@ -678,7 +677,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   /// Returns the fully-initialized buffer. `self` is reset to contain an
   /// empty buffer and cannot be used afterward.
   @inline(__always) // For performance reasons.
-  mutating func finish() -> _ContiguousArrayBuffer<Element> {
+  mutating func finish() -> ContiguousArray<Element> {
     // Adjust the initialized count of the buffer.
     result.count = result.capacity - remainingCapacity
 
@@ -692,12 +691,12 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   /// Returns the fully-initialized buffer. `self` is reset to contain an
   /// empty buffer and cannot be used afterward.
   @inline(__always) // For performance reasons.
-  mutating func finishWithOriginalCount() -> _ContiguousArrayBuffer<Element> {
+  mutating func finishWithOriginalCount() -> ContiguousArray<Element> {
     _sanityCheck(remainingCapacity == result.capacity - result.count,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has incorrect count")
     var finalResult = _ContiguousArrayBuffer<Element>()
     swap(&finalResult, &result)
     remainingCapacity = 0
-    return finalResult
+    return ContiguousArray(_buffer: finalResult)
   }
 }

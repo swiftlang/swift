@@ -1108,9 +1108,9 @@ SequenceTypeTests.test("underestimatedCount/Sequence/CustomImplementation") {
 }
 
 //===----------------------------------------------------------------------===//
-// _copyToNativeArrayBuffer()
+// _copyToContiguousArray()
 //===----------------------------------------------------------------------===//
-SequenceTypeTests.test("_copyToNativeArrayBuffer/OverestimatedCount")
+SequenceTypeTests.test("_copyToContiguousArray/OverestimatedCount")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -1119,7 +1119,7 @@ SequenceTypeTests.test("_copyToNativeArrayBuffer/OverestimatedCount")
     elements: [ 1, 2, 3 ].map(OpaqueValue.init),
     underestimatedCount: .value(4))
   expectCrashLater()
-  let array = s._copyToNativeArrayBuffer()
+  let array = s._copyToContiguousArray()
   _blackHole(array)
 }
 

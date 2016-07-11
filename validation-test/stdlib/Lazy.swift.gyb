@@ -633,8 +633,8 @@ func expectSequencePassthrough<
   SequenceLog._customContainsEquatableElement.expectIncrement(baseType) {
     _ = s._customContainsEquatableElement(arbitraryElement)
   }
-  SequenceLog._copyToNativeArrayBuffer.expectIncrement(baseType) {
-    _ = s._copyToNativeArrayBuffer()
+  SequenceLog._copyToContiguousArray.expectIncrement(baseType) {
+    _ = s._copyToContiguousArray()
   }
 
   SequenceLog._copyContents.expectIncrement(baseType) { () -> Void in

@@ -174,7 +174,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  internal func __copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
+  internal func __copyToContiguousArray() -> ContiguousArray<Element> {
     _abstract()
   }
 
@@ -358,8 +358,8 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   ) rethrows -> R? {
     return try _base._preprocessingPass(preprocess)
   }
-  internal override func __copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
-    return _base._copyToNativeArrayBuffer()._storage
+  internal override func __copyToContiguousArray() -> ContiguousArray<Element> {
+    return _base._copyToContiguousArray()
   }
   internal override func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
@@ -627,8 +627,8 @@ extension Any${Kind} {
     return try _box.__preprocessingPass(preprocess)
   }
 
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
-    return _ContiguousArrayBuffer(self._box.__copyToNativeArrayBuffer())
+  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+    return self._box.__copyToContiguousArray()
   }
 
   public func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)

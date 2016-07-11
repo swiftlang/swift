@@ -336,14 +336,14 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
   // just return zero.
   public var underestimatedCount: Int { return 0 }
 
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Iterator.Element.Iterator.Element> {
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element.Iterator.Element> {
 
-    // The default implementation of `_copyToNativeArrayBuffer` queries the
+    // The default implementation of `_copyToContiguousArray` queries the
     // `count` property, which materializes every inner collection.  This is a
     // bad default for `flatMap()`.  So we treat `self` as a sequence and only
     // rely on underestimated count.
-    return _copySequenceToNativeArrayBuffer(self)
+    return _copySequenceToContiguousArray(self)
   }
 
   // TODO: swift-3-indexing-model - add docs

@@ -89,7 +89,7 @@ public class SequenceLog {
   public static var split = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _preprocessingPass = TypeIndexed(0)
-  public static var _copyToNativeArrayBuffer = TypeIndexed(0)
+  public static var _copyToContiguousArray = TypeIndexed(0)
   public static var _copyContents = TypeIndexed(0)
 }
 
@@ -302,10 +302,10 @@ public struct ${Self}<
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
-    Log._copyToNativeArrayBuffer[selfType] += 1
-    return base._copyToNativeArrayBuffer()
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element> {
+    Log._copyToContiguousArray[selfType] += 1
+    return base._copyToContiguousArray()
   }
 
   /// Copy a Sequence into an array.

@@ -89,9 +89,9 @@ extension ${Self} : Sequence {
   /// - Complexity: O(N).
   public var underestimatedCount: Int { return _base.underestimatedCount }
 
-  public func _copyToNativeArrayBuffer() 
-     -> _ContiguousArrayBuffer<Base.Iterator.Element> {
-    return _base._copyToNativeArrayBuffer()
+  public func _copyToContiguousArray()
+     -> ContiguousArray<Base.Iterator.Element> {
+    return _base._copyToContiguousArray()
   }
   
   @discardableResult

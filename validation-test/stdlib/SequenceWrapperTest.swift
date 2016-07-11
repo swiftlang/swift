@@ -85,10 +85,10 @@ sequenceWrapperTests.test("Dispatch/_preprocessingPass") {
     dispatchLog._preprocessingPass)
 }
 
-sequenceWrapperTests.test("Dispatch/_copyToNativeArrayBuffer") {
+sequenceWrapperTests.test("Dispatch/_copyToContiguousArray") {
   expectWrapperDispatch(
-    direct._copyToNativeArrayBuffer(), indirect._copyToNativeArrayBuffer(),
-    dispatchLog._copyToNativeArrayBuffer)
+    direct._copyToContiguousArray(), indirect._copyToContiguousArray(),
+    dispatchLog._copyToContiguousArray)
 }
 
 runAllTests()
