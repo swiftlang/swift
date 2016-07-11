@@ -391,6 +391,43 @@ extension MyCustomizedError : RecoverableError {
   }
 }
 
+/// An error type that provides localization and recovery, but doesn't
+/// customize NSError directly.
+enum MySwiftCustomizedError : Error {
+  case failed
+  static var errorDescriptionCount = 0
+}
+
+extension MySwiftCustomizedError : LocalizedError {
+  var errorDescription: String? {
+    MySwiftCustomizedError.errorDescriptionCount =
+      MySwiftCustomizedError.errorDescriptionCount + 1
+    return NSLocalizedString("something went horribly wrong", comment: "")
+  }
+
+  var failureReason: String? {
+    return NSLocalizedString("because someone wrote 'throw'", comment: "")
+  }
+
+  var recoverySuggestion: String? {
+    return NSLocalizedString("delete the 'throw'", comment: "")
+  }
+
+  var helpAnchor: String? {
+    return NSLocalizedString("there is no help when writing tests", comment: "")
+  }
+}
+
+extension MySwiftCustomizedError : RecoverableError {
+  var recoveryOptions: [String] {
+    return ["Delete 'throw'", "Disable the test" ]
+  }
+
+  func attemptRecovery(optionIndex recoveryOptionIndex: Int) -> Bool {
+    return recoveryOptionIndex == 0
+  }
+}
+
 /// Fake definition of the informal protocol
 /// "NSErrorRecoveryAttempting" that we use to poke at the object
 /// produced for a RecoverableError.
@@ -425,34 +462,48 @@ class RecoveryDelegate {
   }
 }
 
-ErrorBridgingTests.test("Customizing NSError via protocols") {
-  let error = MyCustomizedError(code: 12345)
-  let nsError = error as NSError
-
-  // CustomNSError
-  expectEqual("custom", nsError.domain)
-  expectEqual(12345, nsError.code)
-  expectOptionalEqual(URL(string: "https://swift.org")!,
-    nsError.userInfo[NSURLErrorKey] as? URL)
-
+/// Helper for testing a customized error.
+func testCustomizedError(error: Error, nsError: NSError) {
   // LocalizedError
-  expectOptionalEqual("something went horribly wrong",
-    nsError.userInfo[NSLocalizedDescriptionKey] as? String)
-  expectOptionalEqual("because someone wrote 'throw'", 
-    nsError.userInfo[NSLocalizedFailureReasonErrorKey] as? String)
-  expectOptionalEqual("delete the 'throw'",
-    nsError.userInfo[NSLocalizedRecoverySuggestionErrorKey] as? String)
-  expectOptionalEqual("there is no help when writing tests",
-    nsError.userInfo[NSHelpAnchorErrorKey] as? String)
-  expectEqual(nsError.localizedDescription, "something went horribly wrong")
-  expectEqual(error.localizedDescription, "something went horribly wrong")
+  if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+    expectEmpty(nsError.userInfo[NSLocalizedDescriptionKey])
+    expectEmpty(nsError.userInfo[NSLocalizedFailureReasonErrorKey])
+    expectEmpty(nsError.userInfo[NSLocalizedRecoverySuggestionErrorKey])
+    expectEmpty(nsError.userInfo[NSHelpAnchorErrorKey])
+  } else {
+    expectOptionalEqual("something went horribly wrong",
+      nsError.userInfo[NSLocalizedDescriptionKey] as? String)
+    expectOptionalEqual("because someone wrote 'throw'",
+      nsError.userInfo[NSLocalizedFailureReasonErrorKey] as? String)
+    expectOptionalEqual("delete the 'throw'",
+      nsError.userInfo[NSLocalizedRecoverySuggestionErrorKey] as? String)
+    expectOptionalEqual("there is no help when writing tests",
+      nsError.userInfo[NSHelpAnchorErrorKey] as? String)
+  }
+  expectEqual("something went horribly wrong", error.localizedDescription)
+  expectEqual("something went horribly wrong", nsError.localizedDescription)
+  expectEqual("because someone wrote 'throw'", nsError.localizedFailureReason)
+  expectEqual("delete the 'throw'", nsError.localizedRecoverySuggestion)
+  expectEqual("there is no help when writing tests", nsError.helpAnchor)
 
   // RecoverableError
+  if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+    expectEmpty(nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey])
+  } else {
+    expectOptionalEqual(["Delete 'throw'", "Disable the test" ],
+      nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey] as? [String])
+  }
   expectOptionalEqual(["Delete 'throw'", "Disable the test" ],
-    nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey] as? [String])
+    nsError.localizedRecoveryOptions)
 
   // Directly recover.
-  let attempter = nsError.userInfo[NSRecoveryAttempterErrorKey]! 
+  let attempter: AnyObject
+  if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+    expectEmpty(nsError.userInfo[NSRecoveryAttempterErrorKey])
+    attempter = nsError.recoveryAttempter!
+  } else {
+    attempter = nsError.userInfo[NSRecoveryAttempterErrorKey]!
+  }
   expectOptionalEqual(attempter.attemptRecovery(fromError: nsError,
                       optionIndex: 0),
     true)
@@ -480,6 +531,54 @@ ErrorBridgingTests.test("Customizing NSError via protocols") {
     didRecoverSelector: #selector(RecoveryDelegate.recover(success:contextInfo:)),
     contextInfo: nil)
   expectEqual(true, rd2.called)
+}
+
+ErrorBridgingTests.test("Customizing NSError via protocols") {
+  let error = MyCustomizedError(code: 12345)
+  let nsError = error as NSError
+
+  // CustomNSError
+  expectEqual("custom", nsError.domain)
+  expectEqual(12345, nsError.code)
+  expectOptionalEqual(URL(string: "https://swift.org")!,
+    nsError.userInfo[NSURLErrorKey] as? URL)
+
+  testCustomizedError(error: error, nsError: nsError)
+}
+
+ErrorBridgingTests.test("Customizing localization/recovery via protocols") {
+  let error = MySwiftCustomizedError.failed
+  let nsError = error as NSError
+  testCustomizedError(error: error, nsError: nsError)
+}
+
+ErrorBridgingTests.test("Customizing localization/recovery laziness") {
+  let countBefore = MySwiftCustomizedError.errorDescriptionCount
+  let error = MySwiftCustomizedError.failed
+  let nsError = error as NSError
+
+  // RecoverableError
+  if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+    expectEmpty(nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey])
+  } else {
+    expectOptionalEqual(["Delete 'throw'", "Disable the test" ],
+      nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey] as? [String])
+  }
+  expectOptionalEqual(["Delete 'throw'", "Disable the test" ],
+    nsError.localizedRecoveryOptions)
+
+  // None of the operations above should affect the count
+  if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+    expectEqual(countBefore, MySwiftCustomizedError.errorDescriptionCount)
+  }
+
+  // This one does affect the count.
+  expectEqual("something went horribly wrong", error.localizedDescription)
+
+  // Check that we did get a call to errorDescription.
+  if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+    expectEqual(countBefore+1, MySwiftCustomizedError.errorDescriptionCount)
+  }
 }
 
 runAllTests()

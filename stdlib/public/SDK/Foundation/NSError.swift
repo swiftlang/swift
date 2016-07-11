@@ -47,21 +47,13 @@ internal func NS_Swift_performErrorRecoverySelector(
 /// NSErrorRecoveryAttempting, which is used by NSError when it
 /// attempts recovery from an error.
 class _NSErrorRecoveryAttempter {
-  // FIXME: If we could meaningfully cast the nsError back to RecoverableError,
-  // we wouldn't need to capture this and could use the user-info
-  // domain providers even for recoverable errors.
-  let error: RecoverableError
-
-  init(error: RecoverableError) {
-    self.error = error
-  }
-
   @objc(attemptRecoveryFromError:optionIndex:delegate:didRecoverSelector:contextInfo:)
   func attemptRecovery(fromError nsError: NSError,
                        optionIndex recoveryOptionIndex: Int,
                        delegate: AnyObject?,
                        didRecoverSelector: Selector,
                        contextInfo: UnsafeMutablePointer<Void>?) {
+    let error = nsError as Error as! RecoverableError
     error.attemptRecovery(optionIndex: recoveryOptionIndex) { success in
       NS_Swift_performErrorRecoverySelector(
         delegate: delegate,
@@ -74,6 +66,7 @@ class _NSErrorRecoveryAttempter {
   @objc(attemptRecoveryFromError:optionIndex:)
   func attemptRecovery(fromError nsError: NSError,
                        optionIndex recoveryOptionIndex: Int) -> Bool {
+    let error = nsError as Error as! RecoverableError
     return error.attemptRecovery(optionIndex: recoveryOptionIndex)
   }
 }
@@ -147,11 +140,54 @@ public extension Error {
 @_silgen_name("swift_Foundation_getErrorDefaultUserInfo")
 public func _swift_Foundation_getErrorDefaultUserInfo(_ error: Error)
   -> AnyObject? {
+  let hasUserInfoValueProvider: Bool
+
   // If the OS supports user info value providers, use those
   // to lazily populate the user-info dictionary for this domain.
   if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
-    // FIXME: This is not implementable until we can recover the
-    // original error from an NSError.
+    // Note: the Cocoa error domain specifically excluded from
+    // user-info value providers.
+    let domain = error._domain
+    if domain != NSCocoaErrorDomain {
+      if NSError.userInfoValueProvider(forDomain: domain) == nil {
+        NSError.setUserInfoValueProvider(forDomain: domain) { (nsError, key) in
+          let error = nsError as Error
+
+          switch key {
+          case NSLocalizedDescriptionKey:
+            return (error as? LocalizedError)?.errorDescription
+
+          case NSLocalizedFailureReasonErrorKey:
+            return (error as? LocalizedError)?.failureReason
+
+          case NSLocalizedRecoverySuggestionErrorKey:
+            return (error as? LocalizedError)?.recoverySuggestion
+
+          case NSHelpAnchorErrorKey:
+            return (error as? LocalizedError)?.helpAnchor
+
+          case NSLocalizedRecoveryOptionsErrorKey:
+            return (error as? RecoverableError)?.recoveryOptions
+
+          case NSRecoveryAttempterErrorKey:
+            if error is RecoverableError {
+              return _NSErrorRecoveryAttempter()
+            }
+            return nil
+
+          default:
+            return nil
+          }
+        }
+      }
+      assert(NSError.userInfoValueProvider(forDomain: domain) != nil)
+
+      hasUserInfoValueProvider = true
+    } else {
+      hasUserInfoValueProvider = false
+    }
+  } else {
+    hasUserInfoValueProvider = false
   }
 
   // Populate the user-info dictionary 
@@ -164,7 +200,10 @@ public func _swift_Foundation_getErrorDefaultUserInfo(_ error: Error)
     result = [:]
   }
 
-  if let localizedError = error as? LocalizedError {
+  // Handle localized errors. If we registered a user-info value
+  // provider, these will computed lazily.
+  if !hasUserInfoValueProvider,
+     let localizedError = error as? LocalizedError {
     if let description = localizedError.errorDescription {
       result[NSLocalizedDescriptionKey] = description as AnyObject
     }
@@ -182,11 +221,13 @@ public func _swift_Foundation_getErrorDefaultUserInfo(_ error: Error)
     }
   }
 
-  if let recoverableError = error as? RecoverableError {
+  // Handle recoverable errors. If we registered a user-info value
+  // provider, these will computed lazily.
+  if !hasUserInfoValueProvider,
+     let recoverableError = error as? RecoverableError {
     result[NSLocalizedRecoveryOptionsErrorKey] =
       recoverableError.recoveryOptions as AnyObject
-    result[NSRecoveryAttempterErrorKey] =
-      _NSErrorRecoveryAttempter(error: recoverableError)
+    result[NSRecoveryAttempterErrorKey] = _NSErrorRecoveryAttempter()
   }
 
   return result as AnyObject
