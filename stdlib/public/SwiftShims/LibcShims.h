@@ -82,6 +82,43 @@ __swift_uint32_t _swift_stdlib_cxx11_mt19937(void);
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint32_t
 _swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
+  
+// Math library functions
+SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_remainderf(float, float);
+SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_squareRootf(float);
+SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_addProductf(float, float, float);
+SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_roundf(float);
+SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_roundevenf(float);
+SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_truncf(float);
+SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_roundawayf(float);
+SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_ceilf(float);
+SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_floorf(float);
+  
+SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_remainder(double, double);
+SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_squareRoot(double);
+SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_addProduct(double, double, double);
+SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_round(double);
+SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_roundeven(double);
+SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_trunc(double);
+SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_roundaway(double);
+SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_ceil(double);
+SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_floor(double);
+  
+// TODO: Remove horrible workaround when importer does Float80 <-> long double.
+#if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_remainderl(void *_self, const void *_other);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_squareRootl(void *_self);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_addProductl(void *_self, const void *_lhs, const void *_rhs);
+SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_roundl(void *_self);
+SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_roundevenl(void *_self);
+SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_truncl(void *_self);
+SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_roundawayl(void *_self);
+SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_ceill(void *_self);
+SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_floorl(void *_self);
+#endif
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

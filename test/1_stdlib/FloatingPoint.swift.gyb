@@ -269,6 +269,77 @@ func testSubNormalFlush(_ f: ${FloatSelf}) {
 % end
 #endif
 
+extension FloatingPoint {
+  public var isQuietNaN: Bool { return isNaN && !isSignalingNaN }
+}
+
+%for Self in ['Float', 'Double', 'Float80']:
+% if Self == 'Float80':
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+% end
+FloatingPoint.test("${Self}.round") {
+  for rule in [FloatingPointRoundingRule.toNearestOrAwayFromZero,
+               FloatingPointRoundingRule.toNearestOrEven,
+               FloatingPointRoundingRule.towardZero,
+               FloatingPointRoundingRule.awayFromZero,
+               FloatingPointRoundingRule.up,
+               FloatingPointRoundingRule.down] {
+
+    //  Zeros, integers and infinities round to themselves:
+    for value in [${Self}(), 1, 1/${Self}.ulpOfOne,
+                  .greatestFiniteMagnitude, .infinity] {
+      expectBitwiseEqual(value, value.rounded(rule))
+      expectBitwiseEqual(-value, (-value).rounded(rule))
+    }
+
+    //  NaNs "round" to NaNs:
+    expectTrue(${Self}.nan.rounded(rule).isNaN)
+
+    //  Now let's try some inexact cases; we're going to stay close to zero,
+    //  and check values close to (half-)integers, because those are the cases
+    //  that people usually get wrong, and they'll reveal simple blunders like
+    //  simply implementing the wrong rounding mode.
+    for base in stride(from: ${Self}(-3.5), to: 4, by: 0.5) {
+      for value in [base.nextDown, base, base.nextUp] {
+        let result = value.rounded(rule)
+        //  Result must be integral.  Since we're testing small values, we
+        //  can simply check that Self(Int(result)) == result.  For larger
+        //  values this wouldn't be a correct test.'
+        expectEqual(${Self}(Int(result)), result)
+        let residual = value - result
+        //  For any rounding rule, abs(residual) must be less than 1, however
+        //  due to rounding the computation can produce 1 exactly.
+        expectTrue(abs(residual) <= 1)
+        //  Remaining validation checks depend on the rounding rule.
+        switch rule {
+        case .toNearestOrAwayFromZero:
+          expectTrue(abs(residual) < 0.5 ||
+                     abs(residual) == 0.5 && abs(result) > abs(value))
+        case .toNearestOrEven:
+          expectTrue(abs(residual) < 0.5 ||
+                     abs(residual) == 0.5 && Int(result) % 2 == 0)
+        case .towardZero:
+          expectTrue(abs(result) <= abs(value))
+        case .awayFromZero:
+          expectTrue(abs(result) >= abs(value))
+        case .up:
+          expectTrue(result >= value)
+        case .down:
+          expectTrue(result <= value)
+        }
+      }
+    }
+  }
+}
+
+FloatingPoint.test("${Self}.remainder") {
+
+}
+% if Self == 'Float80':
+#endif
+% end
+%end
+
 let floatNextUpDownTests: [(Float, Float)] = [
   (.nan, .nan),
   (.greatestFiniteMagnitude, .infinity),
@@ -374,11 +445,6 @@ FloatingPoint.test("Float80.nextUp, .nextDown")
 }
 
 #endif
-
-
-extension FloatingPoint {
-  public var isQuietNaN: Bool { return isNaN && !isSignalingNaN }
-}
 
 % for FloatSelf in ['Float32', 'Float64']:
 

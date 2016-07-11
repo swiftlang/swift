@@ -279,7 +279,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// representable value.
   mutating func divide(by other: Self)
 
-  /*  TODO: Need a remainder builtin or to call C remainder[fl] for these
   /// Remainder of `self` divided by `other`.  This is the IEEE 754 remainder
   /// operation.
   ///
@@ -298,7 +297,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
 
   /// Mutating form of `remainder`.
   mutating func formRemainder(dividingBy other: Self)
-  */
 
   /// Remainder of `self` divided by `other` using truncating division.
   /// Equivalent to the C standard library function `fmod`.
@@ -314,8 +312,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// Mutating form of `truncatingRemainder`.
   mutating func formTruncatingRemainder(dividingBy other: Self)
 
-  /* TODO: Need to call C sqrt and fma or llvm sqrt and fma intrinsics
-   * for these.
   /// Square root of `self`.
   func squareRoot() -> Self
 
@@ -328,7 +324,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
 
   /// Fused multiply-add, accumulating the product of `lhs` and `rhs` to `self`.
   mutating func addProduct(_ lhs: Self, _ rhs: Self)
-  */
 
   /// The minimum of `x` and `y`.  Implements the IEEE 754 `minNum` operation.
   ///
@@ -363,6 +358,35 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// and whichever  is a number if the other is a quiet NaN.  If both `x` and
   /// `y` are quiet NaNs, a quiet NaN is returned.
   static func maximumMagnitude(_ x: Self, _ y: Self) -> Self
+
+  /// Returns the value of `self` rounded to an integral value using the
+  /// specified rounding rule.  If the rounding rule is omitted, it defaults
+  /// to `.toNearestOrAwayFromZero`, aka "schoolbook rounding".
+  ///
+  /// This implements the C library rounding functions and the IEEE 754
+  /// operations that they bind.
+  ///
+  /// - `round(x)` is `x.rounded()` (the default rounding rule is provided by
+  ///   an extension.  This implements the IEEE 754 `roundToIntegralTiesToAway`
+  ///   operation.
+  ///
+  /// - `roundeven(x)` is `x.rounded(.toNearestOrEven)`.  This implements
+  ///   the IEEE 754 `roundToIntegralTiesToEven` operation.
+  ///
+  /// - `trunc(x)` is `x.rounded(.towardZero)`.  This implements the IEEE 754
+  ///   `roundToIntegralTowardZero` operation.
+  ///
+  /// - `ceil(x)` is `x.rounded(.up)`.  This implements the IEEE 754
+  ///   `roundToIntegralTowardPositive` operation.
+  ///
+  /// - `floor(x)` is `x.rounded(.down)`.  This implements the IEEE 754
+  ///   `roundToIntegralTowardNegative` operation.
+  func rounded(_ rule: FloatingPointRoundingRule) -> Self
+
+  /// Rounds `self` to an integral value using the specified rounding rule.
+  /// If the rounding rule is omitted, it defaults to
+  /// `.toNearestOrAwayFromZero`, aka "schoolbook rounding".
+  mutating func round(_ rule: FloatingPointRoundingRule)
 
   /// The least representable value that compares greater than `self`.
   ///
@@ -490,6 +514,35 @@ public enum FloatingPointClassification {
   case positiveInfinity
 }
 
+/// Describes a rule for rounding a floating-point number.
+public enum FloatingPointRoundingRule {
+
+  /// The result is the closest allowed value; if two values are equally close,
+  /// the one with greater magnitude is chosen.  Also known as "schoolbook
+  /// rounding".
+  case toNearestOrAwayFromZero
+
+  /// The result is the closest allowed value; if two values are equally close,
+  /// the even one is chosen.  Also known as "bankers rounding".
+  case toNearestOrEven
+
+  /// The result is the closest allowed value that is greater than or equal
+  /// to the source.
+  case up
+
+  /// The result is the closest allowed value that is less than or equal to
+  /// the source.
+  case down
+
+  /// The result is the closest allowed value whose magnitude is less than or
+  /// equal to that of the source.
+  case towardZero
+
+  /// The result is the closest allowed value whose magnitude is greater than
+  /// or equal to that of the source.
+  case awayFromZero
+}
+
 @_transparent
 public prefix func +<T : FloatingPoint>(x: T) -> T {
   return x
@@ -522,12 +575,10 @@ public func ${op[0]}=<T : FloatingPoint>(lhs: inout T, rhs: T) {
 
 %end
 
-/*  TODO: uncomment once implemented.
 @_transparent
 public func sqrt<T : FloatingPoint>(_ rhs: T) -> T {
   return rhs.squareRoot()
 }
-*/
 
 @_transparent
 public func ==<T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
@@ -676,13 +727,46 @@ extension FloatingPoint {
   }
 
   @_transparent
+  public func rounded(_ rule: FloatingPointRoundingRule) -> Self {
+    var lhs = self
+    lhs.round(rule)
+    return lhs
+  }
+
+  /// Returns `self` rounded to the closest integral value.  If `self` is
+  /// exactly halfway between two integers (e.g. 1.5), the integral value
+  /// with greater magnitude (2.0 in this example) is returned.
+  ///
+  /// Other rounding modes can be explicitly specified with
+  /// `.rounded(_: FloatingPointRoundingRule)`.
+  @_transparent
+  public func rounded() -> Self {
+    return rounded(.toNearestOrAwayFromZero)
+  }
+
+  /// Rounds `self` to the closest integral value.  If `self` is exactly
+  /// halfway between two integers (e.g. 1.5), the integral value with
+  /// greater magnitude is selected.
+  ///
+  /// Other rounding modes can be explicitly specified with
+  /// `.round(_: FloatingPointRoundingRule)`.
+  @_transparent
+  public mutating func round() {
+    round(.toNearestOrAwayFromZero)
+  }
+
+  @_transparent
+  public var nextDown: Self {
+    return -(-self).nextUp
+  }
+
+  @_transparent
   public func truncatingRemainder(dividingBy rhs: Self) -> Self {
     var lhs = self
     lhs.formTruncatingRemainder(dividingBy: rhs)
     return lhs
   }
 
-  /*  TODO: uncomment once implemented.
   @_transparent
   public func remainder(dividingBy rhs: Self) -> Self {
     var lhs = self
@@ -703,7 +787,6 @@ extension FloatingPoint {
     addend.addProduct(lhs, rhs)
     return addend
   }
-  */
 
   public static func minimum(_ left: Self, _ right: Self) -> Self {
     if left.isSignalingNaN || right.isSignalingNaN {

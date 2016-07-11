@@ -508,8 +508,39 @@ extension ${Self}: BinaryFloatingPoint {
       significandBitPattern: significandBitPattern + 1)
   }
 
-  public var nextDown: ${Self} {
-    return -(-self).nextUp
+  @_transparent
+  public mutating func round(_ rule: FloatingPointRoundingRule) {
+%if bits == 80:
+    switch rule {
+    case .toNearestOrAwayFromZero:
+      _swift_roundl(&self)
+    case .toNearestOrEven:
+      _swift_roundevenl(&self)
+    case .towardZero:
+      _swift_truncl(&self)
+    case .awayFromZero:
+      _swift_roundawayl(&self)
+    case .up:
+      _swift_ceill(&self)
+    case .down:
+      _swift_floorl(&self)
+    }
+%else:
+    switch rule {
+    case .toNearestOrAwayFromZero:
+      self = _swift_round${cFuncSuffix(bits)}(self)
+    case .toNearestOrEven:
+      self = _swift_roundeven${cFuncSuffix(bits)}(self)
+    case .towardZero:
+      self = _swift_trunc${cFuncSuffix(bits)}(self)
+    case .awayFromZero:
+      self = _swift_roundaway${cFuncSuffix(bits)}(self)
+    case .up:
+      self = _swift_ceil${cFuncSuffix(bits)}(self)
+    case .down:
+      self = _swift_floor${cFuncSuffix(bits)}(self)
+    }
+%end
   }
 
   @_transparent
@@ -537,30 +568,40 @@ extension ${Self}: BinaryFloatingPoint {
     _value = Builtin.fdiv_FPIEEE${bits}(self._value, other._value)
   }
 
-  /*  TODO: Need a remainder builtin or to call C remainder[fl] for this
   @_transparent
   public mutating func formRemainder(dividingBy other: ${Self}) {
-    fatalError("Unimplemented")
+%if bits == 80:
+    var other = other
+    _swift_remainderl(&self, &other)
+%else:
+    self = _swift_remainder${cFuncSuffix(bits)}(self, other)
+%end
   }
-  */
 
   @_transparent
   public mutating func formTruncatingRemainder(dividingBy other: ${Self}) {
     _value = Builtin.frem_FPIEEE${bits}(self._value, other._value)
   }
 
-  /*  TODO: Need to call C sqrt and fma or llvm sqrt and fma intrinsics
-   *  for these.
   @_transparent
   public mutating func formSquareRoot( ) {
-    fatalError("Unimplemented.")
+%if bits == 80:
+    _swift_squareRootl(&self)
+%else:
+    self = _swift_squareRoot${cFuncSuffix(bits)}(self)
+%end
   }
 
   @_transparent
   public mutating func addProduct(_ lhs: ${Self}, _ rhs: ${Self}) {
-    fatalError("Unimplemented.")
+%if bits == 80:
+    var lhs = lhs
+    var rhs = rhs
+    _swift_addProductl(&self, &lhs, &rhs)
+%else:
+    self = _swift_addProduct${cFuncSuffix(bits)}(self, lhs, rhs)
+%end
   }
-  */
 
   @_transparent
   public func isEqual(to other: ${Self}) -> Bool {

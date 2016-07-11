@@ -166,12 +166,12 @@ public struct CGFloat {
       exponent: exponent, significand: significand.native)
   }
 
-  public var nextUp: CGFloat {
-    return CGFloat(native.nextUp)
+  public mutating func round(_ rule: FloatingPointRoundingRule) {
+    native.round(rule)
   }
 
-  public var nextDown: CGFloat {
-    return CGFloat(native.nextDown)
+  public var nextUp: CGFloat {
+    return CGFloat(native.nextUp)
   }
 
   public static func abs(_ x: CGFloat) -> CGFloat {
@@ -202,8 +202,6 @@ public struct CGFloat {
     native.formTruncatingRemainder(dividingBy: other.native)
   }
 
-  /*  TODO: Need to call C sqrt and fma or llvm sqrt and fma intrinsics
-   *  for these to be implemented on the underlying types.
   public mutating func formRemainder(dividingBy other: CGFloat) {
     native.formRemainder(dividingBy: other.native)
   }
@@ -215,7 +213,6 @@ public struct CGFloat {
   public mutating func addProduct(_ lhs: CGFloat, _ rhs: CGFloat) {
     native.addProduct(lhs.native, rhs.native)
   }
-  */
 
   public func isEqual(to other: CGFloat) -> Bool {
     return self.native.isEqual(to: other.native)
