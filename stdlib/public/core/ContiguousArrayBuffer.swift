@@ -183,8 +183,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 }
 
 @_fixed_layout
-public // @testable
-struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
+internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the `count` elements at the
