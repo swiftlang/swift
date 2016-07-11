@@ -73,6 +73,8 @@ PASS(ConditionForwarding, "condition-forwarding",
      "Forward conditional branch instructions")
 PASS(CopyForwarding, "copy-forwarding",
      "Eliminate redundant copies")
+PASS(EpilogueARCMatcherDumper, "sil-epilogue-arc-dumper",
+     "Dump epilogue retains for return value and releases for arguments")
 PASS(EpilogueRetainReleaseMatcherDumper, "sil-epilogue-retain-release-dumper",
      "Dump epilogue retains for return value and releases for arguments")
 PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
