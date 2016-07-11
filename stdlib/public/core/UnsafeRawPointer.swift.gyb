@@ -24,17 +24,18 @@
 @_fixed_layout
 public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// The underlying raw pointer.
+  /// Implements conformance to the public protocol `_Pointer`.
   public let _rawValue: Builtin.RawPointer
 
   /// Convert a builtin raw pointer to a Unsafe${Mutable}RawPointer.
   @_transparent
-  public init(_ _rawValue : Builtin.RawPointer) {
+  public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
   /// Convert an opaque pointer to ${a_Self}.
   @_transparent
-  public init(_ other : OpaquePointer) {
+  public init(_ other: OpaquePointer) {
     _rawValue = other._rawValue
   }
 
@@ -42,7 +43,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// Returns nil if `from` is nil.
   @_transparent
-  public init?(_ other : OpaquePointer?) {
+  public init?(_ other: OpaquePointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -63,7 +64,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
 
   /// Convert an Unsafe${Mutable}Pointer ${a_Self}.
   @_transparent
-  public init<T>(_ other : Unsafe${Mutable}Pointer<T>) {
+  public init<T>(_ other: Unsafe${Mutable}Pointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -71,7 +72,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// Returns nil if `other` is nil.
   @_transparent
-  public init?<T>(_ other : Unsafe${Mutable}Pointer<T>?) {
+  public init?<T>(_ other: Unsafe${Mutable}Pointer<T>?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -79,7 +80,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
 %  if not mutable:
   /// Convert an UnsafeMutableRawPointer ${a_Self}.
   @_transparent
-  public init(_ other : UnsafeMutableRawPointer) {
+  public init(_ other: UnsafeMutableRawPointer) {
     _rawValue = other._rawValue
   }
 
@@ -87,14 +88,14 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// Returns nil if `other` is nil.
   @_transparent
-  public init?(_ other : UnsafeMutableRawPointer?) {
+  public init?(_ other: UnsafeMutableRawPointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 
   /// Convert an UnsafeMutablePointer ${a_Self}.
   @_transparent
-  public init<T>(_ other : UnsafeMutablePointer<T>) {
+  public init<T>(_ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -102,7 +103,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// Returns nil if `other` is nil.
   @_transparent
-  public init?<T>(_ other : UnsafeMutablePointer<T>?) {
+  public init?<T>(_ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -114,8 +115,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Postcondition: The memory is allocated, but not initialized.
   public static func allocate(
-    bytes size: Int, alignedTo: Int = Int(Builtin.alignof(Double.self)))
-  -> UnsafeMutableRawPointer {
+    bytes size: Int, alignedTo: Int = Int(Builtin.alignof(Double.self))
+  ) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(Builtin.allocRaw(
         size._builtinWordValue, alignedTo._builtinWordValue))
   }
@@ -128,7 +129,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Postcondition: The memory has been deallocated.
   public func deallocate(bytes: Int,
-    alignedTo: Int = Int(Builtin.alignof(Double.self))) {
+    alignedTo: Int = Int(Builtin.alignof(Double.self))
+  ) {
     Builtin.deallocRaw(
       _rawValue, bytes._builtinWordValue, alignedTo._builtinWordValue)
   }
@@ -145,7 +147,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   memory is ever accessed as an unrelated type.
   @_transparent
   public func bindMemory<T>(to: T.Type, capacity: Int)
-      -> Unsafe${Mutable}Pointer<T> {
+  -> Unsafe${Mutable}Pointer<T> {
     // FIXME: call the builtin for binding memory
     return Unsafe${Mutable}Pointer<T>(_rawValue)
   }
@@ -187,8 +189,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///  destroyed or moved from to avoid leaks.
   @discardableResult
   public func initializeMemory<T>(as type: T.Type, at index: Int = 0,
-    count: Int = 1, to value: T)
-    -> UnsafeMutablePointer<T> {
+    count: Int = 1, to value: T
+  ) -> UnsafeMutablePointer<T> {
     _debugPrecondition(index >= 0,
       "UnsafeMutableRawPointer.initializeMemory: negative index")
     _debugPrecondition(count >= 0,
@@ -228,8 +230,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   strideof(T.self)` and `source..<source + count` are initialized.
   @discardableResult
   public func initializeMemory<T>(as: T.Type, from source: UnsafePointer<T>,
-    count: Int)
-    -> UnsafeMutablePointer<T> {
+    count: Int
+  ) -> UnsafeMutablePointer<T> {
     _debugPrecondition(
       count >= 0,
       "UnsafeMutableRawPointer.initializeMemory with negative count")
@@ -266,8 +268,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
   @discardableResult
   public func initializeMemory<C : Collection>(
-    as: C.Iterator.Element.Type, from source: C)
-    -> UnsafeMutablePointer<C.Iterator.Element> {
+    as: C.Iterator.Element.Type, from source: C
+  ) -> UnsafeMutablePointer<C.Iterator.Element> {
     // Initialize and bind each element of the container.
     for (index, element) in source.enumerated() {
       self.initializeMemory(as: C.Iterator.Element.self, at: index, to: element)
@@ -295,8 +297,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   `source..<source + count` is uninitialized.
   @discardableResult
   public func moveInitializeMemory<T>(
-    as: T.Type, from source: UnsafeMutablePointer<T>, count: Int)
-    -> UnsafeMutablePointer<T> {
+    as: T.Type, from source: UnsafeMutablePointer<T>, count: Int
+  ) -> UnsafeMutablePointer<T> {
     _debugPrecondition(
       count >= 0,
       "UnsafeMutableRawPointer.moveInitializeMemory with negative count")
@@ -332,7 +334,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// value of type `T`.
   ///
   /// - Precondition: The underlying pointer plus `offset` is properly
-  /// aligned for accessing `T`.
+  ///   aligned for accessing `T`.
   ///
   /// - Precondition: The memory is initialized to a value of some type, `U`,
   ///   such that `T` is layout compatible with `U`.
@@ -344,7 +346,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// Store a value's bytes into raw memory at `self + offset`.
   ///  
   /// - Precondition: The underlying pointer plus `offset` is properly
-  /// aligned for storing type `T`.
+  ///   aligned for storing type `T`.
   ///
   /// - Precondition: `T` is a trivial type.
   ///
@@ -372,7 +374,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   `typedPtr.deinitialize(count: 1)`
   ///   `self.initializeMemory(as: T.self, to: newValue)`
   public func storeBytes<T>(
-    of value: T, toByteOffset offset: Int = 0, as: T.Type) {
+    of value: T, toByteOffset offset: Int = 0, as: T.Type
+  ) {
     var temp = value
     withUnsafeMutablePointer(&temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue

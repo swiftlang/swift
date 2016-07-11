@@ -115,14 +115,18 @@ func checkRawPointerCorrectness(_ check: Check,
 }
 
 func checkPtr(
-  _ f: ((UnsafeMutableRawPointer) -> (as: Int.Type, from: UnsafeMutablePointer<Int>, count: Int) -> UnsafeMutablePointer<Int>))
--> (Check) -> Void {
+  _ f: ((UnsafeMutableRawPointer)
+    -> (as: Int.Type, from: UnsafeMutablePointer<Int>, count: Int)
+    -> UnsafeMutablePointer<Int>)
+) -> (Check) -> Void {
   return { checkRawPointerCorrectness($0, f) }
 }
 
 func checkPtr(
-  _ f: ((UnsafeMutableRawPointer) -> (as: Int.Type, from: UnsafePointer<Int>, count: Int) -> UnsafeMutablePointer<Int>))
--> (Check) -> Void {
+  _ f: ((UnsafeMutableRawPointer)
+    -> (as: Int.Type, from: UnsafePointer<Int>, count: Int)
+    -> UnsafeMutablePointer<Int>)
+) -> (Check) -> Void {
   return {
     checkRawPointerCorrectness($0) { destPtr in 
       return { f(destPtr)(as: $0, from: UnsafeMutablePointer($1), count: $2) }
