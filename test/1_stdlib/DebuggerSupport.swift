@@ -25,10 +25,12 @@ StringForPrintObjectTests.test("StructWithMembers") {
   expectEqual(printed, "▿ StructWithMembers\n  - a : 1\n  - b : \"Hello World\"\n")
 }
 
+#if _runtime(_ObjC)
 StringForPrintObjectTests.test("ClassWithMembers") {
   let printed = _DebuggerSupport.stringForPrintObject(ClassWithMembers())
   expectTrue(printed.hasPrefix("<ClassWithMembers: 0x"))
 }
+#endif
 
 StringForPrintObjectTests.test("ClassWithMirror") {
   let printed = _DebuggerSupport.stringForPrintObject(ClassWithMirror())
@@ -47,7 +49,7 @@ StringForPrintObjectTests.test("Dictionary") {
 
 StringForPrintObjectTests.test("NilOptional") {
   let printed = _DebuggerSupport.stringForPrintObject(nil as Int?)
-  expectTrue(printed.hasPrefix("nil"))
+  expectEqual(printed, "nil\n")
 }
 
 StringForPrintObjectTests.test("SomeOptional") {
