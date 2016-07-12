@@ -141,6 +141,7 @@
     "Process.swift",
     "Tuple.swift",
     "NewtypeWrapper.swift",
-    "UnsafeBitMap.swift"
+    "UnsafeBitMap.swift",
+    "PrintForDebugger.swift"
   ]
 }
