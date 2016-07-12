@@ -263,23 +263,10 @@ public enum _PrintForDebugger {
     }
   }
 
-  struct StringOutput: OutputStream {
-    var data = ""
-    mutating func _lock() {
-    }
-
-    mutating func _unlock() {
-    }
-
-    mutating func write(_ string: String) {
-        data += string
-    }
-  }
-
   public static func printForDebugger(value: Any) -> String {
     var maxItemCounter = Int.max
     var refs = Set<ObjectIdentifier>()
-    var targetStream = StringOutput()
+    var targetStream = ""
 
     printForDebuggerImpl(
       value: value,
