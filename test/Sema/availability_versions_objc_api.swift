@@ -1,4 +1,3 @@
-// REQUIRES: rdar27144738
 // RUN: %target-parse-verify-swift %clang-importer-sdk -I %S/Inputs/custom-modules
 // RUN: not %target-swift-frontend -parse %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s
 

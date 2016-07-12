@@ -1,7 +1,6 @@
 // RUN: %target-parse-verify-swift %clang-importer-sdk
 
 // REQUIRES: OS=macosx
-// REQUIRES: rdar27144738
 
 import AppKit
 

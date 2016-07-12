@@ -1,3 +1,4 @@
+// REQUIRES: rdar26121117
 import Foo
 import FooSwiftModule
 
@@ -353,8 +354,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK25: <Declaration>func availabilityIntroducedMsg()</Declaration>
 // CHECK25: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityIntroducedMsg</decl.name>()</decl.function.method.instance>
 
-// rdar://problem/27144738
-// RUNdisabled: %sourcekitd-test -req=cursor -pos=59:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK26 %s
+// RUN: %sourcekitd-test -req=cursor -pos=59:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK26 %s
 // CHECK26-NOT: <Declaration>func availabilityDeprecated()</Declaration>
 // CHECK26-NOT: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityDeprecated</decl.name>()</decl.function.method.instance>
 

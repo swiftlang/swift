@@ -2,7 +2,6 @@
 // RUN: not %swift -parse -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s %S/Inputs/availability_implicit_macosx_other.swift 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // REQUIRES: OS=macosx
-// REQUIRES: rdar27144738
 
 
 

@@ -1292,12 +1292,12 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
   else if (ctx.LangOpts.Target.isMacOSX()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
-      [](StringRef Platform) { return Platform == "macosx"; };
+      [](StringRef Platform) { return Platform == "macos"; };
     } else {
       PlatformAvailabilityFilter =
       [](StringRef Platform) {
-        return Platform == "macosx" ||
-               Platform == "macosx_app_extension"; };
+        return Platform == "macos" ||
+               Platform == "macos_app_extension"; };
     }
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
     DeprecatedAsUnavailableFilter =
