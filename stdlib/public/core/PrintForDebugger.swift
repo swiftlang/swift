@@ -55,9 +55,10 @@ public enum _PrintForDebugger {
       }
   }
 
-  static func asStringRepresentation(value: Any?,
-                              mirror: Mirror,
-                              count: Int) -> String? {
+  static func asStringRepresentation(
+    value: Any?,
+    mirror: Mirror,
+    count: Int) -> String? {
     let ds = mirror.displayStyle ?? .`struct`
     switch ds {
     case .optional:
@@ -122,9 +123,10 @@ public enum _PrintForDebugger {
   }
 
 
-  static func shouldExpand(mirror: Mirror,
-                    collectionStatus: CollectionStatus,
-                    isRoot: Bool) -> Bool {
+  static func shouldExpand(
+    mirror: Mirror,
+    collectionStatus: CollectionStatus,
+    isRoot: Bool) -> Bool {
     if isRoot || collectionStatus.isCollection { return true }
     let count = Int(mirror.children.count)
     if count > 0 { return true }
@@ -214,16 +216,17 @@ public enum _PrintForDebugger {
     var printedElements = 0
   
     if let sc = mirror.superclassMirror {
-      printForDebuggerImpl(value: nil,
-                           mirror: sc,
-                           name: "super",
-                           indent: indent + 2,
-                           maxDepth: maxDepth - 1,
-                           isRoot: false,
-                           parentCollectionStatus: .NotACollection,
-                           refsAlreadySeen: &refsAlreadySeen,
-                           maxItemCounter: &maxItemCounter,
-                           targetStream: &targetStream)
+      printForDebuggerImpl(
+        value: nil,
+        mirror: sc,
+        name: "super",
+        indent: indent + 2,
+        maxDepth: maxDepth - 1,
+        isRoot: false,
+        parentCollectionStatus: .NotACollection,
+        refsAlreadySeen: &refsAlreadySeen,
+        maxItemCounter: &maxItemCounter,
+        targetStream: &targetStream)
     }
   
     for (optionalName,child) in mirror.children {
@@ -245,16 +248,17 @@ public enum _PrintForDebugger {
         return
       }
     
-      printForDebuggerImpl(value: child,
-                           mirror: Mirror(reflecting: child),
-                           name: childName,
-                           indent: indent + 2,
-                           maxDepth: maxDepth - 1,
-                           isRoot: false,
-                           parentCollectionStatus: collectionStatus,
-                           refsAlreadySeen: &refsAlreadySeen,
-                           maxItemCounter: &maxItemCounter,
-                           targetStream: &targetStream)
+      printForDebuggerImpl(
+        value: child,
+        mirror: Mirror(reflecting: child),
+        name: childName,
+        indent: indent + 2,
+        maxDepth: maxDepth - 1,
+        isRoot: false,
+        parentCollectionStatus: collectionStatus,
+        refsAlreadySeen: &refsAlreadySeen,
+        maxItemCounter: &maxItemCounter,
+        targetStream: &targetStream)
       printedElements += 1
     }
   }
@@ -277,16 +281,17 @@ public enum _PrintForDebugger {
     var refs = Set<ObjectIdentifier>()
     var targetStream = StringOutput()
 
-    printForDebuggerImpl(value: value,
-                         mirror: Mirror(reflecting: value),
-                         name: nil,
-                         indent: 0,
-                         maxDepth: maxItemCounter,
-                         isRoot: true,
-                         parentCollectionStatus: .NotACollection,
-                         refsAlreadySeen: &refs,
-                         maxItemCounter: &maxItemCounter,
-                         targetStream: &targetStream)
+    printForDebuggerImpl(
+      value: value,
+      mirror: Mirror(reflecting: value),
+      name: nil,
+      indent: 0,
+      maxDepth: maxItemCounter,
+      isRoot: true,
+      parentCollectionStatus: .NotACollection,
+      refsAlreadySeen: &refs,
+      maxItemCounter: &maxItemCounter,
+      targetStream: &targetStream)
 
     return targetStream.data
   }
