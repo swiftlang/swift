@@ -42,6 +42,7 @@ set(SWIFTLIB_ESSENTIAL
   ContiguousArrayBuffer.swift
   CString.swift
   CTypes.swift
+  DebuggerSupport.swift
   EmptyCollection.swift
   ErrorType.swift
   Existential.swift
