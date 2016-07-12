@@ -27,7 +27,7 @@ GlibcTestSuite.test("errno") {
 var GlibcIoctlConstants = TestSuite("GlibcIoctlConstants")
 
 GlibcIoctlConstants.test("tty ioctl constants availability") {
-  let aConstant = TIOCGWINSZ
+  let aConstant = TIOCSTI
 }
 
 runAllTests()
