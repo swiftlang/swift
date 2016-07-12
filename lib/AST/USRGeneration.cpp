@@ -29,6 +29,14 @@ static inline StringRef getUSRSpacePrefix() {
   return "s:";
 }
 
+bool ide::printTypeUSR(Type Ty, raw_ostream &OS) {
+  using namespace Mangle;
+  Mangler Mangler(true);
+  Mangler.mangleType(Ty->getRValueType(), 0);
+  Mangler.finalize(OS);
+  return false;
+}
+
 bool ide::printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS) {
   using namespace Mangle;
   Mangler Mangler(true);

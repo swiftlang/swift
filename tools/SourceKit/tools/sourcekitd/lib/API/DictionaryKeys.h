@@ -118,6 +118,7 @@ extern SourceKit::UIdent KeyObsoleted;
 extern SourceKit::UIdent KeyRemoveCache;
 extern SourceKit::UIdent KeyTypeInterface;
 extern SourceKit::UIdent KeyTypeUsr;
+extern SourceKit::UIdent KeyContainerTypeUsr;
 extern SourceKit::UIdent KeyModuleGroups;
 
 /// \brief Used for determining the printing order of dictionary keys.

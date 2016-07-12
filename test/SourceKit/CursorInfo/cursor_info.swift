@@ -272,6 +272,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK8-NEXT: s:FC11cursor_info2CCcFT1xSi_S0_
 // CHECK8-NEXT: (CC.Type) -> (x: Int) -> CC
 // CHECK8-NEXT: _TtFT1xSi_C11cursor_info2CC
+// CHECK8-NEXT: <Container>C11cursor_info2CC</Container>
 // CHECK8-NEXT: <Declaration>convenience init(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK8-NEXT: <decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
