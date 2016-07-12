@@ -12,68 +12,152 @@
 from __future__ import print_function
 
 import argparse
+import json
 import os
 import sys
+
+from functools import reduce
 
 sys.path.append(os.path.dirname(__file__))
 
 from SwiftBuildSupport import (
     SWIFT_SOURCE_ROOT,
-    WorkingDirectory,
-    check_call,
-    check_output,
-)
+)  # noqa (E402 module level import not at top of file)
 
-REPOSITORIES = {
-    'llvm': 'apple/swift-llvm',
-    'clang': 'apple/swift-clang',
-    'swift': 'apple/swift-swift',
-    'lldb': 'apple/swift-lldb',
-    'cmark': 'apple/swift-cmark',
-    'compiler-rt': 'apple/swift-compiler-rt',
-    'swift-integration-tests': 'apple/swift-integration-tests',
-}
+SCRIPT_FILE = os.path.abspath(__file__)
+SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
 
-def update_working_copy(repo_path, branch):
+sys.path.append(os.path.join(SCRIPT_DIR, 'swift_build_support'))
+
+from swift_build_support import shell  # noqa (E402)
+
+
+def update_single_repository(repo_path, branch, reset_to_remote):
     if not os.path.isdir(repo_path):
         return
 
     print("--- Updating '" + repo_path + "' ---")
-    with WorkingDirectory(repo_path):
+    with shell.pushd(repo_path, dry_run=False, echo=False):
+        shell.call(["git", "fetch"], echo=False)
+
         if branch:
-            status = check_output(['git', 'status', '--porcelain'])
+            status = shell.capture(['git', 'status', '--porcelain', '-uno'],
+                                   echo=False)
             if status:
                 print("Please, commit your changes.")
                 print(status)
                 exit(1)
-            check_call(['git', 'checkout', branch])
+            shell.call(['git', 'checkout', branch], echo=False)
+
+            # If we were asked to reset to the specified branch, do the hard
+            # reset and return.
+            if reset_to_remote:
+                shell.call(['git', 'reset', '--hard', "origin/%s" % branch],
+                           echo=False)
+                return
 
         # Prior to Git 2.6, this is the way to do a "git pull
         # --rebase" that respects rebase.autostash.  See
         # http://stackoverflow.com/a/30209750/125349
-        check_call(["git", "fetch"])
-        check_call(["git", "rebase", "FETCH_HEAD"])
+        shell.call(["git", "rebase", "FETCH_HEAD"], echo=False)
+        shell.call(["git", "submodule", "update", "--recursive"],
+                   echo=False)
+
+
+def update_all_repositories(args, config, scheme_name):
+    repo_branch = scheme_name
+    for repo_name in config['repos'].keys():
+        if repo_name in args.skip_repository_list:
+            print("--- Skipping '" + repo_name + "' ---")
+            continue
+        if scheme_name:
+            # This loop is only correct, since we know that each alias set has
+            # unique contents. This is checked by verify config. Thus the first
+            # branch scheme data that has scheme_name as one of its aliases is
+            # the only possible correct answer.
+            for v in config['branch-schemes'].values():
+                if scheme_name not in v['aliases']:
+                    continue
+                repo_branch = v['repos'][repo_name]
+                break
+
+        update_single_repository(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
+                                 repo_branch,
+                                 args.reset_to_remote)
+
 
 def obtain_additional_swift_sources(
-        with_ssh, branch, skip_history, skip_repositories):
-    for dir_name, repo in REPOSITORIES.items():
-        if dir_name in skip_repositories:
-            print("--- Skipping '" + dir_name + "' ---")
-            continue
-        with WorkingDirectory(SWIFT_SOURCE_ROOT):
-            if not os.path.isdir(os.path.join(dir_name, ".git")):
-                print("--- Cloning '" + dir_name + "' ---")
-                if with_ssh is True:
-                    remote = "git@github.com:" + repo + '.git'
+        config, with_ssh, scheme_name, skip_history, skip_repository_list):
+    with shell.pushd(SWIFT_SOURCE_ROOT, dry_run=False,
+                     echo=False):
+        for repo_name, repo_info in config['repos'].items():
+            if repo_name in skip_repository_list:
+                print("--- Skipping '" + repo_name + "' ---")
+                continue
+
+            if os.path.isdir(os.path.join(repo_name, ".git")):
+                continue
+
+            print("--- Cloning '" + repo_name + "' ---")
+
+            # If we have a url override, use that url instead of
+            # interpolating.
+            remote_repo_info = repo_info['remote']
+            if 'url' in remote_repo_info:
+                remote = remote_repo_info['url']
+            else:
+                remote_repo_id = remote_repo_info['id']
+                if with_ssh is True or 'https-clone-pattern' not in config:
+                    remote = config['ssh-clone-pattern'] % remote_repo_id
                 else:
-                    remote = "https://github.com/" + repo + '.git'
-                if skip_history:
-                    check_call(['git', 'clone', '--depth', '1', remote, dir_name])
+                    remote = config['https-clone-pattern'] % remote_repo_id
+
+            if skip_history:
+                shell.call(['git', 'clone', '--recursive', '--depth', '1',
+                            remote, repo_name], echo=False)
+            else:
+                shell.call(['git', 'clone', '--recursive', remote,
+                            repo_name], echo=False)
+            if scheme_name:
+                for v in config['branch-schemes'].values():
+                    if scheme_name not in v['aliases']:
+                        continue
+                    repo_branch = v['repos'][repo_name]
+                    break
                 else:
-                    check_call(['git', 'clone', remote, dir_name])
-                if branch:
-                    src_path = SWIFT_SOURCE_ROOT + "/" + dir_name + "/" + ".git"
-                    check_call(['git', '--git-dir', src_path, '--work-tree', os.path.join(SWIFT_SOURCE_ROOT, dir_name), 'checkout', branch])
+                    repo_branch = scheme_name
+                src_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name,
+                                        ".git")
+                shell.call(['git', '--git-dir', src_path, '--work-tree',
+                            os.path.join(SWIFT_SOURCE_ROOT, repo_name),
+                            'checkout', repo_branch], echo=False)
+    with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
+                     dry_run=False, echo=False):
+        shell.call(["git", "submodule", "update", "--recursive"],
+                   echo=False)
+
+
+def validate_config(config):
+    # Make sure that our branch-names are unique.
+    scheme_names = config['branch-schemes'].keys()
+    if len(scheme_names) != len(set(scheme_names)):
+        raise RuntimeError('Configuration file has duplicate schemes?!')
+
+    # Then make sure the alias names used by our branches are unique.
+    #
+    # We do this by constructing a list consisting of len(names),
+    # set(names). Then we reduce over that list summing the counts and taking
+    # the union of the sets. We have uniqueness if the length of the union
+    # equals the length of the sum of the counts.
+    data = [(len(v['aliases']), set(v['aliases']))
+            for v in config['branch-schemes'].values()]
+    result = reduce(lambda acc, x: (acc[0] + x[0], acc[1] | x[1]), data,
+                    (0, set([])))
+    if result[0] == len(result[1]):
+        return
+    raise RuntimeError('Configuration file has schemes with duplicate '
+                       'aliases?!')
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -82,42 +166,62 @@ def main():
 repositories.
 
 By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
-    parser.add_argument("--clone",
+    parser.add_argument(
+        "--clone",
         help="Obtain Sources for Swift and Related Projects",
         action="store_true")
-    parser.add_argument("--clone-with-ssh",
+    parser.add_argument(
+        "--clone-with-ssh",
         help="Obtain Sources for Swift and Related Projects via SSH",
         action="store_true")
-    parser.add_argument("--skip-history",
+    parser.add_argument(
+        "--skip-history",
         help="Skip histories when obtaining sources",
         action="store_true")
-    parser.add_argument("--skip-repository",
+    parser.add_argument(
+        "--skip-repository",
         metavar="DIRECTORY",
         default=[],
         help="Skip the specified repository",
+        dest='skip_repository_list',
         action="append")
-    parser.add_argument("--branch",
-        help="Obtain Sources for specific branch")
+    parser.add_argument(
+        "--branch",
+        help='Obtain Sources for specific branch',
+        metavar='BRANCH',
+        dest='scheme')
+    parser.add_argument(
+        '--reset-to-remote',
+        help='Reset each branch to the remote state.',
+        action='store_true')
+    parser.add_argument(
+        "--config",
+        default=os.path.join(SCRIPT_DIR, "update-checkout-config.json"),
+        help="Configuration file to use")
     args = parser.parse_args()
 
     clone = args.clone
     clone_with_ssh = args.clone_with_ssh
     skip_history = args.skip_history
-    branch = args.branch
+    scheme = args.scheme
+
+    with open(args.config) as f:
+        config = json.load(f)
+    validate_config(config)
 
     if clone or clone_with_ssh:
-        obtain_additional_swift_sources(
-            clone_with_ssh, branch, skip_history, args.skip_repository)
+        # If branch is None, default to using the default branch alias
+        # specified by our configuration file.
+        if scheme is None:
+            scheme = config['default-branch-scheme']
 
-    for dir_name, _ in REPOSITORIES.items():
-        if dir_name in args.skip_repository:
-            print("--- Skipping '" + dir_name + "' ---")
-            continue
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name), branch)
+        obtain_additional_swift_sources(
+            config, clone_with_ssh, scheme, skip_history,
+            args.skip_repository_list)
+
+    update_all_repositories(args, config, scheme)
 
     return 0
 
-
 if __name__ == "__main__":
     sys.exit(main())
-
