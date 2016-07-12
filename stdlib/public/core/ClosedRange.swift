@@ -329,7 +329,7 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
 /// - SeeAlso: `CountableRange`, `Range`, `CountableClosedRange`
 @_fixed_layout
 public struct ClosedRange<
-  Bound : Comparable
+  Bound : Equatable
 > {
 
   /// Creates an instance with the given bounds.
@@ -351,7 +351,9 @@ public struct ClosedRange<
 
   /// The range's upper bound.
   public let upperBound: Bound
+}
 
+extension ClosedRange where Bound : Comparable {
   /// Returns a Boolean value indicating whether the given element is contained
   /// within the range.
   ///
@@ -365,7 +367,9 @@ public struct ClosedRange<
   public func contains(_ element: Bound) -> Bool {
     return element >= self.lowerBound && element <= self.upperBound
   }
+}
 
+extension ClosedRange {
   /// A Boolean value indicating whether the range contains no elements.
   ///
   /// Because a closed range cannot represent an empty range, this property is
@@ -387,10 +391,11 @@ public struct ClosedRange<
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-public func ... <Bound : Comparable> (minimum: Bound, maximum: Bound)
+public func ... <Bound : Equatable> (minimum: Bound, maximum: Bound)
   -> ClosedRange<Bound> {
   _precondition(
-    minimum <= maximum, "Can't form Range with upperBound < lowerBound")
+    !minimum._isKnownToExceed(maximum),
+    "Can't form Range with upperBound < lowerBound")
   return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
 }
 

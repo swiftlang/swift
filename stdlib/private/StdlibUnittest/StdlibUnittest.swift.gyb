@@ -270,10 +270,9 @@ public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
 }
 
 % for OtherRange in ['Range', 'CountableRange', 'ClosedRange', 'CountableClosedRange']:
-extension Range
+extension Range where Bound : Comparable
 %   if 'Countable' in OtherRange:
-  where
-  Bound : protocol<Comparable, _Strideable>, Bound.Stride : SignedInteger
+  , Bound : _Strideable, Bound.Stride : SignedInteger
 %   end
 {
   internal func _contains(_ other: ${OtherRange}<Bound>) -> Bool {
@@ -289,7 +288,7 @@ extension Range
 % end
 
 % for Range in ['Range', 'CountableRange', 'ClosedRange', 'CountableClosedRange']:
-public func expectTrapping<Bound>(
+public func expectTrapping<Bound : Comparable>(
   _ point: Bound, in range: ${Range}<Bound>, ${TRACE}
 ) {
   if !range.contains(point) {
@@ -298,7 +297,7 @@ public func expectTrapping<Bound>(
   }
 }
 
-public func expectTrapping<Bound>(
+public func expectTrapping<Bound : Comparable>(
   _ subRange: ${Range}<Bound>, in range: Range<Bound>, ${TRACE}
 ) {
   if !range._contains(subRange) {
@@ -308,7 +307,7 @@ public func expectTrapping<Bound>(
 }
 % end
 
-extension ClosedRange {
+extension ClosedRange where Bound : Comparable {
   internal func _contains(_ other: ClosedRange<Bound>) -> Bool {
     if other.lowerBound < lowerBound { return false }
     if upperBound < other.upperBound { return false }
@@ -316,7 +315,7 @@ extension ClosedRange {
   }
 }
 
-public func expectTrapping<Bound>(
+public func expectTrapping<Bound : Comparable>(
   _ subRange: ClosedRange<Bound>, in range: ClosedRange<Bound>, ${TRACE}
 ) {
   if !range._contains(subRange) {

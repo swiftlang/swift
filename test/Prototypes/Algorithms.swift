@@ -204,9 +204,10 @@ extension MutableCollection where Self: BidirectionalCollection {
     if bounds.isEmpty { return }
     var f = bounds.lowerBound
     var l = index(before: bounds.upperBound)
-    while f < l {
+    while f != l {
       swap(&self[f], &self[l])
       formIndex(after: &f)
+      if f == l { break }
       formIndex(before: &l)
     }
   }
@@ -307,7 +308,8 @@ extension MutableCollection where Self: RandomAccessCollection,
     
     for cycle in 1...cycles {
       _rotateCycle(start: index(startIndex, offsetBy: numericCast(cycle))) {
-        index($0, offsetBy: $0 < pivot ? plus : minus)
+        return index(
+          $0, offsetBy: distance(from: $0, to: pivot) > 0 ? plus : minus)
       }
     }
     return pivot

@@ -29,7 +29,7 @@ public protocol MutableIndexable : Indexable {
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   // TODO: swift-3-indexing-model - Index only needs to be comparable or must be comparable..?
-  associatedtype Index : Comparable
+  associatedtype Index : Equatable
 
   /// The position of the first element in a nonempty collection.
   ///

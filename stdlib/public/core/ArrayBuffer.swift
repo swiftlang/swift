@@ -23,7 +23,8 @@ internal typealias _ArrayBridgeStorage
 
 @_fixed_layout
 public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
-
+  public typealias Index = Int
+  
   /// Create an empty buffer.
   public init() {
     _storage = _ArrayBridgeStorage(native: _emptyArrayStorage)
