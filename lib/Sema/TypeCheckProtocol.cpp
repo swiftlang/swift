@@ -3413,16 +3413,14 @@ void ConformanceChecker::resolveTypeWitnesses() {
       return;
     }
 
-    // Complain that we couldn't find anything.
-    if (!missingTypeWitness)
-      missingTypeWitness = *unresolvedAssocTypes.begin();
-
-    diagnoseOrDefer(missingTypeWitness, true,
-      [missingTypeWitness](TypeChecker &tc,
-                           NormalProtocolConformance *conformance) {
-      tc.diagnose(missingTypeWitness, diag::no_witnesses_type,
-                  missingTypeWitness->getName());
-    });
+    for (auto missingTypeWitness : unresolvedAssocTypes) {
+      diagnoseOrDefer(missingTypeWitness, true,
+        [missingTypeWitness](TypeChecker &tc,
+                             NormalProtocolConformance *conformance) {
+          tc.diagnose(missingTypeWitness, diag::no_witnesses_type,
+                      missingTypeWitness->getName());
+        });
+    }
 
     return;
   }
