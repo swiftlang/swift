@@ -775,6 +775,13 @@ extension ${Self} : AbsoluteValuable {
   }
 }
 
+extension ${Self} : Arithmetic {
+  @_transparent
+  public var magnitude: ${Self} {
+    return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(_value))
+  }
+}
+
 @_transparent
 public prefix func +(x: ${Self}) -> ${Self} {
   return x

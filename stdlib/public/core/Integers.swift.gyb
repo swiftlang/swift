@@ -42,8 +42,8 @@ binaryArithmetic = {
 
 
 //FIXME: This should go in the stdlib separately, probably.
-extension IntegerLiteralConvertible
-  where Self : _BuiltinIntegerLiteralConvertible {
+extension ExpressibleByIntegerLiteral
+  where Self : _ExpressibleByBuiltinIntegerLiteral {
   /// Create an instance initialized to `value`.
   @_transparent
   public init(integerLiteral value: Self) {
@@ -75,11 +75,12 @@ extension IntegerLiteralConvertible
 /// Please note that for ordinary work, the `magnitude` property **should not**
 /// be preferred to the `abs(_)` function, whose return value is of the same
 /// type as its argument.
-public protocol Arithmetic : Equatable, IntegerLiteralConvertible {
-  init?<T : Integer>(exactly source: T)
+public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
+  // FIXME: implement
+  //init?<T : Integer>(exactly source: T)
 
   // FIXME(ABI): should be just Arithmetic
-  associatedtype Magnitude : Equatable, IntegerLiteralConvertible
+  associatedtype Magnitude : Equatable, ExpressibleByIntegerLiteral
 
   var magnitude: Magnitude { get }
 

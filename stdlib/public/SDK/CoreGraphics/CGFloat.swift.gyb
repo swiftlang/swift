@@ -178,6 +178,10 @@ public struct CGFloat {
     return CGFloat(NativeType.abs(x.native))
   }
 
+  public var magnitude: CGFloat {
+    return CGFloat(NativeType.abs(native))
+  }
+
   public mutating func negate() {
     native.negate()
   }
