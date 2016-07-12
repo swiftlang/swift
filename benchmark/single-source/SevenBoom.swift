@@ -29,6 +29,7 @@ public func run_SevenBoom(_ N: Int) {
       c += 1
     }
     catch _ {
+        continue
     }
   }
   CheckResults(c == 1, "IncorrectResults in SevenBoom")

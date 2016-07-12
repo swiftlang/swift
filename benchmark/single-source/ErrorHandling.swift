@@ -34,7 +34,7 @@ public func run_ErrorHandling(_ N: Int) {
     do {
       _ = try doSomething()
     } catch _ {
-
+        continue
     }
   }
 }

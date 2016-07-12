@@ -13,7 +13,8 @@ func opaque_error() -> ErrorProtocol { return MSV.Foo }
 func one() {
   do {
     true ? () : throw opaque_error() // expected-error {{expected expression after '? ... :' in ternary expression}}
-  } catch _ {
+  } catch {
+    _ = error
   }
 
   do {
@@ -26,6 +27,7 @@ func one() {
   } catch where true { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
     let error2 = error
   } catch {
+    // discard
   }
   
   // <rdar://problem/20985280> QoI: improve diagnostic on improper pattern match on type
@@ -33,11 +35,13 @@ func one() {
     throw opaque_error()
   } catch MSV { // expected-error {{'is' keyword required to pattern match against type name}} {{11-11=is }}
   } catch {
+    // discard
   }
 
   do {
     throw opaque_error()
-  } catch is ErrorProtocol {  // expected-warning {{'is' test is always true}}
+  } catch is ErrorProtocol {  // expected-warning {{'is' test is always true}} expected-warning 2 {{catch' block is empty, errors thrown in 'do' block are unhandled}}
+    
   }
   
   func foo() throws {}
@@ -47,6 +51,7 @@ func one() {
     try foo()
 #endif
   } catch {    // don't warn, #if code should be scanned.
+    _ = error
   }
 
   do {
@@ -54,7 +59,23 @@ func one() {
     throw opaque_error()
 #endif
   } catch {    // don't warn, #if code should be scanned.
+    _ = error
   }
+  
+  // Catch block not handling error
+  do {
+  } catch {}    // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+
+  do {
+    #if false
+      throw opaque_error()
+    #endif
+  } catch {}  // expected-warning {{'catch' block is empty, errors thrown in 'do' block are unhandled}}
+  
+  do {
+    try genError()
+  } catch {} // expected-warning {{'catch' block is empty, errors thrown in 'do' block are unhandled}}
+  
 }
 
 func takesAutoclosure(_ fn : @autoclosure () -> Int) {}

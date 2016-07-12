@@ -2486,6 +2486,8 @@ WARNING(no_throw_in_try,none,
 
 WARNING(no_throw_in_do_with_catch,none,
         "'catch' block is unreachable because no errors are thrown in 'do' block", ())
+WARNING(empty_catch_block,none,
+        "'catch' block is empty, errors thrown in 'do' block are unhandled", ())
 
 //------------------------------------------------------------------------------
 // Type Check Types

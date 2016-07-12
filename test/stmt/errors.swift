@@ -27,7 +27,7 @@ func three() {
   do {
     throw opaque_error() // expected-error {{error is not handled because the enclosing catch is not exhaustive}}
   } catch let e as MSV {
-    _ = e
+    _ = e // discard
   }
 }
 
@@ -35,7 +35,7 @@ func four() {
   do {
     throw opaque_error()
   } catch let e {
-    _ = e
+    _ = e // discard
   }
 }
 
@@ -45,6 +45,7 @@ func five() {
   } catch let e as MSV {
     _ = e
   } catch _ {
+    // discard
   }
 }
 
@@ -56,6 +57,7 @@ func six() {
       _ = e
     }
   } catch _ {
+    return
   }
 }
 
@@ -130,6 +132,7 @@ func eleven_one() {
       try thrower()
     // FIXME: suppress the double-emission of the 'always true' warning
     } catch let e as ErrorProtocol { // expected-warning {{immutable value 'e' was never used}} {{17-18=_}} expected-warning 2 {{'as' test is always true}}
+      return // discard
     }
   }
 }
