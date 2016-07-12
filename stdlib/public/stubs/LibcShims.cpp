@@ -12,7 +12,6 @@
 
 #include <random>
 #include <type_traits>
-#include <cmath>
 #if defined(_MSC_VER)
 #include <io.h>
 #else
