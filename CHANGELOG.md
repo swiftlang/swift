@@ -3,6 +3,55 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0112](https://github.com/apple/swift-evolution/blob/master/proposals/0112-nserror-bridging.md):
+  The `NSError` type is now bridged to the Swift `Error` protocol type
+  (formerly called `ErrorProtocol` in Swift 3, `ErrorType` in Swift 2)
+  in Objective-C APIs, much like other Objective-C types are
+  bridged to Swift (e.g., `NSString` being bridged to `String`). For
+  example, the `UIApplicationDelegate` method
+  `applicate(_:didFailToRegisterForRemoteNotificationsWithError:)`
+  changes from accepting an `NSError` argument:
+
+  ```swift
+  optional func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: NSError)
+  ```
+
+  to accepting an `Error` argument:
+
+  ```swift
+  optional func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error)
+  ```
+
+  Additionally, error types imported from Cocoa[Touch] maintain all of
+  the information in the corresponding `NSError`, so it is no longer
+  necessary to `catch let as NSError` to extract (e.g.) the user-info
+  dictionary. Specific also error types contain typed accessors for
+  their common user-info keys. For example:
+
+  ```swift
+  catch let error as CocoaError where error.code == .fileReadNoSuchFileError {
+    print("No such file: \(error.url)")
+  }
+  ```
+
+  Finally, Swift-defined error types can provide localized error
+  descriptions by adopting the new `LocalizedError` protocol, e.g.,
+
+  ```swift
+  extension HomeworkError : LocalizedError {
+    var errorDescription: String? {
+      switch self {
+      case .forgotten: return NSLocalizedString("I forgot it")
+      case .lost: return NSLocalizedString("I lost it")
+      case .dogAteIt: return NSLocalizedString("The dog ate it")
+      }
+    }
+  }
+  ```
+
+  Similarly, the new `RecoverableError` and `CustomNSError` protocols
+  allow additional control over the handling of the error.
+
 * [SE-0060](https://github.com/apple/swift-evolution/blob/master/proposals/0060-defaulted-parameter-order.md):
   Function parameters with default arguments must now be specified in
   declaration order. A call site must always supply the arguments it provides
