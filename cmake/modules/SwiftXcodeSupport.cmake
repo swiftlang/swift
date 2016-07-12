@@ -3,11 +3,11 @@
 
 function(get_effective_platform_for_triple triple output)
   string(FIND "${triple}" "macos" IS_MACOS)
-  if (IS_MACOS)
+  if (NOT IS_MACOS EQUAL -1)
     set(${output} "" PARENT_SCOPE)
     return()
   endif()
-  message(FATAL_ERROR "Not supported")
+  message(FATAL_ERROR "Can not create an effective platform name for triple: ${triple}")
 endfunction()
 
 function(escape_path_for_xcode config path result_var_name)
@@ -27,35 +27,36 @@ endfunction()
 
 function(check_imported_target_has_imported_configuration target config)
   get_target_property(IMPORTED_CONFIGS_LIST ${target} IMPORTED_CONFIGURATIONS)
-  if ("${IMPORTED_CONFIGS_LIST}" STREQUAL "NOTFOUND")
+  if ("${IMPORTED_CONFIGS_LIST}" STREQUAL "IMPORTED_CONFIGS_LIST-NOTFOUND")
     message(FATAL_ERROR "No import configuration of ${target} specified?!")
   endif()
 
-  list(FIND "${IMPORTED_CONFIGS_LIST}" "${config}" FOUND_CONFIG)
-  if (NOT FOUND_CONFIG)
-    message(FATAL_ERROR "${target} does not have imported config '${config}'?! \
-Instead: ${IMPORTED_CONFIGS_LIST}")
+  list(FIND IMPORTED_CONFIGS_LIST "${config}" FOUND_CONFIG)
+  if (FOUND_CONFIG EQUAL -1)
+    message(FATAL_ERROR "${target} does not have imported config '${config}'?! Instead: ${IMPORTED_CONFIGS_LIST}")
   endif()
 endfunction()
 
-function(fixup_imported_target_property_for_xcode target property real_build_type)
-  set(FULL_PROP_NAME "${property}_${real_build_type}")
+function(fixup_imported_target_property_for_xcode target property llvm_build_type)
+  set(FULL_PROP_NAME "${property}_${llvm_build_type}")
 
   # First try to lookup the value associated with the "real build type".
   get_target_property(PROP_VALUE ${target} ${FULL_PROP_NAME})
 
   # If the property is unspecified, return.
-  if ("${PROP_VALUE}" STREQUAL "NOTFOUND")
+  if ("${PROP_VALUE}" STREQUAL "PROP_VALUE-NOTFOUND")
     return()
   endif()
 
   # Otherwise for each cmake configuration that is not real_build_type, hardcode
   # its value to be PROP_VALUE.
-  foreach(c ${CMAKE_CONFIGURATION_TYPES})
-    if ("${c}" STREQUAL "${real_build_type}")
+  foreach(build_type ${CMAKE_CONFIGURATION_TYPES})
+    string(TOUPPER "${build_type}" build_type_upper)
+    if ("${build_type_upper}" STREQUAL "${llvm_build_type}")
       continue()
     endif()
-    set_target_properties(${target} PROPERTIES "${property}_${c}" "${PROP_VALUE}")
+    set(SWIFT_BUILD_PROPERTY_NAME "${property}_${build_type_upper}")
+    set_target_properties(${target} PROPERTIES "${SWIFT_BUILD_PROPERTY_NAME}" "${PROP_VALUE}")
   endforeach()
 endfunction()
 
@@ -69,6 +70,8 @@ endfunction()
 # compiled in, so we can grab the imported location for that configuration and
 # splat it across the other configurations as well.
 function(fix_imported_targets_for_xcode imported_targets)
+  string(TOUPPER "${LLVM_BUILD_TYPE}" LLVM_BUILD_TYPE_UPPER)
+
   # This is the set of configuration specific cmake properties that are
   # supported for imported targets in cmake 3.4.3. Sadly, beyond hacks, it seems
   # that there is no way to dynamically query the list of set properties of a
@@ -93,12 +96,12 @@ function(fix_imported_targets_for_xcode imported_targets)
 
     # First check that we actually imported the configuration that LLVM said
     # that we did. This is just a sanity check.
-    check_imported_target_has_imported_configuration(${target} ${LLVM_BUILD_TYPE})
+    check_imported_target_has_imported_configuration(${target} ${LLVM_BUILD_TYPE_UPPER})
 
     # Then loop through all of the imported properties and translate.
-    foreach(property ${imported_properties})
+    foreach(property ${imported_target_properties})
       fixup_imported_target_property_for_xcode(
-        ${target} ${property} ${LLVM_BUILD_TYPE})
+        ${target} ${property} ${LLVM_BUILD_TYPE_UPPER})
     endforeach()
   endforeach()
 endfunction()
