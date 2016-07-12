@@ -124,18 +124,3 @@ swift::_swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);
   return RandomUniform(getGlobalMT19937());
 }
-
-float swift::_swift_stdlib_remainderf(float dividend, float divisor) {
-  return std::remainder(dividend, divisor);
-}
-
-double swift::_swift_stdlib_remainder(double dividend, double divisor) {
-  return std::remainder(dividend, divisor);
-}
-
-#if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
-void swift::_swift_stdlib_remainderl(void *_self, const void *_other) {
-  *(long double *)_self = std::remainder(*(long double *)_self,
-                                         *(const long double *)_other);
-}
-#endif // Have Float80
