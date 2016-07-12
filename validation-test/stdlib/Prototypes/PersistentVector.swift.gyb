@@ -198,7 +198,7 @@ struct _${name}Bitmap {
 %   if underlyingType == 'UInt':
 #if arch(i386) || arch(arm)
     return Int(Builtin.int_ctpop_Int32(_bits._value))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
     return Int(Builtin.int_ctpop_Int64(_bits._value))
 #endif
 %   elif underlyingType == 'UInt32':
