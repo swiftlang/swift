@@ -6199,11 +6199,11 @@ void ClangImporter::Implementation::importAttributes(
       auto platformK =
         llvm::StringSwitch<Optional<PlatformKind>>(Platform)
           .Case("ios", PlatformKind::iOS)
-          .Case("macosx", PlatformKind::OSX)
+          .Case("macos", PlatformKind::OSX)
           .Case("tvos", PlatformKind::tvOS)
           .Case("watchos", PlatformKind::watchOS)
           .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
-          .Case("macosx_app_extension",
+          .Case("macos_app_extension",
                 PlatformKind::OSXApplicationExtension)
           .Case("tvos_app_extension",
                 PlatformKind::tvOSApplicationExtension)
