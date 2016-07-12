@@ -766,15 +766,6 @@ extension ${Self} : Hashable {
   }
 }
 
-@_transparent
-extension ${Self} : AbsoluteValuable {
-  /// Returns the absolute value of `x`.
-  @_transparent
-  public static func abs(_ x: ${Self}) -> ${Self} {
-    return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x._value))
-  }
-}
-
 extension ${Self} : Arithmetic {
   @_transparent
   public var magnitude: ${Self} {
@@ -1015,4 +1006,13 @@ extension ${Self} {
 %     end
 %   end
 }
+
+
+extension ${Self} {
+  @available(*, unavailable, message: "Please use the `abs(_:)` free function")
+  public static func abs(_ x: ${Self}) -> ${Self} {
+    fatalError("unavailable")
+  }
+}
+
 % end # for (bits, signed) in allInts()

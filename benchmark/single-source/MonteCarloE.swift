@@ -33,6 +33,6 @@ public func run_MonteCarloE(scale: Int) {
                "Incorrect results in MonteCarloE: no empty intervals.")
   let e_estimate = Double(N)/Double(numEmptyIntervals)
   let e = 2.71828
-  CheckResults(Double.abs(e_estimate - e) < 0.1,
+  CheckResults(abs(e_estimate - e) < 0.1,
                "Incorrect results in MonteCarloE: e_estimate == \(e_estimate)")
 }
