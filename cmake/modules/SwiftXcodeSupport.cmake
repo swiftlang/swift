@@ -64,7 +64,7 @@ function(fixup_imported_target_property_for_xcode target property real_build_typ
     if ("${c}" STREQUAL "${real_build_type}")
       continue()
     endif()
-    set_target_properties(${target} PROPERTIES ${FULL_PROP_NAME} "${PROP_VALUE}")
+    set_target_properties(${target} PROPERTIES "${property}_${c}" "${PROP_VALUE}")
   endforeach()
 endfunction()
 
