@@ -78,4 +78,14 @@
 /// resilience we may be able to make this hidden.
 #define SWIFT_RUNTIME_STDLIB_INTERFACE SWIFT_RUNTIME_EXPORT
 
+/// Attribute for stdlib stdlib inline interfaces.
+///
+/// Since these are static inline, there's no need for them to be exported, and
+/// in fact they shouldn't be.
+#if __MACH__ || __ELF__
+# define SWIFT_RUNTIME_STDLIB_INLINE __attribute__((__visibility__("hidden")))
+#else
+# define SWIFT_RUNTIME_STDLIB_INLINE /* nothing?? */
+#endif
+
 #endif

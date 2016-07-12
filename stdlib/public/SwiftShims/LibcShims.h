@@ -84,29 +84,35 @@ __swift_uint32_t
 _swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
   
 // Math library functions
+SWIFT_RUNTIME_STDLIB_INLINE
 static inline float _swift_stdlib_remainderf(float x, float y) {
   return __builtin_remainderf(x, y);
 }
-  
+ 
+SWIFT_RUNTIME_STDLIB_INLINE
 static inline float _swift_stdlib_sqrtf(float x) {
   return __builtin_sqrtf(x);
 }
-  
+
+SWIFT_RUNTIME_STDLIB_INLINE
 static inline double _swift_stdlib_remainder(double x, double y) {
   return __builtin_remainder(x, y);
 }
-  
+
+SWIFT_RUNTIME_STDLIB_INLINE
 static inline double _swift_stdlib_sqrt(double x) {
   return __builtin_sqrt(x);
 }
   
 // TODO: Remove horrible workaround when importer does Float80 <-> long double.
 #if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
+SWIFT_RUNTIME_STDLIB_INLINE
 static inline void _swift_stdlib_remainderl(void *x, const void *y) {
   long double *ptr = (long double *)x;
   *ptr = __builtin_remainderl(*ptr, *(const long double *)y);
 }
 
+SWIFT_RUNTIME_STDLIB_INLINE
 static inline void _swift_stdlib_sqrtl(void *x) {
   long double *ptr = (long double *)x;
   *ptr = __builtin_sqrtl(*ptr);
