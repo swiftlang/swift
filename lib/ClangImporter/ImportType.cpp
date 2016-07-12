@@ -2050,7 +2050,8 @@ Type ClangImporter::Implementation::importMethodType(
   const clang::ObjCPropertyDecl *property = nullptr;
   bool isPropertyGetter = false;
   bool isPropertySetter = false;
-  if (clangDecl->isPropertyAccessor()) {
+  // Swift 2.2 does not import class properties as properties.
+  if (clangDecl->isPropertyAccessor() && clangDecl->isInstanceMethod()) {
     property = clangDecl->findPropertyDecl();
     if (property) {
       if (property->getGetterMethodDecl() == clangDecl) {
