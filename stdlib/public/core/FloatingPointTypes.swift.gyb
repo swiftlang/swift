@@ -578,7 +578,12 @@ extension ${Self}: BinaryFloatingPoint {
 
   @_transparent
   public mutating func formSquareRoot( ) {
-    _value = Builtin.int_sqrt_FPIEEE${bits}(_value)
+%if bits == 80:
+    _swift_stdlib_sqrtl(&self)
+%else:
+    self = _swift_stdlib_sqrt${cFuncSuffix(bits)}(self)
+%end
+
   }
 
   @_transparent
