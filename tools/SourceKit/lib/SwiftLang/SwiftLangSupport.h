@@ -261,6 +261,10 @@ public:
   /// \returns true if the results should be ignored, false otherwise.
   static bool printUSR(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 
+  /// Generate a USR for the Type of a given decl.
+  /// \returns true if the results should be ignored, false otherwise.
+  static bool printDeclTypeUSR(const swift::ValueDecl *D, llvm::raw_ostream &OS);
+
   /// Generate a USR for an accessor, including the prefix.
   /// \returns true if the results should be ignored, false otherwise.
   static bool printAccessorUSR(const swift::AbstractStorageDecl *D,

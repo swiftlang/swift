@@ -22,6 +22,7 @@ func foo(x: FooStruct1) -> S1 {}
 // CHECK_SANITY1-NEXT: global
 // CHECK_SANITY1-NEXT: s:v10cursor_usr6globalSi
 // CHECK_SANITY1-NEXT: Int
+// CHECK_SANITY1-NEXT: _TtSi
 // CHECK_SANITY1-NEXT: <Declaration>var global: <Type usr="s:Si">Int</Type></Declaration>
 // CHECK_SANITY1-NEXT: <decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>global</decl.name>: <decl.var.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.type></decl.var.global>
 

@@ -1328,6 +1328,8 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
     Elem.setBool(KeyIsSystem, true);
   if (!Info.TypeInterface.empty())
     Elem.set(KeyTypeInterface, Info.TypeInterface);
+  if (!Info.TypeUSR.empty())
+    Elem.set(KeyTypeUsr, Info.TypeUSR);
 
   return Rec(RespBuilder.createResponse());
 }

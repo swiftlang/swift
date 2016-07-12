@@ -253,6 +253,7 @@ struct CursorInfo {
   StringRef Name;
   StringRef USR;
   StringRef TypeName;
+  StringRef TypeUSR;
   StringRef DocComment;
   StringRef TypeInterface;
   StringRef GroupName;

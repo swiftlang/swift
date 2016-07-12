@@ -657,6 +657,13 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   }
   unsigned TypenameEnd = SS.size();
 
+  unsigned MangledTypeStart = SS.size();
+  {
+    llvm::raw_svector_ostream OS(SS);
+    SwiftLangSupport::printDeclTypeUSR(VD, OS);
+  }
+  unsigned MangledTypeEnd = SS.size();
+
   unsigned DocCommentBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
@@ -772,6 +779,8 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   StringRef USR = StringRef(SS.begin()+USRBegin, USREnd-USRBegin);
   StringRef TypeName = StringRef(SS.begin()+TypenameBegin,
                                  TypenameEnd-TypenameBegin);
+  StringRef TypeUsr = StringRef(SS.begin()+MangledTypeStart,
+                                MangledTypeEnd - MangledTypeStart);
   StringRef DocComment = StringRef(SS.begin()+DocCommentBegin,
                                    DocCommentEnd-DocCommentBegin);
   StringRef AnnotatedDecl = StringRef(SS.begin()+DeclBegin,
@@ -812,6 +821,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.Name = Name;
   Info.USR = USR;
   Info.TypeName = TypeName;
+  Info.TypeUSR = TypeUsr;
   Info.DocComment = DocComment;
   Info.AnnotatedDeclaration = AnnotatedDecl;
   Info.FullyAnnotatedDeclaration = FullyAnnotatedDecl;

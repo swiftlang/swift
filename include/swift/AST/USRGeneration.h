@@ -23,6 +23,10 @@ enum class AccessorKind;
 
 namespace ide {
 
+/// Prints out the USR for the Type of the given decl.
+/// \returns true if it failed, false on success.
+bool printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS);
+
 /// Prints out the USR for the given Decl.
 /// \returns true if it failed, false on success.
 bool printDeclUSR(const ValueDecl *D, raw_ostream &OS);
