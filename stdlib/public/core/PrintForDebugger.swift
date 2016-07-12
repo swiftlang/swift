@@ -12,7 +12,7 @@
 
 public enum _PrintForDebugger {
 
-  enum CollectionStatus {
+  internal enum CollectionStatus {
     case NotACollection
     case CollectionOfElements
     case CollectionOfPairs
@@ -20,11 +20,11 @@ public enum _PrintForDebugger {
     case Pair
     case ElementOfPair
   
-    var isCollection: Bool {
+    internal var isCollection: Bool {
       return self != .NotACollection
     }
   
-    func getChildStatus(child: Mirror) -> CollectionStatus {
+    internal func getChildStatus(child: Mirror) -> CollectionStatus {
       let disposition = child.displayStyle ?? .struct
     
       if disposition == .collection { return .CollectionOfElements }
@@ -39,7 +39,7 @@ public enum _PrintForDebugger {
     }
   }
 
-  static func asObjectIdentifier(value: Any) -> ObjectIdentifier? {
+  internal static func asObjectIdentifier(value: Any) -> ObjectIdentifier? {
       if let ao = value as? AnyObject {
           return ObjectIdentifier(ao)
       } else {
@@ -47,7 +47,7 @@ public enum _PrintForDebugger {
       }
   }
 
-  static func asNumericValue(value: Any) -> Int {
+  internal static func asNumericValue(value: Any) -> Int {
       if let ao = value as? AnyObject {
           return unsafeBitCast(ao, to: Int.self)
       } else {
@@ -55,7 +55,7 @@ public enum _PrintForDebugger {
       }
   }
 
-  static func asStringRepresentation(
+  internal static func asStringRepresentation(
     value: Any?,
     mirror: Mirror,
     count: Int) -> String? {
@@ -113,7 +113,7 @@ public enum _PrintForDebugger {
     return nil
   }
 
-  static func ivarCount(mirror: Mirror) -> Int {
+  internal static func ivarCount(mirror: Mirror) -> Int {
     let count = Int(mirror.children.count)
     if let sc = mirror.superclassMirror {
       return ivarCount(mirror: sc) + count
@@ -123,7 +123,7 @@ public enum _PrintForDebugger {
   }
 
 
-  static func shouldExpand(
+  internal static func shouldExpand(
     mirror: Mirror,
     collectionStatus: CollectionStatus,
     isRoot: Bool) -> Bool {
@@ -137,7 +137,7 @@ public enum _PrintForDebugger {
     }
   }
 
-  static func printForDebuggerImpl<StreamType: OutputStream>(
+  internal static func printForDebuggerImpl<StreamType: OutputStream>(
     value: Any?,
     mirror: Mirror,
     name: String?,
@@ -280,7 +280,7 @@ public enum _PrintForDebugger {
       maxItemCounter: &maxItemCounter,
       targetStream: &targetStream)
 
-    return targetStream.data
+    return targetStream
   }
 }
 
