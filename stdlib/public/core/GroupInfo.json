@@ -142,6 +142,6 @@
     "Tuple.swift",
     "NewtypeWrapper.swift",
     "UnsafeBitMap.swift",
-    "PrintForDebugger.swift"
+    "DebuggerSupport.swift"
   ]
 }

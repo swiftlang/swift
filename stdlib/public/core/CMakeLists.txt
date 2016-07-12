@@ -42,6 +42,7 @@ set(SWIFTLIB_ESSENTIAL
   ContiguousArrayBuffer.swift
   CString.swift
   CTypes.swift
+  DebuggerSupport.swift
   EmptyCollection.swift
   ErrorType.swift
   Existential.swift
@@ -78,7 +79,6 @@ set(SWIFTLIB_ESSENTIAL
   Pointer.swift
   Policy.swift
   Print.swift
-  PrintForDebugger.swift
   RandomAccessCollection.swift
   Range.swift.gyb
   RangeReplaceableCollection.swift.gyb

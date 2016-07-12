@@ -19,39 +19,39 @@ class ClassWithMirror: CustomReflectable {
   }
 }
 
-let PrintForDebuggerTests = TestSuite("PrintForDebugger")
-PrintForDebuggerTests.test("StructWithMembers") {
-  let printed = _PrintForDebugger.printForDebugger(value: StructWithMembers())
+let StringForPrintObjectTests = TestSuite("StringForPrintObject")
+StringForPrintObjectTests.test("StructWithMembers") {
+  let printed = _DebuggerSupport.stringForPrintObject(StructWithMembers())
   expectEqual(printed, "▿ StructWithMembers\n  - a : 1\n  - b : \"Hello World\"\n")
 }
 
-PrintForDebuggerTests.test("ClassWithMembers") {
-  let printed = _PrintForDebugger.printForDebugger(value: ClassWithMembers())
+StringForPrintObjectTests.test("ClassWithMembers") {
+  let printed = _DebuggerSupport.stringForPrintObject(ClassWithMembers())
   expectTrue(printed.hasPrefix("<ClassWithMembers: 0x"))
 }
 
-PrintForDebuggerTests.test("ClassWithMirror") {
-  let printed = _PrintForDebugger.printForDebugger(value: ClassWithMirror())
+StringForPrintObjectTests.test("ClassWithMirror") {
+  let printed = _DebuggerSupport.stringForPrintObject(ClassWithMirror())
   expectEqual(printed, "▿ ClassWithMirror\n  - a : 1\n  - b : \"Hello World\"\n")
 }
 
-PrintForDebuggerTests.test("Array") {
-  let printed = _PrintForDebugger.printForDebugger(value: [1,2,3,4])
+StringForPrintObjectTests.test("Array") {
+  let printed = _DebuggerSupport.stringForPrintObject([1,2,3,4])
   expectEqual(printed, "▿ 4 elements\n  - 0 : 1\n  - 1 : 2\n  - 2 : 3\n  - 3 : 4\n")
 }
 
-PrintForDebuggerTests.test("Dictionary") {
-  let printed = _PrintForDebugger.printForDebugger(value: [1:2])
+StringForPrintObjectTests.test("Dictionary") {
+  let printed = _DebuggerSupport.stringForPrintObject([1:2])
   expectEqual(printed, "▿ 1 elements\n  ▿ 0 : 2 elements\n    - .0 : 1\n    - .1 : 2\n")
 }
 
-PrintForDebuggerTests.test("NilOptional") {
-  let printed = _PrintForDebugger.printForDebugger(value: nil as Int?)
+StringForPrintObjectTests.test("NilOptional") {
+  let printed = _DebuggerSupport.stringForPrintObject(nil as Int?)
   expectTrue(printed.hasPrefix("nil"))
 }
 
-PrintForDebuggerTests.test("SomeOptional") {
-  let printed = _PrintForDebugger.printForDebugger(value: 3 as Int?)
+StringForPrintObjectTests.test("SomeOptional") {
+  let printed = _DebuggerSupport.stringForPrintObject(3 as Int?)
   expectEqual(printed, "▿ Optional<Int>\n  - some : 3\n")
 }
 

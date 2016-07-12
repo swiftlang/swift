@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public enum _PrintForDebugger {
-
+public enum _DebuggerSupport {
   internal enum CollectionStatus {
     case NotACollection
     case CollectionOfElements
@@ -39,7 +38,7 @@ public enum _PrintForDebugger {
     }
   }
 
-  internal static func asObjectIdentifier(value: Any) -> ObjectIdentifier? {
+  internal static func asObjectIdentifier(_ value: Any) -> ObjectIdentifier? {
     if let ao = value as? AnyObject {
       return ObjectIdentifier(ao)
     } else {
@@ -47,7 +46,7 @@ public enum _PrintForDebugger {
     }
   }
 
-  internal static func asNumericValue(value: Any) -> Int {
+  internal static func asNumericValue(_ value: Any) -> Int {
     if let ao = value as? AnyObject {
       return unsafeBitCast(ao, to: Int.self)
     } else {
@@ -62,54 +61,54 @@ public enum _PrintForDebugger {
   ) -> String? {
     let ds = mirror.displayStyle ?? .`struct`
     switch ds {
-    case .optional:
+      case .optional:
         if count > 0 {
-            return "\(mirror.subjectType)"
+          return "\(mirror.subjectType)"
         }
         else {
-            if let x = value {
-                return String(reflecting: x)
-            }
+          if let x = value {
+            return String(reflecting: x)
+          }
         }
-    case .collection:
+      case .collection:
         fallthrough
-    case .dictionary:
+      case .dictionary:
         fallthrough
-    case .set:
+      case .set:
         fallthrough
-    case .tuple:
+      case .tuple:
         return "\(Int(mirror.children.count)) elements"
-    case .`struct`:
+      case .`struct`:
         fallthrough
-    case .`enum`:
+      case .`enum`:
         if let x = value {
-            if let cdsc = (x as? CustomDebugStringConvertible) {
-                return cdsc.debugDescription
-            }
-            if let csc = (x as? CustomStringConvertible) {
-                return csc.description
-            }
+          if let cdsc = (x as? CustomDebugStringConvertible) {
+            return cdsc.debugDescription
+          }
+          if let csc = (x as? CustomStringConvertible) {
+            return csc.description
+          }
         }
         if count > 0 {
             return "\(mirror.subjectType)"
         }
-    case .`class`:
+      case .`class`:
         if let x = value {
-            if let cdsc = (x as? CustomDebugStringConvertible) {
-                return cdsc.debugDescription
-            }
-            if let csc = (x as? CustomStringConvertible) {
-                return csc.description
-            }
-            // for a Class with no custom summary, mimic the Foundation default
-            return "<\(x.dynamicType): 0x\(String(asNumericValue(value: x), radix: 16, uppercase: false))>"
+          if let cdsc = (x as? CustomDebugStringConvertible) {
+            return cdsc.debugDescription
+          }
+          if let csc = (x as? CustomStringConvertible) {
+            return csc.description
+          }
+          // for a Class with no custom summary, mimic the Foundation default
+          return "<\(x.dynamicType): 0x\(String(asNumericValue(x), radix: 16, uppercase: false))>"
         } else {
-            // but if I can't provide a value, just use the type anyway
-            return "\(mirror.subjectType)"
+          // but if I can't provide a value, just use the type anyway
+          return "\(mirror.subjectType)"
         }
     }
     if let x = value {
-        return String(reflecting: x)
+      return String(reflecting: x)
     }
     return nil
   }
@@ -139,7 +138,7 @@ public enum _PrintForDebugger {
     }
   }
 
-  internal static func printForDebuggerImpl<StreamType: OutputStream>(
+  internal static func printForDebuggerImpl<StreamType : OutputStream>(
     value: Any?,
     mirror: Mirror,
     name: String?,
@@ -204,7 +203,7 @@ public enum _PrintForDebugger {
     }
 
     if let x = value {
-      if let valueIdentifier = asObjectIdentifier(value: x) {
+      if let valueIdentifier = asObjectIdentifier(x) {
         if refsAlreadySeen.contains(valueIdentifier) {
           print(" { ... }", to: &targetStream)
           return
@@ -266,7 +265,7 @@ public enum _PrintForDebugger {
     }
   }
 
-  public static func printForDebugger(value: Any) -> String {
+  public static func stringForPrintObject(_ value: Any) -> String {
     var maxItemCounter = Int.max
     var refs = Set<ObjectIdentifier>()
     var targetStream = ""
