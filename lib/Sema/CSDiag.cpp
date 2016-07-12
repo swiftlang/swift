@@ -3105,7 +3105,7 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
 
 
 /// Return true if the given type conforms to a known protocol type.
-static bool isLiteralConvertibleType(Type fromType,
+static bool isExpressibleByLiteralType(Type fromType,
                                      KnownProtocolKind kind,
                                      ConstraintSystem *CS) {
   auto integerType =
@@ -3122,8 +3122,8 @@ static bool isLiteralConvertibleType(Type fromType,
 }
 
 static bool isIntegerType(Type fromType, ConstraintSystem *CS) {
-  return isLiteralConvertibleType(fromType,
-                                  KnownProtocolKind::IntegerLiteralConvertible,
+  return isExpressibleByLiteralType(fromType,
+                                  KnownProtocolKind::ExpressibleByIntegerLiteral,
                                   CS);
 }
 
@@ -3154,7 +3154,7 @@ static Type isRawRepresentable(Type fromType,
                                KnownProtocolKind kind,
                                ConstraintSystem *CS) {
   Type rawTy = isRawRepresentable(fromType, CS);
-  if (!rawTy || !isLiteralConvertibleType(rawTy, kind, CS))
+  if (!rawTy || !isExpressibleByLiteralType(rawTy, kind, CS))
     return Type();
 
   return rawTy;
@@ -3164,8 +3164,8 @@ static Type isRawRepresentable(Type fromType,
 /// index operation.
 static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
                                              ConstraintSystem *CS) {
-  auto kind = KnownProtocolKind::IntegerLiteralConvertible;
-  return (isLiteralConvertibleType(fromType, kind, CS) &&
+  auto kind = KnownProtocolKind::ExpressibleByIntegerLiteral;
+  return (isExpressibleByLiteralType(fromType, kind, CS) &&
           toType->getCanonicalType().getString() == "String.CharacterView.Index");
 }
 
@@ -3218,7 +3218,7 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
     }
   };
 
-  if (isLiteralConvertibleType(fromType, kind, CS)) {
+  if (isExpressibleByLiteralType(fromType, kind, CS)) {
     if (auto rawTy = isRawRepresentable(toType, kind, CS)) {
       // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
       // or just 'Result(rawValue: <expr>)'.
@@ -3236,7 +3236,7 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
   }
 
   if (auto rawTy = isRawRepresentable(fromType, kind, CS)) {
-    if (isLiteralConvertibleType(toType, kind, CS)) {
+    if (isExpressibleByLiteralType(toType, kind, CS)) {
       std::string convWrapBefore;
       std::string convWrapAfter = ".rawValue";
       if (rawTy->getCanonicalType() != toType->getCanonicalType()) {
@@ -3448,7 +3448,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   }
 
   // If we're diagnostic an issue with 'nil', produce a specific diagnostic,
-  // instead of uttering NilLiteralConvertible.
+  // instead of uttering ExpressibleByNilLiteral.
   if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
     diagnose(expr->getLoc(), nilDiag, contextualType);
     if (nilFollowup)
@@ -3564,10 +3564,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   case CTP_DictionaryKey:
   case CTP_DictionaryValue:
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
-                              KnownProtocolKind::IntegerLiteralConvertible,
+                              KnownProtocolKind::ExpressibleByIntegerLiteral,
                               expr);
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
-                              KnownProtocolKind::StringLiteralConvertible,
+                              KnownProtocolKind::ExpressibleByStringLiteral,
                               expr);
     tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr);
     break;
@@ -5046,7 +5046,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
 static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem *CS,
                                           SourceLoc loc) {
   auto DLC = CS->TC.getProtocol(loc,
-                              KnownProtocolKind::DictionaryLiteralConvertible);
+                              KnownProtocolKind::ExpressibleByDictionaryLiteral);
   if (!DLC) return false;
   return CS->TC.conformsToProtocol(ty, DLC, CS->DC,
                                    ConformanceCheckFlags::InExpression);
@@ -5057,16 +5057,16 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   auto elementTypePurpose = CTP_Unused;
 
   // If we had a contextual type, then it either conforms to
-  // ArrayLiteralConvertible or it is an invalid contextual type.
+  // ExpressibleByArrayLiteral or it is an invalid contextual type.
   if (auto contextualType = CS->getContextualType()) {
     // If our contextual type is an optional, look through them, because we're
     // surely initializing whatever is inside.
     contextualType = contextualType->lookThroughAllAnyOptionalTypes();
 
-    // Validate that the contextual type conforms to ArrayLiteralConvertible and
+    // Validate that the contextual type conforms to ExpressibleByArrayLiteral and
     // figure out what the contextual element type is in place.
     auto ALC = CS->TC.getProtocol(E->getLoc(),
-                                  KnownProtocolKind::ArrayLiteralConvertible);
+                                  KnownProtocolKind::ExpressibleByArrayLiteral);
     ProtocolConformance *Conformance = nullptr;
     if (!ALC)
       return visitExpr(E);
@@ -5100,7 +5100,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     }
     
     if (!foundConformance) {
-      // If the contextual type conforms to DictionaryLiteralConvertible and
+      // If the contextual type conforms to ExpressibleByDictionaryLiteral and
       // this is an empty array, then they meant "[:]".
       if (E->getNumElements() == 0 &&
           isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
@@ -5113,7 +5113,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       diagnose(E->getStartLoc(), diag::type_is_not_array, contextualType)
         .highlight(E->getSourceRange());
 
-      // If the contextual type conforms to DictionaryLiteralConvertible, then
+      // If the contextual type conforms to ExpressibleByDictionaryLiteral, then
       // they wrote "x = [1,2]" but probably meant "x = [1:2]".
       if ((E->getElements().size() & 1) == 0 && !E->getElements().empty() &&
           isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
@@ -5162,17 +5162,17 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
   auto keyTypePurpose = CTP_Unused, valueTypePurpose = CTP_Unused;
 
   // If we had a contextual type, then it either conforms to
-  // DictionaryLiteralConvertible or it is an invalid contextual type.
+  // ExpressibleByDictionaryLiteral or it is an invalid contextual type.
   if (auto contextualType = CS->getContextualType()) {
     // If our contextual type is an optional, look through them, because we're
     // surely initializing whatever is inside.
     contextualType = contextualType->lookThroughAllAnyOptionalTypes();
 
     auto DLC = CS->TC.getProtocol(E->getLoc(),
-                            KnownProtocolKind::DictionaryLiteralConvertible);
+                            KnownProtocolKind::ExpressibleByDictionaryLiteral);
     if (!DLC) return visitExpr(E);
 
-    // Validate the contextual type conforms to DictionaryLiteralConvertible
+    // Validate the contextual type conforms to ExpressibleByDictionaryLiteral
     // and figure out what the contextual Key/Value types are in place.
     ProtocolConformance *Conformance = nullptr;
     if (!CS->TC.conformsToProtocol(contextualType, DLC, CS->DC,
@@ -5257,7 +5257,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   const auto &target = Ctx.LangOpts.Target;
   StringRef importModule;
   StringRef importDefaultTypeName;
-  if (protocol == Ctx.getProtocol(KnownProtocolKind::ColorLiteralConvertible)) {
+  if (protocol == Ctx.getProtocol(KnownProtocolKind::ExpressibleByColorLiteral)) {
     if (target.isMacOSX()) {
       importModule = "AppKit";
       importDefaultTypeName = "NSColor";
@@ -5266,7 +5266,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
       importDefaultTypeName = "UIColor";
     }
   } else if (protocol == Ctx.getProtocol(
-               KnownProtocolKind::ImageLiteralConvertible)) {
+               KnownProtocolKind::ExpressibleByImageLiteral)) {
     if (target.isMacOSX()) {
       importModule = "AppKit";
       importDefaultTypeName = "NSImage";
@@ -5275,7 +5275,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
       importDefaultTypeName = "UIImage";
     }
   } else if (protocol == Ctx.getProtocol( 
-               KnownProtocolKind::FileReferenceLiteralConvertible)) {
+               KnownProtocolKind::ExpressibleByFileReferenceLiteral)) {
     importModule = "Foundation";
     importDefaultTypeName = "URL";
   }

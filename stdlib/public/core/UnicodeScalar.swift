@@ -33,8 +33,8 @@
 ///     // Prints "✈︎"
 @_fixed_layout
 public struct UnicodeScalar :
-  _BuiltinUnicodeScalarLiteralConvertible,
-  UnicodeScalarLiteralConvertible {
+  _ExpressibleByBuiltinUnicodeScalarLiteral,
+  ExpressibleByUnicodeScalarLiteral {
 
   var _value: UInt32
 

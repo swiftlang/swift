@@ -1,12 +1,12 @@
 // RUN: %target-parse-verify-swift
 
-final class DictStringInt : DictionaryLiteralConvertible {
+final class DictStringInt : ExpressibleByDictionaryLiteral {
   typealias Key = String
   typealias Value = Int
   init(dictionaryLiteral elements: (String, Int)...) { }
 }
 
-final class Dictionary<K, V> : DictionaryLiteralConvertible {
+final class Dictionary<K, V> : ExpressibleByDictionaryLiteral {
   typealias Key = K
   typealias Value = V
   init(dictionaryLiteral elements: (K, V)...) { }

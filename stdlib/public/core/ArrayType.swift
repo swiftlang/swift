@@ -13,7 +13,7 @@
 public // @testable
 protocol _ArrayProtocol
   : RangeReplaceableCollection,
-    ArrayLiteralConvertible
+    ExpressibleByArrayLiteral
 {
   //===--- public interface -----------------------------------------------===//
   /// The number of elements the Array stores.

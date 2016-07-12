@@ -5,7 +5,7 @@
 
 import Foundation
 
-enum NSDecimalResult: StringLiteralConvertible, Equatable, CustomStringConvertible {
+enum NSDecimalResult: ExpressibleByStringLiteral, Equatable, CustomStringConvertible {
   case Some(Decimal)
   case Error(Decimal.CalculationError)
   

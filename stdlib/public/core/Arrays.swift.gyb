@@ -901,7 +901,7 @@ public struct ${Self}<Element>
   public var _buffer: _Buffer
 }
 
-extension ${Self} : ArrayLiteralConvertible {
+extension ${Self} : ExpressibleByArrayLiteral {
 %if Self == 'Array':
   // Optimized implementation for Array
   /// Creates an array from the given array literal.

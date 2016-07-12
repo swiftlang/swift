@@ -110,7 +110,7 @@ extension Collection {
 
 `let` constants could be allowed to have generic parameters, such that they produce differently-typed values depending on how they are used. For example, this is particularly useful for named literal values, e.g.,
 
-```let π<T : FloatLiteralConvertible>: T = 3.141592653589793238462643383279502884197169399```
+```let π<T : ExpressibleByFloatLiteral>: T = 3.141592653589793238462643383279502884197169399```
 
 The Clang importer could make particularly good use of this when importing macros.
 

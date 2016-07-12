@@ -143,12 +143,12 @@ enum RawTypeNotFirst : RawTypeNotFirstProtocol, Int { // expected-error {{raw ty
   case E
 }
 
-enum RawTypeNotLiteralConvertible : Array<Int> { // expected-error {{raw type 'Array<Int>' is not convertible from any literal}}
-  // expected-error@-1{{type 'RawTypeNotLiteralConvertible' does not conform to protocol 'RawRepresentable'}}
+enum ExpressibleByRawTypeNotLiteral : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by any literal}}
+  // expected-error@-1{{type 'ExpressibleByRawTypeNotLiteral' does not conform to protocol 'RawRepresentable'}}
   case Ladd, Elliott, Sixteenth, Harrison
 }
 
-enum RawTypeCircularityA : RawTypeCircularityB, IntegerLiteralConvertible { // expected-error {{circular enum raw types 'RawTypeCircularityA' -> 'RawTypeCircularityB' -> 'RawTypeCircularityA'}} FIXME: expected-error{{RawRepresentable}}
+enum RawTypeCircularityA : RawTypeCircularityB, ExpressibleByIntegerLiteral { // expected-error {{circular enum raw types 'RawTypeCircularityA' -> 'RawTypeCircularityB' -> 'RawTypeCircularityA'}} FIXME: expected-error{{RawRepresentable}}
   case Morrison, Belmont, Madison, Hawthorne
 
   init(integerLiteral value: Int) {
@@ -156,7 +156,7 @@ enum RawTypeCircularityA : RawTypeCircularityB, IntegerLiteralConvertible { // e
   }
 }
 
-enum RawTypeCircularityB : RawTypeCircularityA, IntegerLiteralConvertible { // expected-note {{enum 'RawTypeCircularityB' declared here}} 
+enum RawTypeCircularityB : RawTypeCircularityA, ExpressibleByIntegerLiteral { // expected-note {{enum 'RawTypeCircularityB' declared here}} 
   case Willamette, Columbia, Sandy, Multnomah
 
   init(integerLiteral value: Int) { 
@@ -164,11 +164,11 @@ enum RawTypeCircularityB : RawTypeCircularityA, IntegerLiteralConvertible { // e
   }
 }
 
-struct FloatLiteralConvertibleOnly : FloatLiteralConvertible {
+struct ExpressibleByFloatLiteralOnly : ExpressibleByFloatLiteral {
     init(floatLiteral: Double) {}
 }
-enum RawTypeNotIntegerLiteralConvertible : FloatLiteralConvertibleOnly { // expected-error {{RawRepresentable 'init' cannot be synthesized because raw type 'FloatLiteralConvertibleOnly' is not Equatable}}
-  case Everett // expected-error {{enum cases require explicit raw values when the raw type is not integer or string literal convertible}}
+enum ExpressibleByRawTypeNotIntegerLiteral : ExpressibleByFloatLiteralOnly { // expected-error {{RawRepresentable 'init' cannot be synthesized because raw type 'ExpressibleByFloatLiteralOnly' is not Equatable}}
+  case Everett // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Flanders
 }
 
@@ -183,13 +183,13 @@ enum RawTypeWithNegativeValues : Int {
 
 enum RawTypeWithUnicodeScalarValues : UnicodeScalar {
   case Kearney = "K"
-  case Lovejoy // expected-error {{enum cases require explicit raw values when the raw type is not integer or string literal convertible}}
+  case Lovejoy // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Marshall = "M"
 }
 
 enum RawTypeWithCharacterValues : Character {
   case First = "い"
-  case Second // expected-error {{enum cases require explicit raw values when the raw type is not integer or string literal convertible}}
+  case Second // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Third = "は"
 }
 
@@ -387,7 +387,7 @@ enum PlaygroundRepresentation : UInt8 {
   }
 }
 
-struct ManyLiteralable : IntegerLiteralConvertible, StringLiteralConvertible, Equatable {
+struct ManyLiteralable : ExpressibleByIntegerLiteral, ExpressibleByStringLiteral, Equatable {
   init(stringLiteral: String) {}
   init(integerLiteral: Int) {}
 

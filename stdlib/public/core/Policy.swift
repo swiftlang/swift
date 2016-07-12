@@ -66,7 +66,7 @@ public typealias FloatLiteralType = Double
 ///     // Prints "isBool is a 'Bool'"
 ///
 /// The type aliased by `BooleanLiteralType` must conform to the
-/// `BooleanLiteralConvertible` protocol.
+/// `ExpressibleByBooleanLiteral` protocol.
 public typealias BooleanLiteralType = Bool
 
 /// The default type for an otherwise-unconstrained unicode scalar literal.

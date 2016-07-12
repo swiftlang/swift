@@ -22,7 +22,7 @@ public var noErr: OSStatus { return 0 }
 ///
 /// The C type is a typedef for `unsigned char`.
 @_fixed_layout
-public struct DarwinBoolean : Boolean, BooleanLiteralConvertible {
+public struct DarwinBoolean : Boolean, ExpressibleByBooleanLiteral {
   var _value: UInt8
 
   public init(_ value: Bool) {

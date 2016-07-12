@@ -39,7 +39,7 @@ func _convertStringToNSString(_ string: String) -> NSString {
   return string._bridgeToObjectiveC()
 }
 
-extension NSString : StringLiteralConvertible {
+extension NSString : ExpressibleByStringLiteral {
   /// Create an instance initialized to `value`.
   public required convenience init(unicodeScalarLiteral value: StaticString) {
     self.init(stringLiteral: value)
@@ -352,8 +352,8 @@ extension CGFloat : _ObjectiveCBridgeable {
 }
 
 // Literal support for NSNumber
-extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible,
-                     BooleanLiteralConvertible {
+extension NSNumber : ExpressibleByFloatLiteral, ExpressibleByIntegerLiteral,
+                     ExpressibleByBooleanLiteral {
   /// Create an instance initialized to `value`.
   public required convenience init(integerLiteral value: Int) {
     self.init(value: value)
@@ -376,7 +376,7 @@ public let NSNotFound: Int = .max
 // Arrays
 //===----------------------------------------------------------------------===//
 
-extension NSArray : ArrayLiteralConvertible {
+extension NSArray : ExpressibleByArrayLiteral {
   /// Create an instance initialized with `elements`.
   public required convenience init(arrayLiteral elements: AnyObject...) {
     // Let bridging take care of it.
@@ -482,7 +482,7 @@ extension Array : _ObjectiveCBridgeable {
 // Dictionaries
 //===----------------------------------------------------------------------===//
 
-extension NSDictionary : DictionaryLiteralConvertible {
+extension NSDictionary : ExpressibleByDictionaryLiteral {
   public required convenience init(
     dictionaryLiteral elements: (NSCopying, AnyObject)...
   ) {
@@ -1072,13 +1072,13 @@ extension NSSet {
   }
 }
 
-extension NSSet : ArrayLiteralConvertible {
+extension NSSet : ExpressibleByArrayLiteral {
   public required convenience init(arrayLiteral elements: AnyObject...) {
     self.init(array: elements)
   }
 }
 
-extension NSOrderedSet : ArrayLiteralConvertible {
+extension NSOrderedSet : ExpressibleByArrayLiteral {
   public required convenience init(arrayLiteral elements: AnyObject...) {
     self.init(array: elements)
   }

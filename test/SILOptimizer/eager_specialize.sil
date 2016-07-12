@@ -133,7 +133,7 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 // CHECK:   %22 = unchecked_trivial_bit_cast %21 : $() to $()
 // CHECK:   br bb2
 
-sil_scope 9 { parent @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <τ_0_0 where τ_0_0 : SignedInteger, τ_0_0.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, τ_0_0.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, τ_0_0.Stride : SignedNumber, τ_0_0.Stride.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @error Error) }
+sil_scope 9 { parent @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <τ_0_0 where τ_0_0 : SignedInteger, τ_0_0.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral, τ_0_0.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral, τ_0_0.Stride : SignedNumber, τ_0_0.Stride.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @error Error) }
 sil_scope 10 { parent 9 }
 sil_scope 11 { parent 10 }
 
@@ -159,7 +159,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // divideNum<A where ...> (A, den : A) throws -> A
-sil [_specialize <Int, Int, Int, Int, Int>] @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger, T.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, T.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, T.Stride : SignedNumber, T.Stride.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@in T, @in T) -> (@out T, @error Error) {
+sil [_specialize <Int, Int, Int, Int, Int>] @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger, T.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral, T.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral, T.Stride : SignedNumber, T.Stride.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral> (@in T, @in T) -> (@out T, @error Error) {
 // %0                                             // user: %19
 // %1                                             // users: %3, %19, %23
 // %2                                             // users: %4, %7, %19, %22
@@ -168,11 +168,11 @@ bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   %5 = function_ref @_TZFsoi2neuRxs9EquatablerFTxx_Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool, scope 10 // user: %13
   %6 = alloc_stack $T, scope 10 // users: %7, %13, %16
   copy_addr %2 to [initialization] %6 : $*T, scope 10 // id: %7
-  %8 = witness_method $T, #_BuiltinIntegerLiteralConvertible.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : _BuiltinIntegerLiteralConvertible> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0, scope 10 // user: %12
+  %8 = witness_method $T, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0, scope 10 // user: %12
   %9 = metatype $@thick T.Type, scope 10 // users: %12, %19
   %10 = integer_literal $Builtin.Int2048, 0, scope 10 // user: %12
   %11 = alloc_stack $T, scope 10 // users: %12, %13, %15
-  %12 = apply %8<T>(%11, %10, %9) : $@convention(witness_method) <τ_0_0 where τ_0_0 : _BuiltinIntegerLiteralConvertible> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0, scope 10
+  %12 = apply %8<T>(%11, %10, %9) : $@convention(witness_method) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0, scope 10
   %13 = apply %5<T>(%6, %11) : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool, scope 10 // user: %14
   %14 = struct_extract %13 : $Bool, #Bool._value, scope 10 // user: %17
   dealloc_stack %11 : $*T, scope 10 // id: %15
@@ -203,7 +203,7 @@ bb2:                                              // Preds: bb0
 
 // Generic with specialized dispatch. No more [specialize] attribute.
 // 
-// CHECK-LABEL: sil @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger, T.IntegerLiteralType : _BuiltinIntegerLiteralConvertible, T.Stride : SignedNumber, T.Stride.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@in T, @in T) -> (@out T, @error Error) {
+// CHECK-LABEL: sil @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger, T.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral, T.Stride : SignedNumber, T.Stride.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral> (@in T, @in T) -> (@out T, @error Error) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK:   %3 = metatype $@thick T.Type
 // CHECK:   %4 = metatype $@thick Int.Type

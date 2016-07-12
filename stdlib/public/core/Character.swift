@@ -61,8 +61,8 @@
 /// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 public struct Character :
-  _BuiltinExtendedGraphemeClusterLiteralConvertible,
-  ExtendedGraphemeClusterLiteralConvertible, Equatable, Hashable, Comparable {
+  _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
+  ExpressibleByExtendedGraphemeClusterLiteral, Equatable, Hashable, Comparable {
 
   // Fundamentally, it is just a String, but it is optimized for the
   // common case where the UTF-8 representation fits in 63 bits.  The

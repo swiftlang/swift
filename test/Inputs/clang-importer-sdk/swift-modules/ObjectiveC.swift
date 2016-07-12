@@ -37,13 +37,13 @@ public struct ObjCBool : Boolean {
 }
 #endif
 
-extension ObjCBool : BooleanLiteralConvertible {
+extension ObjCBool : ExpressibleByBooleanLiteral {
   public init(booleanLiteral: Bool) {
     self.init(booleanLiteral)
   }
 }
 
-public struct Selector : StringLiteralConvertible {
+public struct Selector : ExpressibleByStringLiteral {
   private var ptr : OpaquePointer
 
   public init(_ value: String) {

@@ -268,7 +268,7 @@ var il_b: Int8
    = 123123
 var il_c: Int8 = 4  // ok
 
-struct int_test4 : IntegerLiteralConvertible {
+struct int_test4 : ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral value: Int) {} // user type.
 }

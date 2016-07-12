@@ -440,7 +440,7 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
     StringRef NameStr = PD->getNameStr();
     if (NameStr.startswith("_Builtin"))
       return true;
-    if (NameStr.startswith("_") && NameStr.endswith("LiteralConvertible"))
+    if (NameStr.startswith("_ExpressibleBy"))
       return true;
     if (whitelistProtocols)
       return false;

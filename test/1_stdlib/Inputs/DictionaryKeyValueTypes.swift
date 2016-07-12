@@ -31,7 +31,7 @@ var _keySerial = _stdlib_AtomicInt(0)
 // A wrapper class that can help us track allocations and find issues with
 // object lifetime.
 final class TestKeyTy 
-  : Equatable, Hashable, CustomStringConvertible, IntegerLiteralConvertible 
+  : Equatable, Hashable, CustomStringConvertible, ExpressibleByIntegerLiteral 
 {
   class var objectCount: Int {
     get {

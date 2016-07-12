@@ -100,7 +100,7 @@ C()
 
 // rdar://problem/18877135
 
-class Foo: FloatLiteralConvertible {
+class Foo: ExpressibleByFloatLiteral {
   required init(floatLiteral: Float) { }
 
   func identify() { print("Foo") }

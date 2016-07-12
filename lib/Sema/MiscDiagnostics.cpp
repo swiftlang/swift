@@ -1904,10 +1904,10 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
                                          TypeChecker &TC) {
   auto integerType =
     TC.getProtocol(SourceLoc(),
-                   KnownProtocolKind::IntegerLiteralConvertible);
+                   KnownProtocolKind::ExpressibleByIntegerLiteral);
   auto floatingType =
     TC.getProtocol(SourceLoc(),
-                   KnownProtocolKind::FloatLiteralConvertible);
+                   KnownProtocolKind::ExpressibleByFloatLiteral);
   if (!integerType || !floatingType) return false;
 
   return

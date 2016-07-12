@@ -19,7 +19,7 @@ func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool
 func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool
 
 
-public struct Selector : StringLiteralConvertible {
+public struct Selector : ExpressibleByStringLiteral {
   private var ptr : OpaquePointer
 
   public init(unicodeScalarLiteral value: String) {

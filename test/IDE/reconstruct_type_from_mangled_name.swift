@@ -86,8 +86,8 @@ class Myclass2 {
   }
 }
 
-struct MyGenStruct1<T, U: StringLiteralConvertible, V: Sequence> {
-// CHECK: decl: struct MyGenStruct1<T, U : StringLiteralConvertible, V : Sequence>
+struct MyGenStruct1<T, U: ExpressibleByStringLiteral, V: Sequence> {
+// CHECK: decl: struct MyGenStruct1<T, U : ExpressibleByStringLiteral, V : Sequence>
 // FIXME: why are these references to the base type?
 // CHECK: decl: struct MyGenStruct1<{{.*}}> for 'T' usr=s:tV14swift_ide_test12MyGenStruct11TMx
 // CHECK: decl: struct MyGenStruct1<{{.*}}> for 'U' usr=s:tV14swift_ide_test12MyGenStruct11UMq_

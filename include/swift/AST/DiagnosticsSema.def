@@ -1611,7 +1611,7 @@ ERROR(circular_enum_inheritance,none,
 ERROR(raw_type_not_first,none,
   "raw type %0 must appear first in the enum inheritance clause", (Type))
 ERROR(raw_type_not_literal_convertible,none,
-      "raw type %0 is not convertible from any literal",
+      "raw type %0 is not expressible by any literal",
       (Type))
 ERROR(enum_raw_type_not_equatable,none,
       "RawRepresentable 'init' cannot be synthesized because raw type %0 is not "
@@ -1639,8 +1639,8 @@ ERROR(objc_enum_raw_type_not_integer,none,
 ERROR(enum_non_integer_raw_value_auto_increment,none,
       "enum case must declare a raw value when the preceding raw value is not an integer", ())
 ERROR(enum_non_integer_convertible_raw_type_no_value,none,
-      "enum cases require explicit raw values when the raw type is not integer "
-      "or string literal convertible", ())
+      "enum cases require explicit raw values when the raw type is not "
+      "expressible by integer or string literal", ())
 ERROR(enum_raw_value_not_unique,none,
       "raw value for enum case is not unique", ())
 NOTE(enum_raw_value_used_here,none,
@@ -1663,7 +1663,7 @@ ERROR(broken_errortype_requirement,none,
 ERROR(broken_int_hashable_conformance,none,
       "Int type is broken: does not conform to Hashable", ())
 ERROR(broken_int_integer_literal_convertible_conformance,none,
-      "Int type is broken: does not conform to IntegerLiteralConvertible", ())
+      "Int type is broken: does not conform to ExpressibleByIntegerLiteral", ())
 ERROR(broken_equatable_eq_operator,none,
       "Equatable protocol is broken: no infix operator declaration for '=='", ())
 ERROR(no_equal_overload_for_int,none,
@@ -2014,10 +2014,10 @@ ERROR(optional_used_as_true_boolean,none,
       "test for '== nil' instead", (Type))
 
 ERROR(interpolation_missing_proto,none,
-      "string interpolation requires the protocol 'StringInterpolationConvertible' to be defined",
+      "string interpolation requires the protocol 'ExpressibleByStringInterpolation' to be defined",
       ())
 ERROR(interpolation_broken_proto,none,
-      "protocol 'StringInterpolationConvertible' is broken",
+      "protocol 'ExpressibleByStringInterpolation' is broken",
       ())
 
 ERROR(object_literal_broken_proto,none,
@@ -2049,44 +2049,44 @@ ERROR(specific_type_of_expression_is_ambiguous,none,
 ERROR(missing_protocol,none,
       "missing protocol %0", (Identifier))
 ERROR(nil_literal_broken_proto,none,
-      "protocol 'NilLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByNilLiteral' is broken", ())
 
 ERROR(builtin_integer_literal_broken_proto,none,
-      "protocol '_BuiltinIntegerLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinIntegerLiteral' is broken", ())
 ERROR(integer_literal_broken_proto,none,
-      "protocol 'IntegerLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByIntegerLiteral' is broken", ())
 
 ERROR(builtin_float_literal_broken_proto,none,
-      "protocol '_BuiltinFloatLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinFloatLiteral' is broken", ())
 ERROR(float_literal_broken_proto,none,
-      "protocol 'FloatLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByFloatLiteral' is broken", ())
 
 ERROR(builtin_boolean_literal_broken_proto,none,
-      "protocol '_BuiltinBooleanLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinBooleanLiteral' is broken", ())
 ERROR(boolean_literal_broken_proto,none,
-      "protocol 'BooleanLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByBooleanLiteral' is broken", ())
 
 ERROR(builtin_unicode_scalar_literal_broken_proto,none,
-      "protocol '_BuiltinUnicodeScalarLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinUnicodeScalarLiteral' is broken", ())
 ERROR(unicode_scalar_literal_broken_proto,none,
-      "protocol 'UnicodeScalarLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByUnicodeScalarLiteral' is broken", ())
 
 ERROR(builtin_extended_grapheme_cluster_literal_broken_proto,none,
-      "protocol '_BuiltinExtendedGraphemeClusterLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinExtendedGraphemeClusterLiteral' is broken", ())
 ERROR(extended_grapheme_cluster_literal_broken_proto,none,
-      "protocol 'ExtendedGraphemeClusterLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByExtendedGraphemeClusterLiteral' is broken", ())
 
 ERROR(builtin_string_literal_broken_proto,none,
-      "protocol '_BuiltinStringLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinStringLiteral' is broken", ())
 ERROR(string_literal_broken_proto,none,
-      "protocol 'StringLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByStringLiteral' is broken", ())
 
 ERROR(bool_type_broken,none,
       "could not find a Bool type defined for 'is'", ())
 
 // Array literals
 ERROR(array_protocol_broken,none,
-      "ArrayLiteralConvertible protocol definition is broken", ())
+      "ExpressibleByArrayLiteral protocol definition is broken", ())
 ERROR(type_is_not_array,none,
       "contextual type %0 cannot be used with array literal", (Type))
 NOTE(meant_dictionary_lit,none,
@@ -2096,7 +2096,7 @@ ERROR(should_use_empty_dictionary_literal,none,
 
 // Dictionary literals
 ERROR(dictionary_protocol_broken,none,
-      "DictionaryLiteralConvertible protocol definition is broken", ())
+      "ExpressibleByDictionaryLiteral protocol definition is broken", ())
 ERROR(type_is_not_dictionary,none,
       "contextual type %0 cannot be used with dictionary literal", (Type))
 

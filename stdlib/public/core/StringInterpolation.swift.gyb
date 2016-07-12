@@ -34,7 +34,7 @@ for int_ty in all_integer_types(word_bits):
 
 }%
 
-extension String : StringInterpolationConvertible {
+extension String : ExpressibleByStringInterpolation {
   /// Creates a new string by concatenating the given interpolations.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
@@ -63,7 +63,7 @@ extension String : StringInterpolationConvertible {
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
   ///
-  /// - SeeAlso: `StringInterpolationConvertible`
+  /// - SeeAlso: `ExpressibleByStringInterpolation`
   public init<T>(stringInterpolationSegment expr: T) {
     self = String(expr)
   }
@@ -74,7 +74,7 @@ extension String : StringInterpolationConvertible {
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
   ///
-  /// - SeeAlso: `StringInterpolationConvertible`
+  /// - SeeAlso: `ExpressibleByStringInterpolation`
   public init(stringInterpolationSegment expr: ${Type}) {
     self = _toStringReadOnlyStreamable(expr)
   }
@@ -86,7 +86,7 @@ extension String : StringInterpolationConvertible {
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
   ///
-  /// - SeeAlso: `StringInterpolationConvertible`
+  /// - SeeAlso: `ExpressibleByStringInterpolation`
   public init(stringInterpolationSegment expr: ${Type}) {
     self = _toStringReadOnlyPrintable(expr)
   }

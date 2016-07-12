@@ -121,8 +121,8 @@ public class ClassVeryPrintable : CustomStringConvertible,
   }
 }
 
-public struct MyString : StringLiteralConvertible,
-  StringInterpolationConvertible {
+public struct MyString : ExpressibleByStringLiteral,
+  ExpressibleByStringInterpolation {
 
   public init(str: String) {
     value = str

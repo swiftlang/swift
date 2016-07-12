@@ -467,7 +467,7 @@ namespace {
     if (lti.haveFloatLiteral) {
       if (auto floatProto =
             CS.TC.Context.getProtocol(
-                                  KnownProtocolKind::FloatLiteralConvertible)) {
+                                  KnownProtocolKind::ExpressibleByFloatLiteral)) {
         if (auto defaultType = CS.TC.getDefaultType(floatProto, CS.DC)) {
           if (!CS.getFavoredType(expr)) {
             CS.setFavoredType(expr, defaultType.getPointer());
@@ -480,7 +480,7 @@ namespace {
     if (lti.haveIntLiteral) {
       if (auto intProto =
             CS.TC.Context.getProtocol(
-                                KnownProtocolKind::IntegerLiteralConvertible)) {
+                                KnownProtocolKind::ExpressibleByIntegerLiteral)) {
         if (auto defaultType = CS.TC.getDefaultType(intProto, CS.DC)) {
           if (!CS.getFavoredType(expr)) {
             CS.setFavoredType(expr, defaultType.getPointer());
@@ -493,7 +493,7 @@ namespace {
     if (lti.haveStringLiteral) {
       if (auto stringProto =
           CS.TC.Context.getProtocol(
-                                KnownProtocolKind::StringLiteralConvertible)) {
+                                KnownProtocolKind::ExpressibleByStringLiteral)) {
         if (auto defaultType = CS.TC.getDefaultType(stringProto, CS.DC)) {
           if (!CS.getFavoredType(expr)) {
             CS.setFavoredType(expr, defaultType.getPointer());
@@ -1291,19 +1291,19 @@ namespace {
 
     Type
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
-      // Dig out the StringInterpolationConvertible protocol.
+      // Dig out the ExpressibleByStringInterpolation protocol.
       auto &tc = CS.getTypeChecker();
       auto &C = CS.getASTContext();
       auto interpolationProto
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::StringInterpolationConvertible);
+                         KnownProtocolKind::ExpressibleByStringInterpolation);
       if (!interpolationProto) {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_missing_proto);
         return nullptr;
       }
 
       // The type of the expression must conform to the
-      // StringInterpolationConvertible protocol.
+      // ExpressibleByStringInterpolation protocol.
       auto locator = CS.getConstraintLocator(expr);
       auto tv = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
       tv->getImpl().literalConformanceProto = interpolationProto;
@@ -1791,16 +1791,16 @@ namespace {
     
     Type visitArrayExpr(ArrayExpr *expr) {
       // An array expression can be of a type T that conforms to the
-      // ArrayLiteralConvertible protocol.
+      // ExpressibleByArrayLiteral protocol.
       auto &tc = CS.getTypeChecker();
       ProtocolDecl *arrayProto
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ArrayLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByArrayLiteral);
       if (!arrayProto) {
         return Type();
       }
 
-      // Assume that ArrayLiteralConvertible contains a single associated type.
+      // Assume that ExpressibleByArrayLiteral contains a single associated type.
       AssociatedTypeDecl *elementAssocTy = nullptr;
       for (auto decl : arrayProto->getMembers()) {
         if ((elementAssocTy = dyn_cast<AssociatedTypeDecl>(decl)))
@@ -1879,12 +1879,12 @@ namespace {
     Type visitDictionaryExpr(DictionaryExpr *expr) {
       ASTContext &C = CS.getASTContext();
       // A dictionary expression can be of a type T that conforms to the
-      // DictionaryLiteralConvertible protocol.
+      // ExpressibleByDictionaryLiteral protocol.
       // FIXME: This isn't actually used for anything at the moment.
       auto &tc = CS.getTypeChecker();
       ProtocolDecl *dictionaryProto
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::DictionaryLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByDictionaryLiteral);
       if (!dictionaryProto) {
         return Type();
       }

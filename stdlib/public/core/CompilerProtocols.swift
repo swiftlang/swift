@@ -225,39 +225,39 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
 /// A type that can be initialized using the nil literal, `nil`.
 ///
 /// `nil` has a specific meaning in Swift---the absence of a value. Only the
-/// `Optional` type conforms to `NilLiteralConvertible`.
-/// `NilLiteralConvertible` conformance for types that use `nil` for other
+/// `Optional` type conforms to `ExpressibleByNilLiteral`.
+/// `ExpressibleByNilLiteral` conformance for types that use `nil` for other
 /// purposes is discouraged.
 ///
 /// - SeeAlso: `Optional`
-public protocol NilLiteralConvertible {
+public protocol ExpressibleByNilLiteral {
   /// Creates an instance initialized with `nil`.
   init(nilLiteral: ())
 }
 
-public protocol _BuiltinIntegerLiteralConvertible {
+public protocol _ExpressibleByBuiltinIntegerLiteral {
   init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
 }
 
 /// Conforming types can be initialized with integer literals.
-public protocol IntegerLiteralConvertible {
-  associatedtype IntegerLiteralType : _BuiltinIntegerLiteralConvertible
+public protocol ExpressibleByIntegerLiteral {
+  associatedtype IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral
   /// Create an instance initialized to `value`.
   init(integerLiteral value: IntegerLiteralType)
 }
 
-public protocol _BuiltinFloatLiteralConvertible {
+public protocol _ExpressibleByBuiltinFloatLiteral {
   init(_builtinFloatLiteral value: _MaxBuiltinFloatType)
 }
 
 /// Conforming types can be initialized with floating point literals.
-public protocol FloatLiteralConvertible {
-  associatedtype FloatLiteralType : _BuiltinFloatLiteralConvertible
+public protocol ExpressibleByFloatLiteral {
+  associatedtype FloatLiteralType : _ExpressibleByBuiltinFloatLiteral
   /// Create an instance initialized to `value`.
   init(floatLiteral value: FloatLiteralType)
 }
 
-public protocol _BuiltinBooleanLiteralConvertible {
+public protocol _ExpressibleByBuiltinBooleanLiteral {
   init(_builtinBooleanLiteral value: Builtin.Int1)
 }
 
@@ -268,12 +268,12 @@ public protocol _BuiltinBooleanLiteralConvertible {
 /// `ObjCBool`---are treated as Boolean values. Expanding this set to include
 /// types that represent more than simple Boolean values is discouraged.
 ///
-/// To add `BooleanLiteralConvertible` conformance to your custom type,
+/// To add `ExpressibleByBooleanLiteral` conformance to your custom type,
 /// implement the `init(booleanLiteral:)` initializer that creates an instance
 /// of your type with the given Boolean value.
-public protocol BooleanLiteralConvertible {
+public protocol ExpressibleByBooleanLiteral {
   /// A type that can represent a Boolean literal, such as `Bool`.
-  associatedtype BooleanLiteralType : _BuiltinBooleanLiteralConvertible
+  associatedtype BooleanLiteralType : _ExpressibleByBuiltinBooleanLiteral
 
   /// Creates an instance initialized to the given Boolean value.
   ///
@@ -290,7 +290,7 @@ public protocol BooleanLiteralConvertible {
   init(booleanLiteral value: BooleanLiteralType)
 }
 
-public protocol _BuiltinUnicodeScalarLiteralConvertible {
+public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32)
 }
 
@@ -298,7 +298,7 @@ public protocol _BuiltinUnicodeScalarLiteralConvertible {
 /// Unicode scalar value.
 ///
 /// The `String`, `StaticString`, `Character`, and `UnicodeScalar` types all
-/// conform to the `UnicodeScalarLiteralConvertible` protocol. You can
+/// conform to the `ExpressibleByUnicodeScalarLiteral` protocol. You can
 /// initialize a variable of any of these types using a string literal that
 /// holds a single Unicode scalar.
 ///
@@ -306,24 +306,24 @@ public protocol _BuiltinUnicodeScalarLiteralConvertible {
 ///     print(ñ)
 ///     // Prints "ñ"
 ///
-/// Conforming to UnicodeScalarLiteralConvertible
+/// Conforming to ExpressibleByUnicodeScalarLiteral
 /// =============================================
 ///
-/// To add `UnicodeScalarLiteralConvertible` conformance to your custom type,
+/// To add `ExpressibleByUnicodeScalarLiteral` conformance to your custom type,
 /// implement the required initializer.
-public protocol UnicodeScalarLiteralConvertible {
+public protocol ExpressibleByUnicodeScalarLiteral {
   /// A type that can represent a Unicode scalar literal.
   ///
   /// Valid types for `UnicodeScalarLiteralType` are `UnicodeScalar`,
   /// `String`, and `StaticString`.
-  associatedtype UnicodeScalarLiteralType : _BuiltinUnicodeScalarLiteralConvertible
+  associatedtype UnicodeScalarLiteralType : _ExpressibleByBuiltinUnicodeScalarLiteral
 
   /// Creates an instance initialized to the given value.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
 }
 
-public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
-  : _BuiltinUnicodeScalarLiteralConvertible {
+public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
+  : _ExpressibleByBuiltinUnicodeScalarLiteral {
 
   init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
@@ -341,7 +341,7 @@ public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
 /// boundary algorithms into extended grapheme clusters.
 ///
 /// The `String`, `StaticString`, and `Character` types conform to the
-/// `ExtendedGraphemeClusterLiteralConvertible` protocol. You can initialize a
+/// `ExpressibleByExtendedGraphemeClusterLiteral` protocol. You can initialize a
 /// variable or constant of any of these types using a string literal that
 /// holds a single character.
 ///
@@ -349,27 +349,27 @@ public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
 ///     print(snowflake)
 ///     // Prints "❄︎"
 ///
-/// Conforming to ExtendedGraphemeClusterLiteralConvertible
+/// Conforming to ExpressibleByExtendedGraphemeClusterLiteral
 /// =======================================================
 ///
-/// To add `ExtendedGraphemeClusterLiteralConvertible` conformance to your
+/// To add `ExpressibleByExtendedGraphemeClusterLiteral` conformance to your
 /// custom type, implement the required initializer.
-public protocol ExtendedGraphemeClusterLiteralConvertible
-  : UnicodeScalarLiteralConvertible {
+public protocol ExpressibleByExtendedGraphemeClusterLiteral
+  : ExpressibleByUnicodeScalarLiteral {
 
   /// A type that can represent an extended grapheme cluster literal.
   ///
   /// Valid types for `ExtendedGraphemeClusterLiteralType` are `Character`,
   /// `String`, and `StaticString`.
   associatedtype ExtendedGraphemeClusterLiteralType
-    : _BuiltinExtendedGraphemeClusterLiteralConvertible
+    : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
   
   /// Creates an instance initialized to the given value.
   init(extendedGraphemeClusterLiteral value: ExtendedGraphemeClusterLiteralType)
 }
 
-public protocol _BuiltinStringLiteralConvertible
-  : _BuiltinExtendedGraphemeClusterLiteralConvertible {
+public protocol _ExpressibleByBuiltinStringLiteral
+  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
 
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
@@ -377,8 +377,8 @@ public protocol _BuiltinStringLiteralConvertible
     isASCII: Builtin.Int1)
 }
 
-public protocol _BuiltinUTF16StringLiteralConvertible
-  : _BuiltinStringLiteralConvertible {
+public protocol _ExpressibleByBuiltinUTF16StringLiteral
+  : _ExpressibleByBuiltinStringLiteral {
 
   init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
@@ -388,25 +388,25 @@ public protocol _BuiltinUTF16StringLiteralConvertible
 /// A type that can be initialized with a string literal.
 ///
 /// The `String` and `StaticString` types conform to the
-/// `StringLiteralConvertible` protocol. You can initialize a variable or
+/// `ExpressibleByStringLiteral` protocol. You can initialize a variable or
 /// constant of either of these types using a string literal of any length.
 ///
 ///     let picnicGuest = "Deserving porcupine"
 ///
-/// Conforming to StringLiteralConvertible
+/// Conforming to ExpressibleByStringLiteral
 /// ======================================
 ///
-/// To add `StringLiteralConvertible` conformance to your custom type,
+/// To add `ExpressibleByStringLiteral` conformance to your custom type,
 /// implement the required initializer.
-public protocol StringLiteralConvertible
-  : ExtendedGraphemeClusterLiteralConvertible {
+public protocol ExpressibleByStringLiteral
+  : ExpressibleByExtendedGraphemeClusterLiteral {
   // FIXME: when we have default function implementations in protocols, provide
   // an implementation of init(extendedGraphemeClusterLiteral:).
   
   /// A type that can represent a string literal.
   ///
   /// Valid types for `StringLiteralType` are `String` and `StaticString`.
-  associatedtype StringLiteralType : _BuiltinStringLiteralConvertible
+  associatedtype StringLiteralType : _ExpressibleByBuiltinStringLiteral
   
   /// Creates an instance initialized to the given string value.
   init(stringLiteral value: StringLiteralType)
@@ -417,14 +417,14 @@ public protocol StringLiteralConvertible
 /// An array literal is a simple way of expressing a list of values. Simply
 /// surround a comma-separated list of values, instances, or literals with
 /// square brackets to create an array literal. You can use an array literal
-/// anywhere an instance of an `ArrayLiteralConvertible` type is expected: as
+/// anywhere an instance of an `ExpressibleByArrayLiteral` type is expected: as
 /// a value assigned to a variable or constant, as a parameter to a method or
 /// initializer, or even as the subject of a nonmutating operation like
 /// `map(_:)` or `filter(_:)`.
 ///
-/// Arrays, sets, and option sets all conform to `ArrayLiteralConvertible`, and
-/// your own custom types can as well. Here's an example of creating a set and
-/// an array using array literals:
+/// Arrays, sets, and option sets all conform to `ExpressibleByArrayLiteral`, 
+/// and your own custom types can as well. Here's an example of creating a set 
+/// and an array using array literals:
 ///
 ///     let employeesSet: Set<String> = ["Amir", "Jihye", "Dave", "Alessia", "Dave"]
 ///     print(employeesSet)
@@ -441,7 +441,7 @@ public protocol StringLiteralConvertible
 /// and number of elements provided.
 ///
 /// - Note: An array literal is not the same as an `Array` instance. You can't
-///   initialize a type that conforms to `ArrayLiteralConvertible` simply by
+///   initialize a type that conforms to `ExpressibleByArrayLiteral` simply by
 ///   assigning an existing array.
 ///
 ///         let anotherSet: Set = employeesArray
@@ -500,7 +500,7 @@ public protocol StringLiteralConvertible
 ///     log(name: "Zero integers", value: [] as [Int])
 ///     // Prints "Zero integers: []"
 ///
-/// Conforming to ArrayLiteralConvertible
+/// Conforming to ExpressibleByArrayLiteral
 /// =====================================
 ///
 /// Add the capability to be initialized with an array literal to your own
@@ -513,7 +513,7 @@ public protocol StringLiteralConvertible
 ///         // implementation details
 ///     }
 ///
-///     extension OrderedSet: ArrayLiteralConvertible {
+///     extension OrderedSet: ExpressibleByArrayLiteral {
 ///         init(arrayLiteral: Element...) {
 ///             self.init()
 ///             for element in arrayLiteral {
@@ -521,7 +521,7 @@ public protocol StringLiteralConvertible
 ///             }
 ///         }
 ///     }
-public protocol ArrayLiteralConvertible {
+public protocol ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
   associatedtype Element
   /// Creates an instance initialized with the given elements.
@@ -555,10 +555,10 @@ public protocol ArrayLiteralConvertible {
 ///
 /// - Note: A dictionary literal is *not* the same as an instance of
 ///   `Dictionary` or the similarly named `DictionaryLiteral` type. You can't
-///   initialize a type that conforms to `DictionaryLiteralConvertible` simply
+///   initialize a type that conforms to `ExpressibleByDictionaryLiteral` simply
 ///   by assigning an instance of one of these types.
 ///
-/// Conforming to the DictionaryLiteralConvertible Protocol
+/// Conforming to the ExpressibleByDictionaryLiteral Protocol
 /// =======================================================
 ///
 /// To add the capability to be initialized with a dictionary literal to your
@@ -579,7 +579,7 @@ public protocol ArrayLiteralConvertible {
 ///         mutating func updateCount(_ n: Int, for element: Element)
 ///     }
 ///
-///     extension CountedSet: DictionaryLiteralConvertible {
+///     extension CountedSet: ExpressibleByDictionaryLiteral {
 ///         init(dictionaryLiteral elements: (Element, Int)...) {
 ///             self.init()
 ///             for (element, count) in elements {
@@ -587,7 +587,7 @@ public protocol ArrayLiteralConvertible {
 ///             }
 ///         }
 ///     }
-public protocol DictionaryLiteralConvertible {
+public protocol ExpressibleByDictionaryLiteral {
   /// The key type of a dictionary literal.
   associatedtype Key
   /// The value type of a dictionary literal.
@@ -609,11 +609,11 @@ public protocol DictionaryLiteralConvertible {
 ///     print(message)
 ///     // Prints "One cookie: $2, 3 cookies: $6."
 ///
-/// Conforming to the StringInterpolationConvertible Protocol
+/// Conforming to the ExpressibleByStringInterpolation Protocol
 /// =========================================================
 ///
 /// To use string interpolation to initialize instances of your custom type,
-/// implement the required initializers for `StringInterpolationConvertible`
+/// implement the required initializers for `ExpressibleByStringInterpolation`
 /// conformance. String interpolation is a multiple-step initialization
 /// process. When you use string interpolation, the following steps occur:
 ///
@@ -636,7 +636,7 @@ public protocol DictionaryLiteralConvertible {
 ///           String(stringInterpolationSegment: " cookies: $"),
 ///           String(stringInterpolationSegment: price * number),
 ///           String(stringInterpolationSegment: "."))
-public protocol StringInterpolationConvertible {
+public protocol ExpressibleByStringInterpolation {
   /// Creates an instance by concatenating the given values.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
@@ -675,19 +675,19 @@ public protocol StringInterpolationConvertible {
 
 /// Conforming types can be initialized with color literals (e.g.
 /// `#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)`).
-public protocol _ColorLiteralConvertible {
+public protocol _ExpressibleByColorLiteral {
   init(colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
 }
 
 /// Conforming types can be initialized with image literals (e.g.
 /// `#imageLiteral(resourceName: "hi.png")`).
-public protocol _ImageLiteralConvertible {
+public protocol _ExpressibleByImageLiteral {
   init(imageLiteralResourceName path: String)
 }
 
 /// Conforming types can be initialized with strings (e.g.
 /// `#fileLiteral(resourceName: "resource.txt")`).
-public protocol _FileReferenceLiteralConvertible {
+public protocol _ExpressibleByFileReferenceLiteral {
   init(fileReferenceLiteralResourceName path: String)
 }
 
@@ -708,3 +708,67 @@ public protocol _DestructorSafeContainer {
 
 @available(*, unavailable, renamed: "Boolean")
 public typealias BooleanType = Boolean
+
+// Deprecated by SE-0115.
+
+@available(*, deprecated, renamed: "ExpressibleByNilLiteral")
+public typealias NilLiteralConvertible
+  = ExpressibleByNilLiteral
+@available(*, deprecated, renamed: "_ExpressibleByBuiltinIntegerLiteral")
+public typealias _BuiltinIntegerLiteralConvertible
+  = _ExpressibleByBuiltinIntegerLiteral
+@available(*, deprecated, renamed: "ExpressibleByIntegerLiteral")
+public typealias IntegerLiteralConvertible
+  = ExpressibleByIntegerLiteral
+@available(*, deprecated, renamed: "_ExpressibleByBuiltinFloatLiteral")
+public typealias _BuiltinFloatLiteralConvertible
+  = _ExpressibleByBuiltinFloatLiteral
+@available(*, deprecated, renamed: "ExpressibleByFloatLiteral")
+public typealias FloatLiteralConvertible
+  = ExpressibleByFloatLiteral
+@available(*, deprecated, renamed: "_ExpressibleByBuiltinBooleanLiteral")
+public typealias _BuiltinBooleanLiteralConvertible
+  = _ExpressibleByBuiltinBooleanLiteral
+@available(*, deprecated, renamed: "ExpressibleByBooleanLiteral")
+public typealias BooleanLiteralConvertible
+  = ExpressibleByBooleanLiteral
+@available(*, deprecated, renamed: "_ExpressibleByBuiltinUnicodeScalarLiteral")
+public typealias _BuiltinUnicodeScalarLiteralConvertible
+  = _ExpressibleByBuiltinUnicodeScalarLiteral
+@available(*, deprecated, renamed: "ExpressibleByUnicodeScalarLiteral")
+public typealias UnicodeScalarLiteralConvertible
+  = ExpressibleByUnicodeScalarLiteral
+@available(*, deprecated, renamed: "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral")
+public typealias _BuiltinExtendedGraphemeClusterLiteralConvertible
+  = _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
+@available(*, deprecated, renamed: "ExpressibleByExtendedGraphemeClusterLiteral")
+public typealias ExtendedGraphemeClusterLiteralConvertible
+  = ExpressibleByExtendedGraphemeClusterLiteral
+@available(*, deprecated, renamed: "_ExpressibleByBuiltinStringLiteral")
+public typealias _BuiltinStringLiteralConvertible
+  = _ExpressibleByBuiltinStringLiteral
+@available(*, deprecated, renamed: "_ExpressibleByBuiltinUTF16StringLiteral")
+public typealias _BuiltinUTF16StringLiteralConvertible
+  = _ExpressibleByBuiltinUTF16StringLiteral
+@available(*, deprecated, renamed: "ExpressibleByStringLiteral")
+public typealias StringLiteralConvertible
+  = ExpressibleByStringLiteral
+@available(*, deprecated, renamed: "ExpressibleByArrayLiteral")
+public typealias ArrayLiteralConvertible
+  = ExpressibleByArrayLiteral
+@available(*, deprecated, renamed: "ExpressibleByDictionaryLiteral")
+public typealias DictionaryLiteralConvertible
+  = ExpressibleByDictionaryLiteral
+@available(*, deprecated, renamed: "ExpressibleByStringInterpolation")
+public typealias StringInterpolationConvertible
+  = ExpressibleByStringInterpolation
+@available(*, deprecated, renamed: "_ExpressibleByColorLiteral")
+public typealias _ColorLiteralConvertible
+  = _ExpressibleByColorLiteral
+@available(*, deprecated, renamed: "_ExpressibleByImageLiteral")
+public typealias _ImageLiteralConvertible
+  = _ExpressibleByImageLiteral
+@available(*, deprecated, renamed: "_ExpressibleByFileReferenceLiteral")
+public typealias _FileReferenceLiteralConvertible
+  = _ExpressibleByFileReferenceLiteral
+

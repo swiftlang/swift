@@ -71,7 +71,7 @@ public struct Bool {
   internal init(_ v: Builtin.Int1) { self._value = v }
 }
 
-extension Bool : _BuiltinBooleanLiteralConvertible, BooleanLiteralConvertible {
+extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
   @_transparent
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
     self._value = value
