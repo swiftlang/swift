@@ -1533,7 +1533,9 @@ namespace {
         // should be removed from MappedTypes.def, and this conditional should
         // become unnecessary.
         if (Name.str() == "id" && Impl.SwiftContext.LangOpts.EnableIdAsAny) {
-          return nullptr;
+          Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
+              MappedTypeNameKind::DoNothing;
+          return Impl.SwiftContext.getAnyDecl();
         }
       
         bool IsError;

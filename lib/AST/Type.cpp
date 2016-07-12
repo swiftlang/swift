@@ -90,11 +90,7 @@ bool TypeBase::hasReferenceSemantics() {
 }
 
 bool TypeBase::isAny() {
-  if (auto comp = getAs<ProtocolCompositionType>())
-    if (comp->getProtocols().empty())
-      return true;
-  
-  return false;
+  return isEqual(getASTContext().getAnyDecl()->getDeclaredType());
 }
 
 bool TypeBase::isAnyClassReferenceType() {
