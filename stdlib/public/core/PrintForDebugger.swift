@@ -40,25 +40,26 @@ public enum _PrintForDebugger {
   }
 
   internal static func asObjectIdentifier(value: Any) -> ObjectIdentifier? {
-      if let ao = value as? AnyObject {
-          return ObjectIdentifier(ao)
-      } else {
-          return nil
-      }
+    if let ao = value as? AnyObject {
+      return ObjectIdentifier(ao)
+    } else {
+      return nil
+    }
   }
 
   internal static func asNumericValue(value: Any) -> Int {
-      if let ao = value as? AnyObject {
-          return unsafeBitCast(ao, to: Int.self)
-      } else {
-          return 0
-      }
+    if let ao = value as? AnyObject {
+      return unsafeBitCast(ao, to: Int.self)
+    } else {
+      return 0
+    }
   }
 
   internal static func asStringRepresentation(
     value: Any?,
     mirror: Mirror,
-    count: Int) -> String? {
+    count: Int
+  ) -> String? {
     let ds = mirror.displayStyle ?? .`struct`
     switch ds {
     case .optional:
@@ -126,7 +127,8 @@ public enum _PrintForDebugger {
   internal static func shouldExpand(
     mirror: Mirror,
     collectionStatus: CollectionStatus,
-    isRoot: Bool) -> Bool {
+    isRoot: Bool
+  ) -> Bool {
     if isRoot || collectionStatus.isCollection { return true }
     let count = Int(mirror.children.count)
     if count > 0 { return true }
@@ -147,7 +149,8 @@ public enum _PrintForDebugger {
     parentCollectionStatus: CollectionStatus,
     refsAlreadySeen: inout Set<ObjectIdentifier>,
     maxItemCounter: inout Int,
-    targetStream: inout StreamType) {
+    targetStream: inout StreamType
+  ) {
     if maxItemCounter <= 0 {
       return
     }
