@@ -557,7 +557,7 @@ namespace {
       // If that fails, fall back on importing the underlying type.
       if (!decl) return Visit(type->desugar());
 
-      Type mappedType = decl->getDeclaredType();
+      Type mappedType = getAdjustedTypeDeclReferenceType(decl);
       ImportHint hint = ImportHint::None;
 
       if (Impl.getSwiftNewtypeAttr(type->getDecl(), /*useSwift2Name=*/false)) {
@@ -621,6 +621,10 @@ namespace {
             break;
           SWIFT_FALLTHROUGH;
         default:
+          if (!underlyingResult.AbstractType->isEqual(mappedType)) {
+            underlyingResult.AbstractType->dump();
+            mappedType->dump();
+          }
           assert(underlyingResult.AbstractType->isEqual(mappedType) &&
                  "typedef without special typedef kind was mapped "
                  "differently from its underlying type?");
@@ -673,6 +677,42 @@ namespace {
       return decl->getDeclaredType();
     }
 
+    /// Retrieve the 'Code' type for a bridged NSError, or nullptr if
+    /// this is not a bridged NSError type.
+    static TypeDecl *getBridgedNSErrorCode(TypeDecl *decl) {
+      auto nominal = dyn_cast<NominalTypeDecl>(decl);
+      if (!nominal) return nullptr;
+
+      for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr,
+                                                      false>()) {
+        if (attr->getProtocolKind() ==
+            KnownProtocolKind::BridgedStoredNSError) {
+          auto &ctx = nominal->getASTContext();
+          auto lookup = nominal->lookupDirect(ctx.Id_Code,
+                                              /*ignoreNewExtensions=*/true);
+          for (auto found : lookup) {
+            if (auto codeDecl = dyn_cast<TypeDecl>(found))
+              return codeDecl;
+          }
+          llvm_unreachable("couldn't find 'Code' within bridged error type");
+        }
+      }
+
+      return nullptr;
+    }
+
+    /// Retrieve the adjusted type of a reference to the given type declaration.
+    static Type getAdjustedTypeDeclReferenceType(TypeDecl *type) {
+      // If the imported declaration is a bridged NSError, dig out
+      // the Code nested type. References to the enum type from C
+      // code need to map to the code type (which is ABI compatible with C),
+      // and the bridged error type is used elsewhere.
+      if (auto codeDecl = getBridgedNSErrorCode(type))
+        return codeDecl->getDeclaredInterfaceType();
+
+      return type->getDeclaredType();
+    }
+
     ImportResult VisitEnumType(const clang::EnumType *type) {
       auto clangDecl = type->getDecl();
       switch (Impl.getEnumKind(clangDecl)) {
@@ -697,7 +737,7 @@ namespace {
         if (!decl)
           return nullptr;
 
-        return decl->getDeclaredType();
+        return getAdjustedTypeDeclReferenceType(decl);
       }
       }
     }

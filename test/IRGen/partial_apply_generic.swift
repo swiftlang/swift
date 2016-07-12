@@ -62,7 +62,7 @@ protocol Protein {
   static func paleoDiet() throws -> Protein
 }
 
-enum CarbOverdose : ErrorProtocol {
+enum CarbOverdose : Error {
   case Mild
   case Severe
 }

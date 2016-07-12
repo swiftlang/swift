@@ -57,6 +57,14 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
   if (!ctorExpr)
     return nullptr;
 
+  // If the declaration we found isn't in the same nominal type as the
+  // constant, ignore it.
+  if (ctorExpr->getDecl()->getDeclContext()
+          ->getAsNominalTypeOrNominalTypeExtensionContext() != 
+        constant->getDeclContext()
+          ->getAsNominalTypeOrNominalTypeExtensionContext())
+    return nullptr;
+
   return dyn_cast<EnumElementDecl>(ctorExpr->getDecl());
 }
 
@@ -1340,11 +1348,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 
     auto castType = IP->getCastTypeLoc().getType();
 
-    if (auto bridgedNSErrorProtocol =
-            Context.getProtocol(KnownProtocolKind::BridgedNSError)) {
-      conformsToProtocol(castType, bridgedNSErrorProtocol, dc,
-                         ConformanceCheckFlags::Used);
-    }
+    // Make sure we use any bridged NSError-related conformances.
+    useBridgedNSErrorConformances(dc, castType);
 
     // Determine whether we have an imbalance in the number of optionals.
     SmallVector<Type, 2> inputTypeOptionals;

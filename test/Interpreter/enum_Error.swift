@@ -4,16 +4,16 @@
 import StdlibUnittest
 
 
-enum ClericalErrorDomain: ErrorProtocol {
+enum ClericalErrorDomain: Error {
   case MisplacedDocument(name: String)
   case AccidentallyErasedTape(fromMinute: Double, toMinute: Double)
 }
 
-enum EmptyErrorDomain: ErrorProtocol {}
+enum EmptyErrorDomain: Error {}
 
-var EnumErrorProtocol = TestSuite("Enum ErrorProtocol derivation")
+var EnumError = TestSuite("Enum Error derivation")
 
-EnumErrorProtocol.test("default codes") {
+EnumError.test("default codes") {
   let a: ClericalErrorDomain = .MisplacedDocument(name: "check-in times.doc")
   let b: ClericalErrorDomain
     = .AccidentallyErasedTape(fromMinute: 5, toMinute: 23.5)

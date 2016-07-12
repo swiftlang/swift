@@ -1055,3 +1055,7 @@ typedef NS_ENUM(NSUInteger, NSClothingStyle) {
   NSClothingStyleHippie
 };
 static const NSClothingStyle NSClothingStyleOfficeCasual __attribute__((availability(swift,unavailable,replacement="NSClothingStyleSemiFormal"))) = NSClothingStyleSemiFormal;
+
+void acceptError(NSError * _Nonnull error);
+NSError * _Nonnull produceError(void);
+NSError * _Nullable produceOptionalError(void);

@@ -961,7 +961,7 @@ extension Sequence {
   }
 }
 
-internal enum _StopIteration : ErrorProtocol {
+internal enum _StopIteration : Error {
   case stop
 }
 

@@ -370,22 +370,22 @@ bb0:
   unreachable
 }
 
-sil @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorProtocol
+sil @throwing_noreturn : $@convention(thin) @noreturn () -> @error Error
 
 // CHECK-LABEL:sil @try_apply_1
 // CHECK:    bb1(
 // CHECK-NEXT: {{ unreachable}}
 // CHECK:    bb2(
 // CHECK-NEXT: throw
-sil @try_apply_1 : $@convention(thin) () -> @error ErrorProtocol {
+sil @try_apply_1 : $@convention(thin) () -> @error Error {
 bb0:
-  %0 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorProtocol
-  try_apply %0() : $@convention(thin) @noreturn () -> @error ErrorProtocol, normal bb1, error bb2
+  %0 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error Error
+  try_apply %0() : $@convention(thin) @noreturn () -> @error Error, normal bb1, error bb2
 bb1(%1 : $()):
   %2 = tuple ()
   return %2 : $()
-bb2(%3 : $ErrorProtocol):
-  throw %3 : $ErrorProtocol
+bb2(%3 : $Error):
+  throw %3 : $Error
 }
 
 // CHECK-LABEL:sil @try_apply_2
@@ -393,19 +393,19 @@ bb2(%3 : $ErrorProtocol):
 // CHECK-NEXT: {{ unreachable}}
 // CHECK:    bb4(
 // CHECK-NEXT: throw
-sil @try_apply_2 : $@convention(thin) (Builtin.Int1) -> @error ErrorProtocol {
+sil @try_apply_2 : $@convention(thin) (Builtin.Int1) -> @error Error {
 bb0(%0 : $Builtin.Int1):
-  %1 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorProtocol
+  %1 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error Error
   cond_br %0, bb1, bb2
 bb1:
-  try_apply %1() : $@convention(thin) @noreturn () -> @error ErrorProtocol, normal bb3, error bb4
+  try_apply %1() : $@convention(thin) @noreturn () -> @error Error, normal bb3, error bb4
 bb2:
-  try_apply %1() : $@convention(thin) @noreturn () -> @error ErrorProtocol, normal bb3, error bb4
+  try_apply %1() : $@convention(thin) @noreturn () -> @error Error, normal bb3, error bb4
 bb3(%2 : $()):
   %3 = tuple ()
   return %3 : $()
-bb4(%4 : $ErrorProtocol):
-  throw %4 : $ErrorProtocol
+bb4(%4 : $Error):
+  throw %4 : $Error
 }
 
 // This should arguably be ill-formed.
@@ -416,13 +416,13 @@ bb4(%4 : $ErrorProtocol):
 // CHECK:      try_apply
 // CHECK:    bb2(
 // CHECK-NEXT: throw
-sil @try_apply_3 : $@convention(thin) () -> @error ErrorProtocol {
+sil @try_apply_3 : $@convention(thin) () -> @error Error {
 bb0:
   %0 = tuple ()
   br bb1(%0 : $())
 bb1(%1 : $()):
-  %2 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorProtocol
-  try_apply %2() : $@convention(thin) @noreturn () -> @error ErrorProtocol, normal bb1, error bb2
-bb2(%3 : $ErrorProtocol):
-  throw %3 : $ErrorProtocol
+  %2 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error Error
+  try_apply %2() : $@convention(thin) @noreturn () -> @error Error, normal bb1, error bb2
+bb2(%3 : $Error):
+  throw %3 : $Error
 }

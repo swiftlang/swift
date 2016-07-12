@@ -85,7 +85,7 @@ struct StaticString {
   var _flags: Builtin.Int8
 }
 
-public protocol ErrorProtocol {
+public protocol Error {
   var _domain: Builtin.Int32 { get }
   var _code: Builtin.Int32 { get }
 }
@@ -95,7 +95,7 @@ sil [fragile] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeOb
 
 sil [fragile] @owned_return : $@convention(thin) () -> (@owned @box Builtin.Int32)
 
-sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol
+sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
 
 /////////////////
 // Basic Tests //
@@ -2028,29 +2028,29 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
+// CHECK-LABEL: sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 // CHECK: bb0
 // CHECK: strong_retain
 // CHECK: bb1
 // CHECK: strong_release
 // CHECK: bb2
 // CHECK: strong_release
-sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
+sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
-  %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol
-  try_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol, normal bb1, error bb2
+  %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
+  try_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error, normal bb1, error bb2
 
 bb1(%2 : $()):
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 
-bb2(%3 : $ErrorProtocol):
+bb2(%3 : $Error):
   strong_release %0 : $Builtin.NativeObject
-  throw %3 : $ErrorProtocol
+  throw %3 : $Error
 }
 
-// CHECK-LABEL: sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
+// CHECK-LABEL: sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 // CHECK: bb0(
 // CHECK: strong_retain
 // CHECK: try_apply
@@ -2058,21 +2058,21 @@ bb2(%3 : $ErrorProtocol):
 // CHECK: strong_release
 // CHECK: bb2(
 // CHECK: strong_release
-sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error ErrorProtocol {
+sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
   %1 = function_ref @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  %2 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol
-  try_apply %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error ErrorProtocol, normal bb1, error bb2
+  %2 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
+  try_apply %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error, normal bb1, error bb2
 
 bb1(%3 : $()):
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 
-bb2(%4 : $ErrorProtocol):
+bb2(%4 : $Error):
   strong_release %0 : $Builtin.NativeObject
-  throw %4 : $ErrorProtocol
+  throw %4 : $Error
 }
 
 // In this control flow, ARC runs multiple iterations to get rid of and move the retain and releases.

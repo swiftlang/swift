@@ -361,8 +361,8 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
-  /// Retrieve the declaration of Swift.ErrorProtocol.
-  NominalTypeDecl *getErrorProtocolDecl() const;
+  /// Retrieve the declaration of Swift.Error.
+  NominalTypeDecl *getErrorDecl() const;
   CanType getExceptionType() const;
   
   /// Retrieve the declaration of Swift.Bool.
@@ -449,6 +449,9 @@ public:
   /// Retrieve the declaration of ObjectiveC.ObjCBool.
   StructDecl *getObjCBoolDecl();
 
+  /// Retrieve the declaration of Foundation.NSError.
+  ClassDecl *getNSErrorDecl() const;
+
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \
   FuncDecl *get##Name(LazyResolver *resolver) const;
@@ -504,9 +507,16 @@ public:
   bool isStandardLibraryTypeBridgedInFoundation(NominalTypeDecl *nominal) const;
 
   /// Get the Objective-C type that a Swift type bridges to, if any.
+  /// 
+  /// \param dc The context in which bridging is occurring.
+  /// \param type The Swift for which we are querying bridging behavior.
+  /// \param resolver The lazy resolver.
+  /// \param bridgedValueType The specific value type that is bridged,
+  /// which will usually by the same as \c type.
   Optional<Type> getBridgedToObjC(const DeclContext *dc,
                                   Type type,
-                                  LazyResolver *resolver) const;
+                                  LazyResolver *resolver,
+                                  Type *bridgedValueType = nullptr) const;
 
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.

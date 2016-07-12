@@ -23,16 +23,16 @@ func cToBlock(_ arg: @convention(c) (Int) -> Int) -> @convention(block) (Int) ->
 
 // ==== Throws variance
 
-// CHECK-LABEL: sil hidden @_TF19function_conversion12funcToThrowsFFT_T_FzT_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> @owned @callee_owned () -> @error ErrorProtocol
-// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned () -> () to $@callee_owned () -> @error ErrorProtocol
+// CHECK-LABEL: sil hidden @_TF19function_conversion12funcToThrowsFFT_T_FzT_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> @owned @callee_owned () -> @error Error
+// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned () -> () to $@callee_owned () -> @error Error
 // CHECK:         return [[FUNC]]
 func funcToThrows(_ x: () -> ()) -> () throws -> () {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF19function_conversion12thinToThrowsFXfT_T_XfzT_T_ : $@convention(thin) (@convention(thin) () -> ()) -> @convention(thin) () -> @error ErrorProtocol
-// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@convention(thin) () -> () to $@convention(thin) () -> @error ErrorProtocol
-// CHECK:         return [[FUNC]] : $@convention(thin) () -> @error ErrorProtocol
+// CHECK-LABEL: sil hidden @_TF19function_conversion12thinToThrowsFXfT_T_XfzT_T_ : $@convention(thin) (@convention(thin) () -> ()) -> @convention(thin) () -> @error Error
+// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@convention(thin) () -> () to $@convention(thin) () -> @error Error
+// CHECK:         return [[FUNC]] : $@convention(thin) () -> @error Error
 func thinToThrows(_ x: @convention(thin) () -> ()) -> @convention(thin) () throws -> () {
   return x
 }

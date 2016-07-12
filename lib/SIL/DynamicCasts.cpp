@@ -169,10 +169,10 @@ bool swift::isObjectiveCBridgeable(Module *M, CanType Ty) {
 }
 
 /// Check if a given type conforms to _Error protocol.
-bool swift::isErrorProtocol(Module *M, CanType Ty) {
-  // Retrieve the ErrorProtocol protocol.
+bool swift::isError(Module *M, CanType Ty) {
+  // Retrieve the Error protocol.
   auto errorTypeProto =
-      M->getASTContext().getProtocol(KnownProtocolKind::ErrorProtocol);
+      M->getASTContext().getProtocol(KnownProtocolKind::Error);
 
   if (errorTypeProto) {
     // Find the conformance of the value type to _BridgedToObjectiveC.
@@ -467,7 +467,7 @@ swift::classifyDynamicCast(Module *M,
   }
 
   // Check if it is a cast between bridged error types.
-  if (isErrorProtocol(M, source) && isErrorProtocol(M, target)) {
+  if (isError(M, source) && isError(M, target)) {
     // TODO: Cast to NSError succeeds always.
     return DynamicCastFeasibility::MaySucceed;
   }
@@ -904,7 +904,7 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
     objectType = type;
 
   // Casting to NSError needs to go through the indirect-cast case,
-  // since it may conform to ErrorProtocol and require ErrorProtocol-to-NSError
+  // since it may conform to Error and require Error-to-NSError
   // bridging, unless we can statically see that the source type inherits
   // NSError.
   

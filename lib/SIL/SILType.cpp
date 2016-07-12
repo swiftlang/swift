@@ -448,7 +448,7 @@ SILType SILType::getAnyOptionalObjectType(SILModule &M,
 
 /// True if the given type value is nonnull, and the represented type is NSError
 /// or CFError, the error classes for which we support "toll-free" bridging to
-/// ErrorProtocol existentials.
+/// Error existentials.
 static bool isBridgedErrorClass(SILModule &M,
                                 Type t) {
   if (!t)
@@ -466,9 +466,9 @@ static bool isBridgedErrorClass(SILModule &M,
   return false;
 }
 
-static bool isErrorProtocolExistential(ArrayRef<ProtocolDecl*> protocols) {
+static bool isErrorExistential(ArrayRef<ProtocolDecl*> protocols) {
   return protocols.size() == 1
-    && protocols[0]->isSpecificProtocol(KnownProtocolKind::ErrorProtocol);
+    && protocols[0]->isSpecificProtocol(KnownProtocolKind::Error);
 }
 
 ExistentialRepresentation
@@ -485,9 +485,9 @@ SILType::getPreferredExistentialRepresentation(SILModule &M,
   if (!getSwiftRValueType()->isAnyExistentialType(protocols))
     return ExistentialRepresentation::None;
   
-  // The (uncomposed) ErrorProtocol existential uses a special boxed representation.
-  if (isErrorProtocolExistential(protocols)) {
-    // NSError or CFError references can be adopted directly as ErrorProtocol
+  // The (uncomposed) Error existential uses a special boxed representation.
+  if (isErrorExistential(protocols)) {
+    // NSError or CFError references can be adopted directly as Error
     // existentials.
     if (isBridgedErrorClass(M, containedType)) {
       return ExistentialRepresentation::Class;
@@ -521,10 +521,10 @@ SILType::canUseExistentialRepresentation(SILModule &M,
     SmallVector<ProtocolDecl *, 4> protocols;
     if (!getSwiftRValueType()->isAnyExistentialType(protocols))
       return false;
-    // The (uncomposed) ErrorProtocol existential uses a special boxed
+    // The (uncomposed) Error existential uses a special boxed
     // representation. It can also adopt class references of bridged error types
     // directly.
-    if (isErrorProtocolExistential(protocols))
+    if (isErrorExistential(protocols))
       return repr == ExistentialRepresentation::Boxed
         || (repr == ExistentialRepresentation::Class
             && isBridgedErrorClass(M, containedType));

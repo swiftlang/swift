@@ -280,9 +280,9 @@ ERROR(cannot_convert_to_return_type_nil,none,
       "nil is incompatible with return type %0", (Type))
 
 ERROR(cannot_convert_thrown_type,none,
-      "thrown expression type %0 does not conform to 'ErrorProtocol'", (Type))
+      "thrown expression type %0 does not conform to 'Error'", (Type))
 ERROR(cannot_throw_nil,none,
-      "cannot infer concrete ErrorProtocol for thrown 'nil' value", ())
+      "cannot infer concrete Error for thrown 'nil' value", ())
 
 
 ERROR(cannot_convert_raw_initializer_value,none,
@@ -1659,7 +1659,7 @@ ERROR(broken_equatable_requirement,none,
 ERROR(broken_hashable_requirement,none,
       "Hashable protocol is broken: unexpected requirement", ())
 ERROR(broken_errortype_requirement,none,
-      "ErrorProtocol protocol is broken: unexpected requirement", ())
+      "Error protocol is broken: unexpected requirement", ())
 ERROR(broken_int_hashable_conformance,none,
       "Int type is broken: does not conform to Hashable", ())
 ERROR(broken_int_integer_literal_convertible_conformance,none,
@@ -2501,7 +2501,7 @@ ERROR(recursive_enum_not_indirect,none,
 ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
       "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
-      "ErrorProtocol}0 type", (unsigned))
+      "Error}0 type", (unsigned))
 ERROR(optional_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Optional<T>", ())

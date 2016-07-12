@@ -432,7 +432,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
         case ErrorExistential: {
           swift_typeref_t ErrorTR
             = swift_reflection_typeRefForMangledTypeName(RC,
-              "_TtPs13ErrorProtocol_", 21);
+              "_TtPs5Error_", 21);
           printf("Reflecting an error existential.\n");
           if (!reflectExistential(RC, Pipe, ErrorTR))
             return EXIT_SUCCESS;

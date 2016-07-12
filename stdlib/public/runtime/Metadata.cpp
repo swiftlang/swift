@@ -2147,12 +2147,12 @@ getExistentialValueWitnesses(ExistentialTypeState &E,
                              SpecialProtocol special) {
   // Use special representation for special protocols.
   switch (special) {
-  case SpecialProtocol::ErrorProtocol:
+  case SpecialProtocol::Error:
 #if SWIFT_OBJC_INTEROP
-    // ErrorProtocol always has a single-ObjC-refcounted representation.
+    // Error always has a single-ObjC-refcounted representation.
     return &_TWVBO;
 #else
-    // Without ObjC interop, ErrorProtocol is native-refcounted.
+    // Without ObjC interop, Error is native-refcounted.
     return &_TWVBo;
 #endif
       
@@ -2174,8 +2174,8 @@ template<> ExistentialTypeRepresentation
 ExistentialTypeMetadata::getRepresentation() const {
   // Some existentials use special containers.
   switch (Flags.getSpecialProtocol()) {
-  case SpecialProtocol::ErrorProtocol:
-    return ExistentialTypeRepresentation::ErrorProtocol;
+  case SpecialProtocol::Error:
+    return ExistentialTypeRepresentation::Error;
   case SpecialProtocol::AnyObject:
   case SpecialProtocol::None:
     break;
@@ -2199,7 +2199,7 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
     return true;
     
   // References to boxed existential containers may be shared.
-  case ExistentialTypeRepresentation::ErrorProtocol: {
+  case ExistentialTypeRepresentation::Error: {
     // We can only take the value if the box is a bridged NSError, in which case
     // owning a reference to the box is owning a reference to the NSError.
     // TODO: Or if the box is uniquely referenced. We don't have intimate
@@ -2227,7 +2227,7 @@ const {
     break;
   }
   
-  case ExistentialTypeRepresentation::ErrorProtocol:
+  case ExistentialTypeRepresentation::Error:
     // TODO: If we were able to claim the value from a uniquely-owned
     // existential box, we would want to deallocError here.
     break;
@@ -2248,7 +2248,7 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
     return opaqueContainer->Type->vw_projectBuffer(
                          const_cast<ValueBuffer*>(&opaqueContainer->Buffer));
   }
-  case ExistentialTypeRepresentation::ErrorProtocol: {
+  case ExistentialTypeRepresentation::Error: {
     const SwiftError *errorBox
       = *reinterpret_cast<const SwiftError * const *>(container);
     // If the error is a bridged NSError, then the "box" is in fact itself
@@ -2274,7 +2274,7 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
       reinterpret_cast<const OpaqueExistentialContainer*>(container);
     return opaqueContainer->Type;
   }
-  case ExistentialTypeRepresentation::ErrorProtocol: {
+  case ExistentialTypeRepresentation::Error: {
     const SwiftError *errorBox
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getType();
@@ -2304,10 +2304,10 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
     witnessTables = opaqueContainer->getWitnessTables();
     break;
   }
-  case ExistentialTypeRepresentation::ErrorProtocol: {
+  case ExistentialTypeRepresentation::Error: {
     // Only one witness table we should be able to return, which is the
-    // ErrorProtocol.
-    assert(i == 0 && "only one witness table in an ErrorProtocol box");
+    // Error.
+    assert(i == 0 && "only one witness table in an Error box");
     const SwiftError *errorBox
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getErrorConformance();

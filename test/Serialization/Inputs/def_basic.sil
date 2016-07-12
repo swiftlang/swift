@@ -998,26 +998,26 @@ sil [fragile] @block_invoke : $@convention(c) (@inout_aliasable @block_storage I
 
 // Test try_apply and throws
 // rdar://20925014
-// CHECK-LABEL: sil public_external [fragile] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> @error ErrorProtocol {
-sil [fragile]  @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> @error ErrorProtocol {
-bb0(%0 : $@convention(thin) () -> @error ErrorProtocol):
-  // CHECK: try_apply %0() : $@convention(thin) () -> @error ErrorProtocol, normal bb1, error bb2
-  try_apply %0() : $@convention(thin) () -> @error ErrorProtocol, normal bb1, error bb2
+// CHECK-LABEL: sil public_external [fragile] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error {
+sil [fragile]  @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error {
+bb0(%0 : $@convention(thin) () -> @error Error):
+  // CHECK: try_apply %0() : $@convention(thin) () -> @error Error, normal bb1, error bb2
+  try_apply %0() : $@convention(thin) () -> @error Error, normal bb1, error bb2
 
 bb1(%1 : $()):
   %2 = tuple ()
   return %2 : $()
 
-bb2(%3 : $ErrorProtocol):
-  throw %3 : $ErrorProtocol
+bb2(%3 : $Error):
+  throw %3 : $Error
 }
 
 // Test apply with the nothrow attribute
-// CHECK-LABEL: sil public_external [fragile] @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> () {
-sil [fragile]  @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> () {
-bb0(%0 : $@convention(thin) () -> @error ErrorProtocol):
-  // CHECK: apply [nothrow] %0() : $@convention(thin) () -> @error ErrorProtocol
-  apply [nothrow] %0() : $@convention(thin) () -> @error ErrorProtocol
+// CHECK-LABEL: sil public_external [fragile] @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error Error) -> () {
+sil [fragile]  @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error Error) -> () {
+bb0(%0 : $@convention(thin) () -> @error Error):
+  // CHECK: apply [nothrow] %0() : $@convention(thin) () -> @error Error
+  apply [nothrow] %0() : $@convention(thin) () -> @error Error
   %2 = tuple ()
   return %2 : $()
 }
@@ -1110,7 +1110,7 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
-struct SomeError: ErrorProtocol {
+struct SomeError: Error {
   var _domain: String { get }
   var _code: Int { get }
 }
@@ -1118,18 +1118,18 @@ struct SomeError: ErrorProtocol {
 // CHECK-LABEL: sil public_external [fragile] @existential_box : $@convention(thin) (SomeError) -> () {
 sil [fragile] @existential_box : $@convention(thin) (SomeError) -> () {
 bb0(%0 : $SomeError):
-  // CHECK: %1 = alloc_existential_box $ErrorProtocol, $SomeError
-  %1 = alloc_existential_box $ErrorProtocol, $SomeError
-  // CHECK: %2 = project_existential_box $SomeError in %1 : $ErrorProtocol
-  %2 = project_existential_box $SomeError in %1 : $ErrorProtocol
+  // CHECK: %1 = alloc_existential_box $Error, $SomeError
+  %1 = alloc_existential_box $Error, $SomeError
+  // CHECK: %2 = project_existential_box $SomeError in %1 : $Error
+  %2 = project_existential_box $SomeError in %1 : $Error
   // CHECK: store %0 to %2 : $*SomeError
   store %0 to %2 : $*SomeError
-  // CHECK: %4 = open_existential_box %1 : $ErrorProtocol to $*[[OPENED:@opened\(".*"\)]] ErrorProtocol
-  %4 = open_existential_box %1 : $ErrorProtocol to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorProtocol
-  // CHECK: destroy_addr %4 : $*[[OPENED]] ErrorProtocol
-  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorProtocol
-  // CHECK: dealloc_existential_box %1 : $ErrorProtocol, $SomeError
-  dealloc_existential_box %1 : $ErrorProtocol, $SomeError
+  // CHECK: %4 = open_existential_box %1 : $Error to $*[[OPENED:@opened\(".*"\)]] Error
+  %4 = open_existential_box %1 : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  // CHECK: destroy_addr %4 : $*[[OPENED]] Error
+  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  // CHECK: dealloc_existential_box %1 : $Error, $SomeError
+  dealloc_existential_box %1 : $Error, $SomeError
   return undef : $()
 }
 
@@ -1351,8 +1351,8 @@ bb0:
 
   %124 = function_ref @block_storage_type : $@convention(thin) Int -> @convention(block) () -> ()
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)
-  %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> @error ErrorProtocol
-  %135 = function_ref @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error ErrorProtocol) -> ()
+  %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error
+  %135 = function_ref @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error Error) -> ()
   %134 = function_ref @box_type : $@convention(thin) (@box Int, Int) -> ()
   %120 = function_ref @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@convention(thin) (@convention(thin) (Int) -> @out Int, Int) -> Int

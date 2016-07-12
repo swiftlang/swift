@@ -54,7 +54,7 @@ func openExistentialToP1(_ p: P) throws {
 // CHECK:   destroy_addr %0
 // CHECK:   return
 //
-// CHECK: bb2([[FAILURE:%.*]] : $ErrorProtocol):
+// CHECK: bb2([[FAILURE:%.*]] : $Error):
 // CHECK:   deinit_existential_addr [[RESULT]]
 // CHECK:   dealloc_stack [[RESULT]]
 // CHECK:   destroy_addr %0
@@ -77,7 +77,7 @@ func openExistentialToP2(_ p: P) throws {
 // CHECK:  destroy_addr %0
 // CHECK:  return
 //
-// CHECK: bb2([[FAILURE:%.*]]: $ErrorProtocol):
+// CHECK: bb2([[FAILURE:%.*]]: $Error):
 // CHECK:  deinit_existential_addr [[RESULT]]
 // CHECK:  dealloc_stack [[RESULT]]
 // CHECK:  destroy_addr %0
@@ -88,30 +88,30 @@ func openExistentialToP2(_ p: P) throws {
 
 // Same as above but for boxed existentials
 
-extension ErrorProtocol {
+extension Error {
   func returnOrThrowSelf() throws -> Self {
     throw self
   }
 }
 
-// CHECK-LABEL: sil hidden @_TF19existential_erasure12errorHandlerFzPs13ErrorProtocol_PS0__
-func errorHandler(_ e: ErrorProtocol) throws -> ErrorProtocol {
-// CHECK: bb0(%0 : $ErrorProtocol):
-// CHECK:  debug_value %0 : $ErrorProtocol
-// CHECK:  [[OPEN:%.*]] = open_existential_box %0 : $ErrorProtocol to $*[[OPEN_TYPE:@opened\(.*\) ErrorProtocol]]
-// CHECK:  [[RESULT:%.*]] = alloc_existential_box $ErrorProtocol, $[[OPEN_TYPE]]
-// CHECK:  [[ADDR:%.*]] = project_existential_box $[[OPEN_TYPE]] in [[RESULT]] : $ErrorProtocol
-// CHECK:  [[FUNC:%.*]] = function_ref @_TFE19existential_erasurePs13ErrorProtocol17returnOrThrowSelf
+// CHECK-LABEL: sil hidden @_TF19existential_erasure12errorHandlerFzPs5Error_PS0__
+func errorHandler(_ e: Error) throws -> Error {
+// CHECK: bb0(%0 : $Error):
+// CHECK:  debug_value %0 : $Error
+// CHECK:  [[OPEN:%.*]] = open_existential_box %0 : $Error to $*[[OPEN_TYPE:@opened\(.*\) Error]]
+// CHECK:  [[RESULT:%.*]] = alloc_existential_box $Error, $[[OPEN_TYPE]]
+// CHECK:  [[ADDR:%.*]] = project_existential_box $[[OPEN_TYPE]] in [[RESULT]] : $Error
+// CHECK:  [[FUNC:%.*]] = function_ref @_TFE19existential_erasurePs5Error17returnOrThrowSelf
 // CHECK:  try_apply [[FUNC]]<[[OPEN_TYPE]]>([[ADDR]], [[OPEN]])
 //
 // CHECK: bb1
-// CHECK:  strong_release %0 : $ErrorProtocol
-// CHECK:  return [[RESULT]] : $ErrorProtocol
+// CHECK:  strong_release %0 : $Error
+// CHECK:  return [[RESULT]] : $Error
 //
-// CHECK: bb2([[FAILURE:%.*]] : $ErrorProtocol):
+// CHECK: bb2([[FAILURE:%.*]] : $Error):
 // CHECK:  dealloc_existential_box [[RESULT]]
-// CHECK:  strong_release %0 : $ErrorProtocol
-// CHECK:  throw [[FAILURE]] : $ErrorProtocol
+// CHECK:  strong_release %0 : $Error
+// CHECK:  throw [[FAILURE]] : $Error
 //
   return try e.returnOrThrowSelf()
 }

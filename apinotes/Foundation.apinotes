@@ -89,7 +89,7 @@ Classes:
   SwiftName: NSDateInterval
   SwiftBridge: DateInterval
 - Name: NSError
-  SwiftName: NSError
+  SwiftBridge: Swift.Error
   Methods:
   - Selector: 'setUserInfoValueProviderForDomain:provider:'
     SwiftName: setUserInfoValueProvider(forDomain:provider:)

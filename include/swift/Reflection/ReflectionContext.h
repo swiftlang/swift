@@ -162,7 +162,7 @@ public:
     }
 
     case MetadataKind::ErrorObject:
-      // ErrorProtocol boxed existential on non-Objective-C runtime target
+      // Error boxed existential on non-Objective-C runtime target
       return nullptr;
 
     default:
@@ -301,7 +301,7 @@ public:
         return false;
 
       // Now we need to skip over the instance metadata pointer and instance's
-      // conformance pointer for Swift.ErrorProtocol.
+      // conformance pointer for Swift.Error.
       StoredPointer InstanceAddress = InstanceMetadataAddressAddress +
         2 * sizeof(StoredPointer);
 

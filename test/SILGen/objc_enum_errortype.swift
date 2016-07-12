@@ -4,4 +4,4 @@
 
 // CHECK: sil @_TFE19objc_enum_errortypeVSC7AXErrorg5_codeSi
 
-extension AXError: ErrorProtocol { }
+extension AXError: Error { }

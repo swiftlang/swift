@@ -944,8 +944,9 @@ static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
   applyAvailableAttribute(valueDecl, requiredRange, C);
 }
 
-/// Add a domain error member, as required by conformance to _BridgedNSError
-/// Returns true on success, false on failure
+/// Add a domain error member, as required by conformance to
+/// _BridgedStoredNSError.
+/// \returns true on success, false on failure
 static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                            clang::NamedDecl *errorDomainDecl,
                            ClangImporter::Implementation &importer) {
@@ -2151,12 +2152,17 @@ namespace {
     /// TypeCheckPattern.cpp as well.
     Decl *importEnumCaseAlias(Identifier name,
                               const clang::EnumConstantDecl *alias,
-                              EnumElementDecl *original,
+                              ValueDecl *original,
                               const clang::EnumDecl *clangEnum,
-                              NominalTypeDecl *importedEnum) {
+                              NominalTypeDecl *importedEnum,
+                              DeclContext *importIntoDC = nullptr) {
       if (name.empty())
         return nullptr;
-      
+
+      // Default the DeclContext to the enum type.
+      if (!importIntoDC)
+        importIntoDC = importedEnum;
+
       // Construct the original constant. Enum constants without payloads look
       // like simple values, but actually have type 'MyEnum.Type -> MyEnum'.
       auto constantRef = new (Impl.SwiftContext) DeclRefExpr(original,
@@ -2170,7 +2176,7 @@ namespace {
                                                                    typeRef);
       instantiate->setType(importedEnumTy);
 
-      Decl *CD = Impl.createConstant(name, importedEnum, importedEnumTy,
+      Decl *CD = Impl.createConstant(name, importIntoDC, importedEnumTy,
                                      instantiate, ConstantConvertKind::None,
                                      /*isStatic*/ true, alias);
       Impl.importAttributes(alias, CD);
@@ -2256,7 +2262,9 @@ namespace {
       auto name = importedName.Imported.getBaseName();
 
       // Create the enum declaration and record it.
+      StructDecl *errorWrapper = nullptr;
       NominalTypeDecl *result;
+      NominalTypeDecl *enumeratorContext;
       auto enumInfo = Impl.getEnumInfo(decl);
       auto enumKind = enumInfo.getKind();
       switch (enumKind) {
@@ -2295,6 +2303,7 @@ namespace {
                             /*setterAccessibility=*/Accessibility::Public);
 
         result = structDecl;
+        enumeratorContext = structDecl;
         break;
       }
 
@@ -2312,9 +2321,80 @@ namespace {
         if (!underlyingType)
           return nullptr;
 
+        /// Basic information about the enum type we're building.
+        Identifier enumName = name;
+        DeclContext *enumDC = dc;
+        SourceLoc loc = Impl.importSourceLoc(decl->getLocStart());
+
+        // If this is an error enum, form the error wrapper type,
+        // which is a struct containing an NSError instance.
+        ProtocolDecl *bridgedNSError = nullptr;
+        ClassDecl *nsErrorDecl = nullptr;
+        ProtocolDecl *errorCodeProto = nullptr;
+        if (enumInfo.isErrorEnum() && 
+            (bridgedNSError =
+               C.getProtocol(KnownProtocolKind::BridgedStoredNSError)) &&
+            (nsErrorDecl = C.getNSErrorDecl()) &&
+            (errorCodeProto =
+               C.getProtocol(KnownProtocolKind::ErrorCodeProtocol))) {
+          // Create the wrapper struct.
+          errorWrapper = Impl.createDeclWithClangNode<StructDecl>(
+                           decl, loc, name, loc, None, nullptr, dc);
+          errorWrapper->computeType();
+
+          // Add inheritance clause.
+          TypeLoc inheritedTypes[1] = {
+            TypeLoc::withoutLoc(bridgedNSError->getDeclaredType())
+          };
+          errorWrapper->setInherited(C.AllocateCopy(inheritedTypes));
+          errorWrapper->setCheckedInheritanceClause();
+
+          // Set up error conformance to be lazily expanded
+          errorWrapper->getAttrs().add(new (C) SynthesizedProtocolAttr(
+              KnownProtocolKind::BridgedStoredNSError));
+
+          // Create the _nsError member.
+          //   public let _nsError: NSError
+          auto nsErrorType = nsErrorDecl->getDeclaredInterfaceType();
+          auto nsErrorProp = new (C) VarDecl(/*static*/ false, /*IsLet*/ true,
+                                             loc, C.Id_nsError, nsErrorType,
+                                             errorWrapper);
+          nsErrorProp->setImplicit();
+          nsErrorProp->setAccessibility(Accessibility::Public);
+
+          // Create a pattern binding to describe the variable.
+          Pattern *nsErrorPattern = createTypedNamedPattern(nsErrorProp);
+
+          auto nsErrorBinding = PatternBindingDecl::create(
+                                  C, loc, StaticSpellingKind::None, loc,
+                                  nsErrorPattern, nullptr, errorWrapper);
+          errorWrapper->addMember(nsErrorProp);
+          errorWrapper->addMember(nsErrorBinding);
+
+          // Create the _nsError initializer.
+          //   public init(_nsError error: NSError)
+          VarDecl *members[1] = { nsErrorProp };
+          auto nsErrorInit = createValueConstructor(errorWrapper, members,
+                                                    /*wantCtorParamNames=*/true,
+                                                    /*wantBody=*/true);
+          errorWrapper->addMember(nsErrorInit);
+
+          // Add the domain error member.
+          //   public static var _nsErrorDomain: String { return error-domain }
+          addErrorDomain(errorWrapper, enumInfo.getErrorDomain(), Impl);
+
+          // Note: the Code will be added after it's created.
+
+          // The enum itself will be nested within the error wrapper,
+          // and be named Code.
+          enumDC = errorWrapper;
+          enumName = C.Id_Code;
+        }
+
+        // Create the enumeration.
         auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
-            decl, Impl.importSourceLoc(decl->getLocStart()), name,
-            Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
+            decl, loc, enumName,
+            Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
 
         // Set up the C underlying type as its Swift raw type.
@@ -2327,17 +2407,12 @@ namespace {
         // Add protocol declarations to the enum declaration.
         SmallVector<TypeLoc, 2> inheritedTypes;
         inheritedTypes.push_back(TypeLoc::withoutLoc(underlyingType));
-        if (enumInfo.isErrorEnum())
-          inheritedTypes.push_back(TypeLoc::withoutLoc(
-              C.getProtocol(KnownProtocolKind::BridgedNSError)
-                  ->getDeclaredType()));
+        if (errorWrapper) {
+          inheritedTypes.push_back(
+            TypeLoc::withoutLoc(errorCodeProto->getDeclaredType()));
+        }
         enumDecl->setInherited(C.AllocateCopy(inheritedTypes));
         enumDecl->setCheckedInheritanceClause();
-
-        // Set up error conformance to be lazily expanded
-        if (enumInfo.isErrorEnum())
-          enumDecl->getAttrs().add(new (C) SynthesizedProtocolAttr(
-              KnownProtocolKind::BridgedNSError));
 
         // Provide custom implementations of the init(rawValue:) and rawValue
         // conversions that just do a bitcast. We can't reliably filter a
@@ -2367,12 +2442,29 @@ namespace {
         enumDecl->addMember(rawValueGetter);
         enumDecl->addMember(rawValue);
         enumDecl->addMember(rawValueBinding);
-        result = enumDecl;
 
-        // Add the domain error member
-        if (enumInfo.isErrorEnum())
-          addErrorDomain(enumDecl, enumInfo.getErrorDomain(), Impl);
+        // If we have an error wrapper, finish it up now that its
+        // nested enum has been constructed.
+        if (errorWrapper) {
+          // Add the ErrorType alias:
+          //   public typealias ErrorType
+          auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
+                         decl, loc, C.Id_ErrorType, loc,
+                         TypeLoc::withoutLoc(
+                           errorWrapper->getDeclaredInterfaceType()),
+                         /*genericSignature=*/nullptr, enumDecl);
+          alias->computeType();
+          enumDecl->addMember(alias);
 
+          // Add the 'Code' enum to the error wrapper.
+          errorWrapper->addMember(enumDecl);
+          result = errorWrapper;
+        } else {
+          result = enumDecl;
+        }
+
+        // The enumerators go into this enumeration.
+        enumeratorContext = enumDecl;
         break;
       }
 
@@ -2380,7 +2472,8 @@ namespace {
         result = importAsOptionSetType(dc, name, decl);
         if (!result)
           return nullptr;
-        
+
+        enumeratorContext = result;
         break;
       }
       }
@@ -2412,31 +2505,50 @@ namespace {
           break;
         case EnumKind::Options:
           enumeratorDecl = SwiftDeclConverter(Impl, /*useSwift2Name=*/false)
-                             .importOptionConstant(*ec, decl, result);
+                             .importOptionConstant(*ec, decl,
+                                                   enumeratorContext);
           swift2EnumeratorDecl = SwiftDeclConverter(Impl,/*useSwift2Name=*/true)
-                                   .importOptionConstant(*ec, decl, result);
+                                   .importOptionConstant(*ec, decl,
+                                                         enumeratorContext);
           break;
         case EnumKind::Enum:
           enumeratorDecl = SwiftDeclConverter(Impl, /*useSwift2Name=*/false)
-                             .importEnumCase(*ec, decl, cast<EnumDecl>(result));
+                             .importEnumCase(*ec, decl,
+                                             cast<EnumDecl>(enumeratorContext));
           swift2EnumeratorDecl = SwiftDeclConverter(Impl,/*useSwift2Name=*/true)
-                                   .importEnumCase(*ec, decl,
-                                                   cast<EnumDecl>(result),
-                                                   enumeratorDecl);
+                                   .importEnumCase(
+                                       *ec, decl,
+                                       cast<EnumDecl>(enumeratorContext),
+                                       enumeratorDecl);
           break;
         }
         if (!enumeratorDecl)
           continue;
 
         if (addEnumeratorsAsMembers) {
-          result->addMember(enumeratorDecl);
-          if (auto *var = dyn_cast<VarDecl>(enumeratorDecl))
-            result->addMember(var->getGetter());
+          // Add a member enumerator to the given nominal type.
+          auto addDecl = [&](NominalTypeDecl *nominal, Decl *decl) {
+            if (!decl) return;
+            nominal->addMember(decl);
+            if (auto *var = dyn_cast<VarDecl>(decl))
+              nominal->addMember(var->getGetter());
+          };
 
-          if (swift2EnumeratorDecl) {
-            result->addMember(swift2EnumeratorDecl);
-            if (auto *var = dyn_cast<VarDecl>(swift2EnumeratorDecl))
-              result->addMember(var->getGetter());
+          addDecl(enumeratorContext, enumeratorDecl);
+          addDecl(enumeratorContext, swift2EnumeratorDecl);
+          
+          // If there is an error wrapper, add an alias within the
+          // wrapper to the corresponding value within the enumerator
+          // context.
+          if (errorWrapper) {
+            auto enumeratorValue = cast<ValueDecl>(enumeratorDecl);
+            auto alias = importEnumCaseAlias(enumeratorValue->getName(),
+                                             *ec,
+                                             enumeratorValue,
+                                             decl,
+                                             enumeratorContext,
+                                             result);
+            addDecl(result, alias);
           }
         }
       }
@@ -2445,6 +2557,8 @@ namespace {
       // raw values and SILGen can emit witness tables for derived conformances.
       // FIXME: There might be better ways to do this.
       Impl.registerExternalDecl(result);
+      if (result != enumeratorContext)
+        Impl.registerExternalDecl(enumeratorContext);
       return result;
     }
 

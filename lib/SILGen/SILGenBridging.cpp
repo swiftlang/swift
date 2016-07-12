@@ -432,6 +432,11 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
     return gen.emitUndef(loc, bridgedTy);
   }
 
+  // Bridge Error to NSError.
+  if (loweredBridgedTy == gen.SGM.Types.getNSErrorType()) {
+    return gen.emitNativeToBridgedError(loc, v, loweredBridgedTy);
+  }
+
   return v;
 }
 
@@ -634,6 +639,11 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
     return gen.emitUndef(loc, nativeTy);
   }
 
+  // Bridge NSError to Error.
+  if (loweredBridgedTy == gen.SGM.Types.getNSErrorType()) {
+    return gen.emitBridgedToNativeError(loc, v);
+  }
+
   return v;
 }
 
@@ -652,43 +662,43 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
   llvm_unreachable("bad CC");
 }
 
-/// Bridge an optional foreign error type to ErrorProtocol.
+/// Bridge an optional foreign error type to Error.
 ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
                                                   ManagedValue bridgedError) {
-#ifndef NDEBUG
-  {
-    OptionalTypeKind optKind;
-    auto objType = bridgedError.getType().getSwiftRValueType()
-                                         .getAnyOptionalObjectType(optKind);
-    assert(optKind == OTK_Optional && "not Optional type");
-    assert(objType == SGM.Types.getNSErrorType() &&
-           "only handling NSError for now");
+  // If the incoming error is non-optional, inject it into an optional.
+  Type bridgedErrorTy = bridgedError.getType().getSwiftRValueType();
+  if (!bridgedErrorTy->getAnyOptionalObjectType()) {
+    SILType loweredOptErrorTy =
+        SGM.getLoweredType(OptionalType::get(bridgedErrorTy));
+    auto *someDecl = getASTContext().getOptionalSomeDecl();
+    auto *enumInst = B.createEnum(loc, bridgedError.getValue(), someDecl,
+                                  loweredOptErrorTy);
+    bridgedError = ManagedValue(enumInst, bridgedError.getCleanup());
   }
-#endif
 
-  auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getNSErrorToErrorProtocolFn());
+  auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getNSErrorToErrorFn());
   auto bridgeFnType = bridgeFn->getType().castTo<SILFunctionType>();
   assert(bridgeFnType->getNumAllResults() == 1);
   assert(bridgeFnType->getAllResults()[0].getConvention()
            == ResultConvention::Owned);
-  auto nativeErrorProtocol = bridgeFnType->getAllResults()[0].getSILType();
+  auto nativeErrorType = bridgeFnType->getAllResults()[0].getSILType();
   assert(bridgeFnType->getParameters()[0].getConvention()
            == ParameterConvention::Direct_Owned);
 
   SILValue nativeError = B.createApply(loc, bridgeFn, bridgeFn->getType(),
-                                       nativeErrorProtocol, {},
+                                       nativeErrorType, {},
                                        bridgedError.forward(*this));
   return emitManagedRValueWithCleanup(nativeError);
 }
 
-/// Bridge ErrorProtocol to a foreign error type.
+/// Bridge Error to a foreign error type.
 ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
                                                   ManagedValue nativeError,
-                                                      CanType bridgedErrorProtocol) {
-  assert(bridgedErrorProtocol == SGM.Types.getNSErrorType() &&
+                                                  CanType bridgedErrorProto) {
+  assert(bridgedErrorProto == SGM.Types.getNSErrorType() &&
          "only handling NSError for now");
 
-  auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getErrorProtocolToNSErrorFn());
+  auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getErrorToNSErrorFn());
   auto bridgeFnType = bridgeFn->getType().castTo<SILFunctionType>();
   assert(bridgeFnType->getNumAllResults() == 1);
   assert(bridgeFnType->getAllResults()[0].getConvention()

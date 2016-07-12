@@ -4112,6 +4112,28 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     if (auto sf = DC->getParentSourceFile()) {
       sf->addUsedConformance(normalConf);
     }
+
+    // Hack: If we've used a conformance to the _BridgedStoredNSError
+    // protocol, also use the RawRepresentable and _ErrorCodeProtocol
+    // conformances on the Code associated type witness.
+    if (Proto->isSpecificProtocol(KnownProtocolKind::BridgedStoredNSError)) {
+      if (auto codeType = ProtocolConformance::getTypeWitnessByName(
+                            T, concrete, Context.Id_Code, this)) {
+        if (codeType->getAnyNominal() != T->getAnyNominal()) {
+          if (auto codeProto =
+                     Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)){
+            (void)conformsToProtocol(codeType, codeProto, DC, options, nullptr,
+                                     SourceLoc());
+          }
+
+          if (auto rawProto =
+                     Context.getProtocol(KnownProtocolKind::RawRepresentable)) {
+            (void)conformsToProtocol(codeType, rawProto, DC, options, nullptr,
+                                     SourceLoc());
+          }
+        }
+      }
+    }
   }
   return true;
 }
@@ -4166,6 +4188,37 @@ void TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
   // Mark the conformances within the arguments.
   for (auto arg : bound->getGenericArgs())
     useObjectiveCBridgeableConformances(dc, arg);
+}
+
+void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
+  // _BridgedStoredNSError.
+  if (auto bridgedStoredNSError = Context.getProtocol(
+                                    KnownProtocolKind::BridgedStoredNSError)) {
+    // Force it as "Used", if it conforms
+    if (conformsToProtocol(type, bridgedStoredNSError, dc,
+                           ConformanceCheckFlags::Used))
+      return;
+  }
+
+  // _ErrorCodeProtocol.
+  if (auto errorCodeProto = Context.getProtocol(
+                              KnownProtocolKind::ErrorCodeProtocol)) {
+    ProtocolConformance *conformance = nullptr;
+    if (conformsToProtocol(type, errorCodeProto, dc,
+                           (ConformanceCheckFlags::SuppressDependencyTracking|
+                            ConformanceCheckFlags::Used),
+                           &conformance) &&
+        conformance) {
+      if (Type errorType = ProtocolConformance::getTypeWitnessByName(
+            type, conformance, Context.Id_ErrorType, this)) {
+        // Early-exit in case of circularity.
+        if (errorType->getAnyNominal() == type->getAnyNominal()) return;
+
+        useBridgedNSErrorConformances(dc, errorType);
+        return;
+      }
+    }
+  }
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
@@ -4749,8 +4802,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::Hashable:
     return DerivedConformance::deriveHashable(*this, Decl, TypeDecl, Requirement);
     
-  case KnownProtocolKind::ErrorProtocol:
-    return DerivedConformance::deriveErrorProtocol(*this, Decl, TypeDecl, Requirement);
+  case KnownProtocolKind::Error:
+    return DerivedConformance::deriveError(*this, Decl, TypeDecl, Requirement);
 
   case KnownProtocolKind::BridgedNSError:
     return DerivedConformance::deriveBridgedNSError(*this, Decl, TypeDecl,

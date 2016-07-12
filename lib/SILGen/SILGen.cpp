@@ -144,8 +144,8 @@ GET_BRIDGING_FN(Darwin, REQUIRED, Bool, REQUIRED, DarwinBoolean)
 GET_BRIDGING_FN(Darwin, REQUIRED, DarwinBoolean, REQUIRED, Bool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, Bool, REQUIRED, ObjCBool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, ObjCBool, REQUIRED, Bool)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, ErrorProtocol)
-GET_BRIDGING_FN(Foundation, REQUIRED, ErrorProtocol, REQUIRED, NSError)
+GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, Error)
+GET_BRIDGING_FN(Foundation, REQUIRED, Error, REQUIRED, NSError)
 
 #undef GET_BRIDGING_FN
 #undef REQUIRED
@@ -1127,11 +1127,12 @@ static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
 
 void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   // We don't need to emit dependent conformances.
-  if (conformanceRef.isAbstract())
+  if (conformanceRef.isAbstract()) 
     return;
 
   auto conformance = conformanceRef.getConcrete();
   auto root = conformance->getRootNormalConformance();
+
   // If we already emitted this witness table, we don't need to track the fact
   // we need it.
   if (emittedWitnessTables.count(root))

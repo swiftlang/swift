@@ -29,7 +29,7 @@ namespace {
   struct BridgedErrorSource {
     virtual ~BridgedErrorSource() = default;
     virtual SILValue emitBridged(SILGenFunction &gen, SILLocation loc,
-                                 CanType bridgedErrorProtocol) const = 0;
+                                 CanType bridgedError) const = 0;
     virtual void emitRelease(SILGenFunction &gen, SILLocation loc) const = 0;
   };
 }
@@ -41,7 +41,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
                                         const BridgedErrorSource &errorSrc) {
   ASTContext &ctx = gen.getASTContext();
 
-  // The foreign error slot has type SomePointer<SomeErrorProtocol?>,
+  // The foreign error slot has type SomePointer<SomeError?>,
   // or possibly an optional thereof.
 
   // If the pointer itself is optional, we need to branch based on
@@ -73,20 +73,20 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
     return;
   }
 
-  // Okay, break down the components of SomePointer<SomeErrorProtocol?>.
+  // Okay, break down the components of SomePointer<SomeError?>.
   // TODO: this should really be an unlowered AST type?
   CanType bridgedErrorPtrType =
     foreignErrorSlot->getType().getSwiftRValueType();
 
   PointerTypeKind ptrKind;
-  CanType bridgedErrorProtocol =
+  CanType bridgedErrorProto =
     CanType(bridgedErrorPtrType->getAnyPointerElementType(ptrKind));
 
   FullExpr scope(gen.Cleanups, CleanupLocation::get(loc));
   WritebackScope writebacks(gen);
 
   // Convert the error to a bridged form.
-  SILValue bridgedError = errorSrc.emitBridged(gen, loc, bridgedErrorProtocol);
+  SILValue bridgedError = errorSrc.emitBridged(gen, loc, bridgedErrorProto);
 
   // Store to the "pointee" property.
   // If we can't find it, diagnose and then just don't store anything.
@@ -103,7 +103,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
                            bridgedErrorPtrType, pointeeProperty,
                            AccessKind::Write,
                            AccessSemantics::Ordinary);
-  RValue rvalue(gen, loc, bridgedErrorProtocol,
+  RValue rvalue(gen, loc, bridgedErrorProto,
                 gen.emitManagedRValueWithCleanup(bridgedError));
   gen.emitAssignToLValue(loc, std::move(rvalue), std::move(lvalue));
 }
@@ -131,12 +131,12 @@ namespace {
     EpilogErrorSource(SILValue nativeError) : NativeError(nativeError) {}
 
     SILValue emitBridged(SILGenFunction &gen, SILLocation loc,
-                         CanType bridgedErrorProtocol) const override {
+                         CanType bridgedErrorProto) const override {
       bool errorShouldBeOptional = false;
-      CanType bridgedErrorObjectType = bridgedErrorProtocol;
+      CanType bridgedErrorObjectType = bridgedErrorProto;
       OptionalTypeKind optErrorKind;
       if (auto objectType =
-            bridgedErrorProtocol.getAnyOptionalObjectType(optErrorKind)) {
+            bridgedErrorProto.getAnyOptionalObjectType(optErrorKind)) {
         bridgedErrorObjectType = objectType;
         errorShouldBeOptional = true;
       }
@@ -149,7 +149,7 @@ namespace {
       if (errorShouldBeOptional) {
         bridgedError =
           gen.B.createOptionalSome(loc, bridgedError, optErrorKind,
-                                   gen.getLoweredType(bridgedErrorProtocol));
+                                   gen.getLoweredType(bridgedErrorProto));
       }
 
       return bridgedError;
@@ -164,8 +164,8 @@ namespace {
   class NilErrorSource : public BridgedErrorSource {
   public:
     SILValue emitBridged(SILGenFunction &gen, SILLocation loc,
-                         CanType bridgedErrorProtocol) const override {
-      SILType optTy = gen.getLoweredType(bridgedErrorProtocol);
+                         CanType bridgedError) const override {
+      SILType optTy = gen.getLoweredType(bridgedError);
       return gen.B.createOptionalNone(loc, optTy);
     }
 
@@ -277,7 +277,7 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
   SILValue errorV = B.createLoad(loc, errorSlot.forward(*this));
   ManagedValue error = emitManagedRValueWithCleanup(errorV);
 
-  // Turn the error into an ErrorProtocol value.
+  // Turn the error into an Error value.
   error = emitBridgedToNativeError(loc, error);
 
   // Propagate.
