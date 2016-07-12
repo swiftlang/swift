@@ -21,9 +21,7 @@ public enum _PrintForDebugger {
     case ElementOfPair
   
     var isCollection: Bool {
-        get {
-            return self != .NotACollection
-        }
+      return self != .NotACollection
     }
   
     func getChildStatus(child: Mirror) -> CollectionStatus {
