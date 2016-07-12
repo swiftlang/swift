@@ -498,12 +498,27 @@ func _UnsafePointer<T>(x: UnsafeMutablePointer<T>, e: T) {
   _ = UnsafeMutablePointer<T>.Memory.self // expected-error {{'Memory' has been renamed to 'Pointee'}} {{31-37=Pointee}} {{none}}
   _ = UnsafeMutablePointer<T>() // expected-error {{'init()' is unavailable: use 'nil' literal}} {{none}}
   _ = x.memory // expected-error {{'memory' has been renamed to 'pointee'}} {{9-15=pointee}} {{none}}
-  _ = UnsafeMutablePointer<T>.alloc(1) // expected-error {{'alloc' is unavailable: use the 'UnsafeMutablePointer(allocatingCapacity:)' initializer}} {{none}}
-  x.dealloc(1) // expected-error {{'dealloc' has been renamed to 'deallocateCapacity'}} {{5-12=deallocateCapacity}} {{none}}
+  _ = UnsafeMutablePointer<T>.alloc(1) // expected-error {{'alloc' has been renamed to 'allocate(capacity:)'}} {{31-36=allocate}} {{37-37=capacity: }} {{none}}
+  x.dealloc(1) // expected-error {{'dealloc' has been renamed to 'deallocate(capacity:)'}} {{5-12=deallocate}} {{13-13=capacity: }} {{none}}
   x.memory = e // expected-error {{'memory' has been renamed to 'pointee'}} {{5-11=pointee}} {{none}}
-  x.initialize(e) // expected-error {{'initialize' has been renamed to 'initialize(with:)'}} {{5-15=initialize}} {{16-16=with: }} {{none}}
+  x.initialize(e) // expected-error {{'initialize' has been renamed to 'initialize(to:)'}} {{5-15=initialize}} {{16-16=to: }} {{none}}
   x.destroy() // expected-error {{'destroy()' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{none}}
   x.destroy(1) // expected-error {{'destroy' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{13-13=count: }} {{none}}
+  x.initialize(with: e) // expected-error {{'initialize(with:count:)' has been renamed to 'initialize(to:count:)'}} {{5-15=initialize}}
+
+  let ptr1 = UnsafeMutablePointer<T>(allocatingCapacity: 1) // expected-error {{'init(allocatingCapacity:)' is unavailable: use 'UnsafeMutablePointer.allocate(capacity:)'}} {{none}}
+  ptr1.initialize(to: e, count: 1)
+  let ptr2 = UnsafeMutablePointer<T>.allocate(capacity: 1)
+  ptr2.initializeFrom(ptr1, count: 1) // expected-error {{'initializeFrom(_:count:)' has been renamed to 'initialize(to:count:)'}}
+  ptr1.assignFrom(ptr2, count: 1) // expected-error {{'assignFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
+  ptr1.assignFrom(ptr2, count: 1) // expected-error {{'assignFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
+  ptr2.assignBackwardFrom(ptr1, count: 1) // expected-error {{'assignBackwardFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
+  ptr1.moveAssignFrom(ptr2, count: 1) // expected-error {{'moveAssignFrom(_:count:)' has been renamed to 'moveAssign(from:count:)'}}
+  ptr2.moveInitializeFrom(ptr1, count: 1) // expected-error {{'moveInitializeFrom(_:count:)' has been renamed to 'moveInitialize(from:count:)'}}
+  ptr1.moveInitializeBackwardFrom(ptr1, count: 1) // expected-error {{'moveInitializeBackwardFrom(_:count:)' has been renamed to 'moveInitialize(from:count:)'}}
+  ptr1.deinitialize(count:1)
+  ptr1.deallocateCapacity(1) // expected-error {{'deallocateCapacity' has been renamed to 'deallocate(capacity:)'}} {{8-26=deallocate}} {{27-27=capacity: }} {{none}}
+  ptr2.deallocate(capacity: 1)
 }
 
 func _VarArgs() {

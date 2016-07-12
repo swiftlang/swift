@@ -197,7 +197,7 @@ NSStringAPIs.test("init(cString_:encoding:)") {
 
 NSStringAPIs.test("init(utf8String:)") {
   var s = "foo あいう"
-  var up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
+  var up = UnsafeMutablePointer<UInt8>.allocate(capacity: 100)
   var i = 0
   for b in s.utf8 {
     up[i] = b
@@ -205,7 +205,7 @@ NSStringAPIs.test("init(utf8String:)") {
   }
   up[i] = 0
   expectOptionalEqual(s, String(utf8String: UnsafePointer(up)))
-  up.deallocateCapacity(100)
+  up.deallocate(capacity: 100)
 }
 
 NSStringAPIs.test("canBeConvertedToEncoding(_:)") {

@@ -145,7 +145,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     let resultPtr = result.baseAddress
     let p = __manager._elementPointer
     for i in 0..<count {
-      (resultPtr + i).initialize(with: _bridgeToObjectiveCUnconditional(p[i]))
+      (resultPtr + i).initialize(to: _bridgeToObjectiveCUnconditional(p[i]))
     }
     _fixLifetime(__manager)
     return result
@@ -239,7 +239,7 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     let verbatim = false
 #endif
 
-    __bufferPointer._valuePointer.initialize(with: 
+    __bufferPointer._valuePointer.initialize(to: 
       _ArrayBody(
         count: count,
         capacity: capacity,
@@ -384,9 +384,8 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     _sanityCheck(bounds.upperBound <= count)
 
     let initializedCount = bounds.upperBound - bounds.lowerBound
-    target.initializeFrom(
-      firstElementAddress + bounds.lowerBound,
-      count: initializedCount)
+    target.initialize(
+      from: firstElementAddress + bounds.lowerBound, count: initializedCount)
     _fixLifetime(owner)
     return target + initializedCount
   }
@@ -505,18 +504,18 @@ public func += <Element, C : Collection>(
 
   if _fastPath(newCount <= lhs.capacity) {
     lhs.count = newCount
-    (lhs.firstElementAddress + oldCount).initializeFrom(rhs)
+    (lhs.firstElementAddress + oldCount).initialize(from: rhs)
   }
   else {
     var newLHS = _ContiguousArrayBuffer<Element>(
       uninitializedCount: newCount,
       minimumCapacity: _growArrayCapacity(lhs.capacity))
 
-    newLHS.firstElementAddress.moveInitializeFrom(
-      lhs.firstElementAddress, count: oldCount)
+    newLHS.firstElementAddress.moveInitialize(
+      from: lhs.firstElementAddress, count: oldCount)
     lhs.count = 0
     swap(&lhs, &newLHS)
-    (lhs.firstElementAddress + oldCount).initializeFrom(rhs)
+    (lhs.firstElementAddress + oldCount).initialize(from: rhs)
   }
 }
 
@@ -607,7 +606,7 @@ internal func _copyCollectionToContiguousArray<
   var i = source.startIndex
   for _ in 0..<count {
     // FIXME(performance): use _copyContents(initializing:).
-    p.initialize(with: source[i])
+    p.initialize(to: source[i])
     source.formIndex(after: &i)
     p += 1
   }
@@ -651,9 +650,8 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
         uninitializedCount: newCapacity, minimumCapacity: 0)
       p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
-      newResult.firstElementAddress.moveInitializeFrom(
-        result.firstElementAddress,
-        count: result.capacity)
+      newResult.firstElementAddress.moveInitialize(
+        from: result.firstElementAddress, count: result.capacity)
       result.count = 0
       swap(&result, &newResult)
     }
@@ -667,7 +665,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
     remainingCapacity -= 1
 
-    p.initialize(with: element)
+    p.initialize(to: element)
     p += 1
   }
 

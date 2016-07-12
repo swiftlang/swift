@@ -51,7 +51,7 @@ struct _UnsafeBitMap {
 
   public // @testable
   func initializeToZero() {
-    values.initialize(with: 0, count: numberOfWords)
+    values.initialize(to: 0, count: numberOfWords)
   }
 
   public // @testable

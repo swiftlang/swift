@@ -217,7 +217,7 @@ extension _ArrayBuffer {
     // Make another pass to retain the copied objects
     var result = target
     for _ in CountableRange(bounds) {
-      result.initialize(with: result.pointee)
+      result.initialize(to: result.pointee)
       result += 1
     }
     return result
