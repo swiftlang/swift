@@ -523,14 +523,14 @@ bb0(%0 : $AnyObject, %1: $Builtin.Int32):
 // CHECK: return
 // CHECK:bb2
 // CHECK: throw
-sil @testUnsafeGuaranteed_throw : $@convention(method) (@guaranteed Foo) -> @error Error {
+sil @testUnsafeGuaranteed_throw : $@convention(method) (@guaranteed Foo) -> @error ErrorProtocol {
 bb0(%0 : $Foo):
   strong_retain %0 : $Foo
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %7 = function_ref @beep_or_throw : $@convention(thin) () -> @error Error
-  %8 = try_apply %7() : $@convention(thin) () -> @error Error, normal bb1, error bb2
+  %7 = function_ref @beep_or_throw : $@convention(thin) () -> @error ErrorProtocol
+  %8 = try_apply %7() : $@convention(thin) () -> @error ErrorProtocol, normal bb1, error bb2
 
 bb1(%15: $()):
   strong_release %5 : $Foo
@@ -538,7 +538,7 @@ bb1(%15: $()):
   %17 = tuple ()
   return %17 : $()
 
-bb2(%9: $Error):
+bb2(%9: $ErrorProtocol):
   strong_release %5 : $Foo
-  throw  %9: $Error
+  throw  %9: $ErrorProtocol
 }
