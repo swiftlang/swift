@@ -31,6 +31,13 @@ typealias int = Int // expected-note {{'int' has been explicitly marked unavaila
 @available(*, unavailable, renamed: "Float")
 typealias float = Float // expected-note {{'float' has been explicitly marked unavailable here}}
 
+protocol MyNewerProtocol {}
+
+@available(*, unavailable, renamed: "MyNewerProtocol")
+protocol MyOlderProtocol {} // expected-note {{'MyOlderProtocol' has been explicitly marked unavailable here}}
+
+extension Int: MyOlderProtocol {} // expected-error {{'MyOlderProtocol' has been renamed to 'MyNewerProtocol'}} 
+
 struct MyCollection<Element> {
   @available(*, unavailable, renamed: "Element")
   typealias T = Element // expected-note 2{{'T' has been explicitly marked unavailable here}}
