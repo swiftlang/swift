@@ -177,6 +177,7 @@ ErrorBridgingTests.test("NSError-to-enum bridging") {
     case let error as CLError:
       isCLError = true
       expectOptionalEqual(testURL, (error as NSError).userInfo[NSURLErrorKey] as? URL)
+      expectOptionalEqual(testURL, error.userInfo[NSURLErrorKey] as? URL)
     default:
       isCLError = false
     }

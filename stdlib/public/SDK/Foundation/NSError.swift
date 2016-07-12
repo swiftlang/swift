@@ -400,6 +400,10 @@ public extension _BridgedStoredNSError
                                 code: numericCast(code.rawValue),
                                 userInfo: userInfo))
   }
+
+  /// The user-info dictionary for an error that was bridged from
+  /// NSError.
+  var userInfo: [String : AnyObject] { return errorUserInfo }
 }
 
 /// Various helper implementations for _BridgedStoredNSError
