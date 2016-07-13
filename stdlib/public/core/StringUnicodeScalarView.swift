@@ -471,7 +471,7 @@ extension String.UnicodeScalarIndex {
       "Invalid String.UTF8Index for this UnicodeScalar view")
 
     // Detect positions that have no corresponding index.
-    if !utf8Index._isOnUnicodeScalarBoundary {
+    if !utf8Index._isOnUnicodeScalarBoundary(in: core) {
       return nil
     }
     self.init(_position: utf8Index._coreIndex)

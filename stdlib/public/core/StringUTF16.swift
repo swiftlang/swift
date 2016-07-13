@@ -407,7 +407,7 @@ extension String.UTF16View.Index {
       "Invalid String.UTF8Index for this UTF-16 view")
 
     // Detect positions that have no corresponding index.
-    if !utf8Index._isOnUnicodeScalarBoundary {
+    if !utf8Index._isOnUnicodeScalarBoundary(in: core) {
       return nil
     }
     _offset = utf8Index._coreIndex
