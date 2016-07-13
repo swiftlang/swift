@@ -282,10 +282,9 @@ Classes:
 - Name: NSDecimalNumber
   SwiftName: NSDecimalNumber
   SwiftBridge: Decimal
-  Methods:
-  - Selector: notANumber
-    SwiftName: notANumber()
-    MethodKind: Class
+  Properties:
+  - Name: notANumber
+    SwiftName: notANumber
 - Name: NSDecimalNumberHandler
   SwiftName: NSDecimalNumberHandler
 - Name: NSDeleteCommand
@@ -711,19 +710,15 @@ Classes:
     SwiftName: prepare(forReadingItemsAt:options:writingItemsAt:options:error:byAccessor:)
     MethodKind: Instance
 - Name: NSFileHandle
-  Methods:
-  - Selector: fileHandleWithStandardInput
-    SwiftName: standardInput()
-    MethodKind: Class
-  - Selector: fileHandleWithStandardOutput
-    SwiftName: standardOutput()
-    MethodKind: Class
-  - Selector: fileHandleWithStandardError
-    SwiftName: standardError()
-    MethodKind: Class
-  - Selector: fileHandleWithNullDevice
-    SwiftName: nullDevice()
-    MethodKind: Class
+  Properties:
+  - Name: fileHandleWithStandardInput
+    SwiftName: standardInput
+  - Name: fileHandleWithStandardOutput
+    SwiftName: standardOutput
+  - Name: fileHandleWithStandardError
+    SwiftName: standardError
+  - Name: fileHandleWithNullDevice
+    SwiftName: nullDevice
 - Name: NSFileManager
   Methods:
   - Selector: 'mountedVolumeURLsIncludingResourceValuesForKeys:options:'
