@@ -1,0 +1,5 @@
+---
+Name: ExternalAccessory
+Tags:
+- Name: EABluetoothAccessoryPickerErrorCode
+  NSErrorDomain: EABluetoothAccessoryPickerErrorDomain

@@ -1,6 +1,8 @@
 ---
 Name: CoreText
-
+Tags:
+- Name: CTFontManagerError
+  NSErrorDomain: kCTFontManagerErrorDomain
 Enumerators:
 - Name: kCTUnderlinePatternSolid
   SwiftName: patternSolid

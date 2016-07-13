@@ -1,5 +1,6 @@
 set(SWIFT_API_NOTES_INPUTS
   AVFoundation
+  AVKit
   AppKit
   AudioToolbox
   CallKit
@@ -9,28 +10,39 @@ set(SWIFT_API_NOTES_INPUTS
   CoreData
   CoreGraphics
   CoreLocation
+  CoreSpotlight
   CoreText
   Dispatch
   EventKit
+  ExternalAccessory
   Foundation
   GameKit
+  GLKit
+  HealthKit
   HomeKit
+  iAd
   Intents
   LocalAuthentication
+  MapKit
   MediaPlayer
+  MessageUI
   Metal
   MultipeerConnectivity
+  NetworkExtension
   NotificationCenter
   ObjectiveC
   PassKit
   QuartzCore
   QuickLook
+  SafariServices
   SceneKit
   SpriteKit
   StoreKit
   TVMLKit
   TVServices
   UIKit
+  UserNotifications
+  VideoSubscriberAccount
   WatchConnectivity
   WatchKit
   WebKit
