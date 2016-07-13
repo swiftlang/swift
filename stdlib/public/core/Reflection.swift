@@ -40,6 +40,13 @@ public struct ObjectIdentifier : Hashable, Comparable {
   }
 }
 
+extension ObjectIdentifier : CustomStringConvertible {
+  /// A textual representation of `self`.
+  public var description: String {
+    return "ObjectIdentifier(\(_rawPointerToString(_value)))"
+  }
+}
+
 public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
   return UInt(lhs) < UInt(rhs)
 }
