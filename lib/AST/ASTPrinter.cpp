@@ -654,6 +654,7 @@ hasMergeGroup(MergeGroupKind Kind) {
   return false;
 }
 }
+
 PrintOptions PrintOptions::printTypeInterface(Type T, const DeclContext *DC) {
   PrintOptions result = printInterface();
   result.TransformContext = std::make_shared<ArchetypeTransformContext>(

@@ -10,13 +10,14 @@ extension A {
 class C1 {
 	func f1() {
 		var abcd : A
-		abcd.fa()
+    abcd.fa()
 		var intarr : [Int]
 		intarr.append(1)
 	}
 }
 
 // RUN: %target-swift-ide-test -print-type-interface -pos=13:6 -source-filename %s | FileCheck %s -check-prefix=TYPE1
+// RUN: %target-swift-ide-test -print-type-interface -usr=_TtV20print_type_interface1A -module-name print_type_interface -source-filename %s | FileCheck %s -check-prefix=TYPE1
 // TYPE1:  public struct A {
 // TYPE1:    public func fa()
 // TYPE1:    public func fea1()
@@ -36,8 +37,10 @@ class C2 {
   }
 }
 
-// RUN: %target-swift-ide-test -print-type-interface -pos=34:6 -source-filename %s | FileCheck %s -check-prefix=TYPE2
-// RUN: %target-swift-ide-test -print-type-interface -pos=35:6 -source-filename %s | FileCheck %s -check-prefix=TYPE3
+// RUN: %target-swift-ide-test -print-type-interface -pos=35:6 -source-filename %s | FileCheck %s -check-prefix=TYPE2
+// RUN: %target-swift-ide-test -print-type-interface -usr=_TtGC20print_type_interface1DCS_2T1_ -module-name print_type_interface -source-filename %s | FileCheck %s -check-prefix=TYPE2
+// RUN: %target-swift-ide-test -print-type-interface -pos=36:6 -source-filename %s | FileCheck %s -check-prefix=TYPE3
+// RUN: %target-swift-ide-test -print-type-interface -usr=_TtGC20print_type_interface1DSi_ -module-name print_type_interface -source-filename %s | FileCheck %s -check-prefix=TYPE3
 
 extension D where T : P1 {
   public func conditionalFunc1() {}

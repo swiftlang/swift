@@ -525,6 +525,13 @@ HeaderToPrint("header-to-print",
 static llvm::cl::opt<std::string>
 LineColumnPair("pos", llvm::cl::desc("Line:Column pair"));
 
+static llvm::cl::opt<std::string>
+USR("usr", llvm::cl::desc("USR"));
+
+static llvm::cl::opt<std::string>
+ModuleName("module-name", llvm::cl::desc("The module name of the given test."),
+           llvm::cl::init("swift_ide_test"));
+
 static llvm::cl::opt<bool>
 NoEmptyLineBetweenMembers("no-empty-line-between-members",
                           llvm::cl::desc("Print no empty line between members."),
@@ -2362,6 +2369,33 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   return 0;
 }
 
+static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvok,
+                                          const StringRef FileName,
+                                          const StringRef Usr) {
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(FileName);
+  CompilerInstance CI;
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+  SourceFile *SF = nullptr;
+  for (auto Unit : CI.getMainModule()->getFiles()) {
+    SF = dyn_cast<SourceFile>(Unit);
+    if (SF)
+      break;
+  }
+  assert(SF && "no source file?");
+  std::string Error;
+  Type ReconstructedType = getTypeFromMangledSymbolname(SF->getASTContext(),
+                                                        Usr, Error);
+  if (!Error.empty()) {
+    llvm::errs() << Error << '\n';
+    return 1;
+  }
+  ASTPrinter::printTypeInterface(ReconstructedType, SF, llvm::outs());
+  return 0;
+}
+
 //===----------------------------------------------------------------------===//
 // Print USRs
 //===----------------------------------------------------------------------===//
@@ -2665,8 +2699,7 @@ int main(int argc, char *argv[]) {
   InitInvok.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(argv[0],
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
-
-  InitInvok.setModuleName("swift_ide_test");
+  InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);
   if (!options::Triple.empty())
@@ -2892,9 +2925,14 @@ int main(int argc, char *argv[]) {
     ExitCode = doPrintUSRs(InitInvok, options::SourceFilename);
     break;
   case ActionType::PrintTypeInterface:
-    ExitCode = doPrintTypeInterface(InitInvok,
-                                    options::SourceFilename,
-                                    options::LineColumnPair);
+    if (options::LineColumnPair.getNumOccurrences() == 1)
+      ExitCode = doPrintTypeInterface(InitInvok,
+                                      options::SourceFilename,
+                                      options::LineColumnPair);
+    else
+      ExitCode = doPrintTypeInterfaceForTypeUsr(InitInvok,
+                                                options::SourceFilename,
+                                                options::USR);
     break;
   case ActionType::ReconstructType:
     ExitCode = doReconstructType(InitInvok, options::SourceFilename);
