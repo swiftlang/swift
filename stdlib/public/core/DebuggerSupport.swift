@@ -38,20 +38,36 @@ public enum _DebuggerSupport {
     }
   }
 
-  internal static func asObjectIdentifier(_ value: Any) -> ObjectIdentifier? {
-    if let ao = value as? AnyObject {
-      return ObjectIdentifier(ao)
-    } else {
-      return nil
+  internal static func isClass(_ value: Any) -> Bool {
+    if let _ = value.dynamicType as? AnyClass {
+      return true
     }
+    return false
+  }
+  
+  internal static func checkValue<T>(
+    _ value: Any,
+    ifClass: (AnyObject)->T,
+    otherwise: ()->T
+  ) -> T {
+    if isClass(value) {
+      if let ao = value as? AnyObject {
+        return ifClass(ao)
+      }
+    }
+    return otherwise()
+  }
+
+  internal static func asObjectIdentifier(_ value: Any) -> ObjectIdentifier? {
+    return checkValue(value,
+      ifClass: { return ObjectIdentifier($0) },
+      otherwise: { return nil })
   }
 
   internal static func asNumericValue(_ value: Any) -> Int {
-    if let ao = value as? AnyObject {
-      return unsafeBitCast(ao, to: Int.self)
-    } else {
-      return 0
-    }
+    return checkValue(value,
+      ifClass: { return unsafeBitCast($0, to: Int.self) },
+      otherwise: { return 0 })
   }
 
   internal static func asStringRepresentation(

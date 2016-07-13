@@ -19,6 +19,42 @@ class ClassWithMirror: CustomReflectable {
   }
 }
 
+#if _runtime(_ObjC)
+struct DontBridgeThisStruct {
+  var message = "Hello World"
+}
+
+extension DontBridgeThisStruct : _ObjectiveCBridgeable {
+  typealias _ObjectiveCType = AnyObject
+
+  static func _isBridgedToObjectiveC() -> Bool { return true }
+
+  func _bridgeToObjectiveC() -> _ObjectiveCType {
+    fatalError("tried to bridge DontBridgeThisStruct")
+  }
+
+  static func _forceBridgeFromObjectiveC(
+    _ source: _ObjectiveCType,
+    result: inout DontBridgeThisStruct?
+  ) {
+    result = nil
+  }
+
+  static func _conditionallyBridgeFromObjectiveC(
+    _ source: _ObjectiveCType,
+    result: inout DontBridgeThisStruct?
+  ) -> Bool {
+    result = nil
+    return false
+  }
+
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> DontBridgeThisStruct {
+    return DontBridgeThisStruct()
+  }
+}
+#endif
+
 let StringForPrintObjectTests = TestSuite("StringForPrintObject")
 StringForPrintObjectTests.test("StructWithMembers") {
   let printed = _DebuggerSupport.stringForPrintObject(StructWithMembers())
@@ -56,5 +92,12 @@ StringForPrintObjectTests.test("SomeOptional") {
   let printed = _DebuggerSupport.stringForPrintObject(3 as Int?)
   expectEqual(printed, "▿ Optional<Int>\n  - some : 3\n")
 }
+
+#if _runtime(_ObjC)
+StringForPrintObjectTests.test("DontBridgeThisStruct") {
+  let printed = _DebuggerSupport.stringForPrintObject(DontBridgeThisStruct())
+  expectEqual(printed, "▿ DontBridgeThisStruct\n  - message : \"Hello World\"\n")
+}
+#endif
 
 runAllTests()
