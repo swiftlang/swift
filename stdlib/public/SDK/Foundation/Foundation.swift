@@ -608,6 +608,24 @@ extension Dictionary : _ObjectiveCBridgeable {
 }
 
 //===----------------------------------------------------------------------===//
+// TextChecking
+//===----------------------------------------------------------------------===//
+
+extension TextCheckingResult.CheckingType {
+    public static var allSystemTypes : TextCheckingResult.CheckingType {
+        return TextCheckingResult.CheckingType(rawValue: 0xffffffff)
+    }
+    
+    public static var allCustomTypes : TextCheckingResult.CheckingType {
+        return TextCheckingResult.CheckingType(rawValue: 0xffffffff << 32)
+    }
+    
+    public static var allTypes : TextCheckingResult.CheckingType {
+        return TextCheckingResult.CheckingType(rawValue: UInt64.max)
+    }
+}
+
+//===----------------------------------------------------------------------===//
 // Fast enumeration
 //===----------------------------------------------------------------------===//
 

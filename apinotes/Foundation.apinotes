@@ -1180,7 +1180,8 @@ Tags:
 - Name: NSTextCheckingType
   SwiftName: TextCheckingResult.CheckingType
 - Name: NSTextCheckingTypes
-  SwiftName: TextCheckingResult.CheckingTypes
+  Availability: nonswift
+  AvailabilityMsg: Use 'TextCheckingResult.CheckingType'
 - Name: NSTimeZoneNameStyle
   SwiftName: TimeZone.NameStyle
 - Name: NSURLCacheStoragePolicy
@@ -1197,6 +1198,8 @@ Tags:
   SwiftName: URLSession.AuthChallengeDisposition
 - Name: NSURLSessionResponseDisposition
   SwiftName: URLSession.ResponseDisposition
+- Name: NSURLSessionTaskMetricsResourceFetchType
+  SwiftName: URLSessionTaskMetrics.ResourceFetchType
 - Name: NSUserNotificationActivationType
   SwiftName: NSUserNotification.ActivationType
 - Name: NSXMLDocumentContentKind
@@ -1205,6 +1208,8 @@ Tags:
   SwiftName: XMLDTDNode.DTDKind
 - Name: NSXMLNodeKind
   SwiftName: XMLNode.Kind
+- Name: NSXMLNodeOptions
+  SwiftName: XMLNode.Options
 - Name: NSXMLParserError
   SwiftName: XMLParser.ErrorCode
 - Name: NSXMLParserExternalEntityResolvingPolicy
