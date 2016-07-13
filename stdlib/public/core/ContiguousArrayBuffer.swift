@@ -433,10 +433,8 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
         _isBridgedToObjectiveC(Element.self),
         "Array element type is not bridged to Objective-C")
     if count == 0 {
-      return _emptyArrayStorage
-    }
-    if _isBridgedVerbatimToObjectiveC(Element.self) {
-      return _storage
+      return _SwiftDeferredNSArray(
+        _nativeStorage: _emptyArrayStorage)
     }
     return _SwiftDeferredNSArray(_nativeStorage: _storage)
   }
