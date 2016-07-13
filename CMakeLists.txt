@@ -16,8 +16,8 @@ list(APPEND CMAKE_MODULE_PATH
 # This is primarily to support building smaller or faster project files.
 #
 
-option(SWIFT_BUILD_TOOLS
-    "Build the Swift compiler and other tools"
+option(SWIFT_INCLUDE_TOOLS
+    "Generate build targets for swift tools"
     TRUE)
 
 option(SWIFT_BUILD_REMOTE_MIRROR
@@ -822,14 +822,14 @@ if(NOT DEFINED SWIFT_API_NOTES_INPUTS)
 endif()
 
 # Add all of the subdirectories, where we actually do work.
-if(SWIFT_BUILD_TOOLS)
+if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
   add_subdirectory(tools)
 endif()
 
 is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
-if(SWIFT_BUILD_TOOLS AND SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
+if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
   add_subdirectory(tools/swift-reflection-dump)
 endif()
 
