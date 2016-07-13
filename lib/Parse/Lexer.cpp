@@ -830,7 +830,7 @@ void Lexer::lexDollarIdent() {
   // It's always an error to see a standalone $
   if (CurPtr == tokStart + 1) {
     diagnose(tokStart, diag::expected_dollar_numeric);
-    return formToken(tok::unknown, TokStart);
+    return formToken(tok::unknown, tokStart);
   }
 
   // We reserve $nonNumeric for persistent bindings in the debugger.
