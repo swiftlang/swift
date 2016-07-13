@@ -209,7 +209,8 @@ func _bridgeNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject?
 ///   the boxed value, but is otherwise opaque.
 ///
 /// TODO: This should subsume `_bridgeToObjectiveC` above.
-func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
+/// COMPILER_INTRINSIC
+public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, to: AnyObject.self)
   }
@@ -217,8 +218,9 @@ func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
 }
 
 // TODO: This should subsume `_bridgeNonVerbatimToObjectiveC` above.
+/// COMPILER_INTRINSIC
 @_silgen_name("_swift_bridgeAnythingNonVerbatimToObjectiveC")
-func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject
+public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject
 
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
