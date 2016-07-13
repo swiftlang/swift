@@ -386,7 +386,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
   let source = [ 10, 20, 30 ]
   let nsa = getAsNSMutableArray(source)
-  var result = nsa as! Array<TestBridgedValueTy>
+  var result = nsa as AnyObject as! Array<TestBridgedValueTy>
   expectTrue(isNativeArray(result))
 
   // Delete the value from NSMutableArray.
@@ -740,8 +740,9 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
   // Bridge back to native array.
-  var native: [TestObjCValueTy] = convertNSArrayToArray(
-    getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3))
+  var native: [TestObjCValueTy] = 
+    getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3) as! Array
+  
   let identity1 = unsafeBitCast(native, to: UInt.self)
 
   // Mutate elements, but don't change count.

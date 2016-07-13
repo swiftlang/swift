@@ -2082,13 +2082,12 @@ extension Array {
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ source: AnyObject
   ) -> Array? {
-    if let deferred = source as? _SwiftDeferredNSArray {
-      if let nativeStorage =
-        deferred._nativeStorage as? _ContiguousArrayStorage<Element> {
-        return Array(_ContiguousArrayBuffer(nativeStorage))
-      }
+    // If source is deferred, we indirect to get its native storage
+    let maybeNative = (source as? _SwiftDeferredNSArray)?._nativeStorage ?? source
+
+    return (maybeNative as? _ContiguousArrayStorage<Element>).map {
+      Array(_ContiguousArrayBuffer($0))
     }
-    return nil
   }
 
   /// Private initializer used for bridging.

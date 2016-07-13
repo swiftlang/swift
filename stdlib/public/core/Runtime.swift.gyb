@@ -290,6 +290,7 @@ public final class _stdlib_AtomicInt {
   }
 
 % for operation_name, operation in [ ('Add', '+'), ('And', '&'), ('Or', '|'), ('Xor', '^') ]:
+  @discardableResult
   public func fetchAnd${operation_name}(_ operand: Int) -> Int {
     return _swift_stdlib_atomicFetch${operation_name}Int(
       object: _valuePtr,
