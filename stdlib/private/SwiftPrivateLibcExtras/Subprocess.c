@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Spawn is not available on Android.
-#if !defined(__ANDROID__)
+// posix_spawn is not available on Android or Windows (MSVC).
+#if !defined(__ANDROID__) && (!defined(_WIN32) || defined(__CYGWIN__))
 
 #include "swift/Runtime/Config.h"
 
@@ -65,5 +65,5 @@ char ***swift_SwiftPrivateLibcExtras_NSGetEnviron(void) {
   return _NSGetEnviron();
 }
 #endif // defined(__APPLE__)
-#endif // defined(__ANDROID__)
+#endif // !defined(__ANDROID__) && (!defined(_WIN32) || defined(__CGYWIN__))
 
