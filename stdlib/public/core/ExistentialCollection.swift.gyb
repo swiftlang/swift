@@ -115,10 +115,6 @@ internal final class _IteratorBox<
   internal var _base: Base
 }
 
-internal func _typeID(_ instance: AnyObject) -> ObjectIdentifier {
-  return ObjectIdentifier(instance.dynamicType)
-}
-
 //===--- Sequence ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
@@ -646,17 +642,17 @@ internal protocol _AnyIndexBox : class {
 
   func _unbox<T : Comparable>() -> T?
 
-  func _equal(to rhs: _AnyIndexBox) -> Bool
+  func _isEqual(to rhs: _AnyIndexBox) -> Bool
 
-  func _notEqual(to rhs: _AnyIndexBox) -> Bool
+  func _isNotEqual(to rhs: _AnyIndexBox) -> Bool
 
-  func _less(than rhs: _AnyIndexBox) -> Bool
+  func _isLess(than rhs: _AnyIndexBox) -> Bool
 
-  func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool
+  func _isLessOrEqual(to rhs: _AnyIndexBox) -> Bool
 
-  func _greater(than rhs: _AnyIndexBox) -> Bool
+  func _isGreater(than rhs: _AnyIndexBox) -> Bool
 
-  func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool
+  func _isGreaterOrEqual(to rhs: _AnyIndexBox) -> Bool
 }
 
 internal final class _IndexBox<
@@ -673,34 +669,34 @@ internal final class _IndexBox<
   }
 
   internal var _typeID: ObjectIdentifier {
-    return Swift._typeID(self)
+    return ObjectIdentifier(self.dynamicType)
   }
 
   internal func _unbox<T : Comparable>() -> T? {
     return (self as _AnyIndexBox as? _IndexBox<T>)?._base
   }
 
-  internal func _equal(to rhs: _AnyIndexBox) -> Bool {
+  internal func _isEqual(to rhs: _AnyIndexBox) -> Bool {
     return _base == _unsafeUnbox(rhs)
   }
 
-  internal func _notEqual(to rhs: _AnyIndexBox) -> Bool {
+  internal func _isNotEqual(to rhs: _AnyIndexBox) -> Bool {
     return _base != _unsafeUnbox(rhs)
   }
 
-  internal func _less(than rhs: _AnyIndexBox) -> Bool {
+  internal func _isLess(than rhs: _AnyIndexBox) -> Bool {
     return _base < _unsafeUnbox(rhs)
   }
 
-  internal func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool {
+  internal func _isLessOrEqual(to rhs: _AnyIndexBox) -> Bool {
     return _base <= _unsafeUnbox(rhs)
   }
 
-  internal func _greater(than rhs: _AnyIndexBox) -> Bool {
+  internal func _isGreater(than rhs: _AnyIndexBox) -> Bool {
     return _base > _unsafeUnbox(rhs)
   }
 
-  internal func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool {
+  internal func _isGreaterOrEqual(to rhs: _AnyIndexBox) -> Bool {
     return _base >= _unsafeUnbox(rhs)
   }
 }
@@ -732,32 +728,32 @@ public struct AnyIndex : Comparable {
 ///   identical.
 public func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._equal(to: rhs._box)
+  return lhs._box._isEqual(to: rhs._box)
 }
 
 public func != (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._notEqual(to: rhs._box)
+  return lhs._box._isNotEqual(to: rhs._box)
 }
 
 public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._less(than: rhs._box)
+  return lhs._box._isLess(than: rhs._box)
 }
 
 public func <= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._lessOrEqual(to: rhs._box)
+  return lhs._box._isLessOrEqual(to: rhs._box)
 }
 
 public func > (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._greater(than: rhs._box)
+  return lhs._box._isGreater(than: rhs._box)
 }
 
 public func >= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._greaterOrEqual(to: rhs._box)
+  return lhs._box._isGreaterOrEqual(to: rhs._box)
 }
 
 //===--- Collections ------------------------------------------------------===//
