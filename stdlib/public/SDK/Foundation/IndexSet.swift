@@ -414,7 +414,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     public func contains(integersIn range: CountableClosedRange<Element>) -> Bool { return self.contains(integersIn: Range(range)) }
 
     
-    /// Returns `true` if `self` contains any of the integers in `indexSet`.
+    /// Returns `true` if `self` contains all of the integers in `indexSet`.
     public func contains(integersIn indexSet: IndexSet) -> Bool {
         return _handle.map { $0.contains(indexSet) }
     }
