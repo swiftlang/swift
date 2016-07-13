@@ -95,19 +95,3 @@ var nsa2 = (a2._buffer._asCocoaArray() as AnyObject) as! NSArray
 for x: AnyObject in nsa2 {
   print(x.description!)
 }
-
-class X : CustomStringConvertible {
-  init(_ value: Int) { self.value = value }
-  var value: Int
-  var description: String { return "X(\(value))" }
-}
-
-// Enumeration over a _ContiguousArrayBuffer
-// CHECK: X(3)
-// CHECK: X(2)
-// CHECK: X(1)
-var a3 = [X(3), X(2), X(1)]
-var nsa3 = (a3._buffer._asCocoaArray() as AnyObject) as! NSArray
-for x: AnyObject in nsa3 {
-  print(x.description!)
-}

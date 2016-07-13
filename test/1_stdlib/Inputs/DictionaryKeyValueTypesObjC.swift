@@ -47,7 +47,6 @@ func isCocoaNSDictionary(_ d: NSDictionary) -> Bool {
 func isNativeNSArray(_ d: NSArray) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType) as NSString
   return className.range(of: "_SwiftDeferredNSArray").length > 0
-      || className.range(of: "_ContiguousArrayBuffer").length > 0
 }
 
 var _objcKeyCount = _stdlib_AtomicInt(0)
