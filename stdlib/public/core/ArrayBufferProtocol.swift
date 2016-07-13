@@ -12,7 +12,7 @@
 
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
-public protocol _ArrayBufferProtocol
+internal protocol _ArrayBufferProtocol
   : MutableCollection, RandomAccessCollection {
 
   associatedtype Indices : RandomAccessCollection = CountableRange<Int>
@@ -127,11 +127,11 @@ public protocol _ArrayBufferProtocol
 
 extension _ArrayBufferProtocol where Index == Int {
 
-  public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
+  internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
 
-  public mutating func replace<C>(
+  internal mutating func replace<C>(
     subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
