@@ -33,7 +33,7 @@ if it is in range for that type.
 
 
 The ExpressibleByStringLiteral Protocol
--------------------------------------
+---------------------------------------
 
 Here is the ExpressibleByStringLiteral protocol as defined in the standard
 library's CompilerProtocols.swift::
@@ -60,7 +60,7 @@ points could be constructed...which may be what's desired in some cases.)
 
 
 The _ExpressibleByBuiltinStringLiteral Protocol
----------------------------------------------
+-----------------------------------------------
 
 CompilerProtocols.swift contains a second protocol::
 
