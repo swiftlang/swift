@@ -351,7 +351,7 @@ set(CMAKE_CXX_ARCHIVE_FINISH "")
 
 include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
-include(SwiftTranslateFlag)
+include(SwiftUtils)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
 include(SwiftSource)
