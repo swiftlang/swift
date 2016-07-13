@@ -349,11 +349,11 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     ///
     /// - parameter range: The range of integers to include.
     public func indexRange(in range: Range<Element>) -> Range<Index> {
-        if range.isEmpty {
+        guard !range.isEmpty, let first = first, let last = last else {
             let i = _index(ofInteger: 0)
             return i..<i
         }
-        
+
         if range.lowerBound > last || (range.upperBound - 1) < first {
             let i = _index(ofInteger: 0)
             return i..<i
