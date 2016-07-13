@@ -79,19 +79,19 @@ func expectBitwiseEqual(
 
 var FloatingPoint = TestSuite("FloatingPoint")
 
-func positiveOne<T: IntegerLiteralConvertible>() -> T {
+func positiveOne<T: ExpressibleByIntegerLiteral>() -> T {
   return 1
 }
-func negativeOne<T: IntegerLiteralConvertible>() -> T {
+func negativeOne<T: ExpressibleByIntegerLiteral>() -> T {
   return -1
 }
 
-FloatingPoint.test("Float/IntegerLiteralConvertible") {
+FloatingPoint.test("Float/ExpressibleByIntegerLiteral") {
   expectEqual(positiveOne(),  1.0 as Float)
   expectEqual(negativeOne(), -1.0 as Float)
 }
 
-FloatingPoint.test("Float/FloatLiteralConvertible") {
+FloatingPoint.test("Float/ExpressibleByFloatLiteral") {
   let x: Float = -0.0
   expectBitwiseEqual(bitPattern: 0x8000_0000, x)
 }
@@ -163,12 +163,12 @@ FloatingPoint.test("Float/Int64") {
   expectEqual(Int64.max, Int64(Float(Int64.max)))
 }
 
-FloatingPoint.test("Double/IntegerLiteralConvertible") {
+FloatingPoint.test("Double/ExpressibleByIntegerLiteral") {
   expectEqual(positiveOne(),  1.0 as Double)
   expectEqual(negativeOne(), -1.0 as Double)
 }
 
-FloatingPoint.test("Double/FloatLiteralConvertible") {
+FloatingPoint.test("Double/ExpressibleByFloatLiteral") {
   let x: Double = -0.0
   expectBitwiseEqual(bitPattern: 0x8000_0000_0000_0000, x)
 }
@@ -425,12 +425,12 @@ FloatingPoint.test("Double.nextUp, .nextDown")
 
 #if arch(i386) || arch(x86_64)
 
-FloatingPoint.test("Float80/IntegerLiteralConvertible") {
+FloatingPoint.test("Float80/ExpressibleByIntegerLiteral") {
   expectEqual(positiveOne(),  1.0 as Float80)
   expectEqual(negativeOne(), -1.0 as Float80)
 }
 
-FloatingPoint.test("Float80/FloatLiteralConvertible") {
+FloatingPoint.test("Float80/ExpressibleByFloatLiteral") {
   let x: Float80 = -0.0
   expectBitwiseEqual(bitPattern: Float80Bits(0x8000, 0), x)
 }

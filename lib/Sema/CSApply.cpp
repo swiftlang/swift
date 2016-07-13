@@ -1593,10 +1593,10 @@ namespace {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::IntegerLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByIntegerLiteral);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BuiltinIntegerLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1607,7 +1607,7 @@ namespace {
       }
       if (auto floatProtocol
             = tc.getProtocol(expr->getLoc(),
-                             KnownProtocolKind::FloatLiteralConvertible)) {
+                             KnownProtocolKind::ExpressibleByFloatLiteral)) {
         if (auto defaultFloatType = tc.getDefaultType(floatProtocol, dc)) {
           if (defaultFloatType->isEqual(type))
             type = defaultFloatType;
@@ -1659,7 +1659,7 @@ namespace {
     Expr *visitNilLiteralExpr(NilLiteralExpr *expr) {
       auto &tc = cs.getTypeChecker();
       auto *protocol = tc.getProtocol(expr->getLoc(),
-                                      KnownProtocolKind::NilLiteralConvertible);
+                                      KnownProtocolKind::ExpressibleByNilLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1696,10 +1696,10 @@ namespace {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::FloatLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByFloatLiteral);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BuiltinFloatLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByBuiltinFloatLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1756,10 +1756,10 @@ namespace {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BooleanLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByBooleanLiteral);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BuiltinBooleanLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral);
       if (!protocol || !builtinProtocol)
         return nullptr;
 
@@ -1799,24 +1799,24 @@ namespace {
       bool isStringLiteral = true;
       bool isGraphemeClusterLiteral = false;
       ProtocolDecl *protocol = tc.getProtocol(
-          expr->getLoc(), KnownProtocolKind::StringLiteralConvertible);
+          expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
 
       if (!tc.conformsToProtocol(type, protocol, cs.DC,
                                  ConformanceCheckFlags::InExpression)) {
-        // If the type does not conform to StringLiteralConvertible, it should
-        // be ExtendedGraphemeClusterLiteralConvertible.
+        // If the type does not conform to ExpressibleByStringLiteral, it should
+        // be ExpressibleByExtendedGraphemeClusterLiteral.
         protocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible);
+            KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral);
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
       }
       if (!tc.conformsToProtocol(type, protocol, cs.DC,
                                  ConformanceCheckFlags::InExpression)) {
-        // ... or it should be UnicodeScalarLiteralConvertible.
+        // ... or it should be ExpressibleByUnicodeScalarLiteral.
         protocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::UnicodeScalarLiteralConvertible);
+            KnownProtocolKind::ExpressibleByUnicodeScalarLiteral);
         isStringLiteral = false;
         isGraphemeClusterLiteral = false;
       }
@@ -1861,7 +1861,7 @@ namespace {
         // UTF-16 string literals, prefer them.
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::BuiltinUTF16StringLiteralConvertible);
+            KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral);
         if (!forceASCII &&
             tc.conformsToProtocol(type, builtinProtocol, cs.DC,
                                   ConformanceCheckFlags::InExpression)) {
@@ -1884,7 +1884,7 @@ namespace {
           // Otherwise, fall back to UTF-8.
           builtinProtocol = tc.getProtocol(
               expr->getLoc(),
-              KnownProtocolKind::BuiltinStringLiteralConvertible);
+              KnownProtocolKind::ExpressibleByBuiltinStringLiteral);
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_builtinStringLiteral,
@@ -1918,7 +1918,7 @@ namespace {
 
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::BuiltinExtendedGraphemeClusterLiteralConvertible);
+            KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral);
         elements.push_back(
           TupleTypeElt(tc.Context.TheRawPointerType,
                        tc.Context.Id_builtinExtendedGraphemeClusterLiteral));
@@ -1945,10 +1945,10 @@ namespace {
 
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible);
+            KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral);
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible);
+            KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral);
 
         elements.push_back(BuiltinIntegerType::get(32, tc.Context));
 
@@ -1988,7 +1988,7 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto interpolationProto
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::StringInterpolationConvertible);
+                         KnownProtocolKind::ExpressibleByStringInterpolation);
       assert(interpolationProto && "Missing string interpolation protocol?");
 
       DeclName name(tc.Context, tc.Context.Id_init,
@@ -2619,7 +2619,7 @@ namespace {
 
       ProtocolDecl *arrayProto
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ArrayLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByArrayLiteral);
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
       ProtocolConformance *conformance = nullptr;
@@ -2685,7 +2685,7 @@ namespace {
 
       ProtocolDecl *dictionaryProto
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::DictionaryLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
       ProtocolConformance *conformance = nullptr;
       bool conforms = tc.conformsToProtocol(dictionaryTy, dictionaryProto,

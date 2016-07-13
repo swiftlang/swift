@@ -5318,7 +5318,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Parse the parameters.
   // FIXME: handle code completion in Arguments.
-  DefaultArgumentInfo DefaultArgs(/*hasSelf*/true);
+  DefaultArgumentInfo DefaultArgs(/*inTypeContext*/true);
   ParameterList *BodyPattern;
   DeclName FullName;
   ParserStatus SignatureStatus

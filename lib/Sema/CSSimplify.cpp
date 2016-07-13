@@ -630,7 +630,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   auto haveNilArgument = false;
   auto nilLiteralProto = cs.TC.getProtocol(SourceLoc(),
                                            KnownProtocolKind::
-                                              NilLiteralConvertible);
+                                              ExpressibleByNilLiteral);
   
   auto isNilLiteral = [&](Type t) -> bool {
     if (auto tyvar = t->getAs<TypeVariableType>()) {

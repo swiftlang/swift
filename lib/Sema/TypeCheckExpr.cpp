@@ -612,84 +612,84 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   Type *type = nullptr;
   const char *name = nullptr;
 
-  // UnicodeScalarLiteralConvertible -> UnicodeScalarType
+  // ExpressibleByUnicodeScalarLiteral -> UnicodeScalarType
   if (protocol ==
            getProtocol(
                SourceLoc(),
-               KnownProtocolKind::UnicodeScalarLiteralConvertible)) {
+               KnownProtocolKind::ExpressibleByUnicodeScalarLiteral)) {
     type = &UnicodeScalarType;
     name = "UnicodeScalarType";
   }
-  // ExtendedGraphemeClusterLiteralConvertible -> ExtendedGraphemeClusterType
+  // ExpressibleByExtendedGraphemeClusterLiteral -> ExtendedGraphemeClusterType
   else if (protocol ==
            getProtocol(
                SourceLoc(),
-               KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible)) {
+               KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral)) {
     type = &ExtendedGraphemeClusterType;
     name = "ExtendedGraphemeClusterType";
   }
-  // StringLiteralConvertible -> StringLiteralType
-  // StringInterpolationConvertible -> StringLiteralType
+  // ExpressibleByStringLiteral -> StringLiteralType
+  // ExpressibleByStringInterpolation -> StringLiteralType
   else if (protocol == getProtocol(
                          SourceLoc(),
-                         KnownProtocolKind::StringLiteralConvertible) ||
+                         KnownProtocolKind::ExpressibleByStringLiteral) ||
            protocol == getProtocol(
                          SourceLoc(),
-                         KnownProtocolKind::StringInterpolationConvertible)) {
+                         KnownProtocolKind::ExpressibleByStringInterpolation)) {
     type = &StringLiteralType;
     name = "StringLiteralType";
   }
-  // IntegerLiteralConvertible -> IntegerLiteralType
+  // ExpressibleByIntegerLiteral -> IntegerLiteralType
   else if (protocol == getProtocol(
                          SourceLoc(),
-                         KnownProtocolKind::IntegerLiteralConvertible)) {
+                         KnownProtocolKind::ExpressibleByIntegerLiteral)) {
     type = &IntLiteralType;
     name = "IntegerLiteralType";
   }
-  // FloatLiteralConvertible -> FloatLiteralType
+  // ExpressibleByFloatLiteral -> FloatLiteralType
   else if (protocol == getProtocol(SourceLoc(),
-                                   KnownProtocolKind::FloatLiteralConvertible)){
+                                   KnownProtocolKind::ExpressibleByFloatLiteral)){
     type = &FloatLiteralType;
     name = "FloatLiteralType";
   }
-  // BooleanLiteralConvertible -> BoolLiteralType
+  // ExpressibleByBooleanLiteral -> BoolLiteralType
   else if (protocol == getProtocol(
                          SourceLoc(),
-                         KnownProtocolKind::BooleanLiteralConvertible)){
+                         KnownProtocolKind::ExpressibleByBooleanLiteral)){
     type = &BooleanLiteralType;
     name = "BooleanLiteralType";
   }
-  // ArrayLiteralConvertible -> Array
+  // ExpressibleByArrayLiteral -> Array
   else if (protocol == getProtocol(SourceLoc(),
-                                   KnownProtocolKind::ArrayLiteralConvertible)){
+                                   KnownProtocolKind::ExpressibleByArrayLiteral)){
     type = &ArrayLiteralType;
     name = "Array";
   }
-  // DictionaryLiteralConvertible -> Dictionary
+  // ExpressibleByDictionaryLiteral -> Dictionary
   else if (protocol == getProtocol(
                          SourceLoc(),
-                         KnownProtocolKind::DictionaryLiteralConvertible)) {
+                         KnownProtocolKind::ExpressibleByDictionaryLiteral)) {
     type = &DictionaryLiteralType;
     name = "Dictionary";
   }
-  // _ColorLiteralConvertible -> _ColorLiteralType
+  // _ExpressibleByColorLiteral -> _ColorLiteralType
   else if (protocol == getProtocol(
                          SourceLoc(),
-                         KnownProtocolKind::ColorLiteralConvertible)) {
+                         KnownProtocolKind::ExpressibleByColorLiteral)) {
     type = &ColorLiteralType;
     name = "_ColorLiteralType";
   }
-  // _ImageLiteralConvertible -> _ImageLiteralType
+  // _ExpressibleByImageLiteral -> _ImageLiteralType
   else if (protocol == getProtocol(
                          SourceLoc(),
-                         KnownProtocolKind::ImageLiteralConvertible)) {
+                         KnownProtocolKind::ExpressibleByImageLiteral)) {
     type = &ImageLiteralType;
     name = "_ImageLiteralType";
   }
-  // _FileReferenceLiteralConvertible -> _FileReferenceLiteralType
+  // _ExpressibleByFileReferenceLiteral -> _FileReferenceLiteralType
   else if (protocol == getProtocol(
                          SourceLoc(),
-                         KnownProtocolKind::FileReferenceLiteralConvertible)) {
+                         KnownProtocolKind::ExpressibleByFileReferenceLiteral)) {
     type = &FileReferenceLiteralType;
     name = "_FileReferenceLiteralType";
   }

@@ -50,8 +50,8 @@ public typealias UIntMax = ${UIntMax}
 /// not use it directly.
 @_show_in_interface
 public protocol _Integer
-  : _BuiltinIntegerLiteralConvertible,
-    IntegerLiteralConvertible,
+  : _ExpressibleByBuiltinIntegerLiteral,
+    ExpressibleByIntegerLiteral,
     CustomStringConvertible,
     Hashable,
     IntegerArithmetic,

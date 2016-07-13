@@ -685,7 +685,7 @@ extension ${Self}: BinaryFloatingPoint {
 }
 
 @_transparent
-extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible {
+extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral {
   public
   init(_builtinIntegerLiteral value: Builtin.Int${builtinIntLiteralBits}){
     self = ${Self}(_bits: Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
@@ -701,7 +701,7 @@ extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible
 
 % builtinFloatLiteralBits = 80
 @_transparent
-extension ${Self} : _BuiltinFloatLiteralConvertible {
+extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
@@ -719,7 +719,7 @@ extension ${Self} : _BuiltinFloatLiteralConvertible {
 
 % builtinFloatLiteralBits = 64
 @_transparent
-extension ${Self} : _BuiltinFloatLiteralConvertible {
+extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:

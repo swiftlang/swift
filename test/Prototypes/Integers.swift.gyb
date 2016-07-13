@@ -95,8 +95,8 @@ extension Bool {
 }
 
 // This should go in the stdlib separately, probably.
-extension IntegerLiteralConvertible
-  where Self : _BuiltinIntegerLiteralConvertible {
+extension ExpressibleByIntegerLiteral
+  where Self : _ExpressibleByBuiltinIntegerLiteral {
   /// Create an instance initialized to `value`.
   @_transparent
   public init(integerLiteral value: Self) {
@@ -143,8 +143,8 @@ public func _log(_ message: @autoclosure () -> String) {
 /// Both mutating and non-mutating operations are declared in the protocol,
 /// however only the mutating ones are required, as non-mutating are provided
 /// by the protocol extension.
-public protocol Arithmetic : Equatable, IntegerLiteralConvertible {
-  // Since `Arithmetic` extends `IntegerLiteralConvertible` it is logical for
+public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
+  // Since `Arithmetic` extends `ExpressibleByIntegerLiteral` it is logical for
   // it to be initializable from instances of `Integer` as well as from integer
   // literals. Failable exact initializers from other `Arithmetic` types should
   // be defined on child protocols.
@@ -229,7 +229,7 @@ public typealias Word = Int${word_bits}
 public typealias UWord = UInt${word_bits}
 
 % IntegerBase = 'Comparable, Arithmetic, ' + \
-%               'IntegerLiteralConvertible, CustomStringConvertible'
+%               'ExpressibleByIntegerLiteral, CustomStringConvertible'
 
 /// Integer protocol is a base for all the integer types that are available in
 /// the standard library, and besides should be sufficient to implement
@@ -798,7 +798,7 @@ extension SignedInteger where Self : FixedWidthInteger {
 %     z = 's' if signed else 'z'
 public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
-    _BuiltinIntegerLiteralConvertible {
+    _ExpressibleByBuiltinIntegerLiteral {
 
   @_transparent
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
@@ -974,7 +974,7 @@ public struct DoubleWidth<
   where
   T.AbsoluteValue : FixedWidthInteger,
   T.AbsoluteValue.AbsoluteValue == T.AbsoluteValue
-> : FixedWidthInteger, _BuiltinIntegerLiteralConvertible {
+> : FixedWidthInteger, _ExpressibleByBuiltinIntegerLiteral {
 
   internal typealias High = T
   internal typealias Low = T.AbsoluteValue
@@ -1189,7 +1189,7 @@ public struct DoubleWidth<
 %   z = 's' if signed else 'z'
 public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
-    _BuiltinIntegerLiteralConvertible {
+    _ExpressibleByBuiltinIntegerLiteral {
 
   internal var _storage = DoubleWidth<${Half}>()
 

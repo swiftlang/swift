@@ -430,7 +430,7 @@ internal struct _UnmanagedAnyObjectArray {
 /// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Set<Element : Hashable> :
-  SetAlgebra, Hashable, Collection, ArrayLiteralConvertible {
+  SetAlgebra, Hashable, Collection, ExpressibleByArrayLiteral {
 
   internal typealias _Self = Set<Element>
   internal typealias _VariantStorage = _VariantSetStorage<Element>
@@ -677,7 +677,7 @@ public struct Set<Element : Hashable> :
   }
 
   //
-  // `ArrayLiteralConvertible` conformance
+  // `ExpressibleByArrayLiteral` conformance
   //
   /// Creates a set containing the elements of the given array literal.
   ///
@@ -1586,7 +1586,7 @@ public func _setBridgeFromObjectiveCConditional<
 /// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Dictionary<Key : Hashable, Value> :
-  Collection, DictionaryLiteralConvertible {
+  Collection, ExpressibleByDictionaryLiteral {
 
   internal typealias _Self = Dictionary<Key, Value>
   internal typealias _VariantStorage = _VariantDictionaryStorage<Key, Value>
@@ -1936,7 +1936,7 @@ public struct Dictionary<Key : Hashable, Value> :
   }
 
   //
-  // DictionaryLiteralConvertible conformance
+  // ExpressibleByDictionaryLiteral conformance
   //
 
   /// Creates a dictionary initialized with a dictionary literal.
@@ -1956,7 +1956,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// - Parameter elements: The key-value pairs that will make up the new
   ///   dictionary. Each key in `elements` must be unique.
   ///
-  /// - SeeAlso: `DictionaryLiteralConvertible`
+  /// - SeeAlso: `ExpressibleByDictionaryLiteral`
   @effects(readonly)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.init(_nativeStorage: _NativeDictionaryStorage.fromArray(elements))

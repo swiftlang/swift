@@ -52,7 +52,7 @@
 /// - `x.isStrictSubset(of: y)` if and only if `x.isSubset(of: y) && x != y`
 /// 
 /// - SeeAlso: `OptionSet`, `Set`
-public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
+public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   // FIXME: write tests for SetAlgebra
   
   /// A type for which the conforming type provides a containment test.

@@ -30,7 +30,7 @@ NSSetAPI.test("initWithObjects") {
   expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
 }
 
-NSSetAPI.test("ArrayLiteralConvertible") {
+NSSetAPI.test("ExpressibleByArrayLiteral") {
   let result: NSSet = [1, "two"]
   expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
 }
@@ -53,7 +53,7 @@ NSOrderedSetAPI.test("initWithObjects") {
   expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
 }
 
-NSOrderedSetAPI.test("ArrayLiteralConvertible") {
+NSOrderedSetAPI.test("ExpressibleByArrayLiteral") {
   let result: NSOrderedSet = [1, "two"]
   expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
 }

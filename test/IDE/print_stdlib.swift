@@ -43,9 +43,9 @@
 // CHECK-NOT: extension {{.*}}!
 // CHECK-NOT: addressWithOwner
 // CHECK-NOT: mutableAddressWithOwner
-// CHECK-NOT: _ColorLiteralConvertible
-// CHECK-NOT: _FileReferenceLiteralConvertible
-// CHECK-NOT: _ImageLiteralConvertible
+// CHECK-NOT: _ExpressibleByColorLiteral
+// CHECK-NOT: _ExpressibleByFileReferenceLiteral
+// CHECK-NOT: _ExpressibleByImageLiteral
 
 // CHECK-SUGAR: extension Array :
 // CHECK-SUGAR: extension ImplicitlyUnwrappedOptional :

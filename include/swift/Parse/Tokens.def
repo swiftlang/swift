@@ -200,9 +200,9 @@ POUND_CONFIG(available)
 
 // Declaratively define object literals, including their
 // corresponding protocols.
-POUND_OBJECT_LITERAL(fileLiteral, "file reference", FileReferenceLiteralConvertible)
-POUND_OBJECT_LITERAL(imageLiteral, "image", ImageLiteralConvertible)
-POUND_OBJECT_LITERAL(colorLiteral, "color", ColorLiteralConvertible)
+POUND_OBJECT_LITERAL(fileLiteral, "file reference", ExpressibleByFileReferenceLiteral)
+POUND_OBJECT_LITERAL(imageLiteral, "image", ExpressibleByImageLiteral)
+POUND_OBJECT_LITERAL(colorLiteral, "color", ExpressibleByColorLiteral)
 
 POUND_OLD_OBJECT_LITERAL(FileReference, fileLiteral, fileReferenceLiteral, resourceName)
 POUND_OLD_OBJECT_LITERAL(Image, imageLiteral, imageLiteral, resourceName)

@@ -232,13 +232,13 @@ public func <(lhs: Decimal, rhs: Decimal) -> Bool {
     return NSDecimalCompare(&lhsVal, &rhsVal) == .orderedAscending
 }
 
-extension Decimal : FloatLiteralConvertible {
+extension Decimal : ExpressibleByFloatLiteral {
     public init(floatLiteral value: Double) {
         self.init(value)
     }
 }
 
-extension Decimal : IntegerLiteralConvertible {
+extension Decimal : ExpressibleByIntegerLiteral {
     public init(integerLiteral value: Int) {
         self.init(value)
     }

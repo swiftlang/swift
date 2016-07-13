@@ -161,7 +161,7 @@ func rdar20142523() {
   })
 }
 
-// <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, IntegerLiteralConvertible)' is not convertible to 'IntegerLiteralConvertible
+// <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, ExpressibleByIntegerLiteral)' is not convertible to 'ExpressibleByIntegerLiteral
 func rdar21080030() {
   var s = "Hello"
   if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'IndexDistance'}}{{24-26=}}

@@ -27,7 +27,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 /// The BinaryFloatingPoint protocol refines these requirements, adds some
 /// additional operations that only make sense for a fixed radix, and also
 /// provides default implementations of some of the FloatingPoint APIs.
-public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
+public protocol FloatingPoint: Comparable, ExpressibleByIntegerLiteral,
   SignedNumber, AbsoluteValuable, Strideable {
 
   /// An integer type that can represent any written exponent.
@@ -607,7 +607,7 @@ public func >= <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
 
 /// A radix-2 (binary) floating-point type that follows the IEEE 754 encoding
 /// conventions.
-public protocol BinaryFloatingPoint: FloatingPoint, FloatLiteralConvertible {
+public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
 
   /// An unsigned integer type that can represent the significand of any value.
   ///

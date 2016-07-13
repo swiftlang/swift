@@ -93,61 +93,61 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
 ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
   if (isa<ArrayExpr>(expr))
     return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ArrayLiteralConvertible);
+                       KnownProtocolKind::ExpressibleByArrayLiteral);
 
   if (isa<DictionaryExpr>(expr))
     return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::DictionaryLiteralConvertible);
+                       KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
   if (!isa<LiteralExpr>(expr))
     return nullptr;
   
   if (isa<NilLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::NilLiteralConvertible);
+                       KnownProtocolKind::ExpressibleByNilLiteral);
   
   if (isa<IntegerLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::IntegerLiteralConvertible);
+                       KnownProtocolKind::ExpressibleByIntegerLiteral);
 
   if (isa<FloatLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::FloatLiteralConvertible);
+                       KnownProtocolKind::ExpressibleByFloatLiteral);
 
   if (isa<BooleanLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::BooleanLiteralConvertible);
+                       KnownProtocolKind::ExpressibleByBooleanLiteral);
 
   if (const auto *SLE = dyn_cast<StringLiteralExpr>(expr)) {
     if (SLE->isSingleUnicodeScalar())
       return getProtocol(
           expr->getLoc(),
-          KnownProtocolKind::UnicodeScalarLiteralConvertible);
+          KnownProtocolKind::ExpressibleByUnicodeScalarLiteral);
 
     if (SLE->isSingleExtendedGraphemeCluster())
       return getProtocol(
           expr->getLoc(),
-          KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible);
+          KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral);
 
     return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::StringLiteralConvertible);
+                       KnownProtocolKind::ExpressibleByStringLiteral);
   }
 
   if (isa<InterpolatedStringLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::StringInterpolationConvertible);
+                       KnownProtocolKind::ExpressibleByStringInterpolation);
 
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
     case MagicIdentifierLiteralExpr::File:
     case MagicIdentifierLiteralExpr::Function:
       return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::StringLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByStringLiteral);
 
     case MagicIdentifierLiteralExpr::Line:
     case MagicIdentifierLiteralExpr::Column:
       return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::IntegerLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByIntegerLiteral);
 
     case MagicIdentifierLiteralExpr::DSOHandle:
       return nullptr;

@@ -784,7 +784,7 @@ public protocol _DefaultCustomPlaygroundQuickLookable {
 ///     let pairs = IntPairs([1: 2, 1: 1, 3: 4, 2: 1])
 ///     print(pairs.elements)
 ///     // Prints "[(1, 2), (1, 1), (3, 4), (2, 1)]"
-public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
+public struct DictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
   /// Creates a new `DictionaryLiteral` instance from the given dictionary
   /// literal.
   ///

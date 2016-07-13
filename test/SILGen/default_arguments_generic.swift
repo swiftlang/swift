@@ -1,14 +1,13 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func foo<T: IntegerLiteralConvertible>(x x: T = 0) { }
+func foo<T: ExpressibleByIntegerLiteral>(x x: T = 0) { }
 
-struct Zim<T: IntegerLiteralConvertible> {
+struct Zim<T: ExpressibleByIntegerLiteral> {
   init(x: T = 0) { }
-  init<U: FloatLiteralConvertible>(_ x: T = 0, y: U = 0.5) { }
+  init<U: ExpressibleByFloatLiteral>(_ x: T = 0, y: U = 0.5) { }
 
-  static func zim(x x: T = 0) { }
-  static func zang<U: FloatLiteralConvertible>(_ x: T = 0,
-                                               y: U = 0.5) { }
+  static func zim(x: T = 0) { }
+  static func zang<U: ExpressibleByFloatLiteral>(_ x: T = 0, y: U = 0.5) { }
 }
 
 // CHECK-LABEL: sil hidden @_TF25default_arguments_generic3barFT_T_ : $@convention(thin) () -> () {

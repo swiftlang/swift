@@ -579,9 +579,9 @@ namespace {
 
     void foundLiteralBinding(ProtocolDecl *proto) {
       switch (*proto->getKnownProtocolKind()) {
-      case KnownProtocolKind::DictionaryLiteralConvertible:
-      case KnownProtocolKind::ArrayLiteralConvertible:
-      case KnownProtocolKind::StringInterpolationConvertible:
+      case KnownProtocolKind::ExpressibleByDictionaryLiteral:
+      case KnownProtocolKind::ExpressibleByArrayLiteral:
+      case KnownProtocolKind::ExpressibleByStringInterpolation:
         LiteralBinding = LiteralBindingKind::Collection;
         break;
 

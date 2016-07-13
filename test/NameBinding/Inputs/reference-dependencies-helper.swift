@@ -32,7 +32,7 @@ typealias OtherFileAliasForSecret = OtherFileSecretTypeWrapper.SecretType
 
 prefix operator *** {}
 
-typealias OtherFileAliasForFloatLiteralConvertible = FloatLiteralConvertible
+typealias ExpressibleByOtherFileAliasForFloatLiteral = ExpressibleByFloatLiteral
 
 enum OtherFileEnum {
   case Value

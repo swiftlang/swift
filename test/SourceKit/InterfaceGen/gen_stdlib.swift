@@ -48,7 +48,7 @@ var x: Int
 // RUN: %sourcekitd-test -req=interface-gen -module Swift -group-name Bool > %t.Bool.response
 // RUN: FileCheck -check-prefix=CHECK-BOOL -input-file %t.Bool.response %s
 // CHECK-BOOL-DAG: extension Bool : Boolean {
-// CHECK-BOOL-DAG: extension Bool : BooleanLiteralConvertible {
+// CHECK-BOOL-DAG: extension Bool : ExpressibleByBooleanLiteral {
 
 // These are not in the bool group:
 // CHECK-BOOL-NOT: Zip2Iterator

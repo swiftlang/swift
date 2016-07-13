@@ -26,12 +26,12 @@
 /// sequence, or as a single Unicode scalar value.
 @_fixed_layout
 public struct StaticString
-  : _BuiltinUnicodeScalarLiteralConvertible,
-    _BuiltinExtendedGraphemeClusterLiteralConvertible,
-    _BuiltinStringLiteralConvertible,
-    UnicodeScalarLiteralConvertible,
-    ExtendedGraphemeClusterLiteralConvertible,
-    StringLiteralConvertible,
+  : _ExpressibleByBuiltinUnicodeScalarLiteral,
+    _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
+    _ExpressibleByBuiltinStringLiteral,
+    ExpressibleByUnicodeScalarLiteral,
+    ExpressibleByExtendedGraphemeClusterLiteral,
+    ExpressibleByStringLiteral,
     CustomStringConvertible,
     CustomDebugStringConvertible,
     CustomReflectable {

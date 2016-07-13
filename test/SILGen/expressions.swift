@@ -6,7 +6,7 @@
 import Swift
 import FooBar
 
-struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible {
+struct SillyString : _ExpressibleByBuiltinStringLiteral, ExpressibleByStringLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {}
 
   init(unicodeScalarLiteral value: SillyString) { }
@@ -29,7 +29,7 @@ struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible 
   init(stringLiteral value: SillyString) { }
 }
 
-struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralConvertible {
+struct SillyUTF16String : _ExpressibleByBuiltinUTF16StringLiteral, ExpressibleByStringLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) { }
 
   init(unicodeScalarLiteral value: SillyString) { }

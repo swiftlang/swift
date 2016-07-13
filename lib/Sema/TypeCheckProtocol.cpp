@@ -3831,9 +3831,9 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
     return;
   }
 
-  // As a special case, diagnose conversion to NilLiteralConvertible, since we
+  // As a special case, diagnose conversion to ExpressibleByNilLiteral, since we
   // know this is something involving 'nil'.
-  if (Proto->isSpecificProtocol(KnownProtocolKind::NilLiteralConvertible)) {
+  if (Proto->isSpecificProtocol(KnownProtocolKind::ExpressibleByNilLiteral)) {
     TC.diagnose(ComplainLoc, diag::cannot_use_nil_with_this_type, T);
     return;
   }

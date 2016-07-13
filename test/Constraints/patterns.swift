@@ -5,7 +5,7 @@
 switch (1, 2.5, "three") {
 case (1, _, _):
   ()
-// Double is IntegerLiteralConvertible
+// Double is ExpressibleByIntegerLiteral
 case (_, 2, _),
      (_, 2.5, _),
      (_, _, "three"):

@@ -6,7 +6,7 @@
 
 import Accelerate
 
-extension vU1024: IntegerLiteralConvertible, CustomStringConvertible, Equatable {
+extension vU1024: ExpressibleByIntegerLiteral, CustomStringConvertible, Equatable {
   public init(integerLiteral: Int) {
     var integerLiteral = integerLiteral
     self.init()
