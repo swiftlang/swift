@@ -216,6 +216,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       CheckInterfaceIsASCII = true;
       break;
 
+    case OPT_dont_print_request:
+      PrintRequest = false;
+      break;
+
     case OPT_print_response_as_json:
       PrintResponseAsJSON = true;
       break;
@@ -242,11 +246,21 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       SynthesizedExtensions = true;
       break;
 
+    case OPT_async:
+      isAsyncRequest = true;
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n';
       return true;
     }
+  }
+
+  if (Request == SourceKitRequest::InterfaceGenOpen && isAsyncRequest) {
+    llvm::errs()
+        << "error: cannot use -async with interface-gen-open request\n";
+    return true;
   }
 
   return false;
