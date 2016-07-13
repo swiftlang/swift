@@ -1626,6 +1626,25 @@ extension ${Self} {
     // Invoke the body.
     return try body(&inoutBufferPointer)
   }
+
+  @discardableResult
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Element>
+  ) -> UnsafeMutablePointer<Element> {
+    if let s = self._baseAddressIfContiguous {
+      let count = self.count
+      ptr.initialize(from: s, count: count)
+      _fixLifetime(self._owner)
+      return ptr + count
+    } else {
+      var p = ptr
+      for x in self {
+        p.initialize(to: x)
+        p += 1
+      }
+      return p
+    }
+  }
 }
 %end
 
