@@ -20,7 +20,7 @@ IntentsTestSuite.test("ErrorDomain") {
 }
 
 IntentsTestSuite.test("extension") {
-  expectEqual("IntentsErrorDomain", INIntentErrorCode._nsErrorDomain)
+  expectEqual("IntentsErrorDomain", INIntentError._nsErrorDomain)
 }
 
 runAllTests()
