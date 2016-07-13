@@ -70,7 +70,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
       (void)consumeToken();
       ParserResult<TypeRepr> Ty;
       
-      if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol)) {
+      if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol, tok::kw_Any)) {
         Ty = parseTypeIdentifierOrTypeComposition();
       } else if (Tok.is(tok::kw_class)) {
         diagnose(Tok, diag::unexpected_class_constraint);

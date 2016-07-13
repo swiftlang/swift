@@ -435,13 +435,6 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   DeclName Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
 
-  // 'Any' is the empty protocol composition; resolve it before doing an
-  // unqualified lookup
-  if (Name.getBaseName() == Context.Id_Any) {
-    auto *TypeRepr = new (Context) ProtocolCompositionTypeRepr(ArrayRef<IdentTypeRepr *>(), Loc, UDRE->getSourceRange());
-    return new (Context) TypeExpr(TypeLoc(TypeRepr));
-  }
-
   // Perform standard value name lookup.
   NameLookupOptions LookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(DC))
@@ -1135,47 +1128,61 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   }
   
   // Fold 'P & Q' into a composition type
-  if (auto *binaryExpr = dyn_cast<BinaryExpr>(E))
-    if (auto d = dyn_cast<OverloadedDeclRefExpr>(binaryExpr->getFn()))
-      for (auto decl : d->getDecls()) {
-        // for a composition
-        if (decl->getNameStr() == "&") {
-          // The protocols we are composing
-          SmallVector<IdentTypeRepr *, 4> Protocols;
-          
-          auto lhsExpr = binaryExpr->getArg()->getElement(0);
-          if (auto *lhs = dyn_cast_or_null<TypeExpr>(lhsExpr)) {
-            if (auto repr = dyn_cast<IdentTypeRepr>(lhs->getTypeRepr()))
-              Protocols.push_back(repr);
-          }
-          // if the lhs is another binary expression, we have a multi element composition:
-          // 'A & B & C' is parsed as ((A & B) & C), so we get the protocols from the lhs here
-          else if (isa<BinaryExpr>(lhsExpr)) {
-            if (auto *expr = simplifyTypeExpr(lhsExpr)) {
-              if (auto* repr = dyn_cast<ProtocolCompositionTypeRepr>(expr->getTypeRepr()))
-                for (auto proto : repr->getProtocols())
-                  Protocols.push_back(proto);
-            } else {
-              return nullptr;
-            }
-          } else {
-            return nullptr;
-          }
-          // add the rhs
-          auto rhs = dyn_cast_or_null<TypeExpr>(binaryExpr->getArg()->getElement(1));
-          if (!rhs) return nullptr;
-          
-          if (auto repr = dyn_cast<IdentTypeRepr>(rhs->getTypeRepr()))
-            Protocols.push_back(repr);
-          
-          auto CompositionRepr =
-            new (TC.Context) ProtocolCompositionTypeRepr(TC.Context.AllocateCopy(Protocols),
-                                                         binaryExpr->getLoc(),
-                                                         binaryExpr->getSourceRange());
-          return new (TC.Context) TypeExpr(TypeLoc(CompositionRepr, Type()));
+  if (auto *binaryExpr = dyn_cast<BinaryExpr>(E)) {
+    bool isComposition = false;
+    // look at the name of the operator, if it is a '&' we can create the
+    // composition TypeExpr
+    auto fn = binaryExpr->getFn();
+    if (auto Overload = dyn_cast<OverloadedDeclRefExpr>(fn)) {
+      for (auto Decl : Overload->getDecls())
+        if (Decl->getName().str() == "&") {
+          isComposition = true;
+          break;
         }
+    } else if (auto *Decl = dyn_cast<UnresolvedDeclRefExpr>(fn)) {
+      if (Decl->getName().isSimpleName() &&
+            Decl->getName().getBaseName().str() == "&")
+        isComposition = true;
+    }
+
+    if (isComposition) {
+      // The protocols we are composing
+      SmallVector<IdentTypeRepr *, 4> Protocols;
+
+      auto lhsExpr = binaryExpr->getArg()->getElement(0);
+      if (auto *lhs = dyn_cast<TypeExpr>(lhsExpr)) {
+        if (auto *repr = dyn_cast<IdentTypeRepr>(lhs->getTypeRepr()))
+          Protocols.push_back(repr);
       }
-  
+      // If the lhs is another binary expression, we have a multi element
+      // composition: 'A & B & C' is parsed as ((A & B) & C); we get
+      // the protocols from the lhs here
+      else if (isa<BinaryExpr>(lhsExpr)) {
+        if (auto expr = simplifyTypeExpr(lhsExpr))
+          if (auto *repr = dyn_cast<ProtocolCompositionTypeRepr>(expr->getTypeRepr()))
+            // add the protocols to our list
+            for (auto proto : repr->getProtocols())
+              Protocols.push_back(proto);
+          else
+            return nullptr;
+        else
+          return nullptr;
+      }
+
+      // Add the rhs which is just a TypeExpr
+      auto *rhs = dyn_cast<TypeExpr>(binaryExpr->getArg()->getElement(1));
+      if (!rhs) return nullptr;
+
+      if (auto *repr = dyn_cast<IdentTypeRepr>(rhs->getTypeRepr()))
+        Protocols.push_back(repr);
+
+      auto CompRepr = new (TC.Context) ProtocolCompositionTypeRepr(
+                        TC.Context.AllocateCopy(Protocols),
+                        binaryExpr->getLoc(), binaryExpr->getSourceRange());
+      return new (TC.Context) TypeExpr(TypeLoc(CompRepr, Type()));
+    }
+  }
+
   return nullptr;
 }
 

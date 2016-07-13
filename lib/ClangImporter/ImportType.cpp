@@ -972,7 +972,7 @@ namespace {
           return {
               proto->getDeclaredType(),
               ImportHint(ImportHint::ObjCBridged,
-                         Impl.SwiftContext.getAnyDecl()->getDeclaredType())};
+                         Impl.SwiftContext.TheAnyType)};
         return {proto->getDeclaredType(), ImportHint::ObjCPointer};
       }
 

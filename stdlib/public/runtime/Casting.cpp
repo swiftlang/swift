@@ -139,7 +139,7 @@ static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
     result += "Any";
   } else {
     // compositions of more than 1 protocol need parens in .Type contexts
-    bool needsParens = level >= TypeSyntaxLevel::TypeSimple && numProtocols != 1;
+    bool needsParens = (level >= TypeSyntaxLevel::TypeSimple) && (numProtocols != 1);
     if (needsParens) result += "(";
     for (unsigned i = 0, e = numProtocols; i < e; ++i) {
       if (i) result += " & ";

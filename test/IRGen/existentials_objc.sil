@@ -19,7 +19,7 @@ bb0(%0 : $*Any, %1 : $T):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} void @init_opaque_existential([[ANY:%swift.Any]]* noalias nocapture sret, [[GIZMO:%.*]]*, [[TYPE:%.*]]* %T) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} void @init_opaque_existential([[ANY:%Any]]* noalias nocapture sret, [[GIZMO:%.*]]*, [[TYPE:%.*]]* %T) {{.*}} {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 1
 // CHECK-NEXT:    store [[TYPE]]* %T, [[TYPE]]** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 0
@@ -34,7 +34,7 @@ bb0(%0 : $*Any, %1 : $*Any):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} void @take_opaque_existential([[ANY:%swift.Any]]* noalias nocapture sret, %swift.Any* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} void @take_opaque_existential([[ANY:%Any]]* noalias nocapture sret, %Any* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC:%1]], i32 0, i32 1
 // CHECK-NEXT:    [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST:%0]], i32 0, i32 1

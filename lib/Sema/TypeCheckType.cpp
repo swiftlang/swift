@@ -821,10 +821,6 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
                            dyn_cast<GenericIdentTypeRepr>(comp), options,
                            resolver, unsatisfiedDependency);
-    
-    // if it is an 'Any' type, return the unbounded composition type
-  } else if (comp->getIdentifier() == TC.Context.Id_Any) {
-    return TC.Context.TheAnyType;
   }
 
   // Resolve the first component, which is the only one that requires

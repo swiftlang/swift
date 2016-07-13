@@ -89,6 +89,12 @@ func testHasMoreAssoc(_ x: Any) {
   }
 }
 
-typealias Any = Int // expected-error {{invalid redeclaration of 'Any'; cannot overload type keyword}}
+struct Outer {
+  typealias Any = Int // expected-error {{expected identifier in typealias declaration}}
+  typealias `Any` = Int
+  static func aa(a: `Any`) -> Int { return a }
+}
+
 typealias X = Struct1<Pub & Bar>
 _ = Struct1<Pub & Bar>.self
+
