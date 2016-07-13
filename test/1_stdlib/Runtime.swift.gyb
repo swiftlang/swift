@@ -975,6 +975,14 @@ Reflection.test("CustomMirror") {
     expectEqual(
       [ ObjectIdentifier(a), ObjectIdentifier(b), ObjectIdentifier(c) ].sorted(),
       [ ObjectIdentifier(c), ObjectIdentifier(b), ObjectIdentifier(a) ].sorted())
+
+    // CustomDebugStringConvertible
+    expectEqual(
+      String(reflecting: ObjectIdentifier(a)),
+      String(reflecting: ObjectIdentifier(a)))
+    expectNotEqual(
+      String(reflecting: ObjectIdentifier(a)),
+      String(reflecting: ObjectIdentifier(b)))
   }
 }
 

@@ -40,6 +40,13 @@ public struct ObjectIdentifier : Hashable, Comparable {
   }
 }
 
+extension ObjectIdentifier : CustomDebugStringConvertible {
+  /// A textual representation of `self`, suitable for debugging.
+  public var debugDescription: String {
+    return "ObjectIdentifier(\(_rawPointerToString(_value)))"
+  }
+}
+
 public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
   return UInt(lhs) < UInt(rhs)
 }
