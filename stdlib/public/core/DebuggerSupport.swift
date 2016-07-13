@@ -77,7 +77,11 @@ public enum _DebuggerSupport {
       case .set:
         fallthrough
       case .tuple:
-        return "\(Int(mirror.children.count)) elements"
+        if count == 1 {
+          return "1 element"
+        } else {
+          return "\(count) elements"
+        }
       case .`struct`:
         fallthrough
       case .`enum`:

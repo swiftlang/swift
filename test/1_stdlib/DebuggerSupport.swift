@@ -44,7 +44,7 @@ StringForPrintObjectTests.test("Array") {
 
 StringForPrintObjectTests.test("Dictionary") {
   let printed = _DebuggerSupport.stringForPrintObject([1:2])
-  expectEqual(printed, "▿ 1 elements\n  ▿ 0 : 2 elements\n    - .0 : 1\n    - .1 : 2\n")
+  expectEqual(printed, "▿ 1 element\n  ▿ 0 : 2 elements\n    - .0 : 1\n    - .1 : 2\n")
 }
 
 StringForPrintObjectTests.test("NilOptional") {
