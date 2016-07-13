@@ -820,8 +820,8 @@ private struct IndexSetBoundaryIterator : IteratorProtocol {
             // 1 has the next element, or they are the same.
             result = nextIn1
             if i1UsedLower { i1Range = i1.next() }
-            // We need to iterate both the value from is1 and is2 in the == case, but only if they are both lower bounds or both upper bounds
-            if i1UsedLower == i2UsedLower && result == nextIn2 {
+            // We need to iterate both the value from is1 and is2 in the == case.
+            if result == nextIn2 {
                 if i2UsedLower { i2Range = i2.next() }
                 i2UsedLower = !i2UsedLower
             }
