@@ -2,7 +2,7 @@
 
 // RUN: not %target-swift-frontend -emit-ir -sanitize=address %s 2>&1 | FileCheck %s -check-prefix=ASAN
 
-// XFAIL: linux
+// FIXME: <rdar://problem/27291311>
 
 func test() {
 }

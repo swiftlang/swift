@@ -1,6 +1,7 @@
-// RUN: not --crash %target-swift-frontend %s -emit-ir
+// RUN: %target-swift-frontend %s -emit-ir
 
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
