@@ -15,7 +15,7 @@ struct ArbitraryThing {}
 idLover.takesId(ArbitraryThing())
 
 var x: AnyObject = NSObject()
-idLover.takesArray(ofId: &x) // expected-error{{cannot pass immutable value as inout argument: implicit conversion from 'AnyObject' to 'Any' requires a temporary}}
+idLover.takesArray(ofId: &x) // expected-error{{cannot pass immutable value as inout argument: implicit conversion from 'AnyObject' to 'id' requires a temporary}}
 var xAsAny = x as Any
 idLover.takesArray(ofId: &xAsAny)
 

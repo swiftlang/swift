@@ -4652,9 +4652,9 @@ static void addAnyTypeKeyword(CodeCompletionResultSink &Sink) {
   CodeCompletionResultBuilder Builder(
       Sink, CodeCompletionResult::ResultKind::Keyword,
       SemanticContextKind::None, {});
-  // pretend 'Any' is from another module
   Builder.setKeywordKind(CodeCompletionKeywordKind::None);
   Builder.addTextChunk("Any");
+  Builder.addTypeAnnotation("Any");
 }
 
 

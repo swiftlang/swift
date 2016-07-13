@@ -1176,6 +1176,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     }
 
     break;
+
+  case tok::kw_Any: { // Any
+    ParserResult<TypeRepr> repr = parseAnyType();
+    auto expr = new (Context) TypeExpr(TypeLoc(repr.get()));
+    Result = makeParserResult(expr);
+    break;
+  }
+
   case tok::dollarident: // $1
     Result = makeParserResult(parseExprAnonClosureArg());
     break;

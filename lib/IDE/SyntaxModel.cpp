@@ -92,7 +92,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         LiteralStartLoc = Optional<SourceLoc>();
         continue;
       }
-      
+
       switch(Tok.getKind()) {
 #define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
 #include "swift/Parse/Tokens.def"

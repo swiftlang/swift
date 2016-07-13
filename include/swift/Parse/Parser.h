@@ -877,8 +877,9 @@ public:
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
 
-  ParserResult<IdentTypeRepr> parseTypeIdentifier();
+  ParserResult<TypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseTypeIdentifierOrTypeComposition();
+  ParserResult<ProtocolCompositionTypeRepr> parseAnyType();
 
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
@@ -1083,7 +1084,7 @@ public:
   bool canParseType();
   bool canParseTypeIdentifier();
   bool canParseTypeIdentifierOrTypeComposition();
-  bool canParseTypeComposition();
+  bool canParseOldStyleProtocolComposition();
   bool canParseTypeTupleBody();
   bool canParseTypeAttribute();
   bool canParseGenericArguments();

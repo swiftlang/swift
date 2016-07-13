@@ -1657,12 +1657,12 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
 llvm::StructType *
 IRGenModule::createNominalType(ProtocolCompositionType *type) {
   llvm::SmallString<32> typeName;
-  
+
   SmallVector<ProtocolDecl *, 4> protocols;
   type->getAnyExistentialTypeProtocols(protocols);
   
   if (protocols.empty()) {
-    typeName.append("swift.Any");
+    typeName.append("Any");
   } else {
     for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
       if (i) typeName.push_back('&');

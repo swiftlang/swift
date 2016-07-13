@@ -461,7 +461,7 @@ contain the following fields:
   `protocol descriptor`_ records, but are pre-calculated for convenience.
 
 - The **number of protocols** that make up the protocol composition is stored at
-  **offset 2**. For the "any" types ``Any`` or ``Any : Class``, this
+  **offset 2**. For the "any" types ``Any`` or ``Any : class``, this
   is zero. For a single-protocol type ``P``, this is one. For a protocol
   composition type ``P & Q & ...``, this is the number of protocols.
 

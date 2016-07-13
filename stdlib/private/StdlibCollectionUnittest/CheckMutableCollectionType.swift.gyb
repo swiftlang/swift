@@ -579,9 +579,9 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
   } // addMutableCollectionTests
 
   public func addMutableBidirectionalCollectionTests<
-    C : protocol<BidirectionalCollection, MutableCollection>,
-    CollectionWithEquatableElement : protocol<BidirectionalCollection, MutableCollection>,
-    CollectionWithComparableElement : protocol<BidirectionalCollection, MutableCollection>
+    C : BidirectionalCollection & MutableCollection,
+    CollectionWithEquatableElement : BidirectionalCollection & MutableCollection,
+    CollectionWithComparableElement : BidirectionalCollection & MutableCollection
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
@@ -602,7 +602,7 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
     withUnsafeMutableBufferPointerIsSupported: Bool,
     isFixedLengthCollection: Bool
   ) where
-    C.SubSequence : protocol<BidirectionalCollection, MutableCollection>,
+    C.SubSequence : BidirectionalCollection & MutableCollection,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
     C.SubSequence.Index == C.Index,
     C.SubSequence.Indices.Iterator.Element == C.Index,
@@ -700,9 +700,9 @@ self.test("\(testNamePrefix).reverse()") {
   } // addMutableBidirectionalCollectionTests
 
   public func addMutableRandomAccessCollectionTests<
-    C : protocol<RandomAccessCollection, MutableCollection>,
-    CollectionWithEquatableElement : protocol<RandomAccessCollection, MutableCollection>,
-    CollectionWithComparableElement : protocol<RandomAccessCollection, MutableCollection>
+    C : RandomAccessCollection & MutableCollection,
+    CollectionWithEquatableElement : RandomAccessCollection & MutableCollection,
+    CollectionWithComparableElement : RandomAccessCollection & MutableCollection
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
@@ -723,7 +723,7 @@ self.test("\(testNamePrefix).reverse()") {
     withUnsafeMutableBufferPointerIsSupported: Bool,
     isFixedLengthCollection: Bool
   ) where
-    C.SubSequence : protocol<RandomAccessCollection, MutableCollection>,
+    C.SubSequence : RandomAccessCollection & MutableCollection,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
     C.SubSequence.Index == C.Index,
     C.SubSequence.Indices.Iterator.Element == C.Index,

@@ -162,7 +162,7 @@ public struct Mirror {
     return nil
   }
   
-  internal static func _superclassIterator<Subject : Any>(
+  internal static func _superclassIterator<Subject>(
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
   ) -> () -> Mirror? {
 

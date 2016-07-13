@@ -517,7 +517,6 @@ ERROR(reserved_member_name,none,
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
-ERROR(invalid_redecl_any,none,"invalid redeclaration of 'Any'; cannot overload type keyword", ())
 
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (Identifier))
