@@ -4,6 +4,7 @@ set(SWIFT_API_NOTES_INPUTS
   AudioToolbox
   CallKit
   CloudKit
+  Contacts
   CoreBluetooth
   CoreData
   CoreGraphics
