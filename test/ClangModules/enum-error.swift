@@ -16,6 +16,9 @@
 
 import Foundation
 
+func testDropCode(other: OtherError) -> OtherError.Code {
+  return other.code
+}
 
 func testError() {
   let testErrorNSError = NSError(domain: TestErrorDomain,

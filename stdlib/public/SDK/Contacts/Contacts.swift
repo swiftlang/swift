@@ -14,7 +14,7 @@
 import Foundation
 
 @available(macOS 10.11, iOS 9.0, *)
-extension CNErrorCode {
+extension CNError {
   /// One or more CNContact, CNGroup or CNContainer objects for which
   /// the error applies.
   public var affectedRecords: [AnyObject]? {

@@ -2722,11 +2722,14 @@ auto ClangImporter::Implementation::importFullName(
       baseName = baseName.substr(removePrefix.size());
       strippedPrefix = true;
     }
+  }
 
-    // If the error is an error enum, it will be mapped to the 'Code'
-    // enum nested within an NSError-containing struct. Strip the word
-    // "Code" off the end of the name, if it's there, because it's
-    // redundant.
+  // If the error is an error enum, it will be mapped to the 'Code'
+  // enum nested within an NSError-containing struct. Strip the word
+  // "Code" off the end of the name, if it's there, because it's
+  // redundant.
+  if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
+    auto enumInfo = getEnumInfo(enumDecl, &clangSema.getPreprocessor());
     if (enumInfo.isErrorEnum() && baseName.size() > 4 &&
         camel_case::getLastWord(baseName) == "Code")
       baseName = baseName.substr(0, baseName.size() - 4);

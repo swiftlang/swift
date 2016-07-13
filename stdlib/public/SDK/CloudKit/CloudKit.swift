@@ -2,7 +2,7 @@
 import Foundation
 
 @available(macOS 10.10, iOS 8.0, *)
-extension CKErrorCode {
+extension CKError {
   /// Retrieve partial error results associated by item ID.
   public var partialErrorsByItemID: [NSObject : Error]? {
     return userInfo[CKPartialErrorsByItemIDKey] as? [NSObject : Error]

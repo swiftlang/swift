@@ -12,4 +12,11 @@ typedef NS_ERROR_ENUM(int, TestError, TestErrorDomain) {
   TETwo,
 };
 
+extern NSString *const OtherErrorDomain;
+typedef NS_ERROR_ENUM(int, OtherErrorCode, OtherErrorDomain) {
+  OtherA,
+  OtherB,
+  OtherC,
+};
+
 TestError getErr();
