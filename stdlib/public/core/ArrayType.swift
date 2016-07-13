@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public // @testable
-protocol _ArrayProtocol
+internal protocol _ArrayProtocol
   : RangeReplaceableCollection,
     ExpressibleByArrayLiteral
 {
