@@ -34,6 +34,7 @@ namespace swift {
   class CompilerInstance;
   class CompilerInvocation;
   class Decl;
+  class Type;
   class AbstractStorageDecl;
   class SourceFile;
   class ValueDecl;
@@ -260,6 +261,14 @@ public:
   /// Generate a USR for a Decl, including the prefix.
   /// \returns true if the results should be ignored, false otherwise.
   static bool printUSR(const swift::ValueDecl *D, llvm::raw_ostream &OS);
+
+  /// Generate a USR for the Type of a given decl.
+  /// \returns true if the results should be ignored, false otherwise.
+  static bool printDeclTypeUSR(const swift::ValueDecl *D, llvm::raw_ostream &OS);
+
+  /// Generate a USR for of a given type.
+  /// \returns true if the results should be ignored, false otherwise.
+  static bool printTypeUSR(swift::Type Ty, llvm::raw_ostream &OS);
 
   /// Generate a USR for an accessor, including the prefix.
   /// \returns true if the results should be ignored, false otherwise.

@@ -118,6 +118,8 @@ static sourcekitd_uid_t KeyNotification;
 static sourcekitd_uid_t KeyPopular;
 static sourcekitd_uid_t KeyUnpopular;
 static sourcekitd_uid_t KeyTypeInterface;
+static sourcekitd_uid_t KeyTypeUsr;
+static sourcekitd_uid_t KeyContainerTypeUsr;
 static sourcekitd_uid_t KeyModuleGroups;
 static sourcekitd_uid_t KeySimplified;
 
@@ -216,6 +218,8 @@ static int skt_main(int argc, const char **argv) {
   KeyPopular = sourcekitd_uid_get_from_cstr("key.popular");
   KeyUnpopular = sourcekitd_uid_get_from_cstr("key.unpopular");
   KeyTypeInterface = sourcekitd_uid_get_from_cstr("key.typeinterface");
+  KeyTypeUsr = sourcekitd_uid_get_from_cstr("key.typeusr");
+  KeyContainerTypeUsr = sourcekitd_uid_get_from_cstr("key.containertypeusr");
   KeyModuleGroups = sourcekitd_uid_get_from_cstr("key.modulegroups");
   KeySimplified = sourcekitd_uid_get_from_cstr("key.simplified");
 
@@ -935,6 +939,10 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   const char *Name = sourcekitd_variant_dictionary_get_string(Info, KeyName);
   const char *Typename = sourcekitd_variant_dictionary_get_string(Info,
                                                                   KeyTypename);
+  const char *TypeUsr = sourcekitd_variant_dictionary_get_string(Info,
+                                                                 KeyTypeUsr);
+  const char *ContainerTypeUsr = sourcekitd_variant_dictionary_get_string(Info,
+                                                          KeyContainerTypeUsr);
   const char *ModuleName = sourcekitd_variant_dictionary_get_string(Info,
                                                               KeyModuleName);
   const char *GroupName = sourcekitd_variant_dictionary_get_string(Info,
@@ -1006,6 +1014,10 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     OS << USR << '\n';
   if (Typename)
     OS << Typename << '\n';
+  if (TypeUsr)
+    OS << TypeUsr << '\n';
+  if (ContainerTypeUsr)
+    OS << "<Container>" << ContainerTypeUsr << "</Container>" << '\n';
   if (ModuleName)
     OS << ModuleName << '\n';
   if (GroupName)

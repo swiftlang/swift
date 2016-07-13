@@ -697,6 +697,14 @@ bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
   return ide::printDeclUSR(D, OS);
 }
 
+bool SwiftLangSupport::printDeclTypeUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
+  return ide::printDeclTypeUSR(D, OS);
+}
+
+bool SwiftLangSupport::printTypeUSR(Type Ty, llvm::raw_ostream &OS) {
+  return ide::printTypeUSR(Ty, OS);
+}
+
 bool SwiftLangSupport::printAccessorUSR(const AbstractStorageDecl *D,
                                         AccessorKind AccKind,
                                         llvm::raw_ostream &OS) {

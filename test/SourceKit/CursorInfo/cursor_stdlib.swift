@@ -26,6 +26,7 @@ func foo3(a: Float, b: Bool) {}
 // CHECK-OVERLAY-NEXT: NSUTF8StringEncoding
 // CHECK-OVERLAY-NEXT: s:v10Foundation20NSUTF8StringEncodingSu
 // CHECK-OVERLAY-NEXT: UInt
+// CHECK-OVERLAY-NEXT: _TtSu
 // CHECK-OVERLAY-NEXT: <Declaration>public let NSUTF8StringEncoding: <Type usr="s:Su">UInt</Type></Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=5:13 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-ITERATOR %s
