@@ -1,0 +1,283 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -non-atomic-rc | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class C {
+  deinit
+  init()
+}
+
+public struct S {
+  @sil_stored var c: C { get set }
+}
+
+sil_global @g : $C
+
+sil_global @s : $S
+
+sil [noinline] @non_escaping_foo : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : $C):
+  return %0 : $C
+}
+
+sil [noinline] @escaping_foo : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : $C):
+  %1 = global_addr @g : $*C
+  store %0 to %1 : $*C
+  return %0 : $C
+}
+
+sil [noinline] @non_escaping_struct_foo : $@convention(thin) (@owned S) -> @owned S {
+bb0(%0 : $S):
+  return %0 : $S
+}
+
+sil [noinline] @escaping_struct_foo : $@convention(thin) (@owned S) -> @owned S {
+bb0(%0 : $S):
+  %1 = global_addr @s : $*S
+  store %0 to %1 : $*S
+  return %0 : $S
+}
+
+
+// Test that RC operations on non-escaping references are converted into
+// non-atomic RC operations.
+
+// CHECK-LABEL: sil @test_strong_rr_positive
+// CHECK: strong_retain [nonatomic]
+// CHECK: strong_release [nonatomic]
+// CHECK: return
+sil @test_strong_rr_positive: $@convention(thin) () -> @owned C {
+bb0:
+  %1 = alloc_ref $C
+  strong_retain %1 : $C
+  %f = function_ref @non_escaping_foo : $@convention(thin) (@owned C) -> @owned C
+  %r = apply %f (%1) : $@convention(thin) (@owned C) -> @owned C
+  strong_release %1 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: sil @test_rr_value_positive
+// CHECK: retain_value [nonatomic]
+// CHECK: release_value [nonatomic]
+// CHECK: return
+sil @test_rr_value_positive: $@convention(thin) () -> @owned S {
+bb0:
+  %0 = alloc_ref $C
+  %2 = struct $S (%0 : $C)
+  %3 = alloc_stack $S
+  store %2 to %3 : $*S
+  retain_value %2 : $S
+  %f = function_ref @non_escaping_struct_foo : $@convention(thin) (@owned S) -> @owned S
+  %r = apply %f (%2) : $@convention(thin) (@owned S) -> @owned S
+  release_value %2 : $S
+  dealloc_stack %3 : $*S
+  return %2 : $S
+}
+
+// CHECK-LABEL: sil @test_strong_rrN_positive
+// CHECK: strong_retain [nonatomic]
+// CHECK: strong_retain [nonatomic]
+// CHECK: strong_release [nonatomic]
+// CHECK: strong_release [nonatomic]
+// CHECK: return
+sil @test_strong_rrN_positive: $@convention(thin) () -> @owned C {
+bb0:
+  %1 = alloc_ref $C
+  strong_retain %1 : $C
+  strong_retain %1 : $C
+  %f = function_ref @non_escaping_foo : $@convention(thin) (@owned C) -> @owned C
+  %r = apply %f (%1) : $@convention(thin) (@owned C) -> @owned C
+  strong_release %1 : $C
+  strong_release %1 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: sil @test_bridged_rr_positive
+// CHECK: strong_retain [nonatomic]
+// CHECK: strong_release [nonatomic]
+// CHECK: return
+sil @test_bridged_rr_positive: $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = ref_to_bridge_object %0 : $C, %1 : $Builtin.Word
+  strong_retain %2 : $Builtin.BridgeObject
+  %f = function_ref @non_escaping_foo : $@convention(thin) (@owned C) -> @owned C
+  %r = apply %f (%0) : $@convention(thin) (@owned C) -> @owned C
+  strong_release %2 : $Builtin.BridgeObject
+  %3 = tuple ()
+  %4 = return %3 : $()
+}
+
+// CHECK-LABEL: sil @test_pin_unpin_positive
+// CHECK: strong_pin [nonatomic]
+// CHECK: strong_unpin [nonatomic]
+// CHECK: return
+sil @test_pin_unpin_positive: $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = unchecked_ref_cast %0 : $C to  $Builtin.NativeObject
+  %2 = strong_pin %1 : $Builtin.NativeObject
+  %f = function_ref @non_escaping_foo : $@convention(thin) (@owned C) -> @owned C
+  %r = apply %f (%0) : $@convention(thin) (@owned C) -> @owned C
+  strong_unpin %2 : $Optional<Builtin.NativeObject>
+  %3 = tuple ()
+  %4 = return %3 : $()
+}
+
+// Test that RC operations on escaping references are not converted into
+// non-atomic RC operations.
+
+// The incoming reference is considered to be escaping.
+// CHECK-LABEL: sil @test_incoming_reference_negative
+// CHECK-NOT: strong_retain [nonatomic]
+// CHECK: strong_retain
+// CHECK-NOT: strong_release [nonatomic]
+// CHECK: strong_release
+// CHECK: return
+sil @test_incoming_reference_negative: $@convention(thin) (C) -> @owned C {
+bb0(%1 : $C):
+  strong_retain %1 : $C
+  %f = function_ref @non_escaping_foo : $@convention(thin) (@owned C) -> @owned C
+  %r = apply %f (%1) : $@convention(thin) (@owned C) -> @owned C
+  strong_release %1 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: sil @test_strong_rr_negative
+// CHECK-NOT: strong_retain [nonatomic]
+// CHECK: strong_retain
+// CHECK-NOT: strong_release [nonatomic]
+// CHECK: strong_release
+// CHECK: return
+sil @test_strong_rr_negative: $@convention(thin) () -> @owned C {
+bb0:
+  %1 = alloc_ref $C
+  strong_retain %1 : $C
+  %f = function_ref @escaping_foo : $@convention(thin) (@owned C) -> @owned C
+  %r = apply %f (%1) : $@convention(thin) (@owned C) -> @owned C
+  strong_release %1 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: sil @test_rr_value_negative
+// CHECK-NOT: retain_value [nonatomic]
+// CHECK: retain_value
+// CHECK-NOT: release_value [nonatomic]
+// CHECK: release_value
+// CHECK: return
+sil @test_rr_value_negative: $@convention(thin) () -> @owned S {
+bb0:
+  %0 = alloc_ref $C
+  %2 = struct $S (%0 : $C)
+  %3 = alloc_stack $S
+  store %2 to %3 : $*S
+  retain_value %2 : $S
+  %f = function_ref @escaping_struct_foo : $@convention(thin) (@owned S) -> @owned S
+  %r = apply %f (%2) : $@convention(thin) (@owned S) -> @owned S
+  release_value %2 : $S
+  dealloc_stack %3 : $*S
+  return %2 : $S
+}
+
+// Check that even if a property of a struct escapes, the whole struct
+// is considered escaped and thus non-atomic RC operations cannot be used.
+
+// CHECK-LABEL: sil @test_escaping_property_rr_value_negative
+// CHECK-NOT: retain_value [nonatomic]
+// CHECK: retain_value
+// CHECK-NOT: release_value [nonatomic]
+// CHECK: release_value
+// CHECK: return
+sil @test_escaping_property_rr_value_negative: $@convention(thin) () -> @owned S {
+bb0:
+  %0 = alloc_ref $C
+  %2 = struct $S (%0 : $C)
+  %3 = alloc_stack $S
+  store %2 to %3 : $*S
+  retain_value %2 : $S
+  %f = function_ref @escaping_foo : $@convention(thin) (@owned C) -> @owned C
+  %r = apply %f (%0) : $@convention(thin) (@owned C) -> @owned C
+  %f1 = function_ref @non_escaping_struct_foo : $@convention(thin) (@owned S) -> @owned S
+  %r1 = apply %f1 (%2) : $@convention(thin) (@owned S) -> @owned S
+  release_value %2 : $S
+  dealloc_stack %3 : $*S
+  return %2 : $S
+}
+
+// CHECK-LABEL: sil @test_strong_rrN_negative
+// CHECK-NOT: strong_retain [nonatomic]
+// CHECK: strong_retain
+// CHECK: strong_retain
+// CHECK-NOT: strong_release [nonatomic]
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: return
+sil @test_strong_rrN_negative: $@convention(thin) () -> @owned C {
+bb0:
+  %1 = alloc_ref $C
+  strong_retain %1 : $C
+  strong_retain %1 : $C
+  %f = function_ref @escaping_foo : $@convention(thin) (@owned C) -> @owned C
+  %r = apply %f (%1) : $@convention(thin) (@owned C) -> @owned C
+  strong_release %1 : $C
+  strong_release %1 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: sil @test_bridged_rr_negative
+// CHECK-NOT: strong_retain [nonatomic]
+// CHECK: strong_retain
+// CHECK-NOT: strong_release [nonatomic]
+// CHECK: strong_release
+// CHECK: return
+sil @test_bridged_rr_negative: $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = ref_to_bridge_object %0 : $C, %1 : $Builtin.Word
+  strong_retain %2 : $Builtin.BridgeObject
+  %f = function_ref @escaping_foo : $@convention(thin) (@owned C) -> @owned C
+  %r = apply %f (%0) : $@convention(thin) (@owned C) -> @owned C
+  strong_release %2 : $Builtin.BridgeObject
+  %3 = tuple ()
+  %4 = return %3 : $()
+}
+
+// CHECK-LABEL: sil @test_pin_unpin_negative
+// CHECK-NOT: strong_pin [nonatomic]
+// CHECK: strong_pin
+// CHECK-NOT: strong_unpin [nonatomic]
+// CHECK: strong_unpin
+// CHECK: return
+sil @test_pin_unpin_negative: $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = unchecked_ref_cast %0 : $C to  $Builtin.NativeObject
+  %2 = strong_pin %1 : $Builtin.NativeObject
+  %f = function_ref @escaping_foo : $@convention(thin) (@owned C) -> @owned C
+  %r = apply %f (%0) : $@convention(thin) (@owned C) -> @owned C
+  strong_unpin %2 : $Optional<Builtin.NativeObject>
+  %3 = tuple ()
+  %4 = return %3 : $()
+}
+
+
+
+// C.__deallocating_deinit
+sil @_TFC28nonatomic_reference_counting1CD : $@convention(method) (@owned C) -> () {
+bb0(%0 : $C):
+  dealloc_ref %0 : $C
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil_vtable C {
+  #C.deinit!deallocator: _TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
+}
+

@@ -169,6 +169,8 @@ PASS(LSLocationPrinter, "lslocation-dump",
      "Dump LSLocation results from analyzing all accessed locations")
 PASS(MergeCondFails, "merge-cond_fails",
      "Remove redundant overflow checks")
+PASS(NonAtomicRC, "non-atomic-rc",
+     "Use non-atomic reference counting whenever possible")
 PASS(NoReturnFolding, "noreturn-folding",
      "Add 'unreachable' after noreturn calls")
 PASS(RCIdentityDumper, "rc-id-dumper",
