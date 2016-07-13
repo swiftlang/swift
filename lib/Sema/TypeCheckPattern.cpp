@@ -1453,8 +1453,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                           /*special kind*/0, Rename.str())
                 .fixItReplace(EEP->getLoc(), Rename.str());
 
+              return true;
             }
-            return true;
           }
 
           diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,
