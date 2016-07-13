@@ -1557,6 +1557,50 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
   }
 }
 
+static void unwrapExistential(OpaqueValue *src,
+                              const ExistentialTypeMetadata *srcType,
+                              OpaqueValue *&srcValue,
+                              const Metadata *&srcCapturedType,
+                              bool &isOutOfLine,
+                              bool &canTake) {
+  switch (srcType->getRepresentation()) {
+    case ExistentialTypeRepresentation::Class: {
+      auto classContainer =
+      reinterpret_cast<const ClassExistentialContainer*>(src);
+      srcValue = (OpaqueValue*) &classContainer->Value;
+      void *obj = classContainer->Value;
+      srcCapturedType = swift_getObjectType(reinterpret_cast<HeapObject*>(obj));
+      isOutOfLine = false;
+      canTake = true;
+      break;
+    }
+    case ExistentialTypeRepresentation::Opaque: {
+      auto opaqueContainer = reinterpret_cast<OpaqueExistentialContainer*>(src);
+      srcCapturedType = opaqueContainer->Type;
+      srcValue = srcCapturedType->vw_projectBuffer(&opaqueContainer->Buffer);
+      isOutOfLine = (src != srcValue);
+      canTake = true;
+      break;
+    }
+    case ExistentialTypeRepresentation::Error: {
+      const SwiftError *errorBox
+      = *reinterpret_cast<const SwiftError * const *>(src);
+      
+      srcCapturedType = errorBox->getType();
+      // A bridged NSError is itself the value.
+      if (errorBox->isPureNSError())
+        srcValue = src;
+      else
+        srcValue = const_cast<OpaqueValue*>(errorBox->getValue());
+      
+      // The value is out-of-line, but we can't take it, since it may be shared.
+      isOutOfLine = true;
+      canTake = false;
+      break;
+    }
+  }
+}
+
 /// Perform a dynamic cast from an existential type to a
 /// non-existential type.
 static bool _dynamicCastFromExistential(OpaqueValue *dest,
@@ -1569,42 +1613,8 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
   bool isOutOfLine;
   bool canTake;
 
-  switch (srcType->getRepresentation()) {
-  case ExistentialTypeRepresentation::Class: {
-    auto classContainer =
-      reinterpret_cast<const ClassExistentialContainer*>(src);
-    srcValue = (OpaqueValue*) &classContainer->Value;
-    void *obj = classContainer->Value;
-    srcCapturedType = swift_getObjectType(reinterpret_cast<HeapObject*>(obj));
-    isOutOfLine = false;
-    canTake = true;
-    break;
-  }
-  case ExistentialTypeRepresentation::Opaque: {
-    auto opaqueContainer = reinterpret_cast<OpaqueExistentialContainer*>(src);
-    srcCapturedType = opaqueContainer->Type;
-    srcValue = srcCapturedType->vw_projectBuffer(&opaqueContainer->Buffer);
-    isOutOfLine = (src != srcValue);
-    canTake = true;
-    break;
-  }
-  case ExistentialTypeRepresentation::Error: {
-    const SwiftError *errorBox
-      = *reinterpret_cast<const SwiftError * const *>(src);
-    
-    srcCapturedType = errorBox->getType();
-    // A bridged NSError is itself the value.
-    if (errorBox->isPureNSError())
-      srcValue = src;
-    else
-      srcValue = const_cast<OpaqueValue*>(errorBox->getValue());
-
-    // The value is out-of-line, but we can't take it, since it may be shared.
-    isOutOfLine = true;
-    canTake = false;
-    break;
-  }
-  }
+  unwrapExistential(src, srcType,
+                    srcValue, srcCapturedType, isOutOfLine, canTake);
   
   auto subFlags = flags;
   if (!canTake)
@@ -1622,8 +1632,11 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
   } else {
     // swift_dynamicCast took or destroyed the value as per the original request
     // We may still have an opaque existential container to deallocate.
-    if (isOutOfLine)
+    if (isOutOfLine) {
+      assert(srcType->getRepresentation()
+               == ExistentialTypeRepresentation::Opaque);
       _maybeDeallocateOpaqueExistential(src, result, flags);
+    }
   }
 
   return result;
@@ -2513,6 +2526,78 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   }
 
   return success;
+}
+
+static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
+                                                const Metadata *srcType,
+                                                bool consume) {
+  // We can always bridge objects verbatim.
+  if (srcType->isAnyClass()) {
+    id result;
+    memcpy(&result, src, sizeof(id));
+    if (!consume)
+      swift_unknownRetain(result);
+    return result;
+  }
+  
+  // Dig through existential types.
+  if (auto srcExistentialTy = dyn_cast<ExistentialTypeMetadata>(srcType)) {
+    OpaqueValue *srcInnerValue;
+    const Metadata *srcInnerType;
+    bool isOutOfLine;
+    bool canTake;
+    
+    unwrapExistential(src, srcExistentialTy,
+                      srcInnerValue, srcInnerType, isOutOfLine, canTake);
+    auto result = bridgeAnythingNonVerbatimToObjectiveC(srcInnerValue,
+                                                        srcInnerType,
+                                                        consume && canTake);
+    // Clean up the existential, or its remains after taking the value from
+    // it.
+    if (consume) {
+      if (canTake) {
+        if (isOutOfLine) {
+          // Should only be true of opaque existentials.
+          assert(srcExistentialTy->getRepresentation()
+                   == ExistentialTypeRepresentation::Opaque);
+          auto container = reinterpret_cast<OpaqueExistentialContainer*>(src);
+          srcInnerType->vw_deallocateBuffer(&container->Buffer);
+        }
+      } else {
+        // We didn't take the value, so clean up the existential value.
+        srcType->vw_destroy(src);
+      }
+    }
+    return result;
+  }
+  
+  if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
+    // Check whether the source is bridged to Objective-C.
+    if (!srcBridgeWitness->isBridgedToObjectiveC(srcType, srcType,
+                                                 srcBridgeWitness)) {
+      return nil;
+    }
+
+    // Bridge the source value to an object.
+    auto srcBridgedObject =
+      srcBridgeWitness->bridgeToObjectiveC(src, srcType, srcBridgeWitness);
+
+    // Consume if the source object was passed in +1.
+    if (consume)
+      srcType->vw_destroy(src);
+
+    return (id)srcBridgedObject;
+  }
+
+  // TODO: Fall back to boxing here.
+  crash("unimplemented boxing bridge");
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C"
+id _swift_bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
+                                                const Metadata *srcType) {
+  return bridgeAnythingNonVerbatimToObjectiveC(src, srcType, /*consume*/ true);
 }
 
 //===--- Bridging helpers for the Swift stdlib ----------------------------===//
