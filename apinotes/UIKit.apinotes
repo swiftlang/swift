@@ -428,5 +428,7 @@ Enumerators:
   SwiftName: normal
 - Name: UIDocumentStateNormal
   SwiftName: normal
+- Name: UIPrinterJobTypeUnknown
+  SwiftName: unknown
 - Name: UIUserInterfaceIdiomTV
   SwiftName: tv
