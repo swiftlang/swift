@@ -77,10 +77,10 @@ bb1:
 // CHECK-LABEL: sil public_external [fragile] @test2 : $@convention(thin) (Int) -> ()
 sil [fragile] @test2 : $@convention(thin) (Int) -> () {
   // CHECK: bb1:
-  // CHECK: return %5 : $()
+  // CHECK: %[[VAL:[0-9]+]] = tuple ()
+  // CHECK: br bb2
   // CHECK: bb2:
-  // CHECK: %5 = tuple ()
-  // CHECK: br bb1
+  // CHECK: return %[[VAL]] : $()
 bb0(%0 : $Int):
   br bb2
 bb1:
@@ -602,7 +602,7 @@ bb3(%6 : $Builtin.Word):
 sil [fragile] @test_cond_branch_basic_block_args : $@convention(thin) (Int, Builtin.Int1) -> Int {
 bb0(%0 : $Int, %1 : $Builtin.Int1):
   cond_br %1, bb1(%0 : $Int), bb2(%0 : $Int)
-  // CHECK: cond_br %1, bb1(%0 : $Int), bb2(%0 : $Int)
+  // CHECK: cond_br %1, bb2(%0 : $Int), bb1(%0 : $Int)
 bb1(%3 : $Int):
   br bb3 (%3 : $Int)
 bb2(%2 : $Int):
@@ -716,12 +716,13 @@ bb1:
 bb2:
   %7 = function_ref @_TF6switch1aFT_T_ : $@convention(thin) () -> ()
   %8 = apply %7() : $@convention(thin) () -> ()
-  br bb5                                                 // CHECK: br
+  br bb5
 
 bb3(%10 : $Int):
   // CHECK: unchecked_enum_data {{%.*}} : $MaybePair, #MaybePair.Left!enumelt.1
   %x = unchecked_enum_data %3 : $MaybePair, #MaybePair.Left!enumelt.1
   br bb4(%x : $Int)
+  // CHECK: br
 
 bb4(%y : $Int):
   %12 = function_ref @_TF6switch1bFT_T_ : $@convention(thin) () -> ()
@@ -763,7 +764,7 @@ bb3:
 // CHECK-LABEL: sil public_external [fragile] @test_switch_value : $@convention(thin) (Builtin.Word) -> ()
 sil [fragile] @test_switch_value : $@convention(thin) (Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word):
-  // CHECK: switch_value %{{.*}} : $Builtin.Word, case %1: bb1, case %2: bb2
+  // CHECK: switch_value %{{.*}} : $Builtin.Word, case %1: bb2, case %2: bb1
   %1 = integer_literal $Builtin.Word, 1
   %2 = integer_literal $Builtin.Word, 2
   switch_value %0 : $Builtin.Word, case %1: bb1, case %2: bb2
@@ -1001,7 +1002,7 @@ sil [fragile] @block_invoke : $@convention(c) (@inout_aliasable @block_storage I
 // CHECK-LABEL: sil public_external [fragile] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error {
 sil [fragile]  @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error {
 bb0(%0 : $@convention(thin) () -> @error Error):
-  // CHECK: try_apply %0() : $@convention(thin) () -> @error Error, normal bb1, error bb2
+  // CHECK: try_apply %0() : $@convention(thin) () -> @error Error, normal bb2, error bb1
   try_apply %0() : $@convention(thin) () -> @error Error, normal bb1, error bb2
 
 bb1(%1 : $()):

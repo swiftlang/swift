@@ -178,6 +178,10 @@ public:
   /// Return the array of opened archetypes operands for this instruction.
   MutableArrayRef<Operand> getOpenedArchetypeOperands();
 
+  /// Returns true if a given kind of instruciton may have opened archetype
+  /// operands.
+  bool mayHaveOpenedArchetypeOperands() const;
+
   unsigned getNumOperands() const { return getAllOperands().size(); }
 
   unsigned getNumOpenedArchetypeOperands() const {

@@ -15,12 +15,14 @@
 #include "Serialization.h"
 #include "swift/Strings.h"
 #include "swift/AST/Module.h"
+#include "swift/SIL/CFG.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -390,7 +392,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // Assign a value ID to each SILInstruction that has value and to each basic
   // block argument.
   unsigned ValueID = 0;
-  for (const SILBasicBlock &BB : F) {
+  llvm::ReversePostOrderTraversal<SILFunction *> RPOT(
+      const_cast<SILFunction *>(&F));
+  for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
+    auto &BB = **Iter;
     BasicBlockMap.insert(std::make_pair(&BB, BasicID++));
 
     for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
@@ -401,8 +406,17 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         ValueIDs[&SI] = ++ValueID;
   }
 
-  for (const SILBasicBlock &BB : F)
-    writeSILBasicBlock(BB);
+  // Write SIL basic blocks in the RPOT order
+  // to make sure that instructions defining open archetypes
+  // are serialized before instructions using those opened
+  // archetypes.
+  unsigned SerializedBBNum = 0;
+  for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
+    auto *BB = *Iter;
+    writeSILBasicBlock(*BB);
+    SerializedBBNum++;
+  }
+  assert(BasicID == SerializedBBNum && "Wrong number of BBs was serialized");
 }
 
 void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
