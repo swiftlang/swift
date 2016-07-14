@@ -2636,8 +2636,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     case AccessorKind::IsAddressor:
       recordDeclLoc(decl,
         [&]{
-          if (decl->isMutating())
-            Printer << "mutating ";
           Printer << (kind == AccessorKind::IsGetter
                         ? "get" : getAddressorLabel(decl));
         });
@@ -2648,8 +2646,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     case AccessorKind::IsMutableAddressor:
       recordDeclLoc(decl,
         [&]{
-          if (decl->isExplicitNonMutating())
-            Printer << "nonmutating ";
           Printer << (kind == AccessorKind::IsDidSet ? "didSet" :
                       kind == AccessorKind::IsMaterializeForSet
                         ? "materializeForSet"
@@ -2661,8 +2657,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     case AccessorKind::IsWillSet:
       recordDeclLoc(decl,
         [&]{
-          if (decl->isExplicitNonMutating())
-            Printer << "nonmutating ";
           Printer << (decl->isSetter() ? "set" : "willSet");
 
           auto params = decl->getParameterLists().back();
