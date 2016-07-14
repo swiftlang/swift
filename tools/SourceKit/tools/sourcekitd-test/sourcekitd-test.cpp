@@ -36,6 +36,10 @@ using namespace llvm;
 using namespace sourcekitd_test;
 
 static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts);
+static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
+                           const std::string &SourceFile,
+                           std::unique_ptr<llvm::MemoryBuffer> SourceBuf,
+                           TestOptions *InitOpts);
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef Filename,
                             llvm::raw_ostream &OS);
 static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename);
@@ -156,6 +160,18 @@ static SourceKit::Semaphore semaSemaphore(0);
 static sourcekitd_response_t semaResponse;
 static const char *semaName;
 
+namespace {
+struct AsyncResponseInfo {
+  SourceKit::Semaphore semaphore{0};
+  sourcekitd_response_t response = nullptr;
+  TestOptions options;
+  std::string sourceFilename;
+  std::unique_ptr<llvm::MemoryBuffer> sourceBuffer;
+};
+}
+
+static std::vector<AsyncResponseInfo> asyncResponses;
+
 static int skt_main(int argc, const char **argv);
 
 int main(int argc, const char **argv) {
@@ -265,17 +281,32 @@ static int skt_main(int argc, const char **argv) {
     }
     if (i == Args.size())
       break;
-    int ret = handleTestInvocation(Args.slice(0, i), InitOpts);
-    if (ret) {
+    if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts)) {
       sourcekitd_shutdown();
       return ret;
     }
     Args = Args.slice(i+1);
   }
 
-  int ret = handleTestInvocation(Args, InitOpts);
+  if (int ret = handleTestInvocation(Args, InitOpts)) {
+    sourcekitd_shutdown();
+    return ret;
+  }
+
+  for (auto &info : asyncResponses) {
+    if (info.semaphore.wait(60 * 1000)) {
+      llvm::report_fatal_error("async request timed out");
+    }
+
+    if (handleResponse(info.response, info.options, info.sourceFilename,
+                       std::move(info.sourceBuffer), nullptr)) {
+      sourcekitd_shutdown();
+      return 1;
+    }
+  }
+
   sourcekitd_shutdown();
-  return ret;
+  return 0;
 }
 
 static inline const char *getInterfaceGenDocumentName() {
@@ -665,8 +696,45 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
                                              Opts.HeaderPath.c_str());
   }
 
-  sourcekitd_request_description_dump(Req);
-  sourcekitd_response_t Resp = sourcekitd_send_request_sync(Req);
+  if (Opts.PrintRequest)
+    sourcekitd_request_description_dump(Req);
+
+  if (!Opts.isAsyncRequest) {
+    sourcekitd_response_t Resp = sourcekitd_send_request_sync(Req);
+    sourcekitd_request_release(Req);
+    return handleResponse(Resp, Opts, SourceFile, std::move(SourceBuf),
+                          &InitOpts)
+               ? 1
+               : 0;
+  } else {
+#if SOURCEKITD_HAS_BLOCKS
+    AsyncResponseInfo info;
+    info.options = Opts;
+    info.sourceFilename = std::move(SourceFile);
+    info.sourceBuffer = std::move(SourceBuf);
+    unsigned respIndex = asyncResponses.size();
+    asyncResponses.push_back(std::move(info));
+
+    sourcekitd_send_request(Req, nullptr, ^(sourcekitd_response_t resp) {
+      auto &info = asyncResponses[respIndex];
+      info.response = resp;
+      info.semaphore.signal(); // Ready to be handled!
+    });
+
+#else
+    llvm::report_fatal_error(
+        "-async not supported when sourcekitd is built without blocks support");
+#endif
+
+    sourcekitd_request_release(Req);
+    return 0;
+  }
+}
+
+static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
+                           const std::string &SourceFile,
+                           std::unique_ptr<llvm::MemoryBuffer> SourceBuf,
+                           TestOptions *InitOpts) {
   bool KeepResponseAlive = false;
   bool IsError = sourcekitd_response_is_error(Resp);
   if (IsError) {
@@ -742,8 +810,10 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
     case SourceKitRequest::InterfaceGenOpen:
       // Just initialize the options for the subsequent request.
-      InitOpts.SourceFile = getInterfaceGenDocumentName();
-      InitOpts.SourceText =
+      assert(!Opts.isAsyncRequest && InitOpts &&
+             "async interface-gen-open is not supported");
+      InitOpts->SourceFile = getInterfaceGenDocumentName();
+      InitOpts->SourceText =
           sourcekitd_variant_dictionary_get_string(Info, KeySourceText);
       break;
 
@@ -832,7 +902,6 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   if (!KeepResponseAlive)
     sourcekitd_response_dispose(Resp);
-  sourcekitd_request_release(Req);
   return IsError;
 }
 

@@ -1024,24 +1024,26 @@ void SwiftLangSupport::getCursorInfo(
                      SwiftArgs, OpArgs);
     }
 
-    SwiftInterfaceGenContext::ResolvedEntity Entity;
-    Entity = IFaceGenRef->resolveEntityForOffset(Offset);
-    if (Entity.isResolved()) {
-      CompilerInvocation Invok;
-      IFaceGenRef->applyTo(Invok);
-      if (Entity.Mod) {
-        passCursorInfoForModule(Entity.Mod, IFaceGenContexts, Invok, Receiver);
+    IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Receiver] {
+      SwiftInterfaceGenContext::ResolvedEntity Entity;
+      Entity = IFaceGenRef->resolveEntityForOffset(Offset);
+      if (Entity.isResolved()) {
+        CompilerInvocation Invok;
+        IFaceGenRef->applyTo(Invok);
+        if (Entity.Mod) {
+          passCursorInfoForModule(Entity.Mod, IFaceGenContexts, Invok,
+                                  Receiver);
+        } else {
+          // FIXME: Should pass the main module for the interface but currently
+          // it's not necessary.
+          passCursorInfoForDecl(
+              Entity.Dcl, /*MainModule*/ nullptr, Type(), Type(), Entity.IsRef,
+              /*OrigBufferID=*/None, *this, Invok, {}, Receiver);
+        }
       } else {
-        // FIXME: Should pass the main module for the interface but currently
-        // it's not necessary.
-        passCursorInfoForDecl(Entity.Dcl, /*MainModule*/nullptr, Type(), Type(),
-                              Entity.IsRef,
-                              /*OrigBufferID=*/None, *this, Invok,
-                              {}, Receiver);
+        Receiver({});
       }
-    } else {
-      Receiver({});
-    }
+    });
     return;
   }
 
