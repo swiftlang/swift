@@ -48,7 +48,7 @@ extension ObjectIdentifier : CustomDebugStringConvertible {
 }
 
 public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
-  return UInt(lhs) < UInt(rhs)
+  return UInt(bitPattern: lhs) < UInt(bitPattern: rhs)
 }
 
 public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
@@ -57,15 +57,15 @@ public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
 
 extension UInt {
   /// Create a `UInt` that captures the full value of `objectID`.
-  public init(_ objectID: ObjectIdentifier) {
+  public init(bitPattern objectID: ObjectIdentifier) {
     self.init(Builtin.ptrtoint_Word(objectID._value))
   }
 }
 
 extension Int {
   /// Create an `Int` that captures the full value of `objectID`.
-  public init(_ objectID: ObjectIdentifier) {
-    self.init(bitPattern: UInt(objectID))
+  public init(bitPattern objectID: ObjectIdentifier) {
+    self.init(bitPattern: UInt(bitPattern: objectID))
   }
 }
 
@@ -628,6 +628,20 @@ struct _MetatypeMirror : _Mirror {
 extension ObjectIdentifier {
   @available(*, unavailable, message: "use the 'UInt(_:)' initializer")
   public var uintValue: UInt {
+    Builtin.unreachable()
+  }
+}
+
+extension UInt {
+  @available(*, unavailable, renamed: "init(bitPattern:)")
+  public init(_ objectID: ObjectIdentifier) {
+    Builtin.unreachable()
+  }
+}
+
+extension Int {
+  @available(*, unavailable, renamed: "init(bitPattern:)")
+  public init(_ objectID: ObjectIdentifier) {
     Builtin.unreachable()
   }
 }
