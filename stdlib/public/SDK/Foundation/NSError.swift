@@ -132,7 +132,7 @@ public extension Error where Self : CustomNSError {
 public extension Error {
   /// Retrieve the localized description for this error.
   var localizedDescription: String {
-    return (self as! NSError).localizedDescription
+    return (self as NSError).localizedDescription
   }
 }
 
