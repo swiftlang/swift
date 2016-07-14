@@ -157,7 +157,7 @@ class ArchetypeSelfTransformer : public PrinterArchetypeTransformer {
     for (; Self->getParent(); Self = Self->getParent()) {
       Names.insert(Names.begin(), Self->getName());
     }
-    if (!Self->getSelfProtocol() || Names.empty())
+    if (!Self->getSelfProtocol())
       return tryNamedArchetypeTransform(Ty);
     Type Result = checkMemberType(DC, BaseTy, Names);
     if (Result)
