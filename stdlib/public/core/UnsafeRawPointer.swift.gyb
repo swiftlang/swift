@@ -114,9 +114,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// `alignedTo` alignment.
   ///
   /// - Postcondition: The memory is allocated, but not initialized.
-  public static func allocate(
-    bytes size: Int, alignedTo: Int = Int(Builtin.alignof(Double.self))
-  ) -> UnsafeMutableRawPointer {
+  public static func allocate(bytes size: Int, alignedTo: Int)
+  -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(Builtin.allocRaw(
         size._builtinWordValue, alignedTo._builtinWordValue))
   }
@@ -128,9 +127,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: The memory is not initialized.
   ///
   /// - Postcondition: The memory has been deallocated.
-  public func deallocate(bytes: Int,
-    alignedTo: Int = Int(Builtin.alignof(Double.self))
-  ) {
+  public func deallocate(bytes: Int, alignedTo: Int) {
     Builtin.deallocRaw(
       _rawValue, bytes._builtinWordValue, alignedTo._builtinWordValue)
   }

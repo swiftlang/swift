@@ -17,9 +17,10 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
   Missile.missilesLaunched = 0
   do {
     let sizeInBytes = 3 * strideof(Missile.self)
-    var p1 = UnsafeMutableRawPointer.allocate(bytes: sizeInBytes)
+    var p1 = UnsafeMutableRawPointer.allocate(
+      bytes: sizeInBytes, alignedTo: alignof(Missile.self))
     defer {
-      p1.deallocate(bytes: sizeInBytes)
+      p1.deallocate(bytes: sizeInBytes, alignedTo: alignof(Missile.self))
     }
     var ptrM = p1.initializeMemory(as: Missile.self, to: Missile(1))
     p1.initializeMemory(as: Missile.self, at: 1, count: 2, to: Missile(2))
@@ -27,9 +28,10 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
     expectEqual(2, ptrM[1].number)
     expectEqual(2, ptrM[2].number)
 
-    var p2 = UnsafeMutableRawPointer.allocate(bytes: sizeInBytes)
+    var p2 = UnsafeMutableRawPointer.allocate(
+      bytes: sizeInBytes, alignedTo: alignof(Missile.self))
     defer {
-      p2.deallocate(bytes: sizeInBytes)
+      p2.deallocate(bytes: sizeInBytes, alignedTo: alignof(Missile.self))
     }
     let ptrM2 = p2.moveInitializeMemory(as: Missile.self, from: ptrM, count: 3)
     defer {
@@ -54,9 +56,10 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
 
 UnsafeMutableRawPointerExtraTestSuite.test("load/store") {
   let sizeInBytes = 3 * strideof(Int.self)
-  var p1 = UnsafeMutableRawPointer.allocate(bytes: sizeInBytes)
+  var p1 = UnsafeMutableRawPointer.allocate(
+    bytes: sizeInBytes, alignedTo: alignof(Int.self))
   defer {
-    p1.deallocate(bytes: sizeInBytes)
+    p1.deallocate(bytes: sizeInBytes, alignedTo: alignof(Int.self))
   }
   let ptrI = p1.initializeMemory(as: Int.self, from: 1...3)
   defer {
