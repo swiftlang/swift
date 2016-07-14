@@ -1223,29 +1223,6 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
   }
 }
 
-static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
-  assert(gen.B.getInsertionBB()->getIterator() == gen.F.begin()
-         && "not at entry point?!");
-
-  SILBasicBlock *entry = gen.B.getInsertionBB();
-  // Create the argc and argv arguments.
-  auto &C = gen.getASTContext();
-  auto FnTy = gen.F.getLoweredFunctionType();
-  auto *argc = entry->createArgument(FnTy->getParameters()[0].getSILType());
-  auto *argv = entry->createArgument(FnTy->getParameters()[1].getSILType());
-
-  // If the standard library provides a _stdlib_didEnterMain intrinsic, call it
-  // first thing.
-  if (auto didEnterMain = C.getDidEnterMain(nullptr)) {
-    ManagedValue params[] = {
-      ManagedValue::forUnmanaged(argc),
-      ManagedValue::forUnmanaged(argv),
-    };
-    (void) gen.emitApplyOfLibraryIntrinsic(loc, didEnterMain, {}, params,
-                                           SGFContext());
-  }
-}
-
 void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   // We don't need to emit dependent conformances.
   if (conformanceRef.isAbstract()) 
@@ -1308,9 +1285,13 @@ public:
       sgm.TopLevelSGF->prepareRethrowEpilog(
                                  CleanupLocation::getModuleCleanupLocation());
 
+      // Create the argc and argv arguments.
       auto PrologueLoc = RegularLocation::getModuleLocation();
       PrologueLoc.markAsPrologue();
-      emitTopLevelProlog(*sgm.TopLevelSGF, PrologueLoc);
+      auto entry = sgm.TopLevelSGF->B.getInsertionBB();
+      auto FnTy = sgm.TopLevelSGF->F.getLoweredFunctionType();
+      entry->createArgument(FnTy->getParameters()[0].getSILType());
+      entry->createArgument(FnTy->getParameters()[1].getSILType());
 
       scope.emplace(sgm.TopLevelSGF->Cleanups,
                     CleanupLocation::getModuleCleanupLocation());
@@ -1409,8 +1390,12 @@ public:
       // Assign a debug scope pointing into the void to the top level function.
       toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc, toplevel));
 
+      // Create the argc and argv arguments.
       SILGenFunction gen(sgm, *toplevel);
-      emitTopLevelProlog(gen, mainClass);
+      auto entry = gen.B.getInsertionBB();
+      auto FnTy = gen.F.getLoweredFunctionType();
+      entry->createArgument(FnTy->getParameters()[0].getSILType());
+      entry->createArgument(FnTy->getParameters()[1].getSILType());
       gen.emitArtificialTopLevel(mainClass);
     }
   }

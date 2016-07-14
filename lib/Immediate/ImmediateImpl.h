@@ -34,8 +34,10 @@ namespace swift {
 
 namespace immediate {
 
-// Returns a handle to the runtime suitable for other 'dlsym' or 'dlclose' 
-// calls or 'NULL' if an error occurred.
+/// Returns a handle to the runtime suitable for other \c dlsym or \c dlclose
+/// calls or \c null if an error occurred.
+///
+/// \param runtimeLibPath Path to search for compiler-relative stdlib dylibs.
 void *loadSwiftRuntime(StringRef runtimeLibPath);
 bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                       SearchPathOptions SearchPathOpts,

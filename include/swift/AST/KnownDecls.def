@@ -64,7 +64,6 @@ FUNC_DECL(BridgeAnyObjectToAny,
 
 FUNC_DECL(ConvertToAnyHashable, "_convertToAnyHashable")
 
-FUNC_DECL(DidEnterMain, "_stdlib_didEnterMain")
 FUNC_DECL(DiagnoseUnexpectedNilOptional, "_diagnoseUnexpectedNilOptional")
 
 FUNC_DECL(GetErrorEmbeddedNSError, "_stdlib_getErrorEmbeddedNSError")
