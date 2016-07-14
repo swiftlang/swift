@@ -7,7 +7,7 @@
 
 % import os.path
 % import gyb
-% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
+% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal, sliceTypeName, defaultIndicesForTraversal
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -787,5 +787,45 @@ CollectionTypeTests.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") 
   _ = tester._withUnsafeMutableBufferPointerIfSupported { _ in () }
   expectCustomizable(tester, tester.log._withUnsafeMutableBufferPointerIfSupported)
 }
+
+
+//===----------------------------------------------------------------------===//
+// Associated Type Inference
+//===----------------------------------------------------------------------===//
+
+// This section verifies that only the absolutely minimal protocol requirements
+// are required to declare each kind of collection. All remaining requirements
+// and associated types should be either inferred from the declared properties
+// and methods or inherited as defaults via protocol extension.
+
+struct FatalIndex : Comparable { }
+func <(lhs: FatalIndex, rhs: FatalIndex) -> Bool { fatalError() }
+func ==(lhs: FatalIndex, rhs: FatalIndex) -> Bool { fatalError() }
+
+% for Traversal in TRAVERSALS:
+%   Collection = collectionForTraversal(Traversal)
+%   Self = 'Fatal' + Collection
+%   Slice = sliceTypeName(Traversal, False, False)
+%   Indices = defaultIndicesForTraversal(Traversal)
+
+struct ${Self}<T> : ${Collection} {
+  var startIndex: FatalIndex { fatalError() }
+  var endIndex: FatalIndex { fatalError() }
+  subscript(i: FatalIndex) -> T { fatalError() }
+  func index(after i: FatalIndex) -> FatalIndex { fatalError() }
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  func index(before i: FatalIndex) -> FatalIndex { fatalError() }
+%   end
+}
+
+CollectionTypeTests.test("AssociatedTypes/${Collection}") {
+  expectTrue(${Self}<Void>.Index.self == FatalIndex.self)
+  expectTrue(${Self}<Void>.Indices.self == ${Indices}<${Self}<Void>>.self)
+  expectTrue(${Self}<Void>.IndexDistance.self == Int.self)
+  expectTrue(${Self}<Void>.Iterator.self == IndexingIterator<${Self}<Void>>.self)
+  expectTrue(${Self}<Void>.SubSequence.self == ${Slice}<${Self}<Void>>.self)
+}
+% end
+
 
 runAllTests()
