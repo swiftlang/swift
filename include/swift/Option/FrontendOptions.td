@@ -230,10 +230,6 @@ def enable_experimental_nested_generic_types :
   Flag<["-"], "enable-experimental-nested-generic-types">,
   HelpText<"Enable experimental support for nested generic types">;
 
-def enable_experimental_collection_casts :
-  Flag<["-"], "enable-experimental-collection-casts">,
-  HelpText<"Enable experimental support for general collection casting">;
-
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
