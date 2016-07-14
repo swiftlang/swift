@@ -465,5 +465,8 @@ int main(int argc, char *argv[]) {
 
   const char *BinaryFilename = argv[1];
 
+  uint16_t Version = swift_reflection_getSupportedMetadataVersion();
+  printf("Metadata version: %u\n", Version);
+
   return doDumpHeapInstance(BinaryFilename);
 }
