@@ -19,7 +19,8 @@
 using namespace swift;
 using namespace swift::ide;
 
-Optional<std::pair<unsigned, unsigned>> swift::ide::parseLineCol(StringRef LineCol) {
+Optional<std::pair<unsigned, unsigned>>
+swift::ide::parseLineCol(StringRef LineCol) {
   unsigned Line, Col;
   size_t ColonIdx = LineCol.find(':');
   if (ColonIdx == StringRef::npos) {

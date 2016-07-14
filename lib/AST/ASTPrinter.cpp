@@ -654,16 +654,18 @@ hasMergeGroup(MergeGroupKind Kind) {
   return false;
 }
 }
-PrintOptions PrintOptions::printTypeInterface(Type T, const DeclContext *DC) {
+
+PrintOptions PrintOptions::printTypeInterface(Type T, DeclContext *DC) {
   PrintOptions result = printInterface();
+  result.PrintExtensionFromConformingProtocols = true;
   result.TransformContext = std::make_shared<ArchetypeTransformContext>(
-    new PrinterArchetypeNameTransformer(T, DC), T);
+    new ArchetypeSelfTransformer(T, *DC), T);
   return result;
 }
 
-void PrintOptions::setArchetypeTransform(Type T, const DeclContext *DC) {
+void PrintOptions::setArchetypeTransform(Type T, DeclContext *DC) {
   TransformContext = std::make_shared<ArchetypeTransformContext>(
-    new PrinterArchetypeNameTransformer(T, DC));
+    new ArchetypeSelfTransformer(T, *DC));
 }
 
 void PrintOptions::setArchetypeTransformForQuickHelp(Type T, DeclContext *DC) {
@@ -802,12 +804,8 @@ bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
   Ty = Ty->getRValueType();
   PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer(), DC);
    if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
-     llvm::SmallPtrSet<const ExtensionDecl*, 4> AllExts;
-     for (auto Ext : ND->getExtensions()) {
-       AllExts.insert(Ext);
-     }
      Options.printExtensionContentAsMembers = [&](const ExtensionDecl *ED) {
-       return AllExts.count(ED) == 1 && isExtensionApplied(*ND->getDeclContext(), Ty, ED);
+       return isExtensionApplied(*ND->getDeclContext(), Ty, ED);
      };
      ND->print(OS, Options);
      return true;
@@ -1903,6 +1901,14 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
     for (auto Ext : NTD->getExtensions()) {
       if (Options.printExtensionContentAsMembers(Ext))
         AddDeclFunc(Ext->getMembers());
+    }
+    if (Options.PrintExtensionFromConformingProtocols) {
+      for (auto Conf : NTD->getAllConformances()) {
+        for (auto Ext : Conf->getProtocol()->getExtensions()) {
+          if (Options.printExtensionContentAsMembers(Ext))
+            AddDeclFunc(Ext->getMembers());
+        }
+      }
     }
   }
   printMembers(Members, needComma, openBracket, closeBracket);

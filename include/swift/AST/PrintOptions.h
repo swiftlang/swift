@@ -263,6 +263,9 @@ struct PrintOptions {
   /// Whether to use an empty line to separate two members in a single decl.
   bool EmptyLineBetweenMembers = false;
 
+  /// Whether to print the extensions from conforming protocols.
+  bool PrintExtensionFromConformingProtocols = false;
+
   enum class ArgAndParamPrintingMode {
     ArgumentOnly,
     MatchSource,
@@ -352,9 +355,9 @@ struct PrintOptions {
     return result;
   }
 
-  static PrintOptions printTypeInterface(Type T, const DeclContext *DC);
+  static PrintOptions printTypeInterface(Type T, DeclContext *DC);
 
-  void setArchetypeTransform(Type T, const DeclContext *DC);
+  void setArchetypeTransform(Type T, DeclContext *DC);
 
   void setArchetypeTransformForQuickHelp(Type T, DeclContext *DC);
 
