@@ -1,4 +1,4 @@
-// XFAIL: linux
+
 
 public struct A {
 	public func fa() {}
