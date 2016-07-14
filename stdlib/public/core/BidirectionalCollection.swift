@@ -167,7 +167,7 @@ extension BidirectionalIndexable {
 /// Supply the default "slicing" `subscript` for `BidirectionalCollection`
 /// models that accept the default associated `SubSequence`,
 /// `BidirectionalSlice<Self>`.
-extension BidirectionalIndexable where SubSequence == BidirectionalSlice<Self> {
+extension BidirectionalCollection where SubSequence == BidirectionalSlice<Self> {
   public subscript(bounds: Range<Index>) -> BidirectionalSlice<Self> {
     _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return BidirectionalSlice(base: self, bounds: bounds)
