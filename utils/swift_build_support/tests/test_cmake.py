@@ -12,6 +12,7 @@ import os
 import unittest
 from argparse import Namespace
 
+from swift_build_support.arguments import CompilerVersion
 from swift_build_support.cmake import CMake, CMakeOptions
 from swift_build_support.toolchain import host_toolchain
 
@@ -132,7 +133,9 @@ class CMakeTestCase(unittest.TestCase):
 
     def test_common_options_clang_compiler_version(self):
         args = self.default_args()
-        args.clang_compiler_version = ("3", "8", "0")
+        args.clang_compiler_version = CompilerVersion(
+            string_representation="3.8.0",
+            components=("3", "8", "0", None))
         cmake = self.cmake(args)
         self.assertEqual(
             list(cmake.common_options()),
@@ -161,7 +164,9 @@ class CMakeTestCase(unittest.TestCase):
         args.export_compile_commands = True
         args.distcc = True
         args.cmake_generator = 'Xcode'
-        args.clang_compiler_version = ("3", "8", "0")
+        args.clang_compiler_version = CompilerVersion(
+            string_representation="3.8.0",
+            components=("3", "8", "0", None))
         args.build_ninja = True
         cmake = self.cmake(args)
         self.assertEqual(
