@@ -193,7 +193,7 @@ set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
 # User-configurable ICU specific options for Android, FreeBSD, Linux.
 #
 
-foreach(sdk ANDROID;FREEBSD;LINUX)
+foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS)
   set(SWIFT_${sdk}_ICU_UC "" CACHE STRING
       "Path to a directory containing the icuuc library for ${sdk}")
   set(SWIFT_${sdk}_ICU_UC_INCLUDE "" CACHE STRING
@@ -733,6 +733,12 @@ if("${SWIFT_PRIMARY_VARIANT_SDK}" STREQUAL "")
 endif()
 if("${SWIFT_PRIMARY_VARIANT_ARCH}" STREQUAL "")
   set(SWIFT_PRIMARY_VARIANT_ARCH "${SWIFT_PRIMARY_VARIANT_ARCH_default}")
+endif()
+
+# Should we cross-compile the standard library for Windows?
+is_sdk_requested(WINDOWS swift_build_windows)
+if(swift_build_windows)
+  configure_sdk_windows(WINDOWS "Windows" "msvc" i686)
 endif()
 
 if("${SWIFT_SDKS}" STREQUAL "")

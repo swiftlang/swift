@@ -91,6 +91,11 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
   include(HandleLLVMOptions)
 
+  # HACK: this ugly tweaking is to prevent the propogation of the flag from LLVM
+  # into swift.  The use of this flag pollutes all targets, and we are not able
+  # to remove it on a per-target basis which breaks cross-compilation.
+  string(REGEX REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+
   set(PACKAGE_VERSION "${LLVM_PACKAGE_VERSION}")
   string(REGEX REPLACE "([0-9]+)\\.[0-9]+(\\.[0-9]+)?" "\\1" PACKAGE_VERSION_MAJOR
     ${PACKAGE_VERSION})
