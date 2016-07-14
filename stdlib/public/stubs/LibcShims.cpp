@@ -133,7 +133,7 @@ float swift::_swift_stdlib_remainderf(float x, float y) {
   return std::remainder(x, y);
 }
 
-float _swift_stdlib_sqrtf(float x) {
+float swift::_swift_stdlib_sqrtf(float x) {
   return std::sqrt(x);
 }
 
@@ -141,19 +141,19 @@ double swift::_swift_stdlib_remainder(double x, double y) {
   return std::remainder(x, y);
 }
 
-double _swift_stdlib_sqrt(double x) {
+double swift::_swift_stdlib_sqrt(double x) {
   return std::sqrt(x);
 }
 
 # if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
 // We use void* for these because the importer doesn't know how to map Float80
 // to long double.
-void _swift_stdlib_remainderl(void *x, const void *y) {
+void swift::_swift_stdlib_remainderl(void *x, const void *y) {
   long double *ptr = (long double *)x;
   *ptr = std::remainder(*ptr, *(const long double *)y);
 }
 
-void _swift_stdlib_sqrtl(void *x) {
+void swift::_swift_stdlib_sqrtl(void *x) {
   long double *ptr = (long double *)x;
   *ptr = std::sqrt(*ptr);
 }
