@@ -611,17 +611,17 @@ extension Dictionary : _ObjectiveCBridgeable {
 // TextChecking
 //===----------------------------------------------------------------------===//
 
-extension TextCheckingResult.CheckingType {
-    public static var allSystemTypes : TextCheckingResult.CheckingType {
-        return TextCheckingResult.CheckingType(rawValue: 0xffffffff)
+extension NSTextCheckingResult.CheckingType {
+    public static var allSystemTypes : NSTextCheckingResult.CheckingType {
+        return NSTextCheckingResult.CheckingType(rawValue: 0xffffffff)
     }
     
-    public static var allCustomTypes : TextCheckingResult.CheckingType {
-        return TextCheckingResult.CheckingType(rawValue: 0xffffffff << 32)
+    public static var allCustomTypes : NSTextCheckingResult.CheckingType {
+        return NSTextCheckingResult.CheckingType(rawValue: 0xffffffff << 32)
     }
     
-    public static var allTypes : TextCheckingResult.CheckingType {
-        return TextCheckingResult.CheckingType(rawValue: UInt64.max)
+    public static var allTypes : NSTextCheckingResult.CheckingType {
+        return NSTextCheckingResult.CheckingType(rawValue: UInt64.max)
     }
 }
 
@@ -1010,7 +1010,7 @@ func _convertErrorToNSError(_ error: Error) -> NSError {
 // Variadic initializers and methods
 //===----------------------------------------------------------------------===//
 
-extension Predicate {
+extension NSPredicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
   public
   convenience init(format predicateFormat: String, _ args: CVarArg...) {
@@ -1225,24 +1225,35 @@ internal func resolveError(_ error: NSError?) throws {
 }
 
 extension NSCoder {
+  @available(*, unavailable, renamed: "decodeObject(of:forKey:)")
   public func decodeObjectOfClass<DecodedObjectType>(
     _ cls: DecodedObjectType.Type, forKey key: String
   ) -> DecodedObjectType?
     where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
+    fatalError("This API has been renamed")
+  }
+
+  public func decodeObject<DecodedObjectType>(
+    of cls: DecodedObjectType.Type, forKey key: String
+  ) -> DecodedObjectType?
+    where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
     let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, nil)
-    return result as! DecodedObjectType?
+    return result as? DecodedObjectType
+  }
+
+  @available(*, unavailable, renamed: "decodeObject(of:forKey:)")
+  @nonobjc
+  public func decodeObjectOfClasses(_ classes: NSSet?, forKey key: String) -> AnyObject? {
+    fatalError("This API has been renamed")
   }
 
   @nonobjc
-  public func decodeObjectOfClasses(_ classes: NSSet?, forKey key: String) -> AnyObject? {
-    var classesAsNSObjects: Set<NSObject>? = nil
+  public func decodeObject(of classes: [AnyClass]?, forKey key: String) -> AnyObject? {
+    var classesAsNSObjects: NSSet? = nil
     if let theClasses = classes {
-      classesAsNSObjects =
-        Set(IteratorSequence(NSFastEnumerationIterator(theClasses)).map {
-          unsafeBitCast($0, to: NSObject.self)
-        })
+      classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }
-    return self.__decodeObject(ofClasses: classesAsNSObjects, forKey: key)
+    return NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, nil)
   }
 
   @available(OSX 10.11, iOS 9.0, *)
@@ -1253,29 +1264,51 @@ extension NSCoder {
     return result
   }
 
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(*, unavailable, renamed: "decodeTopLevelObject(forKey:)")
   public func decodeTopLevelObjectForKey(_ key: String) throws -> AnyObject? {
+    fatalError("This API has been renamed")
+  }
+
+  @available(OSX 10.11, iOS 9.0, *)
+  public func decodeTopLevelObject(forKey key: String) throws -> AnyObject? {
     var error: NSError?
     let result = NS_Swift_NSCoder_decodeObjectForKey(self as AnyObject, key as AnyObject, &error)
     try resolveError(error)
     return result
   }
 
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(*, unavailable, renamed: "decodeTopLevelObject(of:forKey:)")
   public func decodeTopLevelObjectOfClass<DecodedObjectType>(
     _ cls: DecodedObjectType.Type, forKey key: String
+  ) throws -> DecodedObjectType?
+    where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
+    fatalError("This API has been renamed")
+  }
+
+  @available(OSX 10.11, iOS 9.0, *)
+  public func decodeTopLevelObject<DecodedObjectType>(
+    of cls: DecodedObjectType.Type, forKey key: String
   ) throws -> DecodedObjectType?
     where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
     var error: NSError?
     let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, &error)
     try resolveError(error)
-    return result as! DecodedObjectType?
+    return result as? DecodedObjectType
+  }
+
+  @available(*, unavailable, renamed: "decodeTopLevelObject(of:forKey:)")
+  public func decodeTopLevelObjectOfClasses(_ classes: NSSet?, forKey key: String) throws -> AnyObject? {
+    fatalError("This API has been renamed")
   }
 
   @available(OSX 10.11, iOS 9.0, *)
-  public func decodeTopLevelObjectOfClasses(_ classes: NSSet?, forKey key: String) throws -> AnyObject? {
-    var error: NSError?
-    let result = NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classes, key as AnyObject, &error)
+  public func decodeTopLevelObject(of classes: [AnyClass]?, forKey key: String) throws -> AnyObject? {
+    var error: NSError? = nil
+    var classesAsNSObjects: NSSet? = nil
+    if let theClasses = classes {
+      classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
+    }
+    let result = NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, &error)
     try resolveError(error)
     return result
   }
