@@ -1,3 +1,5 @@
+// XFAIL: linux
+
 public struct A {
 	public func fa() {}
 }
@@ -16,7 +18,7 @@ class C1 {
 	}
 }
 
-// RUN: %target-swift-ide-test -print-type-interface -pos=13:6 -source-filename %s | FileCheck %s -check-prefix=TYPE1
+// RUN: %target-swift-ide-test -print-type-interface -pos=15:6 -source-filename %s | FileCheck %s -check-prefix=TYPE1
 // RUN: %target-swift-ide-test -print-type-interface -usr=_TtV20print_type_interface1A -module-name print_type_interface -source-filename %s | FileCheck %s -check-prefix=TYPE1
 // TYPE1:  public struct A {
 // TYPE1:    public func fa()
@@ -37,9 +39,9 @@ class C2 {
   }
 }
 
-// RUN: %target-swift-ide-test -print-type-interface -pos=35:6 -source-filename %s | FileCheck %s -check-prefix=TYPE2
+// RUN: %target-swift-ide-test -print-type-interface -pos=37:6 -source-filename %s | FileCheck %s -check-prefix=TYPE2
 // RUN: %target-swift-ide-test -print-type-interface -usr=_TtGC20print_type_interface1DCS_2T1_ -module-name print_type_interface -source-filename %s | FileCheck %s -check-prefix=TYPE2
-// RUN: %target-swift-ide-test -print-type-interface -pos=36:6 -source-filename %s | FileCheck %s -check-prefix=TYPE3
+// RUN: %target-swift-ide-test -print-type-interface -pos=38:6 -source-filename %s | FileCheck %s -check-prefix=TYPE3
 // RUN: %target-swift-ide-test -print-type-interface -usr=_TtGC20print_type_interface1DSi_ -module-name print_type_interface -source-filename %s | FileCheck %s -check-prefix=TYPE3
 
 extension D where T : P1 {
