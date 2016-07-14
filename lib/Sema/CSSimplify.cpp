@@ -3820,6 +3820,15 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type baseType1 = getBaseTypeForArrayType(t1);
     Type baseType2 = getBaseTypeForArrayType(t2);
 
+    if (TC.getLangOpts().EnableExperimentalCollectionCasts) {
+      return matchTypes(baseType1,
+                        baseType2,
+                        matchKind,
+                        subFlags,
+                        locator.withPathElement(
+                      ConstraintLocator::PathElement::getGenericArgument(0)));
+    }
+
     // Look through type variables in the first element type; we need to know
     // it's structure before we can decide whether this can be an array upcast.
     TypeVariableType *baseTypeVar1;
@@ -3872,6 +3881,29 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     auto t2 = type2->getDesugaredType();
     Type key2, value2;
     std::tie(key2, value2) = *isDictionaryType(t2);
+
+    if (TC.getLangOpts().EnableExperimentalCollectionCasts) {
+      // The source key and value types must be subtypes of the destination
+      // key and value types, respectively.
+      auto result = matchTypes(key1, key2, matchKind, subFlags, 
+                               locator.withPathElement(
+                      ConstraintLocator::PathElement::getGenericArgument(0)));
+      if (result == SolutionKind::Error)
+        return result;
+
+      switch (matchTypes(value1, value2, matchKind, subFlags, 
+                         locator.withPathElement(
+                    ConstraintLocator::PathElement::getGenericArgument(1)))) {
+      case SolutionKind::Solved:
+        return result;
+
+      case SolutionKind::Unsolved:
+        return SolutionKind::Unsolved;
+
+      case SolutionKind::Error:
+        return SolutionKind::Error;
+      }
+    }
 
     // Look through type variables in the first key and value type; we
     // need to know their structure before we can decide whether this
@@ -3978,6 +4010,15 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
     auto t2 = type2->getDesugaredType();
     Type baseType2 = getBaseTypeForSetType(t2);
+
+    if (TC.getLangOpts().EnableExperimentalCollectionCasts) {
+      return matchTypes(baseType1,
+                        baseType2,
+                        matchKind,
+                        subFlags,
+                        locator.withPathElement(
+                      ConstraintLocator::PathElement::getGenericArgument(0)));
+    }
 
     // Look through type variables in the first base type; we need to know
     // their structure before we can decide whether this can be an upcast.

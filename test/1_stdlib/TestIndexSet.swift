@@ -516,6 +516,12 @@ class TestIndexSet : TestIndexSetSuper {
             expectEqual(expected, is1.symmetricDifference(is2))
             expectEqual(expected, is2.symmetricDifference(is1))
         }
+        
+        do {
+            is1 = IndexSet([0, 2])
+            is2 = IndexSet([0, 1, 2])
+            expectEqual(IndexSet(integer: 1), is1.symmetricDifference(is2))
+        }
     }
     
     func testIntersection() {
@@ -587,7 +593,12 @@ class TestIndexSet : TestIndexSetSuper {
             expectEqual(expected, is1.intersection(is2))
             expectEqual(expected, is2.intersection(is1))
         }
-
+        
+        do {
+            is1 = IndexSet([0, 2])
+            is2 = IndexSet([0, 1, 2])
+            expectEqual(is1, is1.intersection(is2))
+        }
     }
     
     func testUnion() {

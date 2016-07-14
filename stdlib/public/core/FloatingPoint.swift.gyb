@@ -27,14 +27,11 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 /// The BinaryFloatingPoint protocol refines these requirements, adds some
 /// additional operations that only make sense for a fixed radix, and also
 /// provides default implementations of some of the FloatingPoint APIs.
-public protocol FloatingPoint: Comparable, ExpressibleByIntegerLiteral,
-  SignedNumber, AbsoluteValuable, Strideable {
+public protocol FloatingPoint: Comparable, Arithmetic,
+  SignedNumber, Strideable {
 
   /// An integer type that can represent any written exponent.
   associatedtype Exponent: SignedInteger
-
-  /// Initialize to zero
-  init()
 
   /// Initialize from sign, exponent, and significand.
   ///
@@ -924,6 +921,12 @@ extension BinaryFloatingPoint {
     return Other(self).totalOrder(with: other)
   }
   */
+}
+
+/// Returns the absolute value of `x`.
+@_transparent
+public func abs<T : FloatingPoint>(_ x: T) -> T where T.Magnitude == T {
+  return x.magnitude
 }
 
 @available(*, unavailable, renamed: "FloatingPoint")

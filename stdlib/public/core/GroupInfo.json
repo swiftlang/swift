@@ -100,6 +100,7 @@
     "BuiltinMath.swift",
     {
     "Integers": [
+      "Integers.swift",
       "IntegerArithmetic.swift",
       "FixedPoint.swift",
       "IntegerParsing.swift"],

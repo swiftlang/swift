@@ -14,6 +14,7 @@
 
 ((nil
   (tab-width . 2)
+  (fill-column . 80)
   (eval .
         ;; Load the Swift project's settings.  To suppress this action
         ;; you can put "(provide 'swift-project-settings)" in your

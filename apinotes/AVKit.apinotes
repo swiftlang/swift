@@ -1,0 +1,6 @@
+---
+Name: AVKit
+Tags:
+- Name: AVKitError
+  NSErrorDomain: AVKitErrorDomain
+

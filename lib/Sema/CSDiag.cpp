@@ -1873,7 +1873,13 @@ private:
   /// Produce a diagnostic for a general conversion failure (irrespective of the
   /// exact expression kind).
   bool diagnoseGeneralConversionFailure(Constraint *constraint);
-     
+
+  /// Produce a diagnostic for binary comparisons of the nil literal
+  /// to other values.
+  bool diagnoseNilLiteralComparison(Expr *lhsExpr, Expr *rhsExpr,
+                                    CalleeCandidateInfo &calleeInfo,
+                                    SourceLoc applyLoc);
+
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTupleExpr(TupleExpr *E);
@@ -4360,6 +4366,60 @@ static bool isNameOfStandardComparisonOperator(StringRef opName) {
          opName == "<="  || opName == ">=";
 }
 
+bool FailureDiagnosis::diagnoseNilLiteralComparison(
+    Expr *lhsExpr, Expr *rhsExpr, CalleeCandidateInfo &calleeInfo,
+    SourceLoc applyLoc) {
+
+  auto overloadName = calleeInfo.declName;
+
+  // Only diagnose for comparison operators.
+  if (!isNameOfStandardComparisonOperator(overloadName))
+    return false;
+
+  Expr *otherExpr = lhsExpr;
+  Expr *nilExpr = rhsExpr;
+
+  // Swap if we picked the wrong side as the nil literal.
+  if (!isa<NilLiteralExpr>(nilExpr->getValueProvidingExpr()))
+    std::swap(otherExpr, nilExpr);
+
+  // Bail if neither side is a nil literal.
+  if (!isa<NilLiteralExpr>(nilExpr->getValueProvidingExpr()))
+    return false;
+
+  // Bail if both sides are a nil literal.
+  if (isa<NilLiteralExpr>(otherExpr->getValueProvidingExpr()))
+    return false;
+
+  auto otherType = otherExpr->getType()->getRValueType();
+
+  // Bail if we were unable to determine the other type.
+  if (isUnresolvedOrTypeVarType(otherType))
+    return false;
+
+  // Regardless of whether the type has reference or value semantics,
+  // comparison with nil is illegal, albeit for different reasons spelled
+  // out by the diagnosis.
+  if (otherType->getAnyOptionalObjectType() &&
+      (overloadName == "!==" || overloadName == "===")) {
+    auto revisedName = overloadName;
+    revisedName.pop_back();
+
+    // If we made it here, then we're trying to perform a comparison with
+    // reference semantics rather than value semantics.  The fixit will
+    // lop off the extra '=' in the operator.
+    diagnose(applyLoc,
+             diag::value_type_comparison_with_nil_illegal_did_you_mean,
+             otherType)
+        .fixItReplace(applyLoc, revisedName);
+  } else {
+    diagnose(applyLoc, diag::value_type_comparison_with_nil_illegal, otherType)
+        .highlight(otherExpr->getSourceRange());
+  }
+
+  return true;
+}
+
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
@@ -4527,34 +4587,11 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     auto lhsExpr = argTuple->getElement(0), rhsExpr = argTuple->getElement(1);
     auto lhsType = lhsExpr->getType()->getRValueType();
     auto rhsType = rhsExpr->getType()->getRValueType();
-    
-    // If this is a comparison against nil, then we should produce a specific
-    // diagnostic.
-    if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
-        !isUnresolvedOrTypeVarType(lhsType)) {
-      if (isNameOfStandardComparisonOperator(overloadName)) {
-        // Regardless of whether the type has reference or value semantics,
-        // comparison with nil is illegal, albeit for different reasons spelled
-        // out by the diagnosis.
-        if (lhsType->getAnyOptionalObjectType() &&
-                   (overloadName == "!==" || overloadName == "===")) {
-          auto revisedName = overloadName;
-          revisedName.pop_back();
-          // If we made it here, then we're trying to perform a comparison with
-          // reference semantics rather than value semantics.  The fixit will
-          // lop off the extra '=' in the operator.
-          diagnose(callExpr->getLoc(),
-                   diag::value_type_comparison_with_nil_illegal_did_you_mean,
-                   lhsType)
-            .fixItReplace(callExpr->getLoc(), revisedName);
-        } else {
-          diagnose(callExpr->getLoc(),
-                   diag::value_type_comparison_with_nil_illegal, lhsType)
-            .highlight(lhsExpr->getSourceRange());
-        }
-        return true;
-      }
-    }
+
+    // Diagnose any comparisons with the nil literal.
+    if (diagnoseNilLiteralComparison(lhsExpr, rhsExpr, calleeInfo,
+                                     callExpr->getLoc()))
+      return true;
 
     if (callExpr->isImplicit() && overloadName == "~=") {
       // This binop was synthesized when typechecking an expression pattern.

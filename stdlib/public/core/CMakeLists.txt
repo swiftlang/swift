@@ -62,6 +62,7 @@ set(SWIFTLIB_ESSENTIAL
   InputStream.swift
   IntegerArithmetic.swift.gyb
   IntegerParsing.swift.gyb
+  Integers.swift.gyb
   Join.swift
   LazyCollection.swift.gyb
   LazySequence.swift

@@ -1,0 +1,130 @@
+//===--- Integers.swift.gyb -----------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+ %{
+#
+# Utility code for later in this template
+#
+
+# Number of bits in the Builtin.Word type
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+
+# Number of bits in integer literals.
+builtinIntLiteralBits = 2048
+IntLiteral = 'Int%s' % builtinIntLiteralBits
+
+class struct(object):
+  def __init__(self, **kw):
+    self.__dict__ = kw
+  def __repr__(self):
+    return 'struct(%r)' % self.__dict__
+
+binaryArithmetic = {
+  'Arithmetic' : [
+    struct(operator='+', name='adding',      mutatingName='add',      firstArg='_',  llvmName='add', kind='+'),
+    struct(operator='-', name='subtracting', mutatingName='subtract', firstArg='_',  llvmName='sub', kind='-'),
+    struct(operator='*', name='multiplied',  mutatingName='multiply', firstArg='by', llvmName='mul', kind='*'),
+    struct(operator='/', name='divided',     mutatingName='divide',   firstArg='by', llvmName='div', kind='/'),
+  ],
+}
+
+}%
+
+//===--- Bits for the Stdlib ----------------------------------------------===//
+
+
+//FIXME: This should go in the stdlib separately, probably.
+extension ExpressibleByIntegerLiteral
+  where Self : _ExpressibleByBuiltinIntegerLiteral {
+  /// Create an instance initialized to `value`.
+  @_transparent
+  public init(integerLiteral value: Self) {
+    self = value
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//===--- Arithmetic -------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+/// Declares methods backing binary arithmetic operators—such as `+`, `-` and
+/// `*`—and their mutating counterparts.
+/// 
+/// It provides a suitable basis for arithmetic on scalars such as integers and
+/// floating point numbers.
+/// 
+/// Both mutating and non-mutating operations are declared in the protocol,
+/// however only the mutating ones are required, as default implementations of
+/// the non-mutating ones are provided by a protocol extension.
+/// 
+/// The `Magnitude` associated type is able to hold the absolute value of any
+/// possible value of `Self`. Concrete types do not have to provide a typealias
+/// for it, as it can be inferred from the `magnitude` property. This property
+/// can be useful in operations that are simpler to implement in terms of
+/// unsigned values, for example, printing a value of an integer, which is just
+/// printing a '-' character in front of an absolute value.
+/// 
+/// Please note that for ordinary work, the `magnitude` property **should not**
+/// be preferred to the `abs(_)` function, whose return value is of the same
+/// type as its argument.
+public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
+  // FIXME: implement
+  //init?<T : Integer>(exactly source: T)
+
+  // FIXME(ABI): should be just Arithmetic
+  associatedtype Magnitude : Equatable, ExpressibleByIntegerLiteral
+
+  var magnitude: Magnitude { get }
+
+
+% for x in binaryArithmetic['Arithmetic']:
+  // defaulted using an in-place counterpart, but can be used as an
+  // optimization hook
+  func ${x.name}(${x.firstArg} rhs: Self) -> Self
+
+  // implementation hook
+  mutating func ${x.mutatingName}(${x.firstArg} rhs: Self)
+% end
+}
+
+extension Arithmetic {
+  @_transparent
+  public init() {
+    self = 0
+  }
+}
+
+% for Protocol in ['Arithmetic']:
+extension ${Protocol} {
+%   for x in binaryArithmetic[Protocol]:
+%     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
+  public func ${x.name}(${x.firstArg} rhs: Self) -> Self {
+    var lhs = self
+    lhs.${x.mutatingName}(${callLabel}rhs)
+    return lhs
+  }
+%   end
+}
+% end
+
+public protocol SignedArithmetic : Arithmetic {
+  func negated() -> Self
+  mutating func negate()
+}
+
+extension SignedArithmetic {
+  public func negated() -> Self {
+    return Self().subtracting(self)
+  }
+  public mutating func negate() {
+    self = negated()
+  }
+}

@@ -260,6 +260,45 @@ extension CocoaError {
 }
 
 extension CocoaError {
+  /// Object that failed to validate for a validation error.
+  public var validationObject: AnyObject? {
+    return userInfo[NSValidationObjectErrorKey]
+  }
+
+  /// Key that failed to validate for a validation error.
+  public var validationKey: String? {
+    return userInfo[NSValidationKeyErrorKey] as? String
+  }
+
+  /// For predicate-based validation, the predicate for the condition
+  /// that failed to validate.
+  public var validationPredicate: Predicate? {
+    return userInfo[NSValidationPredicateErrorKey] as? Predicate
+  }
+
+  /// The value for the key that failed to validate for a validation
+  /// error.
+  public var validationValue: AnyObject? {
+    return userInfo[NSValidationValueErrorKey]
+  }
+
+  /// Stores prompting an error.
+  public var affectedStores: [AnyObject]? {
+    return userInfo[NSAffectedStoresErrorKey] as? [AnyObject]
+  }
+
+  /// Objects prompting an error.
+  public var affectedObjects: [AnyObject]? {
+    return userInfo[NSAffectedObjectsErrorKey] as? [AnyObject]
+  }
+
+  /// The conflicts that arise from a persistent store.
+  public var persistentStoreSaveConflicts: [NSMergeConflict]? {
+    return userInfo[NSPersistentStoreSaveConflictsErrorKey] as? [NSMergeConflict]
+  }
+}
+
+extension CocoaError {
   @available(*, unavailable, renamed: "managedObjectValidationError")
   public static var ManagedObjectValidationError: CocoaError.Code {
     fatalError("unavailable accessor can't be called")
