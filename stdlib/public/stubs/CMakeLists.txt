@@ -16,6 +16,7 @@ endif()
 
 add_swift_library(swiftStdlibStubs OBJECT_LIBRARY TARGET_LIBRARY
   Assert.cpp
+  CommandLine.cpp
   GlobalObjects.cpp
   LibcShims.cpp
   Stubs.cpp
