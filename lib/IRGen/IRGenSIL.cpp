@@ -3735,6 +3735,7 @@ void IRGenSILFunction::visitAddressToPointerInst(swift::AddressToPointerInst *i)
   setLoweredExplosion(i, to);
 }
 
+// Ignores the isStrict flag because Swift TBAA is not lowered into LLVM IR.
 void IRGenSILFunction::visitPointerToAddressInst(swift::PointerToAddressInst *i)
 {
   Explosion from = getLoweredExplosion(i->getOperand());

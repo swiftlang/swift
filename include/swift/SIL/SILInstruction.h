@@ -2127,8 +2127,17 @@ class PointerToAddressInst
 {
   friend class SILBuilder;
 
-  PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+  bool isStrict;
+
+  PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+                       bool isStrict)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty), isStrict(isStrict) {}
+
+public:
+  /// Whether the returned address adheres to strict aliasing.
+  /// If true, then the type of each memory access dependent on
+  /// this address must be consistent with the memory's bound type.
+  bool isStrict() const { return isStrict; }
 };
 
 /// Convert a heap object reference to a different type without any runtime

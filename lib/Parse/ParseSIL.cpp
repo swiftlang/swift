@@ -2001,7 +2001,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   case ValueKind::UncheckedBitwiseCastInst:
   case ValueKind::UpcastInst:
   case ValueKind::AddressToPointerInst:
-  case ValueKind::PointerToAddressInst:
   case ValueKind::BridgeObjectToRefInst:
   case ValueKind::BridgeObjectToWordInst:
   case ValueKind::RefToRawPointerInst:
@@ -2107,7 +2106,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     }
     break;
   }
-      
+  case ValueKind::PointerToAddressInst: {
+    SILType Ty;
+    Identifier ToToken;
+    SourceLoc ToLoc;
+    bool isStrict = false;
+    if (parseTypedValueRef(Val, B) ||
+        parseSILIdentifier(ToToken, ToLoc,
+                           diag::expected_tok_in_sil_instr, "to") ||
+        parseSILOptional(isStrict, *this, "strict") ||
+        parseSILType(Ty) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (ToToken.str() != "to") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
+      return true;
+    }
+
+    ResultVal = B.createPointerToAddress(InstLoc, Val, Ty, isStrict);
+    break;
+  }
   case ValueKind::RefToBridgeObjectInst: {
     SILValue BitsVal;
     if (parseTypedValueRef(Val, B) ||

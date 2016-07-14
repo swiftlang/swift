@@ -3700,7 +3700,7 @@ pointer_to_address
 ``````````````````
 ::
 
-  sil-instruction ::= 'pointer_to_address' sil-operand 'to' sil-type
+  sil-instruction ::= 'pointer_to_address' sil-operand 'to' [strict] sil-type
 
   %1 = pointer_to_address %0 : $Builtin.RawPointer to $*T
   // %1 will be of type $*T
@@ -3712,6 +3712,14 @@ address. It is undefined behavior to cast the ``RawPointer`` back to any type
 other than its original address type or `layout compatible types`_. It is
 also undefined behavior to cast a ``RawPointer`` from a heap object to any
 address type.
+
+The ``strict`` flag indicates whether the returned address adheres to
+strict aliasing.  If true, then the type of each memory access
+dependent on this address must be consistent with the memory's bound
+type. A memory access from an address that is not strict cannot have
+its address substituted with a strict address, even if other nearby
+memory accesses at the same location are strict.
+
 
 unchecked_ref_cast
 ``````````````````

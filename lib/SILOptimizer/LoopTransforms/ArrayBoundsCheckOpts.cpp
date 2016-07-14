@@ -106,7 +106,7 @@ static bool isArrayEltStore(StoreInst *SI) {
   // %46 = unchecked_ref_cast %45 : $... to $_ContiguousArrayStorageBase
   // %47 = unchecked_ref_cast %46 : $... to $Builtin.NativeObject
   // %48 = struct_extract %41 : $..., #UnsafeMutablePointer._rawValue
-  // %49 = pointer_to_address %48 : $Builtin.RawPointer to $*Int
+  // %49 = pointer_to_address %48 : $Builtin.RawPointer to strict $*Int
   // %50 = mark_dependence %49 : $*Int on %47 : $Builtin.NativeObject
   // store %1 to %50 : $*Int
   SILValue Dest = SI->getDest();
