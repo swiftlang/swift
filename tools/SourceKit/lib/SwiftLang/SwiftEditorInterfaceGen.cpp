@@ -79,6 +79,10 @@ public:
   SourceTextInfo Info;
   // This is the non-typechecked AST for the generated interface source.
   CompilerInstance TextCI;
+  // Syncronize access to the embedded compiler instance (if we don't have an
+  // ASTUnit).
+  WorkQueue Queue{WorkQueue::Dequeuing::Serial,
+                  "sourcekit.swift.InterfaceGenContext"};
 };
 
 typedef SwiftInterfaceGenContext::Implementation::TextRange TextRange;
@@ -498,6 +502,14 @@ void SwiftInterfaceGenContext::reportEditorInfo(EditorConsumer &Consumer) const 
   Consumer.finished();
 }
 
+void SwiftInterfaceGenContext::accessASTAsync(std::function<void()> Fn) {
+  if (Impl.AstUnit) {
+    Impl.AstUnit->performAsync(std::move(Fn));
+  } else {
+    Impl.Queue.dispatch(std::move(Fn));
+  }
+}
+
 SwiftInterfaceGenContext::ResolvedEntity
 SwiftInterfaceGenContext::resolveEntityForOffset(unsigned Offset) const {
   // Search among the references.
@@ -633,8 +645,10 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
     return;
   }
 
-  IFaceGenContexts.set(Name, IFaceGenRef);
   IFaceGenRef->reportEditorInfo(Consumer);
+  // reportEditorInfo requires exclusive access to the AST, so don't add this
+  // to the service cache until it has returned.
+  IFaceGenContexts.set(Name, IFaceGenRef);
 }
 
 class PrimaryFileInterfaceConsumer : public SwiftASTConsumer {
@@ -740,8 +754,10 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
     return;
   }
 
-  IFaceGenContexts.set(Name, IFaceGenRef);
   IFaceGenRef->reportEditorInfo(Consumer);
+  // reportEditorInfo requires exclusive access to the AST, so don't add this
+  // to the service cache until it has returned.
+  IFaceGenContexts.set(Name, IFaceGenRef);
 }
 
 void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
