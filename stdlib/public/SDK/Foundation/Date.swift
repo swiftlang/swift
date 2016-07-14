@@ -88,7 +88,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
     /**
     The time interval between the date and the current date and time.
 
-    If the date is earlier than the current date and time, the this property's value is negative.
+    If the date is earlier than the current date and time, this property's value is negative.
 
     - SeeAlso: `timeIntervalSince(_:)`
     - SeeAlso: `timeIntervalSince1970`
@@ -115,7 +115,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
     ///
     /// - parameter timeInterval: The value to add, in seconds.
     /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
-    public func addingTimeInterval(_ timeInterval : TimeInterval) -> Date {
+    public func addingTimeInterval(_ timeInterval: TimeInterval) -> Date {
         return self + timeInterval
     }
     
@@ -179,9 +179,9 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
      
     - Parameter locale: A `Locale` object. If you pass `nil`, `NSDate` formats the date in the same way as the `description` property.
      
-    - Returns: A string representation of the receiver, using the given locale, or if the locale argument is `nil`, in the international format `YYYY-MM-DD HH:MM:SS ±HHMM`, where `±HHMM` represents the time zone offset in hours and minutes from UTC (for example, "`2001-03-24 10:45:32 +0600`")
+    - Returns: A string representation of the receiver, using the given locale, or if the locale argument is `nil`, in the international format `YYYY-MM-DD HH:MM:SS ±HHMM`, where `±HHMM` represents the time zone offset in hours and minutes from UTC (for example, "`2001-03-24 10:45:32 +0600`").
     */
-    public func description(with locale : Locale?) -> String {
+    public func description(with locale: Locale?) -> String {
         return NSDate(timeIntervalSinceReferenceDate: _time).description(with: locale)
     }
     
