@@ -907,16 +907,20 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
 
   var c = makeWrappedCollectionWithComparableElement(elements)
 %   end
-
+  let pivotElt  = c.first
+  var pivot = c.startIndex
 %   if predicate:
   let closureLifetimeTracker = LifetimeTracked(0)
-  let pivot = c.partition() {
-    (lhs, rhs) in
-    _blackHole(closureLifetimeTracker)
-    return extract(lhs).value < extract(rhs).value
+  if let first = pivotElt {
+    pivot = c.partition(by: {
+      val in
+      _blackHole(closureLifetimeTracker)
+      return !(extract(val).value < extract(first).value) })
   }
 %   else:
-  let pivot = c.partition()
+  if let first = c.first {
+    pivot = c.partition(by: { !($0 < first) })
+  }
 %   end
 
   // Check that we didn't lose any elements.
@@ -927,12 +931,12 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
     // All the elements in the first partition are less than the pivot
     // value.
     for i in c[c.startIndex..<pivot].indices {
-      expectLT(extract(c[i]).value, extract(c[pivot]).value)
+      expectLT(extract(c[i]).value, extract(pivotElt!).value)
     }
     // All the elements in the second partition are greater or equal to
     // the pivot value.
     for i in c[pivot..<c.endIndex].indices {
-      expectLE(extract(c[pivot]).value, extract(c[i]).value)
+      expectLE(extract(pivotElt!).value, extract(c[i]).value)
     }
   }
 }
@@ -988,13 +992,18 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
 
 %   if predicate:
   let closureLifetimeTracker = LifetimeTracked(0)
-  let pivot = lc.partition() {
-    (lhs, rhs) in
-    _blackHole(closureLifetimeTracker)
-    return extract(lhs).value < extract(rhs).value
+  var pivot = lc.startIndex
+  if let first = c.first {
+    pivot = lc.partition(by: {
+      val in
+      _blackHole(closureLifetimeTracker)
+      return !(extract(val).value < extract(first).value) })
   }
 %   else:
-  let pivot = lc.partition()
+  var pivot = lc.startIndex
+  if let first = lc.first {
+    pivot = lc.partition(by: { !($0 < first) })
+  }
 %   end
 
   expectEqual(

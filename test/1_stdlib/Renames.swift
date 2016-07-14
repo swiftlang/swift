@@ -72,11 +72,13 @@ func _CollectionAlgorithms<C : MutableCollection, I>(c: C, i: I) where C : Rando
   var c = c
   _ = c.partition(i..<i) { _, _ in true } // expected-error {{slice the collection using the range, and call partition(by:)}} {{none}}
   c.sortInPlace { _, _ in true } // expected-error {{'sortInPlace' has been renamed to 'sort(by:)'}} {{5-16=sort}} {{none}}
+  _ = c.partition { _, _ in true } // expected-error {{call partition(by:)}} {{none}}
 }
 
 func _CollectionAlgorithms<C : MutableCollection, I>(c: C, i: I) where C : RandomAccessCollection, C.Iterator.Element : Comparable, C.Index == I {
   var c = c
-  _ = c.partition(i..<i) // expected-error {{slice the collection using the range, and call partition()}} {{none}}
+  _ = c.partition() // expected-error {{call partition(by:)}} {{none}}
+  _ = c.partition(i..<i) // expected-error {{slice the collection using the range, and call partition(by:)}} {{none}}
   c.sortInPlace() // expected-error {{'sortInPlace()' has been renamed to 'sort()'}} {{5-16=sort}} {{none}}
 }
 

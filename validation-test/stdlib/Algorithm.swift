@@ -149,7 +149,10 @@ Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
     var a: A<Int>
     a = randomArray()
-    _ = a.partition(by: $0)
+    let lt = $0
+    if let first = a.first {
+      _ = a.partition(by: { !lt($0, first) })
+    }
   }
   /*
   // FIXME: Disabled due to <rdar://problem/17734737> Unimplemented:
