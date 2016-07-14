@@ -83,40 +83,63 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint32_t
 _swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
   
-// Math library functions
-SWIFT_RUNTIME_STDLIB_INTERFACE
+#if defined __APPLE__
 static inline float _swift_stdlib_remainderf(float x, float y) {
   return __builtin_remainderf(x, y);
 }
- 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+
 static inline float _swift_stdlib_sqrtf(float x) {
   return __builtin_sqrtf(x);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
 static inline double _swift_stdlib_remainder(double x, double y) {
   return __builtin_remainder(x, y);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
 static inline double _swift_stdlib_sqrt(double x) {
   return __builtin_sqrt(x);
 }
-  
-// TODO: Remove horrible workaround when importer does Float80 <-> long double.
-#if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
-SWIFT_RUNTIME_STDLIB_INTERFACE
+
+# if defined __i386__ || defined __x86_64__
+// We use void* for these because the importer doesn't know how to map Float80
+// to long double.
 static inline void _swift_stdlib_remainderl(void *x, const void *y) {
   long double *ptr = (long double *)x;
   *ptr = __builtin_remainderl(*ptr, *(const long double *)y);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
 static inline void _swift_stdlib_sqrtl(void *x) {
   long double *ptr = (long double *)x;
   *ptr = __builtin_sqrtl(*ptr);
 }
+# endif // defined __i386__ || defined __x86_64__
+#else
+// We want the math shims to be static inline for performance reasons, but
+// that causes test failures on Linux at present, and depends on a compiler
+// feature (__builtin_xxxx) that may not be available on other platforms.
+// They are therefore declared as SWIFT_RUNTIME_STDLIB_INTERFACE functions
+// on non-Apple platforms for now.
+SWIFT_RUNTIME_STDLIB_INTERFACE
+float _swift_stdlib_remainderf(float x, float y);
+ 
+SWIFT_RUNTIME_STDLIB_INTERFACE
+float _swift_stdlib_sqrtf(float x);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+double _swift_stdlib_remainder(double x, double y);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+double _swift_stdlib_sqrt(double x);
+
+# if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
+// We use void* for these because the importer doesn't know how to map Float80
+// to long double.
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_stdlib_remainderl(void *x, const void *y);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_stdlib_sqrtl(void *x);
+# endif // defined __i386__ || defined __x86_64__
 #endif
 
 #ifdef __cplusplus

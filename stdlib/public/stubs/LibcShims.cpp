@@ -12,6 +12,7 @@
 
 #include <random>
 #include <type_traits>
+#include <cmath>
 #if defined(_MSC_VER)
 #include <io.h>
 #else
@@ -123,3 +124,38 @@ swift::_swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);
   return RandomUniform(getGlobalMT19937());
 }
+
+#if !defined __APPLE__
+//  These functions are static inline on Apple platforms, and therefore
+//  function bodies are not needed here.  They should ideally be made static
+//  inlines on other platforms as well.
+float swift::_swift_stdlib_remainderf(float x, float y) {
+  return std::remainder(x, y);
+}
+
+float _swift_stdlib_sqrtf(float x) {
+  return std::sqrt(x);
+}
+
+double swift::_swift_stdlib_remainder(double x, double y) {
+  return std::remainder(x, y);
+}
+
+double _swift_stdlib_sqrt(double x) {
+  return std::sqrt(x);
+}
+
+# if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
+// We use void* for these because the importer doesn't know how to map Float80
+// to long double.
+void _swift_stdlib_remainderl(void *x, const void *y) {
+  long double *ptr = (long double *)x;
+  *ptr = std::remainder(*ptr, *(const long double *)y);
+}
+
+void _swift_stdlib_sqrtl(void *x) {
+  long double *ptr = (long double *)x;
+  *ptr = std::sqrt(*ptr);
+}
+# endif
+#endif // !defined __APPLE__
