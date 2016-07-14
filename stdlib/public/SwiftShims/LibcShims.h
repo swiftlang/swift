@@ -83,43 +83,63 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint32_t
 _swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
   
-// Math library functions
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_remainderf(float, float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_squareRootf(float);
+#if defined __APPLE__
+static inline float _swift_stdlib_remainderf(float x, float y) {
+  return __builtin_remainderf(x, y);
+}
+
+static inline float _swift_stdlib_sqrtf(float x) {
+  return __builtin_sqrtf(x);
+}
+
+static inline double _swift_stdlib_remainder(double x, double y) {
+  return __builtin_remainder(x, y);
+}
+
+static inline double _swift_stdlib_sqrt(double x) {
+  return __builtin_sqrt(x);
+}
+
+# if defined __i386__ || defined __x86_64__
+// We use void* for these because the importer doesn't know how to map Float80
+// to long double.
+static inline void _swift_stdlib_remainderl(void *x, const void *y) {
+  long double *ptr = (long double *)x;
+  *ptr = __builtin_remainderl(*ptr, *(const long double *)y);
+}
+
+static inline void _swift_stdlib_sqrtl(void *x) {
+  long double *ptr = (long double *)x;
+  *ptr = __builtin_sqrtl(*ptr);
+}
+# endif // defined __i386__ || defined __x86_64__
+#else
+// We want the math shims to be static inline for performance reasons, but
+// that causes test failures on Linux at present, and depends on a compiler
+// feature (__builtin_xxxx) that may not be available on other platforms.
+// They are therefore declared as SWIFT_RUNTIME_STDLIB_INTERFACE functions
+// on non-Apple platforms for now.
 SWIFT_RUNTIME_STDLIB_INTERFACE
-float _swift_stdlib_addProductf(float, float, float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_roundf(float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_roundevenf(float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_truncf(float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_roundawayf(float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_ceilf(float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_floorf(float);
-  
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_remainder(double, double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_squareRoot(double);
+float _swift_stdlib_remainderf(float x, float y);
+ 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-double _swift_stdlib_addProduct(double, double, double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_round(double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_roundeven(double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_trunc(double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_roundaway(double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_ceil(double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_floor(double);
-  
-// TODO: Remove horrible workaround when importer does Float80 <-> long double.
-#if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
+float _swift_stdlib_sqrtf(float x);
+
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void _swift_stdlib_remainderl(void *_self, const void *_other);
+double _swift_stdlib_remainder(double x, double y);
+
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void _swift_stdlib_squareRootl(void *_self);
+double _swift_stdlib_sqrt(double x);
+
+# if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
+// We use void* for these because the importer doesn't know how to map Float80
+// to long double.
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void _swift_stdlib_addProductl(void *_self, const void *_lhs, const void *_rhs);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_roundl(void *_self);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_roundevenl(void *_self);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_truncl(void *_self);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_roundawayl(void *_self);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_ceill(void *_self);
-SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_floorl(void *_self);
+void _swift_stdlib_remainderl(void *x, const void *y);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_stdlib_sqrtl(void *x);
+# endif // defined __i386__ || defined __x86_64__
 #endif
 
 #ifdef __cplusplus
@@ -127,4 +147,3 @@ SWIFT_RUNTIME_STDLIB_INTERFACE void _swift_stdlib_floorl(void *_self);
 #endif
 
 #endif // SWIFT_STDLIB_SHIMS_LIBCSHIMS_H
-
