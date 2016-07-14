@@ -68,7 +68,7 @@ extension D {
 // TYPE3:   public func unconditionalFunc2(t: Int) -> Int
 // TYPE3: }
 
-// RUN: %target-swift-ide-test -print-type-interface -usr=_TtGSaSi_ -module-name print_type_interface -source-filename /Users/xge/Documents/sourceroot/swift/test/IDE/print_type_interface.swift | FileCheck %s -check-prefix=TYPE4
+// RUN: %target-swift-ide-test -print-type-interface -usr=_TtGSaSi_ -module-name print_type_interface -source-filename %s | FileCheck %s -check-prefix=TYPE4
 // TYPE4: public typealias Index = Int
 // TYPE4: public func min() -> Int?
 // TYPE4: public mutating func insert<Int>(contentsOf newElements: C, at i: Int)
@@ -76,7 +76,7 @@ extension D {
 // TYPE4: public mutating func replaceSubrange<Int>(_ subrange: CountableRange<Int>, with newElements: C)
 // TYPE4-NOT: public func joined
 
-// RUN: %target-swift-ide-test -print-type-interface -usr=_TtGSaSS_ -module-name print_type_interface -source-filename /Users/xge/Documents/sourceroot/swift/test/IDE/print_type_interface.swift | FileCheck %s -check-prefix=TYPE5
+// RUN: %target-swift-ide-test -print-type-interface -usr=_TtGSaSS_ -module-name print_type_interface -source-filename %s | FileCheck %s -check-prefix=TYPE5
 // TYPE5: public func prefix(_ maxLength: Int) -> ArraySlice<String>
 // TYPE5: public func suffix(_ maxLength: Int) -> ArraySlice<String>
 // TYPE5: public func split(separator: String, maxSplits: Int = default, omittingEmptySubsequences: Bool = default) -> [ArraySlice<String>]
