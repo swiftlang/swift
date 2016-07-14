@@ -975,10 +975,13 @@ void IRGenModule::emitAutolinkInfo() {
   if (!IRGen.Opts.ForceLoadSymbolName.empty()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
-    (void)new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/false,
-                                   llvm::GlobalValue::CommonLinkage,
-                                   llvm::Constant::getNullValue(Int1Ty),
-                                   buf.str());
+    auto symbol =
+        new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/false,
+                                 llvm::GlobalValue::CommonLinkage,
+                                 llvm::Constant::getNullValue(Int1Ty),
+                                 buf.str());
+    if (Triple.isOSBinFormatCOFF())
+      symbol->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
   }
 }
 
