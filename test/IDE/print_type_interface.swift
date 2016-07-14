@@ -74,6 +74,7 @@ extension D {
 // TYPE4-DAG: public mutating func insert<Int>(contentsOf newElements: C, at i: Int)
 // TYPE4-DAG: public mutating func removeFirst(_ n: Int)
 // TYPE4-DAG: public mutating func replaceSubrange<Int>(_ subrange: CountableRange<Int>, with newElements: C)
+// TYPE4-DAG: public func makeIterator() -> IndexingIterator<Array<Int>>
 // TYPE4-NOT: public func joined
 
 // RUN: %target-swift-ide-test -print-type-interface -usr=_TtGSaSS_ -module-name print_type_interface -source-filename %s | FileCheck %s -check-prefix=TYPE5
