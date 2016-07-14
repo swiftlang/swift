@@ -292,6 +292,8 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
                                          SGFContext C,
                                          bool conditional,
                                          bool bridgesFromObjC) {
+  if (SGF.getASTContext().LangOpts.EnableExperimentalCollectionCasts)
+    bridgesFromObjC = false;
 
   // Compute substitutions for the intrinsic call.
   auto fromCollection = cast<BoundGenericStructType>(

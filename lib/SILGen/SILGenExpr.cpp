@@ -1047,17 +1047,21 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto toCollection = cast<BoundGenericStructType>(
                         E->getType()->getCanonicalType());
 
+  bool bridgesToObjC = E->bridgesToObjC();
+  if (SGF.getASTContext().LangOpts.EnableExperimentalCollectionCasts)
+    bridgesToObjC = false;
+
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
   if (fromCollection->getDecl() == ctx.getArrayDecl()) {
     fn = SGF.SGM.getArrayForceCast(loc);
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
-    fn = E->bridgesToObjC() ? SGF.SGM.getDictionaryBridgeToObjectiveC(loc)
-                            : SGF.SGM.getDictionaryUpCast(loc);
+    fn = bridgesToObjC ? SGF.SGM.getDictionaryBridgeToObjectiveC(loc)
+                       : SGF.SGM.getDictionaryUpCast(loc);
   } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
-    fn = E->bridgesToObjC() ? SGF.SGM.getSetBridgeToObjectiveC(loc)
-                            : SGF.SGM.getSetUpCast(loc);
+    fn = bridgesToObjC ? SGF.SGM.getSetBridgeToObjectiveC(loc)
+                       : SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
