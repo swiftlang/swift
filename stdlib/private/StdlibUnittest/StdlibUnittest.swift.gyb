@@ -1951,14 +1951,23 @@ public func checkEquatable<Instances : Collection>(
       let y = instances[j]
 
       let xy = x == y
-      expectEqual(predictedXY, xy, ${trace})
+      expectEqual(
+        predictedXY, xy,
+        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        stackTrace: ${stackTrace})
 
       // Not-equal is an inverse of equal
-      expectNotEqual(xy, x != y, ${trace})
-      
+      expectNotEqual(
+        xy, x != y,
+        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        stackTrace: ${stackTrace})
+
       // Symmetry
-      expectEqual(xy, y == x, ${trace})
-      
+      expectEqual(
+        xy, y == x,
+        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        stackTrace: ${stackTrace})
+
       for k in instances.indices {
         let z = instances[k]
         // Transitivity
@@ -1998,10 +2007,15 @@ public func checkHashable<Instances : Collection>(
   
   checkEquatable(instances, oracle: equalityOracle, ${trace})
   
-  for x in instances {
-    for y in instances {
+  for i in instances.indices {
+    let x = instances[i]
+    for j in instances.indices {
+      let y = instances[j]
       if x == y {
-        expectEqual(x.hashValue, y.hashValue, ${trace})
+        expectEqual(
+          x.hashValue, y.hashValue,
+          "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+          stackTrace: ${stackTrace})
       }
     }
   }
