@@ -1508,15 +1508,6 @@ entry(%a : $ParentClass, %b : $*ParentStruct):
   unreachable
 }
 
-// CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
-// CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
-// CHECK: } 
-sil_vtable Foo {
-  #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
-  #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
-}
-
 // CHECK-LABEL: sil @test_pointer_to_address
 sil @test_pointer_to_address : $(Builtin.RawPointer, X) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $X):
@@ -1530,4 +1521,13 @@ bb0(%0 : $Builtin.RawPointer, %1 : $X):
   // CHECK-NEXT: store %1 to [[T3]] : $*X
   %28 = tuple ()
   return %28 : $()
+}
+
+// CHECK-LABEL: sil_vtable Foo {
+// CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+// CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
+// CHECK: }
+sil_vtable Foo {
+  #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+  #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
 }
