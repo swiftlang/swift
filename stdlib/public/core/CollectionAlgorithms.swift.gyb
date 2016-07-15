@@ -144,7 +144,7 @@ orderingExplanation = """\
 
 extension MutableCollection {
   public mutating func partition(
-      by belongsInSecondPartition: @noescape (${IElement}) throws -> Bool
+    by belongsInSecondPartition: @noescape (${IElement}) throws -> Bool
   ) rethrows -> Index {
 
     var pivot = startIndex
@@ -170,9 +170,9 @@ extension MutableCollection {
   }
 }
 
-extension MutableCollection where Self: BidirectionalCollection {
+extension MutableCollection where Self : BidirectionalCollection {
   public mutating func partition(
-      by belongsInSecondPartition: @noescape (${IElement}) throws -> Bool
+    by belongsInSecondPartition: @noescape (${IElement}) throws -> Bool
   ) rethrows -> Index {
     let maybeOffset = try _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Int in
