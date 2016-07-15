@@ -78,17 +78,14 @@ print("Test1 - Done")
 
 let partition_verifier: ([Int]) -> Void = {
     var y = $0
-    // Partition() returns the index to the pivot value.
-    var idx = y.startIndex
-    var pivot = -1
-    if let first = y.first {
-      pivot = first
-      idx = y.partition(by: { $0 >= first })
-    }
+    // partition(by:) returns the index to the pivot value.
+    let first = y.first
+    let idx = y.partition(by: { $0 >= first! })
+
     // Check that all of the elements in the first partition are smaller than
     // the pivot value.
     for i in 0..<idx {
-      if y[i] >= pivot  {
+      if y[i] >= first! {
         print("Error!\n", terminator: "")
         return
       }
@@ -96,7 +93,7 @@ let partition_verifier: ([Int]) -> Void = {
     // Check that all of the elements in the second partition are greater or
     // equal to the pivot value.
     for i in idx..<y.count - 1 {
-      if y[i] < pivot  {
+      if y[i] < first! {
         print("Error!\n", terminator: "")
         return
       }

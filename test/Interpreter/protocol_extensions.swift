@@ -76,10 +76,8 @@ extension MutableCollection
   where Self: RandomAccessCollection, Self.Iterator.Element : Comparable {
 
   public final mutating func myPartition() -> Index {
-    if let first = self.first {
-      return self.partition(by: { $0 >= first})
-    }
-    return self.startIndex
+    let first = self.first
+    return self.partition(by: { $0 >= first! })
   }
 }
 

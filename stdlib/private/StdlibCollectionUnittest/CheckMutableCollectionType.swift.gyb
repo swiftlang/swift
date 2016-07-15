@@ -879,15 +879,12 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
 // partition()
 //===----------------------------------------------------------------------===//
 
-% for predicate in [False, True]:
-
-func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
+func checkPartition(
   sequence: [Int],
-  equalImpl: ((Int, Int) -> Bool),
+  pivotValue: Int,
   lessImpl: ((Int, Int) -> Bool),
   verifyOrder: Bool
 ) {
-%   if predicate:
   let extract = extractValue
   let elements: [OpaqueValue<Int>] =
     zip(sequence, 0..<sequence.count).map {
@@ -895,33 +892,11 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
     }
 
   var c = makeWrappedCollection(elements)
-%   else:
-  MinimalComparableValue.equalImpl.value = equalImpl
-  MinimalComparableValue.lessImpl.value = lessImpl
-
-  let extract = extractValueFromComparable
-  let elements: [MinimalComparableValue] =
-    zip(sequence, 0..<sequence.count).map {
-      MinimalComparableValue($0, identity: $1)
-    }
-
-  var c = makeWrappedCollectionWithComparableElement(elements)
-%   end
-  let pivotElt  = c.first
-  var pivot = c.startIndex
-%   if predicate:
   let closureLifetimeTracker = LifetimeTracked(0)
-  if let first = pivotElt {
-    pivot = c.partition(by: {
-      val in
-      _blackHole(closureLifetimeTracker)
-      return !(extract(val).value < extract(first).value) })
-  }
-%   else:
-  if let first = c.first {
-    pivot = c.partition(by: { !($0 < first) })
-  }
-%   end
+  let pivot = c.partition(by: { val in
+    _blackHole(closureLifetimeTracker)
+    return !lessImpl(extract(val).value, pivotValue)
+  })
 
   // Check that we didn't lose any elements.
   let identities = c.map { extract($0).identity }
@@ -931,38 +906,49 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
     // All the elements in the first partition are less than the pivot
     // value.
     for i in c[c.startIndex..<pivot].indices {
-      expectLT(extract(c[i]).value, extract(pivotElt!).value)
+      expectLT(extract(c[i]).value, pivotValue)
     }
     // All the elements in the second partition are greater or equal to
     // the pivot value.
     for i in c[pivot..<c.endIndex].indices {
-      expectLE(extract(pivotElt!).value, extract(c[i]).value)
+      expectGE(extract(c[i]).value, pivotValue)
     }
   }
 }
 
-self.test("\(testNamePrefix).partition/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
+self.test("\(testNamePrefix).partition") {
   for test in partitionExhaustiveTests {
     forAllPermutations(test.sequence) { (sequence) in
-      checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
+      checkPartition(
         sequence: sequence,
-        equalImpl: { $0 == $1 },
+        pivotValue: sequence.first ?? 0,
+        lessImpl: { $0 < $1 },
+        verifyOrder: true)
+
+      // Pivot value where all elements will pass the partitioning predicate
+      checkPartition(
+        sequence: sequence,
+        pivotValue: Int.min,
+        lessImpl: { $0 < $1 },
+        verifyOrder: true)
+
+      // Pivot value where no element will pass the partitioning predicate
+      checkPartition(
+        sequence: sequence,
+        pivotValue: Int.max,
         lessImpl: { $0 < $1 },
         verifyOrder: true)
     }
   }
 }
 
-self.test("\(testNamePrefix).partition/${'Predicate' if predicate else 'WhereElementIsComparable'}/InvalidOrderings") {
+self.test("\(testNamePrefix).partition/InvalidOrderings") {
   withInvalidOrderings { (comparisonPredicate) in
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in
-        checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
+        checkPartition(
           sequence: sequence,
-          equalImpl: {
-            !comparisonPredicate($0, $1) &&
-            !comparisonPredicate($1, $0)
-          },
+          pivotValue: sequence.first ?? 0,
           lessImpl: comparisonPredicate,
           verifyOrder: false)
       }
@@ -970,41 +956,23 @@ self.test("\(testNamePrefix).partition/${'Predicate' if predicate else 'WhereEle
   }
 }
 
-self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
+self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported") {
   let sequence = [ 5, 4, 3, 2, 1 ]
-%   if predicate:
   let extract = extractValue
   let elements: [OpaqueValue<Int>] =
     zip(sequence, 0..<sequence.count).map {
       OpaqueValue($0, identity: $1)
     }
   let c = makeWrappedCollection(elements)
-%   else:
-  let extract = extractValueFromComparable
-  let elements: [MinimalComparableValue] =
-    zip(sequence, 0..<sequence.count).map {
-      MinimalComparableValue($0, identity: $1)
-    }
-  let c = makeWrappedCollectionWithComparableElement(elements)
-%   end
 
   var lc = LoggingMutableRandomAccessCollection(wrapping: c)
 
-%   if predicate:
   let closureLifetimeTracker = LifetimeTracked(0)
-  var pivot = lc.startIndex
-  if let first = c.first {
-    pivot = lc.partition(by: {
-      val in
-      _blackHole(closureLifetimeTracker)
-      return !(extract(val).value < extract(first).value) })
-  }
-%   else:
-  var pivot = lc.startIndex
-  if let first = lc.first {
-    pivot = lc.partition(by: { !($0 < first) })
-  }
-%   end
+  let first = c.first
+  let pivot = lc.partition(by: { val in
+    _blackHole(closureLifetimeTracker)
+    return !(extract(val).value < extract(first!).value)
+  })
 
   expectEqual(
     1, lc.log._withUnsafeMutableBufferPointerIfSupported[lc.dynamicType])
@@ -1015,8 +983,6 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
   expectEqual(4, lc.distance(from: lc.startIndex, to: pivot))
   expectEqualSequence([ 1, 4, 3, 2, 5 ], lc.map { extract($0).value })
 }
-
-% end
 
 //===----------------------------------------------------------------------===//
 
