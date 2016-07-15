@@ -284,7 +284,6 @@ func doTestBridgedObjC() {
   // CHECK: doTestBridgedObjC
   print("doTestBridgedObjC")
   
-   testBridgedObjC(Thunks())
   // CHECK-NEXT: produceBridgedObjCArray([BridgedObjC[[A:#[0-9]+]](0), BridgedObjC[[B:#[0-9]+]](1), BridgedObjC[[C:#[0-9]+]](2), BridgedObjC[[D:#[0-9]+]](3), BridgedObjC[[E:#[0-9]+]](4)])
   testBridgedObjC(Thunks())
   // CHECK-NEXT: 5 elements in the array
