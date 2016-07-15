@@ -543,6 +543,9 @@ static llvm::cl::opt<bool>
 NoEmptyLineBetweenMembers("no-empty-line-between-members",
                           llvm::cl::desc("Print no empty line between members."),
                           llvm::cl::init(false));
+
+static llvm::cl::opt<bool> DebugConstraintSolver("debug-constraints",
+    llvm::cl::desc("Enable verbose debugging from the constraint solver."));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -2799,6 +2802,9 @@ int main(int argc, char *argv[]) {
     options::DebugForbidTypecheckPrefix;
   InitInvok.getLangOptions().EnableObjCAttrRequiresFoundation =
     !options::DisableObjCAttrRequiresFoundationModule;
+
+  InitInvok.getLangOptions().DebugConstraintSolver =
+      options::DebugConstraintSolver;
 
   for (auto ConfigName : options::BuildConfigs)
     InitInvok.getLangOptions().addCustomConditionalCompilationFlag(ConfigName);
