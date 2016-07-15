@@ -573,11 +573,6 @@ public func ${op[0]}=<T : FloatingPoint>(lhs: inout T, rhs: T) {
 %end
 
 @_transparent
-public func sqrt<T : FloatingPoint>(_ rhs: T) -> T {
-  return rhs.squareRoot()
-}
-
-@_transparent
 public func ==<T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return lhs.isEqual(to: rhs)
 }
