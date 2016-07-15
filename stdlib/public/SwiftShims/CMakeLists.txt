@@ -11,7 +11,7 @@ set(sources
   SwiftStdint.h
   UnicodeShims.h
   Visibility.h
-  module.map
+  module.modulemap
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
 
