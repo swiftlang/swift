@@ -575,6 +575,87 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
 % end
 
 //===----------------------------------------------------------------------===//
+// partition()
+//===----------------------------------------------------------------------===//
+
+func checkPartition(
+  sequence: [Int],
+  pivotValue: Int,
+  lessImpl: ((Int, Int) -> Bool),
+  verifyOrder: Bool
+) {
+  let extract = extractValue
+  let elements: [OpaqueValue<Int>] =
+    zip(sequence, 0..<sequence.count).map {
+      OpaqueValue($0, identity: $1)
+    }
+
+  var c = makeWrappedCollection(elements)
+  let closureLifetimeTracker = LifetimeTracked(0)
+  let pivot = c.partition(by: { val in
+    _blackHole(closureLifetimeTracker)
+    return !lessImpl(extract(val).value, pivotValue)
+  })
+
+  // Check that we didn't lose any elements.
+  let identities = c.map { extract($0).identity }
+  expectEqualsUnordered(0..<sequence.count, identities)
+
+  if verifyOrder {
+    // All the elements in the first partition are less than the pivot
+    // value.
+    for i in c[c.startIndex..<pivot].indices {
+      expectLT(extract(c[i]).value, pivotValue)
+    }
+    // All the elements in the second partition are greater or equal to
+    // the pivot value.
+    for i in c[pivot..<c.endIndex].indices {
+      expectGE(extract(c[i]).value, pivotValue)
+    }
+  }
+}
+
+self.test("\(testNamePrefix).partition") {
+  for test in partitionExhaustiveTests {
+    forAllPermutations(test.sequence) { (sequence) in
+      checkPartition(
+        sequence: sequence,
+        pivotValue: sequence.first ?? 0,
+        lessImpl: { $0 < $1 },
+        verifyOrder: true)
+
+      // Pivot value where all elements will pass the partitioning predicate
+      checkPartition(
+        sequence: sequence,
+        pivotValue: Int.min,
+        lessImpl: { $0 < $1 },
+        verifyOrder: true)
+
+      // Pivot value where no element will pass the partitioning predicate
+      checkPartition(
+        sequence: sequence,
+        pivotValue: Int.max,
+        lessImpl: { $0 < $1 },
+        verifyOrder: true)
+    }
+  }
+}
+
+self.test("\(testNamePrefix).partition/InvalidOrderings") {
+  withInvalidOrderings { (comparisonPredicate) in
+    for i in 0..<7 {
+      forAllPermutations(i) { (sequence) in
+        checkPartition(
+          sequence: sequence,
+          pivotValue: sequence.first ?? 0,
+          lessImpl: comparisonPredicate,
+          verifyOrder: false)
+      }
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 
   } // addMutableCollectionTests
 
@@ -879,83 +960,7 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
 // partition()
 //===----------------------------------------------------------------------===//
 
-func checkPartition(
-  sequence: [Int],
-  pivotValue: Int,
-  lessImpl: ((Int, Int) -> Bool),
-  verifyOrder: Bool
-) {
-  let extract = extractValue
-  let elements: [OpaqueValue<Int>] =
-    zip(sequence, 0..<sequence.count).map {
-      OpaqueValue($0, identity: $1)
-    }
-
-  var c = makeWrappedCollection(elements)
-  let closureLifetimeTracker = LifetimeTracked(0)
-  let pivot = c.partition(by: { val in
-    _blackHole(closureLifetimeTracker)
-    return !lessImpl(extract(val).value, pivotValue)
-  })
-
-  // Check that we didn't lose any elements.
-  let identities = c.map { extract($0).identity }
-  expectEqualsUnordered(0..<sequence.count, identities)
-
-  if verifyOrder {
-    // All the elements in the first partition are less than the pivot
-    // value.
-    for i in c[c.startIndex..<pivot].indices {
-      expectLT(extract(c[i]).value, pivotValue)
-    }
-    // All the elements in the second partition are greater or equal to
-    // the pivot value.
-    for i in c[pivot..<c.endIndex].indices {
-      expectGE(extract(c[i]).value, pivotValue)
-    }
-  }
-}
-
-self.test("\(testNamePrefix).partition") {
-  for test in partitionExhaustiveTests {
-    forAllPermutations(test.sequence) { (sequence) in
-      checkPartition(
-        sequence: sequence,
-        pivotValue: sequence.first ?? 0,
-        lessImpl: { $0 < $1 },
-        verifyOrder: true)
-
-      // Pivot value where all elements will pass the partitioning predicate
-      checkPartition(
-        sequence: sequence,
-        pivotValue: Int.min,
-        lessImpl: { $0 < $1 },
-        verifyOrder: true)
-
-      // Pivot value where no element will pass the partitioning predicate
-      checkPartition(
-        sequence: sequence,
-        pivotValue: Int.max,
-        lessImpl: { $0 < $1 },
-        verifyOrder: true)
-    }
-  }
-}
-
-self.test("\(testNamePrefix).partition/InvalidOrderings") {
-  withInvalidOrderings { (comparisonPredicate) in
-    for i in 0..<7 {
-      forAllPermutations(i) { (sequence) in
-        checkPartition(
-          sequence: sequence,
-          pivotValue: sequence.first ?? 0,
-          lessImpl: comparisonPredicate,
-          verifyOrder: false)
-      }
-    }
-  }
-}
-
+// FIXME(tests): Move to addMutableCollectionTests?
 self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported") {
   let sequence = [ 5, 4, 3, 2, 1 ]
   let extract = extractValue
