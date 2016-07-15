@@ -75,7 +75,7 @@ func archiveAndUnarchiveObject<T: NSCoding where T: NSObject>(
     NSKeyedArchiver.archivedData(withRootObject: object)
   )
   unarchiver.requiresSecureCoding = true
-  return unarchiver.decodeObjectOfClass(T.self, forKey: "root")
+  return unarchiver.decodeObject(of: T.self, forKey: "root")
 }
 ErrorBridgingTests.test("NSCoding") {
   autoreleasepool {

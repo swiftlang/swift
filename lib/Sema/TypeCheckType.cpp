@@ -2373,7 +2373,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     Type baseTy = element.getType();
     Type fullTy = TC.getArraySliceType(repr->getEllipsisLoc(), baseTy);
     Identifier name = element.getName();
-    element = TupleTypeElt(fullTy, name, DefaultArgumentKind::None, true);
+    element = TupleTypeElt(fullTy, name, true);
   }
 
   return TupleType::get(elements, Context);

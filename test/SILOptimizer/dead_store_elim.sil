@@ -386,9 +386,9 @@ bb0:
   %1 = integer_literal $Builtin.Int32, 64
   %2 = function_ref @escaped_a : $@convention(thin) () -> Builtin.RawPointer
   %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
-  %4 = pointer_to_address %3 : $Builtin.RawPointer to $*Builtin.Int32
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Int32
   %5 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
-  %6 = pointer_to_address %5 : $Builtin.RawPointer to $*Builtin.Int32
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*Builtin.Int32
   cond_br undef, bb1, bb2
 
 bb1:

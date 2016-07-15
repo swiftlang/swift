@@ -68,7 +68,7 @@ Classes:
     SwiftName: dataWithContentsOfMappedFile(_:)
     MethodKind: Class
 - Name: NSCountedSet
-  SwiftName: CountedSet
+  SwiftName: NSCountedSet
 - Name: NSDate
   SwiftName: NSDate
   SwiftBridge: Date
@@ -172,6 +172,12 @@ Classes:
     MethodKind: Instance
   - Selector: 'decodeIntForKey:'
     Availability: nonswift
+    MethodKind: Instance
+  - Selector: 'encodeDataObject:'
+    SwiftName: encode(_:)
+    MethodKind: Instance
+  - Selector: 'decodeDataObject'
+    SwiftName: decodeData()
     MethodKind: Instance
 - Name: NSNotification
   SwiftName: NSNotification
@@ -756,6 +762,7 @@ Classes:
     SwiftName: isPartialStringValid(_:newEditingString:errorDescription:)
     MethodKind: Instance
 - Name: NSConditionLock
+  SwiftName: NSConditionLock
   Methods:
   - Selector: 'tryLockWhenCondition:'
     SwiftName: tryLock(whenCondition:)
@@ -813,6 +820,7 @@ Classes:
     SwiftName: scanUpTo(_:into:)
     MethodKind: Instance
 - Name: NSTextCheckingResult
+  SwiftName: NSTextCheckingResult
   Methods:
   - Selector: 'rangeAtIndex:'
     SwiftName: rangeAt(_:)
@@ -926,6 +934,9 @@ Classes:
     MethodKind: Instance
 - Name: NSUserDefaults
   Methods:
+  - Selector: 'registerDefaults:'
+    SwiftName: register(defaults:)
+    MethodKind: Instance
   - Selector: 'setObject:forKey:'
     SwiftName: set(_:forKey:)
     MethodKind: Instance
@@ -972,7 +983,39 @@ Classes:
   SwiftName: NSMachPort
 - Name: NSOutputStream
   SwiftName: NSOutputStream
+- Name: NSRegularExpression
+  SwiftName: NSRegularExpression
+- Name: NSComparisonPredicate
+  SwiftName: NSComparisonPredicate
+- Name: NSCompoundPredicate
+  SwiftName: NSCompoundPredicate
+- Name: NSPredicate
+  SwiftName: NSPredicate
+- Name: NSMapTable
+  SwiftName: NSMapTable
+- Name: NSHashTable
+  SwiftName: NSHashTable
+- Name: NSPointerArray
+  SwiftName: NSPointerArray
+- Name: NSPointerFunctions
+  SwiftName: NSPointerFunctions
+- Name: NSCache
+  SwiftName: NSCache
+- Name: NSPurgeableData
+  SwiftName: NSPurgeableData
+- Name: NSLock
+  SwiftName: NSLock
+- Name: NSCondition
+  SwiftName: NSCondition
+- Name: NSDistributedLock
+  SwiftName: NSDistributedLock
+- Name: NSRecursiveLock
+  SwiftName: NSRecursiveLock
+- Name: NSSortDescriptor
+  SwiftName: NSSortDescriptor
 Protocols:
+- Name: NSLocking
+  SwiftName: NSLocking
 - Name: NSMetadataQueryDelegate
   SwiftName: NSMetadataQueryDelegate
 - Name: NSCopying
@@ -1015,6 +1058,7 @@ Protocols:
     SwiftName: presentedSubitem(at:didResolve:)
     MethodKind: Instance
 - Name: NSDiscardableContent
+  SwiftName: NSDiscardableContent
   Methods:
   - Selector: beginContentAccess
     SwiftName: beginContentAccess()
@@ -1034,6 +1078,8 @@ Protocols:
   SwiftName: NSURLHandleClient
 - Name: NSMachPortDelegate
   SwiftName: NSMachPortDelegate
+- Name: NSCacheDelegate
+  SwiftName: NSCacheDelegate
 Tags:
 - Name: NSActivityOptions
   SwiftName: ProcessInfo.ActivityOptions
@@ -1074,13 +1120,13 @@ Tags:
 - Name: NSDecodingFailurePolicy
   SwiftName: NSCoder.DecodingFailurePolicy
 - Name: NSComparisonPredicateOptions
-  SwiftName: ComparisonPredicate.Options
+  SwiftName: NSComparisonPredicate.Options
 - Name: NSComparisonPredicateModifier
-  SwiftName: ComparisonPredicate.Modifier
+  SwiftName: NSComparisonPredicate.Modifier
 - Name: NSPredicateOperatorType
-  SwiftName: ComparisonPredicate.Operator
+  SwiftName: NSComparisonPredicate.Operator
 - Name: NSCompoundPredicateType
-  SwiftName: CompoundPredicate.LogicalType
+  SwiftName: NSCompoundPredicate.LogicalType
 - Name: NSDateFormatterStyle
   SwiftName: DateFormatter.Style
 - Name: NSDateFormatterBehavior
@@ -1166,11 +1212,11 @@ Tags:
 - Name: NSPropertyListFormat
   SwiftName: PropertyListSerialization.PropertyListFormat
 - Name: NSRegularExpressionOptions
-  SwiftName: RegularExpression.Options
+  SwiftName: NSRegularExpression.Options
 - Name: NSMatchingOptions
-  SwiftName: RegularExpression.MatchingOptions
+  SwiftName: NSRegularExpression.MatchingOptions
 - Name: NSMatchingFlags
-  SwiftName: RegularExpression.MatchingFlags
+  SwiftName: NSRegularExpression.MatchingFlags
 - Name: NSStreamStatus
   SwiftName: Stream.Status
 - Name: NSStreamEvent
@@ -1178,10 +1224,10 @@ Tags:
 - Name: NSTaskTerminationReason
   SwiftName: Task.TerminationReason
 - Name: NSTextCheckingType
-  SwiftName: TextCheckingResult.CheckingType
+  SwiftName: NSTextCheckingResult.CheckingType
 - Name: NSTextCheckingTypes
   Availability: nonswift
-  AvailabilityMsg: Use 'TextCheckingResult.CheckingType'
+  AvailabilityMsg: Use 'NSTextCheckingResult.CheckingType'
 - Name: NSTimeZoneNameStyle
   SwiftName: TimeZone.NameStyle
 - Name: NSURLCacheStoragePolicy
@@ -1239,7 +1285,7 @@ Tags:
 - Name: NSNetServiceOptions
   SwiftName: NSNetService.Options
 - Name: NSPointerFunctionsOptions
-  SwiftName: PointerFunctions.Options
+  SwiftName: NSPointerFunctions.Options
 - Name: NSSearchPathDirectory
   SwiftName: FileManager.SearchPathDirectory
 - Name: NSSearchPathDomainMask
@@ -1351,6 +1397,14 @@ Typedefs:
   SwiftName: URLFileProtection
 - Name: NSURLBookmarkFileCreationOptions
   SwiftName: NSURL.BookmarkFileCreationOptions
+- Name: NSMapTableValueCallBacks
+  SwiftName: NSMapTableValueCallBacks
+- Name: NSKeyValueOperator
+  SwiftName: NSKeyValueOperator
+- Name: NSValueTransformerName
+  SwiftName: NSValueTransformerName
+- Name: NSErrorDomain
+  SwiftName: NSErrorDomain
 Globals:
 - Name: NSAppleScriptErrorMessage
   SwiftName: NSAppleScript.errorMessage
@@ -1383,11 +1437,11 @@ Globals:
 - Name: NSTaskDidTerminateNotification
   SwiftName: Task.didTerminateNotification
 - Name: NSTextCheckingAllSystemTypes
-  SwiftName: TextCheckingResult.CheckingType.allSystemTypes
+  SwiftName: NSTextCheckingResult.CheckingType.allSystemTypes
 - Name: NSTextCheckingAllCustomTypes
-  SwiftName: TextCheckingResult.CheckingType.allCustomTypes
+  SwiftName: NSTextCheckingResult.CheckingType.allCustomTypes
 - Name: NSTextCheckingAllTypes
-  SwiftName: TextCheckingResult.CheckingType.allTypes
+  SwiftName: NSTextCheckingResult.CheckingType.allTypes
 - Name: NSUbiquitousKeyValueStoreDidChangeExternallyNotification
   SwiftName: NSUbiquitousKeyValueStore.didChangeExternallyNotification
 - Name: NSURLSessionTaskPriorityDefault

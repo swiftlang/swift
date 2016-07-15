@@ -435,39 +435,6 @@ private:
   /// This value is incremented every time a new module is imported.
   unsigned Generation = 1;
 
-  /// \brief A cached set of extensions for a particular Objective-C class.
-  struct CachedExtensions {
-    CachedExtensions()
-      : Extensions(nullptr), Generation(0) { }
-
-    CachedExtensions(const CachedExtensions &) = delete;
-    CachedExtensions &operator=(const CachedExtensions &) = delete;
-
-    CachedExtensions(CachedExtensions &&other)
-      : Extensions(other.Extensions), Generation(other.Generation)
-    {
-      other.Extensions = nullptr;
-      other.Generation = 0;
-    }
-
-    CachedExtensions &operator=(CachedExtensions &&other) {
-      delete Extensions;
-      Extensions = other.Extensions;
-      Generation = other.Generation;
-      other.Extensions = nullptr;
-      other.Generation = 0;
-      return *this;
-    }
-
-    ~CachedExtensions() { delete Extensions; }
-
-    /// \brief The cached extensions.
-    SmallVector<ExtensionDecl *, 4> *Extensions;
-
-    /// \brief Generation number used to tell when this cache has gone stale.
-    unsigned Generation;
-  };
-
   void bumpGeneration() {
     ++Generation;
     SwiftContext.bumpGeneration();

@@ -949,6 +949,21 @@ bb0(%0 : $X):
   // CHECK-NEXT: return [[T0]] : $X
 }
 
+// CHECK-LABEL: sil public_external [fragile] @test_pointer_to_address
+sil [fragile] @test_pointer_to_address : $@convention(thin) (Builtin.RawPointer, X) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $X):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to $*X
+  store %1 to %2 : $*X
+  // CHECK: [[T2:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to $*X
+  // CHECK-NEXT: store %1 to [[T2]] : $*X
+  %3 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*X
+  store %1 to %3 : $*X
+  // CHECK: [[T3:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [strict] $*X
+  // CHECK-NEXT: store %1 to [[T3]] : $*X
+  %28 = tuple ()
+  return %28 : $()
+}
+
 public func serialize_all() {
 }
 
@@ -1348,22 +1363,23 @@ bb0:
   %115 = function_ref @test_mark_fn_escape : $@convention(thin) () -> ()
   %117 = function_ref @test_copy_release_value : $@convention(thin) (X) -> (X)
   %118 = function_ref @test_set_deallocating : $@convention(thin) (X) -> (X)
-  %119 = function_ref @cond_fail_test : $@convention(thin) Builtin.Int1 -> ()
+  %119 = function_ref @test_pointer_to_address : $@convention(thin) (Builtin.RawPointer, X) -> ()
+  %120 = function_ref @cond_fail_test : $@convention(thin) Builtin.Int1 -> ()
 
   %124 = function_ref @block_storage_type : $@convention(thin) Int -> @convention(block) () -> ()
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)
   %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error
   %135 = function_ref @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error Error) -> ()
   %134 = function_ref @box_type : $@convention(thin) (@box Int, Int) -> ()
-  %120 = function_ref @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
-  %121 = function_ref @partial_apply : $@convention(thin) (@convention(thin) (Int) -> @out Int, Int) -> Int
-  %122 = function_ref @partial_apply_with_closure : $@convention(thin) (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> ()
-  %123 = function_ref @extract_generic_struct : $@convention(thin) GenericStruct<Int64> -> Int64
-  %128 = function_ref @select_enum : $@convention(thin) (@in Beth) -> ()
-  %228 = function_ref @existential_box : $@convention(thin) (SomeError) -> ()
-  %129 = function_ref @bridge_object : $@convention(thin) (@owned Class1, Builtin.Word) -> ()
-  %150 = function_ref @a_reabstraction_thunk: $@convention(thin) () -> ()
-  %151 = function_ref @a_regular_thunk: $@convention(thin) () -> ()
+  %140 = function_ref @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
+  %141 = function_ref @partial_apply : $@convention(thin) (@convention(thin) (Int) -> @out Int, Int) -> Int
+  %142 = function_ref @partial_apply_with_closure : $@convention(thin) (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> ()
+  %143 = function_ref @extract_generic_struct : $@convention(thin) GenericStruct<Int64> -> Int64
+  %148 = function_ref @select_enum : $@convention(thin) (@in Beth) -> ()
+  %149 = function_ref @existential_box : $@convention(thin) (SomeError) -> ()
+  %150 = function_ref @bridge_object : $@convention(thin) (@owned Class1, Builtin.Word) -> ()
+  %151 = function_ref @a_reabstraction_thunk: $@convention(thin) () -> ()
+  %152 = function_ref @a_regular_thunk: $@convention(thin) () -> ()
 
   %r = tuple ()
   return %r : $()

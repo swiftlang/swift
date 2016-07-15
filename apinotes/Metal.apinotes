@@ -10,3 +10,5 @@ Tags:
 Enumerators:
 - Name: MTLTextureUsageUnknown
   SwiftName: unknown
+- Name: MTLStorageModeShared
+  SwiftName: shared

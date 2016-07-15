@@ -1,4 +1,4 @@
-//===--- EpilogueRetainReleaseMatcherDumper.cpp - Find Epilogue Releases --===//
+//===--- EpilogueARCMatcherDumper.cpp - Find Epilogue Releases ------------===//
 //
 // This source file is part of the Swift.org open source project
 //

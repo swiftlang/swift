@@ -143,9 +143,6 @@ namespace swift {
     /// \brief Enable experimental nested generic types feature.
     bool EnableExperimentalNestedGenericTypes = false;
 
-    /// \brief Enable generalized collection casting.
-    bool EnableExperimentalCollectionCasts = false;
-
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;

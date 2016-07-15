@@ -1476,21 +1476,18 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     unsigned idx = 0;
     for (const auto &elt : tupleTy->getElements()) {
       Type eltTy = mapSignatureParamType(ctx, elt.getType());
-      if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
-          elt.getDefaultArgKind() != DefaultArgumentKind::None) {
+      if (anyChanged || eltTy.getPointer() != elt.getType().getPointer()) {
         if (!anyChanged) {
           elements.reserve(tupleTy->getNumElements());
           for (unsigned i = 0; i != idx; ++i) {
             const TupleTypeElt &elt = tupleTy->getElement(i);
             elements.push_back(TupleTypeElt(elt.getType(), elt.getName(),
-                                            DefaultArgumentKind::None,
                                             elt.isVararg()));
           }
           anyChanged = true;
         }
 
         elements.push_back(TupleTypeElt(eltTy, elt.getName(),
-                                        DefaultArgumentKind::None,
                                         elt.isVararg()));
       }
       ++idx;
@@ -1556,9 +1553,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
       }
     }
   } else if (isa<SubscriptDecl>(this)) {
-    signature.InterfaceType
-      = getInterfaceType()->getWithoutDefaultArgs(getASTContext())
-          ->getCanonicalType();
+    signature.InterfaceType = getInterfaceType()->getCanonicalType();
 
     // If the subscript occurs within a generic extension context,
     // consider the generic signature of the extension.

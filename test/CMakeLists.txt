@@ -59,7 +59,8 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
-     ("${SDK}" STREQUAL "ANDROID"))
+     ("${SDK}" STREQUAL "ANDROID") OR
+     ("${SDK}" STREQUAL "WINDOWS"))
     # No extra dependencies.
   else()
     message(FATAL_ERROR "Unknown SDK: ${SDK}")

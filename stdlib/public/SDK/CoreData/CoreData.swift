@@ -272,8 +272,8 @@ extension CocoaError {
 
   /// For predicate-based validation, the predicate for the condition
   /// that failed to validate.
-  public var validationPredicate: Predicate? {
-    return userInfo[NSValidationPredicateErrorKey] as? Predicate
+  public var validationPredicate: NSPredicate? {
+    return userInfo[NSValidationPredicateErrorKey] as? NSPredicate
   }
 
   /// The value for the key that failed to validate for a validation

@@ -517,7 +517,7 @@ namespace {
     }
 
     bool visitPointerToAddressInst(PointerToAddressInst *RHS) {
-      return true;
+      return cast<PointerToAddressInst>(LHS)->isStrict() == RHS->isStrict();
     }
 
     bool visitRefToRawPointerInst(RefToRawPointerInst *RHS) {

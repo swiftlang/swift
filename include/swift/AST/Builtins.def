@@ -177,6 +177,11 @@ BUILTIN_SIL_OPERATION(Unpin, "unpin", Special)
 /// Load has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Load, "load", Special)
 
+/// LoadRaw has type (Builtin.RawPointer) -> T
+/// This is a load of T from raw memory.
+/// It's address does not adhere to strict aliasing.
+BUILTIN_SIL_OPERATION(LoadRaw, "loadRaw", Special)
+
 /// Take has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Take, "take", Special)
 

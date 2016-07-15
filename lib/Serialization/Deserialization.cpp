@@ -3419,16 +3419,11 @@ Type ModuleFile::getType(TypeID TID) {
 
       IdentifierID nameID;
       TypeID typeID;
-      uint8_t rawDefArg;
       bool isVararg;
       decls_block::TupleTypeEltLayout::readRecord(scratch, nameID, typeID,
-                                                  rawDefArg, isVararg);
+                                                  isVararg);
 
-      DefaultArgumentKind defArg = DefaultArgumentKind::None;
-      if (auto actualDefArg = getActualDefaultArgKind(rawDefArg))
-        defArg = *actualDefArg;
-      elements.push_back({getType(typeID), getIdentifier(nameID), defArg,
-                          isVararg});
+      elements.push_back({getType(typeID), getIdentifier(nameID), isVararg});
     }
 
     typeOrOffset = TupleType::get(elements, ctx);

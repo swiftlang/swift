@@ -235,6 +235,14 @@ static bool isVoidLike(CanType type) {
            cast<TupleType>(type).getElementType(0)->isVoid()));
 }
 
+static CanType getCanTupleElementType(CanType type, unsigned index) {
+  if (auto tupleTy = dyn_cast<TupleType>(type))
+    return tupleTy.getElementType(index);
+
+  assert(index == 0);
+  return type;
+}
+
 AbstractionPattern
 AbstractionPattern::getTupleElementType(unsigned index) const {
   switch (getKind()) {
@@ -253,7 +261,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
     return OrigTupleElements[index];
   case Kind::ClangType:
     return AbstractionPattern(getGenericSignature(),
-                              cast<TupleType>(getType()).getElementType(index),
+                              getCanTupleElementType(getType(), index),
                               getClangArrayElementType(getClangType(), index));
   case Kind::Discard:
     llvm_unreachable("operation not needed on discarded abstractions yet");
@@ -261,7 +269,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
     if (isTypeParameter())
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
-                              cast<TupleType>(getType()).getElementType(index));
+                              getCanTupleElementType(getType(), index));
   case Kind::ClangFunctionParamTupleType: {
     // Handle the (label: ()) param used by functions imported as labeled
     // nullary initializers.
@@ -269,12 +277,12 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
       return AbstractionPattern(getType()->getASTContext().TheEmptyTupleType);
     
     return AbstractionPattern(getGenericSignature(),
-                              cast<TupleType>(getType()).getElementType(index),
+                              getCanTupleElementType(getType(), index),
                           getClangFunctionParameterType(getClangType(), index));
   }
 
   case Kind::ObjCMethodFormalParamTupleType: {
-    auto swiftEltType = cast<TupleType>(getType()).getElementType(index);
+    auto swiftEltType = getCanTupleElementType(getType(), index);
     auto method = getObjCMethod();
     auto errorInfo = getEncodedForeignErrorInfo();
 
@@ -306,7 +314,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
     if (memberStatus.isInstance() && clangIndex >= memberStatus.getSelfIndex())
       ++clangIndex;
     return AbstractionPattern(getGenericSignature(),
-                          cast<TupleType>(getType()).getElementType(index),
+                              getCanTupleElementType(getType(), index),
                      getClangFunctionParameterType(getClangType(), clangIndex));
   }
   case Kind::ObjCMethodParamTupleType: {

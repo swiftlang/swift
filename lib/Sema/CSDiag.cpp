@@ -3639,6 +3639,96 @@ static bool isSymmetricBinaryOperator(const CalleeCandidateInfo &CCI) {
   return true;
 }
 
+/// Determine whether any of the given callee candidates have a default value.
+static bool candidatesHaveAnyDefaultValues(
+    const CalleeCandidateInfo &candidates) {
+  for (const auto &cand : candidates.candidates) {
+    auto function = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
+    if (!function) continue;
+
+    auto paramLists = function->getParameterLists();
+    if (cand.level >= paramLists.size()) continue;
+
+    auto paramList = paramLists[cand.level];
+    for (auto param : *paramList) {
+      if (param->getDefaultArgumentKind() != DefaultArgumentKind::None)
+        return true;
+    }
+  }
+
+  return false;
+}
+
+/// Find the tuple element that can be initialized by a scalar.
+static Optional<unsigned> getElementForScalarInitOfArg(
+    const TupleType *tupleTy,
+    const CalleeCandidateInfo &candidates) {
+  // Empty tuples cannot be initialized with a scalar.
+  if (tupleTy->getNumElements() == 0) return None;
+  
+  auto getElementForScalarInitSimple =
+      [](const TupleType *tupleTy) -> Optional<unsigned> {
+    int index = tupleTy->getElementForScalarInit();
+    if (index < 0) return None;
+    return index;    
+  };
+
+  // If there aren't any candidates, we're done.
+  if (candidates.empty()) return getElementForScalarInitSimple(tupleTy);
+
+  // Dig out the candidate.
+  const auto &cand = candidates[0];
+  auto function = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
+  if (!function) return getElementForScalarInitSimple(tupleTy);
+
+  auto paramLists = function->getParameterLists();
+  if (cand.level >= paramLists.size())
+    return getElementForScalarInitSimple(tupleTy);
+
+  auto paramList = paramLists[cand.level];
+  if (tupleTy->getNumElements() != paramList->size()) 
+    return getElementForScalarInitSimple(tupleTy);
+
+  // Find a tuple element without a default.
+  Optional<unsigned> elementWithoutDefault;
+  for (unsigned i : range(tupleTy->getNumElements())) {
+    auto param = paramList->get(i);
+
+    // Skip parameters with default arguments.
+    if (param->getDefaultArgumentKind() != DefaultArgumentKind::None)
+      continue;
+
+    // If we already have an element without a default, check whether there are
+    // two fields that need initialization.
+    if (elementWithoutDefault) {
+      // Variadic fields are okay; they'll just end up being empty.
+      if (param->isVariadic()) continue;
+
+      // If the element we saw before was variadic, it can be empty as well.
+      auto priorParam = paramList->get(*elementWithoutDefault);
+      if (!priorParam->isVariadic()) return None;
+    }
+
+    elementWithoutDefault = i;
+  }
+
+  if (elementWithoutDefault) return elementWithoutDefault;
+
+  // All of the fields have default values; initialize the first one.
+  return 0;
+}
+
+/// Return true if the argument of a CallExpr (or related node) has a trailing
+/// closure.
+static bool callArgHasTrailingClosure(Expr *E) {
+  if (!E) return false;
+  if (auto *PE = dyn_cast<ParenExpr>(E))
+    return PE->hasTrailingClosure();
+  else if (auto *TE = dyn_cast<TupleExpr>(E))
+    return TE->hasTrailingClosure();
+  return false;
+}
+
 /// Special magic to handle inout exprs and tuples in argument lists.
 Expr *FailureDiagnosis::
 typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
@@ -3690,21 +3780,11 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // out.  If we can't do that and the tuple has default arguments, we have to
     // punt on passing down the type information, since type checking the
     // subexpression won't be able to find the default argument provider.
-    if (argType)
+    if (argType) {
       if (auto argTT = argType->getAs<TupleType>()) {
-        int scalarElt = argTT->getElementForScalarInit();
-        // If the argument cannot be initialized with a scalar, then it is an
-        // error, so we might as well pass down the expected type, to get a
-        // specific error involving it.
-        if (scalarElt == -1) {
-          // However, if there are default values, we don't actually want to do
-          // this.  We don't know if the user just forgot a label on a defaulted
-          // value.
-          if (argTT->hasAnyDefaultValues())
-            argType = Type();
-        } else {
+        if (auto scalarElt = getElementForScalarInitOfArg(argTT, candidates)) {
           // If we found the single argument being initialized, use it.
-          auto &arg = argTT->getElement(scalarElt);
+          auto &arg = argTT->getElement(*scalarElt);
           
           // If the argument being specified is actually varargs, then we're
           // just specifying one element of a variadic list.  Use the type of
@@ -3713,9 +3793,14 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
             argType = arg.getVarargBaseTy();
           else
             argType = arg.getType();
+        } else if (candidatesHaveAnyDefaultValues(candidates)) {
+          argType = Type();
         }
+      } else if (candidatesHaveAnyDefaultValues(candidates)) {
+        argType = Type();
       }
-    
+    }
+
     auto CTPurpose = argType ? CTP_CallArgument : CTP_Unused;
     return typeCheckChildIndependently(argExpr, argType, CTPurpose, options);
   }
@@ -3724,78 +3809,82 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   // the shuffle of input arguments to destination values.  It requires a
   // TupleType to compute the mapping from argExpr.  Conveniently, it doesn't
   // care about the actual types though, so we can just use 'void' for them.
+  // FIXME: This doesn't need to be limited to tuple types.
   if (argType && argType->is<TupleType>()) {
-    auto argTypeTT = argType->castTo<TupleType>();
-    SmallVector<TupleTypeElt, 4> ArgElts;
+    // Decompose the parameter type, including information about default
+    // arguments.
+    SmallVector<CallArgParam, 4> params =
+        decomposeParamType(
+          argType,
+            candidates.empty() ? nullptr : candidates[0].getDecl(),
+            candidates.empty() ? 0 : candidates[0].level);
+
+    // Form a set of call arguments, using a dummy type (Void), because the
+    // argument/parameter matching code doesn't need it.
     auto voidTy = CS->getASTContext().TheEmptyTupleType;
-    
-    for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i)
-      ArgElts.push_back({ voidTy, TE->getElementName(i) });
-    SmallVector<int, 4> sources;
-    SmallVector<unsigned, 4> variadicArgs;
-    if (!computeTupleShuffle(ArgElts, argTypeTT->getElements(),
-                             sources, variadicArgs)) {
+    SmallVector<CallArgParam, 4> args;
+    for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i) {
+      CallArgParam arg;
+      arg.Ty = voidTy;
+      arg.Label = TE->getElementName(i);
+      args.push_back(arg);
+    }
+
+    /// Use a match call argument listener that allows relabeling.
+    struct RelabelMatchCallArgumentListener : MatchCallArgumentListener {
+      virtual bool relabelArguments(ArrayRef<Identifier> newNames) override {
+        return false;
+      }
+    } listener;
+
+    SmallVector<ParamBinding, 4> paramBindings;
+    if (!matchCallArguments(args, params, callArgHasTrailingClosure(argExpr),
+                            /*allowFixes=*/true,
+                            listener, paramBindings)) {
       SmallVector<Expr*, 4> resultElts(TE->getNumElements(), nullptr);
       SmallVector<TupleTypeElt, 4> resultEltTys(TE->getNumElements(), voidTy);
 
-      // If we got a correct shuffle, we can perform the analysis of all of
-      // the input elements, with their expected types.
-      for (unsigned i = 0, e = sources.size(); i != e; ++i) {
-        // If the value is taken from a default argument, ignore it.
-        if (sources[i] == TupleShuffleExpr::DefaultInitialize ||
-            sources[i] == TupleShuffleExpr::Variadic ||
-            sources[i] == TupleShuffleExpr::CallerDefaultInitialize)
-          continue;
-        
-        assert(sources[i] >= 0 && "Unknown sources index");
-        
-        // Otherwise, it must match the corresponding expected argument type.
-        unsigned inArgNo = sources[i];
-        auto actualType = argTypeTT->getElementType(i);
+      // Perform analysis of the input elements.
+      for (unsigned paramIdx : range(paramBindings.size())) {
+        // Extract the parameter.
+        const auto &param = params[paramIdx];
 
-        if (actualType->is<InOutType>())
+        // Determine the parameter type.
+        auto currentParamType = param.Ty;
+        if (currentParamType->is<InOutType>())
           options |= TCC_AllowLValue;
 
-        auto exprResult =
-          typeCheckChildIndependently(TE->getElement(inArgNo), actualType,
-                                      CTP_CallArgument, options);
-        // If there was an error type checking this argument, then we're done.
-        if (!exprResult)
-          return nullptr;
+        // Look at each of the arguments assigned to this parameter.
+        for (auto inArgNo : paramBindings[paramIdx]) {
+          // Determine the argument type.
+          auto currentArgType = TE->getElement(inArgNo);
 
-        // If the caller expected something inout, but we didn't have
-        // something of inout type, diagnose it.
-        if (auto IOE =
-              dyn_cast<InOutExpr>(exprResult->getSemanticsProvidingExpr())) {
-          if (!actualType->is<InOutType>()) {
-            diagnose(exprResult->getLoc(), diag::extra_address_of,
-                     exprResult->getType()->getInOutObjectType())
-              .highlight(exprResult->getSourceRange())
-              .fixItRemove(IOE->getStartLoc());
-            return nullptr;
-          }
-        }
-        
-        resultElts[inArgNo] = exprResult;
-        resultEltTys[inArgNo] = {
-          exprResult->getType(),
-          TE->getElementName(inArgNo)
-        };
-      }
-      
-      if (!variadicArgs.empty()) {
-        auto varargsTy = argTypeTT->getVarArgsBaseType();
-        for (unsigned i = 0, e = variadicArgs.size(); i != e; ++i) {
-          unsigned inArgNo = variadicArgs[i];
-          
-          auto expr =
-            typeCheckChildIndependently(TE->getElement(inArgNo), varargsTy,
-                                        CTP_CallArgument);
+          auto exprResult =
+            typeCheckChildIndependently(currentArgType, currentParamType,
+                                        CTP_CallArgument, options);
+
           // If there was an error type checking this argument, then we're done.
-          if (!expr)
+          if (!exprResult)
             return nullptr;
-          resultElts[inArgNo] = expr;
-          resultEltTys[inArgNo] = { expr->getType() };
+
+          // If the caller expected something inout, but we didn't have
+          // something of inout type, diagnose it.
+          if (auto IOE =
+                dyn_cast<InOutExpr>(exprResult->getSemanticsProvidingExpr())) {
+            if (!currentParamType->is<InOutType>()) {
+              diagnose(exprResult->getLoc(), diag::extra_address_of,
+                       exprResult->getType()->getInOutObjectType())
+                .highlight(exprResult->getSourceRange())
+                .fixItRemove(IOE->getStartLoc());
+              return nullptr;
+            }
+          }
+
+          resultElts[inArgNo] = exprResult;
+          resultEltTys[inArgNo] = {
+            exprResult->getType(),
+            TE->getElementName(inArgNo)
+          };
         }
       }
       
@@ -4346,17 +4435,6 @@ namespace {
   };
 }
 
-/// Return true if the argument of a CallExpr (or related node) has a trailing
-/// closure.
-static bool callArgHasTrailingClosure(Expr *E) {
-  if (!E) return false;
-  if (auto *PE = dyn_cast<ParenExpr>(E))
-    return PE->hasTrailingClosure();
-  else if (auto *TE = dyn_cast<TupleExpr>(E))
-    return TE->hasTrailingClosure();
-  return false;
-}
-
 /// Return true if this function name is a comparison operator.  This is a
 /// simple heuristic used to guide comparison related diagnostics.
 static bool isNameOfStandardComparisonOperator(StringRef opName) {
@@ -4502,8 +4580,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // If we are constructing a tuple with initializer syntax, the expected
     // argument list is the tuple type itself - and there is no initdecl.
     auto instanceTy = MTT->getInstanceType();
-    if (instanceTy->is<TupleType>()) {
-      argType = instanceTy;
+    if (auto tupleTy = instanceTy->getAs<TupleType>()) {
+      argType = tupleTy;
     }
   }
   

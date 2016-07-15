@@ -1017,7 +1017,7 @@ bb0(%0 : $X, %1 : $Builtin.Word):
 sil @test_address_to_pointer : $@convention(thin) (@owned X) -> @out X {
 bb0(%0 : $*X, %1 : $X):
   %2 = address_to_pointer %0 : $*X to $Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*X
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*X
   store %1 to %3 : $*X
   %7 = tuple ()
   return %7 : $()

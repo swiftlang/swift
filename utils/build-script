@@ -632,7 +632,7 @@ class BuildScriptInvocation(object):
             impl_args += ["--enable-ubsan"]
         if args.clang_compiler_version:
             impl_args += [
-                "--clang-compiler-version=%s.%s.%s" % (
+                "--clang-compiler-version=%s" % (
                     args.clang_compiler_version)
             ]
         if args.verbose_build:

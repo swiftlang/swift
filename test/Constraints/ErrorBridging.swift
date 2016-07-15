@@ -41,3 +41,30 @@ let e1fix = ns1 as FooError // expected-error{{did you mean to use 'as!'}} {{17-
 
 let esub = ns1 as Error
 let esub2 = ns1 as? Error // expected-warning{{conditional cast from 'NSError' to 'Error' always succeeds}}
+
+// SR-1562 / rdar://problem/26370984
+enum MyError : Error {
+  case failed
+}
+
+func concrete1(myError: MyError) -> NSError {
+  return myError as NSError
+}
+
+func concrete2(myError: MyError) -> NSError {
+  return myError // expected-error{{cannot convert return expression of type 'MyError' to return type 'NSError'}}
+}
+
+func generic<T : Error>(error: T) -> NSError {
+  return error as NSError
+}
+
+extension Error {
+  var asNSError: NSError {
+    return self as NSError
+  }
+
+  var asNSError2: NSError {
+    return self // expected-error{{cannot convert return expression of type 'Self' to return type 'NSError'}}
+  }
+}

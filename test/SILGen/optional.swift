@@ -90,7 +90,7 @@ func tuple_bind(_ x: (Int, String)?) -> String? {
 
 // rdar://21883752 - We were crashing on this function because the deallocation happened
 // out of scope.
-// CHECK-LABEL: sil hidden @_TF8optional16crash_on_deallocFTGVs10DictionarySiGSaSi___T_
+// CHECK-LABEL: sil hidden @_TIF8optional16crash_on_deallocFGVs10DictionarySiGSaSi__T_A_
 func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
   var dict = dict
   dict[1]?.append(2)

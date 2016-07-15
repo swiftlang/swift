@@ -1164,9 +1164,9 @@ FloatingPoint.test("Float80/signalingNaN") {
 
 #endif
 
-var FloatingPointClassification = TestSuite("NumericParsing")
+var FloatingPointClassification = TestSuite("FloatingPointClassification")
 
-FloatingPointClassification.test("FloatingPointClassification/Equatable") {
+FloatingPointClassification.test("FloatingPointClassification/Hashable") {
   let values: [FloatingPointClassification] = [
     .signalingNaN,
     .quietNaN,
@@ -1180,7 +1180,7 @@ FloatingPointClassification.test("FloatingPointClassification/Equatable") {
     .positiveInfinity
   ]
   // Values should be equal iff indices equal
-  checkEquatable(values, oracle: { $0 == $1 }) 
+  checkHashable(values, equalityOracle: { $0 == $1 })
 }
 
 runAllTests()

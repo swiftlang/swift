@@ -545,8 +545,8 @@ bb0(%0 : $Builtin.RawPointer):
   %1 = integer_literal $Builtin.Word, 5
   %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
   %3 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
-  %4 = pointer_to_address %2 : $Builtin.RawPointer to $*UInt8
-  %5 = pointer_to_address %3 : $Builtin.RawPointer to $*UInt8
+  %4 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*UInt8
+  %5 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*UInt8
   %6 = load %4 : $*UInt8
   %7 = load %5 : $*UInt8
   %8 = apply %X(%6, %7) : $@convention(thin) (UInt8, UInt8) -> Builtin.Word

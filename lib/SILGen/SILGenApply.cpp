@@ -2776,9 +2776,10 @@ namespace {
 
   private:
     void emit(ArgumentSource &&arg, AbstractionPattern origParamType) {
-      // If it was a tuple in the original type, the parameters will
-      // have been exploded.
-      if (origParamType.isTuple()) {
+      // If it was a tuple in the original type, or the argument
+      // requires the callee to evaluate, the parameters will have
+      // been exploded.
+      if (origParamType.isTuple() || arg.requiresCalleeToEvaluate()) {
         emitExpanded(std::move(arg), origParamType);
         return;
       }
@@ -2883,16 +2884,16 @@ namespace {
 
     /// Emit an argument as an expanded tuple.
     void emitExpanded(ArgumentSource &&arg, AbstractionPattern origParamType) {
-      CanTupleType substArgType = cast<TupleType>(arg.getSubstType());
-
-      // The original type isn't necessarily a tuple.
-      assert(origParamType.matchesTuple(substArgType));
-
       assert(!arg.isLValue() && "argument is l-value but parameter is tuple?");
 
       // If we're working with an r-value, just expand it out and emit
       // all the elements individually.
       if (arg.isRValue()) {
+        CanTupleType substArgType = cast<TupleType>(arg.getSubstType());
+
+        // The original type isn't necessarily a tuple.
+        assert(origParamType.matchesTuple(substArgType));
+
         auto loc = arg.getKnownRValueLocation();
         SmallVector<RValue, 4> elts;
         std::move(arg).asKnownRValue().extractElements(elts);
@@ -3240,6 +3241,18 @@ namespace {
   };
 }
 
+/// Decompose a type, whether it is a tuple or a single type, into an
+/// array of tuple type elements.
+static ArrayRef<TupleTypeElt> decomposeTupleOrSingle(Type type,
+                                                     TupleTypeElt &single) {
+  if (auto tupleTy = type->getAs<TupleType>()) {
+    return tupleTy->getElements();
+  }
+
+  single = TupleTypeElt(type);
+  return single;
+}
+
 void ArgEmitter::emitShuffle(Expr *inner,
                              Expr *outer,
                              ArrayRef<TupleTypeElt> innerElts,
@@ -3249,7 +3262,10 @@ void ArgEmitter::emitShuffle(Expr *inner,
                              ArrayRef<unsigned> variadicArgs,
                              Type varargsArrayType,
                              AbstractionPattern origParamType) {
-  auto outerTuple = cast<TupleType>(outer->getType()->getCanonicalType());
+  TupleTypeElt singleOuterElement;
+  ArrayRef<TupleTypeElt> outerElements =
+    decomposeTupleOrSingle(outer->getType()->getCanonicalType(),
+                           singleOuterElement);
   CanType canVarargsArrayType;
   if (varargsArrayType)
     canVarargsArrayType = varargsArrayType->getCanonicalType();
@@ -3300,8 +3316,9 @@ void ArgEmitter::emitShuffle(Expr *inner,
   // which we can use to emit the inner tuple.
   {
     unsigned nextParamIndex = 0;
-    for (unsigned outerIndex : indices(outerTuple.getElementTypes())) {
-      CanType substEltType = outerTuple.getElementType(outerIndex);
+    for (unsigned outerIndex : indices(outerElements)) {
+      CanType substEltType =
+        outerElements[outerIndex].getType()->getCanonicalType();
       AbstractionPattern origEltType =
         origParamType.getTupleElementType(outerIndex);
       unsigned numParams = getFlattenedValueCount(origEltType, substEltType,
@@ -3332,7 +3349,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
         innerExtents[innerIndex].Params = eltParams;
         origInnerElts[innerIndex] = origEltType;
       } else if (innerIndex == TupleShuffleExpr::Variadic) {
-        auto &varargsField = outerTuple->getElement(outerIndex);
+        auto &varargsField = outerElements[outerIndex];
         assert(varargsField.isVararg());
         assert(!varargsInfo.hasValue() && "already had varargs entry?");
 
@@ -3464,7 +3481,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
   // Make a final pass to emit default arguments and move things into
   // the outer arguments lists.
   unsigned nextCallerDefaultArg = 0;
-  for (unsigned outerIndex = 0, e = outerTuple->getNumElements();
+  for (unsigned outerIndex = 0, e = outerElements.size();
          outerIndex != e; ++outerIndex) {
     // If this comes from an inner element, move the appropriate
     // inner element values over.
@@ -3488,7 +3505,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
     } else if (innerIndex == TupleShuffleExpr::DefaultInitialize) {
       // Otherwise, emit the default initializer, then map that as a
       // default argument.
-      CanType eltType = outerTuple.getElementType(outerIndex);
+      CanType eltType = outerElements[outerIndex].getType()->getCanonicalType();
       auto origType = origParamType.getTupleElementType(outerIndex);
       RValue value =
         SGF.emitApplyOfDefaultArgGenerator(outer, defaultArgsOwner,
@@ -3503,7 +3520,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
 
     // If we're supposed to create a varargs array with the rest, do so.
     } else if (innerIndex == TupleShuffleExpr::Variadic) {
-      auto &varargsField = outerTuple->getElement(outerIndex);
+      auto &varargsField = outerElements[outerIndex];
       assert(varargsField.isVararg() &&
              "Cannot initialize nonvariadic element");
       assert(varargsInfo.hasValue());
@@ -3518,7 +3535,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
         }
       }
 
-      CanType eltType = outerTuple.getElementType(outerIndex);
+      CanType eltType = outerElements[outerIndex].getType()->getCanonicalType();
       ManagedValue varargs = emitEndVarargs(SGF, outer, std::move(*varargsInfo));
       emit(ArgumentSource(outer, RValue(SGF, outer, eltType, varargs)),
            origParamType.getTupleElementType(outerIndex));
@@ -4837,9 +4854,11 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   SmallVector<ManagedValue, 2> results;
   emission.apply().getAll(results);
 
-  // Project out the materialized address.
+  // Project out the materialized address. The address directly returned by
+  // materialize for set is strictly typed, whether it is the local buffer or
+  // stored property.
   SILValue address = results[0].getUnmanagedValue();
-  address = B.createPointerToAddress(loc, address, buffer->getType());
+  address = B.createPointerToAddress(loc, address, buffer->getType(), /*isStrict*/ true);
 
   // Project out the optional callback.
   SILValue optionalCallback = results[1].getUnmanagedValue();
@@ -4941,7 +4960,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                                   SILType::getRawPointerType(getASTContext()));
 
   // Convert to the appropriate address type and return.
-  SILValue address = B.createPointerToAddress(loc, pointer, addressType);
+  SILValue address = B.createPointerToAddress(loc, pointer, addressType, /*isStrict*/ true);
 
   // Mark dependence as necessary.
   switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {

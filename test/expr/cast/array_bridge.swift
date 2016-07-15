@@ -48,7 +48,6 @@ var aa: [[A]] = []
 var bb: [[B]] = []
 
 aa = bb // expected-error {{cannot assign value of type '[[B]]' to type '[[A]]'}}
-bb = aa // expected-error {{cannot assign value of type '[[A]]' to type '[[B]]'}}
 
 class C {
 }

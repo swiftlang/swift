@@ -549,7 +549,7 @@ extension Printing {
 func testSetInitializers() {
   let a: [AnyObject] = [NSObject()]
 
-  let _ = CountedSet(array: a)
+  let _ = NSCountedSet(array: a)
   let _ = NSMutableSet(array: a)
 }
 
