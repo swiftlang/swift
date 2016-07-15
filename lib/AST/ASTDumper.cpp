@@ -2642,50 +2642,6 @@ namespace {
           printField("name", elt.getName().str());
         if (elt.isVararg())
           printFlag("vararg");
-        switch (elt.getDefaultArgKind()) {
-        case DefaultArgumentKind::None:
-          break;
-
-        case DefaultArgumentKind::Column:
-          printField("default_arg", "#column");
-          break;
-
-        case DefaultArgumentKind::DSOHandle:
-          printField("default_arg", "#dsohandle");
-          break;
-
-        case DefaultArgumentKind::File:
-          printField("default_arg", "#file");
-          break;
-
-        case DefaultArgumentKind::Function:
-          printField("default_arg", "#function");
-          break;
-
-        case DefaultArgumentKind::Inherited:
-          printField("default_arg", "inherited");
-          break;
-
-        case DefaultArgumentKind::Line:
-          printField("default_arg", "#line");
-          break;
-
-        case DefaultArgumentKind::Nil:
-          printField("default_arg", "nil");
-          break;
-
-        case DefaultArgumentKind::EmptyArray:
-          printField("default_arg", "[]");
-          break;
-
-        case DefaultArgumentKind::EmptyDictionary:
-          printField("default_arg", "[:]");
-          break;
-
-        case DefaultArgumentKind::Normal:
-          printField("default_arg", "normal");
-          break;
-        }
 
         printRec(elt.getType());
         OS << ")";

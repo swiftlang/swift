@@ -4192,10 +4192,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
       toSugarFields.push_back(TupleTypeElt(fromEltType,
                                            toElt.getName(),
-                                           toElt.getDefaultArgKind(),
                                            toElt.isVararg()));
       fromTupleExprFields[sources[i]] = fromElt;
-      hasInits |= toElt.hasDefaultArg();
       continue;
     }
 
@@ -4231,13 +4229,10 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     // Record the sugared field name.
     toSugarFields.push_back(TupleTypeElt(convertedElt->getType(),
                                          toElt.getName(),
-                                         toElt.getDefaultArgKind(),
                                          toElt.isVararg()));
     fromTupleExprFields[sources[i]] = TupleTypeElt(convertedElt->getType(),
                                                    fromElt.getName(),
-                                                   fromElt.getDefaultArgKind(),
                                                    fromElt.isVararg());
-    hasInits |= toElt.hasDefaultArg();
   }
 
   // Convert all of the variadic arguments to the destination type.
@@ -4277,7 +4272,6 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       fromTupleExprFields[fromFieldIdx] = TupleTypeElt(
                                             convertedElt->getType(),
                                             fromElt.getName(),
-                                            fromElt.getDefaultArgKind(),
                                             fromElt.isVararg());
     }
 
@@ -4366,11 +4360,6 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   bool hasInit = false;
   int i = 0;
   for (auto &field : toTuple->getElements()) {
-    if (field.hasDefaultArg()) {
-      hasInit = true;
-      break;
-    }
-
     if (i == toScalarIdx) {
       if (field.isVararg()) {
         assert(expr->getType()->isEqual(field.getVarargBaseTy()) &&
@@ -4378,7 +4367,6 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 
         sugarFields.push_back(TupleTypeElt(field.getType(),
                                            field.getName(),
-                                           field.getDefaultArgKind(),
                                            true));
       }
       else {
@@ -4413,26 +4401,9 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
       }
     }
 
-    // If this is the scalar field, act like we're shuffling the 0th element.
-    if (i == toScalarIdx) {
-      elements.push_back(0);
-      ++i;
-      continue;
-    }
-
-    assert(field.hasDefaultArg() && "Expected a default argument");
-
-    // Create a caller-side default argument, if we need one.
-    if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
-                                          callee, i).first) {
-      // Record the caller-side default argument expression.
-      // FIXME: Do we need to record what this was synthesized from?
-      elements.push_back(TupleShuffleExpr::CallerDefaultInitialize);
-      callerDefaultArgs.push_back(defArg);
-    } else {
-      // Record the owner of the default argument.
-      elements.push_back(TupleShuffleExpr::DefaultInitialize);
-    }
+    // This is the scalar field, so act like we're shuffling the 0th element.
+    assert(i == toScalarIdx);
+    elements.push_back(0);
     ++i;
   }
 
@@ -4773,8 +4744,7 @@ Expr *ExprRewriter::coerceCallArguments(
       auto paramBaseType = param.Ty;
       assert(sliceType.isNull() && "Multiple variadic parameters?");
       sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
-      toSugarFields.push_back(TupleTypeElt(sliceType, param.Label,
-                                           DefaultArgumentKind::None, true));
+      toSugarFields.push_back(TupleTypeElt(sliceType, param.Label, true));
       anythingShuffled = true;
       sources.push_back(TupleShuffleExpr::Variadic);
 
@@ -4823,7 +4793,6 @@ Expr *ExprRewriter::coerceCallArguments(
                                                          param.Ty)
                                   : param.Ty,
                                 param.Label,
-                                defArgKind,
                                 param.Variadic));
 
       if (defArg) {

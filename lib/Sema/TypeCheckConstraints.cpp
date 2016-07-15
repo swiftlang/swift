@@ -186,13 +186,8 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
       continue;
     }
 
-    // If there aren't any more inputs, we can use a default argument.
+    // If there aren't any more inputs, we are done.
     if (fromNext == fromLast) {
-      if (elt2.hasDefaultArg()) {
-        sources[i] = TupleShuffleExpr::DefaultInitialize;
-        continue;
-      }
-
       return true;
     }
 
@@ -1702,7 +1697,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
       // Apply the solution to the pattern as well.
       Type patternType = expr->getType();
-      patternType = patternType->getWithoutDefaultArgs(tc.Context);
 
       TypeResolutionOptions options;
       options |= TR_OverrideType;

@@ -278,6 +278,9 @@ public:
   // This is a hack and should be avoided.
   void rewriteType(CanType newType) &;
 
+  /// Whether this argument source requires the callee to evaluate.
+  bool requiresCalleeToEvaluate();
+
 private:
   // Make the non-move accessors private to make it more difficult
   // to accidentally re-emit values.
