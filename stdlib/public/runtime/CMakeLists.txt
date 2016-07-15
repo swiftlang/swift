@@ -26,6 +26,7 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   set(swift_runtime_objc_sources
       ErrorObject.mm
       SwiftObject.mm
+      SwiftValue.mm
       Remangle.cpp
       Reflection.mm)
 else()

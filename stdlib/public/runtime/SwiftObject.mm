@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This implements runtime support for bridging between Swift and Objective-C
-// types in cases where they aren't trivial.
+// This implements the Objective-C root class that provides basic `id`-
+// compatibility and `NSObject` protocol conformance for pure Swift classes.
 //
 //===----------------------------------------------------------------------===//
 
@@ -33,6 +33,7 @@
 #include "swift/Strings.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "Private.h"
+#include "SwiftObject.h"
 #include "swift/Runtime/Debug.h"
 #if SWIFT_OBJC_INTEROP
 #include <dlfcn.h>
@@ -76,56 +77,6 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 }
 
 #if SWIFT_OBJC_INTEROP
-struct SwiftObject_s {
-  void *isa __attribute__((__unavailable__));
-  uint32_t strongRefCount __attribute__((__unavailable__));
-  uint32_t weakRefCount __attribute__((__unavailable__));
-};
-
-static_assert(sizeof(SwiftObject_s) == sizeof(HeapObject),
-              "SwiftObject and HeapObject must have the same header");
-static_assert(std::is_trivially_constructible<SwiftObject_s>::value,
-              "SwiftObject must be trivially constructible");
-static_assert(std::is_trivially_destructible<SwiftObject_s>::value,
-              "SwiftObject must be trivially destructible");
-
-#if __has_attribute(objc_root_class)
-__attribute__((__objc_root_class__))
-#endif
-SWIFT_RUNTIME_EXPORT @interface SwiftObject<NSObject> {
-  SwiftObject_s header;
-}
-
-- (BOOL)isEqual:(id)object;
-- (NSUInteger)hash;
-
-- (Class)superclass;
-- (Class)class;
-- (instancetype)self;
-- (struct _NSZone *)zone;
-
-- (id)performSelector:(SEL)aSelector;
-- (id)performSelector:(SEL)aSelector withObject:(id)object;
-- (id)performSelector:(SEL)aSelector withObject:(id)object1 withObject:(id)object2;
-
-- (BOOL)isProxy;
-
-+ (BOOL)isSubclassOfClass:(Class)aClass;
-- (BOOL)isKindOfClass:(Class)aClass;
-- (BOOL)isMemberOfClass:(Class)aClass;
-- (BOOL)conformsToProtocol:(Protocol *)aProtocol;
-
-- (BOOL)respondsToSelector:(SEL)aSelector;
-
-- (instancetype)retain;
-- (oneway void)release;
-- (instancetype)autorelease;
-- (NSUInteger)retainCount;
-
-- (NSString *)description;
-- (NSString *)debugDescription;
-@end
-
 static SwiftObject *_allocHelper(Class cls) {
   // XXX FIXME
   // When we have layout information, do precise alignment rounding
