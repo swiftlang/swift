@@ -37,6 +37,7 @@ set(SWIFTLIB_ESSENTIAL
   CocoaArray.swift
   Collection.swift
   CollectionAlgorithms.swift.gyb
+  Comparable.swift
   CompilerProtocols.swift
   ClosedRange.swift
   ContiguousArrayBuffer.swift
@@ -44,6 +45,7 @@ set(SWIFTLIB_ESSENTIAL
   CTypes.swift
   DebuggerSupport.swift
   EmptyCollection.swift
+  Equatable.swift
   ErrorType.swift
   Existential.swift
   Filter.swift.gyb
@@ -53,6 +55,7 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPoint.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
+  Hashable.swift
   HashedCollections.swift.gyb
   Hashing.swift
   HeapBuffer.swift
