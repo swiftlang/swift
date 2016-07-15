@@ -644,15 +644,7 @@ internal protocol _AnyIndexBox : class {
 
   func _isEqual(to rhs: _AnyIndexBox) -> Bool
 
-  func _isNotEqual(to rhs: _AnyIndexBox) -> Bool
-
   func _isLess(than rhs: _AnyIndexBox) -> Bool
-
-  func _isLessOrEqual(to rhs: _AnyIndexBox) -> Bool
-
-  func _isGreater(than rhs: _AnyIndexBox) -> Bool
-
-  func _isGreaterOrEqual(to rhs: _AnyIndexBox) -> Bool
 }
 
 internal final class _IndexBox<
@@ -680,24 +672,8 @@ internal final class _IndexBox<
     return _base == _unsafeUnbox(rhs)
   }
 
-  internal func _isNotEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base != _unsafeUnbox(rhs)
-  }
-
   internal func _isLess(than rhs: _AnyIndexBox) -> Bool {
     return _base < _unsafeUnbox(rhs)
-  }
-
-  internal func _isLessOrEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base <= _unsafeUnbox(rhs)
-  }
-
-  internal func _isGreater(than rhs: _AnyIndexBox) -> Bool {
-    return _base > _unsafeUnbox(rhs)
-  }
-
-  internal func _isGreaterOrEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base >= _unsafeUnbox(rhs)
   }
 }
 
@@ -731,29 +707,9 @@ public func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   return lhs._box._isEqual(to: rhs._box)
 }
 
-public func != (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._isNotEqual(to: rhs._box)
-}
-
 public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._isLess(than: rhs._box)
-}
-
-public func <= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._isLessOrEqual(to: rhs._box)
-}
-
-public func > (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._isGreater(than: rhs._box)
-}
-
-public func >= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._isGreaterOrEqual(to: rhs._box)
 }
 
 //===--- Collections ------------------------------------------------------===//
