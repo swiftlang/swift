@@ -258,8 +258,6 @@ public:
   /// To sanitize a malformed utf8 string to a well-formed one.
   static std::string sanitizeUtf8(StringRef Text);
   static ValueDecl* findConformancesWithDocComment(ValueDecl *VD);
-  static bool printTypeInterface(Type Ty, DeclContext *DC, std::string &Result);
-  static bool printTypeInterface(Type Ty, DeclContext *DC, llvm::raw_ostream &Out);
 
 private:
   virtual void anchor();
