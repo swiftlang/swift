@@ -53,7 +53,7 @@ using namespace swift;
 namespace swift {
 
 std::unique_ptr<llvm::DenseMap<StringRef, Type>>
-collectNameTypeMap(Type Ty, const DeclContext *DC) {
+collectNameTypeMap(Type Ty) {
   std::unique_ptr<llvm::DenseMap<StringRef, Type>> IdMap(
     new llvm::DenseMap<StringRef, Type>());
   Type BaseTy = Ty->getRValueType();
@@ -89,8 +89,8 @@ class PrinterArchetypeNameTransformer : public PrinterArchetypeTransformer{
   std::unique_ptr<llvm::DenseMap<StringRef, Type>> IdMap;
 
 public:
-  PrinterArchetypeNameTransformer(Type Ty, const DeclContext *DC) :
-    BaseTy(Ty->getRValueType()), IdMap(collectNameTypeMap(Ty, DC)){}
+  PrinterArchetypeNameTransformer(Type Ty) :
+    BaseTy(Ty->getRValueType()), IdMap(collectNameTypeMap(Ty)){}
 
   StringRef transform(StringRef TypeName) override {
     return TypeName;
@@ -174,7 +174,7 @@ public:
 
   ArchetypeSelfTransformer(Type BaseTy, DeclContext &DC):
     BaseTy(BaseTy->getRValueType()), DC(DC), Ctx(DC.getASTContext()),
-    NameTransformer(new PrinterArchetypeNameTransformer(BaseTy, &DC)){}
+    NameTransformer(new PrinterArchetypeNameTransformer(BaseTy)){}
 
   Type transform(Type Ty) override {
     return Ty.transform(F);
