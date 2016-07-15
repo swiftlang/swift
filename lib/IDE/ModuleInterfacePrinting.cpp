@@ -147,6 +147,29 @@ getUnderlyingClangModuleForImport(ImportDecl *Import) {
   return nullptr;
 }
 
+bool swift::ide::
+printTypeInterface(ModuleDecl *M, Type Ty, ASTPrinter &Printer,
+                   std::string &Error) {
+  if (!Ty)
+    return false;
+  Ty = Ty->getRValueType();
+  if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
+    PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer(), M);
+    ND->print(Printer, Options);
+    return true;
+  }
+  Error = "cannot find declaration of type.";
+  return false;
+}
+
+bool swift::ide::
+printTypeInterface(ModuleDecl *M, StringRef TypeUSR, ASTPrinter &Printer,
+                   std::string &Error) {
+  return printTypeInterface(M, getTypeFromMangledSymbolname(M->getASTContext(),
+                                                            TypeUSR, Error),
+                            Printer, Error);
+}
+
 void swift::ide::printModuleInterface(Module *M, Optional<StringRef> Group,
                                       ModuleTraversalOptions TraversalOptions,
                                       ASTPrinter &Printer,

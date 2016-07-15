@@ -2365,8 +2365,12 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
     llvm::errs() << "Cannot get type of the sema token.\n";
     return 1;
   }
-  ASTPrinter::printTypeInterface(SemaT.Ty, SemaT.DC, llvm::outs());
-  return 0;
+  StreamPrinter Printer(llvm::outs());
+  std::string Error;
+  if (printTypeInterface(SemaT.DC->getParentModule(), SemaT.Ty, Printer, Error))
+    return 0;
+  llvm::errs() << Error;
+  return 1;
 }
 
 static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvok,
@@ -2378,22 +2382,14 @@ static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvok,
   if (CI.setup(Invocation))
     return 1;
   CI.performSema();
-  SourceFile *SF = nullptr;
-  for (auto Unit : CI.getMainModule()->getFiles()) {
-    SF = dyn_cast<SourceFile>(Unit);
-    if (SF)
-      break;
-  }
-  assert(SF && "no source file?");
+  DeclContext *DC = CI.getMainModule()->getModuleContext();
+  assert(DC && "no decl context?");
+  StreamPrinter Printer(llvm::outs());
   std::string Error;
-  Type ReconstructedType = getTypeFromMangledSymbolname(SF->getASTContext(),
-                                                        Usr, Error);
-  if (!Error.empty()) {
-    llvm::errs() << Error << '\n';
-    return 1;
-  }
-  ASTPrinter::printTypeInterface(ReconstructedType, SF, llvm::outs());
-  return 0;
+  if (printTypeInterface(DC->getParentModule(), Usr, Printer, Error))
+    return 0;
+  llvm::errs() << Error;
+  return 1;
 }
 
 //===----------------------------------------------------------------------===//

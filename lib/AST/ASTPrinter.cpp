@@ -660,6 +660,10 @@ PrintOptions PrintOptions::printTypeInterface(Type T, DeclContext *DC) {
   result.PrintExtensionFromConformingProtocols = true;
   result.TransformContext = std::make_shared<ArchetypeTransformContext>(
     new ArchetypeSelfTransformer(T, *DC), T);
+  result.printExtensionContentAsMembers = [T](const ExtensionDecl *ED) {
+    return isExtensionApplied(*T->getNominalOrBoundGenericNominal()->
+                              getDeclContext(), T, ED);
+  };
   return result;
 }
 
@@ -795,29 +799,6 @@ ValueDecl* ASTPrinter::findConformancesWithDocComment(ValueDecl *VD) {
     }
   }
   return nullptr;
-}
-
-bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
-                                    llvm::raw_ostream &OS) {
-  if (!Ty)
-    return false;
-  Ty = Ty->getRValueType();
-  PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer(), DC);
-   if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
-     Options.printExtensionContentAsMembers = [&](const ExtensionDecl *ED) {
-       return isExtensionApplied(*ND->getDeclContext(), Ty, ED);
-     };
-     ND->print(OS, Options);
-     return true;
-  }
-  return false;
-}
-
-bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC, std::string &Buffer) {
-  llvm::raw_string_ostream OS(Buffer);
-  auto Result = printTypeInterface(Ty, DC, OS);
-  OS.str();
-  return Result;
 }
 
 void ASTPrinter::anchor() {}
