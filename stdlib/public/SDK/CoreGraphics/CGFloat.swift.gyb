@@ -606,26 +606,6 @@ public func tgamma(_ x: CGFloat) -> CGFloat {
 }
 
 @_transparent
-public func fabs(_ x: CGFloat) -> CGFloat {
-  return CGFloat(fabs(x.native))
-}
-
-@_transparent
-public func sqrt(_ x: CGFloat) -> CGFloat {
-  return CGFloat(sqrt(x.native))
-}
-
-@_transparent
-public func ceil(_ x: CGFloat) -> CGFloat {
-  return CGFloat(ceil(x.native))
-}
-
-@_transparent
-public func floor(_ x: CGFloat) -> CGFloat {
-  return CGFloat(floor(x.native))
-}
-
-@_transparent
 public func nearbyint(_ x: CGFloat) -> CGFloat {
   return CGFloat(nearbyint(x.native))
 }
@@ -633,16 +613,6 @@ public func nearbyint(_ x: CGFloat) -> CGFloat {
 @_transparent
 public func rint(_ x: CGFloat) -> CGFloat {
   return CGFloat(rint(x.native))
-}
-
-@_transparent
-public func round(_ x: CGFloat) -> CGFloat {
-  return CGFloat(round(x.native))
-}
-
-@_transparent
-public func trunc(_ x: CGFloat) -> CGFloat {
-  return CGFloat(trunc(x.native))
 }
 
 @_transparent
@@ -658,16 +628,6 @@ public func hypot(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
 @_transparent
 public func pow(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(pow(lhs.native, rhs.native))
-}
-
-@_transparent
-public func fmod(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
-  return CGFloat(fmod(lhs.native, rhs.native))
-}
-
-@_transparent
-public func remainder(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
-  return CGFloat(remainder(lhs.native, rhs.native))
 }
 
 @_transparent
@@ -758,11 +718,6 @@ public func remquo(_ x: CGFloat, _ y: CGFloat) -> (CGFloat, Int) {
 @_transparent
 public func nan(_ tag: String) -> CGFloat {
   return CGFloat(nan(tag) as CGFloat.NativeType)
-}
-
-@_transparent
-public func fma(_ x: CGFloat, _ y: CGFloat, _ z: CGFloat) -> CGFloat {
-  return CGFloat(fma(x.native, y.native, z.native))
 }
 
 @_transparent

@@ -10,6 +10,52 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Generic functions implementable directly on FloatingPoint.
+@_transparent
+public func fabs<T: FloatingPoint>(_ x: T) -> T {
+  return abs(x)
+}
+
+@_transparent
+public func sqrt<T: FloatingPoint>(_ x: T) -> T {
+  return x.squareRoot()
+}
+
+@_transparent
+public func fma<T: FloatingPoint>(_ x: T, _ y: T, _ z: T) -> T {
+  return z.addingProduct(x,y)
+}
+
+@_transparent
+public func remainder<T: FloatingPoint>(_ x: T, _ y: T) -> T {
+  return x.remainder(dividingBy: y)
+}
+
+@_transparent
+public func fmod<T: FloatingPoint>(_ x: T, _ y: T) -> T {
+  return x.truncatingRemainder(dividingBy: y)
+}
+
+@_transparent
+public func ceil<T: FloatingPoint>(_ x: T) -> T {
+  return x.rounded(.up)
+}
+
+@_transparent
+public func floor<T: FloatingPoint>(_ x: T) -> T {
+  return x.rounded(.down)
+}
+
+@_transparent
+public func round<T: FloatingPoint>(_ x: T) -> T {
+  return x.rounded()
+}
+
+@_transparent
+public func trunc<T: FloatingPoint>(_ x: T) -> T {
+  return x.rounded(.towardZero)
+}
+
 %{
 
 # Don't need 64-bit (Double/CDouble) overlays. The ordinary C imports work fine.
@@ -50,7 +96,7 @@ UnaryFunctions = [
     'acosh', 'asinh', 'atanh', 'cosh', 'sinh', 'tanh',
     'expm1',
     'log1p', 'logb',
-    'cbrt', 'sqrt', 'erf', 'erfc', 'tgamma',
+    'cbrt', 'erf', 'erfc', 'tgamma',
 ]
 
 # These functions have a corresponding LLVM intrinsic
@@ -60,14 +106,13 @@ UnaryIntrinsicFunctions = [
     'cos', 'sin',
     'exp', 'exp2',
     'log', 'log10', 'log2',
-    'fabs',
-    'ceil', 'floor', 'nearbyint', 'rint', 'round', 'trunc',
+    'nearbyint', 'rint',
 ]
 
 # (T, T) -> T
 BinaryFunctions = [
-    'atan2', 'hypot', 'pow', 'fmod',
-    'remainder', 'copysign', 'nextafter', 'fdim', 'fmax', 'fmin'
+    'atan2', 'hypot', 'pow',
+    'copysign', 'nextafter', 'fdim', 'fmax', 'fmin'
 ]
 
 # These functions have special implementations.
@@ -75,7 +120,7 @@ OtherFunctions = [
     'fpclassify',
     'isnormal', 'isfinite', 'isinf', 'isnan', 'signbit',
     'modf', 'ldexp', 'frexp', 'ilogb', 'scalbn', 'lgamma',
-    'remquo', 'nan', 'fma',
+    'remquo', 'nan',
     'jn', 'yn'
 ]
 
@@ -116,7 +161,6 @@ def TypedBinaryFunctions():
             yield floatName(bits), cFloatName(bits), cFuncSuffix(bits), bfunc
 
 }%
-
 
 // Unary functions
 // Note these do not have a corresponding LLVM intrinsic
@@ -315,14 +359,6 @@ public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
 @_transparent
 public func nan(_ tag: String) -> ${T} {
   return ${T}(nan${f}(tag))
-}
-
-% end
-
-% for T, CT, f in OverlayFloatTypes():
-@_transparent
-public func fma(_ x: ${T}, _ y: ${T}, _ z: ${T}) -> ${T} {
-  return ${T}(fma${f}(${CT}(x), ${CT}(y), ${CT}(z)))
 }
 
 % end
