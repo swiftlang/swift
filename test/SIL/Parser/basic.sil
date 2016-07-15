@@ -1516,3 +1516,18 @@ sil_vtable Foo {
   #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
   #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
 }
+
+// CHECK-LABEL: sil @test_pointer_to_address
+sil @test_pointer_to_address : $(Builtin.RawPointer, X) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $X):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to $*X
+  store %1 to %2 : $*X
+  // CHECK: [[T2:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to $*X
+  // CHECK-NEXT: store %1 to [[T2]] : $*X
+  %3 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*X
+  store %1 to %3 : $*X
+  // CHECK: [[T3:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [strict] $*X
+  // CHECK-NEXT: store %1 to [[T3]] : $*X
+  %28 = tuple ()
+  return %28 : $()
+}

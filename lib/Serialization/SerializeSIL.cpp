@@ -1151,7 +1151,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::BridgeObjectToWordInst:
   case ValueKind::UpcastInst:
   case ValueKind::AddressToPointerInst:
-  case ValueKind::PointerToAddressInst:
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RawPointerToRefInst:
   case ValueKind::RefToUnownedInst:
@@ -1168,6 +1167,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::ObjCExistentialMetatypeToObjectInst:
   case ValueKind::ProjectBlockStorageInst: {
     writeConversionLikeInstruction(&SI);
+    break;
+  }
+  case ValueKind::PointerToAddressInst: {
+    assert(SI.getNumOperands() - SI.getOpenedArchetypeOperands().size() == 1);
+    unsigned attrs = cast<PointerToAddressInst>(SI).isStrict() ? 1 : 0;
+    writeOneTypeOneOperandLayout(SI.getKind(), attrs, SI.getType(),
+                                 SI.getOperand(0));
     break;
   }
   case ValueKind::RefToBridgeObjectInst: {

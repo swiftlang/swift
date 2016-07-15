@@ -384,8 +384,8 @@ bb0(%0 : $Builtin.Int8, %1 : $Builtin.NativeObject):
 sil @a2p_p2a_test : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> (Builtin.Word, Builtin.RawPointer) {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
-  %3 = pointer_to_address %1 : $Builtin.RawPointer to $*Builtin.Word
-  %4 = pointer_to_address %2 : $Builtin.RawPointer to $*Builtin.Word
+  %3 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.Word
+  %4 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Builtin.Word
   %5 = address_to_pointer %3 : $*Builtin.Word to $Builtin.RawPointer
   %6 = load %4 : $*Builtin.Word
   %7 = tuple(%6 : $Builtin.Word, %5 : $Builtin.RawPointer)
@@ -400,7 +400,7 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
 sil @a2p_p2a_reinterpret_cast_word_raw_pointer : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int32
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int32
   %4 = load %3 : $*Int32
   return %4 : $Int32
 }
@@ -1101,7 +1101,7 @@ bb0:
 sil @unchecked_addr_cast_formation : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 bb0(%0 : $*Builtin.NativeObject):
   %1 = address_to_pointer %0 : $*Builtin.NativeObject to $Builtin.RawPointer
-  %2 = pointer_to_address %1 : $Builtin.RawPointer to $*Builtin.Word
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.Word
   %3 = load %2 : $*Builtin.Word
   return %3 : $Builtin.Word
 }
@@ -1271,7 +1271,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %7 = builtin "smul_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %6 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Word, Builtin.Int1), 0
   %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int8
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Int8
   %11 = load %10 : $*Int8
   return %11 : $Int8
 }
@@ -1290,7 +1290,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %7 = builtin "smul_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %6 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Word, Builtin.Int1), 0
   %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int8
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Int8
   %11 = load %10 : $*Int8
   return %11 : $Int8
 }
@@ -1305,7 +1305,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %7 = builtin "smul_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %6 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Word, Builtin.Int1), 0
   %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int32
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Int32
   %11 = load %10 : $*Int32
   return %11 : $Int32
 }
@@ -1327,7 +1327,7 @@ bb0(%0 : $Builtin.RawPointer, %1: $Builtin.Int64):
   %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
   %8 = builtin "truncOrBitCast_Int64_Word"(%7 : $Builtin.Int64) : $Builtin.Word
   %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int32
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Int32
   %11 =  load %10 : $*Int32
   return %11 : $Int32
 }
@@ -1923,7 +1923,7 @@ bb0(%0: $MyClass):
   %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
   %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
   %3 = ref_to_raw_pointer %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.RawPointer
-  %4 = pointer_to_address %3 : $Builtin.RawPointer to $*Builtin.Word
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Word
   %5 = integer_literal $Builtin.Word, 5
   store %5 to %4: $*Builtin.Word
   %6 = tuple ()
@@ -2145,11 +2145,11 @@ bb0(%0 : $Builtin.Int1):
 // CHECK-LABEL: sil @builtin_array_opt_index_raw_pointer_to_index_addr
 // CHECK:  [[MT:%.*]] = metatype $@thick Int32.Type
 // CHECK:  [[ONE:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK:  [[PTA1:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*Int32
+// CHECK:  [[PTA1:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:  [[CAST1:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
 // CHECK:  [[IAD1:%.*]] = index_addr [[PTA1]] : $*Int32, [[CAST1]] : $Builtin.Word
 // CHECK:  [[ATP1:%.*]] = address_to_pointer [[IAD1]] : $*Int32 to $Builtin.RawPointer
-// CHECK:  [[PTA2:%.*]] = pointer_to_address %2 : $Builtin.RawPointer to $*Int32
+// CHECK:  [[PTA2:%.*]] = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:  [[CAST2:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
 // CHECK:  [[IAD2:%.*]] = index_addr [[PTA2]] : $*Int32, [[CAST2]] : $Builtin.Word
 // CHECK:  [[ATP2:%.*]] = address_to_pointer [[IAD2]] : $*Int32 to $Builtin.RawPointer

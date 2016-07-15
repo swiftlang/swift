@@ -1473,6 +1473,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getRefCountingOperation(Context, Id);
       
   case BuiltinValueKind::Load:
+  case BuiltinValueKind::LoadRaw:
   case BuiltinValueKind::Take:
     if (!Types.empty()) return nullptr;
     return getLoadOperation(Context, Id);

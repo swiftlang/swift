@@ -1079,7 +1079,10 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand(), "address_to_pointer");
   }
   void visitPointerToAddressInst(PointerToAddressInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "pointer_to_address");
+    *this << "pointer_to_address " << getIDAndType(CI->getOperand()) << " to ";
+    if (CI->isStrict())
+      *this << "[strict] ";
+    *this << CI->getType();
   }
   void visitUncheckedRefCastInst(UncheckedRefCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_ref_cast");

@@ -4837,9 +4837,11 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   SmallVector<ManagedValue, 2> results;
   emission.apply().getAll(results);
 
-  // Project out the materialized address.
+  // Project out the materialized address. The address directly returned by
+  // materialize for set is strictly typed, whether it is the local buffer or
+  // stored property.
   SILValue address = results[0].getUnmanagedValue();
-  address = B.createPointerToAddress(loc, address, buffer->getType());
+  address = B.createPointerToAddress(loc, address, buffer->getType(), /*isStrict*/ true);
 
   // Project out the optional callback.
   SILValue optionalCallback = results[1].getUnmanagedValue();
@@ -4941,7 +4943,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                                   SILType::getRawPointerType(getASTContext()));
 
   // Convert to the appropriate address type and return.
-  SILValue address = B.createPointerToAddress(loc, pointer, addressType);
+  SILValue address = B.createPointerToAddress(loc, pointer, addressType, /*isStrict*/ true);
 
   // Mark dependence as necessary.
   switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {

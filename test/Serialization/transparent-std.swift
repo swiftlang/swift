@@ -52,6 +52,6 @@ func test_conversion(c: C, t32: Builtin.Int32) {
   var f = gep32(p: d, i: t32)
 
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TF19def_transparent_std11destroy_objFT1xBp_T_ : $@convention(thin) (Builtin.RawPointer) -> () {
-// SIL: pointer_to_address %0 : $Builtin.RawPointer to $*Builtin.NativeObject
+// SIL: pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
   destroy_obj(x: d)
 }

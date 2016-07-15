@@ -548,9 +548,9 @@ public:
   }
 
   PointerToAddressInst *createPointerToAddress(SILLocation Loc, SILValue Op,
-                                               SILType Ty) {
+                                               SILType Ty, bool isStrict) {
     return insert(new (F.getModule()) PointerToAddressInst(
-        getSILDebugLocation(Loc), Op, Ty));
+                    getSILDebugLocation(Loc), Op, Ty, isStrict));
   }
 
   UncheckedRefCastInst *createUncheckedRefCast(SILLocation Loc, SILValue Op,
