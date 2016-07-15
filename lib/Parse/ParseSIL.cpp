@@ -596,36 +596,43 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
 ///     'hidden_external'
 ///     'private_external'
 static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
+  // Begin by initializing result to our base value of None.
+  Result = None;
+
+  // Unfortunate collision with access control keywords.
   if (P.Tok.is(tok::kw_public)) {
-    // Unfortunate collision with access control keywords.
     Result = SILLinkage::Public;
     P.consumeToken();
-  } else if (P.Tok.is(tok::kw_private)) {
+    return false;
+  }
+
+  // Unfortunate collision with access control keywords.
+  if (P.Tok.is(tok::kw_private)) {
     Result = SILLinkage::Private;
     P.consumeToken();
-  } else if (P.Tok.isNot(tok::identifier)) {
-    Result = None;
-  } else if (P.Tok.getText() == "hidden") {
-    Result = SILLinkage::Hidden;
-    P.consumeToken(tok::identifier);
-  } else if (P.Tok.getText() == "shared") {
-    Result = SILLinkage::Shared;
-    P.consumeToken(tok::identifier);
-  } else if (P.Tok.getText() == "public_external") {
-    Result = SILLinkage::PublicExternal;
-    P.consumeToken(tok::identifier);
-  } else if (P.Tok.getText() == "hidden_external") {
-    Result = SILLinkage::HiddenExternal;
-    P.consumeToken(tok::identifier);
-  } else if (P.Tok.getText() == "shared_external") {
-    Result = SILLinkage::SharedExternal;
-    P.consumeToken(tok::identifier);
-  } else if (P.Tok.getText() == "private_external") {
-    Result = SILLinkage::PrivateExternal;
-    P.consumeToken(tok::identifier);
-  } else {
-    Result = None;
+    return false;
   }
+
+  // If we do not have an identifier, bail. All SILLinkages that we are parsing
+  // are identifiers.
+  if (P.Tok.isNot(tok::identifier))
+    return false;
+
+  // Then use a string switch to try and parse the identifier.
+  Result = llvm::StringSwitch<Optional<SILLinkage>>(P.Tok.getText())
+    .Case("hidden", SILLinkage::Hidden)
+    .Case("shared", SILLinkage::Shared)
+    .Case("public_external", SILLinkage::PublicExternal)
+    .Case("hidden_external", SILLinkage::HiddenExternal)
+    .Case("shared_external", SILLinkage::SharedExternal)
+    .Case("private_external", SILLinkage::PrivateExternal)
+    .Default(None);
+
+  // If we succeed, consume the token.
+  if (Result) {
+    P.consumeToken(tok::identifier);
+  }
+
   return false;
 }
 
