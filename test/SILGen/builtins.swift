@@ -17,7 +17,7 @@ func foo(_ x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
 
 // CHECK-LABEL: sil hidden @_TF8builtins8load_pod
 func load_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.Int64
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.Int64
   // CHECK: [[VAL:%.*]] = load [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.load(x)
@@ -25,23 +25,40 @@ func load_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
 
 // CHECK-LABEL: sil hidden @_TF8builtins8load_obj
 func load_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.NativeObject
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK: [[VAL:%.*]] = load [[ADDR]]
   // CHECK: retain [[VAL]]
   // CHECK: return [[VAL]]
   return Builtin.load(x)
 }
 
+// CHECK-LABEL: sil hidden @_TF8builtins12load_raw_pod
+func load_raw_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.Int64
+  // CHECK: [[VAL:%.*]] = load [[ADDR]]
+  // CHECK: return [[VAL]]
+  return Builtin.loadRaw(x)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins12load_raw_obj
+func load_raw_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.NativeObject
+  // CHECK: [[VAL:%.*]] = load [[ADDR]]
+  // CHECK: retain [[VAL]]
+  // CHECK: return [[VAL]]
+  return Builtin.loadRaw(x)
+}
+
 // CHECK-LABEL: sil hidden @_TF8builtins8load_gen
 func load_gen<T>(_ x: Builtin.RawPointer) -> T {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*T
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
   // CHECK: copy_addr [[ADDR]] to [initialization] {{%.*}}
   return Builtin.load(x)
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins8move_pod
 func move_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.Int64
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.Int64
   // CHECK: [[VAL:%.*]] = load [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.take(x)
@@ -49,7 +66,7 @@ func move_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
 
 // CHECK-LABEL: sil hidden @_TF8builtins8move_obj
 func move_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.NativeObject
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK: [[VAL:%.*]] = load [[ADDR]]
   // CHECK-NOT: retain [[VAL]]
   // CHECK: return [[VAL]]
@@ -58,7 +75,7 @@ func move_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
 
 // CHECK-LABEL: sil hidden @_TF8builtins8move_gen
 func move_gen<T>(_ x: Builtin.RawPointer) -> T {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*T
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
   // CHECK: copy_addr [take] [[ADDR]] to [initialization] {{%.*}}
   return Builtin.take(x)
 }
@@ -78,14 +95,14 @@ func destroy_pod(_ x: Builtin.RawPointer) {
 
 // CHECK-LABEL: sil hidden @_TF8builtins11destroy_obj
 func destroy_obj(_ x: Builtin.RawPointer) {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.NativeObject
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK: destroy_addr [[ADDR]]
   return Builtin.destroy(Builtin.NativeObject, x)
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins11destroy_gen
 func destroy_gen<T>(_ x: Builtin.RawPointer, _: T) {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*T
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
   // CHECK: destroy_addr [[ADDR]]
   return Builtin.destroy(T.self, x)
 }
@@ -97,7 +114,7 @@ func assign_pod(_ x: Builtin.Int64, y: Builtin.RawPointer) {
   // CHECK: alloc_box
   // CHECK: alloc_box
   // CHECK-NOT: alloc_box
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.Int64
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.Int64
   // CHECK-NOT: load [[ADDR]]
   // CHECK: assign {{%.*}} to [[ADDR]]
   // CHECK: release
@@ -109,7 +126,7 @@ func assign_pod(_ x: Builtin.Int64, y: Builtin.RawPointer) {
 
 // CHECK-LABEL: sil hidden @_TF8builtins10assign_obj
 func assign_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.NativeObject
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK: assign {{%.*}} to [[ADDR]]
   // CHECK: release
   Builtin.assign(x, y)
@@ -120,7 +137,7 @@ func assign_tuple(_ x: (Builtin.Int64, Builtin.NativeObject),
                   y: Builtin.RawPointer) {
   var x = x
   var y = y
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*(Builtin.Int64, Builtin.NativeObject)
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*(Builtin.Int64, Builtin.NativeObject)
   // CHECK: [[T0:%.*]] = tuple_element_addr [[ADDR]]
   // CHECK: assign {{%.*}} to [[T0]]
   // CHECK: [[T0:%.*]] = tuple_element_addr [[ADDR]]
@@ -131,14 +148,14 @@ func assign_tuple(_ x: (Builtin.Int64, Builtin.NativeObject),
 
 // CHECK-LABEL: sil hidden @_TF8builtins10assign_gen
 func assign_gen<T>(_ x: T, y: Builtin.RawPointer) {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*T
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
   // CHECK: copy_addr [take] {{%.*}} to [[ADDR]] :
   Builtin.assign(x, y)
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins8init_pod
 func init_pod(_ x: Builtin.Int64, y: Builtin.RawPointer) {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.Int64
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.Int64
   // CHECK-NOT: load [[ADDR]]
   // CHECK: store {{%.*}} to [[ADDR]]
   // CHECK-NOT: release [[ADDR]]
@@ -147,7 +164,7 @@ func init_pod(_ x: Builtin.Int64, y: Builtin.RawPointer) {
 
 // CHECK-LABEL: sil hidden @_TF8builtins8init_obj
 func init_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.NativeObject
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK-NOT: load [[ADDR]]
   // CHECK: store [[SRC:%.*]] to [[ADDR]]
   // CHECK-NOT: release [[SRC]]
@@ -156,7 +173,7 @@ func init_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
 
 // CHECK-LABEL: sil hidden @_TF8builtins8init_gen
 func init_gen<T>(_ x: T, y: Builtin.RawPointer) {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*T
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
   // CHECK: copy_addr [take] {{%.*}} to [initialization]  [[ADDR]]
   Builtin.initialize(x, y)
 }

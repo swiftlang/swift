@@ -204,6 +204,8 @@ bb0:
   address_to_pointer undef : $*() to $Builtin.RawPointer
   // CHECK: pointer_to_address undef : $Builtin.RawPointer to $*()
   pointer_to_address undef : $Builtin.RawPointer to $*()
+  // CHECK: pointer_to_address undef : $Builtin.RawPointer to [strict] $*()
+  pointer_to_address undef : $Builtin.RawPointer to [strict] $*()
   // CHECK: unchecked_ref_cast undef : $C to $D
   unchecked_ref_cast undef : $C to $D
   // CHECK: unchecked_addr_cast undef : $*D to $*C

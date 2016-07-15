@@ -44,14 +44,14 @@ func test0() {
 // CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Alu9subscriptFVs5Int32S1_ :
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[AVAL]])
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
-// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
+// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK: [[Z:%.*]] = load [[T3]] : $*Int32
   let z = a[10]
 
 // CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Aau9subscriptFVs5Int32S1_ :
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[A]])
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
-// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
+// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK: load
 // CHECK: sadd_with_overflow_Int{{32|64}}
 // CHECK: store {{%.*}} to [[T3]]
@@ -60,7 +60,7 @@ func test0() {
 // CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Aau9subscriptFVs5Int32S1_ :
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[A]])
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
-// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
+// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK: store {{%.*}} to [[T3]]
   a[3] = 6
 }
@@ -73,7 +73,7 @@ func test1() -> Int32 {
 // CHECK: [[ACCESSOR:%.*]] = function_ref @_TFV10addressors1Alu9subscriptFVs5Int32S1_ : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: [[PTR:%.*]] = apply [[ACCESSOR]]({{%.*}}, [[A]]) : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: [[T0:%.*]] = struct_extract [[PTR]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
-// CHECK: [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
+// CHECK: [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK: [[T2:%.*]] = load [[T1]] : $*Int32
 // CHECK: return [[T2]] : $Int32
   return A()[0]
@@ -99,7 +99,7 @@ func test_global() -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_TF10addressorslu6globalVs5Int32 : $@convention(thin) () -> UnsafePointer<Int32>
 // CHECK:   [[T1:%.*]] = apply [[T0]]() : $@convention(thin) () -> UnsafePointer<Int32>
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
-// CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:   [[T4:%.*]] = load [[T3]] : $*Int32
 // CHECK:   return [[T4]] : $Int32
 
@@ -124,7 +124,7 @@ struct B : Subscriptable {
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Bau9subscriptFVs5Int32S1_
 // CHECK:   [[PTR:%.*]] = apply [[T0]]([[INDEX]], [[B]])
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
-// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
 // Accept either of struct_extract+load or load+struct_element_addr.
 // CHECK:   load
 // CHECK:   [[T1:%.*]] = builtin "or_Int32"
@@ -151,7 +151,7 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors6CArrayau9subscriptFSix :
 // CHECK:   [[T1:%.*]] = apply [[T0]]<(Int32) -> Int32>({{%.*}}, [[ARRAY]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<(Int32) -> Int32>, #UnsafeMutablePointer._rawValue
-// CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*@callee_owned (@in Int32) -> @out Int32
+// CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*@callee_owned (@in Int32) -> @out Int32
 // CHECK:   store {{%.*}} to [[T3]] :
   array[0] = id_int
 
@@ -159,7 +159,7 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T1:%.*]] = function_ref @_TFV10addressors6CArraylu9subscriptFSix :
 // CHECK:   [[T2:%.*]] = apply [[T1]]<(Int32) -> Int32>({{%.*}}, [[T0]])
 // CHECK:   [[T3:%.*]] = struct_extract [[T2]] : $UnsafePointer<(Int32) -> Int32>, #UnsafePointer._rawValue
-// CHECK:   [[T4:%.*]] = pointer_to_address [[T3]] : $Builtin.RawPointer to $*@callee_owned (@in Int32) -> @out Int32
+// CHECK:   [[T4:%.*]] = pointer_to_address [[T3]] : $Builtin.RawPointer to [strict] $*@callee_owned (@in Int32) -> @out Int32
 // CHECK:   [[T5:%.*]] = load [[T4]]
   return array[1](5)
 }
@@ -182,7 +182,7 @@ struct D : Subscriptable {
 // SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_{{.*}}
 // SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[PB]])
 // SILGEN:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
-// SILGEN:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
+// SILGEN:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
 // SILGEN:   assign [[VALUE]] to [[ADDR]] : $*Int32
 
 // materializeForSet.
@@ -208,7 +208,7 @@ func test_d(_ array: inout D) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_
 // CHECK:   [[T1:%.*]] = apply [[T0]]({{%.*}}, [[ARRAY]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>,
-// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:   store [[V]] to [[ADDR]] : $*Int32
   array[0] = make_int()
 
@@ -216,7 +216,7 @@ func test_d(_ array: inout D) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_
 // CHECK:   [[T1:%.*]] = apply [[T0]]({{%.*}}, [[ARRAY]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>,
-// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[ADDR:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:   apply [[FN]]([[ADDR]])
   take_int_inout(&array[1])
 
@@ -271,7 +271,7 @@ func test_f0(_ f: F) -> Int32 {
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 1
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
 // CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int32
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
@@ -290,7 +290,7 @@ func test_f1(_ f: F) {
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
@@ -315,7 +315,7 @@ class G {
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 1
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
 // CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int32
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
@@ -328,7 +328,7 @@ class G {
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
@@ -391,7 +391,7 @@ func test_h0(_ f: H) -> Int32 {
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 1
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int32
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
@@ -410,7 +410,7 @@ func test_h1(_ f: H) {
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 1
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
@@ -435,7 +435,7 @@ class I {
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 1
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int32
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
@@ -448,7 +448,7 @@ class I {
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 1
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]]
-// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
+// CHECK:   [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>

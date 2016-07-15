@@ -235,7 +235,8 @@ public:
   }
 
   hash_code visitPointerToAddressInst(PointerToAddressInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand(),
+                              X->isStrict());
   }
 
   hash_code visitAddressToPointerInst(AddressToPointerInst *X) {

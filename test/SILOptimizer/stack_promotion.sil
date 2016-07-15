@@ -425,7 +425,7 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int):
   %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0 
   %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1 
   %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue 
-  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int 
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int 
 
   // store the 2 elements
   store %0 to %14 : $*Int                         
@@ -461,7 +461,7 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int):
   %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0 
   %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1 
   %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue 
-  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int 
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int 
 
   // store the 2 elements
   store %0 to %14 : $*Int                         
@@ -517,7 +517,7 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int, %closure: $@callee_owned (@inout
   %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
   %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
   %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
-  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int
 
   // store the 2 elements
   store %0 to %14 : $*Int
@@ -569,7 +569,7 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int):
   %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
   %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
   %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
-  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int
 
   // store the 2 elements
   store %0 to %14 : $*Int
@@ -629,7 +629,7 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int, %another: $Array<Int>):
   %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
   %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
   %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
-  %14 = pointer_to_address %13 : $Builtin.RawPointer to $*Int
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int
 
   // store the 2 elements
   store %0 to %14 : $*Int

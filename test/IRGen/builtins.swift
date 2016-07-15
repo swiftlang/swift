@@ -134,6 +134,14 @@ func load_test(_ ptr: Builtin.RawPointer) -> Builtin.Int64 {
   return Builtin.load(ptr)
 }
 
+// CHECK: define hidden i64 @_TF8builtins13load_raw_test
+func load_raw_test(_ ptr: Builtin.RawPointer) -> Builtin.Int64 {
+  // CHECK: [[CASTPTR:%.*]] = bitcast i8* [[PTR:%.*]] to i64*
+  // CHECK-NEXT: load i64, i64* [[CASTPTR]]
+  // CHECK: ret
+  return Builtin.loadRaw(ptr)
+}
+
 // CHECK: define hidden void @_TF8builtins11assign_test
 func assign_test(_ value: Builtin.Int64, ptr: Builtin.RawPointer) {
   Builtin.assign(value, ptr)
@@ -146,6 +154,14 @@ func load_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: call void @rt_swift_retain([[REFCOUNT]]* [[T0]])
   // CHECK: ret [[REFCOUNT]]* [[T0]]
   return Builtin.load(ptr)
+}
+
+// CHECK: define hidden %swift.refcounted* @_TF8builtins20load_raw_object_test
+func load_raw_object_test(_ ptr: Builtin.RawPointer) -> Builtin.NativeObject {
+  // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]**
+  // CHECK: call void @rt_swift_retain([[REFCOUNT]]* [[T0]])
+  // CHECK: ret [[REFCOUNT]]* [[T0]]
+  return Builtin.loadRaw(ptr)
 }
 
 // CHECK: define hidden void @_TF8builtins18assign_object_test

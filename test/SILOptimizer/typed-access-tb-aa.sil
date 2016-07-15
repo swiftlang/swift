@@ -934,7 +934,7 @@ sil @tuple_tests : $@convention(thin) () -> () {
 }
 
 // Check that TBAA fails when the root is unchecked_addr_cast or
-// pointer_to_address.
+// pointer_to_address without [strict].
 //
 // CHECK-LABEL: @tbaa_dump
 // CHECK:      PAIR #2.
@@ -943,10 +943,12 @@ sil @tuple_tests : $@convention(thin) () -> () {
 // CHECK-NEXT: MayAlias
 // CHECK:      PAIR #5.
 // CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.Int64
-// CHECK-NEXT:   %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Builtin.Int32
-// FIXME: This should be MayAlias unless the pointer_to_address instruction
-//        comes with a "must not alias" flag.
+// CHECK-NEXT:   %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*Builtin.Int32
 // CHECK-NEXT: NoAlias
+// CHECK:      PAIR #6.
+// CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.Int64
+// CHECK-NEXT:   %9 = pointer_to_address %6 : $Builtin.RawPointer to $*Builtin.Int32
+// CHECK-NEXT: MayAlias
 sil @tbaa_dump : $@convention(thin) (@in Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, 42
@@ -955,10 +957,12 @@ bb0(%0 : $*Builtin.Int64):
   %4 = integer_literal $Builtin.Int32, 0
   store %4 to %3 : $*Builtin.Int32
   %6 = address_to_pointer %0 : $*Builtin.Int64 to $Builtin.RawPointer
-  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Builtin.Int32
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*Builtin.Int32
   store %4 to %7 : $*Builtin.Int32
-  %8 = load %0 : $*Builtin.Int64
-  return %8 : $Builtin.Int64
+  %9 = pointer_to_address %6 : $Builtin.RawPointer to $*Builtin.Int32
+  store %4 to %9 : $*Builtin.Int32
+  %10 = load %0 : $*Builtin.Int64
+  return %10 : $Builtin.Int64
 }
 
 // CHECK-LABEL: @test_project_box

@@ -816,7 +816,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(BridgeObjectToWord)
   ONEOPERAND_ONETYPE_INST(Upcast)
   ONEOPERAND_ONETYPE_INST(AddressToPointer)
-  ONEOPERAND_ONETYPE_INST(PointerToAddress)
   ONEOPERAND_ONETYPE_INST(RefToRawPointer)
   ONEOPERAND_ONETYPE_INST(RawPointerToRef)
   ONEOPERAND_ONETYPE_INST(RefToUnowned)
@@ -833,7 +832,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(PointerToThinFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
-  
+
+  case ValueKind::PointerToAddressInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    bool isStrict = Attr & 0x01;
+    ResultVal = Builder.createPointerToAddress(
+      Loc,
+      getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                      (SILValueCategory)TyCategory2)),
+      getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
+      isStrict);
+    break;
+  }
   case ValueKind::DeallocExistentialBoxInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
