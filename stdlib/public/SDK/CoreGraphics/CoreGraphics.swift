@@ -147,43 +147,13 @@ public extension CGRect {
   }
 
   @_transparent // @fragile
-  mutating func standardizeInPlace() {
-    self = standardized
-  }
-
-  @_transparent // @fragile
-  mutating func makeIntegralInPlace() {
-    self = integral
-  }
-
-  @_transparent // @fragile
-  mutating func insetInPlace(dx: CGFloat, dy: CGFloat) {
-    self = insetBy(dx: dx, dy: dy)
-  }
-
-  @_transparent // @fragile
-  mutating func offsetInPlace(dx: CGFloat, dy: CGFloat) {
-    self = offsetBy(dx: dx, dy: dy)
-  }
-
-  @_transparent // @fragile
-  mutating func formUnion(_ rect: CGRect) {
-    self = union(rect)
-  }
-
-  @_transparent // @fragile
-  mutating func formIntersection(_ rect: CGRect) {
-    self = intersection(rect)
-  }
-
-  @_transparent // @fragile
-  func divide(_ atDistance: CGFloat, fromEdge: CGRectEdge)
+  func divided(atDistance: CGFloat, from fromEdge: CGRectEdge)
     -> (slice: CGRect, remainder: CGRect)
   {
     var slice = CGRect.zero
     var remainder = CGRect.zero
-    divide(slice: &slice, remainder: &remainder, amount: atDistance,
-           edge: fromEdge)
+    divided(slice: &slice, remainder: &remainder, atDistance: atDistance,
+           from: fromEdge)
     return (slice, remainder)
   }
 }

@@ -70,21 +70,23 @@ Functions:
 - Name: CGAffineTransformIsIdentity
   SwiftName: getter:CGAffineTransform.isIdentity(self:)
 - Name: CGAffineTransformTranslate
-  SwiftName: CGAffineTransform.translateBy(self:x:y:)
+  SwiftName: CGAffineTransform.translatedBy(self:x:y:)
 - Name: CGAffineTransformScale
-  SwiftName: CGAffineTransform.scaleBy(self:x:y:)
+  SwiftName: CGAffineTransform.scaledBy(self:x:y:)
 - Name: CGAffineTransformRotate
-  SwiftName: CGAffineTransform.rotate(self:_:)
+  SwiftName: CGAffineTransform.rotated(self:by:)
 - Name: CGAffineTransformConcat
-  SwiftName: CGAffineTransform.concat(self:_:)
+  SwiftName: CGAffineTransform.concatenating(self:_:)
+- Name: CGAffineTransformInvert
+  SwiftName: CGAffineTransform.inverted(self:)
 - Name: CGAffineTransformEqualToTransform
   SwiftName: CGAffineTransform.equalTo(self:_:)
 - Name: CGPointApplyAffineTransform
-  SwiftName: CGPoint.apply(self:transform:)
+  SwiftName: CGPoint.applying(self:_:)
 - Name: CGSizeApplyAffineTransform
-  SwiftName: CGSize.apply(self:transform:)
+  SwiftName: CGSize.applying(self:_:)
 - Name: CGRectApplyAffineTransform
-  SwiftName: CGRect.apply(self:transform:)
+  SwiftName: CGRect.applying(self:_:)
 # CGBitmapContext
 - Name: CGBitmapContextCreateWithData
   SwiftName: CGContext.init(data:width:height:bitsPerComponent:bytesPerRow:space:bitmapInfo:releaseCallback:releaseInfo:)
@@ -126,7 +128,7 @@ Functions:
 # - Name: CGColorCreateCopyWithAlpha
 #   SwiftName: CGColor.init(_:alpha:)
 - Name: CGColorCreateCopyByMatchingToColorSpace
-  SwiftName: CGColor.convert(_:intent:self:options:)
+  SwiftName: CGColor.converted(to:intent:self:options:)
 - Name: CGColorEqualToColor
   SwiftName: CGColor.equalTo(self:_:)
 # CGColorSpace
@@ -141,12 +143,14 @@ Functions:
 - Name: CGColorSpaceCopyICCProfile
   SwiftName: getter:CGColorSpace.iccData(self:)
 # CGContext
+- Name: CGContextConcatCTM
+  SwiftName: CGContext.concatenate(self:_:)
 - Name: CGContextScaleCTM
-  SwiftName: CGContext.scale(self:x:y:)
+  SwiftName: CGContext.scaleBy(self:x:y:)
 - Name: CGContextTranslateCTM
-  SwiftName: CGContext.translate(self:x:y:)
+  SwiftName: CGContext.translateBy(self:x:y:)
 - Name: CGContextRotateCTM
-  SwiftName: CGContext.rotate(self:byAngle:)
+  SwiftName: CGContext.rotate(self:by:)
 - Name: CGContextSetLineWidth
   SwiftName: CGContext.setLineWidth(self:_:)
 - Name: CGContextSetMiterLimit
@@ -206,9 +210,11 @@ Functions:
 - Name: CGContextGetClipBoundingBox
   SwiftName: getter:CGContext.boundingBoxOfClipPath(self:)
 - Name: CGContextClipToRect
-  SwiftName: CGContext.clipTo(self:_:)
+  SwiftName: CGContext.clip(self:to:)
 - Name: CGContextClipToRects
-  SwiftName: CGContext.clipTo(self:_:count:)
+  SwiftName: CGContext.clip(self:to:count:)
+- Name: CGContextClipToMask
+  SwiftName: CGContext.clip(self:to:mask:)
 - Name: CGContextSetFillColor
   SwiftName: CGContext.setFillColor(self:_:)
 - Name: CGContextSetFillColorWithColor
@@ -353,6 +359,8 @@ Functions:
   SwiftName: CGSize.equalTo(self:_:)
 - Name: CGRectEqualToRect
   SwiftName: CGRect.equalTo(self:_:)
+- Name: CGRectDivide
+  SwiftName: CGRect.divided(self:slice:remainder:atDistance:from:)
 # CGGradient
 # - Name: CGGradientCreateWithColorComponents
 #   SwiftName: CGGradient.init(colorComponentsSpace:components:locations:count:)
@@ -485,6 +493,8 @@ Globals:
   Availability: nonswift
 - Name: kCGColorSpaceGenericRGB
   Availability: nonswift
+- Name: kCGColorSpaceSRGB
+  SwiftName: CGColorSpace.sRGB
 
 #
 # Enums
