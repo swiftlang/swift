@@ -510,30 +510,37 @@ extension ${Self}: BinaryFloatingPoint {
 
   @_transparent
   public mutating func round(_ rule: FloatingPointRoundingRule) {
+%if bits == 80:
     switch rule {
     case .toNearestOrAwayFromZero:
-      _value = Builtin.int_round_FPIEEE${bits}(_value)
+      _swift_stdlib_roundl(&self)
     case .toNearestOrEven:
-      //  TODO: switch to roundeven( ) or corresponding builtin when
-      //  available; rint assumes default floating-point environment.
-      //  This is pretty OK at present, since there's no Swifty way
-      //  to fuss with the environment, but we should fix it in the
-      //  long term.
-      _value = Builtin.int_rint_FPIEEE${bits}(_value)
+      _swift_stdlib_roundevenl(&self)
     case .towardZero:
-      _value = Builtin.int_trunc_FPIEEE${bits}(_value)
+      _swift_stdlib_truncl(&self)
     case .awayFromZero:
-      if sign == .minus {
-        _value = Builtin.int_floor_FPIEEE${bits}(_value)
-      }
-      else {
-        _value = Builtin.int_ceil_FPIEEE${bits}(_value)
-      }
+      _swift_stdlib_roundawayl(&self)
     case .up:
-      _value = Builtin.int_ceil_FPIEEE${bits}(_value)
+      _swift_stdlib_ceill(&self)
     case .down:
-      _value = Builtin.int_floor_FPIEEE${bits}(_value)
+      _swift_stdlib_floorl(&self)
     }
+%else:
+    switch rule {
+    case .toNearestOrAwayFromZero:
+      self = _swift_stdlib_round${cFuncSuffix(bits)}(self)
+    case .toNearestOrEven:
+      self = _swift_stdlib_roundeven${cFuncSuffix(bits)}(self)
+    case .towardZero:
+      self = _swift_stdlib_trunc${cFuncSuffix(bits)}(self)
+    case .awayFromZero:
+      self = _swift_stdlib_roundaway${cFuncSuffix(bits)}(self)
+    case .up:
+      self = _swift_stdlib_ceil${cFuncSuffix(bits)}(self)
+    case .down:
+      self = _swift_stdlib_floor${cFuncSuffix(bits)}(self)
+    }
+%end
   }
 
   @_transparent
@@ -579,16 +586,21 @@ extension ${Self}: BinaryFloatingPoint {
   @_transparent
   public mutating func formSquareRoot( ) {
 %if bits == 80:
-    _swift_stdlib_sqrtl(&self)
+    _swift_stdlib_squareRootl(&self)
 %else:
-    self = _swift_stdlib_sqrt${cFuncSuffix(bits)}(self)
+    self = _swift_stdlib_squareRoot${cFuncSuffix(bits)}(self)
 %end
-
   }
 
   @_transparent
   public mutating func addProduct(_ lhs: ${Self}, _ rhs: ${Self}) {
-    _value = Builtin.int_fma_FPIEEE${bits}(lhs._value, rhs._value, _value)
+%if bits == 80:
+    var lhs = lhs
+    var rhs = rhs
+    _swift_stdlib_addProductl(&self, &lhs, &rhs)
+%else:
+    self = _swift_stdlib_addProduct${cFuncSuffix(bits)}(self, lhs, rhs)
+%end
   }
 
   @_transparent

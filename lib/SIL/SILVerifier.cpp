@@ -3263,7 +3263,7 @@ public:
       assert(F->isAvailableExternally() &&
              "external declaration of internal SILFunction not allowed");
       assert(!hasSharedVisibility(F->getLinkage()) &&
-             "external declaration of SILFunction with shared visibility is not "
+             "external declarations of SILFunctions with shared visibility is not "
              "allowed");
       // If F is an external declaration, there is nothing further to do,
       // return.
