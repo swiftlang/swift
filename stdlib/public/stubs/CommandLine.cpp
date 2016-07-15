@@ -90,8 +90,7 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   return outBuf;
 }
 #elif defined (_MSC_VER)
-extern int *__argc;
-extern char **__argv;
+#include <stdlib.h>
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
