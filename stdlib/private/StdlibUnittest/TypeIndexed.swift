@@ -59,7 +59,7 @@ extension TypeIndexed where Value : Strideable {
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = #file, line: UInt = #line,
-    body: () -> R
+    invoking body: () -> R
   ) -> R {
     let expected = self[t].advanced(by: 1)
     let r = body()
@@ -77,7 +77,7 @@ extension TypeIndexed where Value : Equatable {
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = #file, line: UInt = #line,
-    body: () -> R
+    invoking body: () -> R
   ) -> R {
     let expected = self[t]
     let r = body()

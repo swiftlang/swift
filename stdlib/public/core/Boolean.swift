@@ -42,7 +42,7 @@ public prefix func !<T : Boolean>(a: T) -> Bool {
 /// `lhs` evaluates to `true`. For example:
 ///
 ///     let measurements = [7.44, 6.51, 4.74, 5.88, 6.27, 6.12, 7.76]
-///     let sum = measurements.reduce(0, combine: +)
+///     let sum = measurements.reduce(0, +)
 ///
 ///     if measurements.count > 0 && sum / Double(measurements.count) < 6.5 {
 ///         print("Average measurement is less than 6.5")
@@ -121,7 +121,7 @@ public func || <T : Boolean, U : Boolean>(
 /// `lhs` evaluates to `true`. For example:
 ///
 ///     let measurements = [7.44, 6.51, 4.74, 5.88, 6.27, 6.12, 7.76]
-///     let sum = measurements.reduce(0, combine: +)
+///     let sum = measurements.reduce(0, +)
 ///
 ///     if measurements.count > 0 && sum / Double(measurements.count) < 6.5 {
 ///         print("Average measurement is less than 6.5")

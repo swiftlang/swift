@@ -229,10 +229,10 @@ public struct ${Self}<
   }
 
   public func filter(
-    _ includeElement: @noescape (Base.Iterator.Element) throws -> Bool
+    _ isIncluded: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
     Log.filter[selfType] += 1
-    return try base.filter(includeElement)
+    return try base.filter(isIncluded)
   }
 
   public func forEach(
@@ -274,13 +274,13 @@ public struct ${Self}<
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    isSeparator: @noescape (Base.Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     Log.split[selfType] += 1
     return try base.split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: isSeparator)
+      whereSeparator: isSeparator)
   }
 
   public func _customContainsEquatableElement(
