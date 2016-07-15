@@ -57,11 +57,6 @@ public struct DispatchQoS : Equatable {
 	@available(OSX 10.10, iOS 8.0, *)
 	public static let `default` = DispatchQoS(qosClass: .default, relativePriority: 0)
 
-	@available(OSX, introduced: 10.10, deprecated: 10.10, renamed: "DispatchQoS.default")
-	@available(iOS, introduced: 8.0, deprecated: 8.0, renamed: "DispatchQoS.default")
-	@available(*, deprecated, renamed: "DispatchQoS.default")
-	public static let defaultQoS = DispatchQoS.default
-
 	@available(OSX 10.10, iOS 8.0, *)
 	public static let userInitiated = DispatchQoS(qosClass: .userInitiated, relativePriority: 0)
 
@@ -79,11 +74,6 @@ public struct DispatchQoS : Equatable {
 
 		@available(OSX 10.10, iOS 8.0, *)
 		case `default`
-
-		@available(OSX, introduced: 10.10, deprecated: 10.10, renamed: "QoSClass.default")
-		@available(iOS, introduced: 8.0, deprecated: 8.0, renamed: "QoSClass.default")
-		@available(*, deprecated, renamed: "QoSClass.default")
-		static let defaultQoS = QoSClass.default
 
 		@available(OSX 10.10, iOS 8.0, *)
 		case userInitiated
@@ -166,16 +156,6 @@ public extension DispatchGroup {
 	}
 }
 
-public extension DispatchGroup {
-	@available(*, deprecated, renamed: "DispatchGroup.wait(self:wallTimeout:)")
-	public func wait(walltime timeout: DispatchWallTime) -> Int {
-		switch wait(wallTimeout: timeout) {
-		case .success: return 0
-		case .timedOut: return Int(KERN_OPERATION_TIMED_OUT)
-		}
-	}
-}
-
 /// dispatch_semaphore
 
 public extension DispatchSemaphore {
@@ -197,12 +177,3 @@ public extension DispatchSemaphore {
 	}
 }
 
-public extension DispatchSemaphore {
-	@available(*, deprecated, renamed: "DispatchSemaphore.wait(self:wallTimeout:)")
-	public func wait(walltime timeout: DispatchWalltime) -> Int {
-		switch wait(wallTimeout: timeout) {
-		case .success: return 0
-		case .timedOut: return Int(KERN_OPERATION_TIMED_OUT)
-		}
-	}
-}

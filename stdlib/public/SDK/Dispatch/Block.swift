@@ -92,17 +92,6 @@ public class DispatchWorkItem {
 	}
 }
 
-@available(OSX 10.10, iOS 8.0, *)
-public extension DispatchWorkItem {
-	@available(*, deprecated, renamed: "DispatchWorkItem.wait(self:wallTimeout:)")
-	public func wait(timeout: DispatchWallTime) -> Int {
-		switch wait(wallTimeout: timeout) {
-		case .success: return 0
-		case .timedOut: return Int(KERN_OPERATION_TIMED_OUT)
-		}
-	}
-}
-
 /// The dispatch_block_t typealias is different from usual closures in that it
 /// uses @convention(block). This is to avoid unnecessary bridging between
 /// C blocks and Swift closures, which interferes with dispatch APIs that depend

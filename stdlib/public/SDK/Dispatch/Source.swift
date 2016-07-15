@@ -281,38 +281,6 @@ public extension DispatchSourceTimer {
 	}
 }
 
-public extension DispatchSourceTimer {
-	@available(*, deprecated, renamed: "DispatchSourceTimer.scheduleOneshot(self:deadline:leeway:)")
-	public func setTimer(start: DispatchTime, leeway: DispatchTimeInterval = .nanoseconds(0)) {
-		scheduleOneshot(deadline: start, leeway: leeway)
-	}
-
-	@available(*, deprecated, renamed: "DispatchSourceTimer.scheduleOneshot(self:wallDeadline:leeway:)")
-	public func setTimer(walltime start: DispatchWallTime, leeway: DispatchTimeInterval = .nanoseconds(0)) {
-		scheduleOneshot(wallDeadline: start, leeway: leeway)
-	}
-
-	@available(*, deprecated, renamed: "DispatchSourceTimer.scheduleRepeating(self:deadline:interval:leeway:)")
-	public func setTimer(start: DispatchTime, interval: DispatchTimeInterval, leeway: DispatchTimeInterval = .nanoseconds(0)) {
-		scheduleRepeating(deadline: start, interval: interval, leeway: leeway)
-	}
-
-	@available(*, deprecated, renamed: "DispatchSourceTimer.scheduleRepeating(self:deadline:interval:leeway:)")
-	public func setTimer(start: DispatchTime, interval: Double, leeway: DispatchTimeInterval = .nanoseconds(0)) {
-		scheduleRepeating(deadline: start, interval: interval, leeway: leeway)
-	}
-
-	@available(*, deprecated, renamed: "DispatchSourceTimer.scheduleRepeating(self:wallDeadline:interval:leeway:)")
-	public func setTimer(walltime start: DispatchWallTime, interval: DispatchTimeInterval, leeway: DispatchTimeInterval = .nanoseconds(0)) {
-		scheduleRepeating(wallDeadline: start, interval: interval, leeway: leeway)
-	}
-
-	@available(*, deprecated, renamed: "DispatchSourceTimer.scheduleRepeating(self:wallDeadline:interval:leeway:)")
-	public func setTimer(walltime start: DispatchWalltime, interval: Double, leeway: DispatchTimeInterval = .nanoseconds(0)) {
-		scheduleRepeating(wallDeadline: start, interval: interval, leeway: leeway)
-	}
-}
-
 public extension DispatchSourceFileSystemObject {
 	public var handle: Int32 {
 		return Int32(__dispatch_source_get_handle(self as! DispatchSource))

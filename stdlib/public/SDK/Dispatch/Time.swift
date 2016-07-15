@@ -79,9 +79,6 @@ public func ==(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
 	return a.rawValue == b.rawValue
 }
 
-@available(*, deprecated, renamed: "DispatchWallTime")
-public typealias DispatchWalltime = DispatchWallTime
-
 public enum DispatchTimeInterval {
 	case seconds(Int)
 	case milliseconds(Int)

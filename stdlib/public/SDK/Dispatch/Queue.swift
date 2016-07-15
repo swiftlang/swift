@@ -333,52 +333,6 @@ public extension DispatchQueue {
 	}
 }
 
-extension DispatchQueue {
-	@available(*, deprecated, renamed: "DispatchQueue.sync(self:execute:)")
-	public func synchronously(execute work: @noescape () -> ()) {
-		sync(execute: work)
-	}
-
-	@available(OSX, introduced: 10.10, deprecated: 10.12, renamed: "DispatchQueue.sync(self:execute:)")
-	@available(iOS, introduced: 8.0, deprecated: 10.0, renamed: "DispatchQueue.sync(self:execute:)")
-	@available(*, deprecated, renamed: "DispatchQueue.sync(self:execute:)")
-	public func synchronously(execute workItem: DispatchWorkItem) {
-		sync(execute: workItem)
-	}
-
-	@available(OSX, introduced: 10.10, deprecated: 10.12, renamed: "DispatchQueue.async(self:execute:)")
-	@available(iOS, introduced: 8.0, deprecated: 10.0, renamed: "DispatchQueue.async(self:execute:)")
-	@available(*, deprecated, renamed: "DispatchQueue.async(self:execute:)")
-	public func asynchronously(execute workItem: DispatchWorkItem) {
-		async(execute: workItem)
-	}
-
-	@available(*, deprecated, renamed: "DispatchQueue.async(self:group:qos:flags:execute:)")
-	public func asynchronously(group: DispatchGroup? = nil, qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], execute work: @convention(block) () -> Void) {
-		async(group: group, qos: qos, flags: flags, execute: work)
-	}
-
-	@available(*, deprecated, renamed: "DispatchQueue.sync(self:execute:)")
-	public func synchronously<T>(execute work: @noescape () throws -> T) rethrows -> T {
-		return try sync(execute: work)
-	}
-
-	@available(*, deprecated, renamed: "DispatchQueue.sync(self:flags:execute:)")
-	public func synchronously<T>(flags: DispatchWorkItemFlags, execute work: @noescape () throws -> T) rethrows -> T {
-		return try sync(flags: flags, execute: work)
-	}
-
-	@available(*, deprecated, renamed: "DispatchQueue.concurrentPerform(iterations:execute:)")
-	public func apply(applier iterations: Int, execute block: @noescape (Int) -> Void) {
-		DispatchQueue.concurrentPerform(iterations: iterations, execute: block)
-	}
-
-	@available(*, deprecated, renamed: "DispatchQueue.setTarget(self:queue:)")
-	public func setTargetQueue(queue: DispatchQueue) {
-		self.setTarget(queue: queue)
-	}
-}
-
 private func _destructDispatchSpecificValue(ptr: UnsafeMutablePointer<Void>?) {
 	if let p = ptr {
 		Unmanaged<AnyObject>.fromOpaque(p).release()
