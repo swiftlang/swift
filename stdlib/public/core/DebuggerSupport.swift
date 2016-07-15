@@ -202,7 +202,7 @@ public enum _DebuggerSupport {
     }
 
     let count = Int(mirror.children.count)
-    let bullet = isRoot && (count == 0 || willExpand == false) ? ""
+    let bullet = isRoot && (count == 0 || !willExpand) ? ""
       : count == 0    ? "- "
       : maxDepth <= 0 ? "▹ " : "▿ "
     print("\(bullet)", terminator: "", to: &targetStream)
