@@ -1243,7 +1243,6 @@ ERROR(attr_swift3_migration_expected_rparen,none,
 ERROR(attr_bad_swift_name,none,
       "ill-formed Swift name '%0'", (StringRef))
 
-
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,
       "expected 'safe' or 'unsafe'", ())
@@ -1255,6 +1254,10 @@ WARNING(attr_warn_unused_result_removed,none,
         "'warn_unused_result' attribute behavior is now the default", ())
 ERROR(attr_warn_unused_result_expected_rparen,none,
       "expected ')' after 'warn_unused_result' attribute", ())
+
+// escaping
+ERROR(attr_escaping_conflicts_noescape,none,
+      "@escaping conflicts with @noescape", ())
 
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics

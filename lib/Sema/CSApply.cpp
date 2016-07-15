@@ -5479,6 +5479,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                         toEI.isNoReturn() | fromEI.isNoReturn(),
                                         toEI.isAutoClosure(),
                                         toEI.isNoEscape() | fromEI.isNoEscape(),
+                                        toEI.isExplicitlyEscaping() | fromEI.isExplicitlyEscaping(),
                                         toEI.throws() & fromEI.throws());
         auto newToType = FunctionType::get(fromFunc->getInput(),
                                            fromFunc->getResult(), newEI);

@@ -3661,9 +3661,12 @@ public:
         Printer << "@autoclosure ";
       else
         Printer << "@autoclosure(escaping) ";
-    } else if (info.isNoEscape())
+    } else if (info.isNoEscape()) {
       // autoclosure implies noescape.
       Printer << "@noescape ";
+    } else if (info.isExplicitlyEscaping()) {
+      Printer << "@escaping ";
+    }
 
     if (Options.PrintFunctionRepresentationAttrs) {
       // TODO: coalesce into a single convention attribute.

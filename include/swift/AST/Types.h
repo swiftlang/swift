@@ -2126,11 +2126,12 @@ public:
     //   |representation|isAutoClosure|noReturn|noEscape|throws|
     //   |    0 .. 3    |      4      |   5    |    6   |   7  |
     //
-    enum : uint16_t { RepresentationMask = 0x00F };
-    enum : uint16_t { AutoClosureMask    = 0x010 };
-    enum : uint16_t { NoReturnMask       = 0x020 };
-    enum : uint16_t { NoEscapeMask       = 0x040 };
-    enum : uint16_t { ThrowsMask         = 0x080 };
+    enum : uint16_t { RepresentationMask     = 0x00F };
+    enum : uint16_t { AutoClosureMask        = 0x010 };
+    enum : uint16_t { NoReturnMask           = 0x020 };
+    enum : uint16_t { NoEscapeMask           = 0x040 };
+    enum : uint16_t { ThrowsMask             = 0x080 };
+    enum : uint16_t { ExplicitlyEscapingMask = 0x100 };
 
     uint16_t Bits;
 
@@ -2153,15 +2154,18 @@ public:
 
     // Constructor with no defaults.
     ExtInfo(Representation Rep, bool IsNoReturn,
-            bool IsAutoClosure, bool IsNoEscape, bool Throws)
+            bool IsAutoClosure, bool IsNoEscape, bool IsExplicitlyEscaping,
+            bool Throws)
       : ExtInfo(Rep, IsNoReturn, Throws) {
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
+      Bits |= (IsExplicitlyEscaping ? ExplicitlyEscapingMask : 0);
     }
 
     bool isNoReturn() const { return Bits & NoReturnMask; }
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
+    bool isExplicitlyEscaping() const { return Bits & ExplicitlyEscapingMask; }
     bool throws() const { return Bits & ThrowsMask; }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
@@ -2293,6 +2297,12 @@ public:
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {
     return getExtInfo().isNoEscape();
+  }
+
+  /// \brief True if the parameter declaration it is attached to has explicitly
+  /// been marked with the @escaping attribute. This is a temporary measure.
+  bool isExplicitlyEscaping() const {
+    return getExtInfo().isExplicitlyEscaping();
   }
   
   bool throws() const {

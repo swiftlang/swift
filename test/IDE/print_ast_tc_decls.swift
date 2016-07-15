@@ -1320,6 +1320,11 @@ public func ParamAttrs3(a : @noescape () -> ()) {
   a()
 }
 
+// PASS_PRINT_AST: public func ParamAttrs4(a: @escaping () -> ())
+public func ParamAttrs4(a : @escaping () -> ()) {
+  a()
+}
+
 // Protocol extensions
 
 protocol ProtocolToExtend {

@@ -1522,6 +1522,18 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
       return false;
     }
+    // You can't specify @noescape and @escaping together.
+    if (Attributes.has(TAK_escaping)) {
+      diagnose(Loc, diag::attr_escaping_conflicts_noescape);
+      return false;
+    }
+    break;
+  case TAK_escaping:
+    // You can't specify @noescape and @escaping together.
+    if (Attributes.has(TAK_noescape)) {
+      diagnose(Loc, diag::attr_escaping_conflicts_noescape);
+      return false;
+    }
     break;
   case TAK_out:
   case TAK_in:

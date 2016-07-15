@@ -1788,7 +1788,8 @@ ERROR(noescape_implied_by_autoclosure,none,
       "redundantly specified", ())
 ERROR(noescape_conflicts_escaping_autoclosure,none,
       "@noescape conflicts with @autoclosure(escaping)", ())
-
+ERROR(escaping_function_type,none,
+      "@escaping may only be applied to parameters of function type", ())
 
 // NSManaged attribute
 ERROR(attr_NSManaged_not_instance_member,none,

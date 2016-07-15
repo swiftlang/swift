@@ -5228,6 +5228,7 @@ public:
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(AutoClosure)
     UNINTERESTING_ATTR(NoEscape)
+    UNINTERESTING_ATTR(Escaping)
 
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)

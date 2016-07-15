@@ -2951,6 +2951,7 @@ void Serializer::writeType(Type ty) {
            fnTy->isAutoClosure(),
            fnTy->isNoReturn(),
            fnTy->isNoEscape(),
+           fnTy->isExplicitlyEscaping(),
            fnTy->throws());
     break;
   }

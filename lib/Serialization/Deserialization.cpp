@@ -3434,13 +3434,14 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID inputID;
     TypeID resultID;
     uint8_t rawRepresentation;
-    bool autoClosure, noreturn, noescape, throws;
+    bool autoClosure, noreturn, noescape, explicitlyEscaping, throws;
 
     decls_block::FunctionTypeLayout::readRecord(scratch, inputID, resultID,
                                                 rawRepresentation,
                                                 autoClosure,
                                                 noreturn,
                                                 noescape,
+                                                explicitlyEscaping,
                                                 throws);
     auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
     if (!representation.hasValue()) {
@@ -3449,7 +3450,8 @@ Type ModuleFile::getType(TypeID TID) {
     }
     
     auto Info = FunctionType::ExtInfo(*representation,
-                               noreturn, autoClosure, noescape, throws);
+                               noreturn, autoClosure, noescape,
+                               explicitlyEscaping, throws);
     
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
                                      Info);

@@ -1739,7 +1739,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_noreturn, TAK_pseudogeneric,
-    TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure
+    TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
+    TAK_escaping
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -1858,6 +1859,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                   attrs.has(TAK_noreturn),
                                   attrs.has(TAK_autoclosure),
                                   attrs.has(TAK_noescape),
+                                  attrs.has(TAK_escaping),
                                   fnRepr->throws());
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);
