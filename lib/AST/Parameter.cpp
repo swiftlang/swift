@@ -124,7 +124,7 @@ Type ParameterList::getType(const ASTContext &C) const {
     
     argumentInfo.push_back({
       P->getType(), P->getArgumentName(),
-      P->getDefaultArgumentKind(), P->isVariadic()
+      P->isVariadic()
     });
   }
   
@@ -155,7 +155,7 @@ Type ParameterList::getInterfaceType(DeclContext *DC) const {
 
     argumentInfo.push_back({
       type, P->getArgumentName(),
-      P->getDefaultArgumentKind(), P->isVariadic()
+      P->isVariadic()
     });
   }
 

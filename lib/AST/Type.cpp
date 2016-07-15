@@ -689,7 +689,7 @@ bool TypeBase::isExistentialWithError() {
 
 
 static Type getStrippedType(const ASTContext &context, Type type,
-                            bool stripLabels, bool stripDefaultArgs) {
+                            bool stripLabels) {
   return type.transform([&](Type type) -> Type {
     auto *tuple = dyn_cast<TupleType>(type.getPointer());
     if (!tuple)
@@ -700,30 +700,22 @@ static Type getStrippedType(const ASTContext &context, Type type,
     unsigned idx = 0;
     for (const auto &elt : tuple->getElements()) {
       Type eltTy = getStrippedType(context, elt.getType(),
-                                   stripLabels, stripDefaultArgs);
+                                   stripLabels);
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
-          (elt.hasDefaultArg() && stripDefaultArgs) ||
           (elt.hasName() && stripLabels)) {
         if (!anyChanged) {
           elements.reserve(tuple->getNumElements());
           for (unsigned i = 0; i != idx; ++i) {
             const TupleTypeElt &elt = tuple->getElement(i);
             Identifier newName = stripLabels? Identifier() : elt.getName();
-            DefaultArgumentKind newDefArg
-              = stripDefaultArgs? DefaultArgumentKind::None
-                                : elt.getDefaultArgKind();
-            elements.push_back(TupleTypeElt(elt.getType(), newName, newDefArg,
+            elements.push_back(TupleTypeElt(elt.getType(), newName,
                                             elt.isVararg()));
           }
           anyChanged = true;
         }
 
         Identifier newName = stripLabels? Identifier() : elt.getName();
-        DefaultArgumentKind newDefArg
-          = stripDefaultArgs? DefaultArgumentKind::None
-                            : elt.getDefaultArgKind();
-        elements.push_back(TupleTypeElt(eltTy, newName, newDefArg,
-                                        elt.isVararg()));
+        elements.push_back(TupleTypeElt(eltTy, newName, elt.isVararg()));
       }
       ++idx;
     }
@@ -742,13 +734,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
 }
 
 Type TypeBase::getUnlabeledType(ASTContext &Context) {
-  return getStrippedType(Context, Type(this), /*labels=*/true,
-                         /*defaultArgs=*/true);
-}
-
-Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
-  return getStrippedType(Context, Type(this), /*labels=*/false,
-                         /*defaultArgs=*/true);
+  return getStrippedType(Context, Type(this), /*labels=*/true);
 }
 
 Type TypeBase::getWithoutParens() {
@@ -1153,7 +1139,6 @@ CanType TypeBase::getCanonicalType() {
              "Cannot get canonical type of un-typechecked TupleType!");
       CanElts.push_back(TupleTypeElt(field.getType()->getCanonicalType(),
                                      field.getName(),
-                                     field.getDefaultArgKind(),
                                      field.isVararg()));
     }
 
@@ -1519,9 +1504,6 @@ bool TypeBase::isSpelledLike(Type other) {
       return false;
     for (size_t i = 0, sz = tMe->getNumElements(); i < sz; ++i) {
       auto &myField = tMe->getElement(i), &theirField = tThem->getElement(i);
-      if (myField.hasDefaultArg() != theirField.hasDefaultArg())
-        return false;
-      
       if (myField.getName() != theirField.getName())
         return false;
       
@@ -2473,15 +2455,6 @@ bool TypeBase::canOverride(Type other, OverrideMatchMode matchMode,
                        resolver);
 }
 
-/// hasAnyDefaultValues - Return true if any of our elements has a default
-/// value.
-bool TupleType::hasAnyDefaultValues() const {
-  for (const TupleTypeElt &Elt : Elements)
-    if (Elt.hasDefaultArg())
-      return true;
-  return false;
-}
-
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
@@ -2502,9 +2475,6 @@ int TupleType::getElementForScalarInit() const {
   
   int FieldWithoutDefault = -1;
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
-    // Ignore fields with a default value.
-    if (Elements[i].hasDefaultArg()) continue;
-    
     // If we already saw a non-vararg field missing a default value, then we
     // cannot assign a scalar to this tuple.
     if (FieldWithoutDefault != -1) {
@@ -3358,7 +3328,6 @@ case TypeKind::Id:
         for (unsigned I = 0; I != Index; ++I) {
           const TupleTypeElt &FromElt =tuple->getElement(I);
           elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
-                                          FromElt.getDefaultArgKind(),
                                           FromElt.isVararg()));
         }
 
@@ -3366,8 +3335,7 @@ case TypeKind::Id:
       }
 
       // Add the new tuple element, with the new type, no initializer,
-      elements.push_back(TupleTypeElt(eltTy, elt.getName(),
-                                      elt.getDefaultArgKind(), elt.isVararg()));
+      elements.push_back(TupleTypeElt(eltTy, elt.getName(), elt.isVararg()));
       ++Index;
     }
 

@@ -2543,22 +2543,18 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
   for (const TupleTypeElt &Elt : Fields) {
     ID.AddPointer(Elt.NameAndVariadic.getOpaqueValue());
     ID.AddPointer(Elt.getType().getPointer());
-    ID.AddInteger(static_cast<unsigned>(Elt.getDefaultArgKind()));
   }
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
 Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
-  if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName()
-      && Fields[0].getDefaultArgKind() == DefaultArgumentKind::None)
+  if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
     return ParenType::get(C, Fields[0].getType());
 
   RecursiveTypeProperties properties;
   for (const TupleTypeElt &Elt : Fields) {
     if (Elt.getType())
       properties |= Elt.getType()->getRecursiveProperties();
-    if (Elt.getDefaultArgKind() != DefaultArgumentKind::None)
-      properties |= RecursiveTypeProperties::HasDefaultParameter;
   }
 
   auto arena = getArena(properties);

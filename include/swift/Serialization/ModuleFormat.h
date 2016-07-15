@@ -43,7 +43,7 @@ const unsigned char MODULE_DOC_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x07 };
 
 /// Serialized module format major version number.
 ///
-/// Always 0 for Swift 1.x and 2.x.
+/// Always 0 for Swift 1.x - 3.x.
 const uint16_t VERSION_MAJOR = 0;
 
 /// Serialized module format minor version number.
@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 253; // Last change: Add an isStrict flag to SIL pointer_to_address.
+const uint16_t VERSION_MINOR = 254; // Last change: remove tuple default args
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -578,7 +578,6 @@ namespace decls_block {
     TUPLE_TYPE_ELT,
     IdentifierIDField,    // name
     TypeIDField,          // type
-    DefaultArgumentField, // default argument
     BCFixed<1>            // vararg?
   >;
 
