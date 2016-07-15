@@ -147,12 +147,6 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
     return BridgedSwift(trak.value + 1)
   }
 
-  static func printStats() {
-    print(
-      "bridge operations "
-      + "(from, to) = (\(bridgeFromOperationCount), \(bridgeToOperationCount))")
-  }
-  
   static func resetStats() {
     bridgeFromOperationCount = 0
     bridgeToOperationCount = 0
@@ -486,7 +480,7 @@ func testExplicitlyBridged() {
 }
 testExplicitlyBridged()
 
-func testRoundTrip() {
+tests.test("testRoundTrip") {
   class Test : NSObject {
     @objc dynamic func call(_ array: NSArray) -> NSArray {
 
@@ -512,7 +506,7 @@ func testRoundTrip() {
   expectEqual(0, bridgeFromOperationCount)
   expectEqual(0, bridgeToOperationCount)
 }
-testRoundTrip()
+
 //===--- Non-bridging -----------------------------------------------------===//
 // X is not bridged to Objective-C
 //===----------------------------------------------------------------------===//
