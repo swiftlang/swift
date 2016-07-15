@@ -510,37 +510,25 @@ extension ${Self}: BinaryFloatingPoint {
 
   @_transparent
   public mutating func round(_ rule: FloatingPointRoundingRule) {
-%if bits == 80:
     switch rule {
     case .toNearestOrAwayFromZero:
-      _swift_stdlib_roundl(&self)
+      _value = Builtin.int_round_FPIEEE${bits}(_value)
     case .toNearestOrEven:
-      _swift_stdlib_roundevenl(&self)
+      _value = Builtin.int_rint_FPIEEE${bits}(_value)
     case .towardZero:
-      _swift_stdlib_truncl(&self)
+      _value = Builtin.int_trunc_FPIEEE${bits}(_value)
     case .awayFromZero:
-      _swift_stdlib_roundawayl(&self)
+      if sign == .minus {
+        _value = Builtin.int_floor_FPIEEE${bits}(_value)
+      }
+      else {
+        _value = Builtin.int_ceil_FPIEEE${bits}(_value)
+      }
     case .up:
-      _swift_stdlib_ceill(&self)
+      _value = Builtin.int_ceil_FPIEEE${bits}(_value)
     case .down:
-      _swift_stdlib_floorl(&self)
+      _value = Builtin.int_floor_FPIEEE${bits}(_value)
     }
-%else:
-    switch rule {
-    case .toNearestOrAwayFromZero:
-      self = _swift_stdlib_round${cFuncSuffix(bits)}(self)
-    case .toNearestOrEven:
-      self = _swift_stdlib_roundeven${cFuncSuffix(bits)}(self)
-    case .towardZero:
-      self = _swift_stdlib_trunc${cFuncSuffix(bits)}(self)
-    case .awayFromZero:
-      self = _swift_stdlib_roundaway${cFuncSuffix(bits)}(self)
-    case .up:
-      self = _swift_stdlib_ceil${cFuncSuffix(bits)}(self)
-    case .down:
-      self = _swift_stdlib_floor${cFuncSuffix(bits)}(self)
-    }
-%end
   }
 
   @_transparent
@@ -594,13 +582,7 @@ extension ${Self}: BinaryFloatingPoint {
 
   @_transparent
   public mutating func addProduct(_ lhs: ${Self}, _ rhs: ${Self}) {
-%if bits == 80:
-    var lhs = lhs
-    var rhs = rhs
-    _swift_stdlib_addProductl(&self, &lhs, &rhs)
-%else:
-    self = _swift_stdlib_addProduct${cFuncSuffix(bits)}(self, lhs, rhs)
-%end
+    _value = Builtin.int_fma_FPIEEE${bits}(lhs._value, rhs._value, _value)
   }
 
   @_transparent
