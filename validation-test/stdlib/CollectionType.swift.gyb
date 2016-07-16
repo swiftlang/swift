@@ -819,11 +819,14 @@ struct ${Self}<T> : ${Collection} {
 }
 
 CollectionTypeTests.test("AssociatedTypes/${Collection}") {
-  expectTrue(${Self}<Void>.Index.self == FatalIndex.self)
-  expectTrue(${Self}<Void>.Indices.self == ${Indices}<${Self}<Void>>.self)
-  expectTrue(${Self}<Void>.IndexDistance.self == Int.self)
-  expectTrue(${Self}<Void>.Iterator.self == IndexingIterator<${Self}<Void>>.self)
-  expectTrue(${Self}<Void>.SubSequence.self == ${Slice}<${Self}<Void>>.self)
+  typealias C = ${Self}<Void>
+  expectCollectionAssociatedTypes(
+    collectionType: C.self,
+    iteratorType: IndexingIterator<C>.self,
+    subSequenceType: ${Slice}<C>.self,
+    indexType: FatalIndex.self,
+    indexDistanceType: Int.self,
+    indicesType: ${Indices}<C>.self)
 }
 % end
 
