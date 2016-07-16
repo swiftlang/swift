@@ -68,7 +68,7 @@ public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
   invoking body: @noescape () -> Void
 ) {
 #if arch(i386) && (os(iOS) || os(watchOS))
-  autoreleasepool(invoking: body)
+  autoreleasepool(body)
 #else
   body()
 #endif
