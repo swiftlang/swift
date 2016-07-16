@@ -46,7 +46,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// The spare bits that are set when a native array needs deferred
   /// element type checking.
-  var deferredTypeCheckMask: Int { return 1 }
+  internal var deferredTypeCheckMask: Int { return 1 }
   
   /// Returns an `_ArrayBuffer<U>` containing the same elements,
   /// deferring checking each element's `U`-ness until it is accessed.
@@ -68,7 +68,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
         native: _native._storage, bits: deferredTypeCheckMask))
   }
 
-  var needsElementTypeCheck: Bool {
+  internal var needsElementTypeCheck: Bool {
     // NSArray's need an element typecheck when the element type isn't AnyObject
     return !_isNativeTypeChecked && !(AnyObject.self is Element.Type)
   }
@@ -89,12 +89,12 @@ extension _ArrayBuffer {
   }
 
   /// `true`, if the array is native and does not need a deferred type check.
-  var arrayPropertyIsNativeTypeChecked: Bool {
+  internal var arrayPropertyIsNativeTypeChecked: Bool {
     return _isNativeTypeChecked
   }
 
   /// Returns `true` iff this buffer's storage is uniquely-referenced.
-  mutating func isUniquelyReferenced() -> Bool {
+  internal mutating func isUniquelyReferenced() -> Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return _storage.isUniquelyReferenced_native_noSpareBits()
     }
@@ -103,7 +103,7 @@ extension _ArrayBuffer {
 
   /// Returns `true` iff this buffer's storage is either
   /// uniquely-referenced or pinned.
-  mutating func isUniquelyReferencedOrPinned() -> Bool {
+  internal mutating func isUniquelyReferencedOrPinned() -> Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return _storage.isUniquelyReferencedOrPinned_native_noSpareBits()
     }
@@ -114,7 +114,7 @@ extension _ArrayBuffer {
   ///
   /// - Precondition: `_isBridgedToObjectiveC(Element.self)`.
   ///   O(1) if the element type is bridged verbatim, O(N) otherwise.
-  public func _asCocoaArray() -> _NSArrayCore {
+  internal func _asCocoaArray() -> _NSArrayCore {
     _sanityCheck(
       _isBridgedToObjectiveC(Element.self),
       "Array element type is not bridged to Objective-C")
@@ -175,7 +175,7 @@ extension _ArrayBuffer {
     }
   }
 
-  func _typeCheck(_ subRange: Range<Int>) {
+  internal func _typeCheck(_ subRange: Range<Int>) {
     if !_isClassOrObjCExistential(Element.self) {
       return
     }
@@ -194,7 +194,7 @@ extension _ArrayBuffer {
   /// memory starting at `target`.  Return a pointer "past the end" of the
   /// just-initialized memory.
   @discardableResult
-  public func _copyContents(
+  internal func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
@@ -274,17 +274,17 @@ extension _ArrayBuffer {
   /// A pointer to the first element.
   ///
   /// - Precondition: The elements are known to be stored contiguously.
-  public var firstElementAddress: UnsafeMutablePointer<Element> {
+  internal var firstElementAddress: UnsafeMutablePointer<Element> {
     _sanityCheck(_isNative, "must be a native buffer")
     return _native.firstElementAddress
   }
 
-  public var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
+  internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
     return _fastPath(_isNative) ? firstElementAddress : nil
   }
 
   /// The number of elements the buffer stores.
-  public var count: Int {
+  internal var count: Int {
     @inline(__always)
     get {
       return _fastPath(_isNative) ? _native.count : _nonNative.count
@@ -332,13 +332,13 @@ extension _ArrayBuffer {
   }
 
   /// The number of elements the buffer can store without reallocation.
-  public var capacity: Int {
+  internal var capacity: Int {
     return _fastPath(_isNative) ? _native.capacity : _nonNative.count
   }
 
   @_versioned
   @inline(__always)
-  func getElement(_ i: Int, wasNativeTypeChecked: Bool) -> Element {
+  internal func getElement(_ i: Int, wasNativeTypeChecked: Bool) -> Element {
     if _fastPath(wasNativeTypeChecked) {
       return _nativeTypeChecked[i]
     }
@@ -347,7 +347,7 @@ extension _ArrayBuffer {
 
   @_versioned
   @inline(never)
-  func _getElementSlowPath(_ i: Int) -> AnyObject {
+  internal func _getElementSlowPath(_ i: Int) -> AnyObject {
     _sanityCheck(
       _isClassOrObjCExistential(Element.self),
       "Only single reference elements can be indexed here.")
@@ -373,7 +373,7 @@ extension _ArrayBuffer {
   }
 
   /// Get or set the value of the ith element.
-  public subscript(i: Int) -> Element {
+  internal subscript(i: Int) -> Element {
     get {
       return getElement(i, wasNativeTypeChecked: _isNativeTypeChecked)
     }
@@ -395,7 +395,7 @@ extension _ArrayBuffer {
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
-  public func withUnsafeBufferPointer<R>(
+  internal func withUnsafeBufferPointer<R>(
     _ body: @noescape (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     if _fastPath(_isNative) {
@@ -410,7 +410,7 @@ extension _ArrayBuffer {
   /// over the underlying contiguous storage.
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
-  public mutating func withUnsafeMutableBufferPointer<R>(
+  internal mutating func withUnsafeMutableBufferPointer<R>(
     _ body: @noescape (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     _sanityCheck(
@@ -423,14 +423,14 @@ extension _ArrayBuffer {
   }
   
   /// An object that keeps the elements stored in this buffer alive.
-  public var owner: AnyObject {
+  internal var owner: AnyObject {
     return _fastPath(_isNative) ? _native._storage : _nonNative
   }
   
   /// An object that keeps the elements stored in this buffer alive.
   ///
   /// - Precondition: This buffer is backed by a `_ContiguousArrayBuffer`.
-  public var nativeOwner: AnyObject {
+  internal var nativeOwner: AnyObject {
     _sanityCheck(_isNative, "Expect a native array")
     return _native._storage
   }
@@ -438,7 +438,7 @@ extension _ArrayBuffer {
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
-  public var identity: UnsafePointer<Void> {
+  internal var identity: UnsafePointer<Void> {
     if _isNative {
       return _native.identity
     }
@@ -451,7 +451,7 @@ extension _ArrayBuffer {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  public var startIndex: Int {
+  internal var startIndex: Int {
     return 0
   }
 
@@ -460,18 +460,18 @@ extension _ArrayBuffer {
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `index(after:)`.
-  public var endIndex: Int {
+  internal var endIndex: Int {
     return count
   }
 
-  public typealias Indices = CountableRange<Int>
+  internal typealias Indices = CountableRange<Int>
 
   //===--- private --------------------------------------------------------===//
   internal typealias Storage = _ContiguousArrayStorage<Element>
   internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
   @_versioned
-  var _isNative: Bool {
+  internal var _isNative: Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return true
     } else {
@@ -480,7 +480,7 @@ extension _ArrayBuffer {
   }
 
   /// `true`, if the array is native and does not need a deferred type check.
-  var _isNativeTypeChecked: Bool {
+  internal var _isNativeTypeChecked: Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return true
     } else {
@@ -492,7 +492,7 @@ extension _ArrayBuffer {
   ///
   /// - Precondition: `_isNative`.
   @_versioned
-  var _native: NativeBuffer {
+  internal var _native: NativeBuffer {
     return NativeBuffer(
       _isClassOrObjCExistential(Element.self)
       ? _storage.nativeInstance : _storage.nativeInstance_noSpareBits)
@@ -502,12 +502,12 @@ extension _ArrayBuffer {
   ///
   /// - Precondition: `_isNativeTypeChecked`.
   @_versioned
-  var _nativeTypeChecked: NativeBuffer {
+  internal var _nativeTypeChecked: NativeBuffer {
     return NativeBuffer(_storage.nativeInstance_noSpareBits)
   }
 
   @_versioned
-  var _nonNative: _NSArrayCore {
+  internal var _nonNative: _NSArrayCore {
     @inline(__always)
     get {
       _sanityCheck(_isClassOrObjCExistential(Element.self))
