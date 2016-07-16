@@ -41,6 +41,7 @@ var nextBaseSerialNumber = 0
   func baz()
 }
 
+/// A type that will be bridged verbatim to Objective-C
 class Base : NSObject, Fooable {
   func foo() { }
 
@@ -85,6 +86,7 @@ class Derived : Base, Barable {
 var bridgeFromOperationCount = 0
 var bridgeToOperationCount = 0
 
+/// A value type that's bridged using _ObjectiveCBridgeable
 struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   func _bridgeToObjectiveC() -> Derived {
     bridgeToOperationCount += 1
@@ -151,22 +153,39 @@ class Thunks : NSObject {
     return Derived(value)
   }
   
-  @objc func acceptDerivedArray(_ x: [Derived]) {
-    print("acceptDerivedArray(\(x))")
+  @objc func acceptDerivedArray(
+    _ x: [Derived],
+    expecting expected: NSArray
+  )  {
+    expectEqual(x.count, expected.count)
+    for i in 0..<x.count {
+      expectTrue(x[i] === expected[i])
+    }
   }
 
-  @objc func produceDerivedArray(_ numItems: Int) -> [Derived] {
+  @objc func produceDerivedArray(
+    _ expectations: NSMutableArray
+  ) -> [Derived] {
     var array: [Derived] = []
-    for i in 0..<numItems {
+    for i in 0..<5 {
       array.append(Derived(i))
+      expectations.add(array[i])
     }
-    print("produceDerivedArray(\(array))")
     return array
   }
 
-  @objc func acceptBridgedSwiftArray(_ raw: NSArray) {
+  @objc func checkProducedDerivedArray(
+    _ produced: NSArray, expecting expected: NSArray
+  ) {
+    expectEqual(produced.count, expected.count)
+    for i in 0..<produced.count {
+      expectTrue(produced[i] === expected[i])
+    }
+  }
+  
+  @objc func acceptBridgedSwiftArray(_ raw: NSArray) -> AnyObject {
     let x = raw as! [BridgedSwift]
-    print("acceptBridgedSwiftArray(\(x))")
+    return Box(x)
   }
 
   @objc func produceBridgedSwiftArray(_ numItems: Int) -> NSArray {
@@ -174,7 +193,6 @@ class Thunks : NSObject {
     for i in 0..<numItems {
       array.append(BridgedSwift(i))
     }
-    print("produceBridgedSwiftArray(\(array))")
     return array as NSArray
   }
 }
@@ -270,22 +288,9 @@ tests.test("testBridgedVerbatim") {
   expectEmpty(derivedAsAnyObjectArray as? [protocol<Barable, Bazable>])
 }
 
-func doTestDerived() {
-  // CHECK: doTestDerived
-  print("doTestDerived")
-  
-  // CHECK-NEXT: produceDerivedArray([Derived[[A:#[0-9]+]](0), Derived[[B:#[0-9]+]](1), Derived[[C:#[0-9]+]](2), Derived[[D:#[0-9]+]](3), Derived[[E:#[0-9]+]](4)])
+tests.test("doTestDerived") {
   testDerived(Thunks())
-  // CHECK-NEXT: 5 elements in the array
-  // CHECK-NEXT: Derived[[A]](0)
-  // CHECK-NEXT: Derived[[B]](1)
-  // CHECK-NEXT: Derived[[C]](2)
-  // CHECK-NEXT: Derived[[D]](3)
-  // CHECK-NEXT: Derived[[E]](4)
-
-  // CHECK-NEXT: acceptDerivedArray([Derived[[A:#[0-9]+]](10), Derived[[B:#[0-9]+]](11), Derived[[C:#[0-9]+]](12), Derived[[D:#[0-9]+]](13), Derived[[E:#[0-9]+]](14)])
 }
-doTestDerived()
 
 //===--- Explicitly Bridged -----------------------------------------------===//
 // BridgedSwift conforms to _ObjectiveCBridgeable
@@ -455,19 +460,12 @@ func testExplicitlyBridged() {
     // CHECK-NEXT: Correctly rejected downcast of nil array
     print("Correctly rejected downcast of nil array")
   }
-
-  // CHECK-NEXT: produceBridgedSwiftArray([BridgedSwift[[A:#[0-9]+]](0), BridgedSwift[[B:#[0-9]+]](1), BridgedSwift[[C:#[0-9]+]](2), BridgedSwift[[D:#[0-9]+]](3), BridgedSwift[[E:#[0-9]+]](4)])
-  testBridgedSwift(Thunks())
-  // CHECK-NEXT: 5 elements in the array
-  // CHECK-NEXT: Derived[[A:#[0-9]+]](0)
-  // CHECK-NEXT: Derived[[B:#[0-9]+]](1)
-  // CHECK-NEXT: Derived[[C:#[0-9]+]](2)
-  // CHECK-NEXT: Derived[[D:#[0-9]+]](3)
-  // CHECK-NEXT: Derived[[E:#[0-9]+]](4)
-
-  // CHECK-NEXT: acceptBridgedSwiftArray([BridgedSwift[[A:#[0-9]+]](10), BridgedSwift[[B:#[0-9]+]](11), BridgedSwift[[C:#[0-9]+]](12), BridgedSwift[[D:#[0-9]+]](13), BridgedSwift[[E:#[0-9]+]](14)])
 }
 testExplicitlyBridged()
+
+tests.test("testExplicitlyBridged") {
+  testBridgedSwift(Thunks())
+}
 
 tests.test("testRoundTrip") {
   class Test : NSObject {

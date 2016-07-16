@@ -18,9 +18,10 @@
 
 @interface Thunks : NSObject
 - (id)createDerived:(NSInteger)value;
-- (void)acceptDerivedArray:(NSArray *)x;
-- (NSArray *)produceDerivedArray:(NSInteger)numItems;
-- (void)acceptBridgedSwiftArray:(NSArray *)x;
+- (id)acceptDerivedArray:(NSArray *)bridged expecting:(NSArray*)unbridged;
+- (NSArray *)produceDerivedArray:(NSMutableArray *)expectations;
+- (void)checkProducedDerivedArray:(NSArray *)produced expecting:(NSArray *)expected;
+- (id)acceptBridgedSwiftArray:(NSArray *)x;
 - (NSArray *)produceBridgedSwiftArray:(NSInteger)numItems;
 @end
 
@@ -32,14 +33,12 @@ NSArray* idAsArray(id a) {
   return a;
 }
 
+// Call back into thunks, passing arrays in both directions
 void testDerived(id thunks) {
   // Retrieve an array from Swift.
-  NSArray *fromObjCArr = [thunks produceDerivedArray: 5];
-  printf("%d elements in the array\n", (int)fromObjCArr.count);
-
-  for (id obj in fromObjCArr) {
-    printf("%s\n", [obj description].UTF8String);
-  }
+  NSMutableArray* expectations = [[NSMutableArray alloc] init];
+  NSArray *fromObjCArr = [thunks produceDerivedArray:expectations];
+  [thunks checkProducedDerivedArray:fromObjCArr expecting:expectations];
 
   // Send an array to swift.
   NSMutableArray *toObjCArr = [[NSMutableArray alloc] init];
@@ -48,7 +47,8 @@ void testDerived(id thunks) {
   [toObjCArr addObject: [thunks createDerived:12]];
   [toObjCArr addObject: [thunks createDerived:13]];
   [toObjCArr addObject: [thunks createDerived:14]];
-  [thunks acceptDerivedArray: toObjCArr];
+  
+  [thunks acceptDerivedArray: toObjCArr expecting: toObjCArr];
 }
 
 void testBridgedSwift(id thunks) {
