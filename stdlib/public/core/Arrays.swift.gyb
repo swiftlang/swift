@@ -2074,6 +2074,11 @@ public func != <Element : Equatable>(
 
 #if _runtime(_ObjC)
 extension Array {
+  public // @SPI(Foundation)
+  func _bridgeToObjectiveCImpl() -> AnyObject {
+    return _buffer._asCocoaArray()
+  }
+
   /// Tries to downcast the source `NSArray` as our native buffer type.
   /// If it succeeds, creates a new `Array` around it and returns that.
   /// Returns `nil` otherwise.
