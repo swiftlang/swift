@@ -43,6 +43,7 @@ func _countFormatSpecifiers(_ a: String) -> Int {
   let notPercentUTF16: UTF16.CodeUnit = 0
   var lastChar = notPercentUTF16 // anything other than % would work here
   var count = 0
+  var args = Set<UTF16.CodeUnit>()
 
   for c in a.utf16 {
     if lastChar == percentUTF16 {
@@ -51,7 +52,10 @@ func _countFormatSpecifiers(_ a: String) -> Int {
         lastChar = notPercentUTF16
       }
       else {
-        count += 1
+        if !args.contains(c) {
+          count += 1
+          args.insert(c)
+        }
         lastChar = c
       }
     } else {
@@ -925,9 +929,9 @@ extension String {
       return nil
     }
   }
-  
+
   // FIXME: handle optional locale with default arguments
-  
+
   // - (instancetype)
   //     initWithData:(NSData *)data
   //     encoding:(NSStringEncoding)encoding
@@ -938,7 +942,7 @@ extension String {
     guard let s = NSString(data: data, encoding: encoding.rawValue) else { return nil }
     self = s as String
   }
-  
+
   // - (instancetype)initWithFormat:(NSString *)format, ...
 
   /// Returns a `String` object initialized by using a given
@@ -1668,7 +1672,7 @@ extension String {
     }
     return r
   }
-  
+
   /// Returns `true` iff `other` is non-empty and contained within
   /// `self` by case-insensitive, non-literal search, taking into
   /// account the current locale.
@@ -1917,7 +1921,7 @@ extension String {
   ) -> String {
     fatalError("unavailable function can't be called")
   }
-  
+
   @available(*, unavailable, renamed: "replacingCharacters(in:with:)")
   public func replacingCharactersIn(
     _ range: Range<Index>, withString replacement: String
