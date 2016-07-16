@@ -57,4 +57,12 @@ UnicodeAPIs.test("UnicodeDecodingResult/Equatable") {
   checkEquatable(instances, oracle: ==)
 }
 
+let UnicodeScalarTests = TestSuite("UnicodeScalar")
+
+UnicodeScalarTests.test("lossless conversion") {
+  let scalar: UnicodeScalar = "a"
+  let actual = UnicodeScalar(String(scalar))
+  expectOptionalEqual(scalar, actual)
+}
+
 runAllTests()
