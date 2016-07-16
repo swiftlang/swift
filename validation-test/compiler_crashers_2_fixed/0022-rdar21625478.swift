@@ -24,7 +24,7 @@ public protocol MySequence {
   ) -> [T]
 
   func filter(
-    _ isIncluded: @noescape (Iterator.Element) -> Bool
+    _ includeElement: @noescape (Iterator.Element) -> Bool
   ) -> [Iterator.Element]
 
   func _customContainsEquatableElement(
@@ -54,7 +54,7 @@ extension MySequence {
   }
 
   public func filter(
-    _ isIncluded: @noescape (Iterator.Element) -> Bool
+    _ includeElement: @noescape (Iterator.Element) -> Bool
   ) -> [Iterator.Element] {
     return []
   }
@@ -256,10 +256,10 @@ extension LoggingSequenceType
   }
 
   public func filter(
-    _ isIncluded: @noescape (Base.Iterator.Element) -> Bool
+    _ includeElement: @noescape (Base.Iterator.Element) -> Bool
   ) -> [Base.Iterator.Element] {
     Log.filter[selfType] += 1
-    return base.filter(isIncluded)
+    return base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(

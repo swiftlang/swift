@@ -95,19 +95,18 @@ public class ManagedBuffer<Header, Element>
   : ManagedProtoBuffer<Header, Element> {
 
   /// Create a new instance of the most-derived class, calling
-  /// `factory` on the partially-constructed object to generate
-  /// an initial `Header`.
+  /// `initialHeader` on the partially-constructed object to
+  /// generate an initial `Header`.
   public final class func create(
     minimumCapacity: Int,
-    makingHeaderWith factory: (
-      ManagedProtoBuffer<Header, Element>) throws -> Header
+    initialHeader: @noescape (ManagedProtoBuffer<Header, Element>) throws -> Header
   ) rethrows -> ManagedBuffer<Header, Element> {
 
     let p = try ManagedBufferPointer<Header, Element>(
       bufferClass: self,
       minimumCapacity: minimumCapacity,
-      makingHeaderWith: { buffer, _ in
-        try factory(
+      initialHeader: { buffer, _ in
+        try initialHeader(
           unsafeDowncast(buffer, to: ManagedProtoBuffer<Header, Element>.self))
       })
 
@@ -116,18 +115,14 @@ public class ManagedBuffer<Header, Element>
 
   /// Destroy the stored Header.
   deinit {
-    ManagedBufferPointer(self).withUnsafeMutablePointerToHeader {
-      $0.deinitialize()
-    }
+    ManagedBufferPointer(self).withUnsafeMutablePointerToHeader { $0.deinitialize() }
   }
 
   /// The stored `Header` instance.
   public final var header: Header {
     addressWithNativeOwner {
       return (
-        ManagedBufferPointer(self).withUnsafeMutablePointerToHeader {
-          UnsafePointer($0)
-        },
+        ManagedBufferPointer(self).withUnsafeMutablePointerToHeader { UnsafePointer($0) },
         Builtin.castToNativeObject(self))
     }
     mutableAddressWithNativeOwner {
@@ -182,7 +177,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// - parameter bufferClass: The class of the object used for storage.
   /// - parameter minimumCapacity: The minimum number of `Element`s that
   ///   must be able to be stored in the new buffer.
-  /// - parameter factory: A function that produces the initial
+  /// - parameter initialHeader: A function that produces the initial
   ///   `Header` instance stored in the buffer, given the `buffer`
   ///   object and a function that can be called on it to get the actual
   ///   number of allocated elements.
@@ -194,16 +189,14 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
-    makingHeaderWith factory:
-      (buffer: AnyObject, capacity: (AnyObject) -> Int) throws -> Header
+    initialHeader: @noescape (buffer: AnyObject, capacity: @noescape (AnyObject) -> Int) throws -> Header
   ) rethrows {
-    self = ManagedBufferPointer(
-      bufferClass: bufferClass, minimumCapacity: minimumCapacity)
+    self = ManagedBufferPointer(bufferClass: bufferClass, minimumCapacity: minimumCapacity)
 
     // initialize the header field
     try withUnsafeMutablePointerToHeader {
       $0.initialize(with: 
-        try factory(
+        try initialHeader(
           buffer: self.buffer,
           capacity: {
             ManagedBufferPointer(unsafeBufferObject: $0).capacity

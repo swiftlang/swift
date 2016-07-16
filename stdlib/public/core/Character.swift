@@ -92,7 +92,7 @@ public struct Character :
       shift += 8
     }
 
-    UTF8.encode(scalar, into: output)
+    UTF8.encode(scalar, sendingOutputTo: output)
     asInt |= (~0) << shift
     _representation = .small(Builtin.trunc_Int64_Int63(asInt._value))
   }
@@ -297,7 +297,7 @@ public struct Character :
         _SmallUTF8(u8).makeIterator(),
         from: UTF8.self, to: UTF16.self,
         stoppingOnError: false,
-        into: output)
+        sendingOutputTo: output)
       self.data = u16
     }
 

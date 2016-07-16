@@ -214,7 +214,7 @@ extension MutableCollection
 }
 
 /// Generate all permutations.
-public func forAllPermutations(_ size: Int, _ body: ([Int]) -> Void) {
+public func forAllPermutations(_ size: Int, body: ([Int]) -> Void) {
   var data = Array(0..<size)
   repeat {
     body(data)
@@ -223,7 +223,7 @@ public func forAllPermutations(_ size: Int, _ body: ([Int]) -> Void) {
 
 /// Generate all permutations.
 public func forAllPermutations<S : Sequence>(
-  _ sequence: S, _ body: ([S.Iterator.Element]) -> Void
+  _ sequence: S, body: ([S.Iterator.Element]) -> Void
 ) {
   let data = Array(sequence)
   forAllPermutations(data.count) {

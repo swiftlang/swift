@@ -99,10 +99,10 @@ if True:
 ///
 /// You can call any method on the slices that you might have called on the
 /// `absences` array. To learn which half had more absences, use the
-/// `reduce(_:)` method to calculate each sum.
+/// `reduce(_:combine:)` method to calculate each sum.
 ///
-///     let firstHalfSum = firstHalf.reduce(0, +)
-///     let secondHalfSum = secondHalf.reduce(0, +)
+///     let firstHalfSum = firstHalf.reduce(0, combine: +)
+///     let secondHalfSum = secondHalf.reduce(0, combine: +)
 ///
 ///     if firstHalfSum > secondHalfSum {
 ///         print("More absences in the first half.")

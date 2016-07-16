@@ -147,7 +147,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   internal func _filter(
-    _ isIncluded: @noescape (Element) throws -> Bool
+    _ includeElement: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
     _abstract()
   }
@@ -200,7 +200,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   internal func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: @noescape (Element) throws -> Bool
+    isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     _abstract()
   }
@@ -335,9 +335,9 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     return try _base.map(transform)
   }
   internal override func _filter(
-    _ isIncluded: @noescape (Element) throws -> Bool
+    _ includeElement: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
-    return try _base.filter(isIncluded)
+    return try _base.filter(includeElement)
   }
   internal override func _forEach(
     _ body: @noescape (Element) throws -> Void
@@ -376,12 +376,12 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
 %   for ResultKind in EqualAndWeakerKinds:
   internal override func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: @noescape (Element) throws -> Bool
+    isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${ResultKind}<Element>] {
     return try _base.split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      whereSeparator: isSeparator)
+      isSeparator: isSeparator)
       .map {
         Any${ResultKind}(_box: _${Kind}Box<S.SubSequence>(_base: $0))
       }
@@ -579,9 +579,9 @@ extension Any${Kind} {
   }
 
   public func filter(
-    _ isIncluded: @noescape (Element) throws -> Bool
+    _ includeElement: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
-    return try _box._filter(isIncluded)
+    return try _box._filter(includeElement)
   }
 
   public func forEach(
@@ -609,12 +609,12 @@ extension Any${Kind} {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: @noescape (Element) throws -> Bool
+    isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     return try _box._split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      whereSeparator: isSeparator)
+      isSeparator: isSeparator)
   }
 
   public func _preprocessingPass<R>(
