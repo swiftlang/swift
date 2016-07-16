@@ -13,25 +13,25 @@
 import ObjectiveC
 import Foundation
 
-internal var _temporaryLocaleCurrentLocale: Locale? = nil
+internal var _temporaryLocaleCurrentLocale: NSLocale? = nil
 
-extension Locale {
+extension NSLocale {
   @objc
-  public class func _swiftUnittest_currentLocale() -> Locale {
+  public class func _swiftUnittest_currentLocale() -> NSLocale {
     return _temporaryLocaleCurrentLocale!
   }
 }
 
 public func withOverriddenLocaleCurrentLocale<Result>(
-  _ temporaryLocale: Locale,
+  _ temporaryLocale: NSLocale,
   _ body: @noescape () -> Result
 ) -> Result {
   let oldMethod = class_getClassMethod(
-    Locale.self, #selector(getter: Locale.current))
+    NSLocale.self, #selector(getter: NSLocale.current))
   precondition(oldMethod != nil, "could not find +[Locale currentLocale]")
 
   let newMethod = class_getClassMethod(
-    Locale.self, #selector(Locale._swiftUnittest_currentLocale))
+    NSLocale.self, #selector(NSLocale._swiftUnittest_currentLocale))
   precondition(newMethod != nil, "could not find +[Locale _swiftUnittest_currentLocale]")
 
   precondition(_temporaryLocaleCurrentLocale == nil,
@@ -51,11 +51,11 @@ public func withOverriddenLocaleCurrentLocale<Result>(
   _ body: @noescape () -> Result
 ) -> Result {
   precondition(
-    Locale.availableLocaleIdentifiers.contains(temporaryLocaleIdentifier),
+    NSLocale.availableLocaleIdentifiers.contains(temporaryLocaleIdentifier),
     "requested locale \(temporaryLocaleIdentifier) is not available")
 
   return withOverriddenLocaleCurrentLocale(
-    Locale(localeIdentifier: temporaryLocaleIdentifier), body)
+    NSLocale(localeIdentifier: temporaryLocaleIdentifier), body)
 }
 
 /// Executes the `body` in an autorelease pool if the platform does not

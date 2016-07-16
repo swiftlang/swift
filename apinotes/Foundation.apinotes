@@ -647,7 +647,15 @@ Classes:
   - Selector: 'stringFromByteCount:'
     SwiftName: stringFromByteCount(_:)
     MethodKind: Instance
+- Name: NSLocale
+  SwiftName: NSLocale
+  SwiftBridge: Locale
+- Name: NSTimeZone
+  SwiftName: NSTimeZone
+  SwiftBridge: TimeZone
 - Name: NSCalendar
+  SwiftName: NSCalendar
+  SwiftBridge: Calendar
   Methods:
   - Selector: 'dateWithEra:year:month:day:hour:minute:second:nanosecond:'
     SwiftName: date(era:year:month:day:hour:minute:second:nanosecond:)
@@ -1114,9 +1122,9 @@ Tags:
 - Name: NSByteCountFormatterCountStyle
   SwiftName: ByteCountFormatter.CountStyle
 - Name: NSCalendarUnit
-  SwiftName: Calendar.Unit
+  SwiftName: NSCalendar.Unit
 - Name: NSCalendarOptions
-  SwiftName: Calendar.Options
+  SwiftName: NSCalendar.Options
 - Name: NSDecodingFailurePolicy
   SwiftName: NSCoder.DecodingFailurePolicy
 - Name: NSComparisonPredicateOptions
@@ -1229,7 +1237,7 @@ Tags:
   Availability: nonswift
   AvailabilityMsg: Use 'NSTextCheckingResult.CheckingType'
 - Name: NSTimeZoneNameStyle
-  SwiftName: TimeZone.NameStyle
+  SwiftName: NSTimeZone.NameStyle
 - Name: NSURLCacheStoragePolicy
   SwiftName: URLCache.StoragePolicy
 - Name: NSURLCredentialPersistence
@@ -1281,7 +1289,7 @@ Tags:
 - Name: NSDateComponentsFormatterZeroFormattingBehavior
   SwiftName: DateComponentsFormatter.ZeroFormattingBehavior
 - Name: NSLocaleLanguageDirection
-  SwiftName: Locale.LanguageDirection
+  SwiftName: NSLocale.LanguageDirection
 - Name: NSNetServiceOptions
   SwiftName: NSNetService.Options
 - Name: NSPointerFunctionsOptions
@@ -1348,13 +1356,13 @@ Typedefs:
 - Name: NSBackgroundActivityCompletionHandler
   SwiftName: NSBackgroundActivityScheduler.CompletionHandler
 - Name: NSCalendarIdentifier
-  SwiftName: Calendar.Identifier
+  SwiftName: NSCalendar.Identifier
 - Name: NSItemProviderCompletionHandler
   SwiftName: NSItemProvider.CompletionHandler
 - Name: NSItemProviderLoadHandler
   SwiftName: NSItemProvider.LoadHandler
 - Name: NSLocaleKey
-  SwiftName: Locale.Key
+  SwiftName: NSLocale.Key
 - Name: NSNotificationName
   SwiftName: NSNotification.Name
 - Name: NSProgressFileOperationKind
@@ -1423,7 +1431,7 @@ Globals:
 - Name: NSItemProviderErrorDomain
   SwiftName: NSItemProvider.errorDomain
 - Name: NSCurrentLocaleDidChangeNotification
-  SwiftName: Locale.currentLocaleDidChangeNotification
+  SwiftName: NSLocale.currentLocaleDidChangeNotification
 - Name: NSNetServicesErrorDomain
   SwiftName: NSNetService.errorDomain
 - Name: NSNetServicesErrorCode

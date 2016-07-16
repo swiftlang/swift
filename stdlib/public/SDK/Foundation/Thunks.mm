@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #import <Foundation/Foundation.h>
+#import <objc/runtime.h>
 #include <objc/message.h>
 
 #include "swift/Runtime/Config.h"
@@ -117,6 +118,77 @@ NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
   }
   [data release];
   return [result retain];
+}
+
+// A way to get various Calendar, Locale, and TimeZone singletons without bridging twice
+
+SWIFT_CC(swift)
+extern "C" NS_RETURNS_RETAINED NSCalendar *__NSCalendarAutoupdating() {
+    return [[NSCalendar autoupdatingCurrentCalendar] retain];
+}
+
+SWIFT_CC(swift)
+extern "C" NS_RETURNS_RETAINED NSCalendar *__NSCalendarCurrent() {
+    return [[NSCalendar currentCalendar] retain];
+}
+
+SWIFT_CC(swift)
+extern "C" NS_RETURNS_RETAINED NSTimeZone *__NSTimeZoneAutoupdating() {
+    return [[NSTimeZone localTimeZone] retain];
+}
+
+SWIFT_CC(swift)
+extern "C" NS_RETURNS_RETAINED NSTimeZone *__NSTimeZoneCurrent() {
+    return [[NSTimeZone systemTimeZone] retain];
+}
+
+SWIFT_CC(swift)
+extern "C" NS_RETURNS_RETAINED NSLocale *__NSLocaleCurrent() {
+    return [[NSLocale currentLocale] retain];
+}
+
+SWIFT_CC(swift)
+extern "C" NS_RETURNS_RETAINED NSLocale *__NSLocaleAutoupdating() {
+    return [[NSLocale autoupdatingCurrentLocale] retain];
+}
+
+// Autoupdating Subclasses
+SWIFT_CC(swift)
+extern "C" BOOL __NSCalendarIsAutoupdating(NSCalendar *NS_RELEASES_ARGUMENT __nonnull calendar) {
+    static dispatch_once_t onceToken;
+    static Class autoCalendarClass;
+    static Class olderAutoCalendarClass; // Pre 10.12/10.0
+    dispatch_once(&onceToken, ^{
+        autoCalendarClass = (Class)objc_lookUpClass("_NSAutoCalendar");
+        olderAutoCalendarClass = (Class)objc_lookUpClass("NSAutoCalendar");
+    });
+    BOOL result = (autoCalendarClass && [calendar isKindOfClass:autoCalendarClass]) || (olderAutoCalendarClass && [calendar isKindOfClass:olderAutoCalendarClass]);
+    [calendar release];
+    return result;
+}
+
+SWIFT_CC(swift)
+extern "C" BOOL __NSTimeZoneIsAutoupdating(NSTimeZone *NS_RELEASES_ARGUMENT __nonnull timeZone) {
+    static dispatch_once_t onceToken;
+    static Class autoTimeZoneClass;
+    dispatch_once(&onceToken, ^{
+        autoTimeZoneClass = (Class)objc_lookUpClass("__NSLocalTimeZone");
+    });
+    BOOL result = [timeZone isKindOfClass:autoTimeZoneClass];
+    [timeZone release];
+    return result;
+}
+
+SWIFT_CC(swift)
+extern "C" BOOL __NSLocaleIsAutoupdating(NSTimeZone *NS_RELEASES_ARGUMENT __nonnull locale) {
+    static dispatch_once_t onceToken;
+    static Class autoLocaleClass;
+    dispatch_once(&onceToken, ^{
+        autoLocaleClass = (Class)objc_lookUpClass("NSAutoLocale");
+    });
+    BOOL result = [locale isKindOfClass:autoLocaleClass];
+    [locale release];
+    return result;
 }
 
 // -- NSError

@@ -262,22 +262,18 @@ func expectLocalizedEquality(
   _ localeID: String? = nil,
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
 
   let locale = localeID.map {
-    Locale(localeIdentifier: $0)
+    Locale(identifier: $0)
   } ?? Locale.current
   
   expectEqual(
     expected, op(locale),
-    message(), stackTrace: trace)
-  
-  expectEqual(
-    op(Locale.system), op(nil),
-    message(), stackTrace: trace)
+    message(), stackTrace: trace)  
 }
 
 NSStringAPIs.test("capitalizedString(with:)") {
@@ -834,8 +830,6 @@ NSStringAPIs.test("init(format:locale:_:...)") {
   var world: NSString = "world"
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, world, 42))
-  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: Locale.system, world, 42))
 }
 
 NSStringAPIs.test("init(format:locale:arguments:)") {
@@ -843,8 +837,6 @@ NSStringAPIs.test("init(format:locale:arguments:)") {
   let args: [CVarArg] = [ world, 42 ]
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, arguments: args))
-  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: Locale.system, arguments: args))
 }
 
 NSStringAPIs.test("lastPathComponent") {
