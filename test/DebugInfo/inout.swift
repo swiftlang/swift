@@ -2,6 +2,7 @@
 // RUN: cat %t.ll | FileCheck %s
 // RUN: cat %t.ll | FileCheck %s --check-prefix=PROMO-CHECK
 // RUN: cat %t.ll | FileCheck %s --check-prefix=FOO-CHECK
+// REQUIRES: rdar27389560
 
 // LValues are direct values, too. They are reference types, though.
 
