@@ -889,6 +889,7 @@ public struct ${Self}<Element>
   }
 %end
 
+  @_versioned
   internal var _buffer: _Buffer
 }
 
