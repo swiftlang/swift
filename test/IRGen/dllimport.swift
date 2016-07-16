@@ -1,5 +1,6 @@
 // RUN: %swift -target thumbv7--windows-itanium -emit-ir -parse-as-library -parse-stdlib -module-name dllimport %s -o - -enable-source-import -I %S | FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-OPT
 // RUN: %swift -target thumbv7--windows-itanium -O -emit-ir -parse-as-library -parse-stdlib -module-name dllimport %s -o - -enable-source-import -I %S | FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT
+// REQUIRES: rdar27389569
 
 import dllexport
 
