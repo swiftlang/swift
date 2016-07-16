@@ -32,8 +32,12 @@
 #include "clang/Lex/Lexer.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
+#include <algorithm>
+#include <memory>
 #include <queue>
+#include <string>
 #include <utility>
+#include <vector>
 
 using namespace swift;
 
