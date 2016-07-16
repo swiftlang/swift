@@ -14,5 +14,5 @@
 id arrayAsID(NSArray* a);
 NSArray* idAsArray(id a);
 
-void testBridgedObjC(id thunks);
-void testBridgedSwift(id thunks);
+void testSubclass(id thunks);
+void testBridgeableValue(id thunks);

@@ -16,8 +16,7 @@
 // RUN: %target-clang %S/Inputs/ArrayBridge/ArrayBridge.m -c -o %t/ArrayBridgeObjC.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/ArrayBridge/ -Xlinker %t/ArrayBridgeObjC.o -o %t/ArrayBridge
 
-// RUN: %target-run %t/ArrayBridge > %t.txt
-// RUN: FileCheck %s < %t.txt
+// RUN: %target-run %t/ArrayBridge
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -27,7 +26,7 @@ import StdlibUnittest
 let tests = TestSuite("ArrayBridge")
 
 var trackedCount = 0
-var nextTrackedSerialNumber = 0
+var nextBaseSerialNumber = 0
 
 @objc protocol Fooable {
   func foo()
@@ -41,13 +40,14 @@ var nextTrackedSerialNumber = 0
   func baz()
 }
 
-class Tracked : NSObject, Fooable {
+/// A type that will be bridged verbatim to Objective-C
+class Base : NSObject, Fooable {
   func foo() { }
 
   required init(_ value: Int) {
     trackedCount += 1
-    nextTrackedSerialNumber += 1
-    serialNumber = nextTrackedSerialNumber
+    nextBaseSerialNumber += 1
+    serialNumber = nextBaseSerialNumber
     self.value = value
   }
   
@@ -57,48 +57,26 @@ class Tracked : NSObject, Fooable {
     serialNumber = -serialNumber
   }
 
-  override var description: String {
-    assert(serialNumber > 0, "dead Tracked!")
-    return "Base#\(serialNumber)(\(value))"
-  }
-
-  func successor() -> Self {
-    return self.dynamicType.init(self.value + 1)
-  }
-
   override func isEqual(_ other: AnyObject?) -> Bool {
-    return (other as? Tracked)?.value == self.value
+    return (other as? Base)?.value == self.value
   }
   
   var value: Int
   var serialNumber: Int
 }
 
-typealias Base = Tracked
-class Derived : Base, Barable {
+class Subclass : Base, Barable {
   func bar() { }
-
-  override var description: String {
-    assert(serialNumber > 0, "dead Tracked!")
-    return "Derived#\(serialNumber)(\(value))"
-  }
-}
-
-class BridgedObjC : Base, Barable {
-  func bar() { }
-  override var description: String {
-    assert(serialNumber > 0, "dead Tracked!")
-    return "BridgedObjC#\(serialNumber)(\(value))"
-  }
 }
 
 var bridgeFromOperationCount = 0
 var bridgeToOperationCount = 0
 
-struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
-  func _bridgeToObjectiveC() -> BridgedObjC {
+/// A value type that's bridged using _ObjectiveCBridgeable
+struct BridgeableValue : _ObjectiveCBridgeable, Equatable {
+  func _bridgeToObjectiveC() -> Subclass {
     bridgeToOperationCount += 1
-    return BridgedObjC(trak.value)
+    return Subclass(trak.value)
   }
 
   static func _isBridgedToObjectiveC() -> Bool {
@@ -106,20 +84,20 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   }
 
   static func _forceBridgeFromObjectiveC(
-    _ x: BridgedObjC,
-    result: inout BridgedSwift?
+    _ x: Subclass,
+    result: inout BridgeableValue?
   ) {
     assert(x.value >= 0, "not bridged")
     bridgeFromOperationCount += 1
-    result = BridgedSwift(x.value)
+    result = BridgeableValue(x.value)
   }
 
   static func _conditionallyBridgeFromObjectiveC(
-    _ x: BridgedObjC,
-    result: inout BridgedSwift?
+    _ x: Subclass,
+    result: inout BridgeableValue?
   ) -> Bool {
     if x.value >= 0 {
-      result = BridgedSwift(x.value)
+      result = BridgeableValue(x.value)
       return true
     }
 
@@ -127,65 +105,82 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
     return false
   }
 
-  static func _unconditionallyBridgeFromObjectiveC(_ source: BridgedObjC?)
-      -> BridgedSwift {
-    var result: BridgedSwift? = nil
+  static func _unconditionallyBridgeFromObjectiveC(_ source: Subclass?)
+      -> BridgeableValue {
+    var result: BridgeableValue? = nil
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
 
-  var description: String {
-    assert(trak.serialNumber > 0, "dead Tracked!")
-    return "BridgedSwift#\(trak.serialNumber)(\(trak.value))"
-  }
-
   init(_ value: Int) {
-    self.trak = Tracked(value)
+    self.trak = Base(value)
   }
   
-  func successor() -> BridgedSwift {
-    return BridgedSwift(trak.value + 1)
-  }
-
   static func resetStats() {
     bridgeFromOperationCount = 0
     bridgeToOperationCount = 0
   }
   
-  var trak: Tracked
+  var trak: Base
+}
+
+func == (lhs: BridgeableValue, rhs: BridgeableValue) -> Bool {
+  return lhs.trak.value == rhs.trak.value 
 }
 
 // A class used to test various Objective-C thunks.
 class Thunks : NSObject {
-  func createBridgedObjC(_ value: Int) -> AnyObject {
-    return BridgedObjC(value)
+  func createSubclass(_ value: Int) -> AnyObject {
+    return Subclass(value)
   }
   
-  @objc func acceptBridgedObjCArray(_ x: [BridgedObjC]) {
-    print("acceptBridgedObjCArray(\(x))")
+  @objc func acceptSubclassArray(
+    _ x: [Subclass],
+    expecting expected: NSArray
+  )  {
+    expectEqualSequence(
+      expected.lazy.map { ObjectIdentifier($0) },
+      x.lazy.map { ObjectIdentifier($0) }
+    )
   }
 
-  @objc func produceBridgedObjCArray(_ numItems: Int) -> [BridgedObjC] {
-    var array: [BridgedObjC] = []
-    for i in 0..<numItems {
-      array.append(BridgedObjC(i))
+  @objc func produceSubclassArray(
+    _ expectations: NSMutableArray
+  ) -> [Subclass] {
+    var array: [Subclass] = []
+    for i in 0..<5 {
+      array.append(Subclass(i))
+      expectations.add(array[i])
     }
-    print("produceBridgedObjCArray(\(array))")
     return array
   }
 
-  @objc func acceptBridgedSwiftArray(_ raw: NSArray) {
-    let x = raw as! [BridgedSwift]
-    print("acceptBridgedSwiftArray(\(x))")
+  @objc func checkProducedSubclassArray(
+    _ produced: NSArray, expecting expected: NSArray
+  ) {
+    expectEqualSequence(
+      expected.lazy.map { ObjectIdentifier($0) },
+      produced.lazy.map { ObjectIdentifier($0) }
+    )
+  }
+  
+  @objc func acceptBridgeableValueArray(_ raw: NSArray) -> AnyObject {
+    let x = raw as! [BridgeableValue]
+    return Box(x)
   }
 
-  @objc func produceBridgedSwiftArray(_ numItems: Int) -> NSArray {
-    var array: [BridgedSwift] = []
-    for i in 0..<numItems {
-      array.append(BridgedSwift(i))
+  @objc func produceBridgeableValueArray() -> NSArray {
+    var array: [BridgeableValue] = []
+    for i in 0..<5 {
+      array.append(BridgeableValue(i))
     }
-    print("produceBridgedSwiftArray(\(array))")
     return array as NSArray
+  }
+  
+  @objc func checkProducedBridgeableValueArray(_ produced: NSArray) {
+    expectEqualSequence(
+      0..<5,
+      produced.lazy.map { ($0 as! Subclass).value })
   }
 }
 
@@ -195,15 +190,15 @@ class Thunks : NSObject {
 //===----------------------------------------------------------------------===//
 
 tests.test("testBridgedVerbatim") {
-  nextTrackedSerialNumber = 0
+  nextBaseSerialNumber = 0
   let bases: [Base] = [Base(100), Base(200), Base(300)]
 
   //===--- Implicit conversion to/from NSArray ------------------------------===//
 
   let basesConvertedToNSArray = bases as NSArray
-  expectEqual(
-    "Base#1(100)",
-    String(basesConvertedToNSArray.object(at: 0) as! Base))
+  let firstBase = basesConvertedToNSArray.object(at: 0) as! Base
+  expectEqual(100, firstBase.value)
+  expectEqual(1, firstBase.serialNumber)
 
   // Create an ordinary NSArray, not a native one
   let nsArrayOfBase: NSArray = NSArray(object: Base(42))
@@ -230,266 +225,186 @@ tests.test("testBridgedVerbatim") {
   expectTrue(basesConvertedToNSArray.dynamicType.supportsSecureCoding)
 
   //===--- Up- and Down-casts -----------------------------------------------===//
-  var derived: [Derived] = [Derived(11), Derived(22)]
-  let derived0 = derived
+  var subclass: [Subclass] = [Subclass(11), Subclass(22)]
+  let subclass0 = subclass
 
   // upcast is implicit
-  let derivedAsBases: [Base] = derived
-  expectEqual(derived.count, derivedAsBases.count)
-  for (x, y) in zip(derived, derivedAsBases) {
+  let subclassAsBases: [Base] = subclass
+  expectEqual(subclass.count, subclassAsBases.count)
+  for (x, y) in zip(subclass, subclassAsBases) {
     expectTrue(x === y)
   }
 
   // Arrays are logically distinct after upcast
-  derived[0] = Derived(33)
+  subclass[0] = Subclass(33)
 
-  expectEqual([Derived(33), Derived(22)], derived)
-  expectEqual([Derived(11), Derived(22)], derivedAsBases)
+  expectEqual([Subclass(33), Subclass(22)], subclass)
+  expectEqual([Subclass(11), Subclass(22)], subclassAsBases)
 
-  expectEqual(derived0, derivedAsBases as! [Derived])
+  expectEqual(subclass0, subclassAsBases as! [Subclass])
 
-  let derivedInBaseBuffer: [Base] = [Derived(44), Derived(55)]
-  let derived2 = derivedInBaseBuffer
+  let subclassInBaseBuffer: [Base] = [Subclass(44), Subclass(55)]
+  let subclass2 = subclassInBaseBuffer
   
   // Explicit downcast-ability is based on element type, not buffer type
-  expectNotEmpty(derivedInBaseBuffer as? [Derived])
+  expectNotEmpty(subclassInBaseBuffer as? [Subclass])
 
   // We can up-cast to array of AnyObject
-  let derivedAsAnyObjectArray: [AnyObject] = derivedInBaseBuffer
-  expectEqual(derived2, derivedAsAnyObjectArray.map { $0 as! Base })
+  let subclassAsAnyObjectArray: [AnyObject] = subclassInBaseBuffer
+  expectEqual(subclass2, subclassAsAnyObjectArray.map { $0 as! Base })
 
-  let downcastBackToBase = derivedAsAnyObjectArray as? [Base]
+  let downcastBackToBase = subclassAsAnyObjectArray as? [Base]
   expectNotEmpty(downcastBackToBase)
 
-  if let downcastBackToDerived = expectNotEmpty(derivedAsAnyObjectArray as? [Derived]) {
-    expectEqual(derived2, downcastBackToDerived)
+  if let downcastBackToSubclass = expectNotEmpty(subclassAsAnyObjectArray as? [Subclass]) {
+    expectEqual(subclass2, downcastBackToSubclass)
   }
 
-  if let downcastToProtocols = expectNotEmpty(derivedAsAnyObjectArray as? [Fooable]) {
-    expectEqual(derived2, downcastToProtocols.map { $0 as! Derived })
+  if let downcastToProtocols = expectNotEmpty(subclassAsAnyObjectArray as? [Fooable]) {
+    expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  if let downcastToProtocols = expectNotEmpty(derivedAsAnyObjectArray as? [Barable]) {
-    expectEqual(derived2, downcastToProtocols.map { $0 as! Derived })
+  if let downcastToProtocols = expectNotEmpty(subclassAsAnyObjectArray as? [Barable]) {
+    expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  if let downcastToProtocols = expectNotEmpty(derivedAsAnyObjectArray as? [protocol<Barable, Fooable>]) {
-    expectEqual(derived2, downcastToProtocols.map { $0 as! Derived })
+  if let downcastToProtocols = expectNotEmpty(subclassAsAnyObjectArray as? [protocol<Barable, Fooable>]) {
+    expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  expectEmpty(derivedAsAnyObjectArray as? [protocol<Barable, Bazable>])
+  expectEmpty(subclassAsAnyObjectArray as? [protocol<Barable, Bazable>])
 }
 
-func doTestBridgedObjC() {
-  // CHECK: doTestBridgedObjC
-  print("doTestBridgedObjC")
-  
-   testBridgedObjC(Thunks())
-  // CHECK-NEXT: produceBridgedObjCArray([BridgedObjC[[A:#[0-9]+]](0), BridgedObjC[[B:#[0-9]+]](1), BridgedObjC[[C:#[0-9]+]](2), BridgedObjC[[D:#[0-9]+]](3), BridgedObjC[[E:#[0-9]+]](4)])
-  testBridgedObjC(Thunks())
-  // CHECK-NEXT: 5 elements in the array
-  // CHECK-NEXT: BridgedObjC[[A]](0)
-  // CHECK-NEXT: BridgedObjC[[B]](1)
-  // CHECK-NEXT: BridgedObjC[[C]](2)
-  // CHECK-NEXT: BridgedObjC[[D]](3)
-  // CHECK-NEXT: BridgedObjC[[E]](4)
-
-  // CHECK-NEXT: acceptBridgedObjCArray([BridgedObjC[[A:#[0-9]+]](10), BridgedObjC[[B:#[0-9]+]](11), BridgedObjC[[C:#[0-9]+]](12), BridgedObjC[[D:#[0-9]+]](13), BridgedObjC[[E:#[0-9]+]](14)])
+tests.test("doTestSubclass") {
+  testSubclass(Thunks())
 }
-doTestBridgedObjC()
 
 //===--- Explicitly Bridged -----------------------------------------------===//
-// BridgedSwift conforms to _ObjectiveCBridgeable
+// BridgeableValue conforms to _ObjectiveCBridgeable
 //===----------------------------------------------------------------------===//
-func testExplicitlyBridged() {
-  // CHECK-LABEL: testExplicitlyBridged()
-  print("testExplicitlyBridged()")
-
-  let bridgedSwifts = [BridgedSwift(42), BridgedSwift(17)]
+tests.test("testExplicitlyBridged") {
   
-  let bridgedSwiftsAsNSArray = bridgedSwifts as NSArray
-  // CHECK-NEXT: [BridgedObjC#{{[0-9]+}}(42), BridgedObjC#{{[0-9]+}}(17)]
-  print("bridgedSwiftsAsNSArray = \(bridgedSwiftsAsNSArray as [AnyObject]))")
+  let bridgeableValues = [BridgeableValue(42), BridgeableValue(17)]
+  
+  let bridgeableValuesAsNSArray = bridgeableValues as NSArray
+  expectEqual(2, bridgeableValuesAsNSArray.count)
+  expectEqual(42, bridgeableValuesAsNSArray[0].value)
+  expectEqual(17, bridgeableValuesAsNSArray[1].value)
 
   // Make sure we can bridge back.
-  let roundTripBridgedSwifts
-    = Swift._forceBridgeFromObjectiveC(bridgedSwiftsAsNSArray, 
-                                       [BridgedSwift].self)
-  // CHECK-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
-  // CHECK-NEXT: [BridgedSwift#[[id10:[0-9]+]](42), BridgedSwift#[[id11:[0-9]+]](17)]
-  print("roundTripBridgedSwifts = \(roundTripBridgedSwifts))")
+  let roundTrippedValues = Swift._forceBridgeFromObjectiveC(
+    bridgeableValuesAsNSArray, [BridgeableValue].self)
+
+  // Expect equal values...
+  expectEqualSequence(bridgeableValues, roundTrippedValues)
+  // ...with the same identity for some reason? FIXME: understand why.
+  expectFalse(
+    zip(bridgeableValues, roundTrippedValues).contains { $0.trak !== $1.trak })
 
   // Make a real Cocoa NSArray of these...
-  let cocoaBridgedSwifts = NSArray(array: bridgedSwiftsAsNSArray as [AnyObject])
+  let cocoaBridgeableValues = NSArray(
+    array: bridgeableValuesAsNSArray as [AnyObject])
 
   // ...and bridge *that* back
-  let bridgedBackSwifts
-    = Swift._forceBridgeFromObjectiveC(cocoaBridgedSwifts, [BridgedSwift].self)
-  // CHECK-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
-  // CHECK-NOT: [BridgedSwift#[[id10]](42), BridgedSwift#[[id11]](17)]
-  // CHECK-NEXT: [BridgedSwift#{{[0-9]+}}(42), BridgedSwift#{{[0-9]+}}(17)]
-  print("bridgedBackSwifts      = \(bridgedBackSwifts)")
+  let bridgedBackSwifts = Swift._forceBridgeFromObjectiveC(
+    cocoaBridgeableValues, [BridgeableValue].self)
   
-  // all: verbatim, not, and doesn't bridge
-  // implicit conversions to/from NSArray 
-  // [Base] -> [Derived] and [Derived] -> [Base] where Base can be AnyObject
-  // defining @objc method taking [T] and returning [T]
+  // Expect equal, but distinctly created instances
+  expectEqualSequence(bridgeableValues, bridgedBackSwifts)
+  expectFalse(
+    zip(bridgedBackSwifts, roundTrippedValues).contains { $0.trak === $1.trak })
+  expectFalse(
+    zip(bridgedBackSwifts, bridgeableValues).contains { $0.trak === $1.trak })
+
+  let expectedSubclasses = [Subclass(42), Subclass(17)]
+  let expectedBases = expectedSubclasses.lazy.map { $0 as Base }
 
   // Up-casts.
-  let bridgedSwiftsAsBridgedObjCs: [BridgedObjC] = bridgedSwifts
-  // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-  print(bridgedSwiftsAsBridgedObjCs[0])
-  // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-  print(bridgedSwiftsAsBridgedObjCs[1])
+  let bridgeableValuesAsSubclasses: [Subclass] = bridgeableValues
+  expectEqualSequence(expectedSubclasses, bridgeableValuesAsSubclasses)
 
-  let bridgedSwiftsAsBases: [Base] = bridgedSwifts
-  // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-  print(bridgedSwiftsAsBases[0])
-  // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-  print(bridgedSwiftsAsBases[1])
+  let bridgeableValuesAsBases: [Base] = bridgeableValues
+  expectEqualSequence(expectedBases, bridgeableValuesAsBases)
 
-  let bridgedSwiftsAsAnyObjects: [AnyObject] = bridgedSwifts
-  // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-  print(bridgedSwiftsAsAnyObjects[0])
-  // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-  print(bridgedSwiftsAsAnyObjects[1])
+  let bridgeableValuesAsAnyObjects: [AnyObject] = bridgeableValues
+  expectEqualSequence(
+    expectedBases,
+    bridgeableValuesAsAnyObjects.lazy.map { $0 as! Base })
 
   // Downcasts of non-verbatim bridged value types to objects.
   do {
-    let downcasted = bridgedSwifts as [BridgedObjC]
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-    print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-    print(downcasted[1])
+    let downcasted = bridgeableValues as [Subclass]
+    expectEqualSequence(expectedSubclasses, downcasted)
   }
 
   do {
-    let downcasted = bridgedSwifts as [Base]
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-    print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-    print(downcasted[1])
+    let downcasted = bridgeableValues as [Base]
+    expectEqualSequence(expectedBases, downcasted)
   }
 
   do {
-    let downcasted = bridgedSwifts as [AnyObject]
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-    print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-    print(downcasted[1])
+    let downcasted = bridgeableValues as [AnyObject]
+    expectEqualSequence(expectedBases, downcasted.map { $0 as! Base })
   }
 
   // Downcasts of up-casted arrays.
-  if let downcasted = bridgedSwiftsAsAnyObjects as? [BridgedObjC] {
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-    print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-    print(downcasted[1])
-  } else {
-    print("Could not downcast [AnyObject] to [BridgedObjC]?")
+  if let downcasted = expectNotEmpty(
+    bridgeableValuesAsAnyObjects as? [Subclass]
+  ) {
+    expectEqualSequence(expectedSubclasses, downcasted)
   }
 
-  if let downcasted = bridgedSwiftsAsAnyObjects as? [Base] {
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-    print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-    print(downcasted[1])
-  } else {
-    print("Could not downcast [AnyObject] to [Base]?")
+  if let downcasted = bridgeableValuesAsAnyObjects as? [Base] {
+    expectEqualSequence(expectedBases, downcasted)
   }
 
   // Downcast of Cocoa array to an array of classes.
-  let wrappedCocoaBridgedSwifts = cocoaBridgedSwifts as [AnyObject]
-  if let downcasted = wrappedCocoaBridgedSwifts as? [BridgedObjC] {
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-    print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-    print(downcasted[1])
-  } else {
-    print("Could not downcast [AnyObject] to [BridgedObjC]?")
+  let wrappedCocoaBridgeableValues = cocoaBridgeableValues as [AnyObject]
+  if let downcasted = wrappedCocoaBridgeableValues as? [Subclass] {
+    expectEqualSequence(expectedSubclasses, downcasted)
   }
 
   // Downcast of Cocoa array to an array of values.
-  if let downcasted = wrappedCocoaBridgedSwifts as? [BridgedSwift] {
-    // CHECK-NEXT: BridgedSwift#[[ID0:[0-9]+]](42)
-    print(downcasted[0])
-    // CHECK-NEXT: BridgedSwift#[[ID1:[0-9]+]](17)
-    print(downcasted[1])
-  } else {
-    print("Could not downcast [AnyObject] to [BridgedSwift]?")
+  if let downcasted = wrappedCocoaBridgeableValues as? [BridgeableValue] {
+    expectEqualSequence(bridgeableValues, downcasted)
   }
 
   // Downcast of Cocoa array to an array of strings (which should fail)
-  // CHECK-NEXT: Could not downcast [AnyObject] to [String]
-  if let _ = wrappedCocoaBridgedSwifts as? [String] {
-    print("Shouldn't be able to downcast to an array of strings")
-  } else {
-    print("Could not downcast [AnyObject] to [String]")
-  }
+  expectEmpty(wrappedCocoaBridgeableValues as? [String])
 
   // Downcast from an implicitly unwrapped optional array of AnyObjects.
-  var wrappedCocoaBridgedSwiftsIUO: [AnyObject]! = wrappedCocoaBridgedSwifts
-    if let downcasted = wrappedCocoaBridgedSwiftsIUO as? [BridgedSwift] {
-    // CHECK-NEXT: BridgedSwift#[[ID0:[0-9]+]](42)
-    print(downcasted[0])
-    // CHECK-NEXT: BridgedSwift#[[ID1:[0-9]+]](17)
-    print(downcasted[1])
-  } else {
-    print("Could not downcast [AnyObject]! to [BridgedSwift]")
+  var wrappedCocoaBridgeableValuesIUO: [AnyObject]! = wrappedCocoaBridgeableValues
+  if let downcasted = wrappedCocoaBridgeableValuesIUO as? [BridgeableValue] {
+    expectEqualSequence(bridgeableValues, downcasted)
   }
 
   // Downcast from a nil implicitly unwrapped optional array of AnyObjects.
-  wrappedCocoaBridgedSwiftsIUO = nil
-  if let _ = wrappedCocoaBridgedSwiftsIUO as? [BridgedSwift] {
-    print("Cannot downcast from a nil array!")
-  } else {
-    // CHECK-NEXT: Correctly rejected downcast of nil array
-    print("Correctly rejected downcast of nil array")
-  }
+  wrappedCocoaBridgeableValuesIUO = nil
+  expectEmpty(wrappedCocoaBridgeableValuesIUO as? [BridgeableValue])
 
   // Downcast from an optional array of AnyObjects.
-  var wrappedCocoaBridgedSwiftsOpt: [AnyObject]? = wrappedCocoaBridgedSwifts
-    if let downcasted = wrappedCocoaBridgedSwiftsOpt as? [BridgedSwift] {
-    // CHECK-NEXT: BridgedSwift#[[ID0:[0-9]+]](42)
-    print(downcasted[0])
-    // CHECK-NEXT: BridgedSwift#[[ID1:[0-9]+]](17)
-    print(downcasted[1])
-  } else {
-    print("Could not downcast [AnyObject]! to [BridgedSwift]")
+  var wrappedCocoaBridgeableValuesOpt: [AnyObject]? = wrappedCocoaBridgeableValues
+  if let downcasted = wrappedCocoaBridgeableValuesOpt as? [BridgeableValue] {
+    expectEqualSequence(bridgeableValues, downcasted)
   }
 
   // Downcast from a nil optional array of AnyObjects.
-  wrappedCocoaBridgedSwiftsOpt = nil
-  if let _ = wrappedCocoaBridgedSwiftsOpt as? [BridgedSwift] {
-    print("Cannot downcast from a nil array!")
-  } else {
-    // CHECK-NEXT: Correctly rejected downcast of nil array
-    print("Correctly rejected downcast of nil array")
-  }
-
-  // CHECK-NEXT: produceBridgedSwiftArray([BridgedSwift[[A:#[0-9]+]](0), BridgedSwift[[B:#[0-9]+]](1), BridgedSwift[[C:#[0-9]+]](2), BridgedSwift[[D:#[0-9]+]](3), BridgedSwift[[E:#[0-9]+]](4)])
-  testBridgedSwift(Thunks())
-  // CHECK-NEXT: 5 elements in the array
-  // CHECK-NEXT: BridgedObjC[[A:#[0-9]+]](0)
-  // CHECK-NEXT: BridgedObjC[[B:#[0-9]+]](1)
-  // CHECK-NEXT: BridgedObjC[[C:#[0-9]+]](2)
-  // CHECK-NEXT: BridgedObjC[[D:#[0-9]+]](3)
-  // CHECK-NEXT: BridgedObjC[[E:#[0-9]+]](4)
-
-  // CHECK-NEXT: acceptBridgedSwiftArray([BridgedSwift[[A:#[0-9]+]](10), BridgedSwift[[B:#[0-9]+]](11), BridgedSwift[[C:#[0-9]+]](12), BridgedSwift[[D:#[0-9]+]](13), BridgedSwift[[E:#[0-9]+]](14)])
+  wrappedCocoaBridgeableValuesOpt = nil
+  expectEmpty(wrappedCocoaBridgeableValuesOpt as? [BridgeableValue])
+  
+  testBridgeableValue(Thunks())
 }
-testExplicitlyBridged()
 
 tests.test("testRoundTrip") {
   class Test : NSObject {
     @objc dynamic func call(_ array: NSArray) -> NSArray {
 
-      let result = array as! [BridgedSwift]
+      let result = array as! [BridgeableValue]
       expectEqual(0, bridgeFromOperationCount)
       expectEqual(0, bridgeToOperationCount)
 
       // Clear out the stats before returning array
-      BridgedSwift.resetStats()
+      BridgeableValue.resetStats()
       return result as NSArray
     }
   }
@@ -497,10 +412,10 @@ tests.test("testRoundTrip") {
   let test = Test()
   
   let array = [
-    BridgedSwift(10), BridgedSwift(20), BridgedSwift(30),
-    BridgedSwift(40), BridgedSwift(50) ]
+    BridgeableValue(10), BridgeableValue(20), BridgeableValue(30),
+    BridgeableValue(40), BridgeableValue(50) ]
   
-  BridgedSwift.resetStats()
+  BridgeableValue.resetStats()
   _ = test.call(array as NSArray)
   
   expectEqual(0, bridgeFromOperationCount)
@@ -513,19 +428,18 @@ tests.test("testRoundTrip") {
 
 struct X {}
 
-/*
-let x: NSArray = arrayAsID(bases)!
-
-print(x.objectAt(0) as Base)
-*/
-
-func testMutableArray() {
+tests.test("testMutableArray") {
   let m = NSMutableArray(array: ["fu", "bar", "buzz"])
   let a = m as NSArray as! [NSString]
-  print(a) // CHECK-NEXT: [fu, bar, buzz]
+
+  // Create distinct array storage with a copy of the elements in a
+  let aCopy = a.map { $0 }
+
+  // Modify the original mutable array
   m.add("goop")
-  print(a) // CHECK-NEXT: [fu, bar, buzz]
+
+  // Check that our [NSString] is unaffected
+  expectEqualSequence(aCopy, a)
 }
-testMutableArray()
 
 runAllTests()
