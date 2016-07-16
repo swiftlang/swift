@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <errno.h>
 #include <fcntl.h>
 #if !defined(_WIN32) || defined(__CYGWIN__)
 #include <semaphore.h>
@@ -104,3 +105,14 @@ SWIFT_CC(swift) extern char **_swift_FreeBSD_getEnv() {
   return environ;
 }
 #endif // defined(__FreeBSD__)
+
+SWIFT_CC(swift)
+extern int _swift_Platform_getErrno() {
+  return errno;
+}
+
+SWIFT_CC(swift)
+extern void _swift_Platform_setErrno(int value) {
+  errno = value;
+}
+

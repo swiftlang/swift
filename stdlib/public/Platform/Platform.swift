@@ -94,36 +94,18 @@ public func || <T : Boolean>(
 // sys/errno.h
 //===----------------------------------------------------------------------===//
 
+@_silgen_name("_swift_Platform_getErrno")
+func _swift_Platform_getErrno() -> Int32
+
+@_silgen_name("_swift_Platform_setErrno")
+func _swift_Platform_setErrno(_: Int32)
+
 public var errno : Int32 {
   get {
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(PS4)
-    return __error().pointee
-#elseif os(Android)
-    return __errno().pointee
-#elseif os(Windows)
-#if CYGWIN
-    return __errno().pointee
-#else
-    return _errno().pointee
-#endif
-#else
-    return __errno_location().pointee
-#endif
+    return _swift_Platform_getErrno()
   }
   set(val) {
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(PS4)
-    return __error().pointee = val
-#elseif os(Android)
-    return __errno().pointee = val
-#elseif os(Windows)
-#if CYGWIN
-    return __errno().pointee = val
-#else
-    return _errno().pointee = val
-#endif
-#else
-    return __errno_location().pointee = val
-#endif
+    return _swift_Platform_setErrno(val)
   }
 }
 
