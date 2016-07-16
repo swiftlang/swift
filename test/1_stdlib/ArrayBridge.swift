@@ -27,7 +27,7 @@ import StdlibUnittest
 let tests = TestSuite("ArrayBridge")
 
 var trackedCount = 0
-var nextTrackedSerialNumber = 0
+var nextBaseSerialNumber = 0
 
 @objc protocol Fooable {
   func foo()
@@ -41,13 +41,13 @@ var nextTrackedSerialNumber = 0
   func baz()
 }
 
-class Tracked : NSObject, Fooable {
+class Base : NSObject, Fooable {
   func foo() { }
 
   required init(_ value: Int) {
     trackedCount += 1
-    nextTrackedSerialNumber += 1
-    serialNumber = nextTrackedSerialNumber
+    nextBaseSerialNumber += 1
+    serialNumber = nextBaseSerialNumber
     self.value = value
   }
   
@@ -58,7 +58,7 @@ class Tracked : NSObject, Fooable {
   }
 
   override var description: String {
-    assert(serialNumber > 0, "dead Tracked!")
+    assert(serialNumber > 0, "dead Base!")
     return "Base#\(serialNumber)(\(value))"
   }
 
@@ -67,28 +67,18 @@ class Tracked : NSObject, Fooable {
   }
 
   override func isEqual(_ other: AnyObject?) -> Bool {
-    return (other as? Tracked)?.value == self.value
+    return (other as? Base)?.value == self.value
   }
   
   var value: Int
   var serialNumber: Int
 }
 
-typealias Base = Tracked
 class Derived : Base, Barable {
   func bar() { }
-
   override var description: String {
-    assert(serialNumber > 0, "dead Tracked!")
+    assert(serialNumber > 0, "dead Base!")
     return "Derived#\(serialNumber)(\(value))"
-  }
-}
-
-class BridgedObjC : Base, Barable {
-  func bar() { }
-  override var description: String {
-    assert(serialNumber > 0, "dead Tracked!")
-    return "BridgedObjC#\(serialNumber)(\(value))"
   }
 }
 
@@ -96,9 +86,9 @@ var bridgeFromOperationCount = 0
 var bridgeToOperationCount = 0
 
 struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
-  func _bridgeToObjectiveC() -> BridgedObjC {
+  func _bridgeToObjectiveC() -> Derived {
     bridgeToOperationCount += 1
-    return BridgedObjC(trak.value)
+    return Derived(trak.value)
   }
 
   static func _isBridgedToObjectiveC() -> Bool {
@@ -106,7 +96,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   }
 
   static func _forceBridgeFromObjectiveC(
-    _ x: BridgedObjC,
+    _ x: Derived,
     result: inout BridgedSwift?
   ) {
     assert(x.value >= 0, "not bridged")
@@ -115,7 +105,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   }
 
   static func _conditionallyBridgeFromObjectiveC(
-    _ x: BridgedObjC,
+    _ x: Derived,
     result: inout BridgedSwift?
   ) -> Bool {
     if x.value >= 0 {
@@ -127,7 +117,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
     return false
   }
 
-  static func _unconditionallyBridgeFromObjectiveC(_ source: BridgedObjC?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: Derived?)
       -> BridgedSwift {
     var result: BridgedSwift? = nil
     _forceBridgeFromObjectiveC(source!, result: &result)
@@ -135,12 +125,12 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   }
 
   var description: String {
-    assert(trak.serialNumber > 0, "dead Tracked!")
+    assert(trak.serialNumber > 0, "dead Base!")
     return "BridgedSwift#\(trak.serialNumber)(\(trak.value))"
   }
 
   init(_ value: Int) {
-    self.trak = Tracked(value)
+    self.trak = Base(value)
   }
   
   func successor() -> BridgedSwift {
@@ -152,25 +142,25 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
     bridgeToOperationCount = 0
   }
   
-  var trak: Tracked
+  var trak: Base
 }
 
 // A class used to test various Objective-C thunks.
 class Thunks : NSObject {
-  func createBridgedObjC(_ value: Int) -> AnyObject {
-    return BridgedObjC(value)
+  func createDerived(_ value: Int) -> AnyObject {
+    return Derived(value)
   }
   
-  @objc func acceptBridgedObjCArray(_ x: [BridgedObjC]) {
-    print("acceptBridgedObjCArray(\(x))")
+  @objc func acceptDerivedArray(_ x: [Derived]) {
+    print("acceptDerivedArray(\(x))")
   }
 
-  @objc func produceBridgedObjCArray(_ numItems: Int) -> [BridgedObjC] {
-    var array: [BridgedObjC] = []
+  @objc func produceDerivedArray(_ numItems: Int) -> [Derived] {
+    var array: [Derived] = []
     for i in 0..<numItems {
-      array.append(BridgedObjC(i))
+      array.append(Derived(i))
     }
-    print("produceBridgedObjCArray(\(array))")
+    print("produceDerivedArray(\(array))")
     return array
   }
 
@@ -195,7 +185,7 @@ class Thunks : NSObject {
 //===----------------------------------------------------------------------===//
 
 tests.test("testBridgedVerbatim") {
-  nextTrackedSerialNumber = 0
+  nextBaseSerialNumber = 0
   let bases: [Base] = [Base(100), Base(200), Base(300)]
 
   //===--- Implicit conversion to/from NSArray ------------------------------===//
@@ -280,23 +270,22 @@ tests.test("testBridgedVerbatim") {
   expectEmpty(derivedAsAnyObjectArray as? [protocol<Barable, Bazable>])
 }
 
-func doTestBridgedObjC() {
-  // CHECK: doTestBridgedObjC
-  print("doTestBridgedObjC")
+func doTestDerived() {
+  // CHECK: doTestDerived
+  print("doTestDerived")
   
-   testBridgedObjC(Thunks())
-  // CHECK-NEXT: produceBridgedObjCArray([BridgedObjC[[A:#[0-9]+]](0), BridgedObjC[[B:#[0-9]+]](1), BridgedObjC[[C:#[0-9]+]](2), BridgedObjC[[D:#[0-9]+]](3), BridgedObjC[[E:#[0-9]+]](4)])
-  testBridgedObjC(Thunks())
+  // CHECK-NEXT: produceDerivedArray([Derived[[A:#[0-9]+]](0), Derived[[B:#[0-9]+]](1), Derived[[C:#[0-9]+]](2), Derived[[D:#[0-9]+]](3), Derived[[E:#[0-9]+]](4)])
+  testDerived(Thunks())
   // CHECK-NEXT: 5 elements in the array
-  // CHECK-NEXT: BridgedObjC[[A]](0)
-  // CHECK-NEXT: BridgedObjC[[B]](1)
-  // CHECK-NEXT: BridgedObjC[[C]](2)
-  // CHECK-NEXT: BridgedObjC[[D]](3)
-  // CHECK-NEXT: BridgedObjC[[E]](4)
+  // CHECK-NEXT: Derived[[A]](0)
+  // CHECK-NEXT: Derived[[B]](1)
+  // CHECK-NEXT: Derived[[C]](2)
+  // CHECK-NEXT: Derived[[D]](3)
+  // CHECK-NEXT: Derived[[E]](4)
 
-  // CHECK-NEXT: acceptBridgedObjCArray([BridgedObjC[[A:#[0-9]+]](10), BridgedObjC[[B:#[0-9]+]](11), BridgedObjC[[C:#[0-9]+]](12), BridgedObjC[[D:#[0-9]+]](13), BridgedObjC[[E:#[0-9]+]](14)])
+  // CHECK-NEXT: acceptDerivedArray([Derived[[A:#[0-9]+]](10), Derived[[B:#[0-9]+]](11), Derived[[C:#[0-9]+]](12), Derived[[D:#[0-9]+]](13), Derived[[E:#[0-9]+]](14)])
 }
-doTestBridgedObjC()
+doTestDerived()
 
 //===--- Explicitly Bridged -----------------------------------------------===//
 // BridgedSwift conforms to _ObjectiveCBridgeable
@@ -308,7 +297,7 @@ func testExplicitlyBridged() {
   let bridgedSwifts = [BridgedSwift(42), BridgedSwift(17)]
   
   let bridgedSwiftsAsNSArray = bridgedSwifts as NSArray
-  // CHECK-NEXT: [BridgedObjC#{{[0-9]+}}(42), BridgedObjC#{{[0-9]+}}(17)]
+  // CHECK-NEXT: [Derived#{{[0-9]+}}(42), Derived#{{[0-9]+}}(17)]
   print("bridgedSwiftsAsNSArray = \(bridgedSwiftsAsNSArray as [AnyObject]))")
 
   // Make sure we can bridge back.
@@ -336,63 +325,63 @@ func testExplicitlyBridged() {
   // defining @objc method taking [T] and returning [T]
 
   // Up-casts.
-  let bridgedSwiftsAsBridgedObjCs: [BridgedObjC] = bridgedSwifts
-  // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-  print(bridgedSwiftsAsBridgedObjCs[0])
-  // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-  print(bridgedSwiftsAsBridgedObjCs[1])
+  let bridgedSwiftsAsDeriveds: [Derived] = bridgedSwifts
+  // CHECK-NEXT: Derived#[[ID0:[0-9]+]](42)
+  print(bridgedSwiftsAsDeriveds[0])
+  // CHECK-NEXT: Derived#[[ID1:[0-9]+]](17)
+  print(bridgedSwiftsAsDeriveds[1])
 
   let bridgedSwiftsAsBases: [Base] = bridgedSwifts
-  // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+  // CHECK-NEXT: Derived#[[ID0:[0-9]+]](42)
   print(bridgedSwiftsAsBases[0])
-  // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+  // CHECK-NEXT: Derived#[[ID1:[0-9]+]](17)
   print(bridgedSwiftsAsBases[1])
 
   let bridgedSwiftsAsAnyObjects: [AnyObject] = bridgedSwifts
-  // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+  // CHECK-NEXT: Derived#[[ID0:[0-9]+]](42)
   print(bridgedSwiftsAsAnyObjects[0])
-  // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+  // CHECK-NEXT: Derived#[[ID1:[0-9]+]](17)
   print(bridgedSwiftsAsAnyObjects[1])
 
   // Downcasts of non-verbatim bridged value types to objects.
   do {
-    let downcasted = bridgedSwifts as [BridgedObjC]
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+    let downcasted = bridgedSwifts as [Derived]
+    // CHECK-NEXT: Derived#[[ID0:[0-9]+]](42)
     print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    // CHECK-NEXT: Derived#[[ID1:[0-9]+]](17)
     print(downcasted[1])
   }
 
   do {
     let downcasted = bridgedSwifts as [Base]
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+    // CHECK-NEXT: Derived#[[ID0:[0-9]+]](42)
     print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    // CHECK-NEXT: Derived#[[ID1:[0-9]+]](17)
     print(downcasted[1])
   }
 
   do {
     let downcasted = bridgedSwifts as [AnyObject]
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+    // CHECK-NEXT: Derived#[[ID0:[0-9]+]](42)
     print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    // CHECK-NEXT: Derived#[[ID1:[0-9]+]](17)
     print(downcasted[1])
   }
 
   // Downcasts of up-casted arrays.
-  if let downcasted = bridgedSwiftsAsAnyObjects as? [BridgedObjC] {
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+  if let downcasted = bridgedSwiftsAsAnyObjects as? [Derived] {
+    // CHECK-NEXT: Derived#[[ID0:[0-9]+]](42)
     print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    // CHECK-NEXT: Derived#[[ID1:[0-9]+]](17)
     print(downcasted[1])
   } else {
-    print("Could not downcast [AnyObject] to [BridgedObjC]?")
+    print("Could not downcast [AnyObject] to [Derived]?")
   }
 
   if let downcasted = bridgedSwiftsAsAnyObjects as? [Base] {
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+    // CHECK-NEXT: Derived#[[ID0:[0-9]+]](42)
     print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    // CHECK-NEXT: Derived#[[ID1:[0-9]+]](17)
     print(downcasted[1])
   } else {
     print("Could not downcast [AnyObject] to [Base]?")
@@ -400,13 +389,13 @@ func testExplicitlyBridged() {
 
   // Downcast of Cocoa array to an array of classes.
   let wrappedCocoaBridgedSwifts = cocoaBridgedSwifts as [AnyObject]
-  if let downcasted = wrappedCocoaBridgedSwifts as? [BridgedObjC] {
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+  if let downcasted = wrappedCocoaBridgedSwifts as? [Derived] {
+    // CHECK-NEXT: Derived#[[ID0:[0-9]+]](42)
     print(downcasted[0])
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    // CHECK-NEXT: Derived#[[ID1:[0-9]+]](17)
     print(downcasted[1])
   } else {
-    print("Could not downcast [AnyObject] to [BridgedObjC]?")
+    print("Could not downcast [AnyObject] to [Derived]?")
   }
 
   // Downcast of Cocoa array to an array of values.
@@ -470,11 +459,11 @@ func testExplicitlyBridged() {
   // CHECK-NEXT: produceBridgedSwiftArray([BridgedSwift[[A:#[0-9]+]](0), BridgedSwift[[B:#[0-9]+]](1), BridgedSwift[[C:#[0-9]+]](2), BridgedSwift[[D:#[0-9]+]](3), BridgedSwift[[E:#[0-9]+]](4)])
   testBridgedSwift(Thunks())
   // CHECK-NEXT: 5 elements in the array
-  // CHECK-NEXT: BridgedObjC[[A:#[0-9]+]](0)
-  // CHECK-NEXT: BridgedObjC[[B:#[0-9]+]](1)
-  // CHECK-NEXT: BridgedObjC[[C:#[0-9]+]](2)
-  // CHECK-NEXT: BridgedObjC[[D:#[0-9]+]](3)
-  // CHECK-NEXT: BridgedObjC[[E:#[0-9]+]](4)
+  // CHECK-NEXT: Derived[[A:#[0-9]+]](0)
+  // CHECK-NEXT: Derived[[B:#[0-9]+]](1)
+  // CHECK-NEXT: Derived[[C:#[0-9]+]](2)
+  // CHECK-NEXT: Derived[[D:#[0-9]+]](3)
+  // CHECK-NEXT: Derived[[E:#[0-9]+]](4)
 
   // CHECK-NEXT: acceptBridgedSwiftArray([BridgedSwift[[A:#[0-9]+]](10), BridgedSwift[[B:#[0-9]+]](11), BridgedSwift[[C:#[0-9]+]](12), BridgedSwift[[D:#[0-9]+]](13), BridgedSwift[[E:#[0-9]+]](14)])
 }

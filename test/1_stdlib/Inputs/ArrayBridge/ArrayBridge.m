@@ -17,9 +17,9 @@
 #include <stdio.h>
 
 @interface Thunks : NSObject
-- (id)createBridgedObjC:(NSInteger)value;
-- (void)acceptBridgedObjCArray:(NSArray *)x;
-- (NSArray *)produceBridgedObjCArray:(NSInteger)numItems;
+- (id)createDerived:(NSInteger)value;
+- (void)acceptDerivedArray:(NSArray *)x;
+- (NSArray *)produceDerivedArray:(NSInteger)numItems;
 - (void)acceptBridgedSwiftArray:(NSArray *)x;
 - (NSArray *)produceBridgedSwiftArray:(NSInteger)numItems;
 @end
@@ -32,9 +32,9 @@ NSArray* idAsArray(id a) {
   return a;
 }
 
-void testBridgedObjC(id thunks) {
+void testDerived(id thunks) {
   // Retrieve an array from Swift.
-  NSArray *fromObjCArr = [thunks produceBridgedObjCArray: 5];
+  NSArray *fromObjCArr = [thunks produceDerivedArray: 5];
   printf("%d elements in the array\n", (int)fromObjCArr.count);
 
   for (id obj in fromObjCArr) {
@@ -43,12 +43,12 @@ void testBridgedObjC(id thunks) {
 
   // Send an array to swift.
   NSMutableArray *toObjCArr = [[NSMutableArray alloc] init];
-  [toObjCArr addObject: [thunks createBridgedObjC:10]];
-  [toObjCArr addObject: [thunks createBridgedObjC:11]];
-  [toObjCArr addObject: [thunks createBridgedObjC:12]];
-  [toObjCArr addObject: [thunks createBridgedObjC:13]];
-  [toObjCArr addObject: [thunks createBridgedObjC:14]];
-  [thunks acceptBridgedObjCArray: toObjCArr];
+  [toObjCArr addObject: [thunks createDerived:10]];
+  [toObjCArr addObject: [thunks createDerived:11]];
+  [toObjCArr addObject: [thunks createDerived:12]];
+  [toObjCArr addObject: [thunks createDerived:13]];
+  [toObjCArr addObject: [thunks createDerived:14]];
+  [thunks acceptDerivedArray: toObjCArr];
 }
 
 void testBridgedSwift(id thunks) {
@@ -62,10 +62,10 @@ void testBridgedSwift(id thunks) {
 
   // Send an array to swift.
   NSMutableArray *toSwiftArr = [[NSMutableArray alloc] init];
-  [toSwiftArr addObject: [thunks createBridgedObjC:10]];
-  [toSwiftArr addObject: [thunks createBridgedObjC:11]];
-  [toSwiftArr addObject: [thunks createBridgedObjC:12]];
-  [toSwiftArr addObject: [thunks createBridgedObjC:13]];
-  [toSwiftArr addObject: [thunks createBridgedObjC:14]];
+  [toSwiftArr addObject: [thunks createDerived:10]];
+  [toSwiftArr addObject: [thunks createDerived:11]];
+  [toSwiftArr addObject: [thunks createDerived:12]];
+  [toSwiftArr addObject: [thunks createDerived:13]];
+  [toSwiftArr addObject: [thunks createDerived:14]];
   [thunks acceptBridgedSwiftArray: toSwiftArr];
 }
