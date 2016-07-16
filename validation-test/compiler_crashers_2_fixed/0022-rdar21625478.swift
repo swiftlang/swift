@@ -20,11 +20,11 @@ public protocol MySequence {
   var underestimatedCount: Int { get }
 
   func map<T>(
-    @noescape _ transform: (Iterator.Element) -> T
+    _ transform: @noescape (Iterator.Element) -> T
   ) -> [T]
 
   func filter(
-    @noescape _ includeElement: (Iterator.Element) -> Bool
+    _ isIncluded: @noescape (Iterator.Element) -> Bool
   ) -> [Iterator.Element]
 
   func _customContainsEquatableElement(
@@ -32,7 +32,7 @@ public protocol MySequence {
   ) -> Bool?
 
   func _preprocessingPass<R>(
-    @noescape _ preprocess: (Self) -> R
+    _ preprocess: @noescape (Self) -> R
   ) -> R?
 
   func _copyToNativeArrayBuffer()
@@ -48,13 +48,13 @@ extension MySequence {
   }
 
   public func map<T>(
-    @noescape _ transform: (Iterator.Element) -> T
+    _ transform: @noescape (Iterator.Element) -> T
   ) -> [T] {
     return []
   }
 
   public func filter(
-    @noescape _ includeElement: (Iterator.Element) -> Bool
+    _ isIncluded: @noescape (Iterator.Element) -> Bool
   ) -> [Iterator.Element] {
     return []
   }
@@ -66,7 +66,7 @@ extension MySequence {
   }
 
   public func _preprocessingPass<R>(
-    @noescape _ preprocess: (Self) -> R
+    _ preprocess: @noescape (Self) -> R
   ) -> R? {
     return nil
   }
@@ -111,7 +111,7 @@ extension MyCollection {
     return startIndex == endIndex
   }
   public func _preprocessingPass<R>(
-    @noescape _ preprocess: (Self) -> R
+    _ preprocess: @noescape (Self) -> R
   ) -> R? {
     return preprocess(self)
   }
@@ -249,17 +249,17 @@ extension LoggingSequenceType
   }
 
   public func map<T>(
-    @noescape _ transform: (Base.Iterator.Element) -> T
+    _ transform: @noescape (Base.Iterator.Element) -> T
   ) -> [T] {
     Log.map[selfType] += 1
     return base.map(transform)
   }
 
   public func filter(
-    @noescape _ includeElement: (Base.Iterator.Element) -> Bool
+    _ isIncluded: @noescape (Base.Iterator.Element) -> Bool
   ) -> [Base.Iterator.Element] {
     Log.filter[selfType] += 1
-    return base.filter(includeElement)
+    return base.filter(isIncluded)
   }
   
   public func _customContainsEquatableElement(
@@ -273,7 +273,7 @@ extension LoggingSequenceType
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    @noescape _ preprocess: (Self) -> R
+    _ preprocess: @noescape (Self) -> R
   ) -> R? {
     Log._preprocessingPass[selfType] += 1
     return base._preprocessingPass { _ in preprocess(self) }

@@ -24,18 +24,18 @@ func test_NSCoder_decodeObjectForKey(_ coder: NSCoder, key: String) {
 }
 
 func test_NSCoder_decodeObjectOfClasses_forKey(
-  _ coder: NSCoder, classes: NSSet?, key: String
+  _ coder: NSCoder, classes: [AnyClass]?, key: String
 ) {
-  var r = coder.decodeObjectOfClasses(classes, forKey: key)
+  var r = coder.decodeObject(of: classes, forKey: key)
   expectType(Optional<AnyObject>.self, &r)
 }
 
 @available(iOS, introduced: 9.0)
 @available(OSX, introduced: 10.11)
 func test_NSCoder_decodeTopLevelObjectOfClasses_forKey_error(
-  _ coder: NSCoder, classes: NSSet?, key: String
+  _ coder: NSCoder, classes: [AnyClass]?, key: String
 ) throws {
-  var r = try coder.decodeTopLevelObjectOfClasses(classes, forKey: key)
+  var r = try coder.decodeTopLevelObject(of: classes, forKey: key)
   expectType(Optional<AnyObject>.self, &r)
 }
 

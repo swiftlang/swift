@@ -259,7 +259,7 @@ used for ``Int``. It represents an example of how a relatively
 complicated ``format(…)`` might be written::
 
   protocol CustomStringConvertibleInteger 
-    : IntegerLiteralConvertible, Comparable, SignedNumber, CustomStringConvertible {
+    : ExpressibleByIntegerLiteral, Comparable, SignedNumber, CustomStringConvertible {
     func %(lhs: Self, rhs: Self) -> Self
     func /(lhs: Self, rhs: Self) -> Self
     constructor(x: Int)

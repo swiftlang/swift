@@ -356,7 +356,7 @@ public func testFailingCast(_ s:String) -> Int {
    return s as! Int // expected-warning {{cast from 'String' to unrelated type 'Int' always fails}}
 }
 
-enum MyError : ErrorProtocol { case A }
+enum MyError : Error { case A }
 
 @noreturn func raise() throws { throw MyError.A }
 

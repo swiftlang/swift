@@ -115,23 +115,12 @@ extension String {
     ///     print(hearts.unicodeScalars[j].value)
     ///     // Prints "9829"
     public struct Index : Comparable {
-      public init(_ _position: Int, _ _core: _StringCore) {
+      public // SPI(Foundation)
+      init(_position: Int) {
         self._position = _position
-        self._core = _core
-      }
-
-      /// The end index that for this view.
-      internal var _viewStartIndex: Index {
-        return Index(_core.startIndex, _core)
-      }
-
-      /// The end index that for this view.
-      internal var _viewEndIndex: Index {
-        return Index(_core.endIndex, _core)
       }
 
       @_versioned internal var _position: Int
-      @_versioned internal var _core: _StringCore
     }
 
     /// The position of the first Unicode scalar value if the string is
@@ -139,7 +128,7 @@ extension String {
     ///
     /// If the string is empty, `startIndex` is equal to `endIndex`.
     public var startIndex: Index {
-      return Index(_core.startIndex, _core)
+      return Index(_position: _core.startIndex)
     }
 
     /// The "past the end" position---that is, the position one greater than
@@ -147,7 +136,7 @@ extension String {
     ///
     /// In an empty Unicode scalars view, `endIndex` is equal to `startIndex`.
     public var endIndex: Index {
-      return Index(_core.endIndex, _core)
+      return Index(_position: _core.endIndex)
     }
 
     /// Returns the next consecutive location after `i`.
@@ -157,21 +146,21 @@ extension String {
       var scratch = _ScratchIterator(_core, i._position)
       var decoder = UTF16()
       let (_, length) = decoder._decodeOne(&scratch)
-      return Index(i._position + length, _core)
+      return Index(_position: i._position + length)
     }
 
     /// Returns the previous consecutive location before `i`.
     ///
     /// - Precondition: The previous location exists.
     public func index(before i: Index) -> Index {
-      var i = i._position-1
+      var i = i._position - 1
       let codeUnit = _core[i]
       if _slowPath((codeUnit >> 10) == 0b1101_11) {
         if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
           i -= 1
         }
       }
-      return Index(i, _core)
+      return Index(_position: i)
     }
 
     /// Accesses the Unicode scalar value at the given position.
@@ -455,7 +444,7 @@ extension String.UnicodeScalarIndex {
         return nil
       }
     }
-    self.init(utf16Index._offset, unicodeScalars._core)
+    self.init(_position: utf16Index._offset)
   }
 
   /// Creates an index in the given Unicode scalars view that corresponds
@@ -482,10 +471,10 @@ extension String.UnicodeScalarIndex {
       "Invalid String.UTF8Index for this UnicodeScalar view")
 
     // Detect positions that have no corresponding index.
-    if !utf8Index._isOnUnicodeScalarBoundary {
+    if !utf8Index._isOnUnicodeScalarBoundary(in: core) {
       return nil
     }
-    self.init(utf8Index._coreIndex, core)
+    self.init(_position: utf8Index._coreIndex)
   }
 
   /// Creates an index in the given Unicode scalars view that corresponds
@@ -510,7 +499,7 @@ extension String.UnicodeScalarIndex {
     _ characterIndex: String.Index,
     within unicodeScalars: String.UnicodeScalarView
   ) {
-    self.init(characterIndex._base._position, unicodeScalars._core)
+    self.init(_position: characterIndex._base._position)
   }
 
   /// Returns the position in the given UTF-8 view that corresponds exactly to
@@ -581,13 +570,14 @@ extension String.UnicodeScalarIndex {
   public func samePosition(in characters: String) -> String.Index? {
     return String.Index(self, within: characters)
   }
+}
 
-  internal var _isOnGraphemeClusterBoundary: Bool {
-    let scalars = String.UnicodeScalarView(_core)
-    if self == scalars.startIndex || self == scalars.endIndex {
+extension String.UnicodeScalarView {
+  internal func _isOnGraphemeClusterBoundary(_ i: Index) -> Bool {
+    if i == startIndex || i == endIndex {
       return true
     }
-    let precedingScalar = scalars[scalars.index(before: self)]
+    let precedingScalar = self[index(before: i)]
 
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()
@@ -600,8 +590,7 @@ extension String.UnicodeScalarIndex {
       return true
     }
 
-    let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
-      scalars[self].value)
+    let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(self[i].value)
 
     return segmenter.isBoundary(gcb0, gcb1)
   }

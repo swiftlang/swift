@@ -41,7 +41,7 @@
    ;; Integer literals
    '("\\b[-]?[0-9]+\\b" . font-lock-preprocessor-face)
    ;; Decl and type keywords
-   `(,(regexp-opt '("class" "init" "deinit" "extension" "func"
+   `(,(regexp-opt '("class" "init" "deinit" "extension" "fileprivate" "func"
                     "import" "let" "protocol" "static" "struct" "subscript"
                     "typealias" "enum" "var" "lazy" "where"
                     "private" "public" "internal" "override" "throws")

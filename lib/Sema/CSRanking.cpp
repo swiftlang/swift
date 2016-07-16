@@ -118,7 +118,6 @@ static Type stripInitializers(Type origType) {
                for (const auto &field : tupleTy->getElements()) {
                  fields.push_back(TupleTypeElt(field.getType(),
                                                field.getName(),
-                                               DefaultArgumentKind::None,
                                                field.isVararg()));
                                                
                }

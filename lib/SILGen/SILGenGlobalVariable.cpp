@@ -98,8 +98,9 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
                               {}, {});
     // FIXME: It'd be nice if the result of the accessor was natively an
     // address.
-    addr = B.createPointerToAddress(loc, addr,
-                             getLoweredType(var->getType()).getAddressType());
+    addr = B.createPointerToAddress(
+      loc, addr, getLoweredType(var->getType()).getAddressType(),
+      /*isStrict*/ true);
     return ManagedValue::forLValue(addr);
   }
 

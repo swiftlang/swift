@@ -2,6 +2,8 @@
 
 @noescape var fn : () -> Int = { 4 }  // expected-error {{@noescape may only be used on 'parameter' declarations}} {{1-11=}}
 
+func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{@escaping conflicts with @noescape}}
+
 func doesEscape(_ fn : () -> Int) {}
 
 func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {}
@@ -296,10 +298,10 @@ enum r19997577Type {
 }
 
 // type attribute and decl attribute
-func noescapeD(@noescape f: () -> Bool) {} // expected-warning {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape }}
+func noescapeD(@noescape f: () -> Bool) {} // expected-error {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape }}
 func noescapeT(f: @noescape () -> Bool) {} // ok
-func autoclosureD(@autoclosure f: () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure }}
+func autoclosureD(@autoclosure f: () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure }}
 func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
 
 func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {}
-func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure }}
+func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure }}

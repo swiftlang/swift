@@ -12,36 +12,26 @@
 
 import SwiftShims
 
-internal class _Box<Wrapped> {
-  internal var _value: Wrapped
-  internal init(_ value: Wrapped) { self._value = value }
-}
-
 /// Command-line arguments for the current process.
 public enum Process {
-  /// Return an array of string containing the list of command-line arguments
-  /// with which the current process was invoked.
-  internal static func _computeArguments() -> [String] {
-    var result: [String] = []
-    let argv = unsafeArgv
-    for i in 0..<Int(argc) {
-      let arg = argv[i]!
-      let converted = String(cString: arg)
-      result.append(converted)
-    }
-    return result 
-  }
-
+  /// The backing static variable for argument count may come either from the
+  /// entry point or it may need to be computed e.g. if we're in the REPL.
   @_versioned
-  internal static var _argc: CInt = CInt()
+  internal static var _argc: Int32 = Int32()
 
+  /// The backing static variable for arguments may come either from the
+  /// entry point or it may need to be computed e.g. if we're in the REPL.
+  ///
+  /// Care must be taken to ensure that `_swift_stdlib_getUnsafeArgvArgc` is
+  /// not invoked more times than is necessary (at most once).
   @_versioned
   internal static var _unsafeArgv:
-    UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>?
-    = nil
+    UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
+      =  _swift_stdlib_getUnsafeArgvArgc(&_argc)
 
   /// Access to the raw argc value from C.
-  public static var argc: CInt {
+  public static var argc: Int32 {
+    _ = Process.unsafeArgv // Force evaluation of argv.
     return _argc
   }
 
@@ -49,32 +39,16 @@ public enum Process {
   /// through this pointer is unsafe.
   public static var unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>?> {
-    return _unsafeArgv!
+    return _unsafeArgv
   }
 
   /// Access to the swift arguments, also use lazy initialization of static
   /// properties to safely initialize the swift arguments.
-  ///
-  /// NOTE: we can not use static lazy let initializer as they can be moved
-  /// around by the optimizer which will break the data dependence on argc
-  /// and argv.
-  public static var arguments: [String] {
-    let argumentsPtr = UnsafeMutablePointer<AnyObject?>(
-      Builtin.addressof(&_swift_stdlib_ProcessArguments))
-
-    // Check whether argument has been initialized.
-    if let arguments = _stdlib_atomicLoadARCRef(object: argumentsPtr) {
-      return (arguments as! _Box<[String]>)._value
-    }
-
-    let arguments = _Box<[String]>(_computeArguments())
-    _stdlib_atomicInitializeARCRef(object: argumentsPtr, desired: arguments)
-
-    return arguments._value
-  } 
+  public static var arguments: [String]
+    = (0..<Int(argc)).map { String(cString: _unsafeArgv[$0]!) }
 }
 
-/// Intrinsic entry point invoked on entry to a standalone program's "main".
+// FIXME(ABI): Remove this and the entrypoints in SILGen.
 @_transparent
 public // COMPILER_INTRINSIC
 func _stdlib_didEnterMain(
@@ -82,6 +56,13 @@ func _stdlib_didEnterMain(
 ) {
   // Initialize the Process.argc and Process.unsafeArgv variables with the
   // values that were passed in to main.
-  Process._argc = CInt(argc)
+  Process._argc = Int32(argc)
   Process._unsafeArgv = argv
 }
+
+// FIXME: Move this to HashedCollections.swift.gyb
+internal class _Box<Wrapped> {
+  internal var _value: Wrapped
+  internal init(_ value: Wrapped) { self._value = value }
+}
+

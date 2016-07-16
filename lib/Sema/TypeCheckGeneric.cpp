@@ -562,6 +562,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
   if (invalid) {
     func->overwriteType(ErrorType::get(Context));
+    func->setInterfaceType(ErrorType::get(Context));
     return true;
   }
 
@@ -587,15 +588,8 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
     auto *dc = ctor->getDeclContext();
 
-    // FIXME: shouldn't this just be
-    // ctor->getDeclContext()->getDeclaredInterfaceType()?
-    if (dc->getAsProtocolOrProtocolExtensionContext()) {
-      funcTy = dc->getProtocolSelf()->getDeclaredType();
-    } else {
-      funcTy = dc->getAsNominalTypeOrNominalTypeExtensionContext()
-          ->getDeclaredInterfaceType();
-    }
-    
+    funcTy = dc->getSelfInterfaceType();
+
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)
       funcTy = OptionalType::get(ctor->getFailability(), funcTy);
@@ -633,14 +627,7 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
         initArgTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/true);
       }
     } else {
-      argTy = paramLists[e - i - 1]->getType(Context);
-
-      // For an implicit declaration, our argument type will be in terms of
-      // archetypes rather than dependent types. Replace the
-      // archetypes with their corresponding dependent types.
-      if (func->isImplicit()) {
-        argTy = ArchetypeBuilder::mapTypeOutOfContext(func, argTy); 
-      }
+      argTy = paramLists[e - i - 1]->getInterfaceType(func);
 
       if (initFuncTy)
         initArgTy = argTy;
@@ -648,9 +635,6 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
 
     auto info = applyFunctionTypeAttributes(func, i);
 
-    // FIXME: We shouldn't even get here if the function isn't locally generic
-    // to begin with, but fixing that requires a lot of reengineering for local
-    // definitions in generic contexts.
     if (sig && i == e-1) {
       funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
       if (initFuncTy)
@@ -663,9 +647,12 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
   }
 
   // Record the interface type.
+  assert(!funcTy->hasArchetype());
   func->setInterfaceType(funcTy);
-  if (initFuncTy)
+  if (initFuncTy) {
+    assert(!initFuncTy->hasArchetype());
     cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
+  }
 
   if (func->getGenericParams()) {
     // Collect all generic params referenced in parameter types,

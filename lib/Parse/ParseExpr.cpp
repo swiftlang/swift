@@ -186,13 +186,13 @@ ParserResult<Expr> Parser::parseExprArrow() {
   if (Tok.is(tok::kw_throws)) {
     throwsLoc = consumeToken(tok::kw_throws);
     if (!Tok.is(tok::arrow)) {
-      diagnose(throwsLoc, diag::throws_after_function_result);
+      diagnose(throwsLoc, diag::throws_in_wrong_position);
       return nullptr;
     }
   }
   arrowLoc = consumeToken(tok::arrow);
   if (Tok.is(tok::kw_throws)) {
-    diagnose(Tok.getLoc(), diag::throws_after_function_result);
+    diagnose(Tok.getLoc(), diag::throws_in_wrong_position);
     throwsLoc = consumeToken(tok::kw_throws);
   }
   auto arrow = new (Context) ArrowExpr(throwsLoc, arrowLoc);
@@ -919,10 +919,10 @@ static bool isStartOfGetSetAccessor(Parser &P) {
          P.Tok.isContextualKeyword("willSet");
 }
 
-/// Disambiguate and diagnose invalid uses of trailing closures in a situation
+/// Recover invalid uses of trailing closures in a situation
 /// where the parser requires an expr-basic (which does not allow them).  We
-/// handle this by doing some lookahead in common situations and emitting a
-/// diagnostic with a fixit to add wrapping parens.
+/// handle this by doing some lookahead in common situations. And later, Sema
+/// will emit a diagnostic with a fixit to add wrapping parens.
 static bool isValidTrailingClosure(bool isExprBasic, Expr *baseExpr, Parser &P){
   assert(P.Tok.is(tok::l_brace) && "Couldn't be a trailing closure");
   
@@ -955,21 +955,19 @@ static bool isValidTrailingClosure(bool isExprBasic, Expr *baseExpr, Parser &P){
   
   
   // Determine if the {} goes with the expression by eating it, and looking
-  // to see if it is immediately followed by another {.  If so, we consider it
-  // to be part of the proceeding expression.
+  // to see if it is immediately followed by '{', 'where', or comma.  If so,
+  // we consider it to be part of the proceeding expression.
   Parser::BacktrackingScope backtrack(P);
-  auto startLoc = P.consumeToken(tok::l_brace);
+  P.consumeToken(tok::l_brace);
   P.skipUntil(tok::r_brace);
   SourceLoc endLoc;
   if (!P.consumeIf(tok::r_brace, endLoc) ||
-      P.Tok.isNot(tok::l_brace))
+      P.Tok.isNot(tok::l_brace, tok::kw_where, tok::comma)) {
     return false;
-  
-  // Diagnose the bad case and return true so that the caller parses this as a
-  // trailing closure.
-  P.diagnose(startLoc, diag::trailing_closure_requires_parens)
-    .fixItInsert(baseExpr->getStartLoc(), "(")
-    .fixItInsertAfter(endLoc, ")");
+  }
+
+  // Recoverable case. Just return true here and Sema will emit a diagnostic
+  // later. see: Sema/MiscDiagnostics.cpp#checkStmtConditionTrailingClosure
   return true;
 }
 
@@ -1392,7 +1390,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // FIXME: Better recovery.
     if (Result.isNull())
       return Result;
-
+    
     // Check for a .foo suffix.
     SourceLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::period) || consumeIf(tok::period_prefix)) {
@@ -1618,6 +1616,16 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionResult<Expr>();
     }
+    
+    // If we end up with an unknown token on this line, return an ErrorExpr
+    // covering the range of the token.
+    if (!Tok.isAtStartOfLine() && consumeIf(tok::unknown)) {
+      Result = makeParserResult(
+                                new (Context) ErrorExpr(Result.get()->getSourceRange()));
+      continue;
+    }
+    
+    // Otherwise, we don't know what this token is, it must end the expression.
     break;
   }
 

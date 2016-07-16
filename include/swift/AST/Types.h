@@ -18,7 +18,6 @@
 #define SWIFT_TYPES_H
 
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
@@ -103,10 +102,9 @@ public:
     /// function input.
     HasInOut             = 0x10,
 
-    /// This type expression contains a tuple with default arguments
-    /// other than as a function input.
-    HasDefaultParameter  = 0x20,
-    
+    /// Whether this type expression contains an unbound generic type.
+    HasUnboundGeneric    = 0x20,
+
     /// This type expression contains an LValueType other than as a
     /// function input, and can be loaded to convert to an rvalue.
     IsLValue             = 0x40,
@@ -117,10 +115,7 @@ public:
     /// This type expression contains a DynamicSelf type.
     HasDynamicSelf       = 0x100,
 
-    /// Whether this type expression contains an unbound generic type.
-    HasUnboundGeneric    = 0x200,
-
-    IsNotMaterializable  = (HasInOut | HasDefaultParameter | IsLValue)
+    IsNotMaterializable  = (HasInOut | IsLValue)
   };
 
 private:
@@ -151,11 +146,6 @@ public:
   /// Does a type with these properties structurally contain an
   /// inout, except as the parameter of a function?
   bool hasInOut() const { return Bits & HasInOut; }
-  
-  /// Does a type with these properties structurally contain a
-  /// tuple with default argument values, except as the parameter
-  /// of a function?
-  bool hasDefaultArg() const { return Bits & HasDefaultParameter; }
   
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
@@ -402,6 +392,9 @@ public:
   /// hasReferenceSemantics() - Do objects of this type have reference
   /// semantics?
   bool hasReferenceSemantics();
+  
+  /// Is this the 'Any' type?
+  bool isAny();
 
   /// Are values of this type essentially just class references,
   /// possibly with some sort of additional information?
@@ -432,12 +425,6 @@ public:
   /// as a function input.
   bool hasInOut() const {
     return getRecursiveProperties().hasInOut();
-  }
-
-  /// \brief Determine whether the type involves a tuple type with a
-  /// default argument, except as a function input.
-  bool hasDefaultArg() const {
-    return getRecursiveProperties().hasDefaultArg();
   }
 
   /// \brief Determine whether the type involves an archetype.
@@ -740,9 +727,6 @@ public:
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
 
-  /// \brief Retrieve the type without any default arguments.
-  Type getWithoutDefaultArgs(const ASTContext &Context);
-
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
 
@@ -881,6 +865,10 @@ public:
   
   /// Whether this is an empty existential composition ("{}").
   bool isEmptyExistentialComposition();
+
+  /// Whether this is an existential composition containing
+  /// Error.
+  bool isExistentialWithError();
 
   void dump() const LLVM_ATTRIBUTE_USED;
   void dump(raw_ostream &os, unsigned indent = 0) const;
@@ -1317,22 +1305,16 @@ class TupleTypeElt {
   /// \brief This is the type of the field.
   Type ElementType;
 
-  /// The default argument,
-  DefaultArgumentKind DefaultArg;
-
   friend class TupleType;
 
 public:
   TupleTypeElt() = default;
   inline /*implicit*/ TupleTypeElt(Type ty,
                                    Identifier name = Identifier(),
-                                   DefaultArgumentKind defaultArg =
-                                     DefaultArgumentKind::None,
                                    bool isVariadic = false);
 
   /*implicit*/ TupleTypeElt(TypeBase *Ty)
-    : NameAndVariadic(Identifier(), false),
-      ElementType(Ty), DefaultArg(DefaultArgumentKind::None) { }
+    : NameAndVariadic(Identifier(), false), ElementType(Ty) { }
 
   bool hasName() const { return !NameAndVariadic.getPointer().empty(); }
   Identifier getName() const { return NameAndVariadic.getPointer(); }
@@ -1342,14 +1324,6 @@ public:
   /// Determine whether this field is variadic.
   bool isVararg() const {
     return NameAndVariadic.getInt();
-  }
-
-  /// Retrieve the kind of default argument available on this field.
-  DefaultArgumentKind getDefaultArgKind() const { return DefaultArg; }
-
-  /// Whether we have a default argument.
-  bool hasDefaultArg() const {
-    return getDefaultArgKind() != DefaultArgumentKind::None;
   }
 
   static inline Type getVarargBaseTy(Type VarArgT);
@@ -1363,7 +1337,7 @@ public:
 
   /// Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
-    return TupleTypeElt(T, getName(), getDefaultArgKind(), isVararg());
+    return TupleTypeElt(T, getName(), isVararg());
   }
 };
 
@@ -1413,10 +1387,6 @@ public:
   /// getNamedElementId - If this tuple has an element with the specified name,
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
-  
-  /// hasAnyDefaultValues - Return true if any of our elements has a default
-  /// value.
-  bool hasAnyDefaultValues() const;
   
   /// getElementForScalarInit - If a tuple of this type can be initialized with
   /// a scalar, return the element number that the scalar is assigned to.  If
@@ -2156,11 +2126,12 @@ public:
     //   |representation|isAutoClosure|noReturn|noEscape|throws|
     //   |    0 .. 3    |      4      |   5    |    6   |   7  |
     //
-    enum : uint16_t { RepresentationMask = 0x00F };
-    enum : uint16_t { AutoClosureMask    = 0x010 };
-    enum : uint16_t { NoReturnMask       = 0x020 };
-    enum : uint16_t { NoEscapeMask       = 0x040 };
-    enum : uint16_t { ThrowsMask         = 0x080 };
+    enum : uint16_t { RepresentationMask     = 0x00F };
+    enum : uint16_t { AutoClosureMask        = 0x010 };
+    enum : uint16_t { NoReturnMask           = 0x020 };
+    enum : uint16_t { NoEscapeMask           = 0x040 };
+    enum : uint16_t { ThrowsMask             = 0x080 };
+    enum : uint16_t { ExplicitlyEscapingMask = 0x100 };
 
     uint16_t Bits;
 
@@ -2183,15 +2154,18 @@ public:
 
     // Constructor with no defaults.
     ExtInfo(Representation Rep, bool IsNoReturn,
-            bool IsAutoClosure, bool IsNoEscape, bool Throws)
+            bool IsAutoClosure, bool IsNoEscape, bool IsExplicitlyEscaping,
+            bool Throws)
       : ExtInfo(Rep, IsNoReturn, Throws) {
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
+      Bits |= (IsExplicitlyEscaping ? ExplicitlyEscapingMask : 0);
     }
 
     bool isNoReturn() const { return Bits & NoReturnMask; }
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
+    bool isExplicitlyEscaping() const { return Bits & ExplicitlyEscapingMask; }
     bool throws() const { return Bits & ThrowsMask; }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
@@ -2323,6 +2297,12 @@ public:
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {
     return getExtInfo().isNoEscape();
+  }
+
+  /// \brief True if the parameter declaration it is attached to has explicitly
+  /// been marked with the @escaping attribute. This is a temporary measure.
+  bool isExplicitlyEscaping() const {
+    return getExtInfo().isExplicitlyEscaping();
   }
   
   bool throws() const {
@@ -4501,10 +4481,8 @@ inline bool TypeBase::mayHaveSuperclass() {
 
 inline TupleTypeElt::TupleTypeElt(Type ty,
                                   Identifier name,
-                                  DefaultArgumentKind defArg,
                                   bool isVariadic)
-  : NameAndVariadic(name, isVariadic),
-    ElementType(ty), DefaultArg(defArg)
+  : NameAndVariadic(name, isVariadic), ElementType(ty)
 {
   assert(!isVariadic ||
          isa<ErrorType>(ty.getPointer()) ||

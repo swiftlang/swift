@@ -879,9 +879,9 @@ namespace {
                       unsigned level,
                       ArrayRef<CallArgParam> actualArgs);
       
-    void filterList(ArrayRef<CallArgParam> actualArgs);
+    void filterListArgs(ArrayRef<CallArgParam> actualArgs);
     void filterList(Type actualArgsType) {
-      return filterList(decomposeArgType(actualArgsType));
+      return filterListArgs(decomposeArgType(actualArgsType));
     }
     void filterList(ClosenessPredicate predicate);
     void filterContextualMemberList(Expr *argExpr);
@@ -1174,7 +1174,9 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
 
       TypeSubstitutionMap archetypesMap;
       bool matched;
-      if (paramType->hasUnresolvedType() || rArgType->hasTypeVariable())
+      if (paramType->hasUnresolvedType())
+        matched = true;
+      else if (rArgType->hasTypeVariable())
         matched = false;
       else {
         auto matchType = paramType;
@@ -1481,7 +1483,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
 /// After the candidate list is formed, it can be filtered down to discard
 /// obviously mismatching candidates and compute a "closeness" for the
 /// resultant set.
-void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs) {
+void CalleeCandidateInfo::filterListArgs(ArrayRef<CallArgParam> actualArgs) {
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
   filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
@@ -1528,7 +1530,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     
     CallArgParam param;
     param.Ty = argType;
-    return filterList(param);
+    return filterListArgs(param);
   }
   
   // If we have a tuple expression, form a tuple type.
@@ -1545,7 +1547,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     ArgElts.push_back(param);
   }
 
-  return filterList(ArgElts);
+  return filterListArgs(ArgElts);
 }
 
 CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
@@ -1871,7 +1873,13 @@ private:
   /// Produce a diagnostic for a general conversion failure (irrespective of the
   /// exact expression kind).
   bool diagnoseGeneralConversionFailure(Constraint *constraint);
-     
+
+  /// Produce a diagnostic for binary comparisons of the nil literal
+  /// to other values.
+  bool diagnoseNilLiteralComparison(Expr *lhsExpr, Expr *rhsExpr,
+                                    CalleeCandidateInfo &calleeInfo,
+                                    SourceLoc applyLoc);
+
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTupleExpr(TupleExpr *E);
@@ -2229,6 +2237,14 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
   
   // If we found no results at all, mention that fact.
   if (result.UnviableCandidates.empty()) {
+    LookupResult correctionResults;
+    auto tryTypoCorrection = [&] {
+      CS->TC.performTypoCorrection(CS->DC, DeclRefKind::Ordinary, baseObjTy,
+                                   memberName, nameLoc.getBaseNameLoc(),
+                                   defaultMemberLookupOptions,
+                                   correctionResults);
+    };
+
     // TODO: This should handle tuple member lookups, like x.1231 as well.
     if (memberName.isSimpleName("subscript")) {
       diagnose(loc, diag::type_not_subscriptable, baseObjTy)
@@ -2237,18 +2253,29 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       diagnose(loc, diag::could_not_find_type_member,
                MTT->getInstanceType(), memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      tryTypoCorrection();
     } else {
       diagnose(loc, diag::could_not_find_value_member,
                baseObjTy, memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      tryTypoCorrection();
       
       // Check for a few common cases that can cause missing members.
       if (baseObjTy->is<EnumType>() && memberName.isSimpleName("rawValue")) {
         auto loc = baseObjTy->castTo<EnumType>()->getDecl()->getNameLoc();
-        if (loc.isValid())
+        if (loc.isValid()) {
           diagnose(loc, diag::did_you_mean_raw_type);
+          return; // Always prefer this over typo corrections.
+        }
       }
     }
+
+    // Note all the correction candidates.
+    for (auto &correction : correctionResults) {
+      CS->TC.noteTypoCorrection(memberName, nameLoc, correction);
+    }
+
+    // TODO: recover?
     return;
   }
 
@@ -3084,7 +3111,7 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
 
 
 /// Return true if the given type conforms to a known protocol type.
-static bool isLiteralConvertibleType(Type fromType,
+static bool isExpressibleByLiteralType(Type fromType,
                                      KnownProtocolKind kind,
                                      ConstraintSystem *CS) {
   auto integerType =
@@ -3101,8 +3128,8 @@ static bool isLiteralConvertibleType(Type fromType,
 }
 
 static bool isIntegerType(Type fromType, ConstraintSystem *CS) {
-  return isLiteralConvertibleType(fromType,
-                                  KnownProtocolKind::IntegerLiteralConvertible,
+  return isExpressibleByLiteralType(fromType,
+                                  KnownProtocolKind::ExpressibleByIntegerLiteral,
                                   CS);
 }
 
@@ -3133,7 +3160,7 @@ static Type isRawRepresentable(Type fromType,
                                KnownProtocolKind kind,
                                ConstraintSystem *CS) {
   Type rawTy = isRawRepresentable(fromType, CS);
-  if (!rawTy || !isLiteralConvertibleType(rawTy, kind, CS))
+  if (!rawTy || !isExpressibleByLiteralType(rawTy, kind, CS))
     return Type();
 
   return rawTy;
@@ -3143,8 +3170,8 @@ static Type isRawRepresentable(Type fromType,
 /// index operation.
 static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
                                              ConstraintSystem *CS) {
-  auto kind = KnownProtocolKind::IntegerLiteralConvertible;
-  return (isLiteralConvertibleType(fromType, kind, CS) &&
+  auto kind = KnownProtocolKind::ExpressibleByIntegerLiteral;
+  return (isExpressibleByLiteralType(fromType, kind, CS) &&
           toType->getCanonicalType().getString() == "String.CharacterView.Index");
 }
 
@@ -3197,7 +3224,7 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
     }
   };
 
-  if (isLiteralConvertibleType(fromType, kind, CS)) {
+  if (isExpressibleByLiteralType(fromType, kind, CS)) {
     if (auto rawTy = isRawRepresentable(toType, kind, CS)) {
       // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
       // or just 'Result(rawValue: <expr>)'.
@@ -3215,7 +3242,7 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
   }
 
   if (auto rawTy = isRawRepresentable(fromType, kind, CS)) {
-    if (isLiteralConvertibleType(toType, kind, CS)) {
+    if (isExpressibleByLiteralType(toType, kind, CS)) {
       std::string convWrapBefore;
       std::string convWrapAfter = ".rawValue";
       if (rawTy->getCanonicalType() != toType->getCanonicalType()) {
@@ -3427,7 +3454,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   }
 
   // If we're diagnostic an issue with 'nil', produce a specific diagnostic,
-  // instead of uttering NilLiteralConvertible.
+  // instead of uttering ExpressibleByNilLiteral.
   if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
     diagnose(expr->getLoc(), nilDiag, contextualType);
     if (nilFollowup)
@@ -3543,10 +3570,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   case CTP_DictionaryKey:
   case CTP_DictionaryValue:
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
-                              KnownProtocolKind::IntegerLiteralConvertible,
+                              KnownProtocolKind::ExpressibleByIntegerLiteral,
                               expr);
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
-                              KnownProtocolKind::StringLiteralConvertible,
+                              KnownProtocolKind::ExpressibleByStringLiteral,
                               expr);
     tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr);
     break;
@@ -3612,6 +3639,96 @@ static bool isSymmetricBinaryOperator(const CalleeCandidateInfo &CCI) {
   return true;
 }
 
+/// Determine whether any of the given callee candidates have a default value.
+static bool candidatesHaveAnyDefaultValues(
+    const CalleeCandidateInfo &candidates) {
+  for (const auto &cand : candidates.candidates) {
+    auto function = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
+    if (!function) continue;
+
+    auto paramLists = function->getParameterLists();
+    if (cand.level >= paramLists.size()) continue;
+
+    auto paramList = paramLists[cand.level];
+    for (auto param : *paramList) {
+      if (param->getDefaultArgumentKind() != DefaultArgumentKind::None)
+        return true;
+    }
+  }
+
+  return false;
+}
+
+/// Find the tuple element that can be initialized by a scalar.
+static Optional<unsigned> getElementForScalarInitOfArg(
+    const TupleType *tupleTy,
+    const CalleeCandidateInfo &candidates) {
+  // Empty tuples cannot be initialized with a scalar.
+  if (tupleTy->getNumElements() == 0) return None;
+  
+  auto getElementForScalarInitSimple =
+      [](const TupleType *tupleTy) -> Optional<unsigned> {
+    int index = tupleTy->getElementForScalarInit();
+    if (index < 0) return None;
+    return index;    
+  };
+
+  // If there aren't any candidates, we're done.
+  if (candidates.empty()) return getElementForScalarInitSimple(tupleTy);
+
+  // Dig out the candidate.
+  const auto &cand = candidates[0];
+  auto function = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
+  if (!function) return getElementForScalarInitSimple(tupleTy);
+
+  auto paramLists = function->getParameterLists();
+  if (cand.level >= paramLists.size())
+    return getElementForScalarInitSimple(tupleTy);
+
+  auto paramList = paramLists[cand.level];
+  if (tupleTy->getNumElements() != paramList->size()) 
+    return getElementForScalarInitSimple(tupleTy);
+
+  // Find a tuple element without a default.
+  Optional<unsigned> elementWithoutDefault;
+  for (unsigned i : range(tupleTy->getNumElements())) {
+    auto param = paramList->get(i);
+
+    // Skip parameters with default arguments.
+    if (param->getDefaultArgumentKind() != DefaultArgumentKind::None)
+      continue;
+
+    // If we already have an element without a default, check whether there are
+    // two fields that need initialization.
+    if (elementWithoutDefault) {
+      // Variadic fields are okay; they'll just end up being empty.
+      if (param->isVariadic()) continue;
+
+      // If the element we saw before was variadic, it can be empty as well.
+      auto priorParam = paramList->get(*elementWithoutDefault);
+      if (!priorParam->isVariadic()) return None;
+    }
+
+    elementWithoutDefault = i;
+  }
+
+  if (elementWithoutDefault) return elementWithoutDefault;
+
+  // All of the fields have default values; initialize the first one.
+  return 0;
+}
+
+/// Return true if the argument of a CallExpr (or related node) has a trailing
+/// closure.
+static bool callArgHasTrailingClosure(Expr *E) {
+  if (!E) return false;
+  if (auto *PE = dyn_cast<ParenExpr>(E))
+    return PE->hasTrailingClosure();
+  else if (auto *TE = dyn_cast<TupleExpr>(E))
+    return TE->hasTrailingClosure();
+  return false;
+}
+
 /// Special magic to handle inout exprs and tuples in argument lists.
 Expr *FailureDiagnosis::
 typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
@@ -3663,21 +3780,11 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // out.  If we can't do that and the tuple has default arguments, we have to
     // punt on passing down the type information, since type checking the
     // subexpression won't be able to find the default argument provider.
-    if (argType)
+    if (argType) {
       if (auto argTT = argType->getAs<TupleType>()) {
-        int scalarElt = argTT->getElementForScalarInit();
-        // If the argument cannot be initialized with a scalar, then it is an
-        // error, so we might as well pass down the expected type, to get a
-        // specific error involving it.
-        if (scalarElt == -1) {
-          // However, if there are default values, we don't actually want to do
-          // this.  We don't know if the user just forgot a label on a defaulted
-          // value.
-          if (argTT->hasAnyDefaultValues())
-            argType = Type();
-        } else {
+        if (auto scalarElt = getElementForScalarInitOfArg(argTT, candidates)) {
           // If we found the single argument being initialized, use it.
-          auto &arg = argTT->getElement(scalarElt);
+          auto &arg = argTT->getElement(*scalarElt);
           
           // If the argument being specified is actually varargs, then we're
           // just specifying one element of a variadic list.  Use the type of
@@ -3686,9 +3793,14 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
             argType = arg.getVarargBaseTy();
           else
             argType = arg.getType();
+        } else if (candidatesHaveAnyDefaultValues(candidates)) {
+          argType = Type();
         }
+      } else if (candidatesHaveAnyDefaultValues(candidates)) {
+        argType = Type();
       }
-    
+    }
+
     auto CTPurpose = argType ? CTP_CallArgument : CTP_Unused;
     return typeCheckChildIndependently(argExpr, argType, CTPurpose, options);
   }
@@ -3697,78 +3809,82 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   // the shuffle of input arguments to destination values.  It requires a
   // TupleType to compute the mapping from argExpr.  Conveniently, it doesn't
   // care about the actual types though, so we can just use 'void' for them.
+  // FIXME: This doesn't need to be limited to tuple types.
   if (argType && argType->is<TupleType>()) {
-    auto argTypeTT = argType->castTo<TupleType>();
-    SmallVector<TupleTypeElt, 4> ArgElts;
+    // Decompose the parameter type, including information about default
+    // arguments.
+    SmallVector<CallArgParam, 4> params =
+        decomposeParamType(
+          argType,
+            candidates.empty() ? nullptr : candidates[0].getDecl(),
+            candidates.empty() ? 0 : candidates[0].level);
+
+    // Form a set of call arguments, using a dummy type (Void), because the
+    // argument/parameter matching code doesn't need it.
     auto voidTy = CS->getASTContext().TheEmptyTupleType;
-    
-    for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i)
-      ArgElts.push_back({ voidTy, TE->getElementName(i) });
-    SmallVector<int, 4> sources;
-    SmallVector<unsigned, 4> variadicArgs;
-    if (!computeTupleShuffle(ArgElts, argTypeTT->getElements(),
-                             sources, variadicArgs)) {
+    SmallVector<CallArgParam, 4> args;
+    for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i) {
+      CallArgParam arg;
+      arg.Ty = voidTy;
+      arg.Label = TE->getElementName(i);
+      args.push_back(arg);
+    }
+
+    /// Use a match call argument listener that allows relabeling.
+    struct RelabelMatchCallArgumentListener : MatchCallArgumentListener {
+      virtual bool relabelArguments(ArrayRef<Identifier> newNames) override {
+        return false;
+      }
+    } listener;
+
+    SmallVector<ParamBinding, 4> paramBindings;
+    if (!matchCallArguments(args, params, callArgHasTrailingClosure(argExpr),
+                            /*allowFixes=*/true,
+                            listener, paramBindings)) {
       SmallVector<Expr*, 4> resultElts(TE->getNumElements(), nullptr);
       SmallVector<TupleTypeElt, 4> resultEltTys(TE->getNumElements(), voidTy);
 
-      // If we got a correct shuffle, we can perform the analysis of all of
-      // the input elements, with their expected types.
-      for (unsigned i = 0, e = sources.size(); i != e; ++i) {
-        // If the value is taken from a default argument, ignore it.
-        if (sources[i] == TupleShuffleExpr::DefaultInitialize ||
-            sources[i] == TupleShuffleExpr::Variadic ||
-            sources[i] == TupleShuffleExpr::CallerDefaultInitialize)
-          continue;
-        
-        assert(sources[i] >= 0 && "Unknown sources index");
-        
-        // Otherwise, it must match the corresponding expected argument type.
-        unsigned inArgNo = sources[i];
-        auto actualType = argTypeTT->getElementType(i);
+      // Perform analysis of the input elements.
+      for (unsigned paramIdx : range(paramBindings.size())) {
+        // Extract the parameter.
+        const auto &param = params[paramIdx];
 
-        if (actualType->is<InOutType>())
+        // Determine the parameter type.
+        auto currentParamType = param.Ty;
+        if (currentParamType->is<InOutType>())
           options |= TCC_AllowLValue;
 
-        auto exprResult =
-          typeCheckChildIndependently(TE->getElement(inArgNo), actualType,
-                                      CTP_CallArgument, options);
-        // If there was an error type checking this argument, then we're done.
-        if (!exprResult)
-          return nullptr;
+        // Look at each of the arguments assigned to this parameter.
+        for (auto inArgNo : paramBindings[paramIdx]) {
+          // Determine the argument type.
+          auto currentArgType = TE->getElement(inArgNo);
 
-        // If the caller expected something inout, but we didn't have
-        // something of inout type, diagnose it.
-        if (auto IOE =
-              dyn_cast<InOutExpr>(exprResult->getSemanticsProvidingExpr())) {
-          if (!actualType->is<InOutType>()) {
-            diagnose(exprResult->getLoc(), diag::extra_address_of,
-                     exprResult->getType()->getInOutObjectType())
-              .highlight(exprResult->getSourceRange())
-              .fixItRemove(IOE->getStartLoc());
-            return nullptr;
-          }
-        }
-        
-        resultElts[inArgNo] = exprResult;
-        resultEltTys[inArgNo] = {
-          exprResult->getType(),
-          TE->getElementName(inArgNo)
-        };
-      }
-      
-      if (!variadicArgs.empty()) {
-        auto varargsTy = argTypeTT->getVarArgsBaseType();
-        for (unsigned i = 0, e = variadicArgs.size(); i != e; ++i) {
-          unsigned inArgNo = variadicArgs[i];
-          
-          auto expr =
-            typeCheckChildIndependently(TE->getElement(inArgNo), varargsTy,
-                                        CTP_CallArgument);
+          auto exprResult =
+            typeCheckChildIndependently(currentArgType, currentParamType,
+                                        CTP_CallArgument, options);
+
           // If there was an error type checking this argument, then we're done.
-          if (!expr)
+          if (!exprResult)
             return nullptr;
-          resultElts[inArgNo] = expr;
-          resultEltTys[inArgNo] = { expr->getType() };
+
+          // If the caller expected something inout, but we didn't have
+          // something of inout type, diagnose it.
+          if (auto IOE =
+                dyn_cast<InOutExpr>(exprResult->getSemanticsProvidingExpr())) {
+            if (!currentParamType->is<InOutType>()) {
+              diagnose(exprResult->getLoc(), diag::extra_address_of,
+                       exprResult->getType()->getInOutObjectType())
+                .highlight(exprResult->getSourceRange())
+                .fixItRemove(IOE->getStartLoc());
+              return nullptr;
+            }
+          }
+
+          resultElts[inArgNo] = exprResult;
+          resultEltTys[inArgNo] = {
+            exprResult->getType(),
+            TE->getElementName(inArgNo)
+          };
         }
       }
       
@@ -4319,17 +4435,6 @@ namespace {
   };
 }
 
-/// Return true if the argument of a CallExpr (or related node) has a trailing
-/// closure.
-static bool callArgHasTrailingClosure(Expr *E) {
-  if (!E) return false;
-  if (auto *PE = dyn_cast<ParenExpr>(E))
-    return PE->hasTrailingClosure();
-  else if (auto *TE = dyn_cast<TupleExpr>(E))
-    return TE->hasTrailingClosure();
-  return false;
-}
-
 /// Return true if this function name is a comparison operator.  This is a
 /// simple heuristic used to guide comparison related diagnostics.
 static bool isNameOfStandardComparisonOperator(StringRef opName) {
@@ -4337,6 +4442,60 @@ static bool isNameOfStandardComparisonOperator(StringRef opName) {
          opName == "===" || opName == "!==" ||
          opName == "<"   || opName == ">" ||
          opName == "<="  || opName == ">=";
+}
+
+bool FailureDiagnosis::diagnoseNilLiteralComparison(
+    Expr *lhsExpr, Expr *rhsExpr, CalleeCandidateInfo &calleeInfo,
+    SourceLoc applyLoc) {
+
+  auto overloadName = calleeInfo.declName;
+
+  // Only diagnose for comparison operators.
+  if (!isNameOfStandardComparisonOperator(overloadName))
+    return false;
+
+  Expr *otherExpr = lhsExpr;
+  Expr *nilExpr = rhsExpr;
+
+  // Swap if we picked the wrong side as the nil literal.
+  if (!isa<NilLiteralExpr>(nilExpr->getValueProvidingExpr()))
+    std::swap(otherExpr, nilExpr);
+
+  // Bail if neither side is a nil literal.
+  if (!isa<NilLiteralExpr>(nilExpr->getValueProvidingExpr()))
+    return false;
+
+  // Bail if both sides are a nil literal.
+  if (isa<NilLiteralExpr>(otherExpr->getValueProvidingExpr()))
+    return false;
+
+  auto otherType = otherExpr->getType()->getRValueType();
+
+  // Bail if we were unable to determine the other type.
+  if (isUnresolvedOrTypeVarType(otherType))
+    return false;
+
+  // Regardless of whether the type has reference or value semantics,
+  // comparison with nil is illegal, albeit for different reasons spelled
+  // out by the diagnosis.
+  if (otherType->getAnyOptionalObjectType() &&
+      (overloadName == "!==" || overloadName == "===")) {
+    auto revisedName = overloadName;
+    revisedName.pop_back();
+
+    // If we made it here, then we're trying to perform a comparison with
+    // reference semantics rather than value semantics.  The fixit will
+    // lop off the extra '=' in the operator.
+    diagnose(applyLoc,
+             diag::value_type_comparison_with_nil_illegal_did_you_mean,
+             otherType)
+        .fixItReplace(applyLoc, revisedName);
+  } else {
+    diagnose(applyLoc, diag::value_type_comparison_with_nil_illegal, otherType)
+        .highlight(otherExpr->getSourceRange());
+  }
+
+  return true;
 }
 
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
@@ -4421,8 +4580,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // If we are constructing a tuple with initializer syntax, the expected
     // argument list is the tuple type itself - and there is no initdecl.
     auto instanceTy = MTT->getInstanceType();
-    if (instanceTy->is<TupleType>()) {
-      argType = instanceTy;
+    if (auto tupleTy = instanceTy->getAs<TupleType>()) {
+      argType = tupleTy;
     }
   }
   
@@ -4451,7 +4610,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Diagnose some simple and common errors.
   if (calleeInfo.diagnoseSimpleErrors(callExpr))
     return true;
-  
   
   // A common error is to apply an operator that only has inout forms (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -4507,41 +4665,24 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     auto lhsExpr = argTuple->getElement(0), rhsExpr = argTuple->getElement(1);
     auto lhsType = lhsExpr->getType()->getRValueType();
     auto rhsType = rhsExpr->getType()->getRValueType();
-    
-    // If this is a comparison against nil, then we should produce a specific
-    // diagnostic.
-    if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
-        !isUnresolvedOrTypeVarType(lhsType)) {
-      if (isNameOfStandardComparisonOperator(overloadName)) {
-        // Regardless of whether the type has reference or value semantics,
-        // comparison with nil is illegal, albeit for different reasons spelled
-        // out by the diagnosis.
-        if (lhsType->getAnyOptionalObjectType() &&
-                   (overloadName == "!==" || overloadName == "===")) {
-          auto revisedName = overloadName;
-          revisedName.pop_back();
-          // If we made it here, then we're trying to perform a comparison with
-          // reference semantics rather than value semantics.  The fixit will
-          // lop off the extra '=' in the operator.
-          diagnose(callExpr->getLoc(),
-                   diag::value_type_comparison_with_nil_illegal_did_you_mean,
-                   lhsType)
-            .fixItReplace(callExpr->getLoc(), revisedName);
-        } else {
-          diagnose(callExpr->getLoc(),
-                   diag::value_type_comparison_with_nil_illegal, lhsType)
-            .highlight(lhsExpr->getSourceRange());
-        }
-        return true;
-      }
-    }
+
+    // Diagnose any comparisons with the nil literal.
+    if (diagnoseNilLiteralComparison(lhsExpr, rhsExpr, calleeInfo,
+                                     callExpr->getLoc()))
+      return true;
 
     if (callExpr->isImplicit() && overloadName == "~=") {
       // This binop was synthesized when typechecking an expression pattern.
-      diagnose(lhsExpr->getLoc(),
-               diag::cannot_match_expr_pattern_with_value, lhsType, rhsType)
-        .highlight(lhsExpr->getSourceRange())
-        .highlight(rhsExpr->getSourceRange());
+      auto diag = diagnose(lhsExpr->getLoc(),
+                    diag::cannot_match_expr_pattern_with_value,
+                           lhsType, rhsType);
+      diag.highlight(lhsExpr->getSourceRange());
+      diag.highlight(rhsExpr->getSourceRange());
+      if (auto optUnwrappedType = rhsType->getOptionalObjectType()) {
+        if (lhsType->isEqual(optUnwrappedType)) {
+          diag.fixItInsert(lhsExpr->getEndLoc(), "?");
+        }
+      }
       return true;
     }
 
@@ -5020,7 +5161,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
 static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem *CS,
                                           SourceLoc loc) {
   auto DLC = CS->TC.getProtocol(loc,
-                              KnownProtocolKind::DictionaryLiteralConvertible);
+                              KnownProtocolKind::ExpressibleByDictionaryLiteral);
   if (!DLC) return false;
   return CS->TC.conformsToProtocol(ty, DLC, CS->DC,
                                    ConformanceCheckFlags::InExpression);
@@ -5031,16 +5172,16 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   auto elementTypePurpose = CTP_Unused;
 
   // If we had a contextual type, then it either conforms to
-  // ArrayLiteralConvertible or it is an invalid contextual type.
+  // ExpressibleByArrayLiteral or it is an invalid contextual type.
   if (auto contextualType = CS->getContextualType()) {
     // If our contextual type is an optional, look through them, because we're
     // surely initializing whatever is inside.
     contextualType = contextualType->lookThroughAllAnyOptionalTypes();
 
-    // Validate that the contextual type conforms to ArrayLiteralConvertible and
+    // Validate that the contextual type conforms to ExpressibleByArrayLiteral and
     // figure out what the contextual element type is in place.
     auto ALC = CS->TC.getProtocol(E->getLoc(),
-                                  KnownProtocolKind::ArrayLiteralConvertible);
+                                  KnownProtocolKind::ExpressibleByArrayLiteral);
     ProtocolConformance *Conformance = nullptr;
     if (!ALC)
       return visitExpr(E);
@@ -5074,7 +5215,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     }
     
     if (!foundConformance) {
-      // If the contextual type conforms to DictionaryLiteralConvertible and
+      // If the contextual type conforms to ExpressibleByDictionaryLiteral and
       // this is an empty array, then they meant "[:]".
       if (E->getNumElements() == 0 &&
           isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
@@ -5087,7 +5228,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       diagnose(E->getStartLoc(), diag::type_is_not_array, contextualType)
         .highlight(E->getSourceRange());
 
-      // If the contextual type conforms to DictionaryLiteralConvertible, then
+      // If the contextual type conforms to ExpressibleByDictionaryLiteral, then
       // they wrote "x = [1,2]" but probably meant "x = [1:2]".
       if ((E->getElements().size() & 1) == 0 && !E->getElements().empty() &&
           isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
@@ -5136,17 +5277,17 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
   auto keyTypePurpose = CTP_Unused, valueTypePurpose = CTP_Unused;
 
   // If we had a contextual type, then it either conforms to
-  // DictionaryLiteralConvertible or it is an invalid contextual type.
+  // ExpressibleByDictionaryLiteral or it is an invalid contextual type.
   if (auto contextualType = CS->getContextualType()) {
     // If our contextual type is an optional, look through them, because we're
     // surely initializing whatever is inside.
     contextualType = contextualType->lookThroughAllAnyOptionalTypes();
 
     auto DLC = CS->TC.getProtocol(E->getLoc(),
-                            KnownProtocolKind::DictionaryLiteralConvertible);
+                            KnownProtocolKind::ExpressibleByDictionaryLiteral);
     if (!DLC) return visitExpr(E);
 
-    // Validate the contextual type conforms to DictionaryLiteralConvertible
+    // Validate the contextual type conforms to ExpressibleByDictionaryLiteral
     // and figure out what the contextual Key/Value types are in place.
     ProtocolConformance *Conformance = nullptr;
     if (!CS->TC.conformsToProtocol(contextualType, DLC, CS->DC,
@@ -5231,7 +5372,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   const auto &target = Ctx.LangOpts.Target;
   StringRef importModule;
   StringRef importDefaultTypeName;
-  if (protocol == Ctx.getProtocol(KnownProtocolKind::ColorLiteralConvertible)) {
+  if (protocol == Ctx.getProtocol(KnownProtocolKind::ExpressibleByColorLiteral)) {
     if (target.isMacOSX()) {
       importModule = "AppKit";
       importDefaultTypeName = "NSColor";
@@ -5240,7 +5381,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
       importDefaultTypeName = "UIColor";
     }
   } else if (protocol == Ctx.getProtocol(
-               KnownProtocolKind::ImageLiteralConvertible)) {
+               KnownProtocolKind::ExpressibleByImageLiteral)) {
     if (target.isMacOSX()) {
       importModule = "AppKit";
       importDefaultTypeName = "NSImage";
@@ -5249,7 +5390,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
       importDefaultTypeName = "UIImage";
     }
   } else if (protocol == Ctx.getProtocol( 
-               KnownProtocolKind::FileReferenceLiteralConvertible)) {
+               KnownProtocolKind::ExpressibleByFileReferenceLiteral)) {
     importModule = "Foundation";
     importDefaultTypeName = "URL";
   }
@@ -5923,7 +6064,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
   if (getExpressionTooComplex()) {
     TC.diagnose(expr->getLoc(), diag::expression_too_complex).
-    highlight(expr->getSourceRange());
+      highlight(expr->getSourceRange());
     return true;
   }
 

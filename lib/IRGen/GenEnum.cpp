@@ -3570,7 +3570,10 @@ namespace {
       } else if (CommonSpareBits.size() > 0) {
         // Otherwise the payload is just the index.
         payload = EnumPayload::zero(IGM, PayloadSchema);
-        payload.insertValue(IGF, tagIndex, 0);
+        // We know we won't use more than numCaseBits from tagIndex's value:
+        // We made sure of this in the logic above.
+        payload.insertValue(IGF, tagIndex, 0,
+                            numCaseBits >= 32 ? -1 : numCaseBits);
       }
 
       // If the tag bits do not fit in the spare bits, the remaining tag bits

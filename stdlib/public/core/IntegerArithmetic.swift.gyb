@@ -91,7 +91,7 @@ public func ${op}= <T : _IntegerArithmetic>(lhs: inout T, rhs: T) {
 /// - `x - 0 == x`
 /// - `-x == 0 - x`
 /// - `-(-x) == x`
-public protocol SignedNumber : Comparable, IntegerLiteralConvertible {
+public protocol SignedNumber : Comparable, ExpressibleByIntegerLiteral {
   /// Returns the result of negating `x`.
   prefix func - (x: Self) -> Self
 

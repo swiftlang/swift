@@ -273,7 +273,9 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
 }
 
 SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
-  // (address_to_pointer (pointer_to_address x)) -> x
+  // (address_to_pointer (pointer_to_address x [strict])) -> x
+  // The 'strict' flag is only relevant for instructions that access memory;
+  // the moment the address is cast back to a pointer, it no longer matters.
   if (auto *PTAI = dyn_cast<PointerToAddressInst>(ATPI->getOperand()))
     if (PTAI->getType() == ATPI->getOperand()->getType())
       return PTAI->getOperand();
@@ -282,9 +284,11 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
 }
 
 SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
-  // (pointer_to_address (address_to_pointer x)) -> x
+  // (pointer_to_address strict (address_to_pointer x)) -> x
+  // If this address is not strict, then it cannot be replaced by an address
+  // that may be strict.
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand()))
-    if (ATPI->getOperand()->getType() == PTAI->getType())
+    if (ATPI->getOperand()->getType() == PTAI->getType() && PTAI->isStrict())
       return ATPI->getOperand();
 
   return SILValue();

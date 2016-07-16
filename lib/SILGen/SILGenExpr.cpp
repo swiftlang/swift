@@ -1508,8 +1508,8 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &gen, SILLocation loc,
   auto &baseTL = gen.getTypeLowering(baseAbstraction, baseTy);
 
   // Turn the pointer into an address.
-  basePtr = gen.B.createPointerToAddress(loc, basePtr,
-                                     baseTL.getLoweredType().getAddressType());
+  basePtr = gen.B.createPointerToAddress(
+    loc, basePtr, baseTL.getLoweredType().getAddressType(), /*isStrict*/ true);
 
   return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction);
 }
@@ -3517,16 +3517,11 @@ ManagedValue SILGenFunction::emitRValueAsSingleValue(Expr *E, SGFContext C) {
   return std::move(rv).getAsSingleValue(*this, E);
 }
 
-static ManagedValue emitUndef(SILGenFunction &gen, SILLocation loc,
-                              const TypeLowering &undefTL) {
-  SILValue undef = SILUndef::get(undefTL.getLoweredType(), gen.SGM.M);
-  return gen.emitManagedRValueWithCleanup(undef, undefTL);
-}
-
 ManagedValue SILGenFunction::emitUndef(SILLocation loc, Type type) {
-  return ::emitUndef(*this, loc, getTypeLowering(type));
+  return emitUndef(loc, getLoweredType(type));
 }
 
 ManagedValue SILGenFunction::emitUndef(SILLocation loc, SILType type) {
-  return ::emitUndef(*this, loc, getTypeLowering(type));
+  SILValue undef = SILUndef::get(type, SGM.M);
+  return ManagedValue::forUnmanaged(undef);
 }

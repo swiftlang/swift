@@ -245,10 +245,10 @@ public extension DispatchQueue {
 	private func _syncHelper<T>(
 		fn: (@noescape () -> ()) -> (), 
 		execute work: @noescape () throws -> T, 
-		rescue: ((ErrorProtocol) throws -> (T))) rethrows -> T 
+		rescue: ((Error) throws -> (T))) rethrows -> T 
 	{
 		var result: T?
-		var error: ErrorProtocol?
+		var error: Error?
 		fn {
 			do {
 				result = try work()
@@ -268,10 +268,10 @@ public extension DispatchQueue {
 		fn: (DispatchWorkItem) -> (), 
 		flags: DispatchWorkItemFlags,
 		execute work: @noescape () throws -> T,
-		rescue: ((ErrorProtocol) throws -> (T))) rethrows -> T 
+		rescue: ((Error) throws -> (T))) rethrows -> T 
 	{
 		var result: T?
-		var error: ErrorProtocol?
+		var error: Error?
 		let workItem = DispatchWorkItem(flags: flags, noescapeBlock: {
 			do {
 				result = try work()

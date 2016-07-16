@@ -29,7 +29,7 @@
       key.length: 40
     },
     {
-      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 165,
       key.length: 3
     },
@@ -44,7 +44,7 @@
       key.length: 50
     },
     {
-      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 228,
       key.length: 3
     },

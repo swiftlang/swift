@@ -1,5 +1,5 @@
 include(CMakeParseArguments)
-include(SwiftTranslateFlag)
+include(SwiftUtils)
 
 # Populate the variable 'args' in the parent scope with a keyword
 # argument list.  We read the variables options, ${k}_keyword, and

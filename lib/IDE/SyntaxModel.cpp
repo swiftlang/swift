@@ -245,7 +245,7 @@ static const char *const RegexStrURL =
 #define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
   #Keyword "|"
 static const char *const RegexStrDocCommentField =
-  "^[ ]?- ("
+  "^[ ]*- ("
 #include "swift/Markup/SimpleFields.def"
   "returns):";
 
@@ -448,9 +448,15 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       SN.Kind = SyntaxStructureKind::Parameter;
       SN.NameRange = NR;
       SN.BodyRange = charSourceRangeFromSourceRange(SM, E->getSourceRange());
-      if (NR.isValid())
+      if (NR.isValid()) {
         SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
                                                                   E->getEndLoc()));
+        passTokenNodesUntil(NR.getStart(),
+                            PassNodesBehavior::ExcludeNodeAtLocation);
+        if (!TokenNodes.empty())
+          const_cast<SyntaxNode&>(TokenNodes.front()).Kind = SyntaxNodeKind::
+            Identifier;
+      }
       else
         SN.Range = SN.BodyRange;
 
@@ -515,6 +521,17 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     }
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
+  } else if (auto *Tup = dyn_cast<TupleExpr>(E)) {
+    for (unsigned I = 0; I < Tup->getNumElements(); ++ I) {
+      SourceLoc NameLoc = Tup->getElementNameLoc(I);
+      if (NameLoc.isValid()) {
+        passTokenNodesUntil(NameLoc, PassNodesBehavior::ExcludeNodeAtLocation);
+        if (!TokenNodes.empty()) {
+          const_cast<SyntaxNode&>(TokenNodes.front()).Kind = SyntaxNodeKind::
+            Identifier;
+        }
+      }
+    }
   }
 
   return { true, E };
@@ -532,12 +549,13 @@ void ModelASTWalker::handleStmtCondition(StmtCondition cond) {
   for (const auto &elt : cond) {
     if (elt.getKind() != StmtConditionElement::CK_Availability) continue;
 
-    SmallVector<CharSourceRange, 5> PlatformRanges;
-    elt.getAvailability()->getPlatformKeywordRanges(PlatformRanges);
-    std::for_each(PlatformRanges.begin(), PlatformRanges.end(),
-                  [&](CharSourceRange &Range) {
-                    passNonTokenNode({SyntaxNodeKind::Keyword, Range});
-                  });
+    SmallVector<SourceLoc, 5> PlatformLocs;
+    elt.getAvailability()->getPlatformKeywordLocs(PlatformLocs);
+    std::for_each(PlatformLocs.begin(), PlatformLocs.end(),
+                  [&](SourceLoc loc) {
+      auto range = charSourceRangeFromSourceRange(SM, loc);
+      passNonTokenNode({SyntaxNodeKind::Keyword, range});
+    });
   }
 }
 

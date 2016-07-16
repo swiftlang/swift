@@ -3977,10 +3977,13 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
   auto *metadataTy = cast<llvm::PointerType>(metadata->getType());
 
   // Create the alias.
-  llvm::GlobalAlias::create(metadataTy->getElementType(),
-                            metadataTy->getAddressSpace(),
-                            metadata->getLinkage(), classSymbol.str(),
-                            metadata, IGM.getModule());
+  auto *alias = llvm::GlobalAlias::create(metadataTy->getElementType(),
+                                          metadataTy->getAddressSpace(),
+                                          metadata->getLinkage(),
+                                          classSymbol.str(), metadata,
+                                          IGM.getModule());
+  if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::COFF)
+    alias->setDLLStorageClass(metadata->getDLLStorageClass());
 }
 
 /// Emit the type metadata or metadata template for a class.
@@ -5496,8 +5499,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   switch (*known) {
   case KnownProtocolKind::AnyObject:
     return SpecialProtocol::AnyObject;
-  case KnownProtocolKind::ErrorProtocol:
-    return SpecialProtocol::ErrorProtocol;
+  case KnownProtocolKind::Error:
+    return SpecialProtocol::Error;
     
   // The other known protocols aren't special at runtime.
   case KnownProtocolKind::Sequence:
@@ -5510,28 +5513,30 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ObjectiveCBridgeable:
   case KnownProtocolKind::DestructorSafeContainer:
   case KnownProtocolKind::SwiftNewtypeWrapper:
-  case KnownProtocolKind::ArrayLiteralConvertible:
-  case KnownProtocolKind::BooleanLiteralConvertible:
-  case KnownProtocolKind::DictionaryLiteralConvertible:
-  case KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible:
-  case KnownProtocolKind::FloatLiteralConvertible:
-  case KnownProtocolKind::IntegerLiteralConvertible:
-  case KnownProtocolKind::StringInterpolationConvertible:
-  case KnownProtocolKind::StringLiteralConvertible:
-  case KnownProtocolKind::NilLiteralConvertible:
-  case KnownProtocolKind::UnicodeScalarLiteralConvertible:
-  case KnownProtocolKind::ColorLiteralConvertible:
-  case KnownProtocolKind::ImageLiteralConvertible:
-  case KnownProtocolKind::FileReferenceLiteralConvertible:
-  case KnownProtocolKind::BuiltinBooleanLiteralConvertible:
-  case KnownProtocolKind::BuiltinExtendedGraphemeClusterLiteralConvertible:
-  case KnownProtocolKind::BuiltinFloatLiteralConvertible:
-  case KnownProtocolKind::BuiltinIntegerLiteralConvertible:
-  case KnownProtocolKind::BuiltinStringLiteralConvertible:
-  case KnownProtocolKind::BuiltinUTF16StringLiteralConvertible:
-  case KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible:
+  case KnownProtocolKind::ExpressibleByArrayLiteral:
+  case KnownProtocolKind::ExpressibleByBooleanLiteral:
+  case KnownProtocolKind::ExpressibleByDictionaryLiteral:
+  case KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral:
+  case KnownProtocolKind::ExpressibleByFloatLiteral:
+  case KnownProtocolKind::ExpressibleByIntegerLiteral:
+  case KnownProtocolKind::ExpressibleByStringInterpolation:
+  case KnownProtocolKind::ExpressibleByStringLiteral:
+  case KnownProtocolKind::ExpressibleByNilLiteral:
+  case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
+  case KnownProtocolKind::ExpressibleByColorLiteral:
+  case KnownProtocolKind::ExpressibleByImageLiteral:
+  case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinFloatLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinStringLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral:
   case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:
+  case KnownProtocolKind::BridgedStoredNSError:
+  case KnownProtocolKind::ErrorCodeProtocol:
     return SpecialProtocol::None;
   }
 }

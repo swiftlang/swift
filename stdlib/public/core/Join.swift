@@ -110,8 +110,8 @@ public struct JoinedSequence<Base : Sequence> : Sequence
       separator: _separator)
   }
 
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Iterator.Element.Iterator.Element> {
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element.Iterator.Element> {
     var result = ContiguousArray<Iterator.Element>()
     let separatorSize: Int = numericCast(_separator.count)
 
@@ -132,7 +132,7 @@ public struct JoinedSequence<Base : Sequence> : Sequence
       for x in _base {
         result.append(contentsOf: x)
       }
-      return result._buffer
+      return result
     }
 
     var iter = _base.makeIterator()
@@ -144,7 +144,7 @@ public struct JoinedSequence<Base : Sequence> : Sequence
       }
     }
 
-    return result._buffer
+    return result
   }
 
   internal var _base: Base

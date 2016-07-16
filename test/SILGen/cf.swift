@@ -27,22 +27,22 @@ func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: function_ref @CCRefrigeratorDestroy : $@convention(c) (@owned ImplicitlyUnwrappedOptional<CCRefrigerator>) -> ()
   CCRefrigeratorDestroy(clone)
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.refrigerator!1.foreign : CCMagnetismModel -> () -> Unmanaged<CCRefrigerator>! , $@convention(objc_method) (CCMagnetismModel) -> ImplicitlyUnwrappedOptional<Unmanaged<CCRefrigerator>>
+// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.refrigerator!1.foreign : (CCMagnetismModel) -> () -> Unmanaged<CCRefrigerator>! , $@convention(objc_method) (CCMagnetismModel) -> ImplicitlyUnwrappedOptional<Unmanaged<CCRefrigerator>>
   let f0 = model.refrigerator()
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.getRefrigerator!1.foreign : CCMagnetismModel -> () -> CCRefrigerator! , $@convention(objc_method) (CCMagnetismModel) -> @autoreleased ImplicitlyUnwrappedOptional<CCRefrigerator>
+// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.getRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator! , $@convention(objc_method) (CCMagnetismModel) -> @autoreleased ImplicitlyUnwrappedOptional<CCRefrigerator>
   let f1 = model.getRefrigerator()
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.takeRefrigerator!1.foreign : CCMagnetismModel -> () -> CCRefrigerator! , $@convention(objc_method) (CCMagnetismModel) -> @owned ImplicitlyUnwrappedOptional<CCRefrigerator>
+// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.takeRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator! , $@convention(objc_method) (CCMagnetismModel) -> @owned ImplicitlyUnwrappedOptional<CCRefrigerator>
   let f2 = model.takeRefrigerator()
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.borrowRefrigerator!1.foreign : CCMagnetismModel -> () -> CCRefrigerator! , $@convention(objc_method) (CCMagnetismModel) -> @autoreleased ImplicitlyUnwrappedOptional<CCRefrigerator>
+// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.borrowRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator! , $@convention(objc_method) (CCMagnetismModel) -> @autoreleased ImplicitlyUnwrappedOptional<CCRefrigerator>
   let f3 = model.borrowRefrigerator()
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.setRefrigerator!1.foreign : CCMagnetismModel -> (CCRefrigerator!) -> () , $@convention(objc_method) (ImplicitlyUnwrappedOptional<CCRefrigerator>, CCMagnetismModel) -> ()
+// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.setRefrigerator!1.foreign : (CCMagnetismModel) -> (CCRefrigerator!) -> () , $@convention(objc_method) (ImplicitlyUnwrappedOptional<CCRefrigerator>, CCMagnetismModel) -> ()
   model.setRefrigerator(copy)
 
-// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.giveRefrigerator!1.foreign : CCMagnetismModel -> (CCRefrigerator!) -> () , $@convention(objc_method) (@owned ImplicitlyUnwrappedOptional<CCRefrigerator>, CCMagnetismModel) -> ()
+// CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.giveRefrigerator!1.foreign : (CCMagnetismModel) -> (CCRefrigerator!) -> () , $@convention(objc_method) (@owned ImplicitlyUnwrappedOptional<CCRefrigerator>, CCMagnetismModel) -> ()
   model.giveRefrigerator(copy)
 
   // rdar://16846555

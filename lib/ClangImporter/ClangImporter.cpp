@@ -357,7 +357,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-D_ISO646_H_", "-D__ISO646_H",
 
       // Request new APIs from Foundation.
-      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=7",
+      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=8",
 
       // Request new APIs from SceneKit.
       "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=2",
@@ -2715,12 +2715,24 @@ auto ClangImporter::Implementation::importFullName(
   bool strippedPrefix = false;
   if (isa<clang::EnumConstantDecl>(D)) {
     auto enumDecl = cast<clang::EnumDecl>(D->getDeclContext());
-    StringRef removePrefix =
-      getEnumConstantNamePrefix(enumDecl, &clangSema.getPreprocessor());
+    auto enumInfo = getEnumInfo(enumDecl, &clangSema.getPreprocessor());
+
+    StringRef removePrefix = enumInfo.getConstantNamePrefix();
     if (!removePrefix.empty() && baseName.startswith(removePrefix)) {
       baseName = baseName.substr(removePrefix.size());
       strippedPrefix = true;
     }
+  }
+
+  // If the error is an error enum, it will be mapped to the 'Code'
+  // enum nested within an NSError-containing struct. Strip the word
+  // "Code" off the end of the name, if it's there, because it's
+  // redundant.
+  if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
+    auto enumInfo = getEnumInfo(enumDecl, &clangSema.getPreprocessor());
+    if (enumInfo.isErrorEnum() && baseName.size() > 4 &&
+        camel_case::getLastWord(baseName) == "Code")
+      baseName = baseName.substr(0, baseName.size() - 4);
   }
 
   auto hasConflict = [&](const clang::IdentifierInfo *proposedName,
@@ -3262,12 +3274,11 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
 
     if (objcClass) {
       if (auto objcSuperclass = objcClass->getSuperClass()) {
-        if (auto getterMethod
-              = objcSuperclass->lookupInstanceMethod(
-                  objcProperty->getGetterName())) {
-          if (!shouldSuppressDeclImport(getterMethod))
-            return true;
-        }
+        auto getterMethod =
+            objcSuperclass->lookupMethod(objcProperty->getGetterName(),
+                                         objcProperty->isInstanceProperty());
+        if (getterMethod && !shouldSuppressDeclImport(getterMethod))
+          return true;
       }
     }
 

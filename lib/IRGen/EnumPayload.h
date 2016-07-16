@@ -117,8 +117,12 @@ public:
   /// Insert a value into the enum payload.
   ///
   /// The current payload value at the given offset is assumed to be zero.
+  /// If \p numBitsUsedInValue is non-negative denotes the actual number of bits
+  /// that need storing in \p value otherwise the full bit-width of \p value
+  /// will be stored.
   void insertValue(IRGenFunction &IGF,
-                   llvm::Value *value, unsigned bitOffset);
+                   llvm::Value *value, unsigned bitOffset,
+                   int numBitsUsedInValue = -1);
   
   /// Extract a value from the enum payload.
   llvm::Value *extractValue(IRGenFunction &IGF,

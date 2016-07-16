@@ -376,7 +376,7 @@ internal struct _UnmanagedAnyObjectArray {
 ///     }
 ///     // Prints "We have 4 primes."
 ///
-///     let primesSum = primes.reduce(0, combine: +)
+///     let primesSum = primes.reduce(0, +)
 ///     // 'primesSum' == 17
 ///
 ///     let primeStrings = primes.sorted().map(String.init)
@@ -430,7 +430,7 @@ internal struct _UnmanagedAnyObjectArray {
 /// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Set<Element : Hashable> :
-  SetAlgebra, Hashable, Collection, ArrayLiteralConvertible {
+  SetAlgebra, Hashable, Collection, ExpressibleByArrayLiteral {
 
   internal typealias _Self = Set<Element>
   internal typealias _VariantStorage = _VariantSetStorage<Element>
@@ -677,7 +677,7 @@ public struct Set<Element : Hashable> :
   }
 
   //
-  // `ArrayLiteralConvertible` conformance
+  // `ExpressibleByArrayLiteral` conformance
   //
   /// Creates a set containing the elements of the given array literal.
   ///
@@ -1501,7 +1501,7 @@ public func _setBridgeFromObjectiveCConditional<
 ///                               "triangular": [1, 3, 6, 10, 15, 21, 28],
 ///                               "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
 ///     for key in interestingNumbers.keys {
-///         interestingNumbers[key]?.sort(isOrderedBefore: >)
+///         interestingNumbers[key]?.sort(by: >)
 ///     }
 ///
 ///     print(interestingNumbers["primes"]!)
@@ -1586,7 +1586,7 @@ public func _setBridgeFromObjectiveCConditional<
 /// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Dictionary<Key : Hashable, Value> :
-  Collection, DictionaryLiteralConvertible {
+  Collection, ExpressibleByDictionaryLiteral {
 
   internal typealias _Self = Dictionary<Key, Value>
   internal typealias _VariantStorage = _VariantDictionaryStorage<Key, Value>
@@ -1936,7 +1936,7 @@ public struct Dictionary<Key : Hashable, Value> :
   }
 
   //
-  // DictionaryLiteralConvertible conformance
+  // ExpressibleByDictionaryLiteral conformance
   //
 
   /// Creates a dictionary initialized with a dictionary literal.
@@ -1956,7 +1956,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// - Parameter elements: The key-value pairs that will make up the new
   ///   dictionary. Each key in `elements` must be unique.
   ///
-  /// - SeeAlso: `DictionaryLiteralConvertible`
+  /// - SeeAlso: `ExpressibleByDictionaryLiteral`
   @effects(readonly)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.init(_nativeStorage: _NativeDictionaryStorage.fromArray(elements))
@@ -2505,10 +2505,10 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _body: _HashedContainerStorageHeader {
     unsafeAddress {
-      return UnsafePointer(buffer._valuePointer)
+      return UnsafePointer(buffer._headerPointer)
     }
     unsafeMutableAddress {
-      return buffer._valuePointer
+      return buffer._headerPointer
     }
   }
 
@@ -2608,7 +2608,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
       }
     }
 %end
-    buffer._valuePointer.deinitialize()
+    buffer._headerPointer.deinitialize()
     _fixLifetime(self)
   }
 }

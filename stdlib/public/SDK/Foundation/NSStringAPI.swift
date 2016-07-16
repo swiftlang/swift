@@ -76,7 +76,8 @@ extension Optional {
   /// `body` is complicated than that results in unnecessarily repeated code.
   internal func _withNilOrAddress<NSType : AnyObject, ResultType>(
     of object: inout NSType?,
-    body: @noescape (AutoreleasingUnsafeMutablePointer<NSType?>?) -> ResultType
+    _ body:
+      @noescape (AutoreleasingUnsafeMutablePointer<NSType?>?) -> ResultType
   ) -> ResultType {
     return self == nil ? body(nil) : body(&object)
   }
@@ -96,7 +97,10 @@ extension String {
   /// Return an `Index` corresponding to the given offset in our UTF-16
   /// representation.
   func _index(_ utf16Index: Int) -> Index {
-    return Index(_base: String.UnicodeScalarView.Index(utf16Index, _core))
+    return Index(
+      _base: String.UnicodeScalarView.Index(_position: utf16Index),
+      in: characters
+    )
   }
 
   /// Return a `Range<Index>` corresponding to the given `NSRange` of
@@ -143,13 +147,13 @@ extension String {
   //===--- Class Methods --------------------------------------------------===//
   //===--------------------------------------------------------------------===//
 
-  // + (const NSStringEncoding *)availableStringEncodings
+  // @property (class) const NSStringEncoding *availableStringEncodings;
 
   /// Returns an Array of the encodings string objects support
   /// in the application's environment.
-  public static func availableStringEncodings() -> [Encoding] {
+  public static var availableStringEncodings: [Encoding] {
     var result = [Encoding]()
-    var p = NSString.availableStringEncodings()
+    var p = NSString.availableStringEncodings
     while p.pointee != 0 {
       result.append(Encoding(rawValue: p.pointee))
       p += 1
@@ -157,12 +161,12 @@ extension String {
     return result
   }
 
-  // + (NSStringEncoding)defaultCStringEncoding
+  // @property (class) NSStringEncoding defaultCStringEncoding;
 
   /// Returns the C-string encoding assumed for any method accepting
   /// a C string as an argument.
-  public static func defaultCStringEncoding() -> Encoding {
-    return Encoding(rawValue: NSString.defaultCStringEncoding())
+  public static var defaultCStringEncoding: Encoding {
+    return Encoding(rawValue: NSString.defaultCStringEncoding)
   }
 
   // + (NSString *)localizedNameOfStringEncoding:(NSStringEncoding)encoding
@@ -182,7 +186,7 @@ extension String {
   public static func localizedStringWithFormat(
     _ format: String, _ arguments: CVarArg...
   ) -> String {
-    return String(format: format, locale: Locale.current(),
+    return String(format: format, locale: Locale.current,
       arguments: arguments)
   }
 
@@ -492,7 +496,9 @@ extension String {
   //     enumerateLinesUsing:(void (^)(NSString *line, BOOL *stop))block
 
   /// Enumerates all the lines in a string.
-  public func enumerateLines(_ body: (line: String, stop: inout Bool) -> ()) {
+  public func enumerateLines(
+    invoking body: (line: String, stop: inout Bool) -> ()
+  ) {
     _ns.enumerateLines {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
     in
@@ -523,7 +529,7 @@ extension String {
     scheme tagScheme: String,
     options opts: NSLinguisticTagger.Options = [],
     orthography: NSOrthography? = nil,
-    _ body:
+    invoking body:
       (String, Range<Index>, Range<Index>, inout Bool) -> ()
   ) {
     _ns.enumerateLinguisticTags(
@@ -1678,10 +1684,10 @@ extension String {
   ///
   ///     self.rangeOf(
   ///       other, options: .CaseInsensitiveSearch,
-  ///       locale: Locale.current()) != nil
+  ///       locale: Locale.current) != nil
   public func localizedCaseInsensitiveContains(_ other: String) -> Bool {
     let r = self.range(
-      of: other, options: .caseInsensitive, locale: Locale.current()
+      of: other, options: .caseInsensitive, locale: Locale.current
     ) != nil
     if #available(OSX 10.10, iOS 8.0, *) {
       _sanityCheck(r == _ns.localizedCaseInsensitiveContains(other))

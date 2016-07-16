@@ -18,7 +18,7 @@ public func genericMethodOnAnyObject(o: AnyObject, b: Bool) -> AnyObject {
 }
 
 // CHECK-LABEL: sil @_TF21objc_imported_generic24genericMethodOnAnyObject
-// CHECK:         dynamic_method [volatile] {{%.*}} : $@opened([[TAG:.*]]) AnyObject, #GenericClass.thing!1.foreign : <T where T : AnyObject> GenericClass<T> -> () -> T?, $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>
+// CHECK:         dynamic_method [volatile] {{%.*}} : $@opened([[TAG:.*]]) AnyObject, #GenericClass.thing!1.foreign : <T where T : AnyObject> (GenericClass<T>) -> () -> T?, $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>
 
 public func genericMethodOnAnyObjectChained(o: AnyObject, b: Bool) -> AnyObject? {
   return o.thing?()

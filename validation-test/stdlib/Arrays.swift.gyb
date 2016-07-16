@@ -6,18 +6,18 @@ import StdlibCollectionUnittest
 
 let CopyToNativeArrayBufferTests = TestSuite("CopyToNativeArrayBufferTests")
 
-CopyToNativeArrayBufferTests.test("Sequence._copyToNativeArrayBuffer()") {
+CopyToNativeArrayBufferTests.test("Sequence._copyToContiguousArray()") {
   do {
     // Call from a static context.
     let s =
       MinimalSequence(elements: LifetimeTracked(10)..<LifetimeTracked(27))
 
     expectEqual(0, s.timesMakeIteratorCalled.value)
-    let buffer = s._copyToNativeArrayBuffer()
+    let copy = s._copyToContiguousArray()
     expectEqual(1, s.timesMakeIteratorCalled.value)
     expectEqualSequence(
       Array(10..<27),
-      buffer.map { $0.value })
+      copy.map { $0.value })
   }
   do {
     // Call from a generic context.
@@ -25,15 +25,15 @@ CopyToNativeArrayBufferTests.test("Sequence._copyToNativeArrayBuffer()") {
     let s = LoggingSequence(wrapping: wrapped)
 
     expectEqual(0, wrapped.timesMakeIteratorCalled.value)
-    let buffer = s._copyToNativeArrayBuffer()
+    let copy = s._copyToContiguousArray()
     expectEqual(1, wrapped.timesMakeIteratorCalled.value)
     expectEqualSequence(
       Array(10..<27),
-      buffer.map { $0.value })
+      copy.map { $0.value })
   }
 }
 
-CopyToNativeArrayBufferTests.test("Collection._copyToNativeArrayBuffer()") {
+CopyToNativeArrayBufferTests.test("Collection._copyToContiguousArray()") {
   // Check that collections are handled with the collection-specific API.  This
   // means that we are calling the right default implementation (one for
   // collections, not the one for sequences).
@@ -45,12 +45,12 @@ CopyToNativeArrayBufferTests.test("Collection._copyToNativeArrayBuffer()") {
 
     expectEqual(0, c.timesMakeIteratorCalled.value)
     expectEqual(0, c.timesStartIndexCalled.value)
-    let buffer = c._copyToNativeArrayBuffer()
+    let copy = c._copyToContiguousArray()
     expectEqual(0, c.timesMakeIteratorCalled.value)
     expectNotEqual(0, c.timesStartIndexCalled.value)
     expectEqualSequence(
       Array(10..<27),
-      buffer.map { $0.value })
+      copy.map { $0.value })
   }
   do {
     // Call from a generic context.
@@ -59,13 +59,13 @@ CopyToNativeArrayBufferTests.test("Collection._copyToNativeArrayBuffer()") {
     let s = LoggingSequence(wrapping: wrapped)
     expectEqual(0, wrapped.timesMakeIteratorCalled.value)
     expectEqual(0, wrapped.timesStartIndexCalled.value)
-    let buffer = s._copyToNativeArrayBuffer()
+    let copy = s._copyToContiguousArray()
     expectEqual(0, wrapped.timesMakeIteratorCalled.value)
     expectNotEqual(0, wrapped.timesStartIndexCalled.value)
 
     expectEqualSequence(
       Array(10..<27),
-      buffer.map { $0.value })
+      copy.map { $0.value })
   }
 }
 
@@ -306,7 +306,7 @@ ArrayTestSuite.test("${array_type}/map") {
 }
 
 ArrayTestSuite.test("${array_type}/flatMap") {
-  let enumerate : Int -> ${array_type}<Int> =
+  let enumerate : (Int) -> ${array_type}<Int> =
     { return ${array_type}(1..<($0 + 1)) }
   expectEqualSequence([], ${array_type}().flatMap(enumerate))
   expectEqualSequence([ 1 ], ${array_type}([ 1 ]).flatMap(enumerate))

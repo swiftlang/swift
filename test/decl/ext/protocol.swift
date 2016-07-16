@@ -899,3 +899,11 @@ class BadClass1 : BadProto1 {
   func foo() { }
   override var prop: Int { return 5 } // expected-error{{property does not override any property from its superclass}}
 }
+
+protocol BadProto5 {
+  associatedtype T1 // expected-note{{protocol requires nested type 'T1'}}
+  associatedtype T2 // expected-note{{protocol requires nested type 'T2'}}
+  associatedtype T3 // expected-note{{protocol requires nested type 'T3'}}
+}
+
+class BadClass5 : BadProto5 {} // expected-error{{type 'BadClass5' does not conform to protocol 'BadProto5'}}

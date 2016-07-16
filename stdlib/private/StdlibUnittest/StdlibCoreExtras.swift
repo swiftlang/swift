@@ -134,41 +134,96 @@ extension TypeIdentifier
   }
 }
 
-func _forAllPermutationsImpl(
-  _ index: Int, _ size: Int,
-  _ perm: inout [Int], _ visited: inout [Bool],
-  _ body: ([Int]) -> Void
-) {
-  if index == size {
-    body(perm)
-    return
+enum FormNextPermutationResult {
+  case success
+  case formedFirstPermutation
+}
+
+extension MutableCollection
+  where
+  Self : BidirectionalCollection,
+  Iterator.Element : Comparable
+{
+  mutating func _reverseSubrange(_ subrange: Range<Index>) {
+    if subrange.isEmpty { return }
+    var f = subrange.lowerBound
+    var l = index(before: subrange.upperBound)
+    while f < l {
+      swap(&self[f], &self[l])
+      formIndex(after: &f)
+      formIndex(before: &l)
+    }
   }
 
-  for i in 0..<size {
-    if visited[i] {
-      continue
+  mutating func formNextPermutation() -> FormNextPermutationResult {
+    if isEmpty {
+      // There are 0 elements, only one permutation is possible.
+      return .formedFirstPermutation
     }
-    visited[i] = true
-    perm[index] = i
-    _forAllPermutationsImpl(index + 1, size, &perm, &visited, body)
-    visited[i] = false
+
+    do {
+      var i = startIndex
+      formIndex(after: &i)
+      if i == endIndex {
+        // There is only element, only one permutation is possible.
+        return .formedFirstPermutation
+      }
+    }
+
+    var i = endIndex
+    formIndex(before: &i)
+    var beforeI = i
+    formIndex(before: &beforeI)
+    var elementAtI = self[i]
+    var elementAtBeforeI = self[beforeI]
+    while true {
+      if elementAtBeforeI < elementAtI {
+        // Elements at `i..<endIndex` are in non-increasing order.  To form the
+        // next permutation in lexicographical order we need to replace
+        // `self[i-1]` with the next larger element found in the tail, and
+        // reverse the tail.  For example:
+        //
+        //       i-1 i        endIndex
+        //        V  V           V
+        //     6  2  8  7  4  1 [ ]  // Input.
+        //     6 (4) 8  7 (2) 1 [ ]  // Exchanged self[i-1] with the
+        //        ^--------^         // next larger element
+        //                           // from the tail.
+        //     6  4 (1)(2)(7)(8)[ ]  // Reversed the tail.
+        //           <-------->
+        var j = endIndex
+        repeat {
+          formIndex(before: &j)
+        } while !(elementAtBeforeI < self[j])
+        swap(&self[beforeI], &self[j])
+        _reverseSubrange(i..<endIndex)
+        return .success
+      }
+      if beforeI == startIndex {
+        // All elements are in non-increasing order.  Reverse to form the first
+        // permutation, where all elements are sorted (in non-increasing order).
+        reverse()
+        return .formedFirstPermutation
+      }
+      i = beforeI
+      formIndex(before: &beforeI)
+      elementAtI = elementAtBeforeI
+      elementAtBeforeI = self[beforeI]
+    }
   }
 }
 
 /// Generate all permutations.
-public func forAllPermutations(_ size: Int, body: ([Int]) -> Void) {
-  if size == 0 {
-    return
-  }
-
-  var permutation = [Int](repeating: 0, count: size)
-  var visited = [Bool](repeating: false, count: size)
-  _forAllPermutationsImpl(0, size, &permutation, &visited, body)
+public func forAllPermutations(_ size: Int, _ body: ([Int]) -> Void) {
+  var data = Array(0..<size)
+  repeat {
+    body(data)
+  } while data.formNextPermutation() != .formedFirstPermutation
 }
 
 /// Generate all permutations.
 public func forAllPermutations<S : Sequence>(
-  _ sequence: S, body: ([S.Iterator.Element]) -> Void
+  _ sequence: S, _ body: ([S.Iterator.Element]) -> Void
 ) {
   let data = Array(sequence)
   forAllPermutations(data.count) {

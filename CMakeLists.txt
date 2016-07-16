@@ -8,44 +8,20 @@ endif()
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-include(SwiftBuildType)
-
 #
-# User-configurable options.
+# User-configurable options that control the inclusion and default build
+# behavior for components which may not strictly be necessary (tools, examples,
+# and tests).
 #
-# Instead of invoking CMake directly and configuring these options manually,
-# consider using build-script instead.
+# This is primarily to support building smaller or faster project files.
 #
 
-set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
-    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
-set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
-    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
+option(SWIFT_INCLUDE_TOOLS
+    "Generate build targets for swift tools"
+    TRUE)
 
-is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
-if(swift_optimized)
-  set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
-else()
-  set(SWIFT_STDLIB_ASSERTIONS_default TRUE)
-endif()
-option(SWIFT_STDLIB_ASSERTIONS
-    "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
-    "${SWIFT_STDLIB_ASSERTIONS_default}")
-
-option(SWIFT_SERIALIZE_STDLIB_UNITTEST
-    "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
-    FALSE)
-
-option(SWIFT_STDLIB_SIL_DEBUGGING
-    "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
-    FALSE)
-
-option(SWIFT_CHECK_INCREMENTAL_COMPILATION
-    "Check if incremental compilation works when compiling the Swift libraries"
-    FALSE)
-
-option(SWIFT_BUILD_TOOLS
-    "Build the Swift compiler and other tools"
+option(SWIFT_BUILD_REMOTE_MIRROR
+    "Build the Swift Remote Mirror Library"
     TRUE)
 
 option(SWIFT_BUILD_DYNAMIC_STDLIB
@@ -92,8 +68,33 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
+#
+# Miscellaneous User-configurable options.
+#
+# TODO: Please categorize these!
+#
+
+set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
+    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
+set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
+    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
+
+include(SwiftBuildType)
+is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
+if(swift_optimized)
+  set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
+else()
+  set(SWIFT_STDLIB_ASSERTIONS_default TRUE)
+endif()
+option(SWIFT_STDLIB_ASSERTIONS
+    "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
+    "${SWIFT_STDLIB_ASSERTIONS_default}")
+
 option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
        "Use the host compiler and not the internal clang to build the swift runtime"
+       FALSE)
+option(SWIFT_BUILD_RUNTIME_WITH_HOST_LIBLTO
+       "Use the host liblto and not the internal liblto to build the swift runtime"
        FALSE)
 
 set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
@@ -120,7 +121,7 @@ set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror-headers")
+    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
 # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
@@ -174,6 +175,11 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
+
+#
+# User-configurable Android specific options.
+#
+
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
 set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
@@ -183,7 +189,11 @@ set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
 
-foreach(sdk ANDROID;FREEBSD;LINUX)
+#
+# User-configurable ICU specific options for Android, FreeBSD, Linux.
+#
+
+foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS)
   set(SWIFT_${sdk}_ICU_UC "" CACHE STRING
       "Path to a directory containing the icuuc library for ${sdk}")
   set(SWIFT_${sdk}_ICU_UC_INCLUDE "" CACHE STRING
@@ -249,6 +259,18 @@ endif()
 option(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
     "Overwrite memory for deallocated Swift objects"
     "${SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_default}")
+
+option(SWIFT_SERIALIZE_STDLIB_UNITTEST
+    "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
+    FALSE)
+
+option(SWIFT_STDLIB_SIL_DEBUGGING
+    "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    FALSE)
+
+option(SWIFT_CHECK_INCREMENTAL_COMPILATION
+    "Check if incremental compilation works when compiling the Swift libraries"
+    FALSE)
 
 #
 # User-configurable experimental options.  Do not use in production builds.
@@ -329,15 +351,13 @@ set(CMAKE_CXX_ARCHIVE_FINISH "")
 
 include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
-include(SwiftTranslateFlag)
+include(SwiftUtils)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
 include(SwiftSource)
 include(AddSwift)
 include(SwiftConfigureSDK)
 include(SwiftInstallComponents)
-include(SwiftGetConfigurationTypes)
-include(SwiftApplyXcodeSubstitutions)
 include(SwiftList)
 
 swift_configure_install_components("${SWIFT_INSTALL_COMPONENTS}")
@@ -393,6 +413,17 @@ if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 endif()
 
+# This setting causes all CMakeLists.txt to automatically have
+# ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CURRENT_SOURCE_DIR} as an
+# include_directories path. This is done for developer
+# convenience. Additionally, LLVM/Clang build with this option enabled, so we
+# should match them unless it is removed from LLVM/Clang as well.
+#
+# *NOTE* Even though these directories are added to the include path for a
+# specific CMakeLists.txt, these include paths are not propagated down to
+# subdirectories.
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
 # We'll need this once we have generated headers
 include_directories(BEFORE
   ${CMAKE_CURRENT_BINARY_DIR}/include
@@ -421,38 +452,8 @@ if(XCODE)
   swift_common_xcode_cxx_config()
 endif()
 
-function(check_working_std_regex result_var_name)
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    # Apple operating systems use libc++, which has a working std::regex.
-    set("${result_var_name}" TRUE PARENT_SCOPE)
-  else()
-    if(CMAKE_CROSSCOMPILING)
-      # Can't run C source when cross-compiling; assume false until we have a static check.
-      set("${result_var_name}" FALSE PARENT_SCOPE)
-    else()
-      # libstdc++ 4.8 has an incomplete std::regex implementation, and crashes
-      # on many regexes.
-      # libstdc++ 4.9 works.
-      set(std_regex_test_source
-  "
-  #include <regex>
-  const std::regex broken_regex{
-    \"([a]+)\",
-    std::regex::ECMAScript | std::regex::nosubs};
-
-  int main() {}
-  ")
-
-      check_cxx_source_runs("${std_regex_test_source}" "${result_var_name}_TEST")
-      if ("${${result_var_name}_TEST}")
-        set("${result_var_name}" TRUE PARENT_SCOPE)
-      else()
-        set("${result_var_name}" FALSE PARENT_SCOPE)
-      endif()
-    endif()
-  endif()
-endfunction()
-check_working_std_regex(SWIFT_HAVE_WORKING_STD_REGEX)
+include(SwiftCheckCXXNativeRegex)
+check_cxx_native_regex(SWIFT_HAVE_WORKING_STD_REGEX)
 
 # If SWIFT_HOST_VARIANT_SDK not given, try to detect from the CMAKE_SYSTEM_NAME.
 if(SWIFT_HOST_VARIANT_SDK)
@@ -734,6 +735,12 @@ if("${SWIFT_PRIMARY_VARIANT_ARCH}" STREQUAL "")
   set(SWIFT_PRIMARY_VARIANT_ARCH "${SWIFT_PRIMARY_VARIANT_ARCH_default}")
 endif()
 
+# Should we cross-compile the standard library for Windows?
+is_sdk_requested(WINDOWS swift_build_windows)
+if(swift_build_windows)
+  configure_sdk_windows(WINDOWS "Windows" "msvc" i686)
+endif()
+
 if("${SWIFT_SDKS}" STREQUAL "")
   set(SWIFT_SDKS "${SWIFT_CONFIGURED_SDKS}")
 endif()
@@ -820,14 +827,14 @@ if(NOT DEFINED SWIFT_API_NOTES_INPUTS)
 endif()
 
 # Add all of the subdirectories, where we actually do work.
-if(SWIFT_BUILD_TOOLS)
+if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
   add_subdirectory(tools)
 endif()
 
 is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
-if(SWIFT_BUILD_TOOLS AND SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
+if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
   add_subdirectory(tools/swift-reflection-dump)
 endif()
 

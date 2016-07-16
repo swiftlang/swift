@@ -99,10 +99,10 @@ if True:
 ///
 /// You can call any method on the slices that you might have called on the
 /// `absences` array. To learn which half had more absences, use the
-/// `reduce(_:combine:)` method to calculate each sum.
+/// `reduce(_:)` method to calculate each sum.
 ///
-///     let firstHalfSum = firstHalf.reduce(0, combine: +)
-///     let secondHalfSum = secondHalf.reduce(0, combine: +)
+///     let firstHalfSum = firstHalf.reduce(0, +)
+///     let secondHalfSum = secondHalf.reduce(0, +)
 ///
 ///     if firstHalfSum > secondHalfSum {
 ///         print("More absences in the first half.")
@@ -901,7 +901,7 @@ public struct ${Self}<Element>
   public var _buffer: _Buffer
 }
 
-extension ${Self} : ArrayLiteralConvertible {
+extension ${Self} : ExpressibleByArrayLiteral {
 %if Self == 'Array':
   // Optimized implementation for Array
   /// Creates an array from the given array literal.
@@ -936,7 +936,7 @@ extension ${Self} : ArrayLiteralConvertible {
   ///
   /// - Parameter elements: A variadic list of elements of the new array.
   public init(arrayLiteral elements: Element...) {
-    self.init(_buffer: _extractOrCopyToNativeArrayBuffer(elements._buffer))
+    self.init(_buffer: ContiguousArray(elements)._buffer)
   }
 %end
 }
@@ -1037,7 +1037,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   public init<S : Sequence>(_ s: S)
     where S.Iterator.Element == Element {
 
-    self = ${Self}(_buffer: _Buffer(s._copyToNativeArrayBuffer(),
+    self = ${Self}(
+      _buffer: _Buffer(s._copyToContiguousArray()._buffer,
       shiftedToStartIndex: 0))
   }
 
@@ -1426,8 +1427,11 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     }
   }
 
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
-    return _extractOrCopyToNativeArrayBuffer(self._buffer)
+  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+    if let n = _buffer.requestNativeBuffer() {
+      return ContiguousArray(_buffer: n)
+    }
+    return _copyCollectionToContiguousArray(_buffer)
   }
 }
 
@@ -1487,10 +1491,9 @@ extension ${Self} {
     if _fastPath(p != nil || isEmpty) {
       return (_owner, UnsafePointer(p))
     }
-    let n = _extractOrCopyToNativeArrayBuffer(self._buffer)
+    let n = ContiguousArray(self._buffer)._buffer
     return (n.owner, UnsafePointer(n.firstElementAddress))
   }
-
 }
 
 extension ${Self} {
@@ -1976,20 +1979,6 @@ internal func _arrayReserve<_Buffer>(
   _arrayOutOfPlaceUpdate(&buffer, &newBuffer, count, 0, _IgnorePointer())
 }
 
-public // SPI(Foundation)
-func _extractOrCopyToNativeArrayBuffer<Buffer>(
-  _ source: Buffer
-) -> _ContiguousArrayBuffer<Buffer.Iterator.Element>
-  where
-  Buffer : _ArrayBufferProtocol,
-  Buffer.Iterator.Element == Buffer.Element {
-
-  if let n = source.requestNativeBuffer() {
-    return n
-  }
-  return _copyCollectionToNativeArrayBuffer(source)
-}
-
 /// Append items from `newItems` to `buffer`.
 internal func _arrayAppendSequence<Buffer, S>(
   _ buffer: inout Buffer, _ newItems: S
@@ -2093,13 +2082,12 @@ extension Array {
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ source: AnyObject
   ) -> Array? {
-    if let deferred = source as? _SwiftDeferredNSArray {
-      if let nativeStorage =
-        deferred._nativeStorage as? _ContiguousArrayStorage<Element> {
-        return Array(_ContiguousArrayBuffer(nativeStorage))
-      }
+    // If source is deferred, we indirect to get its native storage
+    let maybeNative = (source as? _SwiftDeferredNSArray)?._nativeStorage ?? source
+
+    return (maybeNative as? _ContiguousArrayStorage<Element>).map {
+      Array(_ContiguousArrayBuffer($0))
     }
-    return nil
   }
 
   /// Private initializer used for bridging.

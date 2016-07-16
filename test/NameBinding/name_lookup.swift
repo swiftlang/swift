@@ -35,7 +35,7 @@ class ThisBase1 {
 
   class func baseStaticFunc0() {}
 
-  struct BaseNestedStruct {}
+  struct BaseNestedStruct {} // expected-note {{did you mean 'BaseNestedStruct'?}}
   class BaseNestedClass {
     init() { }
   }
@@ -43,7 +43,7 @@ class ThisBase1 {
     case BaseUnionX(Int)
   }
 
-  typealias BaseNestedTypealias = Int
+  typealias BaseNestedTypealias = Int // expected-note {{did you mean 'BaseNestedTypealias'?}}
 }
 
 class ThisDerived1 : ThisBase1 {
@@ -85,7 +85,7 @@ class ThisDerived1 : ThisBase1 {
   class DerivedNestedClass {
     init() { }
   }
-  enum DerivedNestedUnion {
+  enum DerivedNestedUnion { // expected-note {{did you mean 'DerivedNestedUnion'?}}
     case DerivedUnionX(Int)
   }
 
@@ -223,11 +223,11 @@ class ThisDerived1 : ThisBase1 {
     self.baseInstanceVar = 42 // expected-error {{member 'baseInstanceVar' cannot be used on type 'ThisDerived1'}}
     self.baseProp = 42 // expected-error {{member 'baseProp' cannot be used on type 'ThisDerived1'}}
     self.baseFunc0() // expected-error {{missing argument}}
-    self.baseFunc0(ThisBase1())() // expected-error {{'(ThisBase1) -> () -> ()' is not convertible to 'ThisDerived1 -> () -> ()'}}
+    self.baseFunc0(ThisBase1())() // expected-error {{'(ThisBase1) -> () -> ()' is not convertible to '(ThisDerived1) -> () -> ()'}}
     
     self.baseFunc0(ThisDerived1())()
     self.baseFunc1(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'ThisBase1'}}
-    self.baseFunc1(ThisBase1())(42) // expected-error {{'(ThisBase1) -> (Int) -> ()' is not convertible to 'ThisDerived1 -> (Int) -> ()'}}
+    self.baseFunc1(ThisBase1())(42) // expected-error {{'(ThisBase1) -> (Int) -> ()' is not convertible to '(ThisDerived1) -> (Int) -> ()'}}
     self.baseFunc1(ThisDerived1())(42)
     self[0] = 42.0 // expected-error {{instance member 'subscript' cannot be used on type 'ThisDerived1'}}
     self.baseStaticVar = 42
@@ -351,26 +351,26 @@ extension ThisBase1 {
 
   func baseExtFunc0() {}
 
-  var baseExtStaticVar: Int // expected-error {{extensions may not contain stored properties}}
+  var baseExtStaticVar: Int // expected-error {{extensions may not contain stored properties}} // expected-note 2 {{did you mean 'baseExtStaticVar'?}}
 
-  var baseExtStaticProp: Int {
+  var baseExtStaticProp: Int { // expected-note 2 {{did you mean 'baseExtStaticProp'?}}
     get {
       return 42
     }
     set {}
   }
 
-  class func baseExtStaticFunc0() {}
+  class func baseExtStaticFunc0() {} // expected-note {{did you mean 'baseExtStaticFunc0'?}}
 
-  struct BaseExtNestedStruct {}
-  class BaseExtNestedClass {
+  struct BaseExtNestedStruct {} // expected-note 2 {{did you mean 'BaseExtNestedStruct'?}}
+  class BaseExtNestedClass { // expected-note {{did you mean 'BaseExtNestedClass'?}}
     init() { }
   }
-  enum BaseExtNestedUnion {
+  enum BaseExtNestedUnion { // expected-note {{did you mean 'BaseExtNestedUnion'?}}
     case BaseExtUnionX(Int)
   }
 
-  typealias BaseExtNestedTypealias = Int
+  typealias BaseExtNestedTypealias = Int // expected-note 2 {{did you mean 'BaseExtNestedTypealias'?}}
 }
 
 extension ThisDerived1 {
@@ -398,7 +398,7 @@ extension ThisDerived1 {
   class DerivedExtNestedClass {
     init() { }
   }
-  enum DerivedExtNestedUnion {
+  enum DerivedExtNestedUnion { // expected-note {{did you mean 'DerivedExtNestedUnion'?}}
     case DerivedExtUnionX(Int)
   }
 

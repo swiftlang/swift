@@ -189,6 +189,10 @@ var FOO_MACRO_4: UInt32 { get }
 var FOO_MACRO_5: UInt64 { get }
 var FOO_MACRO_6: typedef_int_t { get }
 var FOO_MACRO_7: typedef_int_t { get }
+var FOO_MACRO_8: Int8 { get }
+var FOO_MACRO_9: Int32 { get }
+var FOO_MACRO_10: Int16 { get }
+var FOO_MACRO_11: Int { get }
 var FOO_MACRO_OR: Int32 { get }
 var FOO_MACRO_AND: Int32 { get }
 var FOO_MACRO_REDEF_1: Int32 { get }

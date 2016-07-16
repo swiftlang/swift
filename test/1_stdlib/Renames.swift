@@ -12,7 +12,7 @@ func _Arrays<T>(e: T) {
   // _ = ContiguousArray(count: 1, repeatedValue: e) // xpected-error {{Please use init(repeating:count:) instead}} {{none}}
   // _ = ArraySlice(count: 1, repeatedValue: e) // xpected-error {{Please use init(repeating:count:) instead}} {{none}}
   // _ = Array(count: 1, repeatedValue: e) // xpected-error {{Please use init(repeating:count:) instead}} {{none}}
-  // The acutall error is: {{argument 'repeatedValue' must precede argument 'count'}}
+  // The actual error is: {{argument 'repeatedValue' must precede argument 'count'}}
 
   var a = ContiguousArray<T>()
   _ = a.removeAtIndex(0) // expected-error {{'removeAtIndex' has been renamed to 'remove(at:)'}} {{9-22=remove}} {{23-23=at: }} {{none}}
@@ -61,7 +61,7 @@ func _Collection<C : Collection>(c: C) {
   func fn<T : Collection, U>(_: T, _: U) where T.Generator == U {} // expected-error {{'T' does not have a member type named 'Generator'; did you mean 'Iterator'?}} {{50-59=Iterator}} {{none}} 
   _ = c.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
   _ = c.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Removed in Swift 3. Please use underestimatedCount property.}} {{none}}
-  _ = c.split(1) { _ in return true} // expected-error {{'split(_:allowEmptySlices:isSeparator:)' is unavailable: Please use split(maxSplits:omittingEmptySubsequences:isSeparator:) instead}} {{none}}
+  _ = c.split(1) { _ in return true} // expected-error {{split(maxSplits:omittingEmptySubsequences:whereSeparator:) instead}} {{none}}
 }
 
 func _Collection<C : Collection, E>(c: C, e: E) where C.Iterator.Element: Equatable, C.Iterator.Element == E {
@@ -70,8 +70,8 @@ func _Collection<C : Collection, E>(c: C, e: E) where C.Iterator.Element: Equata
 
 func _CollectionAlgorithms<C : MutableCollection, I>(c: C, i: I) where C : RandomAccessCollection, C.Index == I {
   var c = c
-  _ = c.partition(i..<i) { _, _ in true } // expected-error {{slice the collection using the range, and call partition(isOrderedBefore:)}} {{none}}
-  c.sortInPlace { _, _ in true } // expected-error {{'sortInPlace' has been renamed to 'sort(isOrderedBefore:)'}} {{5-16=sort}} {{none}}
+  _ = c.partition(i..<i) { _, _ in true } // expected-error {{slice the collection using the range, and call partition(by:)}} {{none}}
+  c.sortInPlace { _, _ in true } // expected-error {{'sortInPlace' has been renamed to 'sort(by:)'}} {{5-16=sort}} {{none}}
 }
 
 func _CollectionAlgorithms<C : MutableCollection, I>(c: C, i: I) where C : RandomAccessCollection, C.Iterator.Element : Comparable, C.Index == I {
@@ -103,7 +103,7 @@ func _EmptyCollection<T>(i: EmptyIterator<T>) {
 }
 
 func _ErrorType() {
-  func fn(_: ErrorType) {} // expected-error {{'ErrorType' has been renamed to 'ErrorProtocol'}} {{14-23=ErrorProtocol}}
+  func fn(_: ErrorType) {} // expected-error {{'ErrorType' has been renamed to 'Error'}} {{14-23=Error}}
 }
 
 func _ExistentialCollection<T>(i: AnyIterator<T>) {
@@ -112,6 +112,9 @@ func _ExistentialCollection<T>(i: AnyIterator<T>) {
   func fn3(_: AnyForwardIndex) {} // expected-error {{'AnyForwardIndex' has been renamed to 'AnyIndex'}} {{15-30=AnyIndex}} {{none}}
   func fn4(_: AnyBidirectionalIndex) {} // expected-error {{'AnyBidirectionalIndex' has been renamed to 'AnyIndex'}} {{15-36=AnyIndex}} {{none}}
   func fn5(_: AnyRandomAccessIndex) {} // expected-error {{'AnyRandomAccessIndex' has been renamed to 'AnyIndex'}} {{15-35=AnyIndex}} {{none}}
+
+  _ = anyGenerator(i) // expected-error {{'anyGenerator' has been replaced by 'AnyIterator.init(_:)'}} {{7-19=AnyIterator}} {{none}}
+  _ = anyGenerator { i.next() } // expected-error {{'anyGenerator' has been replaced by 'AnyIterator.init(_:)'}} {{7-19=AnyIterator}} {{none}}
 }
 func _ExistentialCollection<T>(s: AnySequence<T>) {
   _ = s.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Please use underestimatedCount property instead.}} {{none}}
@@ -389,11 +392,11 @@ func _Sequence<S : Sequence>(s: S, e: S.Iterator.Element) where S.Iterator.Eleme
 
 func _SequenceAlgorithms<S : Sequence>(x: S) {
   _ = x.enumerate() // expected-error {{'enumerate()' has been renamed to 'enumerated()'}} {{9-18=enumerated}} {{none}}
-  _ = x.minElement { _, _ in true } // expected-error {{'minElement' has been renamed to 'min(isOrderedBefore:)'}} {{9-19=min}} {{none}}
-  _ = x.maxElement { _, _ in true } // expected-error {{'maxElement' has been renamed to 'max(isOrderedBefore:)'}} {{9-19=max}} {{none}}
+  _ = x.minElement { _, _ in true } // expected-error {{'minElement' has been renamed to 'min(by:)'}} {{9-19=min}} {{none}}
+  _ = x.maxElement { _, _ in true } // expected-error {{'maxElement' has been renamed to 'max(by:)'}} {{9-19=max}} {{none}}
   _ = x.reverse() // expected-error {{'reverse()' has been renamed to 'reversed()'}} {{9-16=reversed}} {{none}}
-  _ = x.startsWith([]) { _ in true } // expected-error {{'startsWith(_:isEquivalent:)' has been renamed to 'starts(with:isEquivalent:)'}} {{9-19=starts}} {{20-20=with: }} {{none}}
-  _ = x.lexicographicalCompare([]) { _, _ in true } // expected-error {{'lexicographicalCompare(_:isOrderedBefore:)' has been renamed to 'lexicographicallyPrecedes(_:isOrderedBefore:)'}} {{9-31=lexicographicallyPrecedes}}{{none}}
+  _ = x.startsWith([]) { _ in true } // expected-error {{'startsWith(_:isEquivalent:)' has been renamed to 'starts(with:by:)'}} {{9-19=starts}} {{20-20=with: }} {{none}}
+  _ = x.lexicographicalCompare([]) { _, _ in true } // expected-error {{'lexicographicalCompare(_:isOrderedBefore:)' has been renamed to 'lexicographicallyPrecedes(_:by:)'}} {{9-31=lexicographicallyPrecedes}}{{none}}
 }
 func _SequenceAlgorithms<S : Sequence>(x: S) where S.Iterator.Element : Comparable {
   _ = x.minElement() // expected-error {{'minElement()' has been renamed to 'min()'}} {{9-19=min}} {{none}}
@@ -466,7 +469,7 @@ func _Unicode() {
   func fn<T : UnicodeCodecType>(_: T) {} // expected-error {{'UnicodeCodecType' has been renamed to 'UnicodeCodec'}} {{15-31=UnicodeCodec}} {{none}}
 }
 func _Unicode<I : IteratorProtocol, E : UnicodeCodec>(i: I, e: E.Type) where I.Element == E.CodeUnit {
-  _ = transcode(e, e, i, { _ in }, stopOnError: true) // expected-error {{'transcode(_:_:_:_:stopOnError:)' is unavailable: use 'transcode(_:from:to:stoppingOnError:sendingOutputTo:)'}} {{none}}
+  _ = transcode(e, e, i, { _ in }, stopOnError: true) // expected-error {{'transcode(_:_:_:_:stopOnError:)' is unavailable: use 'transcode(_:from:to:stoppingOnError:into:)'}} {{none}}
   _ = UTF16.measure(e, input: i, repairIllFormedSequences: true) // expected-error {{'measure(_:input:repairIllFormedSequences:)' is unavailable: use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'}} {{none}}
 }
 

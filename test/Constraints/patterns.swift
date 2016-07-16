@@ -5,7 +5,7 @@
 switch (1, 2.5, "three") {
 case (1, _, _):
   ()
-// Double is IntegerLiteralConvertible
+// Double is ExpressibleByIntegerLiteral
 case (_, 2, _),
      (_, 2.5, _),
      (_, _, "three"):
@@ -222,3 +222,13 @@ func ugly(_ a: A<EE>) {
     }
   }
 }
+
+// SR-2057
+
+enum SR2057 {
+  case foo
+}
+
+let sr2057: SR2057? = nil
+if case .foo = sr2057 { } // expected-error{{enum case 'foo' not found in type 'SR2057?'}}
+

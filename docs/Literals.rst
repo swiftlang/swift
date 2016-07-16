@@ -23,7 +23,7 @@ is an NSWindow, there will only be one possible method named ``setTitle``,
 which takes an NSString. Therefore, we want the string literal expression to
 end up being an NSString.
 
-Fortunately, NSString implements StringLiteralConvertible, so the type checker
+Fortunately, NSString implements ExpressibleByStringLiteral, so the type checker
 will indeed be able to choose NSString as the type of the string literal. All
 is well.
 
@@ -32,18 +32,18 @@ infinite precision. Once the type has been chosen, the value is checked to see
 if it is in range for that type.
 
 
-The StringLiteralConvertible Protocol
--------------------------------------
+The ExpressibleByStringLiteral Protocol
+---------------------------------------
 
-Here is the StringLiteralConvertible protocol as defined in the standard
+Here is the ExpressibleByStringLiteral protocol as defined in the standard
 library's CompilerProtocols.swift::
 
   // NOTE: the compiler has builtin knowledge of this protocol
   // Conforming types can be initialized with arbitrary string literals.
-  public protocol StringLiteralConvertible
-    : ExtendedGraphemeClusterLiteralConvertible {
+  public protocol ExpressibleByStringLiteral
+    : ExpressibleByExtendedGraphemeClusterLiteral {
     
-    typealias StringLiteralType : _BuiltinStringLiteralConvertible
+    typealias StringLiteralType : _ExpressibleByBuiltinStringLiteral
     // Create an instance initialized to `value`.
     init(stringLiteral value: StringLiteralType)
   }
@@ -51,7 +51,7 @@ library's CompilerProtocols.swift::
 Curiously, the protocol is not defined in terms of primitive types, but in
 terms of any StringLiteralType that the implementer chooses. In most cases,
 this will be Swift's own native String type, which means users can implement
-their own StringLiteralConvertible types while still dealing with a high-level
+their own ExpressibleByStringLiteral types while still dealing with a high-level
 interface.
 
 (Why is this not hardcoded? A String *must* be a valid Unicode string, but
@@ -59,14 +59,14 @@ if the string literal contains escape sequences, an invalid series of code
 points could be constructed...which may be what's desired in some cases.)
 
 
-The _BuiltinStringLiteralConvertible Protocol
----------------------------------------------
+The _ExpressibleByBuiltinStringLiteral Protocol
+-----------------------------------------------
 
 CompilerProtocols.swift contains a second protocol::
 
   // NOTE: the compiler has builtin knowledge of this protocol
-  public protocol _BuiltinStringLiteralConvertible
-    : _BuiltinExtendedGraphemeClusterLiteralConvertible {
+  public protocol _ExpressibleByBuiltinStringLiteral
+    : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
 
     init(
         _builtinStringLiteral start: Builtin.RawPointer,
@@ -82,9 +82,9 @@ data from the literal, and the arguments describe that raw data.
 So, the general runtime behavior is now clear:
 
 1. The compiler generates raw string data.
-2. Some type conforming to _BuiltinStringLiteralConvertible is constructed from 
+2. Some type conforming to _ExpressibleByBuiltinStringLiteral is constructed from 
    the raw string data. This will be a standard library type.
-3. Some type conforming to StringLiteralConvertible is constructed from the
+3. Some type conforming to ExpressibleByStringLiteral is constructed from the
    object constructed in step 2. This may be a user-defined type. This is the
    result.
 
@@ -101,7 +101,7 @@ This algorithm can go forwards or backwards, since it's actually defined in
 terms of constraints, but it's easiest to understand as a linear process.
 
 1. Filter the types provided by the context to only include those that are 
-   StringLiteralConvertible.
+   ExpressibleByStringLiteral.
 2. Using the associated StringLiteralType, find the appropriate
    ``_convertFromBuiltinStringLiteral``.
 3. Using the type from step 1, find the appropriate 
@@ -114,7 +114,7 @@ How about cases where there is no context? ::
 
 Here we have nothing to go on, so instead the type checker looks for a global
 type named ``StringLiteralType`` in the current module-scope context, and uses
-that type if it is actually a StringLiteralConvertible type. This both allows
+that type if it is actually a ExpressibleByStringLiteral type. This both allows
 different standard libraries to set different default literal types, and allows
 a user to *override* the default type in their own source file.
 
@@ -138,6 +138,6 @@ literal type is always Dictionary.
 
 String interpolations are a bit different: they try to individually convert
 each element of the interpolation to the type that adopts
-StringInterpolationConvertible, then calls the variadic
+ExpressibleByStringInterpolation, then calls the variadic
 ``convertFromStringInterpolation`` to put them all together. The default type
 for an interpolated literal without context is also ``StringLiteralType``.

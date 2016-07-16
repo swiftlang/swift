@@ -43,7 +43,7 @@ one_minus_ulp = { 'Float':'0x1.fffffep-1', 'Double':'0x1.fffffffffffffp-1' }
 @_fixed_layout
 @_alignment(${vecsize})
 public struct ${vectype} :
-    ArrayLiteralConvertible, CustomDebugStringConvertible {
+    ExpressibleByArrayLiteral, CustomDebugStringConvertible {
 
   public var _vector: Builtin.${llvm_vectype}
 

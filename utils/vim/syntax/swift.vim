@@ -155,7 +155,7 @@ syn region swiftPreprocFalse start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else
 
 syn match swiftAttribute /@\<\w\+\>/ skipwhite nextgroup=swiftType
 
-syn keyword swiftTodo TODO FIXME contained
+syn keyword swiftTodo MARK TODO FIXME contained
 
 syn match swiftCastOp "\<is\>" skipwhite nextgroup=swiftType
 syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftType

@@ -170,40 +170,6 @@ namespace {
       P.markWasHandled(D);
     }
   };
-
-  /// An RAII type to exclude tokens contributing to private decls from the
-  /// interface hash of the source file. On destruct, it checks if the set of
-  /// attributes includes the "private" attribute; if so, it resets the MD5
-  /// hash of the source file to what it was when the IgnorePrivateDeclTokens
-  /// instance was created, thus excluding from the interface hash all tokens
-  /// parsed in the meantime.
-  struct IgnorePrivateDeclTokens {
-    Parser &TheParser;
-    DeclAttributes &Attributes;
-    Optional<llvm::MD5> SavedHashState;
-
-    IgnorePrivateDeclTokens(Parser &P, DeclAttributes &Attrs)
-      : TheParser(P), Attributes(Attrs) {
-      // NOTE: It's generally not safe to ignore private decls in nominal
-      // types. Such private decls may affect the data layout of a class/struct
-      // or the vtable layout of a class. So only ignore global private decls.
-      if (TheParser.IsParsingInterfaceTokens &&
-          TheParser.CurDeclContext->isModuleScopeContext()) {
-        SavedHashState = TheParser.SF.getInterfaceHashState();
-      }
-    }
-
-    ~IgnorePrivateDeclTokens() {
-      if (!SavedHashState)
-        return;
-
-      if (auto *attr = Attributes.getAttribute<AbstractAccessibilityAttr>()) {
-        if (attr->getAccess() == Accessibility::Private) {
-          TheParser.SF.setInterfaceHashState(*SavedHashState);
-        }
-      }
-    }
-  };
 }
 
 /// \brief Main entrypoint for the parser.
@@ -536,8 +502,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     auto access = llvm::StringSwitch<Accessibility>(AttrName)
       .Case("private", Accessibility::Private)
-      .Case("public", Accessibility::Public)
-      .Case("internal", Accessibility::Internal);
+      .Case("fileprivate", Accessibility::Private) // FIXME: For migration purposes.
+      .Case("internal", Accessibility::Internal)
+      .Case("public", Accessibility::Public);
 
     if (!consumeIf(tok::l_paren)) {
       // Normal accessibility attribute.
@@ -1555,6 +1522,18 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
       return false;
     }
+    // You can't specify @noescape and @escaping together.
+    if (Attributes.has(TAK_escaping)) {
+      diagnose(Loc, diag::attr_escaping_conflicts_noescape);
+      return false;
+    }
+    break;
+  case TAK_escaping:
+    // You can't specify @noescape and @escaping together.
+    if (Attributes.has(TAK_noescape)) {
+      diagnose(Loc, diag::attr_escaping_conflicts_noescape);
+      return false;
+    }
     break;
   case TAK_out:
   case TAK_in:
@@ -1714,11 +1693,13 @@ static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
 static bool isKeywordPossibleDeclStart(const Token &Tok) {
   switch (Tok.getKind()) {
   case tok::at_sign:
+  case tok::kw_associatedtype:
   case tok::kw_case:
   case tok::kw_class:
   case tok::kw_deinit:
   case tok::kw_enum:
   case tok::kw_extension:
+  case tok::kw_fileprivate:
   case tok::kw_func:
   case tok::kw_import:
   case tok::kw_init:
@@ -1732,11 +1713,9 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_struct:
   case tok::kw_subscript:
   case tok::kw_typealias:
-  case tok::kw_associatedtype:
   case tok::kw_var:
   case tok::pound_if:
   case tok::identifier:
-  case tok::pound_setline:
   case tok::pound_sourceLocation:
     return true;
   case tok::pound_line:
@@ -1906,6 +1885,7 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     LastDecl = D;
     Handler(D);
   };
+
   ParserPosition BeginParserPosition;
   if (isCodeCompletionFirstPass())
     BeginParserPosition = getParserPosition();
@@ -1918,7 +1898,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
                                   StructureMarkerKind::Declaration);
 
   DeclAttributes Attributes;
-  IgnorePrivateDeclTokens IgnoreTokens(*this, Attributes);
   if (Tok.hasComment())
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
   bool FoundCCTokenInAttr;
@@ -1975,6 +1954,7 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     }
 
     case tok::kw_private:
+    case tok::kw_fileprivate:
     case tok::kw_internal:
     case tok::kw_public:
       // We still model these specifiers as attributes.
@@ -2158,7 +2138,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       Status = parseLineDirective(false);
       break;
     case tok::pound_line:
-    case tok::pound_setline:
       Status = parseLineDirective(true);
       break;
 
@@ -3827,6 +3806,7 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   auto flagInvalidAccessor = [&](FuncDecl *&func) {
     if (func) {
       func->setType(ErrorType::get(P.Context));
+      func->setInterfaceType(ErrorType::get(P.Context));
       func->setInvalid();
     }
   };
@@ -5350,7 +5330,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Parse the parameters.
   // FIXME: handle code completion in Arguments.
-  DefaultArgumentInfo DefaultArgs(/*hasSelf*/true);
+  DefaultArgumentInfo DefaultArgs(/*inTypeContext*/true);
   ParameterList *BodyPattern;
   DeclName FullName;
   ParserStatus SignatureStatus

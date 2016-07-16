@@ -14,13 +14,13 @@
 
 public enum Result<Value> {
 case Success(Value)
-case Error(ErrorProtocol)
+case Error(Error)
 
   init(success x: Value) {
     self = .Success(x)
   }
   
-  init(error: ErrorProtocol) {
+  init(error: Error) {
     self = .Error(error)
   }
   
@@ -52,7 +52,7 @@ case Error(ErrorProtocol)
     }
   }
 
-  var error: ErrorProtocol? {
+  var error: Error? {
     switch self {
     case .Success: return nil
     case .Error(let x): return x
@@ -79,7 +79,9 @@ public func ?? <T> (
 }
 
 /// Translate the execution of a throwing closure into a Result
-func catchResult<Success>(body: () throws -> Success) -> Result<Success> {
+func catchResult<Success>(
+  invoking body: () throws -> Success
+) -> Result<Success> {
   do {
     return try .Success(body())
   }
@@ -89,11 +91,11 @@ func catchResult<Success>(body: () throws -> Success) -> Result<Success> {
 }
 
 // A couple of error types
-enum Nasty : ErrorProtocol {
+enum Nasty : Error {
 case Bad, Awful, Terrible
 }
 
-enum Icky : ErrorProtocol {
+enum Icky : Error {
 case Sad, Bad, Poor
 }
 

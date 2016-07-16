@@ -159,7 +159,7 @@ func test4() -> ((arg1: Int, arg2: Int) -> Int) {
 func test5() {
   let a: (Int, Int) = (1,2)
   var
-     _: ((Int) -> Int, Int) = a  // expected-error {{cannot convert value of type '(Int, Int)' to specified type '((Int) -> Int, Int)' (aka '(Int -> Int, Int)')}}
+     _: ((Int) -> Int, Int) = a  // expected-error {{cannot convert value of type '(Int, Int)' to specified type '((Int) -> Int, Int)'}}
 
 
   let c: (a: Int, b: Int) = (1,2)
@@ -268,7 +268,7 @@ var il_b: Int8
    = 123123
 var il_c: Int8 = 4  // ok
 
-struct int_test4 : IntegerLiteralConvertible {
+struct int_test4 : ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral value: Int) {} // user type.
 }
@@ -704,12 +704,9 @@ func invalidDictionaryLiteral() {
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
 Int.self == nil // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
-nil == Int.self // expected-error {{binary operator '==' cannot be applied to operands}}
-// expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists}}
+nil == Int.self // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
 Int.self != nil // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
-nil != Int.self // expected-error {{binary operator '!=' cannot be applied to operands}}
-// expected-note @-1 {{overloads for '!=' exist with these partially matching parameter lists}}
-
+nil != Int.self // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {

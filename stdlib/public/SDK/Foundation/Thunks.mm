@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #import <Foundation/Foundation.h>
+#include <objc/message.h>
 
 #include "swift/Runtime/Config.h"
 
@@ -118,3 +119,12 @@ NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
   return [result retain];
 }
 
+// -- NSError
+SWIFT_CC(swift)
+extern "C" void
+NS_Swift_performErrorRecoverySelector(_Nullable id delegate,
+                                      SEL selector,
+                                      BOOL success,
+                                      void * _Nullable contextInfo) {
+  objc_msgSend(delegate, selector, success, contextInfo);
+}

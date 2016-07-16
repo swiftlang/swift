@@ -143,12 +143,12 @@ enum RawTypeNotFirst : RawTypeNotFirstProtocol, Int { // expected-error {{raw ty
   case E
 }
 
-enum RawTypeNotLiteralConvertible : Array<Int> { // expected-error {{raw type 'Array<Int>' is not convertible from any literal}}
-  // expected-error@-1{{type 'RawTypeNotLiteralConvertible' does not conform to protocol 'RawRepresentable'}}
+enum ExpressibleByRawTypeNotLiteral : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by any literal}}
+  // expected-error@-1{{type 'ExpressibleByRawTypeNotLiteral' does not conform to protocol 'RawRepresentable'}}
   case Ladd, Elliott, Sixteenth, Harrison
 }
 
-enum RawTypeCircularityA : RawTypeCircularityB, IntegerLiteralConvertible { // expected-error {{circular enum raw types 'RawTypeCircularityA' -> 'RawTypeCircularityB' -> 'RawTypeCircularityA'}} FIXME: expected-error{{RawRepresentable}}
+enum RawTypeCircularityA : RawTypeCircularityB, ExpressibleByIntegerLiteral { // expected-error {{circular enum raw types 'RawTypeCircularityA' -> 'RawTypeCircularityB' -> 'RawTypeCircularityA'}} FIXME: expected-error{{RawRepresentable}}
   case Morrison, Belmont, Madison, Hawthorne
 
   init(integerLiteral value: Int) {
@@ -156,7 +156,7 @@ enum RawTypeCircularityA : RawTypeCircularityB, IntegerLiteralConvertible { // e
   }
 }
 
-enum RawTypeCircularityB : RawTypeCircularityA, IntegerLiteralConvertible { // expected-note {{enum 'RawTypeCircularityB' declared here}} 
+enum RawTypeCircularityB : RawTypeCircularityA, ExpressibleByIntegerLiteral { // expected-note {{enum 'RawTypeCircularityB' declared here}} 
   case Willamette, Columbia, Sandy, Multnomah
 
   init(integerLiteral value: Int) { 
@@ -164,11 +164,11 @@ enum RawTypeCircularityB : RawTypeCircularityA, IntegerLiteralConvertible { // e
   }
 }
 
-struct FloatLiteralConvertibleOnly : FloatLiteralConvertible {
+struct ExpressibleByFloatLiteralOnly : ExpressibleByFloatLiteral {
     init(floatLiteral: Double) {}
 }
-enum RawTypeNotIntegerLiteralConvertible : FloatLiteralConvertibleOnly { // expected-error {{RawRepresentable 'init' cannot be synthesized because raw type 'FloatLiteralConvertibleOnly' is not Equatable}}
-  case Everett // expected-error {{enum cases require explicit raw values when the raw type is not integer or string literal convertible}}
+enum ExpressibleByRawTypeNotIntegerLiteral : ExpressibleByFloatLiteralOnly { // expected-error {{RawRepresentable 'init' cannot be synthesized because raw type 'ExpressibleByFloatLiteralOnly' is not Equatable}}
+  case Everett // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Flanders
 }
 
@@ -183,13 +183,13 @@ enum RawTypeWithNegativeValues : Int {
 
 enum RawTypeWithUnicodeScalarValues : UnicodeScalar {
   case Kearney = "K"
-  case Lovejoy // expected-error {{enum cases require explicit raw values when the raw type is not integer or string literal convertible}}
+  case Lovejoy // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Marshall = "M"
 }
 
 enum RawTypeWithCharacterValues : Character {
   case First = "い"
-  case Second // expected-error {{enum cases require explicit raw values when the raw type is not integer or string literal convertible}}
+  case Second // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Third = "は"
 }
 
@@ -387,7 +387,7 @@ enum PlaygroundRepresentation : UInt8 {
   }
 }
 
-struct ManyLiteralable : IntegerLiteralConvertible, StringLiteralConvertible, Equatable {
+struct ManyLiteralable : ExpressibleByIntegerLiteral, ExpressibleByStringLiteral, Equatable {
   init(stringLiteral: String) {}
   init(integerLiteral: Int) {}
 
@@ -432,4 +432,93 @@ enum RawValueBTest: Double, RawValueB {
 
 enum foo : String {
   case bar = nil // expected-error {{cannot convert nil to raw type 'String'}}
+}
+
+// Static member lookup from instance methods
+
+struct EmptyStruct {}
+
+enum EnumWithStaticMember {
+  static let staticVar = EmptyStruct()
+
+  func foo() {
+    let _ = staticVar // expected-error {{static member 'staticVar' cannot be used on instance of type 'EnumWithStaticMember'}}
+  }
+}
+
+// SE-0036:
+
+struct SE0036_Auxiliary {}
+
+enum SE0036 {
+  case A
+  case B(SE0036_Auxiliary)
+
+  static func staticReference() {
+    _ = A
+    _ = SE0036.A
+  }
+
+  func staticReferencInInstanceMethod() {
+    _ = A // expected-warning {{referencing enum element 'A' as instance member is deprecated and will be removed in Swift 3}} {{9-9=SE0036.}}
+    _ = SE0036.A
+  }
+
+  static func staticReferencInSwitchInStaticMethod() {
+    switch SE0036.A {
+    case A: break
+    case B(_): break
+    }
+  }
+
+  func staticReferencInSwitchInInstanceMethod() {
+    switch self {
+    case A: break // expected-warning {{referencing enum element 'A' as instance member is deprecated and will be removed in Swift 3}} {{10-10=.}}
+    case B(_): break // expected-warning {{referencing enum element 'B' as instance member is deprecated and will be removed in Swift 3}} {{10-10=.}}
+    }
+  }
+
+  func explicitReferencInSwitch() {
+    switch SE0036.A {
+    case SE0036.A: break
+    case SE0036.B(_): break
+    }
+  }
+
+  func dotReferencInSwitchInInstanceMethod() {
+    switch self {
+    case .A: break
+    case .B(_): break
+    }
+  }
+
+  static func dotReferencInSwitchInStaticMethod() {
+    switch SE0036.A {
+    case .A: break
+    case .B(_): break
+    }
+  }
+
+  init() {
+    self = .A
+    self = A // expected-warning {{referencing enum element 'A' as instance member is deprecated and will be removed in Swift 3}} {{12-12=SE0036.}}
+    self = SE0036.A
+    self = .B(SE0036_Auxiliary())
+    self = B(SE0036_Auxiliary()) // expected-warning {{referencing enum element 'B' as instance member is deprecated and will be removed in Swift 3}} {{12-12=SE0036.}}
+    self = SE0036.B(SE0036_Auxiliary())
+  }
+}
+
+enum SE0036_Generic<T> {
+  case A(x: T)
+
+  func foo() {
+    switch self {
+    case A(_): break // expected-warning {{referencing enum element 'A' as instance member is deprecated and will be removed in Swift 3}} {{10-10=.}}
+    }
+
+    switch self {
+    case SE0036_Generic.A(let a): print(a)
+    }
+  }
 }

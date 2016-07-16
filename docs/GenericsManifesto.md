@@ -110,7 +110,7 @@ extension Collection {
 
 `let` constants could be allowed to have generic parameters, such that they produce differently-typed values depending on how they are used. For example, this is particularly useful for named literal values, e.g.,
 
-```let π<T : FloatLiteralConvertible>: T = 3.141592653589793238462643383279502884197169399```
+```let π<T : ExpressibleByFloatLiteral>: T = 3.141592653589793238462643383279502884197169399```
 
 The Clang importer could make particularly good use of this when importing macros.
 
@@ -205,11 +205,11 @@ Generic parameters could be given the ability to provide default arguments, whic
 ```
 public final class Promise<Value, Reason=Error> { ... }
 
-func getRandomPromise() -> Promise<Int, ErrorProtocol> { ... }
+func getRandomPromise() -> Promise<Int, Error> { ... }
 
 var p1: Promise<Int> = ...
 var p2: Promise<Int, Error> = p1     // okay: p1 and p2 have the same type Promise<Int, Error>
-var p3: Promise = getRandomPromise() // p3 has type Promise<Int, ErrorProtocol> due to type inference
+var p3: Promise = getRandomPromise() // p3 has type Promise<Int, Error> due to type inference
 ```
 
 ### Generalized `class` constraints

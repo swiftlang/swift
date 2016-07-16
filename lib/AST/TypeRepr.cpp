@@ -283,6 +283,7 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   case 2: Printer << "@autoclosure(escaping) "; break;
   case 3: Printer << "@autoclosure "; break;
   }
+  if (Attrs.has(TAK_escaping))     Printer << "@escaping ";
   if (Attrs.has(TAK_thin))         Printer << "@thin ";
   if (Attrs.has(TAK_thick))        Printer << "@thick ";
   if (Attrs.convention.hasValue()) {

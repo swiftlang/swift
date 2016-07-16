@@ -53,7 +53,7 @@ using namespace swift;
 namespace swift {
 
 std::unique_ptr<llvm::DenseMap<StringRef, Type>>
-collectNameTypeMap(Type Ty, const DeclContext *DC) {
+collectNameTypeMap(Type Ty) {
   std::unique_ptr<llvm::DenseMap<StringRef, Type>> IdMap(
     new llvm::DenseMap<StringRef, Type>());
   Type BaseTy = Ty->getRValueType();
@@ -89,8 +89,8 @@ class PrinterArchetypeNameTransformer : public PrinterArchetypeTransformer{
   std::unique_ptr<llvm::DenseMap<StringRef, Type>> IdMap;
 
 public:
-  PrinterArchetypeNameTransformer(Type Ty, const DeclContext *DC) :
-    BaseTy(Ty->getRValueType()), IdMap(collectNameTypeMap(Ty, DC)){}
+  PrinterArchetypeNameTransformer(Type Ty) :
+    BaseTy(Ty->getRValueType()), IdMap(collectNameTypeMap(Ty)){}
 
   StringRef transform(StringRef TypeName) override {
     return TypeName;
@@ -157,7 +157,7 @@ class ArchetypeSelfTransformer : public PrinterArchetypeTransformer {
     for (; Self->getParent(); Self = Self->getParent()) {
       Names.insert(Names.begin(), Self->getName());
     }
-    if (!Self->getSelfProtocol() || Names.empty())
+    if (!Self->getSelfProtocol())
       return tryNamedArchetypeTransform(Ty);
     Type Result = checkMemberType(DC, BaseTy, Names);
     if (Result)
@@ -174,7 +174,7 @@ public:
 
   ArchetypeSelfTransformer(Type BaseTy, DeclContext &DC):
     BaseTy(BaseTy->getRValueType()), DC(DC), Ctx(DC.getASTContext()),
-    NameTransformer(new PrinterArchetypeNameTransformer(BaseTy, &DC)){}
+    NameTransformer(new PrinterArchetypeNameTransformer(BaseTy)){}
 
   Type transform(Type Ty) override {
     return Ty.transform(F);
@@ -654,16 +654,22 @@ hasMergeGroup(MergeGroupKind Kind) {
   return false;
 }
 }
-PrintOptions PrintOptions::printTypeInterface(Type T, const DeclContext *DC) {
+
+PrintOptions PrintOptions::printTypeInterface(Type T, DeclContext *DC) {
   PrintOptions result = printInterface();
+  result.PrintExtensionFromConformingProtocols = true;
   result.TransformContext = std::make_shared<ArchetypeTransformContext>(
-    new PrinterArchetypeNameTransformer(T, DC), T);
+    new ArchetypeSelfTransformer(T, *DC), T);
+  result.printExtensionContentAsMembers = [T](const ExtensionDecl *ED) {
+    return isExtensionApplied(*T->getNominalOrBoundGenericNominal()->
+                              getDeclContext(), T, ED);
+  };
   return result;
 }
 
-void PrintOptions::setArchetypeTransform(Type T, const DeclContext *DC) {
+void PrintOptions::setArchetypeTransform(Type T, DeclContext *DC) {
   TransformContext = std::make_shared<ArchetypeTransformContext>(
-    new PrinterArchetypeNameTransformer(T, DC));
+    new ArchetypeSelfTransformer(T, *DC));
 }
 
 void PrintOptions::setArchetypeTransformForQuickHelp(Type T, DeclContext *DC) {
@@ -795,33 +801,6 @@ ValueDecl* ASTPrinter::findConformancesWithDocComment(ValueDecl *VD) {
   return nullptr;
 }
 
-bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
-                                    llvm::raw_ostream &OS) {
-  if (!Ty)
-    return false;
-  Ty = Ty->getRValueType();
-  PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer(), DC);
-   if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
-     llvm::SmallPtrSet<const ExtensionDecl*, 4> AllExts;
-     for (auto Ext : ND->getExtensions()) {
-       AllExts.insert(Ext);
-     }
-     Options.printExtensionContentAsMembers = [&](const ExtensionDecl *ED) {
-       return AllExts.count(ED) == 1 && isExtensionApplied(*ND->getDeclContext(), Ty, ED);
-     };
-     ND->print(OS, Options);
-     return true;
-  }
-  return false;
-}
-
-bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC, std::string &Buffer) {
-  llvm::raw_string_ostream OS(Buffer);
-  auto Result = printTypeInterface(Ty, DC, OS);
-  OS.str();
-  return Result;
-}
-
 void ASTPrinter::anchor() {}
 
 void ASTPrinter::printIndent() {
@@ -843,7 +822,7 @@ void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name) {
     if (GP->isProtocolSelf())
       Context = PrintNameContext::GenericParameter;
   } else if (T && T->is<DynamicSelfType>()) {
-    assert(T->getAs<DynamicSelfType>()->getSelfType()->getAnyNominal() &&
+    assert(T->castTo<DynamicSelfType>()->getSelfType()->getAnyNominal() &&
            "protocol Self handled as GenericTypeParamDecl");
     Context = PrintNameContext::ClassDynamicSelf;
   }
@@ -1904,6 +1883,14 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
       if (Options.printExtensionContentAsMembers(Ext))
         AddDeclFunc(Ext->getMembers());
     }
+    if (Options.PrintExtensionFromConformingProtocols) {
+      for (auto Conf : NTD->getAllConformances()) {
+        for (auto Ext : Conf->getProtocol()->getExtensions()) {
+          if (Options.printExtensionContentAsMembers(Ext))
+            AddDeclFunc(Ext->getMembers());
+        }
+      }
+    }
   }
   printMembers(Members, needComma, openBracket, closeBracket);
 }
@@ -2739,9 +2726,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           printFunctionParameters(decl);
         });
 
-      auto &Context = decl->getASTContext();
       Type ResultTy = decl->getResultType();
-      if (ResultTy && !ResultTy->isEqual(TupleType::getEmpty(Context))) {
+      if (ResultTy && !ResultTy->isVoid()) {
         Printer << " -> ";
         // Use the non-repr external type, but reuse the TypeLoc printing code.
         Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
@@ -3656,9 +3642,12 @@ public:
         Printer << "@autoclosure ";
       else
         Printer << "@autoclosure(escaping) ";
-    } else if (info.isNoEscape())
+    } else if (info.isNoEscape()) {
       // autoclosure implies noescape.
       Printer << "@noescape ";
+    } else if (info.isExplicitlyEscaping()) {
+      Printer << "@escaping ";
+    }
 
     if (Options.PrintFunctionRepresentationAttrs) {
       // TODO: coalesce into a single convention attribute.
@@ -3734,8 +3723,19 @@ public:
     };
 
     printFunctionExtInfo(T->getExtInfo());
-    printWithParensIfNotSimple(T->getInput());
-
+    
+    bool needsParens =
+      !isa<ParenType>(T->getInput().getPointer()) &&
+      !T->getInput()->is<TupleType>();
+    
+    if (needsParens)
+      Printer << "(";
+    
+    visit(T->getInput());
+    
+    if (needsParens)
+      Printer << ")";
+    
     if (T->throws())
       Printer << " " << tok::kw_throws;
 
@@ -3755,8 +3755,19 @@ public:
     printFunctionExtInfo(T->getExtInfo());
     printGenericParams(&T->getGenericParams());
     Printer << " ";
-    printWithParensIfNotSimple(T->getInput());
+    
+    bool needsParens =
+      !isa<ParenType>(T->getInput().getPointer()) &&
+      !T->getInput()->is<TupleType>();
+      
+    if (needsParens)
+      Printer << "(";
 
+    visit(T->getInput());
+
+    if (needsParens)
+      Printer << ")";
+    
     if (T->throws())
       Printer << " " << tok::kw_throws;
 
@@ -3911,7 +3922,18 @@ public:
     printFunctionExtInfo(T->getExtInfo());
     printGenericSignature(T->getGenericParams(), T->getRequirements());
     Printer << " ";
-    printWithParensIfNotSimple(T->getInput());
+
+    bool needsParens =
+      !isa<ParenType>(T->getInput().getPointer()) &&
+      !T->getInput()->is<TupleType>();
+      
+    if (needsParens)
+      Printer << "(";
+
+    visit(T->getInput());
+
+    if (needsParens)
+      Printer << ")";
 
     if (T->throws())
       Printer << " " << tok::kw_throws;

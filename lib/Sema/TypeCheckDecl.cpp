@@ -271,13 +271,18 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     DC = ext;
     options |= TR_GenericSignature | TR_InheritanceClause;
-  } else if (isa<GenericTypeParamDecl>(decl)) {
+  } else if (auto GP = dyn_cast<GenericTypeParamDecl>(decl)) {
     // For generic parameters, we want name lookup to look at just the
     // signature of the enclosing entity.
     DC = decl->getDeclContext();
     if (auto nominal = dyn_cast<NominalTypeDecl>(DC)) {
       DC = nominal;
       options |= TR_GenericSignature;
+      // When looking up protocol 'Self' accessibility checks are disabled to
+      // head off spurious unavailable diagnostics.
+      if (isa<ProtocolDecl>(DC) && GP->isProtocolSelf()) {
+        options |= TR_AllowUnavailable;
+      }
     } else if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
       DC = ext;
       options |= TR_GenericSignature;
@@ -372,9 +377,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       continue;
 
     // Retrieve the interface type for this inherited type.
-    if (DC->isGenericContext() && DC->isTypeContext()) {
+    if (inheritedTy->hasArchetype())
       inheritedTy = ArchetypeBuilder::mapTypeOutOfContext(DC, inheritedTy);
-    }
 
     // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
@@ -1132,7 +1136,6 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
                                      Type argType) {
   Type fnType;
   Type allocFnType;
-  Type initFnType;
   Type resultType = selfType->getInOutObjectType();
   if (ctor->getFailability() != OTK_None) {
     resultType = OptionalType::get(ctor->getFailability(), resultType);
@@ -1157,14 +1160,10 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
   if (ctor->getDeclContext()->isGenericContext()) {
     allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
                                                outerGenericParams);
-    initFnType = PolymorphicFunctionType::get(selfType, fnType,
-                                              outerGenericParams);
   } else {
     allocFnType = FunctionType::get(selfMetaType, fnType);
-    initFnType = FunctionType::get(selfType, fnType);
   }
   ctor->setType(allocFnType);
-  ctor->setInitializerType(initFnType);
 }
 
 namespace {
@@ -2021,8 +2020,8 @@ static void checkBridgedFunctions(TypeChecker &TC) {
     checkObjCBridgingFunctions(TC, module,
                                TC.Context.getSwiftName(
                                  KnownFoundationEntity::NSError),
-                               "_convertNSErrorToErrorProtocol",
-                               "_convertErrorProtocolToNSError");
+                               "_convertNSErrorToError",
+                               "_convertErrorToNSError");
   }
 }
 
@@ -2386,14 +2385,14 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     };
 
     static auto otherLiteralProtocolKinds = {
-      KnownProtocolKind::FloatLiteralConvertible,
-      KnownProtocolKind::UnicodeScalarLiteralConvertible,
-      KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible,
+      KnownProtocolKind::ExpressibleByFloatLiteral,
+      KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
+      KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
     };
 
-    if (conformsToProtocol(KnownProtocolKind::IntegerLiteralConvertible)) {
+    if (conformsToProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)) {
       valueKind = AutomaticEnumValueKind::Integer;
-    } else if (conformsToProtocol(KnownProtocolKind::StringLiteralConvertible)){
+    } else if (conformsToProtocol(KnownProtocolKind::ExpressibleByStringLiteral)){
       valueKind = AutomaticEnumValueKind::String;
     } else if (std::any_of(otherLiteralProtocolKinds.begin(),
                            otherLiteralProtocolKinds.end(),
@@ -3424,6 +3423,7 @@ public:
                       NTD->getName(),
                       proto->getName());
         }
+        NTD->setInvalid();
         return true;
       }
 
@@ -3438,6 +3438,7 @@ public:
                         diag::unsupported_type_nested_in_generic_type,
                         NTD->getName(),
                         parent->getName());
+          NTD->setInvalid();
           return true;
         } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
           auto *parent = ED->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -3808,9 +3809,9 @@ public:
     return hadError;
   }
 
-  void semaFuncDecl(FuncDecl *FD, GenericTypeResolver *resolver) {
+  bool semaFuncDecl(FuncDecl *FD, GenericTypeResolver *resolver) {
     if (FD->hasType())
-      return;
+      return true;
 
     TC.checkForForbiddenPrefix(FD);
 
@@ -3836,12 +3837,13 @@ public:
     // Checking the function parameter patterns might (recursively)
     // end up setting the type.
     if (FD->hasType())
-      return;
+      return true;
 
     if (badType) {
       FD->setType(ErrorType::get(TC.Context));
+      FD->setInterfaceType(ErrorType::get(TC.Context));
       FD->setInvalid();
-      return;
+      return true;
     }
 
     Type funcTy = FD->getBodyResultTypeLoc().getType();
@@ -3864,8 +3866,9 @@ public:
       Type argTy = paramLists[e - i - 1]->getType(TC.Context);
       if (!argTy) {
         FD->setType(ErrorType::get(TC.Context));
+        FD->setInterfaceType(ErrorType::get(TC.Context));
         FD->setInvalid();
-        return;
+        return true;
       }
 
       // Determine the appropriate generic parameters at this level.
@@ -3887,19 +3890,7 @@ public:
     FD->setType(funcTy);
     FD->setBodyResultType(bodyResultType);
 
-    // For a non-generic method that returns dynamic Self, we need to
-    // provide an interface type where the 'self' argument is the
-    // nominal type.
-    if (FD->hasDynamicSelf() && !genericParams && !outerGenericParams) {
-      auto fnType = FD->getType()->castTo<FunctionType>();
-      auto inputType = fnType->getInput().transform([&](Type type) -> Type {
-        if (type->is<DynamicSelfType>())
-          return FD->getExtensionType();
-        return type;
-      });
-      FD->setInterfaceType(FunctionType::get(inputType, fnType->getResult(),
-                                             fnType->getExtInfo()));
-    }
+    return false;
   }
 
   /// Bind the given function declaration, which declares an operator, to
@@ -4061,8 +4052,16 @@ public:
     if (simpleRepr->getIdentifier() != TC.Context.Id_Self)
       return false;
 
+    // 'Self' in protocol extensions is not dynamic 'Self'.
+    DeclContext *dc = func->getDeclContext();
+    for (auto parentDC = dc; !parentDC->isModuleScopeContext();
+         parentDC = parentDC->getParent()) {
+      if (parentDC->getAsProtocolExtensionContext()) {
+        return false;
+      }
+    }
+
     // Dynamic 'Self' is only permitted on methods.
-    auto dc = func->getDeclContext();
     if (!dc->isTypeContext()) {
       TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_non_method,
                   dc->isLocalContext());
@@ -4070,12 +4069,8 @@ public:
       return true;
     }
 
-    // 'Self' in protocol extensions is not dynamic 'Self'.
-    if (dc->getAsProtocolExtensionContext()) {
-      return false;
-    }
-
-    // 'Self' is only a dynamic self on class methods.
+    // 'Self' is only a dynamic self on class methods and
+    // protocol requirements.
     auto declaredType = dc->getDeclaredTypeOfContext();
     if (declaredType->is<ErrorType>())
       return false;
@@ -4238,7 +4233,11 @@ public:
 
     // Type check the parameters and return type again, now with archetypes.
     GenericTypeToArchetypeResolver resolver;
-    semaFuncDecl(FD, &resolver);
+    if (semaFuncDecl(FD, &resolver))
+      return;
+
+    if (!FD->isGenericContext())
+      TC.configureInterfaceType(FD);
 
     if (FD->isInvalid())
       return;
@@ -5229,6 +5228,7 @@ public:
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(AutoClosure)
     UNINTERESTING_ATTR(NoEscape)
+    UNINTERESTING_ATTR(Escaping)
 
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
@@ -5757,6 +5757,7 @@ public:
   void visitConstructorDecl(ConstructorDecl *CD) {
     if (CD->isInvalid()) {
       CD->overwriteType(ErrorType::get(TC.Context));
+      CD->setInterfaceType(ErrorType::get(TC.Context));
       return;
     }
 
@@ -5855,10 +5856,14 @@ public:
     // Type check the constructor parameters.
     if (CD->isInvalid() || semaFuncParamPatterns(CD)) {
       CD->overwriteType(ErrorType::get(TC.Context));
+      CD->setInterfaceType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
       configureConstructorType(CD, SelfTy,
                                CD->getParameterList(1)->getType(TC.Context));
+
+      if (!CD->isGenericContext())
+        TC.configureInterfaceType(CD);
     }
 
     validateAttributes(TC, CD);
@@ -5964,6 +5969,7 @@ public:
   void visitDestructorDecl(DestructorDecl *DD) {
     if (DD->isInvalid()) {
       DD->overwriteType(ErrorType::get(TC.Context));
+      DD->setInterfaceType(ErrorType::get(TC.Context));
       return;
     }
 
@@ -5992,8 +5998,12 @@ public:
 
     if (semaFuncParamPatterns(DD)) {
       DD->overwriteType(ErrorType::get(TC.Context));
+      DD->setInterfaceType(ErrorType::get(TC.Context));
       DD->setInvalid();
     }
+
+    if (!DD->isGenericContext())
+      TC.configureInterfaceType(DD);
 
     if (!DD->hasType()) {
       Type FnTy;
@@ -6994,13 +7004,13 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
                                 ConformanceCheckFlags::InExpression)) \
         return std::string(String); \
     }
-    CHECK_LITERAL_PROTOCOL(ArrayLiteralConvertible, "[]")
-    CHECK_LITERAL_PROTOCOL(DictionaryLiteralConvertible, "[:]")
-    CHECK_LITERAL_PROTOCOL(UnicodeScalarLiteralConvertible, "\"\"")
-    CHECK_LITERAL_PROTOCOL(ExtendedGraphemeClusterLiteralConvertible, "\"\"")
-    CHECK_LITERAL_PROTOCOL(FloatLiteralConvertible, "0.0")
-    CHECK_LITERAL_PROTOCOL(IntegerLiteralConvertible, "0")
-    CHECK_LITERAL_PROTOCOL(StringLiteralConvertible, "\"\"")
+    CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")
+    CHECK_LITERAL_PROTOCOL(ExpressibleByDictionaryLiteral, "[:]")
+    CHECK_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "\"\"")
+    CHECK_LITERAL_PROTOCOL(ExpressibleByExtendedGraphemeClusterLiteral, "\"\"")
+    CHECK_LITERAL_PROTOCOL(ExpressibleByFloatLiteral, "0.0")
+    CHECK_LITERAL_PROTOCOL(ExpressibleByIntegerLiteral, "0")
+    CHECK_LITERAL_PROTOCOL(ExpressibleByStringLiteral, "\"\"")
 #undef CHECK_LITERAL_PROTOCOL
 
     // For optional types, use 'nil'.

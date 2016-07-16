@@ -1543,21 +1543,21 @@ static KnownProtocolKind
 protocolForLiteralKind(CodeCompletionLiteralKind kind) {
   switch (kind) {
   case CodeCompletionLiteralKind::ArrayLiteral:
-    return KnownProtocolKind::ArrayLiteralConvertible;
+    return KnownProtocolKind::ExpressibleByArrayLiteral;
   case CodeCompletionLiteralKind::BooleanLiteral:
-    return KnownProtocolKind::BooleanLiteralConvertible;
+    return KnownProtocolKind::ExpressibleByBooleanLiteral;
   case CodeCompletionLiteralKind::ColorLiteral:
-    return KnownProtocolKind::ColorLiteralConvertible;
+    return KnownProtocolKind::ExpressibleByColorLiteral;
   case CodeCompletionLiteralKind::ImageLiteral:
-    return KnownProtocolKind::ImageLiteralConvertible;
+    return KnownProtocolKind::ExpressibleByImageLiteral;
   case CodeCompletionLiteralKind::DictionaryLiteral:
-    return KnownProtocolKind::DictionaryLiteralConvertible;
+    return KnownProtocolKind::ExpressibleByDictionaryLiteral;
   case CodeCompletionLiteralKind::IntegerLiteral:
-    return KnownProtocolKind::IntegerLiteralConvertible;
+    return KnownProtocolKind::ExpressibleByIntegerLiteral;
   case CodeCompletionLiteralKind::NilLiteral:
-    return KnownProtocolKind::NilLiteralConvertible;
+    return KnownProtocolKind::ExpressibleByNilLiteral;
   case CodeCompletionLiteralKind::StringLiteral:
-    return KnownProtocolKind::StringLiteralConvertible;
+    return KnownProtocolKind::ExpressibleByStringLiteral;
   case CodeCompletionLiteralKind::Tuple:
     llvm_unreachable("no such protocol kind");
   }
@@ -2167,27 +2167,21 @@ public:
 
     bool modifiedBuilder = false;
 
-    // Do not desugar AFT->getInput(), as we want to treat (_: (a,b)) distinctly
-    // from (a,b) for code-completion.
-    if (auto *TT = dyn_cast<TupleType>(AFT->getInput().getPointer())) {
-      bool NeedComma = false;
-      // Iterate over the tuple type fields, corresponding to each parameter.
-      for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
-        auto defArg = DefaultArgumentKind::None;
-        if (BodyParams && i < BodyParams->size())
-          defArg = BodyParams->get(i)->getDefaultArgumentKind();
-        switch (defArg) {
+    // Determine whether we should skip this argument because it is defaulted.
+    auto shouldSkipArg = [&](unsigned i) -> bool {
+      if (!BodyParams || i >= BodyParams->size())
+        return false;
+
+      switch (BodyParams->get(i)->getDefaultArgumentKind()) {
         case DefaultArgumentKind::None:
-          break;
+          return false;
 
         case DefaultArgumentKind::Normal:
         case DefaultArgumentKind::Inherited:
         case DefaultArgumentKind::Nil:
         case DefaultArgumentKind::EmptyArray:
         case DefaultArgumentKind::EmptyDictionary:
-          if (includeDefaultArgs)
-            break;
-          continue;
+          return !includeDefaultArgs;
 
         case DefaultArgumentKind::File:
         case DefaultArgumentKind::Line:
@@ -2197,8 +2191,18 @@ public:
           // Skip parameters that are defaulted to source location or other
           // caller context information.  Users typically don't want to specify
           // these parameters.
-          continue;
-        }
+          return true;
+      }
+    };
+
+    // Do not desugar AFT->getInput(), as we want to treat (_: (a,b)) distinctly
+    // from (a,b) for code-completion.
+    if (auto *TT = dyn_cast<TupleType>(AFT->getInput().getPointer())) {
+      bool NeedComma = false;
+      // Iterate over the tuple type fields, corresponding to each parameter.
+      for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
+        // If we should skip this argument, do so.
+        if (shouldSkipArg(i)) continue;
 
         const auto &TupleElt = TT->getElement(i);
         auto ParamType = TupleElt.isVararg() ? TupleElt.getVarargBaseTy()
@@ -2218,7 +2222,7 @@ public:
         modifiedBuilder = true;
         NeedComma = true;
       }
-    } else {
+    } else if (!shouldSkipArg(0)) {
       // If it's not a tuple, it could be a unary function.
       Type T = AFT->getInput();
       if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
@@ -3090,8 +3094,9 @@ public:
       return false;
     }
 
-    // Ignore the internal members of Optional, like getLogicValue() and
-    // _getMirror().
+    // Ignore the members of Optional, like getLogicValue(), map(), and
+    // flatMap().
+    //
     // These are not commonly used and cause noise and confusion when showing
     // among the members of the underlying type. If someone really wants to
     // use them they can write them directly.
@@ -4061,8 +4066,9 @@ public:
 
     bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
     bool missingAccess = !isKeywordSpecified("private") &&
-                         !isKeywordSpecified("public") &&
-                         !isKeywordSpecified("internal");
+                         !isKeywordSpecified("fileprivate") &&
+                         !isKeywordSpecified("internal") &&
+                         !isKeywordSpecified("public");
     bool missingOverride = Reason == DeclVisibilityKind::MemberOfSuper &&
                            !isKeywordSpecified("override");
 

@@ -508,8 +508,27 @@ extension ${Self}: BinaryFloatingPoint {
       significandBitPattern: significandBitPattern + 1)
   }
 
-  public var nextDown: ${Self} {
-    return -(-self).nextUp
+  @_transparent
+  public mutating func round(_ rule: FloatingPointRoundingRule) {
+    switch rule {
+    case .toNearestOrAwayFromZero:
+      _value = Builtin.int_round_FPIEEE${bits}(_value)
+    case .toNearestOrEven:
+      _value = Builtin.int_rint_FPIEEE${bits}(_value)
+    case .towardZero:
+      _value = Builtin.int_trunc_FPIEEE${bits}(_value)
+    case .awayFromZero:
+      if sign == .minus {
+        _value = Builtin.int_floor_FPIEEE${bits}(_value)
+      }
+      else {
+        _value = Builtin.int_ceil_FPIEEE${bits}(_value)
+      }
+    case .up:
+      _value = Builtin.int_ceil_FPIEEE${bits}(_value)
+    case .down:
+      _value = Builtin.int_floor_FPIEEE${bits}(_value)
+    }
   }
 
   @_transparent
@@ -537,30 +556,34 @@ extension ${Self}: BinaryFloatingPoint {
     _value = Builtin.fdiv_FPIEEE${bits}(self._value, other._value)
   }
 
-  /*  TODO: Need a remainder builtin or to call C remainder[fl] for this
   @_transparent
   public mutating func formRemainder(dividingBy other: ${Self}) {
-    fatalError("Unimplemented")
+%if bits == 80:
+    var other = other
+    _swift_stdlib_remainderl(&self, &other)
+%else:
+    self = _swift_stdlib_remainder${cFuncSuffix(bits)}(self, other)
+%end
   }
-  */
 
   @_transparent
   public mutating func formTruncatingRemainder(dividingBy other: ${Self}) {
     _value = Builtin.frem_FPIEEE${bits}(self._value, other._value)
   }
 
-  /*  TODO: Need to call C sqrt and fma or llvm sqrt and fma intrinsics
-   *  for these.
   @_transparent
   public mutating func formSquareRoot( ) {
-    fatalError("Unimplemented.")
+%if bits == 80:
+    _swift_stdlib_squareRootl(&self)
+%else:
+    self = _swift_stdlib_squareRoot${cFuncSuffix(bits)}(self)
+%end
   }
 
   @_transparent
   public mutating func addProduct(_ lhs: ${Self}, _ rhs: ${Self}) {
-    fatalError("Unimplemented.")
+    _value = Builtin.int_fma_FPIEEE${bits}(lhs._value, rhs._value, _value)
   }
-  */
 
   @_transparent
   public func isEqual(to other: ${Self}) -> Bool {
@@ -644,7 +667,7 @@ extension ${Self}: BinaryFloatingPoint {
 }
 
 @_transparent
-extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible {
+extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral {
   public
   init(_builtinIntegerLiteral value: Builtin.Int${builtinIntLiteralBits}){
     self = ${Self}(_bits: Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
@@ -660,7 +683,7 @@ extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible
 
 % builtinFloatLiteralBits = 80
 @_transparent
-extension ${Self} : _BuiltinFloatLiteralConvertible {
+extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
@@ -678,7 +701,7 @@ extension ${Self} : _BuiltinFloatLiteralConvertible {
 
 % builtinFloatLiteralBits = 64
 @_transparent
-extension ${Self} : _BuiltinFloatLiteralConvertible {
+extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
@@ -725,12 +748,10 @@ extension ${Self} : Hashable {
   }
 }
 
-@_transparent
-extension ${Self} : AbsoluteValuable {
-  /// Returns the absolute value of `x`.
+extension ${Self} : Arithmetic {
   @_transparent
-  public static func abs(_ x: ${Self}) -> ${Self} {
-    return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x._value))
+  public var magnitude: ${Self} {
+    return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(_value))
   }
 }
 
@@ -967,4 +988,13 @@ extension ${Self} {
 %     end
 %   end
 }
+
+
+extension ${Self} {
+  @available(*, unavailable, message: "Please use the `abs(_:)` free function")
+  public static func abs(_ x: ${Self}) -> ${Self} {
+    fatalError("unavailable")
+  }
+}
+
 % end # for (bits, signed) in allInts()

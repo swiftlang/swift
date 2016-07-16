@@ -557,6 +557,7 @@ private:
 
     // Do not add a semi or comma as it is wrong in most cases during migration
     if (Info.ID == diag::statement_same_line_without_semi.ID ||
+        Info.ID == diag::declaration_same_line_without_semi.ID ||
         Info.ID == diag::expected_separator.ID)
       return false;
     // The following interact badly with the swift migrator, they are undoing
@@ -570,15 +571,35 @@ private:
     if (Info.ID == diag::objc_witness_selector_mismatch.ID ||
         Info.ID == diag::witness_non_objc.ID)
       return false;
+    // The following interact badly with the swift migrator by removing @IB*
+    // attributes when there is some unrelated type issue.
+    if (Info.ID == diag::invalid_iboutlet.ID ||
+        Info.ID == diag::iboutlet_nonobjc_class.ID ||
+        Info.ID == diag::iboutlet_nonobjc_protocol.ID ||
+        Info.ID == diag::iboutlet_nonobject_type.ID ||
+        Info.ID == diag::iboutlet_only_mutable.ID ||
+        Info.ID == diag::invalid_ibdesignable_extension.ID ||
+        Info.ID == diag::invalid_ibinspectable.ID ||
+        Info.ID == diag::invalid_ibaction_decl.ID)
+      return false;
+    // Adding .dynamicType interacts poorly with the swift migrator by
+    // invalidating some inits with type errors.
+    if (Info.ID == diag::init_not_instance_member.ID)
+      return false;
 
     if (Kind == DiagnosticKind::Error)
       return true;
+
+    // Fixits from warnings/notes that should be applied.
     if (Info.ID == diag::forced_downcast_coercion.ID ||
         Info.ID == diag::forced_downcast_noop.ID ||
         Info.ID == diag::variable_never_mutated.ID ||
         Info.ID == diag::function_type_no_parens.ID ||
         Info.ID == diag::convert_let_to_var.ID ||
-        Info.ID == diag::parameter_extraneous_double_up.ID)
+        Info.ID == diag::parameter_extraneous_double_up.ID ||
+        Info.ID == diag::attr_decl_attr_now_on_type.ID ||
+        Info.ID == diag::selector_construction_suggest.ID ||
+        Info.ID == diag::selector_literal_deprecated_suggest.ID)
       return true;
     return false;
   }

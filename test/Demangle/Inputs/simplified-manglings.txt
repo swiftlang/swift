@@ -194,6 +194,6 @@ _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_F
 _TFC3red11BaseClassEHcfzT1aSi_S0_ ---> BaseClassEH.init(a : Int) throws -> BaseClassEH
 _TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1aSi ---> Foo<A where ...>.a.getter
 _TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1bx ---> Foo<A where ...>.b.getter
-_TTRXFo_iT__iT_zoPs13ErrorProtocol__XFo__dT_zoPS___ ---> thunk
+_TTRXFo_iT__iT_zoPs5Error__XFo__dT_zoPS___ ---> thunk
 _TFE1a ---> _TFE1a
 _TFC4testP33_83378C430F65473055F1BD53F3ADCDB71C5doFoofT_T_ ---> C.doFoo() -> ()

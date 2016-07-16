@@ -93,6 +93,10 @@ ERROR(could_not_use_type_member,none,
 ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclName))
+WARNING(could_not_use_enum_element_on_instance,none,
+      "referencing enum element %0 as instance member is deprecated and will "
+      "be removed in Swift 3",
+      (DeclName))
 ERROR(could_not_use_type_member_on_existential,none,
       "static member %1 cannot be used on protocol metatype %0",
       (Type, DeclName))
@@ -276,9 +280,9 @@ ERROR(cannot_convert_to_return_type_nil,none,
       "nil is incompatible with return type %0", (Type))
 
 ERROR(cannot_convert_thrown_type,none,
-      "thrown expression type %0 does not conform to 'ErrorProtocol'", (Type))
+      "thrown expression type %0 does not conform to 'Error'", (Type))
 ERROR(cannot_throw_nil,none,
-      "cannot infer concrete ErrorProtocol for thrown 'nil' value", ())
+      "cannot infer concrete Error for thrown 'nil' value", ())
 
 
 ERROR(cannot_convert_raw_initializer_value,none,
@@ -555,6 +559,8 @@ ERROR(use_undeclared_type_did_you_mean,none,
       "use of undeclared type %0; did you mean to use '%1'?", (Identifier, StringRef))
 NOTE(note_typo_candidate,none,
      "did you mean '%0'?", (StringRef))
+NOTE(note_typo_candidate_implicit_member,none,
+     "did you mean the implicitly-synthesized %1 '%0'?", (StringRef, StringRef))
 NOTE(note_remapped_type,none,
      "did you mean to use '%0'?", (StringRef))
 ERROR(identifier_init_failure,none,
@@ -828,7 +834,7 @@ ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
 
 // Attributes
-WARNING(attr_decl_attr_now_on_type,none,
+ERROR(attr_decl_attr_now_on_type,none,
       "%0 is now an attribute on a parameter type, "
       "instead of on the parameter itself", (StringRef))
 
@@ -939,10 +945,6 @@ ERROR(access_control_setter_more,none,
       "%select{variable|property|subscript}1 cannot have "
       "%select{PRIVATE|an internal|a public}2 setter",
       (Accessibility, unsigned, Accessibility))
-WARNING(access_control_member_more,none,
-    "declaring %select{PRIVATE|an internal|a public}0 %1 for "
-    "%select{a private|an internal|PUBLIC}2 %3",
-    (Accessibility, DescriptiveDeclKind, Accessibility, DescriptiveDeclKind))
 WARNING(access_control_ext_member_more,none,
     "declaring %select{PRIVATE|an internal|a public}0 %1 in "
     "%select{a private|an internal|PUBLIC}2 extension",
@@ -1609,7 +1611,7 @@ ERROR(circular_enum_inheritance,none,
 ERROR(raw_type_not_first,none,
   "raw type %0 must appear first in the enum inheritance clause", (Type))
 ERROR(raw_type_not_literal_convertible,none,
-      "raw type %0 is not convertible from any literal",
+      "raw type %0 is not expressible by any literal",
       (Type))
 ERROR(enum_raw_type_not_equatable,none,
       "RawRepresentable 'init' cannot be synthesized because raw type %0 is not "
@@ -1637,8 +1639,8 @@ ERROR(objc_enum_raw_type_not_integer,none,
 ERROR(enum_non_integer_raw_value_auto_increment,none,
       "enum case must declare a raw value when the preceding raw value is not an integer", ())
 ERROR(enum_non_integer_convertible_raw_type_no_value,none,
-      "enum cases require explicit raw values when the raw type is not integer "
-      "or string literal convertible", ())
+      "enum cases require explicit raw values when the raw type is not "
+      "expressible by integer or string literal", ())
 ERROR(enum_raw_value_not_unique,none,
       "raw value for enum case is not unique", ())
 NOTE(enum_raw_value_used_here,none,
@@ -1657,11 +1659,11 @@ ERROR(broken_equatable_requirement,none,
 ERROR(broken_hashable_requirement,none,
       "Hashable protocol is broken: unexpected requirement", ())
 ERROR(broken_errortype_requirement,none,
-      "ErrorProtocol protocol is broken: unexpected requirement", ())
+      "Error protocol is broken: unexpected requirement", ())
 ERROR(broken_int_hashable_conformance,none,
       "Int type is broken: does not conform to Hashable", ())
 ERROR(broken_int_integer_literal_convertible_conformance,none,
-      "Int type is broken: does not conform to IntegerLiteralConvertible", ())
+      "Int type is broken: does not conform to ExpressibleByIntegerLiteral", ())
 ERROR(broken_equatable_eq_operator,none,
       "Equatable protocol is broken: no infix operator declaration for '=='", ())
 ERROR(no_equal_overload_for_int,none,
@@ -1786,7 +1788,8 @@ ERROR(noescape_implied_by_autoclosure,none,
       "redundantly specified", ())
 ERROR(noescape_conflicts_escaping_autoclosure,none,
       "@noescape conflicts with @autoclosure(escaping)", ())
-
+ERROR(escaping_function_type,none,
+      "@escaping may only be applied to parameters of function type", ())
 
 // NSManaged attribute
 ERROR(attr_NSManaged_not_instance_member,none,
@@ -2012,10 +2015,10 @@ ERROR(optional_used_as_true_boolean,none,
       "test for '== nil' instead", (Type))
 
 ERROR(interpolation_missing_proto,none,
-      "string interpolation requires the protocol 'StringInterpolationConvertible' to be defined",
+      "string interpolation requires the protocol 'ExpressibleByStringInterpolation' to be defined",
       ())
 ERROR(interpolation_broken_proto,none,
-      "protocol 'StringInterpolationConvertible' is broken",
+      "protocol 'ExpressibleByStringInterpolation' is broken",
       ())
 
 ERROR(object_literal_broken_proto,none,
@@ -2047,44 +2050,44 @@ ERROR(specific_type_of_expression_is_ambiguous,none,
 ERROR(missing_protocol,none,
       "missing protocol %0", (Identifier))
 ERROR(nil_literal_broken_proto,none,
-      "protocol 'NilLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByNilLiteral' is broken", ())
 
 ERROR(builtin_integer_literal_broken_proto,none,
-      "protocol '_BuiltinIntegerLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinIntegerLiteral' is broken", ())
 ERROR(integer_literal_broken_proto,none,
-      "protocol 'IntegerLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByIntegerLiteral' is broken", ())
 
 ERROR(builtin_float_literal_broken_proto,none,
-      "protocol '_BuiltinFloatLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinFloatLiteral' is broken", ())
 ERROR(float_literal_broken_proto,none,
-      "protocol 'FloatLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByFloatLiteral' is broken", ())
 
 ERROR(builtin_boolean_literal_broken_proto,none,
-      "protocol '_BuiltinBooleanLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinBooleanLiteral' is broken", ())
 ERROR(boolean_literal_broken_proto,none,
-      "protocol 'BooleanLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByBooleanLiteral' is broken", ())
 
 ERROR(builtin_unicode_scalar_literal_broken_proto,none,
-      "protocol '_BuiltinUnicodeScalarLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinUnicodeScalarLiteral' is broken", ())
 ERROR(unicode_scalar_literal_broken_proto,none,
-      "protocol 'UnicodeScalarLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByUnicodeScalarLiteral' is broken", ())
 
 ERROR(builtin_extended_grapheme_cluster_literal_broken_proto,none,
-      "protocol '_BuiltinExtendedGraphemeClusterLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinExtendedGraphemeClusterLiteral' is broken", ())
 ERROR(extended_grapheme_cluster_literal_broken_proto,none,
-      "protocol 'ExtendedGraphemeClusterLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByExtendedGraphemeClusterLiteral' is broken", ())
 
 ERROR(builtin_string_literal_broken_proto,none,
-      "protocol '_BuiltinStringLiteralConvertible' is broken", ())
+      "protocol '_ExpressibleByBuiltinStringLiteral' is broken", ())
 ERROR(string_literal_broken_proto,none,
-      "protocol 'StringLiteralConvertible' is broken", ())
+      "protocol 'ExpressibleByStringLiteral' is broken", ())
 
 ERROR(bool_type_broken,none,
       "could not find a Bool type defined for 'is'", ())
 
 // Array literals
 ERROR(array_protocol_broken,none,
-      "ArrayLiteralConvertible protocol definition is broken", ())
+      "ExpressibleByArrayLiteral protocol definition is broken", ())
 ERROR(type_is_not_array,none,
       "contextual type %0 cannot be used with array literal", (Type))
 NOTE(meant_dictionary_lit,none,
@@ -2094,7 +2097,7 @@ ERROR(should_use_empty_dictionary_literal,none,
 
 // Dictionary literals
 ERROR(dictionary_protocol_broken,none,
-      "DictionaryLiteralConvertible protocol definition is broken", ())
+      "ExpressibleByDictionaryLiteral protocol definition is broken", ())
 ERROR(type_is_not_dictionary,none,
       "contextual type %0 cannot be used with dictionary literal", (Type))
 
@@ -2340,6 +2343,10 @@ NOTE(add_where_newline, none,
 NOTE(duplicate_where, none,
      "duplicate the 'where' on both patterns to check both patterns",())
 
+ERROR(trailing_closure_requires_parens,none,
+      "trailing closure requires parentheses for disambiguation in this"
+      " context", ())
+
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
@@ -2495,7 +2502,7 @@ ERROR(recursive_enum_not_indirect,none,
 ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
       "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
-      "ErrorProtocol}0 type", (unsigned))
+      "Error}0 type", (unsigned))
 ERROR(optional_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Optional<T>", ())
@@ -2669,8 +2676,8 @@ ERROR(objc_invalid_with_generic_params,none,
 ERROR(objc_convention_invalid,none,
       "%0 is not representable in Objective-C, so it cannot be used"
       " with '@convention(%1)'", (Type, StringRef))
-WARNING(function_type_no_parens,none,
-        "single argument function types require parentheses", ())
+ERROR(function_type_no_parens,none,
+      "single argument function types require parentheses", ())
 NOTE(not_objc_empty_protocol_composition,none,
      "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,none,
@@ -2936,10 +2943,6 @@ ERROR(availability_inout_accessor_only_version_newer, none,
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
 
-WARNING(availability_query_useless_min_deployment, none,
-        "unnecessary check for '%0'; minimum deployment target ensures guard "
-        "will always be true", (StringRef))
-
 WARNING(availability_query_useless_enclosing_scope, none,
         "unnecessary check for '%0'; enclosing scope ensures guard "
         "will always be true", (StringRef))
@@ -3011,6 +3014,10 @@ WARNING(extraneous_default_args_in_call, none,
 //------------------------------------------------------------------------------
 ERROR(circular_reference, none,
       "circular reference", ())
+
+ERROR(redundant_type_alias_define, none,
+"redundant type alias declaration", ())
+
 NOTE(circular_reference_through, none,
      "through reference here", ())
 

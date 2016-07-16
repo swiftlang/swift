@@ -949,33 +949,47 @@ Reflection.test("CustomMirror") {
 
     expectEqual(expected, output)
   }
+}
 
-  do {
-    // Check that object identifiers are unique to class instances.
-    let a = Brilliant(1, "")
-    let b = Brilliant(2, "")
-    let c = Brilliant(3, "")
+Reflection.test("ObjectIdentifier/Hashable,Comparable") {
+  // Check that object identifiers are unique to class instances.
+  let a = Brilliant(1, "")
+  let b = Brilliant(2, "")
+  let c = Brilliant(3, "")
 
-    // Equatable
-    checkEquatable(true, ObjectIdentifier(a), ObjectIdentifier(a))
-    checkEquatable(false, ObjectIdentifier(a), ObjectIdentifier(b))
+  checkHashable(
+    [a, b, c].map(ObjectIdentifier.init),
+    equalityOracle: { $0 == $1 })
 
-    // Comparable
-    func isComparable<X : Comparable>(_ x: X) {}
-    isComparable(ObjectIdentifier(a))
-    // Check the ObjectIdentifier created is stable
-    expectTrue(
-      (ObjectIdentifier(a) < ObjectIdentifier(b))
-      != (ObjectIdentifier(a) > ObjectIdentifier(b)))
-    expectFalse(
-      ObjectIdentifier(a) >= ObjectIdentifier(b)
-      && ObjectIdentifier(a) <= ObjectIdentifier(b))
+  // Comparable
+  func isComparable<X : Comparable>(_ x: X) {}
+  isComparable(ObjectIdentifier(a))
+  // Check the ObjectIdentifier created is stable
+  expectTrue(
+    (ObjectIdentifier(a) < ObjectIdentifier(b))
+    != (ObjectIdentifier(a) > ObjectIdentifier(b)))
+  expectFalse(
+    ObjectIdentifier(a) >= ObjectIdentifier(b)
+    && ObjectIdentifier(a) <= ObjectIdentifier(b))
 
-    // Check that ordering is transitive.
-    expectEqual(
-      [ ObjectIdentifier(a), ObjectIdentifier(b), ObjectIdentifier(c) ].sorted(),
-      [ ObjectIdentifier(c), ObjectIdentifier(b), ObjectIdentifier(a) ].sorted())
-  }
+  // Check that ordering is transitive.
+  expectEqual(
+    [ ObjectIdentifier(a), ObjectIdentifier(b), ObjectIdentifier(c) ].sorted(),
+    [ ObjectIdentifier(c), ObjectIdentifier(b), ObjectIdentifier(a) ].sorted())
+}
+
+Reflection.test("ObjectIdentifier/CustomDebugStringConvertible") {
+  let obj1 = Brilliant(1, "")
+  let obj2 = Brilliant(2, "")
+
+  let oi1 = ObjectIdentifier(obj1)
+  let oi2 = ObjectIdentifier(obj2)
+
+  expectEqual(String(reflecting: oi1), String(reflecting: oi1))
+  expectNotEqual(String(reflecting: oi1), String(reflecting: oi2))
+
+  let p1 = UnsafePointer<Void>(bitPattern: UInt(oi1))!
+  expectPrinted("ObjectIdentifier(\(p1))", oi1)
 }
 
 Reflection.test("CustomMirrorIsInherited") {

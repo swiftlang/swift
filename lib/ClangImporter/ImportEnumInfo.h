@@ -54,8 +54,6 @@ enum class EnumKind {
 };
 
 class EnumInfo {
-  using AttributePtrUnion = clang::NSErrorDomainAttr *;
-
   /// The kind
   EnumKind kind = EnumKind::Unknown;
 
@@ -63,18 +61,15 @@ class EnumInfo {
   /// constants
   StringRef constantNamePrefix = StringRef();
 
-  /// The identifying attribute for specially imported enums
-  ///
-  /// Currently, only NS_ERROR_ENUM creates one for its error domain, but others
-  /// should in the future.
-  AttributePtrUnion attribute = nullptr;
+  /// The name of the NS error domain for Cocoa error enums.
+  StringRef nsErrorDomain = StringRef();
 
 public:
   EnumInfo() = default;
 
   EnumInfo(ASTContext &ctx, const clang::EnumDecl *decl,
            clang::Preprocessor &pp) {
-    classifyEnum(decl, pp);
+    classifyEnum(ctx, decl, pp);
     determineConstantNamePrefix(ctx, decl);
   }
 
@@ -84,18 +79,19 @@ public:
 
   /// Whether this maps to an enum who also provides an error domain
   bool isErrorEnum() const {
-    return getKind() == EnumKind::Enum && attribute;
+    return getKind() == EnumKind::Enum && !nsErrorDomain.empty();
   }
 
   /// For this error enum, extract the name of the error domain constant
-  clang::IdentifierInfo *getErrorDomain() const {
+  StringRef getErrorDomain() const {
     assert(isErrorEnum() && "not error enum");
-    return attribute->getErrorDomain();
+    return nsErrorDomain;
   }
 
 private:
   void determineConstantNamePrefix(ASTContext &ctx, const clang::EnumDecl *);
-  void classifyEnum(const clang::EnumDecl *, clang::Preprocessor &);
+  void classifyEnum(ASTContext &ctx, const clang::EnumDecl *,
+                    clang::Preprocessor &);
 };
 
 // Utility functions of primary interest to enum constant naming

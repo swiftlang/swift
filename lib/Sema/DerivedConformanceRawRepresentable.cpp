@@ -141,8 +141,9 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
     = declareDerivedReadOnlyProperty(tc, parentDecl, enumDecl,
-                                     C.Id_rawValue, rawType,
+                                     C.Id_rawValue,
                                      rawInterfaceType,
+                                     rawType,
                                      getterDecl);
   
   auto dc = cast<IterableDeclContext>(parentDecl);
@@ -304,16 +305,11 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   Type selfMetatype = MetatypeType::get(selfType->getInOutObjectType());
   
   Type allocType;
-  Type initType;
-  if (genericParams) {
+  if (genericParams)
     allocType = PolymorphicFunctionType::get(selfMetatype, type, genericParams);
-    initType = PolymorphicFunctionType::get(selfType, type, genericParams);
-  } else {
+  else
     allocType = FunctionType::get(selfMetatype, type);
-    initType = FunctionType::get(selfType, type);
-  }
   initDecl->setType(allocType);
-  initDecl->setInitializerType(initType);
 
   // Compute the interface type of the initializer.
   Type retInterfaceType

@@ -178,6 +178,10 @@ public:
   /// Return the array of opened archetypes operands for this instruction.
   MutableArrayRef<Operand> getOpenedArchetypeOperands();
 
+  /// Returns true if a given kind of instruciton may have opened archetype
+  /// operands.
+  bool mayHaveOpenedArchetypeOperands() const;
+
   unsigned getNumOperands() const { return getAllOperands().size(); }
 
   unsigned getNumOpenedArchetypeOperands() const {
@@ -2127,8 +2131,17 @@ class PointerToAddressInst
 {
   friend class SILBuilder;
 
-  PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+  bool IsStrict;
+
+  PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+                       bool IsStrict)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty), IsStrict(IsStrict) {}
+
+public:
+  /// Whether the returned address adheres to strict aliasing.
+  /// If true, then the type of each memory access dependent on
+  /// this address must be consistent with the memory's bound type.
+  bool isStrict() const { return IsStrict; }
 };
 
 /// Convert a heap object reference to a different type without any runtime

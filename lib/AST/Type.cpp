@@ -89,6 +89,10 @@ bool TypeBase::hasReferenceSemantics() {
   return getCanonicalType().hasReferenceSemantics();
 }
 
+bool TypeBase::isAny() {
+  return isEqual(getASTContext().getAnyDecl()->getDeclaredType());
+}
+
 bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }
@@ -296,8 +300,7 @@ ArrayRef<Type> TypeBase::getAllGenericArgs(SmallVectorImpl<Type> &scratch) {
     if (auto protoType = type->getAs<ProtocolType>()) {
       auto proto = protoType->getDecl();
       allGenericArgs.push_back(
-        llvm::makeArrayRef(
-          proto->getProtocolSelf()->getDeclaredInterfaceType()));
+        llvm::makeArrayRef(proto->getSelfInterfaceType()));
 
       // Continue up to the parent.
       type = protoType->getParent();
@@ -666,8 +669,27 @@ bool TypeBase::isEmptyExistentialComposition() {
   return false;
 }
 
+bool TypeBase::isExistentialWithError() {
+  // FIXME: Compute this as a bit in TypeBase so this operation isn't
+  // overly expensive.
+  SmallVector<ProtocolDecl *, 4> protocols;
+  if (!getCanonicalType()->isExistentialType(protocols)) return false;
+
+  auto errorProto =
+    getASTContext().getProtocol(KnownProtocolKind::Error);
+  if (!errorProto) return false;
+
+  for (auto proto : protocols) {
+    if (proto == errorProto || proto->inheritsFrom(errorProto))
+      return true;
+  }
+
+  return false;
+}
+
+
 static Type getStrippedType(const ASTContext &context, Type type,
-                            bool stripLabels, bool stripDefaultArgs) {
+                            bool stripLabels) {
   return type.transform([&](Type type) -> Type {
     auto *tuple = dyn_cast<TupleType>(type.getPointer());
     if (!tuple)
@@ -678,30 +700,22 @@ static Type getStrippedType(const ASTContext &context, Type type,
     unsigned idx = 0;
     for (const auto &elt : tuple->getElements()) {
       Type eltTy = getStrippedType(context, elt.getType(),
-                                   stripLabels, stripDefaultArgs);
+                                   stripLabels);
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
-          (elt.hasDefaultArg() && stripDefaultArgs) ||
           (elt.hasName() && stripLabels)) {
         if (!anyChanged) {
           elements.reserve(tuple->getNumElements());
           for (unsigned i = 0; i != idx; ++i) {
             const TupleTypeElt &elt = tuple->getElement(i);
             Identifier newName = stripLabels? Identifier() : elt.getName();
-            DefaultArgumentKind newDefArg
-              = stripDefaultArgs? DefaultArgumentKind::None
-                                : elt.getDefaultArgKind();
-            elements.push_back(TupleTypeElt(elt.getType(), newName, newDefArg,
+            elements.push_back(TupleTypeElt(elt.getType(), newName,
                                             elt.isVararg()));
           }
           anyChanged = true;
         }
 
         Identifier newName = stripLabels? Identifier() : elt.getName();
-        DefaultArgumentKind newDefArg
-          = stripDefaultArgs? DefaultArgumentKind::None
-                            : elt.getDefaultArgKind();
-        elements.push_back(TupleTypeElt(eltTy, newName, newDefArg,
-                                        elt.isVararg()));
+        elements.push_back(TupleTypeElt(eltTy, newName, elt.isVararg()));
       }
       ++idx;
     }
@@ -720,13 +734,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
 }
 
 Type TypeBase::getUnlabeledType(ASTContext &Context) {
-  return getStrippedType(Context, Type(this), /*labels=*/true,
-                         /*defaultArgs=*/true);
-}
-
-Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
-  return getStrippedType(Context, Type(this), /*labels=*/false,
-                         /*defaultArgs=*/true);
+  return getStrippedType(Context, Type(this), /*labels=*/true);
 }
 
 Type TypeBase::getWithoutParens() {
@@ -1131,7 +1139,6 @@ CanType TypeBase::getCanonicalType() {
              "Cannot get canonical type of un-typechecked TupleType!");
       CanElts.push_back(TupleTypeElt(field.getType()->getCanonicalType(),
                                      field.getName(),
-                                     field.getDefaultArgKind(),
                                      field.isVararg()));
     }
 
@@ -1497,9 +1504,6 @@ bool TypeBase::isSpelledLike(Type other) {
       return false;
     for (size_t i = 0, sz = tMe->getNumElements(); i < sz; ++i) {
       auto &myField = tMe->getElement(i), &theirField = tThem->getElement(i);
-      if (myField.hasDefaultArg() != theirField.hasDefaultArg())
-        return false;
-      
       if (myField.getName() != theirField.getName())
         return false;
       
@@ -1598,76 +1602,37 @@ bool TypeBase::isSpelledLike(Type other) {
 }
 
 Type TypeBase::getSuperclass(LazyResolver *resolver) {
-  // If this type is either a bound generic type, or a nested type inside a
-  // bound generic type, we will need to fish out the generic parameters.
-  Type specializedTy;
+  ClassDecl *classDecl = getClassOrBoundGenericClass();
 
-  ClassDecl *classDecl;
-  if (auto classTy = getAs<ClassType>()) {
-    classDecl = classTy->getDecl();
-    if (auto parentTy = classTy->getParent()) {
-      if (parentTy->isSpecialized())
-        specializedTy = parentTy;
-    }
-  } else if (auto boundTy = getAs<BoundGenericType>()) {
-    classDecl = dyn_cast<ClassDecl>(boundTy->getDecl());
-    specializedTy = this;
-  } else if (auto archetype = getAs<ArchetypeType>()) {
-    return archetype->getSuperclass();
-  } else if (auto dynamicSelfTy = getAs<DynamicSelfType>()) {
-    return dynamicSelfTy->getSelfType();
-  } else {
+  // Handle some special non-class types here.
+  if (!classDecl) {
+    if (auto archetype = getAs<ArchetypeType>())
+      return archetype->getSuperclass();
+
+    if (auto dynamicSelfTy = getAs<DynamicSelfType>())
+      return dynamicSelfTy->getSelfType();
+
     // No other types have superclasses.
     return nullptr;
   }
 
-  // Get the superclass type. If the class is generic, the superclass type may
-  // contain generic type parameters from the signature of the class.
-  Type superclassTy;
-  if (classDecl)
-    superclassTy = classDecl->getSuperclass();
+  // We have a class, so get the superclass type.
+  //
+  // If the derived class is generic, the superclass type may contain
+  // generic type parameters from the signature of the derived class.
+  Type superclassTy = classDecl->getSuperclass();
 
-  // If there's no superclass, return a null type. If the class is not in a
-  // generic context, return the original superclass type.
-  if (!superclassTy || !classDecl->isGenericContext())
+  // If there's no superclass, or it is fully concrete, we're done.
+  if (!superclassTy || !superclassTy->hasTypeParameter())
     return superclassTy;
 
-  // The class is defined in a generic context, so its superclass type may refer
-  // to generic parameters of the class or some parent type of the class. Map
-  // it to a contextual type.
-
-  // FIXME: Lame to rely on archetypes in the substitution below.
-  superclassTy = ArchetypeBuilder::mapTypeIntoContext(classDecl, superclassTy);
-
-  // If the type does not bind any generic parameters, return the superclass
-  // type as-is.
-  if (!specializedTy)
-    return superclassTy;
-
-  // If the type is specialized, we need to gather all of the substitutions
-  // for the type and any parent types.
-  TypeSubstitutionMap substitutions;
-  while (specializedTy) {
-    if (auto nominalTy = specializedTy->getAs<NominalType>()) {
-      specializedTy = nominalTy->getParent();
-      continue;
-    }
-
-    // Introduce substitutions for each of the generic parameters/arguments.
-    auto boundTy = specializedTy->castTo<BoundGenericType>();
-    auto gp = boundTy->getDecl()->getGenericParams()->getParams();
-    for (unsigned i = 0, n = boundTy->getGenericArgs().size(); i != n; ++i) {
-      auto archetype = gp[i]->getArchetype();
-      substitutions[archetype] = boundTy->getGenericArgs()[i];
-    }
-
-    specializedTy = boundTy->getParent();
-  }
-
-  // Perform substitutions into the superclass type to yield the
-  // substituted superclass type.
+  // Gather substitutions from the self type, and apply them to the original
+  // superclass type to form the substituted superclass type.
   Module *module = classDecl->getModuleContext();
-  return superclassTy.subst(module, substitutions, None);
+  auto *sig = classDecl->getGenericSignatureOfContext();
+  auto subs = sig->getSubstitutionMap(gatherAllSubstitutions(module, resolver));
+
+  return superclassTy.subst(module, subs, None);
 }
 
 bool TypeBase::isExactSuperclassOf(Type ty, LazyResolver *resolver) {
@@ -1992,11 +1957,17 @@ bool TypeBase::isBridgeableObjectType() {
 }
 
 bool TypeBase::isPotentiallyBridgedValueType() {
+  // struct and enum types
   if (auto nominal = getAnyNominal()) {
-    return isa<StructDecl>(nominal) || isa<EnumDecl>(nominal);
+    if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
+      return true;
   }
-  
-  return false;
+
+  // Error existentials.
+  if (isExistentialWithError()) return true;
+
+  // Archetypes.
+  return is<ArchetypeType>();
 }
 
 /// Determine whether this is a representable Objective-C object type.
@@ -2037,6 +2008,13 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   // Objective-C existential types.
   if (type->isObjCExistentialType())
     return ForeignRepresentableKind::Object;
+  
+  // Any can be bridged to id.
+  if (type->getASTContext().LangOpts.EnableIdAsAny) {
+    if (type->isAny()) {
+      return ForeignRepresentableKind::Bridged;
+    }
+  }
   
   // Class-constrained generic parameters, from ObjC generic classes.
   if (auto tyContext = dc->getInnermostTypeContext())
@@ -2101,6 +2079,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
         return false;
 
       case ForeignRepresentableKind::Bridged:
+      case ForeignRepresentableKind::BridgedError:
         anyBridged = true;
         return false;
 
@@ -2158,9 +2137,33 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   if (type->isTypeParameter() && language == ForeignLanguage::ObjectiveC)
     return { ForeignRepresentableKind::Object, nullptr };
 
+  // In Objective-C, existentials involving Error are bridged
+  // to NSError.
+  if (language == ForeignLanguage::ObjectiveC &&
+      type->isExistentialWithError()) {
+    return { ForeignRepresentableKind::BridgedError, nullptr };
+  }
+
+  /// Determine whether the given type is a type that is bridged to NSError
+  /// because it conforms to the Error protocol.
+  auto isBridgedErrorViaConformance = [dc](Type type) -> bool {
+    ASTContext &ctx = type->getASTContext();
+    auto errorProto = ctx.getProtocol(KnownProtocolKind::Error);
+    if (!errorProto) return false;
+
+    return dc->getParentModule()->lookupConformance(type, errorProto,
+                                                    ctx.getLazyResolver())
+             .hasValue();
+  };
+
   auto nominal = type->getAnyNominal();
-  if (!nominal)
+  if (!nominal) {
+    /// It might still be a bridged Error via conformance to Error.
+    if (isBridgedErrorViaConformance(type))
+      return { ForeignRepresentableKind::BridgedError, nullptr };
+
     return failure();
+  }
 
   ASTContext &ctx = nominal->getASTContext();
 
@@ -2243,8 +2246,13 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   // Determine whether this nominal type is known to be representable
   // in this foreign language.
   auto result = ctx.getForeignRepresentationInfo(nominal, language, dc);
-  if (result.getKind() == ForeignRepresentableKind::None)
+  if (result.getKind() == ForeignRepresentableKind::None) {
+    /// It might still be a bridged Error via conformance to Error.
+    if (isBridgedErrorViaConformance(type))
+      return { ForeignRepresentableKind::BridgedError, nullptr };
+
     return failure();
+  }
 
   if (wasOptional && !result.isRepresentableAsOptional())
     return failure();
@@ -2284,6 +2292,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
         
       case ForeignRepresentableKind::Object:
       case ForeignRepresentableKind::Bridged:
+      case ForeignRepresentableKind::BridgedError:
         break;
       }
     }
@@ -2307,6 +2316,7 @@ bool TypeBase::isRepresentableIn(ForeignLanguage language,
   case ForeignRepresentableKind::Trivial:
   case ForeignRepresentableKind::Object:
   case ForeignRepresentableKind::Bridged:
+  case ForeignRepresentableKind::BridgedError:
   case ForeignRepresentableKind::StaticBridged:
     return true;
   }
@@ -2317,6 +2327,7 @@ bool TypeBase::isTriviallyRepresentableIn(ForeignLanguage language,
   switch (getForeignRepresentableIn(language, dc).first) {
   case ForeignRepresentableKind::None:
   case ForeignRepresentableKind::Bridged:
+  case ForeignRepresentableKind::BridgedError:
   case ForeignRepresentableKind::StaticBridged:
     return false;
 
@@ -2444,15 +2455,6 @@ bool TypeBase::canOverride(Type other, OverrideMatchMode matchMode,
                        resolver);
 }
 
-/// hasAnyDefaultValues - Return true if any of our elements has a default
-/// value.
-bool TupleType::hasAnyDefaultValues() const {
-  for (const TupleTypeElt &Elt : Elements)
-    if (Elt.hasDefaultArg())
-      return true;
-  return false;
-}
-
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
@@ -2473,9 +2475,6 @@ int TupleType::getElementForScalarInit() const {
   
   int FieldWithoutDefault = -1;
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
-    // Ignore fields with a default value.
-    if (Elements[i].hasDefaultArg()) continue;
-    
     // If we already saw a non-vararg field missing a default value, then we
     // cannot assign a scalar to this tuple.
     if (FieldWithoutDefault != -1) {
@@ -2606,8 +2605,8 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
           conformanceType = metatypeType->getInstanceType().getPointer();
           
           if (auto protocolType = dyn_cast<ProtocolType>(conformanceType)) {
-            conformanceType = protocolType->getDecl()->getProtocolSelf()
-                                ->getArchetype();
+            conformanceType = protocolType->getDecl()
+                                          ->getSelfTypeInContext().getPointer();
           }
         }
         
@@ -2965,8 +2964,9 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   if (dc->getAsProtocolOrProtocolExtensionContext()) {
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
-    substitutions[dc->getProtocolSelf()->getDeclaredType()
-                    ->getCanonicalType()->castTo<GenericTypeParamType>()]
+    substitutions[dc->getSelfInterfaceType()
+                    ->getCanonicalType()
+                    ->castTo<GenericTypeParamType>()]
       = baseTy;
     return substitutions;
   }
@@ -3328,7 +3328,6 @@ case TypeKind::Id:
         for (unsigned I = 0; I != Index; ++I) {
           const TupleTypeElt &FromElt =tuple->getElement(I);
           elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
-                                          FromElt.getDefaultArgKind(),
                                           FromElt.isVararg()));
         }
 
@@ -3336,8 +3335,7 @@ case TypeKind::Id:
       }
 
       // Add the new tuple element, with the new type, no initializer,
-      elements.push_back(TupleTypeElt(eltTy, elt.getName(),
-                                      elt.getDefaultArgKind(), elt.isVararg()));
+      elements.push_back(TupleTypeElt(eltTy, elt.getName(), elt.isVararg()));
       ++Index;
     }
 

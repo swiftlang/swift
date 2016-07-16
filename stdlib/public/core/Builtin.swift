@@ -124,7 +124,7 @@ public func unsafeBitCast<T, U>(_ x: T, to: U.Type) -> U {
 
 /// `unsafeBitCast` something to `AnyObject`.
 @_transparent
-public func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
+internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
   return unsafeBitCast(x, to: AnyObject.self)
 }
 

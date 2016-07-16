@@ -432,7 +432,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
         case ErrorExistential: {
           swift_typeref_t ErrorTR
             = swift_reflection_typeRefForMangledTypeName(RC,
-              "_TtPs13ErrorProtocol_", 21);
+              "_TtPs5Error_", 21);
           printf("Reflecting an error existential.\n");
           if (!reflectExistential(RC, Pipe, ErrorTR))
             return EXIT_SUCCESS;
@@ -464,6 +464,9 @@ int main(int argc, char *argv[]) {
     printUsageAndExit();
 
   const char *BinaryFilename = argv[1];
+
+  uint16_t Version = swift_reflection_getSupportedMetadataVersion();
+  printf("Metadata version: %u\n", Version);
 
   return doDumpHeapInstance(BinaryFilename);
 }

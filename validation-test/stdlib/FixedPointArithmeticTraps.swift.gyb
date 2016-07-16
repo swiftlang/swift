@@ -18,7 +18,7 @@ import StdlibUnittest
 func expectOverflow<T>(
   _ res: (T, overflow: Bool),
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: () -> String = "",
+  _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = #file, line: UInt = #line
@@ -31,7 +31,7 @@ func expectOverflow<T>(
 func expectNoOverflow<T>(
   _ res: (T, overflow: Bool),
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: () -> String = "",
+  _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = #file, line: UInt = #line

@@ -3,6 +3,8 @@
 
 // RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: %target-run-simple-swift %s %t | FileCheck %s
+// rdar://26960623
+// REQUIRES: disabled
 // REQUIRES: executable_test
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)

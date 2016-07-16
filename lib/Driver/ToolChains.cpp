@@ -964,7 +964,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
-  if (context.OI.DebugInfoKind == IRGenDebugInfoKind::Normal) {
+  if (context.OI.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
     size_t argCount = Arguments.size();
     if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
       addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);

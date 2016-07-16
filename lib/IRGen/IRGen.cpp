@@ -229,6 +229,11 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
   legacy::PassManager ModulePasses;
   ModulePasses.add(createTargetTransformInfoWrapperPass(
       TargetMachine->getTargetIRAnalysis()));
+
+  // If we're generating a profile, add the lowering pass now.
+  if (Opts.GenerateProfile)
+    ModulePasses.add(createInstrProfilingLegacyPass());
+
   PMBuilder.populateModulePassManager(ModulePasses);
 
   // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
@@ -241,10 +246,6 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
         AAR.addAAResult(WrapperPass->getResult());
     }));
   }
-
-  // If we're generating a profile, add the lowering pass now.
-  if (Opts.GenerateProfile)
-    ModulePasses.add(createInstrProfilingLegacyPass());
 
   if (Opts.Verify)
     ModulePasses.add(createVerifierPass());
@@ -625,6 +626,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       IGM.emitProtocolConformances();
       IGM.emitTypeMetadataRecords();
       IGM.emitBuiltinReflectionMetadata();
+      IGM.emitReflectionMetadataVersion();
     }
 
     // Okay, emit any definitions that we suddenly need.

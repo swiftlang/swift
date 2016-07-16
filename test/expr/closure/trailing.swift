@@ -110,3 +110,73 @@ let someInt = 0
 let intArray = [someInt]
 limitXY(someInt, toGamut: intArray) {}  // expected-error {{extra argument 'toGamut' in call}}
 
+
+// <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics
+func retBool(x: () -> Int) -> Bool {}
+func maybeInt(_: () -> Int) -> Int? {}
+class Foo23036383 {
+  init() {}
+  func map(_: (Int) -> Int) -> Int? {}
+  func meth1(x: Int, _: () -> Int) -> Bool {}
+  func meth2(_: Int, y: () -> Int) -> Bool {}
+  func filter(by: (Int) -> Bool) -> [Int] {}
+}
+enum MyErr : Error {
+  case A
+}
+
+func r23036383(foo: Foo23036383?, obj: Foo23036383) {
+
+  if retBool(x: { 1 }) { } // OK
+  if (retBool { 1 }) { } // OK
+
+  if retBool{ 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{13-13=(x: }} {{18-18=)}}
+  }
+  if retBool { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{13-14=(x: }} {{19-19=)}}
+  }
+  if retBool() { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{14-16=x: }} {{21-21=)}}
+  } else if retBool( ) { 0 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{21-24=x: }} {{29-29=)}}
+  }
+
+  if let _ = maybeInt { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{28-28=)}}
+  }
+  if let _ = maybeInt { 1 } , true {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{28-28=)}}
+  }
+
+  if let _ = foo?.map {$0+1} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{29-29=)}}
+  }
+  if let _ = foo?.map() {$0+1} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{23-25=}} {{31-31=)}}
+  }
+  if let _ = foo, retBool { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{26-27=(x: }} {{32-32=)}}
+  }
+
+  if obj.meth1(x: 1) { 0 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{20-22=, }} {{27-27=)}}
+  }
+  if obj.meth2(1) { 0 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{17-19=, y: }} {{24-24=)}}
+  }
+
+  for _ in obj.filter {$0 > 4} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(by: }} {{31-31=)}}
+  }
+  for _ in obj.filter {$0 > 4} where true {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(by: }} {{31-31=)}}
+  }
+  for _ in [1,2] where retBool { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{31-32=(x: }} {{37-37=)}}
+  }
+
+  while retBool { 1 } { // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{16-17=(x: }} {{22-22=)}}
+  }
+  while let _ = foo, retBool { 1 } { // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{29-30=(x: }} {{35-35=)}}
+  }
+
+  switch retBool { return 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{17-18=(x: }} {{30-30=)}}
+    default: break
+  }
+
+  do {
+    throw MyErr.A;
+  } catch MyErr.A where retBool { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{32-33=(x: }} {{38-38=)}}
+  } catch { }
+
+  if let _ = maybeInt { 1 }, retBool { 1 } { }
+  // expected-error@-1 {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{28-28=)}} 
+  // expected-error@-2 {{trailing closure requires parentheses for disambiguation in this context}} {{37-38=(x: }} {{43-43=)}} 
+}

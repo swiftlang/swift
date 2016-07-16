@@ -36,6 +36,10 @@
 extern "C" {
 #endif
 
+/// Get the metadata version supported by the Remote Mirror library.
+uint16_t
+swift_reflection_getSupportedMetadataVersion();
+
 /// \returns An opaque reflection context.
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(

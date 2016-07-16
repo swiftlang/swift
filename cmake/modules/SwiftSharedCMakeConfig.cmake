@@ -12,56 +12,7 @@ else()
   set(cmake_3_2_USES_TERMINAL USES_TERMINAL)
 endif()
 
-function(get_effective_platform_for_triple triple output)
-  string(FIND "${triple}" "macos" IS_MACOS)
-  if (IS_MACOS)
-    set(${output} "" PARENT_SCOPE)
-    return()
-  endif()
-  message(FATAL_ERROR "Not supported")
-endfunction()
-
-# Eliminate $(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME) from a path.
-#
-# We do not support compiling llvm with an Xcode setting beyond the one that was
-# used with build-script. This allows us to remove those paths. Right now,
-# nothing here is tested for cross compiling with Xcode, but it is in principal
-# possible.
-function(escape_llvm_path_for_xcode path outvar)
-  # First check if we are using Xcode. If not, return early.
-  if (NOT XCODE)
-    set(${outvar} "${path}" PARENT_SCOPE)
-    return()
-  endif()
-
-  get_effective_platform_for_triple("${SWIFT_HOST_TRIPLE}" SWIFT_EFFECTIVE_PLATFORM_NAME)
-  string(REPLACE "$(CONFIGURATION)" "${LLVM_BUILD_TYPE}" path "${path}")
-  string(REPLACE "$(EFFECTIVE_PLATFORM_NAME)" "${SWIFT_EFFECTIVE_PLATFORM_NAME}" path "${path}")
-  set(${outvar} "${path}" PARENT_SCOPE)
-endfunction()
-
-# What this function does is go through each of the passed in imported targets
-# from LLVM/Clang and changes them to use the appropriate fully expanded paths.
-#
-# TODO: This function needs a better name.
-function(fix_imported_target_locations_for_xcode targets)
-  foreach(t ${targets})
-    if (NOT TARGET ${t})
-      message(FATAL_ERROR "${t} is not a target?!")
-    endif()
-
-    get_target_property(TARGET_TYPE ${t} TYPE)
-
-    # We only want to do this for static libraries for now.
-    if (NOT ${TARGET_TYPE} STREQUAL "STATIC_LIBRARY")
-      continue()
-    endif()
-
-    set_target_properties(${t} PROPERTIES
-      IMPORTED_LOCATION_DEBUG "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${t}.a"
-      IMPORTED_LOCATION_RELEASE "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${t}.a")
-  endforeach()
-endfunction()
+include(SwiftXcodeSupport)
 
 macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   option(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
@@ -106,23 +57,24 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
 
   precondition(LLVM_TOOLS_BINARY_DIR)
-  escape_llvm_path_for_xcode("${LLVM_TOOLS_BINARY_DIR}" LLVM_TOOLS_BINARY_DIR)
+  escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_TOOLS_BINARY_DIR}" LLVM_TOOLS_BINARY_DIR)
   precondition_translate_flag(LLVM_BUILD_LIBRARY_DIR LLVM_LIBRARY_DIR)
-  escape_llvm_path_for_xcode("${LLVM_LIBRARY_DIR}" LLVM_LIBRARY_DIR)
+  escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_LIBRARY_DIR}" LLVM_LIBRARY_DIR)
   precondition_translate_flag(LLVM_BUILD_MAIN_INCLUDE_DIR LLVM_MAIN_INCLUDE_DIR)
   precondition_translate_flag(LLVM_BUILD_BINARY_DIR LLVM_BINARY_DIR)
   precondition_translate_flag(LLVM_BUILD_MAIN_SRC_DIR LLVM_MAIN_SRC_DIR)
   precondition(LLVM_LIBRARY_DIRS)
-  escape_llvm_path_for_xcode("${LLVM_LIBRARY_DIRS}" LLVM_LIBRARY_DIRS)
+  escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_LIBRARY_DIRS}" LLVM_LIBRARY_DIRS)
 
   # This could be computed using ${CMAKE_CFG_INTDIR} if we want to link Swift
   # against a matching LLVM build configuration.  However, we usually want to be
   # flexible and allow linking a debug Swift against optimized LLVM.
   set(LLVM_RUNTIME_OUTPUT_INTDIR "${LLVM_BINARY_DIR}")
+  set(LLVM_BINARY_OUTPUT_INTDIR "${LLVM_TOOLS_BINARY_DIR}")
   set(LLVM_LIBRARY_OUTPUT_INTDIR "${LLVM_LIBRARY_DIR}")
 
   if (XCODE)
-    fix_imported_target_locations_for_xcode("${LLVM_EXPORTED_TARGETS}")
+    fix_imported_targets_for_xcode("${LLVM_EXPORTED_TARGETS}")
   endif()
 
   if(NOT ${is_cross_compiling})
@@ -139,6 +91,11 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
   include(HandleLLVMOptions)
 
+  # HACK: this ugly tweaking is to prevent the propogation of the flag from LLVM
+  # into swift.  The use of this flag pollutes all targets, and we are not able
+  # to remove it on a per-target basis which breaks cross-compilation.
+  string(REGEX REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+
   set(PACKAGE_VERSION "${LLVM_PACKAGE_VERSION}")
   string(REGEX REPLACE "([0-9]+)\\.[0-9]+(\\.[0-9]+)?" "\\1" PACKAGE_VERSION_MAJOR
     ${PACKAGE_VERSION})
@@ -150,7 +107,7 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
     "Version number that will be placed into the libclang library , in the form XX.YY")
 
   foreach (INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
-    escape_llvm_path_for_xcode("${INCLUDE_DIR}" INCLUDE_DIR)
+    escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${INCLUDE_DIR}" INCLUDE_DIR)
     include_directories(${INCLUDE_DIR})
   endforeach ()
 
@@ -215,7 +172,7 @@ macro(swift_common_standalone_build_config_clang product is_cross_compiling)
   set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
 
   if (XCODE)
-    fix_imported_target_locations_for_xcode("${CLANG_EXPORTED_TARGETS}")
+    fix_imported_targets_for_xcode("${CLANG_EXPORTED_TARGETS}")
   endif()
 
   include_directories("${CLANG_BUILD_INCLUDE_DIR}"
@@ -306,45 +263,6 @@ macro(swift_common_unified_build_config product)
   endif()
 endmacro()
 
-# Common additional cmake project config for Xcode.
-#
-macro(swift_common_xcode_cxx_config)
-  # Force usage of Clang.
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0"
-      CACHE STRING "Xcode Compiler")
-  # Use C++'11.
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++11"
-      CACHE STRING "Xcode C++ Language Standard")
-  # Use libc++.
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++"
-      CACHE STRING "Xcode C++ Standard Library")
-  # Enable some warnings not enabled by default.  These
-  # mostly reset clang back to its default settings, since
-  # Xcode passes -Wno... for many warnings that are not enabled
-  # by default.
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_ABOUT_RETURN_TYPE "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_ABOUT_MISSING_NEWLINE "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_UNUSED_VALUE "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_UNUSED_VARIABLE "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_SIGN_COMPARE "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_UNUSED_FUNCTION "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_HIDDEN_VIRTUAL_FUNCTIONS "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_UNINITIALIZED_AUTOS "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_WARN_DOCUMENTATION_COMMENTS "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_WARN_BOOL_CONVERSION "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_WARN_EMPTY_BODY "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_WARN_ENUM_CONVERSION "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_WARN_INT_CONVERSION "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_WARN_CONSTANT_CONVERSION "YES")
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_NON_VIRTUAL_DESTRUCTOR "YES")
-
-  # Disable RTTI
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_ENABLE_CPP_RTTI "NO")
-
-  # Disable exceptions
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_ENABLE_CPP_EXCEPTIONS "NO")
-endmacro()
-
 # Common cmake project config for additional warnings.
 #
 macro(swift_common_cxx_warnings)
@@ -375,32 +293,6 @@ function(swift_common_llvm_config target)
 
   if((SWIFT_BUILT_STANDALONE OR SOURCEKIT_BUILT_STANDALONE) AND NOT "${CMAKE_CFG_INTDIR}" STREQUAL ".")
     llvm_map_components_to_libnames(libnames ${link_components})
-
-    # Collect dependencies.
-    set(new_libnames)
-    foreach(lib ${libnames})
-      list(APPEND new_libnames "${lib}")
-      get_target_property(extra_libraries "${lib}" INTERFACE_LINK_LIBRARIES)
-      foreach(dep ${extra_libraries})
-        if(NOT "${new_libnames}" STREQUAL "")
-          list(REMOVE_ITEM new_libnames "${dep}")
-        endif()
-        list(APPEND new_libnames "${dep}")
-      endforeach()
-    endforeach()
-    set(libnames "${new_libnames}")
-
-    # Translate library names into full path names.
-    set(new_libnames)
-    foreach(dep ${libnames})
-      if("${dep}" MATCHES "^LLVM")
-        list(APPEND new_libnames
-            "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-      else()
-        list(APPEND new_libnames "${dep}")
-      endif()
-    endforeach()
-    set(libnames "${new_libnames}")
 
     get_target_property(target_type "${target}" TYPE)
     if("${target_type}" STREQUAL "STATIC_LIBRARY")

@@ -9,7 +9,7 @@ import ImportAsMember.Class
 func testInstanceTypeFactoryMethod(queen: Bee) {
   // CHECK: bb0([[QUEEN:%[0-9]+]] : $ImplicitlyUnwrappedOptional<Bee>, [[HIVE_META:%[0-9]+]] : $@thick Hive.Type):
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
-  // CHECK-NEXT:   [[FACTORY:%[0-9]+]] = class_method [volatile] [[HIVE_META_OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : Hive.Type -> (queen: Bee!) -> Hive! , $@convention(objc_method) (ImplicitlyUnwrappedOptional<Bee>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
+  // CHECK-NEXT:   [[FACTORY:%[0-9]+]] = class_method [volatile] [[HIVE_META_OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (queen: Bee!) -> Hive! , $@convention(objc_method) (ImplicitlyUnwrappedOptional<Bee>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
   // CHECK-NEXT:   [[HIVE:%[0-9]+]] = apply [[FACTORY]]([[QUEEN]], [[HIVE_META_OBJC]]) : $@convention(objc_method) (ImplicitlyUnwrappedOptional<Bee>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
   // CHECK-NEXT:   release_value [[QUEEN]]
   // CHECK-NEXT:   return [[HIVE]] : $ImplicitlyUnwrappedOptional<Hive>
@@ -26,7 +26,7 @@ extension Hive {
     // CHECK: [[SELF_ADDR:%[0-9]+]] = alloc_stack $Hive
     // CHECK: store [[OLD_SELF:%[0-9]+]] to [[SELF_ADDR]]
     // CHECK: [[META:%[0-9]+]] = value_metatype $@thick Hive.Type, [[OLD_SELF]] : $Hive
-    // CHECK: [[FACTORY:%[0-9]+]] = class_method [volatile] [[META]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign : Hive.Type -> (queen: Bee!) -> Hive! , $@convention(objc_method) (ImplicitlyUnwrappedOptional<Bee>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
+    // CHECK: [[FACTORY:%[0-9]+]] = class_method [volatile] [[META]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (queen: Bee!) -> Hive! , $@convention(objc_method) (ImplicitlyUnwrappedOptional<Bee>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
     // CHECK: [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
     // CHECK: apply [[FACTORY]]([[QUEEN:%[0-9]+]], [[OBJC_META]]) : $@convention(objc_method) (ImplicitlyUnwrappedOptional<Bee>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
     // CHECK: store [[NEW_SELF:%[0-9]+]] to [[SELF_ADDR]]

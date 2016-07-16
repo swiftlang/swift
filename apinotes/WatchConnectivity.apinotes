@@ -1,0 +1,5 @@
+---
+Name: WatchConnectivity
+Tags:
+- Name: WCErrorCode
+  NSErrorDomain: WCErrorDomain

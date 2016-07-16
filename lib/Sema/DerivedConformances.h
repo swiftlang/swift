@@ -88,13 +88,13 @@ ValueDecl *deriveHashable(TypeChecker &tc,
                           NominalTypeDecl *type,
                           ValueDecl *requirement);
   
-/// Derive an ErrorProtocol requirement for an enum type.
+/// Derive an Error requirement for an enum type.
 ///
 /// A unique string representation of the enum type will be used as the domain
 /// for members of the enum, and each case will have its own integer code.
 ///
 /// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveErrorProtocol(TypeChecker &tc,
+ValueDecl *deriveError(TypeChecker &tc,
                                Decl *parentDecl,
                                NominalTypeDecl *type,
                                ValueDecl *requirement);

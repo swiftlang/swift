@@ -30,6 +30,15 @@ SILValue swift::getUnderlyingObject(SILValue V) {
   }
 }
 
+SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue V) {
+  while (true) {
+    SILValue V2 = stripIndexingInsts(stripAddressProjections(stripCastsWithoutMarkDependence(V)));
+    if (V2 == V)
+      return V2;
+    V = V2;
+  }
+}
+
 static bool isRCIdentityPreservingCast(ValueKind Kind) {
   switch (Kind) {
     case ValueKind::UpcastInst:
@@ -84,6 +93,21 @@ SILValue swift::stripSinglePredecessorArgs(SILValue V) {
       }
     }
     
+    return V;
+  }
+}
+
+SILValue swift::stripCastsWithoutMarkDependence(SILValue V) {
+  while (true) {
+    V = stripSinglePredecessorArgs(V);
+
+    auto K = V->getKind();
+    if (isRCIdentityPreservingCast(K) ||
+        K == ValueKind::UncheckedTrivialBitCastInst) {
+      V = cast<SILInstruction>(V)->getOperand(0);
+      continue;
+    }
+
     return V;
   }
 }

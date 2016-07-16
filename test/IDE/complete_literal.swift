@@ -39,7 +39,7 @@
 }
 
 // LITERAL4:         Begin completions
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   withCString({#(f): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(f: (UnsafePointer<Int8>) throws -> Result) rethrows{{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   withCString({#(body): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(body: (UnsafePointer<Int8>) throws -> Result) rethrows{{$}}
 
 // FIXME: we should show the qualified String.Index type.
 // rdar://problem/20788802
@@ -62,7 +62,7 @@ func giveMeAString() -> Int {
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#contentsOf: S#})[#Void#]{{; name=.+$}}
 
-struct MyColor: _ColorLiteralConvertible {
+struct MyColor: _ExpressibleByColorLiteral {
   init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) { red = colorLiteralRed }
   var red: Float
 }

@@ -16,7 +16,9 @@ public extension DispatchSourceType {
 	typealias DispatchSourceHandler = @convention(block) () -> Void
 
 	public func setEventHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
-		if #available(OSX 10.10, iOS 8.0, *), let h = handler where qos != .unspecified || !flags.isEmpty {
+		if #available(OSX 10.10, iOS 8.0, *),
+                   let h = handler,
+                   qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
 			__dispatch_source_set_event_handler(self as! DispatchSource, item._block)
 		} else {
@@ -30,7 +32,9 @@ public extension DispatchSourceType {
 	}
 
 	public func setCancelHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
-		if #available(OSX 10.10, iOS 8.0, *), let h = handler where qos != .unspecified || !flags.isEmpty {
+		if #available(OSX 10.10, iOS 8.0, *),
+                   let h = handler,
+                   qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
 			__dispatch_source_set_cancel_handler(self as! DispatchSource, item._block)
 		} else {
@@ -44,7 +48,9 @@ public extension DispatchSourceType {
 	}
 
 	public func setRegistrationHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
-		if #available(OSX 10.10, iOS 8.0, *), let h = handler where qos != .unspecified || !flags.isEmpty {
+		if #available(OSX 10.10, iOS 8.0, *),
+                   let h = handler,
+                   qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
 			__dispatch_source_set_registration_handler(self as! DispatchSource, item._block)
 		} else {

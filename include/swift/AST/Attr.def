@@ -35,6 +35,7 @@ TYPE_ATTR(autoclosure)
 TYPE_ATTR(convention)
 TYPE_ATTR(noreturn)
 TYPE_ATTR(noescape)
+TYPE_ATTR(escaping)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -192,6 +193,7 @@ DECL_ATTR(private, Accessibility,
           OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor |
           DeclModifier | NotSerialized,
           /* Not serialized */ 46)
+DECL_ATTR_ALIAS(fileprivate, Accessibility)
 DECL_ATTR_ALIAS(internal, Accessibility)
 DECL_ATTR_ALIAS(public, Accessibility)
 
@@ -261,6 +263,8 @@ SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
                  OnFunc | OnConstructor | LongAttribute, 65)
 
 SIMPLE_DECL_ATTR(GKInspectable, GKInspectable, OnVar, 66)
+
+SIMPLE_DECL_ATTR(escaping, Escaping, OnParam, 67)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

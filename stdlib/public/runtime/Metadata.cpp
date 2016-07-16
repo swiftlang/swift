@@ -2147,12 +2147,12 @@ getExistentialValueWitnesses(ExistentialTypeState &E,
                              SpecialProtocol special) {
   // Use special representation for special protocols.
   switch (special) {
-  case SpecialProtocol::ErrorProtocol:
+  case SpecialProtocol::Error:
 #if SWIFT_OBJC_INTEROP
-    // ErrorProtocol always has a single-ObjC-refcounted representation.
+    // Error always has a single-ObjC-refcounted representation.
     return &_TWVBO;
 #else
-    // Without ObjC interop, ErrorProtocol is native-refcounted.
+    // Without ObjC interop, Error is native-refcounted.
     return &_TWVBo;
 #endif
       
@@ -2174,8 +2174,8 @@ template<> ExistentialTypeRepresentation
 ExistentialTypeMetadata::getRepresentation() const {
   // Some existentials use special containers.
   switch (Flags.getSpecialProtocol()) {
-  case SpecialProtocol::ErrorProtocol:
-    return ExistentialTypeRepresentation::ErrorProtocol;
+  case SpecialProtocol::Error:
+    return ExistentialTypeRepresentation::Error;
   case SpecialProtocol::AnyObject:
   case SpecialProtocol::None:
     break;
@@ -2199,7 +2199,7 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
     return true;
     
   // References to boxed existential containers may be shared.
-  case ExistentialTypeRepresentation::ErrorProtocol: {
+  case ExistentialTypeRepresentation::Error: {
     // We can only take the value if the box is a bridged NSError, in which case
     // owning a reference to the box is owning a reference to the NSError.
     // TODO: Or if the box is uniquely referenced. We don't have intimate
@@ -2227,7 +2227,7 @@ const {
     break;
   }
   
-  case ExistentialTypeRepresentation::ErrorProtocol:
+  case ExistentialTypeRepresentation::Error:
     // TODO: If we were able to claim the value from a uniquely-owned
     // existential box, we would want to deallocError here.
     break;
@@ -2248,7 +2248,7 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
     return opaqueContainer->Type->vw_projectBuffer(
                          const_cast<ValueBuffer*>(&opaqueContainer->Buffer));
   }
-  case ExistentialTypeRepresentation::ErrorProtocol: {
+  case ExistentialTypeRepresentation::Error: {
     const SwiftError *errorBox
       = *reinterpret_cast<const SwiftError * const *>(container);
     // If the error is a bridged NSError, then the "box" is in fact itself
@@ -2274,7 +2274,7 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
       reinterpret_cast<const OpaqueExistentialContainer*>(container);
     return opaqueContainer->Type;
   }
-  case ExistentialTypeRepresentation::ErrorProtocol: {
+  case ExistentialTypeRepresentation::Error: {
     const SwiftError *errorBox
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getType();
@@ -2304,10 +2304,10 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
     witnessTables = opaqueContainer->getWitnessTables();
     break;
   }
-  case ExistentialTypeRepresentation::ErrorProtocol: {
+  case ExistentialTypeRepresentation::Error: {
     // Only one witness table we should be able to return, which is the
-    // ErrorProtocol.
-    assert(i == 0 && "only one witness table in an ErrorProtocol box");
+    // Error.
+    assert(i == 0 && "only one witness table in an Error box");
     const SwiftError *errorBox
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getErrorConformance();
@@ -2444,6 +2444,7 @@ struct llvm::DenseMapInfo<GlobalString> {
 namespace {
 struct ForeignTypeState {
   Mutex Lock;
+  ConditionVariable InitializationWaiters;
   llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> Types;
 };
 }
@@ -2457,20 +2458,76 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
     return unique;
   }
 
-  // Okay, insert a new row.
-  auto &Foreign = ForeignTypes.get();
-  ScopedLock guard(Foreign.Lock);
-  
-  auto insertResult = Foreign.Types.insert({GlobalString(nonUnique->getName()),
-                                            nonUnique});
-  auto uniqueMetadata = insertResult.first->second;
+  // Okay, check the global map.
+  auto &foreignTypes = ForeignTypes.get();
+  GlobalString key(nonUnique->getName());
+  bool hasInit = nonUnique->hasInitializationFunction();
 
-  // If the insertion created a new entry, set up the metadata we were
-  // passed as the insertion result.
-  if (insertResult.second) {
-    // Call the initialization callback if present.
-    if (nonUnique->hasInitializationFunction())
-      nonUnique->getInitializationFunction()(nonUnique);
+  const ForeignTypeMetadata *uniqueMetadata;
+  bool inserted;
+
+  // A helper function to find the current entry for the key using the
+  // saved iterator if it's still valid.  This should only be called
+  // while the lock is held.
+  decltype(foreignTypes.Types.begin()) savedIterator;
+  size_t savedSize;
+  auto getCurrentEntry = [&]() -> const ForeignTypeMetadata *& {
+    // The iterator may have been invalidated if the size of the map
+    // has changed since the last lookup.
+    if (foreignTypes.Types.size() != savedSize) {
+      savedSize = foreignTypes.Types.size();
+      savedIterator = foreignTypes.Types.find(key);
+      assert(savedIterator != foreignTypes.Types.end() &&
+             "entries cannot be removed from foreign types metadata map");
+    }
+    return savedIterator->second;
+  };
+
+  {
+    ScopedLock guard(foreignTypes.Lock);
+
+    // Try to create an entry in the map.  The initial value of the entry
+    // is our copy of the metadata unless it has an initialization function,
+    // in which case we have to insert null as a placeholder to tell others
+    // to wait while we call the initializer.
+    auto valueToInsert = (hasInit ? nullptr : nonUnique);
+    auto insertResult = foreignTypes.Types.insert({key, valueToInsert});
+    inserted = insertResult.second;
+    savedIterator = insertResult.first;
+    savedSize = foreignTypes.Types.size();
+    uniqueMetadata = savedIterator->second;
+
+    // If we created the entry, then the unique metadata is our copy.
+    if (inserted) {
+      uniqueMetadata = nonUnique;
+
+    // If we didn't create the entry, but it's null, then we have to wait
+    // until it becomes non-null.
+    } else {
+      while (uniqueMetadata == nullptr) {
+        foreignTypes.Lock.wait(foreignTypes.InitializationWaiters);
+        uniqueMetadata = getCurrentEntry();
+      }
+    }
+  }
+
+  // If we inserted the entry and there's an initialization function,
+  // call it.  This has to be done with the lock dropped.
+  if (inserted && hasInit) {
+    nonUnique->getInitializationFunction()(nonUnique);
+
+    // Update the cache entry:
+
+    //   - Reacquire the lock.
+    ScopedLock guard(foreignTypes.Lock);
+
+    //   - Change the entry.
+    auto &entry = getCurrentEntry();
+    assert(entry == nullptr);
+    entry = nonUnique;
+
+    //   - Notify waiters.
+    foreignTypes.InitializationWaiters.notifyAll();
   }
 
   // Remember the unique result in the invasive cache.  We don't want

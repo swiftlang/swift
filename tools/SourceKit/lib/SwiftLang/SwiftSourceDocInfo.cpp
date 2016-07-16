@@ -612,6 +612,7 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
 static bool passCursorInfoForDecl(const ValueDecl *VD,
                                   const Module *MainModule,
                                   const Type Ty,
+                                  const Type ContainerTy,
                                   bool IsRef,
                                   Optional<unsigned> OrigBufferID,
                                   SwiftLangSupport &Lang,
@@ -656,6 +657,20 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
     VD->getType().print(OS);
   }
   unsigned TypenameEnd = SS.size();
+
+  unsigned MangledTypeStart = SS.size();
+  {
+    llvm::raw_svector_ostream OS(SS);
+    SwiftLangSupport::printDeclTypeUSR(VD, OS);
+  }
+  unsigned MangledTypeEnd = SS.size();
+
+  unsigned MangledContainerTypeStart = SS.size();
+  if (ContainerTy) {
+    llvm::raw_svector_ostream OS(SS);
+    SwiftLangSupport::printTypeUSR(ContainerTy, OS);
+  }
+  unsigned MangedContainerTypeEnd = SS.size();
 
   unsigned DocCommentBegin = SS.size();
   {
@@ -772,6 +787,11 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   StringRef USR = StringRef(SS.begin()+USRBegin, USREnd-USRBegin);
   StringRef TypeName = StringRef(SS.begin()+TypenameBegin,
                                  TypenameEnd-TypenameBegin);
+  StringRef TypeUsr = StringRef(SS.begin()+MangledTypeStart,
+                                MangledTypeEnd - MangledTypeStart);
+
+  StringRef ContainerTypeUsr = StringRef(SS.begin()+MangledContainerTypeStart,
+                            MangedContainerTypeEnd - MangledContainerTypeStart);
   StringRef DocComment = StringRef(SS.begin()+DocCommentBegin,
                                    DocCommentEnd-DocCommentBegin);
   StringRef AnnotatedDecl = StringRef(SS.begin()+DeclBegin,
@@ -812,6 +832,8 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.Name = Name;
   Info.USR = USR;
   Info.TypeName = TypeName;
+  Info.TypeUSR = TypeUsr;
+  Info.ContainerTypeUSR = ContainerTypeUsr;
   Info.DocComment = DocComment;
   Info.AnnotatedDeclaration = AnnotatedDecl;
   Info.FullyAnnotatedDeclaration = FullyAnnotatedDecl;
@@ -947,6 +969,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
       } else {
         ValueDecl *VD = SemaTok.CtorTyRef ? SemaTok.CtorTyRef : SemaTok.ValueD;
         bool Failed = passCursorInfoForDecl(VD, MainModule, SemaTok.Ty,
+                                            SemaTok.ContainerType,
                                             SemaTok.IsRef, BufferID, Lang,
                                             CompInvok, PreviousASTSnaps,
                                             Receiver);
@@ -1001,24 +1024,26 @@ void SwiftLangSupport::getCursorInfo(
                      SwiftArgs, OpArgs);
     }
 
-    SwiftInterfaceGenContext::ResolvedEntity Entity;
-    Entity = IFaceGenRef->resolveEntityForOffset(Offset);
-    if (Entity.isResolved()) {
-      CompilerInvocation Invok;
-      IFaceGenRef->applyTo(Invok);
-      if (Entity.Mod) {
-        passCursorInfoForModule(Entity.Mod, IFaceGenContexts, Invok, Receiver);
+    IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Receiver] {
+      SwiftInterfaceGenContext::ResolvedEntity Entity;
+      Entity = IFaceGenRef->resolveEntityForOffset(Offset);
+      if (Entity.isResolved()) {
+        CompilerInvocation Invok;
+        IFaceGenRef->applyTo(Invok);
+        if (Entity.Mod) {
+          passCursorInfoForModule(Entity.Mod, IFaceGenContexts, Invok,
+                                  Receiver);
+        } else {
+          // FIXME: Should pass the main module for the interface but currently
+          // it's not necessary.
+          passCursorInfoForDecl(
+              Entity.Dcl, /*MainModule*/ nullptr, Type(), Type(), Entity.IsRef,
+              /*OrigBufferID=*/None, *this, Invok, {}, Receiver);
+        }
       } else {
-        // FIXME: Should pass the main module for the interface but currently
-        // it's not necessary.
-        passCursorInfoForDecl(Entity.Dcl, /*MainModule*/nullptr, Type(),
-                              Entity.IsRef,
-                              /*OrigBufferID=*/None, *this, Invok,
-                              {}, Receiver);
+        Receiver({});
       }
-    } else {
-      Receiver({});
-    }
+    });
     return;
   }
 
@@ -1115,7 +1140,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
                                 Receiver);
       } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
         bool Failed =
-            passCursorInfoForDecl(VD, MainModule, VD->getType(),
+            passCursorInfoForDecl(VD, MainModule, VD->getType(), Type(),
                                   /*isRef=*/false, BufferID, Lang, CompInvok,
                                   PreviousASTSnaps, Receiver);
         if (Failed) {

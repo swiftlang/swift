@@ -102,8 +102,10 @@ struct TestConfig {
   var tests = [Test]()
 
   mutating func processArguments() -> TestAction {
-    let validOptions=["--iter-scale", "--num-samples", "--num-iters",
-      "--verbose", "--delim", "--run-all", "--list", "--sleep"]
+    let validOptions = [
+      "--iter-scale", "--num-samples", "--num-iters",
+      "--verbose", "--delim", "--run-all", "--list", "--sleep"
+    ]
     let maybeBenchArgs: Arguments? = parseArgs(validOptions)
     if maybeBenchArgs == nil {
       return .Fail("Failed to parse arguments")

@@ -170,7 +170,7 @@ var notgeneric : Int<Float> // expected-error{{cannot specialize non-generic typ
 
 // Make sure that redundant typealiases (that map to the same
 // underlying type) don't break protocol conformance or use.
-class XArray : ArrayLiteralConvertible {
+class XArray : ExpressibleByArrayLiteral {
   typealias Element = Int
   init() { }
 

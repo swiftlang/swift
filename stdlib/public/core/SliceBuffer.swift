@@ -327,11 +327,11 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
 }
 
 extension _SliceBuffer {
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
+  public func _copyToContiguousArray() -> ContiguousArray<Element> {
     if _hasNativeBuffer {
       let n = nativeBuffer
       if count == n.count {
-        return n
+        return ContiguousArray(_buffer: n)
       }
     }
 
@@ -340,6 +340,6 @@ extension _SliceBuffer {
       minimumCapacity: 0)
     result.firstElementAddress.initializeFrom(
       firstElementAddress, count: count)
-    return result
+    return ContiguousArray(_buffer: result)
   }
 }

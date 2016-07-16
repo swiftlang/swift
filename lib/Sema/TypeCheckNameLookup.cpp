@@ -103,7 +103,12 @@ namespace {
     ///
     /// \param foundInType The type through which we found the
     /// declaration.
-    void add(ValueDecl *found, ValueDecl *base, Type foundInType) {
+    ///
+    /// \param promotedInstanceRef true if the lookup result to be added was
+    /// actually looked up on an instance but promted to a type to look up an
+    /// enum element
+    void add(ValueDecl *found, ValueDecl *base, Type foundInType,
+             bool promotedInstanceRef = false) {
       // If we only want types, AST name lookup should not yield anything else.
       assert(!Options.contains(NameLookupFlags::OnlyTypes) ||
              isa<TypeDecl>(found));
@@ -139,7 +144,7 @@ namespace {
           isa<GenericTypeParamDecl>(found) ||
           (isa<FuncDecl>(found) && cast<FuncDecl>(found)->isOperator())) {
         if (Known.insert({{found, base}, false}).second) {
-          Result.add({found, base});
+          Result.add({found, base, promotedInstanceRef});
           FoundDecls.push_back(found);
         }
         return;
@@ -172,7 +177,7 @@ namespace {
         // default implementations in protocols.
         if (witness && !isa<ProtocolDecl>(witness->getDeclContext())) {
           if (Known.insert({{witness, base}, false}).second) {
-            Result.add({witness, base});
+            Result.add({witness, base, promotedInstanceRef});
             FoundDecls.push_back(witness);
           }
         }
@@ -229,7 +234,8 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       assert(foundInType && "bogus base declaration?");
     }
 
-    builder.add(found.getValueDecl(), found.getBaseDecl(), foundInType);
+    builder.add(found.getValueDecl(), found.getBaseDecl(), foundInType,
+                found.IsPromotedInstanceRef);
   }
   return result;
 }
@@ -557,8 +563,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   TypoCorrectionResolver resolver(*this, nameLoc);
   if (baseTypeOrNull) {
     lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, &resolver,
-                             /*include instance members*/
-                               !(lookupOptions & NameLookupFlags::OnlyTypes));
+                             /*include instance members*/ true);
   } else {
     lookupVisibleDecls(consumer, DC, &resolver, /*top level*/ true, nameLoc);
   }
@@ -567,7 +572,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   entries.filterMaxScoreRange(MaxCallEditDistanceFromBestCandidate);
 
   for (auto &entry : entries)
-    result.add({ entry.Value, nullptr });
+    result.add({ entry.Value, nullptr, false });
 }
 
 static InFlightDiagnostic
@@ -578,6 +583,21 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
     if (var->isSelfParameter())
       return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
                          decl->getName().str());
+  }
+
+  if (!decl->getLoc().isValid() && decl->getDeclContext()->isTypeContext()) {
+    Decl *parentDecl = dyn_cast<ExtensionDecl>(decl->getDeclContext());
+    if (!parentDecl) parentDecl = cast<NominalTypeDecl>(decl->getDeclContext());
+
+    if (parentDecl->getLoc().isValid()) {
+      StringRef kind = (isa<VarDecl>(decl) ? "property" :
+                        isa<ConstructorDecl>(decl) ? "initializer" :
+                        isa<FuncDecl>(decl) ? "method" :
+                        "member");
+
+      return tc.diagnose(parentDecl, diag::note_typo_candidate_implicit_member,
+                         decl->getName().str(), kind);
+    }
   }
 
   return tc.diagnose(decl, diag::note_typo_candidate, decl->getName().str());

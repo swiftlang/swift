@@ -259,6 +259,44 @@ static bool isSignToken(const clang::Token &tok) {
          tok.is(clang::tok::tilde);
 }
 
+static Optional<clang::QualType> builtinTypeForToken(const clang::Token &tok,
+    const clang::ASTContext &context) {
+  switch (tok.getKind()) {
+  case clang::tok::kw_short:
+    return clang::QualType(context.ShortTy);
+  case clang::tok::kw_long:
+    return clang::QualType(context.LongTy);
+  case clang::tok::kw___int64:
+    return clang::QualType(context.LongLongTy);
+  case clang::tok::kw___int128:
+    return clang::QualType(context.Int128Ty);
+  case clang::tok::kw_signed:
+    return clang::QualType(context.IntTy);
+  case clang::tok::kw_unsigned:
+    return clang::QualType(context.UnsignedIntTy);
+  case clang::tok::kw_void:
+    return clang::QualType(context.VoidTy);
+  case clang::tok::kw_char:
+    return clang::QualType(context.CharTy);
+  case clang::tok::kw_int:
+    return clang::QualType(context.IntTy);
+  case clang::tok::kw_float:
+    return clang::QualType(context.FloatTy);
+  case clang::tok::kw_double:
+    return clang::QualType(context.DoubleTy);
+  case clang::tok::kw_wchar_t:
+    return clang::QualType(context.WCharTy);
+  case clang::tok::kw_bool:
+    return clang::QualType(context.BoolTy);
+  case clang::tok::kw_char16_t:
+    return clang::QualType(context.Char16Ty);
+  case clang::tok::kw_char32_t:
+    return clang::QualType(context.Char32Ty);
+  default:
+    return llvm::None;
+  }
+}
+
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               DeclContext *DC,
                               Identifier name,
@@ -284,27 +322,36 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
   clang::QualType castClangType;
   if (numTokens > 3 &&
       tokenI[0].is(clang::tok::l_paren) &&
-      tokenI[1].is(clang::tok::identifier) &&
+      (tokenI[1].is(clang::tok::identifier) ||
+        impl.getClangSema().isSimpleTypeSpecifier(tokenI[1].getKind())) &&
       tokenI[2].is(clang::tok::r_paren)) {
     if (castType) {
       // this is a nested cast
       return nullptr;
     }
 
-    auto identifierInfo = tokenI[1].getIdentifierInfo();
-    if (identifierInfo->isStr("id")) {
-      castTypeIsId = true;
-    }
-    auto identifierName = identifierInfo->getName();
-    auto &identifier = impl.getClangASTContext().Idents.get(identifierName);
-    auto parsedType = impl.getClangSema().getTypeName(identifier,
-                                                    clang::SourceLocation(),
-                                                    /*scope*/nullptr);
-    if (parsedType) {
-      castClangType = parsedType.get();
-      castType = &castClangType;
+    if (tokenI[1].is(clang::tok::identifier)) {
+      auto identifierInfo = tokenI[1].getIdentifierInfo();
+      if (identifierInfo->isStr("id")) {
+        castTypeIsId = true;
+      }
+      auto identifierName = identifierInfo->getName();
+      auto &identifier = impl.getClangASTContext().Idents.get(identifierName);
+      auto parsedType = impl.getClangSema().getTypeName(identifier,
+                                                        clang::SourceLocation(),
+                                                        /*scope*/nullptr);
+      if (parsedType) {
+        castClangType = parsedType.get();
+        castType = &castClangType;
+      } else {
+        return nullptr;
+      }
     } else {
-      return nullptr;
+      auto builtinType = builtinTypeForToken(tokenI[1],
+                                             impl.getClangASTContext());
+      if (builtinType) {
+        castType = &builtinType.getValue();
+      }
     }
     tokenI += 3;
     numTokens -= 3;

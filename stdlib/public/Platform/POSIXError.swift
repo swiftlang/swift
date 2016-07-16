@@ -1,8 +1,8 @@
-// FIXME: Only defining _POSIXError for Darwin at the moment.
+// FIXME: Only defining POSIXErrorCode for Darwin at the moment.
 
 #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing POSIX error codes.
-@objc public enum POSIXError : CInt {
+@objc public enum POSIXErrorCode : Int32 {
   // FIXME: These are the values for Darwin. We need to get the Linux
   // values as well.
   /// Operation not permitted.
@@ -81,7 +81,7 @@
   /// Resource temporarily unavailable.
   case EAGAIN          = 35
   /// Operation would block.
-  public static var EWOULDBLOCK: POSIXError { return EAGAIN }
+  public static var EWOULDBLOCK: POSIXErrorCode { return EAGAIN }
   /// Operation now in progress.
   case EINPROGRESS     = 36
   /// Operation already in progress.
@@ -246,7 +246,7 @@
   /// Interface output queue is full.
   case EQFULL          = 106
   /// Must be equal largest errno.
-  public static var ELAST: POSIXError { return EQFULL }
+  public static var ELAST: POSIXErrorCode { return EQFULL }
 
   // FIXME: EOPNOTSUPP has different values depending on __DARWIN_UNIX03 and
   // KERNEL.

@@ -63,6 +63,13 @@ public:
     /// The base declaration through which we found the declaration.
     ValueDecl *Base;
 
+    /// Whether this should actually reference an instance but has been promoted
+    /// to a type reference to access an enum element
+    ///
+    /// This is purely transitional and will be removed when referencing enum
+    /// elements on instance members becomes an error
+    bool IsPromotedInstanceRef;
+
     operator ValueDecl*() const { return Decl; }
     ValueDecl *operator->() const { return Decl; }
   };
@@ -1586,6 +1593,10 @@ public:
 
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
+
+  /// Mark any _BridgedNSError/_BridgedStoredNSError/related
+  /// conformances in the given type as "used".
+  void useBridgedNSErrorConformances(DeclContext *dc, Type type);
 
   /// If this bound-generic type is bridged, mark any
   /// _ObjectiveCBridgeable conformances in the generic arguments of

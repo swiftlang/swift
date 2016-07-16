@@ -925,7 +925,7 @@ matchWitness(TypeChecker &tc,
     // the required type and the witness type.
     cs.emplace(tc, dc, ConstraintSystemOptions());
 
-    Type selfIfaceTy = proto->getProtocolSelf()->getDeclaredType();
+    Type selfIfaceTy = proto->getSelfInterfaceType();
     Type selfTy;
 
     // For a concrete conformance, use the conforming type as the
@@ -1889,17 +1889,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            TypeDecl *typeDecl,
                                            DeclContext *fromDC,
                                            bool performRedeclarationCheck) {
-  // If the declaration context from which the type witness was determined
-  // differs from that of the conformance, adjust the type so that it is
-  // based on the declaration context of the conformance.
-  if (fromDC != DC && DC->getGenericSignatureOfContext() &&
-      fromDC->getGenericSignatureOfContext() && !isa<ProtocolDecl>(fromDC)) {
-    // Map the type to an interface type.
-    type = ArchetypeBuilder::mapTypeOutOfContext(fromDC, type);
-
-    // Map the type into the conformance's context.
-    type = Adoptee->getTypeOfMember(DC->getParentModule(), type, fromDC);
-  }
 
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
@@ -2882,7 +2871,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     // Create a set of type substitutions for all known associated type.
     // FIXME: Base this on dependent types rather than archetypes?
     TypeSubstitutionMap substitutions;
-    substitutions[Proto->getProtocolSelf()->getArchetype()] = Adoptee;
+    substitutions[Proto->getSelfTypeInContext().getPointer()] = Adoptee;
     for (auto member : Proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         if (Conformance->hasTypeWitness(assocType)) {
@@ -3424,16 +3413,14 @@ void ConformanceChecker::resolveTypeWitnesses() {
       return;
     }
 
-    // Complain that we couldn't find anything.
-    if (!missingTypeWitness)
-      missingTypeWitness = *unresolvedAssocTypes.begin();
-
-    diagnoseOrDefer(missingTypeWitness, true,
-      [missingTypeWitness](TypeChecker &tc,
-                           NormalProtocolConformance *conformance) {
-      tc.diagnose(missingTypeWitness, diag::no_witnesses_type,
-                  missingTypeWitness->getName());
-    });
+    for (auto missingTypeWitness : unresolvedAssocTypes) {
+      diagnoseOrDefer(missingTypeWitness, true,
+        [missingTypeWitness](TypeChecker &tc,
+                             NormalProtocolConformance *conformance) {
+          tc.diagnose(missingTypeWitness, diag::no_witnesses_type,
+                      missingTypeWitness->getName());
+        });
+    }
 
     return;
   }
@@ -3844,9 +3831,9 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
     return;
   }
 
-  // As a special case, diagnose conversion to NilLiteralConvertible, since we
+  // As a special case, diagnose conversion to ExpressibleByNilLiteral, since we
   // know this is something involving 'nil'.
-  if (Proto->isSpecificProtocol(KnownProtocolKind::NilLiteralConvertible)) {
+  if (Proto->isSpecificProtocol(KnownProtocolKind::ExpressibleByNilLiteral)) {
     TC.diagnose(ComplainLoc, diag::cannot_use_nil_with_this_type, T);
     return;
   }
@@ -4123,6 +4110,28 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     if (auto sf = DC->getParentSourceFile()) {
       sf->addUsedConformance(normalConf);
     }
+
+    // Hack: If we've used a conformance to the _BridgedStoredNSError
+    // protocol, also use the RawRepresentable and _ErrorCodeProtocol
+    // conformances on the Code associated type witness.
+    if (Proto->isSpecificProtocol(KnownProtocolKind::BridgedStoredNSError)) {
+      if (auto codeType = ProtocolConformance::getTypeWitnessByName(
+                            T, concrete, Context.Id_Code, this)) {
+        if (codeType->getAnyNominal() != T->getAnyNominal()) {
+          if (auto codeProto =
+                     Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)){
+            (void)conformsToProtocol(codeType, codeProto, DC, options, nullptr,
+                                     SourceLoc());
+          }
+
+          if (auto rawProto =
+                     Context.getProtocol(KnownProtocolKind::RawRepresentable)) {
+            (void)conformsToProtocol(codeType, rawProto, DC, options, nullptr,
+                                     SourceLoc());
+          }
+        }
+      }
+    }
   }
   return true;
 }
@@ -4177,6 +4186,37 @@ void TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
   // Mark the conformances within the arguments.
   for (auto arg : bound->getGenericArgs())
     useObjectiveCBridgeableConformances(dc, arg);
+}
+
+void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
+  // _BridgedStoredNSError.
+  if (auto bridgedStoredNSError = Context.getProtocol(
+                                    KnownProtocolKind::BridgedStoredNSError)) {
+    // Force it as "Used", if it conforms
+    if (conformsToProtocol(type, bridgedStoredNSError, dc,
+                           ConformanceCheckFlags::Used))
+      return;
+  }
+
+  // _ErrorCodeProtocol.
+  if (auto errorCodeProto = Context.getProtocol(
+                              KnownProtocolKind::ErrorCodeProtocol)) {
+    ProtocolConformance *conformance = nullptr;
+    if (conformsToProtocol(type, errorCodeProto, dc,
+                           (ConformanceCheckFlags::SuppressDependencyTracking|
+                            ConformanceCheckFlags::Used),
+                           &conformance) &&
+        conformance) {
+      if (Type errorType = ProtocolConformance::getTypeWitnessByName(
+            type, conformance, Context.Id_ErrorType, this)) {
+        // Early-exit in case of circularity.
+        if (errorType->getAnyNominal() == type->getAnyNominal()) return;
+
+        useBridgedNSErrorConformances(dc, errorType);
+        return;
+      }
+    }
+  }
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
@@ -4760,8 +4800,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::Hashable:
     return DerivedConformance::deriveHashable(*this, Decl, TypeDecl, Requirement);
     
-  case KnownProtocolKind::ErrorProtocol:
-    return DerivedConformance::deriveErrorProtocol(*this, Decl, TypeDecl, Requirement);
+  case KnownProtocolKind::Error:
+    return DerivedConformance::deriveError(*this, Decl, TypeDecl, Requirement);
 
   case KnownProtocolKind::BridgedNSError:
     return DerivedConformance::deriveBridgedNSError(*this, Decl, TypeDecl,

@@ -19,6 +19,8 @@
 
 #include "swift/Basic/RelativePointer.h"
 
+const uint16_t SWIFT_REFLECTION_METADATA_VERSION = 1;
+
 namespace swift {
 namespace reflection {
 

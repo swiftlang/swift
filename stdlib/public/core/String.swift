@@ -344,7 +344,7 @@ extension String {
   }
 }
 
-extension String : _BuiltinUnicodeScalarLiteralConvertible {
+extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
   @effects(readonly)
   public // @testable
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
@@ -353,7 +353,7 @@ extension String : _BuiltinUnicodeScalarLiteralConvertible {
   }
 }
 
-extension String : UnicodeScalarLiteralConvertible {
+extension String : ExpressibleByUnicodeScalarLiteral {
   /// Creates an instance initialized to the given Unicode scalar value.
   ///
   /// Don't call this initializer directly. It may be used by the compiler when
@@ -364,7 +364,7 @@ extension String : UnicodeScalarLiteralConvertible {
   }
 }
 
-extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
+extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
   @effects(readonly)
   @_semantics("string.makeUTF8")
   public init(
@@ -379,7 +379,7 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
   }
 }
 
-extension String : ExtendedGraphemeClusterLiteralConvertible {
+extension String : ExpressibleByExtendedGraphemeClusterLiteral {
   /// Creates an instance initialized to the given extended grapheme cluster
   /// literal.
   ///
@@ -391,7 +391,7 @@ extension String : ExtendedGraphemeClusterLiteralConvertible {
   }
 }
 
-extension String : _BuiltinUTF16StringLiteralConvertible {
+extension String : _ExpressibleByBuiltinUTF16StringLiteral {
   @effects(readonly)
   @_semantics("string.makeUTF16")
   public init(
@@ -408,7 +408,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
   }
 }
 
-extension String : _BuiltinStringLiteralConvertible {
+extension String : _ExpressibleByBuiltinStringLiteral {
   @effects(readonly)
   @_semantics("string.makeUTF8")
   public init(
@@ -434,7 +434,7 @@ extension String : _BuiltinStringLiteralConvertible {
   }
 }
 
-extension String : StringLiteralConvertible {
+extension String : ExpressibleByStringLiteral {
   /// Creates an instance initialized to the given string value.
   ///
   /// Don't call this initializer directly. It is used by the compiler when you
@@ -468,8 +468,7 @@ extension String {
     Encoding: UnicodeCodec
   >(_ encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
-    let output: (Encoding.CodeUnit) -> Void = { _ in codeUnitCount += 1 }
-    self._encode(encoding, output: output)
+    self._encode(encoding, into: { _ in codeUnitCount += 1 })
     return codeUnitCount
   }
 
@@ -482,9 +481,11 @@ extension String {
   // with unpaired surrogates
   func _encode<
     Encoding: UnicodeCodec
-  >(_ encoding: Encoding.Type, output: @noescape (Encoding.CodeUnit) -> Void)
-  {
-    return _core.encode(encoding, output: output)
+  >(
+    _ encoding: Encoding.Type,
+    into processCodeUnit: @noescape (Encoding.CodeUnit) -> Void
+  ) {
+    return _core.encode(encoding, into: processCodeUnit)
   }
 }
 

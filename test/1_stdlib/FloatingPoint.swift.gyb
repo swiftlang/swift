@@ -79,19 +79,19 @@ func expectBitwiseEqual(
 
 var FloatingPoint = TestSuite("FloatingPoint")
 
-func positiveOne<T: IntegerLiteralConvertible>() -> T {
+func positiveOne<T: ExpressibleByIntegerLiteral>() -> T {
   return 1
 }
-func negativeOne<T: IntegerLiteralConvertible>() -> T {
+func negativeOne<T: ExpressibleByIntegerLiteral>() -> T {
   return -1
 }
 
-FloatingPoint.test("Float/IntegerLiteralConvertible") {
+FloatingPoint.test("Float/ExpressibleByIntegerLiteral") {
   expectEqual(positiveOne(),  1.0 as Float)
   expectEqual(negativeOne(), -1.0 as Float)
 }
 
-FloatingPoint.test("Float/FloatLiteralConvertible") {
+FloatingPoint.test("Float/ExpressibleByFloatLiteral") {
   let x: Float = -0.0
   expectBitwiseEqual(bitPattern: 0x8000_0000, x)
 }
@@ -163,12 +163,12 @@ FloatingPoint.test("Float/Int64") {
   expectEqual(Int64.max, Int64(Float(Int64.max)))
 }
 
-FloatingPoint.test("Double/IntegerLiteralConvertible") {
+FloatingPoint.test("Double/ExpressibleByIntegerLiteral") {
   expectEqual(positiveOne(),  1.0 as Double)
   expectEqual(negativeOne(), -1.0 as Double)
 }
 
-FloatingPoint.test("Double/FloatLiteralConvertible") {
+FloatingPoint.test("Double/ExpressibleByFloatLiteral") {
   let x: Double = -0.0
   expectBitwiseEqual(bitPattern: 0x8000_0000_0000_0000, x)
 }
@@ -269,6 +269,112 @@ func testSubNormalFlush(_ f: ${FloatSelf}) {
 % end
 #endif
 
+extension FloatingPoint {
+  public var isQuietNaN: Bool { return isNaN && !isSignalingNaN }
+}
+
+%for Self in ['Float', 'Double', 'Float80']:
+% if Self == 'Float80':
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+% end
+FloatingPoint.test("${Self}.round") {
+  for rule in [FloatingPointRoundingRule.toNearestOrAwayFromZero,
+               FloatingPointRoundingRule.toNearestOrEven,
+               FloatingPointRoundingRule.towardZero,
+               FloatingPointRoundingRule.awayFromZero,
+               FloatingPointRoundingRule.up,
+               FloatingPointRoundingRule.down] {
+
+    //  Zeros, integers and infinities round to themselves:
+    for value in [${Self}(), 1, 1/${Self}.ulpOfOne,
+                  .greatestFiniteMagnitude, .infinity] {
+      expectBitwiseEqual(value, value.rounded(rule))
+      expectBitwiseEqual(-value, (-value).rounded(rule))
+    }
+
+    //  NaNs "round" to NaNs:
+    expectTrue(${Self}.nan.rounded(rule).isNaN)
+
+    //  Now let's try some inexact cases; we're going to stay close to zero,
+    //  and check values close to (half-)integers, because those are the cases
+    //  that people usually get wrong, and they'll reveal simple blunders like
+    //  simply implementing the wrong rounding mode.
+    for base in stride(from: ${Self}(-3.5), to: 4, by: 0.5) {
+      for value in [base.nextDown, base, base.nextUp] {
+        let result = value.rounded(rule)
+        //  Result must be integral.  Since we're testing small values, we
+        //  can simply check that Self(Int(result)) == result.  For larger
+        //  values this wouldn't be a correct test.'
+        expectEqual(${Self}(Int(result)), result)
+        let residual = value - result
+        //  For any rounding rule, abs(residual) must be less than 1, however
+        //  due to rounding the computation can produce 1 exactly.
+        expectTrue(abs(residual) <= 1)
+        //  Remaining validation checks depend on the rounding rule.
+        switch rule {
+        case .toNearestOrAwayFromZero:
+          expectTrue(abs(residual) < 0.5 ||
+                     abs(residual) == 0.5 && abs(result) > abs(value))
+        case .toNearestOrEven:
+          expectTrue(abs(residual) < 0.5 ||
+                     abs(residual) == 0.5 && Int(result) % 2 == 0)
+        case .towardZero:
+          expectTrue(abs(result) <= abs(value))
+        case .awayFromZero:
+          expectTrue(abs(result) >= abs(value))
+        case .up:
+          expectTrue(result >= value)
+        case .down:
+          expectTrue(result <= value)
+        }
+      }
+    }
+  }
+}
+
+FloatingPoint.test("${Self}.remainder") {
+  //  Basic sanity tests only; these are only sufficient to provide reassurance
+  //  that a known-good remainder function (e.g. from the C stdlib) has been
+  //  shimmed correctly.  They are not sufficient for development of such a
+  //  function, and should not be employed for that purpose.
+  expectTrue(${Self}(0).remainder(dividingBy: 0).isNaN)
+  expectTrue(${Self}(1).remainder(dividingBy: 0).isNaN)
+  expectTrue(${Self}.infinity.remainder(dividingBy: 0).isNaN)
+  expectTrue(${Self}.infinity.remainder(dividingBy: 1).isNaN)
+  expectEqual(0, ${Self}(0).remainder(dividingBy: .infinity))
+  expectEqual(1, ${Self}(1).remainder(dividingBy: .infinity))
+  expectEqual(-1, ${Self}(2).remainder(dividingBy: 3))
+  expectEqual(-1, ${Self}(3).remainder(dividingBy: 2))
+  expectEqual(1, ${Self}(5).remainder(dividingBy: 2))
+}
+
+FloatingPoint.test("${Self}.squareRoot") {
+  //  Basic sanity tests only; these are only sufficient to provide reassurance
+  //  that a known-good square root function (e.g. from the C stdlib) has been
+  //  shimmed correctly.  They are not sufficient for development of such a
+  //  function, and should not be employed for that purpose.
+  expectTrue(${Self}(-1).squareRoot().isNaN)
+  expectTrue(${Self}.nan.squareRoot().isNaN)
+  expectEqual(-0, ${Self}(-0).squareRoot())
+  expectEqual(0, ${Self}(0).squareRoot())
+  expectEqual(1, ${Self}(1).squareRoot())
+  expectEqual(2, ${Self}(4).squareRoot())
+  expectEqual(.infinity, ${Self}.infinity.squareRoot())
+}
+
+FloatingPoint.test("${Self}.addingProduct") {
+  //  Fails if fma( ) is incorrectly implemented using separate + and *,
+  //  and validates that we have the argument order right for the shimmed
+  //  function.
+  let one = ${Self}(1)
+  let ulp = ${Self}.ulpOfOne
+  expectEqual(ulp*ulp, one.addingProduct(ulp + one, ulp - one))
+}
+% if Self == 'Float80':
+#endif
+% end
+%end
+
 let floatNextUpDownTests: [(Float, Float)] = [
   (.nan, .nan),
   (.greatestFiniteMagnitude, .infinity),
@@ -319,12 +425,12 @@ FloatingPoint.test("Double.nextUp, .nextDown")
 
 #if arch(i386) || arch(x86_64)
 
-FloatingPoint.test("Float80/IntegerLiteralConvertible") {
+FloatingPoint.test("Float80/ExpressibleByIntegerLiteral") {
   expectEqual(positiveOne(),  1.0 as Float80)
   expectEqual(negativeOne(), -1.0 as Float80)
 }
 
-FloatingPoint.test("Float80/FloatLiteralConvertible") {
+FloatingPoint.test("Float80/ExpressibleByFloatLiteral") {
   let x: Float80 = -0.0
   expectBitwiseEqual(bitPattern: Float80Bits(0x8000, 0), x)
 }
@@ -417,6 +523,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
     ${FloatSelf}.greatestFiniteMagnitude,
     ${FloatSelf}.infinity,
     ${FloatSelf}.nan,
+    ${FloatSelf}.signalingNaN,
   ]
 #else
   let interestingValues: [${FloatSelf}] = [
@@ -438,6 +545,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
     ${FloatSelf}.greatestFiniteMagnitude,
     ${FloatSelf}.infinity,
     ${FloatSelf}.nan,
+    ${FloatSelf}.signalingNaN,
   ]
 #endif
 
@@ -469,6 +577,60 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
               ExpectedComparisonResult.eq :
               ExpectedComparisonResult.gt),
           lhs, rhs)
+      }
+
+      //  Check minimum, maximum, minimumMagnitude and maximumMagnitude.
+      let min = ${FloatSelf}.minimum(lhs, rhs)
+      let max = ${FloatSelf}.maximum(lhs, rhs)
+      let minMag = ${FloatSelf}.minimumMagnitude(lhs, rhs)
+      let maxMag = ${FloatSelf}.maximumMagnitude(lhs, rhs)
+      //  If either lhs or rhs is signaling, or if both are quiet NaNs, the
+      //  result is a quiet NaN.
+      if lhs.isSignalingNaN || rhs.isSignalingNaN || (lhs.isNaN && rhs.isNaN) {
+        expectTrue(min.isQuietNaN)
+        expectTrue(max.isQuietNaN)
+        expectTrue(minMag.isQuietNaN)
+        expectTrue(maxMag.isQuietNaN)
+      }
+      //  If only one of lhs and rhs is NaN, the result of the min/max
+      //  operations is always the other value.  While contrary to all other
+      //  IEEE 754 basic operations, this property is critical to ensure
+      //  that clamping to a valid range behaves as expected.
+      else if lhs.isNaN && !rhs.isNaN {
+        expectEqual(min.bitPattern, rhs.bitPattern)
+        expectEqual(max.bitPattern, rhs.bitPattern)
+        expectEqual(minMag.bitPattern, rhs.bitPattern)
+        expectEqual(maxMag.bitPattern, rhs.bitPattern)
+      }
+      else if rhs.isNaN && !lhs.isNaN {
+        expectEqual(min.bitPattern, lhs.bitPattern)
+        expectEqual(max.bitPattern, lhs.bitPattern)
+        expectEqual(minMag.bitPattern, lhs.bitPattern)
+        expectEqual(maxMag.bitPattern, lhs.bitPattern)
+      }
+      //  If lhs and rhs are equal, min is lhs and max is rhs.  This ensures
+      //  that the set {lhs, rhs} is the same as the set {min, max} so long
+      //  as lhs and rhs are non-NaN.  This is less important for min/max than
+      //  it is for minMag and maxMag, but it makes sense to define this way.
+      if lhs <= rhs {
+        expectEqual(min.bitPattern, lhs.bitPattern)
+        expectEqual(max.bitPattern, rhs.bitPattern)
+      } else if lhs > rhs {
+        expectEqual(max.bitPattern, lhs.bitPattern)
+        expectEqual(min.bitPattern, rhs.bitPattern)
+      }
+      //  If lhs and rhs have equal magnitude, minMag is lhs and maxMag is rhs.
+      //  This ensures that the set {lhs, rhs} is the same as the set
+      //  {minMag, maxMag} so long as lhs and rhs are non-NaN; this is a
+      //  restriction of the IEEE 754 rules, but it makes good sense and also
+      //  makes this primitive more useful for building head-tail arithmetic
+      //  operations.
+      if abs(lhs) <= abs(rhs) {
+        expectEqual(minMag.bitPattern, lhs.bitPattern)
+        expectEqual(maxMag.bitPattern, rhs.bitPattern)
+      } else if abs(lhs) > abs(rhs) {
+        expectEqual(maxMag.bitPattern, lhs.bitPattern)
+        expectEqual(minMag.bitPattern, rhs.bitPattern)
       }
     }
   }
@@ -1002,9 +1164,9 @@ FloatingPoint.test("Float80/signalingNaN") {
 
 #endif
 
-var FloatingPointClassification = TestSuite("NumericParsing")
+var FloatingPointClassification = TestSuite("FloatingPointClassification")
 
-FloatingPointClassification.test("FloatingPointClassification/Equatable") {
+FloatingPointClassification.test("FloatingPointClassification/Hashable") {
   let values: [FloatingPointClassification] = [
     .signalingNaN,
     .quietNaN,
@@ -1018,8 +1180,7 @@ FloatingPointClassification.test("FloatingPointClassification/Equatable") {
     .positiveInfinity
   ]
   // Values should be equal iff indices equal
-  checkEquatable(values, oracle: { $0 == $1 }) 
+  checkHashable(values, equalityOracle: { $0 == $1 })
 }
 
 runAllTests()
-

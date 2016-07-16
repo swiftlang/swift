@@ -53,9 +53,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_hashValue))
       return getRequirement(KnownProtocolKind::Hashable);
 
-    // ErrorProtocol._code
+    // Error._code
     if (name.isSimpleName(ctx.Id_code_))
-      return getRequirement(KnownProtocolKind::ErrorProtocol);
+      return getRequirement(KnownProtocolKind::Error);
 
     // _BridgedNSError._nsErrorDomain
     if (name.isSimpleName(ctx.Id_nsErrorDomain))

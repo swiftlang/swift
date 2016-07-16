@@ -110,7 +110,7 @@ class CMake(object):
                    "Debug;Release;MinSizeRel;RelWithDebInfo")
 
         if args.clang_compiler_version:
-            major, minor, patch = args.clang_compiler_version
+            major, minor, patch, _ = args.clang_compiler_version.components
             define("LLVM_VERSION_MAJOR:STRING", major)
             define("LLVM_VERSION_MINOR:STRING", minor)
             define("LLVM_VERSION_PATCH:STRING", patch)

@@ -157,6 +157,9 @@ namespace swift {
     /// Whether we are stripping the "NS" prefix from Foundation et al.
     bool StripNSPrefix = true;
 
+    /// Should 'id' in Objective-C be imported as 'Any' in Swift?
+    bool EnableIdAsAny = false;
+
     /// Enable the Swift 3 migration via Fix-Its.
     bool Swift3Migration = false;
 
@@ -232,7 +235,10 @@ namespace swift {
 
     /// Returns true if the 'os' platform condition argument represents
     /// a supported target operating system.
-    static bool isPlatformConditionOSSupported(StringRef OSName);
+    ///
+    /// Note that this also canonicalizes the OS name if the check returns
+    /// true.
+    static bool checkPlatformConditionOS(StringRef &OSName);
 
     /// Returns true if the 'arch' platform condition argument represents
     /// a supported target architecture.

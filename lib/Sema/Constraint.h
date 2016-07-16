@@ -205,8 +205,6 @@ enum class ConversionRestrictionKind {
   BridgeToObjC,
   /// Explicit bridging from an Objective-C class to a value type.
   BridgeFromObjC,
-  /// Explicit bridging from an ErrorType to an Objective-C NSError.
-  BridgeToNSError,
   /// Implicit conversion from a CF type to its toll-free-bridged Objective-C
   /// class type.
   CFTollFreeBridgeToObjC,

@@ -88,9 +88,9 @@ extension Sequence
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
   public func filter(
-    _ includeElement: @noescape (Base.Iterator.Element) throws -> Bool
+    _ isIncluded: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
-    return try _base.filter(includeElement)
+    return try _base.filter(isIncluded)
   }
   
   public func _customContainsEquatableElement(
@@ -110,9 +110,9 @@ extension Sequence
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
-    return _base._copyToNativeArrayBuffer()
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element> {
+    return _base._copyToContiguousArray()
   }
 
   /// Copy a Sequence into an array, returning one past the last

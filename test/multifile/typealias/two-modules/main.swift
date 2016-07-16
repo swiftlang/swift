@@ -9,5 +9,5 @@
 
 import library
 
-func testFunction<T>(withCompletion completion: (Result<T, ErrorProtocol>) -> Void) { }
+func testFunction<T>(withCompletion completion: (Result<T, Error>) -> Void) { }
 testFunction { (result: GenericResult<Int>) in }

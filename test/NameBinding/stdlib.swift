@@ -13,12 +13,12 @@ struct X {
 
 typealias MaxBuiltinFloatType = Builtin.FPIEEE64
 
-protocol _BuiltinFloatLiteralConvertible {
+protocol _ExpressibleByBuiltinFloatLiteral {
   static func _convertFromBuiltinFloatLiteral(
                 value: MaxBuiltinFloatType) -> Self
 }
 
-protocol FloatLiteralConvertible {
-  associatedtype FloatLiteralType : _BuiltinFloatLiteralConvertible
+protocol ExpressibleByFloatLiteral {
+  associatedtype FloatLiteralType : _ExpressibleByBuiltinFloatLiteral
   static func convertFromFloatLiteral(value: FloatLiteralType) -> Self
 }

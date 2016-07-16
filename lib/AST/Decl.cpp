@@ -44,23 +44,6 @@
 
 using namespace swift;
 
-bool impl::isInternalDeclEffectivelyPublic(const ValueDecl *VD) {
-  assert(VD->getFormalAccess() == Accessibility::Internal);
-
-  if (VD->getAttrs().hasAttribute<VersionedAttr>())
-    return true;
-
-  if (auto *fn = dyn_cast<FuncDecl>(VD))
-    if (auto *ASD = fn->getAccessorStorageDecl())
-      if (ASD->getAttrs().hasAttribute<VersionedAttr>())
-        return true;
-
-  if (VD->getModuleContext()->isTestingEnabled())
-    return true;
-
-  return false;
-}
-
 clang::SourceLocation ClangNode::getLocation() const {
   if (auto D = getAsDecl())
     return D->getLocation();
@@ -457,7 +440,7 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
     StringRef NameStr = PD->getNameStr();
     if (NameStr.startswith("_Builtin"))
       return true;
-    if (NameStr.startswith("_") && NameStr.endswith("LiteralConvertible"))
+    if (NameStr.startswith("_ExpressibleBy"))
       return true;
     if (whitelistProtocols)
       return false;
@@ -1493,21 +1476,18 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     unsigned idx = 0;
     for (const auto &elt : tupleTy->getElements()) {
       Type eltTy = mapSignatureParamType(ctx, elt.getType());
-      if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
-          elt.getDefaultArgKind() != DefaultArgumentKind::None) {
+      if (anyChanged || eltTy.getPointer() != elt.getType().getPointer()) {
         if (!anyChanged) {
           elements.reserve(tupleTy->getNumElements());
           for (unsigned i = 0; i != idx; ++i) {
             const TupleTypeElt &elt = tupleTy->getElement(i);
             elements.push_back(TupleTypeElt(elt.getType(), elt.getName(),
-                                            DefaultArgumentKind::None,
                                             elt.isVararg()));
           }
           anyChanged = true;
         }
 
         elements.push_back(TupleTypeElt(eltTy, elt.getName(),
-                                        DefaultArgumentKind::None,
                                         elt.isVararg()));
       }
       ++idx;
@@ -1573,21 +1553,20 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
       }
     }
   } else if (isa<SubscriptDecl>(this)) {
-    signature.InterfaceType
-      = getInterfaceType()->getWithoutDefaultArgs(getASTContext())
-          ->getCanonicalType();
+    signature.InterfaceType = getInterfaceType()->getCanonicalType();
 
     // If the subscript occurs within a generic extension context,
     // consider the generic signature of the extension.
     if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
       if (auto genericSig = ext->getGenericSignature()) {
-        auto funcTy = signature.InterfaceType->castTo<AnyFunctionType>();
-        signature.InterfaceType
-          = GenericFunctionType::get(genericSig,
-                                     funcTy->getInput(),
-                                     funcTy->getResult(),
-                                     funcTy->getExtInfo())
-              ->getCanonicalType();
+        if (auto funcTy = signature.InterfaceType->getAs<AnyFunctionType>()) {
+          signature.InterfaceType
+            = GenericFunctionType::get(genericSig,
+                                       funcTy->getInput(),
+                                       funcTy->getResult(),
+                                       funcTy->getExtInfo())
+                ->getCanonicalType();
+        }
       }
     }
   } else if (isa<VarDecl>(this)) {
@@ -1690,10 +1669,9 @@ Type ValueDecl::getInterfaceType() const {
 
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(this)) {
     auto proto = cast<ProtocolDecl>(getDeclContext());
-    if (!proto->getProtocolSelf())
+    auto selfTy = proto->getSelfInterfaceType();
+    if (!selfTy)
       return Type();
-    auto selfTy = proto->getProtocolSelf()->getDeclaredType();
-    assert(selfTy);
     auto &ctx = getASTContext();
     InterfaceTy = DependentMemberType::get(
                     selfTy,
@@ -1705,6 +1683,9 @@ Type ValueDecl::getInterfaceType() const {
 
   if (!hasType())
     return Type();
+
+  assert(!isa<AbstractFunctionDecl>(this) &&
+         "functions should have an interface type");
 
   // If the type involves a type variable, don't cache it.
   auto type = getType();
@@ -1792,14 +1773,78 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
 
 SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
   if (auto var = dyn_cast<VarDecl>(this)) {
-    if (auto pbd = var->getParentPatternBinding()) {
-      SourceLoc resultLoc = pbd->getAttrs().getStartLoc(forModifier);
-      return resultLoc.isValid() ? resultLoc : pbd->getStartLoc();
+    // [attrs] var ...
+    // The attributes are part of the VarDecl, but the 'var' is part of the PBD.
+    SourceLoc resultLoc = var->getAttrs().getStartLoc(forModifier);
+    if (resultLoc.isValid()) {
+      return resultLoc;
+    } else if (auto pbd = var->getParentPatternBinding()) {
+      return pbd->getStartLoc();
+    } else {
+      return var->getStartLoc();
     }
   }
 
   SourceLoc resultLoc = getAttrs().getStartLoc(forModifier);
   return resultLoc.isValid() ? resultLoc : getStartLoc();
+}
+
+/// Returns true if \p VD needs to be treated as publicly-accessible at the SIL,
+/// LLVM, and machine levels.
+///
+/// The most common causes of this are -enable-testing and versioned non-public
+/// declarations.
+static bool isInternalDeclEffectivelyPublic(const ValueDecl *VD) {
+  assert(VD->getFormalAccess() == Accessibility::Internal);
+
+  if (VD->getAttrs().hasAttribute<VersionedAttr>())
+    return true;
+
+  if (auto *fn = dyn_cast<FuncDecl>(VD))
+    if (auto *ASD = fn->getAccessorStorageDecl())
+      if (ASD->getAttrs().hasAttribute<VersionedAttr>())
+        return true;
+
+  if (VD->getModuleContext()->isTestingEnabled())
+    return true;
+
+  return false;
+}
+
+Accessibility ValueDecl::getEffectiveAccess() const {
+  Accessibility effectiveAccess = getFormalAccess();
+
+  // Handle @testable.
+  switch (effectiveAccess) {
+  case Accessibility::Public:
+    break;
+  case Accessibility::Internal:
+    if (isInternalDeclEffectivelyPublic(this))
+      effectiveAccess = Accessibility::Public;
+    break;
+  case Accessibility::Private:
+    break;
+  }
+
+  if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(getDeclContext())) {
+    effectiveAccess = std::min(effectiveAccess,
+                               enclosingNominal->getEffectiveAccess());
+
+  } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(getDeclContext())) {
+    // Just check the base type. If it's a constrained extension, Sema should
+    // have already enforced access more strictly.
+    if (auto extendedTy = enclosingExt->getExtendedType()) {
+      if (auto nominal = extendedTy->getAnyNominal()) {
+        effectiveAccess = std::min(effectiveAccess,
+                                   nominal->getEffectiveAccess());
+      }
+    }
+
+  } else if (getDeclContext()->isLocalContext()) {
+    effectiveAccess = Accessibility::Private;
+  }
+
+  return effectiveAccess;
 }
 
 
@@ -1879,8 +1924,8 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   if (!knownProtocol)
     return false;
 
-  // All nominal types can derive their ErrorProtocol conformance.
-  if (*knownProtocol == KnownProtocolKind::ErrorProtocol)
+  // All nominal types can derive their Error conformance.
+  if (*knownProtocol == KnownProtocolKind::Error)
     return true;
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
@@ -1995,8 +2040,8 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
     return DeclaredTyInContext;
 
   auto *decl = const_cast<NominalTypeDecl *>(this);
-  decl->DeclaredTyInContext =
-      computeNominalType(decl, DeclTypeKind::DeclaredTypeInContext);
+  decl->DeclaredTyInContext = computeNominalType(decl,
+                                                 DeclTypeKind::DeclaredTypeInContext);
   return DeclaredTyInContext;
 }
 
@@ -2582,7 +2627,7 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
 /// Determine whether the given type is the 'Self' generic parameter
 /// of a protocol.
 static bool isProtocolSelf(const ProtocolDecl *proto, Type type) {
-  return proto->getProtocolSelf()->getDeclaredType()->isEqual(type);
+  return proto->getSelfInterfaceType()->isEqual(type);
 }
 
 /// Classify usages of Self in the given type.
@@ -3598,6 +3643,8 @@ ParamDecl::ParamDecl(ParamDecl *PD)
 
 /// \brief Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
+  assert(isTypeContext());
+
   // For a protocol or extension thereof, the type is 'Self'.
   if (getAsProtocolOrProtocolExtensionContext()) {
     // In the parser, generic parameters won't be wired up yet, just give up on
@@ -3611,6 +3658,8 @@ Type DeclContext::getSelfTypeInContext() const {
 
 /// \brief Retrieve the interface type of 'self' for the given context.
 Type DeclContext::getSelfInterfaceType() const {
+  assert(isTypeContext());
+
   // For a protocol or extension thereof, the type is 'Self'.
   if (getAsProtocolOrProtocolExtensionContext()) {
     // In the parser, generic parameters won't be wired up yet, just give up on
@@ -3682,21 +3731,28 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
                                  bool isStaticMethod, bool isInOut) {
   ASTContext &C = DC->getASTContext();
   auto selfType = DC->getSelfTypeInContext();
+  auto selfInterfaceType = DC->getSelfInterfaceType();
+
+  assert(!!selfType == !!selfInterfaceType);
 
   // If we have a selfType (i.e. we're not in the parser before we know such
   // things, configure it.
-  if (selfType) {
-    if (isStaticMethod)
+  if (selfType && selfInterfaceType) {
+    if (isStaticMethod) {
       selfType = MetatypeType::get(selfType);
+      selfInterfaceType = MetatypeType::get(selfInterfaceType);
+    }
     
-    if (isInOut)
+    if (isInOut) {
       selfType = InOutType::get(selfType);
+      selfInterfaceType = InOutType::get(selfInterfaceType);
+    }
   }
-    
+
   auto *selfDecl = new (C) ParamDecl(/*IsLet*/!isInOut, SourceLoc(),SourceLoc(),
                                      Identifier(), loc, C.Id_self, selfType,DC);
   selfDecl->setImplicit();
-  selfDecl->setInterfaceType(DC->getSelfInterfaceType());
+  selfDecl->setInterfaceType(selfInterfaceType);
   return selfDecl;
 }
 
@@ -3874,12 +3930,10 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
     // For a protocol, the type of 'self' is the parameter type 'Self', not
     // the protocol itself.
     if (containerTy->is<ProtocolType>()) {
-      if (auto self = dc->getProtocolSelf()) {
-        if (wantInterfaceType)
-          selfTy = self->getDeclaredType();
-        else
-          selfTy = self->getArchetype();
-      }
+      if (wantInterfaceType)
+        selfTy = dc->getSelfInterfaceType();
+      else
+        selfTy = dc->getSelfTypeInContext();
     } else
       selfTy = containerTy;
   }
@@ -4417,26 +4471,16 @@ DynamicSelfType *FuncDecl::getDynamicSelf() const {
   if (!hasDynamicSelf())
     return nullptr;
 
-  auto extType = getExtensionType();
-  if (extType->is<ProtocolType>())
-    return DynamicSelfType::get(getDeclContext()->getProtocolSelf()
-                                  ->getArchetype(),
-                                getASTContext());
-
-  return DynamicSelfType::get(extType, getASTContext());
+  return DynamicSelfType::get(getDeclContext()->getSelfTypeInContext(),
+                              getASTContext());
 }
 
 DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
   if (!hasDynamicSelf())
     return nullptr;
 
-  auto extType = getDeclContext()->getDeclaredInterfaceType();
-  if (extType->is<ProtocolType>())
-    return DynamicSelfType::get(getDeclContext()->getProtocolSelf()
-                                  ->getDeclaredType(),
-                                getASTContext());
-
-  return DynamicSelfType::get(extType, getASTContext());
+  return DynamicSelfType::get(getDeclContext()->getSelfInterfaceType(),
+                              getASTContext());
 }
 
 SourceRange FuncDecl::getSourceRange() const {
@@ -4552,17 +4596,6 @@ Type ConstructorDecl::getResultType() const {
 }
 
 Type ConstructorDecl::getInitializerInterfaceType() {
-  if (!InitializerInterfaceType) {
-    assert((!InitializerType || !InitializerType->is<PolymorphicFunctionType>())
-           && "polymorphic function type is invalid interface type");
-    
-    // Don't cache type variable types.
-    if (InitializerType->hasTypeVariable())
-      return InitializerType;
-    
-    InitializerInterfaceType = InitializerType;
-  }
-  
   return InitializerInterfaceType;
 }
 
@@ -4767,5 +4800,11 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 ClassDecl *ClassDecl::getSuperclassDecl() const {
   if (auto superclass = getSuperclass())
     return superclass->getClassOrBoundGenericClass();
-    return nullptr;
+  return nullptr;
+}
+
+void ClassDecl::setSuperclass(Type superclass) {
+  assert((!superclass || !superclass->hasArchetype())
+         && "superclass must be interface type");
+  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
 }

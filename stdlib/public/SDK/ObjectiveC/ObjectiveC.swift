@@ -24,7 +24,7 @@ public typealias Boolean = Swift.Boolean
 /// bool. Elsewhere, it is "signed char". The Clang importer imports it as
 /// ObjCBool.
 @_fixed_layout
-public struct ObjCBool : Boolean, BooleanLiteralConvertible {
+public struct ObjCBool : Boolean, ExpressibleByBooleanLiteral {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
   var _value: Int8
@@ -96,7 +96,7 @@ func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
 ///
 /// The compiler has special knowledge of this type.
 @_fixed_layout
-public struct Selector : StringLiteralConvertible {
+public struct Selector : ExpressibleByStringLiteral {
   var ptr: OpaquePointer
 
   /// Create a selector from a string.
@@ -188,7 +188,7 @@ func __pushAutoreleasePool() -> OpaquePointer
 func __popAutoreleasePool(_ pool: OpaquePointer)
 
 public func autoreleasepool<Result>(
-  _ body: @noescape () throws -> Result
+  invoking body: @noescape () throws -> Result
 ) rethrows -> Result {
   let pool = __pushAutoreleasePool()
   defer {

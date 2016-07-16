@@ -186,13 +186,8 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
       continue;
     }
 
-    // If there aren't any more inputs, we can use a default argument.
+    // If there aren't any more inputs, we are done.
     if (fromNext == fromLast) {
-      if (elt2.hasDefaultArg()) {
-        sources[i] = TupleShuffleExpr::DefaultInitialize;
-        continue;
-      }
-
       return true;
     }
 
@@ -556,6 +551,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
   ResultValues.clear();
   bool AllMemberRefs = true;
+  bool PromotedInstanceRef = false;
   ValueDecl *Base = 0;
   for (auto Result : Lookup) {
     // Track the base for member declarations.
@@ -566,6 +562,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         break;
       }
 
+      if (Result.IsPromotedInstanceRef) {
+        PromotedInstanceRef = true;
+      }
       Base = Result.Base;
       continue;
     }
@@ -577,7 +576,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   if (AllMemberRefs) {
     Expr *BaseExpr;
     if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*implicit=*/true);
+      BaseExpr = TypeExpr::createForDecl(Loc, NTD, /*implicit=*/true,
+                                         PromotedInstanceRef);
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
                                            /*implicit=*/true);
@@ -1697,7 +1697,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
       // Apply the solution to the pattern as well.
       Type patternType = expr->getType();
-      patternType = patternType->getWithoutDefaultArgs(tc.Context);
 
       TypeResolutionOptions options;
       options |= TR_OverrideType;
@@ -2150,6 +2149,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          Context.getIdentifier("$match"),
                                          rhsType,
                                          DC);
+
+  matchVar->setImplicit();
   EP->setMatchVar(matchVar);
   matchVar->setHasNonPatternBindingInit();
   
@@ -2837,17 +2838,17 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  // We can conditionally cast from NSError to an ErrorProtocol-conforming
+  // We can conditionally cast from NSError to an Error-conforming
   // type.  This is handled in the runtime, so it doesn't need a special cast
   // kind.
-  if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::ErrorProtocol)) {
+  if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
     if (conformsToProtocol(toType, errorTypeProto, dc,
                            (ConformanceCheckFlags::InExpression|
                             ConformanceCheckFlags::Used)))
       if (auto NSErrorTy = getNSErrorType(dc))
         if (isSubtypeOf(fromType, NSErrorTy, dc)
             // Don't mask "always true" warnings if NSError is cast to
-            // ErrorProtocol itself.
+            // Error itself.
             && !isSubtypeOf(fromType, toType, dc))
           return CheckedCastKind::ValueCast;
   }

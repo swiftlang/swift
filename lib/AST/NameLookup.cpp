@@ -174,6 +174,13 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
     signature = decl->getType()->getCanonicalType();
 
+    // FIXME: The type of a variable or subscript doesn't include
+    // enough context to distinguish entities from different
+    // constrained extensions, so use the overload signature's
+    // type. This is layering a partial fix upon a total hack.
+    if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
+      signature = asd->getOverloadSignature().InterfaceType;
+
     // If we've seen a declaration with this signature before, note it.
     auto &knownDecls =
         CollidingDeclGroups[std::make_pair(signature, decl->getName())];
@@ -436,8 +443,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         if (AFD->getExtensionType()) {
           if (AFD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
-            ExtendedType = AFD->getDeclContext()->getProtocolSelf()
-                             ->getArchetype();
+            ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
 
             // Fallback path.
             if (!ExtendedType)
@@ -481,11 +487,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (!isCascadingUse.hasValue())
           isCascadingUse = ACE->isCascadingContextForLookup(false);
       } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
-        if (ED->getAsProtocolOrProtocolExtensionContext()) {
-          ExtendedType = ED->getProtocolSelf()->getArchetype();
-        } else {
-          ExtendedType = ED->getExtendedType();
-        }
+        ExtendedType = ED->getSelfTypeInContext();
 
         BaseDecl = ED->getAsNominalTypeOrNominalTypeExtensionContext();
         MetaBaseDecl = BaseDecl;
@@ -561,7 +563,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             if (FD->isStatic() && !isMetatypeType)
               continue;
           } else if (isa<EnumElementDecl>(Result)) {
-            Results.push_back(UnqualifiedLookupResult(MetaBaseDecl, Result));
+            auto lookupRes = UnqualifiedLookupResult(MetaBaseDecl, Result);
+            if (!BaseDecl->getType()->is<MetatypeType>()) {
+              lookupRes.IsPromotedInstanceRef = true;
+            }
+            Results.push_back(lookupRes);
             continue;
           }
 

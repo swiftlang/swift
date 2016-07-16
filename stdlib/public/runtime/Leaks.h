@@ -12,7 +12,7 @@
 //
 // This is a very simple leak detector implementation that detects objects that
 // are allocated but not deallocated in a region. It is purposefully behind a
-// flag since it is not meant to be used in
+// flag since it is not meant to be used in production yet.
 //
 //===----------------------------------------------------------------------===//
 

@@ -44,3 +44,6 @@ Classes:
   - Selector: 'setParentReferenceFromRecordID:'
     MethodKind: Instance
     SwiftName: 'setParent(_:)'
+Tags:
+- Name: CKErrorCode
+  NSErrorDomain: CKErrorDomain

@@ -16,7 +16,7 @@ class X : P, CP {
 
   // CHECK-LABEL: sil hidden @_TZFC12dynamic_self1X7factory{{.*}} : $@convention(method) (Int, @thick X.Type) -> @owned X
   // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $@thick X.Type):
-  // CHECK: [[CTOR:%[0-9]+]] = class_method [[SELF]] : $@thick X.Type, #X.init!allocator.1 : X.Type -> (int: Int) -> X , $@convention(method) (Int, @thick X.Type) -> @owned X
+  // CHECK: [[CTOR:%[0-9]+]] = class_method [[SELF]] : $@thick X.Type, #X.init!allocator.1 : (X.Type) -> (int: Int) -> X , $@convention(method) (Int, @thick X.Type) -> @owned X
   // CHECK: apply [[CTOR]]([[I]], [[SELF]]) : $@convention(method) (Int, @thick X.Type) -> @owned X
   class func factory(i: Int) -> Self { return self.init(int: i) }
 }
@@ -36,7 +36,7 @@ func testDynamicSelfDispatch(y: Y) {
 // CHECK: bb0([[Y:%[0-9]+]] : $Y):
 // CHECK:   strong_retain [[Y]]
 // CHECK:   [[Y_AS_X:%[0-9]+]] = upcast [[Y]] : $Y to $X  
-// CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X]] : $X, #X.f!1 : X -> () -> Self , $@convention(method) (@guaranteed X) -> @owned X
+// CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X]] : $X, #X.f!1 : (X) -> () -> Self , $@convention(method) (@guaranteed X) -> @owned X
 // CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X]]) : $@convention(method) (@guaranteed X) -> @owned X
 // CHECK:   strong_release [[Y_AS_X]]
 // CHECK:   [[Y_RESULT:%[0-9]+]] = unchecked_ref_cast [[X_RESULT]] : $X to $Y
@@ -50,7 +50,7 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK: bb0([[GY:%[0-9]+]] : $GY<Int>):
   // CHECK:   strong_retain [[GY]]
   // CHECK:   [[GY_AS_GX:%[0-9]+]] = upcast [[GY]] : $GY<Int> to $GX<Array<Int>>
-  // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX]] : $GX<Array<Int>>, #GX.f!1 : <T> GX<T> -> () -> Self , $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
+  // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX]] : $GX<Array<Int>>, #GX.f!1 : <T> (GX<T>) -> () -> Self , $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   strong_release [[GY_AS_GX]]
   // CHECK:   [[GY_RESULT:%[0-9]+]] = unchecked_ref_cast [[GX_RESULT]] : $GX<Array<Int>> to $GY<Int>
@@ -118,7 +118,7 @@ func testObjCInit(meta: ObjCInit.Type) {
 // CHECK:   [[PB:%.*]] = project_box [[O]]
 // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[THICK_META]] : $@thick ObjCInit.Type to $@objc_metatype ObjCInit.Type
 // CHECK:   [[OBJ:%[0-9]+]] = alloc_ref_dynamic [objc] [[OBJC_META]] : $@objc_metatype ObjCInit.Type, $ObjCInit
-// CHECK:   [[INIT:%[0-9]+]] = class_method [volatile] [[OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : ObjCInit.Type -> () -> ObjCInit , $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
+// CHECK:   [[INIT:%[0-9]+]] = class_method [volatile] [[OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : (ObjCInit.Type) -> () -> ObjCInit , $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   [[RESULT_OBJ:%[0-9]+]] = apply [[INIT]]([[OBJ]]) : $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   store [[RESULT_OBJ]] to [[PB]] : $*ObjCInit
 // CHECK:   strong_release [[O]] : $@box ObjCInit
@@ -145,7 +145,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
   v.foo()?.bar()
 }
 // CHECK-LABEL: sil hidden @_TF12dynamic_self18testOptionalResult{{.*}} : $@convention(thin) (@owned OptionalResultInheritor) -> ()
-// CHECK:      [[T0:%.*]] = class_method [[V:%.*]] : $OptionalResult, #OptionalResult.foo!1 : OptionalResult -> () -> Self? , $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
+// CHECK:      [[T0:%.*]] = class_method [[V:%.*]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> Self? , $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
 // CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[V]])
 // CHECK:      select_enum [[RES]]
 // CHECK:      [[T1:%.*]] = unchecked_enum_data [[RES]]

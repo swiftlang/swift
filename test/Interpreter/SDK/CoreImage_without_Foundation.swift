@@ -4,6 +4,9 @@
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
 
+// FIXME: rdar://problem/26932844
+// REQUIRES: disabled
+
 import CoreImage
 // Do NOT add anything that publicly imports Foundation here!
 

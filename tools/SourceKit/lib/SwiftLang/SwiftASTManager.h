@@ -17,6 +17,7 @@
 #include "SourceKit/Core/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include <functional>
 #include <string>
 
 namespace llvm {
@@ -55,6 +56,10 @@ public:
   ArrayRef<ImmutableTextSnapshotRef> getSnapshots() const;
   EditorDiagConsumer &getEditorDiagConsumer() const;
   swift::SourceFile &getPrimarySourceFile() const;
+
+  /// Perform \p Fn asynchronously while preventing concurrent access to the
+  /// AST.
+  void performAsync(std::function<void()> Fn);
 };
 
 typedef IntrusiveRefCntPtr<ASTUnit> ASTUnitRef;

@@ -104,7 +104,7 @@ Type TypeChecker::getUInt8Type(DeclContext *dc) {
 /// We call this the "exception type" to try to avoid confusion with
 /// the AST's ErrorType node.
 Type TypeChecker::getExceptionType(DeclContext *dc, SourceLoc loc) {
-  if (NominalTypeDecl *decl = Context.getErrorProtocolDecl())
+  if (NominalTypeDecl *decl = Context.getErrorDecl())
     return decl->getDeclaredType();
 
   // Not really sugar, but the actual diagnostic text is fine.
@@ -333,7 +333,8 @@ Type TypeChecker::resolveTypeInContext(
       // - Nested type: associated type
       // - Nested type's context: protocol or protocol extension
       //
-      if (assocType && fromProto == nullptr) {
+      if (!fromProto &&
+          ownerNominal->getAsProtocolOrProtocolExtensionContext()) {
         ProtocolConformance *conformance = nullptr;
 
         // If the conformance check failed, the associated type is for a
@@ -344,7 +345,12 @@ Type TypeChecker::resolveTypeInContext(
                                parentDC, ConformanceCheckFlags::Used,
                                &conformance) &&
             conformance) {
-          return conformance->getTypeWitness(assocType, this).getReplacement();
+          if (assocType) {
+            return conformance->getTypeWitness(assocType, this).getReplacement();
+          }
+
+          return substMemberTypeWithBase(parentDC->getParentModule(), typeDecl,
+                                         fromType, /*isTypeReference=*/true);
         }
       }
 
@@ -370,14 +376,11 @@ Type TypeChecker::resolveTypeInContext(
           // instead of the existential type.
           assert(fromType->is<ProtocolType>());
 
-          auto protoSelf = parentDC->getProtocolSelf();
-          if (protoSelf == nullptr)
+          auto selfType = parentDC->getSelfInterfaceType();
+          if (!selfType)
             return ErrorType::get(Context);
-
-          auto selfType = protoSelf
-              ->getDeclaredType()
-              ->castTo<GenericTypeParamType>();
-          fromType = resolver->resolveGenericTypeParamType(selfType);
+          fromType = resolver->resolveGenericTypeParamType(
+              selfType->castTo<GenericTypeParamType>());
 
           if (assocType) {
             // Odd special case, ask Doug to explain it over pizza one day
@@ -1736,7 +1739,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_noreturn, TAK_pseudogeneric,
-    TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure
+    TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
+    TAK_escaping
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -1855,6 +1859,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                   attrs.has(TAK_noreturn),
                                   attrs.has(TAK_autoclosure),
                                   attrs.has(TAK_noescape),
+                                  attrs.has(TAK_escaping),
                                   fnRepr->throws());
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);
@@ -1949,7 +1954,8 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
     TC.diagnose(args->getStartLoc(), diag::function_type_no_parens)
       .highlight(args->getSourceRange())
       .fixItInsert(args->getStartLoc(), "(")
-    .fixItInsertAfter(args->getEndLoc(), ")");
+      .fixItInsertAfter(args->getEndLoc(), ")");
+    
     // Don't emit this warning three times when in generics.
     repr->setWarned();
   }
@@ -2369,7 +2375,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     Type baseTy = element.getType();
     Type fullTy = TC.getArraySliceType(repr->getEllipsisLoc(), baseTy);
     Identifier name = element.getName();
-    element = TupleTypeElt(fullTy, name, DefaultArgumentKind::None, true);
+    element = TupleTypeElt(fullTy, name, true);
   }
 
   return TupleType::get(elements, Context);

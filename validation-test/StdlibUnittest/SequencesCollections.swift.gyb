@@ -301,7 +301,7 @@ SequenceTypeAlgorithms.test("forAllPermutations") {
     forAllPermutations(0) {
       permutations.append($0)
     }
-    expectEqualSequence([] as [[Int]], permutations) { $0 == $1 }
+    expectEqualSequence([[]] as [[Int]], permutations) { $0 == $1 }
   }
 
   do {

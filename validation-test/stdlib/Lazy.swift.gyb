@@ -633,8 +633,8 @@ func expectSequencePassthrough<
   SequenceLog._customContainsEquatableElement.expectIncrement(baseType) {
     _ = s._customContainsEquatableElement(arbitraryElement)
   }
-  SequenceLog._copyToNativeArrayBuffer.expectIncrement(baseType) {
-    _ = s._copyToNativeArrayBuffer()
+  SequenceLog._copyToContiguousArray.expectIncrement(baseType) {
+    _ = s._copyToContiguousArray()
   }
 
   SequenceLog._copyContents.expectIncrement(baseType) { () -> Void in
@@ -1057,7 +1057,7 @@ tests.test("LazyFilterSequence") {
   // Try again using explicit construction
   filtered = LazyFilterSequence(
     _base: MinimalSequence(elements: base),
-    whereElementsSatisfy: { x in calls += 1; return x.value % 2 == 0})
+    { x in calls += 1; return x.value % 2 == 0})
 
   expectEqual(100, calls)
 

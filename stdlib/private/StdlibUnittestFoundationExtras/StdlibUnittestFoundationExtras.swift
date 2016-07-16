@@ -27,7 +27,7 @@ public func withOverriddenLocaleCurrentLocale<Result>(
   _ body: @noescape () -> Result
 ) -> Result {
   let oldMethod = class_getClassMethod(
-    Locale.self, #selector(Locale.current))
+    Locale.self, #selector(getter: Locale.current))
   precondition(oldMethod != nil, "could not find +[Locale currentLocale]")
 
   let newMethod = class_getClassMethod(
@@ -51,7 +51,7 @@ public func withOverriddenLocaleCurrentLocale<Result>(
   _ body: @noescape () -> Result
 ) -> Result {
   precondition(
-    Locale.availableLocaleIdentifiers().contains(temporaryLocaleIdentifier),
+    Locale.availableLocaleIdentifiers.contains(temporaryLocaleIdentifier),
     "requested locale \(temporaryLocaleIdentifier) is not available")
 
   return withOverriddenLocaleCurrentLocale(
@@ -65,10 +65,10 @@ public func withOverriddenLocaleCurrentLocale<Result>(
 /// return-autoreleased optimization.)
 @inline(never)
 public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
-  _ body: @noescape () -> Void
+  invoking body: @noescape () -> Void
 ) {
 #if arch(i386) && (os(iOS) || os(watchOS))
-  autoreleasepool(body)
+  autoreleasepool(invoking: body)
 #else
   body()
 #endif

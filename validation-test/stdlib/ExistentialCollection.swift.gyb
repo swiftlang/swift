@@ -181,8 +181,8 @@ tests.test("${TestedType}: dispatch to wrapped") {
     _ = s._preprocessingPass {}
   }
 
-  Log._copyToNativeArrayBuffer.expectIncrement(Base.self) {
-    _ = s._copyToNativeArrayBuffer()
+  Log._copyToContiguousArray.expectIncrement(Base.self) {
+    _ = s._copyToContiguousArray()
   }
 
   do {

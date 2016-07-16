@@ -49,8 +49,20 @@ class ArgumentsTypeTestCase(unittest.TestCase):
 
     def test_clang_compiler_version(self):
         self.assertEqual(
-            argtype.clang_compiler_version('1.23.456'),
-            ("1", "23", "456"))
+            argtype.clang_compiler_version('1.23.456').components,
+            ("1", "23", "456", None))
+        self.assertEqual(
+            argtype.clang_compiler_version('1.2.3').components,
+            ("1", "2", "3", None))
+        self.assertEqual(
+            argtype.clang_compiler_version('1.2.3.4').components,
+            ("1", "2", "3", "4"))
+        self.assertEqual(
+            argtype.clang_compiler_version('12.34.56').components,
+            ("12", "34", "56", None))
+        self.assertEqual(
+            argtype.clang_compiler_version('12.34.56.78').components,
+            ("12", "34", "56", "78"))
         self.assertRaises(
             argparse.ArgumentTypeError,
             argtype.clang_compiler_version,

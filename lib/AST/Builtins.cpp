@@ -169,6 +169,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              /*GenericParams=*/nullptr,
                              paramList, FnType,
                              TypeLoc::withoutLoc(ResType), DC);
+  FD->setInterfaceType(FnType);
   FD->setImplicit();
   FD->setAccessibility(Accessibility::Public);
   return FD;
@@ -1497,6 +1498,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getRefCountingOperation(Context, Id);
       
   case BuiltinValueKind::Load:
+  case BuiltinValueKind::LoadRaw:
   case BuiltinValueKind::Take:
     if (!Types.empty()) return nullptr;
     return getLoadOperation(Context, Id);

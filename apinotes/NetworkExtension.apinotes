@@ -1,0 +1,11 @@
+---
+Name: NetworkExtension
+Tags:
+- Name: NEAppProxyFlowError
+  SwiftName: NEAppProxyErrorDomain
+- Name: NEFilterError
+  SwiftName: NEFilterErrorDomain
+- Name: NETunnelProviderError
+  SwiftName: NETunnelProviderErrorDomain
+- Name: NEVPNError
+  SwiftName: NEVPNErrorDomain

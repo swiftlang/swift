@@ -560,7 +560,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     }
 
     /// Initializes a newly created URL referencing the local file or directory at the file system representation of the path. File system representation is a null-terminated C string with canonical UTF-8 encoding.
-    public init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory: Bool, relativeToURL baseURL: URL?) {
+    public init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory: Bool, relativeTo baseURL: URL?) {
         _url = NSURL(fileURLWithFileSystemRepresentation: path, isDirectory: isDirectory, relativeTo: baseURL)
     }
     
@@ -1021,9 +1021,9 @@ extension URL : CustomPlaygroundQuickLookable {
 // File references, for playgrounds.
 //===----------------------------------------------------------------------===//
 
-extension URL : _FileReferenceLiteralConvertible {
+extension URL : _ExpressibleByFileReferenceLiteral {
   public init(fileReferenceLiteralResourceName name: String) {
-    self = Bundle.main().urlForResource(name, withExtension: nil)!
+    self = Bundle.main.url(forResource: name, withExtension: nil)!
   }
 }
 

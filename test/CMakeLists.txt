@@ -59,7 +59,8 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
-     ("${SDK}" STREQUAL "ANDROID"))
+     ("${SDK}" STREQUAL "ANDROID") OR
+     ("${SDK}" STREQUAL "WINDOWS"))
     # No extra dependencies.
   else()
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
@@ -92,7 +93,7 @@ if(PYTHONINTERP_FOUND)
 
   set(SWIFT_TEST_EXTRA_ARGS)
 
-  if(NOT SWIFT_BUILD_TOOLS)
+  if(NOT SWIFT_INCLUDE_TOOLS)
     list(APPEND SWIFT_TEST_EXTRA_ARGS
          "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
          "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"

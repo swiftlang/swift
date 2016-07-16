@@ -20,7 +20,7 @@
  
  Each index in an index path represents the index into an array of children from one node in the tree to another, deeper, node.
 */
-public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableCollection, RandomAccessCollection, Comparable, ArrayLiteralConvertible {
+public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableCollection, RandomAccessCollection, Comparable, ExpressibleByArrayLiteral {
     public typealias ReferenceType = NSIndexPath
     public typealias Element = Int
     public typealias Index = Array<Int>.Index

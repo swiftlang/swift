@@ -39,7 +39,7 @@ func _convertStringToNSString(_ string: String) -> NSString {
   return string._bridgeToObjectiveC()
 }
 
-extension NSString : StringLiteralConvertible {
+extension NSString : ExpressibleByStringLiteral {
   /// Create an instance initialized to `value`.
   public required convenience init(unicodeScalarLiteral value: StaticString) {
     self.init(stringLiteral: value)
@@ -352,8 +352,8 @@ extension CGFloat : _ObjectiveCBridgeable {
 }
 
 // Literal support for NSNumber
-extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible,
-                     BooleanLiteralConvertible {
+extension NSNumber : ExpressibleByFloatLiteral, ExpressibleByIntegerLiteral,
+                     ExpressibleByBooleanLiteral {
   /// Create an instance initialized to `value`.
   public required convenience init(integerLiteral value: Int) {
     self.init(value: value)
@@ -376,7 +376,7 @@ public let NSNotFound: Int = .max
 // Arrays
 //===----------------------------------------------------------------------===//
 
-extension NSArray : ArrayLiteralConvertible {
+extension NSArray : ExpressibleByArrayLiteral {
   /// Create an instance initialized with `elements`.
   public required convenience init(arrayLiteral elements: AnyObject...) {
     // Let bridging take care of it.
@@ -482,7 +482,7 @@ extension Array : _ObjectiveCBridgeable {
 // Dictionaries
 //===----------------------------------------------------------------------===//
 
-extension NSDictionary : DictionaryLiteralConvertible {
+extension NSDictionary : ExpressibleByDictionaryLiteral {
   public required convenience init(
     dictionaryLiteral elements: (NSCopying, AnyObject)...
   ) {
@@ -608,6 +608,24 @@ extension Dictionary : _ObjectiveCBridgeable {
 }
 
 //===----------------------------------------------------------------------===//
+// TextChecking
+//===----------------------------------------------------------------------===//
+
+extension NSTextCheckingResult.CheckingType {
+    public static var allSystemTypes : NSTextCheckingResult.CheckingType {
+        return NSTextCheckingResult.CheckingType(rawValue: 0xffffffff)
+    }
+    
+    public static var allCustomTypes : NSTextCheckingResult.CheckingType {
+        return NSTextCheckingResult.CheckingType(rawValue: 0xffffffff << 32)
+    }
+    
+    public static var allTypes : NSTextCheckingResult.CheckingType {
+        return NSTextCheckingResult.CheckingType(rawValue: UInt64.max)
+    }
+}
+
+//===----------------------------------------------------------------------===//
 // Fast enumeration
 //===----------------------------------------------------------------------===//
 
@@ -715,7 +733,7 @@ extension NSSet : Sequence {
   }
 }
 
-extension OrderedSet : Sequence {
+extension NSOrderedSet : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -905,7 +923,7 @@ extension NSRange {
 public
 func NSLocalizedString(_ key: String,
                        tableName: String? = nil,
-                       bundle: Bundle = Bundle.main(),
+                       bundle: Bundle = Bundle.main,
                        value: String = "",
                        comment: String) -> String {
   return bundle.localizedString(forKey: key, value:value, table:tableName)
@@ -971,28 +989,28 @@ public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>?
 public typealias ErrorPointer = NSErrorPointer
 
 public // COMPILER_INTRINSIC
-let _nilObjCError: ErrorProtocol = _GenericObjCError.nilError
+let _nilObjCError: Error = _GenericObjCError.nilError
 
-@_silgen_name("swift_convertNSErrorToErrorProtocol")
+@_silgen_name("swift_convertNSErrorToError")
 public // COMPILER_INTRINSIC
-func _convertNSErrorToErrorProtocol(_ error: NSError?) -> ErrorProtocol {
+func _convertNSErrorToError(_ error: NSError?) -> Error {
   if let error = error {
     return error
   }
   return _nilObjCError
 }
 
-@_silgen_name("swift_convertErrorProtocolToNSError")
+@_silgen_name("swift_convertErrorToNSError")
 public // COMPILER_INTRINSIC
-func _convertErrorProtocolToNSError(_ error: ErrorProtocol) -> NSError {
-  return unsafeDowncast(_bridgeErrorProtocolToNSError(error), to: NSError.self)
+func _convertErrorToNSError(_ error: Error) -> NSError {
+  return unsafeDowncast(_bridgeErrorToNSError(error), to: NSError.self)
 }
 
 //===----------------------------------------------------------------------===//
 // Variadic initializers and methods
 //===----------------------------------------------------------------------===//
 
-extension Predicate {
+extension NSPredicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
   public
   convenience init(format predicateFormat: String, _ args: CVarArg...) {
@@ -1031,7 +1049,7 @@ extension NSString {
     _ format: NSString, _ args: CVarArg...
   ) -> Self {
     return withVaList(args) {
-      self.init(format: format as String, locale: Locale.current(), arguments: $0)
+      self.init(format: format as String, locale: Locale.current, arguments: $0)
     }
   }
 
@@ -1058,7 +1076,7 @@ extension NSArray {
   }
 }
 
-extension OrderedSet {
+extension NSOrderedSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
   public convenience init(objects elements: AnyObject...) {
     self.init(array: elements)
@@ -1072,13 +1090,13 @@ extension NSSet {
   }
 }
 
-extension NSSet : ArrayLiteralConvertible {
+extension NSSet : ExpressibleByArrayLiteral {
   public required convenience init(arrayLiteral elements: AnyObject...) {
     self.init(array: elements)
   }
 }
 
-extension OrderedSet : ArrayLiteralConvertible {
+extension NSOrderedSet : ExpressibleByArrayLiteral {
   public required convenience init(arrayLiteral elements: AnyObject...) {
     self.init(array: elements)
   }
@@ -1201,23 +1219,41 @@ internal func NS_Swift_NSCoder_decodeObjectOfClassesForKey(
 
 @available(OSX 10.11, iOS 9.0, *)
 internal func resolveError(_ error: NSError?) throws {
-  if let error = error where error.code != NSCoderValueNotFoundError {
+  if let error = error, error.code != NSCoderValueNotFoundError {
     throw error
   }
 }
 
 extension NSCoder {
+  @available(*, unavailable, renamed: "decodeObject(of:forKey:)")
   public func decodeObjectOfClass<DecodedObjectType>(
     _ cls: DecodedObjectType.Type, forKey key: String
   ) -> DecodedObjectType?
     where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
+    fatalError("This API has been renamed")
+  }
+
+  public func decodeObject<DecodedObjectType>(
+    of cls: DecodedObjectType.Type, forKey key: String
+  ) -> DecodedObjectType?
+    where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
     let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, nil)
-    return result as! DecodedObjectType?
+    return result as? DecodedObjectType
+  }
+
+  @available(*, unavailable, renamed: "decodeObject(of:forKey:)")
+  @nonobjc
+  public func decodeObjectOfClasses(_ classes: NSSet?, forKey key: String) -> AnyObject? {
+    fatalError("This API has been renamed")
   }
 
   @nonobjc
-  public func decodeObjectOfClasses(_ classes: NSSet?, forKey key: String) -> AnyObject? {
-    return NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classes, key as AnyObject, nil)
+  public func decodeObject(of classes: [AnyClass]?, forKey key: String) -> AnyObject? {
+    var classesAsNSObjects: NSSet? = nil
+    if let theClasses = classes {
+      classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
+    }
+    return NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, nil)
   }
 
   @available(OSX 10.11, iOS 9.0, *)
@@ -1228,29 +1264,51 @@ extension NSCoder {
     return result
   }
 
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(*, unavailable, renamed: "decodeTopLevelObject(forKey:)")
   public func decodeTopLevelObjectForKey(_ key: String) throws -> AnyObject? {
+    fatalError("This API has been renamed")
+  }
+
+  @available(OSX 10.11, iOS 9.0, *)
+  public func decodeTopLevelObject(forKey key: String) throws -> AnyObject? {
     var error: NSError?
     let result = NS_Swift_NSCoder_decodeObjectForKey(self as AnyObject, key as AnyObject, &error)
     try resolveError(error)
     return result
   }
 
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(*, unavailable, renamed: "decodeTopLevelObject(of:forKey:)")
   public func decodeTopLevelObjectOfClass<DecodedObjectType>(
     _ cls: DecodedObjectType.Type, forKey key: String
+  ) throws -> DecodedObjectType?
+    where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
+    fatalError("This API has been renamed")
+  }
+
+  @available(OSX 10.11, iOS 9.0, *)
+  public func decodeTopLevelObject<DecodedObjectType>(
+    of cls: DecodedObjectType.Type, forKey key: String
   ) throws -> DecodedObjectType?
     where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
     var error: NSError?
     let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, &error)
     try resolveError(error)
-    return result as! DecodedObjectType?
+    return result as? DecodedObjectType
+  }
+
+  @available(*, unavailable, renamed: "decodeTopLevelObject(of:forKey:)")
+  public func decodeTopLevelObjectOfClasses(_ classes: NSSet?, forKey key: String) throws -> AnyObject? {
+    fatalError("This API has been renamed")
   }
 
   @available(OSX 10.11, iOS 9.0, *)
-  public func decodeTopLevelObjectOfClasses(_ classes: NSSet?, forKey key: String) throws -> AnyObject? {
-    var error: NSError?
-    let result = NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classes, key as AnyObject, &error)
+  public func decodeTopLevelObject(of classes: [AnyClass]?, forKey key: String) throws -> AnyObject? {
+    var error: NSError? = nil
+    var classesAsNSObjects: NSSet? = nil
+    if let theClasses = classes {
+      classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
+    }
+    let result = NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, &error)
     try resolveError(error)
     return result
   }

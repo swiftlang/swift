@@ -89,7 +89,7 @@ public class SequenceLog {
   public static var split = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _preprocessingPass = TypeIndexed(0)
-  public static var _copyToNativeArrayBuffer = TypeIndexed(0)
+  public static var _copyToContiguousArray = TypeIndexed(0)
   public static var _copyContents = TypeIndexed(0)
 }
 
@@ -229,10 +229,10 @@ public struct ${Self}<
   }
 
   public func filter(
-    _ includeElement: @noescape (Base.Iterator.Element) throws -> Bool
+    _ isIncluded: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
     Log.filter[selfType] += 1
-    return try base.filter(includeElement)
+    return try base.filter(isIncluded)
   }
 
   public func forEach(
@@ -274,13 +274,13 @@ public struct ${Self}<
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    isSeparator: @noescape (Base.Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     Log.split[selfType] += 1
     return try base.split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: isSeparator)
+      whereSeparator: isSeparator)
   }
 
   public func _customContainsEquatableElement(
@@ -302,10 +302,10 @@ public struct ${Self}<
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
-    Log._copyToNativeArrayBuffer[selfType] += 1
-    return base._copyToNativeArrayBuffer()
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element> {
+    Log._copyToContiguousArray[selfType] += 1
+    return base._copyToContiguousArray()
   }
 
   /// Copy a Sequence into an array.

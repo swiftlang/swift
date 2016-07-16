@@ -39,7 +39,7 @@ public struct Zip2Iterator<
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.
   public mutating func next() -> Element? {
-    // The next() function needs to track if it has reached the end. If we
+    // The next() function needs to track if it has reached the end.  If we
     // didn't, and the first sequence is longer than the second, then when we
     // have already exhausted the second sequence, on every subsequent call to
     // next() we would consume and discard one additional element from the
@@ -49,7 +49,8 @@ public struct Zip2Iterator<
       return nil
     }
 
-    guard let element1 = _baseStream1.next(), element2 = _baseStream2.next() else {
+    guard let element1 = _baseStream1.next(),
+          let element2 = _baseStream2.next() else {
       _reachedEnd = true
       return nil
     }

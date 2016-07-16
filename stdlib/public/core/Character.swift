@@ -61,8 +61,8 @@
 /// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 public struct Character :
-  _BuiltinExtendedGraphemeClusterLiteralConvertible,
-  ExtendedGraphemeClusterLiteralConvertible, Equatable, Hashable, Comparable {
+  _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
+  ExpressibleByExtendedGraphemeClusterLiteral, Equatable, Hashable, Comparable {
 
   // Fundamentally, it is just a String, but it is optimized for the
   // common case where the UTF-8 representation fits in 63 bits.  The
@@ -92,7 +92,7 @@ public struct Character :
       shift += 8
     }
 
-    UTF8.encode(scalar, sendingOutputTo: output)
+    UTF8.encode(scalar, into: output)
     asInt |= (~0) << shift
     _representation = .small(Builtin.trunc_Int64_Int63(asInt._value))
   }
@@ -182,8 +182,8 @@ public struct Character :
       _representation = .small(Builtin.trunc_Int64_Int63(initialUTF8._value))
     }
     else {
-      if let native = s._core.nativeBuffer
-              where native.start == UnsafeMutablePointer(s._core._baseAddress!){
+      if let native = s._core.nativeBuffer,
+         native.start == UnsafeMutablePointer(s._core._baseAddress!) {
         _representation = .large(native._storage)
         return
       }
@@ -297,7 +297,7 @@ public struct Character :
         _SmallUTF8(u8).makeIterator(),
         from: UTF8.self, to: UTF16.self,
         stoppingOnError: false,
-        sendingOutputTo: output)
+        into: output)
       self.data = u16
     }
 

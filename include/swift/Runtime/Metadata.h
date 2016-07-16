@@ -2345,8 +2345,8 @@ enum class ExistentialTypeRepresentation {
   Opaque,
   /// The type uses a class existential representation.
   Class,
-  /// The type uses the ErrorProtocol boxed existential representation.
-  ErrorProtocol,
+  /// The type uses the Error boxed existential representation.
+  Error,
 };
 
 /// The structure of existential type metadata.

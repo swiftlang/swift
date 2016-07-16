@@ -3212,9 +3212,7 @@ public:
   ClassDecl *getSuperclassDecl() const;
 
   /// Set the superclass of this class.
-  void setSuperclass(Type superclass) {
-    LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
-  }
+  void setSuperclass(Type superclass);
 
   /// Retrieve the status of circularity checking for class inheritance.
   CircularityCheck getCircularityCheck() const {
@@ -5510,9 +5508,6 @@ class ConstructorDecl : public AbstractFunctionDecl {
 
   ParameterList *ParameterLists[2];
 
-  /// The type of the initializing constructor.
-  Type InitializerType;
-
   /// The interface type of the initializing constructor.
   Type InitializerInterfaceType;
 
@@ -5543,10 +5538,6 @@ public:
 
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
-
-  /// Get the type of the initializing constructor.
-  Type getInitializerType() const { return InitializerType; }
-  void setInitializerType(Type t) { InitializerType = t; }
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();
@@ -5949,24 +5940,6 @@ inline bool ValueDecl::isSettable(const DeclContext *UseDC,
     return sd->isSettable();
   } else
     return false;
-}
-
-namespace impl {
-  bool isInternalDeclEffectivelyPublic(const ValueDecl *VD);
-}
-
-inline Accessibility ValueDecl::getEffectiveAccess() const {
-  switch (getFormalAccess()) {
-  case Accessibility::Public:
-    return Accessibility::Public;
-  case Accessibility::Internal:
-    if (impl::isInternalDeclEffectivelyPublic(this)) {
-      return Accessibility::Public;
-    }
-    return Accessibility::Internal;
-  case Accessibility::Private:
-    return Accessibility::Private;
-  }
 }
 
 inline Optional<VarDecl *>

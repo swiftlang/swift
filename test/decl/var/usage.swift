@@ -48,6 +48,21 @@ class TestClass {
   }
 }
 
+enum TestEnum {
+  case Test(Int, Int, Int)
+}
+
+func testEnum() -> Int {
+  let ev = TestEnum.Test(5, 6, 7)
+  switch ev {
+  case .Test(var i, var j, var k): // expected-warning {{variable 'i' was never mutated; consider changing to 'let' constant}} {{14-17=let}}
+                                   // expected-warning@-1 {{variable 'j' was never mutated; consider changing to 'let' constant}} {{21-24=let}}
+                                   // expected-warning@-2 {{variable 'k' was never mutated; consider changing to 'let' constant}} {{28-31=let}}
+    return i + j + k
+  default:
+    return 0
+  }
+}
 
 func nestedFunction() -> Int {
   var x = 42  // No warning about being never-set.
@@ -201,7 +216,7 @@ func testFixitsInStatementsWithPatterns(_ a : Int?) {
 func test(_ a : Int?, b : Any) {
   if true == true, let x = a {   // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{24-25=_}}
   }
-  if let x = a, y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{10-11=_}}
+  if let x = a, let y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{10-11=_}}
     _ = y
   }
 
@@ -230,5 +245,4 @@ func test(_ a : Int?, b : Any) {
   if let yyy = zzz ?? xxx { } // expected-warning{{with boolean test}} {{6-16=(}} {{26-26=) != nil}}
 
 }
-
 

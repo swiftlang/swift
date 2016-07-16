@@ -164,6 +164,9 @@ struct ASTContext::Implementation {
   /// The declaration of ObjectiveC.ObjCBool.
   StructDecl *ObjCBoolDecl = nullptr;
 
+  /// The declaration of Foundation.NSError.
+  ClassDecl *NSErrorDecl = nullptr;
+
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
@@ -567,7 +570,7 @@ NominalTypeDecl *ASTContext::getStringDecl() const {
 }
 
 CanType ASTContext::getExceptionType() const {
-  if (auto exn = getErrorProtocolDecl()) {
+  if (auto exn = getErrorDecl()) {
     return exn->getDeclaredType()->getCanonicalType();
   } else {
     // Use Builtin.NativeObject just as a stand-in.
@@ -575,8 +578,8 @@ CanType ASTContext::getExceptionType() const {
   }
 }
 
-NominalTypeDecl *ASTContext::getErrorProtocolDecl() const {
-  return getProtocol(KnownProtocolKind::ErrorProtocol);
+NominalTypeDecl *ASTContext::getErrorDecl() const {
+  return getProtocol(KnownProtocolKind::Error);
 }
 
 NominalTypeDecl *ASTContext::getArrayDecl() const {
@@ -838,6 +841,26 @@ StructDecl *ASTContext::getObjCBoolDecl() {
   return Impl.ObjCBoolDecl;
 }
 
+ClassDecl *ASTContext::getNSErrorDecl() const {
+  if (!Impl.NSErrorDecl) {
+    if (Module *M = getLoadedModule(Id_Foundation)) {
+      // Note: use unqualified lookup so we find NSError regardless of
+      // whether it's defined in the Foundation module or the Clang
+      // Foundation module it imports.
+      UnqualifiedLookup lookup(getIdentifier("NSError"), M, nullptr);
+      if (auto type = lookup.getSingleTypeResult()) {
+        if (auto classDecl = dyn_cast<ClassDecl>(type)) {
+          if (classDecl->getGenericParams() == nullptr) {
+            Impl.NSErrorDecl = classDecl;
+          }
+        }
+      }
+    }
+  }
+
+  return Impl.NSErrorDecl;
+}
+
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // Check whether we've already looked for and cached this protocol.
   unsigned index = (unsigned)kind;
@@ -848,8 +871,11 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // Find all of the declarations with this name in the appropriate module.
   SmallVector<ValueDecl *, 1> results;
 
-  // _BridgedNSError is in the Foundation module.
-  if (kind == KnownProtocolKind::BridgedNSError) {
+  // _BridgedNSError, _BridgedStoredNSError, and _ErrorCodeProtocol
+  // are in the Foundation module.
+  if (kind == KnownProtocolKind::BridgedNSError ||
+      kind == KnownProtocolKind::BridgedStoredNSError ||
+      kind == KnownProtocolKind::ErrorCodeProtocol) {
     Module *foundation =
         const_cast<ASTContext *>(this)->getLoadedModule(Id_Foundation);
     if (!foundation)
@@ -902,7 +928,8 @@ static CanType stripImmediateLabels(CanType type) {
 /// Check whether the given function is non-generic.
 static bool isNonGenericIntrinsic(FuncDecl *fn, CanType &input,
                                   CanType &output) {
-  auto fnType = dyn_cast<FunctionType>(fn->getType()->getCanonicalType());
+  auto fnType = dyn_cast<FunctionType>(fn->getInterfaceType()
+                                         ->getCanonicalType());
   if (!fnType)
     return false;
 
@@ -2516,22 +2543,18 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
   for (const TupleTypeElt &Elt : Fields) {
     ID.AddPointer(Elt.NameAndVariadic.getOpaqueValue());
     ID.AddPointer(Elt.getType().getPointer());
-    ID.AddInteger(static_cast<unsigned>(Elt.getDefaultArgKind()));
   }
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
 Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
-  if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName()
-      && Fields[0].getDefaultArgKind() == DefaultArgumentKind::None)
+  if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
     return ParenType::get(C, Fields[0].getType());
 
   RecursiveTypeProperties properties;
   for (const TupleTypeElt &Elt : Fields) {
     if (Elt.getType())
       properties |= Elt.getType()->getRecursiveProperties();
-    if (Elt.getDefaultArgKind() != DefaultArgumentKind::None)
-      properties |= RecursiveTypeProperties::HasDefaultParameter;
   }
 
   auto arena = getArena(properties);
@@ -2622,8 +2645,6 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
   RecursiveTypeProperties properties;
-  if (Parent)
-    properties |= Parent->getRecursiveProperties();
   BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs, properties);
 
   auto arena = getArena(properties);
@@ -2657,8 +2678,8 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   } else {
     auto theEnum = cast<EnumDecl>(TheDecl);
     newType = new (C, arena) BoundGenericEnumType(theEnum, Parent, ArgsCopy,
-                                                   IsCanonical ? &C : 0,
-                                                   properties);
+                                                  IsCanonical ? &C : 0,
+                                                  properties);
   }
   C.Impl.getArena(arena).BoundGenericTypes.InsertNode(newType, InsertPos);
 
@@ -3798,6 +3819,10 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
       }
     }
 
+    // Error is bridged to NSError, when it's available.
+    if (nominal == getErrorDecl() && getNSErrorDecl())
+      result = ForeignRepresentationInfo::forBridgedError();
+
     // If we didn't find anything, mark the result as "None".
     if (!result)
       result = ForeignRepresentationInfo::forNone(CurrentGeneration);
@@ -3827,6 +3852,10 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
           KnownProtocolKind::ObjectiveCBridgeable))
       return ForeignRepresentationInfo::forNone();
 
+    // Ignore error bridging in C.
+    if (entry.getKind() == ForeignRepresentableKind::BridgedError)
+      return ForeignRepresentationInfo::forNone();
+
     SWIFT_FALLTHROUGH;
 
   case ForeignLanguage::ObjectiveC:
@@ -3845,15 +3874,20 @@ bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
           nominal == getDictionaryDecl() ||
           nominal == getSetDecl() ||
           nominal == getStringDecl() ||
+          nominal == getErrorDecl() ||
           // Weird one-off case where CGFloat is bridged to NSNumber.
           nominal->getName() == Id_CGFloat);
 }
 
 Optional<Type>
 ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
-                             LazyResolver *resolver) const {
-  if (type->isBridgeableObjectType())
+                             LazyResolver *resolver,
+                             Type *bridgedValueType) const {
+  if (type->isBridgeableObjectType()) {
+    if (bridgedValueType) *bridgedValueType = type;
+
     return type;
+  }
 
   // Whitelist certain types even if Foundation is not imported, to ensure
   // that casts from AnyObject to one of these types are not optimized away.
@@ -3886,27 +3920,58 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     if (existentialMetaTy->getInstanceType()->isObjCExistentialType())
       return type;
 
-  // Retrieve the _BridgedToObjectiveC protocol.
-  auto bridgedProto = getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
-  if (!bridgedProto)
-    return None;
+  // Check whether the type is an existential that contains
+  // Error. If so, it's bridged to NSError.
+  if (type->isExistentialWithError()) {
+    if (auto nsErrorDecl = getNSErrorDecl()) {
+      // The corresponding value type is Error.
+      if (bridgedValueType)
+        *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
 
-  // Check whether the type conforms to _BridgedToObjectiveC.
-  auto conformance
-    = dc->getParentModule()->lookupConformance(type, bridgedProto, resolver);
-  if (!conformance) {
-    // If we haven't imported Foundation but this is a whitelisted type,
-    // behave as above.
-    if (knownBridgedToObjC)
-      return Type();
-    return None;
+      return nsErrorDecl->getDeclaredInterfaceType();
+    }
   }
 
-  // Find the type we bridge to.
-  return ProtocolConformance::getTypeWitnessByName(type,
-                                                   conformance->getConcrete(),
-                                                   Id_ObjectiveCType,
-                                                   resolver);
+  // Try to find a conformance that will enable bridging.
+  auto findConformance =
+    [&](KnownProtocolKind known) -> Optional<ProtocolConformanceRef> {
+      // Find the protocol.
+      auto proto = getProtocol(known);
+      if (!proto) return None;
+
+      return dc->getParentModule()->lookupConformance(type, proto, resolver);
+    };
+
+  // Do we conform to _ObjectiveCBridgeable?
+  if (auto conformance
+        = findConformance(KnownProtocolKind::ObjectiveCBridgeable)) {
+    // The corresponding value type is... the type.
+    if (bridgedValueType)
+      *bridgedValueType = type;
+
+    // Find the Objective-C class type we bridge to.
+    return ProtocolConformance::getTypeWitnessByName(
+             type, conformance->getConcrete(), Id_ObjectiveCType,
+             resolver);
+  }
+
+  // Do we conform to Error?
+  if (findConformance(KnownProtocolKind::Error)) {
+    // The corresponding value type is Error.
+    if (bridgedValueType)
+      *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
+
+    // Bridge to NSError.
+    if (auto nsErrorDecl = getNSErrorDecl())
+      return nsErrorDecl->getDeclaredInterfaceType();
+  }
+
+
+  // If we haven't imported Foundation but this is a whitelisted type,
+  // behave as above.
+  if (knownBridgedToObjC)
+    return Type();
+  return None;
 }
 
 std::pair<ArchetypeBuilder *, ArchetypeBuilder::PotentialArchetype *>

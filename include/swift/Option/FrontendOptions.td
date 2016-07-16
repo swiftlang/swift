@@ -108,6 +108,9 @@ def print_clang_stats : Flag<["-"], "print-clang-stats">,
 def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
   HelpText<"Always serialize options for debugging (default: only for apps)">;
 
+def autolink_library : Separate<["-"], "autolink-library">,
+  HelpText<"Add dependent library">, Flags<[FrontendOption]>;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
@@ -347,5 +350,8 @@ def group_info_path : Separate<["-"], "group-info-path">,
 
 def enable_protocol_typealiases: Flag<["-"], "enable-protocol-typealiases">,
   HelpText<"Enable typealiases inside protocol declarations">;
+  
+def enable_id_as_any: Flag<["-"], "enable-id-as-any">,
+  HelpText<"Enable importing ObjC 'id' as Swift 'Any' type">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

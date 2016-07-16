@@ -167,28 +167,28 @@ assert(unstandard.maxY == 20)
 assert(unstandard == standard)
 assert(unstandard.standardized == standard)
 
-unstandard.standardizeInPlace()
+unstandard = unstandard.standardized
 print_(unstandard, "standardized unstandard")
 // CHECK-NEXT: standardized unstandard -20.0 -30.0 30.0 50.0
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
 print_(rect.insetBy(dx: 1, dy: -2), "insetBy")
 // CHECK-NEXT: insetBy 12.25 20.25 31.25 48.25
-rect.insetInPlace(dx: 1, dy: -2)
+rect = rect.insetBy(dx: 1, dy: -2)
 print_(rect, "insetInPlace")
 // CHECK-NEXT: insetInPlace 12.25 20.25 31.25 48.25
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
 print_(rect.offsetBy(dx: 3, dy: -4), "offsetBy")
 // CHECK-NEXT: offsetBy 14.25 18.25 33.25 44.25
-rect.offsetInPlace(dx: 3, dy: -4)
+rect = rect.offsetBy(dx: 3, dy: -4)
 print_(rect, "offsetInPlace")
 // CHECK-NEXT: offsetInPlace 14.25 18.25 33.25 44.25
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
 print_(rect.integral, "integral")
 // CHECK-NEXT: integral 11.0 22.0 34.0 45.0
-rect.makeIntegralInPlace()
+rect = rect.integral
 print_(rect, "makeIntegralInPlace")
 // CHECK-NEXT: makeIntegralInPlace 11.0 22.0 34.0 45.0
 
@@ -203,9 +203,9 @@ print_(rect.union(distantRect), "union distant")
 // CHECK-NEXT: union small 10.0 20.0 34.5 46.5
 // CHECK-NEXT: union big 1.0 2.0 101.0 102.0
 // CHECK-NEXT: union distant 11.25 22.25 989.75 1978.75
-rect.formUnion(smallRect)
-rect.formUnion(bigRect)
-rect.formUnion(distantRect)
+rect = rect.union(smallRect)
+rect = rect.union(bigRect)
+rect = rect.union(distantRect)
 print_(rect, "formUnion")
 // CHECK-NEXT: formUnion 1.0 2.0 1000.0 1999.0
 
@@ -217,13 +217,13 @@ print_(rect.intersection(distantRect), "intersect distant")
 // CHECK-NEXT: intersect big 11.25 22.25 33.25 44.25
 // CHECK-NEXT: intersect distant inf inf 0.0 0.0
 assert(rect.intersects(smallRect))
-rect.formIntersection(smallRect)
+rect = rect.intersection(smallRect)
 assert(!rect.isEmpty)
 assert(rect.intersects(bigRect))
-rect.formIntersection(bigRect)
+rect = rect.intersection(bigRect)
 assert(!rect.isEmpty)
 assert(!rect.intersects(distantRect))
-rect.formIntersection(distantRect)
+rect = rect.intersection(distantRect)
 assert(rect.isEmpty)
 
 
@@ -235,7 +235,7 @@ assert(!rect.contains(bigRect))
 
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
-var (slice, remainder) = rect.divide(5, fromEdge:CGRectEdge.minXEdge)
+var (slice, remainder) = rect.divided(atDistance: 5, from:CGRectEdge.minXEdge)
 print_(slice, "slice")
 print_(remainder, "remainder")
 // CHECK-NEXT: slice 11.25 22.25 5.0 44.25

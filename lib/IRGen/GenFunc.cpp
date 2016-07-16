@@ -1489,9 +1489,13 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   
   //
   // Initialize the "isa" pointer, which is _NSConcreteStackBlock.
-  auto NSConcreteStackBlock
-    = IGF.IGM.getModule()->getOrInsertGlobal("_NSConcreteStackBlock",
+  auto NSConcreteStackBlock =
+      IGF.IGM.getModule()->getOrInsertGlobal("_NSConcreteStackBlock",
                                              IGF.IGM.ObjCClassStructTy);
+  if (IGF.IGM.Triple.isOSBinFormatCOFF())
+    cast<llvm::GlobalVariable>(NSConcreteStackBlock)
+        ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+
   //
   // Set the flags.
   // - HAS_COPY_DISPOSE unless the capture type is POD

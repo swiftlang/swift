@@ -217,21 +217,21 @@ class ExistentialTypeInfoBuilder {
   unsigned WitnessTableCount;
   bool Invalid;
 
-  bool isSingleErrorProtocol() const {
+  bool isSingleError() const {
     if (Protocols.size() != 1)
       return false;
 
     for (auto *P : Protocols) {
-      if (P->isErrorProtocol())
+      if (P->isError())
         return true;
     }
     return false;
   }
 
   void examineProtocols() {
-    if (isSingleErrorProtocol()) {
-      Representation = ExistentialTypeRepresentation::ErrorProtocol;
-      // No extra witness table for protocol<ErrorProtocol>
+    if (isSingleError()) {
+      Representation = ExistentialTypeRepresentation::Error;
+      // No extra witness table for protocol<Error>
       return;
     }
 
@@ -311,7 +311,7 @@ public:
     case ExistentialTypeRepresentation::Opaque:
       Kind = RecordKind::OpaqueExistential;
       break;
-    case ExistentialTypeRepresentation::ErrorProtocol:
+    case ExistentialTypeRepresentation::Error:
       Kind = RecordKind::ErrorExistential;
       break;
     }
@@ -339,7 +339,7 @@ public:
       builder.addField("metadata", TC.getAnyMetatypeTypeRef());
       break;
     }
-    case ExistentialTypeRepresentation::ErrorProtocol:
+    case ExistentialTypeRepresentation::Error:
       builder.addField("error", TC.getUnknownObjectTypeRef());
       break;
     }

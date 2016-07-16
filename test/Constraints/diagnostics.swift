@@ -161,7 +161,7 @@ func rdar20142523() {
   })
 }
 
-// <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, IntegerLiteralConvertible)' is not convertible to 'IntegerLiteralConvertible
+// <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, ExpressibleByIntegerLiteral)' is not convertible to 'ExpressibleByIntegerLiteral
 func rdar21080030() {
   var s = "Hello"
   if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'IndexDistance'}}{{24-26=}}
@@ -492,7 +492,7 @@ func rdar20868864(_ s: String) {
 
 // <rdar://problem/20491794> Error message does not tell me what the problem is
 enum Color {
-  case Red
+  case Red // expected-note 2 {{did you mean 'Red'?}}
   case Unknown(description: String)
 
   static func rainbow() -> Color {}
@@ -554,7 +554,7 @@ func r22020088bar(_ p: r22020088P?) {
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
 func f(_ arguments: [String]) -> [ArraySlice<String>] {
-  return arguments.split(maxSplits: 1, omittingEmptySubsequences: false, isSeparator: { $0 == "--" })
+  return arguments.split(maxSplits: 1, omittingEmptySubsequences: false, whereSeparator: { $0 == "--" })
 }
 
 
@@ -777,7 +777,75 @@ class SR1594 {
   }
 }
 
+func nilComparison(i: Int, o: AnyObject) {
+  _ = i == nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil == i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i != nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil != i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i < nil   // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil < i   // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i <= nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil <= i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i > nil   // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil > i   // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i >= nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil >= i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+
+  _ = o === nil // expected-error {{type 'AnyObject' is not optional, value can never be nil}}
+  _ = o !== nil // expected-error {{type 'AnyObject' is not optional, value can never be nil}}
+}
+
 // FIXME: Bad diagnostic
 func secondArgumentNotLabeled(a:Int, _ b: Int) { }
 secondArgumentNotLabeled(10, 20)
 // expected-error@-1 {{unnamed parameter #1 must precede unnamed parameter #0}}
+
+// <rdar://problem/23709100> QoI: incorrect ambiguity error due to implicit conversion
+func testImplConversion(a : Float?) -> Bool {}
+func testImplConversion(a : Int?) -> Bool {
+  let someInt = 42
+  let a : Int = testImplConversion(someInt) // expected-error {{'testImplConversion' produces 'Bool', not the expected contextual result type 'Int'}}
+}
+
+// <rdar://problem/23752537> QoI: Bogus error message: Binary operator '&&' cannot be applied to two 'Bool' operands
+class Foo23752537 {
+  var title: String?
+  var message: String?
+}
+
+extension Foo23752537 {
+  func isEquivalent(other: Foo23752537) {
+    // expected-error @+1 {{'&&' produces 'Bool', not the expected contextual result type '()'}}
+    return (self.title != other.title && self.message != other.message)
+  }
+}
+
+
+// <rdar://problem/22276040> QoI: not great error message with "withUnsafePointer" sametype constraints
+func read2(_ p: UnsafeMutablePointer<Void>, maxLength: Int) {}
+func read<T : Integer>() -> T? {
+  var buffer : T 
+  let n = withUnsafePointer(&buffer) { (p) in
+    read2(UnsafePointer(p), maxLength: sizeof(T)) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
+  }
+}
+
+func f23213302() {
+  var s = Set<Int>()
+  s.subtractInPlace(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Set<Int>'}}
+}
+
+// <rdar://problem/24202058> QoI: Return of call to overloaded function in void-return context
+func rdar24202058(a : Int) {
+  return a <= 480 // expected-error {{'<=' produces 'Bool', not the expected contextual result type '()'}}
+}
+
+// SR-1752: Warning about unused result with ternary operator
+
+struct SR1752 {
+  func foo() {}
+}
+
+let sr1752: SR1752? = nil
+
+true ? nil : sr1752?.foo() // don't generate a warning about unused result since foo returns Void

@@ -61,9 +61,10 @@
 /// algorithms, however, may call for direct iterator use.
 ///
 /// One example is the `reduce1(_:)` method. Similar to the
-/// `reduce(_:combine:)` method defined in the standard library, which takes
-/// an initial value and a combining closure, `reduce1(_:)` uses the first
-/// element of the sequence as the initial value.
+/// `reduce(_:)` method defined in the standard
+/// library, which takes an initial value and a combining closure,
+/// `reduce1(_:)` uses the first element of the sequence as the
+/// initial value.
 ///
 /// Here's an implementation of the `reduce1(_:)` method. The sequence's
 /// iterator is used directly to retrieve the initial value before looping
@@ -71,7 +72,7 @@
 ///
 ///     extension Sequence {
 ///         func reduce1(
-///           combine: (Iterator.Element, Iterator.Element) -> Iterator.Element
+///           _ nextPartialResult: (Iterator.Element, Iterator.Element) -> Iterator.Element
 ///         ) -> Iterator.Element?
 ///         {
 ///             var i = makeIterator()
@@ -80,7 +81,7 @@
 ///             }
 ///
 ///             while let element = i.next() {
-///                 accumulated = combine(accumulated, element)
+///                 accumulated = nextPartialResult(accumulated, element)
 ///             }
 ///             return accumulated
 ///         }
@@ -165,7 +166,7 @@
 /// finished returning elements of the sequence.
 ///
 /// Creating and iterating over a `Countdown` sequence uses a
-/// `CountdownGenerator` to handle the iteration.
+/// `CountdownIterator` to handle the iteration.
 ///
 ///     let threeTwoOne = Countdown(start: 3)
 ///     for count in threeTwoOne {
@@ -387,12 +388,12 @@ public protocol Sequence {
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
-  /// - Parameter includeElement: A closure that takes an element of the
+  /// - Parameter isIncluded: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
   func filter(
-    _ includeElement: @noescape (Iterator.Element) throws -> Bool
+    _ isIncluded: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element]
 
   /// Calls the given closure on each element in the sequence in the same order
@@ -558,18 +559,18 @@ public protocol Sequence {
   /// - Returns: An array of subsequences, split from this sequence's elements.
   func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    isSeparator: @noescape (Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
   /// Returns the first element of the sequence that satisfies the given
   /// predicate or nil if no such element is found.
   ///
-  /// - Parameter where: A closure that takes an element of the
+  /// - Parameter predicate: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element is a match.
   /// - Returns: The first match or `nil` if there was no match.
   func first(
-    where: @noescape (Iterator.Element) throws -> Bool
+    where predicate: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element?
 
   func _customContainsEquatableElement(
@@ -584,7 +585,7 @@ public protocol Sequence {
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Iterator.Element>
+  func _copyToContiguousArray() -> ContiguousArray<Iterator.Element>
 
   /// Copy a Sequence into an array, returning one past the last
   /// element initialized.
@@ -747,12 +748,12 @@ extension Sequence {
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
-  /// - Parameter includeElement: A closure that takes an element of the
+  /// - Parameter shouldInclude: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
   public func filter(
-    _ includeElement: @noescape (Iterator.Element) throws -> Bool
+    _ isIncluded: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element] {
 
     var result = ContiguousArray<Iterator.Element>()
@@ -760,7 +761,7 @@ extension Sequence {
     var iterator = self.makeIterator()
 
     while let element = iterator.next() {
-      if try includeElement(element) {
+      if try isIncluded(element) {
         result.append(element)
       }
     }
@@ -859,7 +860,7 @@ extension Sequence {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    isSeparator: @noescape (Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [AnySequence<Iterator.Element>] {
     _precondition(maxSplits >= 0, "Must take zero or more splits")
     var result: [AnySequence<Iterator.Element>] = []
@@ -961,7 +962,7 @@ extension Sequence {
   }
 }
 
-internal enum _StopIteration : ErrorProtocol {
+internal enum _StopIteration : Error {
   case stop
 }
 
@@ -969,7 +970,7 @@ extension Sequence {
   /// Returns the first element of the sequence that satisfies the given
   /// predicate or nil if no such element is found.
   ///
-  /// - Parameter where: A closure that takes an element of the
+  /// - Parameter predicate: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element is a match.
   /// - Returns: The first match or `nil` if there was no match.
@@ -1043,7 +1044,7 @@ extension Sequence where Iterator.Element : Equatable {
     return split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: { $0 == separator })
+      whereSeparator: { $0 == separator })
   }
 }
 

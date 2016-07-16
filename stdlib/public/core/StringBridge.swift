@@ -313,7 +313,8 @@ extension String {
   /// Same as `_bridgeToObjectiveC()`, but located inside the core standard
   /// library.
   public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
-    if let ns = _core.cocoaBuffer where _swift_stdlib_CFStringGetLength(ns) == _core.count {
+    if let ns = _core.cocoaBuffer,
+        _swift_stdlib_CFStringGetLength(ns) == _core.count {
       return ns
     }
     _sanityCheck(_core.hasContiguousStorage)

@@ -292,7 +292,7 @@ bb0(%0 : $EP):
   %utbc = unchecked_trivial_bit_cast %se : $Builtin.BridgeObject to $Builtin.RawPointer
   %idx = integer_literal $Builtin.Int32, 0
   %irp = index_raw_pointer %utbc : $Builtin.RawPointer, %idx : $Builtin.Int32
-  %pta = pointer_to_address %irp : $Builtin.RawPointer to $*Int32
+  %pta = pointer_to_address %irp : $Builtin.RawPointer to [strict] $*Int32
   %sea = struct_element_addr %pta : $*Int32, #Int32._value
   %l = load %sea : $*Builtin.Int32
   return %l : $Builtin.Int32

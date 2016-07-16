@@ -126,9 +126,9 @@ orderingExplanation = """\
   /// is, for any elements `a`, `b`, and `c`, the following conditions must
   /// hold:
   ///
-  /// - `isOrderedBefore(a, a)` is always `false`. (Irreflexivity)
-  /// - If `isOrderedBefore(a, b)` and `isOrderedBefore(b, c)` are both `true`,
-  ///   then `isOrderedBefore(a, c)` is also `true`. (Transitive
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are both `true`,
+  ///   then `areInIncreasingOrder(a, c)` is also `true`. (Transitive
   ///   comparability)
   /// - Two elements are *incomparable* if neither is ordered before the other
   ///   according to the predicate. If `a` and `b` are incomparable, and `b`
@@ -165,7 +165,7 @@ extension MutableCollection
   /// This method is typically one step of a sorting algorithm. A collection is
   /// partitioned around a pivot index when each of the elements before the
   /// pivot is correctly ordered before each of the elements at or after the
-  /// pivot. The `partition(isOrderedBefore:)` method reorders the elements of
+  /// pivot. The `partition(by:)` method reorders the elements of
   /// the collection and returns a pivot index that satisfies this condition,
   /// using the given predicate to determine the relative order of any two
   /// elements.
@@ -197,18 +197,18 @@ ${orderingExplanation}
   /// argument is greater than its second argument, larger elements are
   /// ordered before smaller elements.
   ///
-  /// - Parameter isOrderedBefore: A predicate that returns `true` if its first
+  /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its first
   ///   argument should be ordered before its second argument; otherwise,
   ///   `false`.
   /// - Returns: A pivot index, such that every element before the pivot is
   ///   ordered before every element at or above the pivot, using
-  ///   `isOrderedBefore` to determine the relative order of any two elements.
+  ///   `areInIncreasingOrder` to determine the relative order of any two elements.
   ///   The returned pivot is equal to the collection's end index only if the
   ///   collection is empty.
   ///
   /// - SeeAlso: `partition()`
   public mutating func partition(
-    isOrderedBefore: @noescape (${IElement}, ${IElement}) -> Bool
+    by areInIncreasingOrder: @noescape (${IElement}, ${IElement}) -> Bool
   ) -> Index
 
 %   else:
@@ -248,7 +248,7 @@ ${orderingExplanation}
   ///   less than every element at or above the pivot. The returned pivot is
   ///   equal to the collection's end index only if the collection is empty.
   ///
-  /// - SeeAlso: `partition(isOrderedBefore:)`
+  /// - SeeAlso: `partition(by:)`
   public mutating func partition() -> Index
 
 %   end
@@ -259,7 +259,7 @@ ${orderingExplanation}
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
       let unsafeBufferPivot = bufferPointer.partition(
 %   if preds:
-        isOrderedBefore: isOrderedBefore
+        by: areInIncreasingOrder
 %   end
         )
       return unsafeBufferPivot - bufferPointer.startIndex
@@ -272,11 +272,11 @@ ${orderingExplanation}
     typealias EscapingBinaryPredicate =
       (${IElement}, ${IElement}) -> Bool
     var escapableIsOrderedBefore =
-      unsafeBitCast(isOrderedBefore, to: EscapingBinaryPredicate.self)
+      unsafeBitCast(areInIncreasingOrder, to: EscapingBinaryPredicate.self)
     return _partition(
       &self,
       subRange: startIndex..<endIndex,
-      isOrderedBefore: &escapableIsOrderedBefore)
+      by: &escapableIsOrderedBefore)
 %   else:
     return _partition(&self, subRange: startIndex..<endIndex)
 %   end
@@ -313,15 +313,15 @@ extension ${Self} where Self.Iterator.Element : Comparable {
   ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
   ///
   /// To sort the elements of your ${sequenceKind} in descending order, pass the
-  /// greater-than operator (`>`) to the `sorted(isOrderedBefore:)` method.
+  /// greater-than operator (`>`) to the `sorted(by:)` method.
   ///
-  ///     let descendingStudents = students.sorted(isOrderedBefore: >)
+  ///     let descendingStudents = students.sorted(by: >)
   ///     print(descendingStudents)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
   /// - Returns: A sorted array of the ${sequenceKind}'s elements.
   ///
-  /// - SeeAlso: `sorted(isOrderedBefore:)`
+  /// - SeeAlso: `sorted(by:)`
   /// ${'- MutatingVariant: sort' if Self == 'MutableCollection' else ''}
   public func sorted() -> [Iterator.Element] {
     var result = ContiguousArray(self)
@@ -342,7 +342,7 @@ extension ${Self} {
   ///
 ${orderingExplanation}
   /// The sorting algorithm is not stable. A nonstable sort may change the
-  /// relative order of elements for which `isOrderedBefore` does not
+  /// relative order of elements for which `areInIncreasingOrder` does not
   /// establish an order.
   ///
   /// In the following example, the predicate provides an ordering for an array
@@ -375,10 +375,10 @@ ${orderingExplanation}
   /// You also use this method to sort elements that conform to the
   /// `Comparable` protocol in descending order. To sort your ${sequenceKind}
   /// in descending order, pass the greater-than operator (`>`) as the
-  /// `isOrderedBefore` parameter.
+  /// `areInIncreasingOrder` parameter.
   ///
   ///     let students: Set = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
-  ///     let descendingStudents = students.sorted(isOrderedBefore: >)
+  ///     let descendingStudents = students.sorted(by: >)
   ///     print(descendingStudents)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
@@ -387,10 +387,10 @@ ${orderingExplanation}
   ///
   ///     print(students.sorted())
   ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
-  ///     print(students.sorted(isOrderedBefore: <))
+  ///     print(students.sorted(by: <))
   ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
   ///
-  /// - Parameter isOrderedBefore: A predicate that returns `true` if its first
+  /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its first
   ///   argument should be ordered before its second argument; otherwise,
   ///   `false`.
   /// - Returns: A sorted array of the ${sequenceKind}'s elements.
@@ -398,11 +398,11 @@ ${orderingExplanation}
   /// - SeeAlso: `sorted()`
   /// ${'- MutatingVariant: sort' if Self == 'MutableCollection' else ''}
   public func sorted(
-    isOrderedBefore:
+    by areInIncreasingOrder:
       @noescape (${IElement}, ${IElement}) -> Bool
   ) -> [Iterator.Element] {
     var result = ContiguousArray(self)
-    result.sort(isOrderedBefore: isOrderedBefore)
+    result.sort(by: areInIncreasingOrder)
     return Array(result)
   }
 }
@@ -433,9 +433,9 @@ extension MutableCollection
   ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
   ///
   /// To sort the elements of your collection in descending order, pass the
-  /// greater-than operator (`>`) to the `sort(isOrderedBefore:)` method.
+  /// greater-than operator (`>`) to the `sort(by:)` method.
   ///
-  ///     students.sort(isOrderedBefore: >)
+  ///     students.sort(by: >)
   ///     print(students)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   public mutating func sort() {
@@ -464,7 +464,7 @@ extension MutableCollection where Self : RandomAccessCollection {
   ///
 ${orderingExplanation}
   /// The sorting algorithm is not stable. A nonstable sort may change the
-  /// relative order of elements for which `isOrderedBefore` does not
+  /// relative order of elements for which `areInIncreasingOrder` does not
   /// establish an order.
   ///
   /// In the following example, the closure provides an ordering for an array
@@ -501,35 +501,35 @@ ${orderingExplanation}
   /// predicate.
   ///
   ///     var students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
-  ///     students.sort(isOrderedBefore: >)
+  ///     students.sort(by: >)
   ///     print(students)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
-  /// - Parameter isOrderedBefore: A predicate that returns `true` if its first
+  /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its first
   ///   argument should be ordered before its second argument; otherwise,
   ///   `false`.
   public mutating func sort(
-    isOrderedBefore:
+    by areInIncreasingOrder:
       @noescape (${IElement}, ${IElement}) -> Bool
   ) {
     typealias EscapingBinaryPredicate =
       (Iterator.Element, Iterator.Element) -> Bool
     let escapableIsOrderedBefore =
-      unsafeBitCast(isOrderedBefore, to: EscapingBinaryPredicate.self)
+      unsafeBitCast(areInIncreasingOrder, to: EscapingBinaryPredicate.self)
 
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      bufferPointer.sort(isOrderedBefore: escapableIsOrderedBefore)
+      bufferPointer.sort(by: escapableIsOrderedBefore)
       return ()
     }
     if didSortUnsafeBuffer == nil {
       _introSort(
         &self,
         subRange: startIndex..<endIndex,
-        isOrderedBefore: escapableIsOrderedBefore)
+        by: escapableIsOrderedBefore)
     }
   }
 }
@@ -633,7 +633,7 @@ ${subscriptCommentPost}
     
 extension MutableCollection where Self : RandomAccessCollection {
 
-  @available(*, unavailable, message: "slice the collection using the range, and call partition(isOrderedBefore:)")
+  @available(*, unavailable, message: "slice the collection using the range, and call partition(by:)")
   public mutating func partition(
     _ range: Range<Index>,
     isOrderedBefore: (${IElement}, ${IElement}) -> Bool
@@ -663,7 +663,7 @@ extension MutableCollection
 }
 
 extension MutableCollection where Self : RandomAccessCollection {
-  @available(*, unavailable, renamed: "sort(isOrderedBefore:)")
+  @available(*, unavailable, renamed: "sort(by:)")
   public mutating func sortInPlace(
     _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) -> Bool
   ) {

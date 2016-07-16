@@ -1,0 +1,5 @@
+---
+Name: Intents
+Tags:
+- Name: INIntentErrorCode
+  NSErrorDomain: INIntentErrorDomain

@@ -1,0 +1,51 @@
+// RUN: rm -rf %t  &&  mkdir %t
+//
+// RUN: %gyb %s -o %t/BridgeIdAsAny.swift
+// RUN: %target-build-swift -module-name a %t/BridgeIdAsAny.swift -o %t.out
+// RUN: %target-run %t.out
+// REQUIRES: executable_test
+//
+// REQUIRES: objc_interop
+
+import StdlibUnittest
+import Foundation
+
+var BridgeAnything = TestSuite("BridgeAnything")
+
+func wantonlyWrapInAny<T>(_ x: T) -> Any {
+  return x
+}
+
+// Professional runtime testers on a closed course. Do not attempt at home.
+extension LifetimeTracked: Error {}
+extension String: Error {}
+
+% for testName, valueExpr, testExpr in [("classes", "LifetimeTracked(0)", " === x"), ("strings", '"vitameatavegamin"', '.isEqual(to: "vitameatavegamin")')]:
+BridgeAnything.test("${testName}") {
+  do {
+    let x = ${valueExpr}
+    expectTrue(_bridgeAnythingToObjectiveC(x)${testExpr})
+    expectTrue(_bridgeAnythingNonVerbatimToObjectiveC(x)${testExpr})
+
+    let xInAny: Any = x
+    expectTrue(_bridgeAnythingToObjectiveC(xInAny)${testExpr})
+    expectTrue(_bridgeAnythingNonVerbatimToObjectiveC(xInAny)${testExpr})
+
+    let xInAnyInAny = wantonlyWrapInAny(xInAny)
+    expectTrue(_bridgeAnythingToObjectiveC(xInAnyInAny)${testExpr})
+    expectTrue(_bridgeAnythingNonVerbatimToObjectiveC(xInAnyInAny)${testExpr})
+
+    let xInError: Error = x
+    expectTrue(_bridgeAnythingToObjectiveC(xInError)${testExpr})
+    expectTrue(_bridgeAnythingNonVerbatimToObjectiveC(xInError)${testExpr})
+
+    let xInErrorInAny = wantonlyWrapInAny(xInError)
+    expectTrue(_bridgeAnythingToObjectiveC(xInErrorInAny)${testExpr})
+    expectTrue(_bridgeAnythingNonVerbatimToObjectiveC(xInErrorInAny)${testExpr})
+  }
+
+  expectEqual(0, LifetimeTracked.instances)
+}
+% end
+
+runAllTests()
