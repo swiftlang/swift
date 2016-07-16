@@ -688,7 +688,7 @@ public protocol SignedInteger_ : BinaryInteger, SignedArithmetic {
 
 extension SignedInteger_ {
   public var description: String {
-    let base = String(magnitude)
+    let base = String(describing: magnitude)
     return self < 0 ? "-" + base : base
   }
 

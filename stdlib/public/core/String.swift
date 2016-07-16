@@ -975,9 +975,10 @@ extension String {
 #endif
   }
   
-  public // @testable
-  init<T: LosslessStringConvertible>(_ v: T) {
-    self = v.description
+  /// Creates an instance from the description of a given
+  /// LosslessStringConvertible instance.
+  public init<T : LosslessStringConvertible>(_ value: T) {
+    self = value.description
   }
 }
 

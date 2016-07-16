@@ -263,9 +263,9 @@ extension UnicodeScalar : LosslessStringConvertible {
     if let v = UInt32(description) where (v < 0xD800 || v > 0xDFFF)
       && v <= 0x10FFFF {
       self = UnicodeScalar(v)
+    } else {
+      return nil
     }
-
-    return nil
   }
 }
 

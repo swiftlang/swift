@@ -164,7 +164,17 @@ public protocol CustomStringConvertible {
   var description: String { get }
 }
 
+/// A type that can be represented as a string in a lossless, unambiguous way.
+///
+/// For example, the integer value 1050 can be represented in its entirety as
+/// the string "1050".
+///
+/// The description property of a conforming type must be a value-preserving
+/// representation of the original value. As such, it should be possible to
+/// attempt to re-create an instance from its string representation.
 public protocol LosslessStringConvertible : CustomStringConvertible {
+  /// Instantiates an instance of the conforming type from a string
+  /// representation.
   init?(_ description: String)
 }
 
