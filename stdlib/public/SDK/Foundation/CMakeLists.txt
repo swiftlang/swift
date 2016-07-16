@@ -7,6 +7,9 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   ExtraStringAPIs.swift
   ReferenceConvertible.swift
   AffineTransform.swift
+  Calendar.swift
+  TimeZone.swift
+  Locale.swift
   CharacterSet.swift
   Date.swift
   DateComponents.swift
