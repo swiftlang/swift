@@ -1257,7 +1257,7 @@ public final class TestSuite {
       f()
     }
     expectEqual(
-      0, LifetimeTracked.instances, "leaked LifetimeTracked instances:",
+      0, LifetimeTracked.instances, "Found leaked LifetimeTracked instances.",
       file: test.testLoc.file, line: test.testLoc.line)
   }
 
