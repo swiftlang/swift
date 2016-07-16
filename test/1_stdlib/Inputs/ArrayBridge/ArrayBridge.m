@@ -21,8 +21,9 @@
 - (id)acceptSubclassArray:(NSArray *)bridged expecting:(NSArray*)unbridged;
 - (NSArray *)produceSubclassArray:(NSMutableArray *)expectations;
 - (void)checkProducedSubclassArray:(NSArray *)produced expecting:(NSArray *)expected;
+- (void)checkProducedBridgeableValueArray:(NSArray *)produced;
 - (id)acceptBridgeableValueArray:(NSArray *)x;
-- (NSArray *)produceBridgeableValueArray:(NSInteger)numItems;
+- (NSArray *)produceBridgeableValueArray;
 @end
 
 id arrayAsID(NSArray* a) {
@@ -53,13 +54,9 @@ void testSubclass(id thunks) {
 
 void testBridgeableValue(id thunks) {
   // Retrieve an array from Swift.
-  NSArray *fromSwiftArr = [thunks produceBridgeableValueArray: 5];
-  printf("%d elements in the array\n", (int)fromSwiftArr.count);
-
-  for (id obj in fromSwiftArr) {
-    printf("%s\n", [obj description].UTF8String);
-  }
-
+  NSArray *fromSwiftArr = [thunks produceBridgeableValueArray];
+  [thunks checkProducedBridgeableValueArray: fromSwiftArr];
+    
   // Send an array to swift.
   NSMutableArray *toSwiftArr = [[NSMutableArray alloc] init];
   [toSwiftArr addObject: [thunks createSubclass:10]];
