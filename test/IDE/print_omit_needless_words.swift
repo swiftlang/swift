@@ -119,8 +119,8 @@
 // Note: Noun phrase puts preposition inside.
 // CHECK-FOUNDATION: func url(withAddedString: String) -> NSURL?
 
-// Note: CalendarUnits is not a set of "Options".
-// CHECK-FOUNDATION: class func forCalendarUnits(_: Calendar.Unit) -> String!
+// Note: NSCalendarUnits is not a set of "Options".
+// CHECK-FOUNDATION: class func forCalendarUnits(_: NSCalendar.Unit) -> String!
 
 // Note: <property type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }
