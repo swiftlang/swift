@@ -785,6 +785,25 @@ emitBuiltinIsUniqueOrPinned_native(SILGenFunction &gen,
   return ManagedValue::forUnmanaged(result);
 }
 
+static ManagedValue emitBuiltinBindMemory(SILGenFunction &gen,
+                                          SILLocation loc,
+                                          ArrayRef<Substitution> subs,
+                                          ArrayRef<ManagedValue> args,
+                                          CanFunctionType formalApplyType,
+                                          SGFContext C) {
+  assert(subs.size() == 1 && "bindMemory should have a single substitution");
+  assert(args.size() == 3 && "bindMemory should have three argument");
+
+  // The substitution determines the element type for bound memory.
+  CanType boundFormalType = subs[0].getReplacement()->getCanonicalType();
+  SILType boundType = gen.getLoweredType(boundFormalType);
+
+  gen.B.createBindMemory(loc, args[0].getValue(),
+                         args[1].getValue(), boundType);
+
+  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
+}
+
 /// Specialized emitter for type traits.
 template<TypeTraitResult (TypeBase::*Trait)(),
          BuiltinValueKind Kind>
