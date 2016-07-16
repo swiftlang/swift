@@ -264,7 +264,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
-  public func withUnsafeBufferPointer<R>(
+  internal func withUnsafeBufferPointer<R>(
     _ body: @noescape (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
@@ -274,7 +274,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
-  public mutating func withUnsafeMutableBufferPointer<R>(
+  internal mutating func withUnsafeMutableBufferPointer<R>(
     _ body: @noescape (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
@@ -284,7 +284,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   //===--- _ArrayBufferProtocol conformance -----------------------------------===//
   /// Create an empty buffer.
-  public init() {
+  internal init() {
     __bufferPointer = ManagedBufferPointer(
       _uncheckedUnsafeBufferObject: _emptyArrayStorage)
   }
@@ -294,7 +294,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     self = buffer
   }
 
-  public mutating func requestUniqueMutableBackingBuffer(
+  internal mutating func requestUniqueMutableBackingBuffer(
     minimumCapacity: Int
   ) -> _ContiguousArrayBuffer<Element>? {
     if _fastPath(isUniquelyReferenced() && capacity >= minimumCapacity) {
@@ -303,29 +303,29 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return nil
   }
 
-  public mutating func isMutableAndUniquelyReferenced() -> Bool {
+  internal mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
   }
 
-  public mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
+  internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
     return isUniquelyReferencedOrPinned()
   }
 
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
-  public func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
+  internal func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     return self
   }
 
   @_versioned
-  func getElement(_ i: Int) -> Element {
+  internal func getElement(_ i: Int) -> Element {
     _sanityCheck(i >= 0 && i < count, "Array index out of range")
     return firstElementAddress[i]
   }
 
   /// Get or set the value of the ith element.
-  public subscript(i: Int) -> Element {
+  internal subscript(i: Int) -> Element {
     get {
       return getElement(i)
     }
@@ -343,7 +343,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   /// The number of elements the buffer stores.
-  public var count: Int {
+  internal var count: Int {
     get {
       return __bufferPointer.header.count
     }
@@ -369,7 +369,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   /// The number of elements the buffer can store without reallocation.
-  public var capacity: Int {
+  internal var capacity: Int {
     return __bufferPointer.header.capacity
   }
 
@@ -377,7 +377,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// memory starting at `target`.  Return a pointer "past the end" of the
   /// just-initialized memory.
   @discardableResult
-  public func _copyContents(
+  internal func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
@@ -528,7 +528,7 @@ extension _ContiguousArrayBuffer : RandomAccessCollection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  public var startIndex: Int {
+  internal var startIndex: Int {
     return 0
   }
   /// The collection's "past the end" position.
@@ -536,11 +536,11 @@ extension _ContiguousArrayBuffer : RandomAccessCollection {
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `index(after:)`.
-  public var endIndex: Int {
+  internal var endIndex: Int {
     return count
   }
 
-  public typealias Indices = CountableRange<Int>
+  internal typealias Indices = CountableRange<Int>
 }
 
 extension Sequence {
@@ -581,7 +581,7 @@ extension Collection {
 }
 
 extension _ContiguousArrayBuffer {
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  internal func _copyToContiguousArray() -> ContiguousArray<Element> {
     return ContiguousArray(_buffer: self)
   }
 }

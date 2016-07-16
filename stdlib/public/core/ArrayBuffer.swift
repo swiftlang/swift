@@ -25,11 +25,11 @@ internal typealias _ArrayBridgeStorage
 internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Create an empty buffer.
-  public init() {
+  internal init() {
     _storage = _ArrayBridgeStorage(native: _emptyArrayStorage)
   }
 
-  public init(nsArray: _NSArrayCore) {
+  internal init(nsArray: _NSArrayCore) {
     _sanityCheck(_isClassOrObjCExistential(Element.self))
     _storage = _ArrayBridgeStorage(objC: nsArray)
   }
@@ -126,7 +126,7 @@ extension _ArrayBuffer {
   /// `_ContiguousArrayBuffer` that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns `nil`.
-  public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
+  internal mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
   -> NativeBuffer? {
     if _fastPath(isUniquelyReferenced()) {
       let b = _native
@@ -137,18 +137,18 @@ extension _ArrayBuffer {
     return nil
   }
 
-  public mutating func isMutableAndUniquelyReferenced() -> Bool {
+  internal mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
   }
 
-  public mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
+  internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
     return isUniquelyReferencedOrPinned()
   }
 
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
-  public func requestNativeBuffer() -> NativeBuffer? {
+  internal func requestNativeBuffer() -> NativeBuffer? {
     if !_isClassOrObjCExistential(Element.self) {
       return _native
     }
@@ -467,8 +467,8 @@ extension _ArrayBuffer {
   public typealias Indices = CountableRange<Int>
 
   //===--- private --------------------------------------------------------===//
-  typealias Storage = _ContiguousArrayStorage<Element>
-  public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
+  internal typealias Storage = _ContiguousArrayStorage<Element>
+  internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
   @_versioned
   var _isNative: Bool {
