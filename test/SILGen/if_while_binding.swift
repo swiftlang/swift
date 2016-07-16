@@ -329,7 +329,7 @@ func testCaseBool(_ value : Bool?) {
     marker_1()
   }
 
-  // CHECK:   bb3:                                              // Preds: bb0 bb1 bb2
+  // CHECK:   bb3:                                              // Preds: bb2 bb1 bb0
   // CHECK:   switch_enum %0 : $Optional<Bool>, case #Optional.some!enumelt.1: bb4, default bb6
 
   // CHECK:   bb4(
@@ -340,7 +340,7 @@ func testCaseBool(_ value : Bool?) {
   // CHECK: function_ref @_TF16if_while_binding8marker_2FT_T_
   // CHECK: br bb6{{.*}}                                      // id: %15
 
-  // CHECK: bb6:                                              // Preds: bb3 bb4 bb5
+  // CHECK: bb6:                                              // Preds: bb5 bb4 bb3
   if case false? = value {
     marker_2()
   }

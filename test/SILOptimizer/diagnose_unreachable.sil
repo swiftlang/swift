@@ -118,7 +118,7 @@ bb6:
 // CHECK-LABEL:sil @InfLoop
 // CHECK: bb0:
 // CHECK-NEXT:  br bb1
-// CHECK:bb1:                                              // Preds: bb0 bb3
+// CHECK:bb1:                                              // Preds: bb3 bb0
 // CHECK-NEXT:  br bb2
 // CHECK:bb2:                                              // Preds: bb1
 // CHECK-NEXT:  br bb3
