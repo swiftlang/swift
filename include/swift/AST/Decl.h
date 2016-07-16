@@ -4988,7 +4988,8 @@ class FuncDecl final : public AbstractFunctionDecl,
       AccessorKeywordLoc(AccessorKeywordLoc),
       OverriddenOrDerivedForOrBehaviorParamDecl(),
       OperatorAndAddressorKind(nullptr, AddressorKind::NotAddressor) {
-    FuncDeclBits.IsStatic = StaticLoc.isValid() || getName().isOperator();
+    FuncDeclBits.IsStatic =
+      StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
     setType(Ty);

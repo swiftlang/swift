@@ -372,7 +372,7 @@ func testPreferClassMethodToCurriedInstanceMethod(_ obj: InstanceOrClassMethod) 
 }
 
 protocol Numeric {
-  func +(x: Self, y: Self) -> Self
+  static func +(x: Self, y: Self) -> Self
 }
 
 func acceptBinaryFunc<T>(_ x: T, _ fn: (T, T) -> T) { }

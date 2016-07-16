@@ -161,7 +161,7 @@ public protocol Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  func == (lhs: Self, rhs: Self) -> Bool
+  static func == (lhs: Self, rhs: Self) -> Bool
 }
 
 /// Returns a Boolean value indicating whether two values are not equal.

@@ -145,7 +145,7 @@ public protocol Comparable : Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  func < (lhs: Self, rhs: Self) -> Bool
+  static func < (lhs: Self, rhs: Self) -> Bool
 
   /// Returns a Boolean value indicating whether the value of the first
   /// argument is less than or equal to that of the second argument.
@@ -153,7 +153,7 @@ public protocol Comparable : Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  func <= (lhs: Self, rhs: Self) -> Bool
+  static func <= (lhs: Self, rhs: Self) -> Bool
 
   /// Returns a Boolean value indicating whether the value of the first
   /// argument is greater than or equal to that of the second argument.
@@ -161,7 +161,7 @@ public protocol Comparable : Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  func >= (lhs: Self, rhs: Self) -> Bool
+  static func >= (lhs: Self, rhs: Self) -> Bool
 
   /// Returns a Boolean value indicating whether the value of the first
   /// argument is greater than that of the second argument.
@@ -169,7 +169,7 @@ public protocol Comparable : Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  func > (lhs: Self, rhs: Self) -> Bool
+  static func > (lhs: Self, rhs: Self) -> Bool
 }
 
 /// Returns a Boolean value indicating whether the value of the first argument

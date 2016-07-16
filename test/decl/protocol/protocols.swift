@@ -311,7 +311,7 @@ func StaticProtocolGenericFunc<t : StaticP>(_: t) {
 // Operators
 //===----------------------------------------------------------------------===//
 protocol Eq {
-  func ==(lhs: Self, rhs: Self) -> Bool
+  static func ==(lhs: Self, rhs: Self) -> Bool
 }
 
 extension Int : Eq { }
@@ -321,8 +321,8 @@ prefix operator <> {}
 postfix operator <> {}
 
 protocol IndexValue {
-  prefix func <> (_ max: Self) -> Int
-  postfix func <> (min: Self) -> Int
+  static prefix func <> (_ max: Self) -> Int
+  static postfix func <> (min: Self) -> Int
 }
 
 prefix func <> (max: Int) -> Int  { return 0 }

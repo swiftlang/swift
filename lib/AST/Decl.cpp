@@ -4377,10 +4377,7 @@ bool FuncDecl::isUnaryOperator() const {
   if (!isOperator())
     return false;
   
-  unsigned opArgIndex
-    = getDeclContext()->getAsProtocolOrProtocolExtensionContext() ? 1 : 0;
-  
-  auto *params = getParameterList(opArgIndex);
+  auto *params = getParameterList(getDeclContext()->isTypeContext());
   return params->size() == 1 && !params->get(0)->isVariadic();
 }
 
@@ -4388,11 +4385,10 @@ bool FuncDecl::isBinaryOperator() const {
   if (!isOperator())
     return false;
   
-  unsigned opArgIndex
-    = getDeclContext()->getAsProtocolOrProtocolExtensionContext() ? 1 : 0;
-  
-  auto *params = getParameterList(opArgIndex);
-  return params->size() == 2 && !params->get(1)->isVariadic();
+  auto *params = getParameterList(getDeclContext()->isTypeContext());
+  return params->size() == 2 &&
+    !params->get(0)->isVariadic() &&
+    !params->get(1)->isVariadic();
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,

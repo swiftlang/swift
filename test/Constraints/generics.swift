@@ -3,7 +3,7 @@
 infix operator +++ {}
 
 protocol ConcatToAnything {
-  func +++ <T>(lhs: Self, other: T)
+  static func +++ <T>(lhs: Self, other: T)
 }
 
 func min<T : Comparable>(_ x: T, y: T) -> T {

@@ -14,7 +14,7 @@ protocol NeedsGenericMethods {
   func twoArgsOneVar<T>(x: T, y: T) // expected-note {{protocol requires function 'twoArgsOneVar(x:y:)' with type '<T> (x: T, y: T) -> ()'}}
   func twoArgsTwoVars<T, U>(x: T, y: U) // expected-note {{protocol requires function 'twoArgsTwoVars(x:y:)' with type '<T, U> (x: T, y: U) -> ()'}}
 
-  func •<T : Fungible>(x: Self, y: T) // expected-note {{protocol requires function '•' with type '<T> (TooTightConstraints, T) -> ()'}}
+  static func •<T : Fungible>(x: Self, y: T) // expected-note {{protocol requires function '•' with type '<T> (TooTightConstraints, T) -> ()'}}
 }
 
 class EqualConstraints : NeedsGenericMethods {

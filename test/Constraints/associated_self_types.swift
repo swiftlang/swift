@@ -23,7 +23,7 @@ postfix func ~>> <_Self : MySequence, A : P where _Self.Iterator.Element == A.It
 }
 
 protocol _ExtendedSequence : MySequence {
-  postfix func ~>> <A : P where Self.Iterator.Element == A.Iterator.Element>(s: Self) -> A
+  static postfix func ~>> <A : P where Self.Iterator.Element == A.Iterator.Element>(s: Self) -> A
 }
 
 struct MyRangeIterator<T> : MyIteratorProtocol {

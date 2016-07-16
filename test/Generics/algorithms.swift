@@ -1,15 +1,15 @@
 // RUN: %target-parse-verify-swift
 
 protocol Eq {
-  func ==(lhs: Self, rhs: Self) -> Bool
-  func !=(lhs: Self, rhs: Self) -> Bool
+  static func ==(lhs: Self, rhs: Self) -> Bool
+  static func !=(lhs: Self, rhs: Self) -> Bool
 }
 
 protocol Comparable: Eq {
-  func <(lhs: Self, rhs: Self) -> Bool
-  func <=(lhs: Self, rhs: Self) -> Bool
-  func >=(lhs: Self, rhs: Self) -> Bool
-  func >(lhs: Self, rhs: Self) -> Bool
+  static func <(lhs: Self, rhs: Self) -> Bool
+  static func <=(lhs: Self, rhs: Self) -> Bool
+  static func >=(lhs: Self, rhs: Self) -> Bool
+  static func >(lhs: Self, rhs: Self) -> Bool
 }
 
 func find<R : IteratorProtocol where R.Element : Eq>

@@ -88,7 +88,7 @@ prefix operator ~~ {}
 
 protocol P3 {
   associatedtype Assoc : P1
-  prefix func ~~(_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X3z) -> Assoc'}}
+  static prefix func ~~(_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X3z) -> Assoc'}}
 }
 
 // Global operator match
@@ -111,7 +111,7 @@ postfix func ~~(_: X3z) -> X1a {} // expected-note{{candidate is postfix, not pr
 postfix operator ~~ {}
 protocol P4 {
   associatedtype Assoc : P1
-  postfix func ~~ (_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X4z) -> Assoc'}}
+  static postfix func ~~ (_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X4z) -> Assoc'}}
 }
 
 // Global operator match
@@ -178,8 +178,8 @@ func ~>> (x: Int, args: T1) {}
 3~>>T1(2, "Hi")
 
 protocol Crankable {
-  func ~>> (x: Self, args: T0)
-  func ~>> (x: Self, args: T1)
+  static func ~>> (x: Self, args: T0)
+  static func ~>> (x: Self, args: T1)
 }
 
 extension Int : Crankable {}
@@ -210,7 +210,7 @@ protocol P8 {
 prefix func %%% <T : P8>(x: T) -> T { }
 
 protocol P9 : P8 {
-  prefix func %%% (x: Self) -> Self
+  static prefix func %%% (x: Self) -> Self
 }
 
 struct X9 : P9 {
@@ -231,7 +231,7 @@ struct X10 : P10 {
 }
 
 protocol P11 {
-  func ==(x: Self, y: Self) -> Bool
+  static func ==(x: Self, y: Self) -> Bool
 }
 
 protocol P12 {

@@ -4,4 +4,4 @@
 // RUN: %target-swift-frontend -emit-module -parse-as-library -o %t/def_class.swiftmodule %t/stage1.swiftmodule
 // RUN: %target-swift-frontend -emit-sil -Xllvm -sil-disable-pass="External Defs To Decls" -sil-debug-serialization -I %t %S/class.swift | FileCheck %s -check-prefix=SIL
 
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TZFsoi1pFTSiSi_Si : $@convention(thin) (Int, Int) -> Int {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TFsoi1pFTSiSi_Si : $@convention(thin) (Int, Int) -> Int {
