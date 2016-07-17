@@ -392,31 +392,20 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // Assign a value ID to each SILInstruction that has value and to each basic
   // block argument.
   unsigned ValueID = 0;
-  llvm::ReversePostOrderTraversal<SILFunction *> RPOT(
-      const_cast<SILFunction *>(&F));
-  for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
-    auto &BB = **Iter;
+  for (const auto &BB : F) {
     BasicBlockMap.insert(std::make_pair(&BB, BasicID++));
 
     for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
       ValueIDs[static_cast<const ValueBase*>(*I)] = ++ValueID;
 
-    for (const SILInstruction &SI : BB)
+    for (const auto &SI : BB)
       if (SI.hasValue())
         ValueIDs[&SI] = ++ValueID;
   }
 
-  // Write SIL basic blocks in the RPOT order
-  // to make sure that instructions defining open archetypes
-  // are serialized before instructions using those opened
-  // archetypes.
-  unsigned SerializedBBNum = 0;
-  for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
-    auto *BB = *Iter;
-    writeSILBasicBlock(*BB);
-    SerializedBBNum++;
+  for (const auto &BB : F) {
+    writeSILBasicBlock(BB);
   }
-  assert(BasicID == SerializedBBNum && "Wrong number of BBs was serialized");
 }
 
 void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
