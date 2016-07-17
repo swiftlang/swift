@@ -28,6 +28,7 @@ set(SWIFTLIB_ESSENTIAL
   AssertCommon.swift
   BidirectionalCollection.swift
   Bool.swift
+  Boolean.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   Builtin.swift

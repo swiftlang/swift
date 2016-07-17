@@ -1990,6 +1990,8 @@ ERROR(try_assign_rhs_noncovering,none,
 
 NOTE(subscript_decl_here,none,
      "subscript operator declared here", ())
+ERROR(condition_broken_proto,none,
+      "protocol 'Boolean' is broken", ())
 
 ERROR(broken_bool,none, "type 'Bool' is broken", ())
 
@@ -2008,6 +2010,9 @@ ERROR(conditional_downcast_foreign,none,
 ERROR(optional_used_as_boolean,none,
      "optional type %0 cannot be used as a boolean; "
      "test for '!= nil' instead", (Type))
+ERROR(optional_used_as_true_boolean,none,
+      "optional type %0 cannot be used as a boolean; "
+      "test for '== nil' instead", (Type))
 
 ERROR(interpolation_missing_proto,none,
       "string interpolation requires the protocol 'ExpressibleByStringInterpolation' to be defined",

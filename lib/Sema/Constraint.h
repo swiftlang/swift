@@ -242,6 +242,9 @@ enum class FixKind : uint8_t {
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
   
+  /// Introduce a '!= nil' to convert an Optional to a Boolean expression.
+  OptionalToBoolean,
+  
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
 };

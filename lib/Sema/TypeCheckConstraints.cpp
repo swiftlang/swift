@@ -2035,15 +2035,20 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       // Save the original expression.
       OrigExpr = expr;
       
-      // Otherwise, the result must be convertible to Bool.
-      auto boolDecl = cs.getASTContext().getBoolDecl();
-      if (!boolDecl)
+      // Otherwise, the result must be a Boolean.
+      auto &tc = cs.getTypeChecker();
+      auto logicValueProto = tc.getProtocol(expr->getLoc(),
+                                            KnownProtocolKind::Boolean);
+      if (!logicValueProto)
         return true;
-      
-      // Condition must convert to Bool.
-      cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
-                       boolDecl->getDeclaredType(),
-                       cs.getConstraintLocator(expr));
+
+      auto logicValueType = logicValueProto->getDeclaredType();
+
+      // We use SelfObjectOfProtocol because an existential Boolean is
+      // allowed as a condition, but Boolean is not self-conforming.
+      cs.addConstraint(ConstraintKind::SelfObjectOfProtocol,
+                       expr->getType(), logicValueType,
+                       cs.getConstraintLocator(OrigExpr), /*isFavored*/true);
       return false;
     }
 

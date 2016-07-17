@@ -753,7 +753,7 @@ func testParenExprInTheWay() {
   //expected-note @-1 {{overloads for '&' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, T, Self}}
 
   
-  if x & x {} // expected-error {{'Int' is not convertible to 'Bool'}}
+  if x & x {} // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 }
 
 // <rdar://problem/21352576> Mixed method/property overload groups can cause a crash during constraint optimization

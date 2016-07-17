@@ -173,5 +173,5 @@ func testREPLPrintable() {
   doREPLPrint("foo")
 }
 
-// Bool coercion
-if true as Bool {}
+// Boolean coercion
+if true as Boolean {}

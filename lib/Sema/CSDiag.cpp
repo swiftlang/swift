@@ -1874,9 +1874,6 @@ private:
   /// exact expression kind).
   bool diagnoseGeneralConversionFailure(Constraint *constraint);
 
-  /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
-  bool diagnoseConversionToBool(Expr *expr, Type exprType);
-  
   /// Produce a diagnostic for binary comparisons of the nil literal
   /// to other values.
   bool diagnoseNilLiteralComparison(Expr *lhsExpr, Expr *rhsExpr,
@@ -2437,46 +2434,6 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   return true;
 }
 
-/// Produce a specialized diagnostic if this is an invalid conversion to Bool.
-bool FailureDiagnosis::diagnoseConversionToBool(Expr *expr, Type exprType) {
-  
-  // Check for "=" converting to Bool.  The user probably meant ==.
-  if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr())) {
-    diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
-      .fixItReplace(AE->getEqualLoc(), "==")
-      .highlight(AE->getDest()->getLoc())
-      .highlight(AE->getSrc()->getLoc());
-    return true;
-  }
-  
-  // If we're trying to convert something from optional type to Bool, then a
-  // comparision against nil was probably expected.
-  // TODO: It would be nice to handle "!x" --> x == false, but we have no way
-  // to get to the parent expr at present.
-  if (exprType->getAnyOptionalObjectType()) {
-    StringRef prefix = "((";
-    StringRef suffix = ") != nil)";
-    
-    // Check if we need the inner parentheses.
-    // Technically we only need them if there's something in 'expr' with
-    // lower precedence than '!=', but the code actually comes out nicer
-    // in most cases with parens on anything non-trivial.
-    if (expr->canAppendCallParentheses()) {
-      prefix = prefix.drop_back();
-      suffix = suffix.drop_front();
-    }
-    // FIXME: The outer parentheses may be superfluous too.
-    
-    diagnose(expr->getLoc(), diag::optional_used_as_boolean, exprType)
-      .fixItInsert(expr->getStartLoc(), prefix)
-      .fixItInsertAfter(expr->getEndLoc(), suffix);
-    return true;
-  }
-
-  return false;
-}
-
-
 bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   auto anchor = expr;
   bool resolvedAnchorToExpr = false;
@@ -2606,12 +2563,17 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     return false;
 
   
-  // Check for various issues converting to Bool.
-  if (toType->isBool() && diagnoseConversionToBool(anchor, fromType))
-    return true;
-  
-  
   if (auto PT = toType->getAs<ProtocolType>()) {
+    // Check for "=" converting to Boolean.  The user probably meant ==.
+    if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr()))
+      if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::Boolean)) {
+        diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
+        .fixItReplace(AE->getEqualLoc(), "==")
+        .highlight(AE->getDest()->getLoc())
+        .highlight(AE->getSrc()->getLoc());
+        return true;
+      }
+ 
     if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
       diagnose(expr->getLoc(), diag::cannot_use_nil_with_this_type, toType)
         .highlight(expr->getSourceRange());
@@ -3530,10 +3492,30 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     return true;
   }
   
-  // If we're trying to convert something to Bool, check to see if it is for
-  // a known reason.
-  if (contextualType->isBool() && diagnoseConversionToBool(expr, exprType))
-    return true;
+  // If we're trying to convert something from optional type to Bool, then a
+  // comparision against nil was probably expected.
+  // TODO: It would be nice to handle "!x" --> x == false, but we have no way to
+  // get to the parent expr at present.
+  if (contextualType->isBool())
+    if (exprType->getAnyOptionalObjectType()) {
+      StringRef prefix = "((";
+      StringRef suffix = ") != nil)";
+      
+      // Check if we need the inner parentheses.
+      // Technically we only need them if there's something in 'expr' with
+      // lower precedence than '!=', but the code actually comes out nicer
+      // in most cases with parens on anything non-trivial.
+      if (expr->canAppendCallParentheses()) {
+        prefix = prefix.drop_back();
+        suffix = suffix.drop_front();
+      }
+      // FIXME: The outer parentheses may be superfluous too.
+      
+      diagnose(expr->getLoc(), diag::optional_used_as_boolean, exprType)
+        .fixItInsert(expr->getStartLoc(), prefix)
+        .fixItInsertAfter(expr->getEndLoc(), suffix);
+      return true;
+    }
   
   exprType = exprType->getRValueType();
 
@@ -5031,6 +5013,25 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
   auto falseExpr = typeCheckChildIndependently(IE->getElseExpr());
   if (!falseExpr) return true;
 
+  // Check for "=" converting to Boolean.  The user probably meant ==.
+  if (auto *AE = dyn_cast<AssignExpr>(condExpr->getValueProvidingExpr())) {
+    diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
+      .fixItReplace(AE->getEqualLoc(), "==")
+      .highlight(AE->getDest()->getLoc())
+      .highlight(AE->getSrc()->getLoc());
+    return true;
+  }
+
+  // If the condition wasn't of boolean type, diagnose the problem.
+  auto booleanType = CS->TC.getProtocol(IE->getQuestionLoc(),
+                                        KnownProtocolKind::Boolean);
+  if (!booleanType) return true;
+
+  if (!CS->TC.conformsToProtocol(condExpr->getType(), booleanType, CS->DC,
+                                 ConformanceCheckFlags::InExpression,
+                                 nullptr, condExpr->getLoc()))
+    return true;
+  
   // If the true/false values already match, it must be a contextual problem.
   if (trueExpr->getType()->isEqual(falseExpr->getType()))
     return false;

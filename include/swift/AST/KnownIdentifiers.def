@@ -80,6 +80,7 @@ IDENTIFIER_WITH_NAME(EqualsOperator, "==")
 // Builtins and literals
 IDENTIFIER_(MaxBuiltinIntegerType)
 IDENTIFIER(IntegerLiteralType)
+IDENTIFIER(boolValue)
 IDENTIFIER(nilLiteral)
 IDENTIFIER(integerLiteral)
 IDENTIFIER_(builtinIntegerLiteral)

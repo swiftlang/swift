@@ -53,8 +53,8 @@ func funcdecl5(_ a: Int, y: Int) {
   } else if (y == 2) {
   }
 
-  // This diagnostic is terrible - rdar://12939553
-  if x {}   // expected-error {{'Int' is not convertible to 'Bool'}}
+  // FIXME: This diagnostic is terrible - rdar://12939553
+  if x {}   // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 
   if true {
     if (B) {
@@ -94,7 +94,7 @@ struct infloopbool {
 }
 
 func infloopbooltest() {
-  if (infloopbool()) {} // expected-error {{'infloopbool' is not convertible to 'Bool'}}
+  if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'Boolean'}}
 }
 
 // test "builder" API style

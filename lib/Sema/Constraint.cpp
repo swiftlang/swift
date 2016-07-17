@@ -431,6 +431,8 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: force downcast";
   case FixKind::AddressOf:
     return "fix: add address-of";
+  case FixKind::OptionalToBoolean:
+    return "fix: convert optional to boolean";
   case FixKind::CoerceToCheckedCast:
     return "fix: as to as!";
   }
