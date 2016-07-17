@@ -25,7 +25,7 @@ class TestURL : TestURLSuper {
     func testBasics() {
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
         
-        expectTrue(url.pathComponents!.count > 0)
+        expectTrue(url.pathComponents.count > 0)
     }
     
     func testProperties() {
@@ -45,7 +45,7 @@ class TestURL : TestURLSuper {
         // Create a temporary file
         var file = URL(fileURLWithPath: NSTemporaryDirectory())
         let name = "my_great_file" + UUID().uuidString
-        try! file.appendPathComponent(name)
+        file.appendPathComponent(name)
         let data = Data(bytes: [1, 2, 3, 4, 5])
         do {
             try data.write(to: file)
@@ -71,7 +71,7 @@ class TestURL : TestURLSuper {
         // Create a temporary file
         var file = URL(fileURLWithPath: NSTemporaryDirectory())
         let name = "my_great_file" + UUID().uuidString
-        try! file.appendPathComponent(name)
+        file.appendPathComponent(name)
         let data = Data(bytes: [1, 2, 3, 4, 5])
         do {
             try data.write(to: file)
@@ -88,7 +88,7 @@ class TestURL : TestURLSuper {
             try file.setResourceValues(resourceValues)
             
             // get label number
-            try file.resourceValues(forKeys: [.labelNumberKey])
+            let _ = try file.resourceValues(forKeys: [.labelNumberKey])
             expectNotEmpty(resourceValues.labelNumber)
             expectEqual(resourceValues.labelNumber!, 1)
         } catch (let e as NSError) {
