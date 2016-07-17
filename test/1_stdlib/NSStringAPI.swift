@@ -20,9 +20,9 @@ class NonContiguousNSString : NSString {
     fatalError("don't call this initializer")
   }
 
-  override init() { 
+  override init() {
     _value = []
-    super.init() 
+    super.init()
   }
 
   init(_ value: [UInt16]) {
@@ -191,7 +191,7 @@ NSStringAPIs.test("init(contentsOf:usedEncoding:error:)") {
 
 NSStringAPIs.test("init(cString_:encoding:)") {
   expectOptionalEqual("foo, a basmati bar!",
-      String(cString: 
+      String(cString:
           "foo, a basmati bar!", encoding: String.defaultCStringEncoding))
 }
 
@@ -262,7 +262,7 @@ func expectLocalizedEquality(
   _ localeID: String? = nil,
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
@@ -270,11 +270,11 @@ func expectLocalizedEquality(
   let locale = localeID.map {
     Locale(localeIdentifier: $0)
   } ?? Locale.current
-  
+
   expectEqual(
     expected, op(locale),
     message(), stackTrace: trace)
-  
+
   expectEqual(
     op(Locale.system), op(nil),
     message(), stackTrace: trace)
@@ -284,7 +284,7 @@ NSStringAPIs.test("capitalizedString(with:)") {
   expectLocalizedEquality(
     "Foo Foo Foo Foo",
     { loc in "foo Foo fOO FOO".capitalized(with: loc) })
-  
+
   expectLocalizedEquality("Жжж", { loc in "жжж".capitalized(with: loc) })
 
   expectEqual(
@@ -486,11 +486,11 @@ NSStringAPIs.test("data(usingEncoding:allowLossyConversion:)") {
 NSStringAPIs.test("init(data:encoding:)") {
   let bytes: [UInt8] = [0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86]
   let data = Data(bytes: bytes)
-  
+
   expectEmpty(String(data: data, encoding: .nonLossyASCII))
-  
+
   expectEqualSequence(
-    "あいう".characters, 
+    "あいう".characters,
     String(data: data, encoding: .utf8)!.characters)
 }
 
@@ -816,6 +816,9 @@ NSStringAPIs.test("init(format:_:...)") {
   // test for rdar://problem/18317906
   expectEqual("3.12", String(format: "%.2f", 3.123456789))
   expectEqual("3.12", NSString(format: "%.2f", 3.123456789))
+
+  // test for rdar://problem/26051182
+  expectEqual("foo bar foo", String(format: "%2$@ %1$@ %2$@", "bar", "foo"))
 }
 
 NSStringAPIs.test("init(format:arguments:)") {
@@ -1392,7 +1395,7 @@ NSStringAPIs.test("folding(options:locale:)") {
   ) -> (Locale?) -> String {
     return { loc in s.folding(options: options, locale: loc) }
   }
-  
+
   expectLocalizedEquality("abcd", fwo("abCD", .caseInsensitive), "en")
 
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
@@ -1886,4 +1889,3 @@ NSStringAPIs.test("copy construction") {
 }
 
 runAllTests()
-
