@@ -121,8 +121,8 @@ co ? true : false // expected-error{{optional type 'C?' cannot be used as a bool
 !co ? false : true // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{4-4= != nil)}}
 ciuo ? true : false // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{1-1=(}} {{5-5= != nil)}}
 !ciuo ? false : true // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
-!co // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{4-4= != nil)}}
-!ciuo // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
+!co // expected-error{{optional type 'C?' cannot be used as a boolean; test for '== nil' instead}}{{1-2=}} {{2-2=(}} {{4-4= == nil)}}
+!ciuo // expected-error{{optional type 'C!' cannot be used as a boolean; test for '== nil' instead}}{{1-2=}} {{2-2=(}} {{6-6= == nil)}}
 
 // Forgotten ! or ?
 var someInt = co.a // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=?}}

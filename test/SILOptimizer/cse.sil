@@ -1335,10 +1335,10 @@ protocol Proto : class {
 // CHECK: bb1:
 // CHECK-NEXT: %[[WM2:[0-9]+]] = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThat!1
 // CHECK-NEXT: apply %[[WM2]]{{.*}}(%[[OPENED_EXISTENTIAL]])
-// CHECK-NEXT: br bb
+// CHECK-NEXT: br
 // CHECK: bb2:
 // CHECK-NEXT: apply %[[WM1]]{{.*}}(%[[OPENED_EXISTENTIAL]])
-// CHECK-NEXT: br bb
+// CHECK-NEXT: br
 // CHECK: bb3:
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
