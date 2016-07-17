@@ -21,6 +21,9 @@ internal func __NSCalendarAutoupdating() -> NSCalendar
 @_silgen_name("__NSCalendarCurrent")
 internal func __NSCalendarCurrent() -> NSCalendar
 
+@_silgen_name("__NSCalendarInit")
+internal func __NSCalendarInit(_ identifier : NSString) -> NSCalendar?
+
 /**
  `Calendar` encapsulates information about systems of reckoning time in which the beginning, length, and divisions of a year are defined. It provides information about the calendar and support for calendrical computations such as determining the range of a given calendrical unit and adding units to a given absolute time.
 */
@@ -104,7 +107,8 @@ public struct Calendar : CustomStringConvertible, CustomDebugStringConvertible, 
     ///
     /// - parameter identifier: The kind of calendar to use.
     public init(identifier: Identifier) {
-        _handle = _MutableHandle(adoptingReference: NSCalendar(identifier: Calendar._toNSCalendarIdentifier(identifier))!)
+        let result = __NSCalendarInit(Calendar._toNSCalendarIdentifier(identifier))!
+        _handle = _MutableHandle(adoptingReference: result)
         _autoupdating = false
     }
     

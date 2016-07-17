@@ -122,6 +122,14 @@ NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
 
 // A way to get various Calendar, Locale, and TimeZone singletons without bridging twice
 
+// Unfortunately the importer does not realize that [NSCalendar initWithIdentifier:] has been around forever, and only sees the iOS 8 availability of [NSCalendar calendarWithIdentifier:].
+SWIFT_CC(swift)
+extern "C" NS_RETURNS_RETAINED NSCalendar * __nullable __NSCalendarInit(NSString * NS_RELEASES_ARGUMENT __nonnull identifier) {
+    NSCalendar *result = [[NSCalendar alloc] initWithCalendarIdentifier:identifier];
+    [identifier release];
+    return result;
+}
+
 SWIFT_CC(swift)
 extern "C" NS_RETURNS_RETAINED NSCalendar *__NSCalendarAutoupdating() {
     return [[NSCalendar autoupdatingCurrentCalendar] retain];
