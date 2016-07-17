@@ -22,7 +22,7 @@ public var noErr: OSStatus { return 0 }
 ///
 /// The C type is a typedef for `unsigned char`.
 @_fixed_layout
-public struct DarwinBoolean : Boolean, ExpressibleByBooleanLiteral {
+public struct DarwinBoolean : ExpressibleByBooleanLiteral {
   var _value: UInt8
 
   public init(_ value: Bool) {
@@ -66,26 +66,7 @@ func _convertBoolToDarwinBoolean(_ x: Bool) -> DarwinBoolean {
 }
 public // COMPILER_INTRINSIC
 func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
-  return Bool(x)
-}
-
-// FIXME: We can't make the fully-generic versions @_transparent due to
-// rdar://problem/19418937, so here are some @_transparent overloads
-// for DarwinBoolean.
-@_transparent
-public func && <T : Boolean>(
-  lhs: T,
-  rhs: @autoclosure () -> DarwinBoolean
-) -> Bool {
-  return lhs.boolValue ? rhs().boolValue : false
-}
-
-@_transparent
-public func || <T : Boolean>(
-  lhs: T,
-  rhs: @autoclosure () -> DarwinBoolean
-) -> Bool {
-  return lhs.boolValue ? true : rhs().boolValue
+  return x.boolValue
 }
 
 #endif
