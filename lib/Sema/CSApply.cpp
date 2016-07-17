@@ -257,12 +257,6 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
     conformance->getWitness(requirement, &tc).getDecl());
 }
 
-static VarDecl *findNamedPropertyWitness(TypeChecker &tc, DeclContext *dc,
-                                         Type type, ProtocolDecl *proto,
-                                         Identifier name, Diag<> diag) {
-  return findNamedWitnessImpl<VarDecl>(tc, dc, type, proto, name, diag);
-}
-
 static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
                                         DeclContext *DC) {
   // This only matters for stored properties.
@@ -6277,20 +6271,10 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
 
   // If we didn't manage to resolve directly to an expression, we don't
   // have a great diagnostic to give, so bail.
-  if (!resolved || !resolved->getAnchor())
+  if (!resolved || !resolved->getAnchor() ||
+      !resolved->getPath().empty())
     return false;
   
-  if (!resolved->getPath().empty()) {
-    // We allow OptionalToBoolean fixes with an opened type to refer to the
-    // Boolean conformance.
-    if (fix.first.getKind() == FixKind::OptionalToBoolean &&
-        resolved->getPath().size() == 1 &&
-        resolved->getPath()[0].getKind() == ConstraintLocator::OpenedGeneric)
-      ; /* ok */
-    else
-      return false;
-  }
-
   Expr *affected = resolved->getAnchor();
 
   switch (fix.first.getKind()) {
@@ -6378,74 +6362,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
                   ->getRValueObjectType();
     TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
       .fixItInsert(affected->getStartLoc(), "&");
-    return true;
-  }
-
-  case FixKind::OptionalToBoolean: {
-    // If we're implicitly trying to treat an optional type as a boolean,
-    // let the user know that they should be testing for a value manually
-    // instead.
-    Expr *errorExpr = expr;
-    StringRef prefix = "((";
-    StringRef suffix = ") != nil)";
-    
-    // In the common case of a !x, post the error against the inner
-    // expression as an == comparison.
-    if (auto PUE =
-        dyn_cast<PrefixUnaryExpr>(errorExpr->getSemanticsProvidingExpr())){
-      bool isNot = false;
-      if (auto *D = PUE->getCalledValue())
-        isNot = D->getNameStr() == "!";
-      else if (auto *ODR = dyn_cast<OverloadedDeclRefExpr>(PUE->getFn()))
-        isNot = ODR->getDecls()[0]->getNameStr() == "!";
-      
-      if (isNot) {
-        suffix = ") == nil)";
-        errorExpr = PUE->getArg();
-        
-        // Check if we need the inner parentheses.
-        // Technically we only need them if there's something in 'expr' with
-        // lower precedence than '!=', but the code actually comes out nicer
-        // in most cases with parens on anything non-trivial.
-        if (errorExpr->canAppendCallParentheses()) {
-          prefix = prefix.drop_back();
-          suffix = suffix.drop_front();
-        }
-        // FIXME: The outer parentheses may be superfluous too.
-
-        
-        TC.diagnose(errorExpr->getLoc(),diag::optional_used_as_true_boolean,
-                    simplifyType(errorExpr->getType())->getRValueType())
-          .fixItRemove(PUE->getLoc())
-          .fixItInsert(errorExpr->getStartLoc(), prefix)
-          .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
-        return true;
-      }
-    }
-    
-    // If we can, post the fix-it to the sub-expression if it's a better
-    // fit.
-    if (auto ifExpr = dyn_cast<IfExpr>(errorExpr))
-      errorExpr = ifExpr->getCondExpr();
-    if (auto prefixUnaryExpr = dyn_cast<PrefixUnaryExpr>(errorExpr))
-      errorExpr = prefixUnaryExpr->getArg();
-    
-
-    // Check if we need the inner parentheses.
-    // Technically we only need them if there's something in 'expr' with
-    // lower precedence than '!=', but the code actually comes out nicer
-    // in most cases with parens on anything non-trivial.
-    if (errorExpr->canAppendCallParentheses()) {
-      prefix = prefix.drop_back();
-      suffix = suffix.drop_front();
-    }
-    // FIXME: The outer parentheses may be superfluous too.
-
-    TC.diagnose(errorExpr->getLoc(), diag::optional_used_as_boolean,
-                simplifyType(errorExpr->getType())->getRValueType())
-      .fixItInsert(errorExpr->getStartLoc(), prefix)
-      .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
-    
     return true;
   }
 
@@ -6745,25 +6661,16 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 /// conforms to the give \c protocol.
 /// \param expr The expression to convert.
 /// \param locator The locator describing where the conversion occurs.
-/// \param protocol The protocol to use for conversion.
-/// \param generalName The name of the protocol method to use for the
-/// conversion.
 /// \param builtinName The name of the builtin method to use for the
 /// last step of the conversion.
-/// \param brokenProtocolDiag Diagnostic to emit if the protocol
-/// definition is missing.
 /// \param brokenBuiltinDiag Diagnostic to emit if the builtin definition
 /// is broken.
 ///
 /// \returns the converted expression.
-static Expr *convertViaBuiltinProtocol(const Solution &solution,
-                                       Expr *expr,
-                                       ConstraintLocator *locator,
-                                       ProtocolDecl *protocol,
-                                       Identifier generalName,
-                                       Identifier builtinName,
-                                       Diag<> brokenProtocolDiag,
-                                       Diag<> brokenBuiltinDiag) {
+static Expr *convertViaMember(const Solution &solution, Expr *expr,
+                              ConstraintLocator *locator,
+                              Identifier builtinName,
+                              Diag<> brokenBuiltinDiag) {
   auto &cs = solution.getConstraintSystem();
 
   // FIXME: Cache name.
@@ -6776,66 +6683,17 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isa<AbstractFunctionDecl>(cs.DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto witnesses = tc.lookupMember(cs.DC, type->getRValueType(), builtinName,
+  auto members = tc.lookupMember(cs.DC, type->getRValueType(), builtinName,
                                    lookupOptions);
-  if (!witnesses) {
-    auto protocolType = protocol->getType()->
-                        getAs<MetatypeType>()->getInstanceType();
-    
-    // Find the witness we need to use.
-    ValueDecl *witness = nullptr;
-    
-    if (!protocolType->isEqual(type)) {
-      witness = findNamedPropertyWitness(tc, cs.DC, type -> getRValueType(),
-                                         protocol, generalName,
-                                         brokenProtocolDiag);
-    } else {
-      // If the expression is already typed to the protocol, lookup the protocol
-      // method directly.
-      witnesses = tc.lookupMember(cs.DC, type->getRValueType(), generalName,
-                                  lookupOptions);
-      if (!witnesses) {
-        tc.diagnose(protocol->getLoc(), brokenProtocolDiag);
-        return nullptr;
-      }
-      witness = witnesses[0];
-    }
-    
-    // Form a reference to this member.
-    Expr *memberRef = new (ctx) MemberRefExpr(expr, expr->getStartLoc(),
-                                              witness,
-                                              DeclNameLoc(expr->getEndLoc()),
-                                              /*Implicit=*/true);
-    bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-    if (failed) {
-      // If the member reference expression failed to type check, the Expr's
-      // type does not conform to the given protocol.
-      tc.diagnose(expr->getLoc(),
-                  diag::type_does_not_conform,
-                  type,
-                  protocol->getType());
-      return nullptr;
-    }
-    expr = memberRef;
-
-    // At this point, we must have a type with the builtin member.
-    type = expr->getType();
-    witnesses = tc.lookupMember(cs.DC, type->getRValueType(), builtinName,
-                                lookupOptions);
-    if (!witnesses) {
-      tc.diagnose(protocol->getLoc(), brokenProtocolDiag);
-      return nullptr;
-    }
-  }
-
+  
   // Find the builtin method.
-  if (witnesses.size() != 1) {
-    tc.diagnose(protocol->getLoc(), brokenBuiltinDiag);
+  if (members.size() != 1) {
+    tc.diagnose(expr->getLoc(), brokenBuiltinDiag);
     return nullptr;
   }
-  FuncDecl *builtinMethod = dyn_cast<FuncDecl>(witnesses[0].Decl);
+  FuncDecl *builtinMethod = dyn_cast<FuncDecl>(members[0].Decl);
   if (!builtinMethod) {
-    tc.diagnose(protocol->getLoc(), brokenBuiltinDiag);
+    tc.diagnose(expr->getLoc(), brokenBuiltinDiag);
     return nullptr;
 
   }
@@ -6864,15 +6722,9 @@ Expr *
 Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) const {
   auto &tc = getConstraintSystem().getTypeChecker();
 
-  // FIXME: Cache names.
-  auto result = convertViaBuiltinProtocol(
-                  *this, expr, locator,
-                  tc.getProtocol(expr->getLoc(),
-                                 KnownProtocolKind::Boolean),
-                  tc.Context.Id_boolValue,
-                  tc.Context.Id_getBuiltinLogicValue,
-                  diag::condition_broken_proto,
-                  diag::broken_bool);
+  auto result = convertViaMember(*this, expr, locator,
+                                 tc.Context.Id_getBuiltinLogicValue,
+                                 diag::broken_bool);
   if (result && !result->getType()->isBuiltinIntegerType(1)) {
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return nullptr;
