@@ -585,6 +585,9 @@ public:
   /// \brief Check if this type is equal to the empty tuple type.
   bool isVoid();
 
+  /// \brief Check if this type is equal to Swift.Bool.
+  bool isBool();
+
   /// \brief Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
 

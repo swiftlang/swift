@@ -3491,7 +3491,32 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
       .highlight(expr->getSourceRange());
     return true;
   }
-
+  
+  // If we're trying to convert something from optional type to Bool, then a
+  // comparision against nil was probably expected.
+  // TODO: It would be nice to handle "!x" --> x == false, but we have no way to
+  // get to the parent expr at present.
+  if (contextualType->isBool())
+    if (exprType->getAnyOptionalObjectType()) {
+      StringRef prefix = "((";
+      StringRef suffix = ") != nil)";
+      
+      // Check if we need the inner parentheses.
+      // Technically we only need them if there's something in 'expr' with
+      // lower precedence than '!=', but the code actually comes out nicer
+      // in most cases with parens on anything non-trivial.
+      if (expr->canAppendCallParentheses()) {
+        prefix = prefix.drop_back();
+        suffix = suffix.drop_front();
+      }
+      // FIXME: The outer parentheses may be superfluous too.
+      
+      diagnose(expr->getLoc(), diag::optional_used_as_boolean, exprType)
+        .fixItInsert(expr->getStartLoc(), prefix)
+        .fixItInsertAfter(expr->getEndLoc(), suffix);
+      return true;
+    }
+  
   exprType = exprType->getRValueType();
 
   // Special case of some common conversions involving Swift.String
