@@ -385,10 +385,9 @@ public:
   
   // Convert a paren expr to a pattern if it contains a pattern.
   Pattern *visitParenExpr(ParenExpr *E) {
-    if (Pattern *subPattern = visit(E->getSubExpr()))
-      return new (TC.Context) ParenPattern(E->getLParenLoc(), subPattern,
-                                           E->getRParenLoc());
-    return nullptr;
+    Pattern *subPattern = getSubExprPattern(E->getSubExpr());
+    return new (TC.Context) ParenPattern(E->getLParenLoc(), subPattern,
+                                         E->getRParenLoc());
   }
   
   // Convert all tuples to patterns.
