@@ -23,8 +23,12 @@ class TestDateIntervalSuper { }
 class TestDateInterval : TestDateIntervalSuper {
     func dateWithString(_ str: String) -> Date {
         let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US")
+	if #available(iOS 9, *){
+           formatter.calendar = Calendar(identifier: .gregorian)!
+	}else{
+	   formatter.calendar = Calendar(calendarIdentifier: .gregorian)!
+	}
+        formatter.locale = Locale(localeIdentifier: "en_US")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss Z"
         return formatter.date(from: str)! as Date
     }

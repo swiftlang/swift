@@ -6,8 +6,8 @@ import Foundation
 import user_objc
 
 // Ignore deprecated constants in prefix stripping, even if they aren't deprecated /yet/.
-let calendarUnits: NSCalendar.Unit = [.era, .year, .calendar]
-let calendarUnits2: NSCalendar.Unit = [.NSMonthCalendarUnit, .NSYearCalendarUnit] // expected-error 2 {{unavailable}}
+let calendarUnits: Calendar.Unit = [.era, .year, .calendar]
+let calendarUnits2: Calendar.Unit = [.NSMonthCalendarUnit, .NSYearCalendarUnit] // expected-error 2 {{unavailable}}
   // ...unless they're all deprecated.
 let calendarUnitsDep: CalendarUnitDeprecated = [.eraCalendarUnitDeprecated, .yearCalendarUnitDeprecated] // expected-error 2 {{unavailable}}
 
