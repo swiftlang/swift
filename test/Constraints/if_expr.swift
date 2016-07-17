@@ -1,11 +1,5 @@
 // RUN: %target-parse-verify-swift
 
-struct MyLogicValue : Boolean {
-  var boolValue: Bool {
-    return true
-  }
-}
-
 func useInt(_ x: Int) {}
 func useDouble(_ x: Double) {}
 
@@ -34,7 +28,7 @@ useDouble(c)
 useDouble(d)
 
 var z = true ? a : b // expected-error{{result values in '? :' expression have mismatching types 'Int' and 'Double'}}
-var _ = a ? b : b // expected-error{{type 'Int' does not conform to protocol 'Boolean'}}
+var _ = a ? b : b // expected-error{{'Int' is not convertible to 'Bool'}}
 
 
 
@@ -56,9 +50,9 @@ useB(i)
 useD1(i) // expected-error{{cannot convert value of type 'B' to expected argument type 'D1'}}
 useD2(i) // expected-error{{cannot convert value of type 'B' to expected argument type 'D2'}}
 
-var x = MyLogicValue() ? 1 : 0
-var y = 22 ? 1 : 0 // expected-error{{type 'Int' does not conform to protocol 'Boolean'}}
+var x = true ? 1 : 0
+var y = 22 ? 1 : 0 // expected-error{{'Int' is not convertible to 'Bool'}}
 
-_ = x ? x : x // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
+_ = x ? x : x // expected-error {{'Int' is not convertible to 'Bool'}}
 _ = true ? x : 1.2 // expected-error {{result values in '? :' expression have mismatching types 'Int' and 'Double'}}
 

@@ -2575,16 +2575,15 @@ namespace {
     
     Type visitIfExpr(IfExpr *expr) {
       // The conditional expression must conform to LogicValue.
-      Expr *condExpr = expr->getCondExpr();
-      auto booleanType
-        = CS.getTypeChecker().getProtocol(expr->getQuestionLoc(),
-                                          KnownProtocolKind::Boolean);
-      if (!booleanType)
+      auto boolDecl = CS.getASTContext().getBoolDecl();
+      if (!boolDecl)
         return Type();
 
-      CS.addConstraint(ConstraintKind::ConformsTo, condExpr->getType(),
-                       booleanType->getDeclaredType(),
-                       CS.getConstraintLocator(condExpr));
+      // Condition must convert to Bool.
+      CS.addConstraint(ConstraintKind::Conversion,
+                       expr->getCondExpr()->getType(),
+                       boolDecl->getDeclaredType(),
+                       CS.getConstraintLocator(expr->getCondExpr()));
 
       // The branches must be convertible to a common type.
       auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
