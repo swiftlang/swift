@@ -2303,7 +2303,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   
   if (!shouldAttemptFixes())
     return SolutionKind::Error;
-#if 1
+
   // See if there's anything we can do to fix the conformance:
   OptionalTypeKind optionalKind;
   if (auto optionalObjectType = type->getAnyOptionalObjectType(optionalKind)) {
@@ -2326,7 +2326,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return result;
     }
   }
-#endif
   
   // There's nothing more we can do; fail.
   return SolutionKind::Error;
