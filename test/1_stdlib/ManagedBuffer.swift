@@ -19,15 +19,6 @@ import StdlibUnittest
 import Foundation
 #endif
 
-// Check that `NonObjectiveCBase` can be subclassed and the subclass can be
-// created.
-public class SubclassOfNonObjectiveCBase : NonObjectiveCBase {
-  public override init() {}
-}
-func createSubclassOfNonObjectiveCBase() {
-  _ = SubclassOfNonObjectiveCBase()
-}
-
 // Check that the generic parameters are called 'Header' and 'Element'.
 protocol TestProtocol1 {}
 
@@ -199,11 +190,11 @@ tests.test("ManagedBufferPointer") {
       CountAndCapacity(
         count: LifetimeTracked(0), capacity: getRealCapacity(buffer))
     }
-    expectTrue(mgr.holdsUniqueReference())
+    expectTrue(mgr.isUniqueReference())
 
     let buf = mgr.buffer as? TestManagedBuffer<LifetimeTracked>
     expectTrue(buf != nil)
-    expectFalse(mgr.holdsUniqueReference())
+    expectFalse(mgr.isUniqueReference())
     
     let s = buf!
     expectEqual(0, s.count)
@@ -232,12 +223,12 @@ tests.test("ManagedBufferPointer") {
       minimumCapacity: 0
     ) { _, _ in CountAndCapacity(count: LifetimeTracked(0), capacity: 99) }
 
-    expectTrue(mgr.holdsUniqueReference())
+    expectTrue(mgr.isUniqueReference())
     expectEqual(mgr.header.count.value, 0)
     expectEqual(mgr.header.capacity, 99)
 
     let s2 = mgr.buffer as! MyBuffer<LifetimeTracked>
-    expectFalse(mgr.holdsUniqueReference())
+    expectFalse(mgr.isUniqueReference())
     
     let val = mgr.withUnsafeMutablePointerToHeader { $0 }.pointee
     expectEqual(val.count.value, 0)
@@ -245,25 +236,15 @@ tests.test("ManagedBufferPointer") {
   }
 }
 
-tests.test("isUniquelyReferenced") {
+tests.test("isKnownUniquelyReferenced") {
   var s = TestManagedBuffer<LifetimeTracked>.create(0)
-  expectTrue(isUniquelyReferenced(&s))
+  expectTrue(isKnownUniquelyReferenced(&s))
   var s2 = s
-  expectFalse(isUniquelyReferenced(&s))
-  expectFalse(isUniquelyReferenced(&s2))
-  _fixLifetime(s)
-  _fixLifetime(s2)
-}
-
-tests.test("isUniquelyReferencedNonObjC") {
-  var s = TestManagedBuffer<LifetimeTracked>.create(0)
-  expectTrue(isUniquelyReferencedNonObjC(&s))
-  var s2 = s
-  expectFalse(isUniquelyReferencedNonObjC(&s))
-  expectFalse(isUniquelyReferencedNonObjC(&s2))
+  expectFalse(isKnownUniquelyReferenced(&s))
+  expectFalse(isKnownUniquelyReferenced(&s2))
 #if _runtime(_ObjC)
   var s3 = NSArray()
-  expectFalse(isUniquelyReferencedNonObjC(&s3))
+  expectFalse(isKnownUniquelyReferenced(&s3))
 #endif
   _fixLifetime(s)
   _fixLifetime(s2)

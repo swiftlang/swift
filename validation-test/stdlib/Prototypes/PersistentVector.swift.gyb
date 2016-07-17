@@ -1676,13 +1676,12 @@ func == <Key, Value> (
   return lhs.taggedPointer == rhs.taggedPointer
 }
 
-final class _NativePVDictionaryStorageRef<Key : Hashable, Value>
-  : NonObjectiveCBase {
+final internal class _NativePVDictionaryStorageRef<Key : Hashable, Value> {
 
   var _rootNode: _PVAnyNodePointer<Key, Value>?
   var _count: Int
 
-  override init() {
+  init() {
     self._rootNode = nil
     self._count = 0
   }
@@ -1788,7 +1787,7 @@ struct _NativePVDictionaryStorage<Key : Hashable, Value> {
       count = 1
       return nil
     }
-    let isUnique = isUniquelyReferenced(&_storageRef)
+    let isUnique = isKnownUniquelyReferenced(&_storageRef)
     let (oldValue, newRootNode, wasInserted) = oldRootNode.updateValue(
       value,
       forKey: key,
@@ -1811,7 +1810,7 @@ struct _NativePVDictionaryStorage<Key : Hashable, Value> {
       return nil
     }
     let hashValue = key.hashValue
-    let isUnique = isUniquelyReferenced(&_storageRef)
+    let isUnique = isKnownUniquelyReferenced(&_storageRef)
     let (oldValue, newRootNode) = oldRootNode.removeValue(
       forKey: key,
       hashValue: hashValue,

@@ -235,11 +235,11 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   }
 
   mutating func isUniquelyReferenced() -> Bool {
-    return isUniquelyReferencedNonObjC(&owner)
+    return isKnownUniquelyReferenced(&owner)
   }
 
   mutating func isUniquelyReferencedOrPinned() -> Bool {
-    return isUniquelyReferencedOrPinnedNonObjC(&owner)
+    return _isKnownUniquelyReferencedOrPinned(&owner)
   }
 
   @_versioned

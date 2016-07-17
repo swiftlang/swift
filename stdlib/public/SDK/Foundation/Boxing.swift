@@ -54,7 +54,7 @@ extension _MutableBoxing {
     @inline(__always)
     mutating func _applyMutation<ReturnType>(_ whatToDo : @noescape(ReferenceType) -> ReturnType) -> ReturnType {
         // Only create a new box if we are not uniquely referenced
-        if !isUniquelyReferencedNonObjC(&_handle) {
+        if !isKnownUniquelyReferenced(&_handle) {
             let ref = _handle._pointer
             _handle = _MutableHandle(reference: ref)
         }
@@ -187,7 +187,7 @@ extension _MutablePairBoxing {
         case .Immutable(_):
             break
         case .Mutable(_):
-            unique = isUniquelyReferencedNonObjC(&_wrapped)
+            unique = isKnownUniquelyReferenced(&_wrapped)
         }
 
         switch (wrapper) {

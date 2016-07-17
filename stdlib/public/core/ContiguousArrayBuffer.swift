@@ -411,14 +411,14 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///   may need to be considered, such as whether the buffer could be
   ///   some immutable Cocoa container.
   public mutating func isUniquelyReferenced() -> Bool {
-    return __bufferPointer.holdsUniqueReference()
+    return __bufferPointer.isUniqueReference()
   }
 
   /// Returns `true` iff this buffer's storage is either
   /// uniquely-referenced or pinned.  NOTE: this does not mean
   /// the buffer is mutable; see the comment on isUniquelyReferenced.
   public mutating func isUniquelyReferencedOrPinned() -> Bool {
-    return __bufferPointer.holdsUniqueOrPinnedReference()
+    return __bufferPointer._isUniqueOrPinnedReference()
   }
 
 #if _runtime(_ObjC)

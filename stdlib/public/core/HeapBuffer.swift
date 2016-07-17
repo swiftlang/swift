@@ -40,8 +40,8 @@ internal func _swift_bufferAllocate(
 /// either in a derived class, or it can be in some manager object
 /// that owns the _HeapBuffer.
 public // @testable (test/Prototypes/MutableIndexableDict.swift)
-class _HeapBufferStorage<Value, Element> : NonObjectiveCBase {
-  public override init() {}
+class _HeapBufferStorage<Value, Element> {
+  public init() {}
 
   /// The type used to actually manage instances of
   /// `_HeapBufferStorage<Value, Element>`.
