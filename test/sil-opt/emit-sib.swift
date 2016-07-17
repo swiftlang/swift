@@ -1,3 +1,6 @@
+// <rdar://problem/27394237> IR generation CFG order isn't deterministic (XFAIL: test/sil-opt/emit-sib.swift)
+// XFAIL: *
+
 // RUN: rm -rf %t && mkdir -p %t
 
 // RUN: %target-swiftc_driver -emit-sib %s -module-name test -assert-config Release -O -o %t/a-opt.sib
