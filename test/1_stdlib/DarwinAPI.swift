@@ -49,10 +49,9 @@ DarwinBooleanAPI.test("boolValue/extra values") {
 
 DarwinBooleanAPI.test("Boolean") {
   var trueValue: DarwinBoolean = true
-  expectIsBooleanType(&trueValue)
 
   var success = false
-  if trueValue {
+  if trueValue.boolValue {
     success = true
   } else {
     expectUnreachable()
@@ -89,20 +88,20 @@ DarwinBooleanAPI.test("&&") {
   let trueValue: DarwinBoolean = true
   let falseValue: DarwinBoolean = false
 
-  expectTrue(trueValue && trueValue)
-  expectFalse(trueValue && falseValue)
-  expectFalse(falseValue && trueValue)
-  expectFalse(falseValue && falseValue)
+  expectTrue(trueValue.boolValue && trueValue.boolValue)
+  expectFalse(trueValue.boolValue && falseValue.boolValue)
+  expectFalse(falseValue.boolValue && trueValue.boolValue)
+  expectFalse(falseValue.boolValue && falseValue.boolValue)
 }
 
 DarwinBooleanAPI.test("||") {
   let trueValue: DarwinBoolean = true
   let falseValue: DarwinBoolean = false
 
-  expectTrue(trueValue || trueValue)
-  expectTrue(trueValue || falseValue)
-  expectTrue(falseValue || trueValue)
-  expectFalse(falseValue || falseValue)
+  expectTrue(trueValue.boolValue || trueValue.boolValue)
+  expectTrue(trueValue.boolValue || falseValue.boolValue)
+  expectTrue(falseValue.boolValue || trueValue.boolValue)
+  expectFalse(falseValue.boolValue || falseValue.boolValue)
 }
 
 var DarwinIoctlConstants = TestSuite("DarwinIoctlConstants")

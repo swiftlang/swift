@@ -17,11 +17,13 @@
 #include <stdio.h>
 
 @interface Thunks : NSObject
-- (id)createBridgedObjC:(NSInteger)value;
-- (void)acceptBridgedObjCArray:(NSArray *)x;
-- (NSArray *)produceBridgedObjCArray:(NSInteger)numItems;
-- (void)acceptBridgedSwiftArray:(NSArray *)x;
-- (NSArray *)produceBridgedSwiftArray:(NSInteger)numItems;
+- (id)createSubclass:(NSInteger)value;
+- (id)acceptSubclassArray:(NSArray *)bridged expecting:(NSArray*)unbridged;
+- (NSArray *)produceSubclassArray:(NSMutableArray *)expectations;
+- (void)checkProducedSubclassArray:(NSArray *)produced expecting:(NSArray *)expected;
+- (void)checkProducedBridgeableValueArray:(NSArray *)produced;
+- (void)acceptBridgeableValueArray:(NSArray *)x;
+- (NSArray *)produceBridgeableValueArray;
 @end
 
 id arrayAsID(NSArray* a) {
@@ -32,40 +34,35 @@ NSArray* idAsArray(id a) {
   return a;
 }
 
-void testBridgedObjC(id thunks) {
+// Call back into thunks, passing arrays in both directions
+void testSubclass(id thunks) {
   // Retrieve an array from Swift.
-  NSArray *fromObjCArr = [thunks produceBridgedObjCArray: 5];
-  printf("%d elements in the array\n", (int)fromObjCArr.count);
-
-  for (id obj in fromObjCArr) {
-    printf("%s\n", [obj description].UTF8String);
-  }
+  NSMutableArray* expectations = [[NSMutableArray alloc] init];
+  NSArray *fromObjCArr = [thunks produceSubclassArray:expectations];
+  [thunks checkProducedSubclassArray:fromObjCArr expecting:expectations];
 
   // Send an array to swift.
   NSMutableArray *toObjCArr = [[NSMutableArray alloc] init];
-  [toObjCArr addObject: [thunks createBridgedObjC:10]];
-  [toObjCArr addObject: [thunks createBridgedObjC:11]];
-  [toObjCArr addObject: [thunks createBridgedObjC:12]];
-  [toObjCArr addObject: [thunks createBridgedObjC:13]];
-  [toObjCArr addObject: [thunks createBridgedObjC:14]];
-  [thunks acceptBridgedObjCArray: toObjCArr];
+  [toObjCArr addObject: [thunks createSubclass:10]];
+  [toObjCArr addObject: [thunks createSubclass:11]];
+  [toObjCArr addObject: [thunks createSubclass:12]];
+  [toObjCArr addObject: [thunks createSubclass:13]];
+  [toObjCArr addObject: [thunks createSubclass:14]];
+  
+  [thunks acceptSubclassArray: toObjCArr expecting: toObjCArr];
 }
 
-void testBridgedSwift(id thunks) {
+void testBridgeableValue(id thunks) {
   // Retrieve an array from Swift.
-  NSArray *fromSwiftArr = [thunks produceBridgedSwiftArray: 5];
-  printf("%d elements in the array\n", (int)fromSwiftArr.count);
-
-  for (id obj in fromSwiftArr) {
-    printf("%s\n", [obj description].UTF8String);
-  }
-
+  NSArray *fromSwiftArr = [thunks produceBridgeableValueArray];
+  [thunks checkProducedBridgeableValueArray: fromSwiftArr];
+    
   // Send an array to swift.
   NSMutableArray *toSwiftArr = [[NSMutableArray alloc] init];
-  [toSwiftArr addObject: [thunks createBridgedObjC:10]];
-  [toSwiftArr addObject: [thunks createBridgedObjC:11]];
-  [toSwiftArr addObject: [thunks createBridgedObjC:12]];
-  [toSwiftArr addObject: [thunks createBridgedObjC:13]];
-  [toSwiftArr addObject: [thunks createBridgedObjC:14]];
-  [thunks acceptBridgedSwiftArray: toSwiftArr];
+  [toSwiftArr addObject: [thunks createSubclass:10]];
+  [toSwiftArr addObject: [thunks createSubclass:11]];
+  [toSwiftArr addObject: [thunks createSubclass:12]];
+  [toSwiftArr addObject: [thunks createSubclass:13]];
+  [toSwiftArr addObject: [thunks createSubclass:14]];
+  [thunks acceptBridgeableValueArray: toSwiftArr];
 }

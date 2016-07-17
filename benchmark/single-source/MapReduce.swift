@@ -20,7 +20,7 @@ public func run_MapReduce(_ N: Int) {
   var c = 0
   for _ in 1...N*100 {
     numbers = numbers.map({$0 &+ 5})
-    c += numbers.reduce(0, &+)
+    c += numbers.reduce(0, combine: &+)
   }
   CheckResults(c != 0, "IncorrectResults in MapReduce")
 }

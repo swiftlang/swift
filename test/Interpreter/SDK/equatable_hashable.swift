@@ -18,7 +18,7 @@ test_CBool()
 
 func test_ObjCBool() {
   let x = ObjCBool(true)
-  let hash = testHash(Bool(x))
+  let hash = testHash(x.boolValue)
   print("ObjCBool: hash = \(hash)")
 }
 // CHECK-NEXT: ObjCBool: hash = 1

@@ -22,7 +22,7 @@ public var noErr: OSStatus { return 0 }
 ///
 /// The C type is a typedef for `unsigned char`.
 @_fixed_layout
-public struct DarwinBoolean : Boolean, ExpressibleByBooleanLiteral {
+public struct DarwinBoolean : ExpressibleByBooleanLiteral {
   var _value: UInt8
 
   public init(_ value: Bool) {
@@ -66,26 +66,7 @@ func _convertBoolToDarwinBoolean(_ x: Bool) -> DarwinBoolean {
 }
 public // COMPILER_INTRINSIC
 func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
-  return Bool(x)
-}
-
-// FIXME: We can't make the fully-generic versions @_transparent due to
-// rdar://problem/19418937, so here are some @_transparent overloads
-// for DarwinBoolean.
-@_transparent
-public func && <T : Boolean>(
-  lhs: T,
-  rhs: @autoclosure () -> DarwinBoolean
-) -> Bool {
-  return lhs.boolValue ? rhs().boolValue : false
-}
-
-@_transparent
-public func || <T : Boolean>(
-  lhs: T,
-  rhs: @autoclosure () -> DarwinBoolean
-) -> Bool {
-  return lhs.boolValue ? true : rhs().boolValue
+  return x.boolValue
 }
 
 #endif
@@ -94,36 +75,18 @@ public func || <T : Boolean>(
 // sys/errno.h
 //===----------------------------------------------------------------------===//
 
+@_silgen_name("_swift_Platform_getErrno")
+func _swift_Platform_getErrno() -> Int32
+
+@_silgen_name("_swift_Platform_setErrno")
+func _swift_Platform_setErrno(_: Int32)
+
 public var errno : Int32 {
   get {
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(PS4)
-    return __error().pointee
-#elseif os(Android)
-    return __errno().pointee
-#elseif os(Windows)
-#if CYGWIN
-    return __errno().pointee
-#else
-    return _errno().pointee
-#endif
-#else
-    return __errno_location().pointee
-#endif
+    return _swift_Platform_getErrno()
   }
   set(val) {
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(PS4)
-    return __error().pointee = val
-#elseif os(Android)
-    return __errno().pointee = val
-#elseif os(Windows)
-#if CYGWIN
-    return __errno().pointee = val
-#else
-    return _errno().pointee = val
-#endif
-#else
-    return __errno_location().pointee = val
-#endif
+    return _swift_Platform_setErrno(val)
   }
 }
 

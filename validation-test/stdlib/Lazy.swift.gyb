@@ -1057,7 +1057,7 @@ tests.test("LazyFilterSequence") {
   // Try again using explicit construction
   filtered = LazyFilterSequence(
     _base: MinimalSequence(elements: base),
-    { x in calls += 1; return x.value % 2 == 0})
+    whereElementsSatisfy: { x in calls += 1; return x.value % 2 == 0})
 
   expectEqual(100, calls)
 

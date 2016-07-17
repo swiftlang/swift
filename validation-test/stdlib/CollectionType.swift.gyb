@@ -105,10 +105,10 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
   }
 
   func filter(
-    _ isIncluded: @noescape (Element) throws -> Bool
+    _ transform: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
     MinimalCollectionWithCustomFilter.timesFilterWasCalled += 1
-    return try _data.filter(isIncluded)
+    return try _data.filter(transform)
   }
 
 %   end
@@ -119,27 +119,27 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
 
 func callStaticCollectionFilter(
   _ sequence: MinimalCollectionWithDefaultFilter<OpaqueValue<Int>>,
-  _ isIncluded: @noescape (OpaqueValue<Int>) -> Bool
+  includeElement: @noescape (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
-  var result = sequence.filter(isIncluded)
+  var result = sequence.filter(includeElement)
   expectType([OpaqueValue<Int>].self, &result)
   return result
 }
 
 func callStaticCollectionFilter(
   _ sequence: MinimalCollectionWithCustomFilter<OpaqueValue<Int>>,
-  _ isIncluded: @noescape (OpaqueValue<Int>) -> Bool
+  includeElement: @noescape (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
-  var result = sequence.filter(isIncluded)
+  var result = sequence.filter(includeElement)
   expectType([OpaqueValue<Int>].self, &result)
   return result
 }
 
 func callGenericCollectionFilter<S : Collection>(
   _ sequence: S,
-  _ isIncluded: @noescape (S.Iterator.Element) -> Bool
+  includeElement: @noescape (S.Iterator.Element) -> Bool
 ) -> [S.Iterator.Element] {
-  var result = sequence.filter(isIncluded)
+  var result = sequence.filter(includeElement)
   expectType(Array<S.Iterator.Element>.self, &result)
   return result
 }
@@ -819,11 +819,14 @@ struct ${Self}<T> : ${Collection} {
 }
 
 CollectionTypeTests.test("AssociatedTypes/${Collection}") {
-  expectTrue(${Self}<Void>.Index.self == FatalIndex.self)
-  expectTrue(${Self}<Void>.Indices.self == ${Indices}<${Self}<Void>>.self)
-  expectTrue(${Self}<Void>.IndexDistance.self == Int.self)
-  expectTrue(${Self}<Void>.Iterator.self == IndexingIterator<${Self}<Void>>.self)
-  expectTrue(${Self}<Void>.SubSequence.self == ${Slice}<${Self}<Void>>.self)
+  typealias C = ${Self}<Void>
+  expectCollectionAssociatedTypes(
+    collectionType: C.self,
+    iteratorType: IndexingIterator<C>.self,
+    subSequenceType: ${Slice}<C>.self,
+    indexType: FatalIndex.self,
+    indexDistanceType: Int.self,
+    indicesType: ${Indices}<C>.self)
 }
 % end
 

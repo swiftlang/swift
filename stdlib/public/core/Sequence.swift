@@ -61,10 +61,9 @@
 /// algorithms, however, may call for direct iterator use.
 ///
 /// One example is the `reduce1(_:)` method. Similar to the
-/// `reduce(_:)` method defined in the standard
-/// library, which takes an initial value and a combining closure,
-/// `reduce1(_:)` uses the first element of the sequence as the
-/// initial value.
+/// `reduce(_:combine:)` method defined in the standard library, which takes
+/// an initial value and a combining closure, `reduce1(_:)` uses the first
+/// element of the sequence as the initial value.
 ///
 /// Here's an implementation of the `reduce1(_:)` method. The sequence's
 /// iterator is used directly to retrieve the initial value before looping
@@ -72,7 +71,7 @@
 ///
 ///     extension Sequence {
 ///         func reduce1(
-///           _ nextPartialResult: (Iterator.Element, Iterator.Element) -> Iterator.Element
+///           combine: (Iterator.Element, Iterator.Element) -> Iterator.Element
 ///         ) -> Iterator.Element?
 ///         {
 ///             var i = makeIterator()
@@ -81,7 +80,7 @@
 ///             }
 ///
 ///             while let element = i.next() {
-///                 accumulated = nextPartialResult(accumulated, element)
+///                 accumulated = combine(accumulated, element)
 ///             }
 ///             return accumulated
 ///         }
@@ -388,12 +387,12 @@ public protocol Sequence {
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
-  /// - Parameter isIncluded: A closure that takes an element of the
+  /// - Parameter includeElement: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
   func filter(
-    _ isIncluded: @noescape (Iterator.Element) throws -> Bool
+    _ includeElement: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element]
 
   /// Calls the given closure on each element in the sequence in the same order
@@ -559,18 +558,18 @@ public protocol Sequence {
   /// - Returns: An array of subsequences, split from this sequence's elements.
   func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
   /// Returns the first element of the sequence that satisfies the given
   /// predicate or nil if no such element is found.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// - Parameter where: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element is a match.
   /// - Returns: The first match or `nil` if there was no match.
   func first(
-    where predicate: @noescape (Iterator.Element) throws -> Bool
+    where: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element?
 
   func _customContainsEquatableElement(
@@ -748,12 +747,12 @@ extension Sequence {
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
-  /// - Parameter shouldInclude: A closure that takes an element of the
+  /// - Parameter includeElement: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
   public func filter(
-    _ isIncluded: @noescape (Iterator.Element) throws -> Bool
+    _ includeElement: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element] {
 
     var result = ContiguousArray<Iterator.Element>()
@@ -761,7 +760,7 @@ extension Sequence {
     var iterator = self.makeIterator()
 
     while let element = iterator.next() {
-      if try isIncluded(element) {
+      if try includeElement(element) {
         result.append(element)
       }
     }
@@ -860,7 +859,7 @@ extension Sequence {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [AnySequence<Iterator.Element>] {
     _precondition(maxSplits >= 0, "Must take zero or more splits")
     var result: [AnySequence<Iterator.Element>] = []
@@ -970,7 +969,7 @@ extension Sequence {
   /// Returns the first element of the sequence that satisfies the given
   /// predicate or nil if no such element is found.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// - Parameter where: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element is a match.
   /// - Returns: The first match or `nil` if there was no match.
@@ -1044,7 +1043,7 @@ extension Sequence where Iterator.Element : Equatable {
     return split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      whereSeparator: { $0 == separator })
+      isSeparator: { $0 == separator })
   }
 }
 

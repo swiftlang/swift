@@ -44,11 +44,6 @@
 /// Conforming to the Boolean Protocol
 /// ==================================
 ///
-/// Only three types provided by Swift---`Bool`, `DarwinBoolean`, and
-/// `ObjCBool`---conform to the `Boolean` protocol. Expanding this set to
-/// include types that represent more than simple Boolean values is
-/// discouraged.
-///
 /// To add `Boolean` conformance to your custom type, implement a `boolValue`
 /// property that represents your type as an instance of `Bool`, the default
 /// concrete type for the `Boolean` protocol.
@@ -476,7 +471,7 @@ public protocol ExpressibleByStringLiteral
 /// array as a parameter:
 ///
 ///     func sum(values: [Int]) -> Int {
-///         return values.reduce(0, +)
+///         return values.reduce(0, combine: +)
 ///     }
 ///
 ///     let sumOfFour = sum([5, 10, 15, 20])

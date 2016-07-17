@@ -147,9 +147,11 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
 /// - Precondition: SourceElement is a class type.
 /// - Precondition: TargetElement is bridged non-verbatim to Objective-C.
 ///   O(n), because each element must be bridged separately.
-internal func _arrayConditionalBridgeElements<SourceElement, TargetElement>(
-       _ source: Array<SourceElement>
-     ) -> Array<TargetElement>? {
+internal func _arrayConditionalBridgeElements<
+  SourceElement,
+  TargetElement
+>(_ source: Array<SourceElement>) -> Array<TargetElement>? {
+    
   _sanityCheck(_isBridgedVerbatimToObjectiveC(SourceElement.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(TargetElement.self))
   
@@ -158,26 +160,18 @@ internal func _arrayConditionalBridgeElements<SourceElement, TargetElement>(
   
   var p = buf.firstElementAddress
   
-ElementwiseBridging:
-  repeat {
-    for object: SourceElement in source {
-      let value = Swift._conditionallyBridgeFromObjectiveC(
-        unsafeBitCast(object, to: AnyObject.self), TargetElement.self)
-      if _slowPath(value == nil) {
-        break ElementwiseBridging
-      }
-      p.initialize(with: value!)
-      p += 1
+  // Make sure the resulting array owns anything that is successfully stored
+  // there.
+  defer { buf.count = p - buf.firstElementAddress }
+    
+  for object: SourceElement in source {
+    guard let value = object as? TargetElement else {
+      return nil
     }
-    return Array(_buffer: _ArrayBuffer(buf, shiftedToStartIndex: 0))
+    p.initialize(with: value)
+    p += 1
   }
-  while false
-  
-  // Don't destroy anything we never created.
-  buf.count = p - buf.firstElementAddress
-  
-  // Report failure
-  return nil
+  return Array(_buffer: _ArrayBuffer(buf, shiftedToStartIndex: 0))
 }
 
 /// Implements `source as? [TargetElement]`: convert each element of

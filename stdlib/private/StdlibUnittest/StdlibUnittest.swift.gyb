@@ -107,7 +107,7 @@ var _seenExpectCrash = false
 /// Run `body` and expect a failure to happen.
 ///
 /// The check passes iff `body` triggers one or more failures.
-public func expectFailure(${TRACE}, invoking body: () -> Void) {
+public func expectFailure(${TRACE}, body: () -> Void) {
   let startAnyExpectFailed = _anyExpectFailed
   _anyExpectFailed = false
   body()
@@ -450,7 +450,7 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
   
 public func expectIsBooleanType<X : Boolean>(_ x: inout X) -> X { return x }
 
-public struct AssertionResult : CustomStringConvertible, Boolean {
+public struct AssertionResult : CustomStringConvertible {
   init(isPass: Bool) {
     self._isPass = isPass
   }
@@ -490,13 +490,13 @@ public func expectUnreachableCatch(_ error: Error, ${TRACE}) {
 %for BoolType in ['Bool', 'AssertionResult']:
 
 public func expectTrue(_ actual: ${BoolType}, ${TRACE}) {
-  if !actual {
+  if !actual.boolValue {
     expectationFailure("expected: true", trace: ${trace})
   }
 }
 
 public func expectFalse(_ actual: ${BoolType}, ${TRACE}) {
-  if actual {
+  if actual.boolValue {
     expectationFailure("expected: false", trace: ${trace})
   }
 }
@@ -1257,7 +1257,7 @@ public final class TestSuite {
       f()
     }
     expectEqual(
-      0, LifetimeTracked.instances, "leaked LifetimeTracked instances:",
+      0, LifetimeTracked.instances, "Found leaked LifetimeTracked instances.",
       file: test.testLoc.file, line: test.testLoc.line)
   }
 
@@ -1951,14 +1951,23 @@ public func checkEquatable<Instances : Collection>(
       let y = instances[j]
 
       let xy = x == y
-      expectEqual(predictedXY, xy, ${trace})
+      expectEqual(
+        predictedXY, xy,
+        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        stackTrace: ${stackTrace})
 
       // Not-equal is an inverse of equal
-      expectNotEqual(xy, x != y, ${trace})
-      
+      expectNotEqual(
+        xy, x != y,
+        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        stackTrace: ${stackTrace})
+
       // Symmetry
-      expectEqual(xy, y == x, ${trace})
-      
+      expectEqual(
+        xy, y == x,
+        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        stackTrace: ${stackTrace})
+
       for k in instances.indices {
         let z = instances[k]
         // Transitivity
@@ -1998,10 +2007,15 @@ public func checkHashable<Instances : Collection>(
   
   checkEquatable(instances, oracle: equalityOracle, ${trace})
   
-  for x in instances {
-    for y in instances {
+  for i in instances.indices {
+    let x = instances[i]
+    for j in instances.indices {
+      let y = instances[j]
       if x == y {
-        expectEqual(x.hashValue, y.hashValue, ${trace})
+        expectEqual(
+          x.hashValue, y.hashValue,
+          "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+          stackTrace: ${stackTrace})
       }
     }
   }
@@ -2228,7 +2242,7 @@ public func expectEqualSequence<
 ) where
   Expected.Iterator.Element == Actual.Iterator.Element {
 
-  if !expected.elementsEqual(actual, by: sameValue) {
+  if !expected.elementsEqual(actual, isEquivalent: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
@@ -2246,9 +2260,9 @@ public func expectEqualsUnordered<
   Expected.Iterator.Element == Actual.Iterator.Element {
   
   let x: [Expected.Iterator.Element] =
-    expected.sorted(by: compose(compare, { $0.isLT() }))
+    expected.sorted(isOrderedBefore: compose(compare, { $0.isLT() }))
   let y: [Actual.Iterator.Element] =
-    actual.sorted(by: compose(compare, { $0.isLT() }))
+    actual.sorted(isOrderedBefore: compose(compare, { $0.isLT() }))
   expectEqualSequence(
     x, y, ${trace}, sameValue: compose(compare, { $0.isEQ() }))
 }
@@ -2345,10 +2359,10 @@ public func expectEqualsUnordered<
   }
 
   let x: [(T, T)] =
-    expected.sorted(by: comparePairLess)
+    expected.sorted(isOrderedBefore: comparePairLess)
   let y: [(T, T)] =
     actual.map { ($0.0, $0.1) }
-      .sorted(by: comparePairLess)
+      .sorted(isOrderedBefore: comparePairLess)
 
   func comparePairEquals(_ lhs: (T, T), rhs: (key: T, value: T)) -> Bool {
     return lhs.0 == rhs.0 && lhs.1 == rhs.1

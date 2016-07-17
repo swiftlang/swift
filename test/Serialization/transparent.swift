@@ -44,10 +44,10 @@ func wrap_br() {
 // SIL: bb0(%0 : $MaybePair):
 // SIL: retain_value %0 : $MaybePair
 // SIL: switch_enum %0 : $MaybePair, case #MaybePair.Neither!enumelt: bb[[CASE1:[0-9]+]], case #MaybePair.Left!enumelt.1: bb[[CASE2:[0-9]+]], case #MaybePair.Right!enumelt.1: bb[[CASE3:[0-9]+]], case #MaybePair.Both!enumelt.1: bb[[CASE4:[0-9]+]]
-// SIL: bb[[CASE4]](%{{.*}} : $(Int32, String)):
-// SIL: bb[[CASE3]](%{{.*}} : $String):
-// SIL: bb[[CASE2]](%{{.*}} : $Int32):
 // SIL: bb[[CASE1]]:
+// SIL: bb[[CASE2]](%{{.*}} : $Int32):
+// SIL: bb[[CASE3]](%{{.*}} : $String):
+// SIL: bb[[CASE4]](%{{.*}} : $(Int32, String)):
 func test_switch(u: MaybePair) {
   do_switch(u: u)
 }

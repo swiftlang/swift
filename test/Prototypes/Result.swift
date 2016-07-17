@@ -79,9 +79,7 @@ public func ?? <T> (
 }
 
 /// Translate the execution of a throwing closure into a Result
-func catchResult<Success>(
-  invoking body: () throws -> Success
-) -> Result<Success> {
+func catchResult<Success>(body: () throws -> Success) -> Result<Success> {
   do {
     return try .Success(body())
   }

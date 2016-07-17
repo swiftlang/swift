@@ -510,8 +510,19 @@ bool TypeBase::isLegalSILType() {
 }
 
 bool TypeBase::isVoid() {
-  return isEqual(getASTContext().TheEmptyTupleType);
+  if (auto TT = getAs<TupleType>())
+    return TT->getNumElements() == 0;
+  return false;
 }
+
+/// \brief Check if this type is equal to Swift.Bool.
+bool TypeBase::isBool() {
+  if (auto NTD = getAnyNominal())
+    if (isa<StructDecl>(NTD))
+      return getASTContext().getBoolDecl() == NTD;
+  return false;
+}
+
 
 bool TypeBase::isAssignableType() {
   if (isLValueType()) return true;

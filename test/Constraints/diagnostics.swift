@@ -554,7 +554,7 @@ func r22020088bar(_ p: r22020088P?) {
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
 func f(_ arguments: [String]) -> [ArraySlice<String>] {
-  return arguments.split(maxSplits: 1, omittingEmptySubsequences: false, whereSeparator: { $0 == "--" })
+  return arguments.split(maxSplits: 1, omittingEmptySubsequences: false, isSeparator: { $0 == "--" })
 }
 
 
@@ -596,10 +596,11 @@ func r18397777(_ d : r21447318?) {
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
   }
   
-  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
+  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{8-8= != nil)}}
+
   }
 
-  if !Optional(c) { // expected-error {{optional type 'Optional<_>' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
+  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{18-18= != nil)}}
   }
 }
 
@@ -755,7 +756,9 @@ func r24251022() {
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
   // https://twitter.com/_jlfischer/status/712337382175952896
-  return a == b && 1 == 2  // expected-error {{'&&' produces 'Bool', not the expected contextual result type 'Int'}}
+  // TODO: <rdar://problem/27391581> QoI: Nonsensitical "binary operator '&&' cannot be applied to two 'Bool' operands"
+  return a == b && 1 == 2  // expected-error {{binary operator '&&' cannot be applied to two 'Bool' operands}}
+  // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
 }
 
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
@@ -815,8 +818,10 @@ class Foo23752537 {
 
 extension Foo23752537 {
   func isEquivalent(other: Foo23752537) {
-    // expected-error @+1 {{'&&' produces 'Bool', not the expected contextual result type '()'}}
+    // TODO: <rdar://problem/27391581> QoI: Nonsensitical "binary operator '&&' cannot be applied to two 'Bool' operands"
+    // expected-error @+1 {{binary operator '&&' cannot be applied to two 'Bool' operands}}
     return (self.title != other.title && self.message != other.message)
+    // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
   }
 }
 

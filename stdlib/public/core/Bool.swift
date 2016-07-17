@@ -174,3 +174,79 @@ public prefix func !(a: Bool) -> Bool {
 public func ==(lhs: Bool, rhs: Bool) -> Bool {
   return Bool(Builtin.cmp_eq_Int1(lhs._value, rhs._value))
 }
+
+
+/// Performs a logical AND operation on two Bool values.
+///
+/// The logical AND operator (`&&`) combines two Bool values and returns
+/// `true` if both of the values are `true`. If either of the values is
+/// `false`, the operator returns `false`.
+///
+/// This operator uses short-circuit evaluation: The left-hand side (`lhs`) is
+/// evaluated first, and the right-hand side (`rhs`) is evaluated only if
+/// `lhs` evaluates to `true`. For example:
+///
+///     let measurements = [7.44, 6.51, 4.74, 5.88, 6.27, 6.12, 7.76]
+///     let sum = measurements.reduce(0, combine: +)
+///
+///     if measurements.count > 0 && sum / Double(measurements.count) < 6.5 {
+///         print("Average measurement is less than 6.5")
+///     }
+///     // Prints "Average measurement is less than 6.5"
+///
+/// In this example, `lhs` tests whether `measurements.count` is greater than
+/// zero. Evaluation of the `&&` operator is one of the following:
+///
+/// - When `measurements.count` is equal to zero, `lhs` evaluates to `false`
+///   and `rhs` is not evaluated, preventing a divide-by-zero error in the
+///   expression `sum / Double(measurements.count)`. The result of the
+///   operation is `false`.
+/// - When `measurements.count` is greater than zero, `lhs` evaluates to `true`
+///   and `rhs` is evaluated. The result of evaluating `rhs` is the result of
+///   the `&&` operation.
+///
+/// - Parameters:
+///   - lhs: The left-hand side of the operation.
+///   - rhs: The right-hand side of the operation.
+@inline(__always)
+public func &&(lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows -> Bool{
+  return lhs ? try rhs() : false
+}
+
+/// Performs a logical OR operation on two Bool values.
+///
+/// The logical OR operator (`||`) combines two Bool values and returns
+/// `true` if at least one of the values is `true`. If both values are
+/// `false`, the operator returns `false`.
+///
+/// This operator uses short-circuit evaluation: The left-hand side (`lhs`) is
+/// evaluated first, and the right-hand side (`rhs`) is evaluated only if
+/// `lhs` evaluates to `false`. For example:
+///
+///     let majorErrors: Set = ["No first name", "No last name", ...]
+///     let error = ""
+///
+///     if error.isEmpty || !majorErrors.contains(error) {
+///         print("No major errors detected")
+///     } else {
+///         print("Major error: \(error)")
+///     }
+///     // Prints "No major errors detected")
+///
+/// In this example, `lhs` tests whether `error` is an empty string. Evaluation
+/// of the `||` operator is one of the following:
+///
+/// - When `error` is an empty string, `lhs` evaluates to `true` and `rhs` is
+///   not evaluated, skipping the call to `majorErrors.contains(_:)`. The
+///   result of the operation is `true`.
+/// - When `error` is not an empty string, `lhs` evaluates to `false` and `rhs`
+///   is evaluated. The result of evaluating `rhs` is the result of the `||`
+///   operation.
+///
+/// - Parameters:
+///   - lhs: The left-hand side of the operation.
+///   - rhs: The right-hand side of the operation.
+@inline(__always)
+public func ||(lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows -> Bool{
+  return lhs ? true : try rhs()
+}

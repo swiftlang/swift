@@ -1021,7 +1021,7 @@ func benchSortStrings(_ words: [String]) {
   // Notice that we _copy_ the array of words before we sort it.
   // Pass an explicit '<' predicate to benchmark reabstraction thunks.
   var tempwords = words
-  tempwords.sort(by: <)
+  tempwords.sort(isOrderedBefore: <)
 }
 
 public func run_SortStrings(_ N: Int) {

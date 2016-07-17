@@ -27,11 +27,11 @@
 /// closure, function, or method that doesn't return a value.
 ///
 ///     // No return type declared:
-///     func logMessage(s: String) {
+///     func logMessage(_ s: String) {
 ///         print("Message: \(s)")
 ///     }
 ///
-///     let logger: String -> Void = logMessage
+///     let logger: (String) -> Void = logMessage
 ///     logger("This is a void function")
 ///     // Prints "Message: This is a void function"
 public typealias Void = ()
