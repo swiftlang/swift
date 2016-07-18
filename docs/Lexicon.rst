@@ -82,6 +82,13 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     it would when a normal Optional is force-unwrapped. IUOs implicitly
     convert to and from normal Optionals with the same wrapped type.
 
+  IWYU (include what you use)
+    The accepted wisdom that mplementation files (``.cpp``, `.c`, ``.m``,
+    ``.mm``) should explicity ``#include`` or ``#import`` the headers they use.
+    Doing so prevents compilation errors when header files are included in a
+    different order, or when header files are modified to use forward
+    declarations instead of direct includes.
+
   main module
     The module for the file or files currently being compiled.
 
