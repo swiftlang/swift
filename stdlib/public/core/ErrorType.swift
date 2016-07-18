@@ -14,18 +14,19 @@ import SwiftShims
 // TODO: API review
 /// A type representing an error value that can be thrown.
 ///
-/// Any type that declares conformance to `Error` can be used to
-/// represent an error in Swift's error handling system. Because
-/// `Error` has no requirements of its own, you can declare
-/// conformance on any custom type you create.
+/// Any type that declares conformance to the `Error` protocol can be used to
+/// represent an error in Swift's error handling system. Because the `Error`
+/// protocol has no requirements of its own, you can declare conformance on
+/// any custom type you create.
 ///
 /// Using Enumerations as Errors
 /// ============================
 ///
 /// Swift's enumerations are well suited to represent simple errors. Create an
-/// enumeration that conforms to `Error` with a case for each possible
-/// error. If there are additional details about the error that could be
-/// helpful for recovery, use associated values to include that information.
+/// enumeration that conforms to the `Error` protocol with a case for each
+/// possible error. If there are additional details about the error that could
+/// be helpful for recovery, use associated values to include that
+/// information.
 ///
 /// The following example shows an `IntParsingError` enumeration that captures
 /// two different kinds of errors that can occur when parsing an integer from
