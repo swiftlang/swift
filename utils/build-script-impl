@@ -1757,7 +1757,7 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
-    if [[ "${ENABLE_ASAN}" ]] ; then
+    if [[ "${ENABLE_ASAN}" || "$(uname -s)" == "Linux" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
             -DSWIFT_SOURCEKIT_USE_INPROC_LIBRARY:BOOL=TRUE
