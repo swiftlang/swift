@@ -2388,8 +2388,14 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  cs.addConstraint(ConstraintKind::ExplicitConversion, expr->getType(), type,
-                   cs.getConstraintLocator(expr));
+  auto constraint = Constraint::create(cs, ConstraintKind::ExplicitConversion,
+                                       expr->getType(), type, DeclName(),
+                                       cs.getConstraintLocator(expr));
+  // An unapplied member function wants a flattened function type.
+  if (auto ignored = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr))
+    if (isa<TypeExpr>(ignored->getLHS()))
+      constraint->setFunctionFlattening();
+  cs.addConstraint(constraint);
 
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();

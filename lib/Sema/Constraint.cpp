@@ -27,24 +27,23 @@ using namespace swift;
 using namespace constraints;
 
 Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
-                       ConstraintLocator *locator, 
+                       ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(kind), HasRestriction(false), HasFix(false), IsActive(false),
-    RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
-    Nested(constraints), Locator(locator)
-{
+    : Kind(kind), HasRestriction(false), HasFix(false), IsActive(false),
+      RememberChoice(false), IsFavored(false), IsFunctionFlattening(false),
+      NumTypeVariables(typeVars.size()), Nested(constraints), Locator(locator) {
   assert(kind == ConstraintKind::Disjunction);
   std::uninitialized_copy(typeVars.begin(), typeVars.end(),
                           getTypeVariablesBuffer().begin());
 }
 
-Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, 
+Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
                        DeclName Member, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(Kind), HasRestriction(false), HasFix(false), IsActive(false),
-    RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
-    Types { First, Second, Member }, Locator(locator)
-{
+    : Kind(Kind), HasRestriction(false), HasFix(false), IsActive(false),
+      RememberChoice(false), IsFavored(false), IsFunctionFlattening(false),
+      NumTypeVariables(typeVars.size()), Types{First, Second, Member},
+      Locator(locator) {
   switch (Kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -100,26 +99,24 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
-Constraint::Constraint(Type type, OverloadChoice choice, 
+Constraint::Constraint(Type type, OverloadChoice choice,
                        ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(ConstraintKind::BindOverload),
-    HasRestriction(false), HasFix(false), IsActive(false),
-    RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
-    Overload{type, choice}, Locator(locator)
-{ 
+    : Kind(ConstraintKind::BindOverload), HasRestriction(false), HasFix(false),
+      IsActive(false), RememberChoice(false), IsFavored(false),
+      IsFunctionFlattening(false), NumTypeVariables(typeVars.size()),
+      Overload{type, choice}, Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
-Constraint::Constraint(ConstraintKind kind, 
+Constraint::Constraint(ConstraintKind kind,
                        ConversionRestrictionKind restriction,
                        Type first, Type second, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-    : Kind(kind), Restriction(restriction),
-      HasRestriction(true), HasFix(false), IsActive(false),
-      RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
-      Types{ first, second, Identifier() }, Locator(locator)
-{
+    : Kind(kind), Restriction(restriction), HasRestriction(true), HasFix(false),
+      IsActive(false), RememberChoice(false), IsFavored(false),
+      IsFunctionFlattening(false), NumTypeVariables(typeVars.size()),
+      Types{first, second, Identifier()}, Locator(locator) {
   assert(!first.isNull());
   assert(!second.isNull());
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
@@ -128,12 +125,11 @@ Constraint::Constraint(ConstraintKind kind,
 Constraint::Constraint(ConstraintKind kind, Fix fix,
                        Type first, Type second, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(kind), TheFix(fix.getKind()), FixData(fix.getData()), 
-    HasRestriction(false), HasFix(true),
-    IsActive(false), RememberChoice(false), IsFavored(false),
-    NumTypeVariables(typeVars.size()),
-    Types{ first, second, Identifier() }, Locator(locator)
-{
+    : Kind(kind), TheFix(fix.getKind()), FixData(fix.getData()),
+      HasRestriction(false), HasFix(true), IsActive(false),
+      RememberChoice(false), IsFavored(false), IsFunctionFlattening(false),
+      NumTypeVariables(typeVars.size()), Types{first, second, Identifier()},
+      Locator(locator) {
   assert(!first.isNull());
   assert(!second.isNull());
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());

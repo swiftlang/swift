@@ -1024,6 +1024,16 @@ namespace {
         Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
                                                               ref);
         closeExistential(result, /*force=*/openedExistential);
+
+        if (!isa<FuncDecl>(member))
+          return result;
+
+        auto newTy = result->getType()
+                         ->castTo<AnyFunctionType>()
+                         ->getUncurriedFunction();
+        result = coerceToType(
+            result, newTy, locator.withPathElement(ConstraintLocator::Member));
+        cast<FunctionConversionExpr>(result)->setFlattening();
         return result;
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
@@ -4637,6 +4647,8 @@ static bool isReferenceToMetatypeMember(Expr *expr) {
     return dotIgnored->getLHS()->getType()->is<AnyMetatypeType>();
   if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(expr))
     return dotSyntax->getBase()->getType()->is<AnyMetatypeType>();
+  if (auto conversion = dyn_cast<FunctionConversionExpr>(expr))
+    return isReferenceToMetatypeMember(conversion->getSubExpr());
   return false;
 }
 
@@ -6952,4 +6964,3 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   isSomeExpr->setType(tc.lookupBoolType(cs.DC));
   return isSomeExpr;
 }
-

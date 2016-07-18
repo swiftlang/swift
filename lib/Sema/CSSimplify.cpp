@@ -889,6 +889,13 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      TypeMatchKind kind, unsigned flags,
                                      ConstraintLocatorBuilder locator) {
+  if (flags & TMF_FlattenFunction) {
+    // If we want a flattened function, remove a level of currying and continue.
+    return matchFunctionTypes(
+        func1->getUncurriedFunction()->castTo<FunctionType>(), func2, kind,
+        flags & ~TMF_FlattenFunction, locator);
+  }
+
   // An @autoclosure function type can be a subtype of a
   // non-@autoclosure function type.
   if (func1->isAutoClosure() != func2->isAutoClosure() &&
@@ -2992,19 +2999,24 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       }
     }
 
+    bool isFlattened =
+        isMetatype && cand->isInstanceMember() && isa<FuncDecl>(cand);
+
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
     if (isDynamicLookup) {
       assert(cand->getDeclContext()->isTypeContext() && "Dynamic lookup bug");
 
       // We found this declaration via dynamic lookup, record it as such.
-      result.addViable(OverloadChoice::getDeclViaDynamic(baseTy, cand));
+      result.addViable(
+          OverloadChoice::getDeclViaDynamic(baseTy, cand, isFlattened));
       return;
     }
 
     // If we have a bridged type, we found this declaration via bridging.
     if (isBridged) {
-      result.addViable(OverloadChoice::getDeclViaBridge(bridgedType, cand));
+      result.addViable(
+          OverloadChoice::getDeclViaBridge(bridgedType, cand, isFlattened));
       return;
     }
 
@@ -3015,10 +3027,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
         ->getInstanceType()
         ->getAnyOptionalObjectType());
-      result.addViable(OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy,
-                                                                   cand));
+      result.addViable(OverloadChoice::getDeclViaUnwrappedOptional(
+          ovlBaseTy, cand, isFlattened));
     } else {
-      result.addViable(OverloadChoice(ovlBaseTy, cand, *this));
+      result.addViable(OverloadChoice(ovlBaseTy, cand, *this,
+                                      /*isSpecialized=*/false, isFlattened));
     }
   };
 
@@ -4328,9 +4341,10 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
       return result;
     }
 
-    return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
-                      matchKind,
-                      TMF_None, constraint.getLocator());
+    return matchTypes(
+        constraint.getFirstType(), constraint.getSecondType(), matchKind,
+        constraint.isFunctionFlattening() ? TMF_FlattenFunction : TMF_None,
+        constraint.getLocator());
   }
 
   case ConstraintKind::ApplicableFunction:

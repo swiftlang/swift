@@ -3131,6 +3131,32 @@ AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   llvm_unreachable("unhandled function type");
 }
 
+AnyFunctionType *AnyFunctionType::getUncurriedFunction() {
+  assert(getCurryLevel() > 0 && "nothing to uncurry");
+
+  auto innerFunction = getResult()->castTo<AnyFunctionType>();
+  SmallVector<TupleTypeElt, 4> params{getInput()->getDesugaredType()};
+
+  if (auto tuple = innerFunction->getInput()->getAs<TupleType>())
+    params.append(tuple->getElements().begin(), tuple->getElements().end());
+  else
+    params.push_back(innerFunction->getInput()->getDesugaredType());
+
+  auto inputType = TupleType::get(params, getASTContext());
+  auto extInfo =
+      innerFunction->getExtInfo().withRepresentation(getRepresentation());
+
+  if (auto generic = getAs<GenericFunctionType>())
+    return GenericFunctionType::get(generic->getGenericSignature(), inputType,
+                                    innerFunction->getResult(), extInfo);
+
+  if (auto poly = getAs<PolymorphicFunctionType>())
+    return PolymorphicFunctionType::get(inputType, innerFunction->getResult(),
+                                        &poly->getGenericParams(), extInfo);
+
+  return FunctionType::get(inputType, innerFunction->getResult(), extInfo);
+}
+
 FunctionType *FunctionType::get(Type Input, Type Result,
                                 const ExtInfo &Info) {
   auto properties = getFunctionRecursiveProperties(Input, Result);

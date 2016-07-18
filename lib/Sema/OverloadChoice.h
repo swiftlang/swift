@@ -91,23 +91,26 @@ class OverloadChoice {
   /// overload choice kind shifted by 1 with the low bit set.
   uintptr_t DeclOrKind;
 
+  bool IsFlattened;
+
 public:
   OverloadChoice()
-      : BaseAndBits(nullptr, 0), DeclOrKind() {}
+      : BaseAndBits(nullptr, 0), DeclOrKind(), IsFlattened(false) {}
 
   OverloadChoice(Type base, ValueDecl *value, ConstraintSystem &CS,
-                 bool isSpecialized = false);
+                 bool isSpecialized = false, bool isFlattened = false);
 
   OverloadChoice(Type base, TypeDecl *type, bool isSpecialized = false)
-      : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0) {
-    assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0
-           && "Badly aligned decl");
+      : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
+        IsFlattened(false) {
+    assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0 &&
+           "Badly aligned decl");
     DeclOrKind = reinterpret_cast<uintptr_t>(type) | 0x01;
   }
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
     : BaseAndBits(base, 0),
-      DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x03)
+      DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x03), IsFlattened(false)
       {
     assert(base && "Must have a base type for overload choice");
     assert(kind != OverloadChoiceKind::Decl &&
@@ -122,37 +125,47 @@ public:
     : BaseAndBits(base, 0),
       DeclOrKind(((uintptr_t)index
                   + (uintptr_t)OverloadChoiceKind::TupleIndex) << 2
-                 | (uintptr_t)0x03) {
+                 | (uintptr_t)0x03), IsFlattened(false) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
   }
 
   /// Retrieve an overload choice for a declaration that was found via
   /// dynamic lookup.
-  static OverloadChoice getDeclViaDynamic(Type base, ValueDecl *value) {
+  static OverloadChoice getDeclViaDynamic(Type base, ValueDecl *value, bool isFlattened = false) {
+    // assert((!isFlattened || isa<FuncDecl>(value)) &&
+    //        "can only flatten function decls");
     OverloadChoice result;
     result.BaseAndBits.setPointer(base);
     result.DeclOrKind = reinterpret_cast<uintptr_t>(value) | 0x02;
+    result.IsFlattened = isFlattened;
     return result;
   }
 
   /// Retrieve an overload choice for a declaration that was found via
   /// bridging to an Objective-C class.
-  static OverloadChoice getDeclViaBridge(Type base, ValueDecl *value) {
+  static OverloadChoice getDeclViaBridge(Type base, ValueDecl *value,
+                                         bool isFlattened = false) {
+    // assert((!isFlattened || isa<FuncDecl>(value)) &&
+    //        "can only flatten function decls");
     OverloadChoice result;
     result.BaseAndBits.setPointer(base);
     result.BaseAndBits.setInt(IsBridgedBit);
     result.DeclOrKind = reinterpret_cast<uintptr_t>(value);
+    result.IsFlattened = isFlattened;
     return result;
   }
 
   /// Retrieve an overload choice for a declaration that was found
   /// by unwrapping an optional context type.
-  static OverloadChoice getDeclViaUnwrappedOptional(Type base,
-                                                    ValueDecl *value) {
+  static OverloadChoice getDeclViaUnwrappedOptional(Type base, ValueDecl *value,
+                                                    bool isFlattened = false) {
+    // assert((!isFlattened || isa<FuncDecl>(value)) &&
+    //        "can only flatten function decls");
     OverloadChoice result;
     result.BaseAndBits.setPointer(base);
     result.BaseAndBits.setInt(IsUnwrappedOptionalBit);
     result.DeclOrKind = reinterpret_cast<uintptr_t>(value);
+    result.IsFlattened = isFlattened;
     return result;
   }
 
@@ -166,7 +179,11 @@ public:
   bool isSpecialized() const { 
     return BaseAndBits.getInt() & IsSpecializedBit;
   }
-  
+
+  bool isFlattened() const {
+    return IsFlattened;
+  }
+
   /// \brief Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
     switch (DeclOrKind & 0x03) {

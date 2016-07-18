@@ -2297,6 +2297,16 @@ public:
     return getExtInfo().throws();
   }
 
+  unsigned getCurryLevel() const {
+    unsigned Level = 0;
+    const AnyFunctionType *function = this;
+    while ((function = function->getResult()->getAs<AnyFunctionType>()))
+      ++Level;
+    return Level;
+  }
+
+  AnyFunctionType *getUncurriedFunction();
+
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
