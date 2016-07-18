@@ -768,6 +768,8 @@ ERROR(instance_member_use_on_type,none,
 ERROR(instance_member_in_initializer,none,
       "cannot use instance member %0 within property initializer; "
       "property initializers run before 'self' is available", (DeclName))
+ERROR(instance_member_in_default_parameter,none,
+      "cannot use instance member %0 as a default parameter", (DeclName))
 
 ERROR(invalid_initialization_parameter_same_type,none,
       "invalid initializer call with same type %0 as parameter", (Type))
