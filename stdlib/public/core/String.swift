@@ -60,7 +60,7 @@ import SwiftShims
 ///     print(greeting)
 ///     // Prints "Welcome!"
 ///
-/// Comparing strings for equality using the is-equal-to operator (`==`) or a
+/// Comparing strings for equality using the equal-to operator (`==`) or a
 /// relational operator (like `<` and `>=`) is always performed using the
 /// Unicode canonical representation. This means that different
 /// representations of a string compare as being equal.

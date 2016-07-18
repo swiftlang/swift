@@ -37,7 +37,7 @@
 /// To use your own custom type in a set or as the key type of a dictionary,
 /// add `Hashable` conformance to your type by providing a `hashValue`
 /// property. The `Hashable` protocol inherits from the `Equatable` protocol,
-/// so you must also add an is-equal-to operator (`==`) function for your
+/// so you must also add an equal-to operator (`==`) function for your
 /// custom type.
 ///
 /// As an example, consider a `GridPoint` type that describes a location in a

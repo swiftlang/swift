@@ -48,7 +48,7 @@
 /// =====================================
 ///
 /// Types with Comparable conformance implement the less-than operator (`<`)
-/// and the is-equal-to operator (`==`). These two operations impose a strict
+/// and the equal-to operator (`==`). These two operations impose a strict
 /// total order on the values of a type, in which exactly one of the following
 /// must be true for any two values `a` and `b`:
 ///
