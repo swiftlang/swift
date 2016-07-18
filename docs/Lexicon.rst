@@ -83,7 +83,7 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     convert to and from normal Optionals with the same wrapped type.
 
   IWYU (include what you use)
-    The accepted wisdom that implementation files (``.cpp``, `.c`, ``.m``,
+    The accepted wisdom that implementation files (``.cpp``, ``.c``, ``.m``,
     ``.mm``) should explicity ``#include`` or ``#import`` the headers they use.
     Doing so prevents compilation errors when header files are included in a
     different order, or when header files are modified to use forward
