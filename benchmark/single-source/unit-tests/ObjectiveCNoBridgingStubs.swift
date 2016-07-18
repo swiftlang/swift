@@ -134,7 +134,7 @@ func testObjectiveCBridgeStubURLAppendPathRef() {
   for _ in 0 ..< 10_000 {
     var url = startUrl
     for _ in 0 ..< 10 {
-      url = try! url.appendingPathComponent("foo")
+      url = url.appendingPathComponent("foo")
     }
   }
 }
