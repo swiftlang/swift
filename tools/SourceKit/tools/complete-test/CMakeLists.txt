@@ -5,7 +5,7 @@ else()
 endif()
 
 if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
-  set(SOURCEKITD_TEST_DEPEND ${SOURCEKITD_TEST_DEPEND} dispatch)
+  set(SOURCEKITD_TEST_DEPEND ${SOURCEKITD_TEST_DEPEND} dispatch swiftCore)
 endif()
 
 add_sourcekit_executable(complete-test
