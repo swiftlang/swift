@@ -71,7 +71,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 		body: @noescape (UnsafePointer<ContentType>) throws -> Result) rethrows -> Result
 	{
 		var ptr: UnsafePointer<Void>? = nil
-		var size = 0;
+		var size = 0
 		let data = __dispatch_data_create_map(__wrapped, &ptr, &size)
 		defer { _fixLifetime(data) }
 		return try body(UnsafePointer<ContentType>(ptr!))
@@ -247,7 +247,7 @@ public struct DispatchDataIterator : IteratorProtocol, Sequence {
 	/// - Precondition: No preceding call to `self.next()` has returned `nil`.
 	public mutating func next() -> DispatchData._Element? {
 		if _position == _count { return nil }
-		let element = _ptr[_position];
+		let element = _ptr[_position]
 		_position = _position + 1
 		return element
 	}

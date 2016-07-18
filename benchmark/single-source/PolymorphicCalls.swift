@@ -61,7 +61,7 @@ public class B {
 public class A1 {
     let b: B1
     public init(b:B1) {
-        self.b = b;
+        self.b = b
     }
     public func run1() -> Int {
         return b.f1() + b.f2() + b.f3()

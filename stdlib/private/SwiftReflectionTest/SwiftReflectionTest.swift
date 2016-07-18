@@ -24,7 +24,7 @@ import Darwin
 let RequestInstanceKind = "k"
 let RequestInstanceAddress = "i"
 let RequestReflectionInfos = "r"
-let RequestReadBytes = "b";
+let RequestReadBytes = "b"
 let RequestSymbolAddress = "s"
 let RequestStringLength = "l"
 let RequestDone = "d"
@@ -282,9 +282,9 @@ internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
     case String(validatingUTF8: RequestStringLength)!:
       sendStringLength()
     case String(validatingUTF8: RequestPointerSize)!:
-      sendPointerSize();
+      sendPointerSize()
     case String(validatingUTF8: RequestDone)!:
-      return;
+      return
     default:
       fatalError("Unknown request received: '\(Array(command.utf8))'!")
     }
