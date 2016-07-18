@@ -591,6 +591,42 @@ namespace {
   };
 }
 
+/// Update SIL basic block's arguments types which refer to opened
+/// archetypes. Replace such types by performing type substitutions
+/// according to the provided type substitution map.
+static void updateBasicBlockArgTypes(SILBasicBlock *BB,
+                                     TypeSubstitutionMap &TypeSubstMap) {
+  // Check types of all BB arguments.
+  for (auto &Arg : BB->getBBArgs()) {
+    if (!Arg->getType().getSwiftRValueType()->hasOpenedExistential())
+      continue;
+    // Type of this BB argument uses an opened existential.
+    // Try to apply substitutions to it and if it produces a different type,
+    // use this type as new type of the BB argument.
+    auto NewArgType = Arg->getType().subst(
+        BB->getModule(), BB->getModule().getSwiftModule(), TypeSubstMap);
+    if (NewArgType == Arg->getType())
+      continue;
+    // Replace the type of this BB argument. The type of a BBArg
+    // can only be changed using replaceBBArg, if the BBArg has no uses.
+    // So, make it look as if it has no uses.
+
+    // First collect all uses, before changing the type.
+    SmallVector<Operand *, 4> OriginalArgUses;
+    for (auto *ArgUse : Arg->getUses()) {
+      OriginalArgUses.push_back(ArgUse);
+    }
+    // Then replace all uses by an undef.
+    Arg->replaceAllUsesWith(SILUndef::get(Arg->getType(), BB->getModule()));
+    // Replace the type of the BB argument.
+    BB->replaceBBArg(Arg->getIndex(), NewArgType, Arg->getDecl());
+    // Restore all uses to refer to the BB argument with updated type.
+    for (auto ArgUse : OriginalArgUses) {
+      ArgUse->set(Arg);
+    }
+  }
+}
+
 /// Handle CSE of open_existential_ref instructions.
 /// Returns true if uses of open_existential_ref can
 /// be replaced by a dominating instruction.
@@ -601,6 +637,10 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
                                     SILBasicBlock::iterator &I) {
   assert(isa<OpenExistentialRefInst>(Inst));
   llvm::SmallSetVector<SILInstruction *, 16> Candidates;
+  auto OldOpenedArchetype = getOpenedArchetypeOf(Inst);
+  auto NewOpenedArchetype = getOpenedArchetypeOf(dyn_cast<SILInstruction>(V));
+  TypeSubstitutionMap TypeSubstMap;
+  TypeSubstMap[OldOpenedArchetype.getPointer()] = NewOpenedArchetype;
   // Collect all candidates that may contain opened archetypes
   // that need to be replaced.
   for (auto Use : Inst->getUses()) {
@@ -614,10 +654,21 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
       }
       Candidates.insert(User);
     }
+    if (!isa<TermInst>(User))
+      continue;
+    // The current use of the opened archetype is a terminator instruction.
+    // Check if any of the successor BBs uses this opened archetype in the
+    // types of its basic block arguments. If this is the case, replace
+    // those uses by the new opened archetype.
+    auto Successors = User->getParent()->getSuccessorBlocks();
+    for (auto Successor : Successors) {
+      if (Successor->bbarg_empty())
+        continue;
+      // If a BB has any arguments, update their types if necessary.
+      updateBasicBlockArgTypes(Successor, TypeSubstMap);
+    }
   }
   // Now process candidates.
-  auto OldOpenedArchetype = getOpenedArchetypeOf(Inst);
-  auto NewOpenedArchetype = getOpenedArchetypeOf(dyn_cast<SILInstruction>(V));
   // TODO: Move it to CSE instance to avoid recreating it every time?
   SILOpenedArchetypesTracker OpenedArchetypesTracker(*Inst->getFunction());
   // Register the new archetype to be used.
