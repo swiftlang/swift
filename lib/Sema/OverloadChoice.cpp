@@ -23,11 +23,10 @@
 using namespace swift;
 using namespace constraints;
 
-OverloadChoice::OverloadChoice(
-    Type base, ValueDecl *value, bool isSpecialized, ConstraintSystem &CS)
+OverloadChoice::OverloadChoice(Type base, ValueDecl *value,
+                               ConstraintSystem &CS, bool isSpecialized)
     : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0) {
   assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
          "Badly aligned decl");
-
   DeclOrKind = reinterpret_cast<uintptr_t>(value);
 }

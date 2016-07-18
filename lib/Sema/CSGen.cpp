@@ -1024,8 +1024,8 @@ namespace {
       auto memberLocator =
         CS.getConstraintLocator(expr, ConstraintLocator::Member);
       auto tv = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
-      
-      OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false, CS);
+
+      OverloadChoice choice(base->getType(), decl, CS);
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator);
       return tv;
@@ -1114,8 +1114,7 @@ namespace {
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (decl) {
-        OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false,
-                              CS);
+        OverloadChoice choice(base->getType(), decl, CS);
         CS.addBindOverloadConstraint(fnTy, choice, subscriptMemberLocator);
       } else {
         CS.addValueMemberConstraint(baseTy, Context.Id_subscript,
@@ -1312,10 +1311,9 @@ namespace {
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
-      CS.resolveOverload(locator, tv,
-                         OverloadChoice(Type(), E->getDecl(),
-                                        E->isSpecialized(), CS));
-      
+      CS.resolveOverload(locator, tv, OverloadChoice(Type(), E->getDecl(), CS,
+                                                     E->isSpecialized()));
+
       if (E->getDecl()->getType() &&
           !E->getDecl()->getType()->getAs<TypeVariableType>()) {
         CS.setFavoredType(E, E->getDecl()->getType().getPointer());
@@ -1377,9 +1375,8 @@ namespace {
         if (decls[i]->isInvalid())
           continue;
 
-        choices.push_back(OverloadChoice(Type(), decls[i],
-                                         expr->isSpecialized(),
-                                         CS));
+        choices.push_back(
+            OverloadChoice(Type(), decls[i], CS, expr->isSpecialized()));
       }
 
       // If there are no valid overloads, give up.

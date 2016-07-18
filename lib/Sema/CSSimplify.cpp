@@ -2842,9 +2842,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
           }
         }
       }
-      
-      result.addViable(OverloadChoice(baseTy, ctor,
-                                      /*isSpecialized=*/false, *this));
+
+      result.addViable(OverloadChoice(baseTy, ctor, *this));
     }
 
 
@@ -2885,9 +2884,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       TC.validateDecl(candidate.first, true);
       if (candidate.first->isInvalid())
         return result.markErrorAlreadyDiagnosed();
-      
-      result.addViable(OverloadChoice(baseTy, candidate.first,
-                                      /*isSpecialized=*/false));
+
+      result.addViable(OverloadChoice(baseTy, candidate.first));
     }
     
     return result;
@@ -3020,8 +3018,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       result.addViable(OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy,
                                                                    cand));
     } else {
-      result.addViable(OverloadChoice(ovlBaseTy, cand,
-                                      /*isSpecialized=*/false, *this));
+      result.addViable(OverloadChoice(ovlBaseTy, cand, *this));
     }
   };
 

@@ -75,7 +75,7 @@ class OverloadChoice {
     /// optional context type, turning a "Decl" kind into
     /// "DeclViaUnwrappedOptional".
     IsUnwrappedOptionalBit = 0x04,
-    
+
     // IsBridged and IsUnwrappedOptional are mutually exclusive, so there is
     // room for another mutually exclusive OverloadChoiceKind to be packed into
     // those two bits.
@@ -95,11 +95,11 @@ public:
   OverloadChoice()
       : BaseAndBits(nullptr, 0), DeclOrKind() {}
 
-  OverloadChoice(
-      Type base, ValueDecl *value, bool isSpecialized, ConstraintSystem &CS);
-  
-  OverloadChoice(Type base, TypeDecl *type, bool isSpecialized)
-    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0) {
+  OverloadChoice(Type base, ValueDecl *value, ConstraintSystem &CS,
+                 bool isSpecialized = false);
+
+  OverloadChoice(Type base, TypeDecl *type, bool isSpecialized = false)
+      : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0) {
     assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0
            && "Badly aligned decl");
     DeclOrKind = reinterpret_cast<uintptr_t>(type) | 0x01;
@@ -170,14 +170,14 @@ public:
   /// \brief Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
     switch (DeclOrKind & 0x03) {
-    case 0x00: 
+    case 0x00:
       if (BaseAndBits.getInt() & IsBridgedBit)
         return OverloadChoiceKind::DeclViaBridge;
       if (BaseAndBits.getInt() & IsUnwrappedOptionalBit)
         return OverloadChoiceKind::DeclViaUnwrappedOptional;
 
       return OverloadChoiceKind::Decl;
-      
+
     case 0x01: return OverloadChoiceKind::TypeDecl;
     case 0x02: return OverloadChoiceKind::DeclViaDynamic;
     case 0x03: {
