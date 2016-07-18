@@ -5,7 +5,6 @@
 public struct ObjCBool {
   var value : UInt8
 
-  /// \brief Allow use in a Boolean context.
   public var boolValue: Bool {
     if value == 0 { return false }
     return true

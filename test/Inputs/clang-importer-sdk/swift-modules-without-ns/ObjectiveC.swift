@@ -10,7 +10,6 @@ public struct ObjCBool {
     self.value = value
   }
 
-  /// \brief Allow use in a Boolean context.
   public var boolValue: Bool {
     return value
   }
@@ -29,7 +28,6 @@ public struct ObjCBool {
     self.value = value
   }
 
-  /// \brief Allow use in a Boolean context.
   public var boolValue: Bool {
     if value == 0 { return false }
     return true
