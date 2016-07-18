@@ -13,8 +13,8 @@
 @_exported import Intents
 import Foundation
 
-// @available(iOS, introduced: 10.0)
-// @available(OSX, introduced: 10.12)
+@available(iOS, introduced=10.0)
+@available(OSX, introduced=10.12)
 extension INIntentErrorCode : _BridgedNSError {
   public static var _NSErrorDomain: String { return INIntentErrorDomain }
 }
