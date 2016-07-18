@@ -165,6 +165,7 @@ public prefix func !(a: Bool) -> Bool {
   return Bool(Builtin.xor_Int1(a._value, true._value))
 }
 
+// Binary Equivalence Check
 @_transparent
 public func ==(lhs: Bool, rhs: Bool) -> Bool {
   return Bool(Builtin.cmp_eq_Int1(lhs._value, rhs._value))
