@@ -47,6 +47,36 @@ RangeTraps.test("Closed")
   _ = 1...0
 }
 
+RangeTraps.test("IncompleteHalfOpen")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+  var range = 1..<
+  expectType(IncompleteRange<Int>.self, &range)
+  
+  var badRange = range.completed(byUnchecked: -1..<0)
+  expectType(CountableRange<Int>.self, &badRange)
+  
+  expectCrashLater()
+  _ = range.completed(by: -1..<0)
+}
+
+RangeTraps.test("IncompleteClosed")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+  var range = 1...
+  expectType(IncompleteClosedRange<Int>.self, &range)
+  
+  var badRange = range.completed(byUnchecked: -1...0)
+  expectType(CountableClosedRange<Int>.self, &badRange)
+
+  expectCrashLater()
+  _ = range.completed(by: -1...0)
+}
+
 RangeTraps.test("OutOfRange")
   .skip(.custom(
     { _isFastAssertConfiguration() },

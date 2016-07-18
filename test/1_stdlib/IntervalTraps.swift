@@ -50,5 +50,34 @@ IntervalTraps.test("Closed")
   _ = 1.0...0.0
 }
 
+IntervalTraps.test("IncompleteHalfOpen")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+  var incompleteInterval = 1.0..<
+  var completeInterval = -1.0..<0.0
+  // FIXME: the plan is for floating point numbers to no longer be
+  // strideable; then this will drop the "OfStrideable"
+  expectType(IncompleteRange<Double>.self, &incompleteInterval)
+  expectCrashLater()
+  _ = incompleteInterval.completed(by: completeInterval)
+}
+
+IntervalTraps.test("IncompleteClosed")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+  var incompleteInterval = 1.0...
+  var completeInterval = -1.0...0.0
+  // FIXME: the plan is for floating point numbers to no longer be
+  // strideable; then this will drop the "OfStrideable"
+  expectType(IncompleteClosedRange<Double>.self, &incompleteInterval)
+
+  expectCrashLater()
+  _ = incompleteInterval.completed(by: completeInterval)
+}
+
 runAllTests()
 
