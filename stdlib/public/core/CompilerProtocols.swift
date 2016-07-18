@@ -12,46 +12,6 @@
 // Intrinsic protocols shared with the compiler
 //===----------------------------------------------------------------------===//
 
-/// A type that represents a Boolean value.
-///
-/// Types that conform to the `Boolean` protocol can be used as the condition
-/// in control statements, such as `if` and `while`, and in other contexts
-/// that require a logical value, such as the `where` clause of a `case`
-/// statement.
-///
-/// Swift uses only simple Boolean values in conditional contexts to help avoid
-/// accidental programming errors and to help maintain the clarity of each
-/// control statement. Unlike other programming languages, integers or strings
-/// cannot be used where a Boolean value is expected.
-///
-/// For example, the following code sample will not compile, because it
-/// attempts to use the integer `i` in a logical context:
-///
-///     var i = 5
-///     while i {
-///         print(i)
-///         i -= 1
-///     }
-///
-/// The correct approach in Swift is to compare the `i` value with zero in the
-/// `while` statement.
-///
-///     while i != 0 {
-///         print(i)
-///         i -= 1
-///     }
-///
-/// Conforming to the Boolean Protocol
-/// ==================================
-///
-/// To add `Boolean` conformance to your custom type, implement a `boolValue`
-/// property that represents your type as an instance of `Bool`, the default
-/// concrete type for the `Boolean` protocol.
-public protocol Boolean {
-  /// This value expressed as a `Bool` instance.
-  var boolValue: Bool { get }
-}
-
 /// A type that can be converted to and from an associated raw value.
 ///
 /// With a `RawRepresentable` type, you can switch back and forth between a
@@ -701,8 +661,8 @@ public protocol _ExpressibleByFileReferenceLiteral {
 public protocol _DestructorSafeContainer {
 }
 
-@available(*, unavailable, renamed: "Boolean")
-public typealias BooleanType = Boolean
+@available(*, unavailable, renamed: "Bool")
+public typealias BooleanType = Bool
 
 // Deprecated by SE-0115.
 

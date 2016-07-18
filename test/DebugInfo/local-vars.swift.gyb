@@ -15,7 +15,7 @@
 public class C {
   let member : Int
   init(_ i : Int) { member = i }
-  func isZero() -> Boolean { return member == 0 }
+  func isZero() -> Bool { return member == 0 }
 }
 
 public struct S {

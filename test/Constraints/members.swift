@@ -146,10 +146,6 @@ func goo() {
 
 func id<T>(_ t: T) -> T { return t }
 
-func doGetLogicValue<T : Boolean>(_ t: T) {
-  t.boolValue  // expected-warning {{expression of type 'Bool' is unused}}
-}
-
 protocol P {
   init()
   func bar(_ x: Int)

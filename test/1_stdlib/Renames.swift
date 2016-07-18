@@ -94,7 +94,7 @@ func _CollectionOfOne<T>(i: IteratorOverOne<T>) {
 }
 
 func _CompilerProtocols() {
-  func fn(_: BooleanType) {} // expected-error {{'BooleanType' has been renamed to 'Boolean'}} {{14-25=Boolean}} {{none}}
+  func fn(_: BooleanType) {} // expected-error {{'BooleanType' has been renamed to 'Bool'}} {{14-25=Bool}} {{none}}
 }
 
 func _EmptyCollection<T>(i: EmptyIterator<T>) {

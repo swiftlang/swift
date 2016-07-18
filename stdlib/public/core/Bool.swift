@@ -14,7 +14,7 @@
 
 /// A value type whose instances are either `true` or `false`.
 ///
-/// `Bool` is the default type for Boolean values in Swift. Create instances of
+/// `Bool` represents Boolean values in Swift. Create instances of
 /// `Bool` by using one of the Boolean literals `true` and `false` or by
 /// assigning the result of a Boolean method or operation to a variable or
 /// constant.
@@ -69,6 +69,10 @@ public struct Bool {
   @_versioned
   @_transparent
   internal init(_ v: Builtin.Int1) { self._value = v }
+  
+  public init(_ value: Bool) {
+    self = value
+  }
 }
 
 extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
@@ -101,21 +105,11 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   }
 }
 
-extension Bool : Boolean {
+extension Bool {
+  // This is a magic entry point known to the compiler.
   @_transparent
   public func _getBuiltinLogicValue() -> Builtin.Int1 {
     return _value
-  }
-
-  /// This value expressed as a `Bool` instance; its value is identical to that
-  /// of the current instance.
-  @_transparent public var boolValue: Bool { return self }
-
-  /// Creates an instance representing the given logical value.
-  ///
-  /// - Parameter value: The logical value for the new instance.
-  public init<T : Boolean>(_ value: T) {
-    self = value.boolValue
   }
 }
 

@@ -171,19 +171,19 @@ public func XCTAssertNotNil(_ expression: @autoclosure () throws -> Any?, _ mess
   }
 }
 
-public func XCTAssert(_ expression: @autoclosure () throws -> Boolean, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
+public func XCTAssert(_ expression: @autoclosure () throws -> Bool, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
   // XCTAssert is just a cover for XCTAssertTrue.
   XCTAssertTrue(expression, message, file: file, line: line)
 }
 
-public func XCTAssertTrue(_ expression: @autoclosure () throws -> Boolean, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
+public func XCTAssertTrue(_ expression: @autoclosure () throws -> Bool, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
   let assertionType = _XCTAssertionType.`true`
   
   // evaluate the expression exactly once
   var expressionValueOptional: Bool?
   
   let result = _XCTRunThrowableBlock {
-    expressionValueOptional = try expression().boolValue
+    expressionValueOptional = try expression()
   }
   
   switch result {
@@ -207,14 +207,14 @@ public func XCTAssertTrue(_ expression: @autoclosure () throws -> Boolean, _ mes
   }
 }
 
-public func XCTAssertFalse(_ expression: @autoclosure () throws -> Boolean, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
+public func XCTAssertFalse(_ expression: @autoclosure () throws -> Bool, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
   let assertionType = _XCTAssertionType.`false`
   
   // evaluate the expression exactly once
   var expressionValueOptional: Bool?
   
   let result = _XCTRunThrowableBlock {
-    expressionValueOptional = try expression().boolValue
+    expressionValueOptional = try expression()
   }
   
   switch result {

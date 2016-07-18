@@ -3,7 +3,7 @@
 // The iOS/arm64 target uses _Bool for Objective-C's BOOL.  We include
 // x86_64 here as well because the iOS simulator also uses _Bool.
 #if ((os(iOS) || os(tvOS)) && (arch(arm64) || arch(x86_64))) || os(watchOS)
-public struct ObjCBool : Boolean {
+public struct ObjCBool {
   private var value : Bool
 
   public init(_ value: Bool) {
@@ -18,7 +18,7 @@ public struct ObjCBool : Boolean {
 
 #else
 
-public struct ObjCBool : Boolean {
+public struct ObjCBool {
   private var value : UInt8
 
   public init(_ value: Bool) {
@@ -68,7 +68,7 @@ internal func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
 }
 
 internal func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
-  return Bool(x)
+  return x.boolValue
 }
 
 public func ~=(x: NSObject, y: NSObject) -> Bool {

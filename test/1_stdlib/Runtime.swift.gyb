@@ -66,21 +66,29 @@ Runtime.test("_canBeClass") {
 
 //===----------------------------------------------------------------------===//
 
+protocol MyBoolean {
+  var boolValue : Bool { get }
+}
+
+extension Bool : MyBoolean {
+  var boolValue : Bool { return self }
+}
+
 // The protocol should be defined in the standard library, otherwise the cast
 // does not work.
-typealias P1 = Boolean
+typealias P1 = MyBoolean
 typealias P2 = CustomStringConvertible
 protocol Q1 {}
 
 // A small struct that can be stored inline in an opaque buffer.
-struct StructConformsToP1 : Boolean, Q1 {
+struct StructConformsToP1 : MyBoolean, Q1 {
   var boolValue: Bool {
     return true
   }
 }
 
 // A small struct that can be stored inline in an opaque buffer.
-struct Struct2ConformsToP1<T : Boolean> : Boolean, Q1 {
+struct Struct2ConformsToP1<T : MyBoolean> : MyBoolean, Q1 {
   init(_ value: T) {
     self.value = value
   }
@@ -135,13 +143,13 @@ struct Struct4ConformsToP2<T : CustomStringConvertible> : CustomStringConvertibl
 
 struct StructDoesNotConformToP1 : Q1 {}
 
-class ClassConformsToP1 : Boolean, Q1 {
+class ClassConformsToP1 : MyBoolean, Q1 {
   var boolValue: Bool {
     return true
   }
 }
 
-class Class2ConformsToP1<T : Boolean> : Boolean, Q1 {
+class Class2ConformsToP1<T : MyBoolean> : MyBoolean, Q1 {
   init(_ value: T) {
     self.value = [value]
   }

@@ -264,23 +264,22 @@ public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
 @_versioned
 @_transparent
 @_semantics("branchhint")
-internal func _branchHint<C : Boolean>(_ actual: C, expected: Bool)
-  -> Bool {
-  return Bool(Builtin.int_expect_Int1(actual.boolValue._value, expected._value))
+internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
+  return Bool(Builtin.int_expect_Int1(actual._value, expected._value))
 }
 
 /// Optimizer hint that `x` is expected to be `true`.
 @_transparent
 @_semantics("fastpath")
-public func _fastPath<C: Boolean>(_ x: C) -> Bool {
-  return _branchHint(x.boolValue, expected: true)
+public func _fastPath(_ x: Bool) -> Bool {
+  return _branchHint(x, expected: true)
 }
 
 /// Optimizer hint that `x` is expected to be `false`.
 @_transparent
 @_semantics("slowpath")
-public func _slowPath<C : Boolean>(_ x: C) -> Bool {
-  return _branchHint(x.boolValue, expected: false)
+public func _slowPath(_ x: Bool) -> Bool {
+  return _branchHint(x, expected: false)
 }
 
 /// Optimizer hint that the code where this function is called is on the fast
