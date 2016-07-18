@@ -266,15 +266,15 @@ _UnimplementedError()
 //===----------------------------------------------------------------------===//
 
 func testBitwiseOperationsImpl<T : UnsignedInteger>(_: T.Type) {
-  var x = numericCast(0b11_1010_00) as T
-  var y = numericCast(0b10_1100_10) as T
+  let x = numericCast(0b11_1010_00) as T
+  let y = numericCast(0b10_1100_10) as T
 
   expectEqual(0b10_1000_00, x & y)
   expectEqual(0b11_1110_10, x | y)
   expectEqual(0b01_0110_10, x ^ y)
   expectEqual(0b00_0101_11, (~x) & 0xff)
 
-  var z = T.allZeros
+  let z = T.allZeros
   expectEqual(x, x | z)
   expectEqual(x, x ^ z)
   expectEqual(z, x & z)
@@ -344,30 +344,14 @@ BoolTestSuite.test("init()") {
   expectFalse(v)
 }
 
-struct Booleanish : Boolean {
-  let boolValue: Bool
-}
-
-BoolTestSuite.test("init<T : Boolean>(_:)") {
-  do {
-    let v = Bool(Booleanish(boolValue: false))
-    expectFalse(v)
-  }
-  do {
-    let v = Bool(Booleanish(boolValue: true))
-    expectTrue(v)
-  }
-}
-
 BoolTestSuite.test("Boolean") {
   do {
     var v: Bool = false
-    expectIsBooleanType(&v)
-    expectFalse(v.boolValue)
+    expectFalse(v)
   }
   do {
     var v: Bool = true
-    expectTrue(v.boolValue)
+    expectTrue(v)
   }
 }
 

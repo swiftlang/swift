@@ -6,7 +6,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: %target-swift-frontend %s -parse -verify
+// RUN: not %target-swift-frontend %s -parse -verify
 
 // Issue found by https://github.com/jvasileff (John Vasileff)
 // This bug is NOT triggered when compiling with -O.
