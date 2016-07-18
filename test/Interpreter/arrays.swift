@@ -120,6 +120,25 @@ print("contig_arr2 != contig_arr3: \(contig_arr2 != contig_arr3)")
 print("contig_arr1 != contig_arr4: \(contig_arr1 != contig_arr4)")
 print("contig_arr1 == contig_arr4: \(contig_arr1 == contig_arr4)")
 
+// Check if slicing with incomplete ranges is equivalent to slicing
+// with complete ranges.
+
+let slice_nil_2_open   = arr1[..<2]
+let slice_0_2_open     = arr1[0..<2]
+
+let slice_nil_2_closed = arr1[...2]
+let slice_0_2_closed   = arr1[0...2]
+
+let slice_2_nil_open   = arr1[2..<]
+let slice_2_4_open     = arr1[2..<4]
+
+// CHECK: slice_nil_2_open == slice_0_2_open: true
+// CHECK-NEXT: slice_nil_2_closed == slice_0_2_closed: true
+// CHECK-NEXT: slice_2_nil_open == slice_2_4_open: true
+print("slice_nil_2_open == slice_0_2_open: \(slice_nil_2_open == slice_0_2_open)")
+print("slice_nil_2_closed == slice_0_2_closed: \(slice_nil_2_closed == slice_0_2_closed)")
+print("slice_2_nil_open == slice_2_4_open: \(slice_2_nil_open == slice_2_4_open)")
+
 // <rdar://problem/16950035>
 protocol Runcible {}
 class Spoon: Runcible {

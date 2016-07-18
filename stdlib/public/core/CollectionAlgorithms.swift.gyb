@@ -530,6 +530,36 @@ ${subscriptCommentPost}
     }
 %   end
   }
+
+  public subscript(bounds: IncompleteRange<Index>) -> SubSequence {
+    get {
+      return self[
+        bounds.completed(by: Range(uncheckedBounds: (startIndex, endIndex)))
+      ]
+    }
+%   if 'Mutable' in Self:
+    set {
+      self[
+        bounds.completed(by: Range(uncheckedBounds: (startIndex, endIndex)))
+      ] = newValue
+    }
+%   end
+  }
+
+  public subscript(bounds: IncompleteClosedRange<Index>) -> SubSequence {
+    get {
+      return self[
+        bounds.completed(by: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
+      ]
+    }
+%   if 'Mutable' in Self:
+    set {
+      self[
+        bounds.completed(by: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
+      ] = newValue
+    }
+%   end
+  }
 }
 
 // WORKAROUND rdar://25214066 - should be on Collection
