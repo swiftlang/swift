@@ -557,6 +557,8 @@ public func ~= <T : Equatable>(a: T, b: T) -> Bool {
 // Standard postfix operators.
 postfix operator ++ {}
 postfix operator -- {}
+postfix operator ..< {}
+postfix operator ... {}
 
 // Optional<T> unwrapping operator is built into the compiler as a part of
 // postfix expression grammar.
@@ -570,6 +572,8 @@ prefix operator ! {}
 prefix operator ~ {}
 prefix operator + {}
 prefix operator - {}
+prefix operator ..< {}
+prefix operator ... {}
 
 // Standard infix operators.
 
