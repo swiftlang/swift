@@ -49,8 +49,11 @@ public:
 
   const SILFunction &getFunction() const { return F; }
 
-  // Register a definiton of a given opened archetype.
-  void addOpenedArchetypeDef(Type archetype, SILValue Def);
+  void addOpenedArchetypeDef(Type archetype, SILValue Def) {
+    assert(!getOpenedArchetypeDef(archetype) &&
+           "There can be only one definition of an opened archetype");
+    OpenedArchetypeDefs[archetype] = Def;
+  }
 
   void removeOpenedArchetypeDef(Type archetype, SILValue Def) {
     auto FoundDef = getOpenedArchetypeDef(archetype);
