@@ -32,6 +32,24 @@ func ==(a: KnownUnbridged, b: KnownUnbridged) -> Bool {
   return a.x === b.x && a.y === b.y
 }
 
+struct KnownUnbridgedWithDescription: CustomStringConvertible,
+                                      CustomDebugStringConvertible {
+  var x, y: LifetimeTracked
+
+  init() {
+    x = LifetimeTracked(17)
+    y = LifetimeTracked(38)
+  }
+
+  var description: String {
+    return "\(x)\(y), baby, hey"
+  }
+
+  var debugDescription: String {
+    return "KnownUnbridgedWithDescription(\"\(x)\(y)\" /* baby, hey */)"
+  }
+}
+
 func bridgedObjectPreservesIdentity(original: LifetimeTracked,
                                     bridged: AnyObject) {
   expectTrue(original === bridged)
@@ -114,5 +132,15 @@ BridgeAnything.test("${testName}") {
   expectEqual(0, LifetimeTracked.instances)
 }
 % end
+
+BridgeAnything.test("description of boxed values") {
+  for x in [KnownUnbridged(), KnownUnbridgedWithDescription()] as [Any] {
+    let summary = String(reflecting: x)
+    expectEqual(summary, _bridgeAnythingToObjectiveC(x).description)
+    expectEqual(summary, _bridgeAnythingToObjectiveC(x).debugDescription)
+  }
+
+  expectEqual(0, LifetimeTracked.instances)
+}
 
 runAllTests()
