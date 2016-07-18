@@ -116,7 +116,7 @@ public struct _StringBuffer {
         input.makeIterator(),
         from: encoding, to: UTF32.self,
         stoppingOnError: true,
-        into: sink)
+        sendingOutputTo: sink)
       _sanityCheck(!hadError, "string cannot be ASCII if there were decoding errors")
       return (result, hadError)
     }
@@ -130,7 +130,7 @@ public struct _StringBuffer {
         input.makeIterator(),
         from: encoding, to: UTF16.self,
         stoppingOnError: !repairIllFormedSequences,
-        into: sink)
+        sendingOutputTo: sink)
       return (result, hadError)
     }
   }

@@ -44,7 +44,7 @@ for i in 1..<1000 {
     };
 }
 
-let six = (1..<3).reduce(0, +);
+let six = (1..<3).reduce(0, combine: +);
 
 func lessThanTwo(input: UInt) -> Bool {
     switch input {

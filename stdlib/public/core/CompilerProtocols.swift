@@ -431,7 +431,7 @@ public protocol ExpressibleByStringLiteral
 /// array as a parameter:
 ///
 ///     func sum(values: [Int]) -> Int {
-///         return values.reduce(0, +)
+///         return values.reduce(0, combine: +)
 ///     }
 ///
 ///     let sumOfFour = sum([5, 10, 15, 20])

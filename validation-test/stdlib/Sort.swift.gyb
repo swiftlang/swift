@@ -99,7 +99,7 @@ class OffsetCollection : MutableCollection, RandomAccessCollection {
 %   for p in withPredicateValues:
 // workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %     comparePredicate = "<" if p else ""
-%     commaComparePredicate = ", by: <" if p else ""
+%     commaComparePredicate = ", isOrderedBefore: <" if p else ""
 %     name = "lessPredicate" if p else "noPredicate"
 
 Algorithm.test("${t}/sorted/${name}") {
@@ -110,7 +110,7 @@ Algorithm.test("${t}/sorted/${name}") {
 
   // Similar test for sorting with predicate
 %       if comparePredicate:
-  sortedAry1 = ary.sorted(by: ${comparePredicate})
+  sortedAry1 = ary.sorted(isOrderedBefore: ${comparePredicate})
 %       else:
   sortedAry1 = ary.sorted()
 %       end

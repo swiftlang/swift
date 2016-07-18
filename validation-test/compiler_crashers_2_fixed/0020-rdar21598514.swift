@@ -116,10 +116,10 @@ extension LoggingSequenceType {
   }
 
   public func filter(
-    @noescape isIncluded: (Base.Iterator.Element) -> Bool
+    @noescape includeElement: (Base.Iterator.Element) -> Bool
   ) -> [Base.Iterator.Element] {
     ++SequenceLog.filter[selfType]
-    return base.filter(isIncluded)
+    return base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
