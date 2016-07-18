@@ -587,6 +587,89 @@ public func ..< <Bound>(
   return CountableRange(uncheckedBounds: (lower: minimum, upper: maximum))
 }
 
+% for (Closed, Op) in [('', '..<'), ('Closed', '...')]:
+/// A `${Closed}Range` which may not have all of its bounds specified.
+/// The `Incomplete${Closed}Range` can be completed by providing a 
+/// `${Closed}Range` or `Countable${Closed}Range` from which it can retrieve 
+/// default upper and lower bounds.
+@_fixed_layout
+public struct Incomplete${Closed}Range<
+  Bound : Comparable
+> {
+  /// The lowest value within the range. 
+  /// If `nil`, completing the range will adopt the default value's 
+  /// `lowerBound`.
+  public let lowerBound: Bound?
+% if Closed == 'Closed':
+  /// The highest value within the range.
+% else:
+  /// The value just above the highest value within the range.
+% end
+  /// If `nil`, completing the range will adopt the default value's 
+  /// `upperBound`.
+  public let upperBound: Bound?
+  
+  internal init(_bounds bounds: (lower: Bound?, upper: Bound?)) {
+    lowerBound = bounds.lower
+    upperBound = bounds.upper
+  }
+}
+
+% for Countable in ['', 'Countable']:
+extension Incomplete${Closed}Range 
+% if Countable == 'Countable':
+  where
+    // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+    Bound : protocol<_Strideable, Comparable>,
+    Bound.Stride : SignedInteger {
+% else:
+  {
+% end
+% for Unchecked in ['', 'Unchecked']:
+  /// Returns a `${Countable}${Closed}Range` with the same `upperBound` 
+  /// and `lowerBound` as the current instance. `nil` bounds are 
+  /// filled in from `defaultBounds`.
+  /// 
+  /// This method does not check whether `lowerBound` and `upperBound` 
+  /// lie within `defaultBounds`. 
+% if Unchecked == 'Unchecked':
+  /// Nor does it check whether the resulting `lowerBound` is below 
+  /// its `upperBound`.
+% end
+  public func completed(by${Unchecked} defaultBounds: ${Countable}${Closed}Range<Bound>) -> ${Countable}${Closed}Range<Bound> {
+    let lower = lowerBound ?? defaultBounds.lowerBound
+    let upper = upperBound ?? defaultBounds.upperBound
+%   if Unchecked == 'Unchecked':
+    return .init(uncheckedBounds: (lower: lower, upper: upper))
+%   else:
+    return lower ${Op} upper
+%   end
+  }
+% end
+}
+% end
+
+/// Constructs an `Incomplete${Closed}Range` with the provided upper 
+/// bound and an unknown lower bound.
+public prefix func ${Op} <Bound: Comparable>(upperBound: Bound) -> Incomplete${Closed}Range<Bound> {
+  return .init(_bounds: (lower: nil, upper: upperBound))
+}
+
+/// Constructs an `Incomplete${Closed}Range` with the provided lower 
+/// bound and an unknown upper bound.
+public postfix func ${Op} <Bound: Comparable>(lowerBound: Bound) -> Incomplete${Closed}Range<Bound> {
+  return .init(_bounds: (lower: lowerBound, upper: nil))
+}
+
+/// Constructs an `Incomplete${Closed}Range` with the provided upper 
+/// and lower bounds. Either or both may be `nil`, in which case the 
+/// bound will be provided when the `Incomplete${Closed}Range` is 
+/// completed.
+public func ${Op} <Bound: Comparable>(lowerBound: Bound?, upperBound: Bound?) -> Incomplete${Closed}Range<Bound> {
+  return .init(_bounds: (lower: lowerBound, upper: upperBound))
+}
+% end
+
 // swift-3-indexing-model: this is not really a proper rename
 @available(*, unavailable, renamed: "IndexingIterator")
 public struct RangeGenerator<Bound> {}
