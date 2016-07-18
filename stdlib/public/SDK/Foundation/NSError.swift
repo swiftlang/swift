@@ -451,7 +451,7 @@ public extension _BridgedStoredNSError {
       guard let stringKey = key as? String else { continue }
       result[stringKey] = value
     }
-    return result;
+    return result
   }
 }
 
