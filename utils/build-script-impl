@@ -628,8 +628,6 @@ function set_build_options_for_host() {
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
-                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
-                -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
@@ -674,6 +672,11 @@ function set_build_options_for_host() {
             exit 1
             ;;
     esac
+
+    llvm_cmake_options+=(
+        -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+        -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+    )
 
     if [[ "${llvm_target_arch}" ]] ; then
         llvm_cmake_options+=(
