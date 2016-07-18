@@ -104,11 +104,24 @@ class TestUserInfo : TestUserInfoSuper {
     func notification(_ notif: Notification) {
         posted = notif
     }
+
+    // MARK: -
+    func test_classForCoder() {
+        // confirm internal bridged impl types are not exposed to archival machinery
+        // we have to be circuitous here, as bridging makes it very difficult to confirm this
+        let note = Notification(name: Notification.Name(rawValue: "TestSwiftNotification"), userInfo: ["key":"value"])
+        let archivedNote = NSKeyedArchiver.archivedData(withRootObject: note)
+        let noteAsPlist = try! PropertyListSerialization.propertyList(from: archivedNote, options: [], format: nil)
+        let plistAsData = try! PropertyListSerialization.data(fromPropertyList: noteAsPlist, format: .xml, options: 0)
+        let xml = NSString(data: plistAsData, encoding: String.Encoding.utf8.rawValue)!
+        expectEqual(xml.range(of: "_NSUserInfoDictionary").location, NSNotFound)
+    }
 }
 
 #if !FOUNDATION_XCTEST
 var UserInfoTests = TestSuite("UserInfo")
 UserInfoTests.test("test_userInfoPost") { TestUserInfo().test_userInfoPost() }
 UserInfoTests.test("test_equality") { TestUserInfo().test_equality() }
+UserInfoTests.test("test_classForCoder") { TestUserInfo().test_classForCoder() }
 runAllTests()
 #endif

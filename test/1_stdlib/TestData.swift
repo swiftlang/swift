@@ -817,6 +817,16 @@ class TestData : TestDataSuper {
         }
     }
     
+
+    // MARK: -
+    func test_classForCoder() {
+        // confirm internal bridged impl types are not exposed to archival machinery
+        let d = Data() as NSData
+        let expected: AnyClass = NSData.self as AnyClass
+        expectTrue(d.classForCoder == expected)
+        expectTrue(d.classForArchiver == expected)
+        expectTrue(d.classForKeyedArchiver == expected)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -856,6 +866,7 @@ DataTests.test("test_basicMutableDataMutation") { TestData().test_basicMutableDa
 DataTests.test("test_roundTrip") { TestData().test_roundTrip() }
 DataTests.test("test_passing") { TestData().test_passing() }
 DataTests.test("test_bufferSizeCalculation") { TestData().test_bufferSizeCalculation() }
+DataTests.test("test_classForCoder") { TestData().test_classForCoder() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

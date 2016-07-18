@@ -143,6 +143,16 @@ class TestCharacterSet : TestCharacterSetSuper {
         result = string.components(separatedBy: set)
         expectEqual(2, result.count)
     }
+
+    // MARK: -
+    func test_classForCoder() {
+        // confirm internal bridged impl types are not exposed to archival machinery
+        let cs = CharacterSet() as NSCharacterSet
+        let expected: AnyClass = NSCharacterSet.self as AnyClass
+        expectTrue(cs.classForCoder == expected)
+        expectTrue(cs.classForArchiver == expected)
+        expectTrue(cs.classForKeyedArchiver == expected)
+    }
 }
 
 
@@ -155,6 +165,7 @@ CharacterSetTests.test("testMutability_SR_1782") { TestCharacterSet().testMutabi
 CharacterSetTests.test("testRanges") { TestCharacterSet().testRanges() }
 CharacterSetTests.test("testInsertAndRemove") { TestCharacterSet().testInsertAndRemove() }
 CharacterSetTests.test("testBasics") { TestCharacterSet().testBasics() }
+CharacterSetTests.test("test_classForCoder") { TestCharacterSet().test_classForCoder() }
 runAllTests()
 #endif
 
