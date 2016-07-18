@@ -751,10 +751,6 @@ public:
   /// parameter replaced. Only makes sense for function members of types.
   Type replaceSelfParameterType(Type newSelf);
 
-  /// Returns a function type that is not 'noreturn', but is otherwise the same
-  /// as this type.
-  Type getWithoutNoReturn(unsigned UncurryLevel);
-
   /// getRValueType - For an @lvalue type, retrieves the underlying object type.
   /// Otherwise, returns the type itself.
   Type getRValueType();
