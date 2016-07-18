@@ -19,6 +19,9 @@ from string import maketrans, capitalize
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
+# FIXME(integers): change it to use all_integer_types
+fixedBitWidths = [8, 16, 32, 64]
+
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
 IntLiteral = 'Int%s' % builtinIntLiteralBits
@@ -727,3 +730,195 @@ extension SignedInteger_ where Self : FixedWidthInteger {
     return -1 &<< Self._highBitIndex
   }
 }
+
+
+//===----------------------------------------------------------------------===//
+//===--- Concrete FixedWidthIntegers --------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+% for bits in fixedBitWidths:
+%   for signed in True, False:
+%     Self = ('Int%d_' if signed else 'UInt%d_') % bits
+%     Unsigned = 'Signed' if signed else 'Unsigned'
+%     u = 's' if signed else 'u'
+%     U = 'U' if signed else ''
+%     z = 's' if signed else 'z'
+public struct ${Self}
+  : FixedWidthInteger, ${Unsigned}Integer_,
+    _ExpressibleByBuiltinIntegerLiteral {
+
+  @_transparent
+  public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
+    _storage = Builtin.truncOrBitCast_${IntLiteral}_Int${bits}(x)
+    Builtin.condfail(
+      Builtin.cmp_ne_${IntLiteral}(
+        Builtin.${z}extOrBitCast_Int${bits}_${IntLiteral}(
+          _storage), x))
+  }
+
+  @_transparent
+  public init(bitPattern x: ${U}Int${bits}_) {
+    _storage = x._storage
+  }
+
+  public func isEqual(to rhs: ${Self}) -> Bool {
+    return Bool(Builtin.cmp_eq_Int${bits}(_storage, rhs._storage))
+  }
+
+  public func isLess(than rhs: ${Self}) -> Bool {
+    return Bool(Builtin.cmp_${u}lt_Int${bits}(_storage, rhs._storage))
+  }
+
+%       for x in [op for ops in binaryArithmetic.values() for op in ops]:
+%         callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
+  /// Return a pair consisting of `self` ${x.operator} `rhs`,
+  /// truncated to fit if necessary, and a flag indicating whether an
+  /// arithmetic overflow occurred.
+  @_transparent
+  public func ${x.name}WithOverflow(
+    ${x.firstArg} rhs: ${Self}
+  ) -> (partialValue: ${Self}, overflow: ArithmeticOverflow) {
+
+%         if x.kind == '/':
+    // No LLVM primitives for checking overflow of division
+    // operations, so we check manually.
+    if _slowPath(
+      rhs == 0
+      ${'|| self == %s.min && rhs == -1' % Self if signed else ''}
+    ) {
+      return (partialValue: self, overflow: .overflow)
+    }
+
+    let (newStorage, overflow) = (
+      Builtin.${u}${x.llvmName}_Int${bits}(self._storage, rhs._storage),
+      false._value)
+
+%         else:
+
+    let (newStorage, overflow)
+    = Builtin.${u}${x.llvmName}_with_overflow_Int${bits}(
+      self._storage, rhs._storage, false._value)
+%         end
+
+    return (
+      partialValue: ${Self}(newStorage),
+      overflow: ArithmeticOverflow(Bool(overflow)))
+  }
+%       end
+
+  @_transparent
+  public init(_ _storage: Builtin.Int${bits}) {
+    self._storage = _storage
+  }
+
+% for x in binaryBitwise:
+  @_transparent
+  public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
+    return ${Self}(
+      Builtin.${x.llvmName}_Int${bits}(self._storage, rhs._storage))
+  }
+% end
+
+% for x in maskingShifts:
+  @_transparent
+  public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
+    let rhs_ = rhs & ${Self}._highBitIndex
+    return ${Self}(
+      Builtin.${x.llvmName(signed)}_Int${bits}(self._storage, rhs_._storage))
+  }
+% end
+
+  @_transparent
+  public static var bitWidth : Int { return ${bits} }
+
+  public var bitWidth: Int { return ${bits} }
+
+  @_transparent
+  public var minimumSignedRepresentationBitWidth: Int {
+% if signed:
+    let x = self < 0 ? ~self : self
+    return (x == 0) ? 1 : (${Self}.bitWidth - x.leadingZeros + 1)
+% else:
+    return (self == 0) ? 1 : (${Self}.bitWidth - self.leadingZeros + 1)
+% end
+  }
+
+
+  @_transparent
+  public var leadingZeros: Int {
+    fatalError()
+    // FIXME(integers): uncomment when Int conforms to Integer
+    //return Int(
+      //${Self}(
+        //Builtin.int_ctlz_Int${bits}(self._storage, false._value)
+      //)._lowUWord._storage)
+  }
+
+  @_transparent
+  public func word(at n: Int) -> UInt {
+    fatalError()
+    // FIXME(integers): uncomment when Int conforms to Integer
+    /*_precondition(n >= 0, "Negative word index")*/
+    /*if _fastPath(n < countRepresentedWords) {*/
+      /*let shift = UInt(n._storage) &* ${word_bits}*/
+      /*let bitWidth = UInt(self.bitWidth._storage)*/
+      /*_sanityCheck(shift < bitWidth)*/
+      /*return (self &>> ${Self}(_truncatingBits: shift))._lowUWord*/
+    /*}*/
+    /*return self < 0 ? ~0 : 0*/
+  }
+
+
+  @_transparent
+  public // transparent
+  var _lowUWord: UInt {
+    % truncOrExt = z + 'ext' if bits <= word_bits else 'trunc'
+    return UInt(
+      Builtin.${truncOrExt}OrBitCast_Int${bits}_Int${word_bits}(_storage)
+    )
+  }
+
+  @_transparent
+  public // transparent
+  init(_truncatingBits bits: UInt) {
+    // FIXME(integers): uncomment when Int conforms to Integer
+    fatalError()
+    /*% truncOrExt = 'zext' if bits > word_bits else 'trunc'*/
+    /*self.init(*/
+      /*Builtin.${truncOrExt}OrBitCast_Int${word_bits}_Int${bits}(bits._storage))*/
+  }
+
+% if signed:
+  @_transparent
+  public var magnitude: U${Self} {
+    let base = U${Self}(_storage)
+    return self < 0 ? ~base + 1 : base
+  }
+% end
+
+%     dbits = bits*2
+  public static func doubleWidthMultiply(_ self_: ${Self}, _ other: ${Self})
+    -> (high: ${Self}, low: ${Self}.Magnitude) {
+%       if bits > 64:
+    fatalError("${bits}-bit integer multiplication is not supported")
+%       else:
+    // FIXME(integers): uncomment when Int conforms to Integer
+    fatalError()
+    /*let lhs = Builtin.${z}ext_Int${bits}_Int${dbits}(self_._storage)*/
+    /*let rhs = Builtin.${z}ext_Int${bits}_Int${dbits}(other._storage)*/
+
+    /*let res = Builtin.mul_Int${dbits}(lhs, rhs)*/
+    /*let low = ${Self}.Magnitude(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(res))*/
+    /*let shift: UInt8 = ${bits}*/
+    /*let shifted = Builtin.ashr_Int${dbits}(res,*/
+      /*Builtin.zextOrBitCast_Int8_Int${dbits}(shift._storage))*/
+    /*let high = ${Self}(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(shifted))*/
+    /*return (high: high, low: low)*/
+%       end
+  }
+
+  public var _storage: Builtin.Int${bits}
+}
+
+%   end
+% end
