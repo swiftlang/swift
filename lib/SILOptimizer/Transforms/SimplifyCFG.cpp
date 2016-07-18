@@ -2121,18 +2121,22 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
     // execute the cond_fail speculatively.
     if (!Pred->getSingleSuccessor())
       return false;
-    
+
+    // If we already found a constant pred, we do not need to check the incoming
+    // value to see if it is constant. We are already going to perform the
+    // optimization.
+    if (somePredsAreConst)
+      continue;
+
     SILValue incoming = condArg->getIncomingValue(Pred);
-    if (isa<IntegerLiteralInst>(incoming)) {
-      somePredsAreConst = true;
-      break;
-    }
+    somePredsAreConst |= isa<IntegerLiteralInst>(incoming);
   }
+
   if (!somePredsAreConst)
     return false;
-  
+
   DEBUG(llvm::dbgs() << "move to predecessors: " << *CFI);
-  
+
   // Move the cond_fail to the predecessor blocks.
   for (auto *Pred : BB->getPreds()) {
     SILValue incoming = condArg->getIncomingValue(Pred);
@@ -3504,6 +3508,22 @@ public:
   StringRef getName() override { return "SROA BB Arguments"; }
 };
 
+// Used to test tryMoveCondFailToPreds with sil-opt
+class MoveCondFailToPreds : public SILFunctionTransform {
+public:
+  MoveCondFailToPreds() {}
+  void run() override {
+    for (auto &BB : *getFunction()) {
+      if (tryMoveCondFailToPreds(&BB)) {
+        invalidateAnalysis(
+            SILAnalysis::InvalidationKind::BranchesAndInstructions);
+      }
+    }
+  }
+
+  StringRef getName() override { return "Move Cond Fail To Preds"; }
+};
+
 } // End anonymous namespace.
 
 /// Splits all critical edges in a function.
@@ -3522,4 +3542,9 @@ SILTransform *swift::createSROABBArgs() { return new SROABBArgs(); }
 // Simplifies basic block arguments.
 SILTransform *swift::createSimplifyBBArgs() {
   return new SimplifyBBArgs();
+}
+
+// Moves cond_fail instructions to predecessors.
+SILTransform *swift::createMoveCondFailToPreds() {
+  return new MoveCondFailToPreds();
 }
