@@ -108,7 +108,8 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
 extension Bool {
   // This is a magic entry point known to the compiler.
   @_transparent
-  public func _getBuiltinLogicValue() -> Builtin.Int1 {
+  public // COMPILER_INTRINSIC
+  func _getBuiltinLogicValue() -> Builtin.Int1 {
     return _value
   }
 }
