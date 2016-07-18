@@ -107,7 +107,7 @@ var _seenExpectCrash = false
 /// Run `body` and expect a failure to happen.
 ///
 /// The check passes iff `body` triggers one or more failures.
-public func expectFailure(${TRACE}, body: () -> Void) {
+public func expectFailure(${TRACE}, invoking body: () -> Void) {
   let startAnyExpectFailed = _anyExpectFailed
   _anyExpectFailed = false
   body()
@@ -2244,7 +2244,7 @@ public func expectEqualSequence<
 ) where
   Expected.Iterator.Element == Actual.Iterator.Element {
 
-  if !expected.elementsEqual(actual, isEquivalent: sameValue) {
+  if !expected.elementsEqual(actual, by: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
@@ -2262,9 +2262,9 @@ public func expectEqualsUnordered<
   Expected.Iterator.Element == Actual.Iterator.Element {
   
   let x: [Expected.Iterator.Element] =
-    expected.sorted(isOrderedBefore: compose(compare, { $0.isLT() }))
+    expected.sorted(by: compose(compare, { $0.isLT() }))
   let y: [Actual.Iterator.Element] =
-    actual.sorted(isOrderedBefore: compose(compare, { $0.isLT() }))
+    actual.sorted(by: compose(compare, { $0.isLT() }))
   expectEqualSequence(
     x, y, ${trace}, sameValue: compose(compare, { $0.isEQ() }))
 }
@@ -2361,10 +2361,10 @@ public func expectEqualsUnordered<
   }
 
   let x: [(T, T)] =
-    expected.sorted(isOrderedBefore: comparePairLess)
+    expected.sorted(by: comparePairLess)
   let y: [(T, T)] =
     actual.map { ($0.0, $0.1) }
-      .sorted(isOrderedBefore: comparePairLess)
+      .sorted(by: comparePairLess)
 
   func comparePairEquals(_ lhs: (T, T), rhs: (key: T, value: T)) -> Bool {
     return lhs.0 == rhs.0 && lhs.1 == rhs.1

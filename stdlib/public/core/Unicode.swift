@@ -121,7 +121,7 @@ public protocol UnicodeCodec {
   /// fermata in UTF-8:
   ///
   ///     var bytes: [UTF8.CodeUnit] = []
-  ///     UTF8.encode("𝄐", sendingOutputTo: { bytes.append($0) })
+  ///     UTF8.encode("𝄐", into: { bytes.append($0) })
   ///     print(bytes)
   ///     // Prints "[240, 157, 132, 144]"
   ///
@@ -131,7 +131,7 @@ public protocol UnicodeCodec {
   ///     time.
   static func encode(
     _ input: UnicodeScalar,
-    sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: @noescape (CodeUnit) -> Void
   )
 
   /// Searches for the first occurrence of a `CodeUnit` that is equal to 0.
@@ -364,7 +364,7 @@ public struct UTF8 : UnicodeCodec {
   /// representation. The following code encodes a fermata in UTF-8:
   ///
   ///     var bytes: [UTF8.CodeUnit] = []
-  ///     UTF8.encode("𝄐", sendingOutputTo: { bytes.append($0) })
+  ///     UTF8.encode("𝄐", into: { bytes.append($0) })
   ///     print(bytes)
   ///     // Prints "[240, 157, 132, 144]"
   ///
@@ -374,7 +374,7 @@ public struct UTF8 : UnicodeCodec {
   ///     time.
   public static func encode(
     _ input: UnicodeScalar,
-    sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: @noescape (CodeUnit) -> Void
   ) {
     var c = UInt32(input)
     var buf3 = UInt8(c & 0xFF)
@@ -555,7 +555,7 @@ public struct UTF16 : UnicodeCodec {
   /// representation. The following code encodes a fermata in UTF-16:
   ///
   ///     var codeUnits: [UTF16.CodeUnit] = []
-  ///     UTF16.encode("𝄐", sendingOutputTo: { codeUnits.append($0) })
+  ///     UTF16.encode("𝄐", into: { codeUnits.append($0) })
   ///     print(codeUnits)
   ///     // Prints "[55348, 56592]"
   ///
@@ -565,7 +565,7 @@ public struct UTF16 : UnicodeCodec {
   ///     time.
   public static func encode(
     _ input: UnicodeScalar,
-    sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: @noescape (CodeUnit) -> Void
   ) {
     let scalarValue: UInt32 = UInt32(input)
 
@@ -655,7 +655,7 @@ public struct UTF32 : UnicodeCodec {
   /// encodes a fermata in UTF-32:
   ///
   ///     var codeUnit: UTF32.CodeUnit = 0
-  ///     UTF32.encode("𝄐", sendingOutputTo: { codeUnit = $0 })
+  ///     UTF32.encode("𝄐", into: { codeUnit = $0 })
   ///     print(codeUnit)
   ///     // Prints "119056"
   ///
@@ -665,7 +665,7 @@ public struct UTF32 : UnicodeCodec {
   ///     time.
   public static func encode(
     _ input: UnicodeScalar,
-    sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: @noescape (CodeUnit) -> Void
   ) {
     processCodeUnit(UInt32(input))
   }
@@ -685,7 +685,7 @@ public struct UTF32 : UnicodeCodec {
 ///     var codeUnits: [UTF32.CodeUnit] = []
 ///     let sink = { codeUnits.append($0) }
 ///     transcode(bytes.makeIterator(), from: UTF8.self, to: UTF32.self,
-///               stoppingOnError: false, sendingOutputTo: sink)
+///               stoppingOnError: false, into: sink)
 ///     print(codeUnits)
 ///     // Prints "[70, 101, 114, 109, 97, 116, 97, 32, 119056]"
 ///
@@ -711,7 +711,7 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
   from inputEncoding: InputEncoding.Type,
   to outputEncoding: OutputEncoding.Type,
   stoppingOnError stopOnError: Bool,
-  sendingOutputTo processCodeUnit: @noescape (OutputEncoding.CodeUnit) -> Void
+  into processCodeUnit: @noescape (OutputEncoding.CodeUnit) -> Void
 ) -> Bool
   where
   Input : IteratorProtocol,
@@ -730,7 +730,7 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
   while true {
     switch inputDecoder.decode(&input) {
     case .scalarValue(let us):
-      OutputEncoding.encode(us, sendingOutputTo: processCodeUnit)
+      OutputEncoding.encode(us, into: processCodeUnit)
     case .emptyInput:
       break loop
     case .error:
@@ -738,7 +738,7 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
       if stopOnError {
         break loop
       }
-      OutputEncoding.encode("\u{fffd}", sendingOutputTo: processCodeUnit)
+      OutputEncoding.encode("\u{fffd}", into: processCodeUnit)
     }
   }
   return hadError
@@ -1133,7 +1133,7 @@ extension UnicodeCodec {
 @available(*, unavailable, renamed: "UnicodeCodec")
 public typealias UnicodeCodecType = UnicodeCodec
 
-@available(*, unavailable, message: "use 'transcode(_:from:to:stoppingOnError:sendingOutputTo:)'")
+@available(*, unavailable, message: "use 'transcode(_:from:to:stoppingOnError:into:)'")
 public func transcode<Input, InputEncoding, OutputEncoding>(
   _ inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
   _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,

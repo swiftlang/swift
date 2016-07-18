@@ -101,7 +101,7 @@ class NonContiguousNSString : NSString {
       from: UTF32.self,
       to: UTF16.self,
       stoppingOnError: true,
-      sendingOutputTo: output)
+      into: output)
     expectFalse(hadError)
     self.init(encoded)
   }
