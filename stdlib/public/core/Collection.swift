@@ -1484,17 +1484,15 @@ extension Collection {
   /// that was originally separated by one or more spaces.
   ///
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.characters.split(whereSeparator: { $0 == " " })
+  ///     print(line.characters.split(isSeparator: { $0 == " " })
   ///                          .map(String.init))
   ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
   ///
-  ///     print(
-  ///         line.characters.split(
-  ///             maxSplits: 1, whereSeparator: { $0 == " " }
-  ///             ).map(String.init))
+  ///     print(line.characters.split(maxSplits: 1, isSeparator: { $0 == " " })
+  ///                           .map(String.init))
   ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
   ///
   /// The final example passes `false` for the `omittingEmptySubsequences`
@@ -1525,7 +1523,7 @@ extension Collection {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     // TODO: swift-3-indexing-model - review the following
     _precondition(maxSplits >= 0, "Must take zero or more splits")
@@ -1626,7 +1624,7 @@ extension Collection where Iterator.Element : Equatable {
     return split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      whereSeparator: { $0 == separator })
+      isSeparator: { $0 == separator })
   }
 }
 
@@ -1721,11 +1719,11 @@ extension Collection {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, message: "Please use split(maxSplits:omittingEmptySubsequences:whereSeparator:) instead")
+  @available(*, unavailable, message: "Please use split(maxSplits:omittingEmptySubsequences:isSeparator:) instead")
   public func split(
     _ maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
-    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
+    isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     Builtin.unreachable()
   }

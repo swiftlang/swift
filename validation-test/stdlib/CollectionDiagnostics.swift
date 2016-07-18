@@ -56,13 +56,13 @@ func sortResultIgnored<
   var array = array // expected-warning {{variable 'array' was never mutated; consider changing to 'let' constant}}
 
   sequence.sorted() // expected-warning {{result of call to 'sorted()' is unused}}
-  sequence.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted(by:)' is unused}}
+  sequence.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted(isOrderedBefore:)' is unused}}
 
   mutableCollection.sorted() // expected-warning {{result of call to 'sorted()' is unused}}
-  mutableCollection.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted(by:)' is unused}}
+  mutableCollection.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted(isOrderedBefore:)' is unused}}
 
   array.sorted() // expected-warning {{result of call to 'sorted()' is unused}}
-  array.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted(by:)' is unused}}
+  array.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted(isOrderedBefore:)' is unused}}
 }
 
 struct GoodIndexable : Indexable {

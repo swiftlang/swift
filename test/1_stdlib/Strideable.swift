@@ -66,14 +66,14 @@ StrideTestSuite.test("Double") {
     // Work on Doubles
     expectEqual(
       sum,
-      stride(from: start, to: end, by: stepSize).reduce(0.0, +))
+      stride(from: start, to: end, by: stepSize).reduce(0.0, combine: +))
   }
   
   func checkClosed(from start: Double, through end: Double, by stepSize: Double, sum: Double) {
     // Work on Doubles
     expectEqual(
       sum,
-      stride(from: start, through: end, by: stepSize).reduce(0.0, +))
+      stride(from: start, through: end, by: stepSize).reduce(0.0, combine: +))
   }
   
   checkOpen(from: 1.0, to: 15.0, by: 3.0, sum: 35.0)
@@ -104,8 +104,7 @@ StrideTestSuite.test("HalfOpen") {
     // Work on Ints
     expectEqual(
       sum,
-      stride(from: start, to: end, by: stepSize).reduce(
-        0, +))
+      stride(from: start, to: end, by: stepSize).reduce(0, combine: +))
 
     // Work on an arbitrary RandomAccessIndex
     expectEqual(
@@ -130,15 +129,12 @@ StrideTestSuite.test("Closed") {
     // Work on Ints
     expectEqual(
       sum,
-      stride(from: start, through: end, by: stepSize).reduce(
-        0, +))
+      stride(from: start, through: end, by: stepSize).reduce(0, combine: +))
 
     // Work on an arbitrary RandomAccessIndex
     expectEqual(
       sum,
-      stride(from: R(start), through: R(end), by: stepSize).reduce(
-        0, { $0 + $1.x })
-    )
+      stride(from: R(start), through: R(end), by: stepSize).reduce(0) { $0 + $1.x })
   }
   
   check(from: 1, through: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13

@@ -65,7 +65,7 @@ public func withOverriddenLocaleCurrentLocale<Result>(
 /// return-autoreleased optimization.)
 @inline(never)
 public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
-  invoking body: @noescape () -> Void
+  _ body: @noescape () -> Void
 ) {
 #if arch(i386) && (os(iOS) || os(watchOS))
   autoreleasepool(body)

@@ -376,7 +376,7 @@ internal struct _UnmanagedAnyObjectArray {
 ///     }
 ///     // Prints "We have 4 primes."
 ///
-///     let primesSum = primes.reduce(0, +)
+///     let primesSum = primes.reduce(0, combine: +)
 ///     // 'primesSum' == 17
 ///
 ///     let primeStrings = primes.sorted().map(String.init)
@@ -1501,7 +1501,7 @@ public func _setBridgeFromObjectiveCConditional<
 ///                               "triangular": [1, 3, 6, 10, 15, 21, 28],
 ///                               "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
 ///     for key in interestingNumbers.keys {
-///         interestingNumbers[key]?.sort(by: >)
+///         interestingNumbers[key]?.sort(isOrderedBefore: >)
 ///     }
 ///
 ///     print(interestingNumbers["primes"]!)
