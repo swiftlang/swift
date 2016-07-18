@@ -453,10 +453,6 @@ public struct AssertionResult : CustomStringConvertible {
     self._isPass = isPass
   }
 
-  public var boolValue: Bool {
-    return _isPass
-  }
-
   public func withDescription(_ description: String) -> AssertionResult {
     var result = self
     result.description += description
@@ -486,13 +482,13 @@ public func expectUnreachableCatch(_ error: Error, ${TRACE}) {
 }
 
 public func expectTrue(_ actual: AssertionResult, ${TRACE}) {
-  if !actual.boolValue {
+  if !actual._isPass {
     expectationFailure("expected: true", trace: ${trace})
   }
 }
 
 public func expectFalse(_ actual: AssertionResult, ${TRACE}) {
-  if actual.boolValue {
+  if actual._isPass {
     expectationFailure("expected: false", trace: ${trace})
   }
 }
