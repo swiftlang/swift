@@ -31,6 +31,10 @@
 #include "Private.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "stddef.h"
+#if SWIFT_OBJC_INTEROP
+#include "swift/Runtime/ObjCBridge.h"
+#include "SwiftValue.h"
+#endif
 
 #include <cstring>
 #include <type_traits>
@@ -2086,6 +2090,65 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
   return {false, payloadType};
 }
 
+#if SWIFT_OBJC_INTEROP
+/// Try to unbox a SwiftValue box to perform a dynamic cast.
+static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
+                                          OpaqueValue *src,
+                                          const Metadata *srcType,
+                                          const Metadata *targetType,
+                                          DynamicCastFlags flags) {
+  // Swift type should be AnyObject or a class type.
+  if (!srcType->isAnyClass()) {
+    auto existential = dyn_cast<ExistentialTypeMetadata>(srcType);
+    if (!existential ||
+        existential->Flags.getSpecialProtocol()
+          != SpecialProtocol::AnyObject)
+      return false;
+  }
+  
+  id srcObject;
+  memcpy(&srcObject, src, sizeof(id));
+  
+  // Do we have a SwiftValue?
+  SwiftValue *srcSwiftValue = getAsSwiftValue(srcObject);
+  if (!srcSwiftValue)
+    return false;
+  
+  // If so, extract the boxed value and try to cast it.
+  const Metadata *boxedType;
+  const OpaqueValue *boxedValue;
+  std::tie(boxedType, boxedValue)
+    = getValueFromSwiftValue(srcSwiftValue);
+  
+  // We can't touch the value from the box because it may be
+  // multiply-referenced.
+  // TODO: Check for uniqueness and consume if box is unique?
+  
+  // Does the boxed type exactly match the target type we're looking for?
+  if (boxedType == targetType) {
+    targetType->vw_initializeWithCopy(dest,
+                                      const_cast<OpaqueValue*>(boxedValue));
+    // Release the box if we need to.
+    if (flags & DynamicCastFlags::TakeOnSuccess)
+      objc_release((id)srcSwiftValue);
+    return true;
+  }
+  
+  // Maybe we can cast the boxed value to our destination type somehow.
+  auto innerFlags = flags - DynamicCastFlags::TakeOnSuccess
+                          - DynamicCastFlags::DestroyOnFailure;
+  if (swift_dynamicCast(dest, const_cast<OpaqueValue*>(boxedValue),
+                        boxedType, targetType, innerFlags)) {
+    // Release the box if we need to.
+    if (flags & DynamicCastFlags::TakeOnSuccess)
+      objc_release((id)srcSwiftValue);
+    return true;
+  }
+  
+  return false;
+}
+#endif
+
 /// Perform a dynamic cast to an arbitrary type.
 SWIFT_RT_ENTRY_VISIBILITY
 bool swift::swift_dynamicCast(OpaqueValue *dest,
@@ -2231,13 +2294,23 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
         return true;
       }
 #endif
+      SWIFT_FALLTHROUGH;
+    }
+
+    case MetadataKind::Existential: {
+#if SWIFT_OBJC_INTEROP
+      // A class or AnyObject reference may point at a boxed SwiftValue.
+      if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,
+                                        targetType, flags)) {
+        return true;
+      }
+#endif
       break;
     }
 
+    case MetadataKind::ExistentialMetatype:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
-    case MetadataKind::Existential:
-    case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
@@ -2549,7 +2622,7 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
     if (consume) {
       if (canTake) {
         if (isOutOfLine) {
-          // Should only be true of opaque existentials.
+          // Should only be true of opaque existentials right now.
           assert(srcExistentialTy->getRepresentation()
                    == ExistentialTypeRepresentation::Opaque);
           auto container = reinterpret_cast<OpaqueExistentialContainer*>(src);
@@ -2581,8 +2654,8 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
     return (id)srcBridgedObject;
   }
 
-  // TODO: Fall back to boxing here.
-  crash("unimplemented boxing bridge");
+  // Fall back to boxing.
+  return (id)bridgeAnythingToSwiftValueObject(src, srcType, consume);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE

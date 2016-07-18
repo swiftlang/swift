@@ -1,7 +1,7 @@
 // RUN: rm -rf %t  &&  mkdir %t
 //
 // RUN: %gyb %s -o %t/BridgeIdAsAny.swift
-// RUN: %target-build-swift -module-name a %t/BridgeIdAsAny.swift -o %t.out
+// RUN: %target-build-swift -g -module-name a %t/BridgeIdAsAny.swift -o %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 //
@@ -20,28 +20,95 @@ func wantonlyWrapInAny<T>(_ x: T) -> Any {
 extension LifetimeTracked: Error {}
 extension String: Error {}
 
-% for testName, valueExpr, testExpr in [("classes", "LifetimeTracked(0)", " === x"), ("strings", '"vitameatavegamin"', '.isEqual(to: "vitameatavegamin")')]:
+struct KnownUnbridged: Equatable, Error {
+  var x, y: LifetimeTracked
+
+  init() {
+    x = LifetimeTracked(17)
+    y = LifetimeTracked(38)
+  }
+}
+func ==(a: KnownUnbridged, b: KnownUnbridged) -> Bool {
+  return a.x === b.x && a.y === b.y
+}
+
+func bridgedObjectPreservesIdentity(original: LifetimeTracked,
+                                    bridged: AnyObject) {
+  expectTrue(original === bridged)
+}
+
+func stringBridgesToEqualNSString(original: String,
+                                  bridged: AnyObject) {
+  expectTrue(bridged.isEqual(to: original))
+}
+
+func boxedTypeRoundTripsThroughDynamicCasting(original: KnownUnbridged,
+                                              bridged: AnyObject) {
+  direct: do {
+    guard let bridgedAndCast = bridged as? KnownUnbridged else {
+      expectUnreachable()
+      break direct
+    }
+    expectEqual(original, bridgedAndCast)
+  }
+
+  let bridgedAny: Any = bridged
+  any: do {
+    guard let bridgedAndCastAny = bridgedAny as? KnownUnbridged else {
+      expectUnreachable()
+      break any
+    }
+    expectEqual(original, bridgedAndCastAny)
+  }
+
+  anyInAny: do {
+    let bridgedAnyInAny = wantonlyWrapInAny(bridgedAny)
+    guard let bridgedAndCastAnyInAny = bridgedAnyInAny as? KnownUnbridged else {
+      expectUnreachable()
+      break anyInAny
+    }
+    expectEqual(original, bridgedAndCastAnyInAny)
+  }
+
+  // Failed casts should fail, and hopefully shouldn't leak or corrupt memory
+  // either.
+  expectEqual(bridged as? Int, nil)
+  expectEqual(bridged as? String, nil)
+}
+
+// We want to exhaustively check all paths through the bridging and dynamic
+// casting infrastructure, so expand out test cases that wrap the different
+// interesting bridging cases in different kinds of existential container.
+%{
+testCases = [
+  ("classes",        "LifetimeTracked(0)", "bridgedObjectPreservesIdentity"),
+  ("strings",        '"vitameatavegamin"', "stringBridgesToEqualNSString"),
+  ("unbridged type", "KnownUnbridged()",   "boxedTypeRoundTripsThroughDynamicCasting"),
+]
+}%
+
+% for testName, valueExpr, testFunc in testCases:
 BridgeAnything.test("${testName}") {
   do {
     let x = ${valueExpr}
-    expectTrue(_bridgeAnythingToObjectiveC(x)${testExpr})
-    expectTrue(_bridgeAnythingNonVerbatimToObjectiveC(x)${testExpr})
+    ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(x))
+    ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(x))
 
     let xInAny: Any = x
-    expectTrue(_bridgeAnythingToObjectiveC(xInAny)${testExpr})
-    expectTrue(_bridgeAnythingNonVerbatimToObjectiveC(xInAny)${testExpr})
+    ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInAny))
+    ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInAny))
 
     let xInAnyInAny = wantonlyWrapInAny(xInAny)
-    expectTrue(_bridgeAnythingToObjectiveC(xInAnyInAny)${testExpr})
-    expectTrue(_bridgeAnythingNonVerbatimToObjectiveC(xInAnyInAny)${testExpr})
+    ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInAnyInAny))
+    ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInAnyInAny))
 
     let xInError: Error = x
-    expectTrue(_bridgeAnythingToObjectiveC(xInError)${testExpr})
-    expectTrue(_bridgeAnythingNonVerbatimToObjectiveC(xInError)${testExpr})
+    ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInError))
+    ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInError))
 
     let xInErrorInAny = wantonlyWrapInAny(xInError)
-    expectTrue(_bridgeAnythingToObjectiveC(xInErrorInAny)${testExpr})
-    expectTrue(_bridgeAnythingNonVerbatimToObjectiveC(xInErrorInAny)${testExpr})
+    ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInErrorInAny))
+    ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInErrorInAny))
   }
 
   expectEqual(0, LifetimeTracked.instances)
