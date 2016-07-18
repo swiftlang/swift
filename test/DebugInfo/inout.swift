@@ -2,7 +2,6 @@
 // RUN: cat %t.ll | FileCheck %s
 // RUN: cat %t.ll | FileCheck %s --check-prefix=PROMO-CHECK
 // RUN: cat %t.ll | FileCheck %s --check-prefix=FOO-CHECK
-// REQUIRES: rdar27389560
 
 // LValues are direct values, too. They are reference types, though.
 
@@ -19,9 +18,9 @@ typealias MyFloat = Float
 // PROMO-CHECK: call void @llvm.dbg.declare(metadata %Vs5Int64** %
 // PROMO-CHECK-SAME:   metadata ![[A1:[0-9]+]], metadata ![[EMPTY_EXPR:[0-9]+]])
 
-// PROMO-CHECK: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "_TtVs5Int64"
-// PROMO-CHECK: ![[EMPTY_EXPR]] = !DIExpression()
-// PROMO-CHECK: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "_TtRVs5Int64"
+// PROMO-CHECK-DAG: ![[EMPTY_EXPR]] = !DIExpression()
+// PROMO-CHECK-DAG: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "_TtVs5Int64"
+// PROMO-CHECK-DAG: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "_TtRVs5Int64"
 // PROMO-CHECK: ![[A1]] = !DILocalVariable(name: "a", arg: 1
 // PROMO-CHECK-SAME:                       type: ![[INT]]
 func modifyFooHeap(_ a: inout Int64,
