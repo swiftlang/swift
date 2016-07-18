@@ -480,12 +480,17 @@ public:
           *this << 's';
         *this << ": ";
 
-        // Display the user ids sorted to give a stable use order in the printer's
-        // output. This makes diffing large sections of SIL significantly easier.
         llvm::SmallVector<ID, 32> UserIDs;
         for (auto *Op : V->getUses())
           UserIDs.push_back(getID(Op->getUser()));
-        std::sort(UserIDs.begin(), UserIDs.end());
+
+        // Display the user ids sorted to give a stable use order in the
+        // printer's output if we are asked to do so. This makes diffing large
+        // sections of SIL significantly easier at the expense of not showing
+        // the _TRUE_ order of the users in the use list.
+        if (Ctx.sortSIL()) {
+          std::sort(UserIDs.begin(), UserIDs.end());
+        }
 
         interleave(UserIDs.begin(), UserIDs.end(),
             [&] (ID id) { *this << id; },
@@ -512,13 +517,18 @@ public:
       
       *this << "// Preds:";
 
-      // Display the predecessors ids sorted to give a stable use order in the
-      // printer's output. This makes diffing large sections of SIL
-      // significantly easier.
       llvm::SmallVector<ID, 32> PredIDs;
       for (auto *BBI : BB->getPreds())
         PredIDs.push_back(getID(BBI));
-      std::sort(PredIDs.begin(), PredIDs.end());
+
+      // Display the pred ids sorted to give a stable use order in the printer's
+      // output if we are asked to do so. This makes diffing large sections of
+      // SIL significantly easier at the expense of not showing the _TRUE_ order
+      // of the users in the use list.
+      if (Ctx.sortSIL()) {
+        std::sort(PredIDs.begin(), PredIDs.end());
+      }
+
       for (auto Id : PredIDs)
         *this << ' ' << Id;
     }
@@ -551,12 +561,16 @@ public:
       *this << 's';
     *this << ": ";
 
-    // Display the user ids sorted to give a stable use order in the printer's
-    // output. This makes diffing large sections of SIL significantly easier.
     llvm::SmallVector<ID, 32> UserIDs;
     for (auto *Op : V->getUses())
       UserIDs.push_back(getID(Op->getUser()));
-    std::sort(UserIDs.begin(), UserIDs.end());
+
+    // If we are asked to, display the user ids sorted to give a stable use
+    // order in the printer's output. This makes diffing large sections of SIL
+    // significantly easier.
+    if (Ctx.sortSIL()) {
+      std::sort(UserIDs.begin(), UserIDs.end());
+    }
 
     interleave(UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
                [&] { *this << ", "; });
