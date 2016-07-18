@@ -790,6 +790,17 @@ SILCloner<ImplClass>::visitCopyAddrInst(CopyAddrInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitBindMemoryInst(BindMemoryInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createBindMemory(getOpLocation(Inst->getLoc()),
+                                  getOpValue(Inst->getBase()),
+                                  getOpValue(Inst->getIndex()),
+                                  Inst->getBoundType()));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitConvertFunctionInst(ConvertFunctionInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,

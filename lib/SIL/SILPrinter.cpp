@@ -1042,6 +1042,13 @@ public:
       *this << "[initialization] ";
     *this << getIDAndType(CI->getDest());
   }
+
+  void visitBindMemoryInst(BindMemoryInst *BI) {
+    *this << "bind_memory ";
+    *this << getIDAndType(BI->getBase()) << ", ";
+    *this << getIDAndType(BI->getIndex()) << " to ";
+    *this << BI->getBoundType();
+  }
   
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand,
                                     StringRef name) {
