@@ -195,7 +195,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
 
     // initialize the header field
     try withUnsafeMutablePointerToHeader {
-      $0.initialize(with: 
+      $0.initialize(to: 
         try initialHeader(
           buffer: self.buffer,
           capacity: {

@@ -493,8 +493,8 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     precondition(!childNodePopulationBitmap[i]) // sanity check
     precondition(!keyPopulationBitmap[i]) // sanity check
 
-    (_keyVector(layout: layout) + keyCount).initialize(with: key)
-    (_valueVector(layout: layout) + keyCount).initialize(with: value)
+    (_keyVector(layout: layout) + keyCount).initialize(to: key)
+    (_valueVector(layout: layout) + keyCount).initialize(to: value)
 
     keyPopulationBitmap[i] = true
   }
@@ -1140,8 +1140,8 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
 
     UnsafeMutablePointer<Key>(
       _childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
-      .initialize(with: key)
-    (_valueArray + i).initialize(with: value)
+      .initialize(to: key)
+    (_valueArray + i).initialize(to: value)
 
     keyPopulationBitmap[i] = true
   }
@@ -1326,12 +1326,12 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
     self = _Self(uninitializedNodeFor: layout)
 
     let keyArray = self._keyArray
-    keyArray.initialize(with: key0)
-    (keyArray + 1).initialize(with: key1)
+    keyArray.initialize(to: key0)
+    (keyArray + 1).initialize(to: key1)
 
     let valueArray = self._valueArray(layout: layout)
-    valueArray.initialize(with: value0)
-    (valueArray + 1).initialize(with: value1)
+    valueArray.initialize(to: value0)
+    (valueArray + 1).initialize(to: value1)
   }
 
   func initializeKey(
@@ -1342,8 +1342,8 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
   ) {
     precondition(i >= 0 && i < layout.keyCount) // sanity check
 
-    (_keyArray + i).initialize(with: key)
-    (_valueArray(layout: layout) + i).initialize(with: value)
+    (_keyArray + i).initialize(to: key)
+    (_valueArray(layout: layout) + i).initialize(to: value)
   }
 
   func copyValues(
@@ -1372,11 +1372,11 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
 
     let keyArray = _keyArray
     keyArray.initialize(from: newKeys, count: layout.keyCount - 1)
-    (keyArray + layout.keyCount - 1).initialize(with: appendKey)
+    (keyArray + layout.keyCount - 1).initialize(to: appendKey)
 
     let valueArray = _valueArray(layout: layout)
     valueArray.initialize(from: newValues, count: layout.keyCount - 1)
-    (valueArray + layout.keyCount - 1).initialize(with: appendValue)
+    (valueArray + layout.keyCount - 1).initialize(to: appendValue)
   }
 
   func unsafeMaybeGet(

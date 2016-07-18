@@ -282,7 +282,7 @@ public func _stdlib_bridgeNSErrorToError<
   T : _ObjectiveCBridgeableError
 >(_ error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
   if let bridged = T(_bridgedNSError: error) {
-    out.initialize(with: bridged)
+    out.initialize(to: bridged)
     return true
   } else {
     return false
