@@ -127,6 +127,22 @@ case let x?: break
 case nil: break
 }
 
+func SR2066(x: Int?) {
+    // nil literals should still work when wrapped in parentheses
+    switch x {
+    case (nil): break
+    case _?: break
+    }
+    switch x {
+    case ((nil)): break
+    case _?: break
+    }
+    switch (x, x) {
+    case ((nil), _): break
+    case (_?, _): break
+    }
+}
+
 // Test x???? patterns.
 switch (nil as Int???) {
 case let x???: print(x, terminator: "")
