@@ -19,7 +19,7 @@
 #ifndef SWIFT_STDLIB_SHIMS_DISPATCHSHIMS_H
 #define SWIFT_STDLIB_SHIMS_DISPATCHSHIMS_H
 
-//#include <dispatch/dispatch.h>
+#ifdef __OBJC2__
 
 #include "SwiftStdint.h"
 #include "SwiftStddef.h"
@@ -98,6 +98,8 @@ void _swift_dispatch_apply_current(
 #ifdef __cplusplus
 }} // extern "C", namespace swift
 #endif
+
+#endif // __OBJC2__
 
 #endif // SWIFT_STDLIB_SHIMS_DISPATCHSHIMS_H
 
