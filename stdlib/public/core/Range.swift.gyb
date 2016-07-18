@@ -636,6 +636,7 @@ extension Incomplete${Closed}Range
   /// Nor does it check whether the resulting `lowerBound` is below 
   /// its `upperBound`.
 % end
+  @_transparent
   public func completed(by${Unchecked} defaultBounds: ${Countable}${Closed}Range<Bound>) -> ${Countable}${Closed}Range<Bound> {
     let lower = lowerBound ?? defaultBounds.lowerBound
     let upper = upperBound ?? defaultBounds.upperBound
@@ -651,12 +652,14 @@ extension Incomplete${Closed}Range
 
 /// Constructs an `Incomplete${Closed}Range` with the provided upper 
 /// bound and an unknown lower bound.
+@_transparent
 public prefix func ${Op} <Bound: Comparable>(upperBound: Bound) -> Incomplete${Closed}Range<Bound> {
   return .init(_bounds: (lower: nil, upper: upperBound))
 }
 
 /// Constructs an `Incomplete${Closed}Range` with the provided lower 
 /// bound and an unknown upper bound.
+@_transparent
 public postfix func ${Op} <Bound: Comparable>(lowerBound: Bound) -> Incomplete${Closed}Range<Bound> {
   return .init(_bounds: (lower: lowerBound, upper: nil))
 }
@@ -665,6 +668,7 @@ public postfix func ${Op} <Bound: Comparable>(lowerBound: Bound) -> Incomplete${
 /// and lower bounds. Either or both may be `nil`, in which case the 
 /// bound will be provided when the `Incomplete${Closed}Range` is 
 /// completed.
+@_transparent
 public func ${Op} <Bound: Comparable>(lowerBound: Bound?, upperBound: Bound?) -> Incomplete${Closed}Range<Bound> {
   return .init(_bounds: (lower: lowerBound, upper: upperBound))
 }
