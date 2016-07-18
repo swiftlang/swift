@@ -128,8 +128,6 @@ BridgeAnything.test("${testName}") {
     ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInErrorInAny))
     ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInErrorInAny))
   }
-
-  expectEqual(0, LifetimeTracked.instances)
 }
 % end
 
