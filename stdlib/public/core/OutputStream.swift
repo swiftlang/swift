@@ -20,8 +20,8 @@ import SwiftShims
 ///
 /// You can send the output of the standard library's `print(_:to:)` and
 /// `dump(_:to:)` functions to an instance of a type that conforms to the
-/// `OutputStream` protocol instead of to standard output. Swift's `String`
-/// type conforms to `OutputStream` already, so you can capture the output
+/// `TextOutputStream` protocol instead of to standard output. Swift's `String`
+/// type conforms to `TextOutputStream` already, so you can capture the output
 /// from `print(_:to:)` and `dump(_:to:)` in a string instead of logging it to
 /// standard output.
 ///
@@ -31,18 +31,18 @@ import SwiftShims
 ///     }
 ///     // s == "12345"
 ///
-/// Conforming to the OutputStream Protocol
+/// Conforming to the TextOutputStream Protocol
 /// =======================================
 ///
-/// To make your custom type conform to the `OutputStream` protocol, implement
-/// the required `write(_:)` method. Functions that use an `OutputStream`
+/// To make your custom type conform to the `TextOutputStream` protocol, implement
+/// the required `write(_:)` method. Functions that use an `TextOutputStream`
 /// target may call `write(_:)` multiple times per writing operation.
 ///
 /// As an example, here's an implementation of an output stream that converts
 /// any input to its plain ASCII representation before sending it to standard
 /// output.
 ///
-///     struct ASCIILogger: OutputStream {
+///     struct ASCIILogger: TextOutputStream {
 ///         mutating func write(_ string: String) {
 ///             let ascii = string.unicodeScalars.lazy.map { scalar in
 ///                 scalar == "\n"
@@ -65,7 +65,7 @@ import SwiftShims
 ///     var asciiLogger = ASCIILogger()
 ///     print(s, to: &asciiLogger)
 ///     // Prints "Hearts \u{2661} and Diamonds \u{2662}"
-public protocol OutputStream {
+public protocol TextOutputStream {
   mutating func _lock()
   mutating func _unlock()
 
@@ -73,7 +73,7 @@ public protocol OutputStream {
   mutating func write(_ string: String)
 }
 
-extension OutputStream {
+extension TextOutputStream {
   public mutating func _lock() {}
   public mutating func _unlock() {}
 }
@@ -81,7 +81,7 @@ extension OutputStream {
 /// A source of text-streaming operations.
 ///
 /// Instances of types that conform to the `Streamable` protocol can write
-/// their value to instances of any type that conforms to the `OutputStream`
+/// their value to instances of any type that conforms to the `TextOutputStream`
 /// protocol. The Swift standard library's text-related types, `String`,
 /// `Character`, and `UnicodeScalar`, all conform to `Streamable`.
 ///
@@ -94,7 +94,7 @@ extension OutputStream {
 public protocol Streamable {
   /// Writes a textual representation of this instance into the given output
   /// stream.
-  func write<Target : OutputStream>(to target: inout Target)
+  func write<Target : TextOutputStream>(to target: inout Target)
 }
 
 /// A type with a customized textual representation.
@@ -229,7 +229,7 @@ func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
 func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 
 /// Do our best to print a value that cannot be printed directly.
-internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
+internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream,
     isDebugPrint: Bool
 ) {
@@ -316,7 +316,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
 
 @inline(never)
 @_semantics("stdlib_binary_only")
-internal func _print_unlocked<T, TargetStream : OutputStream>(
+internal func _print_unlocked<T, TargetStream : TextOutputStream>(
   _ value: T, _ target: inout TargetStream
 ) {
   // Optional has no representation suitable for display; therefore,
@@ -372,7 +372,7 @@ func _toStringReadOnlyPrintable<T : CustomStringConvertible>(_ x: T) -> String {
 //===----------------------------------------------------------------------===//
 
 @inline(never)
-public func _debugPrint_unlocked<T, TargetStream : OutputStream>(
+public func _debugPrint_unlocked<T, TargetStream : TextOutputStream>(
     _ value: T, _ target: inout TargetStream
 ) {
   if let debugPrintableObject = value as? CustomDebugStringConvertible {
@@ -394,7 +394,7 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStream>(
   _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: true)
 }
 
-internal func _dumpPrint_unlocked<T, TargetStream : OutputStream>(
+internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream
 ) {
   if let displayStyle = mirror.displayStyle {
@@ -463,7 +463,7 @@ internal func _dumpPrint_unlocked<T, TargetStream : OutputStream>(
 // OutputStreams
 //===----------------------------------------------------------------------===//
 
-internal struct _Stdout : OutputStream {
+internal struct _Stdout : TextOutputStream {
   mutating func _lock() {
     _swift_stdlib_flockfile_stdout()
   }
@@ -489,7 +489,7 @@ internal struct _Stdout : OutputStream {
   }
 }
 
-extension String : OutputStream {
+extension String : TextOutputStream {
   /// Appends the given string to this string.
   /// 
   /// - Parameter other: A string to append.
@@ -506,7 +506,7 @@ extension String : Streamable {
   /// Writes the string into the given output stream.
   /// 
   /// - Parameter target: An output stream.
-  public func write<Target : OutputStream>(to target: inout Target) {
+  public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(self)
   }
 }
@@ -515,7 +515,7 @@ extension Character : Streamable {
   /// Writes the character into the given output stream.
   ///
   /// - Parameter target: An output stream.
-  public func write<Target : OutputStream>(to target: inout Target) {
+  public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(String(self))
   }
 }
@@ -525,7 +525,7 @@ extension UnicodeScalar : Streamable {
   /// output stream.
   ///
   /// - Parameter target: An output stream.
-  public func write<Target : OutputStream>(to target: inout Target) {
+  public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(String(Character(self)))
   }
 }
@@ -534,9 +534,9 @@ extension UnicodeScalar : Streamable {
 public var _playgroundPrintHook : ((String) -> Void)? = {_ in () }
 
 internal struct _TeeStream<
-  L : OutputStream, 
-  R : OutputStream
-> : OutputStream {
+  L : TextOutputStream,
+  R : TextOutputStream
+> : TextOutputStream {
   var left: L
   var right: R
   
@@ -548,12 +548,12 @@ internal struct _TeeStream<
   mutating func _unlock() { right._unlock(); left._unlock() }
 }
 
-@available(*, unavailable, renamed: "OutputStream")
-public typealias OutputStreamType = OutputStream
+@available(*, unavailable, renamed: "TextOutputStream")
+public typealias OutputStreamType = TextOutputStream
 
 extension Streamable {
   @available(*, unavailable, renamed: "write(to:)")
-  public func writeTo<Target : OutputStream>(_ target: inout Target) {
+  public func writeTo<Target : TextOutputStream>(_ target: inout Target) {
     Builtin.unreachable()
   }
 }

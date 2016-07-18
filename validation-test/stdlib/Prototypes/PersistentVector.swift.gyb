@@ -164,7 +164,7 @@ func _dumpRec(
   }
 }
 
-struct _Stdout : OutputStream {
+struct _Stdout : TextOutputStream {
   mutating func _lock() {
     _swift_stdlib_flockfile_stdout()
   }
