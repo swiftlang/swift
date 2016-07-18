@@ -584,7 +584,7 @@ func _stdlib_getline() -> String? {
 
 func _printDebuggingAdvice(_ fullTestName: String) {
   print("To debug, run:")
-  var invocation = [Process.arguments[0]]
+  var invocation = [CommandLine.arguments[0]]
   let interpreter = getenv("SWIFT_INTERPRETER")
   if interpreter != nil {
     if let interpreterCmd = String(validatingUTF8: interpreter!) {
@@ -1122,7 +1122,7 @@ public func runAllTests() {
 #endif
 
   let _isChildProcess: Bool =
-    Process.arguments.contains("--stdlib-unittest-run-child")
+    CommandLine.arguments.contains("--stdlib-unittest-run-child")
 
   if _isChildProcess {
     _childProcess()
@@ -1132,15 +1132,15 @@ public func runAllTests() {
     var args = [String]()
     var i = 0
     i += 1 // Skip the name of the executable.
-    while i < Process.arguments.count {
-      let arg = Process.arguments[i]
+    while i < CommandLine.arguments.count {
+      let arg = CommandLine.arguments[i]
       if arg == "--stdlib-unittest-in-process" {
         runTestsInProcess = true
         i += 1
         continue
       }
       if arg == "--stdlib-unittest-filter" {
-        filter = Process.arguments[i + 1]
+        filter = CommandLine.arguments[i + 1]
         i += 2
         continue
       }
@@ -1158,7 +1158,7 @@ public func runAllTests() {
       }
 
       // Pass through unparsed arguments to the child process.
-      args.append(Process.arguments[i])
+      args.append(CommandLine.arguments[i])
 
       i += 1
     }

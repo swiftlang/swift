@@ -21,6 +21,6 @@ class MyDelegate: NSApplicationDelegate {}
 // Ensure that we coexist with normal references to the functions we
 // implicitly reference in the synthesized main.
 func bar() {
-  NSApplicationMain(Process.argc, Process.unsafeArgv)
+  NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
 }
 #endif

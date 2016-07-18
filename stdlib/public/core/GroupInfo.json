@@ -138,7 +138,7 @@
     "Shims.swift",
     "Unmanaged.swift",
     "Availability.swift",
-    "Process.swift",
+    "CommandLine.swift",
     "Tuple.swift",
     "NewtypeWrapper.swift",
     "UnsafeBitMap.swift",
