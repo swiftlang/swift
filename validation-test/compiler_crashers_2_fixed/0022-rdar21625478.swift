@@ -35,8 +35,8 @@ public protocol MySequence {
     _ preprocess: @noescape (Self) -> R
   ) -> R?
 
-  func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Iterator.Element>
+  func _copyToContiguousArray()
+    -> ContiguousArray<Iterator.Element>
 
   func _copyContents(
     initializing ptr: UnsafeMutablePointer<Iterator.Element>
@@ -71,8 +71,8 @@ extension MySequence {
     return nil
   }
 
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Iterator.Element> {
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Iterator.Element> {
     fatalError()
   }
 
@@ -224,7 +224,7 @@ public class SequenceLog {
   public static var filter = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _preprocessingPass = TypeIndexed(0)
-  public static var _copyToNativeArrayBuffer = TypeIndexed(0)
+  public static var _copyToContiguousArray = TypeIndexed(0)
   public static var _copyContents = TypeIndexed(0)
 }
 
@@ -281,10 +281,10 @@ extension LoggingSequenceType
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
-    Log._copyToNativeArrayBuffer[selfType] += 1
-    return base._copyToNativeArrayBuffer()
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element> {
+    Log._copyToContiguousArray[selfType] += 1
+    return base._copyToContiguousArray()
   }
 
   /// Copy a Sequence into an array.

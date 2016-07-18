@@ -19,23 +19,14 @@ import StdlibCollectionUnittest
 all_array_types = ['ContiguousArray', 'ArraySlice', 'Array']
 }%
 
-extension Array {
-  var identity: UnsafePointer<Void> {
-    return self._buffer.identity
+%for Self in all_array_types:
+extension ${Self} {
+  typealias _BufferID = UnsafePointer<Void>?
+  var _bufferID: _BufferID {
+    return unsafeBitCast(_owner, to: _BufferID.self)
   }
 }
-
-extension ArraySlice {
-  var identity: UnsafePointer<Void> {
-    return self._buffer.identity
-  }
-}
-
-extension ContiguousArray {
-  var identity: UnsafePointer<Void> {
-    return self._buffer.identity
-  }
-}
+%end
 
 var ArrayTestSuite = TestSuite("Array")
 
@@ -64,21 +55,21 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
     ${element_type}(40), ${element_type}(50), ${element_type}(60),
     ${element_type}(70)
   ]]
-  let identityOuter = a.identity
-  var identityInner = a[0].identity
+  let identityOuter = a._bufferID
+  var identityInner = a[0]._bufferID
 
   func checkIdentity(_ stackTrace: SourceLocStack) {
 %     if element_type == 'TestValueTy':
     // Does not reallocate storage because we changed a property based on a
     // reference; array storage was not changed.  Writeback of the inner array
     // does not happen.
-    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
-    expectEqual(identityInner, a[0].identity, stackTrace: stackTrace)
+    expectEqual(identityOuter, a._bufferID, stackTrace: stackTrace)
+    expectEqual(identityInner, a[0]._bufferID, stackTrace: stackTrace)
 %     else:
-    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
+    expectEqual(identityOuter, a._bufferID, stackTrace: stackTrace)
 
     // Should not reallocate storage.
-    expectEqual(identityInner, a[0].identity, stackTrace: stackTrace)
+    expectEqual(identityInner, a[0]._bufferID, stackTrace: stackTrace)
 %     end
   }
 
@@ -134,23 +125,23 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
     ${element_type}(40), ${element_type}(50), ${element_type}(60),
     ${element_type}(70), ${element_type}(80), ${element_type}(90),
   ]]
-  let identityOuter = a.identity
-  var identityInner = a[0].identity
+  let identityOuter = a._bufferID
+  var identityInner = a[0]._bufferID
 
   func checkIdentity(_ stackTrace: SourceLocStack) {
 %     if element_type == 'TestValueTy':
     // Does not reallocate storage because we changed a property based on a
     // reference; array storage was not changed.
-    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
-    expectEqual(identityInner, a[0].identity, stackTrace: stackTrace)
+    expectEqual(identityOuter, a._bufferID, stackTrace: stackTrace)
+    expectEqual(identityInner, a[0]._bufferID, stackTrace: stackTrace)
 %     else:
-    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
+    expectEqual(identityOuter, a._bufferID, stackTrace: stackTrace)
     // Writeback happens in subscript(Range<Int>), but array notices that the new
     // value did not change.
     // Another writeback happens in Array.subscript(Int), but this is not what we
     // want.
-    expectNotEqual(identityInner, a[0].identity, stackTrace: stackTrace)
-    identityInner = a[0].identity
+    expectNotEqual(identityInner, a[0]._bufferID, stackTrace: stackTrace)
+    identityInner = a[0]._bufferID
 %     end
   }
 
@@ -158,9 +149,9 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   a[0..<1][0][0] = ${element_type}(1010)
 
   // Reallocates storage because of the writeback in Array.subscript(Int).
-  expectEqual(identityOuter, a.identity)
-  expectNotEqual(identityInner, a[0].identity)
-  identityInner = a[0].identity
+  expectEqual(identityOuter, a._bufferID)
+  expectNotEqual(identityInner, a[0]._bufferID)
+  identityInner = a[0]._bufferID
 
   a[0..<1][0][1].value = 1020
 
@@ -195,9 +186,9 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   // Reallocates storage because of the writeback in Array.subscript(Int)
   // (writeback is being requested for the array element even though it is not
   // needed).
-  expectEqual(identityOuter, a.identity)
-  expectNotEqual(identityInner, a[0].identity)
-  identityInner = a[0].identity
+  expectEqual(identityOuter, a._bufferID)
+  expectNotEqual(identityInner, a[0]._bufferID)
+  identityInner = a[0]._bufferID
 
   withInoutT(&a[0..<1][0][6].value) {
     (x: inout Int) in

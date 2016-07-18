@@ -790,11 +790,12 @@ public struct ${Self}<Element>
   // FIXME(ABI): move to an initializer on _Buffer.
   static internal func _copyBuffer(_ buffer: inout _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
-      uninitializedCount: buffer.count, minimumCapacity: buffer.count)
+      _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
     buffer._copyContents(
       subRange: Range(buffer.indices),
       initializing: newBuffer.firstElementAddress)
-    buffer = _Buffer(newBuffer, shiftedToStartIndex: buffer.startIndex)
+    buffer = _Buffer(
+      _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
   }
 
   @_semantics("array.make_mutable")
@@ -872,33 +873,32 @@ public struct ${Self}<Element>
 
 %if Self == 'Array':
 #if _runtime(_ObjC)
-  public typealias _Buffer = _ArrayBuffer<Element>
+  internal typealias _Buffer = _ArrayBuffer<Element>
 #else
-  public typealias _Buffer = _ContiguousArrayBuffer<Element>
+  internal typealias _Buffer = _ContiguousArrayBuffer<Element>
 #endif
 %elif Self == 'ArraySlice':
-  public typealias _Buffer = _SliceBuffer<Element>
+  internal typealias _Buffer = _SliceBuffer<Element>
 %else:
-  public typealias _Buffer = _${Self.strip('_')}Buffer<Element>
+  internal typealias _Buffer = _${Self.strip('_')}Buffer<Element>
 %end
 
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
-  public // @testable
-  init(_buffer: _Buffer) {
+  internal init(_buffer: _Buffer) {
     self._buffer = _buffer
   }
 
 %if Self == 'ArraySlice':
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
-  public // @testable
-  init(_buffer: _ContiguousArrayBuffer<Element>) {
-    self.init(_buffer: _Buffer(_buffer, shiftedToStartIndex: 0))
+  internal init(_buffer buffer: _ContiguousArrayBuffer<Element>) {
+    self.init(_buffer: _Buffer(_buffer: buffer, shiftedToStartIndex: 0))
   }
 %end
 
-  public var _buffer: _Buffer
+  @_versioned
+  internal var _buffer: _Buffer
 }
 
 extension ${Self} : ExpressibleByArrayLiteral {
@@ -1038,8 +1038,9 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     where S.Iterator.Element == Element {
 
     self = ${Self}(
-      _buffer: _Buffer(s._copyToContiguousArray()._buffer,
-      shiftedToStartIndex: 0))
+      _buffer: _Buffer(
+        _buffer: s._copyToContiguousArray()._buffer,
+        shiftedToStartIndex: 0))
   }
 
   /// Creates a new array containing the specified number of a single, repeated
@@ -1071,8 +1072,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     minimumCapacity: Int
   ) -> _Buffer {
     let newBuffer = _ContiguousArrayBuffer<Element>(
-      uninitializedCount: 0, minimumCapacity: minimumCapacity)
-    return _Buffer(newBuffer, shiftedToStartIndex: 0)
+      _uninitializedCount: 0, minimumCapacity: minimumCapacity)
+    return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
   /// Construct a ${Self} of `count` uninitialized elements.
@@ -1125,7 +1126,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
         storage, to: _ContiguousArrayStorage<Element>.self))
     
     return (
-      Array(_buffer: _Buffer(innerBuffer, shiftedToStartIndex: 0)),
+      Array(
+        _buffer: _Buffer(_buffer: innerBuffer, shiftedToStartIndex: 0)),
         innerBuffer.firstElementAddress)
   }
 
@@ -1205,12 +1207,13 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       minimumCapacity: minimumCapacity) == nil {
 
       let newBuffer = _ContiguousArrayBuffer<Element>(
-        uninitializedCount: count, minimumCapacity: minimumCapacity)
+        _uninitializedCount: count, minimumCapacity: minimumCapacity)
 
       _buffer._copyContents(
         subRange: Range(_buffer.indices),
         initializing: newBuffer.firstElementAddress)
-      _buffer = _Buffer(newBuffer, shiftedToStartIndex: _buffer.startIndex)
+      _buffer = _Buffer(
+        _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
     }
     _sanityCheck(capacity >= minimumCapacity)
   }
@@ -1606,6 +1609,25 @@ extension ${Self} {
     // Invoke the body.
     return try body(&inoutBufferPointer)
   }
+
+  @discardableResult
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Element>
+  ) -> UnsafeMutablePointer<Element> {
+    if let s = self._baseAddressIfContiguous {
+      let count = self.count
+      ptr.initializeFrom(s, count: count)
+      _fixLifetime(self._owner)
+      return ptr + count
+    } else {
+      var p = ptr
+      for x in self {
+        p.initialize(with: x)
+        p += 1
+      }
+      return p
+    }
+  }
 }
 %end
 
@@ -1833,7 +1855,7 @@ internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferProtocol
       ? _growArrayCapacity(source.capacity) : source.capacity)
 
   return _ContiguousArrayBuffer(
-    uninitializedCount: countForBuffer, minimumCapacity: minimumCapacity)
+    _uninitializedCount: countForBuffer, minimumCapacity: minimumCapacity)
 }
 
 internal protocol _PointerFunction {
@@ -1916,7 +1938,7 @@ internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
     let tailEnd = source.endIndex
     source._copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
   }
-  source = _Buffer(dest, shiftedToStartIndex: source.startIndex)
+  source = _Buffer(_buffer: dest, shiftedToStartIndex: source.startIndex)
 }
 
 internal struct _InitializePointer<T> : _PointerFunction {
@@ -2074,6 +2096,11 @@ public func != <Element : Equatable>(
 
 #if _runtime(_ObjC)
 extension Array {
+  public // @SPI(Foundation)
+  func _bridgeToObjectiveCImpl() -> AnyObject {
+    return _buffer._asCocoaArray()
+  }
+
   /// Tries to downcast the source `NSArray` as our native buffer type.
   /// If it succeeds, creates a new `Array` around it and returns that.
   /// Returns `nil` otherwise.
