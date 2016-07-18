@@ -83,8 +83,8 @@ class TestDate : TestDateSuper {
     func dateWithString(_ str: String) -> Date {
         let formatter = DateFormatter()
         // Note: Calendar(identifier:) is OSX 10.9+ and iOS 8.0+ whereas the CF version has always been available
-        formatter.calendar = CFCalendarCreateWithIdentifier(kCFAllocatorSystemDefault, .gregorianCalendar)! as Calendar
-        formatter.locale = Locale(localeIdentifier: "en_US")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss Z"
         return formatter.date(from: str)! as Date
     }
