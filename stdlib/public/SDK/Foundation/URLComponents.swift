@@ -41,12 +41,16 @@ public struct URLComponents : ReferenceConvertible, Hashable, CustomStringConver
         _handle = _MutableHandle(adoptingReference: result)
     }
     
-    /// Returns a URL created from the NSURLComponents. If the NSURLComponents has an authority component (user, password, host or port) and a path component, then the path must either begin with "/" or be an empty string. If the NSURLComponents does not have an authority component (user, password, host or port) and has a path component, the path component must not start with "//". If those requirements are not met, nil is returned.
+    /// Returns a URL created from the NSURLComponents. 
+    ///
+    /// If the NSURLComponents has an authority component (user, password, host or port) and a path component, then the path must either begin with "/" or be an empty string. If the NSURLComponents does not have an authority component (user, password, host or port) and has a path component, the path component must not start with "//". If those requirements are not met, nil is returned.
     public var url: URL? {
         return _handle.map { $0.url }
     }
     
-    // Returns a URL created from the NSURLComponents relative to a base URL. If the NSURLComponents has an authority component (user, password, host or port) and a path component, then the path must either begin with "/" or be an empty string. If the NSURLComponents does not have an authority component (user, password, host or port) and has a path component, the path component must not start with "//". If those requirements are not met, nil is returned.
+    // Returns a URL created from the NSURLComponents relative to a base URL. 
+    ///
+    /// If the NSURLComponents has an authority component (user, password, host or port) and a path component, then the path must either begin with "/" or be an empty string. If the NSURLComponents does not have an authority component (user, password, host or port) and has a path component, the path component must not start with "//". If those requirements are not met, nil is returned.
     public func url(relativeTo base: URL?) -> URL? {
         return _handle.map { $0.url(relativeTo: base) }
     }
@@ -106,9 +110,14 @@ public struct URLComponents : ReferenceConvertible, Hashable, CustomStringConver
     /// The path subcomponent.
     ///
     /// The getter for this property removes any percent encoding this component may have (if the component allows percent encoding). Setting this property assumes the subcomponent or component string is not percent encoded and will add percent encoding (if the component allows percent encoding).
-    public var path: String? {
-        get { return _handle.map { $0.path } }
-        set { _applyMutation { $0.path = newValue } }
+    public var path: String {
+        get {
+            guard let result = _handle.map({ $0.path }) else { return "" }
+            return result
+        }
+        set {
+            _applyMutation { $0.path = newValue }
+        }
     }
     
     /// The query subcomponent.
@@ -155,9 +164,14 @@ public struct URLComponents : ReferenceConvertible, Hashable, CustomStringConver
     /// The path subcomponent, percent-encoded.
     ///
     /// The getter for this property retains any percent encoding this component may have. Setting this properties assumes the component string is already correctly percent encoded. Attempting to set an incorrectly percent encoded string will cause a `fatalError`. Although ';' is a legal path character, it is recommended that it be percent-encoded for best compatibility with `URL` (`String.addingPercentEncoding(withAllowedCharacters:)` will percent-encode any ';' characters if you pass `CharacterSet.urlPathAllowed`).
-    public var percentEncodedPath: String? {
-        get { return _handle.map { $0.percentEncodedPath } }
-        set { _applyMutation { $0.percentEncodedPath = newValue } }
+    public var percentEncodedPath: String {
+        get {
+            guard let result = _handle.map({ $0.percentEncodedPath }) else { return "" }
+            return result
+        }
+        set {
+            _applyMutation { $0.percentEncodedPath = newValue }
+        }
     }
     
     /// The query subcomponent, percent-encoded.
@@ -270,7 +284,7 @@ public struct URLComponents : ReferenceConvertible, Hashable, CustomStringConver
     ///
     /// The setter combines an array containing any number of `URLQueryItem`s, each of which represents a single key-value pair, into a query string and sets the `URLComponents` query property. Passing an empty array sets the query component of the `URLComponents` to an empty string. Passing nil removes the query component of the `URLComponents`.
     ///
-    /// - note: If a name-value pair in a query is empty (i.e. the query string starts with '&', ends with '&', or has "&&" within it), you get a `URLQueryItem` with a zero-length name and a nil value. If a query's name-value pair has nothing before the equals sign, you get a zero-length name. If a query's name-value pair has nothing after the equals sign, you get a zero-length value. If a query's name-value pair has no equals sign, the query name-value pair string is the name and you get a nil value.
+    /// - note: If a name-value pair in a query is empty (i.e. the query string starts with '&', ends with '&', or has "&&" within it), you get a `URLQueryItem` with a zero-length name and and a nil value. If a query's name-value pair has nothing before the equals sign, you get a zero-length name. If a query's name-value pair has nothing after the equals sign, you get a zero-length value. If a query's name-value pair has no equals sign, the query name-value pair string is the name and you get a nil value.
     @available(OSX 10.10, iOS 8.0, *)
     public var queryItems: [URLQueryItem]? {
         get { return _handle.map { $0.queryItems?.map { return $0 as URLQueryItem } } }
