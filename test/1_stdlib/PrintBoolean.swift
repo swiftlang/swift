@@ -11,17 +11,17 @@ PrintTests.test("CustomStringConvertible") {
     expectTrue(any is CustomStringConvertible)
   }
 
-  hasDescription(Bool(true))
-  hasDescription(CBool(true))
+  hasDescription(true as Bool)
+  hasDescription(true as CBool)
 }
 
 PrintTests.test("Printable") {
-  expectPrinted("true", CBool(true))
-  expectPrinted("false", CBool(false))
-  
-  expectPrinted("true", Bool(true))
-  expectPrinted("false", Bool(false))
-  
+  expectPrinted("true", true as CBool)
+  expectPrinted("false", false as CBool)
+
+  expectPrinted("true", true as Bool)
+  expectPrinted("false", false as Bool)
+
   expectPrinted("true", true)
   expectPrinted("false", false)
 }
