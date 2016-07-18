@@ -425,11 +425,11 @@ final class _ForkJoinWorkerThread {
   internal func startAsync() {
     var queue: DispatchQueue? = nil
     if #available(OSX 10.10, iOS 8.0, *) {
-      queue = DispatchQueue.global(attributes: .qosBackground)
+      queue = DispatchQueue.global(qos: .background)
     } else {
-      queue = DispatchQueue.global(attributes: .priorityBackground)
+      queue = DispatchQueue.global(priority: .background)
     }
-    queue!.asynchronously {
+    queue!.async {
       self._thread()
     }
   }
