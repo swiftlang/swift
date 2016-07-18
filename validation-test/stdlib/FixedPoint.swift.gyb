@@ -346,11 +346,13 @@ BoolTestSuite.test("init()") {
 
 BoolTestSuite.test("Boolean") {
   do {
-    var v: Bool = false
+    var v = false
+    expectType(Bool.self, &v)
     expectFalse(v)
   }
   do {
-    var v: Bool = true
+    var v = true
+    expectType(Bool.self, &v)
     expectTrue(v)
   }
 }
@@ -367,10 +369,7 @@ BoolTestSuite.test("CustomStringConvertible") {
 }
 
 BoolTestSuite.test("Equatable,Hashable") {
-  checkHashable(true, false, false)
-  checkHashable(false, false, true)
-  checkHashable(true, true, true)
-
+  checkHashable([false, true], equalityOracle: { $0 == $1 })
   expectNotEqual(false.hashValue, true.hashValue)
 }
 
