@@ -1063,6 +1063,10 @@ static const char *const IntrinsicNameTable[] = {
 #undef GET_INTRINSIC_NAME_TABLE
 };
 
+#define GET_INTRINSIC_TARGET_DATA
+#include "llvm/IR/Intrinsics.gen"
+#undef GET_INTRINSIC_TARGET_DATA
+
 /// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types
 /// removed (e.g. like "bswap") return the LLVM IR IntrinsicID for the intrinsic
 /// or 0 if the intrinsic name doesn't match anything.
@@ -1084,7 +1088,7 @@ unsigned swift::getLLVMIntrinsicID(StringRef InName, bool hasArgTypes) {
   
   const char *Name = NameS.c_str();
   ArrayRef<const char *> NameTable(&IntrinsicNameTable[1],
-                                   std::end(IntrinsicNameTable));
+                                   TargetInfos[1].Offset);
   int Idx = Intrinsic::lookupLLVMIntrinsicByName(NameTable, Name);
   return static_cast<Intrinsic::ID>(Idx + 1);
 }
