@@ -3,6 +3,20 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0099](https://github.com/apple/swift-evolution/blob/master/proposals/0099-conditionclauses.md):
+  Condition clauses in `if`, `guard`, and `while` statements now use a more
+  regular syntax. Each pattern or optional binding must be prefixed with `case`
+  or `let` respectively, and all conditions are separated by `,` instead of
+  `where`.
+
+  ```swift
+  // before
+  if let a = a, b = b where a == b { }
+
+  // after
+  if let a = a, let b = b, a == b { }
+  ```
+
 * [SE-0112](https://github.com/apple/swift-evolution/blob/master/proposals/0112-nserror-bridging.md):
   The `NSError` type is now bridged to the Swift `Error` protocol type
   (formerly called `ErrorProtocol` in Swift 3, `ErrorType` in Swift 2)
