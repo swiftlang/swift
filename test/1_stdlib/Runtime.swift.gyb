@@ -66,34 +66,33 @@ Runtime.test("_canBeClass") {
 
 //===----------------------------------------------------------------------===//
 
-protocol MyBoolean {
-  var boolValue : Bool { get }
-}
-
-extension Bool : MyBoolean {
-  var boolValue : Bool { return self }
-}
-
 // The protocol should be defined in the standard library, otherwise the cast
 // does not work.
-typealias P1 = MyBoolean
+typealias P1 = CustomReflectable
 typealias P2 = CustomStringConvertible
 protocol Q1 {}
 
-// A small struct that can be stored inline in an opaque buffer.
-struct StructConformsToP1 : MyBoolean, Q1 {
-  var boolValue: Bool {
-    return true
+extension P1 {
+  var success: Bool {
+    print(String(customMirror))
+    return String(customMirror) == "Mirror for ()"
   }
 }
 
 // A small struct that can be stored inline in an opaque buffer.
-struct Struct2ConformsToP1<T : MyBoolean> : MyBoolean, Q1 {
+struct StructConformsToP1 : CustomReflectable, Q1 {
+  var customMirror: Mirror {
+    return Mirror(reflecting: ())
+  }
+}
+
+// A small struct that can be stored inline in an opaque buffer.
+struct Struct2ConformsToP1<T : CustomReflectable> : CustomReflectable, Q1 {
   init(_ value: T) {
     self.value = value
   }
-  var boolValue: Bool {
-    return value.boolValue
+  var customMirror: Mirror {
+    return value.customMirror
   }
   var value: T
 }
@@ -143,18 +142,18 @@ struct Struct4ConformsToP2<T : CustomStringConvertible> : CustomStringConvertibl
 
 struct StructDoesNotConformToP1 : Q1 {}
 
-class ClassConformsToP1 : MyBoolean, Q1 {
-  var boolValue: Bool {
-    return true
+class ClassConformsToP1 : CustomReflectable, Q1 {
+  var customMirror: Mirror {
+    return Mirror(reflecting: ())
   }
 }
 
-class Class2ConformsToP1<T : MyBoolean> : MyBoolean, Q1 {
+class Class2ConformsToP1<T : CustomReflectable> : CustomReflectable, Q1 {
   init(_ value: T) {
     self.value = [value]
   }
-  var boolValue: Bool {
-    return value[0].boolValue
+  var customMirror: Mirror {
+    return value[0].customMirror
   }
   // FIXME: should be "var value: T", but we don't support it now.
   var value: Array<T>
@@ -164,12 +163,12 @@ class ClassDoesNotConformToP1 : Q1 {}
 
 Runtime.test("dynamicCasting with as") {
   var someP1Value = StructConformsToP1()
-  var someP1Value2 = Struct2ConformsToP1(true)
+  var someP1Value2 = Struct2ConformsToP1(StructConformsToP1())
   var someNotP1Value = StructDoesNotConformToP1()
   var someP2Value = Struct3ConformsToP2()
   var someP2Value2 = Struct4ConformsToP2(Struct3ConformsToP2())
   var someP1Ref = ClassConformsToP1()
-  var someP1Ref2 = Class2ConformsToP1(true)
+  var someP1Ref2 = Class2ConformsToP1(ClassConformsToP1())
   var someNotP1Ref = ClassDoesNotConformToP1()
 
   expectTrue(someP1Value is P1)
@@ -209,57 +208,57 @@ Runtime.test("dynamicCasting with as") {
   expectTrue(someP1Ref2 as AnyObject is P1)
   expectFalse(someNotP1Ref as AnyObject is P1)
 
-  expectTrue((someP1Value as P1).boolValue)
-  expectTrue((someP1Value2 as P1).boolValue)
+  expectTrue((someP1Value as P1).success)
+  expectTrue((someP1Value2 as P1).success)
   expectEqual("10 20 30 40", (someP2Value as P2).description)
   expectEqual("10 20 30 40 50 60 70 80", (someP2Value2 as P2).description)
 
-  expectTrue((someP1Ref as P1).boolValue)
-  expectTrue((someP1Ref2 as P1).boolValue)
+  expectTrue((someP1Ref as P1).success)
+  expectTrue((someP1Ref2 as P1).success)
 
-  expectTrue(((someP1Value as Q1) as! P1).boolValue)
-  expectTrue(((someP1Value2 as Q1) as! P1).boolValue)
+  expectTrue(((someP1Value as Q1) as! P1).success)
+  expectTrue(((someP1Value2 as Q1) as! P1).success)
   expectEqual("10 20 30 40", ((someP2Value as Q1) as! P2).description)
   expectEqual("10 20 30 40 50 60 70 80",
     ((someP2Value2 as Q1) as! P2).description)
-  expectTrue(((someP1Ref as Q1) as! P1).boolValue)
-  expectTrue(((someP1Ref2 as Q1) as! P1).boolValue)
+  expectTrue(((someP1Ref as Q1) as! P1).success)
+  expectTrue(((someP1Ref2 as Q1) as! P1).success)
 
-  expectTrue(((someP1Value as Any) as! P1).boolValue)
-  expectTrue(((someP1Value2 as Any) as! P1).boolValue)
+  expectTrue(((someP1Value as Any) as! P1).success)
+  expectTrue(((someP1Value2 as Any) as! P1).success)
   expectEqual("10 20 30 40", ((someP2Value as Any) as! P2).description)
   expectEqual("10 20 30 40 50 60 70 80",
     ((someP2Value2 as Any) as! P2).description)
-  expectTrue(((someP1Ref as Any) as! P1).boolValue)
-  expectTrue(((someP1Ref2 as Any) as! P1).boolValue)
+  expectTrue(((someP1Ref as Any) as! P1).success)
+  expectTrue(((someP1Ref2 as Any) as! P1).success)
 
-  expectTrue(((someP1Ref as AnyObject) as! P1).boolValue)
+  expectTrue(((someP1Ref as AnyObject) as! P1).success)
 
   expectEmpty((someNotP1Value as? P1))
   expectEmpty((someNotP1Ref as? P1))
 
-  expectTrue(((someP1Value as Q1) as? P1)!.boolValue)
-  expectTrue(((someP1Value2 as Q1) as? P1)!.boolValue)
+  expectTrue(((someP1Value as Q1) as? P1)!.success)
+  expectTrue(((someP1Value2 as Q1) as? P1)!.success)
   expectEmpty(((someNotP1Value as Q1) as? P1))
   expectEqual("10 20 30 40", ((someP2Value as Q1) as? P2)!.description)
   expectEqual("10 20 30 40 50 60 70 80",
     ((someP2Value2 as Q1) as? P2)!.description)
-  expectTrue(((someP1Ref as Q1) as? P1)!.boolValue)
-  expectTrue(((someP1Ref2 as Q1) as? P1)!.boolValue)
+  expectTrue(((someP1Ref as Q1) as? P1)!.success)
+  expectTrue(((someP1Ref2 as Q1) as? P1)!.success)
   expectEmpty(((someNotP1Ref as Q1) as? P1))
 
-  expectTrue(((someP1Value as Any) as? P1)!.boolValue)
-  expectTrue(((someP1Value2 as Any) as? P1)!.boolValue)
+  expectTrue(((someP1Value as Any) as? P1)!.success)
+  expectTrue(((someP1Value2 as Any) as? P1)!.success)
   expectEmpty(((someNotP1Value as Any) as? P1))
   expectEqual("10 20 30 40", ((someP2Value as Any) as? P2)!.description)
   expectEqual("10 20 30 40 50 60 70 80",
     ((someP2Value2 as Any) as? P2)!.description)
-  expectTrue(((someP1Ref as Any) as? P1)!.boolValue)
-  expectTrue(((someP1Ref2 as Any) as? P1)!.boolValue)
+  expectTrue(((someP1Ref as Any) as? P1)!.success)
+  expectTrue(((someP1Ref2 as Any) as? P1)!.success)
   expectEmpty(((someNotP1Ref as Any) as? P1))
 
-  expectTrue(((someP1Ref as AnyObject) as? P1)!.boolValue)
-  expectTrue(((someP1Ref2 as AnyObject) as? P1)!.boolValue)
+  expectTrue(((someP1Ref as AnyObject) as? P1)!.success)
+  expectTrue(((someP1Ref2 as AnyObject) as? P1)!.success)
   expectEmpty(((someNotP1Ref as AnyObject) as? P1))
 
   let doesThrow: (Int) throws -> Int = { $0 }
