@@ -118,15 +118,11 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
                                          offset);
 }
 
-// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
-// resolving relative references to coalesceable symbols.
-// It should be removed when fixed. rdar://problem/22674524
-static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type,
-                                      bool willBeRelativelyAddressed = false) {
+static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type) {
   auto name = LinkEntity::forTypeMangling(type);
   llvm::SmallString<32> mangling;
   name.mangle(mangling);
-  return IGM.getAddrOfGlobalString(mangling, willBeRelativelyAddressed);
+  return IGM.getAddrOfGlobalString(mangling);
 }
 
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
@@ -2110,8 +2106,7 @@ namespace {
     }
 
     void addName() {
-      addRelativeAddress(getMangledTypeName(IGM, getAbstractType(),
-                                 /*willBeRelativelyAddressed*/ true));
+      addRelativeAddress(getMangledTypeName(IGM, getAbstractType()));
     }
     
     void addGenericMetadataPatternAndKind() {
@@ -2501,8 +2496,7 @@ namespace {
       
       addConstantInt32(numFields);
       addConstantInt32InWords(FieldVectorOffset);
-      addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
-                                           /*willBeRelativelyAddressed*/ true));
+      addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames));
       
       // Build the field type accessor function.
       llvm::Function *fieldTypeVectorAccessor
@@ -2585,8 +2579,7 @@ namespace {
       
       addConstantInt32(numFields);
       addConstantInt32InWords(FieldVectorOffset);
-      addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames,
-                                           /*willBeRelativelyAddressed*/ true));
+      addRelativeAddress(IGM.getAddrOfGlobalString(fieldNames));
       
       // Build the field type accessor function.
       llvm::Function *fieldTypeVectorAccessor

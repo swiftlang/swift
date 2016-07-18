@@ -103,9 +103,8 @@ import Swift
 //    we fill in on instantiation.
 //    The witness table pattern includes extra inhabitant witness
 //    implementations which are used if the instance has extra inhabitants.
-//    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[DYNAMICSINGLETON_FIELD_NAMES:@.*]] = private constant [7 x i8] c"value\00\00"
-// CHECK: [[DYNAMICSINGLETON_NAME:@.*]] = private constant [25 x i8] c"O4enum16DynamicSingleton\00"
+// CHECK: [[DYNAMICSINGLETON_FIELD_NAMES:@.*]] = private unnamed_addr constant [7 x i8] c"value\00\00"
+// CHECK: [[DYNAMICSINGLETON_NAME:@.*]] = private unnamed_addr constant [25 x i8] c"O4enum16DynamicSingleton\00"
 // CHECK: @_TMnO4enum16DynamicSingleton = hidden constant <{ {{.*}} i32 }> <{
 // CHECK:   [25 x i8]* [[DYNAMICSINGLETON_NAME]]
 // --       One payload

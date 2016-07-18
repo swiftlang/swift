@@ -89,19 +89,19 @@
 // CHECK-32:     i8* bitcast (void (%0*, i8*)* @_TToFC13objc_subclass10SwiftGizmoD to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(isEnabled)", i32 0, i32 0),
-// CHECK-32:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* {{@[^ ,]+}}, i32 0, i32 0),
 // CHECK-32:     i8* bitcast ({{(i8|i1)}} (%0*, i8*)* @_TToFC13objc_subclass10SwiftGizmog7enabledSb to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(setIsEnabled:)", i32 0, i32 0),
-// CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[^ ,]+}}, i32 0, i32 0),
 // CHECK-32:     i8* bitcast (void (%0*, i8*, {{(i8|i1)}})* @_TToFC13objc_subclass10SwiftGizmos7enabledSb to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([17 x i8], [17 x i8]* @"\01L_selector_data(initWithBellsOn:)", i32 0, i32 0),
-// CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[^ ,]+}}, i32 0, i32 0),
 // CHECK-32:     i8* bitcast (%0* (%0*, i8*, i32)* @_TToFC13objc_subclass10SwiftGizmocfT7bellsOnSi_GSQS0__ to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([15 x i8], [15 x i8]* @"\01L_selector_data(.cxx_construct)", i32 0, i32 0),
-// CHECK-32:     i8* getelementptr inbounds ([3 x i8], [3 x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:     i8* getelementptr inbounds ([3 x i8], [3 x i8]* {{@[^ ,]+}}, i32 0, i32 0),
 // CHECK-32:     i8* bitcast (%0* (%0*, i8*)* @_TToFC13objc_subclass10SwiftGizmoe to i8*)
 // CHECK-32:   }]
 // CHECK-32: }, section "__DATA, __objc_const", align 4
@@ -139,19 +139,19 @@
 // CHECK-64:     i8* bitcast (void ([[OPAQUE10:%.*]]*, i8*)* @_TToFC13objc_subclass10SwiftGizmoD to i8*)
 // CHECK-64:   }, {
 // CHECK-64:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(isEnabled)", i64 0, i64 0),
-// CHECK-64:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* {{@[0-9]+}}, i64 0, i64 0),
+// CHECK-64:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* {{@[^ ,]+}}, i64 0, i64 0),
 // CHECK-64:     i8* bitcast ({{(i8|i1)}} ([[OPAQUE11:%.*]]*, i8*)* @_TToFC13objc_subclass10SwiftGizmog7enabledSb to i8*)
 // CHECK-64:   }, {
 // CHECK-64:     i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(setIsEnabled:)", i64 0, i64 0),
-// CHECK-64:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@[0-9]+}}, i64 0, i64 0),
+// CHECK-64:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@[^ ,]+}}, i64 0, i64 0),
 // CHECK-64:     i8* bitcast (void ([[OPAQUE12:%.*]]*, i8*, {{(i8|i1)}})* @_TToFC13objc_subclass10SwiftGizmos7enabledSb to i8*)
 // CHECK-64:   }, {
 // CHECK-64:     i8* getelementptr inbounds ([17 x i8], [17 x i8]* @"\01L_selector_data(initWithBellsOn:)", i64 0, i64 0),
-// CHECK-64:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@[0-9]+}}, i64 0, i64 0),
+// CHECK-64:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@[^ ,]+}}, i64 0, i64 0),
 // CHECK-64:     i8* bitcast ([[OPAQUE11:%.*]]* ([[OPAQUE12:%.*]]*, i8*, i64)* @_TToFC13objc_subclass10SwiftGizmocfT7bellsOnSi_GSQS0__ to i8*)
 // CHECK-64:   }, {
 // CHECK-64:     i8* getelementptr inbounds ([15 x i8], [15 x i8]* @"\01L_selector_data(.cxx_construct)", i64 0, i64 0),
-// CHECK-64:     i8* getelementptr inbounds ([3 x i8], [3 x i8]* {{@[0-9]+}}, i64 0, i64 0),
+// CHECK-64:     i8* getelementptr inbounds ([3 x i8], [3 x i8]* {{@[^ ,]+}}, i64 0, i64 0),
 // CHECK-64:     i8* bitcast ([[OPAQUE5]]* ([[OPAQUE6]]*, i8*)* @_TToFC13objc_subclass10SwiftGizmoe to i8*)
 // CHECK-64:   }]
 // CHECK-64: }, section "__DATA, __objc_const", align 8
@@ -230,11 +230,11 @@
 // CHECK-32:       i8* bitcast (%3* (%3*, i8*)* @_TToFC13objc_subclass11SwiftGizmo2cfT_S0_ to i8*)
 // CHECK-32:     }, {
 // CHECK-32:       i8* getelementptr inbounds ([17 x i8], [17 x i8]* @"\01L_selector_data(initWithBellsOn:)", i32 0, i32 0),
-// CHECK-32:       i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:       i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[^ ,]+}}, i32 0, i32 0),
 // CHECK-32:       i8* bitcast (%3* (%3*, i8*, i32)* @_TToFC13objc_subclass11SwiftGizmo2cfT7bellsOnSi_GSQS0__ to i8*)
 // CHECK-32:     }, {
 // CHECK-32:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i32 0, i32 0),
-// CHECK-32:       i8* getelementptr inbounds ([3 x i8], [3 x i8]* {{@[0-9]+}}, i32 0, i32 0),
+// CHECK-32:       i8* getelementptr inbounds ([3 x i8], [3 x i8]* {{@[^ ,]+}}, i32 0, i32 0),
 // CHECK-32:       i8* bitcast (void (%3*, i8*)* @_TToFC13objc_subclass11SwiftGizmo2E to i8*)
 // CHECK-32:     }
 // CHECK-32:   ]
@@ -258,11 +258,11 @@
 // CHECK-64:       i8* bitcast ([[OPAQUE18:%.*]]* ([[OPAQUE19:%.*]]*, i8*)* @_TToFC13objc_subclass11SwiftGizmo2cfT_S0_ to i8*)
 // CHECK-64:     }, {
 // CHECK-64:       i8* getelementptr inbounds ([17 x i8], [17 x i8]* @"\01L_selector_data(initWithBellsOn:)", i64 0, i64 0),
-// CHECK-64:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@[0-9]+}}, i64 0, i64 0),
+// CHECK-64:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@[^ ,]+}}, i64 0, i64 0),
 // CHECK-64:       i8* bitcast ([[OPAQUE21:%.*]]* ([[OPAQUE22:%.*]]*, i8*, i64)* @_TToFC13objc_subclass11SwiftGizmo2cfT7bellsOnSi_GSQS0__ to i8*)
 // CHECK-64:     }, {
 // CHECK-64:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0),
-// CHECK-64:       i8* getelementptr inbounds ([3 x i8], [3 x i8]* {{@[0-9]+}}, i64 0, i64 0)
+// CHECK-64:       i8* getelementptr inbounds ([3 x i8], [3 x i8]* {{@[^ ,]+}}, i64 0, i64 0)
 // CHECK-64:       i8* bitcast (void ([[OPAQUE20:%.*]]*, i8*)* @_TToFC13objc_subclass11SwiftGizmo2E to i8*)
 // CHECK-64:     }
 // CHECK-64: ] }
