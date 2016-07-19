@@ -1049,10 +1049,10 @@ class infer_instanceVar1 {
   var var_ExistentialMetatype9: (Protocol_ObjC1 & Protocol_ObjC2).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype0: Any.Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype1: PlainProtocol.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype2: PlainProtocol.Type
+// CHECK-LABEL: {{^}}  var var_ExistentialMetatype2: (PlainProtocol).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype3: (PlainProtocol & Protocol_Class1).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype4: (PlainProtocol & Protocol_ObjC1).Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype5: Protocol_Class1.Type
+// CHECK-LABEL: {{^}}  var var_ExistentialMetatype5: (Protocol_Class1).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype6: (Protocol_Class1 & Protocol_Class2).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype7: (Protocol_Class1 & Protocol_ObjC1).Type
 // CHECK-LABEL: @objc var var_ExistentialMetatype8: Protocol_ObjC1.Type
@@ -1187,7 +1187,7 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc weak var var_Weak2: @sil_weak Protocol_ObjC1
 // CHECK-LABEL: @objc weak var var_Weak5: @sil_weak AnyObject
 // CHECK-LABEL: @objc weak var var_Weak7: @sil_weak Protocol_ObjC1
-// CHECK-LABEL: @objc weak var var_Weak8: @sil_weak Protocol_ObjC1 & Protocol_ObjC2
+// CHECK-LABEL: @objc weak var var_Weak8: @sil_weak (Protocol_ObjC1 & Protocol_ObjC2)?
 
   weak var var_Weak_fail1: PlainClass?
   weak var var_Weak_bad2: PlainStruct?
@@ -1361,7 +1361,7 @@ class infer_instanceVar1 {
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType9: [Protocol_ObjC1 & PlainProtocol]
-  // CHECK-LABEL: {{^}}  var var_ArrayType9: [Protocol_ObjC1 & PlainProtocol]
+  // CHECK-LABEL: {{^}}  var var_ArrayType9: [PlainProtocol & Protocol_ObjC1]
 
   @objc var var_ArrayType9_: [Protocol_ObjC1 & PlainProtocol]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}

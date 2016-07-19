@@ -286,7 +286,7 @@ struct ErrorTypeInVarDecl8 {
 }
 
 struct ErrorTypeInVarDecl9 {
-  var v1 : protocol // expected-error {{expected '<' in protocol composition type}}
+  var v1 : protocol // expected-error {{expected identifier for type name}}
   var v2 : Int
 }
 

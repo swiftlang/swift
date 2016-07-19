@@ -408,7 +408,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
   
   // Handle deprecated case
-  if (Tok.getKind() == tok::kw_protocol) {
+  if (Tok.getKind() == tok::kw_protocol && startsWithLess(peekToken())) {
     SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
     
     // Check for the starting '<'.
