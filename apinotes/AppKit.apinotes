@@ -392,6 +392,11 @@ Classes:
     SwiftName: remove(contentsOf:)
     MethodKind: Instance
 - Name: NSBezierPath
+  Properties:
+  - Name: bezierPathByFlatteningPath
+    SwiftName: flattened
+  - Name: bezierPathByReversingPath
+    SwiftName: reversed
   Methods:
   - Selector: 'clipRect:'
     SwiftName: clip(_:)
