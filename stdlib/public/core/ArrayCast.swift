@@ -16,181 +16,49 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
-// FIXME: These need to be implemented even for non-objc:
-// rdar://problem/18881196
-
-internal enum _ValueOrReference {
-  case reference, value
-
-  internal init<T>(_: T.Type) {
-    self = _isClassOrObjCExistential(T.self) ? .reference : .value
-  }
-}
-
-internal enum _BridgeStyle {
-  case verbatim, explicit
-
-  internal init<T>(_: T.Type) {
-   self = _isBridgedVerbatimToObjectiveC(T.self) ? .verbatim : .explicit
-  }
-}
-
-//===--- Forced casts: [T] as! [U] ----------------------------------------===//
-
 /// Implements `source as! [TargetElement]`.
 ///
-/// - Precondition: At least one of `SourceElement` and `TargetElement` is a
-/// class type or ObjC existential.  May trap for other "valid" inputs when
-/// `TargetElement` is not bridged verbatim, if an element can't be converted.
+/// - Note: When SourceElement and TargetElement are both bridged verbatim, type
+///   checking is deferred until elements are actually accessed.
 public func _arrayForceCast<SourceElement, TargetElement>(
   _ source: Array<SourceElement>
 ) -> Array<TargetElement> {
-  switch (
-    _ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)
-  ) {
-  case (.reference, .verbatim):
-    let native = source._buffer.requestNativeBuffer()
-    
-    if _fastPath(native != nil) {
-      if _fastPath(native!.storesOnlyElementsOfType(TargetElement.self)) {
+#if _runtime(_ObjC)
+  if _isClassOrObjCExistential(SourceElement.self)
+  && _isClassOrObjCExistential(TargetElement.self) {
+    let src = source._buffer
+    if let native = src.requestNativeBuffer() {
+      if native.storesOnlyElementsOfType(TargetElement.self) {
         // A native buffer that is known to store only elements of the
         // TargetElement can be used directly
-        return Array(_buffer: source._buffer.cast(toBufferOf: TargetElement.self))
+        return Array(_buffer: src.cast(toBufferOf: TargetElement.self))
       }
       // Other native buffers must use deferred element type checking
       return Array(_buffer:
-        source._buffer.downcast(
-          toBufferWithDeferredTypeCheckOf: TargetElement.self))
+        src.downcast(toBufferWithDeferredTypeCheckOf: TargetElement.self))
     }
-    // All non-native buffers use deferred element typechecking
     return Array(_immutableCocoaArray: source._buffer._asCocoaArray())
-    
-  case (.reference, .explicit):
-    let result: [TargetElement]? = _arrayConditionalBridgeElements(source)
-    _precondition(result != nil, "array cannot be bridged from Objective-C")
-    return result!
-    
-  case (.value, .verbatim):
-    if source.isEmpty {
-      return Array()
-    }
-
-    var buf = _ContiguousArrayBuffer<TargetElement>(
-      uninitializedCount: source.count, minimumCapacity: 0)
-    
-    let _: Void = buf.withUnsafeMutableBufferPointer {
-      var p = $0.baseAddress!
-      for value in source {
-        let bridged: AnyObject? = _bridgeToObjectiveC(value)
-        _precondition(
-          bridged != nil, "array element cannot be bridged to Objective-C")
-        // FIXME: should be an unsafeDowncast.
-        p.initialize(with: unsafeBitCast(bridged!, to: TargetElement.self))
-        p += 1
-      }
-    }
-    return Array(_buffer: _ArrayBuffer(buf, shiftedToStartIndex: 0))
-    
-  case (.value, .explicit):
-    _sanityCheckFailure(
-      "Force-casting between Arrays of value types not prevented at compile-time"
-    )
   }
+#endif
+  return _arrayConditionalCast(source)!
 }
 
-//===--- Conditional casts: [T] as? [U] -----------------------------------===//
+internal struct _UnwrappingFailed : Error {}
 
-/// Implements the semantics of `x as? [TargetElement]` where `x` has type
-/// `[SourceElement]` and `TargetElement` is a verbatim-bridged trivial subtype of
-/// `SourceElement`.
-///
-/// Returns an Array<TargetElement> containing the same elements as a
-///
-/// O(1) if a's buffer elements are dynamically known to have type
-/// TargetElement or a type derived from TargetElement.  O(N)
-/// otherwise.
-internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
-  _ a: Array<SourceElement>
-) -> [TargetElement]? {
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(SourceElement.self))
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(TargetElement.self))
-  
-  if _fastPath(!a.isEmpty) {
-    let native = a._buffer.requestNativeBuffer()
-    
-    if _fastPath(native != nil) {
-      if native!.storesOnlyElementsOfType(TargetElement.self) {
-        return Array(_buffer: a._buffer.cast(toBufferOf: TargetElement.self))
-      }
-      return nil
-    }
-    
-    // slow path: we store an NSArray
-    
-    // We can skip the check if TargetElement happens to be AnyObject
-    if !(AnyObject.self is TargetElement.Type) {
-      for element in a {
-        if !(element is TargetElement) {
-          return nil
-        }
-      }
-    }
-    return Array(_buffer: a._buffer.cast(toBufferOf: TargetElement.self))
+extension Optional {
+  internal func unwrappedOrError() throws -> Wrapped {
+    if let x = self { return x }
+    throw _UnwrappingFailed()
   }
-  return []
-}
-
-/// Try to convert the source array of objects to an array of values
-/// produced by bridging the objects from Objective-C to `TargetElement`.
-///
-/// - Precondition: SourceElement is a class type.
-/// - Precondition: TargetElement is bridged non-verbatim to Objective-C.
-///   O(n), because each element must be bridged separately.
-internal func _arrayConditionalBridgeElements<
-  SourceElement,
-  TargetElement
->(_ source: Array<SourceElement>) -> Array<TargetElement>? {
-    
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(SourceElement.self))
-  _sanityCheck(!_isBridgedVerbatimToObjectiveC(TargetElement.self))
-  
-  let buf = _ContiguousArrayBuffer<TargetElement>(
-    uninitializedCount: source.count, minimumCapacity: 0)
-  
-  var p = buf.firstElementAddress
-  
-  // Make sure the resulting array owns anything that is successfully stored
-  // there.
-  defer { buf.count = p - buf.firstElementAddress }
-    
-  for object: SourceElement in source {
-    guard let value = object as? TargetElement else {
-      return nil
-    }
-    p.initialize(with: value)
-    p += 1
-  }
-  return Array(_buffer: _ArrayBuffer(buf, shiftedToStartIndex: 0))
 }
 
 /// Implements `source as? [TargetElement]`: convert each element of
 /// `source` to a `TargetElement` and return the resulting array, or
 /// return `nil` if any element fails to convert.
 ///
-/// - Precondition: `SourceElement` is a class or ObjC existential type.
-/// O(n), because each element must be checked.
+/// - Complexity: O(n), because each element must be checked.
 public func _arrayConditionalCast<SourceElement, TargetElement>(
   _ source: [SourceElement]
 ) -> [TargetElement]? {
-  switch (_ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)) {
-  case (.value, _):
-    _sanityCheckFailure(
-      "Conditional cast from array of value types not prevented at compile-time")
-  case (.reference, .verbatim):
-    return _arrayConditionalDownCastElements(source)
-  case (.reference, .explicit):
-    return _arrayConditionalBridgeElements(source)
-  }
+  return try? source.map { try ($0 as? TargetElement).unwrappedOrError() }
 }
-#endif

@@ -362,12 +362,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       // Request new APIs from SceneKit.
       "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=2",
 
-      // Request new APIs from GameplayKit.
-      "-DSWIFT_SDK_OVERLAY_GAMEPLAYKIT_EPOCH=1",
-
-      // Request new APIs from SpriteKit.
-      "-DSWIFT_SDK_OVERLAY_SPRITEKIT_EPOCH=1",
-
       // Request new APIs from CoreImage.
       "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=2",
 

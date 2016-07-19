@@ -9,9 +9,8 @@
 
 import StdlibUnittest
 
-let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
 
-var CharacterTraps = TestSuite("CharacterTraps" + testSuiteSuffix)
+var CharacterTraps = TestSuite("CharacterTraps")
 
 CharacterTraps.test("CharacterFromEmptyString")
   .skip(.custom(
