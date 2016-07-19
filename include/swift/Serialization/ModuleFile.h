@@ -43,6 +43,7 @@ class ProtocolConformance;
 /// A serialized module, along with the tools to access it.
 class ModuleFile : public LazyMemberLoader {
   friend class SerializedASTFile;
+  friend class SILDeserializer;
   using Status = serialization::Status;
 
   /// A reference back to the AST representation of the file.
@@ -75,6 +76,9 @@ class ModuleFile : public LazyMemberLoader {
 
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
+
+  /// A callback to be invoked every time a type was deserialized.
+  llvm::function_ref<void(Type)> DeserializedTypeCallback;
 
 public:
   /// Represents another module that has been imported as a dependency.

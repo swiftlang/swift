@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/NameLookup.h"
@@ -94,6 +95,7 @@ namespace {
   };
 
   class SILParser {
+    friend Parser;
   public:
     Parser &P;
     SILModule &SILMod;
@@ -112,14 +114,19 @@ namespace {
     llvm::StringMap<ValueBase*> LocalValues;
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
+    /// A callback to be invoked every time a type was deserialized.
+    llvm::function_ref<void(Type)> ParsedTypeCallback;
+
+
     bool performTypeLocChecking(TypeLoc &T, bool IsSIL = true);
     bool parseSpecConformanceSubstitutions(
                    SmallVectorImpl<ParsedSubstitution> &parsed);
     ProtocolConformance *parseProtocolConformanceHelper(ProtocolDecl *&proto,
                                                         bool localScope);
   public:
-
-    SILParser(Parser &P) : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S) {}
+    SILParser(Parser &P)
+        : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S),
+          ParsedTypeCallback([](Type ty) {}) {}
 
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
     /// for errors and return true if there were any.
@@ -796,6 +803,8 @@ bool SILParser::parseASTType(CanType &result) {
   if (performTypeLocChecking(loc, false))
     return true;
   result = loc.getType()->getCanonicalType();
+  // Invoke the callback on the parsed type.
+  ParsedTypeCallback(loc.getType());
   return false;
 }
 
@@ -838,6 +847,10 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
 
   Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),
                                      category);
+
+  // Invoke the callback on the parsed type.
+  ParsedTypeCallback(Ty.getType());
+
   return false;
 
 }
@@ -3922,6 +3935,17 @@ bool Parser::parseDeclSIL() {
       // is required for adding typedef operands to instructions.
       B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 
+      // Define a callback to be invoked on the deserialized types.
+      auto OldParsedTypeCallback = FunctionState.ParsedTypeCallback;
+      SWIFT_DEFER {
+        FunctionState.ParsedTypeCallback = OldParsedTypeCallback;
+      };
+
+      FunctionState.ParsedTypeCallback = [&OpenedArchetypesTracker,
+                                          &FunctionState](Type ty) {
+        OpenedArchetypesTracker.registerUsedOpenedArchetypes(ty);
+      };
+
       do {
         if (FunctionState.parseSILBasicBlock(B))
           return true;
@@ -3930,6 +3954,12 @@ bool Parser::parseDeclSIL() {
       SourceLoc RBraceLoc;
       parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                          LBraceLoc);
+
+      // Check that there are no unresolved forward definitions of opened
+      // archetypes.
+      if (OpenedArchetypesTracker.hasUnresolvedOpenedArchetypeDefinitions())
+        llvm_unreachable(
+            "All forward definitions of opened archetypes should be resolved");
     }
 
     FunctionState.F->setLinkage(resolveSILLinkage(FnLinkage, isDefinition));
