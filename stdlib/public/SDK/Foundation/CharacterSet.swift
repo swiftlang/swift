@@ -202,9 +202,14 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
         return CharacterSet(reference: NSCharacterSet.illegalCharacters as NSCharacterSet)
     }
     
-    /// Returns a character set containing the characters in Unicode General Category P*.
+    @available(*, unavailable, renamed: "punctuationCharacters")
     public static var punctuation : CharacterSet {
-        return CharacterSet(reference: NSCharacterSet.punctuation as NSCharacterSet)
+        return CharacterSet(reference: NSCharacterSet.punctuationCharacters as NSCharacterSet)
+    }
+
+    /// Returns a character set containing the characters in Unicode General Category P*.
+    public static var punctuationCharacters : CharacterSet {
+        return CharacterSet(reference: NSCharacterSet.punctuationCharacters as NSCharacterSet)
     }
     
     /// Returns a character set containing the characters in Unicode General Category Lt.

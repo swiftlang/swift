@@ -44,6 +44,8 @@ Classes:
     SwiftName: symbols
   - Name: newlineCharacterSet
     SwiftName: newlines
+  - Name: punctuationCharacterSet
+    SwiftName: punctuationCharacters
   Methods:
   - Selector: 'hasMemberInPlane:'
     SwiftName: hasMemberInPlane(_:)
