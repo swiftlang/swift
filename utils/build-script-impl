@@ -23,19 +23,6 @@ set -e
 
 umask 0022
 
-#
-# Options that can be "configured" by editing this file.
-#
-# These options are not exposed as command line options on purpose.  If you
-# need to change any of these, you should do so on trunk or in a branch.
-#
-
-LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64;PowerPC;SystemZ"
-
-#
-# End of configurable options.
-#
-
 # Declare the set of known settings along with each one's description
 #
 # If you add a user-settable variable, add it to this list.
@@ -236,6 +223,7 @@ KNOWN_SETTINGS=(
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
+    llvm-targets-to-build              "X86;ARM;AArch64;PowerPC;SystemZ" "The code generators that LLVM should build"
 )
 
 # Centralized access point for traced command invocation.
