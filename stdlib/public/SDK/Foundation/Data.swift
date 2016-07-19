@@ -644,11 +644,11 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     
     @available(*, unavailable, message: "use withUnsafeMutableBytes instead")
     public var mutableBytes: UnsafeMutablePointer<Void> { fatalError() }
-}
 
-/// Returns `true` if the two `Data` arguments are equal.
-public func ==(d1 : Data, d2 : Data) -> Bool {
-    return d1._wrapped.isEqual(to: d2)
+    /// Returns `true` if the two `Data` arguments are equal.
+    public static func ==(d1 : Data, d2 : Data) -> Bool {
+        return d1._wrapped.isEqual(to: d2)
+    }
 }
 
 /// Provides bridging functionality for struct Data to class NSData and vice-versa.

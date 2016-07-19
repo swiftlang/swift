@@ -424,11 +424,11 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     public func isSuperset(of other: CharacterSet) -> Bool {
         return _mapUnmanaged { $0.isSuperset(of: other) }
     }
-}
 
-/// Returns true if the two `CharacterSet`s are equal.
-public func ==(lhs : CharacterSet, rhs: CharacterSet) -> Bool {
-    return lhs._wrapped.isEqual(rhs as NSCharacterSet)
+    /// Returns true if the two `CharacterSet`s are equal.
+    public static func ==(lhs : CharacterSet, rhs: CharacterSet) -> Bool {
+        return lhs._wrapped.isEqual(rhs as NSCharacterSet)
+    }
 }
 
 

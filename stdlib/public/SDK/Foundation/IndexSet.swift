@@ -12,28 +12,32 @@
 
 @_exported import Foundation // Clang module
 
-public func ==(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-    return lhs.value == rhs.value && rhs.rangeIndex == rhs.rangeIndex
+extension IndexSet.Index {
+    public static func ==(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
+        return lhs.value == rhs.value && rhs.rangeIndex == rhs.rangeIndex
+    }
+
+    public static func <(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
+        return lhs.value < rhs.value && rhs.rangeIndex <= rhs.rangeIndex
+    }
+
+    public static func <=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
+        return lhs.value <= rhs.value && rhs.rangeIndex <= rhs.rangeIndex
+    }
+
+    public static func >(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
+        return lhs.value > rhs.value && rhs.rangeIndex >= rhs.rangeIndex
+    }
+
+    public static func >=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
+        return lhs.value >= rhs.value && rhs.rangeIndex >= rhs.rangeIndex
+    }
 }
 
-public func <(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-    return lhs.value < rhs.value && rhs.rangeIndex <= rhs.rangeIndex
-}
-
-public func <=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-    return lhs.value <= rhs.value && rhs.rangeIndex <= rhs.rangeIndex
-}
-
-public func >(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-    return lhs.value > rhs.value && rhs.rangeIndex >= rhs.rangeIndex
-}
-
-public func >=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-    return lhs.value >= rhs.value && rhs.rangeIndex >= rhs.rangeIndex
-}
-
-public func ==(lhs: IndexSet.RangeView, rhs: IndexSet.RangeView) -> Bool {
-    return lhs.startIndex == rhs.startIndex && lhs.endIndex == rhs.endIndex && lhs.indexSet == rhs.indexSet
+extension IndexSet.RangeView {
+    public static func ==(lhs: IndexSet.RangeView, rhs: IndexSet.RangeView) -> Bool {
+        return lhs.startIndex == rhs.startIndex && lhs.endIndex == rhs.endIndex && lhs.indexSet == rhs.indexSet
+    }
 }
 
 // We currently cannot use this mechanism because NSIndexSet is not abstract; it has its own ivars and therefore subclassing it using the same trick as NSData, etc. does not work.
@@ -837,8 +841,10 @@ private struct IndexSetBoundaryIterator : IteratorProtocol {
     }
 }
 
-public func ==(lhs: IndexSet, rhs: IndexSet) -> Bool {
-    return lhs._handle.map { $0.isEqual(to: rhs) }
+extension IndexSet {
+    public static func ==(lhs: IndexSet, rhs: IndexSet) -> Bool {
+        return lhs._handle.map { $0.isEqual(to: rhs) }
+    }
 }
 
 private func _toNSRange(_ r : Range<IndexSet.Element>) -> NSRange {

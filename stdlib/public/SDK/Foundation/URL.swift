@@ -1117,10 +1117,10 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     private var reference : NSURL {
         return _url
     }
-}
 
-public func ==(lhs: URL, rhs: URL) -> Bool {
-    return lhs.reference.isEqual(rhs.reference)
+    public static func ==(lhs: URL, rhs: URL) -> Bool {
+        return lhs.reference.isEqual(rhs.reference)
+    }
 }
 
 extension URL : _ObjectiveCBridgeable {
