@@ -423,6 +423,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
+    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>())),
     TheNativeObjectType(new (*this, AllocationArena::Permanent)
                            BuiltinNativeObjectType(*this)),
     TheBridgeObjectType(new (*this, AllocationArena::Permanent)
@@ -800,26 +801,6 @@ TypeAliasDecl *ASTContext::getVoidDecl() const {
 
   return Impl.VoidDecl;
 }
-
-
-TypeAliasDecl *ASTContext::getAnyDecl() const {
-  if (Impl.AnyDecl) {
-    return Impl.AnyDecl;
-  }
-
-  // Go find 'Any' in the Swift module.
-  SmallVector<ValueDecl *, 1> results;
-  lookupInSwiftModule("Any", results);
-  for (auto result : results) {
-    if (auto typeAlias = dyn_cast<TypeAliasDecl>(result)) {
-      Impl.AnyDecl = typeAlias;
-      break;
-    }
-  }
-
-  return Impl.AnyDecl;
-}
-
 
 StructDecl *ASTContext::getObjCBoolDecl() {
   if (!Impl.ObjCBoolDecl) {

@@ -832,7 +832,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       comp->getIdentifier() == TC.Context.Id_Self) {
     auto func = cast<FuncDecl>(DC);
     assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
-
+    
     return func->getDynamicSelf();
   }
 
@@ -3182,7 +3182,7 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   SmallVector<ProtocolDecl *, 4> Protocols;
   if (T->isExistentialType(Protocols)) {
     if (Protocols.empty()) {
-      // protocol<> is not @objc.
+      // Any is not @objc.
       diagnose(TypeRange.Start, diag::not_objc_empty_protocol_composition);
       return;
     }

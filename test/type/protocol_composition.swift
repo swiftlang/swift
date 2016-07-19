@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func canonical_empty_protocol() -> protocol<> {
+func canonical_empty_protocol() -> Any {
   return 1
 }
 
@@ -22,26 +22,29 @@ protocol P4 : P3 {
   func f(_: Double) -> Double
 }
 
-typealias Any = protocol<>
-typealias Any2 = protocol< >
+typealias Any1 = protocol<> // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}}
+typealias Any2 = protocol< > // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}}
 
-// Okay to inherit a typealias for a protocol<> type.
+// Okay to inherit a typealias for Any type.
 protocol P5 : Any { }
+protocol P6 : protocol<> { } // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}}
+                             // expected-error@-1 {{protocol composition is neither allowed nor needed here}}
+typealias P7 = Any & Any1
 
 extension Int : P5 { }
 
-typealias Bogus = protocol<P1, Int> // expected-error{{non-protocol type 'Int' cannot be used within 'protocol<...>'}}
+typealias Bogus = P1 & Int // expected-error{{non-protocol type 'Int' cannot be used within a protocol composition}}
 
 func testEquality() {
   // Remove duplicates from protocol-conformance types.
-  let x1 : (_ : protocol<P2, P4>) -> ()
-  let x2 : (_ : protocol<P3, P4, P2, P1>) -> ()
+  let x1 : (_ : P2 & P4) -> ()
+  let x2 : (_ : P3 & P4 & P2 & P1) -> ()
   x1 = x2
   _ = x1
 
   // Singleton protocol-conformance types, after duplication, are the same as
   // simply naming the protocol type.
-  let x3 : (_ : protocol<P2, P1>) -> ()
+  let x3 : (_ : P2 & P1) -> ()
   let x4 : (_ : P2) -> ()
   x3 = x4
   _ = x3
@@ -52,15 +55,15 @@ func testEquality() {
   x5 = x6
   _ = x5
 
-  let x7 : (_ : protocol<P1, P3>) -> ()
-  let x8 : (_ : protocol<P2>) -> ()
-  x7 = x8 // expected-error{{cannot assign value of type '(P2) -> ()' to type '(protocol<P1, P3>) -> ()'}}
+  let x7 : (_ : P1 & P3) -> ()
+  let x8 : (_ : P2) -> ()
+  x7 = x8 // expected-error{{cannot assign value of type '(P2) -> ()' to type '(P1 & P3) -> ()'}}
   _ = x7
 }
 
 // Name lookup into protocol-conformance types
 func testLookup() {
-  let x1 : protocol<P2, P1, P4>
+  let x1 : P2 & P1 & P4
   x1.p1()
   x1.p2()
   x1.p3()
@@ -93,13 +96,13 @@ extension Struct1 : REPLPrintable, FooProtocol {
   func format(_ kind: UnicodeScalar, layout: String) -> String {}
 }
 
-func accept_manyPrintable(_: protocol<REPLPrintable, FooProtocol>) {}
+func accept_manyPrintable(_: REPLPrintable & FooProtocol) {}
 
-func return_superPrintable() -> protocol<FooProtocol, SuperREPLPrintable> {}
+func return_superPrintable() -> FooProtocol & SuperREPLPrintable {}
 
 func testConversion() {
   // Conversions for literals.
-  var x : protocol<REPLPrintable, FooProtocol> = Struct1()
+  var x : REPLPrintable & FooProtocol = Struct1()
   accept_manyPrintable(Struct1())
 
   // Conversions for nominal types that conform to a number of protocols.
@@ -108,17 +111,22 @@ func testConversion() {
   accept_manyPrintable(sp)
 
   // Conversions among existential types.
-  var x2 : protocol<SuperREPLPrintable, FooProtocol>
-  x2 = x // expected-error{{value of type 'protocol<FooProtocol, REPLPrintable>' does not conform to 'protocol<FooProtocol, SuperREPLPrintable>' in assignment}}
+  var x2 : protocol<SuperREPLPrintable, FooProtocol> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+  x2 = x // expected-error{{value of type 'FooProtocol & REPLPrintable' does not conform to 'FooProtocol & SuperREPLPrintable' in assignment}}
   x = x2
 
   // Subtyping
-  var _ : () -> protocol<FooProtocol, SuperREPLPrintable> = return_superPrintable
+  var _ : () -> FooProtocol & SuperREPLPrintable = return_superPrintable
 
   // FIXME: closures make ABI conversions explicit. rdar://problem/19517003
-  var _ : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable() }
+  var _ : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable() } // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
 }
 
 // Test the parser's splitting of >= into > and =.
-var x : protocol<P5>=17
+var x : protocol<P5>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+
+typealias A = protocol<> // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}} {{15-25=Any}}
+typealias B = protocol<P1, P2> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{15-24=}} {{26-27= &}} {{30-31=}}
+
+
 

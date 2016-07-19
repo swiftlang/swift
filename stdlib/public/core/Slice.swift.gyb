@@ -100,7 +100,7 @@ def get_slice_doc_comment(Self):
 %         BaseRequirements.append('MutableIndexable')
 %       if RangeReplaceable:
 %         BaseRequirements.append('RangeReplaceableIndexable')
-%       BaseRequirements = 'protocol<' + ', '.join(BaseRequirements) + '>'
+%       BaseRequirements = ' & '.join(BaseRequirements)
 %       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 
 ${get_slice_doc_comment(Self)}

@@ -258,7 +258,8 @@ public:
 
 /// A TypeInfo implementation for existential types, i.e., types like:
 ///   Printable
-///   protocol<Printable, Serializable>
+///   Printable & Serializable
+///   Any
 /// with the semantic translation:
 ///   \exists t : Printable . t
 /// t here is an ArchetypeType.

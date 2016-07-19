@@ -473,20 +473,17 @@ create a new protocol aggregating those protocols::
 
 However, this only makes sense when the resulting protocol is a useful
 abstraction. A SerializableDocument may or may not be a useful abstraction. When
-it is not useful, one can instead use protocol<> types to compose different
-protocols, e.g.,::
+it is not useful, one can instead use '&' types to compose different protocols, e.g.,::
 
-  var doc : protocol<Document, Serializable>
+  var doc : Document & Serializable
 
 Here, doc has an existential type that is known to conform to both the Document
 and Serializable protocols. This gives rise to a natural "top" type, such that
 every type in the language is a subtype of "top". Java has java.lang.Object, C#
 has object, Objective-C has "id" (although "id" is weird, because it is also
 convertible to everything; it's best not to use it as a model). In Swift, the
-"top" type is simply an empty protocol composition::
+"top" type is simply an empty protocol composition: ``Any``::
 
-  typealias Any = protocol<>
-  
   var value : Any = 17 // an any can hold an integer
   value = "hello" // or a String
   value = (42, "hello", Red) // or anything else
@@ -858,9 +855,9 @@ is effectively parsed as::
 
 by splitting the '>>' operator token into two '>' operator tokens.
 
-However, this is manageable, and is already implemented for protocol composition
-(protocol<>). The larger problem occurs at expression context, where the parser
-cannot disambiguate the tokens::
+However, this is manageable, and is already implemented for the (now depreacted)
+protocol composition syntax (protocol<>). The larger problem occurs at expression
+context, where the parser cannot disambiguate the tokens::
 
   Matrix<Double>(10, 10)
 

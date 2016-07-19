@@ -100,7 +100,7 @@ func patternIs3() {
 
 func patternIsGeneric1<
     GenericFoo : FooProtocol,
-    GenericBar : protocol<FooProtocol, BarProtocol>,
+    GenericBar : FooProtocol & BarProtocol,
     GenericBaz>(x: FooClass) {
   switch x {
   case is #^PATTERN_IS_GENERIC_1^#
@@ -116,11 +116,11 @@ func patternIsGeneric1<
 
 struct PatternIsGeneric2<
     StructGenericFoo : FooProtocol,
-    StructGenericBar : protocol<FooProtocol, BarProtocol>,
+    StructGenericBar : FooProtocol & BarProtocol,
     StructGenericBaz> {
   func patternIsGeneric2<
       GenericFoo : FooProtocol,
-      GenericBar : protocol<FooProtocol, BarProtocol>,
+      GenericBar : FooProtocol & BarProtocol,
       GenericBaz>(x: FooClass) {
     switch x {
     case is #^PATTERN_IS_GENERIC_2^#

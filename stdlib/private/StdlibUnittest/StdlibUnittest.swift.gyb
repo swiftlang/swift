@@ -273,7 +273,7 @@ public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
 extension Range
 %   if 'Countable' in OtherRange:
   where
-  Bound : protocol<Comparable, _Strideable>, Bound.Stride : SignedInteger
+  Bound : Comparable & _Strideable, Bound.Stride : SignedInteger
 %   end
 {
   internal func _contains(_ other: ${OtherRange}<Bound>) -> Bool {

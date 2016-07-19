@@ -247,24 +247,24 @@ protocol Runcible {
 
 protocol Bendable { }
 
-// CHECK-LABEL: $@convention(thin) (@in protocol<Bendable, Runcible>) -> @out Runcible
-sil [fragile] @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in protocol<Bendable, Runcible>) -> (@out Runcible) {
-bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
+// CHECK-LABEL: $@convention(thin) (@in Bendable & Runcible) -> @out Runcible
+sil [fragile] @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in Bendable & Runcible) -> (@out Runcible) {
+bb0(%0 : $*Runcible, %1 : $*Bendable & Runcible):
   // CHECK: alloc_box
-  %2 = alloc_box $protocol<Bendable, Runcible>
-  %2a = project_box %2 : $@box protocol<Bendable, Runcible>
-  // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*protocol<Bendable, Runcible>
-  %3 = copy_addr [take] %1 to [initialization] %2a : $*protocol<Bendable, Runcible>
+  %2 = alloc_box $Bendable & Runcible
+  %2a = project_box %2 : $@box Bendable & Runcible
+  // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*Bendable & Runcible
+  %3 = copy_addr [take] %1 to [initialization] %2a : $*Bendable & Runcible
   // CHECK: alloc_stack
-  %4 = alloc_stack $protocol<Bendable, Runcible>
-  // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*protocol<Bendable, Runcible>
-  %5 = copy_addr %2a to [initialization] %4 : $*protocol<Bendable, Runcible>
+  %4 = alloc_stack $Bendable & Runcible
+  // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*Bendable & Runcible
+  %5 = copy_addr %2a to [initialization] %4 : $*Bendable & Runcible
   %7 = tuple ()
   // CHECK: destroy_addr
-  %8 = destroy_addr %4 : $*protocol<Bendable, Runcible>
+  %8 = destroy_addr %4 : $*Bendable & Runcible
   // CHECK: dealloc_stack
-  %9 = dealloc_stack %4 : $*protocol<Bendable, Runcible>
-  %10 = strong_release %2 : $@box protocol<Bendable, Runcible>
+  %9 = dealloc_stack %4 : $*Bendable & Runcible
+  %10 = strong_release %2 : $@box Bendable & Runcible
   // CHECK: return
   %11 = return %7 : $()
 }
@@ -1324,7 +1324,7 @@ bb0:
   %13 = function_ref @return_constant : $@convention(thin) () -> Int
   %23 = function_ref @existentials : $@convention(thin) (@in P) -> ()
   %25 = function_ref @classes : $@convention(thin) () -> ()
-  %27 = function_ref @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in protocol<Bendable, Runcible>) -> @out Runcible
+  %27 = function_ref @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in Bendable & Runcible) -> @out Runcible
   %29 = function_ref @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@convention(thin) (@owned ClassBound) -> ()
   %31 = function_ref @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
   %33 = function_ref @_TFV6struct5AlephCfMS0_FT_S0_ : $@convention(thin) (@thin Aleph.Type) -> Aleph

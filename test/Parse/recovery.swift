@@ -281,7 +281,7 @@ struct ErrorTypeInVarDecl7 {
 }
 
 struct ErrorTypeInVarDecl8 {
-  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol composition type}} expected-note {{to match this opening '<'}}
+  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol composition type}} expected-note {{to match this opening '<'}} expected-warning{{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
   var v2 : Int
 }
 
@@ -291,23 +291,43 @@ struct ErrorTypeInVarDecl9 {
 }
 
 struct ErrorTypeInVarDecl10 {
-  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol composition type}} expected-note {{to match this opening '<'}}
+  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol composition type}} expected-note {{to match this opening '<'}} expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
   var v2 : Int
 }
 
 struct ErrorTypeInVarDecl11 {
-  var v1 : protocol<FooProtocol, // expected-error {{expected identifier for type name}}
+  var v1 : protocol<FooProtocol, // expected-error {{expected identifier for type name}} expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
   var v2 : Int
 }
 
 func ErrorTypeInPattern1(_: protocol<) { } // expected-error {{expected identifier for type name}}
-
-func ErrorTypeInPattern2(_: protocol<F) { } // expected-error {{expected '>' to complete protocol composition type}}
-// expected-note@-1 {{to match this opening '<'}}
-// expected-error@-2 {{use of undeclared type 'F'}}
+                                           // expected-warning @-1 {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+func ErrorTypeInPattern2(_: protocol<F) { } // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+                                            // expected-error@-1 {{expected '>' to complete protocol composition type}}
+                                            // expected-note@-2 {{to match this opening '<'}}
+                                            // expected-error@-3 {{use of undeclared type 'F'}}
 
 func ErrorTypeInPattern3(_: protocol<F,) { } // expected-error {{expected identifier for type name}}
-// expected-error@-1 {{use of undeclared type 'F'}}
+                                             // expected-error@-1 {{use of undeclared type 'F'}}
+                                             // expected-warning@-2 {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+
+struct ErrorTypeInVarDecl12 {
+  var v1 : FooProtocol & // expected-error{{expected identifier for type name}}
+  var v2 : Int
+}
+
+struct ErrorTypeInVarDecl13 { // expected-note {{in declaration of 'ErrorTypeInVarDecl13'}}
+  var v1 : & FooProtocol // expected-error {{expected type}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error{{expected declaration}} 
+  var v2 : Int
+}
+
+struct ErrorTypeInVarDecl16 {
+  var v1 : FooProtocol & // expected-error {{expected identifier for type name}}
+  var v2 : Int
+}
+
+func ErrorTypeInPattern4(_: FooProtocol & ) { } // expected-error {{expected identifier for type name}}
+
 
 struct ErrorGenericParameterList1< // expected-error {{expected an identifier to name generic parameter}} expected-error {{expected '{' in struct}}
 

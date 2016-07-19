@@ -86,18 +86,18 @@ bb0(%0 : $*NontrivialStruct):
 // Inout deshadowing should *not* deshadow inouts that are copied to temporaries for use by
 // @in arguments. <rdar://problem/16105449>
 
-sil @in_argument : $@convention(thin) (@in protocol<>) -> ()
+sil @in_argument : $@convention(thin) (@in Any) -> ()
 
 // CHECK-LABEL: sil @inout_argument_passed_to_in_argument
-sil @inout_argument_passed_to_in_argument : $@convention(thin) (@inout protocol<>) -> () {
-// CHECK:       bb0([[INOUT:%.*]] : $*protocol<>):
-entry(%0 : $*protocol<>):
-  %f = function_ref @in_argument : $@convention(thin) (@in protocol<>) -> ()
-  %x = alloc_stack $protocol<>
+sil @inout_argument_passed_to_in_argument : $@convention(thin) (@inout Any) -> () {
+// CHECK:       bb0([[INOUT:%.*]] : $*Any):
+entry(%0 : $*Any):
+  %f = function_ref @in_argument : $@convention(thin) (@in Any) -> ()
+  %x = alloc_stack $Any
   // CHECK:       copy_addr [[INOUT]] to [initialization]
-  copy_addr %0 to [initialization] %x : $*protocol<>
-  %z = apply %f(%x) : $@convention(thin) (@in protocol<>) -> ()
-  dealloc_stack %x : $*protocol<>
+  copy_addr %0 to [initialization] %x : $*Any
+  %z = apply %f(%x) : $@convention(thin) (@in Any) -> ()
+  dealloc_stack %x : $*Any
   return %z : $()
 }
 

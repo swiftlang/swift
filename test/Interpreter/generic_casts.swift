@@ -19,11 +19,11 @@ func allToIntOrZero<T>(_ x: T) -> Int {
   return 0
 }
 
-func anyToInt(_ x: protocol<>) -> Int {
+func anyToInt(_ x: Any) -> Int {
   return x as! Int
 }
 
-func anyToIntOrZero(_ x: protocol<>) -> Int {
+func anyToIntOrZero(_ x: Any) -> Int {
   if x is Int {
     return x as! Int
   }
@@ -58,11 +58,11 @@ func allToCOrE<T>(_ x: T) -> C {
   return E()
 }
 
-func anyToC(_ x: protocol<>) -> C {
+func anyToC(_ x: Any) -> C {
   return x as! C
 }
 
-func anyToCOrE(_ x: protocol<>) -> C {
+func anyToCOrE(_ x: Any) -> C {
   if x is C {
     return x as! C
   }
@@ -80,11 +80,11 @@ func allClassesToCOrE<T : Class>(_ x: T) -> C {
   return E()
 }
 
-func anyClassToC(_ x: protocol<Class>) -> C {
+func anyClassToC(_ x: Class) -> C {
   return x as! C
 }
 
-func anyClassToCOrE(_ x: protocol<Class>) -> C {
+func anyClassToCOrE(_ x: Class) -> C {
   if x is C {
     return x as! C
   }

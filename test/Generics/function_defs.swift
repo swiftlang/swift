@@ -54,7 +54,7 @@ func otherExistential<T : EqualComparable>(_ t1: T) {
   otherEqComp2 = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp2
 
-  _ = t1 as protocol<EqualComparable, OtherEqualComparable> // expected-error{{'T' is not convertible to 'protocol<EqualComparable, OtherEqualComparable>'; did you mean to use 'as!' to force downcast?}} {{10-12=as!}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
+  _ = t1 as EqualComparable & OtherEqualComparable // expected-error{{'T' is not convertible to 'EqualComparable & OtherEqualComparable'; did you mean to use 'as!' to force downcast?}} {{10-12=as!}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
 }
 
 protocol Runcible {
@@ -144,7 +144,7 @@ protocol IntSubscriptable {
   subscript (index : Int) -> ElementType { get  }
 }
 
-func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(_ t: T) {
+func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {
   var index = t.getIndex()
   var value = t.getValue()
   var element = t.getElement()

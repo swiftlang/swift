@@ -19,7 +19,7 @@ func concreteTypes() {
 
 func existentialMetatypes(nonClass: NonClassProto.Type,
                           classConstrained: ClassConstrainedProto.Type,
-                          compo: protocol<NonClassProto, ClassConstrainedProto>.Type) {
+                          compo: (NonClassProto & ClassConstrainedProto).Type) {
   takesAnyObject(nonClass) // expected-error{{argument type 'NonClassProto.Type' does not conform to expected type 'AnyObject'}}
   takesAnyObject(classConstrained)
   takesAnyObject(compo)

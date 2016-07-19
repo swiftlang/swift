@@ -3465,12 +3465,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     NodePointer type_list = pointer->getChild(0);
     if (!type_list)
       return;
-    bool needs_proto_marker = (type_list->getNumChildren() != 1);
-    if (needs_proto_marker)
-      Printer << "protocol<";
-    printChildren(type_list, ", ");
-    if (needs_proto_marker)
-      Printer << ">";
+    if (type_list->getNumChildren() == 0)
+      Printer << "Any";
+    else
+      printChildren(type_list, " & ");
     return;
   }
   case Node::Kind::Archetype: {

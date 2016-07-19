@@ -11,7 +11,7 @@ protocol B {
 }
 
 // CHECK-DAG: _TtP5pcomp1AS_1B_
-func f(_ arg :protocol<A,B>) {
+func f(_ arg : A & B) {
 }
 
 

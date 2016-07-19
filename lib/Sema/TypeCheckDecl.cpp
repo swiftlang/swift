@@ -389,7 +389,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
                                      inheritedClause[i-1].getSourceRange().End);
       SourceLoc afterMyEndLoc
         = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                     inherited.getSourceRange().End);
+                                     inherited.getSourceRange().Start);
 
       diagnose(inherited.getSourceRange().Start,
                diag::duplicate_inheritance, inheritedTy)
@@ -853,7 +853,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   // If there's no type yet, come back to it later.
   if (!current->hasType())
     return;
-
+  
   // Make sure we don't do this checking again.
   current->setCheckedRedeclaration(true);
 

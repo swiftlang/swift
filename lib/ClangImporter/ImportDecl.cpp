@@ -1535,7 +1535,22 @@ namespace {
         if (Name.str() == "id" && Impl.SwiftContext.LangOpts.EnableIdAsAny) {
           Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
               MappedTypeNameKind::DoNothing;
-          return Impl.SwiftContext.getAnyDecl();
+
+          auto DC = Impl.importDeclContextOf(Decl, importedName.EffectiveContext);
+          if (!DC) return nullptr;
+
+          auto loc = Impl.importSourceLoc(Decl->getLocStart());
+          auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
+                          Decl, loc, Name, loc,
+                          TypeLoc::withoutLoc(Impl.SwiftContext.TheAnyType),
+                          /*genericparams*/nullptr, DC);
+
+          auto attr = AvailableAttr::createUnconditional(
+                        Impl.SwiftContext, "'id' is not available in Swift; use 'Any'",
+                        "", UnconditionalAvailabilityKind::UnavailableInSwift);
+
+          Result->getAttrs().add(attr);
+          return Result;
         }
       
         bool IsError;

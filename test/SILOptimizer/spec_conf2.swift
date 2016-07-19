@@ -14,9 +14,9 @@ class Foo: P, Q {
 }
 
 @inline(never)
-func inner_function<T : protocol<P, Q> >(In In : T) { }
+func inner_function<T : P & Q>(In In : T) { }
 @inline(never)
-func outer_function<T : protocol<P, Q> >(In In : T) { inner_function(In: In) }
+func outer_function<T : P & Q>(In In : T) { inner_function(In: In) }
 
 //CHECK: sil shared [noinline] @_TTSg5C10spec_conf23FooS0_S_1PS_S0_S_1QS____TF10spec_conf214outer_function
 //CHECK: function_ref @_TTSg5C10spec_conf23FooS0_S_1PS_S0_S_1QS____TF10spec_conf214inner_function

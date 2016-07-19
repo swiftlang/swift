@@ -3294,6 +3294,12 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return !arch->isOpenedExistential();
     }
 
+    case TypeKind::ProtocolComposition: {
+      // 'Any' and single protocol compositions are simple
+      auto composition = type->getAs<ProtocolCompositionType>();
+      return composition->getProtocols().size() <= 1;
+    }
+
     default:
       return true;
     }
@@ -4043,16 +4049,18 @@ public:
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *T) {
-    Printer << tok::kw_protocol << "<";
-    bool First = true;
-    for (auto Proto : T->getProtocols()) {
-      if (First)
-        First = false;
-      else
-        Printer << ", ";
-      visit(Proto);
+    if (T->getProtocols().empty()) {
+      Printer << "Any";
+    } else {
+      bool First = true;
+      for (auto Proto : T->getProtocols()) {
+        if (First)
+          First = false;
+        else
+          Printer << " & ";
+        visit(Proto);
+      }
     }
-    Printer << ">";
   }
 
   void visitLValueType(LValueType *T) {
