@@ -718,27 +718,25 @@ public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
 /// A protocol for `AnyCollection<Element>`,
 /// `AnyBidirectionalCollection<Element>`, and
 /// `AnyRandomAccessCollection<Element>`.
-///
-/// This protocol can be considered an implementation detail of the
-/// `===` and `!==` implementations for these types.
 public protocol AnyCollectionProtocol : Collection {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `_underlyingCollectionID`.
   var _underlyingCollectionID: ObjectIdentifier { get }
+
+  /// Returns `true` iff `self` and `other` use the same `_box` to store their
+  /// underlying collections.
+  func _storesSameUnderlyingCollection<
+    C: AnyCollectionProtocol
+  >(_ other: C) -> Bool
 }
 
-/// Returns `true` iff `lhs` and `rhs` store the same underlying collection.
-public func === <
-  L : AnyCollectionProtocol, R : AnyCollectionProtocol
->(lhs: L, rhs: R) -> Bool {
-  return lhs._underlyingCollectionID == rhs._underlyingCollectionID
-}
-
-/// Returns `false` iff `lhs` and `rhs` store the same underlying collection.
-public func !== <
-  L : AnyCollectionProtocol, R : AnyCollectionProtocol
->(lhs: L, rhs: R) -> Bool {
-  return lhs._underlyingCollectionID != rhs._underlyingCollectionID
+extension AnyCollectionProtocol {
+  public // @testable
+  func _storesSameUnderlyingCollection<
+    C: AnyCollectionProtocol
+  >(_ other: C) -> Bool {
+    return _underlyingCollectionID == other._underlyingCollectionID
+  }
 }
 
 % for (ti, Traversal) in enumerate(TRAVERSALS):
@@ -1001,5 +999,19 @@ public func anyGenerator<G : IteratorProtocol>(_ base: G) -> AnyIterator<G.Eleme
 
 @available(*, unavailable, renamed: "AnyIterator.init(_:)")
 public func anyGenerator<Element>(_ body: () -> Element?) -> AnyIterator<Element> {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable)
+public func === <
+  L : AnyCollectionProtocol, R : AnyCollectionProtocol
+>(lhs: L, rhs: R) -> Bool {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable)
+public func !== <
+  L : AnyCollectionProtocol, R : AnyCollectionProtocol
+>(lhs: L, rhs: R) -> Bool {
   Builtin.unreachable()
 }
