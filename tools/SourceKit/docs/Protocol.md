@@ -393,6 +393,68 @@ range ::=
 
 Sub-diagnostics are only diagnostic notes currently.
 
+# Demangling
+
+SourceKit is capable of "demangling" mangled Swift symbols. In other words,
+it's capable of taking the symbol `_TF13MyCoolPackageg6raichuVS_7Pokemon` as
+input, and returning the human-readable
+`MyCoolPackage.raichu.getter : MyCoolPackage.Pokemon`.
+
+### Request
+
+```
+{
+    <key.request>: (UID) <source.request.demangle>,
+    <key.names>:   [string*] // An array of names to demangle.
+}
+```
+
+### Response
+
+```
+{
+    <key.results>: (array) [demangle-result+] // The results for each
+                                              // demangling, in the order in
+                                              // which they were requested.
+}
+```
+
+```
+demangle-result ::=
+{
+    <key.name>: (string) // The demangled name.
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=demangle [<names>]
+```
+
+For example, to demangle the symbol `_TF13MyCoolPackageg6raichuVS_7Pokemon`:
+
+```
+$ sourcekitd-test -req=demangle _TF13MyCoolPackageg6raichuVS_7Pokemon
+```
+
+Note that when using `sourcekitd-test`, the output is output in an ad hoc text
+format, not JSON.
+
+You could also issue the following request in the `sourcekitd-repl`, which
+produces JSON:
+
+```
+$ sourcekitd-repl
+Welcome to SourceKit.  Type ':help' for assistance.
+(SourceKit) {
+    key.request: source.request.demangle,
+    key.names: [
+      "_TF13MyCoolPackageg6raichuVS_7Pokemon"
+    ]
+}
+```
+
 # UIDs
 
 ## Keys
@@ -410,4 +472,3 @@ Sub-diagnostics are only diagnostic notes currently.
 - `key.sourcetext`
 - `key.typename`
 - `key.usr`
-
