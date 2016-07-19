@@ -295,10 +295,10 @@ func _Optional<T>(x: T) {
   _ = Optional<T>.Some(x) // expected-error {{'Some' has been renamed to 'some'}} {{19-23=some}} {{none}}
 }
 
-func _OutputStream() {
-  func fn<S : OutputStreamType>(_: S) {} // expected-error {{'OutputStreamType' has been renamed to 'OutputStream'}} {{15-31=OutputStream}} {{none}}
+func _TextOutputStream() {
+  func fn<S : OutputStreamType>(_: S) {} // expected-error {{'OutputStreamType' has been renamed to 'TextOutputStream'}} {{15-31=TextOutputStream}} {{none}}
 }
-func _OutputStream<S : Streamable, O : OutputStream>(s: S, o: O) {
+func _TextOutputStream<S : Streamable, O : TextOutputStream>(s: S, o: O) {
   var o = o
   s.writeTo(&o) // expected-error {{'writeTo' has been renamed to 'write(to:)'}} {{5-12=write}} {{13-13=to: }} {{none}}
 }
@@ -312,7 +312,7 @@ func _Print<T>(x: T) {
   debugPrint(x, appendNewline: true) // expected-error {{'debugPrint(_:appendNewline:)' is unavailable: Please use 'terminator: ""' instead of 'appendNewline: false': 'debugPrint((...), terminator: "")'}} {{none}}
 }
 
-func _Print<T, O : OutputStream>(x: T, o: O) {
+func _Print<T, O : TextOutputStream>(x: T, o: O) {
   // FIXME: Not working due to <rdar://22101775>
   //var o = o
   //print(x, &o) // xpected-error {{}} {{none}}
