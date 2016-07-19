@@ -1404,6 +1404,24 @@ public func _setBridgeFromObjectiveCConditional<
   }
   return result
 }
+#else
+
+public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
+  -> Set<BaseValue> {
+  fatalError("_setUpCast is unimplemented")
+}
+
+public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
+  -> Set<DerivedValue> {
+  fatalError("_setDownCast is unimplemented")
+}
+
+public func _setDownCastConditional<BaseValue, DerivedValue>(
+  _ source: Set<BaseValue>
+) -> Set<DerivedValue>? {
+  fatalError("_setDownCastConditional is unimplemented")
+}
+
 #endif
 
 //===--- APIs unique to Dictionary<Key, Value> ----------------------------===//
@@ -2401,6 +2419,28 @@ public func _dictionaryBridgeFromObjectiveCConditional<
   }
   return result
 }
+#else
+
+public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
+    _ source: Dictionary<DerivedKey, DerivedValue>
+) -> Dictionary<BaseKey, BaseValue> {
+  fatalError("_dictionaryUpCast is unimplemented")
+}
+
+public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
+  _ source: Dictionary<BaseKey, BaseValue>
+) -> Dictionary<DerivedKey, DerivedValue> {
+  fatalError("_dictionaryDownCast is unimplemented")
+}
+
+public func _dictionaryDownCastConditional<
+  BaseKey, BaseValue, DerivedKey, DerivedValue
+>(
+  _ source: Dictionary<BaseKey, BaseValue>
+) -> Dictionary<DerivedKey, DerivedValue>? {
+  fatalError("_dictionaryDownCastConditional is unimplemented")
+}
+
 #endif
 
 //===--- APIs templated for Dictionary and Set ----------------------------===//
