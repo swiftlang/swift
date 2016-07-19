@@ -109,7 +109,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
     
     withUnsafeMutablePointerToElements {
       (p: UnsafeMutablePointer<T>) -> () in
-      (p + count).initialize(with: x)
+      (p + count).initialize(to: x)
     }
     self.count = count + 2
   }

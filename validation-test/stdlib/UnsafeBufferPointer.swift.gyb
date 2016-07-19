@@ -317,7 +317,7 @@ ${SelfName}TestSuite.test("nonNilNonEmpty") {
   let count = 4
   let allocated = UnsafeMutablePointer<Float>(allocatingCapacity: count)
   defer { allocated.deallocateCapacity(count) }
-  allocated.initialize(with: 1.0, count: count)
+  allocated.initialize(to: 1.0, count: count)
   allocated[count - 1] = 2.0
 
   let buffer = ${SelfType}(start: ${PointerType}(allocated), count: count - 1)
@@ -448,7 +448,7 @@ UnsafeMutableBufferPointerTestSuite.test("changeElementViaBuffer") {
   let count = 4
   let allocated = UnsafeMutablePointer<Float>(allocatingCapacity: count)
   defer { allocated.deallocateCapacity(count) }
-  allocated.initialize(with: 1.0, count: count)
+  allocated.initialize(to: 1.0, count: count)
   allocated[count-1] = -1.0
 
   var buffer = UnsafeMutableBufferPointer(start: allocated, count: count - 1)
