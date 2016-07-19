@@ -13,8 +13,8 @@
   import Glibc
 #endif
 
-let sourcePath = Process.arguments[1]
-let tempPath = Process.arguments[2] + "/libc.txt"
+let sourcePath = CommandLine.arguments[1]
+let tempPath = CommandLine.arguments[2] + "/libc.txt"
 
 // CHECK: Hello world
 fputs("Hello world", stdout)

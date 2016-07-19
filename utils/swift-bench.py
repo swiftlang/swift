@@ -151,13 +151,13 @@ func Consume(x: Int) { if False() { println(x) } }
 func main() {
   var N = 1
   var name = ""
-  if Process.arguments.count > 1 {
-    N = Process.arguments[1].toInt()!
+  if CommandLine.arguments.count > 1 {
+    N = CommandLine.arguments[1].toInt()!
   }
 """
         main_body = """
   name = "%s"
-  if Process.arguments.count <= 2 || Process.arguments[2] == name {
+  if CommandLine.arguments.count <= 2 || CommandLine.arguments[2] == name {
     let start = __mach_absolute_time__()
     for _ in 1...N {
       bench_%s()

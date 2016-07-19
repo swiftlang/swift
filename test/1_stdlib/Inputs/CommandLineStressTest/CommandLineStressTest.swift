@@ -1,10 +1,10 @@
-// Do not change the SIL name for this without also changing ProcessStressTest.c
-@_silgen_name("swift_process_test_getProcessArgs")
+// Do not change the SIL name for this without also changing CommandLineStressTest.c
+@_silgen_name("swift_commandline_test_getProcessArgs")
 public func runTest() {
-  let ProcessRaceTestSuite = TestSuite("Process Race")
+  let CommandLineRaceTestSuite = TestSuite("CommandLine Race")
 
-  ProcessRaceTestSuite.test("passes") {
-    runRaceTest(ProcessRace.self, trials: 1)
+  CommandLineRaceTestSuite.test("passes") {
+    runRaceTest(CommandLineRace.self, trials: 1)
   }
 
   runAllTests()
@@ -12,16 +12,16 @@ public func runTest() {
 
 import StdlibUnittest
 
-struct ProcessRace : RaceTestWithPerTrialData {
-  class ProcessRaceData {
+struct CommandLineRace : RaceTestWithPerTrialData {
+  class CommandLineRaceData {
     init() {}
   }
 
   typealias ThreadLocalData = Void
   typealias Observation = Observation1UInt
 
-  func makeRaceData() -> ProcessRaceData {
-    return ProcessRaceData()
+  func makeRaceData() -> CommandLineRaceData {
+    return CommandLineRaceData()
   }
 
   func makeThreadLocalData() -> Void {
@@ -29,9 +29,9 @@ struct ProcessRace : RaceTestWithPerTrialData {
   }
 
   func thread1(
-    _ raceData: ProcessRaceData, _ threadLocalData: inout ThreadLocalData
+    _ raceData: CommandLineRaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
-    let argptr = Process.unsafeArgv
+    let argptr = CommandLine.unsafeArgv
     return Observation(unsafeBitCast(argptr, to: UInt.self))
   }
 
