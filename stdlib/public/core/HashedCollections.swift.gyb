@@ -12,6 +12,7 @@
 
 import SwiftShims
 
+// TODO: swift-3-indexing-model: rewrite this description to reflect new indexing model
 // General Mutable, Value-Type Collections
 // =================================================
 //
@@ -455,18 +456,12 @@ public struct Set<Element : Hashable> :
   public init(minimumCapacity: Int) {
     _variantStorage =
       _VariantStorage.native(
-        _NativeStorage.Owner(minimumCapacity: minimumCapacity))
+        _NativeStorage.create(minimumCapacity: minimumCapacity))
   }
 
   /// Private initializer.
   internal init(_nativeStorage: _NativeSetStorage<Element>) {
-    _variantStorage = _VariantStorage.native(
-      _NativeStorage.Owner(nativeStorage: _nativeStorage))
-  }
-
-  /// Private initializer.
-  internal init(_nativeStorageOwner: _NativeSetStorageOwner<Element>) {
-    _variantStorage = .native(_nativeStorageOwner)
+    _variantStorage = _VariantStorage.native(_nativeStorage)
   }
 
   //
@@ -507,7 +502,7 @@ public struct Set<Element : Hashable> :
 
   // TODO: swift-3-indexing-model - add docs
   public func index(after i: Index) -> Index {
-    return i.successor()
+    return _variantStorage.index(after: i)
   }
 
   // APINAMING: complexity docs are broadly missing in this file.
@@ -755,8 +750,8 @@ public struct Set<Element : Hashable> :
       // adopt its native storage and let COW handle uniquing only
       // if necessary.
       switch s._variantStorage {
-        case .native(let owner):
-          _variantStorage = .native(owner)
+        case .native(let storage):
+          _variantStorage = .native(storage)
         case .cocoa(let owner):
           _variantStorage = .cocoa(owner)
       }
@@ -1141,15 +1136,13 @@ internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
 ///   `false`.
 public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Bool {
   switch (lhs._variantStorage, rhs._variantStorage) {
-  case (.native(let lhsNativeOwner), .native(let rhsNativeOwner)):
-    let lhsNative = lhsNativeOwner.nativeStorage
-    let rhsNative = rhsNativeOwner.nativeStorage
+  case (.native(let lhsNative), .native(let rhsNative)):
 
-    if lhsNativeOwner === rhsNativeOwner {
+    if lhsNative === rhsNative {
       return true
     }
 
-    if lhsNative.count != rhsNative.count {
+    if lhsNative._count != rhsNative._count {
       return false
     }
 
@@ -1170,12 +1163,11 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
       _sanityCheckFailure("internal error: unexpected cocoa set")
 #endif
 
-  case (_VariantSetStorage.native(let lhsNativeOwner),
+  case (_VariantSetStorage.native(let lhsNative),
     _VariantSetStorage.cocoa(let rhsCocoa)):
 #if _runtime(_ObjC)
-    let lhsNative = lhsNativeOwner.nativeStorage
 
-    if lhsNative.count != rhsCocoa.count {
+    if lhsNative._count != rhsCocoa.count {
       return false
     }
 
@@ -1187,11 +1179,11 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
       let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
       if let rhsValue = optRhsValue {
         if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
-          i = i.successor()
+          i = lhsNative.index(after: i)
           continue
         }
       }
-      i = i.successor()
+      i = lhsNative.index(after: i)
       return false
     }
     return true
@@ -1315,10 +1307,11 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
   switch source._variantStorage {
-  case _VariantSetStorage.native(let nativeOwner):
+  case _VariantSetStorage.native(let storage):
+    let bridgingStorage = storage.bridgingStorage()
     return Set(
     _immutableCocoaSet:
-    unsafeBitCast(nativeOwner, to: _NSSet.self))
+    unsafeBitCast(bridgingStorage, to: _NSSet.self))
 
   case _VariantSetStorage.cocoa(let cocoaStorage):
     return Set(
@@ -1618,18 +1611,12 @@ public struct Dictionary<Key : Hashable, Value> :
   ///   allocate storage for in the new dictionary.
   public init(minimumCapacity: Int) {
     _variantStorage =
-      .native(_NativeStorage.Owner(minimumCapacity: minimumCapacity))
+      .native(_NativeStorage.create(minimumCapacity: minimumCapacity))
   }
 
   internal init(_nativeStorage: _NativeDictionaryStorage<Key, Value>) {
     _variantStorage =
-      .native(_NativeStorage.Owner(nativeStorage: _nativeStorage))
-  }
-
-  internal init(
-    _nativeStorageOwner: _NativeDictionaryStorageOwner<Key, Value>
-  ) {
-    _variantStorage = .native(_nativeStorageOwner)
+      .native(_nativeStorage)
   }
 
 #if _runtime(_ObjC)
@@ -1679,7 +1666,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   // TODO: swift-3-indexing-model - add docs
   public func index(after i: Index) -> Index {
-    return i.successor()
+    return _variantStorage.index(after: i)
   }
 
   /// Returns the index for the given key.
@@ -2031,15 +2018,13 @@ public func == <Key : Equatable, Value : Equatable>(
   rhs: [Key : Value]
 ) -> Bool {
   switch (lhs._variantStorage, rhs._variantStorage) {
-  case (.native(let lhsNativeOwner), .native(let rhsNativeOwner)):
-    let lhsNative = lhsNativeOwner.nativeStorage
-    let rhsNative = rhsNativeOwner.nativeStorage
+  case (.native(let lhsNative), .native(let rhsNative)):
 
-    if lhsNativeOwner === rhsNativeOwner {
+    if lhsNative === rhsNative {
       return true
     }
 
-    if lhsNative.count != rhsNative.count {
+    if lhsNative._count != rhsNative._count {
       return false
     }
 
@@ -2069,11 +2054,10 @@ public func == <Key : Equatable, Value : Equatable>(
     _sanityCheckFailure("internal error: unexpected cocoa dictionary")
 #endif
 
-  case (.native(let lhsNativeOwner), .cocoa(let rhsCocoa)):
+  case (.native(let lhsNative), .cocoa(let rhsCocoa)):
 #if _runtime(_ObjC)
-    let lhsNative = lhsNativeOwner.nativeStorage
 
-    if lhsNative.count != rhsCocoa.count {
+    if lhsNative._count != rhsCocoa.count {
       return false
     }
 
@@ -2264,7 +2248,8 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
   switch source._variantStorage {
-  case .native(let nativeOwner):
+  case .native(let storage):
+    // TODO: rewrite the docs
     // FIXME(performance): this introduces an indirection through Objective-C
     // runtime, even though we access native storage.  But we cannot
     // unsafeBitCast the owner object, because that would change the generic
@@ -2276,9 +2261,10 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
     //
     // Note: it is safe to treat the storage as immutable here because
     // Dictionary will not mutate storage with reference count greater than 1.
+    let nativeStorage = storage.bridgingStorage()
     return Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(nativeOwner, to: _NSDictionary.self))
+        unsafeBitCast(nativeStorage, to: _NSDictionary.self))
 
   case .cocoa(let cocoaStorage):
     return Dictionary(
@@ -2439,36 +2425,54 @@ collections = [
 ]
 }%
 
+% for (Self, a_self, TypeParametersDecl, TypeParameters, AnyTypeParameters, Sequence, AnySequenceType) in collections:
+
 /// Header part of the native storage.
-internal struct _HashedContainerStorageHeader {
+internal struct _${Self}StorageHeader<${TypeParameters}> {
+
+%if Self == 'Set':
+  internal typealias Key = ${TypeParameters}
+  internal typealias Value = ${TypeParameters}
+%end
+
   internal init(capacity: Int) {
     self.capacity = capacity
   }
 
-  internal var capacity: Int
+  internal let capacity: Int
   internal var count: Int = 0
-  internal var maxLoadFactorInverse: Double =
+  internal let maxLoadFactorInverse: Double =
     _hashContainerDefaultMaxLoadFactorInverse
-}
 
-% for (Self, a_self, TypeParametersDecl, TypeParameters, AnyTypeParameters, Sequence, AnySequenceType) in collections:
+  // Placeholder values until the struct can be initialized.
+  internal var initializedEntries: _UnsafeBitMap! = nil
+  internal var keys: UnsafeMutablePointer<Key>! = nil
+% if Self == 'Dictionary':
+  internal var values: UnsafeMutablePointer<Value>! = nil
+% end
+}
 
 /// An instance of this class has all `${Self}` data tail-allocated.
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
-final internal class _Native${Self}StorageImpl<${TypeParameters}> :
-  ManagedBuffer<_HashedContainerStorageHeader, UInt8> {
+final internal class _Native${Self}Storage<${TypeParameters}> :
+  ManagedBuffer<_${Self}StorageHeader<${TypeParameters}>, UInt8> {
   // Note: It is intended that ${TypeParameters}
   // (without : Hashable) is used here - this storage must work
   // with non-Hashable types.
 
+  internal typealias StorageHeader = _${Self}StorageHeader<${TypeParameters}>
   internal typealias BufferPointer =
-    ManagedBufferPointer<_HashedContainerStorageHeader, UInt8>
-  internal typealias StorageImpl = _Native${Self}StorageImpl
+    ManagedBufferPointer<StorageHeader, UInt8>
+  internal typealias Storage = _Native${Self}Storage<${TypeParameters}>
 
 %if Self == 'Set': # Set needs these to keep signatures simple.
   internal typealias Key = ${TypeParameters}
+  internal typealias Value = ${TypeParameters}
+  internal typealias SequenceElementWithoutLabels = Element
+%else:
+  internal typealias SequenceElementWithoutLabels = (Key, Value)
 %end
 
   /// Returns the bytes necessary to store a bit map of 'capacity' bytes and
@@ -2503,7 +2507,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   }
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
-  internal var _body: _HashedContainerStorageHeader {
+  internal var _body: StorageHeader {
     unsafeAddress {
       return UnsafePointer(buffer._headerPointer)
     }
@@ -2512,6 +2516,9 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     }
   }
 
+  /// The number of _logical elements_ the ${a_self} can store. Not to be
+  /// confused with `capacity`, the total number of raw `UInt8` bytes stored
+  /// by the `ManagedBuffer`.
   @_versioned
   internal var _capacity: Int {
     defer { _fixLifetime(self) }
@@ -2562,9 +2569,20 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   }
 %end
 
-  /// Create a storage instance with room for 'capacity' entries and all entries
-  /// marked invalid.
-  internal class func create(capacity: Int) -> StorageImpl {
+  @inline(__always)
+  internal static func create(minimumCapacity: Int) -> Storage {
+    // Make sure there's a representable power of 2 >= minimumCapacity
+    _sanityCheck(minimumCapacity <= (Int.max >> 1) + 1)
+    var capacity = 2
+    while capacity < minimumCapacity {
+      capacity <<= 1
+    }
+    return create(capacity: capacity)
+  }
+
+  /// Create a storage instance with room for at least 'minimumCapacity'
+  /// entries and all entries marked invalid.
+  internal static func create(capacity: Int) -> Storage {
     let requiredCapacity =
       bytesForBitMap(capacity: capacity) + bytesForKeys(capacity: capacity)
 %if Self == 'Dictionary':
@@ -2572,13 +2590,19 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 %end
 
     let r = super.create(minimumCapacity: requiredCapacity) { _ in
-      return _HashedContainerStorageHeader(capacity: capacity)
+      return StorageHeader(capacity: capacity)
     }
-    let storage = r as! StorageImpl
+    let storage = r as! Storage
     let initializedEntries = _UnsafeBitMap(
         storage: storage._initializedHashtableEntriesBitMapStorage,
         bitCount: capacity)
     initializedEntries.initializeToZero()
+    // Initialize header
+    storage._body.initializedEntries = initializedEntries
+    storage._body.keys = storage._keys
+% if Self == 'Dictionary':
+    storage._body.values = storage._values
+% end
     return storage
   }
 
@@ -2613,190 +2637,150 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   }
 }
 
-@_fixed_layout
-public // @testable
-struct _Native${Self}Storage<${TypeParametersDecl}> :
-  _HashStorage, CustomStringConvertible {
-  internal typealias Owner = _Native${Self}StorageOwner<${TypeParameters}>
-  internal typealias StorageImpl = _Native${Self}StorageImpl<${TypeParameters}>
+// TODO: conditionally conform to _HashStorage for better compile-time safety.
+// TODO: conditionally conform to CustomStringConvertible.
+extension _Native${Self}Storage 
+  where ${'Key' if Self == 'Dictionary' else 'Element'} : Hashable
+{
   internal typealias SequenceElement = ${Sequence}
-%if Self == 'Set':
-  internal typealias SequenceElementWithoutLabels = Element
-%else:
-  internal typealias SequenceElementWithoutLabels = (Key, Value)
-%end
-  internal typealias Storage = _Native${Self}Storage<${TypeParameters}>
 
-%if Self == 'Set': # Set needs these to keep signatures simple.
-  internal typealias Key = ${TypeParameters}
-  internal typealias Value = ${TypeParameters}
-%end
-
-  internal let buffer: StorageImpl
-
-  internal let initializedEntries: _UnsafeBitMap
-  internal let keys: UnsafeMutablePointer<Key>
-%if Self == 'Dictionary':
-  internal let values: UnsafeMutablePointer<Value>
-%end
-
-  internal init(capacity: Int) {
-    buffer = StorageImpl.create(capacity: capacity)
-    initializedEntries = _UnsafeBitMap(
-      storage: buffer._initializedHashtableEntriesBitMapStorage,
-      bitCount: capacity)
-    keys = buffer._keys
-%if Self == 'Dictionary':
-    values = buffer._values
-%end
-    _fixLifetime(buffer)
+#if _runtime(_ObjC)
+  func bridgingStorage() -> _Native${Self}BridgingStorage<${TypeParameters}> {
+    return _Native${Self}BridgingStorage(nativeStorage: self)
   }
+#endif
 
-  internal init(minimumCapacity: Int = 2) {
-    // Make sure there's a representable power of 2 >= minimumCapacity
-    _sanityCheck(minimumCapacity <= (Int.max >> 1) + 1)
-
-    var capacity = 2
-    while capacity < minimumCapacity {
-      capacity <<= 1
+  /// A textual representation of `self`.
+  var description: String {
+    var result = ""
+#if INTERNAL_CHECKS_ENABLED
+    for i in 0..<_capacity {
+      if isInitializedEntry(at: i) {
+        let key = self.key(at: i)
+        result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
+      } else {
+        result += "bucket \(i), empty\n"
+      }
     }
-
-    self = _Native${Self}Storage(capacity: capacity)
-  }
-
-  @_transparent
-  public // @testable
-  var capacity: Int {
-    return buffer._capacity
-  }
-
-  @_versioned
-  @_transparent
-  internal var count: Int {
-    get {
-      return buffer._count
-    }
-    nonmutating set(newValue) {
-      buffer._count = newValue
-    }
-  }
-
-  @_transparent
-  internal var maxLoadFactorInverse: Double {
-    return buffer._maxLoadFactorInverse
+#endif
+    return result
   }
 
   @_versioned
   @inline(__always)
   internal func key(at i: Int) -> Key {
-    _precondition(i >= 0 && i < capacity)
+    _precondition(i >= 0 && i < _capacity)
     _sanityCheck(isInitializedEntry(at: i))
+    defer { _fixLifetime(self) }
 
-    let res = (keys + i).pointee
-    _fixLifetime(self)
+    let res = (_body.keys + i).pointee
     return res
   }
 
   @_versioned
   internal func isInitializedEntry(at i: Int) -> Bool {
-    _precondition(i >= 0 && i < capacity)
-    return initializedEntries[i]
+    _precondition(i >= 0 && i < _capacity)
+    defer { _fixLifetime(self) }
+
+    return _body.initializedEntries[i]
   }
 
   @_transparent
   internal func destroyEntry(at i: Int) {
     _sanityCheck(isInitializedEntry(at: i))
-    (keys + i).deinitialize()
+    defer { _fixLifetime(self) }
+
+    (_body.keys + i).deinitialize()
 %if Self == 'Dictionary':
-    (values + i).deinitialize()
+    (_body.values + i).deinitialize()
 %end
-    initializedEntries[i] = false
-    _fixLifetime(self)
+    _body.initializedEntries[i] = false
   }
 
 %if Self == 'Set':
   @_transparent
   internal func initializeKey(_ k: Key, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
+    defer { _fixLifetime(self) }
 
-    (keys + i).initialize(with: k)
-    initializedEntries[i] = true
-    _fixLifetime(self)
+    (_body.keys + i).initialize(with: k)
+    _body.initializedEntries[i] = true
   }
 
   @_transparent
   internal func moveInitializeEntry(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
-    (keys + toEntryAt).initialize(with: (from.keys + at).move())
-    from.initializedEntries[at] = false
-    initializedEntries[toEntryAt] = true
+    defer { _fixLifetime(self) }
+
+    (_body.keys + toEntryAt).initialize(with: (from._body.keys + at).move())
+    from._body.initializedEntries[at] = false
+    _body.initializedEntries[toEntryAt] = true
   }
 
   internal func setKey(_ key: Key, at i: Int) {
-    _precondition(i >= 0 && i < capacity)
+    _precondition(i >= 0 && i < _capacity)
     _sanityCheck(isInitializedEntry(at: i))
+    defer { _fixLifetime(self) }
 
-    (keys + i).pointee = key
-    _fixLifetime(self)
+    (_body.keys + i).pointee = key
   }
 
 %elif Self == 'Dictionary':
   @_transparent
   internal func initializeKey(_ k: Key, value v: Value, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
+    defer { _fixLifetime(self) }
 
-    (keys + i).initialize(with: k)
-    (values + i).initialize(with: v)
-    initializedEntries[i] = true
-    _fixLifetime(self)
+    (_body.keys + i).initialize(with: k)
+    (_body.values + i).initialize(with: v)
+    _body.initializedEntries[i] = true
   }
 
   @_transparent
   internal func moveInitializeEntry(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
-    (keys + toEntryAt).initialize(with: (from.keys + at).move())
-    (values + toEntryAt).initialize(with: (from.values + at).move())
-    from.initializedEntries[at] = false
-    initializedEntries[toEntryAt] = true
+    defer { _fixLifetime(self) }
+
+    (_body.keys + toEntryAt).initialize(with: (from._body.keys + at).move())
+    (_body.values + toEntryAt).initialize(with: (from._body.values + at).move())
+    from._body.initializedEntries[at] = false
+    _body.initializedEntries[toEntryAt] = true
   }
 
   @_versioned
   @_transparent
   internal func value(at i: Int) -> Value {
     _sanityCheck(isInitializedEntry(at: i))
+    defer { _fixLifetime(self) }
 
-    let res = (values + i).pointee
-    _fixLifetime(self)
+    let res = (_body.values + i).pointee
     return res
   }
 
   @_transparent
   internal func setKey(_ key: Key, value: Value, at i: Int) {
     _sanityCheck(isInitializedEntry(at: i))
-    (keys + i).pointee = key
-    (values + i).pointee = value
-    _fixLifetime(self)
+    defer { _fixLifetime(self) }
+
+    (_body.keys + i).pointee = key
+    (_body.values + i).pointee = value
   }
 
 %end
 
-  //
-  // Implementation details
-  //
-
   internal var _bucketMask: Int {
     // The capacity is not negative, therefore subtracting 1 will not overflow.
-    return capacity &- 1
+    return _capacity &- 1
   }
 
   @_versioned
   internal func _bucket(_ k: Key) -> Int {
-    return _squeezeHashValue(k.hashValue, 0..<capacity)
+    return _squeezeHashValue(k.hashValue, 0..<_capacity)
   }
 
   @_versioned
   internal func _index(after bucket: Int) -> Int {
-    // Bucket is within 0 and capacity. Therefore adding 1 does not overflow.
+    // Bucket is within 0 and _capacity. Therefore adding 1 does not overflow.
     return (bucket &+ 1) & _bucketMask
   }
 
@@ -2821,10 +2805,10 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     while true {
       let isHole = !isInitializedEntry(at: bucket)
       if isHole {
-        return (Index(nativeStorage: self, offset: bucket), false)
+        return (Index(offset: bucket), false)
       }
       if self.key(at: bucket) == key {
-        return (Index(nativeStorage: self, offset: bucket), true)
+        return (Index(offset: bucket), true)
       }
       bucket = _index(after: bucket)
     }
@@ -2846,7 +2830,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
 %if Self == 'Set':
 
-  internal mutating func unsafeAddNew(key newKey: Element) {
+  internal func unsafeAddNew(key newKey: Element) {
     let (i, found) = _find(newKey, startBucket: _bucket(newKey))
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
@@ -2855,7 +2839,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
 %elif Self == 'Dictionary':
 
-  internal mutating func unsafeAddNew(key newKey: Key, value: Value) {
+  internal func unsafeAddNew(key newKey: Key, value: Value) {
     let (i, found) = _find(newKey, startBucket: _bucket(newKey))
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
@@ -2863,23 +2847,6 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
 %end
-
-  /// A textual representation of `self`.
-  public // @testable
-  var description: String {
-    var result = ""
-#if INTERNAL_CHECKS_ENABLED
-    for i in 0..<capacity {
-      if isInitializedEntry(at: i) {
-        let key = self.key(at: i)
-        result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
-      } else {
-        result += "bucket \(i), empty\n"
-      }
-    }
-#endif
-    return result
-  }
 
   //
   // _HashStorage conformance
@@ -2889,28 +2856,36 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @_versioned
   internal var startIndex: Index {
-    return Index(nativeStorage: self, offset: -1).successor()
+    // We start at "index after -1" instead of "0" because we need to find the
+    // first occupied slot.
+    return index(after: Index(offset: -1))
   }
 
   @_versioned
   internal var endIndex: Index {
-    return Index(nativeStorage: self, offset: capacity)
+    return Index(offset: _capacity)
   }
 
   @_versioned
   internal func index(after i: Index) -> Index {
-    return i.successor()
+    _precondition(i != endIndex)
+    var idx = i.offset + 1
+    while idx < _capacity && !isInitializedEntry(at: idx) {
+      idx += 1
+    }
+
+    return Index(offset: idx)
   }
 
+  @_versioned
   internal func formIndex(after i: inout Index) {
-    // FIXME: swift-3-indexing-model: optimize if possible.
-    i = i.successor()
+    i = index(after: i)
   }
 
   @_versioned
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
-    if count == 0 {
+    if _count == 0 {
       // Fast path that avoids computing the hash of the key.
       return nil
     }
@@ -2944,7 +2919,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_versioned
   @inline(__always)
   internal func maybeGet(_ key: Key) -> Value? {
-    if count == 0 {
+    if _count == 0 {
       // Fast path that avoids computing the hash of the key.
       return nil
     }
@@ -2961,13 +2936,13 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @discardableResult
-  internal mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
+  internal func updateValue(_ value: Value, forKey key: Key) -> Value? {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
 
   @discardableResult
-  internal mutating func insert(
+  internal func insert(
     _ value: Value, forKey key: Key
   ) -> (inserted: Bool, memberAfterInsert: Value) {
     _sanityCheckFailure(
@@ -2975,31 +2950,31 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @discardableResult
-  internal mutating func remove(at index: Index) -> SequenceElement {
+  internal func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
 
   @discardableResult
-  internal mutating func removeValue(forKey key: Key) -> Value? {
+  internal func removeValue(forKey key: Key) -> Value? {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
 
-  internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
+  internal func removeAll(keepingCapacity keepCapacity: Bool) {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
 
   internal static func fromArray(_ elements: [SequenceElementWithoutLabels])
-    -> _Native${Self}Storage<${TypeParameters}> {
+    -> Storage 
+  {
 
     let requiredCapacity =
-      _Native${Self}Storage<${TypeParameters}>.minimumCapacity(
+      Storage.minimumCapacity(
         minimumCount: elements.count,
         maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
-    let nativeStorage = _Native${Self}Storage<${TypeParameters}>(
-      minimumCapacity: requiredCapacity)
+    let nativeStorage = Storage.create(minimumCapacity: requiredCapacity)
 
 %if Self == 'Set':
 
@@ -3013,7 +2988,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       nativeStorage.initializeKey(key, at: i.offset)
       count += 1
     }
-    nativeStorage.count = count
+    nativeStorage._count = count
 
 %elif Self == 'Dictionary':
 
@@ -3023,7 +2998,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       _precondition(!found, "${Self} literal contains duplicate keys")
       nativeStorage.initializeKey(key, value: value, at: i.offset)
     }
-    nativeStorage.count = elements.count
+    nativeStorage._count = elements.count
 
 %end
 
@@ -3036,18 +3011,18 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 /// `${Self}<${AnyTypeParameters}>`, but `AnyObject` cannot be a Key because
 /// it is not `Hashable`.
 internal struct _BridgedNative${Self}Storage {
-  internal typealias StorageImpl =
-    _Native${Self}StorageImpl<${AnyTypeParameters}>
+  internal typealias Storage =
+    _Native${Self}Storage<${AnyTypeParameters}>
   internal typealias SequenceElement = ${AnySequenceType}
 
-  internal let buffer: StorageImpl
+  internal let buffer: Storage
   internal let initializedEntries: _UnsafeBitMap
   internal let keys: UnsafeMutablePointer<AnyObject>
 %if Self == 'Dictionary':
   internal let values: UnsafeMutablePointer<AnyObject>
 %end
 
-  internal init(buffer: StorageImpl) {
+  internal init(buffer: Storage) {
     self.buffer = buffer
     initializedEntries = _UnsafeBitMap(
       storage: buffer._initializedHashtableEntriesBitMapStorage,
@@ -3061,9 +3036,7 @@ internal struct _BridgedNative${Self}Storage {
 
   @_transparent
   internal var capacity: Int {
-    let result = buffer._capacity
-    _fixLifetime(buffer)
-    return result
+    return buffer._capacity
   }
 
   @_versioned
@@ -3136,21 +3109,21 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
 >
   : _SwiftNativeNSEnumerator, _NSEnumerator {
 
-  internal typealias NativeStorageOwner =
-    _Native${Self}StorageOwner<${TypeParameters}>
+  internal typealias BridgingStorage =
+    _Native${Self}BridgingStorage<${TypeParameters}>
   internal typealias Index = _Native${Self}Index<${TypeParameters}>
 
   internal override required init() {
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  internal init(_ nativeStorageOwner: NativeStorageOwner) {
-    self.nativeStorageOwner = nativeStorageOwner
-    nextIndex = nativeStorageOwner.nativeStorage.startIndex
-    endIndex = nativeStorageOwner.nativeStorage.endIndex
+  internal init(_ bridgingStorage: BridgingStorage) {
+    self.bridgingStorage = bridgingStorage
+    nextIndex = bridgingStorage.nativeStorage.startIndex
+    endIndex = bridgingStorage.nativeStorage.endIndex
   }
 
-  internal var nativeStorageOwner: NativeStorageOwner
+  internal var bridgingStorage: BridgingStorage
   internal var nextIndex: Index
   internal var endIndex: Index
 
@@ -3165,8 +3138,8 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     if nextIndex == endIndex {
       return nil
     }
-    let bridgedKey: AnyObject = nativeStorageOwner._getBridgedKey(nextIndex)
-    nativeStorageOwner.nativeStorage.formIndex(after: &nextIndex)
+    let bridgedKey: AnyObject = bridgingStorage._getBridgedKey(nextIndex)
+    bridgingStorage.nativeStorage.formIndex(after: &nextIndex)
     return bridgedKey
   }
 
@@ -3190,8 +3163,8 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
 
     // Return only a single element so that code can start iterating via fast
     // enumeration, terminate it, and continue via NSEnumerator.
-    let bridgedKey: AnyObject = nativeStorageOwner._getBridgedKey(nextIndex)
-    nativeStorageOwner.nativeStorage.formIndex(after: &nextIndex)
+    let bridgedKey: AnyObject = bridgingStorage._getBridgedKey(nextIndex)
+    bridgingStorage.nativeStorage.formIndex(after: &nextIndex)
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
     unmanagedObjects[0] = bridgedKey
@@ -3201,25 +3174,15 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
 }
 #endif
 
-/// This class is an artifact of the COW implementation.  This class only
-/// exists to keep separate retain counts separate for:
-/// - `${Self}` and `NS${Self}`,
-/// - `${Self}Index`.
-///
-/// This is important because the uniqueness check for COW only cares about
-/// retain counts of the first kind.
-///
-/// Specifically, `${Self}` points to instances of this class.  This class
-/// is also a proper `NS${Self}` subclass, which is returned to Objective-C
-/// during bridging.  `${Self}Index` points directly to
-/// `_Native${Self}Storage`.
-final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
+#if _runtime(_ObjC)
+/// This class exists for Objective-C bridging. It holds a reference to a
+/// `_Native${Self}Storage`, and can be upcast to `NS${Self}` when
+/// bridging is necessary.
+final internal class _Native${Self}BridgingStorage<${TypeParametersDecl}>
   : _SwiftNativeNS${Self}, _NS${Self}Core {
 
   internal typealias NativeStorage = _Native${Self}Storage<${TypeParameters}>
-#if _runtime(_ObjC)
   internal typealias BridgedNativeStorage = _BridgedNative${Self}Storage
-#endif
 
 %if Self == 'Set':
   internal typealias Key = Element
@@ -3227,7 +3190,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 %end
 
   internal init(minimumCapacity: Int = 2) {
-    nativeStorage = NativeStorage(minimumCapacity: minimumCapacity)
+    nativeStorage = NativeStorage.create(minimumCapacity: minimumCapacity)
     super.init()
   }
 
@@ -3243,8 +3206,6 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   internal var _heapBufferBridged_DoNotUse: AnyObject? = nil
 
   internal var nativeStorage: NativeStorage
-
-#if _runtime(_ObjC)
 
 %if Self == 'Set':
 
@@ -3328,10 +3289,10 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   /// The storage for bridged ${Self} elements, if present.
   internal var _bridgedBuffer:
-    BridgedNativeStorage.StorageImpl? {
+    BridgedNativeStorage.Storage? {
     get {
       if let ref = _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-        return unsafeDowncast(ref, to: BridgedNativeStorage.StorageImpl.self)
+        return unsafeDowncast(ref, to: BridgedNativeStorage.Storage.self)
       }
       return nil
     }
@@ -3359,7 +3320,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   internal func _createBridgedNativeStorage(_ capacity: Int) ->
     BridgedNativeStorage {
-    let buffer = BridgedNativeStorage.StorageImpl.create(capacity: capacity)
+    let buffer = BridgedNativeStorage.Storage.create(capacity: capacity)
     return BridgedNativeStorage(buffer: buffer)
   }
 
@@ -3369,10 +3330,10 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     }
 
     // Create storage for bridged data.
-    let bridged = _createBridgedNativeStorage(nativeStorage.capacity)
+    let bridged = _createBridgedNativeStorage(nativeStorage._capacity)
 
     // Bridge everything.
-    for i in 0..<nativeStorage.capacity {
+    for i in 0..<nativeStorage._capacity {
       if nativeStorage.isInitializedEntry(at: i) {
         let key = _bridgeToObjectiveCUnconditional(nativeStorage.key(at: i))
 %if Self == 'Set':
@@ -3483,7 +3444,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   @objc
   internal var count: Int {
-    return nativeStorage.count
+    return nativeStorage._count
   }
 
   internal func bridgingObjectForKey(_ aKey: AnyObject)
@@ -3526,7 +3487,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
     var currIndex = _Native${Self}Index<${TypeParameters}>(
-        nativeStorage: nativeStorage, offset: Int(theState.extra.0))
+        offset: Int(theState.extra.0))
     let endIndex = nativeStorage.endIndex
     var stored = 0
     for i in 0..<count {
@@ -3543,11 +3504,13 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     state.pointee = theState
     return stored
   }
-#endif
 }
+#else
+final internal class _Native${Self}BridgingStorage<${TypeParametersDecl}> { }
+#endif
 
 #if _runtime(_ObjC)
-internal struct _Cocoa${Self}Storage : _HashStorage {
+internal final class _Cocoa${Self}Storage : _HashStorage {
   internal var cocoa${Self}: _NS${Self}
 
   internal typealias Index = _Cocoa${Self}Index
@@ -3557,22 +3520,31 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
   internal typealias Key = AnyObject
   internal typealias Value = AnyObject
 
+  internal lazy var allKeys : _Box<_HeapBuffer<Int, AnyObject>> = {
+    return _Box(_stdlib_NS${Self}_all${'Objects' if Self == 'Set' else 'Keys'}(self.cocoa${Self}))
+  }()
+
   internal var startIndex: Index {
-    return Index(cocoa${Self}, startIndex: ())
+    return Index(value: 0)
   }
 
   internal var endIndex: Index {
-    return Index(cocoa${Self}, endIndex: ())
+    return Index(value: allKeys._value.value)
+  }
+
+  // Assumption: we rely on NS${Self}.getObjects when being
+  // repeatedly called on the same NS${Self}, returning items in the same
+  // order every time.
+  @_versioned
+  internal func index(after i: Index) -> Index {
+    _precondition(
+      i.currentKeyIndex < allKeys._value.value, "cannot increment endIndex")
+    return _Cocoa${Self}Index(value: i.currentKeyIndex + 1)
   }
 
   @_versioned
-  internal func index(after i: Index) -> Index {
-    return i.successor()
-  }
-
   internal func formIndex(after i: inout Index) {
-    // FIXME: swift-3-indexing-model: optimize if possible.
-    i = i.successor()
+    i = index(after: i)
   }
 
   @_versioned
@@ -3585,31 +3557,26 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
       return nil
     }
 
-%if Self == 'Set':
-    let allKeys = _stdlib_NSSet_allObjects(cocoaSet)
-%elif Self == 'Dictionary':
-    let allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary)
-%end
     var keyIndex = -1
-    for i in 0..<allKeys.value {
-      if _stdlib_NSObject_isEqual(key, allKeys[i]) {
+    for i in 0..<allKeys._value.value {
+      if _stdlib_NSObject_isEqual(key, allKeys._value[i]) {
         keyIndex = i
         break
       }
     }
     _sanityCheck(keyIndex >= 0,
         "key was found in fast path, but not found later?")
-    return Index(cocoa${Self}, allKeys, keyIndex)
+    return Index(value: keyIndex)
   }
 
   internal func assertingGet(_ i: Index) -> SequenceElement {
 %if Self == 'Set':
-    let value: Value? = i.allKeys[i.currentKeyIndex]
+    let value: Value? = allKeys._value[i.currentKeyIndex]
     _sanityCheck(value != nil, "item not found in underlying NS${Self}")
     return value!
 %elif Self == 'Dictionary':
-    let key: Key = i.allKeys[i.currentKeyIndex]
-    let value: Value = i.cocoaDictionary.objectFor(key)!
+    let key: Key = allKeys._value[i.currentKeyIndex]
+    let value: Value = cocoaDictionary.objectFor(key)!
     return (key, value)
 %end
 
@@ -3638,29 +3605,33 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
 
   }
 
+  internal init(cocoa${Self}: _NS${Self}) {
+    self.cocoa${Self} = cocoa${Self}
+  }
+
   @discardableResult
-  internal mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
+  internal func updateValue(_ value: Value, forKey key: Key) -> Value? {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   @discardableResult
-  internal mutating func insert(
+  internal func insert(
     _ value: Value, forKey key: Key
   ) -> (inserted: Bool, memberAfterInsert: Value) {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   @discardableResult
-  internal mutating func remove(at index: Index) -> SequenceElement {
+  internal func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   @discardableResult
-  internal mutating func removeValue(forKey key: Key) -> Value? {
+  internal func removeValue(forKey key: Key) -> Value? {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
-  internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
+  internal func removeAll(keepingCapacity keepCapacity: Bool) {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
@@ -3681,8 +3652,6 @@ internal struct _Cocoa${Self}Storage {}
 internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
   internal typealias NativeStorage = _Native${Self}Storage<${TypeParameters}>
-  internal typealias NativeStorageOwner =
-    _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias NativeIndex = _Native${Self}Index<${TypeParameters}>
   internal typealias CocoaStorage = _Cocoa${Self}Storage
   internal typealias SequenceElement = ${Sequence}
@@ -3694,7 +3663,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   internal typealias Value = ${TypeParameters}
 %end
 
-  case native(NativeStorageOwner)
+  case native(NativeStorage)
   case cocoa(CocoaStorage)
 
   @_versioned
@@ -3704,6 +3673,8 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
   internal mutating func isUniquelyReferenced() -> Bool {
+    // Note that &self drills down through .native(NativeStorage) to the first
+    // property in NativeStorage, which is the reference to the buffer.
     if _fastPath(guaranteedNative) {
       return _isUnique_native(&self)
     }
@@ -3721,8 +3692,8 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   @_versioned
   internal var asNative: NativeStorage {
     switch self {
-    case .native(let owner):
-      return owner.nativeStorage
+    case .native(let storage):
+      return storage
     case .cocoa:
       _sanityCheckFailure("internal error: not backed by native storage")
     }
@@ -3745,24 +3716,14 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     -> (reallocated: Bool, capacityChanged: Bool) {
     switch self {
     case .native:
-      let oldCapacity = asNative.capacity
+      let oldCapacity = asNative._capacity
       if isUniquelyReferenced() && oldCapacity >= minimumCapacity {
-#if _runtime(_ObjC)
-        // Clear the cache of bridged elements.
-        switch self {
-        case .native(let owner):
-          owner.deinitializeHeapBufferBridged()
-        case .cocoa:
-          _sanityCheckFailure("internal error: not backed by native storage")
-        }
-#endif
         return (reallocated: false, capacityChanged: false)
       }
 
       let oldNativeStorage = asNative
-      let newNativeOwner = NativeStorageOwner(minimumCapacity: minimumCapacity)
-      var newNativeStorage = newNativeOwner.nativeStorage
-      let newCapacity = newNativeStorage.capacity
+      let newNativeStorage = NativeStorage.create(minimumCapacity: minimumCapacity)
+      let newCapacity = newNativeStorage._capacity
       for i in 0..<oldCapacity {
         if oldNativeStorage.isInitializedEntry(at: i) {
           if oldCapacity == newCapacity {
@@ -3785,17 +3746,16 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
           }
         }
       }
-      newNativeStorage.count = oldNativeStorage.count
+      newNativeStorage._count = oldNativeStorage._count
 
-      self = .native(newNativeOwner)
+      self = .native(newNativeStorage)
       return (reallocated: true,
-              capacityChanged: oldCapacity != newNativeStorage.capacity)
+              capacityChanged: oldCapacity != newNativeStorage._capacity)
 
     case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
       let cocoa${Self} = cocoaStorage.cocoa${Self}
-      let newNativeOwner = NativeStorageOwner(minimumCapacity: minimumCapacity)
-      var newNativeStorage = newNativeOwner.nativeStorage
+      let newNativeStorage = NativeStorage.create(minimumCapacity: minimumCapacity)
       let oldCocoaIterator = _Cocoa${Self}Iterator(cocoa${Self})
 %if Self == 'Set':
       while let key = oldCocoaIterator.next() {
@@ -3812,9 +3772,9 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       }
 
 %end
-      newNativeStorage.count = cocoa${Self}.count
+      newNativeStorage._count = cocoa${Self}.count
 
-      self = .native(newNativeOwner)
+      self = .native(newNativeStorage)
       return (reallocated: true, capacityChanged: true)
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
@@ -4013,10 +3973,10 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
     
     let minCapacity = found
-      ? asNative.capacity
+      ? asNative._capacity
       : NativeStorage.minimumCapacity(
-          minimumCount: asNative.count + 1,
-          maxLoadFactorInverse: asNative.maxLoadFactorInverse)
+          minimumCount: asNative._count + 1,
+          maxLoadFactorInverse: asNative._maxLoadFactorInverse)
 
     let (_, capacityChanged) = ensureUniqueNativeStorage(minCapacity)
     if capacityChanged {
@@ -4029,7 +3989,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       asNative.setKey(key, at: i.offset)
     } else {
       asNative.initializeKey(key, at: i.offset)
-      asNative.count += 1
+      asNative._count += 1
     }
 %elif Self == 'Dictionary':
     let oldValue: Value? = found ? asNative.value(at: i.offset) : nil
@@ -4037,7 +3997,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       asNative.setKey(key, value: value, at: i.offset)
     } else {
       asNative.initializeKey(key, value: value, at: i.offset)
-      asNative.count += 1
+      asNative._count += 1
     }
 %end
 
@@ -4069,8 +4029,8 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   internal mutating func nativeInsert(
     _ value: Value, forKey key: Key
   ) -> (inserted: Bool, memberAfterInsert: Value) {
-    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
 
+    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
     if found {
 %if Self == 'Set':
       return (inserted: false, memberAfterInsert: asNative.key(at: i.offset))
@@ -4080,20 +4040,21 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
 
     let minCapacity = NativeStorage.minimumCapacity(
-      minimumCount: asNative.count + 1,
-      maxLoadFactorInverse: asNative.maxLoadFactorInverse)
+      minimumCount: asNative._count + 1,
+      maxLoadFactorInverse: asNative._maxLoadFactorInverse)
 
     let (_, capacityChanged) = ensureUniqueNativeStorage(minCapacity)
+
     if capacityChanged {
       i = asNative._find(key, startBucket: asNative._bucket(key)).pos
     }
 
 %if Self == 'Set':
     asNative.initializeKey(key, at: i.offset)
-    asNative.count += 1
+    asNative._count += 1
 %elif Self == 'Dictionary':
     asNative.initializeKey(key, value: value, at: i.offset)
-    asNative.count += 1
+    asNative._count += 1
 %end
 
     return (inserted: true, memberAfterInsert: value)
@@ -4124,7 +4085,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   /// - parameter idealBucket: The ideal bucket for the element being deleted.
   /// - parameter offset: The offset of the element that will be deleted.
   /// Precondition: there should be an initialized entry at offset.
-  internal mutating func nativeDeleteImpl(
+  internal mutating func nativeDelete(
     _ nativeStorage: NativeStorage, idealBucket: Int, offset: Int
   ) {
     _sanityCheck(
@@ -4132,7 +4093,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
     // remove the element
     nativeStorage.destroyEntry(at: offset)
-    nativeStorage.count -= 1
+    nativeStorage._count -= 1
 
     // If we've put a hole in a chain of contiguous elements, some
     // element after the hole may belong where the new hole is.
@@ -4186,9 +4147,8 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
   internal mutating func nativeRemoveObject(forKey key: Key) -> Value? {
-    var nativeStorage = asNative
-    var idealBucket = nativeStorage._bucket(key)
-    var (index, found) = nativeStorage._find(key, startBucket: idealBucket)
+    var idealBucket = asNative._bucket(key)
+    var (index, found) = asNative._find(key, startBucket: idealBucket)
 
     // Fast path: if the key is not present, we will not mutate the set,
     // so don't force unique storage.
@@ -4196,11 +4156,9 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       return nil
     }
 
-    let (reallocated, capacityChanged) =
-      ensureUniqueNativeStorage(nativeStorage.capacity)
-    if reallocated {
-      nativeStorage = asNative
-    }
+    let (_, capacityChanged) =
+      ensureUniqueNativeStorage(asNative._capacity)
+    let nativeStorage = asNative
     if capacityChanged {
       idealBucket = nativeStorage._bucket(key)
       (index, found) = nativeStorage._find(key, startBucket: idealBucket)
@@ -4211,7 +4169,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 %elif Self == 'Dictionary':
     let oldValue = nativeStorage.value(at: index.offset)
 %end
-    nativeDeleteImpl(nativeStorage, idealBucket: idealBucket,
+    nativeDelete(nativeStorage, idealBucket: idealBucket,
       offset: index.offset)
     return oldValue
   }
@@ -4219,14 +4177,11 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   internal mutating func nativeRemove(
     at nativeIndex: NativeIndex
   ) -> SequenceElement {
-    var nativeStorage = asNative
 
     // The provided index should be valid, so we will always mutating the
     // set storage.  Request unique storage.
-    let (reallocated, _) = ensureUniqueNativeStorage(nativeStorage.capacity)
-    if reallocated {
-      nativeStorage = asNative
-    }
+    _ = ensureUniqueNativeStorage(asNative._capacity)
+    let nativeStorage = asNative
 
     let result = nativeStorage.assertingGet(nativeIndex)
 %if Self == 'Set':
@@ -4235,7 +4190,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     let key = result.0
 %end
 
-    nativeDeleteImpl(nativeStorage, idealBucket: nativeStorage._bucket(key),
+    nativeDelete(nativeStorage, idealBucket: nativeStorage._bucket(key),
         offset: nativeIndex.offset)
     return result
   }
@@ -4258,7 +4213,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       // operation.
       let cocoaIndex = index._cocoaIndex
       let anyObjectKey: AnyObject =
-        cocoaIndex.allKeys[cocoaIndex.currentKeyIndex]
+        cocoaStorage.allKeys._value[cocoaIndex.currentKeyIndex]
       migrateDataToNativeStorage(cocoaStorage)
       let key = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
       let value = nativeRemoveObject(forKey: key)
@@ -4299,8 +4254,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
   internal mutating func nativeRemoveAll() {
-    var nativeStorage = asNative
-
     // FIXME(performance): if the storage is non-uniquely referenced, we
     // shouldn't be copying the elements into new storage and then immediately
     // deleting the elements. We should detect that the storage is not uniquely
@@ -4308,17 +4261,15 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
     // We have already checked for the empty dictionary case, so we will always
     // mutating the dictionary storage.  Request unique storage.
-    let (reallocated, _) = ensureUniqueNativeStorage(nativeStorage.capacity)
-    if reallocated {
-      nativeStorage = asNative
-    }
+    _ = ensureUniqueNativeStorage(asNative._capacity)
+    let nativeStorage = asNative
 
-    for b in 0..<nativeStorage.capacity {
+    for b in 0..<nativeStorage._capacity {
       if nativeStorage.isInitializedEntry(at: b) {
         nativeStorage.destroyEntry(at: b)
       }
     }
-    nativeStorage.count = 0
+    nativeStorage._count = 0
   }
 
   internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
@@ -4327,7 +4278,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
 
     if !keepCapacity {
-      self = .native(NativeStorage.Owner(minimumCapacity: 2))
+      self = .native(NativeStorage.create(minimumCapacity: 2))
       return
     }
 
@@ -4341,7 +4292,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       nativeRemoveAll()
     case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
-      self = .native(NativeStorage.Owner(minimumCapacity: cocoaStorage.count))
+      self = .native(NativeStorage.create(minimumCapacity: cocoaStorage.count))
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
@@ -4350,12 +4301,12 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
   internal var count: Int {
     if _fastPath(guaranteedNative) {
-      return asNative.count
+      return asNative._count
     }
 
     switch self {
     case .native:
-      return asNative.count
+      return asNative._count
     case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
       return cocoaStorage.count
@@ -4372,9 +4323,9 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   @inline(__always)
   internal func makeIterator() -> ${Self}Iterator<${TypeParameters}> {
     switch self {
-    case .native(let owner):
+    case .native(let storage):
       return ._native(
-        start: asNative.startIndex, end: asNative.endIndex, owner: owner)
+        start: asNative.startIndex, end: asNative.endIndex, storage: storage)
     case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
       return ._cocoa(_Cocoa${Self}Iterator(cocoaStorage.cocoa${Self}))
@@ -4391,41 +4342,13 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 }
 
-internal struct _Native${Self}Index<${TypeParametersDecl}> :
-  Comparable {
-
-  internal typealias NativeStorage = _Native${Self}Storage<${TypeParameters}>
-  internal typealias NativeIndex = _Native${Self}Index<${TypeParameters}>
-
-  // FIXME: swift-3-indexing-model: remove `nativeStorage`, we don't need it in
-  // the new model.
+internal struct _Native${Self}Index<${TypeParametersDecl}> : Comparable {
   @_versioned
-  internal var nativeStorage: NativeStorage
   internal var offset: Int
 
   @_versioned
-  internal init(nativeStorage: NativeStorage, offset: Int) {
-    self.nativeStorage = nativeStorage
+  internal init(offset: Int) {
     self.offset = offset
-  }
-
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Precondition: The next value is representable.
-  internal func successor() -> NativeIndex {
-    // FIXME: swift-3-indexing-model: remove this method.
-    var i = offset + 1
-    // FIXME: Can't write the simple code pending
-    // <rdar://problem/15484639> Refcounting bug
-    while i < nativeStorage.capacity /*&& !nativeStorage[i]*/ {
-      // FIXME: workaround for <rdar://problem/15484639>
-      if nativeStorage.isInitializedEntry(at: i) {
-        break
-      }
-      // end workaround
-      i += 1
-    }
-    return NativeIndex(nativeStorage: nativeStorage, offset: i)
   }
 }
 
@@ -4449,79 +4372,19 @@ internal func < <${TypeParametersDecl}> (
 #if _runtime(_ObjC)
 @_versioned
 internal struct _Cocoa${Self}Index : Comparable {
-  // Assumption: we rely on NSDictionary.getObjects when being
-  // repeatedly called on the same NSDictionary, returning items in the same
-  // order every time.
-  // Similarly, the same assumption holds for NSSet.allObjects.
-
-  /// A reference to the NS${Self}, which owns members in `allObjects`,
-  /// or `allKeys`, for NSSet and NSDictionary respectively.
-  internal let cocoa${Self}: _NS${Self}
-  // FIXME: swift-3-indexing-model: try to remove the cocoa reference, but make
-  // sure that we have a safety check for accessing `allKeys`.  Maybe move both
-  // into the dictionary/set itself.
-
-  /// An unowned array of keys.
-  internal var allKeys: _HeapBuffer<Int, AnyObject>
-
-  /// Index into `allKeys`
+  /// Index into `allKeys`, a property on the parent collection.
   internal var currentKeyIndex: Int
 
-  internal init(_ cocoa${Self}: _NS${Self}, startIndex: ()) {
-    self.cocoa${Self} = cocoa${Self}
-%if Self == 'Set':
-    self.allKeys = _stdlib_NSSet_allObjects(cocoaSet)
-%elif Self == 'Dictionary':
-    self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary)
-%end
-    self.currentKeyIndex = 0
-  }
-
-  internal init(_ cocoa${Self}: _NS${Self}, endIndex: ()) {
-    self.cocoa${Self} = cocoa${Self}
-%if Self == 'Set':
-    self.allKeys = _stdlib_NS${Self}_allObjects(cocoa${Self})
-%elif Self == 'Dictionary':
-    self.allKeys = _stdlib_NS${Self}_allKeys(cocoa${Self})
-%end
-    self.currentKeyIndex = allKeys.value
-  }
-
-  internal init(_ cocoa${Self}: _NS${Self},
-    _ allKeys: _HeapBuffer<Int, AnyObject>,
-    _ currentKeyIndex: Int
-  ) {
-    self.cocoa${Self} = cocoa${Self}
-    self.allKeys = allKeys
-    self.currentKeyIndex = currentKeyIndex
-  }
-
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Precondition: The next value is representable.
-  internal func successor() -> _Cocoa${Self}Index {
-    // FIXME: swift-3-indexing-model: remove this method.
-    _precondition(
-      currentKeyIndex < allKeys.value, "cannot increment endIndex")
-    return _Cocoa${Self}Index(cocoa${Self}, allKeys, currentKeyIndex + 1)
+  internal init(value: Int) {
+    currentKeyIndex = value
   }
 }
 
 internal func ==(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
-  _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
-    "cannot compare indexes pointing to different ${Self}s")
-  _precondition(lhs.allKeys.value == rhs.allKeys.value,
-    "one or both of the indexes have been invalidated")
-
   return lhs.currentKeyIndex == rhs.currentKeyIndex
 }
 
 internal func <(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
-  _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
-    "cannot compare indexes pointing to different ${Self}s")
-  _precondition(lhs.allKeys.value == rhs.allKeys.value,
-    "one or both of the indexes have been invalidated")
-
   return lhs.currentKeyIndex < rhs.currentKeyIndex
 }
 #else
@@ -4560,6 +4423,7 @@ elif Self == 'Dictionary':
 ${SubscriptingWithIndexDoc}
 public struct ${Self}Index<${TypeParametersDecl}> :
   Comparable {
+  // swift-3-indexing-model: rewrite the fixme to reflect the new index model
   // FIXME(ABI)(compiler limitation): `DictionaryIndex` and `SetIndex` should
   // be nested types.
 
@@ -4618,26 +4482,6 @@ public struct ${Self}Index<${TypeParametersDecl}> :
     }
   }
 #endif
-
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Precondition: The next value is representable.
-  internal func successor() -> ${Self}Index<${TypeParameters}> {
-    if _fastPath(_guaranteedNative) {
-      return ._native(_nativeIndex.successor())
-    }
-
-    switch _value {
-    case ._native(let nativeIndex):
-      return ._native(nativeIndex.successor())
-    case ._cocoa(let cocoaIndex):
-#if _runtime(_ObjC)
-      return ._cocoa(cocoaIndex.successor())
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
-    }
-  }
 }
 
 public func == <${TypeParametersDecl}> (
@@ -4649,8 +4493,8 @@ public func == <${TypeParametersDecl}> (
   }
 
   switch (lhs._value, rhs._value) {
-  case (._native(let lhsNative), ._native(let rhsNative)):
-    return lhsNative == rhsNative
+  case (._native(let lhs), ._native(let rhs)):
+    return lhs.offset == rhs.offset
   case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
 #if _runtime(_ObjC)
     return lhsCocoa == rhsCocoa
@@ -4767,19 +4611,18 @@ final internal class _Cocoa${Self}Iterator {}
 
 internal enum ${Self}IteratorRepresentation<${TypeParametersDecl}> {
   internal typealias _Iterator = ${Self}Iterator<${TypeParameters}>
-  internal typealias _NativeStorageOwner =
-    _Native${Self}StorageOwner<${TypeParameters}>
+  internal typealias _NativeStorage =
+    _Native${Self}Storage<${TypeParameters}>
   internal typealias _NativeIndex = _Iterator._NativeIndex
 
   // For native storage, we keep two indices to keep track of the iteration
   // progress and the storage owner to make the storage non-uniquely
   // referenced.
   //
-  // While indices keep the storage alive, they don't affect reference count of
-  // the storage.  Iterator is iterating over a frozen view of the collection
-  // state, so it should keep its own reference to the storage owner.
+  // Iterator is iterating over a frozen view of the collection
+  // state, so it should keep its own reference to the storage.
   case _native(
-    start: _NativeIndex, end: _NativeIndex, owner: _NativeStorageOwner)
+    start: _NativeIndex, end: _NativeIndex, storage: _NativeStorage)
   case _cocoa(_Cocoa${Self}Iterator)
 }
 
@@ -4795,8 +4638,8 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
   // Index, which is multi-pass, it is suitable for implementing a
   // IteratorProtocol, which is being consumed as iteration proceeds.
 
-  internal typealias _NativeStorageOwner =
-    _Native${Self}StorageOwner<${TypeParameters}>
+  internal typealias _NativeStorage =
+    _Native${Self}Storage<${TypeParameters}>
   internal typealias _NativeIndex = _Native${Self}Index<${TypeParameters}>
 
   @_versioned
@@ -4804,10 +4647,10 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
 
   @_versioned
   internal static func _native(
-    start: _NativeIndex, end: _NativeIndex, owner: _NativeStorageOwner
+    start: _NativeIndex, end: _NativeIndex, storage: _NativeStorage
   ) -> ${Self}Iterator {
     return ${Self}Iterator(
-      _state: ._native(start: start, end: end, owner: owner))
+      _state: ._native(start: start, end: end, storage: storage))
   }
 #if _runtime(_ObjC)
   @_versioned
@@ -4831,13 +4674,13 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
   @_versioned
   internal mutating func _nativeNext() -> ${Sequence}? {
     switch _state {
-    case ._native(let startIndex, let endIndex, let owner):
+    case ._native(let startIndex, let endIndex, let storage):
       if startIndex == endIndex {
         return nil
       }
-      let result = startIndex.nativeStorage.assertingGet(startIndex)
+      let result = storage.assertingGet(startIndex)
       _state =
-        ._native(start: startIndex.successor(), end: endIndex, owner: owner)
+        ._native(start: storage.index(after: startIndex), end: endIndex, storage: storage)
       return result
     case ._cocoa:
       _sanityCheckFailure("internal error: not backed by NS${Self}")
@@ -4944,7 +4787,7 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
       "the number of members added does not match the promised count")
 
     // Finish building the `${Self}`.
-    _nativeStorage.count = _requestedCount
+    _nativeStorage._count = _requestedCount
 
     // Prevent taking the result twice.
     _actualCount = -1
@@ -4984,7 +4827,7 @@ extension ${Self} {
 extension ${Self} {
   public func _bridgeToObjectiveCImpl() -> _NS${Self}Core {
     switch _variantStorage {
-    case _Variant${Self}Storage.native(let nativeOwner):
+    case _Variant${Self}Storage.native(let storage):
 %if Self == 'Set':
       _precondition(_isBridgedToObjectiveC(Element.self),
         "Key is not bridged to Objective-C")
@@ -4992,7 +4835,8 @@ extension ${Self} {
       _precondition(_isBridgedToObjectiveC(Value.self),
         "Value is not bridged to Objective-C")
 %end
-      return nativeOwner as _Native${Self}StorageOwner<${TypeParameters}>
+      let bridgingStorage = storage.bridgingStorage()
+      return bridgingStorage as _Native${Self}BridgingStorage<${TypeParameters}>
 
     case _Variant${Self}Storage.cocoa(let cocoaStorage):
       return cocoaStorage.cocoa${Self}
@@ -5002,12 +4846,12 @@ extension ${Self} {
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ s: AnyObject
   ) -> ${Self}<${TypeParameters}>? {
-    if let nativeOwner =
-        s as AnyObject as? _Native${Self}StorageOwner<${TypeParameters}> {
+    if let bridgingStorage =
+        s as AnyObject as? _Native${Self}BridgingStorage<${TypeParameters}> {
       // If `NS${Self}` is actually native storage of `${Self}` with key
       // and value types that the requested ones match exactly, then just
       // re-wrap the native storage.
-      return ${Self}<${TypeParameters}>(_nativeStorageOwner: nativeOwner)
+      return ${Self}<${TypeParameters}>(_nativeStorage: bridgingStorage.nativeStorage)
     }
     // FIXME: what if `s` is native storage, but for different key/value type?
     return nil
