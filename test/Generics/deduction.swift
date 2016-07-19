@@ -221,7 +221,7 @@ func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
 // Deduction for member operators
 //===----------------------------------------------------------------------===//
 protocol Addable {
-  func +(x: Self, y: Self) -> Self
+  static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
   u + u // expected-error{{binary operator '+' cannot be applied to two 'U' operands}}
@@ -265,7 +265,7 @@ postfix operator <*> {}
 
 protocol MetaFunction {
   associatedtype Result
-  postfix func <*> (_: Self) -> Result?
+  static postfix func <*> (_: Self) -> Result?
 }
 
 protocol Bool_ {}

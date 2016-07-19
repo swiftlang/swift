@@ -2704,7 +2704,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       printSourceRange(Range, Ctx);
     } else {
       if (!Options.SkipIntroducerKeywords) {
-        if (decl->isStatic() && !decl->isOperator())
+        if (decl->isStatic())
           printStaticKeyword(decl->getCorrectStaticSpelling());
         if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>()) {
           Printer.printKeyword("mutating");

@@ -186,45 +186,46 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
     }
     
     public var debugDescription: String { return description }
-}
 
-/// Returns true if the two `Date` values represent the same point in time.
-public func ==(lhs: Date, rhs: Date) -> Bool {
-    return lhs.timeIntervalSinceReferenceDate == rhs.timeIntervalSinceReferenceDate
-}
+    /// Returns true if the two `Date` values represent the same point in time.
+    public static func ==(lhs: Date, rhs: Date) -> Bool {
+        return lhs.timeIntervalSinceReferenceDate == rhs.timeIntervalSinceReferenceDate
+    }
 
-/// Returns true if the left hand `Date` is earlier in time than the right hand `Date`.
-public func <(lhs: Date, rhs: Date) -> Bool {
-    return lhs.timeIntervalSinceReferenceDate < rhs.timeIntervalSinceReferenceDate
-}
+    /// Returns true if the left hand `Date` is earlier in time than the right hand `Date`.
+    public static func <(lhs: Date, rhs: Date) -> Bool {
+        return lhs.timeIntervalSinceReferenceDate < rhs.timeIntervalSinceReferenceDate
+    }
 
-/// Returns true if the left hand `Date` is later in time than the right hand `Date`.
-public func >(lhs: Date, rhs: Date) -> Bool {
-    return lhs.timeIntervalSinceReferenceDate > rhs.timeIntervalSinceReferenceDate
-}
+    /// Returns true if the left hand `Date` is later in time than the right hand `Date`.
+    public static func >(lhs: Date, rhs: Date) -> Bool {
+        return lhs.timeIntervalSinceReferenceDate > rhs.timeIntervalSinceReferenceDate
+    }
 
-/// Returns a `Date` with a specified amount of time added to it.
-public func +(lhs: Date, rhs: TimeInterval) -> Date {
-    return Date(timeIntervalSinceReferenceDate: lhs.timeIntervalSinceReferenceDate + rhs)
-}
+    /// Returns a `Date` with a specified amount of time added to it.
+    public static func +(lhs: Date, rhs: TimeInterval) -> Date {
+        return Date(timeIntervalSinceReferenceDate: lhs.timeIntervalSinceReferenceDate + rhs)
+    }
 
-/// Returns a `Date` with a specified amount of time subtracted from it.
-public func -(lhs: Date, rhs: TimeInterval) -> Date {
-    return Date(timeIntervalSinceReferenceDate: lhs.timeIntervalSinceReferenceDate - rhs)
-}
+    /// Returns a `Date` with a specified amount of time subtracted from it.
+    public static func -(lhs: Date, rhs: TimeInterval) -> Date {
+        return Date(timeIntervalSinceReferenceDate: lhs.timeIntervalSinceReferenceDate - rhs)
+    }
 
-/// Add a `TimeInterval` to a `Date`.
-///
-/// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
-public func +=(lhs: inout Date, rhs: TimeInterval) {
-    lhs = lhs + rhs
-}
+    /// Add a `TimeInterval` to a `Date`.
+    ///
+    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
+    public static func +=(lhs: inout Date, rhs: TimeInterval) {
+        lhs = lhs + rhs
+    }
 
-/// Subtract a `TimeInterval` from a `Date`.
-///
-/// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
-public func -=(lhs: inout Date, rhs: TimeInterval) {
-    lhs = lhs - rhs
+    /// Subtract a `TimeInterval` from a `Date`.
+    ///
+    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
+    public static func -=(lhs: inout Date, rhs: TimeInterval) {
+        lhs = lhs - rhs
+    }
+
 }
 
 extension Date : _ObjectiveCBridgeable {

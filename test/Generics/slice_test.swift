@@ -83,7 +83,7 @@ class Vector<T> {
 }
 
 protocol Comparable {
-  func <(lhs: Self, rhs: Self) -> Bool
+  static func <(lhs: Self, rhs: Self) -> Bool
 }
 
 func sort<T : Comparable>(_ array: inout [T]) {
@@ -117,6 +117,6 @@ func findIf<T>(_ array: [T], fn: (T) -> Bool) -> Int {
 }
 
 protocol Eq {
-  func ==(lhs: Self, rhs: Self) -> Bool
-  func !=(lhs: Self, rhs: Self) -> Bool
+  static func ==(lhs: Self, rhs: Self) -> Bool
+  static func !=(lhs: Self, rhs: Self) -> Bool
 }

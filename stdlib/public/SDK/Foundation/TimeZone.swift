@@ -219,13 +219,13 @@ public struct TimeZone : CustomStringConvertible, CustomDebugStringConvertible, 
             return _wrapped.hash
         }
     }
-}
 
-public func ==(lhs: TimeZone, rhs: TimeZone) -> Bool {
-    if lhs._autoupdating || rhs._autoupdating {
-        return lhs._autoupdating == rhs._autoupdating
-    } else {
-        return lhs._wrapped.isEqual(rhs._wrapped)
+    public static func ==(lhs: TimeZone, rhs: TimeZone) -> Bool {
+        if lhs._autoupdating || rhs._autoupdating {
+            return lhs._autoupdating == rhs._autoupdating
+        } else {
+            return lhs._wrapped.isEqual(rhs._wrapped)
+        }
     }
 }
 

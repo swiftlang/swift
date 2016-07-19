@@ -25,8 +25,8 @@ enum E {
 
 // Check if the == comparison can be compiled to a simple icmp instruction.
 
-// CHECK-NORMAL-LABEL:define hidden i1 @_TZF12enum_derivedoi2eeFTOS_1ES0__Sb(i2, i2)
-// CHECK-TESTABLE-LABEL:define{{( protected)?}} i1 @_TZF12enum_derivedoi2eeFTOS_1ES0__Sb(i2, i2)
+// CHECK-NORMAL-LABEL:define hidden i1 @_TF12enum_derivedoi2eeFTOS_1ES0__Sb(i2, i2)
+// CHECK-TESTABLE-LABEL:define{{( protected)?}} i1 @_TF12enum_derivedoi2eeFTOS_1ES0__Sb(i2, i2)
 // CHECK: %2 = icmp eq i2 %0, %1
 // CHECK: ret i1 %2
 

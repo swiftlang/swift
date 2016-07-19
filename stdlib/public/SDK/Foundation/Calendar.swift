@@ -1065,19 +1065,20 @@ public struct Calendar : CustomStringConvertible, CustomDebugStringConvertible, 
             return identifierMap[identifier]!
         }
     }
-}
 
-public func ==(lhs: Calendar, rhs: Calendar) -> Bool {
-    if lhs._autoupdating || rhs._autoupdating {
-        return lhs._autoupdating == rhs._autoupdating
-    } else {
-        // NSCalendar's isEqual is broken (27019864) so we must implement this ourselves
-        return lhs.identifier == rhs.identifier &&
-            lhs.locale == rhs.locale &&
-            lhs.timeZone == rhs.timeZone &&
-            lhs.firstWeekday == rhs.firstWeekday &&
-            lhs.minimumDaysInFirstWeek == rhs.minimumDaysInFirstWeek
+    public static func ==(lhs: Calendar, rhs: Calendar) -> Bool {
+        if lhs._autoupdating || rhs._autoupdating {
+            return lhs._autoupdating == rhs._autoupdating
+        } else {
+            // NSCalendar's isEqual is broken (27019864) so we must implement this ourselves
+            return lhs.identifier == rhs.identifier &&
+                lhs.locale == rhs.locale &&
+                lhs.timeZone == rhs.timeZone &&
+                lhs.firstWeekday == rhs.firstWeekday &&
+                lhs.minimumDaysInFirstWeek == rhs.minimumDaysInFirstWeek
+        }
     }
+
 }
 
 extension Calendar : _ObjectiveCBridgeable {

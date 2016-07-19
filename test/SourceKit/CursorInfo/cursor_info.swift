@@ -210,7 +210,7 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // RUN: %sourcekitd-test -req=cursor -pos=9:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK2 %s
 // CHECK2:      source.lang.swift.ref.function.operator.infix ()
 // CHECK2-NEXT: +
-// CHECK2-NEXT: s:ZFsoi1pFTSiSi_Si
+// CHECK2-NEXT: s:Fsoi1pFTSiSi_Si
 // CHECK2-NEXT: (Int, Int) -> Int{{$}}
 // CHECK2-NEXT: _TtFTSiSi_Si
 // CHECK2-NEXT: Swift{{$}}

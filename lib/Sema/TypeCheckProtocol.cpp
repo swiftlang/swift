@@ -707,7 +707,9 @@ matchWitness(TypeChecker &tc,
     auto funcWitness = cast<FuncDecl>(witness);
 
     // Either both must be 'static' or neither.
-    if (funcReq->isStatic() != funcWitness->isStatic())
+    if (funcReq->isStatic() != funcWitness->isStatic() &&
+        !(funcReq->isOperator() &&
+          !funcWitness->getDeclContext()->isTypeContext()))
       return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
 
     // If we require a prefix operator and the witness is not a prefix operator,

@@ -281,12 +281,13 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
         _handle = _MutableHandle(reference: reference)
     }
 
+    public static func ==(lhs : DateComponents, rhs: DateComponents) -> Bool {
+        // Don't copy references here; no one should be storing anything
+        return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+    }
+
 }
 
-public func ==(lhs : DateComponents, rhs: DateComponents) -> Bool {
-    // Don't copy references here; no one should be storing anything
-    return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
-}
 
 // MARK: - Bridging
 

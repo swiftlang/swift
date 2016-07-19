@@ -474,7 +474,7 @@ public protocol BitwiseOperations {
   ///     // Prints "0"
   ///
   /// - Complexity: O(1).
-  func & (lhs: Self, rhs: Self) -> Self
+  static func & (lhs: Self, rhs: Self) -> Self
 
   /// Returns the union of bits set in the two arguments.
   ///
@@ -493,7 +493,7 @@ public protocol BitwiseOperations {
   ///     // Prints "5"
   ///
   /// - Complexity: O(1).
-  func | (lhs: Self, rhs: Self) -> Self
+  static func | (lhs: Self, rhs: Self) -> Self
 
   /// Returns the bits that are set in exactly one of the two arguments.
   ///
@@ -513,7 +513,7 @@ public protocol BitwiseOperations {
   ///     // Prints "5"
   ///
   /// - Complexity: O(1).
-  func ^ (lhs: Self, rhs: Self) -> Self
+  static func ^ (lhs: Self, rhs: Self) -> Self
 
   /// Returns the inverse of the bits set in the argument.
   ///
@@ -532,7 +532,7 @@ public protocol BitwiseOperations {
   ///     let allOnes = ~UInt8.allZeros   // 0b11111111
   ///
   /// - Complexity: O(1).
-  prefix func ~ (x: Self) -> Self
+  static prefix func ~ (x: Self) -> Self
 
   /// The empty bitset.
   ///
