@@ -304,6 +304,15 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   let _: P! = id(p.returnSelfIUOStatic(true))
 }
 
+protocol StaticP {
+  static func foo(a: Int)
+}
+extension StaticP {
+  func bar() {
+    _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype 'StaticP.Protocol'}} {{9-16=Self}}
+  }
+}
+
 func existentialClassP(_ p: ClassP) {
   // Instance member of existential)
   let _: (Int) -> () = id(p.bas)
