@@ -8,7 +8,9 @@
 // Credits: https://twitter.com/kiliankoe/status/752090953977036800
 
 // RUN: not --crash %target-swift-frontend %s -parse
-extension Dictionary {
-    func a<b: Sequence where Value: Sequence>() -> Dictionary<Key, b> {
+protocol P {
+}
+struct A<T> {
+    func a<B where T: P>() -> B {
     }
 }
