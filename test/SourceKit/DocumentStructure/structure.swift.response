@@ -320,7 +320,7 @@
                       key.bodylength: 17,
                       key.substructure: [
                         {
-                          key.kind: source.lang.swift.decl.var.parameter,
+                          key.kind: source.lang.swift.expr.argument,
                           key.offset: 564,
                           key.length: 1,
                           key.nameoffset: 0,
@@ -329,7 +329,7 @@
                           key.bodylength: 1
                         },
                         {
-                          key.kind: source.lang.swift.decl.var.parameter,
+                          key.kind: source.lang.swift.expr.argument,
                           key.name: "name",
                           key.offset: 567,
                           key.length: 14,
@@ -580,7 +580,7 @@
           key.bodylength: 6,
           key.substructure: [
             {
-              key.kind: source.lang.swift.decl.var.parameter,
+              key.kind: source.lang.swift.expr.argument,
               key.name: "d",
               key.offset: 1103,
               key.length: 6,

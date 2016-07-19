@@ -952,6 +952,7 @@ private:
 
   static StringRef getTagName(SyntaxStructureKind K) {
     switch (K) {
+      case SyntaxStructureKind::Argument: return "arg";
       case SyntaxStructureKind::Class: return "class";
       case SyntaxStructureKind::Struct: return "struct";
       case SyntaxStructureKind::Protocol: return "protocol";
