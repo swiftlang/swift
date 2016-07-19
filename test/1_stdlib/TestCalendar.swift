@@ -113,6 +113,7 @@ class TestCalendar : TestCalendarSuper {
             var c = Calendar(identifier: .gregorian)
             // Use english localization
             c.locale = Locale(identifier: "en_US")
+            c.timeZone = TimeZone(identifier: "America/Los_Angeles")!
             
             expectEqual("AM", c.amSymbol)
             expectEqual("PM", c.pmSymbol)
