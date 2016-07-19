@@ -269,10 +269,13 @@ public:
   const VersionRange &getAvailableRange() const { return AvailableRange; }
   void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
   
-  void getPlatformKeywordLocs(SmallVectorImpl<SourceLoc> &PlatformLocs);
+  void getPlatformKeywordRanges(SmallVectorImpl<CharSourceRange>
+                                &PlatformRanges);
 };
 
+  
 
+  
 /// This represents an entry in an "if" or "while" condition.  Pattern bindings
 /// can bind any number of names in the pattern binding decl, and may have an
 /// associated where clause.  When "if let" is involved, an arbitrary number of

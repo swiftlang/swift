@@ -3090,9 +3090,8 @@ public:
       return false;
     }
 
-    // Ignore the members of Optional, like getLogicValue(), map(), and
-    // flatMap().
-    //
+    // Ignore the internal members of Optional, like getLogicValue() and
+    // _getMirror().
     // These are not commonly used and cause noise and confusion when showing
     // among the members of the underlying type. If someone really wants to
     // use them they can write them directly.

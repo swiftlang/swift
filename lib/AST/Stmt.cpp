@@ -284,14 +284,24 @@ SourceLoc PoundAvailableInfo::getEndLoc() const {
 }
 
 void PoundAvailableInfo::
-getPlatformKeywordLocs(SmallVectorImpl<SourceLoc> &PlatformLocs) {
+getPlatformKeywordRanges(SmallVectorImpl<CharSourceRange> &PlatformRanges) {
   for (unsigned i = 0; i < NumQueries; i++) {
     auto *VersionSpec =
       dyn_cast<VersionConstraintAvailabilitySpec>(getQueries()[i]);
     if (!VersionSpec)
       continue;
     
-    PlatformLocs.push_back(VersionSpec->getPlatformLoc());
+    auto Loc = VersionSpec->getPlatformLoc();
+    auto Platform = VersionSpec->getPlatform();
+    switch (Platform) {
+    case PlatformKind::none:
+      break;
+#define AVAILABILITY_PLATFORM(X, PrettyName)                          \
+  case PlatformKind::X:                                               \
+    PlatformRanges.push_back(CharSourceRange(Loc, strlen(#X)));       \
+    break;
+#include "swift/AST/PlatformKinds.def"
+    }
   }
 }
 

@@ -1,5 +1,0 @@
----
-Name: LocalAuthentication
-Tags:
-- Name: LAError
-  NSErrorDomain: LAErrorDomain

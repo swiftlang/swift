@@ -243,8 +243,3 @@ Functions:
 Enumerators:
 - Name: AVMovieWritingAddMovieHeaderToDestination
   SwiftName: addMovieHeaderToDestination
-- Name: AVMusicSequenceLoadSMF_ChannelsToTracks
-  SwiftName: smfChannelsToTracks
-Tags:
-- Name: AVError
-  NSErrorDomain: AVFoundationErrorDomain

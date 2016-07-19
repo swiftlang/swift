@@ -140,8 +140,6 @@ class HostSpecificConfiguration(object):
                         invocation.platforms_to_skip_test_host:
                     test_host_only = True
                     test = True
-                else:
-                    test = False
 
             name = deployment_target.name
             if build:
@@ -795,9 +793,6 @@ class BuildScriptInvocation(object):
 
         if args.dry_run:
             impl_args += ["--dry-run"]
-
-        if args.lit_args:
-            impl_args += ["--llvm-lit-args=%s" % args.lit_args]
 
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
@@ -1949,12 +1944,6 @@ details of the setups of other systems or automated environments.""")
         "--only-execute",
         "--skip-test-optimized",
         action=arguments.action.unavailable)
-
-    parser.add_argument(
-        "--lit-args",
-        help="lit args to use when testing",
-        metavar="LITARGS",
-        default="-sv")
 
     args = migration.parse_args(parser, sys.argv[1:])
 

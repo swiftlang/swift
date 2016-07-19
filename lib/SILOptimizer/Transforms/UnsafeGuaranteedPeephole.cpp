@@ -37,7 +37,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -47,14 +46,9 @@ using namespace swift;
 /// Remove retain/release pairs around builtin "unsafeGuaranteed" instruction
 /// sequences.
 static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
-                                               RCIdentityFunctionInfo &RCIA,
-                                               PostDominanceAnalysis *PDA) {
+                                               RCIdentityFunctionInfo &RCIA) {
   DEBUG(llvm::dbgs() << "Running on function " << F.getName() << "\n");
   bool Changed = false;
-
-  // Lazily compute post-dominance info only when we really need it.
-  PostDominanceInfo *PDI = nullptr;
-
   for (auto &BB : F) {
     auto It = BB.begin(), End = BB.end();
     llvm::DenseMap<SILValue, SILInstruction *> LastRetain;
@@ -125,15 +119,6 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
         continue;
       }
 
-      if (!PDI)
-        PDI = PDA->get(&F);
-
-      // It needs to post-dominated the end instruction, since we need to remove
-      // the release along all paths to exit.
-      if (!PDI->properlyDominates(UnsafeGuaranteedEndI, UnsafeGuaranteedI))
-        continue;
-
-
       // Find the release to match with the unsafeGuaranteedValue.
       auto &UnsafeGuaranteedEndBB = *UnsafeGuaranteedEndI->getParent();
       auto LastRelease = findReleaseToMatchUnsafeGuaranteedValue(
@@ -180,8 +165,7 @@ class UnsafeGuaranteedPeephole : public swift::SILFunctionTransform {
 
   void run() override {
     auto &RCIA = *getAnalysis<RCIdentityAnalysis>()->get(getFunction());
-    auto *PostDominance = getAnalysis<PostDominanceAnalysis>();
-    if (removeGuaranteedRetainReleasePairs(*getFunction(), RCIA, PostDominance))
+    if (removeGuaranteedRetainReleasePairs(*getFunction(), RCIA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 

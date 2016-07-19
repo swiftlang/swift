@@ -1,7 +1,0 @@
----
-Name: CoreBluetooth
-Tags:
-- Name: CBError
-  NSErrorDomain: CBErrorDomain
-- Name: CBATTError
-  NSErrorDomain: CBATTErrorDomain

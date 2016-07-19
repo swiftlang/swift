@@ -488,7 +488,10 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
                          Types.getConstantInfo(constant).ContextGenericParams);
 
   // Create a debug scope for the function using astNode as source location.
-  F->setDebugScope(new (M) SILDebugScope(Loc, F));
+  F->setDebugScope(new (M) SILDebugScope(RegularLocation(astNode), F));
+
+  F->setLocation(Loc);
+
   F->setDeclContext(astNode);
 
   DEBUG(llvm::dbgs() << "lowering ";
@@ -878,8 +881,12 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                        makeModuleFragile
                            ? IsFragile
                            : IsNotFragile);
-  f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
+  f->setDebugScope(
+      new (M) SILDebugScope(RegularLocation(binding->getInit(pbdEntry)), f));
+  f->setLocation(binding);
+
   SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding, pbdEntry);
+
   f->verify();
 
   return f;

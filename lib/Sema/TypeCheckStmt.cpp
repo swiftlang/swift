@@ -1041,9 +1041,9 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     return;
   }
 
-  // If the result of this expression is of type "()" potentially wrapped in
-  // optionals, then it is safe to ignore.
-  if (valueE->getType()->lookThroughAllAnyOptionalTypes()->isVoid() ||
+  // If the result of this expression is of type "()", then it is safe to
+  // ignore.
+  if (valueE->getType()->isVoid() ||
       valueE->getType()->is<ErrorType>())
     return;
   

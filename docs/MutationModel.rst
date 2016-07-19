@@ -2,14 +2,13 @@
 
 .. raw:: html
 
-    <style>
-    table.docutils td,
-    table.docutils th {
-      border: 1px solid #aaa;
-    }
-    </style>
-
-
+   <style>
+   table.docutils td, table.docutils th {
+       border: 1px solid #aaa;
+   }
+   </style>
+   
+    
 ==================================
 Immutability and Read-Only Methods
 ==================================

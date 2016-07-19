@@ -476,10 +476,7 @@ Classes:
     SwiftName: intValue
   - Name: unsignedIntegerValue
     SwiftName: uintValue
-- Name: NSAttributedString
-  SwiftName: NSAttributedString
 - Name: NSOrderedSet
-  SwiftName: NSOrderedSet
   Methods:
   - Selector: 'enumerateObjectsWithOptions:usingBlock:'
     SwiftName: enumerateObjects(options:using:)
@@ -585,57 +582,40 @@ Classes:
   SwiftName: NSXPCListenerEndpoint
 - Name: NSAppleScript
   SwiftName: NSAppleScript
-- Name: NSBundleResourceRequest
-  SwiftName: NSBundleResourceRequest
 - Name: NSBundle
   Methods:
   - Selector: 'URLForAuxiliaryExecutable:'
-    SwiftName: url(forAuxiliaryExecutable:)
+    SwiftName: urlForAuxiliaryExecutable(_:)
     MethodKind: Instance
   - Selector: 'pathForAuxiliaryExecutable:'
-    SwiftName: path(forAuxiliaryExecutable:)
+    SwiftName: pathForAuxiliaryExecutable(_:)
     MethodKind: Instance
   - Selector: 'URLForResource:withExtension:subdirectory:inBundleWithURL:'
-    SwiftName: url(forResource:withExtension:subdirectory:in:)
-    MethodKind: Class
-  - Selector: 'URLsForResourcesWithExtension:subdirectory:inBundleWithURL:'
-    SwiftName: urls(forResourcesWithExtension:subdirectory:in:)
+    SwiftName: urlForResource(_:withExtension:subdirectory:inBundleWith:)
     MethodKind: Class
   - Selector: 'URLForResource:withExtension:'
-    SwiftName: url(forResource:withExtension:)
+    SwiftName: urlForResource(_:withExtension:)
     MethodKind: Instance
   - Selector: 'URLForResource:withExtension:subdirectory:'
-    SwiftName: url(forResource:withExtension:subdirectory:)
+    SwiftName: urlForResource(_:withExtension:subdirectory:)
     MethodKind: Instance
-  - Selector: 'URLsForResourcesWithExtension:subdirectory:'
-    SwiftName: urls(forResourcesWithExtension:subdirectory:)
-    MethodKind: Instance
-  - Selector: 'URLsForResourcesWithExtension:subdirectory:localization:'
-    SwiftName: urls(forResourcesWithExtension:subdirectory:localization:)
+  - Selector: 'URLForResource:withExtension:subdirectory:localization:'
+    SwiftName: urlForResource(_:withExtension:subdirectory:localization:)
     MethodKind: Instance
   - Selector: 'pathForResource:ofType:inDirectory:'
-    SwiftName: path(forResource:ofType:inDirectory:)
-    MethodKind: Class
-  - Selector: 'pathsForResourcesOfType:inDirectory:'
-    SwiftName: paths(forResourcesOfType:inDirectory:)
+    SwiftName: pathForResource(_:ofType:inDirectory:)
     MethodKind: Class
   - Selector: 'pathForResource:ofType:'
-    SwiftName: path(forResource:ofType:)
+    SwiftName: pathForResource(_:ofType:)
     MethodKind: Instance
   - Selector: 'pathForResource:ofType:inDirectory:'
-    SwiftName: path(forResource:ofType:inDirectory:)
+    SwiftName: pathForResource(_:ofType:inDirectory:)
     MethodKind: Instance
   - Selector: 'pathForResource:ofType:inDirectory:forLocalization:'
-    SwiftName: path(forResource:ofType:inDirectory:forLocalization:)
-    MethodKind: Instance
-  - Selector: 'pathsForResourcesOfType:inDirectory:'
-    SwiftName: paths(forResourcesOfType:inDirectory:)
-    MethodKind: Instance
-  - Selector: 'pathsForResourcesOfType:inDirectory:forLocalization:'
-    SwiftName: paths(forResourcesOfType:inDirectory:forLocalization:)
+    SwiftName: pathForResource(_:ofType:inDirectory:forLocalization:)
     MethodKind: Instance
   - Selector: 'objectForInfoDictionaryKey:'
-    SwiftName: object(forInfoDictionaryKey:)
+    SwiftName: objectForInfoDictionaryKey(_:)
     MethodKind: Instance
 - Name: NSByteCountFormatter
   Methods:
@@ -730,19 +710,16 @@ Classes:
     SwiftName: mountedVolumeURLs(includingResourceValuesForKeys:options:)
     MethodKind: Instance
   - Selector: 'URLsForDirectory:inDomains:'
-    SwiftName: urls(for:in:)
+    SwiftName: urlsForDirectory(_:inDomains:)
     MethodKind: Instance
   - Selector: 'URLForDirectory:inDomain:appropriateForURL:create:error:'
-    SwiftName: url(for:in:appropriateFor:create:)
+    SwiftName: urlForDirectory(_:in:appropriateFor:create:)
     MethodKind: Instance
   - Selector: 'URLForUbiquityContainerIdentifier:'
-    SwiftName: url(forUbiquityContainerIdentifier:)
+    SwiftName: urlForUbiquityContainerIdentifier(_:)
     MethodKind: Instance
   - Selector: 'containerURLForSecurityApplicationGroupIdentifier:'
-    SwiftName: containerURL(forSecurityApplicationGroupIdentifier:)
-    MethodKind: Instance
-  - Selector: 'URLForPublishingUbiquitousItemAtURL:expirationDate:error:'
-    SwiftName: url(forPublishingUbiquitousItemAt:expiration:)
+    SwiftName: containerURLForSecurityApplicationGroupIdentifier(_:)
     MethodKind: Instance
 - Name: NSFileVersion
   SwiftName: NSFileVersion
@@ -819,9 +796,6 @@ Classes:
     MethodKind: Instance
 - Name: NSTextCheckingResult
   Methods:
-  - Selector: 'rangeAtIndex:'
-    SwiftName: rangeAt(_:)
-    MethodKind: Instance
   - Selector: 'resultByAdjustingRangesWithOffset:'
     SwiftName: resultByAdjustingRangesWithOffset(_:)
     MethodKind: Instance
@@ -944,9 +918,6 @@ Classes:
     SwiftName: set(_:forKey:)
     MethodKind: Instance
   - Selector: 'setBool:forKey:'
-    SwiftName: set(_:forKey:)
-    MethodKind: Instance
-  - Selector: 'setURL:forKey:'
     SwiftName: set(_:forKey:)
     MethodKind: Instance
   - Selector: 'addSuiteNamed:'
@@ -1207,7 +1178,7 @@ Tags:
 - Name: NSXMLDocumentContentKind
   SwiftName: XMLDocument.ContentKind
 - Name: NSXMLDTDNodeKind
-  SwiftName: XMLDTDNode.DTDKind
+  SwiftName: XMLDTDNode.Kind
 - Name: NSXMLNodeKind
   SwiftName: XMLNode.Kind
 - Name: NSXMLParserError
@@ -1229,7 +1200,7 @@ Tags:
 - Name: NSCalculationError
   SwiftName: NSDecimalNumber.CalculationError
 - Name: NSAttributedStringEnumerationOptions
-  SwiftName: NSAttributedString.EnumerationOptions
+  SwiftName: AttributedString.EnumerationOptions
 - Name: NSDateComponentsFormatterUnitsStyle
   SwiftName: DateComponentsFormatter.UnitsStyle
 - Name: NSDateComponentsFormatterZeroFormattingBehavior
@@ -1254,6 +1225,8 @@ Tags:
   SwiftName: NSString.EnumerationOptions
 - Name: NSURLBookmarkCreationOptions
   SwiftName: NSURL.BookmarkCreationOptions
+- Name: NSURLBookmarkFileCreationOptions
+  SwiftName: NSURL.BookmarkFileCreationOptions
 - Name: NSURLBookmarkResolutionOptions
   SwiftName: NSURL.BookmarkResolutionOptions
 - Name: NSURLHandleStatus
@@ -1349,8 +1322,6 @@ Typedefs:
   SwiftName: DistributedNotificationCenter.CenterType
 - Name: NSURLFileProtectionType
   SwiftName: URLFileProtection
-- Name: NSURLBookmarkFileCreationOptions
-  SwiftName: NSURL.BookmarkFileCreationOptions
 Globals:
 - Name: NSAppleScriptErrorMessage
   SwiftName: NSAppleScript.errorMessage

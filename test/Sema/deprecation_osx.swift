@@ -156,7 +156,7 @@ func functionWithDeprecatedMethodInDeadElseBranch() {
     let _ = ClassDeprecatedIn10_9()  // no-warning
   }
 
-  if #available(OSX 10.9, *) { // no-warning
+  if #available(OSX 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
   } else {
     // This branch is dead because our minimum deployment target is 10.51.
     let _ = ClassDeprecatedIn10_9()  // no-warning

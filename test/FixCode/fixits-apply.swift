@@ -204,8 +204,3 @@ class InitDynType {
     self.init()
   }
 }
-
-class NoSemi {
-  enum Bar { case bar }
-  var foo: .Bar = .bar
-}

@@ -99,8 +99,5 @@ if 1 != 2, #available(iOS 8.0, *) {}
 if case 42 = 42, #available(iOS 8.0, *) {}
 if let x = Optional(42), #available(iOS 8.0, *) {}
 
-// Allow "macOS" as well.
-if #available(macOS 10.51, *) {
-}
 
 

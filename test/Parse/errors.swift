@@ -110,15 +110,7 @@ func postThrows() -> Int throws { // expected-error{{'throws' may only occur bef
   return 5
 }
 
-func postThrows2() -> throws Int { // expected-error{{'throws' may only occur before '->'}}{{20-22=throws}}{{23-29=->}}
-  return try postThrows()
-}
-
 func postRethrows(_ f: () throws -> Int) -> Int rethrows { // expected-error{{'rethrows' may only occur before '->'}}{{42-42=rethrows }}{{48-57=}}
-  return try f()
-}
-
-func postRethrows2(_ f: () throws -> Int) -> rethrows Int { // expected-error{{'rethrows' may only occur before '->'}}{{43-45=rethrows}}{{46-54=->}}
   return try f()
 }
 

@@ -98,6 +98,10 @@ private:
   /// function references.
   BlockListType BlockList;
 
+  /// The SIL location of the function, which provides a link back to the AST.
+  /// The function only gets a location after it's been emitted.
+  Optional<SILLocation> Location;
+
   /// The declcontext of this function.
   DeclContext *DeclCtx;
 
@@ -433,17 +437,20 @@ public:
   ///          or is raw SIL (so that the mandatory passes still run).
   bool shouldOptimize() const;
 
+  /// Initialize the source location of the function.
+  void setLocation(SILLocation L) { Location = L; }
+
   /// Check if the function has a location.
   /// FIXME: All functions should have locations, so this method should not be
   /// necessary.
   bool hasLocation() const {
-    return DebugScope && !DebugScope->Loc.isNull();
+    return Location.hasValue();
   }
 
   /// Get the source location of the function.
   SILLocation getLocation() const {
-    assert(DebugScope && "no scope/location");
-    return getDebugScope()->Loc;
+    assert(Location.hasValue());
+    return Location.getValue();
   }
 
   /// Initialize the debug scope of the function.

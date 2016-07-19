@@ -10,6 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Customizes the result of `_reflect(x)`, where `x` is a conforming
+/// type.
+public protocol _Reflectable {
+  // The runtime has inappropriate knowledge of this protocol and how its
+  // witness tables are laid out. Changing this protocol requires a
+  // corresponding change to Reflection.cpp.
+
+  /// Returns a mirror that reflects `self`.
+  func _getMirror() -> _Mirror
+}
+
 /// A unique identifier for a class instance or metatype.
 ///
 /// In Swift, only class instances and metatypes have unique identities. There
@@ -126,8 +137,10 @@ func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
   out.initialize(with: String(reflecting: x))
 }
 
-/// Produce a mirror for any value.  The runtime produces a mirror that
-/// structurally reflects values of any type.
+/// Produce a mirror for any value. If the value's type conforms to
+/// `_Reflectable`, invoke its `_getMirror()` method; otherwise, fall back
+/// to an implementation in the runtime that structurally reflects values
+/// of any type.
 @_silgen_name("swift_reflectAny")
 internal func _reflect<T>(_ x: T) -> _Mirror
 

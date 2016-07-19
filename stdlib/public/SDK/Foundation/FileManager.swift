@@ -27,20 +27,10 @@ extension FileManager {
      renamed syntax should be:
      public func replaceItem(at originalItemURL: URL, withItemAt newItemURL: URL, backupItemName: String? = nil, options : FileManager.ItemReplacementOptions = []) throws -> URL?
     */
-    
-    @available(*, deprecated, renamed:"replaceItemAt(_:withItemAt:backupItemName:options:)")
+    @available(OSX 10.6, iOS 4.0, *)
     public func replaceItemAtURL(originalItemURL: NSURL, withItemAtURL newItemURL: NSURL, backupItemName: String? = nil, options: FileManager.ItemReplacementOptions = []) throws -> NSURL? {
         var error: NSError? = nil
         if let result = NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(self, originalItemURL, newItemURL, backupItemName, options, &error) {
-            return result
-        }
-        throw error!
-    }
-
-    @available(OSX 10.6, iOS 4.0, *)
-    public func replaceItemAt(_ originalItemURL: URL, withItemAt newItemURL: URL, backupItemName: String? = nil, options: FileManager.ItemReplacementOptions = []) throws -> NSURL? {
-        var error: NSError? = nil
-        if let result = NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(self, originalItemURL as URL, newItemURL as URL, backupItemName, options, &error) {
             return result
         }
         throw error!

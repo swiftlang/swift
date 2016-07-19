@@ -402,9 +402,6 @@ public:
   /// hasReferenceSemantics() - Do objects of this type have reference
   /// semantics?
   bool hasReferenceSemantics();
-  
-  /// Is this the 'Any' type?
-  bool isAny();
 
   /// Are values of this type essentially just class references,
   /// possibly with some sort of additional information?

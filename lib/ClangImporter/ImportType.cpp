@@ -926,15 +926,9 @@ namespace {
       if (!proto)
         return Type();
 
-      // id maps to Any in bridgeable contexts, AnyObject otherwise.
+      // id maps to AnyObject.
       if (type->isObjCIdType()) {
-        if (Impl.SwiftContext.LangOpts.EnableIdAsAny) {
-          return { proto->getDeclaredType(),
-                 ImportHint(ImportHint::ObjCBridged,
-                         ProtocolCompositionType::get(Impl.SwiftContext, {})) };
-        } else {
-          return { proto->getDeclaredType(), ImportHint::ObjCPointer };
-        }
+        return { proto->getDeclaredType(), ImportHint::ObjCPointer };
       }
 
       // Class maps to AnyObject.Type.
@@ -1213,13 +1207,9 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   // If we have a bridged Objective-C type and we are allowed to
   // bridge, do so.
-  if (hint == ImportHint::ObjCBridged && canBridgeTypes(importKind))
-    // id and Any can be bridged without Foundation. There would be
-    // bootstrapping issues with the ObjectiveC module otherwise.
-    if (hint.BridgedType->isAny()
-        || impl.tryLoadFoundationModule()
-        || impl.ImportForwardDeclarations)
-      importedType = hint.BridgedType;
+  if (hint == ImportHint::ObjCBridged && canBridgeTypes(importKind) &&
+      (impl.tryLoadFoundationModule() || impl.ImportForwardDeclarations))
+    importedType = hint.BridgedType;
 
   if (!importedType)
     return importedType;

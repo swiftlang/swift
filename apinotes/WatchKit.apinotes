@@ -25,6 +25,3 @@ Enumerators:
   SwiftName: downloadFailed
 - Name: WatchKitRecordingFailedError
   SwiftName: recordingFailed
-Tags:
-- Name: WatchKitErrorCode
-  NSErrorDomain: WatchKitErrorDomain

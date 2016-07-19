@@ -8,5 +8,4 @@ class NOTYPECHECK_cls {}
 
 class ClsSec {
   let member : Int = NOTYPECHECK_member
-  lazy var lazymember: Int = NOTYPECHECK_lazymember
 }

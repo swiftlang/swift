@@ -626,12 +626,10 @@ public:
                               StringRef Name, unsigned ArgNo,
                               Alignment Align = Alignment(0)) {
     auto Ty = Storage->getType();
-    if (IGM.IRGen.Opts.Optimize ||
+    if (IGM.IRGen.Opts.Optimize || (ArgNo == 0) ||
         isa<llvm::AllocaInst>(Storage) ||
         isa<llvm::UndefValue>(Storage) ||
-        Ty == IGM.RefCountedPtrTy) // No debug info is emitted for refcounts.
-      return Storage;
-    if (ArgNo == 0) {
+        Ty == IGM.RefCountedPtrTy) { // No debug info is emitted for refcounts.
       // Account for bugs in LLVM.
       //
       // - The LLVM type legalizer currently doesn't update debug
@@ -655,8 +653,6 @@ public:
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, Name}}];
     if (!Alloca.isValid())
       Alloca = createAlloca(Ty, Align, Name+".addr");
-
-    ArtificialLocation AutoRestore(getDebugScope(), IGM.DebugInfo, Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();
   }

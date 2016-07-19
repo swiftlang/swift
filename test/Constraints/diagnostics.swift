@@ -822,12 +822,3 @@ func rdar24202058(a : Int) {
   return a <= 480 // expected-error {{'<=' produces 'Bool', not the expected contextual result type '()'}}
 }
 
-// SR-1752: Warning about unused result with ternary operator
-
-struct SR1752 {
-  func foo() {}
-}
-
-let sr1752: SR1752? = nil
-
-true ? nil : sr1752?.foo() // don't generate a warning about unused result since foo returns Void

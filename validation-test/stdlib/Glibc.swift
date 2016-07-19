@@ -7,11 +7,7 @@
 // UNSUPPORTED: OS=watchos
 // UNSUPPORTED: OS=linux-androideabi
 
-// REQUIRES: OS=linux-gnu
-
-import Swift
 import StdlibUnittest
-
 
 import Glibc
 

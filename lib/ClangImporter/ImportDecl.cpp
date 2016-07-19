@@ -1008,11 +1008,9 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
 /// As addErrorDomain above, but performs a lookup
 static bool addErrorDomain(NominalTypeDecl *swiftDecl,
-                           StringRef errorDomainName,
+                           clang::IdentifierInfo *errorDomainDeclName,
                            ClangImporter::Implementation &importer) {
   auto &clangSema = importer.getClangSema();
-  clang::IdentifierInfo *errorDomainDeclName =
-    &clangSema.getASTContext().Idents.get(errorDomainName);
   clang::LookupResult lookupResult(
       clangSema, clang::DeclarationName(errorDomainDeclName),
       clang::SourceLocation(), clang::Sema::LookupNameKind::LookupOrdinaryName);
@@ -1525,16 +1523,6 @@ namespace {
 
       Type SwiftType;
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
-        // Ignore the 'id' typedef. We want to bridge the underlying
-        // ObjCId type.
-        //
-        // When we remove the EnableIdAsAny staging flag, the 'id' entry
-        // should be removed from MappedTypes.def, and this conditional should
-        // become unnecessary.
-        if (Name.str() == "id" && Impl.SwiftContext.LangOpts.EnableIdAsAny) {
-          return nullptr;
-        }
-      
         bool IsError;
         StringRef StdlibTypeName;
         MappedTypeNameKind NameMapping;
@@ -6199,11 +6187,11 @@ void ClangImporter::Implementation::importAttributes(
       auto platformK =
         llvm::StringSwitch<Optional<PlatformKind>>(Platform)
           .Case("ios", PlatformKind::iOS)
-          .Case("macos", PlatformKind::OSX)
+          .Case("macosx", PlatformKind::OSX)
           .Case("tvos", PlatformKind::tvOS)
           .Case("watchos", PlatformKind::watchOS)
           .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
-          .Case("macos_app_extension",
+          .Case("macosx_app_extension",
                 PlatformKind::OSXApplicationExtension)
           .Case("tvos_app_extension",
                 PlatformKind::tvOSApplicationExtension)

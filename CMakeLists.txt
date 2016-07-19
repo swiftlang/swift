@@ -48,10 +48,6 @@ option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
 
-option(SWIFT_BUILD_REMOTE_MIRROR
-    "Build the Swift Remote Mirror Library"
-    TRUE)
-
 option(SWIFT_BUILD_DYNAMIC_STDLIB
     "Build dynamic variants of the Swift standard library"
     TRUE)
@@ -124,7 +120,7 @@ set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
+    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror-headers")
 
 # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING

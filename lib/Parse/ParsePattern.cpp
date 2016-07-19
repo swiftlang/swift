@@ -648,26 +648,6 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   }
 
   SourceLoc arrowLoc;
-
-  auto diagnoseInvalidThrows = [&]() -> Optional<InFlightDiagnostic> {
-    if (throwsLoc.isValid())
-      return None;
-
-    if (Tok.is(tok::kw_throws)) {
-      throwsLoc = consumeToken();
-    } else if (Tok.is(tok::kw_rethrows)) {
-      throwsLoc = consumeToken();
-      rethrows = true;
-    }
-
-    if (!throwsLoc.isValid())
-      return None;
-
-    auto diag = rethrows ? diag::rethrows_in_wrong_position
-                         : diag::throws_in_wrong_position;
-    return diagnose(Tok, diag);
-  };
-
   // If there's a trailing arrow, parse the rest as the result type.
   if (Tok.isAny(tok::arrow, tok::colon)) {
     if (!consumeIf(tok::arrow, arrowLoc)) {
@@ -675,15 +655,6 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       diagnose(Tok, diag::func_decl_expected_arrow)
           .fixItReplace(SourceRange(Tok.getLoc()), "->");
       arrowLoc = consumeToken(tok::colon);
-    }
-
-    // Check for 'throws' and 'rethrows' after the arrow, but
-    // before the type, and correct it.
-    if (auto diagOpt = diagnoseInvalidThrows()) {
-      assert(arrowLoc.isValid());
-      assert(throwsLoc.isValid());
-      (*diagOpt).fixItExchange(SourceRange(arrowLoc),
-                               SourceRange(throwsLoc));
     }
 
     ParserResult<TypeRepr> ResultType =
@@ -701,14 +672,26 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   }
 
   // Check for 'throws' and 'rethrows' after the type and correct it.
-  if (auto diagOpt = diagnoseInvalidThrows()) {
-    assert(arrowLoc.isValid());
-    assert(retType);
-    SourceLoc typeEndLoc = Lexer::getLocForEndOfToken(SourceMgr,
-                                                      retType->getEndLoc());
-    SourceLoc throwsEndLoc = Lexer::getLocForEndOfToken(SourceMgr, throwsLoc);
-    (*diagOpt).fixItInsert(arrowLoc, rethrows ? "rethrows " : "throws ")
-              .fixItRemoveChars(typeEndLoc, throwsEndLoc);
+  if (!throwsLoc.isValid()) {
+    if (Tok.is(tok::kw_throws)) {
+      throwsLoc = consumeToken();
+    } else if (Tok.is(tok::kw_rethrows)) {
+      throwsLoc = consumeToken();
+      rethrows = true;
+    }
+
+    if (throwsLoc.isValid()) {
+      assert(arrowLoc.isValid());
+      assert(retType);
+      auto diag = rethrows ? diag::rethrows_after_function_result
+                           : diag::throws_after_function_result;
+      SourceLoc typeEndLoc = Lexer::getLocForEndOfToken(SourceMgr,
+                                                        retType->getEndLoc());
+      SourceLoc throwsEndLoc = Lexer::getLocForEndOfToken(SourceMgr, throwsLoc);
+      diagnose(Tok, diag)
+        .fixItInsert(arrowLoc, rethrows ? "rethrows " : "throws ")
+        .fixItRemoveChars(typeEndLoc, throwsEndLoc);
+    }
   }
 
   return Status;

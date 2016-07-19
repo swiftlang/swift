@@ -2938,6 +2938,10 @@ ERROR(availability_inout_accessor_only_version_newer, none,
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
 
+WARNING(availability_query_useless_min_deployment, none,
+        "unnecessary check for '%0'; minimum deployment target ensures guard "
+        "will always be true", (StringRef))
+
 WARNING(availability_query_useless_enclosing_scope, none,
         "unnecessary check for '%0'; enclosing scope ensures guard "
         "will always be true", (StringRef))

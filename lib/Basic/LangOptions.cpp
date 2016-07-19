@@ -55,9 +55,7 @@ bool contains(const Type (&Array)[N], const Type &V) {
   return std::find(std::begin(Array), std::end(Array), V) != std::end(Array);
 }
 
-bool LangOptions::checkPlatformConditionOS(StringRef &OSName) {
-  if (OSName == "macOS")
-    OSName = "OSX";
+bool LangOptions::isPlatformConditionOSSupported(StringRef OSName) {
   return contains(SupportedConditionalCompilationOSs, OSName);
 }
 
@@ -194,9 +192,14 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   }
 
   // Set the "runtime" platform condition.
-  if (EnableObjCInterop)
+  if (EnableObjCInterop) {
     addPlatformConditionValue("_runtime", "_ObjC");
-  else
+
+    // Indicate that (NS)URLRequest is now bridged.
+    if (Target.isOSDarwin())
+      addCustomConditionalCompilationFlag("BRIDGED_URLREQUEST");
+
+  } else
     addPlatformConditionValue("_runtime", "_Native");
 
   // If you add anything to this list, change the default size of

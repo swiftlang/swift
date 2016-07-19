@@ -1,4 +1,3 @@
----
 Name:            GameKit
 Classes:
   - Name: GKLocalPlayer
@@ -6,6 +5,3 @@ Classes:
       - Selector:        'localPlayer'
         MethodKind:      Class
         FactoryAsInit:   C
-Tags:
-- Name: GKErrorCode
-  NSErrorDomain: GKErrorDomain

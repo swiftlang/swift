@@ -190,7 +190,7 @@ class TestData : TestDataSuper {
     
     func testCustomData() {
         let length = 5
-        let allOnesData = Data(referencing: AllOnesData(length: length))
+        let allOnesData = Data(reference: AllOnesData(length: length))
         expectEqual(1, allOnesData[0], "First byte of all 1s data should be 1")
         
         // Double the length
@@ -246,7 +246,7 @@ class TestData : TestDataSuper {
         let allOnes = AllOnesData(length: 64)
         
         // Type-erased
-        let data = Data(referencing: allOnes)
+        let data = Data(reference: allOnes)
         
         // Create a home for our test data
         let dirPath = (NSTemporaryDirectory() as NSString).appendingPathComponent(NSUUID().uuidString)
@@ -291,7 +291,7 @@ class TestData : TestDataSuper {
         expectEqual(s.count, 2, "Expected only two entries in the Set")
     }
     
-    func testReplaceSubrange() {
+    func testReplaceBytes() {
         var hello = dataFrom("Hello")
         let world = dataFrom("World")
         
@@ -302,11 +302,11 @@ class TestData : TestDataSuper {
         let goodbye = dataFrom("Goodbye")
         let expected = dataFrom("Goodbye World")
         
-        goodbyeWorld.replaceSubrange(0..<5, with: goodbye)
+        goodbyeWorld.replaceBytes(in: 0..<5, with: goodbye)
         expectEqual(goodbyeWorld, expected)
     }
     
-    func testReplaceSubrange2() {
+    func testReplaceBytes2() {
         let hello = dataFrom("Hello")
         let world = dataFrom(" World")
         let goodbye = dataFrom("Goodbye")
@@ -316,12 +316,12 @@ class TestData : TestDataSuper {
         mutateMe.append(world)
 
         if let found = mutateMe.range(of: hello) {
-            mutateMe.replaceSubrange(found, with: goodbye)
+            mutateMe.replaceBytes(in: found, with: goodbye)
         }
         expectEqual(mutateMe, expected)
     }
     
-    func testReplaceSubrange3() {
+    func testReplaceBytes3() {
         // The expected result
         let expectedBytes : [UInt8] = [1, 2, 9, 10, 11, 12, 13]
         let expected = expectedBytes.withUnsafeBufferPointer {
@@ -337,44 +337,9 @@ class TestData : TestDataSuper {
         // The bytes we'll insert
         let b : [UInt8] = [9, 10, 11, 12, 13]
         b.withUnsafeBufferPointer {
-            a.replaceSubrange(2..<5, with: $0)
+            a.replaceBytes(in: 2..<5, with: $0)
         }
         expectEqual(expected, a)
-    }
-    
-    func testReplaceSubrange4() {
-        let expectedBytes : [UInt8] = [1, 2, 9, 10, 11, 12, 13]
-        let expected = Data(bytes: expectedBytes)
-        
-        // The data we'll mutate
-        let someBytes : [UInt8] = [1, 2, 3, 4, 5]
-        var a = Data(bytes: someBytes)
-        
-        // The bytes we'll insert
-        let b : [UInt8] = [9, 10, 11, 12, 13]
-        a.replaceSubrange(2..<5, with: b)
-        expectEqual(expected, a)
-    }
-    
-    func testReplaceSubrange5() {
-        var d = Data(bytes: [1, 2, 3])
-        d.replaceSubrange(0..<0, with: [4])
-        expectEqual(Data(bytes: [4, 1, 2, 3]), d)
-        
-        d.replaceSubrange(0..<4, with: [9])
-        expectEqual(Data(bytes: [9]), d)
-        
-        d.replaceSubrange(0..<d.count, with: [])
-        expectEqual(Data(), d)
-        
-        d.replaceSubrange(0..<0, with: [1, 2, 3, 4])
-        expectEqual(Data(bytes: [1, 2, 3, 4]), d)
-        
-        d.replaceSubrange(1..<3, with: [9, 8])
-        expectEqual(Data(bytes: [1, 9, 8, 4]), d)
-        
-        d.replaceSubrange(d.count..<d.count, with: [5])
-        expectEqual(Data(bytes: [1, 9, 8, 4, 5]), d)
     }
 
     func testRange() {
@@ -404,8 +369,8 @@ class TestData : TestDataSuper {
         let expected = dataFrom("Hello World")
         var helloWorld = dataFrom("")
         
-        helloWorld.replaceSubrange(0..<0, with: world)
-        helloWorld.replaceSubrange(0..<0, with: hello)
+        helloWorld.replaceBytes(in: 0..<0, with: world)
+        helloWorld.replaceBytes(in: 0..<0, with: hello)
         
         expectEqual(helloWorld, expected)
     }
@@ -459,7 +424,7 @@ class TestData : TestDataSuper {
         buffer[0] = 0
         buffer[1] = 0
         
-        var data = Data(capacity: c * strideof(UInt16.self))
+        var data = Data(capacity: c * strideof(UInt16.self))!
         data.resetBytes(in: 0..<c * strideof(UInt16.self))
         data[0] = 0xFF
         data[1] = 0xFF
@@ -830,11 +795,9 @@ DataTests.test("testBridgingMutable") { TestData().testBridgingMutable() }
 DataTests.test("testBridgingCustom") { TestData().testBridgingCustom() }
 DataTests.test("testEquality") { TestData().testEquality() }
 DataTests.test("testDataInSet") { TestData().testDataInSet() }
-DataTests.test("testReplaceSubrange") { TestData().testReplaceSubrange() }
-DataTests.test("testReplaceSubrange2") { TestData().testReplaceSubrange2() }
-DataTests.test("testReplaceSubrange3") { TestData().testReplaceSubrange3() }
-DataTests.test("testReplaceSubrange4") { TestData().testReplaceSubrange4() }
-DataTests.test("testReplaceSubrange5") { TestData().testReplaceSubrange5() }
+DataTests.test("testReplaceBytes") { TestData().testReplaceBytes() }
+DataTests.test("testReplaceBytes2") { TestData().testReplaceBytes2() }
+DataTests.test("testReplaceBytes3") { TestData().testReplaceBytes3() }
 DataTests.test("testRange") { TestData().testRange() }
 DataTests.test("testInsertData") { TestData().testInsertData() }
 DataTests.test("testLoops") { TestData().testLoops() }
@@ -867,7 +830,7 @@ DataTests.test("bounding failure subdata") {
 DataTests.test("bounding failure replace") {
     var data = "Hello World".data(using: .utf8)!
     expectCrashLater()
-    data.replaceSubrange(5..<200, with: Data())
+    data.replaceBytes(in: 5..<200, with: Data())
 }
 
 DataTests.test("bounding failure replace2") {
@@ -876,7 +839,7 @@ DataTests.test("bounding failure replace2") {
     expectCrashLater()
     bytes.withUnsafeBufferPointer {
         // lowerBound ok, upperBound after end of data
-        data.replaceSubrange(0..<2, with: $0)
+        data.replaceBytes(in: 0..<2, with: $0)
     }
 }
 
@@ -886,16 +849,8 @@ DataTests.test("bounding failure replace3") {
     expectCrashLater()
     bytes.withUnsafeBufferPointer {
         // lowerBound is > length
-        data.replaceSubrange(2..<4, with: $0)
+        data.replaceBytes(in: 2..<4, with: $0)
     }
-}
-
-DataTests.test("bounding failure replace4") {
-    var data = "a".data(using: .utf8)!
-    var bytes : [UInt8] = [1, 2, 3]
-    expectCrashLater()
-    // lowerBound is > length
-    data.replaceSubrange(2..<4, with: bytes)
 }
 
 DataTests.test("bounding failure reset range") {

@@ -1,5 +1,0 @@
----
-Name: EventKit
-Tags:
-- Name: EKErrorCode
-  NSErrorDomain: EKErrorDomain

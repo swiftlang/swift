@@ -1683,7 +1683,7 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
           return ConditionalCompilationExprState::error();
         }
         if (fnName == "os") {
-          if (!LangOptions::checkPlatformConditionOS(argument)) {
+          if (!LangOptions::isPlatformConditionOSSupported(argument)) {
             diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
                      "operating system", fnName);
             return ConditionalCompilationExprState::error();

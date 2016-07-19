@@ -1011,7 +1011,7 @@ func useUnavailableExtension() {
 func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
 // Default availability reflects minimum deployment: 10.9 and up
 
-  if #available(OSX 10.9, *) { // no-warning
+  if #available(OSX 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
     let _ = globalFuncAvailableOn10_9()
   }
   
@@ -1023,7 +1023,7 @@ func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
     }
   }
 
-  if #available(OSX 10.9, *) { // expected-note {{enclosing scope here}}
+  if #available(OSX 10.9, *) { // expected-note {{enclosing scope here}} expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
   } else {
     // Make sure we generate a warning about an unnecessary check even if the else branch of if is dead.
     if #available(OSX 10.51, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
@@ -1032,7 +1032,7 @@ func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
 
   // This 'if' is strictly to limit the scope of the guard fallthrough
   if p {
-    guard #available(OSX 10.9, *) else { // expected-note {{enclosing scope here}}
+    guard #available(OSX 10.9, *) else { // expected-note {{enclosing scope here}} expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
       // Make sure we generate a warning about an unnecessary check even if the else branch of guard is dead.
       if #available(OSX 10.51, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
       }
