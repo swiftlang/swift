@@ -32,6 +32,7 @@ set(SWIFT_API_NOTES_INPUTS
   NotificationCenter
   ObjectiveC
   PassKit
+  Photos
   QuartzCore
   QuickLook
   SafariServices
