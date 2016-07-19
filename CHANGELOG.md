@@ -3,6 +3,33 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0091](https://github.com/apple/swift-evolution/blob/master/proposals/0091-improving-operators-in-protocols.md):
+  Operators can now be defined within types or extensions thereof. For example:
+
+  ```swift
+  struct Foo: Equatable {
+    let value: Int
+
+    static func ==(lhs: Foo, rhs: Foo) -> Bool {
+      return lhs.value == rhs.value
+    }
+  }
+  ```
+
+  Such operators must be declared as `static` (or, within a class, `class
+  final`), and have the same signature as their global counterparts. As part of
+  this change, operator requirements declared in protocols must also be
+  explicitly declared `static`:
+
+  ```swift
+  protocol Equatable {
+    static func ==(lhs: Self, rhs: Self) -> Bool
+  }
+  ```
+
+  Note that the type checker performance optimization described by SE-0091 is
+  not yet implemented.
+
 * [SE-0099](https://github.com/apple/swift-evolution/blob/master/proposals/0099-conditionclauses.md):
   Condition clauses in `if`, `guard`, and `while` statements now use a more
   regular syntax. Each pattern or optional binding must be prefixed with `case`
