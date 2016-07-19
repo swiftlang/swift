@@ -1016,6 +1016,7 @@ public:
   /// Emit 'undef' in a particular formal type.
   ManagedValue emitUndef(SILLocation loc, Type type);
   ManagedValue emitUndef(SILLocation loc, SILType type);
+  RValue emitUndefRValue(SILLocation loc, Type type);
   
   std::pair<ManagedValue, SILValue>
   emitUninitializedArrayAllocation(Type ArrayTy,

@@ -302,27 +302,30 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
   if (fromCollection->getDecl() == ctx.getArrayDecl()) {
-    fn = conditional ? ctx.getArrayConditionalCast(nullptr)
-                          : ctx.getArrayForceCast(nullptr);
+    fn = conditional ? SGF.SGM.getArrayConditionalCast(loc)
+                     : SGF.SGM.getArrayForceCast(loc);
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
     fn = bridgesFromObjC
            ? (conditional
-                ? ctx.getDictionaryBridgeFromObjectiveCConditional(nullptr)
-                : ctx.getDictionaryBridgeFromObjectiveC(nullptr))
+                ? SGF.SGM.getDictionaryBridgeFromObjectiveCConditional(loc)
+                : SGF.SGM.getDictionaryBridgeFromObjectiveC(loc))
            : (conditional
-                ? ctx.getDictionaryDownCastConditional(nullptr)
-                : ctx.getDictionaryDownCast(nullptr));
+                ? SGF.SGM.getDictionaryDownCastConditional(loc)
+                : SGF.SGM.getDictionaryDownCast(loc));
   } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
     fn = bridgesFromObjC
            ? (conditional
-                ? ctx.getSetBridgeFromObjectiveCConditional(nullptr)
-                : ctx.getSetBridgeFromObjectiveC(nullptr))
+                ? SGF.SGM.getSetBridgeFromObjectiveCConditional(loc)
+                : SGF.SGM.getSetBridgeFromObjectiveC(loc))
            : (conditional
-                ? ctx.getSetDownCastConditional(nullptr)
-                : ctx.getSetDownCast(nullptr));
+                ? SGF.SGM.getSetDownCastConditional(loc)
+                : SGF.SGM.getSetDownCast(loc));
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
+
+  // This will have been diagnosed by the accessors above.
+  if (!fn) return SGF.emitUndefRValue(loc, destType);
 
   auto fnArcheTypes = fn->getGenericParams()->getPrimaryArchetypes();
   auto fromSubsts = fromCollection->gatherAllSubstitutions(
