@@ -86,7 +86,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
         _precondition(
           bridged != nil, "array element cannot be bridged to Objective-C")
         // FIXME: should be an unsafeDowncast.
-        p.initialize(with: unsafeBitCast(bridged!, to: TargetElement.self))
+        p.initialize(to: unsafeBitCast(bridged!, to: TargetElement.self))
         p += 1
       }
     }
@@ -168,7 +168,7 @@ internal func _arrayConditionalBridgeElements<
     guard let value = object as? TargetElement else {
       return nil
     }
-    p.initialize(with: value)
+    p.initialize(to: value)
     p += 1
   }
   return Array(_buffer: _ArrayBuffer(buf, shiftedToStartIndex: 0))
