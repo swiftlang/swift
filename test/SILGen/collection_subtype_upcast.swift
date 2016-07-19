@@ -8,7 +8,7 @@ struct S { var x, y: Int }
 // CHECK-NEXT: retain_value %0
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[FN:%.*]] = function_ref @_TFs15_arrayForceCastu0_rFGSax_GSaq__
-// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<S, protocol<>>(%0) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<S, Any>(%0) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
 // CHECK-NEXT: release_value %0
 // CHECK-NEXT: return [[RESULT]]
 func array_upcast(array: [S]) -> [Any] {
@@ -30,8 +30,8 @@ func ==(lhs: S, rhs: S) -> Bool {
 // CHECK-NEXT: debug_value %0
 // CHECK-NEXT: retain_value %0
 // CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[FN:%.*]] = function_ref @_TFs29_dictionaryBridgeToObjectiveCu2_Rxs8Hashable0_S_rFGVs10Dictionaryxq__GS0_q0_q1__
-// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<S, Int, S, protocol<>>(%0) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+// CHECK-NEXT: [[FN:%.*]] = function_ref @_TFs17_dictionaryUpCastu2_Rxs8Hashable0_S_rFGVs10Dictionaryxq__GS0_q0_q1__
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<S, Int, S, Any>(%0) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
 // CHECK-NEXT: release_value %0
 // CHECK-NEXT: return [[RESULT]]
 func dict_upcast(dict: [S: Int]) -> [S: Any] {
