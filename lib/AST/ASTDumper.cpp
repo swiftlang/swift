@@ -1497,6 +1497,15 @@ public:
     Indent -= 2;
   }
 
+  void printRecLabelled(Expr *E, StringRef label) {
+    Indent += 2;
+    OS.indent(Indent);
+    OS << '(' << label << '\n';
+    printRec(E);
+    OS << ')';
+    Indent -= 2;
+  }
+
   /// FIXME: This should use ExprWalker to print children.
 
   void printRec(Decl *D) { D->dump(OS, Indent + 2); }
@@ -1894,6 +1903,14 @@ public:
       OS << " bridges_to_objc";
     OS << '\n';
     printRec(E->getSubExpr());
+    if (auto keyConversion = E->getKeyConversion()) {
+      OS << '\n';
+      printRecLabelled(keyConversion.Conversion, "key_conversion");
+    }
+    if (auto valueConversion = E->getValueConversion()) {
+      OS << '\n';
+      printRecLabelled(valueConversion.Conversion, "value_conversion");
+    }
     OS << ')';
   }
   void visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
