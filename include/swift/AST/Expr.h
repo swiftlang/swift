@@ -38,6 +38,7 @@ namespace swift {
   class Type;
   class ValueDecl;
   class Decl;
+  class DeclRefExpr;
   class Pattern;
   class SubscriptDecl;
   class Stmt;
@@ -431,6 +432,10 @@ public:
   const Expr *getValueProvidingExpr() const {
     return const_cast<Expr *>(this)->getValueProvidingExpr();
   }
+
+  /// If this is a reference to an operator written as a member of a type (or
+  /// extension thereof), return the underlying operator reference.
+  DeclRefExpr *getMemberOperatorRef();
 
   /// This recursively walks the AST rooted at this expression.
   Expr *walk(ASTWalker &walker);

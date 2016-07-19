@@ -3307,19 +3307,7 @@ public:
       //
       // FIXME: Would be better to have some kind of 'OperatorRefExpr'?
       for (auto &element : sequence.drop_back(2)) {
-        if (!element->isImplicit()) continue;
-
-        auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(element);
-        if (!dotSyntax) continue;
-
-        auto operatorRef = dyn_cast<DeclRefExpr>(dotSyntax->getFn());
-        if (!operatorRef) continue;
-
-        auto func = dyn_cast<FuncDecl>(operatorRef->getDecl());
-        if (!func) continue;
-
-        // If it's an operator, use the DeclRefExpr rather than the call.
-        if (func->isOperator()) {
+        if (auto operatorRef = element->getMemberOperatorRef()) {
           operatorRef->setType(nullptr);
           element = operatorRef;
         }

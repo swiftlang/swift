@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -859,7 +860,7 @@ namespace {
     CalleeCandidateInfo(Expr *Fn, bool hasTrailingClosure,
                         ConstraintSystem *CS)
       : CS(CS), hasTrailingClosure(hasTrailingClosure) {
-      collectCalleeCandidates(Fn);
+      collectCalleeCandidates(Fn, /*implicitDotSyntax=*/false);
     }
 
     CalleeCandidateInfo(Type baseType, ArrayRef<OverloadChoice> candidates,
@@ -911,7 +912,7 @@ namespace {
     void dump() const LLVM_ATTRIBUTE_USED;
     
   private:
-    void collectCalleeCandidates(Expr *fnExpr);
+    void collectCalleeCandidates(Expr *fnExpr, bool implicitDotSyntax);
   };
 }
 
@@ -1302,21 +1303,24 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
   return { closeness, {}};
 }
 
-void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
+void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn, 
+                                                  bool implicitDotSyntax) {
   fn = fn->getValueProvidingExpr();
 
   // Treat a call to a load of a variable as a call to that variable, it is just
   // the lvalue'ness being removed.
   if (auto load = dyn_cast<LoadExpr>(fn)) {
     if (isa<DeclRefExpr>(load->getSubExpr()))
-      return collectCalleeCandidates(load->getSubExpr());
+      return collectCalleeCandidates(load->getSubExpr(),
+                                     /*implicitDotSyntax=*/false);
   }
 
   // Determine the callee level for a "bare" reference to the given
   // declaration.
-  auto getCalleeLevel = [](ValueDecl *decl) -> unsigned {
+  auto getCalleeLevel = [implicitDotSyntax](ValueDecl *decl) -> unsigned {
     if (auto func = dyn_cast<FuncDecl>(decl)) {
-      if (func->isOperator() && func->getDeclContext()->isTypeContext())
+      if (func->isOperator() && func->getDeclContext()->isTypeContext() &&
+          !implicitDotSyntax)
         return 1;
     }
 
@@ -1369,12 +1373,13 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
   }
 
   if (auto *DSBI = dyn_cast<DotSyntaxBaseIgnoredExpr>(fn)) {
-    collectCalleeCandidates(DSBI->getRHS());
+    collectCalleeCandidates(DSBI->getRHS(), /*implicitDotSyntax=*/false);
     return;
   }
 
   if (auto AE = dyn_cast<ApplyExpr>(fn)) {
-    collectCalleeCandidates(AE->getFn());
+    collectCalleeCandidates(AE->getFn(),
+                            /*implicitDotSyntax=*/AE->getMemberOperatorRef());
 
     // If this is a DotSyntaxCallExpr, then the callee is a method, and the
     // argument list of this apply is the base being applied to the method.
@@ -1402,12 +1407,12 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
   }
 
   if (auto *OVE = dyn_cast<OpenExistentialExpr>(fn)) {
-    collectCalleeCandidates(OVE->getSubExpr());
+    collectCalleeCandidates(OVE->getSubExpr(), /*implicitDotSyntax=*/false);
     return;
   }
 
   if (auto *CFCE = dyn_cast<CovariantFunctionConversionExpr>(fn)) {
-    collectCalleeCandidates(CFCE->getSubExpr());
+    collectCalleeCandidates(CFCE->getSubExpr(), /*implicitDotSyntax=*/false);
     return;
   }
 
@@ -4692,7 +4697,15 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
   if (!fnExpr) return true;
-  
+
+  SWIFT_DEFER {
+    if (!fnExpr) return;
+
+    // If it's a member operator reference, put the operator back.
+    if (auto operatorRef = fnExpr->getMemberOperatorRef())
+      callExpr->setFn(operatorRef);
+  };
+
   // If we have a contextual type, and if we have an ambiguously typed function
   // result from our previous check, we re-type-check it using this contextual
   // type to inform the result type of the callee.
