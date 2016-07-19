@@ -323,38 +323,38 @@ func getNullCString() -> UnsafeMutablePointer<CChar>? {
 }
 
 func getASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
-  let up = UnsafeMutablePointer<CChar>(allocatingCapacity: 100)
+  let up = UnsafeMutablePointer<CChar>.allocate(capacity: 100)
   up[0] = 0x61
   up[1] = 0x62
   up[2] = 0
-  return (up, { up.deallocateCapacity(100) })
+  return (up, { up.deallocate(capacity: 100) })
 }
 
 func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
-  let up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
+  let up = UnsafeMutablePointer<UInt8>.allocate(capacity: 100)
   up[0] = 0xd0
   up[1] = 0xb0
   up[2] = 0xd0
   up[3] = 0xb1
   up[4] = 0
-  return (UnsafeMutablePointer(up), { up.deallocateCapacity(100) })
+  return (UnsafeMutablePointer(up), { up.deallocate(capacity: 100) })
 }
 
 func getIllFormedUTF8String1(
 ) -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
-  let up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
+  let up = UnsafeMutablePointer<UInt8>.allocate(capacity: 100)
   up[0] = 0x41
   up[1] = 0xed
   up[2] = 0xa0
   up[3] = 0x80
   up[4] = 0x41
   up[5] = 0
-  return (UnsafeMutablePointer(up), { up.deallocateCapacity(100) })
+  return (UnsafeMutablePointer(up), { up.deallocate(capacity: 100) })
 }
 
 func getIllFormedUTF8String2(
 ) -> (UnsafeMutablePointer<CChar>, dealloc: () -> ()) {
-  let up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
+  let up = UnsafeMutablePointer<UInt8>.allocate(capacity: 100)
   up[0] = 0x41
   up[0] = 0x41
   up[1] = 0xed
@@ -362,7 +362,7 @@ func getIllFormedUTF8String2(
   up[3] = 0x81
   up[4] = 0x41
   up[5] = 0
-  return (UnsafeMutablePointer(up), { up.deallocateCapacity(100) })
+  return (UnsafeMutablePointer(up), { up.deallocate(capacity: 100) })
 }
 
 func asCCharArray(_ a: [UInt8]) -> [CChar] {
