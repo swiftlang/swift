@@ -10,6 +10,7 @@ let r3 : Optional<() rethrows -> ()> = nil // expected-error {{only function dec
 func f1(_ f: () throws -> ()) rethrows { try f() }
 func f2(_ f: () -> ()) rethrows { f() } // expected-error {{'rethrows' function must take a throwing function argument}}
 func f3(_ f: UndeclaredFunctionType) rethrows { f() } // expected-error {{use of undeclared type 'UndeclaredFunctionType'}}
+func f4(_ f: inout () throws -> ()) rethrows { try f() }
 
 /** Protocol conformance checking ********************************************/
 
