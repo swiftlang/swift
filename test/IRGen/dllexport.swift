@@ -1,6 +1,8 @@
 // RUN: %swift -target thumbv7--windows-itanium -emit-ir -parse-as-library -parse-stdlib -module-name dllexport %s -o - | FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-OPT
 // RUN: %swift -target thumbv7--windows-itanium -O -emit-ir -parse-as-library -parse-stdlib -module-name dllexport %s -o - | FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT
 
+// REQUIRES: CODEGENERATOR=ARM
+
 @noreturn
 @_silgen_name("_swift_fatalError")
 func fatalError()
