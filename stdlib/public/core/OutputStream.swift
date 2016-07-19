@@ -73,6 +73,9 @@ public protocol TextOutputStream {
   mutating func write(_ string: String)
 }
 
+/// Temporary typealias
+public typealias OutputStream = TextOutputStream
+
 extension TextOutputStream {
   public mutating func _lock() {}
   public mutating func _unlock() {}
