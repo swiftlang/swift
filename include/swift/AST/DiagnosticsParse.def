@@ -648,8 +648,6 @@ ERROR(protocol_init_argument_init,none,
       "default argument not permitted in a protocol initializer", ())
 
 // Protocol Types
-ERROR(expected_langle_protocol,PointsToFirstBadToken,
-      "expected '<' in protocol composition type", ())
 ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol composition type", ())
 ERROR(disallowed_protocol_composition,PointsToFirstBadToken,

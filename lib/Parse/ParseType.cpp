@@ -410,12 +410,6 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
   // Handle deprecated case
   if (Tok.getKind() == tok::kw_protocol && startsWithLess(peekToken())) {
     SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
-    
-    // Check for the starting '<'.
-    if (!startsWithLess(Tok)) {
-      diagnose(Tok, diag::expected_langle_protocol);
-      return nullptr;
-    }
     SourceLoc LAngleLoc = consumeStartingLess();
     
     // Check for empty protocol composition.
