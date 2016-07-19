@@ -475,6 +475,13 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   if (auto bridgeAnything =
         gen.getASTContext().getBridgeAnythingToObjectiveC(nullptr)) {
     Substitution sub(loweredNativeTy, {});
+    // Put the value into memory if necessary.
+    assert(v.getType().isTrivial(gen.SGM.M) || v.hasCleanup());
+    if (v.getType().isObject()) {
+      auto tmp = gen.emitTemporaryAllocation(loc, v.getType());
+      v.forwardInto(gen, loc, tmp);
+      v = gen.emitManagedBufferWithCleanup(tmp);
+    }
     return gen.emitApplyOfLibraryIntrinsic(loc, bridgeAnything, sub, v,
                                            SGFContext())
       .getAsSingleValue(gen, loc);
@@ -493,7 +500,8 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
   if (loweredNativeTy == loweredBridgedTy)
     return v;
 
-  if (loweredNativeTy.getAnyOptionalObjectType()) {
+  if (loweredBridgedTy.getAnyOptionalObjectType()
+      && loweredNativeTy.getAnyOptionalObjectType()) {
     return gen.emitOptionalToOptional(loc, v, bridgedTy,
                                       emitNativeToCBridgedValue);
   }

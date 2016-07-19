@@ -862,16 +862,16 @@ public:
                                                  const TypeLowering &optTL,
                                                  SGFContext C = SGFContext());
 
-  typedef std::function<ManagedValue(SILGenFunction &gen,
-                                     SILLocation loc,
-                                     ManagedValue input,
-                                     SILType loweredResultTy)> ValueTransform;
+  typedef llvm::function_ref<ManagedValue(SILGenFunction &gen,
+                                    SILLocation loc,
+                                    ManagedValue input,
+                                    SILType loweredResultTy)> ValueTransformRef;
 
   /// Emit a transformation on the value of an optional type.
   ManagedValue emitOptionalToOptional(SILLocation loc,
                                       ManagedValue input,
                                       SILType loweredResultTy,
-                                      const ValueTransform &transform);
+                                      ValueTransformRef transform);
 
   /// Emit a reinterpret-cast from one pointer type to another, using a library
   /// intrinsic.
