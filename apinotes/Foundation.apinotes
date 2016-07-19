@@ -645,7 +645,7 @@ Classes:
 - Name: NSByteCountFormatter
   Methods:
   - Selector: 'stringFromByteCount:'
-    SwiftName: stringFromByteCount(_:)
+    SwiftName: string(fromByteCount:)
     MethodKind: Instance
 - Name: NSLocale
   SwiftName: NSLocale
