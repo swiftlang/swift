@@ -82,15 +82,15 @@
 /// To add `Comparable` conformance to `Date`, first declare conformance to
 /// `Comparable` and implement the `<` operator function.
 ///
-///     extension Date: Comparable { }
-///
-///     func <(lhs: Date, rhs: Date) -> Bool {
-///         if lhs.year != rhs.year {
-///             return lhs.year < rhs.year
-///         } else if lhs.month != rhs.month {
-///             return lhs.month < rhs.month
-///         } else {
-///             return lhs.day < rhs.day
+///     extension Date: Comparable {
+///         static func <(lhs: Date, rhs: Date) -> Bool {
+///             if lhs.year != rhs.year {
+///                 return lhs.year < rhs.year
+///             } else if lhs.month != rhs.month {
+///                 return lhs.month < rhs.month
+///             } else {
+///                 return lhs.day < rhs.day
+///             }
 ///         }
 ///     }
 ///

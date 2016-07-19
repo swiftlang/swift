@@ -31,21 +31,21 @@ public enum UnicodeDecodingResult : Equatable {
   
   /// An indication of a decoding error.
   case error
-}
 
-public func == (
-  lhs: UnicodeDecodingResult,
-  rhs: UnicodeDecodingResult
-) -> Bool {
-  switch (lhs, rhs) {
-  case (.scalarValue(let lhsScalar), .scalarValue(let rhsScalar)):
-    return lhsScalar == rhsScalar
-  case (.emptyInput, .emptyInput):
-    return true
-  case (.error, .error):
-    return true
-  default:
-    return false
+  public static func == (
+    lhs: UnicodeDecodingResult,
+    rhs: UnicodeDecodingResult
+  ) -> Bool {
+    switch (lhs, rhs) {
+    case (.scalarValue(let lhsScalar), .scalarValue(let rhsScalar)):
+      return lhsScalar == rhsScalar
+    case (.emptyInput, .emptyInput):
+      return true
+    case (.error, .error):
+      return true
+    default:
+      return false
+    }
   }
 }
 

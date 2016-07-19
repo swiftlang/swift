@@ -971,7 +971,7 @@ FuncDecl *ASTContext::getEqualIntDecl(LazyResolver *resolver) const {
   for (ValueDecl *vd : equalFuncs) {
     // All "==" decls should be functions, but who knows...
     FuncDecl *funcDecl = dyn_cast<FuncDecl>(vd);
-    if (!funcDecl)
+    if (!funcDecl || funcDecl->getDeclContext()->isTypeContext())
       continue;
     
     if (resolver)

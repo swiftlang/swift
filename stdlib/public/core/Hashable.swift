@@ -54,13 +54,13 @@
 /// as the `Element` type for a set. To add `Hashable` conformance, provide an
 /// `==` operator function and a `hashValue` property.
 ///
-///     func ==(lhs: GridPoint, rhs: GridPoint) -> Bool {
-///         return lhs.x == rhs.x && lhs.y == rhs.y
-///     }
-///
 ///     extension GridPoint: Hashable {
 ///         var hashValue: Int {
 ///             return x.hashValue ^ y.hashValue
+///         }
+///
+///         static func ==(lhs: GridPoint, rhs: GridPoint) -> Bool {
+///             return lhs.x == rhs.x && lhs.y == rhs.y
 ///         }
 ///     }
 ///

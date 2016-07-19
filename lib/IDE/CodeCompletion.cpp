@@ -3291,9 +3291,9 @@ public:
     // We allocate these expressions on the stack because we know they can't
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::BinaryOperator,
-                               DeclNameLoc(SourceLoc()));
+                               DeclNameLoc(LHS->getEndLoc()));
     sequence.drop_back(1).back() = &UDRE;
-    CodeCompletionExpr CCE((SourceRange()));
+    CodeCompletionExpr CCE(LHS->getSourceRange());
     sequence.back() = &CCE;
 
     SWIFT_DEFER {
@@ -3301,6 +3301,29 @@ public:
       SE->setElement(SE->getNumElements() - 1, nullptr);
       SE->setElement(SE->getNumElements() - 2, nullptr);
       eraseErrorTypes(SE);
+
+      // Reset any references to operators in types, so they are properly
+      // handled as operators by sequence folding.
+      //
+      // FIXME: Would be better to have some kind of 'OperatorRefExpr'?
+      for (auto &element : sequence.drop_back(2)) {
+        if (!element->isImplicit()) continue;
+
+        auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(element);
+        if (!dotSyntax) continue;
+
+        auto operatorRef = dyn_cast<DeclRefExpr>(dotSyntax->getFn());
+        if (!operatorRef) continue;
+
+        auto func = dyn_cast<FuncDecl>(operatorRef->getDecl());
+        if (!func) continue;
+
+        // If it's an operator, use the DeclRefExpr rather than the call.
+        if (func->isOperator()) {
+          operatorRef->setType(nullptr);
+          element = operatorRef;
+        }
+      }
     };
 
     Expr *expr = SE;

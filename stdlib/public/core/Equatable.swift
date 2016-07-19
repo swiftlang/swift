@@ -75,12 +75,13 @@
 /// closure in each call, extend the `StreetAddress` type to conform to
 /// `Equatable`.
 ///
-///     extension StreetAddress: Equatable { }
-///     func ==(lhs: StreetAddress, rhs: StreetAddress) -> Bool {
+///     extension StreetAddress: Equatable {
+///       static func ==(lhs: StreetAddress, rhs: StreetAddress) -> Bool {
 ///         return
 ///             lhs.number == rhs.number &&
 ///             lhs.street == rhs.street &&
 ///             lhs.unit == rhs.unit
+///       }
 ///     }
 ///
 /// The `StreetAddress` type now conforms to `Equatable`. You can use `==` to
@@ -130,10 +131,10 @@
 ///         init(_ value: Int) {
 ///             self.value = value
 ///         }
-///     }
 ///
-///     func ==(lhs: IntegerRef, rhs: IntegerRef) -> Bool {
-///         return lhs.value == rhs.value
+///         static func ==(lhs: IntegerRef, rhs: IntegerRef) -> Bool {
+///             return lhs.value == rhs.value
+///         }
 ///     }
 ///
 /// The implementation of the `==` function returns the same value whether its

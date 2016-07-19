@@ -314,15 +314,16 @@ extension UInt64 {
   }
 }
 
-extension UnicodeScalar : Comparable, Equatable {
+extension UnicodeScalar : Equatable {
+  public static func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
+    return lhs.value == rhs.value
+  }
 }
 
-public func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
-  return lhs.value == rhs.value
-}
-
-public func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
-  return lhs.value < rhs.value
+extension UnicodeScalar : Comparable {
+  public static func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
+    return lhs.value < rhs.value
+  }
 }
 
 extension UnicodeScalar {

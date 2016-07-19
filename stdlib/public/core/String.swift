@@ -516,21 +516,23 @@ public func _stdlib_compareNSStringDeterministicUnicodeCollationPointer(
 #endif
 
 extension String : Equatable {
-}
-
-public func ==(lhs: String, rhs: String) -> Bool {
-  if lhs._core.isASCII && rhs._core.isASCII {
-    if lhs._core.count != rhs._core.count {
-      return false
+  public static func ==(lhs: String, rhs: String) -> Bool {
+    if lhs._core.isASCII && rhs._core.isASCII {
+      if lhs._core.count != rhs._core.count {
+        return false
+      }
+      return _swift_stdlib_memcmp(
+        lhs._core.startASCII, rhs._core.startASCII,
+        rhs._core.count) == 0
     }
-    return _swift_stdlib_memcmp(
-      lhs._core.startASCII, rhs._core.startASCII,
-      rhs._core.count) == 0
+    return lhs._compareString(rhs) == 0
   }
-  return lhs._compareString(rhs) == 0
 }
 
 extension String : Comparable {
+  public static func <(lhs: String, rhs: String) -> Bool {
+    return lhs._compareString(rhs) < 0
+  }
 }
 
 extension String {
@@ -621,10 +623,6 @@ extension String {
   }
 }
 
-public func <(lhs: String, rhs: String) -> Bool {
-  return lhs._compareString(rhs) < 0
-}
-
 // Support for copy-on-write
 extension String {
 
@@ -712,28 +710,28 @@ extension String : Hashable {
   }
 }
 
-@effects(readonly)
-@_semantics("string.concat")
-public func + (lhs: String, rhs: String) -> String {
-  var lhs = lhs
-  if lhs.isEmpty {
-    return rhs
-  }
-  lhs._core.append(rhs._core)
-  return lhs
-}
-
-// String append
-public func += (lhs: inout String, rhs: String) {
-  if lhs.isEmpty {
-    lhs = rhs
-  }
-  else {
-    lhs._core.append(rhs._core)
-  }
-}
-
 extension String {
+  @effects(readonly)
+  @_semantics("string.concat")
+  public static func + (lhs: String, rhs: String) -> String {
+    var lhs = lhs
+    if lhs.isEmpty {
+      return rhs
+    }
+    lhs._core.append(rhs._core)
+    return lhs
+  }
+
+  // String append
+  public static func += (lhs: inout String, rhs: String) {
+    if lhs.isEmpty {
+      lhs = rhs
+    }
+    else {
+      lhs._core.append(rhs._core)
+    }
+  }
+
   /// Constructs a `String` in `resultStorage` containing the given UTF-8.
   ///
   /// Low-level construction interface used by introspection

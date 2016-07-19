@@ -10,20 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-public func == (
-  lhs: String.UnicodeScalarView.Index,
-  rhs: String.UnicodeScalarView.Index
-) -> Bool {
-  return lhs._position == rhs._position
-}
-
-public func < (
-  lhs: String.UnicodeScalarView.Index,
-  rhs: String.UnicodeScalarView.Index
-) -> Bool {
-  return lhs._position < rhs._position
-}
-
 extension String {
   /// A view of a string's contents as a collection of Unicode scalar values.
   ///
@@ -114,7 +100,7 @@ extension String {
     ///     // Prints "♥︎ 💘"
     ///     print(hearts.unicodeScalars[j].value)
     ///     // Prints "9829"
-    public struct Index : Comparable {
+    public struct Index {
       public // SPI(Foundation)
       init(_position: Int) {
         self._position = _position
@@ -326,6 +312,22 @@ extension String {
     set {
       _core = newValue._core
     }
+  }
+}
+
+extension String.UnicodeScalarView.Index : Comparable {
+  public static func == (
+    lhs: String.UnicodeScalarView.Index,
+    rhs: String.UnicodeScalarView.Index
+  ) -> Bool {
+    return lhs._position == rhs._position
+  }
+
+  public static func < (
+    lhs: String.UnicodeScalarView.Index,
+    rhs: String.UnicodeScalarView.Index
+  ) -> Bool {
+    return lhs._position < rhs._position
   }
 }
 
