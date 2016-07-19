@@ -45,7 +45,7 @@ public func run_PopFrontUnsafePointer(_ N: Int) {
       var count = arrayCount
       while count != 0 {
         result += a[0]
-        a.assign(from: a + 1, count: count - 1)
+        a.assignFrom(a + 1, count: count - 1)
         count -= 1
       }
       CheckResults(result == arrayCount, "IncorrectResults in StringInterpolation: \(result) != \(arrayCount)")

@@ -693,33 +693,6 @@ CopyAddrInst::CopyAddrInst(SILDebugLocation Loc, SILValue SrcLValue,
       IsInitializationOfDest(isInitializationOfDest),
       Operands(this, SrcLValue, DestLValue) {}
 
-BindMemoryInst *
-BindMemoryInst::create(SILDebugLocation Loc, SILValue Base, SILValue Index,
-                       SILType BoundType, SILFunction &F,
-                       SILOpenedArchetypesState &OpenedArchetypes) {
-  SmallVector<SILValue, 8> OpenedArchetypeOperands;
-  collectOpenedArchetypeOperands(BoundType.getSwiftRValueType(),
-                                 OpenedArchetypeOperands,
-                                 OpenedArchetypes, F.getModule());
-  void *Buffer = F.getModule().allocateInst(
-      sizeof(BindMemoryInst) +
-          sizeof(Operand) * (OpenedArchetypeOperands.size() + NumFixedOpers),
-      alignof(BindMemoryInst));
-  return ::new (Buffer)
-    BindMemoryInst(Loc, Base, Index, BoundType, OpenedArchetypeOperands);
-}
-
-BindMemoryInst::BindMemoryInst(SILDebugLocation Loc, SILValue Base,
-                               SILValue Index,
-                               SILType BoundType,
-                               ArrayRef<SILValue> OpenedArchetypeOperands)
-  : SILInstruction(ValueKind::BindMemoryInst, Loc),
-    BoundType(BoundType),
-    NumOperands(NumFixedOpers + OpenedArchetypeOperands.size()) {
-  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                         Base, Index, OpenedArchetypeOperands);
-}
-
 UncheckedRefCastAddrInst::UncheckedRefCastAddrInst(SILDebugLocation Loc,
                                                    SILValue src,
                                                    CanType srcType,

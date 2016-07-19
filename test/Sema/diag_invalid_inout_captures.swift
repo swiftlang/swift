@@ -12,8 +12,7 @@ struct you_cry_in_your_tea {
 
 func why_so_sad(line: inout String) {
     no_escape { line = "Remember we made an arrangement when you went away" } // OK
-    do_escape { line = "now you're making me mad" } // expected-error {{escaping closures can only capture inout parameters explicitly by value}}
-    do_escape { [line] in _ = line } // OK
+    do_escape { line = "now you're making me mad" } // expected-error {{closure cannot implicitly capture an inout parameter unless @noescape}}
 }
 
 func remember(line: inout String) -> () -> Void {

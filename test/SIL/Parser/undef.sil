@@ -69,8 +69,6 @@ bb0:
   index_addr undef : $*(), undef : $Builtin.Int64
   // CHECK: index_raw_pointer undef : $Builtin.RawPointer, undef : $Builtin.Int64
   index_raw_pointer undef : $Builtin.RawPointer, undef : $Builtin.Int64
-  // CHECK: bind_memory undef : $Builtin.RawPointer, undef : $Builtin.Word to $*S
-  bind_memory undef : $Builtin.RawPointer, undef : $Builtin.Word to $*S
 
   // Reference Counting
 

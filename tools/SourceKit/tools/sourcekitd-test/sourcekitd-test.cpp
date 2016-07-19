@@ -142,7 +142,6 @@ static sourcekitd_uid_t RequestRelatedIdents;
 static sourcekitd_uid_t RequestEditorOpen;
 static sourcekitd_uid_t RequestEditorOpenInterface;
 static sourcekitd_uid_t RequestEditorOpenSwiftSourceInterface;
-static sourcekitd_uid_t RequestEditorOpenSwiftTypeInterface;
 static sourcekitd_uid_t RequestEditorOpenHeaderInterface;
 static sourcekitd_uid_t RequestEditorExtractTextFromComment;
 static sourcekitd_uid_t RequestEditorReplaceText;
@@ -259,7 +258,6 @@ static int skt_main(int argc, const char **argv) {
   RequestEditorOpen = sourcekitd_uid_get_from_cstr("source.request.editor.open");
   RequestEditorOpenInterface = sourcekitd_uid_get_from_cstr("source.request.editor.open.interface");
   RequestEditorOpenSwiftSourceInterface = sourcekitd_uid_get_from_cstr("source.request.editor.open.interface.swiftsource");
-  RequestEditorOpenSwiftTypeInterface = sourcekitd_uid_get_from_cstr("source.request.editor.open.interface.swifttype");
   RequestEditorOpenHeaderInterface = sourcekitd_uid_get_from_cstr("source.request.editor.open.interface.header");
   RequestEditorExtractTextFromComment = sourcekitd_uid_get_from_cstr("source.request.editor.extract.comment");
   RequestEditorReplaceText = sourcekitd_uid_get_from_cstr("source.request.editor.replacetext");
@@ -617,26 +615,20 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   case SourceKitRequest::InterfaceGenOpen:
     sourcekitd_request_dictionary_set_int64(Req, KeySynthesizedExtension,
                                             Opts.SynthesizedExtensions);
-    if (Opts.ModuleName.empty() && Opts.HeaderPath.empty() &&
-        Opts.SourceFile.empty() && Opts.USR.empty()) {
-      llvm::errs() << "Missing '-module <module name>' or '-header <path>'" <<
-        "or '<source-file>' or '-usr <USR>' \n";
+    if (Opts.ModuleName.empty() && Opts.HeaderPath.empty() && Opts.SourceFile.empty()) {
+      llvm::errs() << "Missing '-module <module name>' or '-header <path>' or '<source-file>' \n";
       return 1;
     }
     if (!Opts.ModuleName.empty()) {
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                             RequestEditorOpenInterface);
-    } else if (!Opts.USR.empty()) {
-      sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
-                                            RequestEditorOpenSwiftTypeInterface);
-    } else if (!Opts.SourceFile.empty()) {
-      sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
-                                            RequestEditorOpenSwiftSourceInterface);
-    } else {
+    } else if (Opts.SourceFile.empty()){
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                             RequestEditorOpenHeaderInterface);
+    } else {
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                            RequestEditorOpenSwiftSourceInterface);
     }
-
     sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName());
     if (!Opts.ModuleGroupName.empty())
       sourcekitd_request_dictionary_set_string(Req, KeyGroupName,
@@ -644,8 +636,6 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     if (!Opts.InterestedUSR.empty())
       sourcekitd_request_dictionary_set_string(Req, KeyInterestedUSR,
                                                Opts.InterestedUSR.c_str());
-    if (!Opts.USR.empty())
-      sourcekitd_request_dictionary_set_string(Req, KeyUSR, Opts.USR.c_str());
     break;
 
   case SourceKitRequest::FindInterfaceDoc:

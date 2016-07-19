@@ -1676,7 +1676,7 @@ extension Sequence
   ) -> UnsafeMutablePointer<Iterator.Element> {
     if let s = self._baseAddressIfContiguous {
       let count = self.count
-      ptr.initialize(from: s, count: count)
+      ptr.initializeFrom(s, count: count)
       _fixLifetime(self._owner)
       return ptr + count
     } else {

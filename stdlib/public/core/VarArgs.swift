@@ -113,7 +113,7 @@ public func _encodeBitsAsWords<T : CVarArg>(_ x: T) -> [Int] {
     count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self))
   _sanityCheck(result.count > 0)
   var tmp = x
-  // FIXME: use UnsafeMutablePointer.assign(from:) instead of memcpy.
+  // FIXME: use UnsafeMutablePointer.assignFrom() instead of memcpy.
   _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous!),
           src: UnsafeMutablePointer(Builtin.addressof(&tmp)),
           size: UInt(sizeof(T.self)))
@@ -336,7 +336,7 @@ final internal class _VaListBuilder {
       // count is updated below
 
       if let allocatedOldStorage = oldStorage {
-        newStorage.moveInitialize(from: allocatedOldStorage, count: oldCount)
+        newStorage.moveInitializeFrom(allocatedOldStorage, count: oldCount)
         deallocStorage(wordCount: oldAllocated, storage: allocatedOldStorage)
       }
     }

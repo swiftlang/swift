@@ -1523,15 +1523,6 @@ bb0(%0 : $Builtin.RawPointer, %1 : $X):
   return %28 : $()
 }
 
-// CHECK-LABEL: sil @test_bind_memory
-sil @test_bind_memory : $(Builtin.RawPointer, Builtin.Word) -> () {
-bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
-  bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $*X
-  // CHECK: bind_memory {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*X
-  %28 = tuple ()
-  return %28 : $()
-}
-
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
 // CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_

@@ -311,9 +311,6 @@ BUILTIN_SIL_OPERATION(IsUnique_native, "isUnique_native", Special)
 BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
                       Special)
 
-/// bindMemory : <T> (Builtin.RawPointer, Builtin.Word, T.Type) -> ()
-BUILTIN_SIL_OPERATION(BindMemory, "bindMemory", Special)
-
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.

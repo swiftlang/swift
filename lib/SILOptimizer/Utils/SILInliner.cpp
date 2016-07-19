@@ -311,7 +311,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::AllocRefDynamicInst:
     case ValueKind::AllocStackInst:
     case ValueKind::AllocValueBufferInst:
-    case ValueKind::BindMemoryInst:
     case ValueKind::ValueMetatypeInst:
     case ValueKind::WitnessMethodInst:
     case ValueKind::AssignInst:

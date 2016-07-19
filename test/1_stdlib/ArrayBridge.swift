@@ -13,9 +13,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
-// RUN: %gyb %s -o %t/ArrayBridge.swift
 // RUN: %target-clang %S/Inputs/ArrayBridge/ArrayBridge.m -c -o %t/ArrayBridgeObjC.o -g
-// RUN:  %line-directive %t/ArrayBridge.swift -- %target-build-swift %t/ArrayBridge.swift -I %S/Inputs/ArrayBridge/ -Xlinker %t/ArrayBridgeObjC.o -o %t/ArrayBridge -- 
+// RUN: %target-build-swift %s -I %S/Inputs/ArrayBridge/ -Xlinker %t/ArrayBridgeObjC.o -o %t/ArrayBridge
 
 // RUN: %target-run %t/ArrayBridge
 // REQUIRES: executable_test
@@ -204,6 +203,25 @@ tests.test("testBridgedVerbatim") {
   expectEqual(100, firstBase.value)
   expectEqual(1, firstBase.serialNumber)
 
+  // Create an ordinary NSArray, not a native one
+  let nsArrayOfBase: NSArray = NSArray(object: Base(42))
+
+  // NSArray can be unconditionally cast to [AnyObject]...
+  let nsArrayOfBaseConvertedToAnyObjectArray = nsArrayOfBase as [AnyObject]
+
+  // Capture the representation of the first element
+  let base42: ObjectIdentifier
+  do {
+    let b = nsArrayOfBase.object(at: 0) as! Base
+    expectEqual(42, b.value)
+    base42 = ObjectIdentifier(b)
+  }
+
+  // ...with the same elements
+  expectEqual(
+    base42,
+    ObjectIdentifier(nsArrayOfBaseConvertedToAnyObjectArray[0] as! Base))
+
   // Verify that NSArray class methods are inherited by a Swift bridging class.
   let className = String(reflecting: basesConvertedToNSArray.dynamicType)
   expectTrue(className.hasPrefix("Swift._ContiguousArrayStorage"))
@@ -228,72 +246,46 @@ tests.test("testBridgedVerbatim") {
 
   expectEqual(subclass0, subclassAsBases as! [Subclass])
 
-}
-
-% for Any in 'Any', 'AnyObject':
-
-tests.test("Another/${Any}") {
-  // Create an ordinary NSArray, not a native one
-  let nsArrayOfBase: NSArray = NSArray(object: Base(42))
-
-  // NSArray can be unconditionally cast to [${Any}]...
-  
-  let nsArrayOfBaseConvertedToAnyArray = nsArrayOfBase
-  % if Any == 'Any':
-  // FIXME: nsArrayOfBase as [Any] doesn't typecheck
-  as [AnyObject]
-  % end
-  as [${Any}]
-
-  // Capture the representation of the first element
-  let base42: ObjectIdentifier
-  do {
-    let b = nsArrayOfBase.object(at: 0) as! Base
-    expectEqual(42, b.value)
-    base42 = ObjectIdentifier(b)
-  }
-
-  // ...with the same elements
-  expectEqual(
-    base42,
-    ObjectIdentifier(nsArrayOfBaseConvertedToAnyArray[0] as! Base))
-
   let subclassInBaseBuffer: [Base] = [Subclass(44), Subclass(55)]
   let subclass2 = subclassInBaseBuffer
   
   // Explicit downcast-ability is based on element type, not buffer type
   expectNotEmpty(subclassInBaseBuffer as? [Subclass])
 
-  // We can up-cast to array of Any
-  let subclassAsAnyArray: [${Any}] = subclassInBaseBuffer
-  expectEqual(subclass2, subclassAsAnyArray.map { $0 as! Base })
+  // We can up-cast to array of AnyObject
+  let subclassAsAnyObjectArray: [AnyObject] = subclassInBaseBuffer
+  expectEqual(subclass2, subclassAsAnyObjectArray.map { $0 as! Base })
 
-  let downcastBackToBase = subclassAsAnyArray as? [Base]
+  let downcastBackToBase = subclassAsAnyObjectArray as? [Base]
   expectNotEmpty(downcastBackToBase)
 
-  if let downcastBackToSubclass = expectNotEmpty(subclassAsAnyArray as? [Subclass]) {
+  if let downcastBackToSubclass = expectNotEmpty(subclassAsAnyObjectArray as? [Subclass]) {
     expectEqual(subclass2, downcastBackToSubclass)
   }
 
-  if let downcastToProtocols = expectNotEmpty(subclassAsAnyArray as? [Fooable]) {
+  if let downcastToProtocols = expectNotEmpty(subclassAsAnyObjectArray as? [Fooable]) {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  if let downcastToProtocols = expectNotEmpty(subclassAsAnyArray as? [Barable]) {
+  if let downcastToProtocols = expectNotEmpty(subclassAsAnyObjectArray as? [Barable]) {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  if let downcastToProtocols = expectNotEmpty(subclassAsAnyArray as? [Barable & Fooable]) {
+  if let downcastToProtocols = expectNotEmpty(subclassAsAnyObjectArray as? [protocol<Barable, Fooable>]) {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  expectEmpty(subclassAsAnyArray as? [protocol<Barable, Bazable>])
+  expectEmpty(subclassAsAnyObjectArray as? [protocol<Barable, Bazable>])
+}
+
+tests.test("doTestSubclass") {
+  testSubclass(Thunks())
 }
 
 //===--- Explicitly Bridged -----------------------------------------------===//
 // BridgeableValue conforms to _ObjectiveCBridgeable
 //===----------------------------------------------------------------------===//
-tests.test("testExplicitlyBridged/${Any}") {
+tests.test("testExplicitlyBridged") {
   
   let bridgeableValues = [BridgeableValue(42), BridgeableValue(17)]
   
@@ -314,14 +306,7 @@ tests.test("testExplicitlyBridged/${Any}") {
 
   // Make a real Cocoa NSArray of these...
   let cocoaBridgeableValues = NSArray(
-    array: bridgeableValuesAsNSArray
-    %if Any == 'Any':
-    // FIXME: should just be "as [Any]" but the typechecker doesn't allow it yet
-    as [AnyObject] as [Any] as! [AnyObject]
-    %else:
-    as [${Any}]
-    %end
-  )
+    array: bridgeableValuesAsNSArray as [AnyObject])
 
   // ...and bridge *that* back
   let bridgedBackSwifts = Swift._forceBridgeFromObjectiveC(
@@ -344,10 +329,10 @@ tests.test("testExplicitlyBridged/${Any}") {
   let bridgeableValuesAsBases: [Base] = bridgeableValues
   expectEqualSequence(expectedBases, bridgeableValuesAsBases)
 
-  let bridgeableValuesAsAnys: [${Any}] = bridgeableValues
+  let bridgeableValuesAsAnyObjects: [AnyObject] = bridgeableValues
   expectEqualSequence(
     expectedBases,
-    bridgeableValuesAsAnys.lazy.map { $0 as! Base })
+    bridgeableValuesAsAnyObjects.lazy.map { $0 as! Base })
 
   // Downcasts of non-verbatim bridged value types to objects.
   do {
@@ -361,29 +346,23 @@ tests.test("testExplicitlyBridged/${Any}") {
   }
 
   do {
-    let downcasted = bridgeableValues as [${Any}]
+    let downcasted = bridgeableValues as [AnyObject]
     expectEqualSequence(expectedBases, downcasted.map { $0 as! Base })
   }
 
   // Downcasts of up-casted arrays.
   if let downcasted = expectNotEmpty(
-    bridgeableValuesAsAnys as? [Subclass]
+    bridgeableValuesAsAnyObjects as? [Subclass]
   ) {
     expectEqualSequence(expectedSubclasses, downcasted)
   }
 
-  if let downcasted = bridgeableValuesAsAnys as? [Base] {
+  if let downcasted = bridgeableValuesAsAnyObjects as? [Base] {
     expectEqualSequence(expectedBases, downcasted)
   }
 
   // Downcast of Cocoa array to an array of classes.
-  let wrappedCocoaBridgeableValues = cocoaBridgeableValues
-  %if Any == 'Any':
-  // FIXME: should just be "as [Any]" but typechecker doesn't allow it yet.
-  as [AnyObject]
-  %end
-  as [${Any}]
-  
+  let wrappedCocoaBridgeableValues = cocoaBridgeableValues as [AnyObject]
   if let downcasted = wrappedCocoaBridgeableValues as? [Subclass] {
     expectEqualSequence(expectedSubclasses, downcasted)
   }
@@ -396,33 +375,28 @@ tests.test("testExplicitlyBridged/${Any}") {
   // Downcast of Cocoa array to an array of strings (which should fail)
   expectEmpty(wrappedCocoaBridgeableValues as? [String])
 
-  // Downcast from an implicitly unwrapped optional array of Anys.
-  var wrappedCocoaBridgeableValuesIUO: [${Any}]! = wrappedCocoaBridgeableValues
+  // Downcast from an implicitly unwrapped optional array of AnyObjects.
+  var wrappedCocoaBridgeableValuesIUO: [AnyObject]! = wrappedCocoaBridgeableValues
   if let downcasted = wrappedCocoaBridgeableValuesIUO as? [BridgeableValue] {
     expectEqualSequence(bridgeableValues, downcasted)
   }
 
-  // Downcast from a nil implicitly unwrapped optional array of Anys.
+  // Downcast from a nil implicitly unwrapped optional array of AnyObjects.
   wrappedCocoaBridgeableValuesIUO = nil
   expectEmpty(wrappedCocoaBridgeableValuesIUO as? [BridgeableValue])
 
-  // Downcast from an optional array of Anys.
-  var wrappedCocoaBridgeableValuesOpt: [${Any}]? = wrappedCocoaBridgeableValues
+  // Downcast from an optional array of AnyObjects.
+  var wrappedCocoaBridgeableValuesOpt: [AnyObject]? = wrappedCocoaBridgeableValues
   if let downcasted = wrappedCocoaBridgeableValuesOpt as? [BridgeableValue] {
     expectEqualSequence(bridgeableValues, downcasted)
   }
 
-  // Downcast from a nil optional array of Anys.
+  // Downcast from a nil optional array of AnyObjects.
   wrappedCocoaBridgeableValuesOpt = nil
   expectEmpty(wrappedCocoaBridgeableValuesOpt as? [BridgeableValue])
-}
-% end
-
-tests.test("testThunks") {
-  testSubclass(Thunks())
+  
   testBridgeableValue(Thunks())
 }
-
 
 tests.test("testRoundTrip") {
   class Test : NSObject {

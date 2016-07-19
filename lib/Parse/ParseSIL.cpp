@@ -1114,7 +1114,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("alloc_ref", ValueKind::AllocRefInst)
     .Case("alloc_ref_dynamic", ValueKind::AllocRefDynamicInst)
     .Case("alloc_value_buffer", ValueKind::AllocValueBufferInst)
-    .Case("bind_memory", ValueKind::BindMemoryInst)
     .Case("value_metatype", ValueKind::ValueMetatypeInst)
     .Case("witness_method", ValueKind::WitnessMethodInst)
     .Case("apply", ValueKind::ApplyInst)
@@ -2964,27 +2963,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     ResultVal = B.createCopyAddr(InstLoc, SrcLVal, DestLVal,
                                  IsTake_t(IsTake),
                                  IsInitialization_t(IsInit));
-    break;
-  }
-  case ValueKind::BindMemoryInst: {
-    SILValue IndexVal;
-    Identifier ToToken;
-    SourceLoc ToLoc;
-    SILType EltTy;
-    if (parseTypedValueRef(Val, B) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseTypedValueRef(IndexVal, B) ||
-        parseSILIdentifier(ToToken, ToLoc,
-                           diag::expected_tok_in_sil_instr, "to") ||
-        parseSILType(EltTy) ||
-        parseSILDebugLocation(InstLoc, B))
-      return true;
-
-    if (ToToken.str() != "to") {
-      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
-      return true;
-    }
-    ResultVal = B.createBindMemory(InstLoc, Val, IndexVal, EltTy);
     break;
   }
   case ValueKind::StructInst: {

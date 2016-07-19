@@ -808,12 +808,3 @@ func unsafeGuaranteed_generic_return<T: AnyObject> (_ a: T) -> (T, Builtin.Int8)
 func unsafeGuaranteedEnd(_ t: Builtin.Int8) {
   Builtin.unsafeGuaranteedEnd(t)
 }
-
-// CHECK-LABEL: sil hidden @_TF8builtins10bindMemory
-// CHECK: bb0([[P:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Builtin.Word, [[T:%.*]] : $@thick T.Type):
-// CHECK: bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T
-// CHECK:   return {{%.*}} : $()
-// CHECK: }
-func bindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {
-  Builtin.bindMemory(ptr, idx, T.self)
-}

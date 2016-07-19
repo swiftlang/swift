@@ -12,6 +12,9 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
+// FIXME: This test runs very slowly on watchOS.
+// UNSUPPORTED: OS=watchos
+
 public enum ApproximateCount {
   case Unknown
   case Precise(IntMax)

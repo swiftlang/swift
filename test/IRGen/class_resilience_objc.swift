@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-ir -o - -primary-file %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-ir -o - -primary-file %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-ptrsize-%target-cpu
 
 // REQUIRES: objc_interop
 
@@ -54,8 +54,23 @@ public class GenericObjCSubclass<T> : NSCoder {
 
 // CHECK:         bitcast %C21class_resilience_objc19GenericObjCSubclass* %0
 
-// CHECK-32:      [[ADDR:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to %swift.type**
-// CHECK-32-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
+// Isa access.
+// 32-bit armv7k: casts to objc_object* and calls object_getClass().
+// 32-bit other: casts to swift.type** and loads it.
+// 64-bit: casts to int64* and loads it and applies the isa mask.
+
+// CHECK-32-i386:        [[ADDR:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to %swift.type**
+// CHECK-32-i386-NEXT:   [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
+
+// CHECK-32-armv7:       [[ADDR:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to %swift.type**
+// CHECK-32-armv7-NEXT:  [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
+
+// CHECK-32-armv7s:      [[ADDR:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to %swift.type**
+// CHECK-32-armv7s-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
+
+// CHECK-32-armv7k:      [[ADDR:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to %objc_object*
+// CHECK-32-armv7k-NEXT: [[CLASS:%.*]] = call %objc_class* @object_getClass(%objc_object* [[ADDR]])
+// CHECK-32-armv7k-NEXT: [[ISA:%.*]] = bitcast %objc_class* [[CLASS]] to %swift.type*
 
 // CHECK-64:      [[ADDR:%.*]] = bitcast %C21class_resilience_objc19GenericObjCSubclass* %0 to [[INT]]*
 // CHECK-64-NEXT: [[ISA:%.*]] = load [[INT]], [[INT]]* [[ADDR]]

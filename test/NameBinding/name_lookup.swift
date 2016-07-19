@@ -485,16 +485,6 @@ class Test19935319 {
   func getFoo() -> Int {}
 }
 
-// <rdar://problem/27013358> Crash using instance member as default parameter
-class rdar27013358 {
-  let defaultValue = 1
-  func returnTwo() -> Int {
-    return 2
-  }
-  init(defaulted value: Int = defaultValue) {} // expected-error {{cannot use instance member 'defaultValue' as a default parameter}}
-  init(another value: Int = returnTwo()) {} // expected-error {{cannot use instance member 'returnTwo' as a default parameter}}
-}
-
 // <rdar://problem/23904262> QoI: ivar default initializer cannot reference other default initialized ivars?
 class r23904262 {
   let x = 1

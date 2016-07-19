@@ -1,12 +1,13 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
-
-// NOTE: Clang used to miscompile GLKit functions on i386. rdar://problem/19184403
+// REQUIRES: objc_interop
 
 // On i386, it seems to work optimized mode, but fails in non-optimized.
-// rdar://problem/26392402
+// FIXME: rdar://problem/26392402
 // UNSUPPORTED: CPU=i386
-// REQUIRES: objc_interop
+
+// watchOS does not have GLKit.
+// UNSUPPORTED: OS=watchos
 
 import GLKit
 

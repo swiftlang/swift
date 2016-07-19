@@ -153,7 +153,7 @@ extension _ArrayBufferProtocol where Index == Int {
     if growth > 0 {
       // Slide the tail part of the buffer forwards, in reverse order
       // so as not to self-clobber.
-      newTailStart.moveInitialize(from: oldTailStart, count: tailCount)
+      newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailCount)
 
       // Assign over the original subRange
       var i = newValues.startIndex
@@ -190,15 +190,15 @@ extension _ArrayBufferProtocol where Index == Int {
 
         // Assign over the rest of the replaced range with the first
         // part of the tail.
-        newTailStart.moveAssign(from: oldTailStart, count: shrinkage)
+        newTailStart.moveAssignFrom(oldTailStart, count: shrinkage)
 
         // Slide the rest of the tail back
-        oldTailStart.moveInitialize(
-          from: oldTailStart + shrinkage, count: tailCount - shrinkage)
+        oldTailStart.moveInitializeFrom(
+          oldTailStart + shrinkage, count: tailCount - shrinkage)
       }
       else {                      // Tail fits within erased elements
         // Assign over the start of the replaced range with the tail
-        newTailStart.moveAssign(from: oldTailStart, count: tailCount)
+        newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
 
         // Destroy elements remaining after the tail in subRange
         (newTailStart + tailCount).deinitialize(

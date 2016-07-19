@@ -178,7 +178,7 @@ public:
   /// Return the array of opened archetypes operands for this instruction.
   MutableArrayRef<Operand> getOpenedArchetypeOperands();
 
-  /// Returns true if a given kind of instruction may have opened archetype
+  /// Returns true if a given kind of instruciton may have opened archetype
   /// operands.
   bool mayHaveOpenedArchetypeOperands() const;
 
@@ -510,6 +510,7 @@ public:
     return V->getKind() == KIND;
   }
 };
+
 
 /// Holds common debug information about local variables and function
 /// arguments that are needed by DebugValueInst, DebugValueAddrInst,
@@ -1572,10 +1573,6 @@ public:
   }
 };
 
-//===----------------------------------------------------------------------===//
-// Memory instructions.
-//===----------------------------------------------------------------------===//
-
 /// StringLiteralInst::Encoding hashes to its underlying integer representation.
 static inline llvm::hash_code hash_value(StringLiteralInst::Encoding E) {
   return llvm::hash_value(size_t(E));
@@ -2049,83 +2046,6 @@ public:
     return V->getKind() == ValueKind::CopyAddrInst;
   }
 };
-
-/// BindMemoryInst -
-/// "bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T"
-/// Binds memory at the raw pointer %0 to type $T with enough capacity
-/// to hold $1 values.
-class BindMemoryInst final :
-    public SILInstruction,
-    protected llvm::TrailingObjects<BindMemoryInst, Operand> {
-
-  typedef llvm::TrailingObjects<BindMemoryInst, Operand> TrailingBase;
-  friend TrailingBase;
-  using TrailingBase::totalSizeToAlloc;
-
-  friend class SILBuilder;
-
-  enum { BaseOperIdx, IndexOperIdx, NumFixedOpers };
-
-  SILType BoundType;
-
-  // Fixed operands + opened archetype operands.
-  unsigned NumOperands;
-
-  static BindMemoryInst *create(
-    SILDebugLocation Loc, SILValue Base, SILValue Index, SILType BoundType,
-    SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
-
-  BindMemoryInst(SILDebugLocation Loc, SILValue Base, SILValue Index,
-                 SILType BoundType,
-                 ArrayRef<SILValue> OpenedArchetypeOperands);
-
-public:
-  // Destruct tail allocated objects.
-  ~BindMemoryInst() {
-    Operand *Operands = &getAllOperands()[0];
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
-      Operands[i].~Operand();
-    }
-  }
-
-  SILValue getBase() const { return getAllOperands()[BaseOperIdx].get(); }
-
-  SILValue getIndex() const { return getAllOperands()[IndexOperIdx].get(); }
-
-  SILType getBoundType() const { return BoundType ; }
-
-  // Implement llvm::TrailingObjects.
-  size_t numTrailingObjects(
-      typename TrailingBase::template OverloadToken<Operand>) const {
-    return NumOperands;
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(NumOperands)};
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return {TrailingBase::template getTrailingObjects<Operand>(),
-            static_cast<size_t>(NumOperands)};
-  }
-
-  ArrayRef<Operand> getOpenedArchetypeOperands() const {
-    return getAllOperands().slice(2);
-  }
-
-  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
-    return getAllOperands().slice(2);
-  }
-
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::BindMemoryInst;
-  }
-};
-
-//===----------------------------------------------------------------------===//
-// Conversion instructions.
-//===----------------------------------------------------------------------===//
 
 /// ConversionInst - Abstract class representing instructions that convert
 /// values.
@@ -4269,7 +4189,7 @@ public:
   }
 };
 
-/// IndexAddrInst - "%2 : $*T = index_addr %0 : $*T, %1 : $Builtin.Word"
+/// IndexAddrInst - "%2 : $*T = index_addr %0 : $*T, %1 : $Builtin.Int64"
 /// This takes an address and indexes it, striding by the pointed-
 /// to type.  This is used to index into arrays of uniform elements.
 class IndexAddrInst : public IndexingInst {
@@ -4288,7 +4208,7 @@ public:
 
 /// IndexRawPointerInst
 /// %2 : $Builtin.RawPointer \
-///   = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
+///   = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Int64
 /// This takes an address and indexes it, striding by the pointed-
 /// to type.  This is used to index into arrays of uniform elements.
 class IndexRawPointerInst : public IndexingInst {

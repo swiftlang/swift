@@ -1333,7 +1333,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       Swift.max(newCount, _growArrayCapacity(capacity))
       : newCount)
 
-    (self._buffer.firstElementAddress + oldCount).initialize(from: newElements)
+    (self._buffer.firstElementAddress + oldCount).initializeFrom(newElements)
     self._buffer.count = newCount
   }
 
@@ -1888,7 +1888,7 @@ internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
     backingStart.deinitialize(count: sourceOffset)
 
     // Move the head items
-    destStart.moveInitialize(from: sourceStart, count: headCount)
+    destStart.moveInitializeFrom(sourceStart, count: headCount)
 
     // Destroy unused source items
     oldStart.deinitialize(count: oldCount)
@@ -1896,7 +1896,7 @@ internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
     initializeNewElements.call(newStart, count: newCount)
 
     // Move the tail items
-    newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
+    newEnd.moveInitializeFrom(oldStart + oldCount, count: tailCount)
 
     // Destroy any items that may be lurking in a _SliceBuffer after
     // its real last element

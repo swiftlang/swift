@@ -180,28 +180,6 @@ SwiftValue *swift::getAsSwiftValue(id object) {
 }
 #pragma clang diagnostic pop
 
-static NSString *getValueDescription(SwiftValue *self) {
-  String tmp;
-  const Metadata *type;
-  const OpaqueValue *value;
-  std::tie(type, value) = getValueFromSwiftValue(self);
-  
-  // Copy the value, since it will be consumed by getSummary.
-  ValueBuffer copyBuf;
-  auto copy = type->vw_initializeBufferWithCopy(&copyBuf,
-                                              const_cast<OpaqueValue*>(value));
-  swift_getSummary(&tmp, copy, type);
-  type->vw_deallocateBuffer(&copyBuf);
-  return convertStringToNSString(&tmp);
-}
-
-- (NSString *)description {
-  return getValueDescription(self);
-}
-- (NSString *)debugDescription {
-  return getValueDescription(self);
-}
-
 // Private methods for debugging purposes.
 
 - (const Metadata *)_swiftTypeMetadata {
@@ -211,7 +189,7 @@ static NSString *getValueDescription(SwiftValue *self) {
   return getValueFromSwiftValue(self).second;
 }
 
-// TODO: Forward isEqual: and hash to
+// TODO: Forward description, debugDescription, isEqual:, hash, etc. to
 // corresponding operations on the boxed Swift type.
 
 @end

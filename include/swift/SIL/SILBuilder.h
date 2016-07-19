@@ -518,12 +518,6 @@ public:
         getSILDebugLocation(Loc), srcAddr, destAddr, isTake, isInitialize));
   }
 
-  BindMemoryInst *createBindMemory(SILLocation Loc, SILValue base,
-                                   SILValue index, SILType boundType) {
-    return insert(BindMemoryInst::create(getSILDebugLocation(Loc), base, index,
-                                         boundType, F, OpenedArchetypes));
-  }
-
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
     return insert(new (F.getModule())

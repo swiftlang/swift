@@ -42,11 +42,6 @@ public:
                                             bool SynthesizedExtensions,
                                             Optional<StringRef> InterestedUSR);
 
-  static SwiftInterfaceGenContextRef
-    createForTypeInterface(swift::CompilerInvocation Invocation,
-                           StringRef TypeUSR,
-                           std::string &ErrorMsg);
-
   static SwiftInterfaceGenContextRef createForSwiftSource(StringRef DocumentName,
                                                           StringRef SourceFileName,
                                                           ASTUnitRef AstUnit,

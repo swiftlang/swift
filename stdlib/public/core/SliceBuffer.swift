@@ -190,7 +190,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     _sanityCheck(bounds.upperBound >= bounds.lowerBound)
     _sanityCheck(bounds.upperBound <= endIndex)
     let c = bounds.count
-    target.initialize(from: subscriptBaseAddress + bounds.lowerBound, count: c)
+    target.initializeFrom(subscriptBaseAddress + bounds.lowerBound, count: c)
     return target + c
   }
 
@@ -338,8 +338,8 @@ extension _SliceBuffer {
     let result = _ContiguousArrayBuffer<Element>(
       uninitializedCount: count,
       minimumCapacity: 0)
-    result.firstElementAddress.initialize(
-      from: firstElementAddress, count: count)
+    result.firstElementAddress.initializeFrom(
+      firstElementAddress, count: count)
     return ContiguousArray(_buffer: result)
   }
 }

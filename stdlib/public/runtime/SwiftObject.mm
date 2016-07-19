@@ -43,7 +43,6 @@
 #include <unordered_map>
 #if SWIFT_OBJC_INTEROP
 # import <CoreFoundation/CFBase.h> // for CFTypeID
-# import <Foundation/Foundation.h>
 # include <malloc/malloc.h>
 # include <dispatch/dispatch.h>
 #endif
@@ -92,13 +91,20 @@ static SwiftObject *_allocHelper(Class cls) {
     class_getInstanceSize(cls), mask));
 }
 
-NSString *swift::convertStringToNSString(String *swiftString) {
+// Helper from the standard library for stringizing an arbitrary object.
+namespace {
+  struct String { void *x, *y, *z; };
+}
+
+extern "C" void swift_getSummary(String *out, OpaqueValue *value,
+                                 const Metadata *T);
+
+static NSString *_getDescription(SwiftObject *obj) {
   typedef SWIFT_CC(swift) NSString *ConversionFn(void *sx, void *sy, void *sz);
 
   // Cached lookup of swift_convertStringToNSString, which is in Foundation.
-  static std::atomic<ConversionFn *> TheConvertStringToNSString(nullptr);
-  auto convertStringToNSString =
-    TheConvertStringToNSString.load(std::memory_order_relaxed);
+  static ConversionFn *convertStringToNSString = nullptr;
+  
   if (!convertStringToNSString) {
     convertStringToNSString = (ConversionFn *)(uintptr_t)
       dlsym(RTLD_DEFAULT, "swift_convertStringToNSString");
@@ -107,25 +113,31 @@ NSString *swift::convertStringToNSString(String *swiftString) {
     // ObjC interop is low.
     if (!convertStringToNSString)
       return @"SwiftObject";
-    
-    TheConvertStringToNSString.store(convertStringToNSString,
-                                     std::memory_order_relaxed);
   }
   
-  return convertStringToNSString(swiftString->x,
-                                 swiftString->y,
-                                 swiftString->z);
-}
-
-static NSString *_getDescription(SwiftObject *obj) {
   String tmp;
   swift_retain((HeapObject*)obj);
   swift_getSummary(&tmp, (OpaqueValue*)&obj, _swift_getClassOfAllocated(obj));
-  return [convertStringToNSString(&tmp) autorelease];
+  return [convertStringToNSString(tmp.x, tmp.y, tmp.z) autorelease];
 }
 
 static NSString *_getClassDescription(Class cls) {
-  return NSStringFromClass(cls);
+  typedef SWIFT_CC(swift) NSString *ConversionFn(Class cls);
+
+  // Cached lookup of NSStringFromClass, which is in Foundation.
+  static ConversionFn *NSStringFromClass_fn = nullptr;
+  
+  if (!NSStringFromClass_fn) {
+    NSStringFromClass_fn = (ConversionFn *)(uintptr_t)
+      dlsym(RTLD_DEFAULT, "NSStringFromClass");
+    // If Foundation hasn't loaded yet, fall back to returning the static string
+    // "SwiftObject". The likelihood of someone invoking +description without
+    // ObjC interop is low.
+    if (!NSStringFromClass_fn)
+      return @"SwiftObject";
+  }
+  
+  return NSStringFromClass_fn(cls);
 }
 
 

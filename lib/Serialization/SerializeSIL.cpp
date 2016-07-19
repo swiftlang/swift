@@ -1275,31 +1275,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                   addValueRef(operand));
     break;
   }
-  case ValueKind::BindMemoryInst: {
-    auto *BI = cast<BindMemoryInst>(&SI);
-    SILValue baseOperand = BI->getBase();
-    SILValue indexOperand = BI->getIndex();
-    SILType boundType = BI->getBoundType();
-    SmallVector<ValueID, 6> ListOfValues;
-    ListOfValues.push_back(S.addTypeRef(
-                             baseOperand->getType().getSwiftRValueType()));
-    ListOfValues.push_back((unsigned)baseOperand->getType().getCategory());
-    ListOfValues.push_back(addValueRef(baseOperand));
-    ListOfValues.push_back(S.addTypeRef(
-                             indexOperand->getType().getSwiftRValueType()));
-    ListOfValues.push_back((unsigned)indexOperand->getType().getCategory());
-    ListOfValues.push_back(addValueRef(indexOperand));
-
-    SILOneTypeValuesLayout::emitRecord(
-      Out,
-      ScratchRecord,
-      SILAbbrCodes[SILOneTypeValuesLayout::Code],
-      (unsigned)SI.getKind(),
-      S.addTypeRef(boundType.getSwiftRValueType()),
-      (unsigned)boundType.getCategory(),
-      ListOfValues);
-    break;
-  }
   case ValueKind::RefElementAddrInst:
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst:
