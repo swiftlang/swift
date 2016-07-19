@@ -273,7 +273,7 @@ public struct ${Self}<Pointee>
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initialize(with: (source + i).move())
+    //   (self + i).initialize(to: (source + i).move())
     // }
   }
 
@@ -306,7 +306,7 @@ public struct ${Self}<Pointee>
     // var src = source + count
     // var dst = self + count
     // while dst != self {
-    //   (--dst).initialize(with: (--src).move())
+    //   (--dst).initialize(to: (--src).move())
     // }
   }
 
