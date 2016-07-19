@@ -1501,7 +1501,7 @@ extension Collection {
   /// parameter, so the returned array contains empty strings where spaces
   /// were repeated.
   ///
-  ///     print(line.characters.split(omittingEmptySubsequences: false, isSeparator: { $0 == " " })
+  ///     print(line.characters.split(omittingEmptySubsequences: false, whereSeparator: { $0 == " " })
   ///                           .map(String.init))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
