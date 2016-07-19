@@ -531,6 +531,10 @@ ${subscriptCommentPost}
 %   end
   }
 
+${subscriptCommentPre}
+${subscriptCommentMid}
+${subscriptCommentPost}
+  ///   The bounds will be completed using `startIndex` and `endIndex`.
   public subscript(bounds: IncompleteRange<Index>) -> SubSequence {
     get {
       return self[
@@ -546,6 +550,10 @@ ${subscriptCommentPost}
 %   end
   }
 
+${subscriptCommentPre}
+${subscriptCommentMid}
+${subscriptCommentPost}
+  ///   The bounds will be completed using `startIndex` and `endIndex`.
   public subscript(bounds: IncompleteClosedRange<Index>) -> SubSequence {
     get {
       return self[
