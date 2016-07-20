@@ -29,21 +29,21 @@ class TypeBase;
 class DeclContext;
 class Type;
 enum DeclAttrKind : unsigned;
-class PrinterArchetypeTransformer;
+class PrinterTypeTransformer;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 
 /// Necessary information for archetype transformation during printing.
-struct ArchetypeTransformContext {
+struct TypeTransformContext {
   Type getTypeBase();
   NominalTypeDecl *getNominal();
-  PrinterArchetypeTransformer *getTransformer();
+  PrinterTypeTransformer *getTransformer();
   bool isPrintingSynthesizedExtension();
   bool isPrintingTypeInterface();
-  ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer);
-  ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer,
+  TypeTransformContext(PrinterTypeTransformer *Transformer);
+  TypeTransformContext(PrinterTypeTransformer *Transformer,
                             Type T);
-  ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer,
+  TypeTransformContext(PrinterTypeTransformer *Transformer,
                             NominalTypeDecl *NTD,
                             SynthesizedExtensionAnalyzer *Analyzer);
   Type transform(Type Input);
@@ -51,7 +51,7 @@ struct ArchetypeTransformContext {
 
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
 
-  ~ArchetypeTransformContext();
+  ~TypeTransformContext();
 private:
   struct Implementation;
   Implementation &Impl;
@@ -306,7 +306,7 @@ struct PrintOptions {
   llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;
 
   /// \brief The information for converting archetypes to specialized types.
-  std::shared_ptr<ArchetypeTransformContext> TransformContext;
+  std::shared_ptr<TypeTransformContext> TransformContext;
 
   BracketOptions BracketOptions;
 
@@ -357,9 +357,9 @@ struct PrintOptions {
 
   static PrintOptions printTypeInterface(Type T, DeclContext *DC);
 
-  void setArchetypeTransform(Type T, DeclContext *DC);
+  void setArchetypeSelfTransform(Type T, DeclContext *DC);
 
-  void setArchetypeTransformForQuickHelp(Type T, DeclContext *DC);
+  void setArchetypeSelfTransformForQuickHelp(Type T, DeclContext *DC);
 
   void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D,
                                     SynthesizedExtensionAnalyzer *SynAnalyzer);

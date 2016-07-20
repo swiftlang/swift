@@ -4049,7 +4049,7 @@ public:
       DeclNameOffsetLocatorPrinter Printer(OS);
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
-        Options.setArchetypeTransform(transformType, VD->getDeclContext());
+        Options.setArchetypeSelfTransform(transformType, VD->getDeclContext());
       Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(DAK_NoReturn);

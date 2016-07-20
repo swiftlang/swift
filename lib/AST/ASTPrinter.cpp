@@ -76,14 +76,14 @@ collectNameTypeMap(Type Ty) {
 }
 
 
-class PrinterArchetypeTransformer {
+class PrinterTypeTransformer {
 public:
   virtual Type transform(Type Ty) = 0;
   virtual StringRef transform(StringRef TypeName) = 0;
-  virtual ~PrinterArchetypeTransformer() {};
+  virtual ~PrinterTypeTransformer() {};
 };
 
-class PrinterArchetypeNameTransformer : public PrinterArchetypeTransformer{
+class PrinterArchetypeNameTransformer : public PrinterTypeTransformer{
   Type BaseTy;
   llvm::DenseMap<TypeBase *, Type> Cache;
   std::unique_ptr<llvm::DenseMap<StringRef, Type>> IdMap;
@@ -123,11 +123,11 @@ public:
   }
 };
 
-class ArchetypeSelfTransformer : public PrinterArchetypeTransformer {
+class ArchetypeSelfTransformer : public PrinterTypeTransformer {
   Type BaseTy;
   DeclContext &DC;
   const ASTContext &Ctx;
-  std::unique_ptr<PrinterArchetypeTransformer> NameTransformer;
+  std::unique_ptr<PrinterTypeTransformer> NameTransformer;
 
   llvm::StringMap<Type> Map;
   std::vector<std::unique_ptr<std::string>> Buffers;
@@ -658,7 +658,7 @@ hasMergeGroup(MergeGroupKind Kind) {
 PrintOptions PrintOptions::printTypeInterface(Type T, DeclContext *DC) {
   PrintOptions result = printInterface();
   result.PrintExtensionFromConformingProtocols = true;
-  result.TransformContext = std::make_shared<ArchetypeTransformContext>(
+  result.TransformContext = std::make_shared<TypeTransformContext>(
     new ArchetypeSelfTransformer(T, *DC), T);
   result.printExtensionContentAsMembers = [T](const ExtensionDecl *ED) {
     return isExtensionApplied(*T->getNominalOrBoundGenericNominal()->
@@ -667,20 +667,21 @@ PrintOptions PrintOptions::printTypeInterface(Type T, DeclContext *DC) {
   return result;
 }
 
-void PrintOptions::setArchetypeTransform(Type T, DeclContext *DC) {
-  TransformContext = std::make_shared<ArchetypeTransformContext>(
+void PrintOptions::setArchetypeSelfTransform(Type T, DeclContext *DC) {
+  TransformContext = std::make_shared<TypeTransformContext>(
     new ArchetypeSelfTransformer(T, *DC));
 }
 
-void PrintOptions::setArchetypeTransformForQuickHelp(Type T, DeclContext *DC) {
-  TransformContext = std::make_shared<ArchetypeTransformContext>(
+void PrintOptions::setArchetypeSelfTransformForQuickHelp(Type T,
+                                                         DeclContext *DC) {
+  TransformContext = std::make_shared<TypeTransformContext>(
     new ArchetypeSelfTransformer(T, *DC));
 }
 
 void PrintOptions::
 initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D,
                                       SynthesizedExtensionAnalyzer *Analyzer) {
-  TransformContext = std::make_shared<ArchetypeTransformContext>(
+  TransformContext = std::make_shared<TypeTransformContext>(
     new ArchetypeSelfTransformer(D), D, Analyzer);
 }
 
@@ -688,39 +689,39 @@ void PrintOptions::clearArchetypeTransformerForSynthesizedExtensions() {
   TransformContext.reset();
 }
 
-struct ArchetypeTransformContext::Implementation {
-  std::shared_ptr<PrinterArchetypeTransformer> Transformer;
+struct TypeTransformContext::Implementation {
+  std::shared_ptr<PrinterTypeTransformer> Transformer;
 
   // When printing a type interface, this is the type to print.
   // When synthesizing extensions, this is the target nominal.
   llvm::PointerUnion<TypeBase*, NominalTypeDecl*> TypeBaseOrNominal;
   SynthesizedExtensionAnalyzer *SynAnalyzer = nullptr;
 
-  Implementation(PrinterArchetypeTransformer *Transformer):
+  Implementation(PrinterTypeTransformer *Transformer):
     Transformer(Transformer) {}
-  Implementation(PrinterArchetypeTransformer *Transformer, Type T):
+  Implementation(PrinterTypeTransformer *Transformer, Type T):
     Transformer(Transformer), TypeBaseOrNominal(T.getPointer()) {}
-  Implementation(PrinterArchetypeTransformer *Transformer, NominalTypeDecl* NTD,
+  Implementation(PrinterTypeTransformer *Transformer, NominalTypeDecl* NTD,
                  SynthesizedExtensionAnalyzer *SynAnalyzer):
     Transformer(Transformer), TypeBaseOrNominal(NTD), SynAnalyzer(SynAnalyzer) {}
 };
 
-ArchetypeTransformContext::~ArchetypeTransformContext() { delete &Impl; }
+TypeTransformContext::~TypeTransformContext() { delete &Impl; }
 
-ArchetypeTransformContext::ArchetypeTransformContext(
-  PrinterArchetypeTransformer *Transformer):
+TypeTransformContext::TypeTransformContext(
+  PrinterTypeTransformer *Transformer):
     Impl(* new Implementation(Transformer)){};
 
-ArchetypeTransformContext::ArchetypeTransformContext(
-  PrinterArchetypeTransformer *Transformer, Type T):
+TypeTransformContext::TypeTransformContext(
+  PrinterTypeTransformer *Transformer, Type T):
     Impl(* new Implementation(Transformer, T)){};
 
-ArchetypeTransformContext::ArchetypeTransformContext(
-  PrinterArchetypeTransformer *Transformer, NominalTypeDecl *NTD,
+TypeTransformContext::TypeTransformContext(
+  PrinterTypeTransformer *Transformer, NominalTypeDecl *NTD,
   SynthesizedExtensionAnalyzer *SynAnalyzer) :
     Impl(* new Implementation(Transformer, NTD, SynAnalyzer)){};
 
-bool ArchetypeTransformContext::
+bool TypeTransformContext::
 shouldPrintRequirement(ExtensionDecl *ED, StringRef Req) {
   if (Impl.SynAnalyzer) {
     return Impl.SynAnalyzer->shouldPrintRequirement(ED, Req);
@@ -728,33 +729,33 @@ shouldPrintRequirement(ExtensionDecl *ED, StringRef Req) {
   return true;
 }
 
-NominalTypeDecl *ArchetypeTransformContext::getNominal() {
+NominalTypeDecl *TypeTransformContext::getNominal() {
   return Impl.TypeBaseOrNominal.get<NominalTypeDecl*>();
 }
 
-Type ArchetypeTransformContext::getTypeBase() {
+Type TypeTransformContext::getTypeBase() {
   return Impl.TypeBaseOrNominal.get<TypeBase*>();
 }
 
-PrinterArchetypeTransformer*
-ArchetypeTransformContext::getTransformer() {
+PrinterTypeTransformer*
+TypeTransformContext::getTransformer() {
   return Impl.Transformer.get();
 }
 
-bool ArchetypeTransformContext::isPrintingSynthesizedExtension() {
+bool TypeTransformContext::isPrintingSynthesizedExtension() {
   return !Impl.TypeBaseOrNominal.isNull() &&
          Impl.TypeBaseOrNominal.is<NominalTypeDecl*>();
 }
-bool ArchetypeTransformContext::isPrintingTypeInterface() {
+bool TypeTransformContext::isPrintingTypeInterface() {
   return !Impl.TypeBaseOrNominal.isNull() &&
           Impl.TypeBaseOrNominal.is<TypeBase*>();
 }
 
-Type ArchetypeTransformContext::transform(Type Input) {
+Type TypeTransformContext::transform(Type Input) {
   return Impl.Transformer->transform(Input);
 }
 
-StringRef ArchetypeTransformContext::transform(StringRef Input) {
+StringRef TypeTransformContext::transform(StringRef Input) {
   return Impl.Transformer->transform(Input);
 }
 
