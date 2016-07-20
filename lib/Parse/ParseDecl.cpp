@@ -333,9 +333,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       if (!Tok.is(tok::equal))
         return false;
 
-      bool wantSpace = (Tok.getRange().getEnd() == peekToken().getLoc());
       diagnose(Tok.getLoc(), diag::replace_equal_with_colon_for_value)
-        .fixItReplace(Tok.getLoc(), wantSpace ? ": " : ":");
+        .fixItReplace(Tok.getLoc(), ": ");
     }
     return true;
   };
@@ -1410,11 +1409,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       if (Attributes.has(TAK_noescape)) {
         diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
       } else {
-        StringRef replacement = " @escaping ";
-        if (autoclosureEscapingParenRange.End.getAdvancedLoc(1) != Tok.getLoc())
-          replacement = replacement.drop_back();
         diagnose(Loc, diag::attr_autoclosure_escaping_deprecated)
-            .fixItReplace(autoclosureEscapingParenRange, replacement);
+            .fixItReplace(autoclosureEscapingParenRange, " @escaping ");
       }
       Attributes.setAttr(TAK_escaping, Loc);
     } else if (Attributes.has(TAK_noescape)) {
@@ -2837,7 +2833,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
       // It is a common mistake to write "typealias A : Int" instead of = Int.
       // Recognize this and produce a fixit.
       diagnose(Tok, diag::expected_equal_in_typealias)
-          .fixItReplace(Tok.getLoc(), "=");
+          .fixItReplace(Tok.getLoc(), " = ");
       consumeToken(tok::colon);
     } else {
       consumeToken(tok::equal);

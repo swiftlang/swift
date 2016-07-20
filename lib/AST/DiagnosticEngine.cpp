@@ -176,9 +176,35 @@ InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
     return fixItRemove(R);
 
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  if (Engine && R.isValid())
-    Engine->getActiveDiagnostic().addFixIt(
-        Diagnostic::FixIt(toCharSourceRange(Engine->SourceMgr, R), Str));
+  if (R.isInvalid() || !Engine) return *this;
+
+  auto &SM = Engine->SourceMgr;
+  auto charRange = toCharSourceRange(Engine->SourceMgr, R);
+
+  // If we're replacing with something that wants spaces around it, do a bit of
+  // extra work so that we don't suggest extra spaces.
+  if (Str.back() == ' ') {
+    auto afterChars = SM.extractText({charRange.getEnd(), 1});
+    if (!afterChars.empty() && isspace(afterChars[0])) {
+      Str = Str.drop_back();
+    }
+  }
+  if (!Str.empty() && Str.front() == ' ') {
+    bool ShouldRemove = false;
+    auto buffer = SM.findBufferContainingLoc(charRange.getStart());
+    if (SM.getLocForBufferStart(buffer) == charRange.getStart()) {
+      ShouldRemove = true;
+    } else {
+      auto beforeChars =
+        SM.extractText({charRange.getStart().getAdvancedLoc(-1), 1});
+      ShouldRemove = !beforeChars.empty() && isspace(beforeChars[0]);
+    }
+    if (ShouldRemove) {
+      Str = Str.drop_front();
+    }
+  }
+
+  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, Str));
   return *this;
 }
 

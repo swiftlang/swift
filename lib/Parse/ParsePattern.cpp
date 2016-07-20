@@ -696,7 +696,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     if (!consumeIf(tok::arrow, arrowLoc)) {
       // FixIt ':' to '->'.
       diagnose(Tok, diag::func_decl_expected_arrow)
-          .fixItReplace(SourceRange(Tok.getLoc()), "->");
+          .fixItReplace(Tok.getLoc(), " -> ");
       arrowLoc = consumeToken(tok::colon);
     }
 
@@ -787,12 +787,10 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
   
   // Now parse an optional type annotation.
   if (Tok.is(tok::colon)) {
-    SourceLoc pastEndOfPrevLoc = getEndOfPreviousLoc();
     SourceLoc colonLoc = consumeToken(tok::colon);
-    SourceLoc startOfNextLoc = Tok.getLoc();
     
     if (result.isNull())  // Recover by creating AnyPattern.
-      result = makeParserErrorResult(new (Context) AnyPattern(PreviousLoc));
+      result = makeParserErrorResult(new (Context) AnyPattern(colonLoc));
     
     ParserResult<TypeRepr> Ty = parseType();
     if (Ty.hasCodeCompletion())
@@ -824,19 +822,10 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
         if (status.isSuccess()) {
           backtrack.cancelBacktrack();
           
-          // Suggest replacing ':' with '=' (ensuring proper whitespace).
-          
-          bool needSpaceBefore = (pastEndOfPrevLoc == colonLoc);
-          bool needSpaceAfter =
-            SourceMgr.getByteDistance(colonLoc, startOfNextLoc) <= 1;
-          
-          StringRef replacement = " = ";
-          if (!needSpaceBefore) replacement = replacement.drop_front();
-          if (!needSpaceAfter)  replacement = replacement.drop_back();
-          
+          // Suggest replacing ':' with '='
           diagnose(lParenLoc, diag::initializer_as_typed_pattern)
             .highlight({Ty.get()->getStartLoc(), rParenLoc})
-            .fixItReplace(colonLoc, replacement);
+            .fixItReplace(colonLoc, " = ");
           result.setIsParseError();
         }
       }
