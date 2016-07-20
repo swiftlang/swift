@@ -108,7 +108,7 @@ func _ErrorType() {
 
 func _ExistentialCollection<T>(i: AnyIterator<T>) {
   func fn1<T>(_: AnyGenerator<T>) {} // expected-error {{'AnyGenerator' has been renamed to 'AnyIterator'}} {{18-30=AnyIterator}} {{none}}
-  func fn2<T : AnyCollectionType>(_: T) {} // expected-error {{'AnyCollectionType' has been renamed to 'AnyCollectionProtocol'}} {{16-33=AnyCollectionProtocol}} {{none}}
+  func fn2<T : AnyCollectionType>(_: T) {} // expected-error {{'AnyCollectionType' has been renamed to '_AnyCollectionProtocol'}} {{16-33=_AnyCollectionProtocol}} {{none}}
   func fn3(_: AnyForwardIndex) {} // expected-error {{'AnyForwardIndex' has been renamed to 'AnyIndex'}} {{15-30=AnyIndex}} {{none}}
   func fn4(_: AnyBidirectionalIndex) {} // expected-error {{'AnyBidirectionalIndex' has been renamed to 'AnyIndex'}} {{15-36=AnyIndex}} {{none}}
   func fn5(_: AnyRandomAccessIndex) {} // expected-error {{'AnyRandomAccessIndex' has been renamed to 'AnyIndex'}} {{15-35=AnyIndex}} {{none}}
@@ -128,7 +128,7 @@ func _ExistentialCollection<T>(c: AnyBidirectionalCollection<T>) {
 func _ExistentialCollection<T>(c: AnyRandomAccessCollection<T>) {
   _ = c.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Please use underestimatedCount property instead.}} {{none}}
 }
-func _ExistentialCollection<C : AnyCollectionProtocol>(c: C) {
+func _ExistentialCollection<C : _AnyCollectionProtocol>(c: C) {
   _ = c.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
 }
 
