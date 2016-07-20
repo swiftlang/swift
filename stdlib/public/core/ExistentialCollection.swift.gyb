@@ -681,7 +681,7 @@ internal final class _IndexBox<
 /// the specific underlying type.
 ///
 /// - SeeAlso: `AnyCollection`
-public struct AnyIndex : Comparable {
+public struct AnyIndex {
   /// Creates a new index wrapping `base`.
   public init<BaseIndex : Comparable>(_ base: BaseIndex) {
     self._box = _IndexBox(_base: base)
@@ -698,18 +698,20 @@ public struct AnyIndex : Comparable {
   internal var _box: _AnyIndexBox
 }
 
-/// Returns `true` iff `lhs` and `rhs` wrap equal underlying indices.
-///
-/// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
-///   identical.
-public func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._isEqual(to: rhs._box)
-}
+extension AnyIndex : Comparable {
+  /// Returns `true` iff `lhs` and `rhs` wrap equal underlying indices.
+  ///
+  /// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
+  ///   identical.
+  public static func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    return lhs._box._isEqual(to: rhs._box)
+  }
 
-public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._isLess(than: rhs._box)
+  public static func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    return lhs._box._isLess(than: rhs._box)
+  }
 }
 
 //===--- Collections ------------------------------------------------------===//
