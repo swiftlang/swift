@@ -22,6 +22,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
@@ -1509,8 +1510,7 @@ static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
 }
 
 /// Clean up the given declaration type for display purposes.
-static Type getTypeForDisplay(TypeChecker &tc, Module *module,
-                              ValueDecl *decl) {
+static Type getTypeForDisplay(Module *module, ValueDecl *decl) {
   // If we're not in a type context, just grab the interface type.
   Type type = decl->getInterfaceType();
   if (!decl->getDeclContext()->isTypeContext() ||
@@ -1543,7 +1543,7 @@ static Type getTypeForDisplay(TypeChecker &tc, Module *module,
 static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
                                          NormalProtocolConformance *conformance,
                                          ValueDecl *req) {
-  auto type = getTypeForDisplay(tc, module, req);
+  auto type = getTypeForDisplay(module, req);
 
   // Replace generic type parameters and associated types with their
   // witnesses, when we have them.
@@ -1737,7 +1737,7 @@ diagnoseMatch(TypeChecker &tc, Module *module,
 
   case MatchKind::TypeConflict: {
     auto diag = tc.diagnose(match.Witness, diag::protocol_witness_type_conflict,
-                            getTypeForDisplay(tc, module, match.Witness),
+                            getTypeForDisplay(module, match.Witness),
                             withAssocTypes);
     if (!isa<TypeDecl>(req))
       fixItOverrideDeclarationTypes(tc, diag, match.Witness, req);
@@ -1987,6 +1987,77 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     assocType,
     getArchetypeSubstitution(TC, DC, assocType->getArchetype(), type),
     typeDecl);
+}
+
+/// Generates a note for a protocol requirement for which no witness was found
+/// and provides a fixit to add a stub to the adopter
+static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
+                              NormalProtocolConformance *Conformance,
+                              TypeChecker &TC) {
+  SourceLoc FixitLocation;
+  SourceLoc TypeLoc;
+  if (auto Extension = dyn_cast<ExtensionDecl>(Conformance->getDeclContext())) {
+    FixitLocation = Extension->getBraces().Start.getAdvancedLocOrInvalid(1);
+    TypeLoc = Extension->getStartLoc();
+  } else if (auto Nominal =
+               dyn_cast<NominalTypeDecl>(Conformance->getDeclContext())) {
+    FixitLocation = Nominal->getBraces().Start.getAdvancedLocOrInvalid(1);
+    TypeLoc = Nominal->getStartLoc();
+  } else {
+    llvm_unreachable("Unknown adopter kind");
+  }
+
+  // FIXME: Infer body indention from the source rather than hard-coding
+  // 4 spaces.
+  std::string ExtraIndent = "    ";
+  StringRef CurrentIndent = Lexer::getIndentationForLine(TC.Context.SourceMgr,
+                                                         TypeLoc);
+  std::string StubIndent = CurrentIndent.str() + ExtraIndent;
+
+  std::string FixitString;
+  llvm::raw_string_ostream FixitStream(FixitString);
+  ExtraIndentStreamPrinter Printer(FixitStream, StubIndent);
+
+  if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
+    Printer.printNewline();
+    Printer << "typealias " << MissingTypeWitness->getName() << " = <#type#>";
+    Printer << "\n";
+
+    TC.diagnose(MissingTypeWitness, diag::no_witnesses_type,
+                MissingTypeWitness->getName())
+      .fixItInsert(FixitLocation, FixitStream.str());
+  } else {
+
+    PrintOptions Options = PrintOptions::printForDiagnostics();
+    Options.AccessibilityFilter = Accessibility::Private;
+    Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
+    if (isa<ClassDecl>(Conformance->getDeclContext())) {
+      Type SelfType = Conformance->getDeclContext()->getSelfTypeInContext();
+      DeclContext *Adopter = Conformance->getDeclContext();
+      Options.setArchetypeSelfTransform(SelfType, Adopter);
+    } else {
+      Type SelfType = Conformance->getDeclContext()->getSelfTypeInContext();
+      DeclContext *Adopter = Conformance->getDeclContext();
+      Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
+    }
+    Options.CurrentModule = Conformance->getDeclContext()->getParentModule();
+    if (isa<NominalTypeDecl>(Conformance->getDeclContext())) {
+      // Create a variable declaration instead of a computed property in nominal
+      // types
+      Options.PrintPropertyAccessors = false;
+    }
+
+    Printer.printNewline();
+    Requirement->print(Printer, Options);
+    Printer << "\n";
+
+    // Point out the requirement that wasn't met.
+    TC.diagnose(Requirement, diag::no_witnesses,
+                            getRequirementKind(Requirement),
+                            Requirement->getFullName(),
+                            RequirementType)
+      .fixItInsert(FixitLocation, FixitStream.str());
+  }
 }
 
 ResolveWitnessResult
@@ -2293,24 +2364,26 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       Type reqType = getRequirementTypeForDisplay(tc, dc->getParentModule(),
                                                   conformance, requirement);
 
-      // Point out the requirement that wasn't met.
-      tc.diagnose(requirement,
-                  numViable > 0 ? (ignoringNames
-                                   ? diag::ambiguous_witnesses_wrong_name
-                                   : diag::ambiguous_witnesses)
-                                : diag::no_witnesses,
-                  getRequirementKind(requirement),
-                  requirement->getFullName(),
-                  reqType);
+      if (numViable > 0) {
+        auto diagnosticMessage = diag::ambiguous_witnesses;
+        if (ignoringNames) {
+          diagnosticMessage = diag::ambiguous_witnesses_wrong_name;
+        }
+        tc.diagnose(requirement, diagnosticMessage,
+                    getRequirementKind(requirement),
+                    requirement->getFullName(),
+                    reqType);
+      } else {
+        // Generate diagnostics for the missing requirement and a fixit to add
+        // it
+        diagnoseNoWitness(requirement, reqType, conformance, tc);
+      }
 
       // Diagnose each of the matches.
       for (const auto &match : matches)
         diagnoseMatch(tc, dc->getParentModule(), conformance, requirement,
                       match);
     });
-
-
-  // FIXME: Suggest a new declaration that does match?
 
   return ResolveWitnessResult::ExplicitFailed;
 }
@@ -3419,8 +3492,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
       diagnoseOrDefer(missingTypeWitness, true,
         [missingTypeWitness](TypeChecker &tc,
                              NormalProtocolConformance *conformance) {
-          tc.diagnose(missingTypeWitness, diag::no_witnesses_type,
-                      missingTypeWitness->getName());
+          diagnoseNoWitness(missingTypeWitness, Type(), conformance, tc);
         });
     }
 

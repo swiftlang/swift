@@ -28,22 +28,23 @@ class NominalTypeDecl;
 class TypeBase;
 class DeclContext;
 class Type;
+class ModuleDecl;
 enum DeclAttrKind : unsigned;
-class PrinterArchetypeTransformer;
+class PrinterTypeTransformer;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 
 /// Necessary information for archetype transformation during printing.
-struct ArchetypeTransformContext {
+struct TypeTransformContext {
   Type getTypeBase();
   NominalTypeDecl *getNominal();
-  PrinterArchetypeTransformer *getTransformer();
+  PrinterTypeTransformer *getTransformer();
   bool isPrintingSynthesizedExtension();
   bool isPrintingTypeInterface();
-  ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer);
-  ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer,
+  TypeTransformContext(PrinterTypeTransformer *Transformer);
+  TypeTransformContext(PrinterTypeTransformer *Transformer,
                             Type T);
-  ArchetypeTransformContext(PrinterArchetypeTransformer *Transformer,
+  TypeTransformContext(PrinterTypeTransformer *Transformer,
                             NominalTypeDecl *NTD,
                             SynthesizedExtensionAnalyzer *Analyzer);
   Type transform(Type Input);
@@ -51,7 +52,7 @@ struct ArchetypeTransformContext {
 
   bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
 
-  ~ArchetypeTransformContext();
+  ~TypeTransformContext();
 private:
   struct Implementation;
   Implementation &Impl;
@@ -305,8 +306,17 @@ struct PrintOptions {
   /// \brief Print types with alternative names from their canonical names.
   llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;
 
+  /// \brief The module in which the printer is used. Determines if the module
+  /// name should be printed when printing a type.
+  ModuleDecl *CurrentModule;
+
   /// \brief The information for converting archetypes to specialized types.
-  std::shared_ptr<ArchetypeTransformContext> TransformContext;
+  std::shared_ptr<TypeTransformContext> TransformContext;
+
+  /// \brief If this is not \c nullptr then functions (incuding accessors and
+  /// constructors) will be printed with a body that is determined by this
+  /// function.
+  std::function<std::string(const ValueDecl *)> FunctionBody;
 
   BracketOptions BracketOptions;
 
@@ -357,9 +367,11 @@ struct PrintOptions {
 
   static PrintOptions printTypeInterface(Type T, DeclContext *DC);
 
-  void setArchetypeTransform(Type T, DeclContext *DC);
+  void setArchetypeSelfTransform(Type T, DeclContext *DC);
 
-  void setArchetypeTransformForQuickHelp(Type T, DeclContext *DC);
+  void setArchetypeSelfTransformForQuickHelp(Type T, DeclContext *DC);
+
+  void setArchetypeAndDynamicSelfTransform(Type T, DeclContext *DC);
 
   void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D,
                                     SynthesizedExtensionAnalyzer *SynAnalyzer);
