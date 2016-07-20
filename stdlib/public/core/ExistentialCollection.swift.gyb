@@ -715,28 +715,11 @@ public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
 //===--- Collections ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// A protocol for `AnyCollection<Element>`,
-/// `AnyBidirectionalCollection<Element>`, and
-/// `AnyRandomAccessCollection<Element>`.
-public protocol AnyCollectionProtocol : Collection {
+public // @testable
+protocol _AnyCollectionProtocol : Collection {
   /// Identifies the underlying collection stored by `self`. Instances
-  /// copied from one another have the same `_underlyingCollectionID`.
-  var _underlyingCollectionID: ObjectIdentifier { get }
-
-  /// Returns `true` iff `self` and `other` use the same `_box` to store their
-  /// underlying collections.
-  func _storesSameUnderlyingCollection<
-    C: AnyCollectionProtocol
-  >(_ other: C) -> Bool
-}
-
-extension AnyCollectionProtocol {
-  public // @testable
-  func _storesSameUnderlyingCollection<
-    C: AnyCollectionProtocol
-  >(_ other: C) -> Bool {
-    return _underlyingCollectionID == other._underlyingCollectionID
-  }
+  /// copied or upgraded/downgraded from one another have the same `_boxID`.
+  var _boxID: ObjectIdentifier { get }
 }
 
 % for (ti, Traversal) in enumerate(TRAVERSALS):
@@ -751,7 +734,7 @@ extension AnyCollectionProtocol {
 ///
 /// - SeeAlso: ${', '.join('`Any%sCollection`' % t for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
 public struct ${Self}<Element>
-  : AnyCollectionProtocol, ${SelfProtocol} {
+  : _AnyCollectionProtocol, ${SelfProtocol} {
 
   internal init(_box: _${Self}Box<Element>) {
     self._box = _box
@@ -948,7 +931,7 @@ public struct ${Self}<Element>
 
   /// Uniquely identifies the stored underlying collection.
   public // Due to language limitations only
-  var _underlyingCollectionID: ObjectIdentifier {
+  var _boxID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }
 
@@ -976,10 +959,13 @@ extension Any${Kind} {
 }
 %end
 
-@available(*, unavailable, renamed: "AnyCollectionProtocol")
-public typealias AnyCollectionType = AnyCollectionProtocol
+@available(*, unavailable, renamed: "_AnyCollectionProtocol")
+public typealias AnyCollectionType = _AnyCollectionProtocol
 
-extension AnyCollectionProtocol {
+@available(*, unavailable, renamed: "_AnyCollectionProtocol")
+public typealias AnyCollectionProtocol = _AnyCollectionProtocol
+
+extension _AnyCollectionProtocol {
   @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> AnyIterator<Iterator.Element> {
     Builtin.unreachable()
@@ -1004,14 +990,14 @@ public func anyGenerator<Element>(_ body: () -> Element?) -> AnyIterator<Element
 
 @available(*, unavailable)
 public func === <
-  L : AnyCollectionProtocol, R : AnyCollectionProtocol
+  L : _AnyCollectionProtocol, R : _AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
   Builtin.unreachable()
 }
 
 @available(*, unavailable)
 public func !== <
-  L : AnyCollectionProtocol, R : AnyCollectionProtocol
+  L : _AnyCollectionProtocol, R : _AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
   Builtin.unreachable()
 }
