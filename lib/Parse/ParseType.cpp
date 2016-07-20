@@ -458,17 +458,23 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       RAngleLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
     }
     
-    // Replace 'protocol<T1, T2>' with 'T1 & T2'
-    auto Diag = diagnose(ProtocolLoc, diag::deprecated_protocol_composition);
     auto composition = ProtocolCompositionTypeRepr::create(
       Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
 
-    Diag.highlight({ProtocolLoc, RAngleLoc});
-    for (auto Comma : Commas)          // remove commas and '<'
-      Diag.fixItReplace(Comma, " &");
-    Diag
-      .fixItRemove({ProtocolLoc, LAngleLoc}) // remove 'protocol<'
-      .fixItRemove(RAngleLoc); // remove '>'
+    if (Status.isSuccess()) {
+      // Only if we have complete protocol<...> construct, diagnose deprecated.
+      auto Diag = diagnose(ProtocolLoc,
+        Commas.size() > 0 ? diag::deprecated_protocol_composition
+                          : diag::deprecated_protocol_composition_single);
+      Diag.highlight({ProtocolLoc, RAngleLoc});
+
+      // Replace 'protocol<T1, T2>' with 'T1 & T2'
+      for (auto Comma : Commas)          // remove commas and '<'
+        Diag.fixItReplace(Comma, " &");
+      Diag
+        .fixItRemove({ProtocolLoc, LAngleLoc}) // remove 'protocol<'
+        .fixItRemove(RAngleLoc); // remove '>'
+    }
 
     return makeParserResult(Status, composition);
   }

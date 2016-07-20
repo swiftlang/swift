@@ -655,6 +655,8 @@ ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
 
 WARNING(deprecated_protocol_composition,none,
         "'protocol<...>' composition syntax is deprecated; join the protocols using '&'", ())
+WARNING(deprecated_protocol_composition_single,none,
+        "'protocol<...>' composition syntax is deprecated and not needed here", ())
 WARNING(deprecated_any_composition,none,
         "'protocol<>' syntax is deprecated; use 'Any' instead", ())
 
