@@ -3449,10 +3449,13 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
     
-    auto Info = FunctionType::ExtInfo(*representation,
-                               noreturn, autoClosure, noescape,
-                               explicitlyEscaping, throws);
-    
+    bool isEscaping = !noescape;
+    auto Info = FunctionType::ExtInfo(
+        *representation,
+        /*IsNoReturn=*/noreturn, /*IsAutoClosure=*/autoClosure,
+        /*IsEscaping=*/isEscaping, /*IsExplicitlyEscaping=*/explicitlyEscaping,
+        /*Throws=*/throws);
+
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
                                      Info);
     break;

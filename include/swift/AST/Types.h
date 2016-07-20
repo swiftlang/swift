@@ -2157,11 +2157,11 @@ public:
 
     // Constructor with no defaults.
     ExtInfo(Representation Rep, bool IsNoReturn,
-            bool IsAutoClosure, bool IsNoEscape, bool IsExplicitlyEscaping,
+            bool IsAutoClosure, bool IsEscaping, bool IsExplicitlyEscaping,
             bool Throws)
       : ExtInfo(Rep, IsNoReturn, Throws) {
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
-      Bits |= (IsNoEscape ? NoEscapeMask : 0);
+      Bits |= (IsEscaping ? 0 : NoEscapeMask);
       Bits |= (IsExplicitlyEscaping ? ExplicitlyEscapingMask : 0);
     }
 

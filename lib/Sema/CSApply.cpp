@@ -5516,12 +5516,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       bool fromEscaping = fromEI.isEscaping(), toEscaping = toEI.isEscaping();
       if ((!toEscaping && fromEscaping) ||
           (toEI.isNoReturn() && !fromEI.isNoReturn())) {
-        swift::AnyFunctionType::ExtInfo newEI(fromEI.getRepresentation(),
-                                        toEI.isNoReturn() | fromEI.isNoReturn(),
-                                        toEI.isAutoClosure(),
-                                        !toEscaping | !fromEscaping,
-                                        toEI.isExplicitlyEscaping() | fromEI.isExplicitlyEscaping(),
-                                        toEI.throws() & fromEI.throws());
+        bool isEscaping = toEscaping && fromEscaping;
+        swift::AnyFunctionType::ExtInfo newEI(
+            fromEI.getRepresentation(),
+            /*IsNoReturn=*/toEI.isNoReturn() | fromEI.isNoReturn(),
+            /*IsAutoClosure=*/toEI.isAutoClosure(),
+            /*IsEscaping=*/isEscaping,
+            /*IsExplicitlyEscaping=*/toEI.isExplicitlyEscaping() |
+                fromEI.isExplicitlyEscaping(),
+            /*Throws=*/toEI.throws() & fromEI.throws());
         auto newToType = FunctionType::get(fromFunc->getInput(),
                                            fromFunc->getResult(), newEI);
         if (applyTypeToClosureExpr(expr, newToType)) {

@@ -1855,12 +1855,14 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     // Resolve the function type directly with these attributes.
-    FunctionType::ExtInfo extInfo(rep,
-                                  attrs.has(TAK_noreturn),
-                                  attrs.has(TAK_autoclosure),
-                                  attrs.has(TAK_noescape),
-                                  attrs.has(TAK_escaping),
-                                  fnRepr->throws());
+    bool isEscaping = !attrs.has(TAK_noescape);
+    FunctionType::ExtInfo extInfo(
+        rep,
+        /*IsNoReturn=*/attrs.has(TAK_noreturn),
+        /*IsAutoClosure=*/attrs.has(TAK_autoclosure),
+        /*IsEscaping=*/isEscaping,
+        /*IsExplicitlyEscaping=*/attrs.has(TAK_escaping),
+        /*Throws=*/fnRepr->throws());
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);
     if (!ty || ty->is<ErrorType>()) return ty;
