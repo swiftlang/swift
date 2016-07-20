@@ -308,7 +308,7 @@ ManagedValue
 SILGenFunction::emitOptionalToOptional(SILLocation loc,
                                        ManagedValue input,
                                        SILType resultTy,
-                                       const ValueTransform &transformValue) {
+                                       ValueTransformRef transformValue) {
   auto contBB = createBasicBlock();
   auto isNotPresentBB = createBasicBlock();
   auto isPresentBB = createBasicBlock();

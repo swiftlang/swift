@@ -293,8 +293,9 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
     auto &tl = gen.getTypeLowering(result.getSILType());
     if (tl.isAddressOnly()) {
       assert(result.getConvention() == ResultConvention::Indirect);
-      assert(resultType->isAny() &&
-             "Should not be trying to bridge anything except for Any here");
+      assert((resultType->isAny()
+              || resultType->getAnyOptionalObjectType()->isAny())
+             && "Should not be trying to bridge anything except for Any here");
     }
   }
 
@@ -475,6 +476,13 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   if (auto bridgeAnything =
         gen.getASTContext().getBridgeAnythingToObjectiveC(nullptr)) {
     Substitution sub(loweredNativeTy, {});
+    // Put the value into memory if necessary.
+    assert(v.getType().isTrivial(gen.SGM.M) || v.hasCleanup());
+    if (v.getType().isObject()) {
+      auto tmp = gen.emitTemporaryAllocation(loc, v.getType());
+      v.forwardInto(gen, loc, tmp);
+      v = gen.emitManagedBufferWithCleanup(tmp);
+    }
     return gen.emitApplyOfLibraryIntrinsic(loc, bridgeAnything, sub, v,
                                            SGFContext())
       .getAsSingleValue(gen, loc);
@@ -493,7 +501,8 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
   if (loweredNativeTy == loweredBridgedTy)
     return v;
 
-  if (loweredNativeTy.getAnyOptionalObjectType()) {
+  if (loweredBridgedTy.getAnyOptionalObjectType()
+      && loweredNativeTy.getAnyOptionalObjectType()) {
     return gen.emitOptionalToOptional(loc, v, bridgedTy,
                                       emitNativeToCBridgedValue);
   }
@@ -951,8 +960,9 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
 
   if (substTy->getNumIndirectResults() > 0) {
     SILResultInfo indirectResult = substTy->getSingleResult();
-    assert(indirectResult.getType()->isAny() &&
-           "Should not be trying to bridge anything except for Any here");
+    assert((indirectResult.getType()->isAny()
+            || indirectResult.getType().getAnyOptionalObjectType()->isAny())
+           && "Should not be trying to bridge anything except for Any here");
     args.push_back(emitTemporaryAllocation(loc, indirectResult.getSILType()));
   }
 

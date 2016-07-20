@@ -3072,7 +3072,10 @@ namespace {
       // boxing.
       // TODO: Generalize. Similarly, when bridging from NSFoo -> Foo -> NSFoo,
       // we should elide the bridge altogether and pass the original object.
-      if (isAnyObjectType(param.getType()) && !arg.isRValue()) {
+      auto paramObjTy = param.getType();
+      if (auto objTy = paramObjTy.getAnyOptionalObjectType())
+        paramObjTy = objTy;
+      if (isAnyObjectType(paramObjTy) && !arg.isRValue()) {
         return emitNativeToBridgedObjectArgument(std::move(arg).asKnownExpr(),
                                                  loweredSubstArgType,
                                                  origParamType, param);
@@ -3087,8 +3090,60 @@ namespace {
                                       
     }
     
-    Expr *lookThroughExistentialErasures(Expr *argExpr) {
+    enum class ExistentialPeepholeOptionality {
+      /// A non-optional value erased to a non-optional existential.
+      Nonoptional,
+      
+      /// A non-optional value erased to an optional existential.
+      NonoptionalToOptional,
+      
+      /// An optional value erased to an optional existential.
+      OptionalToOptional,
+    };
+    
+    std::pair<Expr *, ExistentialPeepholeOptionality>
+    lookThroughExistentialErasures(Expr *argExpr) {
+      auto origArgExpr = argExpr;
+    
+      auto optionality = ExistentialPeepholeOptionality::Nonoptional;
       argExpr = argExpr->getSemanticsProvidingExpr();
+      
+      // Check for an OptionalEvaluation. If we see one we'll want to match it
+      // to the inner BindOptional.
+      if (auto optEval = dyn_cast<OptionalEvaluationExpr>(argExpr)) {
+        
+        // The result of the conversion should be promoted back to optional
+        // at the outermost level.
+        if (auto inject = dyn_cast<InjectIntoOptionalExpr>(
+                         optEval->getSubExpr()->getSemanticsProvidingExpr())) {
+          optionality = ExistentialPeepholeOptionality::OptionalToOptional;
+          argExpr = inject->getSubExpr()->getSemanticsProvidingExpr();
+        }
+      }
+      
+      // Look through a BindOptionalExpr if we have an optional-to-optional
+      // peephole, or fail the peephole if there isn't a BindOptionalToOptional.
+      auto tryToBindOptional =
+        [&](Expr *subExpr) -> std::pair<Expr *, ExistentialPeepholeOptionality> {
+          if (optionality ==
+                ExistentialPeepholeOptionality::OptionalToOptional) {
+            // If we see the binding, look through it.
+            if (auto bind = dyn_cast<BindOptionalExpr>(subExpr))
+              return {bind->getSubExpr()->getSemanticsProvidingExpr(),
+                      optionality};
+            // Otherwise, we don't know what we're seeing. Back out of the
+            // peephole.
+            return {origArgExpr, ExistentialPeepholeOptionality::Nonoptional};
+          }
+          
+          return {subExpr, optionality};
+        };
+      
+      // Look through an optional injection.
+      if (auto inject = dyn_cast<InjectIntoOptionalExpr>(argExpr)) {
+        optionality = ExistentialPeepholeOptionality::NonoptionalToOptional;
+        argExpr = inject->getSubExpr()->getSemanticsProvidingExpr();
+      }
 
       // When converting from an existential type to a more general existential,
       // the inner existential is opened first. Look through this pattern.
@@ -3100,17 +3155,18 @@ namespace {
         // If we drilled down to the underlying opened existential, look
         // through it.
         if (subExpr == open->getOpaqueValue())
-          return open->getExistentialValue();
+          return tryToBindOptional(open->getExistentialValue());
         // TODO: Maybe there are other peepholes we could attempt on opened
         // existentials?
-        return open;
+        return tryToBindOptional(open);
       }
       
       // Look through ErasureExprs and try to bridge the underlying
       // concrete value instead.
       while (auto erasure = dyn_cast<ErasureExpr>(argExpr))
         argExpr = erasure->getSubExpr()->getSemanticsProvidingExpr();
-      return argExpr;
+
+      return tryToBindOptional(argExpr);
     }
     
     /// Emit an argument expression that we know will be bridged to an
@@ -3119,54 +3175,94 @@ namespace {
                                                SILType loweredSubstArgType,
                                                AbstractionPattern origParamType,
                                                SILParameterInfo param) {
-      argExpr = lookThroughExistentialErasures(argExpr);
+      auto origArgExpr = argExpr;
+      (void) origArgExpr;
+      // Look through existential erasures.
+      ExistentialPeepholeOptionality optionality;
+      std::tie(argExpr, optionality) = lookThroughExistentialErasures(argExpr);
       
       // Emit the argument.
       auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
       ManagedValue emittedArg = SGF.emitRValue(argExpr, contexts.ForEmission)
         .getScalarValue();
       
-      // If the argument is not already a class instance, bridge it.
-      if (!argExpr->getType()->mayHaveSuperclass()
-          && !argExpr->getType()->isClassExistentialType()) {
-        emittedArg = SGF.emitNativeToBridgedValue(argExpr, emittedArg,
-                                                  Rep, param.getType());
+      // Early exit if we already exactly match the parameter type.
+      if (emittedArg.getType() == param.getSILType()) {
+        return emittedArg;
       }
-      auto emittedArgTy = emittedArg.getType().getSwiftRValueType();
-      assert(emittedArgTy->mayHaveSuperclass()
-        || emittedArgTy->isClassExistentialType());
       
-      // Upcast reference types to AnyObject.
-      if (!isAnyObjectType(emittedArgTy)) {
-        // Open class existentials first to upcast the reference inside.
-        if (emittedArgTy->isClassExistentialType()) {
-          emittedArgTy = ArchetypeType::getOpened(emittedArgTy);
-          auto opened = SGF.B.createOpenExistentialRef(argExpr,
+      // Factor the bridging conversion out in case we need to do it as an
+      // optional-to-optional transform.
+      auto doBridge = [&](SILGenFunction &gen,
+                          SILLocation loc,
+                          ManagedValue emittedArg,
+                          SILType loweredResultTy) -> ManagedValue {
+        // If the argument is not already a class instance, bridge it.
+        if (!emittedArg.getType().getSwiftRValueType()->mayHaveSuperclass()
+            && !emittedArg.getType().isClassExistentialType()) {
+          emittedArg = SGF.emitNativeToBridgedValue(loc, emittedArg, Rep,
+                                          loweredResultTy.getSwiftRValueType());
+        }
+        auto emittedArgTy = emittedArg.getType().getSwiftRValueType();
+        assert(emittedArgTy->mayHaveSuperclass()
+          || emittedArgTy->isClassExistentialType());
+        
+        // Upcast reference types to AnyObject.
+        if (!isAnyObjectType(emittedArgTy)) {
+          // Open class existentials first to upcast the reference inside.
+          if (emittedArgTy->isClassExistentialType()) {
+            emittedArgTy = ArchetypeType::getOpened(emittedArgTy);
+            auto opened = SGF.B.createOpenExistentialRef(loc,
                                  emittedArg.getValue(),
                                  SILType::getPrimitiveObjectType(emittedArgTy));
-          emittedArg = ManagedValue(opened, emittedArg.getCleanup());
-        }
-        
-        // Erase to AnyObject.
-        auto conformance = SGF.SGM.SwiftModule->lookupConformance(
-          emittedArgTy,
-          SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject),
-          nullptr);
-        assert(conformance &&
-               "no AnyObject conformance for class?!");
-        
-        ArrayRef<ProtocolConformanceRef> conformances(*conformance);
-        auto ctxConformances = SGF.getASTContext().AllocateCopy(conformances);
-        
-        auto erased = SGF.B.createInitExistentialRef(argExpr,
+            emittedArg = ManagedValue(opened, emittedArg.getCleanup());
+          }
+          
+          // Erase to AnyObject.
+          auto conformance = SGF.SGM.SwiftModule->lookupConformance(
+            emittedArgTy,
+            SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject),
+            nullptr);
+          assert(conformance &&
+                 "no AnyObject conformance for class?!");
+          
+          ArrayRef<ProtocolConformanceRef> conformances(*conformance);
+          auto ctxConformances = SGF.getASTContext().AllocateCopy(conformances);
+          
+          auto erased = SGF.B.createInitExistentialRef(loc,
                            SILType::getPrimitiveObjectType(getAnyObjectType()),
                            emittedArgTy, emittedArg.getValue(),
                            ctxConformances);
-        emittedArg = ManagedValue(erased, emittedArg.getCleanup());
-      }
+          emittedArg = ManagedValue(erased, emittedArg.getCleanup());
+        }
+        
+        assert(isAnyObjectType(emittedArg.getSwiftType()));
+        return emittedArg;
+      };
       
-      assert(isAnyObjectType(emittedArg.getSwiftType()));
-      return emittedArg;
+      // Bind the optional value if we started with an optional.
+      bool nativeIsOptional = (bool)emittedArg.getType().getSwiftRValueType()
+        ->getAnyOptionalObjectType();
+      bool bridgedIsOptional = (bool)param.getSILType().getSwiftRValueType()
+        ->getAnyOptionalObjectType();
+      if (nativeIsOptional && bridgedIsOptional) {
+        return SGF.emitOptionalToOptional(argExpr,
+                                          emittedArg, param.getSILType(),
+                                          doBridge);
+      } else if (!nativeIsOptional && bridgedIsOptional) {
+        OptionalTypeKind otk;
+        auto paramObjTy = param.getSILType()
+          .getAnyOptionalObjectType(SGF.SGM.M, otk);
+        auto transformed = doBridge(SGF, argExpr, emittedArg,
+                                    paramObjTy);
+        // Inject into optional.
+        auto opt = SGF.B.createEnum(argExpr, transformed.getValue(),
+                                  SGF.getASTContext().getOptionalSomeDecl(otk),
+                                  param.getSILType());
+        return ManagedValue(opt, transformed.getCleanup());
+      } else {
+        return doBridge(SGF, argExpr, emittedArg, param.getSILType());
+      }
     }
     
     struct EmittedArgument {
