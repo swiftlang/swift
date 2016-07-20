@@ -960,14 +960,10 @@ struct _ParentProcess {
       let crashOutput = crashStdout + crashStderr
       for expectedSubstring in t.crashOutputMatches {
         var found = false
-        if expectedSubstring == "" {
-          found = true
-        } else {
-          for s in crashOutput {
-            if findSubstring(s, expectedSubstring) != nil {
-              found = true
-              break
-            }
+        for s in crashOutput {
+          if findSubstring(s, expectedSubstring) != nil {
+            found = true
+            break
           }
         }
         if !found {

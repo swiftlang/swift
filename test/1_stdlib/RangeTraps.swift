@@ -20,9 +20,8 @@
 
 import StdlibUnittest
 
-let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
 
-var RangeTraps = TestSuite("RangeTraps" + testSuiteSuffix)
+var RangeTraps = TestSuite("RangeTraps")
 
 RangeTraps.test("HalfOpen")
   .skip(.custom(

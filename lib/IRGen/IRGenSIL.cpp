@@ -872,6 +872,8 @@ public:
   void visitCopyAddrInst(CopyAddrInst *i);
   void visitDestroyAddrInst(DestroyAddrInst *i);
 
+  void visitBindMemoryInst(BindMemoryInst *i);
+
   void visitCondFailInst(CondFailInst *i);
   
   void visitConvertFunctionInst(ConvertFunctionInst *i);
@@ -4563,6 +4565,10 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
     }
   }
 }
+
+// This is a no-op because we do not lower Swift TBAA info to LLVM IR, and it
+// does not produce any values.
+void IRGenSILFunction::visitBindMemoryInst(swift::BindMemoryInst *) {}
 
 static DeallocStackInst *
 findPairedDeallocStackForDestroyAddr(DestroyAddrInst *destroyAddr) {

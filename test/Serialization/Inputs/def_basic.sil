@@ -964,6 +964,15 @@ bb0(%0 : $Builtin.RawPointer, %1 : $X):
   return %28 : $()
 }
 
+// CHECK-LABEL: sil public_external [fragile] @test_bind_memory
+sil [fragile] @test_bind_memory : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $*X
+  // CHECK: bind_memory {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*X
+  %28 = tuple ()
+  return %28 : $()
+}
+
 public func serialize_all() {
 }
 
@@ -1364,7 +1373,8 @@ bb0:
   %117 = function_ref @test_copy_release_value : $@convention(thin) (X) -> (X)
   %118 = function_ref @test_set_deallocating : $@convention(thin) (X) -> (X)
   %119 = function_ref @test_pointer_to_address : $@convention(thin) (Builtin.RawPointer, X) -> ()
-  %120 = function_ref @cond_fail_test : $@convention(thin) Builtin.Int1 -> ()
+  %120 = function_ref @test_bind_memory : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> ()
+  %121 = function_ref @cond_fail_test : $@convention(thin) Builtin.Int1 -> ()
 
   %124 = function_ref @block_storage_type : $@convention(thin) Int -> @convention(block) () -> ()
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)

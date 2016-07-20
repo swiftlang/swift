@@ -10,7 +10,6 @@
 
 import StdlibUnittest
 
-let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
 
 %{
 # We test for bounds-checking traps for both reading and writing
@@ -28,7 +27,7 @@ def bounds_trap(index, expr_to_write):
 
 % for ArrayTy in array_types:
 
-var ${ArrayTy}Traps = TestSuite("${ArrayTy}Traps" + testSuiteSuffix)
+var ${ArrayTy}Traps = TestSuite("${ArrayTy}Traps")
 
 %   for io in ['read', 'write']:
 

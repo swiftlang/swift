@@ -9,9 +9,8 @@
 
 import StdlibUnittest
 
-let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
 
-var StringTraps = TestSuite("StringTraps" + testSuiteSuffix)
+var StringTraps = TestSuite("StringTraps")
 
 StringTraps.test("startIndex/predecessor")
   .skip(.custom(
