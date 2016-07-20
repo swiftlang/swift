@@ -237,8 +237,9 @@ public struct DispatchDataIterator : IteratorProtocol, Sequence {
 		self._count = 0
 		self._data = __dispatch_data_create_map(
 			_data as __DispatchData, &ptr, &self._count)
-		self._ptr = UnsafePointer(ptr!)
+		self._ptr = UnsafePointer(ptr)
 		self._position = _data.startIndex
+		assert(self._ptr != nil || self._count == self._position)
 	}
 
 	/// Advance to the next element and return it, or `nil` if no next
@@ -253,7 +254,7 @@ public struct DispatchDataIterator : IteratorProtocol, Sequence {
 	}
 
 	internal let _data: __DispatchData
-	internal var _ptr: UnsafePointer<UInt8>
+	internal var _ptr: UnsafePointer<UInt8>!
 	internal var _count: Int
 	internal var _position: DispatchData.Index
 }
