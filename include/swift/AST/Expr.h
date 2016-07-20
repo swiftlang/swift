@@ -2513,16 +2513,51 @@ public:
 /// elements have type U, where U is a subtype of T.
 class CollectionUpcastConversionExpr : public ImplicitConversionExpr {
 public:
+  struct ConversionPair {
+    OpaqueValueExpr *OrigValue;
+    Expr *Conversion;
+
+    explicit operator bool() const { return OrigValue != nullptr; }
+  };
+private:
+  ConversionPair KeyConversion;
+  ConversionPair ValueConversion;
+public:
   CollectionUpcastConversionExpr(Expr *subExpr, Type type,
+                                 ConversionPair keyConversion,
+                                 ConversionPair valueConversion,
                                  bool bridgesToObjC)
     : ImplicitConversionExpr(
-        ExprKind::CollectionUpcastConversion, subExpr, type) {
+        ExprKind::CollectionUpcastConversion, subExpr, type),
+      KeyConversion(keyConversion), ValueConversion(valueConversion) {
+    assert((!KeyConversion || ValueConversion)
+           && "key conversion without value conversion");
     CollectionUpcastConversionExprBits.BridgesToObjC = bridgesToObjC;
   }
 
   /// Whether this upcast bridges the source elements to Objective-C.
   bool bridgesToObjC() const {
     return CollectionUpcastConversionExprBits.BridgesToObjC;
+  }
+
+  /// Returns the expression that should be used to perform a
+  /// conversion of the collection's values; null if the conversion
+  /// is formally trivial because the key type does not change.
+  const ConversionPair &getKeyConversion() const {
+    return KeyConversion;
+  }
+  void setKeyConversion(const ConversionPair &pair) {
+    KeyConversion = pair;
+  }
+
+  /// Returns the expression that should be used to perform a
+  /// conversion of the collection's values; null if the conversion
+  /// is formally trivial because the value type does not change.
+  const ConversionPair &getValueConversion() const {
+    return ValueConversion;
+  }
+  void setValueConversion(const ConversionPair &pair) {
+    ValueConversion = pair;
   }
 
   static bool classof(const Expr *E) {

@@ -133,7 +133,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb
   Mirror.swift
-  Process.swift
+  CommandLine.swift
   SliceBuffer.swift
   Tuple.swift.gyb
   UnfoldSequence.swift

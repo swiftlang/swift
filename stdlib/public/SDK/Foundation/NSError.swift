@@ -282,7 +282,7 @@ public func _stdlib_bridgeNSErrorToError<
   T : _ObjectiveCBridgeableError
 >(_ error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
   if let bridged = T(_bridgedNSError: error) {
-    out.initialize(with: bridged)
+    out.initialize(to: bridged)
     return true
   } else {
     return false
@@ -296,9 +296,11 @@ public protocol __BridgedNSError : Error {
 }
 
 // Allow two bridged NSError types to be compared.
-public func ==<T: __BridgedNSError>(lhs: T, rhs: T) -> Bool
-  where T: RawRepresentable, T.RawValue: SignedInteger {
-  return lhs.rawValue.toIntMax() == rhs.rawValue.toIntMax()
+extension __BridgedNSError
+    where Self: RawRepresentable, Self.RawValue: SignedInteger {
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    return lhs.rawValue.toIntMax() == rhs.rawValue.toIntMax()
+  }
 }
 
 public extension __BridgedNSError 
@@ -322,11 +324,12 @@ public extension __BridgedNSError
 }
 
 // Allow two bridged NSError types to be compared.
-public func ==<T: __BridgedNSError>(lhs: T, rhs: T) -> Bool
-  where T: RawRepresentable, T.RawValue: UnsignedInteger {
-  return lhs.rawValue.toUIntMax() == rhs.rawValue.toUIntMax()
+extension __BridgedNSError
+    where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    return lhs.rawValue.toUIntMax() == rhs.rawValue.toUIntMax()
+  }
 }
-
 
 public extension __BridgedNSError
     where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
@@ -471,19 +474,21 @@ public protocol _ErrorCodeProtocol : Equatable {
   // Code match Self, but we cannot express those requirements yet.
 }
 
-/// Allow one to match an error code against an arbitrary error.
-public func ~= <Code: _ErrorCodeProtocol>(match: Code, error: Error)
-    -> Bool
-    where Code._ErrorType: _BridgedStoredNSError {
-  guard let specificError = error as? Code._ErrorType else { return false }
+extension _ErrorCodeProtocol where Self._ErrorType: _BridgedStoredNSError {
+  /// Allow one to match an error code against an arbitrary error.
+  public static func ~=(match: Self, error: Error) -> Bool {
+    guard let specificError = error as? Self._ErrorType else { return false }
 
-  // FIXME: Work around IRGen crash when we set Code == Code._ErrorType.Code.
-  let specificCode = specificError.code as! Code
-  return match == specificCode
+    // FIXME: Work around IRGen crash when we set Code == Code._ErrorType.Code.
+    let specificCode = specificError.code as! Self
+    return match == specificCode
+  }
 }
 
-public func == <T: _BridgedStoredNSError>(lhs: T, rhs: T) -> Bool {
-  return lhs._nsError.isEqual(rhs._nsError)
+extension _BridgedStoredNSError {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs._nsError.isEqual(rhs._nsError)
+  }
 }
 
 @available(*, unavailable, renamed: "CocoaError")

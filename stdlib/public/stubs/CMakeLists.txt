@@ -4,6 +4,7 @@ set(swift_stubs_unicode_normalization_sources)
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   set(swift_stubs_objc_sources
       Availability.mm
+      DispatchShims.mm
       FoundationHelpers.mm
       SwiftNativeNSXXXBase.mm.gyb)
   set(LLVM_OPTIONAL_SOURCES

@@ -61,9 +61,10 @@
 /// algorithms, however, may call for direct iterator use.
 ///
 /// One example is the `reduce1(_:)` method. Similar to the
-/// `reduce(_:combine:)` method defined in the standard library, which takes
-/// an initial value and a combining closure, `reduce1(_:)` uses the first
-/// element of the sequence as the initial value.
+/// `reduce(_:)` method defined in the standard
+/// library, which takes an initial value and a combining closure,
+/// `reduce1(_:)` uses the first element of the sequence as the
+/// initial value.
 ///
 /// Here's an implementation of the `reduce1(_:)` method. The sequence's
 /// iterator is used directly to retrieve the initial value before looping
@@ -71,7 +72,7 @@
 ///
 ///     extension Sequence {
 ///         func reduce1(
-///           combine: (Iterator.Element, Iterator.Element) -> Iterator.Element
+///           _ nextPartialResult: (Iterator.Element, Iterator.Element) -> Iterator.Element
 ///         ) -> Iterator.Element?
 ///         {
 ///             var i = makeIterator()
@@ -80,7 +81,7 @@
 ///             }
 ///
 ///             while let element = i.next() {
-///                 accumulated = combine(accumulated, element)
+///                 accumulated = nextPartialResult(accumulated, element)
 ///             }
 ///             return accumulated
 ///         }
@@ -387,12 +388,12 @@ public protocol Sequence {
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
-  /// - Parameter includeElement: A closure that takes an element of the
+  /// - Parameter isIncluded: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
   func filter(
-    _ includeElement: @noescape (Iterator.Element) throws -> Bool
+    _ isIncluded: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element]
 
   /// Calls the given closure on each element in the sequence in the same order
@@ -522,23 +523,27 @@ public protocol Sequence {
   /// that was originally separated by one or more spaces.
   ///
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.characters.split(isSeparator: { $0 == " " })
+  ///     print(line.characters.split(whereSeparator: { $0 == " " })
   ///                          .map(String.init))
   ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
   ///
-  ///     print(line.characters.split(maxSplits: 1, isSeparator: { $0 == " " })
-  ///                           .map(String.init))
+  ///     print(
+  ///         line.characters.split(maxSplits: 1, whereSeparator: { $0 == " " })
+  ///                        .map(String.init))
   ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
   ///
   /// The final example passes `false` for the `omittingEmptySubsequences`
   /// parameter, so the returned array contains empty strings where spaces
   /// were repeated.
   ///
-  ///     print(line.characters.split(omittingEmptySubsequences: false, isSeparator: { $0 == " " })
-  ///                           .map(String.init))
+  ///     print(
+  ///         line.characters.split(
+  ///             omittingEmptySubsequences: false, 
+  ///             whereSeparator: { $0 == " " })
+  ///         ).map(String.init))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// - Parameters:
@@ -558,18 +563,18 @@ public protocol Sequence {
   /// - Returns: An array of subsequences, split from this sequence's elements.
   func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    isSeparator: @noescape (Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
   /// Returns the first element of the sequence that satisfies the given
   /// predicate or nil if no such element is found.
   ///
-  /// - Parameter where: A closure that takes an element of the
+  /// - Parameter predicate: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element is a match.
   /// - Returns: The first match or `nil` if there was no match.
   func first(
-    where: @noescape (Iterator.Element) throws -> Bool
+    where predicate: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element?
 
   func _customContainsEquatableElement(
@@ -747,12 +752,12 @@ extension Sequence {
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
-  /// - Parameter includeElement: A closure that takes an element of the
+  /// - Parameter shouldInclude: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
   public func filter(
-    _ includeElement: @noescape (Iterator.Element) throws -> Bool
+    _ isIncluded: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element] {
 
     var result = ContiguousArray<Iterator.Element>()
@@ -760,7 +765,7 @@ extension Sequence {
     var iterator = self.makeIterator()
 
     while let element = iterator.next() {
-      if try includeElement(element) {
+      if try isIncluded(element) {
         result.append(element)
       }
     }
@@ -823,22 +828,26 @@ extension Sequence {
   /// that was originally separated by one or more spaces.
   ///
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.characters.split(isSeparator: { $0 == " " })
+  ///     print(line.characters.split(whereSeparator: { $0 == " " })
   ///                          .map(String.init))
   ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
   ///
-  ///     print(line.characters.split(maxSplits: 1, isSeparator: { $0 == " " })
-  ///                           .map(String.init))
+  ///     print(
+  ///        line.characters.split(maxSplits: 1, whereSeparator: { $0 == " " })
+  ///                       .map(String.init))
   ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
   ///
   /// The final example passes `true` for the `allowEmptySlices` parameter, so
   /// the returned array contains empty strings where spaces were repeated.
   ///
-  ///     print(line.characters.split(omittingEmptySubsequences: false, isSeparator: { $0 == " " })
-  ///                           .map(String.init))
+  ///     print(
+  ///         line.characters.split(
+  ///             omittingEmptySubsequences: false, 
+  ///             whereSeparator: { $0 == " " }
+  ///         ).map(String.init))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// - Parameters:
@@ -859,7 +868,7 @@ extension Sequence {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    isSeparator: @noescape (Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [AnySequence<Iterator.Element>] {
     _precondition(maxSplits >= 0, "Must take zero or more splits")
     var result: [AnySequence<Iterator.Element>] = []
@@ -969,7 +978,7 @@ extension Sequence {
   /// Returns the first element of the sequence that satisfies the given
   /// predicate or nil if no such element is found.
   ///
-  /// - Parameter where: A closure that takes an element of the
+  /// - Parameter predicate: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element is a match.
   /// - Returns: The first match or `nil` if there was no match.
@@ -1043,7 +1052,7 @@ extension Sequence where Iterator.Element : Equatable {
     return split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: { $0 == separator })
+      whereSeparator: { $0 == separator })
   }
 }
 
@@ -1178,7 +1187,7 @@ extension Sequence {
   ) -> UnsafeMutablePointer<Iterator.Element> {
     var p = UnsafeMutablePointer<Iterator.Element>(ptr)
     for x in IteratorSequence(self.makeIterator()) {
-      p.initialize(with: x)
+      p.initialize(to: x)
       p += 1
     }
     return p

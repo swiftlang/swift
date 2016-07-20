@@ -414,8 +414,7 @@ public:
   }
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
-    assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
-           Tok.is(tok::kw_Self) || Tok.is(tok::kw_throws));
+    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self, tok::kw_throws));
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
     return consumeToken();
@@ -877,9 +876,11 @@ public:
   bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
-  ParserResult<IdentTypeRepr> parseTypeIdentifier();
 
-  ParserResult<ProtocolCompositionTypeRepr> parseTypeComposition();
+  ParserResult<TypeRepr> parseTypeIdentifier();
+  ParserResult<TypeRepr> parseTypeIdentifierOrTypeComposition();
+  ParserResult<ProtocolCompositionTypeRepr> parseAnyType();
+
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
 
@@ -1082,7 +1083,8 @@ public:
 
   bool canParseType();
   bool canParseTypeIdentifier();
-  bool canParseTypeComposition();
+  bool canParseTypeIdentifierOrTypeComposition();
+  bool canParseOldStyleProtocolComposition();
   bool canParseTypeTupleBody();
   bool canParseTypeAttribute();
   bool canParseGenericArguments();

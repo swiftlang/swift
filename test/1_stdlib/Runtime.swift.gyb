@@ -311,7 +311,7 @@ Runtime.test("typeName") {
   expectEqual("a.SomeClass", _typeName(SomeClass.self))
   expectEqual("a.SomeStruct", _typeName(SomeStruct.self))
   expectEqual("a.SomeEnum", _typeName(SomeEnum.self))
-  expectEqual("protocol<>.Protocol", _typeName(Any.Protocol.self))
+  expectEqual("Any.Protocol", _typeName(Any.Protocol.self))
   expectEqual("Swift.AnyObject.Protocol", _typeName(AnyObject.Protocol.self))
   expectEqual("Swift.AnyObject.Type.Protocol", _typeName(AnyClass.Protocol.self))
   expectEqual("Swift.Optional<Swift.AnyObject>.Type", _typeName((AnyObject?).Type.self))
@@ -336,7 +336,7 @@ Runtime.test("typeName") {
     _typeName(a.dynamicType))
 
   a = Any.self
-  expectEqual("protocol<>.Protocol", _typeName(a.dynamicType))
+  expectEqual("Any.Protocol", _typeName(a.dynamicType))
 }
 
 class SomeSubclass : SomeClass {}
@@ -562,7 +562,7 @@ Reflection.test("Struct/Generic/DefaultMirror") {
     dump(value, to: &output)
 
     let expected =
-      "▿ a.GenericStructWithDefaultMirror<Swift.Int, Swift.Array<Swift.Optional<protocol<>>>>\n" +
+      "▿ a.GenericStructWithDefaultMirror<Swift.Int, Swift.Array<Swift.Optional<Any>>>\n" +
       "  - first: 123\n" +
       "  ▿ second: 3 elements\n" +
       "    ▿ Optional(\"abc\")\n" +

@@ -2367,10 +2367,13 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   }
   StreamPrinter Printer(llvm::outs());
   std::string Error;
-  if (printTypeInterface(SemaT.DC->getParentModule(), SemaT.Ty, Printer, Error))
-    return 0;
-  llvm::errs() << Error;
-  return 1;
+  std::string TypeName;
+  if (printTypeInterface(SemaT.DC->getParentModule(), SemaT.Ty, Printer,
+                         TypeName, Error)) {
+    llvm::errs() << Error;
+    return 1;
+  }
+  return 0;
 }
 
 static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvok,
@@ -2385,11 +2388,14 @@ static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvok,
   DeclContext *DC = CI.getMainModule()->getModuleContext();
   assert(DC && "no decl context?");
   StreamPrinter Printer(llvm::outs());
+  std::string TypeName;
   std::string Error;
-  if (printTypeInterface(DC->getParentModule(), Usr, Printer, Error))
-    return 0;
-  llvm::errs() << Error;
-  return 1;
+  if (printTypeInterface(DC->getParentModule(), Usr, Printer, TypeName,
+                         Error)) {
+    llvm::errs() << Error;
+    return 1;
+  }
+  return 0;
 }
 
 //===----------------------------------------------------------------------===//

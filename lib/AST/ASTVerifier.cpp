@@ -641,6 +641,24 @@ struct ASTNodeBase {};
       OptionalEvaluations.pop_back();
     }
 
+    // Register the OVEs in a collection upcast.
+    bool shouldVerify(CollectionUpcastConversionExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      if (auto keyConversion = expr->getKeyConversion())
+        OpaqueValues[keyConversion.OrigValue] = 0;
+      if (auto valueConversion = expr->getValueConversion())
+        OpaqueValues[valueConversion.OrigValue] = 0;
+      return true;
+    }
+    void cleanup(CollectionUpcastConversionExpr *expr) {
+      if (auto keyConversion = expr->getKeyConversion())
+        OpaqueValues.erase(keyConversion.OrigValue);
+      if (auto valueConversion = expr->getValueConversion())
+        OpaqueValues.erase(valueConversion.OrigValue);
+    }
+
     /// Canonicalize the given DeclContext pointer, in terms of
     /// producing something that can be looked up in
     /// ClosureDiscriminators.

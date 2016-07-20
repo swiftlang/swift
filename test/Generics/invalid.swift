@@ -77,5 +77,5 @@ func badDiagnostic2() {
 func takesAny(_ a: Any) {}
 
 func badDiagnostic3() {
-  takesAny(Deli.self) // expected-error {{argument type 'Deli<_>.Type' does not conform to expected type 'Any' (aka 'protocol<>')}}
+  takesAny(Deli.self) // expected-error {{argument type 'Deli<_>.Type' does not conform to expected type 'Any'}}
 }

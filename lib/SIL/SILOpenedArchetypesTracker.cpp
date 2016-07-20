@@ -14,20 +14,6 @@
 
 using namespace swift;
 
-void SILOpenedArchetypesTracker::addOpenedArchetypeDef(Type archetype,
-                                                       SILValue Def) {
-  auto OldDef = getOpenedArchetypeDef(archetype);
-  if (OldDef && isa<GlobalAddrInst>(OldDef)) {
-    // It is a forward definition created during deserialization.
-    // Replace it with the real definition now.
-    OldDef->replaceAllUsesWith(Def);
-    OldDef = SILValue();
-  }
-  assert(!OldDef &&
-         "There can be only one definition of an opened archetype");
-  OpenedArchetypeDefs[archetype] = Def;
-}
-
 // Register archetypes opened by a given instruction.
 // Can be used to incrementally populate the mapping, e.g.
 // if it is done when performing a scan of all instructions

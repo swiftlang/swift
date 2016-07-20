@@ -468,8 +468,7 @@ extension String {
     Encoding: UnicodeCodec
   >(_ encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
-    let output: (Encoding.CodeUnit) -> Void = { _ in codeUnitCount += 1 }
-    self._encode(encoding, output: output)
+    self._encode(encoding, into: { _ in codeUnitCount += 1 })
     return codeUnitCount
   }
 
@@ -482,9 +481,11 @@ extension String {
   // with unpaired surrogates
   func _encode<
     Encoding: UnicodeCodec
-  >(_ encoding: Encoding.Type, output: @noescape (Encoding.CodeUnit) -> Void)
-  {
-    return _core.encode(encoding, output: output)
+  >(
+    _ encoding: Encoding.Type,
+    into processCodeUnit: @noescape (Encoding.CodeUnit) -> Void
+  ) {
+    return _core.encode(encoding, into: processCodeUnit)
   }
 }
 
@@ -744,7 +745,7 @@ extension String {
     start: UnsafeMutablePointer<UTF8.CodeUnit>,
     utf8CodeUnitCount: Int
   ) {
-    resultStorage.initialize(with: 
+    resultStorage.initialize(to: 
       String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeBufferPointer(start: start, count: utf8CodeUnitCount)))

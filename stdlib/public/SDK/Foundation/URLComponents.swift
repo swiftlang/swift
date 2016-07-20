@@ -309,11 +309,10 @@ public struct URLComponents : ReferenceConvertible, Hashable, CustomStringConver
         _handle = _MutableHandle(reference: reference)
     }
     
-}
-
-public func ==(lhs: URLComponents, rhs: URLComponents) -> Bool {
-    // Don't copy references here; no one should be storing anything
-    return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+    public static func ==(lhs: URLComponents, rhs: URLComponents) -> Bool {
+        // Don't copy references here; no one should be storing anything
+        return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+    }
 }
 
 extension URLComponents : _ObjectiveCBridgeable {
@@ -376,11 +375,11 @@ public struct URLQueryItem : ReferenceConvertible, Hashable, Equatable, CustomSt
     public var description: String { return _queryItem.description }
     public var debugDescription: String { return _queryItem.debugDescription }
     public var hashValue: Int { return _queryItem.hash }
-}
 
-@available(OSX 10.10, iOS 8.0, *)
-public func ==(lhs: URLQueryItem, rhs: URLQueryItem) -> Bool {
-    return lhs._queryItem.isEqual(rhs as NSURLQueryItem)
+    @available(OSX 10.10, iOS 8.0, *)
+    public static func ==(lhs: URLQueryItem, rhs: URLQueryItem) -> Bool {
+        return lhs._queryItem.isEqual(rhs as NSURLQueryItem)
+    }
 }
 
 @available(OSX 10.10, iOS 8.0, *)

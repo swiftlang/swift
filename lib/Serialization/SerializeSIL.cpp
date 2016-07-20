@@ -392,20 +392,31 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // Assign a value ID to each SILInstruction that has value and to each basic
   // block argument.
   unsigned ValueID = 0;
-  for (const auto &BB : F) {
+  llvm::ReversePostOrderTraversal<SILFunction *> RPOT(
+      const_cast<SILFunction *>(&F));
+  for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
+    auto &BB = **Iter;
     BasicBlockMap.insert(std::make_pair(&BB, BasicID++));
 
     for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
       ValueIDs[static_cast<const ValueBase*>(*I)] = ++ValueID;
 
-    for (const auto &SI : BB)
+    for (const SILInstruction &SI : BB)
       if (SI.hasValue())
         ValueIDs[&SI] = ++ValueID;
   }
 
-  for (const auto &BB : F) {
-    writeSILBasicBlock(BB);
+  // Write SIL basic blocks in the RPOT order
+  // to make sure that instructions defining open archetypes
+  // are serialized before instructions using those opened
+  // archetypes.
+  unsigned SerializedBBNum = 0;
+  for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
+    auto *BB = *Iter;
+    writeSILBasicBlock(*BB);
+    SerializedBBNum++;
   }
+  assert(BasicID == SerializedBBNum && "Wrong number of BBs was serialized");
 }
 
 void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
@@ -1262,6 +1273,31 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                   S.addTypeRef(operand->getType().getSwiftRValueType()),
                   (unsigned)operand->getType().getCategory(),
                   addValueRef(operand));
+    break;
+  }
+  case ValueKind::BindMemoryInst: {
+    auto *BI = cast<BindMemoryInst>(&SI);
+    SILValue baseOperand = BI->getBase();
+    SILValue indexOperand = BI->getIndex();
+    SILType boundType = BI->getBoundType();
+    SmallVector<ValueID, 6> ListOfValues;
+    ListOfValues.push_back(S.addTypeRef(
+                             baseOperand->getType().getSwiftRValueType()));
+    ListOfValues.push_back((unsigned)baseOperand->getType().getCategory());
+    ListOfValues.push_back(addValueRef(baseOperand));
+    ListOfValues.push_back(S.addTypeRef(
+                             indexOperand->getType().getSwiftRValueType()));
+    ListOfValues.push_back((unsigned)indexOperand->getType().getCategory());
+    ListOfValues.push_back(addValueRef(indexOperand));
+
+    SILOneTypeValuesLayout::emitRecord(
+      Out,
+      ScratchRecord,
+      SILAbbrCodes[SILOneTypeValuesLayout::Code],
+      (unsigned)SI.getKind(),
+      S.addTypeRef(boundType.getSwiftRValueType()),
+      (unsigned)boundType.getCategory(),
+      ListOfValues);
     break;
   }
   case ValueKind::RefElementAddrInst:

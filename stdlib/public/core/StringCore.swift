@@ -329,9 +329,9 @@ public struct _StringCore {
   }
 
   /// Write the string, in the given encoding, to output.
-  func encode<
-    Encoding: UnicodeCodec
-  >(_ encoding: Encoding.Type, output: @noescape (Encoding.CodeUnit) -> Void)
+  func encode<Encoding: UnicodeCodec>(
+    _ encoding: Encoding.Type,
+    into processCodeUnit: @noescape (Encoding.CodeUnit) -> Void)
   {
     if _fastPath(_baseAddress != nil) {
       if _fastPath(elementWidth == 1) {
@@ -339,7 +339,7 @@ public struct _StringCore {
           start: UnsafeMutablePointer<UTF8.CodeUnit>(_baseAddress!),
           count: count
         ) {
-          Encoding.encode(UnicodeScalar(UInt32(x)), sendingOutputTo: output)
+          Encoding.encode(UnicodeScalar(UInt32(x)), into: processCodeUnit)
         }
       }
       else {
@@ -351,7 +351,7 @@ public struct _StringCore {
           from: UTF16.self,
           to: encoding,
           stoppingOnError: true,
-          sendingOutputTo: output
+          into: processCodeUnit
         )
         _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
       }
@@ -361,7 +361,7 @@ public struct _StringCore {
       _StringCore(
         _cocoaStringToContiguous(
           source: cocoaBuffer!, range: 0..<count, minimumCapacity: 0)
-      ).encode(encoding, output: output)
+      ).encode(encoding, into: processCodeUnit)
 #else
       _sanityCheckFailure("encode: non-native string without objc runtime")
 #endif
@@ -623,8 +623,8 @@ extension _StringCore : RangeReplaceableCollection {
       let tailStart = rangeStart + (replacedCount << elementShift)
 
       if growth > 0 {
-        (tailStart + (growth << elementShift)).assignBackwardFrom(
-          tailStart, count: tailCount << elementShift)
+        (tailStart + (growth << elementShift)).assign(
+          from: tailStart, count: tailCount << elementShift)
       }
 
       if _fastPath(elementWidth == 1) {
@@ -643,8 +643,8 @@ extension _StringCore : RangeReplaceableCollection {
       }
 
       if growth < 0 {
-        (tailStart + (growth << elementShift)).assignFrom(
-          tailStart, count: tailCount << elementShift)
+        (tailStart + (growth << elementShift)).assign(
+          from: tailStart, count: tailCount << elementShift)
       }
     }
     else {

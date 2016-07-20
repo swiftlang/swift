@@ -219,7 +219,7 @@ struct _ForkJoinMutex {
   var _mutex: UnsafeMutablePointer<pthread_mutex_t>
 
   init() {
-    _mutex = UnsafeMutablePointer(allocatingCapacity: 1)
+    _mutex = UnsafeMutablePointer.allocate(capacity: 1)
     if pthread_mutex_init(_mutex, nil) != 0 {
       fatalError("pthread_mutex_init")
     }
@@ -230,7 +230,7 @@ struct _ForkJoinMutex {
       fatalError("pthread_mutex_init")
     }
     _mutex.deinitialize()
-    _mutex.deallocateCapacity(1)
+    _mutex.deallocate(capacity: 1)
   }
 
   func withLock<Result>(_ body: @noescape () -> Result) -> Result {
@@ -249,7 +249,7 @@ struct _ForkJoinCond {
   var _cond: UnsafeMutablePointer<pthread_cond_t>
 
   init() {
-    _cond = UnsafeMutablePointer(allocatingCapacity: 1)
+    _cond = UnsafeMutablePointer.allocate(capacity: 1)
     if pthread_cond_init(_cond, nil) != 0 {
       fatalError("pthread_cond_init")
     }
@@ -260,7 +260,7 @@ struct _ForkJoinCond {
       fatalError("pthread_cond_destroy")
     }
     _cond.deinitialize()
-    _cond.deallocateCapacity(1)
+    _cond.deallocate(capacity: 1)
   }
 
   func signal() {
@@ -425,11 +425,11 @@ final class _ForkJoinWorkerThread {
   internal func startAsync() {
     var queue: DispatchQueue? = nil
     if #available(OSX 10.10, iOS 8.0, *) {
-      queue = DispatchQueue.global(attributes: .qosBackground)
+      queue = DispatchQueue.global(qos: .background)
     } else {
-      queue = DispatchQueue.global(attributes: .priorityBackground)
+      queue = DispatchQueue.global(priority: .background)
     }
-    queue!.asynchronously {
+    queue!.async {
       self._thread()
     }
   }
@@ -859,7 +859,7 @@ internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
     fatalError("abstract method")
   }
 
-  func filter(_ predicate: (OutputElement) -> Bool)
+  func filter(_ isIncluded: (OutputElement) -> Bool)
     -> _CollectionTransformerStep<PipelineInputElement, OutputElement> {
 
     fatalError("abstract method")
@@ -911,11 +911,11 @@ final internal class _CollectionTransformerStepCollectionSource<
     }
   }
 
-  override func filter(_ predicate: (InputElement) -> Bool)
+  override func filter(_ isIncluded: (InputElement) -> Bool)
     -> _CollectionTransformerStep<PipelineInputElement, InputElement> {
 
     return _CollectionTransformerStepOneToMaybeOne(self) {
-      predicate($0) ? $0 : nil
+      isIncluded($0) ? $0 : nil
     }
   }
 
@@ -990,7 +990,7 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
     }
   }
 
-  override func filter(_ predicate: (OutputElement) -> Bool)
+  override func filter(_ isIncluded: (OutputElement) -> Bool)
     -> _CollectionTransformerStep<PipelineInputElement, OutputElement> {
 
     // Let the closure below capture only one variable, not the whole `self`.
@@ -998,7 +998,7 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
     return _CollectionTransformerStepOneToMaybeOne<PipelineInputElement, OutputElement, InputStep>(_input) {
       (input: InputElement) -> OutputElement? in
       if let e = localTransform(input) {
-        return predicate(e) ? e : nil
+        return isIncluded(e) ? e : nil
       }
       return nil
     }
@@ -1265,16 +1265,18 @@ public struct CollectionTransformerPipeline<
     )
   }
 
-  public func filter(_ predicate: (T) -> Bool)
+  public func filter(_ isIncluded: (T) -> Bool)
     -> CollectionTransformerPipeline<InputCollection, T> {
 
     return CollectionTransformerPipeline<InputCollection, T>(
       _input: _input,
-      _step: _step.filter(predicate)
+      _step: _step.filter(isIncluded)
     )
   }
 
-  public func reduce<U>(_ initial: U, _ combine: (U, T) -> U) -> U {
+  public func reduce<U>(
+    _ initial: U, _ combine: (U, T) -> U
+  ) -> U {
     return _runCollectionTransformer(_input, _step.reduce(initial, combine))
   }
 

@@ -356,11 +356,11 @@ public func reflect(object: AnyObject) {
 /// an Any existential.
 public func reflect<T>(any: T) {
   let any: Any = any
-  let anyPointer = UnsafeMutablePointer<Any>(allocatingCapacity: sizeof(Any.self))
-  anyPointer.initialize(with: any)
+  let anyPointer = UnsafeMutablePointer<Any>.allocate(capacity: sizeof(Any.self))
+  anyPointer.initialize(to: any)
   let anyPointerValue = unsafeBitCast(anyPointer, to: UInt.self)
   reflect(instanceAddress: anyPointerValue, kind: .Existential)
-  anyPointer.deallocateCapacity(sizeof(Any.self))
+  anyPointer.deallocate(capacity: sizeof(Any.self))
 }
 
 // Reflect an `Error`, a.k.a. an "error existential".
@@ -419,61 +419,62 @@ struct ThickFunctionParts {
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
 public func reflect(function: () -> ()) {
-  let fn = UnsafeMutablePointer<ThickFunction0>(
-      allocatingCapacity: sizeof(ThickFunction0.self))
-  fn.initialize(with: ThickFunction0(function: function))
+  let fn = UnsafeMutablePointer<ThickFunction0>.allocate(
+    capacity: sizeof(ThickFunction0.self))
+  fn.initialize(to: ThickFunction0(function: function))
 
   let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
   let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocateCapacity(sizeof(ThickFunction0.self))
+  fn.deallocate(capacity: sizeof(ThickFunction0.self))
 }
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
 public func reflect(function: (Int) -> ()) {
-  let fn = UnsafeMutablePointer<ThickFunction1>(
-      allocatingCapacity: sizeof(ThickFunction1.self))
-  fn.initialize(with: ThickFunction1(function: function))
+  let fn =
+  UnsafeMutablePointer<ThickFunction1>.allocate(
+    capacity: sizeof(ThickFunction1.self))
+  fn.initialize(to: ThickFunction1(function: function))
 
   let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
   let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocateCapacity(sizeof(ThickFunction1.self))
+  fn.deallocate(capacity: sizeof(ThickFunction1.self))
 }
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
 public func reflect(function: (Int, String) -> ()) {
-  let fn = UnsafeMutablePointer<ThickFunction2>(
-      allocatingCapacity: sizeof(ThickFunction2.self))
-  fn.initialize(with: ThickFunction2(function: function))
+  let fn = UnsafeMutablePointer<ThickFunction2>.allocate(
+      capacity: sizeof(ThickFunction2.self))
+  fn.initialize(to: ThickFunction2(function: function))
 
   let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
   let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocateCapacity(sizeof(ThickFunction2.self))
+  fn.deallocate(capacity: sizeof(ThickFunction2.self))
 }
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
 public func reflect(function: (Int, String, AnyObject?) -> ()) {
-  let fn = UnsafeMutablePointer<ThickFunction3>(
-      allocatingCapacity: sizeof(ThickFunction3.self))
-  fn.initialize(with: ThickFunction3(function: function))
+  let fn = UnsafeMutablePointer<ThickFunction3>.allocate(
+      capacity: sizeof(ThickFunction3.self))
+  fn.initialize(to: ThickFunction3(function: function))
 
   let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
   let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocateCapacity(sizeof(ThickFunction3.self))
+  fn.deallocate(capacity: sizeof(ThickFunction3.self))
 }
 
 /// Call this function to indicate to the parent that there are

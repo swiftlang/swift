@@ -3,6 +3,63 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md):
+  The `protocol<...>` composition construct has been removed. In its
+  place, an infix type operator `&` has been introduced.
+
+  ```swift
+  let a: Foo & Bar
+  let b = value as? A & B & C
+  func foo<T : Foo & Bar>(x: T) { … }
+  func bar(x: Foo & Bar) { … }
+  typealias G = GenericStruct<Foo & Bar>
+  ```
+
+  The empty protocol composition, the `Any` type, was previously 
+  defined as being `protocol<>`. This has been removed from the 
+  standard library and `Any` is now a keyword with the same behaviour.
+
+* [SE-0091](https://github.com/apple/swift-evolution/blob/master/proposals/0091-improving-operators-in-protocols.md):
+  Operators can now be defined within types or extensions thereof. For example:
+
+  ```swift
+  struct Foo: Equatable {
+    let value: Int
+
+    static func ==(lhs: Foo, rhs: Foo) -> Bool {
+      return lhs.value == rhs.value
+    }
+  }
+  ```
+
+  Such operators must be declared as `static` (or, within a class, `class
+  final`), and have the same signature as their global counterparts. As part of
+  this change, operator requirements declared in protocols must also be
+  explicitly declared `static`:
+
+  ```swift
+  protocol Equatable {
+    static func ==(lhs: Self, rhs: Self) -> Bool
+  }
+  ```
+
+  Note that the type checker performance optimization described by SE-0091 is
+  not yet implemented.
+
+* [SE-0099](https://github.com/apple/swift-evolution/blob/master/proposals/0099-conditionclauses.md):
+  Condition clauses in `if`, `guard`, and `while` statements now use a more
+  regular syntax. Each pattern or optional binding must be prefixed with `case`
+  or `let` respectively, and all conditions are separated by `,` instead of
+  `where`.
+
+  ```swift
+  // before
+  if let a = a, b = b where a == b { }
+
+  // after
+  if let a = a, let b = b, a == b { }
+  ```
+
 * [SE-0112](https://github.com/apple/swift-evolution/blob/master/proposals/0112-nserror-bridging.md):
   The `NSError` type is now bridged to the Swift `Error` protocol type
   (formerly called `ErrorProtocol` in Swift 3, `ErrorType` in Swift 2)
@@ -51,6 +108,7 @@ Swift 3.0
 
   Similarly, the new `RecoverableError` and `CustomNSError` protocols
   allow additional control over the handling of the error.
+
 
 * [SE-0060](https://github.com/apple/swift-evolution/blob/master/proposals/0060-defaulted-parameter-order.md):
   Function parameters with default arguments must now be specified in

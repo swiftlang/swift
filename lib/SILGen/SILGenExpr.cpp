@@ -1047,20 +1047,27 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto toCollection = cast<BoundGenericStructType>(
                         E->getType()->getCanonicalType());
 
+  bool bridgesToObjC = E->bridgesToObjC();
+  if (SGF.getASTContext().LangOpts.EnableExperimentalCollectionCasts)
+    bridgesToObjC = false;
+
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
   if (fromCollection->getDecl() == ctx.getArrayDecl()) {
-    fn = ctx.getArrayForceCast(nullptr);
+    fn = SGF.SGM.getArrayForceCast(loc);
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
-    fn = E->bridgesToObjC() ? ctx.getDictionaryBridgeToObjectiveC(nullptr)
-                            : ctx.getDictionaryUpCast(nullptr);
+    fn = bridgesToObjC ? SGF.SGM.getDictionaryBridgeToObjectiveC(loc)
+                       : SGF.SGM.getDictionaryUpCast(loc);
   } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
-    fn = E->bridgesToObjC() ? ctx.getSetBridgeToObjectiveC(nullptr)
-                            : ctx.getSetUpCast(nullptr);
+    fn = bridgesToObjC ? SGF.SGM.getSetBridgeToObjectiveC(loc)
+                       : SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
+
+  // This will have been diagnosed by the accessors above.
+  if (!fn) return SGF.emitUndefRValue(E, E->getType());
   
   auto fnArcheTypes = fn->getGenericParams()->getPrimaryArchetypes();
   auto fromSubsts = fromCollection->gatherAllSubstitutions(
@@ -3515,6 +3522,11 @@ ManagedValue SILGenFunction::emitRValueAsSingleValue(Expr *E, SGFContext C) {
   RValue &&rv = emitRValue(E, C);
   if (rv.isUsed()) return ManagedValue::forInContext();
   return std::move(rv).getAsSingleValue(*this, E);
+}
+
+RValue SILGenFunction::emitUndefRValue(SILLocation loc, Type type) {
+  return RValue(*this, loc, type->getCanonicalType(),
+                emitUndef(loc, getLoweredType(type)));
 }
 
 ManagedValue SILGenFunction::emitUndef(SILLocation loc, Type type) {

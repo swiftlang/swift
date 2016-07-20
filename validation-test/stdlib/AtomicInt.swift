@@ -725,7 +725,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
     _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     var observation = Observation4UInt(0, 0, 0, 0)
-    var initializerDestroyed = HeapBool(false)
+    let initializerDestroyed = HeapBool(false)
     do {
       let initializer = DummyObject(
         destroyedFlag: initializerDestroyed,
@@ -749,13 +749,13 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     let ref = observations[0].data2
-    if observations.contains({ $0.data2 != ref }) {
+    if observations.contains(where: { $0.data2 != ref }) {
       for observation in observations {
         sink(.failureInteresting("mismatched reference, expected \(ref): \(observation)"))
       }
       return
     }
-    if observations.contains({ $0.data3 != 0x12345678 }) {
+    if observations.contains(where: { $0.data3 != 0x12345678 }) {
       for observation in observations {
         sink(.failureInteresting("wrong data: \(observation)"))
       }

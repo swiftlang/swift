@@ -130,7 +130,7 @@ public protocol _Mirror {
 @_silgen_name("swift_getSummary")
 public // COMPILER_INTRINSIC
 func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
-  out.initialize(with: String(reflecting: x))
+  out.initialize(to: String(reflecting: x))
 }
 
 /// Produce a mirror for any value.  The runtime produces a mirror that
@@ -140,7 +140,7 @@ internal func _reflect<T>(_ x: T) -> _Mirror
 
 /// Dump an object's contents using its mirror to the specified output stream.
 @discardableResult
-public func dump<T, TargetStream : OutputStream>(
+public func dump<T, TargetStream : TextOutputStream>(
   _ value: T,
   to target: inout TargetStream,
   name: String? = nil,
@@ -183,7 +183,7 @@ public func dump<T>(
 }
 
 /// Dump an object's contents. User code should use dump().
-internal func _dump_unlocked<TargetStream : OutputStream>(
+internal func _dump_unlocked<TargetStream : TextOutputStream>(
   _ value: Any,
   to target: inout TargetStream,
   name: String?,
@@ -282,7 +282,7 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
 
 /// Dump information about an object's superclass, given a mirror reflecting
 /// that superclass.
-internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
+internal func _dumpSuperclass_unlocked<TargetStream : TextOutputStream>(
   mirror: Mirror,
   to target: inout TargetStream,
   indent: Int,

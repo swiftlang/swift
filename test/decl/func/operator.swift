@@ -52,7 +52,7 @@ prefix operator ~~~ {} // expected-note 2{{prefix operator found here}}
 func ~~~(x: Float) {} // expected-error{{prefix unary operator missing 'prefix' modifier}}{{1-1=prefix }}
 
 protocol P {
-  func ~~~(x: Self) // expected-error{{prefix unary operator missing 'prefix' modifier}}{{3-3=prefix }}
+  static func ~~~(x: Self) // expected-error{{prefix unary operator missing 'prefix' modifier}}{{10-10=prefix }}
 }
 
 prefix func +// this should be a comment, not an operator
@@ -159,8 +159,7 @@ prefix func & (x: Int) {} // expected-error {{cannot declare a custom prefix '&'
 
 // Only allow operators at global scope:
 func operator_in_func_bad () {
-    prefix func + (input: String) -> String { return "+" + input } // expected-error {{operators are only allowed at global scope}} expected-error{{braced block of statements is an unused closure}} \
-                                                                    // expected-error {{use of unresolved identifier 'input'}}
+    prefix func + (input: String) -> String { return "+" + input } // expected-error {{operator functions can only be declared at global or in type scope}}
 }
 
 infix operator ? {}  // expected-error {{expected operator name in operator declaration}} 
@@ -196,3 +195,47 @@ _ = -++n // expected-error {{unary operators may not be juxtaposed; parenthesize
 // <rdar://problem/16230507> Cannot use a negative constant as the second operator of ... operator
 _ = 3...-5  // expected-error {{missing whitespace between '...' and '-' operators}}
 
+
+protocol P0 {
+  static func %%%(lhs: Self, rhs: Self) -> Self
+}
+
+protocol P1 {
+  func %%%(lhs: Self, rhs: Self) -> Self // expected-warning{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
+}
+
+struct S0 {
+  static func %%%(lhs: S0, rhs: S0) -> S0 { return lhs }
+}
+
+extension S0 {
+  static func %%%%(lhs: S0, rhs: S0) -> S0 { return lhs }
+}
+
+struct S1 {
+  func %%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
+}
+
+extension S1 {
+  func %%%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
+}
+
+class C0 {
+  static func %%%(lhs: S0, rhs: S0) -> S0 { return lhs }
+}
+
+class C1 {
+  final func %%%(lhs: S0, rhs: S0) -> S0 { return lhs }
+}
+
+final class C2 {
+  class func %%%(lhs: S0, rhs: S0) -> S0 { return lhs }
+}
+
+class C3 {
+  class func %%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%' declared in non-final class 'C3' must be 'final'}}{{3-3=final }}
+}
+
+class C4 {
+  func %%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%' declared in type 'C4' must be 'static'}}{{3-3=static }}
+}

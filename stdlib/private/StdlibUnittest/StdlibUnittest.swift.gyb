@@ -107,7 +107,7 @@ var _seenExpectCrash = false
 /// Run `body` and expect a failure to happen.
 ///
 /// The check passes iff `body` triggers one or more failures.
-public func expectFailure(${TRACE}, body: () -> Void) {
+public func expectFailure(${TRACE}, invoking body: () -> Void) {
   let startAnyExpectFailed = _anyExpectFailed
   _anyExpectFailed = false
   body()
@@ -273,7 +273,7 @@ public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
 extension Range
 %   if 'Countable' in OtherRange:
   where
-  Bound : protocol<Comparable, _Strideable>, Bound.Stride : SignedInteger
+  Bound : Comparable & _Strideable, Bound.Stride : SignedInteger
 %   end
 {
   internal func _contains(_ other: ${OtherRange}<Bound>) -> Bool {
@@ -584,7 +584,7 @@ func _stdlib_getline() -> String? {
 
 func _printDebuggingAdvice(_ fullTestName: String) {
   print("To debug, run:")
-  var invocation = [Process.arguments[0]]
+  var invocation = [CommandLine.arguments[0]]
   let interpreter = getenv("SWIFT_INTERPRETER")
   if interpreter != nil {
     if let interpreterCmd = String(validatingUTF8: interpreter!) {
@@ -1122,7 +1122,7 @@ public func runAllTests() {
 #endif
 
   let _isChildProcess: Bool =
-    Process.arguments.contains("--stdlib-unittest-run-child")
+    CommandLine.arguments.contains("--stdlib-unittest-run-child")
 
   if _isChildProcess {
     _childProcess()
@@ -1132,15 +1132,15 @@ public func runAllTests() {
     var args = [String]()
     var i = 0
     i += 1 // Skip the name of the executable.
-    while i < Process.arguments.count {
-      let arg = Process.arguments[i]
+    while i < CommandLine.arguments.count {
+      let arg = CommandLine.arguments[i]
       if arg == "--stdlib-unittest-in-process" {
         runTestsInProcess = true
         i += 1
         continue
       }
       if arg == "--stdlib-unittest-filter" {
-        filter = Process.arguments[i + 1]
+        filter = CommandLine.arguments[i + 1]
         i += 2
         continue
       }
@@ -1158,7 +1158,7 @@ public func runAllTests() {
       }
 
       // Pass through unparsed arguments to the child process.
-      args.append(Process.arguments[i])
+      args.append(CommandLine.arguments[i])
 
       i += 1
     }
@@ -2244,7 +2244,7 @@ public func expectEqualSequence<
 ) where
   Expected.Iterator.Element == Actual.Iterator.Element {
 
-  if !expected.elementsEqual(actual, isEquivalent: sameValue) {
+  if !expected.elementsEqual(actual, by: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
@@ -2262,9 +2262,9 @@ public func expectEqualsUnordered<
   Expected.Iterator.Element == Actual.Iterator.Element {
   
   let x: [Expected.Iterator.Element] =
-    expected.sorted(isOrderedBefore: compose(compare, { $0.isLT() }))
+    expected.sorted(by: compose(compare, { $0.isLT() }))
   let y: [Actual.Iterator.Element] =
-    actual.sorted(isOrderedBefore: compose(compare, { $0.isLT() }))
+    actual.sorted(by: compose(compare, { $0.isLT() }))
   expectEqualSequence(
     x, y, ${trace}, sameValue: compose(compare, { $0.isEQ() }))
 }
@@ -2361,10 +2361,10 @@ public func expectEqualsUnordered<
   }
 
   let x: [(T, T)] =
-    expected.sorted(isOrderedBefore: comparePairLess)
+    expected.sorted(by: comparePairLess)
   let y: [(T, T)] =
     actual.map { ($0.0, $0.1) }
-      .sorted(isOrderedBefore: comparePairLess)
+      .sorted(by: comparePairLess)
 
   func comparePairEquals(_ lhs: (T, T), rhs: (key: T, value: T)) -> Bool {
     return lhs.0 == rhs.0 && lhs.1 == rhs.1

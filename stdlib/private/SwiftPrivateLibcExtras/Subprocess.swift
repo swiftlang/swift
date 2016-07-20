@@ -110,8 +110,8 @@ public func spawnChild(_ args: [String])
     // Start the executable. If execve() does not encounter an error, the
     // code after this block will never be executed, and the parent write pipe
     // will be closed.
-    withArrayOfCStrings([Process.arguments[0]] + args) {
-      execve(Process.arguments[0], $0, _getEnviron())
+    withArrayOfCStrings([CommandLine.arguments[0]] + args) {
+      execve(CommandLine.arguments[0], $0, _getEnviron())
     }
 
     // If execve() encountered an error, we write the errno encountered to the
@@ -182,7 +182,7 @@ public func spawnChild(_ args: [String])
 
   var pid: pid_t = -1
   var childArgs = args
-  childArgs.insert(Process.arguments[0], at: 0)
+  childArgs.insert(CommandLine.arguments[0], at: 0)
   let interpreter = getenv("SWIFT_INTERPRETER")
   if interpreter != nil {
     if let invocation = String(validatingUTF8: interpreter!) {

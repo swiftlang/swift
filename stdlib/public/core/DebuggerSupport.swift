@@ -158,7 +158,7 @@ public enum _DebuggerSupport {
     }
   }
 
-  internal static func printForDebuggerImpl<StreamType : OutputStream>(
+  internal static func printForDebuggerImpl<StreamType : TextOutputStream>(
     value: Any?,
     mirror: Mirror,
     name: String?,

@@ -90,7 +90,7 @@ bool TypeBase::hasReferenceSemantics() {
 }
 
 bool TypeBase::isAny() {
-  return isEqual(getASTContext().getAnyDecl()->getDeclaredType());
+  return isEqual(getASTContext().TheAnyType);
 }
 
 bool TypeBase::isAnyClassReferenceType() {

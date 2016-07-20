@@ -616,6 +616,13 @@ NOTE(unary_operator_declaration_here,none,
    "%select{prefix|postfix}0 operator found here", (bool))
 ERROR(invalid_arg_count_for_operator,none,
       "operators must have one or two arguments", ())
+ERROR(operator_in_local_scope,none,
+      "operator functions can only be declared at global or in type scope", ())
+ERROR(nonstatic_operator_in_type,none,
+      "operator %0 declared in type %1 must be 'static'", (Identifier, Type))
+ERROR(nonfinal_operator_in_class,none,
+      "operator %0 declared in non-final class %1 must be 'final'",
+      (Identifier, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Coercions
@@ -768,6 +775,8 @@ ERROR(instance_member_use_on_type,none,
 ERROR(instance_member_in_initializer,none,
       "cannot use instance member %0 within property initializer; "
       "property initializers run before 'self' is available", (DeclName))
+ERROR(instance_member_in_default_parameter,none,
+      "cannot use instance member %0 as a default parameter", (DeclName))
 
 ERROR(invalid_initialization_parameter_same_type,none,
       "invalid initializer call with same type %0 as parameter", (Type))
@@ -1378,7 +1387,7 @@ ERROR(circular_protocol_def,none,
 NOTE(protocol_here,none,
      "protocol %0 declared here", (Identifier))
 ERROR(protocol_composition_not_protocol,none, 
-      "non-protocol type %0 cannot be used within 'protocol<...>'", (Type))
+      "non-protocol type %0 cannot be used within a protocol composition", (Type))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 
@@ -2155,7 +2164,7 @@ NOTE(transitive_capture_through_here,none,
      (Identifier, Identifier))
 
 ERROR(closure_implicit_capture_without_noescape,none,
-      "closure cannot implicitly capture an inout parameter unless @noescape",
+      "escaping closures can only capture inout parameters explicitly by value",
       ())
 ERROR(closure_implicit_capture_mutating_self,none,
       "closure cannot implicitly capture a mutating self parameter",
@@ -2674,7 +2683,7 @@ ERROR(objc_convention_invalid,none,
 ERROR(function_type_no_parens,none,
       "single argument function types require parentheses", ())
 NOTE(not_objc_empty_protocol_composition,none,
-     "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
+     "'Any' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,none,
      "protocol %0 is not '@objc'", (Type))
 NOTE(not_objc_empty_tuple,none,

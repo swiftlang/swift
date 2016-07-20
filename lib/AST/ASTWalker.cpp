@@ -525,13 +525,39 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
-  
+
   Expr *visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);
       return E;
     }
     return nullptr;
+  }
+  
+  Expr *visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
+    if (Expr *E2 = doIt(E->getSubExpr())) {
+      E->setSubExpr(E2);
+    } else {
+      return nullptr;
+    }
+
+    if (auto &keyConv = E->getKeyConversion()) {
+      if (Expr *E2 = doIt(keyConv.Conversion)) {
+        E->setKeyConversion({keyConv.OrigValue, E2});
+      } else {
+        return nullptr;
+      }
+    }
+
+    if (auto &valueConv = E->getValueConversion()) {
+      if (Expr *E2 = doIt(valueConv.Conversion)) {
+        E->setValueConversion({valueConv.OrigValue, E2});
+      } else {
+        return nullptr;
+      }
+    }
+
+    return E;
   }
   
   Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {

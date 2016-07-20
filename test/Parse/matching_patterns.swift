@@ -54,7 +54,7 @@ case _:
 }
 
 
-var e : protocol<> = 0
+var e : Any = 0
 
 switch e {
 // 'is' pattern.

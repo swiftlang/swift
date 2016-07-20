@@ -353,7 +353,7 @@ class TestString : CustomStringConvertible, CustomDebugStringConvertible {
   }
 }
 class TestStream : Streamable {
-  func write<Target : OutputStream>(to target: inout Target) {
+  func write<Target : TextOutputStream>(to target: inout Target) {
     target.write("AStream")
   }
 }
@@ -368,7 +368,7 @@ func debugPrintStr<T>(_ a: T) -> String {
 // Furthermore, printing an Optional should always print the debug
 // description regardless of whether the wrapper type conforms to an
 // output stream protocol.
-OptionalTests.test("Optional OutputStream") {
+OptionalTests.test("Optional TextOutputStream") {
   let optNoString: TestNoString? = TestNoString()
   expectFalse(optNoString is CustomStringConvertible)
   expectFalse(canGenericCast(optNoString, CustomStringConvertible.self))

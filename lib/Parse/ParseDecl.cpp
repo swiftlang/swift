@@ -2433,35 +2433,42 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
       continue;
     }
 
-    // Provide a nice error if protocol composition is used.
-    if (Tok.is(tok::kw_protocol) && startsWithLess(peekToken())) {
-      auto compositionResult = parseTypeComposition();
-      Status |= compositionResult;
-      if (auto composition = compositionResult.getPtrOrNull()) {
-        // Record the protocols inside the composition.
-        Inherited.append(composition->getProtocols().begin(),
-                         composition->getProtocols().end());
+    bool usesDeprecatedCompositionSyntax = Tok.is(tok::kw_protocol) && startsWithLess(peekToken());
+    bool isAny = Tok.is(tok::kw_Any); // We allow (redundant) inheritance from Any
 
-        // Provide fixits to remove the composition, leaving the types intact.
-        auto angleRange = composition->getAngleBrackets();
-        diagnose(composition->getProtocolLoc(),
-                 diag::disallowed_protocol_composition)
-            .fixItRemove({composition->getProtocolLoc(), angleRange.Start})
-            .fixItRemove(startsWithGreater(L->getTokenAt(angleRange.End))
-                             ? angleRange.End
-                             : SourceLoc());
+    auto ParsedTypeResult = parseTypeIdentifierOrTypeComposition();
+    Status |= ParsedTypeResult;
+
+    // Cannot inherit from composition
+    if (auto Composition = dyn_cast_or_null<ProtocolCompositionTypeRepr>(ParsedTypeResult.getPtrOrNull())) {
+      // Record the protocols inside the composition.
+      Inherited.append(Composition->getProtocols().begin(),
+                       Composition->getProtocols().end());
+      // We can inherit from Any
+      if (!isAny) {
+        if (usesDeprecatedCompositionSyntax) {
+          // Provide fixits to remove the composition, leaving the types intact.
+          auto compositionRange = Composition->getCompositionRange();
+          diagnose(Composition->getSourceLoc(),
+                   diag::disallowed_protocol_composition)
+            .highlight({Composition->getStartLoc(), compositionRange.End})
+            .fixItRemove({Composition->getSourceLoc(), compositionRange.Start})
+            .fixItRemove(startsWithGreater(L->getTokenAt(compositionRange.End))
+                         ? compositionRange.End
+                         : SourceLoc());
+        } else {
+          diagnose(Composition->getStartLoc(),
+                   diag::disallowed_protocol_composition)
+            .highlight(Composition->getSourceRange());
+          // TODO: Decompose 'A & B & C' list to 'A, B, C'
+        }
       }
-
       continue;
     }
 
-    // Parse the inherited type (which must be a protocol).
-    ParserResult<TypeRepr> Ty = parseTypeIdentifier();
-    Status |= Ty;
-
-    // Record the type.
-    if (Ty.isNonNull())
-      Inherited.push_back(Ty.get());
+    // Record the type if its a single type.
+    if (ParsedTypeResult.isNonNull())
+      Inherited.push_back(ParsedTypeResult.get());
 
     // Check for a ',', which indicates that there are more protocols coming.
   } while (consumeIf(tok::comma, prevComma));
@@ -4392,9 +4399,12 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
       StaticLoc = SourceLoc();
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
-      if (StaticSpelling == StaticSpellingKind::KeywordClass)
+      if (StaticSpelling == StaticSpellingKind::KeywordClass) {
         diagnose(Tok, diag::class_func_not_in_class)
             .fixItReplace(StaticLoc, "static");
+
+        StaticSpelling = StaticSpellingKind::KeywordStatic;
+      }
     }
   }
 
@@ -4407,15 +4417,23 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   Identifier SimpleName;
   Token NameTok = Tok;
   SourceLoc NameLoc = Tok.getLoc();
-  Token NonglobalTok = Tok;
-  bool NonglobalError = false;
 
-  if (!(Flags & PD_AllowTopLevel) && 
-      !(Flags & PD_InProtocol) &&
-      Tok.isAnyOperator()) {
-    // Postpone complaining about this error till we see if the 
-    // DCC wants to move it below.
-    NonglobalError = true;
+  // Within a protocol, recover from a missing 'static'.
+  if (Tok.isAnyOperator() && (Flags & PD_InProtocol)) {
+    switch (StaticSpelling) {
+    case StaticSpellingKind::None:
+      diagnose(NameLoc, diag::operator_static_in_protocol, NameTok.getText())
+        .fixItInsert(FuncLoc, "static ");
+      StaticSpelling = StaticSpellingKind::KeywordStatic;
+      break;
+
+    case StaticSpellingKind::KeywordStatic:
+      // Okay, this is correct.
+      break;
+
+    case StaticSpellingKind::KeywordClass:
+      llvm_unreachable("should have been fixed above");
+    }
   }
 
   if (parseAnyIdentifier(SimpleName, diag::expected_identifier_in_decl,
@@ -4458,12 +4476,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
   DebuggerContextChange DCC(*this, SimpleName, DeclKind::Func);
   
-  if (NonglobalError && !DCC.movedToTopLevel()) {
-    // FIXME: Recovery here is awful.
-    diagnose(NonglobalTok, diag::func_decl_nonglobal_operator);
-    return nullptr;
-  }
-
   // Parse the generic-params, if present.
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);

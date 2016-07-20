@@ -23,19 +23,6 @@ set -e
 
 umask 0022
 
-#
-# Options that can be "configured" by editing this file.
-#
-# These options are not exposed as command line options on purpose.  If you
-# need to change any of these, you should do so on trunk or in a branch.
-#
-
-LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64;PowerPC;SystemZ"
-
-#
-# End of configurable options.
-#
-
 # Declare the set of known settings along with each one's description
 #
 # If you add a user-settable variable, add it to this list.
@@ -236,6 +223,7 @@ KNOWN_SETTINGS=(
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
+    llvm-targets-to-build              "X86;ARM;AArch64;PowerPC;SystemZ" "The code generators that LLVM should build"
 )
 
 # Centralized access point for traced command invocation.
@@ -628,8 +616,6 @@ function set_build_options_for_host() {
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
-                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
-                -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
@@ -674,6 +660,11 @@ function set_build_options_for_host() {
             exit 1
             ;;
     esac
+
+    llvm_cmake_options+=(
+        -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+        -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+    )
 
     if [[ "${llvm_target_arch}" ]] ; then
         llvm_cmake_options+=(
@@ -1757,7 +1748,7 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
-    if [[ "${ENABLE_ASAN}" ]] ; then
+    if [[ "${ENABLE_ASAN}" || "$(uname -s)" == "Linux" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
             -DSWIFT_SOURCEKIT_USE_INPROC_LIBRARY:BOOL=TRUE

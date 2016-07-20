@@ -98,69 +98,6 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 // Standard protocols
 //===----------------------------------------------------------------------===//
 
-/// The protocol to which all types implicitly conform.
-///
-/// The `Any` protocol can be used as the concrete type for an instance of any
-/// type in Swift: a class, struct, or enumeration; a metatype, such as
-/// `Int.self`; a tuple with any types of components; or a closure or function
-/// type.
-///
-/// Casting Any Instances to a Known Type
-/// =====================================
-///
-/// When you use `Any` as a concrete type, you must cast your instance back to
-/// a known type before you can access its properties or methods. Instances
-/// with a concrete type of `Any` maintain their original dynamic type and can
-/// be cast to that type using one of the type-cast operators (`as`, `as?`, or
-/// `as!`). 
-/// 
-/// For example, use `as?` to conditionally downcast the first object
-/// in a heterogeneous array to a `String`.
-///
-///     let mixed: [Any] = ["one", "two", 3, true, {(x: Int) -> Int in x * 2 }]
-///
-///     let first = = numberObjects.firstObject
-///     if let first = mixed.first as? String {
-///         print("The first item, '\(first)', is a String")
-///     }
-///     // Prints("The first item, 'one', is a String")
-///
-/// If you have prior knowledge that an `Any` instance is an instance of
-/// a particular type, you can use the `as!` operator to unconditionally
-/// downcast. Performing an invalid cast results in a runtime error.
-///
-///     let second = mixed[1] as! String
-///     print("'\(second)' is also a String")
-///     // Prints "'two' is also a String"
-///
-/// In a `switch` statement, a value is cast to a type only when pattern
-/// matching with that type succeeds. For that reason, you use the `as`
-/// operator instead of the conditional `as?` or unconditional `as!`
-/// operators.
-///
-///     for item in mixed {
-///         switch item {
-///         case let s as String:
-///             print("String: \(s)")
-///         case let i as Int:
-///             print("Integer: \(i)")
-///         case let b as Bool:
-///             print("Bool: \(b)")
-///         case let f as Int -> Int:
-///             print("Function: 2 * 5 = \(f(5))")
-///         default:
-///             print("Unrecognized type")
-///         }
-///     }
-///     // Prints "String: one"
-///     // Prints "String: two"
-///     // Prints "Integer: 3"
-///     // Prints "Bool: true"
-///     // Prints "Function: 2 * 5 = 10"
-///     
-/// - SeeAlso: `AnyObject`, `AnyClass`
-public typealias Any = protocol<>
-
 #if _runtime(_ObjC)
 /// The protocol to which all classes implicitly conform.
 ///
@@ -474,7 +411,7 @@ public protocol BitwiseOperations {
   ///     // Prints "0"
   ///
   /// - Complexity: O(1).
-  func & (lhs: Self, rhs: Self) -> Self
+  static func & (lhs: Self, rhs: Self) -> Self
 
   /// Returns the union of bits set in the two arguments.
   ///
@@ -493,7 +430,7 @@ public protocol BitwiseOperations {
   ///     // Prints "5"
   ///
   /// - Complexity: O(1).
-  func | (lhs: Self, rhs: Self) -> Self
+  static func | (lhs: Self, rhs: Self) -> Self
 
   /// Returns the bits that are set in exactly one of the two arguments.
   ///
@@ -513,7 +450,7 @@ public protocol BitwiseOperations {
   ///     // Prints "5"
   ///
   /// - Complexity: O(1).
-  func ^ (lhs: Self, rhs: Self) -> Self
+  static func ^ (lhs: Self, rhs: Self) -> Self
 
   /// Returns the inverse of the bits set in the argument.
   ///
@@ -532,7 +469,7 @@ public protocol BitwiseOperations {
   ///     let allOnes = ~UInt8.allZeros   // 0b11111111
   ///
   /// - Complexity: O(1).
-  prefix func ~ (x: Self) -> Self
+  static prefix func ~ (x: Self) -> Self
 
   /// The empty bitset.
   ///

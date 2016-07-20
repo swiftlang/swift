@@ -5043,6 +5043,35 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
   }
 }
 
+static CollectionUpcastConversionExpr::ConversionPair
+buildElementConversion(ExprRewriter &rewriter,
+                       Type srcCollectionType,
+                       Type destCollectionType,
+                       ConstraintLocatorBuilder locator,
+                       unsigned typeArgIndex) {
+  // We don't need this stuff unless we've got generalized casts.
+  auto &ctx = rewriter.cs.getASTContext();
+  if (!ctx.LangOpts.EnableExperimentalCollectionCasts)
+    return {};
+
+  Type srcType = srcCollectionType->castTo<BoundGenericType>()
+                                  ->getGenericArgs()[typeArgIndex];
+  Type destType = destCollectionType->castTo<BoundGenericType>()
+                                    ->getGenericArgs()[typeArgIndex];
+
+  // If the types are the same, no conversion is required.
+  if (srcType->isEqual(destType)) return {};
+
+  // Build the conversion.
+  auto opaque = new (ctx) OpaqueValueExpr(SourceLoc(), srcType);
+  auto conversion =
+    rewriter.coerceToType(opaque, destType,
+           locator.withPathElement(
+             ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)));
+
+  return { opaque, conversion };
+}
+
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator,
                                  Optional<Pattern*> typeFromPattern) {
@@ -5193,10 +5222,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
       }
 
+      // Build the value conversion.
+      auto conv =
+        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+
       // Form the upcast.
       bool isBridged = !cs.getBaseTypeForArrayType(fromType.getPointer())
                           ->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
+                                                             {}, conv,
                                                              isBridged);
     }
 
@@ -5207,6 +5241,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
       }
 
+      // Build the key and value conversions.
+      auto keyConv =
+        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+      auto valueConv =
+        buildElementConversion(*this, expr->getType(), toType, locator, 1);
+
       // If the source key and value types are object types, this is an upcast.
       // Otherwise, it's bridged.
       Type sourceKey, sourceValue;
@@ -5215,6 +5255,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       bool isBridged = !sourceKey->isBridgeableObjectType() ||
                        !sourceValue->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
+                                                             keyConv, valueConv,
                                                              isBridged);
     }
 
@@ -5225,9 +5266,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
       }
 
+      // Build the value conversion.
+      auto conv =
+        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+
       bool isBridged = !cs.getBaseTypeForSetType(fromType.getPointer())
                           ->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
+                                                             {}, conv,
                                                              isBridged);
     }
 

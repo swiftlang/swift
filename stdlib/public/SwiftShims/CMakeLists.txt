@@ -1,5 +1,6 @@
 set(sources
   CoreFoundationShims.h
+  DispatchShims.h
   FoundationShims.h
   GlobalObjects.h
   HeapObject.h

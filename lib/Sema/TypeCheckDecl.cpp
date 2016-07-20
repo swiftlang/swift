@@ -389,7 +389,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
                                      inheritedClause[i-1].getSourceRange().End);
       SourceLoc afterMyEndLoc
         = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                     inherited.getSourceRange().End);
+                                     inherited.getSourceRange().Start);
 
       diagnose(inherited.getSourceRange().Start,
                diag::duplicate_inheritance, inheritedTy)
@@ -853,7 +853,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   // If there's no type yet, come back to it later.
   if (!current->hasType())
     return;
-
+  
   // Make sure we don't do this checking again.
   current->setCheckedRedeclaration(true);
 
@@ -3898,6 +3898,41 @@ public:
   void bindFuncDeclToOperator(FuncDecl *FD) {
     OperatorDecl *op = nullptr;
     auto operatorName = FD->getFullName().getBaseName();
+
+    // Check for static/final/class when we're in a type.
+    auto dc = FD->getDeclContext();
+    if (dc->isTypeContext()) {
+      // Within a class, operator functions must be 'static' or 'final'.
+      if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
+        // For a class, we also need the function or class to be 'final'.
+        if (!classDecl->isFinal() && !FD->isFinal() &&
+            FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
+          if (!FD->isStatic()) {
+            TC.diagnose(FD->getLoc(), diag::nonstatic_operator_in_type,
+                        operatorName,
+                        dc->getDeclaredInterfaceType())
+              .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
+                           "static ");
+          } else {
+            TC.diagnose(FD->getLoc(), diag::nonfinal_operator_in_class,
+                        operatorName, dc->getDeclaredInterfaceType())
+              .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
+                           "final ");
+            FD->getAttrs().add(new (TC.Context) FinalAttr(/*IsImplicit=*/true));
+          }
+        }
+      } else if (!FD->isStatic()) {
+        // Operator functions must be static.
+        TC.diagnose(FD, diag::nonstatic_operator_in_type,
+                    operatorName,
+                    dc->getDeclaredInterfaceType())
+          .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
+                       "static ");
+      }
+    } else if (!dc->isModuleScopeContext()) {
+      TC.diagnose(FD, diag::operator_in_local_scope);
+    }
+
     SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
     if (FD->isUnaryOperator()) {
       if (FD->getAttrs().hasAttribute<PrefixAttr>()) {

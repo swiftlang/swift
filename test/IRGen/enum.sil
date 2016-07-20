@@ -2334,7 +2334,7 @@ entry(%e : $MultiPayloadClassGeneric<C>):
 }
 
 enum MultiPayloadAddressOnlyFixed {
-  case X(protocol<>)
+  case X(Any)
   case Y(Builtin.Int32)
 }
 

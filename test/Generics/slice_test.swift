@@ -44,13 +44,13 @@ class Vector<T> {
       let size = Int(Builtin.sizeof(T.self))
       let newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size))
       for i in 0..<length {
-        (newbase + i).initialize(with: (base+i).move())
+        (newbase + i).initialize(to: (base+i).move())
       }
       c_free(base)
       base = newbase
       capacity = newcapacity
     }
-    (base+length).initialize(with: elem)
+    (base+length).initialize(to: elem)
     length += 1
   }
 
@@ -83,7 +83,7 @@ class Vector<T> {
 }
 
 protocol Comparable {
-  func <(lhs: Self, rhs: Self) -> Bool
+  static func <(lhs: Self, rhs: Self) -> Bool
 }
 
 func sort<T : Comparable>(_ array: inout [T]) {
@@ -117,6 +117,6 @@ func findIf<T>(_ array: [T], fn: (T) -> Bool) -> Int {
 }
 
 protocol Eq {
-  func ==(lhs: Self, rhs: Self) -> Bool
-  func !=(lhs: Self, rhs: Self) -> Bool
+  static func ==(lhs: Self, rhs: Self) -> Bool
+  static func !=(lhs: Self, rhs: Self) -> Bool
 }

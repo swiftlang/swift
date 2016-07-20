@@ -77,12 +77,12 @@ public struct PersonNameComponents : ReferenceConvertible, Hashable, Equatable, 
     
     public var description: String { return _handle.map { $0.description } }
     public var debugDescription: String { return _handle.map { $0.debugDescription } }
-}
 
-@available(OSX 10.11, iOS 9.0, *)
-public func ==(lhs : PersonNameComponents, rhs: PersonNameComponents) -> Bool {
-    // Don't copy references here; no one should be storing anything
-    return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+    @available(OSX 10.11, iOS 9.0, *)
+    public static func ==(lhs : PersonNameComponents, rhs: PersonNameComponents) -> Bool {
+        // Don't copy references here; no one should be storing anything
+        return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+    }
 }
 
 @available(OSX 10.11, iOS 9.0, *)

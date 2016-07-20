@@ -123,34 +123,33 @@ static const char *_getProtocolName(const ProtocolDescriptor *protocol) {
 }
 
 static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
+                                      TypeSyntaxLevel level,
                                       bool qualified,
                                       std::string &result) {
   auto options = Demangle::DemangleOptions();
   options.QualifyEntities = qualified;
   options.DisplayDebuggerGeneratedModule = false;
-
+  
   // If there's only one protocol, the existential type name is the protocol
-  // name.
+  // name. If there are 0 protocols it is 'Any'
   auto descriptors = protocols->getProtocols();
+  auto numProtocols = protocols->NumProtocols;
   
-  if (protocols->NumProtocols == 1) {
-    auto name = _getProtocolName(descriptors[0]);
-    result += Demangle::demangleTypeAsString(name,
-                                             strlen(name),
-                                             options);
-    return;
+  if (numProtocols == 0) {
+    result += "Any";
+  } else {
+    // compositions of more than 1 protocol need parens in .Type contexts
+    bool needsParens = (level >= TypeSyntaxLevel::TypeSimple) && (numProtocols != 1);
+    if (needsParens) result += "(";
+    for (unsigned i = 0, e = numProtocols; i < e; ++i) {
+      if (i) result += " & ";
+      auto name = _getProtocolName(descriptors[i]);
+      result += Demangle::demangleTypeAsString(name,
+                                               strlen(name),
+                                               options);
+    }
+    if (needsParens) result += ")";
   }
-  
-  result += "protocol<";
-  for (unsigned i = 0, e = protocols->NumProtocols; i < e; ++i) {
-    if (i > 0)
-      result += ", ";
-    auto name = _getProtocolName(descriptors[i]);
-    result += Demangle::demangleTypeAsString(name,
-                                             strlen(name),
-                                             options);
-  }
-  result += ">";
 }
 
 static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
@@ -233,7 +232,7 @@ static void _buildNameForMetadata(const Metadata *type,
   }
   case MetadataKind::Existential: {
     auto exis = static_cast<const ExistentialTypeMetadata *>(type);
-    _buildExistentialTypeName(&exis->Protocols, qualified, result);
+    _buildExistentialTypeName(&exis->Protocols, level, qualified, result);
     return;
   }
   case MetadataKind::ExistentialMetatype: {

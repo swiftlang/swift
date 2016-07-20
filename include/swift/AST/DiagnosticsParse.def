@@ -289,8 +289,6 @@ ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
 
 
 // Func
-ERROR(func_decl_nonglobal_operator,none,
-      "operators are only allowed at global scope", ())
 ERROR(func_decl_without_paren,PointsToFirstBadToken,
       "expected '(' in argument list of function declaration", ())
 ERROR(static_func_decl_global_scope,none,
@@ -298,6 +296,9 @@ ERROR(static_func_decl_global_scope,none,
       (StaticSpellingKind))
 ERROR(func_decl_expected_arrow,none,
       "expected '->' after function parameter tuple", ())
+WARNING(operator_static_in_protocol,none,
+        "operator '%0' declared in protocol must be 'static'",
+        (StringRef))
 
 // Enum
 ERROR(expected_lbrace_enum,PointsToFirstBadToken,
@@ -647,12 +648,15 @@ ERROR(protocol_init_argument_init,none,
       "default argument not permitted in a protocol initializer", ())
 
 // Protocol Types
-ERROR(expected_langle_protocol,PointsToFirstBadToken,
-      "expected '<' in protocol composition type", ())
 ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol composition type", ())
 ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
       "protocol composition is neither allowed nor needed here", ())
+
+WARNING(deprecated_protocol_composition,none,
+        "'protocol<...>' composition syntax is deprecated; join the protocols using '&'", ())
+WARNING(deprecated_any_composition,none,
+        "'protocol<>' syntax is deprecated; use 'Any' instead", ())
 
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics

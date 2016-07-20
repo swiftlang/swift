@@ -972,7 +972,7 @@ namespace {
           return {
               proto->getDeclaredType(),
               ImportHint(ImportHint::ObjCBridged,
-                         Impl.SwiftContext.getAnyDecl()->getDeclaredType())};
+                         Impl.SwiftContext.TheAnyType)};
         return {proto->getDeclaredType(), ImportHint::ObjCPointer};
       }
 
@@ -1599,7 +1599,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   if (isVariadic) {
     auto paramTy =
         BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
-                              {SwiftContext.getAnyDecl()->getDeclaredType()});
+                              {SwiftContext.TheAnyType});
     auto name = SwiftContext.getIdentifier("varargs");
     auto param = new (SwiftContext)
         ParamDecl(true, SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),

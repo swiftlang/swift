@@ -61,7 +61,7 @@ func _Collection<C : Collection>(c: C) {
   func fn<T : Collection, U>(_: T, _: U) where T.Generator == U {} // expected-error {{'T' does not have a member type named 'Generator'; did you mean 'Iterator'?}} {{50-59=Iterator}} {{none}} 
   _ = c.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
   _ = c.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Removed in Swift 3. Please use underestimatedCount property.}} {{none}}
-  _ = c.split(1) { _ in return true} // expected-error {{'split(_:allowEmptySlices:isSeparator:)' is unavailable: Please use split(maxSplits:omittingEmptySubsequences:isSeparator:) instead}} {{none}}
+  _ = c.split(1) { _ in return true} // expected-error {{split(maxSplits:omittingEmptySubsequences:whereSeparator:) instead}} {{none}}
 }
 
 func _Collection<C : Collection, E>(c: C, e: E) where C.Iterator.Element: Equatable, C.Iterator.Element == E {
@@ -70,8 +70,8 @@ func _Collection<C : Collection, E>(c: C, e: E) where C.Iterator.Element: Equata
 
 func _CollectionAlgorithms<C : MutableCollection, I>(c: C, i: I) where C : RandomAccessCollection, C.Index == I {
   var c = c
-  _ = c.partition(i..<i) { _, _ in true } // expected-error {{slice the collection using the range, and call partition(isOrderedBefore:)}} {{none}}
-  c.sortInPlace { _, _ in true } // expected-error {{'sortInPlace' has been renamed to 'sort(isOrderedBefore:)'}} {{5-16=sort}} {{none}}
+  _ = c.partition(i..<i) { _, _ in true } // expected-error {{slice the collection using the range, and call partition(by:)}} {{none}}
+  c.sortInPlace { _, _ in true } // expected-error {{'sortInPlace' has been renamed to 'sort(by:)'}} {{5-16=sort}} {{none}}
 }
 
 func _CollectionAlgorithms<C : MutableCollection, I>(c: C, i: I) where C : RandomAccessCollection, C.Iterator.Element : Comparable, C.Index == I {
@@ -295,10 +295,10 @@ func _Optional<T>(x: T) {
   _ = Optional<T>.Some(x) // expected-error {{'Some' has been renamed to 'some'}} {{19-23=some}} {{none}}
 }
 
-func _OutputStream() {
-  func fn<S : OutputStreamType>(_: S) {} // expected-error {{'OutputStreamType' has been renamed to 'OutputStream'}} {{15-31=OutputStream}} {{none}}
+func _TextOutputStream() {
+  func fn<S : OutputStreamType>(_: S) {} // expected-error {{'OutputStreamType' has been renamed to 'TextOutputStream'}} {{15-31=TextOutputStream}} {{none}}
 }
-func _OutputStream<S : Streamable, O : OutputStream>(s: S, o: O) {
+func _TextOutputStream<S : Streamable, O : TextOutputStream>(s: S, o: O) {
   var o = o
   s.writeTo(&o) // expected-error {{'writeTo' has been renamed to 'write(to:)'}} {{5-12=write}} {{13-13=to: }} {{none}}
 }
@@ -312,7 +312,7 @@ func _Print<T>(x: T) {
   debugPrint(x, appendNewline: true) // expected-error {{'debugPrint(_:appendNewline:)' is unavailable: Please use 'terminator: ""' instead of 'appendNewline: false': 'debugPrint((...), terminator: "")'}} {{none}}
 }
 
-func _Print<T, O : OutputStream>(x: T, o: O) {
+func _Print<T, O : TextOutputStream>(x: T, o: O) {
   // FIXME: Not working due to <rdar://22101775>
   //var o = o
   //print(x, &o) // xpected-error {{}} {{none}}
@@ -392,11 +392,11 @@ func _Sequence<S : Sequence>(s: S, e: S.Iterator.Element) where S.Iterator.Eleme
 
 func _SequenceAlgorithms<S : Sequence>(x: S) {
   _ = x.enumerate() // expected-error {{'enumerate()' has been renamed to 'enumerated()'}} {{9-18=enumerated}} {{none}}
-  _ = x.minElement { _, _ in true } // expected-error {{'minElement' has been renamed to 'min(isOrderedBefore:)'}} {{9-19=min}} {{none}}
-  _ = x.maxElement { _, _ in true } // expected-error {{'maxElement' has been renamed to 'max(isOrderedBefore:)'}} {{9-19=max}} {{none}}
+  _ = x.minElement { _, _ in true } // expected-error {{'minElement' has been renamed to 'min(by:)'}} {{9-19=min}} {{none}}
+  _ = x.maxElement { _, _ in true } // expected-error {{'maxElement' has been renamed to 'max(by:)'}} {{9-19=max}} {{none}}
   _ = x.reverse() // expected-error {{'reverse()' has been renamed to 'reversed()'}} {{9-16=reversed}} {{none}}
-  _ = x.startsWith([]) { _ in true } // expected-error {{'startsWith(_:isEquivalent:)' has been renamed to 'starts(with:isEquivalent:)'}} {{9-19=starts}} {{20-20=with: }} {{none}}
-  _ = x.lexicographicalCompare([]) { _, _ in true } // expected-error {{'lexicographicalCompare(_:isOrderedBefore:)' has been renamed to 'lexicographicallyPrecedes(_:isOrderedBefore:)'}} {{9-31=lexicographicallyPrecedes}}{{none}}
+  _ = x.startsWith([]) { _ in true } // expected-error {{'startsWith(_:isEquivalent:)' has been renamed to 'starts(with:by:)'}} {{9-19=starts}} {{20-20=with: }} {{none}}
+  _ = x.lexicographicalCompare([]) { _, _ in true } // expected-error {{'lexicographicalCompare(_:isOrderedBefore:)' has been renamed to 'lexicographicallyPrecedes(_:by:)'}} {{9-31=lexicographicallyPrecedes}}{{none}}
 }
 func _SequenceAlgorithms<S : Sequence>(x: S) where S.Iterator.Element : Comparable {
   _ = x.minElement() // expected-error {{'minElement()' has been renamed to 'min()'}} {{9-19=min}} {{none}}
@@ -469,7 +469,7 @@ func _Unicode() {
   func fn<T : UnicodeCodecType>(_: T) {} // expected-error {{'UnicodeCodecType' has been renamed to 'UnicodeCodec'}} {{15-31=UnicodeCodec}} {{none}}
 }
 func _Unicode<I : IteratorProtocol, E : UnicodeCodec>(i: I, e: E.Type) where I.Element == E.CodeUnit {
-  _ = transcode(e, e, i, { _ in }, stopOnError: true) // expected-error {{'transcode(_:_:_:_:stopOnError:)' is unavailable: use 'transcode(_:from:to:stoppingOnError:sendingOutputTo:)'}} {{none}}
+  _ = transcode(e, e, i, { _ in }, stopOnError: true) // expected-error {{'transcode(_:_:_:_:stopOnError:)' is unavailable: use 'transcode(_:from:to:stoppingOnError:into:)'}} {{none}}
   _ = UTF16.measure(e, input: i, repairIllFormedSequences: true) // expected-error {{'measure(_:input:repairIllFormedSequences:)' is unavailable: use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'}} {{none}}
 }
 
@@ -498,12 +498,27 @@ func _UnsafePointer<T>(x: UnsafeMutablePointer<T>, e: T) {
   _ = UnsafeMutablePointer<T>.Memory.self // expected-error {{'Memory' has been renamed to 'Pointee'}} {{31-37=Pointee}} {{none}}
   _ = UnsafeMutablePointer<T>() // expected-error {{'init()' is unavailable: use 'nil' literal}} {{none}}
   _ = x.memory // expected-error {{'memory' has been renamed to 'pointee'}} {{9-15=pointee}} {{none}}
-  _ = UnsafeMutablePointer<T>.alloc(1) // expected-error {{'alloc' is unavailable: use the 'UnsafeMutablePointer(allocatingCapacity:)' initializer}} {{none}}
-  x.dealloc(1) // expected-error {{'dealloc' has been renamed to 'deallocateCapacity'}} {{5-12=deallocateCapacity}} {{none}}
+  _ = UnsafeMutablePointer<T>.alloc(1) // expected-error {{'alloc' has been renamed to 'allocate(capacity:)'}} {{31-36=allocate}} {{37-37=capacity: }} {{none}}
+  x.dealloc(1) // expected-error {{'dealloc' has been renamed to 'deallocate(capacity:)'}} {{5-12=deallocate}} {{13-13=capacity: }} {{none}}
   x.memory = e // expected-error {{'memory' has been renamed to 'pointee'}} {{5-11=pointee}} {{none}}
-  x.initialize(e) // expected-error {{'initialize' has been renamed to 'initialize(with:)'}} {{5-15=initialize}} {{16-16=with: }} {{none}}
+  x.initialize(e) // expected-error {{'initialize' has been renamed to 'initialize(to:)'}} {{5-15=initialize}} {{16-16=to: }} {{none}}
   x.destroy() // expected-error {{'destroy()' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{none}}
   x.destroy(1) // expected-error {{'destroy' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{13-13=count: }} {{none}}
+  x.initialize(with: e) // expected-error {{'initialize(with:count:)' has been renamed to 'initialize(to:count:)'}} {{5-15=initialize}}
+
+  let ptr1 = UnsafeMutablePointer<T>(allocatingCapacity: 1) // expected-error {{'init(allocatingCapacity:)' is unavailable: use 'UnsafeMutablePointer.allocate(capacity:)'}} {{none}}
+  ptr1.initialize(with: e, count: 1) // expected-error {{'initialize(with:count:)' has been renamed to 'initialize(to:count:)'}}
+  let ptr2 = UnsafeMutablePointer<T>.allocate(capacity: 1)
+  ptr2.initializeFrom(ptr1, count: 1) // expected-error {{'initializeFrom(_:count:)' has been renamed to 'initialize(from:count:)'}}
+  ptr1.assignFrom(ptr2, count: 1) // expected-error {{'assignFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
+  ptr1.assignFrom(ptr2, count: 1) // expected-error {{'assignFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
+  ptr2.assignBackwardFrom(ptr1, count: 1) // expected-error {{'assignBackwardFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
+  ptr1.moveAssignFrom(ptr2, count: 1) // expected-error {{'moveAssignFrom(_:count:)' has been renamed to 'moveAssign(from:count:)'}}
+  ptr2.moveInitializeFrom(ptr1, count: 1) // expected-error {{'moveInitializeFrom(_:count:)' has been renamed to 'moveInitialize(from:count:)'}}
+  ptr1.moveInitializeBackwardFrom(ptr1, count: 1) // expected-error {{'moveInitializeBackwardFrom(_:count:)' has been renamed to 'moveInitialize(from:count:)'}}
+  ptr1.deinitialize(count:1)
+  ptr1.deallocateCapacity(1) // expected-error {{'deallocateCapacity' has been renamed to 'deallocate(capacity:)'}} {{8-26=deallocate}} {{27-27=capacity: }} {{none}}
+  ptr2.deallocate(capacity: 1)
 }
 
 func _VarArgs() {

@@ -47,7 +47,7 @@ using namespace swift;
 
 namespace {
   
-/// The layout of protocol<>.
+/// The layout of Any.
 using Any = OpaqueExistentialContainer;
 
 // Swift assumes Any is returned in memory. 

@@ -429,13 +429,13 @@ public struct Locale : CustomStringConvertible, CustomDebugStringConvertible, Ha
             return _wrapped.hash
         }
     }
-}
 
-public func ==(lhs: Locale, rhs: Locale) -> Bool {
-    if lhs._autoupdating || rhs._autoupdating {
-        return lhs._autoupdating == rhs._autoupdating
-    } else {
-        return lhs._wrapped.isEqual(rhs._wrapped)
+    public static func ==(lhs: Locale, rhs: Locale) -> Bool {
+        if lhs._autoupdating || rhs._autoupdating {
+            return lhs._autoupdating == rhs._autoupdating
+        } else {
+            return lhs._wrapped.isEqual(rhs._wrapped)
+        }
     }
 }
 

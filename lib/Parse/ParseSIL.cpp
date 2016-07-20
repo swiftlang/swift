@@ -239,6 +239,12 @@ namespace {
       SmallVector<ValueDecl *, 4> values;
       return parseSILDottedPath(Decl, values);
     }
+    bool parseSILDottedPathWithoutPound(ValueDecl *&Decl,
+                                        SmallVectorImpl<ValueDecl *> &values);
+    bool parseSILDottedPathWithoutPound(ValueDecl *&Decl) {
+      SmallVector<ValueDecl *, 4> values;
+      return parseSILDottedPathWithoutPound(Decl, values);
+    }
     /// At the time of calling this function, we may not have the type of the
     /// Decl yet. So we return a SILDeclRef on the first lookup result and also
     /// return all the lookup results. After parsing the expected type, the
@@ -676,75 +682,83 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
                                  Inline_t *inlineStrategy, bool *isLet,
                                  SmallVectorImpl<std::string> *Semantics,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
-                                 EffectsKind *MRK, Parser &P) {
-  while (P.consumeIf(tok::l_square)) {
-    if (isLet && P.Tok.is(tok::kw_let)) {
+                                 ValueDecl **ClangDecl,
+                                 EffectsKind *MRK, SILParser &SP) {
+  while (SP.P.consumeIf(tok::l_square)) {
+    if (isLet && SP.P.Tok.is(tok::kw_let)) {
       *isLet = true;
-      P.consumeToken(tok::kw_let);
-      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      SP.P.consumeToken(tok::kw_let);
+      SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
     }
-    else if (P.Tok.isNot(tok::identifier)) {
-      P.diagnose(P.Tok, diag::expected_in_attribute_list);
+    else if (SP.P.Tok.isNot(tok::identifier)) {
+      SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
       return true;
-    } else if (isTransparent && P.Tok.getText() == "transparent")
+    } else if (isTransparent && SP.P.Tok.getText() == "transparent")
       *isTransparent = true;
-    else if (isFragile && P.Tok.getText() == "fragile")
+    else if (isFragile && SP.P.Tok.getText() == "fragile")
       *isFragile = true;
-    else if (isThunk && P.Tok.getText() == "thunk")
+    else if (isThunk && SP.P.Tok.getText() == "thunk")
       *isThunk = IsThunk;
-    else if (isThunk && P.Tok.getText() == "reabstraction_thunk")
+    else if (isThunk && SP.P.Tok.getText() == "reabstraction_thunk")
       *isThunk = IsReabstractionThunk;
-    else if (isGlobalInit && P.Tok.getText() == "global_init")
+    else if (isGlobalInit && SP.P.Tok.getText() == "global_init")
       *isGlobalInit = true;
-    else if (inlineStrategy && P.Tok.getText() == "noinline")
+    else if (inlineStrategy && SP.P.Tok.getText() == "noinline")
       *inlineStrategy = NoInline;
-    else if (inlineStrategy && P.Tok.getText() == "always_inline")
+    else if (inlineStrategy && SP.P.Tok.getText() == "always_inline")
       *inlineStrategy = AlwaysInline;
-    else if (MRK && P.Tok.getText() == "readnone")
+    else if (MRK && SP.P.Tok.getText() == "readnone")
       *MRK = EffectsKind::ReadNone;
-    else if (MRK && P.Tok.getText() == "readonly")
+    else if (MRK && SP.P.Tok.getText() == "readonly")
       *MRK = EffectsKind::ReadOnly;
-    else if (MRK && P.Tok.getText() == "readwrite")
+    else if (MRK && SP.P.Tok.getText() == "readwrite")
       *MRK = EffectsKind::ReadWrite;
-    else if (Semantics && P.Tok.getText() == "_semantics") {
-      P.consumeToken(tok::identifier);
-      if (P.Tok.getKind() != tok::string_literal) {
-        P.diagnose(P.Tok, diag::expected_in_attribute_list);
+    else if (Semantics && SP.P.Tok.getText() == "_semantics") {
+      SP.P.consumeToken(tok::identifier);
+      if (SP.P.Tok.getKind() != tok::string_literal) {
+        SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
         return true;
       }
   
       // Drop the double quotes.
-      StringRef rawString = P.Tok.getText().drop_front().drop_back();
+      StringRef rawString = SP.P.Tok.getText().drop_front().drop_back();
       Semantics->push_back(rawString);
-      P.consumeToken(tok::string_literal);
+      SP.P.consumeToken(tok::string_literal);
 
-      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
     }
-    else if (SpecAttrs && P.Tok.getText() == "_specialize") {
-      P.consumeToken(tok::identifier);
+    else if (SpecAttrs && SP.P.Tok.getText() == "_specialize") {
+      SP.P.consumeToken(tok::identifier);
 
       /// Parse a specialized attributed, building a parsed substitution list
       /// and pushing a new ParsedSpecAttr on the SpecAttrs list. Conformances
       /// cannot be generated until the function declaration is fully parsed so
       /// that the function's generic signature can be consulted.
-      SILParser SpecAttrState(P);
       ParsedSpecAttr SpecAttr;
-      if (SpecAttrState.parseApplySubstitutions(SpecAttr.subs))
+      if (SP.parseApplySubstitutions(SpecAttr.subs))
         return true;
 
       SpecAttrs->emplace_back(SpecAttr);
 
-      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      continue;
+    }
+    else if (ClangDecl && SP.P.Tok.getText() == "clang") {
+      SP.P.consumeToken(tok::identifier);
+      if (SP.parseSILDottedPathWithoutPound(*ClangDecl))
+        return true;
+
+      SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
     }
     else {
-      P.diagnose(P.Tok, diag::expected_in_attribute_list);
+      SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
       return true;
     }
-    P.consumeToken(tok::identifier);
-    P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+    SP.P.consumeToken(tok::identifier);
+    SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
   }
   return false;
 }
@@ -875,7 +889,11 @@ bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
                                    SmallVectorImpl<ValueDecl *> &values) {
   if (P.parseToken(tok::pound, diag::expected_sil_constant))
     return true;
+  return parseSILDottedPathWithoutPound(Decl, values);
+}
 
+bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
+                                   SmallVectorImpl<ValueDecl *> &values) {
   // Handle sil-dotted-path.
   Identifier Id;
   SmallVector<Identifier, 4> FullName;
@@ -1114,6 +1132,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("alloc_ref", ValueKind::AllocRefInst)
     .Case("alloc_ref_dynamic", ValueKind::AllocRefDynamicInst)
     .Case("alloc_value_buffer", ValueKind::AllocValueBufferInst)
+    .Case("bind_memory", ValueKind::BindMemoryInst)
     .Case("value_metatype", ValueKind::ValueMetatypeInst)
     .Case("witness_method", ValueKind::WitnessMethodInst)
     .Case("apply", ValueKind::ApplyInst)
@@ -2965,6 +2984,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
                                  IsInitialization_t(IsInit));
     break;
   }
+  case ValueKind::BindMemoryInst: {
+    SILValue IndexVal;
+    Identifier ToToken;
+    SourceLoc ToLoc;
+    SILType EltTy;
+    if (parseTypedValueRef(Val, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseTypedValueRef(IndexVal, B) ||
+        parseSILIdentifier(ToToken, ToLoc,
+                           diag::expected_tok_in_sil_instr, "to") ||
+        parseSILType(EltTy) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (ToToken.str() != "to") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
+      return true;
+    }
+    ResultVal = B.createBindMemory(InstLoc, Val, IndexVal, EltTy);
+    break;
+  }
   case ValueKind::StructInst: {
     SILType StructTy;
     if (parseSILType(StructTy) ||
@@ -3836,11 +3876,12 @@ bool Parser::parseDeclSIL() {
   Inline_t inlineStrategy = InlineDefault;
   SmallVector<std::string, 1> Semantics;
   SmallVector<ParsedSpecAttr, 4> SpecAttrs;
+  ValueDecl *ClangDecl = nullptr;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||
       parseDeclSILOptional(&isTransparent, &isFragile, &isThunk, &isGlobalInit,
                            &inlineStrategy, nullptr, &Semantics, &SpecAttrs,
-                           &MRK, *this) ||
+                           &ClangDecl, &MRK, FunctionState) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -3867,6 +3908,8 @@ bool Parser::parseDeclSIL() {
     FunctionState.F->setGlobalInit(isGlobalInit);
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setEffectsKind(MRK);
+    if (ClangDecl)
+      FunctionState.F->setClangNodeOwner(ClangDecl);
     for (auto &Attr : Semantics) {
       FunctionState.F->addSemanticsAttr(Attr);
     }
@@ -3975,15 +4018,16 @@ bool Parser::parseSILGlobal() {
   // Inform the lexer that we're lexing the body of the SIL declaration.
   Lexer::SILBodyRAII Tmp(*L);
   Scope S(this, ScopeKind::TopLevel);
+  SILParser State(*this);
   if (parseSILLinkage(GlobalLinkage, *this) ||
       parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
-                           nullptr, &isLet, nullptr, nullptr, nullptr, *this) ||
+                           nullptr, &isLet, nullptr, nullptr, nullptr,
+                           nullptr, State) ||
       parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
     return true;
 
-  SILParser State(*this);
   if (State.parseSILType(GlobalType))
     return true;
 
@@ -4320,7 +4364,8 @@ bool Parser::parseSILWitnessTable() {
   
   bool isFragile = false;
   if (parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, *this))
+                           nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, WitnessState))
     return true;
 
   Scope S(this, ScopeKind::TopLevel);

@@ -51,7 +51,7 @@ prefix operator % {}
 
 protocol P2 {
   associatedtype Assoc2
-  prefix func %(target: Self) -> Assoc2
+  static prefix func %(target: Self) -> Assoc2
 }
 
 prefix func % <P:P1>(target: P) -> P.Assoc1 {
@@ -94,7 +94,7 @@ protocol P6 {
 
 protocol P7 : P6 {
   associatedtype Assoc : P6
-  func ~> (x: Self, _: S7a) -> Assoc
+  static func ~> (x: Self, _: S7a) -> Assoc
 }
 
 func ~> <T:P6>(x: T, _: S7a) -> S7b { return S7b() }

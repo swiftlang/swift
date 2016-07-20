@@ -65,18 +65,18 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 
 /// Invoke `body` with a C `va_list` argument derived from `args`.
 public func withVaList<R>(_ args: [CVarArg],
-  invoke body: @noescape (CVaListPointer) -> R) -> R {
+  _ body: @noescape (CVaListPointer) -> R) -> R {
   let builder = _VaListBuilder()
   for a in args {
     builder.append(a)
   }
-  return _withVaList(builder, invoke: body)
+  return _withVaList(builder, body)
 }
 
 /// Invoke `body` with a C `va_list` argument derived from `builder`.
 internal func _withVaList<R>(
   _ builder: _VaListBuilder,
-  invoke body: @noescape (CVaListPointer) -> R
+  _ body: @noescape (CVaListPointer) -> R
 ) -> R {
   let result = body(builder.va_list())
   _fixLifetime(builder)
@@ -113,7 +113,7 @@ public func _encodeBitsAsWords<T : CVarArg>(_ x: T) -> [Int] {
     count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self))
   _sanityCheck(result.count > 0)
   var tmp = x
-  // FIXME: use UnsafeMutablePointer.assignFrom() instead of memcpy.
+  // FIXME: use UnsafeMutablePointer.assign(from:) instead of memcpy.
   _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous!),
           src: UnsafeMutablePointer(Builtin.addressof(&tmp)),
           size: UInt(sizeof(T.self)))
@@ -336,7 +336,7 @@ final internal class _VaListBuilder {
       // count is updated below
 
       if let allocatedOldStorage = oldStorage {
-        newStorage.moveInitializeFrom(allocatedOldStorage, count: oldCount)
+        newStorage.moveInitialize(from: allocatedOldStorage, count: oldCount)
         deallocStorage(wordCount: oldAllocated, storage: allocatedOldStorage)
       }
     }

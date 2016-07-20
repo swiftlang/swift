@@ -12,8 +12,11 @@
 
 import SwiftShims
 
+/// Temporary typealias to aid in migration
+public typealias Process = CommandLine
+
 /// Command-line arguments for the current process.
-public enum Process {
+public enum CommandLine {
   /// The backing static variable for argument count may come either from the
   /// entry point or it may need to be computed e.g. if we're in the REPL.
   @_versioned
@@ -31,7 +34,7 @@ public enum Process {
 
   /// Access to the raw argc value from C.
   public static var argc: Int32 {
-    _ = Process.unsafeArgv // Force evaluation of argv.
+    _ = CommandLine.unsafeArgv // Force evaluation of argv.
     return _argc
   }
 
@@ -54,10 +57,10 @@ public // COMPILER_INTRINSIC
 func _stdlib_didEnterMain(
   argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
 ) {
-  // Initialize the Process.argc and Process.unsafeArgv variables with the
+  // Initialize the CommandLine.argc and CommandLine.unsafeArgv variables with the
   // values that were passed in to main.
-  Process._argc = Int32(argc)
-  Process._unsafeArgv = argv
+  CommandLine._argc = Int32(argc)
+  CommandLine._unsafeArgv = argv
 }
 
 // FIXME: Move this to HashedCollections.swift.gyb

@@ -99,10 +99,10 @@ if True:
 ///
 /// You can call any method on the slices that you might have called on the
 /// `absences` array. To learn which half had more absences, use the
-/// `reduce(_:combine:)` method to calculate each sum.
+/// `reduce(_:)` method to calculate each sum.
 ///
-///     let firstHalfSum = firstHalf.reduce(0, combine: +)
-///     let secondHalfSum = secondHalf.reduce(0, combine: +)
+///     let firstHalfSum = firstHalf.reduce(0, +)
+///     let secondHalfSum = secondHalf.reduce(0, +)
 ///
 ///     if firstHalfSum > secondHalfSum {
 ///         print("More absences in the first half.")
@@ -1061,7 +1061,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     var p: UnsafeMutablePointer<Element>
     (self, p) = ${Self}._allocateUninitialized(count)
     for _ in 0..<count {
-      p.initialize(with: repeatedValue)
+      p.initialize(to: repeatedValue)
       p += 1
     }
   }
@@ -1252,7 +1252,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     _sanityCheck(_buffer.capacity >= _buffer.count + 1)
 
     _buffer.count = oldCount + 1
-    (_buffer.firstElementAddress + oldCount).initialize(with: newElement)
+    (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
   }
 
   /// Adds a new element at the end of the array.
@@ -1333,7 +1333,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       Swift.max(newCount, _growArrayCapacity(capacity))
       : newCount)
 
-    (self._buffer.firstElementAddress + oldCount).initializeFrom(newElements)
+    (self._buffer.firstElementAddress + oldCount).initialize(from: newElements)
     self._buffer.count = newCount
   }
 
@@ -1616,7 +1616,7 @@ internal struct _InitializeMemoryFromCollection<
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<count {
-      p.initialize(with: newValues[q])
+      p.initialize(to: newValues[q])
       newValues.formIndex(after: &q)
       p += 1
     }
@@ -1888,7 +1888,7 @@ internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
     backingStart.deinitialize(count: sourceOffset)
 
     // Move the head items
-    destStart.moveInitializeFrom(sourceStart, count: headCount)
+    destStart.moveInitialize(from: sourceStart, count: headCount)
 
     // Destroy unused source items
     oldStart.deinitialize(count: oldCount)
@@ -1896,7 +1896,7 @@ internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
     initializeNewElements.call(newStart, count: newCount)
 
     // Move the tail items
-    newEnd.moveInitializeFrom(oldStart + oldCount, count: tailCount)
+    newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
 
     // Destroy any items that may be lurking in a _SliceBuffer after
     // its real last element
@@ -1923,7 +1923,7 @@ internal struct _InitializePointer<T> : _PointerFunction {
   internal func call(_ rawMemory: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 1)
     // FIXME: it would be better if we could find a way to move, here
-    rawMemory.initialize(with: newValue)
+    rawMemory.initialize(to: newValue)
   }
 
   @_transparent
@@ -2003,7 +2003,7 @@ internal func _arrayAppendSequence<Buffer, S>(
     let base = buffer.firstElementAddress
 
     while (nextItem != nil) && count < capacity {
-      (base + count).initialize(with: nextItem!)
+      (base + count).initialize(to: nextItem!)
       count += 1
       nextItem = stream.next()
     }

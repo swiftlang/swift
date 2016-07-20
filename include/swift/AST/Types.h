@@ -3476,7 +3476,7 @@ END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 /// \code
 /// protocol P { /* ... */ }
 /// protocol Q { /* ... */ }
-/// var x : protocol<P, Q>
+/// var x : P & Q
 /// \endcode
 ///
 /// Here, the type of x is a composition of the protocols 'P' and 'Q'.

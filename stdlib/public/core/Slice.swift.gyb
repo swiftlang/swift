@@ -46,7 +46,7 @@ def get_slice_doc_comment(Self):
 ///
 /// 1) Create a slice of the `absences` array that holds the second half of the
 ///    days.
-/// 2) Use the `max(isOrderedBefore:)` method to determine the index of the day
+/// 2) Use the `max(by:)` method to determine the index of the day
 ///    with the most absences.
 /// 3) Print the result using the index found in step 2 on the original
 ///    `absences` array.
@@ -54,7 +54,7 @@ def get_slice_doc_comment(Self):
 /// Here's an implementation of those steps:
 ///
 ///     let secondHalf = absences.suffix(absences.count / 2)
-///     if let i = secondHalf.indices.max(isOrderedBefore: { secondHalf[$0] < secondHalf[$1] }) {
+///     if let i = secondHalf.indices.max(by: { secondHalf[$0] < secondHalf[$1] }) {
 ///         print("Highest second-half absences: \(absences[i])")
 ///     }
 ///     // Prints "Highest second-half absences: 3"
@@ -100,7 +100,7 @@ def get_slice_doc_comment(Self):
 %         BaseRequirements.append('MutableIndexable')
 %       if RangeReplaceable:
 %         BaseRequirements.append('RangeReplaceableIndexable')
-%       BaseRequirements = 'protocol<' + ', '.join(BaseRequirements) + '>'
+%       BaseRequirements = ' & '.join(BaseRequirements)
 %       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 
 ${get_slice_doc_comment(Self)}
