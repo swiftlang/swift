@@ -9,9 +9,7 @@
 
 import StdlibUnittest
 
-let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
-
-var DictionaryTraps = TestSuite("DictionaryTraps" + testSuiteSuffix)
+var DictionaryTraps = TestSuite("DictionaryTraps")
 
 DictionaryTraps.test("DuplicateKeys1")
   .skip(.custom(

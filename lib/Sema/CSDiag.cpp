@@ -2306,18 +2306,48 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       return;
     case MemberLookupResult::UR_InstanceMemberOnType:
       // If the base is an implicit self type reference, and we're in a
-      // property initializer, then the user wrote something like:
+      // an initializer, then the user wrote something like:
       //
       //   class Foo { let x = 1, y = x }
       //
-      // which runs in type context, not instance context.  Produce a tailored
-      // diagnostic since this comes up and is otherwise non-obvious what is
-      // going on.
-      if (baseExpr && baseExpr->isImplicit() && isa<Initializer>(CS->DC) &&
-          CS->DC->getParent()->getDeclaredTypeOfContext()->isEqual(instanceTy)){
-        CS->TC.diagnose(nameLoc, diag::instance_member_in_initializer,
-                        memberName);
-        return;
+      // which runs in type context, not instance context, or
+      //
+      //   class Bar {
+      //     let otherwise = 1              // instance member
+      //     var x: Int
+      //     func init(x: Int =otherwise) { // default parameter
+      //       self.x = x
+      //     }
+      //   }
+      //
+      // in which an instance member is used as a default value for a
+      // parameter.
+      //
+      // Produce a tailored diagnostic for these cases since this
+      // comes up and is otherwise non-obvious what is going on.
+      if (baseExpr && baseExpr->isImplicit() && isa<Initializer>(CS->DC)) {
+        auto *TypeDC = CS->DC->getParent();
+        bool propertyInitializer = true;
+        // If the parent context is not a type context, we expect it
+        // to be a defaulted parameter in a function declaration.
+        if (!TypeDC->isTypeContext()) {
+          assert(TypeDC->getContextKind() ==
+                     DeclContextKind::AbstractFunctionDecl &&
+                 "Expected function decl context for initializer!");
+          TypeDC = TypeDC->getParent();
+          propertyInitializer = false;
+        }
+        assert(TypeDC->isTypeContext() && "Expected type decl context!");
+
+        if (TypeDC->getDeclaredTypeOfContext()->isEqual(instanceTy)) {
+          if (propertyInitializer)
+            CS->TC.diagnose(nameLoc, diag::instance_member_in_initializer,
+                            memberName);
+          else
+            CS->TC.diagnose(nameLoc, diag::instance_member_in_default_parameter,
+                            memberName);
+          return;
+        }
       }
         
       diagnose(loc, diag::could_not_use_instance_member_on_type,
@@ -4006,18 +4036,39 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
         auto DC = CCI.CS->DC;
 
         // If the base is an implicit self type reference, and we're in a
-        // property initializer, then the user wrote something like:
+        // an initializer, then the user wrote something like:
         //
         //   class Foo { let val = initFn() }
+        // or
+        //   class Bar { func something(x: Int = initFn()) }
         //
         // which runs in type context, not instance context.  Produce a tailored
         // diagnostic since this comes up and is otherwise non-obvious what is
         // going on.
-        if (UDE->getBase()->isImplicit() && isa<Initializer>(DC) &&
-            DC->getParent()->getDeclaredTypeOfContext()->isEqual(baseType)){
-          TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
+        if (UDE->getBase()->isImplicit() && isa<Initializer>(DC)) {
+          auto *TypeDC = DC->getParent();
+          bool propertyInitializer = true;
+          // If the parent context is not a type context, we expect it
+          // to be a defaulted parameter in a function declaration.
+          if (!TypeDC->isTypeContext()) {
+            assert(TypeDC->getContextKind() ==
+                       DeclContextKind::AbstractFunctionDecl &&
+                   "Expected function decl context for initializer!");
+            TypeDC = TypeDC->getParent();
+            propertyInitializer = false;
+          }
+          assert(TypeDC->isTypeContext() && "Expected type decl context!");
+
+          if (TypeDC->getDeclaredTypeOfContext()->isEqual(baseType)) {
+            if (propertyInitializer)
+              TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
                           UDE->getName());
-          return true;
+            else
+              TC.diagnose(UDE->getLoc(),
+                          diag::instance_member_in_default_parameter,
+                          UDE->getName());
+            return true;
+          }
         }
 
         // Otherwise, complain about use of instance value on type.

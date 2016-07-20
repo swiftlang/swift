@@ -6,10 +6,10 @@ infix operator ~> { precedence 255 }
 protocol Target {}
 
 func ~> <Target, Arg0, Result>(x: inout Target, f: (_: inout Target, _: Arg0) -> Result) -> (Arg0) -> Result {
-  return { f(&x, $0) } // expected-error {{closure cannot implicitly capture an inout parameter unless @noescape}}
+  return { f(&x, $0) } // expected-error {{escaping closures can only capture inout parameters explicitly by value}}
 }
 
 func ~> (x: inout Int, f: (_: inout Int, _: Target) -> Target) -> (Target) -> Target {
-  return { f(&x, $0) } // expected-error {{closure cannot implicitly capture an inout parameter unless @noescape}}
+  return { f(&x, $0) } // expected-error {{escaping closures can only capture inout parameters explicitly by value}}
 }
 

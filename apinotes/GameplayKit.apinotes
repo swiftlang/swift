@@ -1,8 +1,0 @@
----
-Name: GameplayKit
-Classes:
-- Name: GKStateMachine
-  Methods:
-  - Selector: 'stateForClass:'
-    MethodKind: Instance
-    SwiftPrivate: true

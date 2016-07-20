@@ -11,9 +11,7 @@
 import StdlibUnittest
 import Foundation
 
-let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
-
-var DictionaryTraps = TestSuite("DictionaryTraps" + testSuiteSuffix)
+var DictionaryTraps = TestSuite("DictionaryTraps")
 
 struct NotBridgedKeyTy : Equatable, Hashable {
   init(_ value: Int) {

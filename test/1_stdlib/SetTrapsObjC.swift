@@ -11,7 +11,6 @@
 import StdlibUnittest
 import Foundation
 
-let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
 
 struct NotBridgedKeyTy : Equatable, Hashable {
   init(_ value: Int) {
@@ -50,7 +49,7 @@ func == (lhs: BridgedVerbatimRefTy, rhs: BridgedVerbatimRefTy) -> Bool {
 assert(_isBridgedToObjectiveC(BridgedVerbatimRefTy.self))
 assert(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
 
-var SetTraps = TestSuite("SetTraps" + testSuiteSuffix)
+var SetTraps = TestSuite("SetTraps")
 
 SetTraps.test("sanity") {
   // Sanity checks.  This code should not trap.

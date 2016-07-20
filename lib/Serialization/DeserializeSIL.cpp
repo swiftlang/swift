@@ -1345,6 +1345,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getLocalValue(ValID2, addrType));
     break;
   }
+  case ValueKind::BindMemoryInst: {
+    assert(RecordKind == SIL_ONE_TYPE_VALUES &&
+           "Layout should be OneTypeValues.");
+    auto Ty = MF->getType(TyID);   // BoundTy
+    ResultVal = Builder.createBindMemory(
+      Loc,
+      getLocalValue(ListOfValues[2],
+                    getSILType(MF->getType(ListOfValues[0]),
+                               (SILValueCategory)ListOfValues[1])),
+      getLocalValue(ListOfValues[5],
+                    getSILType(MF->getType(ListOfValues[3]),
+                               (SILValueCategory)ListOfValues[4])),
+      getSILType(Ty, (SILValueCategory)TyCategory));
+    break;
+  }
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst: {
     // Use SILOneValueOneOperandLayout.

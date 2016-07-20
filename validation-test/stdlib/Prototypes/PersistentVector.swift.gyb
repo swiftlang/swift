@@ -503,7 +503,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   func initializeChildNodes(
     from newChildNodes: UnsafeMutablePointer<_PVAnyNodePointer<Key, Value>?>
   ) {
-    _childNodeVector.initializeFrom(newChildNodes, count: childNodeCount)
+    _childNodeVector.initialize(from: newChildNodes, count: childNodeCount)
     for childNode in childNodes {
       childNode!.retain()
     }
@@ -520,7 +520,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     precondition(bucket >= 0 && bucket < 32) // sanity check
     let i = childNodePopulationBitmap.countBitsSetBelow(bucket)
     let childNodeVector = _childNodeVector
-    childNodeVector.initializeFrom(newChildNodes, count: i)
+    childNodeVector.initialize(from: newChildNodes, count: i)
     for childNode in
       UnsafeMutableBufferPointer(
         start: childNodeVector, count: i)
@@ -531,7 +531,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     childNodeVector[i] = newChildNode
 
     let destPointer = childNodeVector + i + 1
-    destPointer.initializeFrom(
+    destPointer.initialize(from: 
       newChildNodes + i + 1, count: childNodeCount - i - 1)
     for childNode in
       UnsafeMutableBufferPointer(
@@ -552,7 +552,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     precondition(bucket >= 0 && bucket < 32) // sanity check
     let i = childNodePopulationBitmap.countBitsSetBelow(bucket)
     let childNodeVector = _childNodeVector
-    childNodeVector.initializeFrom(newChildNodes, count: i)
+    childNodeVector.initialize(from: newChildNodes, count: i)
     for childNode in
       UnsafeMutableBufferPointer(
         start: childNodeVector, count: i)
@@ -563,7 +563,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     childNodeVector[i] = newChildNode
 
     let destPointer = childNodeVector + i + 1
-    destPointer.initializeFrom(
+    destPointer.initialize(from: 
       newChildNodes + i, count: childNodeCount - i - 1)
     for childNode in
       UnsafeMutableBufferPointer(
@@ -577,7 +577,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     from newKeys: UnsafeMutablePointer<Key>,
     layout: _PVSparseVectorNodeLayoutParameters
   ) {
-    _keyVector(layout: layout).initializeFrom(newKeys, count: layout.keyCount)
+    _keyVector(layout: layout).initialize(from: newKeys, count: layout.keyCount)
   }
 
   func copyKeys(
@@ -589,11 +589,11 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     precondition(bucket >= 0 && bucket < 32) // sanity check
     let keyVector = _keyVector(layout: layout)
     let i = keyPopulationBitmap.countBitsSetBelow(bucket)
-    keyVector.initializeFrom(newKeys, count: i)
+    keyVector.initialize(from: newKeys, count: i)
     keyVector[i] = newKey
 
     let destPointer = keyVector + i + 1
-    destPointer.initializeFrom(
+    destPointer.initialize(from: 
       newKeys + i + 1, count: layout.keyCount - i - 1)
   }
 
@@ -601,7 +601,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     from newValues: UnsafeMutablePointer<Value>,
     layout: _PVSparseVectorNodeLayoutParameters
   ) {
-    _valueVector(layout: layout).initializeFrom(newValues, count: layout.keyCount)
+    _valueVector(layout: layout).initialize(from: newValues, count: layout.keyCount)
   }
 
   func copyValues(
@@ -613,11 +613,11 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     precondition(bucket >= 0 && bucket < 32) // sanity check
     let valueVector = _valueVector(layout: layout)
     let i = keyPopulationBitmap.countBitsSetBelow(bucket)
-    valueVector.initializeFrom(newValues, count: i)
+    valueVector.initialize(from: newValues, count: i)
     valueVector[i] = newValue
 
     let destPointer = valueVector + i + 1
-    destPointer.initializeFrom(
+    destPointer.initialize(from: 
       newValues + i + 1, count: layout.keyCount - i - 1)
   }
 
@@ -636,18 +636,18 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     let i = keyPopulationBitmap.countBitsSetBelow(bucket)
     do {
       let keyVector = _keyVector(layout: layout)
-      keyVector.initializeFrom(newKeys, count: i)
+      keyVector.initialize(from: newKeys, count: i)
 
       let destPointer = keyVector + i
-      destPointer.initializeFrom(
+      destPointer.initialize(from: 
         newKeys + i + 1, count: layout.keyCount - i)
     }
     do {
       let valueVector = _valueVector(layout: layout)
-      valueVector.initializeFrom(newValues, count: i)
+      valueVector.initialize(from: newValues, count: i)
 
       let destPointer = valueVector + i
-      destPointer.initializeFrom(
+      destPointer.initialize(from: 
         newValues + i + 1, count: layout.keyCount - i)
     }
   }
@@ -665,22 +665,22 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     let i = keyPopulationBitmap.countBitsSetBelow(bucket)
     do {
       let keyVector = _keyVector(layout: layout)
-      keyVector.initializeFrom(newKeys, count: i)
+      keyVector.initialize(from: newKeys, count: i)
 
       keyVector[i] = newKey
 
       let destPointer = keyVector + i + 1
-      destPointer.initializeFrom(
+      destPointer.initialize(from: 
         newKeys + i, count: layout.keyCount - i - 1)
     }
     do {
       let valueVector = _valueVector(layout: layout)
-      valueVector.initializeFrom(newValues, count: i)
+      valueVector.initialize(from: newValues, count: i)
 
       valueVector[i] = newValue
 
       let destPointer = valueVector + i + 1
-      destPointer.initializeFrom(
+      destPointer.initialize(from: 
         newValues + i, count: layout.keyCount - i - 1)
     }
   }
@@ -1353,11 +1353,11 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
     layout: _PVCollisionNodePointerLayoutParameters
   ) {
     let valueArray = _valueArray(layout: layout)
-    valueArray.initializeFrom(newValues, count: i)
+    valueArray.initialize(from: newValues, count: i)
     valueArray[i] = newValue
 
     let destPointer = valueArray + i + 1
-    destPointer.initializeFrom(
+    destPointer.initialize(from: 
       newValues + i + 1, count: layout.keyCount - i - 1)
   }
 
@@ -1414,7 +1414,7 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
         } else {
           // Create a new node.
           let newNode = _PVCollisionNodePointer(uninitializedNodeFor: layout)
-          newNode._keyArray.initializeFrom(
+          newNode._keyArray.initialize(from: 
             keyArray, count: layout.keyCount)
           newNode.copyValues(
             from: valueArray,
