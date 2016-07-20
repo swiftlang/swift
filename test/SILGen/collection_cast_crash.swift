@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -O -primary-file %s -emit-sil -o - | FileCheck %s
 
-// XFAIL: linux
-
 // check if the compiler does not crash if a function is specialized
 // which contains a collection cast
 
@@ -54,15 +52,15 @@ func setDownCast<Ct : KeyClass>(_ s : Set<KeyClass>) -> Set<Ct> {
 
 let arr: [MyClass] = [MyClass()]
 
-arrayUpCast(arr)
-arrayDownCast(arr)
+_ = arrayUpCast(arr)
+_ = arrayDownCast(arr)
 
 let dict: [KeyClass:MyClass] = [KeyClass() : MyClass()]
 
-dictUpCast(dict)
-dictDownCast(dict)
+_ = dictUpCast(dict)
+_ = dictDownCast(dict)
 
 let s: Set<KeyClass> = Set()
 
-setUpCast(s)
-setDownCast(s)
+_ = setUpCast(s)
+_ = setDownCast(s)
