@@ -1,0 +1,205 @@
+//===--- HashedCollectionCasts.swift.gyb ----------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %gyb %s -o %t/HashedCollectionCasts.swift
+// RUN: %line-directive %t/HashedCollectionCasts.swift -- %target-build-swift -Xfrontend -enable-experimental-collection-casts %t/HashedCollectionCasts.swift -o %t/a.out
+// RUN: %line-directive %t/HashedCollectionCasts.swift -- %target-run %t/a.out 2>&1
+// REQUIRES: executable_test
+// REQUIRES: objc_interop
+
+import StdlibUnittest
+
+class Base : Hashable {
+  init(_ value: Int) {
+    self.value = value
+  }
+  var value: Int
+  var hashValue : Int {
+    return value.hashValue
+  }
+}
+
+func == (lhs: Base, rhs: Base) -> Bool {
+  return lhs.value == rhs.value
+}
+
+class Derived : Base {}
+
+protocol AnyFoo {
+  init(_ value: Int)
+}
+extension Int : AnyFoo { }
+
+var tests = TestSuite("HashedCollectionCasts")
+
+// A wrapper for an as? cast that suppresses warnings when the cast always
+// succeeds.
+func cast<T, U>(_ x: T, to result: U.Type) -> U? {
+  return x as? U
+}
+
+%{
+from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
+classKeys = ('Derived', 'Base')
+classValues = classKeys + ('AnyObject', 'Any')
+nonClassKeys = ('Int',)
+nonClassValues = ('Int', 'AnyFoo', 'Any')
+
+testingWithExperimentalCollectionCasts = True
+
+# FIXME: depending on how we do the tests, some direct casts fail.  This
+# function describes those cases.
+  
+def indirectCastFIXME(Key0, Value0, Key1, Value1):
+  if testingWithExperimentalCollectionCasts:
+    # Typechecker asserts per https://github.com/apple/swift/commit/f4d7ce84d88d8132a4e46cc9644b9d8a52a00e71#commitcomment-18346931
+    return (Key0 == Key1) != (Value0 == Value1)
+  else:
+    # Typechecker rejects the cast
+    return '[%s:%s]=>[%s:%s]' % (Key0,Value0,Key1,Value1) in (
+    '[Derived:Any]=>[Base:Any]', '[Int:AnyFoo]=>[Int:Any]')
+}%
+
+% for keys, values in [ (classKeys, classValues), (nonClassKeys, nonClassValues) ]:
+
+%   for ki0, Key0 in enumerate(keys):
+%     DynamicKey = keys[0] if Key0.startswith('Any') else Key0
+%     for Key1 in keys[ki0:]:
+
+tests.test("Set/Up/${Key0}=>${Key1}") {
+
+  let source : Set = [
+    ${DynamicKey}(42) as ${Key0},
+    ${DynamicKey}(17) as ${Key0}]
+
+  let upcasted = source as Set<${Key1}>
+
+  expectEqual(source.count, upcasted.count)
+  for x in source {
+    expectTrue(upcasted.contains(x))
+  }
+}
+
+% if Key1 != Key0:
+tests.test("Set/Down/${Key1}=>${Key0}") {
+
+  let source : Set = [
+    ${DynamicKey}(42) as ${Key1},
+    ${DynamicKey}(17) as ${Key1}]
+
+  // FIXME Set<Base> => Set<Derived> fails dynamically, and never even reaches
+  // one of my runtime entry points.
+  guard let downcasted = expectNotEmpty(cast(source, to: Set<${Key0}>.self))
+  else { return }
+  
+  expectEqual(source.count, downcasted.count)
+  for x in downcasted {
+    expectTrue(source.contains(x))
+  }
+}
+% end
+
+%       for vi0, Value0 in enumerate(values):
+%         DynamicValue = values[0] if Value0.startswith('Any') else Value0
+%         def makeValue(i): return '%s(%s) as %s' % (DynamicValue, i, Value0)
+%         for Value1 in values[vi0:]:
+
+tests.test(
+  "Dictionary/Up/[${Key0}:${Value0}]=>[${Key1}:${Value1}]") {
+
+  // Check that the cast type-checks
+  let source = [
+    ${DynamicKey}(42) as ${Key0} : ${DynamicValue}(42) as ${Value0},
+    ${DynamicKey}(17) as ${Key0} : ${DynamicValue}(17) as ${Value0}]
+
+
+%   if indirectCastFIXME(Key0,Value0,Key1,Value1):
+  // let upcasted_ = source as Any as? [${Key1}:${Value1}]
+  let upcasted_ = cast(source, to: [${Key1}:${Value1}].self)
+
+  // FIXME: Conditional casting fails to dynamically type-check, and never even
+  // reaches one of my runtime entry points in any of these cases.
+  guard let upcasted = expectNotEmpty(upcasted_) else { return }
+%   else:
+  let upcasted = source as [${Key1}:${Value1}]
+%   end
+
+  expectEqual(source.count, upcasted.count)
+  
+  for (k0, v0) in source {
+    guard let v1 = expectNotEmpty(upcasted[k0]) else { continue }
+    
+    guard let dv0 = expectNotEmpty(
+      cast(v0, to: ${DynamicValue}.self)) else { continue }
+    
+    guard let dv1 = expectNotEmpty(
+      cast(v1, to: ${DynamicValue}.self)) else { continue }
+
+    expectEqual(dv0, dv1)
+  }
+}
+
+% if Key1 != Key0 or Value1 != Value0:
+
+tests.test(
+  "Dictionary/Down/[${Key1}:${Value1}]=>[${Key0}:${Value0}]") {
+
+  // Check that the cast type-checks
+  let source = [
+    ${DynamicKey}(42) as ${Key1} : ${DynamicValue}(42) as ${Value1},
+    ${DynamicKey}(17) as ${Key1} : ${DynamicValue}(17) as ${Value1}]
+
+  // FIXME: The following are routed through
+  // _dictionaryBridgeFromObjectiveCConditional, causing the test to crash, but
+  // there's no reason for bridging in these cases:
+  //
+  // [Derived:Any] => [Derived:AnyObject]
+  // [Derived:Any] => [Derived:Base]
+  // [Base:Any] => [Derived:Derived]
+  // [Base:Any] => [Derived:Base]
+  // [Base:Any] => [Derived:AnyObject]
+  // [Base:Any] => [Base:Derived]
+  // [Base:Any] => [Base:Base]
+  // [Base:Any] => [Base:AnyObject]
+  // [Int:AnyFoo] => [Int:Int]
+  // [Int:Any] => [Int:Int]
+  // [Int:Any] => [Int:AnyFoo]
+  guard let downcasted = expectNotEmpty(source as? [${Key0}:${Value0}])
+  else { return }
+
+  expectEqual(source.count, downcasted.count)
+  
+  for (k0, v0) in downcasted {
+    guard let v1 = expectNotEmpty(source[k0]) else { continue }
+    
+    guard let dv0 = expectNotEmpty(
+      cast(v0, to: ${DynamicValue}.self)) else { continue }
+    
+    guard let dv1 = expectNotEmpty(
+      cast(v1, to: ${DynamicValue}.self)) else { continue }
+
+    expectEqual(dv0, dv1)
+  }
+}
+
+% end
+
+%         end
+%       end
+%     end
+%   end
+% end
+
+
+runAllTests()
+
