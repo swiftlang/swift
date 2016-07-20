@@ -53,7 +53,6 @@ namespace swift {
   class ExtensionDecl;
   class DebuggerClient;
   class DeclName;
-  class DerivedFileUnit;
   class FileUnit;
   class FuncDecl;
   class InfixOperatorDecl;
@@ -237,8 +236,6 @@ public:
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
   FileUnit &getMainFile(FileUnitKind expectedKind) const;
-
-  DerivedFileUnit &getDerivedFileUnit() const;
 
   DebuggerClient *getDebugClient() const { return DebugClient; }
   void setDebugClient(DebuggerClient *R) {
@@ -750,47 +747,6 @@ public:
                      unsigned Alignment = alignof(FileUnit));
 };
   
-/// A container for a module-level definition derived as part of an implicit
-/// protocol conformance.
-class DerivedFileUnit final : public FileUnit {
-  TinyPtrVector<FuncDecl *> DerivedDecls;
-
-public:
-  DerivedFileUnit(ModuleDecl &M);
-  ~DerivedFileUnit() = default;
-
-  void addDerivedDecl(FuncDecl *FD) {
-    DerivedDecls.push_back(FD);
-  }
-
-  void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                   NLKind lookupKind,
-                   SmallVectorImpl<ValueDecl*> &result) const override;
-  
-  void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
-                          VisibleDeclConsumer &consumer,
-                          NLKind lookupKind) const override;
-  
-  void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
-
-  void lookupObjCMethods(
-         ObjCSelector selector,
-         SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
-
-  Identifier
-  getDiscriminatorForPrivateValue(const ValueDecl *D) const override {
-    llvm_unreachable("no private decls in the derived file unit");
-  }
-
-  static bool classof(const FileUnit *file) {
-    return file->getKind() == FileUnitKind::Derived;
-  }
-  static bool classof(const DeclContext *DC) {
-    return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
-  }
-};
-
-
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of

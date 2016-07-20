@@ -37,9 +37,6 @@ static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
     ntd->addMember(D, Hint);
   } else if (auto *ed = dyn_cast<ExtensionDecl>(DC)) {
     ed->addMember(D, Hint);
-  } else if (isa<SourceFile>(DC)) {
-    auto *mod = DC->getParentModule();
-    mod->getDerivedFileUnit().addDerivedDecl(cast<FuncDecl>(D));
   } else {
     assert((isa<AbstractFunctionDecl>(DC) || isa<FileUnit>(DC)) &&
            "Unknown declcontext");
