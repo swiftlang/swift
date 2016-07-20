@@ -38,7 +38,7 @@ A smoke test on Linux does the following:
 
 1. Builds the compiler incrementally.
 2. Builds the standard library incrementally.
-3. lldb is build incrementally.
+3. lldb is built incrementally.
 4. The swift test and validation-test targets are run. The optimized version of these
    tests are not run.
 5. lldb is tested.
