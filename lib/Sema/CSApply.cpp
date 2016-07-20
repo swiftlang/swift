@@ -442,19 +442,72 @@ namespace {
       // member with an implied base type.
       if (decl->getDeclContext()->isTypeContext() && isa<FuncDecl>(decl)) {
         assert(cast<FuncDecl>(decl)->isOperator() && "Must be an operator");
+
         auto openedFnType = openedType->castTo<FunctionType>();
-        auto baseTy = simplifyType(openedFnType->getInput())
-                        ->getRValueInstanceType();
+        auto simplifiedFnType
+          = simplifyType(openedFnType)->castTo<FunctionType>();
+        auto baseTy = simplifiedFnType->getInput()->getRValueInstanceType();
+
+        // Handle operator requirements found in protocols.
+        if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+          // If we don't have an archetype or existential, we have to call the
+          // witness.
+          // FIXME: This is awful. We should be able to handle this as a call to
+          // the protocol requirement with Self == the concrete type, and SILGen
+          // (or later) can devirtualize as appropriate.
+          if (!baseTy->is<ArchetypeType>() && !baseTy->isAnyExistentialType()) {
+            auto &tc = cs.getTypeChecker();
+            ProtocolConformance *conformance = nullptr;
+            (void)tc.conformsToProtocol(baseTy, proto, cs.DC,
+                                        (ConformanceCheckFlags::InExpression|
+                                         ConformanceCheckFlags::Used),
+                                        &conformance);
+            if (conformance) {
+              if (auto witnessRef = conformance->getWitness(decl, &tc)) {
+                // Hack up an AST that we can type-check (independently) to get
+                // it into the right form.
+                // FIXME: the hope through 'getDecl()' is because
+                // SpecializedProtocolConformance doesn't substitute into
+                // witnesses' ConcreteDeclRefs.
+                Type expectedFnType = simplifiedFnType->getResult();
+                Expr *refExpr;
+                ValueDecl *witness = witnessRef.getDecl();
+                if (witness->getDeclContext()->isTypeContext()) {
+                  Expr *base =
+                    TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
+                                                 ctx);
+                  refExpr = new (ctx) MemberRefExpr(base, SourceLoc(), witness,
+                                                    loc, /*Implicit=*/true);
+                } else {
+                  refExpr = new (ctx) DeclRefExpr(witness, loc,
+                                                  /*Implicit=*/false);
+                }
+
+                if (tc.typeCheckExpression(refExpr, cs.DC,
+                                           TypeLoc::withoutLoc(expectedFnType),
+                                           CTP_CannotFail))
+                  return nullptr;
+
+               // Remove an outer function-conversion expression. This
+               // happens when we end up referring to a witness for a
+               // superclass conformance, and 'Self' differs.
+               if (auto fnConv = dyn_cast<FunctionConversionExpr>(refExpr))
+                 refExpr = fnConv->getSubExpr();
+
+                return refExpr;
+              }
+            }
+          }
+        }
+
+        // Build a reference to the protocol requirement.
         Expr *base = TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
                                                   ctx);
-        auto result = buildMemberRef(base, openedType, SourceLoc(), decl,
-                                     loc, openedFnType->getResult(),
-                                     locator, locator, implicit, semantics,
-                                     /*isDynamic=*/false);
-        if (!result)
-          return nullptr;
 
-        return result;
+        return buildMemberRef(base, openedType, SourceLoc(), decl,
+                              loc, openedFnType->getResult(),
+                              locator, locator, implicit, semantics,
+                              /*isDynamic=*/false);
       }
 
       // If this is a declaration with generic function type, build a
