@@ -59,6 +59,7 @@ extension UInt${bits} {
 %{
 Self = self_type.stdlib_name
 bits = self_type.bits
+cFuncSuffix = self_type.cFuncSuffix
 SignificandSize = self_type.significand_size
 SignificandBitCount = self_type.significand_bits
 ExponentBitCount = self_type.exponent_bits
@@ -578,7 +579,7 @@ extension ${Self}: BinaryFloatingPoint {
     var other = other
     _swift_stdlib_remainderl(&self, &other)
 %else:
-    self = _swift_stdlib_remainder${cFuncSuffix(bits)}(self, other)
+    self = _swift_stdlib_remainder${cFuncSuffix}(self, other)
 %end
   }
 
@@ -592,7 +593,7 @@ extension ${Self}: BinaryFloatingPoint {
 %if bits == 80:
     _swift_stdlib_squareRootl(&self)
 %else:
-    self = _swift_stdlib_squareRoot${cFuncSuffix(bits)}(self)
+    self = _swift_stdlib_squareRoot${cFuncSuffix}(self)
 %end
   }
 

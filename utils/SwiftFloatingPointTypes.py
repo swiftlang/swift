@@ -22,20 +22,20 @@ def getFtoIBounds(floatBits, intBits, signed):
 
 class SwiftFloatType(object):
     
-    def __init__(self, name, significandBits, exponentBits, significandSize, totalBits):
+    def __init__(self, name, cFuncSuffix, significandBits, exponentBits, significandSize, totalBits):
         self.stdlib_name = name
+        self.cFuncSuffix = cFuncSuffix
         self.significand_bits = significandBits
         self.significand_size = significandSize
         self.exponent_bits = exponentBits
         self.explicit_significand_bits = significandBits + 1
         self.bits = totalBits
         
-        
 def floating_point_bits_to_type():
     return {
-        32: SwiftFloatType(name="Float",   significandBits=23, exponentBits=8,  significandSize=32, totalBits=32),
-        64: SwiftFloatType(name="Double",  significandBits=52, exponentBits=11, significandSize=64, totalBits=64),
-        80: SwiftFloatType(name="Float80", significandBits=63, exponentBits=15, significandSize=64, totalBits=80),
+        32: SwiftFloatType(name="Float",   cFuncSuffix="f", significandBits=23, exponentBits=8,  significandSize=32, totalBits=32),
+        64: SwiftFloatType(name="Double",  cFuncSuffix="",  significandBits=52, exponentBits=11, significandSize=64, totalBits=64),
+        80: SwiftFloatType(name="Float80", cFuncSuffix="l", significandBits=63, exponentBits=15, significandSize=64, totalBits=80),
     }
 
 def all_floating_point_types():
