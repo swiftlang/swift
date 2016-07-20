@@ -4072,6 +4072,9 @@ Type ModuleFile::getType(TypeID TID) {
     return nullptr;
   }
 
+  // Invoke the callback on the deserialized type.
+  DeserializedTypeCallback(typeOrOffset);
+
   return typeOrOffset;
 }
 

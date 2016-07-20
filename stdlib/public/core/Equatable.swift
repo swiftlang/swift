@@ -17,9 +17,9 @@
 /// A type that can be compared for value equality.
 ///
 /// Types that conform to the `Equatable` protocol can be compared for equality
-/// using the is-equal-to operator (`==`) or inequality using the
-/// is-not-equal-to operator (`!=`). Most basic types in the Swift standard
-/// library conform to `Equatable`.
+/// using the equal-to operator (`==`) or inequality using the not-equal-to
+/// operator (`!=`). Most basic types in the Swift standard library conform to
+/// `Equatable`.
 ///
 /// Some sequence and collection operations can be used more simply when the
 /// elements conform to `Equatable`. For example, to check whether an array
@@ -48,10 +48,10 @@
 /// `Comparable` protocols, which allow more uses of your custom type, such as
 /// constructing sets or sorting the elements of a collection.
 ///
-/// To adopt the `Equatable` protocol, implement the "is equal to" operator
-/// (`==`). The standard library provides an implementation for the "is not
-/// equal to" operator (`!=`) for any `Equatable` type, which calls the custom
-/// `==` function and negates its result.
+/// To adopt the `Equatable` protocol, implement the equal-to operator (`==`).
+/// The standard library provides an implementation for the not-equal-to
+/// operator (`!=`) for any `Equatable` type, which calls the custom `==`
+/// function and negates its result.
 ///
 /// As an example, consider a `StreetAddress` structure that holds the parts of
 /// a street address: a house or building number, the street name, and an
@@ -136,9 +136,9 @@
 ///         return lhs.value == rhs.value
 ///     }
 ///
-/// The implementation of the `==` function returns the same value whether
-/// its two arguments are the same instance or are two different instances
-/// with the same integer stored in their `value` properties. For example:
+/// The implementation of the `==` function returns the same value whether its
+/// two arguments are the same instance or are two different instances with
+/// the same integer stored in their `value` properties. For example:
 ///
 ///     let a = IntegerRef(100)
 ///     let b = IntegerRef(100)
@@ -147,7 +147,7 @@
 ///     // Prints "true, true"
 ///
 /// Class instance identity, on the other hand, is compared using the
-/// triple-equals "is identical to" operator (`===`). For example:
+/// triple-equals identical-to operator (`===`). For example:
 ///
 ///     let c = a
 ///     print(a === c, b === c, separator: ", ")
@@ -169,7 +169,7 @@ public protocol Equatable {
 /// Inequality is the inverse of equality. For any values `a` and `b`, `a != b`
 /// implies that `a == b` is `false`.
 ///
-/// This is the default implementation of the is-not-equal-to operator (`!=`)
+/// This is the default implementation of the not-equal-to operator (`!=`)
 /// for any type that conforms to `Equatable`.
 ///
 /// - Parameters:

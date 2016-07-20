@@ -229,7 +229,7 @@ if True:
 /// array's first and last elements. If the array is empty, these properties
 /// are `nil`.
 ///
-///     if let firstElement = oddNumbers.first, lastElement = oddNumbers.last {
+///     if let firstElement = oddNumbers.first, let lastElement = oddNumbers.last {
 ///         print(firstElement, lastElement, separator: ", ")
 ///     }
 ///     // Prints "1, 15"
