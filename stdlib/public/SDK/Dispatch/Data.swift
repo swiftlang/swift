@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public typealias Iterator = DispatchDataIterator
 	public typealias Index = Int
@@ -43,8 +45,8 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter bytes: A pointer to the memory. It will be copied.
 	/// - parameter count: The number of bytes to copy.
 	public init(bytes buffer: UnsafeBufferPointer<UInt8>) {
-		__wrapped = __dispatch_data_create(
-			buffer.baseAddress!, buffer.count, nil, _dispatch_data_destructor_default())
+		__wrapped = _swift_dispatch_data_create(
+			buffer.baseAddress!, buffer.count, nil, _dispatch_data_destructor_default()) as! __DispatchData
 	}
 
 	/// Initialize a `Data` without copying the bytes.
@@ -55,8 +57,8 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public init(bytesNoCopy bytes: UnsafeBufferPointer<UInt8>, deallocator: Deallocator = .free) {
 		let (q, b) = deallocator._deallocator
 
-		__wrapped = __dispatch_data_create(
-			bytes.baseAddress!, bytes.count, q, b)
+		__wrapped = _swift_dispatch_data_create(
+			bytes.baseAddress!, bytes.count, q, b) as! __DispatchData
 	}
 
 	internal init(data: __DispatchData) {
@@ -93,7 +95,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter bytes: A pointer to the bytes to copy in to the data.
 	/// - parameter count: The number of bytes to copy.
 	public mutating func append(_ bytes: UnsafePointer<UInt8>, count: Int) {
-		let data = __dispatch_data_create(bytes, count, nil, _dispatch_data_destructor_default())
+		let data = _swift_dispatch_data_create(bytes, count, nil, _dispatch_data_destructor_default()) as! __DispatchData
 		self.append(DispatchData(data: data))
 	}
 
@@ -101,7 +103,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	///
 	/// - parameter data: The data to append to this data.
 	public mutating func append(_ other: DispatchData) {
-		let data = __dispatch_data_create_concat(__wrapped, other as __DispatchData)
+		let data = __dispatch_data_create_concat(__wrapped, other.__wrapped)
 		__wrapped = data
 	}
 
@@ -239,13 +241,13 @@ public struct DispatchDataIterator : IteratorProtocol, Sequence {
 			_data as __DispatchData, &ptr, &self._count)
 		self._ptr = UnsafePointer(ptr)
 		self._position = _data.startIndex
+
+		// The only time we expect a 'nil' pointer is when the data is empty.
 		assert(self._ptr != nil || self._count == self._position)
 	}
 
 	/// Advance to the next element and return it, or `nil` if no next
 	/// element exists.
-	///
-	/// - Precondition: No preceding call to `self.next()` has returned `nil`.
 	public mutating func next() -> DispatchData._Element? {
 		if _position == _count { return nil }
 		let element = _ptr[_position];

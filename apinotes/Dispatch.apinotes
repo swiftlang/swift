@@ -198,7 +198,7 @@ Functions:
   AvailabilityMsg: 'Use DispatchWorkItem.isCancelled'
 # dispatch_data
 - Name: dispatch_data_create
-  SwiftPrivate: true
+  Availability: nonswift
 - Name: dispatch_data_get_size
   SwiftPrivate: true
 - Name: dispatch_data_apply
