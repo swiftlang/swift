@@ -287,7 +287,7 @@ tests.test("Another/${Any}") {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  expectEmpty(subclassAsAnyArray as? [protocol<Barable, Bazable>])
+  expectEmpty(subclassAsAnyArray as? [Barable & Bazable])
 }
 
 //===--- Explicitly Bridged -----------------------------------------------===//

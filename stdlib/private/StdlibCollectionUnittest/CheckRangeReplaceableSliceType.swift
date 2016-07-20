@@ -151,8 +151,8 @@ extension TestSuite {
   } // addRangeReplaceableSliceTests
 
   public func addRangeReplaceableBidirectionalSliceTests<
-    C : protocol<BidirectionalCollection, RangeReplaceableCollection>,
-    CollectionWithEquatableElement : protocol<BidirectionalCollection, RangeReplaceableCollection>
+    C : BidirectionalCollection & RangeReplaceableCollection,
+    CollectionWithEquatableElement : BidirectionalCollection & RangeReplaceableCollection
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
@@ -298,8 +298,8 @@ extension TestSuite {
   } // addRangeReplaceableBidirectionalSliceTests
 
   public func addRangeReplaceableRandomAccessSliceTests<
-    C : protocol<RandomAccessCollection, RangeReplaceableCollection>,
-    CollectionWithEquatableElement : protocol<RandomAccessCollection, RangeReplaceableCollection>
+    C : RandomAccessCollection & RangeReplaceableCollection,
+    CollectionWithEquatableElement : RandomAccessCollection & RangeReplaceableCollection
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
