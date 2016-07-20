@@ -195,6 +195,8 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
 <decl:Var>var <loc>FOO_MACRO_11</loc>: <ref:Struct>Int</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_OR</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_AND</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_BITWIDTH</loc>: <ref:Struct>UInt64</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_SIGNED</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_REDEF_1</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_REDEF_2</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Func>func <loc>theLastDeclInFoo()</loc></decl>

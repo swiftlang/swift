@@ -233,6 +233,8 @@ var FOO_MACRO_10: Int16 { get }
 var FOO_MACRO_11: Int { get }
 var FOO_MACRO_OR: Int32 { get }
 var FOO_MACRO_AND: Int32 { get }
+var FOO_MACRO_BITWIDTH: UInt64 { get }
+var FOO_MACRO_SIGNED: Int32 { get }
 
 var FOO_MACRO_REDEF_1: Int32 { get }
 
