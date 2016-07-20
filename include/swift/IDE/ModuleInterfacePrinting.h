@@ -52,7 +52,7 @@ bool printTypeInterface(ModuleDecl *M, Type Ty, ASTPrinter &Printer,
                         std::string &TypeName, std::string &Error);
 
 bool printTypeInterface(ModuleDecl *M, StringRef TypeUSR, ASTPrinter &Printer,
-                        std::string &TyepName, std::string &Error);
+                        std::string &TypeName, std::string &Error);
 
 void printModuleInterface(ModuleDecl *M, Optional<StringRef> Group,
                           ModuleTraversalOptions TraversalOptions,
