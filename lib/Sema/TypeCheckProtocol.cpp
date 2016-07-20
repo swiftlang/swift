@@ -1509,8 +1509,7 @@ static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
 }
 
 /// Clean up the given declaration type for display purposes.
-static Type getTypeForDisplay(TypeChecker &tc, Module *module,
-                              ValueDecl *decl) {
+static Type getTypeForDisplay(Module *module, ValueDecl *decl) {
   // If we're not in a type context, just grab the interface type.
   Type type = decl->getInterfaceType();
   if (!decl->getDeclContext()->isTypeContext() ||
@@ -1543,7 +1542,7 @@ static Type getTypeForDisplay(TypeChecker &tc, Module *module,
 static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
                                          NormalProtocolConformance *conformance,
                                          ValueDecl *req) {
-  auto type = getTypeForDisplay(tc, module, req);
+  auto type = getTypeForDisplay(module, req);
 
   // Replace generic type parameters and associated types with their
   // witnesses, when we have them.
@@ -1737,7 +1736,7 @@ diagnoseMatch(TypeChecker &tc, Module *module,
 
   case MatchKind::TypeConflict: {
     auto diag = tc.diagnose(match.Witness, diag::protocol_witness_type_conflict,
-                            getTypeForDisplay(tc, module, match.Witness),
+                            getTypeForDisplay(module, match.Witness),
                             withAssocTypes);
     if (!isa<TypeDecl>(req))
       fixItOverrideDeclarationTypes(tc, diag, match.Witness, req);
