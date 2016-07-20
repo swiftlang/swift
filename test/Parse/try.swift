@@ -42,10 +42,10 @@ i = try? foo() + bar()
 i ?+= try? foo() + bar()
 i ?+= try? foo() %%%% bar() // expected-error {{'try?' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}} // expected-warning {{result of operator '%%%%' is unused}}
 i ?+= try? foo() %%% bar()
-_ = foo() < try? bar() // expected-error {{'try?' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
-_ = (try? foo()) < bar() // expected-error {{call can throw but is not marked with 'try'}}
-_ = foo() < (try? bar()) // expected-error {{call can throw but is not marked with 'try'}}
-_ = (try? foo()) < (try? bar())
+_ = foo() == try? bar() // expected-error {{'try?' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
+_ = (try? foo()) == bar() // expected-error {{call can throw but is not marked with 'try'}}
+_ = foo() == (try? bar()) // expected-error {{call can throw but is not marked with 'try'}}
+_ = (try? foo()) == (try? bar())
 
 let j = true ? try? foo() : try? bar() + 0
 let k = true ? try? foo() : try? bar() %%% 0 // expected-error {{'try?' following conditional operator does not cover everything to its right}}

@@ -73,7 +73,6 @@ func testRelation(_ p: (Int?, Int?) -> Bool) -> [Bool] {
 OptionalTests.test("Equatable") {
   expectEqual([true, false, false, false, false, true], testRelation(==))
   expectEqual([false, true, true, true, true, false], testRelation(!=))
-  expectEqual([false, true, false, false, true, false], testRelation(<))
 }
 
 OptionalTests.test("CustomReflectable") {
