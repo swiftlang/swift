@@ -440,7 +440,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *ParentExpr=nullptr) {
       // This only cares about declarations of noescape function type.
       auto AFT = DRE->getDecl()->getType()->getAs<AnyFunctionType>();
-      if (!AFT || !AFT->isNoEscape())
+      if (!AFT || AFT->isEscaping())
         return;
 
       // Only diagnose this once.  If we check and accept this use higher up in

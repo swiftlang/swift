@@ -2167,7 +2167,6 @@ public:
 
     bool isNoReturn() const { return Bits & NoReturnMask; }
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
-    bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool isExplicitlyEscaping() const { return Bits & ExplicitlyEscapingMask; }
     bool throws() const { return Bits & ThrowsMask; }
     Representation getRepresentation() const {
@@ -2176,6 +2175,8 @@ public:
              && "unexpected SIL representation");
       return Representation(rawRep);
     }
+
+    bool isEscaping() const { return isExplicitlyEscaping() || (Bits & NoEscapeMask) == 0; }
 
     bool hasSelfParam() const {
       switch (getSILRepresentation()) {
@@ -2224,11 +2225,11 @@ public:
       else
         return ExtInfo(Bits & ~AutoClosureMask);
     }
-    ExtInfo withNoEscape(bool NoEscape = true) const {
-      if (NoEscape)
-        return ExtInfo(Bits | NoEscapeMask);
-      else
+    ExtInfo withEscaping(bool Escaping = true) const {
+      if (Escaping)
         return ExtInfo(Bits & ~NoEscapeMask);
+      else
+        return ExtInfo(Bits | NoEscapeMask);
     }
     ExtInfo withThrows(bool Throws = true) const {
       if (Throws)
@@ -2298,8 +2299,8 @@ public:
 
   /// \brief True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
-  bool isNoEscape() const {
-    return getExtInfo().isNoEscape();
+  bool isEscaping() const {
+    return getExtInfo().isEscaping();
   }
 
   /// \brief True if the parameter declaration it is attached to has explicitly

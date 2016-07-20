@@ -2527,7 +2527,7 @@ namespace {
       // A direct call to a ClosureExpr makes it noescape.
       FunctionType::ExtInfo extInfo;
       if (isa<ClosureExpr>(fnExpr->getSemanticsProvidingExpr()))
-        extInfo = extInfo.withNoEscape();
+        extInfo = extInfo.withEscaping(false);
       
       auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy,
                                       extInfo);

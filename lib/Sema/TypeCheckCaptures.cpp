@@ -171,8 +171,8 @@ public:
     // If VD is a noescape decl, then the closure we're computing this for
     // must also be noescape.
     if (VD->hasType() && VD->getType()->is<AnyFunctionType>() &&
-        VD->getType()->castTo<AnyFunctionType>()->isNoEscape() &&
-        !capture.isNoEscape() &&
+        !VD->getType()->castTo<AnyFunctionType>()->isEscaping() &&
+        capture.isEscaping() &&
         // Don't repeatedly diagnose the same thing.
         Diagnosed.insert(VD).second) {
 

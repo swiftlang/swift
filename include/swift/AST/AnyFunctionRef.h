@@ -134,7 +134,9 @@ public:
     auto *CE = TheFunction.get<AbstractClosureExpr *>();
     if (!CE->getType() || CE->getType()->is<ErrorType>())
       return false;
-    return CE->getType()->castTo<FunctionType>()->isNoEscape();
+
+    bool isEscaping = CE->getType()->castTo<FunctionType>()->isEscaping();
+    return !isEscaping;
   }
 
   bool isObjC() const {

@@ -1610,8 +1610,8 @@ Type ConstraintSystem::simplifyType(Type type,
       auto it = extraFunctionAttrs.find(ft);
       if (it != extraFunctionAttrs.end()) {
         auto extInfo = ft->getExtInfo();
-        if (it->second.isNoEscape())
-          extInfo = extInfo.withNoEscape();
+        if (!it->second.isEscaping())
+          extInfo = extInfo.withEscaping(false);
         if (it->second.isNoReturn())
           extInfo = extInfo.withIsNoReturn();
         if (it->second.throws())
@@ -1640,8 +1640,8 @@ Type Solution::simplifyType(TypeChecker &tc, Type type) const {
       auto it = CS.extraFunctionAttrs.find(ft);
       if (it != CS.extraFunctionAttrs.end()) {
         auto extInfo = ft->getExtInfo();
-        if (it->second.isNoEscape())
-          extInfo = extInfo.withNoEscape();
+        if (!it->second.isEscaping())
+          extInfo = extInfo.withEscaping(false);
         if (it->second.isNoReturn())
           extInfo = extInfo.withIsNoReturn();
         if (it->second.throws())

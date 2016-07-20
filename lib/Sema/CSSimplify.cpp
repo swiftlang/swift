@@ -926,8 +926,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
-  if (func1->isNoEscape() != func2->isNoEscape() &&
-      (func1->isNoEscape() || kind < TypeMatchKind::Subtype))
+  if (func1->isEscaping() != func2->isEscaping() &&
+      (!func1->isEscaping() || kind < TypeMatchKind::Subtype))
     return SolutionKind::Error;
 
   if (matchFunctionRepresentations(func1->getExtInfo().getRepresentation(),
@@ -3441,9 +3441,9 @@ retry:
 
     // If our type constraints is for a FunctionType, move over the @noescape
     // flag.
-    if (func1->isNoEscape() && !func2->isNoEscape()) {
+    if (!func1->isEscaping() && func2->isEscaping()) {
       auto &extraExtInfo = extraFunctionAttrs[func2];
-      extraExtInfo = extraExtInfo.withNoEscape();
+      extraExtInfo = extraExtInfo.withEscaping(false);
     }
     return SolutionKind::Solved;
   }

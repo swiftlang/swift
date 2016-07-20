@@ -2546,7 +2546,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     if (auto destFT = toType->getAs<FunctionType>()) {
       auto destExtInfo = destFT->getExtInfo();
 
-      if (!srcFT->isNoEscape()) destExtInfo = destExtInfo.withNoEscape(false);
+      if (srcFT->isEscaping()) destExtInfo = destExtInfo.withEscaping(true);
       if (!srcFT->throws()) destExtInfo = destExtInfo.withThrows(false);
       if (destExtInfo != destFT->getExtInfo())
         toType = FunctionType::get(destFT->getInput(),
@@ -2561,7 +2561,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
         return true;
       }
 
-      if (srcFT->isNoEscape() && !destFT->isNoEscape()) {
+      if (!srcFT->isEscaping() && destFT->isEscaping()) {
         diagnose(expr->getLoc(), diag::noescape_functiontype_mismatch,
                  fromType, toType)
         .highlight(expr->getSourceRange());
@@ -3618,7 +3618,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     if (auto destFT = contextualType->getAs<FunctionType>()) {
       auto destExtInfo = destFT->getExtInfo();
       
-      if (!srcFT->isNoEscape()) destExtInfo = destExtInfo.withNoEscape(false);
+      if (srcFT->isEscaping()) destExtInfo = destExtInfo.withEscaping(true);
       if (!srcFT->throws()) destExtInfo = destExtInfo.withThrows(false);
       if (destExtInfo != destFT->getExtInfo())
         contextualType = FunctionType::get(destFT->getInput(),
@@ -3628,7 +3628,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
       // noescape, emit a specific diagnostic about that.
       if (srcFT->throws() && !destFT->throws())
         diagID = diag::throws_functiontype_mismatch;
-      else if (srcFT->isNoEscape() && !destFT->isNoEscape())
+      else if (!srcFT->isEscaping() && destFT->isEscaping())
         diagID = diag::noescape_functiontype_mismatch;
     }
 

@@ -233,7 +233,7 @@ class TypeMatcher {
         // FIXME: Compare throws()? Both existing subclasses would prefer
         // to mismatch on (!firstFunc->throws() && secondFunc->throws()), but
         // embedding that non-commutativity in this general matcher is icky.
-        if (firstFunc->isNoEscape() != secondFunc->isNoEscape())
+        if (firstFunc->isEscaping() != secondFunc->isEscaping())
           return mismatch(firstFunc.getPointer(), secondFunc);
         
         return this->visit(firstFunc.getInput(), secondFunc->getInput()) &&

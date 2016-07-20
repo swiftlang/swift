@@ -3643,12 +3643,15 @@ public:
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
     if (Options.SkipAttributes)
       return;
+    bool isEscaping = info.isEscaping();
     if (info.isAutoClosure()) {
-      if (info.isNoEscape())
-        Printer << "@autoclosure ";
-      else
+      if (isEscaping)
+        // TODO: Instead: Printer << "@autoclosure @escaping ";
         Printer << "@autoclosure(escaping) ";
-    } else if (info.isNoEscape()) {
+      else
+        Printer << "@autoclosure ";
+    } else if (!isEscaping) {
+      // TODO: Instead: else if (isEscaping) Printer << "@escaping"
       // autoclosure implies noescape.
       Printer << "@noescape ";
     } else if (info.isExplicitlyEscaping()) {

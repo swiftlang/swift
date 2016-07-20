@@ -1566,7 +1566,7 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   }
 
   // Just stop if we've already applied this attribute.
-  if (FTy->isNoEscape())
+  if (!FTy->isEscaping())
     return;
 
   // This range can be implicit e.g. if we're in the middle of diagnosing
@@ -1582,9 +1582,9 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
     .fixItRemove(attrRemovalRange) 
     .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape ");
 
-  // Change the type to include the noescape bit.
+  // Change the type to clear the escaping bit.
   PD->overwriteType(FunctionType::get(FTy->getInput(), FTy->getResult(),
-                                      FTy->getExtInfo().withNoEscape(true)));
+                                      FTy->getExtInfo().withEscaping(false)));
 }
 
 

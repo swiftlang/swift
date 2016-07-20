@@ -60,7 +60,7 @@ public:
   }
 
   bool isDirect() const { return Value.getInt() & IsDirect; }
-  bool isNoEscape() const { return Value.getInt() & IsNoEscape; }
+  bool isEscaping() const { return (Value.getInt() & IsNoEscape) == 0; }
 
   bool isDynamicSelfMetadata() const { return !Value.getPointer(); }
 
