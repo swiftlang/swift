@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "deserialize"
 #include "DeserializeSIL.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Serialization/ModuleFile.h"
 #include "SILFormat.h"
 #include "swift/SIL/SILArgument.h"
@@ -559,6 +560,16 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   // is required for adding typedef operands to instructions.
   Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 
+  // Define a callback to be invoked on the deserialized types.
+  auto OldDeserializedTypeCallback = MF->DeserializedTypeCallback;
+  SWIFT_DEFER {
+    MF->DeserializedTypeCallback = OldDeserializedTypeCallback;
+  };
+
+  MF->DeserializedTypeCallback = [&OpenedArchetypesTracker] (Type ty) {
+    OpenedArchetypesTracker.registerUsedOpenedArchetypes(ty);
+  };
+
   // Another SIL_FUNCTION record means the end of this SILFunction.
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
   // of this SILFunction.
@@ -597,6 +608,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   // error.
   if (fn->empty() && errorIfEmptyBody)
     return nullptr;
+
+  // Check that there are no unresolved forward definitions of opened
+  // archetypes.
+  if (OpenedArchetypesTracker.hasUnresolvedOpenedArchetypeDefinitions())
+    llvm_unreachable(
+        "All forward definitions of opened archetypes should be resolved");
 
   if (Callback)
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
