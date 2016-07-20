@@ -119,7 +119,7 @@ public func run_Dictionary(scale: Int) {
   for _ in 1...N {
     Dict = [:]
     for word in Input {
-      Dict[word] = true;
+      Dict[word] = true
     }
   }
   CheckResults(Dict.count == 270,
@@ -272,7 +272,7 @@ public func run_DictionaryOfObjects(scale: Int) {
   for _ in 1...N {
     Dict = [:]
     for word in Input {
-      Dict[Box(word)] = Box(true);
+      Dict[Box(word)] = Box(true)
     }
   }
   CheckResults(Dict.count == 270,

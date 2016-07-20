@@ -26,7 +26,7 @@ public func run_SetIsSubsetOf(_ N: Int) {
     otherSet.insert(Int(truncatingBitPattern: Random()))
   }
 
-  var isSubset = false;
+  var isSubset = false
   for _ in 0 ..< N * 5000 {
     isSubset = set.isSubset(of: otherSet)
     if isSubset {
@@ -137,7 +137,7 @@ public func run_SetIsSubsetOf_OfObjects(_ N: Int) {
     otherSet.insert(Box(Int(truncatingBitPattern: Random())))
   }
 
-  var isSubset = false;
+  var isSubset = false
   for _ in 0 ..< N * 5000 {
     isSubset = set.isSubset(of: otherSet)
     if isSubset {

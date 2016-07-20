@@ -110,5 +110,5 @@ let samples: [rrggbb_t] = [
 
 @inline(never)
 public func run_Histogram(_ N: Int) {
-  output_sorted_sparse_rgb_histogram(samples, N);
+  output_sorted_sparse_rgb_histogram(samples, N)
 }
