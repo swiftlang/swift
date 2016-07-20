@@ -2126,17 +2126,21 @@ public:
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |representation|isAutoClosure|noReturn|noEscape|throws|
-    //   |    0 .. 3    |      4      |   5    |    6   |   7  |
+    //   |representation|isAutoClosure|noReturn|isEscaping|throws|
+    //   |    0 .. 3    |      4      |   5    |    6     |   7  |
     //
     enum : uint16_t { RepresentationMask     = 0x00F };
     enum : uint16_t { AutoClosureMask        = 0x010 };
     enum : uint16_t { NoReturnMask           = 0x020 };
-    enum : uint16_t { NoEscapeMask           = 0x040 };
+    enum : uint16_t { EscapingMask           = 0x040 };
     enum : uint16_t { ThrowsMask             = 0x080 };
     enum : uint16_t { ExplicitlyEscapingMask = 0x100 };
 
-    uint16_t Bits;
+	// By default, we assume escaping
+    // TODO: Swift default
+    enum : uint16_t { DefaultBits = EscapingMask };
+
+    uint16_t Bits = DefaultBits;
 
     ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
 
@@ -2144,7 +2148,7 @@ public:
     
   public:
     // Constructor with all defaults.
-    ExtInfo() : Bits(0) {
+    ExtInfo() : Bits(DefaultBits) {
       assert(getRepresentation() == Representation::Swift);
     }
 
@@ -2152,7 +2156,8 @@ public:
     ExtInfo(Representation Rep, bool IsNoReturn, bool Throws) {
       Bits = ((unsigned) Rep) |
              (IsNoReturn ? NoReturnMask : 0) |
-             (Throws ? ThrowsMask : 0);
+             (Throws ? ThrowsMask : 0) |
+             DefaultBits;
     }
 
     // Constructor with no defaults.
@@ -2161,8 +2166,13 @@ public:
             bool Throws)
       : ExtInfo(Rep, IsNoReturn, Throws) {
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
-      Bits |= (IsEscaping ? 0 : NoEscapeMask);
+      // TODO: can do simple | pattern when default is not to escape
+      if (IsEscaping)
+        Bits |= EscapingMask;
+      else
+        Bits &= ~EscapingMask;
       Bits |= (IsExplicitlyEscaping ? ExplicitlyEscapingMask : 0);
+
     }
 
     bool isNoReturn() const { return Bits & NoReturnMask; }
@@ -2176,7 +2186,7 @@ public:
       return Representation(rawRep);
     }
 
-    bool isEscaping() const { return isExplicitlyEscaping() || (Bits & NoEscapeMask) == 0; }
+    bool isEscaping() const { return isExplicitlyEscaping() || (Bits & EscapingMask); }
 
     bool hasSelfParam() const {
       switch (getSILRepresentation()) {
@@ -2227,9 +2237,9 @@ public:
     }
     ExtInfo withEscaping(bool Escaping = true) const {
       if (Escaping)
-        return ExtInfo(Bits & ~NoEscapeMask);
+        return ExtInfo(Bits | EscapingMask);
       else
-        return ExtInfo(Bits | NoEscapeMask);
+        return ExtInfo(Bits & ~EscapingMask);
     }
     ExtInfo withThrows(bool Throws = true) const {
       if (Throws)
