@@ -274,6 +274,20 @@ public:
   void printText(StringRef Text) override;
 };
 
+/// AST stream printer that adds extra indentation to each line.
+class ExtraIndentStreamPrinter : public StreamPrinter {
+  StringRef ExtraIndent;
+
+public:
+  ExtraIndentStreamPrinter(raw_ostream &out, StringRef extraIndent)
+  : StreamPrinter(out), ExtraIndent(extraIndent) { }
+
+  virtual void printIndent() {
+    printText(ExtraIndent);
+    StreamPrinter::printIndent();
+  }
+};
+
 bool shouldPrint(const Decl *D, PrintOptions &Options);
 bool shouldPrintPattern(const Pattern *P, PrintOptions &Options);
 

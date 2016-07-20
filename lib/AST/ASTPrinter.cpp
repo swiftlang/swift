@@ -124,6 +124,7 @@ public:
 };
 
 class ArchetypeSelfTransformer : public PrinterTypeTransformer {
+protected:
   Type BaseTy;
   DeclContext &DC;
   const ASTContext &Ctx;
@@ -204,6 +205,30 @@ public:
       return StringRef(*Buffers.back());
     }
     return tryNamedArchetypeTransform(TypeName);
+  }
+};
+
+class ArchetypeAndDynamicSelfTransformer : public ArchetypeSelfTransformer {
+public:
+  using ArchetypeSelfTransformer::ArchetypeSelfTransformer;
+
+  Type transform(Type Ty) override {
+    if (Ty->is<DynamicSelfType>()) {
+      return BaseTy;
+    }
+    return ArchetypeSelfTransformer::transform(Ty);
+  }
+
+  StringRef transform(StringRef TypeName) override {
+    if (TypeName == "Self") {
+      std::unique_ptr<std::string> pBuffer(new std::string);
+      llvm::raw_string_ostream OS(*pBuffer);
+      BaseTy.print(OS);
+      OS.str();
+      Buffers.push_back(std::move(pBuffer));
+      return StringRef(*Buffers.back());
+    }
+    return ArchetypeSelfTransformer::transform(TypeName);
   }
 };
 
@@ -676,6 +701,12 @@ void PrintOptions::setArchetypeSelfTransformForQuickHelp(Type T,
                                                          DeclContext *DC) {
   TransformContext = std::make_shared<TypeTransformContext>(
     new ArchetypeSelfTransformer(T, *DC));
+}
+
+void PrintOptions::setArchetypeAndDynamicSelfTransform(Type T,
+                                                       DeclContext *DC) {
+  TransformContext = std::make_shared<TypeTransformContext>(
+    new ArchetypeAndDynamicSelfTransformer(T, *DC));
 }
 
 void PrintOptions::
@@ -1737,8 +1768,9 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   // We sometimes want to print the accessors abstractly
   // instead of listing out how they're actually implemented.
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
-  if (inProtocol ||
-      (Options.AbstractAccessors && !Options.FunctionDefinitions)) {
+  if (!Options.FunctionBody &&
+      (inProtocol ||
+        (Options.AbstractAccessors && !Options.FunctionDefinitions))) {
     bool mutatingGetter = ASD->getGetter() && ASD->isGetterMutating();
     bool settable = ASD->isSettable(nullptr);
     bool nonmutatingSetter = false;
@@ -1789,7 +1821,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
 
   // Otherwise, print all the concrete defining accessors.
 
-  bool PrintAccessorBody = Options.FunctionDefinitions;
+  bool PrintAccessorBody = Options.FunctionDefinitions || Options.FunctionBody;
 
   auto PrintAccessor = [&](FuncDecl *Accessor, StringRef Label) {
     if (!Accessor)
@@ -1833,8 +1865,19 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
 
   case AbstractStorageDecl::StoredWithTrivialAccessors:
   case AbstractStorageDecl::Computed:
-    PrintAccessor(ASD->getGetter(), "get");
-    PrintAccessor(ASD->getSetter(), "set");
+    if (ASD->getGetter() && !ASD->getSetter() && PrintAccessorBody &&
+          !Options.FunctionDefinitions) {
+      // Omit the 'get' keyword. Directly print getter
+      if (auto BodyFunc = Options.FunctionBody) {
+        Printer.printNewline();
+        IndentRAII IndentBody(*this);
+        indent();
+        Printer << BodyFunc(ASD->getGetter());
+      }
+    } else {
+      PrintAccessor(ASD->getGetter(), "get");
+      PrintAccessor(ASD->getSetter(), "set");
+    }
     break;
 
   case AbstractStorageDecl::StoredWithObservers:
@@ -2672,7 +2715,16 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         });
       Printer << " {";
     }
-    if (Options.FunctionDefinitions && decl->getBody()) {
+    if (auto BodyFunc = Options.FunctionBody) {
+      {
+        IndentRAII IndentBody(*this);
+        indent();
+        Printer.printNewline();
+        Printer << BodyFunc(decl);
+      }
+      indent();
+      Printer.printNewline();
+    } else if (Options.FunctionDefinitions && decl->getBody()) {
       if (printASTNodes(decl->getBody()->getElements())) {
         Printer.printNewline();
         indent();
@@ -2731,12 +2783,22 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       }
     }
 
-    if (!Options.FunctionDefinitions || !decl->getBody()) {
-      return;
-    }
+    if (auto BodyFunc = Options.FunctionBody) {
+      Printer << " {";
+      Printer.printNewline();
+      {
+        IndentRAII IndentBody(*this);
+        indent();
+        Printer << BodyFunc(decl);
+      }
+      indent();
+      Printer.printNewline();
+      Printer << "}";
 
-    Printer << " ";
-    visit(decl->getBody());
+    } else if (Options.FunctionDefinitions && decl->getBody()) {
+      Printer << " ";
+      visit(decl->getBody());
+    }
   }
 }
 
@@ -2860,12 +2922,21 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
       printFunctionParameters(decl);
     });
 
-  if (!Options.FunctionDefinitions || !decl->getBody()) {
-    return;
+  if (auto BodyFunc = Options.FunctionBody) {
+    Printer << " {";
+    {
+      Printer.printNewline();
+      IndentRAII IndentBody(*this);
+      indent();
+      Printer << BodyFunc(decl);
+    }
+    indent();
+    Printer.printNewline();
+    Printer << "}";
+  } else if (Options.FunctionDefinitions && decl->getBody()) {
+    Printer << " ";
+    visit(decl->getBody());
   }
-
-  Printer << " ";
-  visit(decl->getBody());
 }
 
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
@@ -3359,6 +3430,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return true;
 
     Module *M = D->getDeclContext()->getParentModule();
+
+    if (Options.CurrentModule && M == Options.CurrentModule) {
+      return false;
+    }
 
     // Don't print qualifiers for types from the standard library.
     if (M->isStdlibModule() ||

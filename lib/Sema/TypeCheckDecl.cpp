@@ -7148,22 +7148,6 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
   }
 }
 
-namespace {
-  /// AST stream printer that adds extra indentation to each line.
-  class ExtraIndentStreamPrinter : public StreamPrinter {
-    StringRef ExtraIndent;
-
-  public:
-    ExtraIndentStreamPrinter(raw_ostream &out, StringRef extraIndent)
-    : StreamPrinter(out), ExtraIndent(extraIndent) { }
-
-    virtual void printIndent() {
-      printText(ExtraIndent);
-      StreamPrinter::printIndent();
-    }
-  };
-}
-
 /// Diagnose a missing required initializer.
 static void diagnoseMissingRequiredInitializer(
               TypeChecker &TC,
