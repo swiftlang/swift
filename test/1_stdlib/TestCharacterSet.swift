@@ -150,7 +150,6 @@ class TestCharacterSet : TestCharacterSetSuper {
         let cs = CharacterSet() as NSCharacterSet
         let expected: AnyClass = NSCharacterSet.self as AnyClass
         expectTrue(cs.classForCoder == expected)
-        expectTrue(cs.classForArchiver == expected)
         expectTrue(cs.classForKeyedArchiver == expected)
     }
 }

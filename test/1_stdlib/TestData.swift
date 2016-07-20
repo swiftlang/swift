@@ -824,7 +824,6 @@ class TestData : TestDataSuper {
         let d = Data() as NSData
         let expected: AnyClass = NSData.self as AnyClass
         expectTrue(d.classForCoder == expected)
-        expectTrue(d.classForArchiver == expected)
         expectTrue(d.classForKeyedArchiver == expected)
     }
 }
