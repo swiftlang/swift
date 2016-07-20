@@ -1270,6 +1270,7 @@ func _unsafeUpcast<T, U>(_ x: T, to: U.Type) -> U {
 ///   protocol (such as `AnyObject`) of `DerivedValue`.
 public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
   -> Set<BaseValue> {
+  print("## _setUpCast<\(DerivedValue.self), \(BaseValue.self)>")
   var builder = _SetBuilder<BaseValue>(count: source.count)
   for x in source {
     builder.add(member: _unsafeUpcast(x, to: BaseValue.self))
@@ -1288,6 +1289,7 @@ public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
 public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
   _ source: Set<SwiftValue>
 ) -> Set<ObjCValue> {
+  print("## _setBridgeToObjectiveC<\(SwiftValue.self), \(ObjCValue.self)>")
   _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
 
@@ -1323,6 +1325,7 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
 public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   -> Set<DerivedValue> {
 
+  print("## _setDownCast<\(BaseValue.self), \(DerivedValue.self)>")
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
@@ -1349,6 +1352,7 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
 public func _setDownCastConditional<BaseValue, DerivedValue>(
   _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {
+  print("## _setDownCastConditional<\(BaseValue.self), \(DerivedValue.self)>")
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
@@ -1389,6 +1393,7 @@ public func _setBridgeFromObjectiveCConditional<
 >(
   _ source: Set<ObjCValue>
 ) -> Set<SwiftValue>? {
+  print("## _setBridgeFromObjectiveCConditional<\(ObjCValue.self), \(SwiftValue.self)>")
   _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
 
@@ -2182,6 +2187,7 @@ internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
 public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
     _ source: Dictionary<DerivedKey, DerivedValue>
 ) -> Dictionary<BaseKey, BaseValue> {
+  print("## _dictionaryUpCast<\(DerivedKey.self), \(DerivedValue.self), \(BaseKey.self), \(BaseValue.self)>")
   var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
 
   for (k, v) in source {
@@ -2206,6 +2212,7 @@ public func _dictionaryBridgeToObjectiveC<
 >(
   _ source: Dictionary<SwiftKey, SwiftValue>
 ) -> Dictionary<ObjCKey, ObjCValue> {
+  print("## _dictionaryBridgeToObjectiveC<\(SwiftKey.self), \(SwiftValue.self), \(ObjCKey.self), \(ObjCValue.self)>")
 
   // Note: We force this function to stay in the swift dylib because
   // it is not performance sensitive and keeping it in the dylib saves
@@ -2264,6 +2271,7 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue> {
 
+  print("## _dictionaryDownCast<\(BaseKey.self), \(BaseValue.self), \(DerivedKey.self), \(DerivedValue.self)>")
   switch source._variantStorage {
   case .native(let nativeOwner):
     // FIXME(performance): this introduces an indirection through Objective-C
@@ -2300,7 +2308,8 @@ public func _dictionaryDownCastConditional<
 >(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue>? {
-  
+  print("## _dictionaryDownCastConditional<\(BaseKey.self), \(BaseValue.self), \(DerivedKey.self), \(DerivedValue.self)>")  
+
   var result = Dictionary<DerivedKey, DerivedValue>()
   for (key, value) in source {
     if let derivedKey = key as? DerivedKey {
@@ -2344,6 +2353,7 @@ public func _dictionaryBridgeFromObjectiveCConditional<
 >(
   _ source: Dictionary<ObjCKey, ObjCValue>
 ) -> Dictionary<SwiftKey, SwiftValue>? {
+  print("## _dictionaryBridgeFromObjectiveCConditional<\(ObjCKey.self), \(ObjCValue.self), \(SwiftKey.self), \(SwiftValue.self)>")
   _sanityCheck(
     _isClassOrObjCExistential(ObjCKey.self) ||
     _isClassOrObjCExistential(ObjCValue.self))
