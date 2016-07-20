@@ -123,6 +123,7 @@ KNOWN_SETTINGS=(
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
+    skip-test-llvm              "1"              "set to skip testing LLVM. Set to true by default"
     skip-test-llbuild           ""               "set to skip testing llbuild"
     skip-test-swiftpm           ""               "set to skip testing swiftpm"
     skip-test-xctest            ""               "set to skip testing xctest"
@@ -662,10 +663,49 @@ function set_build_options_for_host() {
             ;;
     esac
 
+
     llvm_cmake_options+=(
         -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
         -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
     )
+
+    # If we are asked to not test LLVM, do not include tools that are not used
+    # to test Swift.
+    #
+    # *NOTE* Currently we do not support testing LLVM via build-script. But in a
+    # future commit we will.
+    if [[ "${SKIP_TEST_LLVM}" ]]; then
+        llvm_cmake_options+=(
+            # Do not include LLVM tests.
+            -DLLVM_INCLUDE_TESTS:BOOL=NO
+            -DCLANG_INCLUDE_TESTS:BOOL=NO
+        )
+
+        # Disable LLVM Tools that we do not use.
+        LLVM_TOOLS_TO_DISABLE=(
+            BUGPOINT BUGPOINT_PASSES GOLD LLI LLVM_AS_FUZZER LLVM_C_TEST
+            LLVM_CXXDUMP LLVM_DIFF LLVM_DIS LLVM_DWP LLVM_EXTRACT LLVM_GO
+            LLVM_JITLISTENER LLVM_LTO LLVM_MC LLVM_MC_FUZZER LLVM_MCMARKUP
+            LLVM_PDBDUMP LLVM_READOBJ LLVM_RTDYLD LLVM_SHLIB LLVM_SIZE LLVM_SPLIT
+            LLVM_STRESS LLVM_SYMBOLIZER MSBUILD OBJ2YAML OPT SANCOV SANSTATS
+            VERIFY_USELISTORDER XCODE_TOOLCHAIN YAML2OBJ
+        )
+        for tool in "${LLVM_TOOLS_TO_DISABLE[@]}"; do
+            llvm_cmake_options+=(
+                -DLLVM_TOOL_${tool}_BUILD:BOOL=NO
+            )
+        done
+
+        # Disable Clang Tools that we do not use.
+        CLANG_TOOLS_TO_DISABLE=(
+            CLANG_CHECK DIAGTOOL SCAN_BUILD SCAN_VIEW CLANG_FORMAT
+        )
+        for tool in "${CLANG_TOOLS_TO_DISABLE[@]}"; do
+            llvm_cmake_options+=(
+                -DCLANG_TOOL_${tool}_BUILD:BOOL=NO
+            )
+        done    
+    fi
 
     if [[ "${llvm_target_arch}" ]] ; then
         llvm_cmake_options+=(
