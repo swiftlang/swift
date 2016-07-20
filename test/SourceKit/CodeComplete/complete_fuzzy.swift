@@ -90,7 +90,7 @@ func test3() {
 }
 
 // RUN: %complete-test %s -fuzz -tok=CONTEXT_SORT_1 | FileCheck %s -check-prefix=CONTEXT_SORT_1
-// RUN: %complete-test %s -fuzz -fuzzy-weight=10 -tok=CONTEXT_SORT_1 | FileCheck %s -check-prefix=CONTEXT_SORT_1
+// RUN: %complete-test %s -fuzz -fuzzy-weight=1 -tok=CONTEXT_SORT_1 | FileCheck %s -check-prefix=CONTEXT_SORT_4
 // RUN: %complete-test %s -fuzz -fuzzy-weight=100 -tok=CONTEXT_SORT_1 | FileCheck %s -check-prefix=CONTEXT_SORT_2
 // RUN: %complete-test %s -fuzz -fuzzy-weight=10000 -no-inner-results -tok=CONTEXT_SORT_1 | FileCheck %s -check-prefix=CONTEXT_SORT_3
 let myVar = 1
@@ -101,8 +101,8 @@ struct Test4 {
 
     #^CONTEXT_SORT_1,myVa^#
 // CONTEXT_SORT_1: Results for filterText: myVa [
-// CONTEXT_SORT_1-NEXT: myLocalVar
 // CONTEXT_SORT_1-NEXT: myVarTest4
+// CONTEXT_SORT_1-NEXT: myLocalVar
 // CONTEXT_SORT_1-NEXT: myVar
 
 // CONTEXT_SORT_2: Results for filterText: myVa [
@@ -114,6 +114,11 @@ struct Test4 {
 // CONTEXT_SORT_3-NEXT: myVar
 // CONTEXT_SORT_3-NEXT: myVarTest4
 // CONTEXT_SORT_3-NEXT: myLocalVar
+
+// CONTEXT_SORT_4: Results for filterText: myVa [
+// CONTEXT_SORT_4-NEXT: myLocalVar
+// CONTEXT_SORT_4-NEXT: myVarTest4
+// CONTEXT_SORT_4-NEXT: myVar
   }
 }
 
@@ -149,3 +154,25 @@ func test6(x: S1) {
 // MIN_LENGTH_1-NEXT: ]
 // MIN_LENGTH_1-LABEL: Results for filterText: b [
 // MIN_LENGTH_1-NEXT: ]
+
+// RUN: %complete-test %s -fuzz -tok=MAP | FileCheck %s -check-prefix=MAP
+protocol P {
+  func map()
+}
+extension P {
+  func map() {}
+}
+struct Arr : P {
+  func withUnsafeMutablePointer() {}
+}
+func test7(x: Arr) {
+  x.#^MAP,ma,map^#
+}
+// MAP: Results for filterText: ma [
+// MAP-NEXT: map()
+// MAP-NEXT: withUnsafeMutablePointer()
+// MAP-NEXT: ]
+// MAP-LABEL: Results for filterText: map [
+// MAP-NEXT: map()
+// MAP-NEXT: withUnsafeMutablePointer()
+// MAP-NEXT: ]
