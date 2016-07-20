@@ -156,7 +156,7 @@ internal func sendBytes<T>(from address: UnsafePointer<T>, count: Int) {
 internal func sendAddress(of instance: AnyObject) {
   debugLog("BEGIN \(#function)")
   defer { debugLog("END \(#function)") }
-  var address = unsafeAddress(of: instance)
+  var address = Unmanaged.passUnretained(instance).toOpaque()
   sendBytes(from: &address, count: sizeof(UInt.self))
 }
 
@@ -296,8 +296,9 @@ internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
 /// This reflects the stored properties of the immediate class.
 /// The superclass is not (yet?) visited.
 public func reflect(object: AnyObject) {
-  let address = unsafeAddress(of: object)
-  let addressValue = unsafeBitCast(address, to: UInt.self)
+  defer { _fixLifetime(object) }
+  var address = Unmanaged.passUnretained(object).toOpaque()
+  let addressValue = UInt(bitPattern: address)
   reflect(instanceAddress: addressValue, kind: .Object)
 }
 
