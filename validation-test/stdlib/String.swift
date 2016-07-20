@@ -325,9 +325,9 @@ StringTests.test("hasPrefix")
   .skip(.nativeRuntime("String.hasPrefix undefined without _runtime(_ObjC)"))
   .code {
 #if _runtime(_ObjC)
-  expectFalse("".hasPrefix(""))
+  expectTrue("".hasPrefix(""))
   expectFalse("".hasPrefix("a"))
-  expectFalse("a".hasPrefix(""))
+  expectTrue("a".hasPrefix(""))
   expectTrue("a".hasPrefix("a"))
 
   // U+0301 COMBINING ACUTE ACCENT

@@ -114,16 +114,18 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
-  ///   Passing an empty string (`""`) as `prefix` always results in `false`.
   /// - Returns: `true` if the string begins with `prefix`, otherwise, `false`.
   public func hasPrefix(_ prefix: String) -> Bool {
     let selfCore = self._core
     let prefixCore = prefix._core
+    let prefixCount = prefixCore.count
+    if prefixCount == 0 {
+      return true
+    }
     if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
       if selfCore.isASCII && prefixCore.isASCII {
         // Prefix longer than self.
-        let prefixCount = prefixCore.count
-        if prefixCount > selfCore.count || prefixCount == 0 {
+        if prefixCount > selfCore.count {
           return false
         }
         return Int(_swift_stdlib_memcmp(
@@ -167,17 +169,19 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
-  ///   Passing an empty string (`""`) as `suffix` always results in `false`.
   /// - Returns: `true` if the string ends with `suffix`, otherwise, `false`.
   public func hasSuffix(_ suffix: String) -> Bool {
     let selfCore = self._core
     let suffixCore = suffix._core
+    let suffixCount = suffixCore.count
+    if suffixCount == 0 {
+      return true
+    }
     if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
       if selfCore.isASCII && suffixCore.isASCII {
-        // Prefix longer than self.
-        let suffixCount = suffixCore.count
+        // Suffix longer than self.
         let selfCount = selfCore.count
-        if suffixCount > selfCount || suffixCount == 0 {
+        if suffixCount > selfCount {
           return false
         }
         return Int(_swift_stdlib_memcmp(

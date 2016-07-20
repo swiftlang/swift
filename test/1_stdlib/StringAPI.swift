@@ -220,10 +220,12 @@ func checkHasPrefixHasSuffix(
   _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
 #if _runtime(_ObjC)
-  if lhs == "" {
+  if rhs == "" {
+    expectTrue(lhs.hasPrefix(rhs), stackTrace: stackTrace)
+    expectTrue(lhs.hasSuffix(rhs), stackTrace: stackTrace)
     return
   }
-  if rhs == "" {
+  if lhs == "" {
     expectFalse(lhs.hasPrefix(rhs), stackTrace: stackTrace)
     expectFalse(lhs.hasSuffix(rhs), stackTrace: stackTrace)
     return
