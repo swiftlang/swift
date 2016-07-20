@@ -293,8 +293,9 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
     auto &tl = gen.getTypeLowering(result.getSILType());
     if (tl.isAddressOnly()) {
       assert(result.getConvention() == ResultConvention::Indirect);
-      assert(resultType->isAny() &&
-             "Should not be trying to bridge anything except for Any here");
+      assert((resultType->isAny()
+              || resultType->getAnyOptionalObjectType()->isAny())
+             && "Should not be trying to bridge anything except for Any here");
     }
   }
 
@@ -959,8 +960,9 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
 
   if (substTy->getNumIndirectResults() > 0) {
     SILResultInfo indirectResult = substTy->getSingleResult();
-    assert(indirectResult.getType()->isAny() &&
-           "Should not be trying to bridge anything except for Any here");
+    assert((indirectResult.getType()->isAny()
+            || indirectResult.getType().getAnyOptionalObjectType()->isAny())
+           && "Should not be trying to bridge anything except for Any here");
     args.push_back(emitTemporaryAllocation(loc, indirectResult.getSILType()));
   }
 

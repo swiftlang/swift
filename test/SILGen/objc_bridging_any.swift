@@ -309,10 +309,10 @@ class SwiftIdLover : NSObject {
   // CHECK: [[OBJC_RESULT:%.*]] = apply [[BRIDGE_ANYTHING]]<{{.*}}>([[OPEN_RESULT]])
   // CHECK: return [[OBJC_RESULT]]
 
-// TODO
-#if false
   func methodReturningOptionalAny() -> Any? {}
-#endif
+  // CHECK-LABEL: sil hidden @_TFC17objc_bridging_any12SwiftIdLover26methodReturningOptionalAny
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_bridging_any12SwiftIdLover26methodReturningOptionalAny
+  // CHECK:       function_ref @_TFs27_bridgeAnythingToObjectiveC
 
   func methodTakingAny(a: Any) {}
   // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_bridging_any12SwiftIdLover15methodTakingAnyfT1aP__T_ : $@convention(objc_method) (AnyObject, SwiftIdLover) -> ()
@@ -330,9 +330,11 @@ class SwiftIdLover : NSObject {
   // CHECK-NEXT:  strong_release %1
   // CHECK-NEXT:  return
 
-#if false
   func methodTakingOptionalAny(a: Any?) {}
-#endif
+  // CHECK-LABEL: sil hidden @_TFC17objc_bridging_any12SwiftIdLover23methodTakingOptionalAny
+
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_bridging_any12SwiftIdLover23methodTakingOptionalAny
+  // CHECK: init_existential_addr %11 : $*Any, $@opened({{.*}}) AnyObject
 
   // CHECK-LABEL: sil hidden @_TFC17objc_bridging_any12SwiftIdLover26methodTakingBlockTakingAnyfFP_T_T_ : $@convention(method) (@owned @callee_owned (@in Any) -> (), @guaranteed SwiftIdLover) -> ()
 
@@ -395,9 +397,7 @@ class SwiftIdLover : NSObject {
   // CHECK-NEXT:  dealloc_stack [[RESULT]]
   // CHECK-NEXT:  return [[VOID]] : $()
 
-#if false
   func methodTakingBlockTakingOptionalAny(_: (Any?) -> ()) {}
-#endif
 
   func methodReturningBlockTakingAny() -> ((Any) -> ()) {}
 
@@ -429,9 +429,7 @@ class SwiftIdLover : NSObject {
   // CHECK-NEXT:  strong_release %1
   // CHECK-NEXT:  return [[EMPTY]]
 
-#if false
   func methodReturningBlockTakingOptionalAny() -> ((Any?) -> ()) {}
-#endif
 
   func methodTakingBlockReturningAny(_: () -> Any) {}
 
@@ -468,13 +466,11 @@ class SwiftIdLover : NSObject {
   // CHECK-NEXT:  dealloc_stack [[RESULT]]
   // CHECK-NEXT:  return [[BRIDGED]]
 
-#if false
   func methodTakingBlockReturningOptionalAny(_: () -> Any?) {}
-#endif
 
   func methodReturningBlockReturningAny() -> (() -> Any) {}
 
-#if false
   func methodReturningBlockReturningOptionalAny() -> (() -> Any?) {}
-#endif
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__iGSqP___XFdCb__aGSqPs9AnyObject___
+  // CHECK: function_ref @_TFs27_bridgeAnythingToObjectiveC
 }
