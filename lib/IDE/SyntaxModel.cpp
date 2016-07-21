@@ -445,7 +445,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     if (isCurrentCallArgExpr(ParentTupleExpr)) {
       CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, E);
       SyntaxStructureNode SN;
-      SN.Kind = SyntaxStructureKind::Parameter;
+      SN.Kind = SyntaxStructureKind::Argument;
       SN.NameRange = NR;
       SN.BodyRange = charSourceRangeFromSourceRange(SM, E->getSourceRange());
       if (NR.isValid()) {
