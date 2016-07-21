@@ -12,7 +12,7 @@ want it to be.
 
 It's a basic assumption in this paper that Swift shouldn't make an
 implicit promise to exactly match the default platform calling
-convention.  That is, if a C or Objective-C programmer manages to derive the
+convention.  That is, if a C or ObjC programmer manages to derive the
 address of a Swift function, we don't have to promise that an obvious
 translation of the type of that function will be correctly callable
 from C.  For example, this wouldn't be guaranteed to work::
@@ -26,7 +26,7 @@ from C.  For example, this wouldn't be guaranteed to work::
 We do sometimes need to be able to match C conventions, both to use
 them and to generate implementations of them, but that level of
 compatibility should be opt-in and site-specific.  If Swift would
-benefit from internally using a better convention than C/Objective-C uses,
+benefit from internally using a better convention than C/ObjC uses,
 and switching to that convention doesn't damage the dynamic abilities
 of our target platforms (debugging, dtrace, stack traces, unwinding,
 etc.), there should be nothing preventing us from doing so.  (If we
@@ -141,7 +141,7 @@ physical conventions.
 Ownership transfer conventions
 ==============================
 
-Arguments and results that require cleanup, like an Objective-C object
+Arguments and results that require cleanup, like an ObjC object
 reference or a non-POD C++ object, raise two questions about
 responsibility: who is responsible for cleaning it up, and when?
 
@@ -806,7 +806,7 @@ of things:
   at this level both because it is affected by abstraction patterns
   and because different tuple elements may use different ownership
   conventions.  (This is most likely for imported APIs, where it's the
-  tuple elements that correspond to specific C or Objective-C parameters.)
+  tuple elements that correspond to specific C or ObjC parameters.)
 
   This completely eliminates top-level tuple types from the function
   signature except when they are a target of abstraction and thus are
