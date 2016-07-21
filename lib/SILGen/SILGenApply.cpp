@@ -1232,6 +1232,13 @@ public:
   }
 
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
+    // If this is a flattening function conversion, emit the expression
+    // directly.
+    if (e->isFlattening()) {
+      visitExpr(e);
+      return;
+    }
+
     // FIXME: Check whether this function conversion requires us to build a
     // thunk.
     visit(e->getSubExpr());

@@ -1460,6 +1460,7 @@ public:
   ManagedValue emitTransformedValue(SILLocation loc, ManagedValue input,
                                     CanType inputType,
                                     CanType outputType,
+                                    bool isFlattening = false,
                                     SGFContext ctx = SGFContext());
 
   /// Most general form of the above.
@@ -1468,6 +1469,7 @@ public:
                                     CanType inputSubstType,
                                     AbstractionPattern outputOrigType,
                                     CanType outputSubstType,
+                                    bool isFlattening = false,
                                     SGFContext ctx = SGFContext());
   RValue emitTransformedValue(SILLocation loc, RValue &&input,
                               AbstractionPattern inputOrigType,

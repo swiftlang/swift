@@ -112,9 +112,11 @@ namespace {
   private:
     SILGenFunction &SGF;
     SILLocation Loc;
+    bool Flattening;
 
   public:
-    Transform(SILGenFunction &SGF, SILLocation loc) : SGF(SGF), Loc(loc) {}
+    Transform(SILGenFunction &SGF, SILLocation loc, bool flattening = false)
+        : SGF(SGF), Loc(loc), Flattening(flattening) {}
     virtual ~Transform() = default;
 
     /// Transform an arbitrary value.
@@ -1252,7 +1254,7 @@ namespace {
       return SGF.emitTransformedValue(Loc, input,
                                       inputOrigType, inputSubstType,
                                       outputOrigType, outputSubstType,
-                                      context);
+                                      /*isFlattening=*/false, context);
     }
 
     /// Force the given result into the given initialization.
@@ -2177,7 +2179,7 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
       Gen.emitTransformedValue(Loc, innerResult,
                                op.InnerOrigType, op.InnerSubstType,
                                op.OuterOrigType, op.OuterSubstType,
-                               outerResultCtxt);
+                               /*isFlattening=*/false, outerResultCtxt);
 
     // If the outer is indirect, force it into the context.
     if (outerIsIndirect) {
@@ -2269,26 +2271,72 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
 /// \param inputSubstType Formal AST type of function value being thunked
 /// \param outputOrigType Abstraction pattern of the thunk
 /// \param outputSubstType Formal AST type of the thunk
-static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
-                           AbstractionPattern inputOrigType,
-                           CanAnyFunctionType inputSubstType,
-                           AbstractionPattern outputOrigType,
-                           CanAnyFunctionType outputSubstType) {
+static void buildThunkBody(
+        SILGenFunction &gen, SILLocation loc, bool isFlattening,
+        AbstractionPattern inputOrigType, CanAnyFunctionType inputSubstType,
+        AbstractionPattern outputOrigType, CanAnyFunctionType outputSubstType) {
   PrettyStackTraceSILFunction stackTrace("emitting reabstraction thunk in",
                                          &gen.F);
   auto thunkType = gen.F.getLoweredFunctionType();
 
   FullExpr scope(gen.Cleanups, CleanupLocation::get(loc));
 
-  SmallVector<ManagedValue, 8> params;
+  SmallVector<ManagedValue, 8> paramsBuffer;
   // TODO: Could accept +0 arguments here when forwardFunctionArguments/
   // emitApply can.
-  gen.collectThunkParams(loc, params, /*allowPlusZero*/ false);
-
-  ManagedValue fnValue = params.pop_back_val();
+  gen.collectThunkParams(loc, paramsBuffer, /*allowPlusZero*/ false);
+  ManagedValue fnValue = paramsBuffer.pop_back_val();
   auto fnType = fnValue.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
   auto argTypes = fnType->getParameters();
+  
+  ArrayRef<ManagedValue> params(paramsBuffer);
+  if (isFlattening) {
+    // Flatten an instance function type.
+    assert(
+      inputSubstType->getCurryLevel() - outputSubstType->getCurryLevel() == 1 &&
+           "Invalid (un)currying");
+
+    SmallVector<SILValue, 1> selfArg;
+    forwardFunctionArguments(gen, loc, fnType, params.front(), selfArg);
+    auto inner = gen.emitApplyWithRethrow(loc, fnValue.forward(gen),
+                                          /*substFnType*/ fnValue.getType(),
+                                          /*substitutions*/ {}, selfArg);
+
+    // For the next steps update the variables by dropping the already applied
+    // first parameter (`self`)
+    params = params.slice(1);
+    fnValue = ManagedValue::forUnmanaged(inner);
+    fnType = fnValue.getType().castTo<SILFunctionType>();
+    argTypes = fnType->getParameters();
+    inputOrigType = inputOrigType.getFunctionResultType();
+    inputSubstType = cast<AnyFunctionType>(inputSubstType.getResult());
+    
+    Type newOrigInput, newSubstInput;
+    auto origFunction = cast<AnyFunctionType>(outputOrigType.getType());
+    if (auto origInput = dyn_cast<TupleType>(origFunction.getInput())) {
+      auto substInput = cast<TupleType>(outputSubstType.getInput());
+      assert(origInput->getNumElements() == substInput->getNumElements() &&
+             "invalid premise");
+      newOrigInput = TupleType::get(origInput->getElements().slice(1),
+                                    gen.getASTContext());
+      newSubstInput = TupleType::get(substInput->getElements().slice(1),
+                                     gen.getASTContext());
+    } else {
+      // In this case `self` was the only parameter, which leaves us with an
+      // application of `Void`
+      assert(!dyn_cast<TupleType>(outputSubstType.getInput()) &&
+             "invalid premise");
+      newOrigInput = newSubstInput = TupleType::getEmpty(gen.getASTContext());
+    }
+
+    outputOrigType = AbstractionPattern(CanFunctionType::get(
+        newOrigInput->getCanonicalType(), origFunction.getResult(),
+        origFunction->getExtInfo()));
+    outputSubstType = CanFunctionType::get(newSubstInput->getCanonicalType(),
+                                           outputSubstType.getResult(),
+                                           outputSubstType->getExtInfo());
+  }
 
   // Translate the argument values.  Function parameters are
   // contravariant: we want to switch the direction of transformation
@@ -2419,14 +2467,12 @@ CanSILFunctionType SILGenFunction::buildThunkType(
 }
 
 /// Create a reabstraction thunk.
-static ManagedValue createThunk(SILGenFunction &gen,
-                                SILLocation loc,
-                                ManagedValue fn,
-                                AbstractionPattern inputOrigType,
-                                CanAnyFunctionType inputSubstType,
-                                AbstractionPattern outputOrigType,
-                                CanAnyFunctionType outputSubstType,
-                                const TypeLowering &expectedTL) {
+static ManagedValue createThunk(
+          SILGenFunction &gen, SILLocation loc, ManagedValue fn,
+          AbstractionPattern inputOrigType, CanAnyFunctionType inputSubstType,
+          AbstractionPattern outputOrigType, CanAnyFunctionType outputSubstType,
+          const TypeLowering &expectedTL, bool isFlattening) {
+
   auto expectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
 
   // We can't do bridging here.
@@ -2452,7 +2498,7 @@ static ManagedValue createThunk(SILGenFunction &gen,
     thunk->setContextGenericParams(gen.F.getContextGenericParams());
     SILGenFunction thunkSGF(gen.SGM, *thunk);
     auto loc = RegularLocation::getAutoGeneratedLocation();
-    buildThunkBody(thunkSGF, loc,
+    buildThunkBody(thunkSGF, loc, isFlattening,
                    inputOrigType, inputSubstType,
                    outputOrigType, outputSubstType);
   }
@@ -2494,7 +2540,7 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
     return createThunk(SGF, Loc, fn,
                        inputOrigType, inputSubstType,
                        outputOrigType, outputSubstType,
-                       expectedTL);
+                       expectedTL, Flattening);
   }
 
   // We do not, conversion is trivial.
@@ -2535,7 +2581,7 @@ SILGenFunction::emitOrigToSubstValue(SILLocation loc, ManagedValue v,
   return emitTransformedValue(loc, v,
                               origType, substType,
                               AbstractionPattern(substType), substType,
-                              ctxt);
+                              /*isFlattening=*/false, ctxt);
 }
 
 /// Given a value with the abstraction patterns of the original formal
@@ -2561,7 +2607,7 @@ SILGenFunction::emitSubstToOrigValue(SILLocation loc, ManagedValue v,
   return emitTransformedValue(loc, v,
                               AbstractionPattern(substType), substType,
                               origType, substType,
-                              ctxt);
+                              /*isFlattening=*/false, ctxt);
 }
 
 /// Given a value with the abstraction patterns of the substituted
@@ -2594,10 +2640,12 @@ ManagedValue
 SILGenFunction::emitTransformedValue(SILLocation loc, ManagedValue v,
                                      CanType inputType,
                                      CanType outputType,
+                                     bool isFlattening,
                                      SGFContext ctxt) {
   return emitTransformedValue(loc, v,
                               AbstractionPattern(inputType), inputType,
-                              AbstractionPattern(outputType), outputType);
+                              AbstractionPattern(outputType), outputType,
+                              isFlattening, ctxt);
 }
 
 ManagedValue
@@ -2606,8 +2654,9 @@ SILGenFunction::emitTransformedValue(SILLocation loc, ManagedValue v,
                                      CanType inputSubstType,
                                      AbstractionPattern outputOrigType,
                                      CanType outputSubstType,
+                                     bool isFlattening,
                                      SGFContext ctxt) {
-  return Transform(*this, loc).transform(v,
+  return Transform(*this, loc, isFlattening).transform(v,
                                          inputOrigType,
                                          inputSubstType,
                                          outputOrigType,
