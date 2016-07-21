@@ -607,11 +607,11 @@ public func &${x.operator} <T: FixedWidthInteger>(lhs: T, rhs: T) -> T {
 //===--- UnsignedInteger --------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public protocol UnsignedInteger_ : BinaryInteger {
+public protocol UnsignedInteger : BinaryInteger {
   associatedtype Magnitude : BinaryInteger
 }
 
-extension UnsignedInteger_ {
+extension UnsignedInteger {
   @_transparent
   public var magnitude: Self { return self }
 
@@ -641,7 +641,7 @@ extension UnsignedInteger_ {
   }
 }
 
-extension UnsignedInteger_ where Self : FixedWidthInteger {
+extension UnsignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : BinaryInteger>(_ source: T) {
     // FIXME(integers): uncomment checks
@@ -684,11 +684,11 @@ extension UnsignedInteger_ where Self : FixedWidthInteger {
 //===--- SignedInteger ----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public protocol SignedInteger_ : BinaryInteger, SignedArithmetic {
+public protocol SignedInteger : BinaryInteger, SignedArithmetic {
   associatedtype Magnitude : BinaryInteger
 }
 
-extension SignedInteger_ {
+extension SignedInteger {
   public var description: String {
     let base = String(describing: magnitude)
     return self < 0 ? "-" + base : base
@@ -698,7 +698,7 @@ extension SignedInteger_ {
   public static var isSigned: Bool { return true }
 }
 
-extension SignedInteger_ where Self : FixedWidthInteger {
+extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : BinaryInteger>(_ source: T) {
     // FIXME(integers): uncomment checks
@@ -738,13 +738,13 @@ extension SignedInteger_ where Self : FixedWidthInteger {
 % for self_type in all_integer_types(word_bits):
 %   bits = self_type.bits
 %   signed = self_type.is_signed
-%   Self = self_type.stdlib_name + "_"
+%   Self = self_type.stdlib_name
 %   Unsigned = 'Signed' if signed else 'Unsigned'
 %   u = 's' if signed else 'u'
 %   U = 'U' if signed else ''
 %   z = 's' if signed else 'z'
 public struct ${Self}
-  : FixedWidthInteger, ${Unsigned}Integer_,
+  : FixedWidthInteger, ${Unsigned}Integer,
     _ExpressibleByBuiltinIntegerLiteral {
 
   @_transparent
@@ -757,7 +757,7 @@ public struct ${Self}
   }
 
   @_transparent
-  public init(bitPattern x: ${U}Int${bits}_) {
+  public init(bitPattern x: ${U}Int${bits}) {
     _storage = x._storage
   }
 
