@@ -4564,7 +4564,7 @@ public:
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       if (func->hasDynamicSelf()) {
         type = type->replaceCovariantResultType(subclass,
-                                                func->getNaturalArgumentCount());
+                                                func->getNumParameterLists());
       }
     } else if (isa<ConstructorDecl>(decl)) {
       type = type->replaceCovariantResultType(subclass, /*uncurryLevel=*/2);

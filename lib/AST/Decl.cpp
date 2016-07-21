@@ -4415,7 +4415,7 @@ Type FuncDecl::getResultType() const {
   if (resultTy->is<ErrorType>())
     return resultTy;
 
-  for (unsigned i = 0, e = getNaturalArgumentCount(); i != e; ++i)
+  for (unsigned i = 0, e = getNumParameterLists(); i != e; ++i)
     resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
 
   if (!resultTy)

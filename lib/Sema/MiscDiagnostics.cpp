@@ -182,7 +182,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (expr->getArg()->getType()->hasInOut()) {
         // We need to apply all argument clauses.
         InvalidPartialApplications.insert({
-          fnExpr, {fn->getNaturalArgumentCount(), kind}
+          fnExpr, {fn->getNumParameterLists(), kind}
         });
       }
     }

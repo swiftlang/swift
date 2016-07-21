@@ -4838,33 +4838,11 @@ public:
   /// depending on the function context.
   bool argumentNameIsAPIByDefault() const;
 
+  /// \brief Returns the "natural" number of argument clauses taken by this
+  /// function.  This value is one for free-standing functions, and two for
+  /// methods.
   unsigned getNumParameterLists() const {
     return AbstractFunctionDeclBits.NumParameterLists;
-  }
-
-  /// \brief Returns the "natural" number of argument clauses taken by this
-  /// function.  This value is always at least one, and it may be more if the
-  /// function is implicitly or explicitly curried.
-  ///
-  /// For example, this function:
-  /// \code
-  ///   func negate(x : Int) -> Int { return -x }
-  /// \endcode
-  /// has a natural argument count of 1 if it is freestanding.  If it is
-  /// a method, it has a natural argument count of 2, as does this
-  /// curried function:
-  /// \code
-  ///   func add(x : Int)(y : Int) -> Int { return x + y }
-  /// \endcode
-  ///
-  /// This value never exceeds the number of chained function types
-  /// in the function's type, but it can be less for functions which
-  /// return a value of function type:
-  /// \code
-  ///   func const(x : Int) -> () -> Int { return { x } } // NAC==1
-  /// \endcode
-  unsigned getNaturalArgumentCount() const {
-    return getNumParameterLists();
   }
 
   /// \brief Returns the parameter pattern(s) for the function definition that
