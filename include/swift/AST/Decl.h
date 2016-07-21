@@ -2167,15 +2167,41 @@ public:
     return TypeAndAccess.getInt().hasValue();
   }
 
+  /// \see getFormalAccess
+  Accessibility getFormalAccessImpl(const DeclContext *useDC) const;
+
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
   /// This is the access used when calculating if access control is being used
-  /// consistently.
-  Accessibility getFormalAccess() const {
+  /// consistently. If \p useDC is provided (the location where the value is
+  /// being used), features that affect formal access such as \c \@testable are
+  /// taken into account.
+  ///
+  /// \sa getFormalAccessScope
+  Accessibility getFormalAccess(const DeclContext *useDC = nullptr) const {
     assert(hasAccessibility() && "accessibility not computed yet");
-    return TypeAndAccess.getInt().getValue();
+    Accessibility result = TypeAndAccess.getInt().getValue();
+    if (useDC && result == Accessibility::Internal)
+      return getFormalAccessImpl(useDC);
+    return result;
   }
+
+  /// Returns the outermost DeclContext from which this declaration can be
+  /// accessed, or null if the declaration is public.
+  ///
+  /// This is used when calculating if access control is being used
+  /// consistently. If \p useDC is provided (the location where the value is
+  /// being used), features that affect formal access such as \c \@testable are
+  /// taken into account.
+  ///
+  /// \invariant
+  /// <code>value.isAccessibleFrom(value.getFormalAccessScope())</code>
+  ///
+  /// \sa getFormalAccess
+  /// \sa isAccessibleFrom
+  const DeclContext *
+  getFormalAccessScope(const DeclContext *useDC = nullptr) const;
 
   /// Returns the access level that actually controls how a declaration should
   /// be emitted and may be used.
