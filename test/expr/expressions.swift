@@ -705,10 +705,10 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-Int.self == nil // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
-nil == Int.self // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
-Int.self != nil // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
-nil != Int.self // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
+_ = Int.self == nil
+_ = nil == Int.self
+_ = Int.self != nil
+_ = nil != Int.self
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
