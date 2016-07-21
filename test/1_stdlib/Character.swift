@@ -222,7 +222,7 @@ CharacterTests.test("RoundTripping/Random") {
 CharacterTests.test("forall x: ASCII . String(Character(x)) == String(x)") {
   // For all ASCII chars, constructing a Character then a String should be the
   // same as constructing a String directly.
-  let asciiDomain = Array(0..<128).map({ UnicodeScalar(Int($0)) })
+  let asciiDomain = (0..<128).map({ UnicodeScalar(Int($0))! })
   expectEqualFunctionsForDomain(asciiDomain,
     { String($0) },
     { String(Character($0)) })
@@ -233,8 +233,8 @@ CharacterTests.test(
   // For all ASCII chars, constructing a Character then a String should ordered
   // the same as constructing a String directly.
   let asciiDomain = Array(0..<127)
-  let ascii0to126 = asciiDomain.map({ UnicodeScalar(Int($0)) })
-  let ascii1to127 = asciiDomain.map({ UnicodeScalar(Int($0 + 1)) })
+  let ascii0to126 = asciiDomain.map({ UnicodeScalar(Int($0))! })
+  let ascii1to127 = asciiDomain.map({ UnicodeScalar(Int($0 + 1))! })
   typealias PredicateFn = (UnicodeScalar) -> (UnicodeScalar) -> Bool
   expectEqualMethodsForDomain(
     ascii0to126,
@@ -258,7 +258,7 @@ var UnicodeScalarTests = TestSuite("UnicodeScalar")
 
 UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)") {
   for i in 0..<0x7f {
-    let us = UnicodeScalar(i)
+    let us = UnicodeScalar(i)!
     expectEqual(UInt8(i), UInt8(ascii: us))
   }
 }
@@ -281,11 +281,11 @@ UnicodeScalarTests.test("UInt32(_: UnicodeScalar),UInt64(_: UnicodeScalar)") {
 }
 
 UnicodeScalarTests.test("isASCII()") {
-  expectTrue(UnicodeScalar(0).isASCII)
+  expectTrue(UnicodeScalar(0)!.isASCII)
   expectTrue(("A" as UnicodeScalar).isASCII)
-  expectTrue(UnicodeScalar(127).isASCII)
-  expectFalse(UnicodeScalar(128).isASCII)
-  expectFalse(UnicodeScalar(256).isASCII)
+  expectTrue(UnicodeScalar(127)!.isASCII)
+  expectFalse(UnicodeScalar(128)!.isASCII)
+  expectFalse(UnicodeScalar(256)!.isASCII)
 }
 
 UnicodeScalarTests.test("Comparable") {

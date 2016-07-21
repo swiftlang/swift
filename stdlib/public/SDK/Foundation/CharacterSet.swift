@@ -103,7 +103,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
     public init(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)
+        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
         _wrapped = _SwiftNSCharacterSet(immutableObject: NSCharacterSet(range: _utfRangeToNSRange(halfOpenRange)))
     }
 
@@ -294,7 +294,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
     public mutating func insert(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)
+        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
         let nsRange = _utfRangeToNSRange(halfOpenRange)
         _applyUnmanagedMutation {
             $0.addCharacters(in: nsRange)
@@ -311,7 +311,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
 
     /// Remove a closed range of integer values from the `CharacterSet`.
     public mutating func remove(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)
+        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
         let nsRange = _utfRangeToNSRange(halfOpenRange)
         _applyUnmanagedMutation {
             $0.removeCharacters(in: nsRange)

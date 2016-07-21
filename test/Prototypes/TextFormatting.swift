@@ -202,7 +202,7 @@ func _writePositive<T:XPrintableInteger, S: XOutputStream>(
   var digit = UInt32((value % radix).toInt())
   var baseCharOrd : UInt32 = digit <= 9 ? UnicodeScalar("0").value 
                                         : UnicodeScalar("A").value - 10
-  stream.append(String(UnicodeScalar(baseCharOrd + digit)))
+  stream.append(String(UnicodeScalar(baseCharOrd + digit)!))
   return nDigits + 1
 }
 
