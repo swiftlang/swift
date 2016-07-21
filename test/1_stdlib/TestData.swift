@@ -629,13 +629,7 @@ class TestData : TestDataSuper {
     }
 
     func test_basicReadWrite() {
-        let url : URL
-        do {
-            url = try URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true).appendingPathComponent("testfile")
-        } catch {
-            expectTrue(false, "Should not have thrown")
-            return
-        }
+        let url = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true).appendingPathComponent("testfile")
 
         let count = 1 << 24
         let randomMemory = malloc(count)!
@@ -645,6 +639,44 @@ class TestData : TestDataSuper {
             try data.write(to: url)
             let readData = try Data(contentsOf: url)
             expectEqual(data, readData)
+        } catch {
+            expectTrue(false, "Should not have thrown")
+        }
+        
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch {
+            // ignore
+        }
+    }
+
+    func test_writeFailure() {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true).appendingPathComponent("testfile")
+        
+        let data = Data()
+        do {
+            try data.write(to: url)
+        } catch let error as NSError {
+            print(error)
+            expectTrue(false, "Should not have thrown")
+        }
+        
+        do {
+            try data.write(to: url, options: [.withoutOverwriting])
+            expectTrue(false, "Should have thrown")
+        } catch let error as NSError {
+            expectEqual(error.code, NSFileWriteFileExistsError)
+        }
+        
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch {
+            // ignore
+        }
+        
+        // Make sure clearing the error condition allows the write to succeed
+        do {
+            try data.write(to: url, options: [.withoutOverwriting])
         } catch {
             expectTrue(false, "Should not have thrown")
         }
@@ -858,6 +890,7 @@ DataTests.test("test_base64Data_medium") { TestData().test_base64Data_medium() }
 DataTests.test("test_dataHash") { TestData().test_dataHash() }
 DataTests.test("test_discontiguousEnumerateBytes") { TestData().test_discontiguousEnumerateBytes() }
 DataTests.test("test_basicReadWrite") { TestData().test_basicReadWrite() }
+DataTests.test("test_writeFailure") { TestData().test_writeFailure() }
 DataTests.test("test_bridgeOverrides") { TestData().test_bridgeOverrides() }
 DataTests.test("test_genericBuffers") { TestData().test_genericBuffers() }
 DataTests.test("test_basicDataMutation") { TestData().test_basicDataMutation() }
