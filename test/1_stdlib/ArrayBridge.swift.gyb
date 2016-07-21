@@ -15,7 +15,7 @@
 //
 // RUN: %gyb %s -o %t/ArrayBridge.swift
 // RUN: %target-clang %S/Inputs/ArrayBridge/ArrayBridge.m -c -o %t/ArrayBridgeObjC.o -g
-// RUN:  %line-directive %t/ArrayBridge.swift -- %target-build-swift %t/ArrayBridge.swift -I %S/Inputs/ArrayBridge/ -Xlinker %t/ArrayBridgeObjC.o -o %t/ArrayBridge -- 
+// RUN:  %line-directive %t/ArrayBridge.swift -- %target-build-swift -Xfrontend -enable-experimental-collection-casts %t/ArrayBridge.swift -I %S/Inputs/ArrayBridge/ -Xlinker %t/ArrayBridgeObjC.o -o %t/ArrayBridge -- 
 
 // RUN: %target-run %t/ArrayBridge
 // REQUIRES: executable_test
@@ -240,7 +240,8 @@ tests.test("Another/${Any}") {
   
   let nsArrayOfBaseConvertedToAnyArray = nsArrayOfBase
   % if Any == 'Any':
-  // FIXME: nsArrayOfBase as [Any] doesn't typecheck
+  // FIXME: nsArrayOfBase as [Any] doesn't
+  // typecheck. -enable-experimental-collection-casts doesn't change that.
   as [AnyObject]
   % end
   as [${Any}]
@@ -316,7 +317,8 @@ tests.test("testExplicitlyBridged/${Any}") {
   let cocoaBridgeableValues = NSArray(
     array: bridgeableValuesAsNSArray
     %if Any == 'Any':
-    // FIXME: should just be "as [Any]" but the typechecker doesn't allow it yet
+    // FIXME: should just be "as [Any]" but the typechecker doesn't allow it
+    // yet. -enable-experimental-collection-casts doesn't change that.
     as [AnyObject] as [Any] as! [AnyObject]
     %else:
     as [${Any}]
@@ -379,7 +381,8 @@ tests.test("testExplicitlyBridged/${Any}") {
   // Downcast of Cocoa array to an array of classes.
   let wrappedCocoaBridgeableValues = cocoaBridgeableValues
   %if Any == 'Any':
-  // FIXME: should just be "as [Any]" but typechecker doesn't allow it yet.
+  // FIXME: should just be "as [Any]" but typechecker doesn't allow it
+  // yet. -enable-experimental-collection-casts doesn't change that.
   as [AnyObject]
   %end
   as [${Any}]
