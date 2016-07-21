@@ -1118,6 +1118,9 @@ ERROR(function_type_access,none,
 WARNING(non_trailing_closure_before_default_args,none,
         "closure parameter prior to parameters with default arguments will "
         "not be treated as a trailing closure", ())
+ERROR(noreturn_not_supported,none,
+      "'@noreturn' has been removed; functions that never return should have a "
+      "return type of 'Never' instead", ())
 
 // Extensions
 ERROR(non_nominal_extension,none,
