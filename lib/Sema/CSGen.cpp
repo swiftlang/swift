@@ -52,14 +52,6 @@ static ValueDecl *findReferencedDecl(Expr *expr, DeclNameLoc &loc) {
   } while (true);
 }
 
-/// \brief Return 'true' if the decl in question refers to an operator that
-/// could be added to the global scope via a delayed protocol conformance.
-/// Currently, this is only true for '==', which is added via an Equatable
-/// conformance.
-static bool isDelayedOperatorDecl(ValueDecl *vd) {
-  return vd && (vd->getName().str() == "==");
-}
-
 static bool isArithmeticOperatorDecl(ValueDecl *vd) {
   return vd && 
   (vd->getName().str() == "+" ||
@@ -552,74 +544,16 @@ namespace {
     return false;
   }
   
-  /// Extracts == from a type's Equatable conformance.
-  ///
-  /// This only applies to types whose Equatable conformance can be derived.
-  /// Performing the conformance check forces the function to be synthesized.
-  void addNewEqualsOperatorOverloads(ConstraintSystem &CS,
-                                     SmallVectorImpl<Constraint *> &newConstraints,
-                                     Type paramTy,
-                                     Type tyvarType,
-                                     ConstraintLocator *csLoc) {
-    ProtocolDecl *equatableProto =
-    CS.TC.Context.getProtocol(KnownProtocolKind::Equatable);
-    if (!equatableProto)
-      return;
-    
-    paramTy = paramTy->getLValueOrInOutObjectType();
-    paramTy = paramTy->getReferenceStorageReferent();
-    
-    auto nominal = paramTy->getAnyNominal();
-    if (!nominal)
-      return;
-    if (!nominal->derivesProtocolConformance(equatableProto))
-      return;
-    
-    ProtocolConformance *conformance = nullptr;
-    if (!CS.TC.conformsToProtocol(paramTy, equatableProto,
-                                  CS.DC, ConformanceCheckFlags::InExpression,
-                                  &conformance))
-      return;
-    if (!conformance)
-      return;
-    
-    auto requirement =
-    equatableProto->lookupDirect(CS.TC.Context.Id_EqualsOperator);
-    assert(requirement.size() == 1 && "broken Equatable protocol");
-    ConcreteDeclRef witness =
-        conformance->getWitness(requirement.front(), &CS.TC);
-    if (!witness)
-      return;
-    
-    // FIXME: If we ever have derived == for generic types, we may need to
-    // revisit this.
-    if (witness.getDecl()->getType()->hasArchetype())
-      return;
-    
-    OverloadChoice choice{
-      Type(), witness.getDecl(), /*specialized=*/false, CS
-    };
-    auto overload =
-        Constraint::createBindOverload(CS, tyvarType, choice, csLoc);
-    newConstraints.push_back(overload);
-  }
-  
   /// Favor certain overloads in a call based on some basic analysis
   /// of the overload set and call arguments.
   ///
   /// \param expr The application.
   /// \param isFavored Determine whether the given overload is favored.
-  /// \param createReplacements If provided, a function that creates a set of
-  /// replacement fallback constraints.
   /// \param mustConsider If provided, a function to detect the presence of
   /// overloads which inhibit any overload from being favored.
   void favorCallOverloads(ApplyExpr *expr,
                           ConstraintSystem &CS,
                           std::function<bool(ValueDecl *)> isFavored,
-                          std::function<void(TypeVariableType *tyvarType,
-                                             ArrayRef<Constraint *>,
-                                             SmallVectorImpl<Constraint *>&)>
-                              createReplacements = nullptr,
                           std::function<bool(ValueDecl *)>
                               mustConsider = nullptr) {
     // Find the type variable associated with the function, if any.
@@ -663,8 +597,6 @@ namespace {
 
       // If there might be replacement constraints, get them now.
       SmallVector<Constraint *, 4> replacementConstraints;
-      if (createReplacements)
-        createReplacements(tyvarType, oldConstraints, replacementConstraints);
 
       // Copy over the existing bindings, dividing the constraints up
       // into "favored" and non-favored lists.
@@ -673,19 +605,8 @@ namespace {
         if (isFavored(oldConstraint->getOverloadChoice().getDecl()))
           favoredConstraints.push_back(oldConstraint);
 
-      // If we did not find any favored constraints, just introduce
-      // the replacement constraints (if they differ).
-      if (favoredConstraints.empty()) {
-        if (replacementConstraints.size() > oldConstraints.size()) {
-          // Remove the old constraint.
-          CS.removeInactiveConstraint(constraint);
-          CS.addConstraint(
-                           Constraint::createDisjunction(CS,
-                                                         replacementConstraints,
-                                                         csLoc));
-        }
-        break;
-      }
+      // If we did not find any favored constraints, we're done.
+      if (favoredConstraints.empty()) break;
 
       if (favoredConstraints.size() == 1) {
         auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
@@ -717,12 +638,6 @@ namespace {
       // Find the disjunction of fallback constraints. If any
       // constraints were added here, create a new disjunction.
       Constraint *fallbackConstraintsDisjunction = constraint;
-      if (replacementConstraints.size() > oldConstraints.size()) {
-        fallbackConstraintsDisjunction =
-            Constraint::createDisjunction(CS,
-                                          replacementConstraints,
-                                          csLoc);
-      }
       
       // Form the (favored, fallback) disjunction.
       auto aggregateConstraints = {
@@ -730,13 +645,11 @@ namespace {
         fallbackConstraintsDisjunction
       };
       
-      CS.addConstraint(
-                       Constraint::createDisjunction(CS,
+      CS.addConstraint(Constraint::createDisjunction(CS,
                                                      aggregateConstraints,
                                                      csLoc));
       break;
     }
-    
   }
   
   /// Determine whether or not a given NominalTypeDecl has a failable
@@ -943,7 +856,6 @@ namespace {
 
       favorCallOverloads(expr, CS,
                          isFavoredDecl,
-                         /*createReplacements=*/nullptr,
                          mustConsider);
     }
   }
@@ -1029,42 +941,10 @@ namespace {
         (!contextualTy || contextualTy->isEqual(resultTy));
     };
     
-    auto createReplacements
-    = [&](TypeVariableType *tyvarType,
-          ArrayRef<Constraint *> oldConstraints,
-          SmallVectorImpl<Constraint *>& replacementConstraints) {
-      auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn());
-      if (!declRef)
-        return;
-      
-      if (!declRef->isPotentiallyDelayedGlobalOperator())
-        return;
-      
-      Identifier eqOperator = CS.TC.Context.Id_EqualsOperator;
-      if (declRef->getDecls()[0]->getName() != eqOperator)
-        return;
-      
-      if (declRef->isSpecialized())
-        return;
-      
-      replacementConstraints.append(oldConstraints.begin(),
-                                    oldConstraints.end());
-      
-      auto csLoc = CS.getConstraintLocator(expr->getFn());
-      addNewEqualsOperatorOverloads(CS, replacementConstraints, firstArgTy,
-                                    tyvarType, csLoc);
-      if (!firstArgTy->isEqual(secondArgTy)) {
-        addNewEqualsOperatorOverloads(CS, replacementConstraints,
-                                      secondArgTy,
-                                      tyvarType, csLoc);
-      }
-    };
-    
-    favorCallOverloads(expr, CS, isFavoredDecl, createReplacements);
+    favorCallOverloads(expr, CS, isFavoredDecl);
   }
   
   class ConstraintOptimizer : public ASTWalker {
-    
     ConstraintSystem &CS;
     
   public:
@@ -1491,9 +1371,6 @@ namespace {
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
-      
-      if (!decls.empty() && isDelayedOperatorDecl(decls[0]))
-        expr->setIsPotentiallyDelayedGlobalOperator();
       
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
         // If the result is invalid, skip it.
