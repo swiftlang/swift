@@ -575,7 +575,6 @@ class BuildScriptInvocation(object):
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
             "--lldb-build-type", args.lldb_build_variant,
             "--foundation-build-type", args.foundation_build_variant,
-            "--libdispatch-build-type", args.libdispatch_build_variant,
             "--xctest-build-type", args.build_variant,
             "--llvm-enable-assertions", str(args.llvm_assertions).lower(),
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
