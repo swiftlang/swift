@@ -406,6 +406,21 @@ extension String {
     return result
   }
 
+  /// A contiguously stored null-terminated UTF-8 representation of
+  /// the string.
+  ///
+  /// This is a variation on nulTerminatedUTF8 that creates an array
+  /// of element type CChar for use with CString API's.
+  public var nulTerminatedUTF8CString: ContiguousArray<CChar> {
+    var result = ContiguousArray<CChar>()
+    result.reserveCapacity(utf8.count + 1)
+    for c in utf8 {
+      result.append(CChar(bitPattern: c))
+    }
+    result.append(0)
+    return result
+  }
+
   internal func _withUnsafeBufferPointerToUTF8<R>(
     _ body: @noescape (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
   ) rethrows -> R {
