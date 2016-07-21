@@ -429,19 +429,13 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
     // Parse the type-composition-list.
     ParserStatus Status;
     SmallVector<IdentTypeRepr *, 4> Protocols;
-    SmallVector<SourceLoc, 4> Commas; // Used offer fixit to convert commas to '&'
     do {
       // Parse the type-identifier.
       ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
       Status |= Protocol;
       if (auto *ident = dyn_cast_or_null<IdentTypeRepr>(Protocol.getPtrOrNull()))
         Protocols.push_back(ident);
-      Commas.push_back(Tok.getLoc());
     } while (consumeIf(tok::comma));
-
-    // Token after last typename wasn't a comma, don't replace
-    // it with a '&'
-    Commas.pop_back();
 
     // Check for the terminating '>'.
     SourceLoc RAngleLoc = PreviousLoc;
@@ -463,17 +457,26 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
 
     if (Status.isSuccess()) {
       // Only if we have complete protocol<...> construct, diagnose deprecated.
-      auto Diag = diagnose(ProtocolLoc,
-        Commas.size() > 0 ? diag::deprecated_protocol_composition
-                          : diag::deprecated_protocol_composition_single);
-      Diag.highlight({ProtocolLoc, RAngleLoc});
+
+      auto extractText = [&](IdentTypeRepr *Ty) -> StringRef {
+        auto SourceRange = Ty->getSourceRange();
+        return SourceMgr.extractText(
+          Lexer::getCharSourceRangeFromSourceRange(SourceMgr, SourceRange));
+      };
+      SmallString<32> replacement;
+      auto Begin = Protocols.begin();
+      replacement += extractText(*Begin);
+      while(++Begin != Protocols.end()) {
+        replacement += " & ";
+        replacement += extractText(*Begin);
+      }
 
       // Replace 'protocol<T1, T2>' with 'T1 & T2'
-      for (auto Comma : Commas)          // remove commas and '<'
-        Diag.fixItReplace(Comma, " &");
-      Diag
-        .fixItRemove({ProtocolLoc, LAngleLoc}) // remove 'protocol<'
-        .fixItRemove(RAngleLoc); // remove '>'
+      diagnose(ProtocolLoc,
+        Protocols.size() > 1 ? diag::deprecated_protocol_composition
+                             : diag::deprecated_protocol_composition_single)
+        .highlight(composition->getSourceRange())
+        .fixItReplace(composition->getSourceRange(), replacement);
     }
 
     return makeParserResult(Status, composition);
