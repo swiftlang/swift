@@ -5041,9 +5041,6 @@ buildElementConversion(ExprRewriter &rewriter,
   Type destType = destCollectionType->castTo<BoundGenericType>()
                                     ->getGenericArgs()[typeArgIndex];
 
-  // If the types are the same, no conversion is required.
-  if (srcType->isEqual(destType)) return {};
-
   // Build the conversion.
   auto opaque = new (ctx) OpaqueValueExpr(SourceLoc(), srcType);
   auto conversion =
