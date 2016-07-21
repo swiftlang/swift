@@ -155,6 +155,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Unmanaged<T>
   NominalTypeDecl *UnmanagedDecl = nullptr;
 
+  /// The declaration of Swift.Never.
+  NominalTypeDecl *NeverDecl = nullptr;
+
   /// The declaration of Swift.Void.
   TypeAliasDecl *VoidDecl = nullptr;
 
@@ -710,7 +713,7 @@ NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
 NominalTypeDecl *ASTContext::getOpaquePointerDecl() const {
   if (!Impl.OpaquePointerDecl)
     Impl.OpaquePointerDecl
-    = findStdlibType(*this, "OpaquePointer", 0);
+      = findStdlibType(*this, "OpaquePointer", 0);
   
   return Impl.OpaquePointerDecl;
 }
@@ -784,6 +787,17 @@ ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
   llvm_unreachable("bad pointer kind");
 }
 
+NominalTypeDecl *ASTContext::getNeverDecl() const {
+  if (!Impl.NeverDecl)
+    Impl.NeverDecl = findStdlibType(*this, "Never", 0);
+  
+  return Impl.NeverDecl;
+}
+
+CanType ASTContext::getNeverType() const {
+  return getNeverDecl()->getDeclaredType()->getCanonicalType();
+}
+
 TypeAliasDecl *ASTContext::getVoidDecl() const {
   if (Impl.VoidDecl) {
     return Impl.VoidDecl;
@@ -802,10 +816,11 @@ TypeAliasDecl *ASTContext::getVoidDecl() const {
   return Impl.VoidDecl;
 }
 
-StructDecl *ASTContext::getObjCBoolDecl() {
+StructDecl *ASTContext::getObjCBoolDecl() const {
   if (!Impl.ObjCBoolDecl) {
     SmallVector<ValueDecl *, 1> results;
-    if (Module *M = getModuleByName(Id_ObjectiveC.str())) {
+    auto *Context = const_cast<ASTContext *>(this);
+    if (Module *M = Context->getModuleByName(Id_ObjectiveC.str())) {
       M->lookupValue({ }, getIdentifier("ObjCBool"), NLKind::UnqualifiedLookup,
                      results);
       for (auto result : results) {

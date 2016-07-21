@@ -294,6 +294,11 @@ Type SILFunction::mapTypeOutOfContext(Type type) const {
                                                type);
 }
 
+bool SILFunction::isNoReturnFunction() const {
+  return SILType::getPrimitiveObjectType(getLoweredFunctionType())
+      .isNoReturnFunction();
+}
+
 SILBasicBlock *SILFunction::createBasicBlock() {
   return new (getModule()) SILBasicBlock(this);
 }

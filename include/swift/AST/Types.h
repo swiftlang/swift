@@ -392,7 +392,10 @@ public:
   /// hasReferenceSemantics() - Do objects of this type have reference
   /// semantics?
   bool hasReferenceSemantics();
-  
+
+  /// Is this an uninhabited type, such as 'Never'?
+  bool isNever();
+
   /// Is this the 'Any' type?
   bool isAny();
 

@@ -89,6 +89,15 @@ bool TypeBase::hasReferenceSemantics() {
   return getCanonicalType().hasReferenceSemantics();
 }
 
+bool TypeBase::isNever() {
+  if (auto nominalDecl = getAnyNominal())
+    if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
+      if (enumDecl->getAllElements().empty())
+        return true;
+
+  return false;
+}
+
 bool TypeBase::isAny() {
   return isEqual(getASTContext().TheAnyType);
 }
