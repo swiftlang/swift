@@ -1311,7 +1311,7 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
   if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
     defaultAccess = AA->getAccess();
   else
-    defaultAccess = std::min(maxAccess, Accessibility::Internal);
+    defaultAccess = Accessibility::Internal;
 
   // Normally putting a public member in an internal extension is harmless,
   // because that member can never be used elsewhere. But if some of the types
@@ -1368,9 +1368,9 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     case DeclContextKind::GenericTypeDecl: {
       auto generic = cast<GenericTypeDecl>(DC);
       validateAccessibility(generic);
-      Accessibility access = generic->getFormalAccess();
-      if (!isa<ProtocolDecl>(generic))
-        access = std::min(access, Accessibility::Internal);
+      Accessibility access = Accessibility::Internal;
+      if (isa<ProtocolDecl>(generic))
+        access = generic->getFormalAccess();
       D->setAccessibility(access);
       break;
     }

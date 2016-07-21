@@ -27,7 +27,7 @@ struct BA_DefaultStruct {
 
 // CHECK-LABEL: private{{(\*/)?}} struct BB_PrivateStruct {
 private struct BB_PrivateStruct {
-  // CHECK: private var x
+  // CHECK: internal var x
   var x = 0
   // CHECK: private init(x: Int)
   // CHECK: private init()
@@ -58,7 +58,7 @@ public struct BE_PublicStructPrivateMembers {
 
 // CHECK-LABEL: {{^}}private{{(\*/)?}} struct BF_FilePrivateStruct {
 fileprivate struct BF_FilePrivateStruct {
-  // CHECK: {{^}} private var x
+  // CHECK: {{^}} internal var x
   var x = 0
   // CHECK: {{^}} private init(x: Int)
   // CHECK: {{^}} private init()
@@ -92,7 +92,7 @@ private enum DA_PrivateEnum {
   // CHECK: {{^}} case Foo
   // CHECK: Bar
   case Foo, Bar
-  // CHECK: private init()
+  // CHECK: internal init()
   init() { self = .Foo }
   // CHECK: private var hashValue
 } // CHECK: {{^[}]}}
@@ -145,7 +145,7 @@ public class FC_PublicClass {}
 // CHECK-SRC: {{^}}ex
 // CHECK-LABEL: tension FA_PrivateClass {
 extension FA_PrivateClass {
-  // CHECK: private func a()
+  // CHECK: internal func a()
   func a() {}
 } // CHECK: {{^[}]}}
 
@@ -179,7 +179,7 @@ private extension FE_PublicClass {
   func explicitPrivateExt() {}
   // CHECK: private struct PrivateNested {
   struct PrivateNested {
-    // CHECK: private var x
+    // CHECK: internal var x
     var x: Int
   } // CHECK: }
 } // CHECK: {{^[}]}}
@@ -213,7 +213,7 @@ public extension FE_PublicClass {
 func GA_localTypes() {
   // CHECK-SRC: private struct Local {
   struct Local {
-    // CHECK-SRC: private let x
+    // CHECK-SRC: internal let x
     let x = 0
   }
   _ = Local()
@@ -240,11 +240,11 @@ public struct GB_NestedOuter {
 
 // CHECK-LABEL: private{{(\*/)?}} struct GC_NestedOuterPrivate {
 private struct GC_NestedOuterPrivate {
-  // CHECK: private struct Inner {
+  // CHECK: internal struct Inner {
   struct Inner {
     // CHECK: private{{(\*/)?}} let x
     private let x = 0
-    // CHECK: private let y
+    // CHECK: internal let y
     let y = 0
   }
 } // CHECK: {{^[}]}}
@@ -306,7 +306,7 @@ extension HB_InternalProtocol where Assoc == HC_PrivateStruct {
 } // CHECK: {{^[}]}}
 // CHECK-LABEL: extension HC_PrivateProtocol {
 extension HC_PrivateProtocol {
-  // CHECK: private func unconstrained()
+  // CHECK: internal func unconstrained()
   func unconstrained() {}
 } // CHECK: {{^[}]}}
 // CHECK-LABEL: extension HC_PrivateProtocol where Assoc == HA_PublicStruct {
