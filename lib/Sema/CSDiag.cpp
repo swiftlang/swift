@@ -2358,10 +2358,22 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     case MemberLookupResult::UR_TypeMemberOnInstance:
       if (instanceTy->isExistentialType() && baseObjTy->is<AnyMetatypeType>()) {
         // If the base of the lookup is an existential metatype, emit an
-        // error specific to that
-        diagnose(loc, diag::could_not_use_type_member_on_existential,
-                 baseObjTy, memberName)
-          .highlight(baseRange).highlight(nameLoc.getSourceRange());
+        // error saying the lookup cannot be on a protocol metatype
+        auto Diag = diagnose(loc, diag::could_not_use_type_member_on_existential,
+                             baseObjTy, memberName);
+        Diag.highlight(baseRange).highlight(nameLoc.getSourceRange());
+
+        // See through function decl context
+        if (auto parent = CS->DC->getParent())
+        // If we are in an protocol extension of 'Proto' and we see
+        // 'Proto.static', suggest 'Self.static'
+        if (auto extensionContext = parent->getAsProtocolExtensionContext()) {
+          if (extensionContext->getDeclaredType()->getCanonicalType()
+              == instanceTy->getCanonicalType()) {
+            Diag.fixItReplace(baseRange, "Self");
+          }
+        }
+
       } else {
         // Otherwise the static member lookup was invalid because it was
         // called on an instance
