@@ -1235,8 +1235,7 @@ public func fixitForReferenceInGlobalFunctionWithDeclModifier() {
       // expected-note@-3 {{add @available attribute to enclosing global function}} {{1-1=@available(OSX 10.51, *)\n}}
 }
 
-@noreturn
-func fixitForReferenceInGlobalFunctionWithAttribute() {
+func fixitForReferenceInGlobalFunctionWithAttribute() -> Never {
   functionAvailableOn10_51()
     // expected-error@-1 {{'functionAvailableOn10_51()' is only available on OS X 10.51 or newer}}
     // expected-note@-2 {{add 'if #available' version check}} {{3-29=if #available(OSX 10.51, *) {\n      functionAvailableOn10_51()\n  } else {\n      // Fallback on earlier versions\n  }}}

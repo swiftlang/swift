@@ -100,9 +100,6 @@ class Attributes {
 // CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@objc</attr-builtin> <kw>var</kw> {{(<attr-builtin>)?}}v3{{(</attr-builtin>)?}}: <type>String</type>
   @IBOutlet @objc var v3: String
 
-// CHECK: <attr-builtin>@noreturn</attr-builtin> <kw>func</kw> f0() {}
-  @noreturn func f0() {}
-
 // CHECK: <attr-builtin>@available</attr-builtin>(*, unavailable) <kw>func</kw> f1() {}
   @available(*, unavailable) func f1() {}
 
@@ -111,9 +108,6 @@ class Attributes {
 
 // CHECK: <attr-builtin>@IBAction</attr-builtin> <attr-builtin>@available</attr-builtin>(*, unavailable) <kw>func</kw> f3() {}
   @IBAction @available(*, unavailable) func f3() {}
-
-// CHECK: <attr-builtin>@IBAction</attr-builtin> <attr-builtin>@available</attr-builtin>(*, unavailable) <attr-builtin>@noreturn</attr-builtin> <kw>func</kw> f4() {}
-  @IBAction @available(*, unavailable) @noreturn func f4() {}
 
 // CHECK: <attr-builtin>mutating</attr-builtin> <kw>func</kw> func_mutating_1() {}
   mutating func func_mutating_1() {}

@@ -431,10 +431,10 @@ BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 /// once has type (Builtin.RawPointer, () -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 
-/// unreachable has type @noreturn () -> ()
+/// unreachable has type () -> Never
 BUILTIN_MISC_OPERATION(Unreachable, "unreachable", "", Special)
 
-/// conditionallyUnreachable has type @noreturn () -> ()
+/// conditionallyUnreachable has type () -> Never
 BUILTIN_MISC_OPERATION(CondUnreachable, "conditionallyUnreachable", "", Special)
 
 /// DestroyArray has type (T.Type, Builtin.RawPointer, Builtin.Word) -> ()

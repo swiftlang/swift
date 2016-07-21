@@ -97,10 +97,9 @@ bb2:
 class B { }
 class E : B { }
 
-sil @exit : $@convention(thin) @noreturn () -> () {
+sil @exit : $@convention(thin) () -> Never {
 bb0:
-  %1 = tuple ()
-  return %1 : $()
+  br bb0
 }
 
 // CHECK-LABEL: sil @removeTriviallyDeadInstructions
@@ -119,8 +118,8 @@ bb0(%0 : $B):
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject
   %7 = strong_release %3 : $B
   %8 = strong_release %1 : $@box B
-  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
+  %10 = apply %9() : $@convention(thin) () -> Never
   %6 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B
   %11 = tuple()
   %12 = return %11 : $()
@@ -137,8 +136,8 @@ bb0(%0: $B, %1: $Builtin.Int1):
 bb1:
   %22 = br bb2
 bb2:
-  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
+  %10 = apply %9() : $@convention(thin) () -> Never
   %21 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B
   %32 = tuple ()
   %33 = return %32 : $()

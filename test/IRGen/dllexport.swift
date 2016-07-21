@@ -3,9 +3,10 @@
 
 // REQUIRES: CODEGENERATOR=ARM
 
-@noreturn
+enum Never {}
+
 @_silgen_name("_swift_fatalError")
-func fatalError()
+func fatalError() -> Never
 
 public protocol p {
   func f()
@@ -18,8 +19,7 @@ public class c {
 public var ci : c = c()
 
 public class d {
-  @noreturn
-  private func m() {
+  private func m() -> Never {
     fatalError()
   }
 }

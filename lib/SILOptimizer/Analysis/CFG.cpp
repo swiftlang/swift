@@ -81,7 +81,7 @@ findAllNonFailureExitBBs(SILFunction *F,
     // non-failure exit BB. Add it to our list and continue.
     auto PrevIter = std::prev(SILBasicBlock::iterator(TI));
     if (auto *AI = dyn_cast<ApplyInst>(&*PrevIter)) {
-      if (AI->getSubstCalleeType()->isNoReturn() &&
+      if (AI->isCalleeNoReturn() &&
           !isTrapNoReturnFunction(AI)) {
         BBs.push_back(&BB);
         continue;

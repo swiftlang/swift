@@ -1518,12 +1518,12 @@ importFunctionType(DeclContext *dc,
   if (!parameterList)
     return Type();
 
-  FunctionType::ExtInfo extInfo;
-  extInfo = extInfo.withIsNoReturn(isNoReturn);
+  if (isNoReturn)
+    swiftResultTy = SwiftContext.getNeverType();
 
   // Form the function type.
   auto argTy = parameterList->getType(SwiftContext);
-  return FunctionType::get(argTy, swiftResultTy, extInfo);
+  return FunctionType::get(argTy, swiftResultTy);
 }
 
 ParameterList *ClangImporter::Implementation::importFunctionParameterList(
@@ -2430,9 +2430,13 @@ Type ClangImporter::Implementation::importMethodType(
   
   // Form the parameter list.
   *bodyParams = ParameterList::create(SwiftContext, swiftParams);
-  
+
+  if (isNoReturn) {
+    origSwiftResultTy = SwiftContext.getNeverType();
+    swiftResultTy = SwiftContext.getNeverType();
+  }
+
   FunctionType::ExtInfo extInfo;
-  extInfo = extInfo.withIsNoReturn(isNoReturn);
 
   if (errorInfo) {
     foreignErrorInfo = getForeignErrorInfo(*errorInfo, errorParamType,

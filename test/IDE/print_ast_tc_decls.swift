@@ -492,24 +492,6 @@ protocol d0150_TestClassProtocol : class {}
 // PASS_COMMON-LABEL: {{^}}@objc protocol d0151_TestClassProtocol {{{$}}
 
 
-@noreturn @_silgen_name("exit") func d0160_testNoReturn()
-// PASS_COMMON-LABEL: {{^}}@_silgen_name("exit"){{$}}
-// PASS_COMMON-NEXT: {{^}}@noreturn func d0160_testNoReturn(){{$}}
-
-@noreturn func d0161_testNoReturn() { d0160_testNoReturn() }
-// PASS_COMMON-LABEL: {{^}}@noreturn func d0161_testNoReturn(){{$}}
-
-class d0162_TestNoReturn {
-// PASS_COMMON-LABEL: {{^}}class d0162_TestNoReturn {{{$}}
-
-  @noreturn func instanceFunc() { d0160_testNoReturn() }
-// PASS_COMMON-NEXT: {{^}}  @noreturn func instanceFunc(){{$}}
-
-  @noreturn func classFunc() {d0160_testNoReturn() }
-// PASS_COMMON-NEXT: {{^}}  @noreturn func classFunc(){{$}}
-}
-
-
 class d0170_TestAvailability {
 // PASS_COMMON-LABEL: {{^}}class d0170_TestAvailability {{{$}}
 
