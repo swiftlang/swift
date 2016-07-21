@@ -1,4 +1,4 @@
-//===--- Algorithms.swift -------------------------------------------------===//
+//===--- Algorithms.swift.gyb ---------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,10 +9,23 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift
-// REQUIRES: executable_test
+// RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
+// RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone
+// RUN: %line-directive %t/out.swift -- %target-run %t/a.out
 
+import Swift
 import StdlibUnittest
+
+%{
+
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    defaultIndicesForTraversal,
+    sliceTypeName
+)
+
+}%
 
 //===--- Rotate -----------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -158,31 +171,6 @@ extension MutableCollectionAlgorithms {
   }
 }
 
-// We could use Array instead, but this should be much more efficient.
-// It should be proposed for addition to the standard library, for
-// similar purposes.
-public struct CollectionOfTwo<Element> : RandomAccessCollection {
-  public typealias Indices = CountableRange<Int>
-  
-  @inline(__always)
-  public init(_ first: Element, _ second: Element) {
-    self._elements = (first, second)
-  }
-
-  public var startIndex: Int { return 0 }
-  public var endIndex: Int   { return 2 }
-
-  public subscript(index: Int) -> Element {
-    switch index {
-    case 0: return _elements.0
-    case 1: return _elements.1
-    default: fatalError("Index out of bounds.")
-    }
-  }
-  
-  internal let _elements: (Element, Element)
-}
-
 extension MutableCollection where Self: BidirectionalCollection {
 
   // This could be internal, but until we have pinned accessors for
@@ -314,51 +302,298 @@ extension MutableCollection where Self: RandomAccessCollection,
   }
 }
 
-extension Collection where SubSequence : Collection {
-  public func rotated(
-    shiftingToStart middle: Index
-  ) -> FlattenCollection<CollectionOfTwo<SubSequence>> {
-    return CollectionOfTwo(
-      self[middle..<endIndex], self[startIndex..<middle]
-    ).flatten()
+//===--- ConcatenatedCollection -------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+// ConcatenatedCollection improves on a flattened array or other collection by
+// allowing random-access traversal if the underlying collections are
+// random-access.
+//
+// Q: Add a ConcatenatedSequence for consistency? Would be nice to be able to
+// call `let seqAB = concatenate(seqA, seqB)`.
+
+/// Represents a position in either the first or second collection of a
+/// `ConcatenatedCollection`.
+internal enum _ConcatenatedCollectionIndexRepresentation<
+  I1 : Comparable, I2 : Comparable
+> {
+  case first(I1)
+  case second(I2)
+}
+
+/// A position in a `ConcatenatedCollection` collection.
+public struct ConcatenatedCollectionIndex<
+  C1 : Collection, C2 : Collection
+> : Comparable {
+  /// Creates a new index into the first underlying collection.
+  internal init(first i: C1.Index) {
+    _position = .first(i)
+  }
+
+  /// Creates a new index into the second underlying collection.
+  internal init(second i: C2.Index) {
+    _position = .second(i)
+  }
+
+  internal let _position:
+    _ConcatenatedCollectionIndexRepresentation<C1.Index, C2.Index>
+}
+
+public func < <C1: Collection, C2: Collection>(
+  lhs: ConcatenatedCollectionIndex<C1, C2>,
+  rhs: ConcatenatedCollectionIndex<C1, C2>
+) -> Bool {
+  switch (lhs._position, rhs._position) {
+  case (.first, .second):
+    return true
+  case (.second, .first):
+    return false
+  case let (.first(l), .first(r)):
+    return l < r
+  case let (.second(l), .second(r)):
+    return l < r
   }
 }
 
-extension Collection where SubSequence : BidirectionalCollection {
-  public func rotated(
-    shiftingToStart middle: Index
-  ) -> FlattenBidirectionalCollection<CollectionOfTwo<SubSequence>> {
-    return CollectionOfTwo(
-      self[middle..<endIndex], self[startIndex..<middle]
-    ).flatten()
+public func == <C1: Collection, C2: Collection>(
+  lhs: ConcatenatedCollectionIndex<C1, C2>,
+  rhs: ConcatenatedCollectionIndex<C1, C2>
+) -> Bool {
+  switch (lhs._position, rhs._position) {
+  case let (.first(l), .first(r)):
+    return l == r
+  case let (.second(l), .second(r)):
+    return l == r
+  default:
+    return false
   }
 }
 
-extension LazyCollectionProtocol 
-  where Elements.SubSequence : Collection, Index == Elements.Index {
-  public func rotated(
-    shiftingToStart middle: Index
-  ) -> LazyCollection<
-    FlattenCollection<CollectionOfTwo<Elements.SubSequence>>
-  > {
-    return elements.rotated(shiftingToStart: middle).lazy
+% for Traversal in TRAVERSALS:
+%   Collection = collectionForTraversal(Traversal)
+%   Self = "Concatenated" + Collection
+
+/// A concatenation of two collections with the same element type.
+public struct ${Self}<C1 : ${Collection}, C2: ${Collection}
+  where C1.Iterator.Element == C2.Iterator.Element>: ${Collection} {
+
+  init(_base1: C1, base2: C2) {
+    self._base1 = _base1
+    self._base2 = base2
+  }
+
+  public typealias Index = ConcatenatedCollectionIndex<C1, C2>
+
+  public var startIndex: Index {
+    // If `_base1` is empty, then `_base2.startIndex` is either a valid position
+    // of an element or equal to `_base2.endIndex`.
+    return _base1.isEmpty
+      ? ConcatenatedCollectionIndex(second: _base2.startIndex)
+      : ConcatenatedCollectionIndex(first: _base1.startIndex)
+  }
+
+  public var endIndex: Index {
+    return ConcatenatedCollectionIndex(second: _base2.endIndex)
+  }
+
+  public subscript(i: Index) -> C1.Iterator.Element {
+    switch i._position {
+    case let .first(i):
+      return _base1[i]
+    case let .second(i):
+      return _base2[i]
+    }
+  }
+
+  public func index(after i: Index) -> Index {
+    switch i._position {
+    case let .first(i):
+      _sanityCheck(i != _base1.endIndex)
+      let next = _base1.index(after: i)
+      return next == _base1.endIndex
+        ? ConcatenatedCollectionIndex(second: _base2.startIndex)
+        : ConcatenatedCollectionIndex(first: next)
+    case let .second(i):
+      return ConcatenatedCollectionIndex(second: _base2.index(after: i))
+    }
+  }
+
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  public func index(before i: Index) -> Index {
+    assert(i != startIndex, "Can't advance before startIndex")
+    switch i._position {
+    case let .first(i):
+      return ConcatenatedCollectionIndex(first: _base1.index(before: i))
+    case let .second(i):
+      return i == _base2.startIndex
+        ? ConcatenatedCollectionIndex(
+            first: _base1.index(before: _base1.endIndex))
+        : ConcatenatedCollectionIndex(second: _base2.index(before: i))
+    }
+  }
+%   end
+
+%   if Traversal is 'RandomAccess':
+  public func index(_ i: Index, offsetBy n: ${Self}.IndexDistance) -> Index {
+    if n == 0 { return i }
+    return n > 0 ? _offsetForward(i, by: n) : _offsetBackward(i, by: -n)
+  }
+
+  internal func _offsetForward(
+    _ i: Index, by n: ${Self}.IndexDistance
+  ) -> Index {
+    switch i._position {
+    case let .first(i):
+      let d: ${Self}.IndexDistance = numericCast(
+        _base1.distance(from: i, to: _base1.endIndex))
+      if n < d {
+        return ConcatenatedCollectionIndex(
+          first: _base1.index(i, offsetBy: numericCast(n)))
+      } else {
+        return ConcatenatedCollectionIndex(
+          second: _base2.index(_base2.startIndex, offsetBy: numericCast(n - d)))
+      }
+    case let .second(i):
+      return ConcatenatedCollectionIndex(
+        second: _base2.index(i, offsetBy: numericCast(n)))
+    }
+  }
+
+  internal func _offsetBackward(
+    _ i: Index, by n: ${Self}.IndexDistance
+  ) -> Index {
+    switch i._position {
+    case let .first(i):
+      return ConcatenatedCollectionIndex(
+        first: _base1.index(i, offsetBy: -numericCast(n)))
+    case let .second(i):
+      let d: ${Self}.IndexDistance = numericCast(
+        _base2.distance(from: _base2.startIndex, to: i))
+      if n <= d {
+        return ConcatenatedCollectionIndex(
+          second: _base2.index(i, offsetBy: -numericCast(n)))
+      } else {
+        return ConcatenatedCollectionIndex(
+          first: _base1.index(_base1.endIndex, offsetBy: -numericCast(n - d)))
+      }
+    }
+  }
+%   end
+
+  let _base1: C1
+  let _base2: C2
+}
+
+/// Returns a new collection that presents a view onto the elements of the
+/// first collection and then the elements of the second collection.
+func concatenate<
+  C1 : ${Collection}, C2 : ${Collection}
+  where C1.Iterator.Element == C2.Iterator.Element
+>(_ first: C1, _ second: C2) -> ${Self}<C1, C2> {
+  return ${Self}(_base1: first, base2: second)
+}
+
+% end
+
+//===--- RotatedCollection ------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+/// A position in a rotated collection.
+public struct RotatedCollectionIndex<
+  Base : Collection where Base.SubSequence: Collection
+> : Comparable {
+  internal let _index:
+    ConcatenatedCollectionIndex<Base.SubSequence, Base.SubSequence>
+}
+
+public func < <Base: Collection where Base.SubSequence: Collection>(
+  lhs: RotatedCollectionIndex<Base>, rhs: RotatedCollectionIndex<Base>
+) -> Bool {
+  return lhs._index < rhs._index
+}
+
+public func == <Base: Collection where Base.SubSequence: Collection>(
+  lhs: RotatedCollectionIndex<Base>, rhs: RotatedCollectionIndex<Base>
+) -> Bool {
+  return lhs._index == rhs._index
+}
+
+% for Traversal in TRAVERSALS:
+%   Collection = collectionForTraversal(Traversal)
+%   Self = "Rotated" + Collection
+
+/// A rotated view onto a `${Collection}`.
+public struct ${Self}<
+  Base : ${Collection} where Base.SubSequence: ${Collection}
+> : ${Collection} {
+  let _concatenation: Concatenated${Collection}<
+    Base.SubSequence, Base.SubSequence>
+
+  init(_base: Base, shiftingToStart i: Base.Index) {
+    _concatenation = concatenate(_base.suffix(from: i), _base.prefix(upTo: i))
+  }
+
+  public typealias Index = RotatedCollectionIndex<Base>
+
+  public var startIndex: Index {
+    return RotatedCollectionIndex(_index: _concatenation.startIndex)
+  }
+
+  public var endIndex: Index {
+    return RotatedCollectionIndex(_index: _concatenation.endIndex)
+  }
+
+  public subscript(i: Index) -> Base.SubSequence.Iterator.Element {
+    return _concatenation[i._index]
+  }
+
+  public func index(after i: Index) -> Index {
+    return RotatedCollectionIndex(_index: _concatenation.index(after: i._index))
+  }
+
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  public func index(before i: Index) -> Index {
+    return RotatedCollectionIndex(
+      _index: _concatenation.index(before: i._index))
+  }
+%   end
+
+  public func index(_ i: Index, offsetBy n: ${Self}.IndexDistance) -> Index {
+    return RotatedCollectionIndex(
+      _index: _concatenation.index(i._index, offsetBy: n))
+  }
+
+  /// The shifted position of the base collection's `startIndex`.
+  public var shiftedStartIndex: Index {
+    return RotatedCollectionIndex(
+      _index: ConcatenatedCollectionIndex(
+        second: _concatenation._base2.startIndex)
+    )
   }
 }
 
-extension LazyCollectionProtocol
-  where
-  Self : BidirectionalCollection,
-  Elements : BidirectionalCollection,
-  Elements.SubSequence : BidirectionalCollection, Index == Elements.Index {
-
-  public func rotated(
-    shiftingToStart middle: Index
-  ) -> LazyBidirectionalCollection<
-    FlattenBidirectionalCollection<CollectionOfTwo<Elements.SubSequence>>
-  > {
-    return elements.rotated(shiftingToStart: middle).lazy
+extension ${Collection} where SubSequence: ${Collection} {
+  /// Returns a view of this collection with the elements reordered such the
+  /// element at the given position ends up first.
+  ///
+  /// The subsequence of the collection up to `i` is shifted to after the
+  /// subsequence starting at `i`. The order of the elements within each
+  /// partition is otherwise unchanged.
+  ///
+  ///     let a = [10, 20, 30, 40, 50, 60, 70]
+  ///     let r = a.rotated(shiftingToStart: 3)
+  ///     // r.elementsEqual([40, 50, 60, 70, 10, 20, 30])
+  ///
+  /// - Parameter i: The position in the collection that should be first in the
+  ///   result. `i` must be a valid index of the collection.
+  /// - Returns: A rotated view on the elements of this collection, such that
+  ///   the element at `i` is first.
+  func rotated(shiftingToStart i: Index) -> ${Self}<Self> {
+    return ${Self}(_base: self, shiftingToStart: i)
   }
 }
+
+% end
 
 //===--- Stable Partition -------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -518,6 +753,26 @@ suite.test("rotateRandomAccess") {
       expectEqual(b, Array(a.rotated(shiftingToStart: p)))
     }
   }
+}
+
+suite.test("concatenate") {
+  for x in 0...6 {
+    for y in 0...x {
+      let r1 = 0..<y
+      let r2 = y..<x
+      expectEqual(Array(0..<x), Array(concatenate(r1, r2)))
+    }
+  }
+
+  let c1 = concatenate([1, 2, 3, 4, 5], 6...10)
+  let c2 = concatenate(1...5, [6, 7, 8, 9, 10])
+  expectEqual(Array(1...10), Array(c1))
+  expectEqual(Array(1...10), Array(c2))
+
+  let h = "Hello, "
+  let w = "world!"
+  let hw = concatenate(h.characters, w.characters)
+  expectEqual("Hello, world!", String(hw))
 }
 
 suite.test("stablePartition") {
