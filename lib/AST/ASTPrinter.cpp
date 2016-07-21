@@ -868,10 +868,12 @@ void ASTPrinter::printTypeRef(DynamicSelfType *T, Identifier Name) {
   if (auto staticSelfT = T->getSelfType()) {
     // Handle protocol 'Self', which is an archetype.
     if (auto AT = staticSelfT->getAs<ArchetypeType>()) {
-      if (auto GTD = AT->getSelfProtocol()->getProtocolSelf()) {
-        assert(GTD->isProtocolSelf());
-        printTypeRef(T, GTD, Name);
-        return;
+      if (auto SelfP = AT->getSelfProtocol()) {
+        if (auto GTD = SelfP->getProtocolSelf()) {
+          assert(GTD->isProtocolSelf());
+          printTypeRef(T, GTD, Name);
+          return;
+        }
       }
 
     // Handle class 'Self', which is just a class type.
