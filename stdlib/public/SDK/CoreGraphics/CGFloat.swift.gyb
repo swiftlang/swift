@@ -67,6 +67,19 @@ public struct CGFloat {
   public var native: NativeType
 }
 
+extension CGFloat : Arithmetic {
+  // FIXME(integers): implement properly
+  public init?<T : BinaryInteger>(exactly source: T) {
+    fatalError()
+  }
+
+  @_transparent
+  public var magnitude: CGFloat {
+    return CGFloat(abs(native))
+  }
+
+}
+
 @_transparent extension CGFloat : BinaryFloatingPoint {
 
   public typealias RawSignificand = UInt
@@ -172,10 +185,6 @@ public struct CGFloat {
 
   public var nextUp: CGFloat {
     return CGFloat(native.nextUp)
-  }
-
-  public var magnitude: CGFloat {
-    return CGFloat(abs(native))
   }
 
   public mutating func negate() {

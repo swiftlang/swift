@@ -105,7 +105,7 @@ extension ExpressibleByIntegerLiteral
 /// type as its argument.
 public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
   // FIXME(integers): implement
-  //init?<T : BinaryInteger>(exactly source: T)
+  init?<T : BinaryInteger>(exactly source: T)
 
   // FIXME(ABI): should be just Arithmetic
   associatedtype Magnitude : Equatable, ExpressibleByIntegerLiteral
