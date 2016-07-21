@@ -120,3 +120,14 @@ swift::_swift_dispatch_apply_current(
 		block((long)i);
 	});
 }
+
+__swift_shims_dispatch_data_t
+swift::_swift_dispatch_data_create(
+		const void *buffer,
+		__swift_size_t size,
+		__swift_shims_dispatch_queue_t queue,
+		__swift_shims_dispatch_block_t destructor)
+{
+	return dispatch_data_create(buffer, size, cast(queue), cast(destructor));
+}
+

@@ -61,3 +61,10 @@ if #available(OSX 10.10, iOS 8.0, *) {
     block.cancel()
   }
 }
+
+DispatchAPI.test("dispatch_data_t enumeration") {
+	// Ensure we can iterate the empty iterator
+	for x in DispatchData.empty {
+		_ = 1
+	}
+}

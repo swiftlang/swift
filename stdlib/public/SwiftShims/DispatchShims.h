@@ -95,6 +95,14 @@ void _swift_dispatch_apply_current(
 		unsigned int iterations,
 		void SWIFT_DISPATCH_NOESCAPE (^block)(long));
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_shims_dispatch_data_t 
+_swift_dispatch_data_create(
+		const void *buffer,
+		__swift_size_t size,
+		__swift_shims_dispatch_queue_t queue,
+		__swift_shims_dispatch_block_t destructor);
+
 #ifdef __cplusplus
 }} // extern "C", namespace swift
 #endif
