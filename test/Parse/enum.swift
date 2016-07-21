@@ -460,7 +460,7 @@ enum SE0036 {
   }
 
   func staticReferencInInstanceMethod() {
-    _ = A // expected-warning {{referencing enum element 'A' as instance member is deprecated and will be removed in Swift 3}} {{9-9=SE0036.}}
+    _ = A // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{9-9=SE0036.}}
     _ = SE0036.A
   }
 
@@ -473,8 +473,8 @@ enum SE0036 {
 
   func staticReferencInSwitchInInstanceMethod() {
     switch self {
-    case A: break // expected-warning {{referencing enum element 'A' as instance member is deprecated and will be removed in Swift 3}} {{10-10=.}}
-    case B(_): break // expected-warning {{referencing enum element 'B' as instance member is deprecated and will be removed in Swift 3}} {{10-10=.}}
+    case A: break // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{10-10=.}}
+    case B(_): break // expected-error {{enum element 'B' cannot be referenced as an instance member}} {{10-10=.}}
     }
   }
 
@@ -501,10 +501,10 @@ enum SE0036 {
 
   init() {
     self = .A
-    self = A // expected-warning {{referencing enum element 'A' as instance member is deprecated and will be removed in Swift 3}} {{12-12=SE0036.}}
+    self = A // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{12-12=.}}
     self = SE0036.A
     self = .B(SE0036_Auxiliary())
-    self = B(SE0036_Auxiliary()) // expected-warning {{referencing enum element 'B' as instance member is deprecated and will be removed in Swift 3}} {{12-12=SE0036.}}
+    self = B(SE0036_Auxiliary()) // expected-error {{enum element 'B' cannot be referenced as an instance member}} {{12-12=.}}
     self = SE0036.B(SE0036_Auxiliary())
   }
 }
@@ -514,7 +514,7 @@ enum SE0036_Generic<T> {
 
   func foo() {
     switch self {
-    case A(_): break // expected-warning {{referencing enum element 'A' as instance member is deprecated and will be removed in Swift 3}} {{10-10=.}}
+    case A(_): break // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{10-10=SE0036_Generic.}}
     }
 
     switch self {
@@ -522,3 +522,4 @@ enum SE0036_Generic<T> {
     }
   }
 }
+

@@ -1031,13 +1031,6 @@ class TypeExpr : public Expr {
   TypeLoc Info;
   TypeExpr(Type Ty);
 public:
-  /// Whether this type reference actually references an instance but has been
-  /// promoted to a type reference to access an enum element
-  ///
-  /// This is purely transitional and will be removed when referencing enum
-  /// elements on instance members becomes an error
-  bool IsPromotedInstanceRef = false;
-
   // Create a TypeExpr with location information.
   TypeExpr(TypeLoc Ty);
 
@@ -1058,8 +1051,7 @@ public:
   
   /// Return a TypeExpr for a TypeDecl and the specified location.
   static TypeExpr *createForDecl(SourceLoc Loc, TypeDecl *D,
-                                 bool isImplicit,
-                                 bool isPromotedInstanceRef = false);
+                                 bool isImplicit);
   static TypeExpr *createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
                                             ArrayRef<TypeRepr*> args,
                                             SourceRange angleLocs);

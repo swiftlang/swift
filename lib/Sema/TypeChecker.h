@@ -63,13 +63,6 @@ public:
     /// The base declaration through which we found the declaration.
     ValueDecl *Base;
 
-    /// Whether this should actually reference an instance but has been promoted
-    /// to a type reference to access an enum element
-    ///
-    /// This is purely transitional and will be removed when referencing enum
-    /// elements on instance members becomes an error
-    bool IsPromotedInstanceRef;
-
     operator ValueDecl*() const { return Decl; }
     ValueDecl *operator->() const { return Decl; }
   };
@@ -1204,12 +1197,17 @@ public:
   /// events in the type checking of this expression, and which can introduce
   /// additional constraints.
   ///
+  /// \param baseCS If this type checking process is the simplification of
+  /// another constraint system, set the original constraint system. \c null
+  /// otherwise
+  ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            TypeLoc convertType = TypeLoc(),
                            ContextualTypePurpose convertTypePurpose =CTP_Unused,
                            TypeCheckExprOptions options =TypeCheckExprOptions(),
-                           ExprTypeCheckListener *listener = nullptr);
+                           ExprTypeCheckListener *listener = nullptr,
+                           constraints::ConstraintSystem *baseCS = nullptr);
 
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            ExprTypeCheckListener *listener) {
