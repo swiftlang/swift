@@ -12,9 +12,6 @@
 
 import SwiftShims
 
-/// Temporary typealias to aid in migration
-public typealias Process = CommandLine
-
 /// Command-line arguments for the current process.
 public enum CommandLine {
   /// The backing static variable for argument count may come either from the
