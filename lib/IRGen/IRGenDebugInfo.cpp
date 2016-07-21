@@ -838,7 +838,7 @@ void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF,
                       (Size)CI.getTargetInfo().getPointerWidth(0),
                       (Alignment)CI.getTargetInfo().getPointerAlign(0));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          TName, 0,
+                          nullptr, TName, 0,
                           // swift.type is already a pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
@@ -874,7 +874,7 @@ getStorageSize(const llvm::DataLayout &DL, ArrayRef<llvm::Value *> Storage) {
 
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, StringRef Name, unsigned ArgNo,
+    const SILDebugScope *DS, ValueDecl *VarDecl, StringRef Name, unsigned ArgNo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
   // Self is always an artificial argument.
   if (ArgNo > 0 && Name == IGM.Context.Id_self.str())
@@ -893,7 +893,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
   auto *Scope = dyn_cast<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
-  auto Loc = getDebugLoc(SM, DbgTy.getDecl());
+  auto Loc = getDebugLoc(SM, VarDecl);
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.

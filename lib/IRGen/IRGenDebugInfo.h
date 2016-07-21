@@ -182,7 +182,8 @@ public:
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
-                               StringRef Name, unsigned ArgNo = 0,
+                               ValueDecl *VarDecl, StringRef Name,
+                               unsigned ArgNo = 0,
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue);
 

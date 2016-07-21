@@ -720,6 +720,7 @@ public:
                                     DebugTypeInfo Ty,
                                     SILType SILTy,
                                     const SILDebugScope *DS,
+                                    ValueDecl *VarDecl,
                                     StringRef Name,
                                     unsigned ArgNo = 0,
                                     IndirectionKind Indirection = DirectValue) {
@@ -735,11 +736,11 @@ public:
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
-      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, Name,
-                                             ArgNo, Indirection);
+      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
+                                             Name, ArgNo, Indirection);
     } else
-      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, Name, 0,
-                                             Indirection);
+      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
+                                             Name, 0, Indirection);
   }
 
   void emitFailBB() {
@@ -1491,9 +1492,9 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
         countArgs(CurSILFn->getDeclContext()) + 1 + BB->getBBArgs().size();
     auto Storage = emitShadowCopy(ErrorResultSlot.getAddress(), getDebugScope(),
                                   Name, ArgNo);
-    IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DTI,
-                                           getDebugScope(), Name, ArgNo,
-                                           IndirectValue, ArtificialValue);
+    IGM.DebugInfo->emitVariableDeclaration(
+        Builder, Storage, DTI, getDebugScope(), nullptr, Name, ArgNo,
+        IndirectValue, ArtificialValue);
   }
 }
 
@@ -3209,8 +3210,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   Explosion e = getLoweredExplosion(SILVal);
   unsigned ArgNo = i->getVarInfo().ArgNo;
   emitShadowCopy(e.claimAll(), i->getDebugScope(), Name, ArgNo, Copy);
-  emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(), Name,
-                               ArgNo);
+  emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
+                               i->getDecl(), Name, ArgNo);
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -3239,7 +3240,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   unsigned ArgNo = i->getVarInfo().ArgNo;
   emitDebugVariableDeclaration(
       emitShadowCopy(Addr, i->getDebugScope(), Name, ArgNo), DbgTy,
-      i->getType(), i->getDebugScope(), Name, ArgNo,
+      i->getType(), i->getDebugScope(), Decl, Name, ArgNo,
       DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
 }
 
@@ -3510,7 +3511,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     auto DbgTy = DebugTypeInfo(Decl, RealType, type, Unwrap);
     StringRef Name = getVarName(i);
     if (auto DS = i->getDebugScope())
-      emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Name,
+      emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Decl, Name,
                                    i->getVarInfo().ArgNo);
   }
 }
@@ -3679,8 +3680,8 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     DebugTypeInfo DbgTy(Decl, i->getElementType().getSwiftType(), type, false);
     IGM.DebugInfo->emitVariableDeclaration(
         Builder,
-          emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),
-        DbgTy, i->getDebugScope(), Name, 0,
+        emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),
+        DbgTy, i->getDebugScope(), Decl, Name, 0,
         DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
   }
 }
