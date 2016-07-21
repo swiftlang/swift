@@ -995,8 +995,11 @@ Reflection.test("ObjectIdentifier/CustomDebugStringConvertible") {
   expectEqual(String(reflecting: oi1), String(reflecting: oi1))
   expectNotEqual(String(reflecting: oi1), String(reflecting: oi2))
 
-  let p1 = UnsafePointer<Void>(bitPattern: UInt(oi1))!
+  let p1 = UnsafePointer<Void>(bitPattern: UInt(bitPattern: oi1))!
   expectPrinted("ObjectIdentifier(\(p1))", oi1)
+  let p2 = UnsafePointer<Void>(bitPattern: Int(bitPattern: oi1))!
+  expectPrinted("ObjectIdentifier(\(p2))", oi1)
+
 }
 
 Reflection.test("CustomMirrorIsInherited") {
