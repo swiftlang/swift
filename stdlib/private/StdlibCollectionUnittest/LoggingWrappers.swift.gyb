@@ -192,7 +192,7 @@ public class RangeReplaceableCollectionLog : CollectionLog {
 %       Constraints = Kind
 %       Protocols = Kind
 %     else:
-%       Constraints = 'protocol<' + Kind + ', ' + collectionForTraversal(Traversal) + '>'
+%       Constraints = Kind + ' & ' + collectionForTraversal(Traversal)
 %       Protocols = ', '.join(set([Kind, collectionForTraversal(Traversal)]))
 %     end
 /// Interposes between `${Kind}` method calls to increment each method's
