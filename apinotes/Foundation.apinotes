@@ -160,6 +160,28 @@ Classes:
   - Selector: 'notificationCenterForType:'
     MethodKind: Class
     FactoryAsInit: C
+- Name: NSKeyedArchiver
+  SwiftName: NSKeyedArchiver
+  Methods:
+  - Selector: 'encodeInt:forKey:'
+    Availability: nonswift
+    AvailabilityMsg: Use 'encodeInt32(_:forKey:)' instead
+    MethodKind: Instance
+  - Selector: 'decodeIntForKey:'
+    Availability: nonswift
+    AvailabilityMsg: Use 'decodeInt32(forKey:)' instead
+    MethodKind: Instance
+- Name: NSKeyedUnarchiver
+  SwiftName: NSKeyedUnarchiver
+  Methods:
+  - Selector: 'encodeInt:forKey:'
+    Availability: nonswift
+    AvailabilityMsg: Use 'encodeInt32(_:forKey:)' instead
+    MethodKind: Instance
+  - Selector: 'decodeIntForKey:'
+    Availability: nonswift
+    AvailabilityMsg: Use 'decodeInt32(forKey:)' instead
+    MethodKind: Instance
 - Name: NSCoder
   SwiftName: NSCoder
   Methods:
@@ -168,10 +190,10 @@ Classes:
     Availability: nonswift
     AvailabilityMsg: use generic 'decodeObjectOfClass(_:forKey:)'
   - Selector: 'encodeInt:forKey:'
-    Availability: nonswift
+    SwiftName: encodeCInt(_:forKey:)
     MethodKind: Instance
   - Selector: 'decodeIntForKey:'
-    Availability: nonswift
+    SwiftName: decodeCInt(forKey:)
     MethodKind: Instance
   - Selector: 'encodeDataObject:'
     SwiftName: encode(_:)
@@ -554,10 +576,6 @@ Classes:
   SwiftName: NSArchiver
 - Name: NSUnarchiver
   SwiftName: NSUnarchiver
-- Name: NSKeyedArchiver
-  SwiftName: NSKeyedArchiver
-- Name: NSKeyedUnarchiver
-  SwiftName: NSKeyedUnarchiver
 - Name: NSUniqueIDSpecifier
   SwiftName: NSUniqueIDSpecifier
 - Name: NSUserActivity
