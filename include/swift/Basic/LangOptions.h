@@ -161,7 +161,7 @@ namespace swift {
     bool StripNSPrefix = true;
 
     /// Should 'id' in Objective-C be imported as 'Any' in Swift?
-    bool EnableIdAsAny = false;
+    bool EnableIdAsAny = true;
 
     /// Enable the Swift 3 migration via Fix-Its.
     bool Swift3Migration = false;
