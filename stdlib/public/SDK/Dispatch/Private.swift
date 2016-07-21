@@ -12,13 +12,13 @@
 
 // Redeclarations of all SwiftPrivate functions with appropriate markup.
 
-@available(*, unavailable, renamed:"DispatchQueue.init(label:attributes:target:)")
+@available(*, unavailable, renamed:"DispatchQueue.init(label:qos:attributes:autoreleaseFrequency:target:)")
 public func dispatch_queue_create(_ label: UnsafePointer<Int8>?, _ attr: __OS_dispatch_queue_attr?) -> DispatchQueue
 {
 	fatalError()
 }
 
-@available(*, unavailable, renamed:"DispatchQueue.init(label:attributes:target:)")
+@available(*, unavailable, renamed:"DispatchQueue.init(label:qos:attributes:autoreleaseFrequency:target:)")
 public func dispatch_queue_create_with_target(_ label: UnsafePointer<Int8>?, _ attr: __OS_dispatch_queue_attr?, _ queue: DispatchQueue?) -> DispatchQueue
 {
 	fatalError()
@@ -156,25 +156,25 @@ public func dispatch_get_global_queue(_ identifier: Int, _ flags: UInt) -> Dispa
 	fatalError()
 }
 
-@available(*, unavailable, renamed: "DispatchQueue.main")
+@available(*, unavailable, renamed: "getter:DispatchQueue.main()")
 public func dispatch_get_main_queue() -> DispatchQueue 
 {
 	fatalError()
 }
 
-@available(*, unavailable, renamed:"DispatchQueueAttributes.initiallyInactive")
+@available(*, unavailable, renamed:"DispatchQueue.Attributes.initiallyInactive")
 public func dispatch_queue_attr_make_initially_inactive(_ attr: __OS_dispatch_queue_attr?) -> __OS_dispatch_queue_attr
 {
 	fatalError()
 }
 
-@available(*, unavailable, renamed:"DispatchQueueAttributes.autoreleaseWorkItem")
+@available(*, unavailable, renamed:"DispatchQueue.AutoreleaseFrequency.workItem")
 public func dispatch_queue_attr_make_with_autorelease_frequency(_ attr: __OS_dispatch_queue_attr?, _ frequency: __dispatch_autorelease_frequency_t) -> __OS_dispatch_queue_attr
 {
 	fatalError()
 }
 
-@available(*, unavailable, renamed:"DispatchQueueAttributes.qosUserInitiated")
+@available(*, unavailable, renamed:"DispatchQoS")
 public func dispatch_queue_attr_make_with_qos_class(_ attr: __OS_dispatch_queue_attr?, _ qos_class: qos_class_t, _ relative_priority: Int32) -> __OS_dispatch_queue_attr
 {
 	fatalError()
@@ -192,19 +192,19 @@ public func dispatch_queue_get_qos_class(_ queue: DispatchQueue, _ relative_prio
 	fatalError()
 }
 
-@available(*, unavailable, renamed:"DispatchQueue.after(self:when:execute:)")
+@available(*, unavailable, renamed:"DispatchQueue.asyncAfter(self:deadline:qos:flags:execute:)")
 public func dispatch_after(_ when: dispatch_time_t, _ queue: DispatchQueue, _ block: () -> Void)
 {
 	fatalError()
 }
 
-@available(*, unavailable, renamed:"DispatchQueue.asynchronously(self:group:qos:flags:execute:)")
+@available(*, unavailable, renamed:"DispatchQueue.async(self:group:qos:flags:execute:)")
 public func dispatch_barrier_async(_ queue: DispatchQueue, _ block: () -> Void)
 {
 	fatalError()
 }
 
-@available(*, unavailable, renamed:"DispatchQueue.synchronously(self:flags:execute:)")
+@available(*, unavailable, renamed:"DispatchQueue.sync(self:flags:execute:)")
 public func dispatch_barrier_sync(_ queue: DispatchQueue, _ block: @noescape () -> Void)
 {
 	fatalError()
@@ -336,22 +336,22 @@ public func dispatch_walltime(_ when: UnsafePointer<timespec>?, _ delta: Int64) 
 	fatalError()
 }
 
-@available(*, unavailable, renamed: "DispatchQueue.GlobalAttributes.qosUserInitiated")
+@available(*, unavailable, renamed: "DispatchQueue.GlobalQueuePriority.high")
 public var DISPATCH_QUEUE_PRIORITY_HIGH: Int {
   fatalError()
 }
 
-@available(*, unavailable, renamed: "DispatchQueue.GlobalAttributes.qosDefault")
+@available(*, unavailable, renamed: "DispatchQueue.GlobalQueuePriority.default")
 public var DISPATCH_QUEUE_PRIORITY_DEFAULT: Int {
   fatalError()
 }
 
-@available(*, unavailable, renamed: "DispatchQueue.GlobalAttributes.qosUtility")
+@available(*, unavailable, renamed: "DispatchQueue.GlobalQueuePriority.low")
 public var DISPATCH_QUEUE_PRIORITY_LOW: Int {
   fatalError()
 }
 
-@available(*, unavailable, renamed: "DispatchQueue.GlobalAttributes.qosBackground")
+@available(*, unavailable, renamed: "DispatchQueue.GlobalQueuePriority.background")
 public var DISPATCH_QUEUE_PRIORITY_BACKGROUND: Int {
   fatalError()
 }
