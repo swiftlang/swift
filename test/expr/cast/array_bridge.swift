@@ -1,7 +1,5 @@
 // RUN: %target-parse-verify-swift
 
-// REQUIRES: objc_interop
-
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
   static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)

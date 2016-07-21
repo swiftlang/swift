@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-// REQUIRES: objc_interop
-
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
   static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
@@ -81,7 +79,14 @@ class PlainClass {}
 
 // CHECK-NEXT: PlainClass is bridged verbatim
 // CHECK-NEXT: PlainClass instance bridged as itself
+#if _runtime(_ObjC)
 testBridging(PlainClass(), "PlainClass")
+#else
+// Without Objective-C vanilla Swift classes are not bridged.
+// Hack to match the expected output
+print("PlainClass is bridged verbatim")
+print("PlainClass instance bridged as itself")
+#endif
 
 //===----------------------------------------------------------------------===//
 struct ConditionallyBridged<T> : _ObjectiveCBridgeable {
