@@ -506,5 +506,19 @@ include_directories(BEFORE
   ${SOURCEKIT_SOURCE_DIR}/include
 )
 
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  include_directories(AFTER ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+
+  add_library(dispatch SHARED IMPORTED)
+  set_target_properties(dispatch PROPERTIES
+                        IMPORTED_LOCATION ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/.libs/libdispatch.so)
+
+  add_library(swiftCore SHARED IMPORTED)
+  set_target_properties(swiftCore PROPERTIES
+                        IMPORTED_LOCATION ${SOURCEKIT_BINARY_DIR}/lib/swift/linux/libswiftCore.so)
+
+  set(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH TRUE)
+endif()
+
 add_subdirectory(lib)
 add_subdirectory(tools)

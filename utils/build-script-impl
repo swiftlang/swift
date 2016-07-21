@@ -1979,6 +1979,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
                     -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${host} cmark)"
+                    -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
+                    -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                 )
 
                 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
