@@ -54,20 +54,6 @@ classKeys = ('Derived', 'Base')
 classValues = classKeys + ('AnyObject', 'Any')
 nonClassKeys = ('Int',)
 nonClassValues = ('Int', 'AnyFoo', 'Any')
-
-testingWithExperimentalCollectionCasts = True
-
-# FIXME: depending on how we do the tests, some direct casts fail.  This
-# function describes those cases.
-  
-def indirectCastFIXME(Key0, Value0, Key1, Value1):
-  if testingWithExperimentalCollectionCasts:
-    # Typechecker asserts per https://github.com/apple/swift/commit/f4d7ce84d88d8132a4e46cc9644b9d8a52a00e71#commitcomment-18346931
-    return (Key0 == Key1) != (Value0 == Value1)
-  else:
-    # Typechecker rejects the cast
-    return '[%s:%s]=>[%s:%s]' % (Key0,Value0,Key1,Value1) in (
-    '[Derived:Any]=>[Base:Any]', '[Int:AnyFoo]=>[Int:Any]')
 }%
 
 % for keys, values in [ (classKeys, classValues), (nonClassKeys, nonClassValues) ]:
@@ -91,22 +77,33 @@ tests.test("Set/Up/${Key0}=>${Key1}") {
 }
 
 % if Key1 != Key0:
-tests.test("Set/Down/${Key1}=>${Key0}") {
+%   for method in 'Direct', 'Indirect':
+tests.test("Set/Down/${method}/${Key1}=>${Key0}") {
 
   let source : Set = [
     ${DynamicKey}(42) as ${Key1},
     ${DynamicKey}(17) as ${Key1}]
 
+  % if method == 'Direct':
+  
+  guard let downcasted = expectNotEmpty(source as? Set<${Key0}>)
+  else { return }
+  
+  % else:
+  
   // FIXME Set<Base> => Set<Derived> fails dynamically, and never even reaches
   // one of my runtime entry points.
   guard let downcasted = expectNotEmpty(cast(source, to: Set<${Key0}>.self))
   else { return }
+  
+  % end
   
   expectEqual(source.count, downcasted.count)
   for x in downcasted {
     expectTrue(source.contains(x))
   }
 }
+%   end
 % end
 
 %       for vi0, Value0 in enumerate(values):
@@ -114,8 +111,10 @@ tests.test("Set/Down/${Key1}=>${Key0}") {
 %         def makeValue(i): return '%s(%s) as %s' % (DynamicValue, i, Value0)
 %         for Value1 in values[vi0:]:
 
+%           for method in 'Direct', 'Indirect':
+
 tests.test(
-  "Dictionary/Up/[${Key0}:${Value0}]=>[${Key1}:${Value1}]") {
+  "Dictionary/Up/${method}/[${Key0}:${Value0}]=>[${Key1}:${Value1}]") {
 
   // Check that the cast type-checks
   let source = [
@@ -123,15 +122,15 @@ tests.test(
     ${DynamicKey}(17) as ${Key0} : ${DynamicValue}(17) as ${Value0}]
 
 
-%   if indirectCastFIXME(Key0,Value0,Key1,Value1):
-  // let upcasted_ = source as Any as? [${Key1}:${Value1}]
-  let upcasted_ = cast(source, to: [${Key1}:${Value1}].self)
-
-  // FIXME: Conditional casting fails to dynamically type-check, and never even
-  // reaches one of my runtime entry points in any of these cases.
-  guard let upcasted = expectNotEmpty(upcasted_) else { return }
-%   else:
+%   if method == 'Direct':
   let upcasted = source as [${Key1}:${Value1}]
+%   else:
+  // FIXME: Conditional casting fails to dynamically type-check, and never even
+  // reaches one of my runtime entry points unless the source type is identical
+  // to the destination type.
+  let upcasted_ = source as Any as? [${Key1}:${Value1}]
+  
+  guard let upcasted = expectNotEmpty(upcasted_) else { return }
 %   end
 
   expectEqual(source.count, upcasted.count)
@@ -148,6 +147,8 @@ tests.test(
     expectEqual(dv0, dv1)
   }
 }
+
+% end
 
 % if Key1 != Key0 or Value1 != Value0:
 
