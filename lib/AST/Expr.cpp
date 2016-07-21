@@ -183,6 +183,24 @@ Expr *Expr::getValueProvidingExpr() {
   return E;
 }
 
+DeclRefExpr *Expr::getMemberOperatorRef() {
+  auto expr = this;
+  if (!expr->isImplicit()) return nullptr;
+
+  auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(expr);
+  if (!dotSyntax) return nullptr;
+
+  auto operatorRef = dyn_cast<DeclRefExpr>(dotSyntax->getFn());
+  if (!operatorRef) return nullptr;
+
+  auto func = dyn_cast<FuncDecl>(operatorRef->getDecl());
+  if (!func) return nullptr;
+
+  if (!func->isOperator()) return nullptr;
+
+  return operatorRef;
+}
+
 /// Propagate l-value use information to children.
 void Expr::propagateLValueAccessKind(AccessKind accessKind,
                                      bool allowOverwrite) {

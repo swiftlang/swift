@@ -205,7 +205,7 @@ extension String {
     ///     }
     ///     // Prints "[72, 101, 97, 114, 116, 115]"
     ///     // Prints "Hearts"
-    public struct Index : Comparable {
+    public struct Index {
       internal typealias Buffer = _StringCore._UTF8Chunk
 
       init(_coreIndex: Int, _ _buffer: Buffer) {
@@ -449,54 +449,56 @@ extension String {
   public typealias UTF8Index = UTF8View.Index
 }
 
-// FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
-//        assuming String.UTF8View.Index continues to exist
-public func == (
-  lhs: String.UTF8View.Index,
-  rhs: String.UTF8View.Index
-) -> Bool {
-  // If the underlying UTF16 index differs, they're unequal
-  if lhs._coreIndex != rhs._coreIndex {
-    return false
-  }
-
-  // Match up bytes in the buffer
-  var buffer = (lhs._buffer, rhs._buffer)
-  var isContinuation: Bool
-  repeat {
-    let unit = (
-      UTF8.CodeUnit(truncatingBitPattern: buffer.0),
-      UTF8.CodeUnit(truncatingBitPattern: buffer.1))
-
-    isContinuation = UTF8.isContinuation(unit.0)
-    if !isContinuation {
-      // We don't check for unit equality in this case because one of
-      // the units might be an 0xFF read from the end of the buffer.
-      return !UTF8.isContinuation(unit.1)
-    }
-    // Continuation bytes must match exactly
-    else if unit.0 != unit.1 {
+extension String.UTF8View.Index : Comparable {
+  // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
+  //        assuming String.UTF8View.Index continues to exist
+  public static func == (
+    lhs: String.UTF8View.Index,
+    rhs: String.UTF8View.Index
+  ) -> Bool {
+    // If the underlying UTF16 index differs, they're unequal
+    if lhs._coreIndex != rhs._coreIndex {
       return false
     }
 
-    // Move the buffers along.
-    buffer = (
-      String.UTF8Index._nextBuffer(after: buffer.0),
-      String.UTF8Index._nextBuffer(after: buffer.1))
-  }
-  while true
-}
+    // Match up bytes in the buffer
+    var buffer = (lhs._buffer, rhs._buffer)
+    var isContinuation: Bool
+    repeat {
+      let unit = (
+        UTF8.CodeUnit(truncatingBitPattern: buffer.0),
+        UTF8.CodeUnit(truncatingBitPattern: buffer.1))
 
-public func < (
-  lhs: String.UTF8View.Index,
-  rhs: String.UTF8View.Index
-) -> Bool {
-  if lhs._coreIndex == rhs._coreIndex && lhs._buffer != rhs._buffer {
-    // The index with more continuation bytes remaining before the next
-    return lhs._utf8ContinuationBytesUntilNextUnicodeScalar >
-      rhs._utf8ContinuationBytesUntilNextUnicodeScalar
+      isContinuation = UTF8.isContinuation(unit.0)
+      if !isContinuation {
+        // We don't check for unit equality in this case because one of
+        // the units might be an 0xFF read from the end of the buffer.
+        return !UTF8.isContinuation(unit.1)
+      }
+      // Continuation bytes must match exactly
+      else if unit.0 != unit.1 {
+        return false
+      }
+
+      // Move the buffers along.
+      buffer = (
+        String.UTF8Index._nextBuffer(after: buffer.0),
+        String.UTF8Index._nextBuffer(after: buffer.1))
+    }
+    while true
   }
-  return lhs._coreIndex < rhs._coreIndex
+
+  public static func < (
+    lhs: String.UTF8View.Index,
+    rhs: String.UTF8View.Index
+  ) -> Bool {
+    if lhs._coreIndex == rhs._coreIndex && lhs._buffer != rhs._buffer {
+      // The index with more continuation bytes remaining before the next
+      return lhs._utf8ContinuationBytesUntilNextUnicodeScalar >
+        rhs._utf8ContinuationBytesUntilNextUnicodeScalar
+    }
+    return lhs._coreIndex < rhs._coreIndex
+  }
 }
 
 // Index conversions

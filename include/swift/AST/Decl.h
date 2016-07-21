@@ -4968,8 +4968,8 @@ class FuncDecl final : public AbstractFunctionDecl,
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
-  llvm::PointerUnion3<FuncDecl *, NominalTypeDecl*, BehaviorRecord *>
-    OverriddenOrDerivedForOrBehaviorParamDecl;
+  llvm::PointerUnion<FuncDecl *, BehaviorRecord *>
+    OverriddenOrBehaviorParamDecl;
   llvm::PointerIntPair<OperatorDecl *, 3,
                        AddressorKind> OperatorAndAddressorKind;
 
@@ -4986,7 +4986,7 @@ class FuncDecl final : public AbstractFunctionDecl,
                            NumParameterLists, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       AccessorKeywordLoc(AccessorKeywordLoc),
-      OverriddenOrDerivedForOrBehaviorParamDecl(),
+      OverriddenOrBehaviorParamDecl(),
       OperatorAndAddressorKind(nullptr, AddressorKind::NotAddressor) {
     FuncDeclBits.IsStatic =
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
@@ -5228,48 +5228,32 @@ public:
   
   /// Get the supertype method this method overrides, if any.
   FuncDecl *getOverriddenDecl() const {
-    return OverriddenOrDerivedForOrBehaviorParamDecl.dyn_cast<FuncDecl *>();
+    return OverriddenOrBehaviorParamDecl.dyn_cast<FuncDecl *>();
   }
   void setOverriddenDecl(FuncDecl *over) {
     // A function cannot be an override if it is also a derived global decl
     // (since derived decls are at global scope).
-    assert((!OverriddenOrDerivedForOrBehaviorParamDecl
-            || !OverriddenOrDerivedForOrBehaviorParamDecl.is<FuncDecl*>())
+    assert((!OverriddenOrBehaviorParamDecl
+            || !OverriddenOrBehaviorParamDecl.is<FuncDecl*>())
          && "function can only be one of override, derived, or behavior param");
-    OverriddenOrDerivedForOrBehaviorParamDecl = over;
+    OverriddenOrBehaviorParamDecl = over;
     over->setIsOverridden();
-  }
-  
-  /// Get the type this function was implicitly generated on the behalf of for
-  /// a derived protocol conformance, if any.
-  NominalTypeDecl *getDerivedForTypeDecl() const {
-    return OverriddenOrDerivedForOrBehaviorParamDecl
-      .dyn_cast<NominalTypeDecl *>();
-  }
-  void setDerivedForTypeDecl(NominalTypeDecl *ntd) {
-    // A function cannot be an override if it is also a derived global decl
-    // (since derived decls are at global scope).
-    assert((!OverriddenOrDerivedForOrBehaviorParamDecl
-            || !OverriddenOrDerivedForOrBehaviorParamDecl
-                  .is<NominalTypeDecl *>())
-         && "function can only be one of override, derived, or behavior param");
-    OverriddenOrDerivedForOrBehaviorParamDecl = ntd;
   }
   
   /// Get the property behavior this function serves as a parameter for, if
   /// any.
   BehaviorRecord *getParamBehavior() const {
-    return OverriddenOrDerivedForOrBehaviorParamDecl
+    return OverriddenOrBehaviorParamDecl
       .dyn_cast<BehaviorRecord *>();
   }
   
   void setParamBehavior(BehaviorRecord *behavior) {
     // Behavior param blocks cannot be overrides or derived.
-    assert((!OverriddenOrDerivedForOrBehaviorParamDecl
-            || !OverriddenOrDerivedForOrBehaviorParamDecl
+    assert((!OverriddenOrBehaviorParamDecl
+            || !OverriddenOrBehaviorParamDecl
                   .is<BehaviorRecord *>())
          && "function can only be one of override, derived, or behavior param");
-    OverriddenOrDerivedForOrBehaviorParamDecl = behavior;
+    OverriddenOrBehaviorParamDecl = behavior;
   }
   
   OperatorDecl *getOperatorDecl() const {

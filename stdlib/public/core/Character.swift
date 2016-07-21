@@ -62,7 +62,7 @@
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 public struct Character :
   _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
-  ExpressibleByExtendedGraphemeClusterLiteral, Equatable, Hashable, Comparable {
+  ExpressibleByExtendedGraphemeClusterLiteral, Hashable {
 
   // Fundamentally, it is just a String, but it is optimized for the
   // common case where the UTF-8 representation fits in 63 bits.  The
@@ -391,30 +391,35 @@ internal var _minASCIICharReprBuiltin: Builtin.Int63 {
   }
 }
 
-public func ==(lhs: Character, rhs: Character) -> Bool {
-  switch (lhs._representation, rhs._representation) {
-  case let (.small(lbits), .small(rbits)) where
-    Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
-    && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
-    return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
-  default:
-    // FIXME(performance): constructing two temporary strings is extremely
-    // wasteful and inefficient.
-    return String(lhs) == String(rhs)
+extension Character : Equatable {
+  public static func ==(lhs: Character, rhs: Character) -> Bool {
+    switch (lhs._representation, rhs._representation) {
+    case let (.small(lbits), .small(rbits)) where
+      Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
+      && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
+      return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
+    default:
+      // FIXME(performance): constructing two temporary strings is extremely
+      // wasteful and inefficient.
+      return String(lhs) == String(rhs)
+    }
   }
 }
 
-public func <(lhs: Character, rhs: Character) -> Bool {
-  switch (lhs._representation, rhs._representation) {
-  case let (.small(lbits), .small(rbits)) where
-    // Note: This is consistent with Foundation but unicode incorrect.
-    // See String._compareASCII.
-    Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
-    && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
-    return Bool(Builtin.cmp_ult_Int63(lbits, rbits))
-  default:
-    // FIXME(performance): constructing two temporary strings is extremely
-    // wasteful and inefficient.
-    return String(lhs) < String(rhs)
+extension Character : Comparable {
+  public static func <(lhs: Character, rhs: Character) -> Bool {
+    switch (lhs._representation, rhs._representation) {
+    case let (.small(lbits), .small(rbits)) where
+      // Note: This is consistent with Foundation but unicode incorrect.
+      // See String._compareASCII.
+      Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
+      && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
+      return Bool(Builtin.cmp_ult_Int63(lbits, rbits))
+    default:
+      // FIXME(performance): constructing two temporary strings is extremely
+      // wasteful and inefficient.
+      return String(lhs) < String(rhs)
+    }
   }
 }
+

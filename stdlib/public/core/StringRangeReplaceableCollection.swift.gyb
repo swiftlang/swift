@@ -94,12 +94,14 @@ extension String {
   }
 }
 
-public func == (lhs: String.Index, rhs: String.Index) -> Bool {
-  return lhs._base == rhs._base
-}
+extension String.Index {
+  public static func == (lhs: String.Index, rhs: String.Index) -> Bool {
+    return lhs._base == rhs._base
+  }
 
-public func < (lhs: String.Index, rhs: String.Index) -> Bool {
-  return lhs._base < rhs._base
+  public static func < (lhs: String.Index, rhs: String.Index) -> Bool {
+    return lhs._base < rhs._base
+  }
 }
 
 extension String {

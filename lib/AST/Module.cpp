@@ -347,35 +347,12 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
 }
 
 void Module::addFile(FileUnit &newFile) {
-  assert(!isa<DerivedFileUnit>(newFile) &&
-         "DerivedFileUnits are added automatically");
-
   // Require Main and REPL files to be the first file added.
   assert(Files.empty() ||
          !isa<SourceFile>(newFile) ||
          cast<SourceFile>(newFile).Kind == SourceFileKind::Library ||
          cast<SourceFile>(newFile).Kind == SourceFileKind::SIL);
   Files.push_back(&newFile);
-
-  switch (newFile.getKind()) {
-  case FileUnitKind::Source:
-  case FileUnitKind::ClangModule: {
-    for (auto File : Files) {
-      if (isa<DerivedFileUnit>(File))
-        return;
-    }
-    auto DFU = new (getASTContext()) DerivedFileUnit(*this);
-    Files.push_back(DFU);
-    break;
-  }
-
-  case FileUnitKind::Builtin:
-  case FileUnitKind::SerializedAST:
-    break;
-
-  case FileUnitKind::Derived:
-    llvm_unreachable("DerivedFileUnits are added automatically");
-  }
 }
 
 void Module::removeFile(FileUnit &existingFile) {
@@ -388,15 +365,6 @@ void Module::removeFile(FileUnit &existingFile) {
   // Adjust for the std::reverse_iterator offset.
   ++I;
   Files.erase(I.base());
-}
-
-DerivedFileUnit &Module::getDerivedFileUnit() const {
-  for (auto File : Files) {
-    if (auto DFU = dyn_cast<DerivedFileUnit>(File))
-      return *DFU;
-  }
-  llvm_unreachable("the client should not be calling this function if "
-                   "there is no DerivedFileUnit");
 }
 
 VarDecl *Module::getDSOHandle() {
@@ -538,58 +506,6 @@ void BuiltinUnit::lookupObjCMethods(
        ObjCSelector selector,
        SmallVectorImpl<AbstractFunctionDecl *> &results) const {
   // No @objc methods in the Builtin module.
-}
-
-DerivedFileUnit::DerivedFileUnit(Module &M)
-    : FileUnit(FileUnitKind::Derived, M) {
-  M.getASTContext().addDestructorCleanup(*this);
-}
-
-void DerivedFileUnit::lookupValue(Module::AccessPathTy accessPath,
-                                  DeclName name,
-                                  NLKind lookupKind,
-                                  SmallVectorImpl<ValueDecl*> &result) const {
-  // If this import is specific to some named type or decl ("import Swift.int")
-  // then filter out any lookups that don't match.
-  if (!Module::matchesAccessPath(accessPath, name))
-    return;
-  
-  for (auto D : DerivedDecls) {
-    if (D->getFullName().matchesRef(name))
-      result.push_back(D);
-  }
-}
-
-void DerivedFileUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
-                                         VisibleDeclConsumer &consumer,
-                                         NLKind lookupKind) const {
-  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-  
-  Identifier Id;
-  if (!accessPath.empty()) {
-    Id = accessPath.front().first;
-  }
-
-  for (auto D : DerivedDecls) {
-    if (Id.empty() || D->getName() == Id)
-      consumer.foundDecl(D, DeclVisibilityKind::VisibleAtTopLevel);
-  }
-}
-
-void DerivedFileUnit::lookupObjCMethods(
-       ObjCSelector selector,
-       SmallVectorImpl<AbstractFunctionDecl *> &results) const {
-  for (auto D : DerivedDecls) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (func->isObjC() && func->getObjCSelector() == selector)
-        results.push_back(func);
-    }
-  }
-}
-
-void DerivedFileUnit::getTopLevelDecls(SmallVectorImpl<swift::Decl *> &results)
-const {
-  results.append(DerivedDecls.begin(), DerivedDecls.end());
 }
 
 void SourceFile::lookupValue(Module::AccessPathTy accessPath, DeclName name,
@@ -1203,8 +1119,6 @@ StringRef Module::getModuleFilename() const {
       Result = LF->getFilename();
       continue;
     }
-    if (isa<DerivedFileUnit>(F))
-      continue;
     return StringRef();
   }
   return Result;

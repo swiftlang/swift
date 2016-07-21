@@ -14,7 +14,7 @@
 ///
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
-public struct ObjectIdentifier : Hashable, Comparable {
+public struct ObjectIdentifier : Hashable {
   internal let _value: Builtin.RawPointer
 
   // FIXME: Better hashing algorithm
@@ -47,12 +47,14 @@ extension ObjectIdentifier : CustomDebugStringConvertible {
   }
 }
 
-public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
-  return UInt(bitPattern: lhs) < UInt(bitPattern: rhs)
-}
+extension ObjectIdentifier : Comparable {
+  public static func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
+    return UInt(bitPattern: lhs) < UInt(bitPattern: rhs)
+  }
 
-public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
+  public static func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
+  }
 }
 
 extension UInt {

@@ -3918,9 +3918,6 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
       addOperatorsAndTopLevel(S, iterable->getMembers(),
                              operatorMethodDecls, topLevelDecls, objcMethods,
                              false);
-      addOperatorsAndTopLevel(S, iterable->getDerivedGlobalDecls(),
-                             operatorMethodDecls, topLevelDecls, objcMethods,
-                             true);
     }
 
     // Record Objective-C methods.
@@ -3991,9 +3988,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         addOperatorsAndTopLevel(*this, IDC->getMembers(),
                                 operatorMethodDecls, topLevelDecls,
                                 objcMethods, false);
-        addOperatorsAndTopLevel(*this, IDC->getDerivedGlobalDecls(),
-                                operatorMethodDecls, topLevelDecls,
-                                objcMethods, true);
       }
     }
 
@@ -4015,9 +4009,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         addOperatorsAndTopLevel(*this, IDC->getMembers(),
                                 operatorMethodDecls, topLevelDecls,
                                 objcMethods, false, /*isLocal=*/true);
-        addOperatorsAndTopLevel(*this, IDC->getDerivedGlobalDecls(),
-                                operatorMethodDecls, topLevelDecls,
-                                objcMethods, true, /*isLocal=*/true);
       }
     }
   }

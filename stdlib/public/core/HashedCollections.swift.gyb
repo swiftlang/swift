@@ -1132,79 +1132,81 @@ internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
   return (true, lhs.count == rhs.count)
 }
 
-/// Returns a Boolean value indicating whether two sets have equal elements.
-///
-/// - Parameters:
-///   - lhs: A set.
-///   - rhs: Another set.
-/// - Returns: `true` if the `lhs` and `rhs` have the same elements; otherwise,
-///   `false`.
-public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Bool {
-  switch (lhs._variantStorage, rhs._variantStorage) {
-  case (.native(let lhsNativeOwner), .native(let rhsNativeOwner)):
-    let lhsNative = lhsNativeOwner.nativeStorage
-    let rhsNative = rhsNativeOwner.nativeStorage
+extension Set {
+  /// Returns a Boolean value indicating whether two sets have equal elements.
+  ///
+  /// - Parameters:
+  ///   - lhs: A set.
+  ///   - rhs: Another set.
+  /// - Returns: `true` if the `lhs` and `rhs` have the same elements; otherwise,
+  ///   `false`.
+  public static func == (lhs: Set<Element>, rhs: Set<Element>) -> Bool {
+    switch (lhs._variantStorage, rhs._variantStorage) {
+    case (.native(let lhsNativeOwner), .native(let rhsNativeOwner)):
+      let lhsNative = lhsNativeOwner.nativeStorage
+      let rhsNative = rhsNativeOwner.nativeStorage
 
-    if lhsNativeOwner === rhsNativeOwner {
-      return true
-    }
+      if lhsNativeOwner === rhsNativeOwner {
+        return true
+      }
 
-    if lhsNative.count != rhsNative.count {
-      return false
-    }
-
-    for member in lhs {
-      let (_, found) =
-        rhsNative._find(member, startBucket: rhsNative._bucket(member))
-      if !found {
+      if lhsNative.count != rhsNative.count {
         return false
       }
-    }
-    return true
 
-  case (_VariantSetStorage.cocoa(let lhsCocoa),
-      _VariantSetStorage.cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    return _stdlib_NSObject_isEqual(lhsCocoa.cocoaSet, rhsCocoa.cocoaSet)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa set")
-#endif
-
-  case (_VariantSetStorage.native(let lhsNativeOwner),
-    _VariantSetStorage.cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    let lhsNative = lhsNativeOwner.nativeStorage
-
-    if lhsNative.count != rhsCocoa.count {
-      return false
-    }
-
-    let endIndex = lhsNative.endIndex
-    var i = lhsNative.startIndex
-    while i != endIndex {
-      let key = lhsNative.assertingGet(i)
-      let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
-      let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
-      if let rhsValue = optRhsValue {
-        if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
-          i = i.successor()
-          continue
+      for member in lhs {
+        let (_, found) =
+          rhsNative._find(member, startBucket: rhsNative._bucket(member))
+        if !found {
+          return false
         }
       }
-      i = i.successor()
-      return false
-    }
-    return true
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa set")
-#endif
+      return true
 
-  case (_VariantSetStorage.cocoa, _VariantSetStorage.native):
-#if _runtime(_ObjC)
-    return rhs == lhs
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa set")
-#endif
+    case (_VariantSetStorage.cocoa(let lhsCocoa),
+        _VariantSetStorage.cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      return _stdlib_NSObject_isEqual(lhsCocoa.cocoaSet, rhsCocoa.cocoaSet)
+  #else
+        _sanityCheckFailure("internal error: unexpected cocoa set")
+  #endif
+
+    case (_VariantSetStorage.native(let lhsNativeOwner),
+      _VariantSetStorage.cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      let lhsNative = lhsNativeOwner.nativeStorage
+
+      if lhsNative.count != rhsCocoa.count {
+        return false
+      }
+
+      let endIndex = lhsNative.endIndex
+      var i = lhsNative.startIndex
+      while i != endIndex {
+        let key = lhsNative.assertingGet(i)
+        let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
+        let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
+        if let rhsValue = optRhsValue {
+          if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
+            i = i.successor()
+            continue
+          }
+        }
+        i = i.successor()
+        return false
+      }
+      return true
+  #else
+        _sanityCheckFailure("internal error: unexpected cocoa set")
+  #endif
+
+    case (_VariantSetStorage.cocoa, _VariantSetStorage.native):
+  #if _runtime(_ObjC)
+      return rhs == lhs
+  #else
+        _sanityCheckFailure("internal error: unexpected cocoa set")
+  #endif
+    }
   }
 }
 
@@ -2044,91 +2046,87 @@ public struct Dictionary<Key : Hashable, Value> :
 
 }
 
-public func == <Key : Equatable, Value : Equatable>(
-  lhs: [Key : Value],
-  rhs: [Key : Value]
-) -> Bool {
-  switch (lhs._variantStorage, rhs._variantStorage) {
-  case (.native(let lhsNativeOwner), .native(let rhsNativeOwner)):
-    let lhsNative = lhsNativeOwner.nativeStorage
-    let rhsNative = rhsNativeOwner.nativeStorage
+extension Dictionary where Key : Equatable, Value : Equatable {
+  public static func == (lhs: [Key : Value], rhs: [Key : Value]) -> Bool {
+    switch (lhs._variantStorage, rhs._variantStorage) {
+    case (.native(let lhsNativeOwner), .native(let rhsNativeOwner)):
+      let lhsNative = lhsNativeOwner.nativeStorage
+      let rhsNative = rhsNativeOwner.nativeStorage
 
-    if lhsNativeOwner === rhsNativeOwner {
-      return true
-    }
+      if lhsNativeOwner === rhsNativeOwner {
+        return true
+      }
 
-    if lhsNative.count != rhsNative.count {
-      return false
-    }
-
-    for (k, v) in lhs {
-      let (pos, found) = rhsNative._find(k, startBucket: rhsNative._bucket(k))
-      // FIXME: Can't write the simple code pending
-      // <rdar://problem/15484639> Refcounting bug
-      /*
-      if !found || rhs[pos].value != lhsElement.value {
+      if lhsNative.count != rhsNative.count {
         return false
       }
-      */
-      if !found {
-        return false
-      }
-      if rhsNative.value(at: pos.offset) != v {
-        return false
-      }
-    }
-    return true
 
-  case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    return _stdlib_NSObject_isEqual(
-      lhsCocoa.cocoaDictionary, rhsCocoa.cocoaDictionary)
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
-
-  case (.native(let lhsNativeOwner), .cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    let lhsNative = lhsNativeOwner.nativeStorage
-
-    if lhsNative.count != rhsCocoa.count {
-      return false
-    }
-
-    let endIndex = lhsNative.endIndex
-    var index = lhsNative.startIndex
-    while index != endIndex {
-      let (key, value) = lhsNative.assertingGet(index)
-      let optRhsValue: AnyObject? =
-        rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))
-      // TODO: swift-3-indexing-model: change 'if' into 'guard'.
-      if let rhsValue = optRhsValue {
-        if value == _forceBridgeFromObjectiveC(rhsValue, Value.self) {
-          lhsNative.formIndex(after: &index)
-          continue
+      for (k, v) in lhs {
+        let (pos, found) = rhsNative._find(k, startBucket: rhsNative._bucket(k))
+        // FIXME: Can't write the simple code pending
+        // <rdar://problem/15484639> Refcounting bug
+        /*
+        if !found || rhs[pos].value != lhsElement.value {
+          return false
+        }
+        */
+        if !found {
+          return false
+        }
+        if rhsNative.value(at: pos.offset) != v {
+          return false
         }
       }
-      return false
+      return true
+
+    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      return _stdlib_NSObject_isEqual(
+        lhsCocoa.cocoaDictionary, rhsCocoa.cocoaDictionary)
+  #else
+      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
+  #endif
+
+    case (.native(let lhsNativeOwner), .cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      let lhsNative = lhsNativeOwner.nativeStorage
+
+      if lhsNative.count != rhsCocoa.count {
+        return false
+      }
+
+      let endIndex = lhsNative.endIndex
+      var index = lhsNative.startIndex
+      while index != endIndex {
+        let (key, value) = lhsNative.assertingGet(index)
+        let optRhsValue: AnyObject? =
+          rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))
+        // TODO: swift-3-indexing-model: change 'if' into 'guard'.
+        if let rhsValue = optRhsValue {
+          if value == _forceBridgeFromObjectiveC(rhsValue, Value.self) {
+            lhsNative.formIndex(after: &index)
+            continue
+          }
+        }
+        return false
+      }
+      return true
+  #else
+      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
+  #endif
+
+    case (.cocoa, .native):
+  #if _runtime(_ObjC)
+      return rhs == lhs
+  #else
+      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
+  #endif
     }
-    return true
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
-
-  case (.cocoa, .native):
-#if _runtime(_ObjC)
-    return rhs == lhs
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
   }
-}
 
-public func != <Key : Equatable, Value : Equatable>(
-  lhs: [Key : Value],
-  rhs: [Key : Value]
-) -> Bool {
-  return !(lhs == rhs)
+  public static func != (lhs: [Key : Value], rhs: [Key : Value]) -> Bool {
+    return !(lhs == rhs)
+  }
 }
 
 extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
@@ -4469,22 +4467,24 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
   }
 }
 
-internal func == <${TypeParametersDecl}> (
-  lhs: _Native${Self}Index<${TypeParameters}>,
-  rhs: _Native${Self}Index<${TypeParameters}>
-) -> Bool {
-  // FIXME: assert that lhs and rhs are from the same dictionary.
-  return lhs.offset == rhs.offset
-}
+extension _Native${Self}Index {
+  internal static func == (
+    lhs: _Native${Self}Index<${TypeParameters}>,
+    rhs: _Native${Self}Index<${TypeParameters}>
+  ) -> Bool {
+    // FIXME: assert that lhs and rhs are from the same dictionary.
+    return lhs.offset == rhs.offset
+  }
 
-internal func < <${TypeParametersDecl}> (
-  lhs: _Native${Self}Index<${TypeParameters}>,
-  rhs: _Native${Self}Index<${TypeParameters}>
-) -> Bool {
-  // FIXME: assert that lhs and rhs are from the same dictionary.
-  return lhs.offset < rhs.offset
+  internal static func < (
+    lhs: _Native${Self}Index<${TypeParameters}>,
+    rhs: _Native${Self}Index<${TypeParameters}>
+  ) -> Bool {
+    // FIXME: assert that lhs and rhs are from the same dictionary.
+    return lhs.offset < rhs.offset
+  }
+  // TODO: swift-3-indexing-model: forward all Comparable operations.
 }
-// TODO: swift-3-indexing-model: forward all Comparable operations.
 
 #if _runtime(_ObjC)
 @_versioned
@@ -4547,22 +4547,30 @@ internal struct _Cocoa${Self}Index : Comparable {
   }
 }
 
-internal func ==(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
-  _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
-    "cannot compare indexes pointing to different ${Self}s")
-  _precondition(lhs.allKeys.value == rhs.allKeys.value,
-    "one or both of the indexes have been invalidated")
+extension _Cocoa${Self}Index {
+  internal static func ==(
+    lhs: _Cocoa${Self}Index,
+    rhs: _Cocoa${Self}Index
+  ) -> Bool {
+    _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
+      "cannot compare indexes pointing to different ${Self}s")
+    _precondition(lhs.allKeys.value == rhs.allKeys.value,
+      "one or both of the indexes have been invalidated")
 
-  return lhs.currentKeyIndex == rhs.currentKeyIndex
-}
+    return lhs.currentKeyIndex == rhs.currentKeyIndex
+  }
 
-internal func <(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
-  _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
-    "cannot compare indexes pointing to different ${Self}s")
-  _precondition(lhs.allKeys.value == rhs.allKeys.value,
-    "one or both of the indexes have been invalidated")
+  internal static func <(
+    lhs: _Cocoa${Self}Index,
+    rhs: _Cocoa${Self}Index
+  ) -> Bool {
+    _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
+      "cannot compare indexes pointing to different ${Self}s")
+    _precondition(lhs.allKeys.value == rhs.allKeys.value,
+      "one or both of the indexes have been invalidated")
 
-  return lhs.currentKeyIndex < rhs.currentKeyIndex
+    return lhs.currentKeyIndex < rhs.currentKeyIndex
+  }
 }
 #else
 internal struct _Cocoa${Self}Index {}
@@ -4680,47 +4688,49 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   }
 }
 
-public func == <${TypeParametersDecl}> (
-  lhs: ${Self}Index<${TypeParameters}>,
-  rhs: ${Self}Index<${TypeParameters}>
-) -> Bool {
-  if _fastPath(lhs._guaranteedNative) {
-    return lhs._nativeIndex == rhs._nativeIndex
+extension ${Self}Index {
+  public static func == (
+    lhs: ${Self}Index<${TypeParameters}>,
+    rhs: ${Self}Index<${TypeParameters}>
+  ) -> Bool {
+    if _fastPath(lhs._guaranteedNative) {
+      return lhs._nativeIndex == rhs._nativeIndex
+    }
+
+    switch (lhs._value, rhs._value) {
+    case (._native(let lhsNative), ._native(let rhsNative)):
+      return lhsNative == rhsNative
+    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      return lhsCocoa == rhsCocoa
+  #else
+      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
+  #endif
+    default:
+      _preconditionFailure("comparing indexes from different sets")
+    }
   }
 
-  switch (lhs._value, rhs._value) {
-  case (._native(let lhsNative), ._native(let rhsNative)):
-    return lhsNative == rhsNative
-  case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    return lhsCocoa == rhsCocoa
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
-  default:
-    _preconditionFailure("comparing indexes from different sets")
-  }
-}
+  public static func < (
+    lhs: ${Self}Index<${TypeParameters}>,
+    rhs: ${Self}Index<${TypeParameters}>
+  ) -> Bool {
+    if _fastPath(lhs._guaranteedNative) {
+      return lhs._nativeIndex < rhs._nativeIndex
+    }
 
-public func < <${TypeParametersDecl}> (
-  lhs: ${Self}Index<${TypeParameters}>,
-  rhs: ${Self}Index<${TypeParameters}>
-) -> Bool {
-  if _fastPath(lhs._guaranteedNative) {
-    return lhs._nativeIndex < rhs._nativeIndex
-  }
-
-  switch (lhs._value, rhs._value) {
-  case (._native(let lhsNative), ._native(let rhsNative)):
-    return lhsNative < rhsNative
-  case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    return lhsCocoa < rhsCocoa
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
-  default:
-    _preconditionFailure("comparing indexes from different sets")
+    switch (lhs._value, rhs._value) {
+    case (._native(let lhsNative), ._native(let rhsNative)):
+      return lhsNative < rhsNative
+    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      return lhsCocoa < rhsCocoa
+  #else
+      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
+  #endif
+    default:
+      _preconditionFailure("comparing indexes from different sets")
+    }
   }
 }
 

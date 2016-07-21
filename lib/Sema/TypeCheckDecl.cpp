@@ -3520,8 +3520,6 @@ public:
     
     for (Decl *member : ED->getMembers())
       visit(member);
-    for (Decl *global : ED->getDerivedGlobalDecls())
-      visit(global);
     
 
     TC.checkDeclAttributes(ED);
@@ -3549,8 +3547,6 @@ public:
     // Visit each of the members.
     for (Decl *Member : SD->getMembers())
       visit(Member);
-    for (Decl *Global : SD->getDerivedGlobalDecls())
-      visit(Global);
 
     TC.checkDeclAttributes(SD);
   }
@@ -3689,8 +3685,6 @@ public:
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
-    for (Decl *global : CD->getDerivedGlobalDecls())
-      visit(global);
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -5770,8 +5764,6 @@ public:
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
-    for (Decl *Global : ED->getDerivedGlobalDecls())
-      visit(Global);
 
     if (!ED->isInvalid())
       TC.checkDeclAttributes(ED);

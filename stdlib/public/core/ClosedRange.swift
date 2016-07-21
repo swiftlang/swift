@@ -25,7 +25,7 @@ internal enum _ClosedRangeIndexRepresentation<Bound>
 // FIXME(ABI)(compiler limitation): should be a nested type in
 // `ClosedRange`.
 /// A position in a `CountableClosedRange` instance.
-public struct ClosedRangeIndex<Bound> : Comparable
+public struct ClosedRangeIndex<Bound>
   where
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
   // swift-3-indexing-model: should conform to _Strideable, otherwise
@@ -48,25 +48,33 @@ public struct ClosedRangeIndex<Bound> : Comparable
   }
 }
 
-public func == <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
-  switch (lhs._value, rhs._value) {
-  case (.inRange(let l), .inRange(let r)):
-    return l == r
-  case (.pastEnd, .pastEnd):
-    return true
-  default:
-    return false
+extension ClosedRangeIndex : Comparable {
+  public static func == (
+    lhs: ClosedRangeIndex<Bound>,
+    rhs: ClosedRangeIndex<Bound>
+  ) -> Bool {
+    switch (lhs._value, rhs._value) {
+    case (.inRange(let l), .inRange(let r)):
+      return l == r
+    case (.pastEnd, .pastEnd):
+      return true
+    default:
+      return false
+    }
   }
-}
 
-public func < <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
-  switch (lhs._value, rhs._value) {
-  case (.inRange(let l), .inRange(let r)):
-    return l < r
-  case (.inRange(_), .pastEnd):
-    return true
-  default:
-    return false
+  public static func < (
+    lhs: ClosedRangeIndex<Bound>,
+    rhs: ClosedRangeIndex<Bound>
+  ) -> Bool {
+    switch (lhs._value, rhs._value) {
+    case (.inRange(let l), .inRange(let r)):
+      return l < r
+    case (.inRange(_), .pastEnd):
+      return true
+    default:
+      return false
+    }
   }
 }
 

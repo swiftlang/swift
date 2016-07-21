@@ -809,17 +809,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       openedFnType = openedType->castTo<FunctionType>();
     }
 
-    // FIXME: We shouldn't need this for operators in protocols, either, but
-    // constraint application fails without this at the moment.
-    if (isa<ProtocolDecl>(func->getDeclContext())) {
-       // The 'Self' type must be bound to an archetype.
-       // FIXME: We eventually want to loosen this constraint, to allow us
-       // to find operator functions both in classes and in protocols to which
-       // a class conforms (if there's a default implementation).
-       addArchetypeConstraint(openedFnType->getInput()->getRValueInstanceType(),
-                              getConstraintLocator(locator));
-    }
-
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
 

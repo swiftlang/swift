@@ -971,7 +971,7 @@ FuncDecl *ASTContext::getEqualIntDecl(LazyResolver *resolver) const {
   for (ValueDecl *vd : equalFuncs) {
     // All "==" decls should be functions, but who knows...
     FuncDecl *funcDecl = dyn_cast<FuncDecl>(vd);
-    if (!funcDecl)
+    if (!funcDecl || funcDecl->getDeclContext()->isTypeContext())
       continue;
     
     if (resolver)
@@ -1229,13 +1229,7 @@ void ASTContext::verifyAllLoadedModules() const {
 
   for (auto &topLevelModulePair : LoadedModules) {
     Module *M = topLevelModulePair.second;
-    bool hasAnyFileUnits = std::any_of(M->getFiles().begin(),
-                                       M->getFiles().end(),
-                                       [](const FileUnit *file) {
-      return !isa<DerivedFileUnit>(file);
-    });
-    if (!hasAnyFileUnits)
-      assert(M->failedToLoad());
+    assert(!M->getFiles().empty() || M->failedToLoad());
   }
 #endif
 }
