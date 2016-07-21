@@ -1060,6 +1060,26 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
         return URLResourceValues(keys: keys, values: try _url.promisedItemResourceValues(forKeys: Array(keys)))
     }
     
+    @available(*, unavailable, message: "Use struct URLResourceValues and URL.setResourceValues(_:) instead")
+    public func setResourceValue(_ value: AnyObject?, forKey key: URLResourceKey) throws {
+        fatalError()
+    }
+    
+    @available(*, unavailable, message: "Use struct URLResourceValues and URL.setResourceValues(_:) instead")
+    public func setResourceValues(_ keyedValues: [URLResourceKey : AnyObject]) throws {
+        fatalError()
+    }
+    
+    @available(*, unavailable, message: "Use struct URLResourceValues and URL.resourceValues(forKeys:) instead")
+    public func resourceValues(forKeys keys: [URLResourceKey]) throws -> [URLResourceKey : AnyObject] {
+        fatalError()
+    }
+    
+    @available(*, unavailable, message: "Use struct URLResourceValues and URL.setResourceValues(_:) instead")
+    public func getResourceValue(_ value: AutoreleasingUnsafeMutablePointer<AnyObject?>, forKey key: URLResourceKey) throws {
+        fatalError()
+    }
+    
     // MARK: - Bookmarks and Alias Files
     
     /// Returns bookmark data for the URL, created with specified options and resource values.

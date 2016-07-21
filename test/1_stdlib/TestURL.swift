@@ -148,6 +148,62 @@ class TestURL : TestURLSuper {
             expectEqual("globalnav", first.value)
         }
     }
+    
+    func testURLResourceValues() {
+        
+        let fileName = "temp_file"
+        var dir = URL(fileURLWithPath: NSTemporaryDirectory())
+        dir.appendPathComponent(UUID().uuidString)
+        
+        try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+        
+        dir.appendPathComponent(fileName)
+        try! Data(bytes: [1,2,3,4]).write(to: dir)
+        
+        defer {
+            do {
+                try FileManager.default.removeItem(at: dir)
+            } catch {
+                // Oh well
+            }
+        }
+        
+        do {
+            let values = try dir.resourceValues(forKeys: [.nameKey, .isDirectoryKey])
+            expectEqual(values.name, fileName)
+            expectFalse(values.isDirectory!)
+            expectEqual(nil, values.creationDate) // Didn't ask for this
+        } catch {
+            expectTrue(false, "Unable to get resource value")
+        }
+        
+        let originalDate : Date
+        do {
+            var values = try dir.resourceValues(forKeys: [.creationDateKey])
+            expectNotEqual(nil, values.creationDate)
+            originalDate = values.creationDate!
+        } catch {
+            originalDate = Date()
+            expectTrue(false, "Unable to get creation date")
+        }
+        
+        let newDate = originalDate + 100
+        
+        do {
+            var values = URLResourceValues()
+            values.creationDate = newDate
+            try dir.setResourceValues(values)
+        } catch {
+            expectTrue(false, "Unable to set resource value")
+        }
+        
+        do {
+            let values = try dir.resourceValues(forKeys: [.creationDateKey])
+            expectEqual(newDate, values.creationDate)
+        } catch {
+            expectTrue(false, "Unable to get values")
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -157,5 +213,6 @@ URLTests.test("testProperties") { TestURL().testProperties() }
 URLTests.test("testSetProperties") { TestURL().testSetProperties() }
 URLTests.test("testMoreSetProperties") { TestURL().testMoreSetProperties() }
 URLTests.test("testURLComponents") { TestURL().testURLComponents() }
+URLTests.test("testURLResourceValues") { TestURL().testURLResourceValues() }
 runAllTests()
 #endif
