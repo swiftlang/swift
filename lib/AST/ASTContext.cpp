@@ -183,7 +183,7 @@ struct ASTContext::Implementation {
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
-  /// func _unimplemented_initializer(className: StaticString).
+  /// func _unimplementedInitializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
 
   /// func _undefined<T>(msg: StaticString, file: StaticString, line: UInt) -> T
@@ -1019,7 +1019,7 @@ ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
 
   // Look for the function.
   CanType input, output;
-  auto decl = findLibraryIntrinsic(*this, "_unimplemented_initializer",
+  auto decl = findLibraryIntrinsic(*this, "_unimplementedInitializer",
                                    resolver);
   if (!decl || !isNonGenericIntrinsic(decl, input, output))
     return nullptr;

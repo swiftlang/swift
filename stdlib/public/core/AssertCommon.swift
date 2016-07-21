@@ -213,16 +213,16 @@ func _fatalErrorMessage(
   Builtin.int_trap()
 }
 
-// FIXME(ABI): rename to lower camel case to conform to API guidelines.
 /// Prints a fatal error message when an unimplemented initializer gets
 /// called by the Objective-C runtime.
 @_transparent @noreturn
 public // COMPILER_INTRINSIC
-func _unimplemented_initializer(className: StaticString,
-                                initName: StaticString = #function,
-                                file: StaticString = #file,
-                                line: UInt = #line,
-                                column: UInt = #column) {
+func _unimplementedInitializer(className: StaticString,
+                               initName: StaticString = #function,
+                               file: StaticString = #file,
+                               line: UInt = #line,
+                               column: UInt = #column
+) {
   // This function is marked @_transparent so that it is inlined into the caller
   // (the initializer stub), and, depending on the build configuration,
   // redundant parameter values (#file etc.) are eliminated, and don't leak

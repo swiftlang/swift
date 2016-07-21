@@ -2015,7 +2015,7 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
     return;
   }
 
-  // Create a call to Swift._unimplemented_initializer
+  // Create a call to Swift._unimplementedInitializer
   auto loc = classDecl->getLoc();
   Expr *fn = new (tc.Context) DeclRefExpr(unimplementedInitDecl,
                                           DeclNameLoc(loc),
