@@ -21,6 +21,9 @@ internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutablePointer<Void>, 
 @_silgen_name("__NSDataInvokeDeallocatorFree")
 internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutablePointer<Void>, _ length: Int) -> Void
 
+@_silgen_name("_NSWriteDataToFile_Swift")
+internal func _NSWriteDataToFile_Swift(url: URL, data: NSData, options: UInt, error: NSErrorPointer) -> Bool
+
 internal final class _SwiftNSData : _SwiftNativeNSData, _SwiftNativeFoundationType {
     internal typealias ImmutableType = NSData
     internal typealias MutableType = NSMutableData
@@ -355,6 +358,21 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     }
     
     // MARK: -
+    
+    private func _shouldUseNonAtomicWriteReimplementation(options: Data.WritingOptions = []) -> Bool {
+
+        // Avoid a crash that happens on OSX 10.11.x and iOS 9.x or before when writing a bridged Data non-atomically with Foundation's standard write() implementation.
+        if !options.contains(.atomic) {
+            #if os(OSX)
+                return NSFoundationVersionNumber <= Double(NSFoundationVersionNumber10_11_Max)
+            #else
+                return NSFoundationVersionNumber <= Double(NSFoundationVersionNumber_iOS_9_x_Max)
+            #endif
+        } else {
+            return false
+        }
+
+    }
    
     /// Write the contents of the `Data` to a location.
     ///
@@ -363,7 +381,14 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     /// - throws: An error in the Cocoa domain, if there is an error writing to the `URL`.
     public func write(to url: URL, options: Data.WritingOptions = []) throws {
         try _mapUnmanaged {
-            try $0.write(to: url, options: WritingOptions(rawValue: options.rawValue))
+            if _shouldUseNonAtomicWriteReimplementation(options: options) {
+                var error : NSError?
+                if !_NSWriteDataToFile_Swift(url: url, data: $0, options: options.rawValue, error: &error) {
+                    throw error!
+                }
+            } else {
+                try $0.write(to: url, options: WritingOptions(rawValue: options.rawValue))
+            }
         }
     }
     
