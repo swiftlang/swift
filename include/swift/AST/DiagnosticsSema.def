@@ -762,11 +762,11 @@ ERROR(extra_named_single_element_tuple,none,
 ERROR(argument_out_of_order_named_named,none,
       "argument %0 must precede argument %1", (Identifier, Identifier))
 ERROR(argument_out_of_order_named_unnamed,none,
-      "argument %0 must precede unnamed parameter #%1", (Identifier, unsigned))
+      "argument %0 must precede unnamed argument #%1", (Identifier, unsigned))
 ERROR(argument_out_of_order_unnamed_named,none,
-      "unnamed parameter #%0 must precede argument %1", (unsigned, Identifier))
+      "unnamed argument #%0 must precede argument %1", (unsigned, Identifier))
 ERROR(argument_out_of_order_unnamed_unnamed,none,
-      "unnamed parameter #%0 must precede unnamed parameter #%1",
+      "unnamed argument #%0 must precede unnamed argument #%1",
       (unsigned, unsigned))
 
 ERROR(instance_member_use_on_type,none,
