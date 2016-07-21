@@ -72,6 +72,7 @@ KNOWN_SETTINGS=(
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
+    libdispatch-build-type      "Debug"          "the build variant for libdispatch"
     playgroundlogger-build-type "Debug"          "the build variant for PlaygroundLogger"
     playgroundsupport-build-type "Debug"         "the build variant for PlaygroundSupport"
     xctest-build-type           "Debug"          "the build variant for xctest"
@@ -1466,7 +1467,7 @@ function build_directory_bin() {
                 echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
                 ;;
             libdispatch)
-                echo "${root}/bin"
+                echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
                 ;;
             playgroundlogger)
                 # FIXME: var name for build type
@@ -2255,12 +2256,20 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
                     # First time building; need to run autotools and configure
+                    if [[ "$LIBDISPATCH_BUILD_TYPE" == "Release" ]] ; then
+                        dispatch_build_variant_arg="release"
+                    elif [[ "$LIBDISPATCH_BUILD_TYPE" == "RelWithDebInfo" ]]; then
+                        dispatch_build_variant_arg="releasedebuginfo"
+                    else
+                        dispatch_build_variant_arg="debug"
+                    fi
                     call mkdir -p "${LIBDISPATCH_BUILD_DIR}"
                     with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
                         call autoreconf -fvi
                     with_pushd "${LIBDISPATCH_BUILD_DIR}" \
                         call env CC="${LLVM_BIN}/clang" CXX="${LLVM_BIN}/clang++" SWIFTC="${SWIFTC_BIN}" \
                             "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
+                            --with-build-variant=$dispatch_build_variant_arg \
                             --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
 
                 fi
