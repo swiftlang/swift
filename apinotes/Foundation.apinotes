@@ -989,8 +989,6 @@ Classes:
   SwiftName: NSURLHandle
 - Name: NSMachPort
   SwiftName: NSMachPort
-- Name: NSOutputStream
-  SwiftName: NSOutputStream
 - Name: NSRegularExpression
   SwiftName: NSRegularExpression
 - Name: NSComparisonPredicate
