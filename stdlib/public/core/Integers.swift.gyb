@@ -14,13 +14,12 @@
 # Utility code for later in this template
 #
 
+from SwiftIntTypes import all_integer_types
+
 from string import maketrans, capitalize
 
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
-
-# FIXME(integers): change it to use all_integer_types
-fixedBitWidths = [8, 16, 32, 64]
 
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
@@ -736,13 +735,14 @@ extension SignedInteger_ where Self : FixedWidthInteger {
 //===--- Concrete FixedWidthIntegers --------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-% for bits in fixedBitWidths:
-%   for signed in True, False:
-%     Self = ('Int%d_' if signed else 'UInt%d_') % bits
-%     Unsigned = 'Signed' if signed else 'Unsigned'
-%     u = 's' if signed else 'u'
-%     U = 'U' if signed else ''
-%     z = 's' if signed else 'z'
+% for self_type in all_integer_types(word_bits):
+%   bits = self_type.bits
+%   signed = self_type.is_signed
+%   Self = self_type.stdlib_name + "_"
+%   Unsigned = 'Signed' if signed else 'Unsigned'
+%   u = 's' if signed else 'u'
+%   U = 'U' if signed else ''
+%   z = 's' if signed else 'z'
 public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer_,
     _ExpressibleByBuiltinIntegerLiteral {
@@ -920,5 +920,4 @@ public struct ${Self}
   public var _storage: Builtin.Int${bits}
 }
 
-%   end
 % end
