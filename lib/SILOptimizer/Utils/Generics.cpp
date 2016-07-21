@@ -19,6 +19,29 @@
 
 using namespace swift;
 
+// Max depth of a bound generic which can be processed by the generic
+// specializer.
+// E.g. the depth of Array<Array<Array<T>>> is 3.
+// No specializations will be produced, if any of generic parameters contains
+// a bound generic type with the depth higher than this threshold 
+static const unsigned BoundGenericDepthThreshold = 50;
+
+static unsigned getBoundGenericDepth(Type t) {
+  unsigned Depth = 0;
+  if (auto BGT = t->getAs<BoundGenericType>()) {
+    Depth++;
+    auto GenericArgs = BGT->getGenericArgs();
+    unsigned MaxGenericArgDepth = 0;
+    for (auto GenericArg : GenericArgs) {
+      auto ArgDepth = getBoundGenericDepth(GenericArg);
+      if (ArgDepth > MaxGenericArgDepth)
+        MaxGenericArgDepth = ArgDepth;
+    }
+    Depth += MaxGenericArgDepth;
+  }
+  return Depth;
+}
+
 // =============================================================================
 // ReabstractionInfo
 // =============================================================================
@@ -50,6 +73,19 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
     DEBUG(llvm::dbgs() << "    Cannot specialize with dynamic self.\n");
     return;
   }
+
+  // Check if the substitution contains any generic types that are too deep.
+  // If this is the case, bail to avoid the explosion in the number of 
+  // generated specializations.
+  for (auto Sub : ParamSubs) {
+    auto Replacement = Sub.getReplacement();
+    if (Replacement.findIf([](Type ty) -> bool {
+          return getBoundGenericDepth(ty) >= BoundGenericDepthThreshold;
+        })) {
+      return;
+    }
+  }
+
   SILModule &M = OrigF->getModule();
   Module *SM = M.getSwiftModule();
 

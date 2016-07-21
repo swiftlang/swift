@@ -35,14 +35,6 @@
 #include <cstring>
 #include <type_traits>
 
-// FIXME: Clang defines max_align_t in stddef.h since 3.6.
-// Remove this hack when we don't care about older Clangs on all platforms.
-#ifdef __APPLE__
-typedef std::max_align_t swift_max_align_t;
-#else
-typedef long double swift_max_align_t;
-#endif
-
 using namespace swift;
 using namespace metadataimpl;
 
@@ -2483,7 +2475,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   // Allocate a buffer to store the T? returned by bridging.
   // The extra byte is for the tag.
   const std::size_t inlineValueSize = 3 * sizeof(void*);
-  alignas(swift_max_align_t) char inlineBuffer[inlineValueSize + 1];
+  alignas(std::max_align_t) char inlineBuffer[inlineValueSize + 1];
   void *optDestBuffer;
   if (targetType->getValueWitnesses()->getStride() <= inlineValueSize) {
     // Use the inline buffer.

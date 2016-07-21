@@ -22,7 +22,7 @@
 - (NSArray *)produceSubclassArray:(NSMutableArray *)expectations;
 - (void)checkProducedSubclassArray:(NSArray *)produced expecting:(NSArray *)expected;
 - (void)checkProducedBridgeableValueArray:(NSArray *)produced;
-- (id)acceptBridgeableValueArray:(NSArray *)x;
+- (void)acceptBridgeableValueArray:(NSArray *)x;
 - (NSArray *)produceBridgeableValueArray;
 @end
 

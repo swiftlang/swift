@@ -219,5 +219,36 @@ AssertionsTestSuite.test("expectEqual<T : Equatable, U : Equatable, V : Equatabl
   }
 }
 
+AssertionsTestSuite.test("expectEqual<T : Equatable, U : Equatable, V : Equatable, W : Equatable>") {
+  let _0 = MinimalEquatableValue(0)
+  let _1 = MinimalEquatableValue(1)
+
+  for a in [_0, _1] {
+    for b in [_0, _1] {
+      for c in [_0, _1] {
+        for d in [_0, _1] {
+          for e in [_0, _1] {
+            for f in [_0, _1] {
+              for g in [_0, _1] {
+                for h in [_0, _1] {
+                  let lhs = (a, b, c, d)
+                  let rhs = (e, f, g, h)
+                  if lhs == rhs {
+                    expectEqual(lhs, rhs)
+                  } else {
+                    expectFailure {
+                      expectEqual(lhs, rhs)
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 runAllTests()
 

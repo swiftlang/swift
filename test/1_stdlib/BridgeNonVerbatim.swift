@@ -23,8 +23,9 @@
 
 import Swift
 import SwiftShims
-import ObjectiveC
+import Foundation
 import StdlibUnittest
+import StdlibUnittestFoundationExtras
 
 struct X : _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
@@ -69,7 +70,7 @@ print("testing...")
 
 func testScope() {
   let a = [X(1), X(2), X(3)]
-  let nsx = a._buffer._asCocoaArray()
+  let nsx: NSArray = a._bridgeToObjectiveC()
 
   // construction of these tracked objects is lazy
   // CHECK-NEXT: trackedCount = 0 .
@@ -77,12 +78,12 @@ func testScope() {
 
   // We can get a single element out
   // CHECK-NEXT: nsx[0]: 1 .
-  let one = nsx.objectAt(0) as! LifetimeTracked
+  let one = nsx.object(at: 0) as! LifetimeTracked
   print("nsx[0]: \(one.value) .")
 
   // We can get the element again, but it may not have the same identity
   // CHECK-NEXT: object identity matches?
-  let anotherOne = nsx.objectAt(0) as! LifetimeTracked
+  let anotherOne = nsx.object(at: 0) as! LifetimeTracked
   print("object identity matches? \(one === anotherOne)")
 
   // Because the elements come back at +0, we really don't want to
@@ -92,9 +93,10 @@ func testScope() {
   objects.withUnsafeMutableBufferPointer {
     // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
     (buf: inout UnsafeMutableBufferPointer<Int>) -> () in
-    nsx.getObjects(
-      UnsafeMutablePointer<AnyObject>(buf.baseAddress!),
-      range: _SwiftNSRange(location: 1, length: 2))
+    nsx.available_getObjects(
+      AutoreleasingUnsafeMutablePointer(buf.baseAddress!),
+      range: NSRange(location: 1, length: 2))
+    return
   }
 
   // CHECK-NEXT: getObjects yields them at +0: true

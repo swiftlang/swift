@@ -1664,30 +1664,6 @@ extension Collection where SubSequence == Self {
   }
 }
 
-// TODO: swift-3-indexing-model - review the following
-extension Sequence
-  where Self : _ArrayProtocol, Self.Element == Self.Iterator.Element {
-  // A fast implementation for when you are backed by a contiguous array.
-  @discardableResult
-  public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Iterator.Element>
-  ) -> UnsafeMutablePointer<Iterator.Element> {
-    if let s = self._baseAddressIfContiguous {
-      let count = self.count
-      ptr.initializeFrom(s, count: count)
-      _fixLifetime(self._owner)
-      return ptr + count
-    } else {
-      var p = ptr
-      for x in self {
-        p.initialize(with: x)
-        p += 1
-      }
-      return p
-    }
-  }
-}
-
 extension Collection {
   public func _preprocessingPass<R>(
     _ preprocess: @noescape () throws -> R

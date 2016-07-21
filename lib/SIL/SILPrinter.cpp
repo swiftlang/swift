@@ -9,9 +9,11 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines the logic to pretty-print SIL, Instructions, etc.
-//
+///
+/// \file
+///
+/// This file defines the logic to pretty-print SIL, Instructions, etc.
+///
 //===----------------------------------------------------------------------===//
 
 #include "swift/Strings.h"

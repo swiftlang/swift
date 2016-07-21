@@ -164,9 +164,12 @@ class Thunks : NSObject {
     )
   }
   
-  @objc func acceptBridgeableValueArray(_ raw: NSArray) -> AnyObject {
+  @objc func acceptBridgeableValueArray(_ raw: NSArray) {
     let x = raw as! [BridgeableValue]
-    return Box(x)
+    expectEqualSequence(
+      raw.lazy.map { $0 as! BridgeableValue },
+      x
+    )
   }
 
   @objc func produceBridgeableValueArray() -> NSArray {
