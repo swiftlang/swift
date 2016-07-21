@@ -1255,29 +1255,22 @@ internal func _stdlib_NSSet_allObjects(_ nss: _NSSet) ->
 
 //===--- Compiler conversion/casting entry points for Set<Element> --------===//
 
-func _impossible<T>(_:T.Type) -> T {
-  Builtin.unreachable()
-}
-
-func _unsafeUpcast<T, U>(_ x: T, to: U.Type) -> U {
-  _sanityCheck(x is U)
-  return x as? U ?? _impossible(U.self)
-}
-
+#if _runtime(_ObjC)
 /// Perform a non-bridged upcast that always succeeds.
 ///
 /// - Precondition: `BaseValue` is a base class or base `@objc`
 ///   protocol (such as `AnyObject`) of `DerivedValue`.
 public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
   -> Set<BaseValue> {
+  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
+
   var builder = _SetBuilder<BaseValue>(count: source.count)
-  for x in source {
-    builder.add(member: _unsafeUpcast(x, to: BaseValue.self))
+  for member in source {
+    builder.add(member: unsafeBitCast(member, to: BaseValue.self))
   }
   return builder.take()
 }
-
-#if _runtime(_ObjC)
 
 /// Implements an unconditional upcast that involves bridging.
 ///
@@ -1295,7 +1288,6 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
   let valueBridgesDirectly =
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
     _isBridgedVerbatimToObjectiveC(ObjCValue.self)
-
   for member in source {
     var bridgedMember: ObjCValue
     if valueBridgesDirectly {
@@ -1310,8 +1302,6 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
   }
   return result
 }
-
-#endif
 
 /// Implements a forced downcast.  This operation should have O(1) complexity.
 ///
@@ -1362,8 +1352,6 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
   }
   return result
 }
-
-#if _runtime(_ObjC)
 
 /// Implements an unconditional downcast that involves bridging.
 ///
@@ -1417,6 +1405,23 @@ public func _setBridgeFromObjectiveCConditional<
     result.insert(resultValue)
   }
   return result
+}
+#else
+
+public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
+  -> Set<BaseValue> {
+  fatalError("_setUpCast is unimplemented")
+}
+
+public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
+  -> Set<DerivedValue> {
+  fatalError("_setDownCast is unimplemented")
+}
+
+public func _setDownCastConditional<BaseValue, DerivedValue>(
+  _ source: Set<BaseValue>
+) -> Set<DerivedValue>? {
+  fatalError("_setDownCastConditional is unimplemented")
 }
 
 #endif
@@ -2174,6 +2179,7 @@ internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
 
 //===--- Compiler conversion/casting entry points for Dictionary<K, V> ----===//
 
+#if _runtime(_ObjC)
 /// Perform a non-bridged upcast that always succeeds.
 ///
 /// - Precondition: `BaseKey` and `BaseValue` are base classes or base `@objc`
@@ -2182,16 +2188,21 @@ internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
 public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
     _ source: Dictionary<DerivedKey, DerivedValue>
 ) -> Dictionary<BaseKey, BaseValue> {
-  var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
+  // FIXME: This crappy implementation is O(n) because it copies the
+  // data; a proper implementation would be O(1).
 
+  _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
+  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedKey.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
+
+  var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
   for (k, v) in source {
-    result[_unsafeUpcast(k, to: BaseKey.self)]
-      = _unsafeUpcast(v, to: BaseValue.self)
+    result[unsafeBitCast(k, to: BaseKey.self)] =
+      unsafeBitCast(v, to: BaseValue.self)
   }
   return result
 }
-
-#if _runtime(_ObjC)
 
 /// Implements an unconditional upcast that involves bridging.
 ///
@@ -2263,6 +2274,10 @@ public func _dictionaryBridgeToObjectiveC<
 public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue> {
+  _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
+  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedKey.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
   switch source._variantStorage {
   case .native(let nativeOwner):
@@ -2300,7 +2315,11 @@ public func _dictionaryDownCastConditional<
 >(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue>? {
-  
+  _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
+  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedKey.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
+
   var result = Dictionary<DerivedKey, DerivedValue>()
   for (key, value) in source {
     if let derivedKey = key as? DerivedKey {
@@ -2399,6 +2418,12 @@ public func _dictionaryBridgeFromObjectiveCConditional<
   return result
 }
 #else
+
+public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
+    _ source: Dictionary<DerivedKey, DerivedValue>
+) -> Dictionary<BaseKey, BaseValue> {
+  fatalError("_dictionaryUpCast is unimplemented")
+}
 
 public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   _ source: Dictionary<BaseKey, BaseValue>
