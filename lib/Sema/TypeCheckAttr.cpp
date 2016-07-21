@@ -1709,21 +1709,6 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
 }
 
-AnyFunctionType::ExtInfo
-TypeChecker::applyFunctionTypeAttributes(AbstractFunctionDecl *func,
-                                         unsigned i) {
-  auto info = AnyFunctionType::ExtInfo();
-
-  // For curried functions, 'throws' and 'noreturn' only applies to the
-  // innermost function.
-  if (i == 0) {
-    info = info.withIsNoReturn(func->getAttrs().hasAttribute<NoReturnAttr>());
-    info = info.withThrows(func->hasThrows());
-  }
-
-  return info;
-}
-
 Optional<Diag<>>
 TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   DeclContext *DC = D->getDeclContext();

@@ -275,7 +275,6 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
 
 void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   const TypeAttributes &Attrs = getAttrs();
-  if (Attrs.has(TAK_noreturn))     Printer << "@noreturn ";
 
   switch (Attrs.has(TAK_autoclosure)*2 + Attrs.has(TAK_noescape)) {
   case 0: break;  // Nothing specified.

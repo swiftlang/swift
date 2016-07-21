@@ -1601,8 +1601,6 @@ Type ConstraintSystem::simplifyType(Type type,
         auto extInfo = ft->getExtInfo();
         if (it->second.isNoEscape())
           extInfo = extInfo.withNoEscape();
-        if (it->second.isNoReturn())
-          extInfo = extInfo.withIsNoReturn();
         if (it->second.throws())
           extInfo = extInfo.withThrows();
         return FunctionType::get(ft->getInput(), ft->getResult(), extInfo);
@@ -1631,8 +1629,6 @@ Type Solution::simplifyType(TypeChecker &tc, Type type) const {
         auto extInfo = ft->getExtInfo();
         if (it->second.isNoEscape())
           extInfo = extInfo.withNoEscape();
-        if (it->second.isNoReturn())
-          extInfo = extInfo.withIsNoReturn();
         if (it->second.throws())
           extInfo = extInfo.withThrows();
         return FunctionType::get(simplifyType(tc, ft->getInput()),

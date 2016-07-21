@@ -5596,10 +5596,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // throwing subexpressions. We also don't want to change the convention
       // of the original closure.
       auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
-      if ((toEI.isNoEscape() && !fromEI.isNoEscape()) ||
-          (toEI.isNoReturn() && !fromEI.isNoReturn())) {
+      if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
         swift::AnyFunctionType::ExtInfo newEI(fromEI.getRepresentation(),
-                                        toEI.isNoReturn() | fromEI.isNoReturn(),
                                         toEI.isAutoClosure(),
                                         toEI.isNoEscape() | fromEI.isNoEscape(),
                                         toEI.isExplicitlyEscaping() | fromEI.isExplicitlyEscaping(),

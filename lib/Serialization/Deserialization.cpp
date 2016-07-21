@@ -3434,12 +3434,11 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID inputID;
     TypeID resultID;
     uint8_t rawRepresentation;
-    bool autoClosure, noreturn, noescape, explicitlyEscaping, throws;
+    bool autoClosure, noescape, explicitlyEscaping, throws;
 
     decls_block::FunctionTypeLayout::readRecord(scratch, inputID, resultID,
                                                 rawRepresentation,
                                                 autoClosure,
-                                                noreturn,
                                                 noescape,
                                                 explicitlyEscaping,
                                                 throws);
@@ -3450,7 +3449,7 @@ Type ModuleFile::getType(TypeID TID) {
     }
     
     auto Info = FunctionType::ExtInfo(*representation,
-                               noreturn, autoClosure, noescape,
+                               autoClosure, noescape,
                                explicitlyEscaping, throws);
     
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
@@ -3799,16 +3798,13 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID resultID;
     DeclID genericContextID;
     uint8_t rawRep;
-    bool noreturn = false;
     bool throws = false;
 
-    // TODO: add noreturn serialization.
     decls_block::PolymorphicFunctionTypeLayout::readRecord(scratch,
                                                            inputID,
                                                            resultID,
                                                            genericContextID,
                                                            rawRep,
-                                                           noreturn,
                                                            throws);
     GenericParamList *paramList =
       maybeGetOrReadGenericParams(genericContextID, FileContext, DeclTypeCursor);
@@ -3821,7 +3817,6 @@ Type ModuleFile::getType(TypeID TID) {
     }
     
     auto Info = PolymorphicFunctionType::ExtInfo(*rep,
-                                                 noreturn,
                                                  throws);
 
     typeOrOffset = PolymorphicFunctionType::get(getType(inputID),
@@ -3834,16 +3829,13 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID inputID;
     TypeID resultID;
     uint8_t rawRep;
-    bool noreturn = false;
     bool throws = false;
     ArrayRef<uint64_t> genericParamIDs;
 
-    // TODO: add noreturn serialization.
     decls_block::GenericFunctionTypeLayout::readRecord(scratch,
                                                        inputID,
                                                        resultID,
                                                        rawRep,
-                                                       noreturn,
                                                        throws,
                                                        genericParamIDs);
     auto rep = getActualFunctionTypeRepresentation(rawRep);
@@ -3868,7 +3860,7 @@ Type ModuleFile::getType(TypeID TID) {
     // Read the generic requirements.
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements);
-    auto info = GenericFunctionType::ExtInfo(*rep, noreturn, throws);
+    auto info = GenericFunctionType::ExtInfo(*rep, throws);
 
     auto sig = GenericSignature::get(genericParams, requirements);
     typeOrOffset = GenericFunctionType::get(sig,
@@ -3898,7 +3890,6 @@ Type ModuleFile::getType(TypeID TID) {
   case decls_block::SIL_FUNCTION_TYPE: {
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
-    bool noreturn = false;
     bool pseudogeneric = false;
     bool hasErrorResult;
     unsigned numParams;
@@ -3908,7 +3899,6 @@ Type ModuleFile::getType(TypeID TID) {
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
                                              rawCalleeConvention,
                                              rawRepresentation,
-                                             noreturn,
                                              pseudogeneric,
                                              hasErrorResult,
                                              numParams,
@@ -3922,7 +3912,7 @@ Type ModuleFile::getType(TypeID TID) {
       error();
       return nullptr;
     }
-    SILFunctionType::ExtInfo extInfo(*representation, noreturn, pseudogeneric);
+    SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric);
 
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);

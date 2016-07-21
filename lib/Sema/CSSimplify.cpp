@@ -875,12 +875,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return SolutionKind::Error;
   }
 
-  // A @noreturn function type can be a subtype of a non-@noreturn function
-  // type.
-  if (func1->isNoReturn() != func2->isNoReturn() &&
-      (func2->isNoReturn() || kind < TypeMatchKind::SameType))
-    return SolutionKind::Error;
-
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
   if (func1->isNoEscape() != func2->isNoEscape() &&

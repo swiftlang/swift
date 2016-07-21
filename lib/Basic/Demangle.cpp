@@ -2122,7 +2122,6 @@ private:
   // impl-function-attribute ::= 'Cm'            // compatible with Swift method
   // impl-function-attribute ::= 'CO'            // compatible with ObjC method
   // impl-function-attribute ::= 'Cw'            // compatible with protocol witness
-  // impl-function-attribute ::= 'N'             // noreturn
   // impl-function-attribute ::= 'G'             // generic
   NodePointer demangleImplFunctionType() {
     NodePointer type = NodeFactory::create(Node::Kind::ImplFunctionType);
@@ -2144,9 +2143,6 @@ private:
       else
         return nullptr;
     }
-
-    if (Mangled.nextIf('N'))
-      addImplFunctionAttribute(type, "@noreturn");
 
     // Enter a new generic context if this type is generic.
     // FIXME: replace with std::optional, when we have it.

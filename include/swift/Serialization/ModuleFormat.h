@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 255; // Last change: bind_memory instruction
+const uint16_t VERSION_MINOR = 256; // Last change: remove noreturn bit
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -587,7 +587,6 @@ namespace decls_block {
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // auto-closure?
-    BCFixed<1>,  // noreturn?
     BCFixed<1>,  // noescape?
     BCFixed<1>,  // explicitlyEscaping?
     BCFixed<1>   // throws?
@@ -681,7 +680,6 @@ namespace decls_block {
     TypeIDField, // output
     DeclIDField, // decl that owns the generic params
     FunctionTypeRepresentationField, // representation
-    BCFixed<1>,  // noreturn?
     BCFixed<1>   // throws?
     // Trailed by its generic parameters, if the owning decl ID is 0.
   >;
@@ -691,7 +689,6 @@ namespace decls_block {
     TypeIDField,         // input
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
-    BCFixed<1>,          // noreturn?
     BCFixed<1>,          // throws?
     BCArray<TypeIDField> // generic parameters
                          // followed by requirements
@@ -701,7 +698,6 @@ namespace decls_block {
     SIL_FUNCTION_TYPE,
     ParameterConventionField, // callee convention
     SILFunctionTypeRepresentationField, // representation
-    BCFixed<1>,            // noreturn?
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // error result?
     BCFixed<30>,           // number of parameters

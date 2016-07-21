@@ -968,11 +968,6 @@ public:
     handleExternalDecl(nominal);
   }
 
-  /// Determine attributes for the given function and curry level, with a level
-  /// of 0 indicating the innermost function.
-  AnyFunctionType::ExtInfo
-  applyFunctionTypeAttributes(AbstractFunctionDecl *func, unsigned i);
-
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 

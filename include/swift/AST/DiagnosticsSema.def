@@ -1329,8 +1329,6 @@ NOTE(protocol_witness_mutating_conflict,none,
      "candidate is marked 'mutating' but protocol does not allow it", ())
 NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
-NOTE(protocol_witness_noreturn_conflict,none,
-     "candidate is not @noreturn, but protocol requires it", ())
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
 NOTE(protocol_witness_throws_conflict,none,
@@ -1777,9 +1775,6 @@ ERROR(final_not_allowed_here,none,
 ERROR(final_not_on_accessors,none,
       "'final' cannot be applied to accessors, it must be put on the "
       "%select{var|let|subscript}0", (unsigned))
-
-ERROR(override_noreturn_with_return,none,
-      "an override of a @noreturn method should also be @noreturn", ())
 
 ERROR(override_rethrows_with_non_rethrows,none,
       "override of 'rethrows' %select{method|initializer}0 should also "

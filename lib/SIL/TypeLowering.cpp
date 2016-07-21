@@ -1683,7 +1683,6 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
          && "There are no foreign destroying destructors");
   AnyFunctionType::ExtInfo extInfo =
             AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                     /*noreturn*/ false,
                                      /*throws*/ false);
   if (isForeign)
     extInfo = extInfo
@@ -1714,7 +1713,6 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
   auto emptyTupleTy = TupleType::getEmpty(ctx)->getCanonicalType();
   CanType resultType = isDestroyer? emptyTupleTy : classType;
   auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                          /*noreturn*/ false,
                                           /*throws*/ false);
   extInfo = extInfo
     .withSILRepresentation(isObjC? SILFunctionTypeRepresentation::ObjCMethod
@@ -1768,7 +1766,6 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
                                                                 captureInfo);
 
   auto innerExtInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                               funcType->isNoReturn(),
                                                funcType->throws());
 
   // If we don't have any local captures (including function captures),
@@ -1794,7 +1791,6 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   // Add an extra empty tuple level to represent the captures. We'll append the
   // lowered capture types here.
   auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                          /*noreturn*/ false,
                                           /*throws*/ false);
 
   if (genericSig) {

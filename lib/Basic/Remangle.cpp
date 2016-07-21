@@ -1125,8 +1125,6 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
     Out << "CO";
   } else if (text == "@convention(witness_method)") {
     Out << "Cw";
-  } else if (text == "@noreturn") {
-    Out << "CN";
   } else {
     unreachable("bad impl-function-attribute");
   }

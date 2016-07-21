@@ -1216,8 +1216,8 @@ flow, such as a non-``Void`` function failing to ``return`` a value, or a
 ``switch`` statement failing to cover all possible values of its subject.
 The guaranteed dead code elimination pass can eliminate truly unreachable
 basic blocks, or ``unreachable`` instructions may be dominated by applications
-of ``@noreturn`` functions. An ``unreachable`` instruction that survives
-guaranteed DCE and is not immediately preceded by a ``@noreturn``
+of functions returning uninhabited types. An ``unreachable`` instruction that
+survives guaranteed DCE and is not immediately preceded by an no-return
 application is a dataflow error.
 
 Runtime Failure
@@ -3912,12 +3912,8 @@ in the following ways:
 - A class tuple element of the destination type may be a superclass or
   subclass of the source type's corresponding tuple element.
 
-The function types may also differ in attributes, with the following
-caveats:
-
-- The ``convention`` attribute cannot be changed.
-- A ``@noreturn`` function may be converted to a non-``@noreturn``
-  type and vice-versa.
+The function types may also differ in attributes, except that the
+``convention`` attribute cannot be changed.
 
 thin_function_to_pointer
 ````````````````````````
@@ -4133,7 +4129,7 @@ unreachable
 Indicates that control flow must not reach the end of the current basic block.
 It is a dataflow error if an unreachable terminator is reachable from the entry
 point of a function and is not immediately preceded by an ``apply`` of a
-``@noreturn`` function.
+no-return function.
 
 return
 ``````

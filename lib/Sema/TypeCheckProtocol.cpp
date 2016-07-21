@@ -122,9 +122,6 @@ namespace {
     /// \brief The witness did not match because of mutating conflicts.
     MutatingConflict,
 
-    /// The witness is not @noreturn, but the requirement is.
-    NoReturnConflict,
-
     /// The witness is not rethrows, but the requirement is.
     RethrowsConflict,
 
@@ -315,7 +312,6 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
-      case MatchKind::NoReturnConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
       case MatchKind::NonObjC:
@@ -339,7 +335,6 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
-      case MatchKind::NoReturnConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
       case MatchKind::NonObjC:
@@ -728,11 +723,6 @@ matchWitness(TypeChecker &tc,
     // Check that the mutating bit is ok.
     if (checkMutating(funcReq, funcWitness, funcWitness))
       return RequirementMatch(witness, MatchKind::MutatingConflict);
-
-    /// If the requirement is @noreturn, the witness must also be @noreturn.
-    if (reqAttrs.hasAttribute<NoReturnAttr>() &&
-        !witnessAttrs.hasAttribute<NoReturnAttr>())
-      return RequirementMatch(witness, MatchKind::NoReturnConflict);
 
     // If the requirement is rethrows, the witness must either be
     // rethrows or be non-throwing.
@@ -1783,10 +1773,6 @@ diagnoseMatch(TypeChecker &tc, Module *module,
   case MatchKind::MutatingConflict:
     // FIXME: Could emit a Fix-It here.
     tc.diagnose(match.Witness, diag::protocol_witness_mutating_conflict);
-    break;
-  case MatchKind::NoReturnConflict:
-    // FIXME: Could emit a Fix-It here.
-    tc.diagnose(match.Witness, diag::protocol_witness_noreturn_conflict);
     break;
   case MatchKind::RethrowsConflict:
     // FIXME: Could emit a Fix-It here.

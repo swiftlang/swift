@@ -3752,9 +3752,6 @@ public:
         break;
       }
     }
-
-    if (info.isNoReturn())
-      Printer << "@noreturn ";
   }
 
   void printFunctionExtInfo(SILFunctionType::ExtInfo info) {
@@ -3789,9 +3786,6 @@ public:
 
     if (info.isPseudogeneric())
       Printer << "@pseudogeneric ";
-
-    if (info.isNoReturn())
-      Printer << "@noreturn ";
   }
 
   void visitFunctionType(FunctionType *T) {

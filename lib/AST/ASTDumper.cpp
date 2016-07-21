@@ -2869,7 +2869,6 @@ namespace {
         break;
       }
 
-      printFlag(T->isNoReturn(), "noreturn");
       printFlag(T->isAutoClosure(), "autoclosure");
       printFlag(T->isNoEscape(), "noescape");
       printFlag(T->isExplicitlyEscaping(), "escaping");

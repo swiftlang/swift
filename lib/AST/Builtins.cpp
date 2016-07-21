@@ -984,7 +984,7 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
   auto Thin = FunctionType::ExtInfo(FunctionTypeRepresentation::Thin,
-                                    /*noreturn*/ false, /*throws*/ false);
+                                    /*throws*/ false);
   
   auto BlockTy = FunctionType::get(VoidTy, VoidTy, Thin);
   return getBuiltinFunction(Id, {HandleTy, BlockTy}, VoidTy);
