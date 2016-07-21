@@ -59,6 +59,11 @@ internal final class _SwiftNSCharacterSet : _SwiftNativeNSCharacterSet, _SwiftNa
     func mutableCopy(with zone: NSZone? = nil) -> AnyObject {
         return _mapUnmanaged { $0.mutableCopy(with: zone) }
     }
+
+    @objc
+    public var classForCoder: AnyClass {
+        return NSCharacterSet.self
+    }
 }
 
 /**
