@@ -16,6 +16,10 @@ _TtSi ---> Int
 _TtSq ---> Optional
 _TtSS ---> String
 _TtSu ---> UInt
+_TtGSP ---> UnsafePointer
+_TtGSp ---> UnsafeMutablePointer
+_TtSV ---> UnsafeRawPointer
+_TtSv ---> UnsafeMutableRawPointer
 _TtGSaSS_ ---> [String]
 _TtGSqSS_ ---> String?
 _TtGSQSS_ ---> String!

@@ -27,7 +27,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// Implements conformance to the public protocol `_Pointer`.
   public let _rawValue: Builtin.RawPointer
 
-  /// Convert a builtin raw pointer to a Unsafe${Mutable}RawPointer.
+  /// Convert a builtin raw pointer to ${a_Self}.
   @_transparent
   public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
@@ -48,21 +48,21 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     _rawValue = unwrapped._rawValue
   }
 
-  /// Construct ${a_Self} with a given pattern of bits.
+  /// Convert a pattern of bits to ${a_Self}.
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
     _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Construct ${a_Self} with a given pattern of bits.
+  /// Convert a pattern of bits to ${a_Self}.
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
     _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Convert an Unsafe${Mutable}Pointer ${a_Self}.
+  /// Convert an Unsafe${Mutable}Pointer to ${a_Self}.
   @_transparent
   public init<T>(_ other: Unsafe${Mutable}Pointer<T>) {
     _rawValue = other._rawValue
@@ -138,7 +138,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: The memory is uninitialized.
   ///
   /// - Postcondition: The memory is bound to 'T' starting at `self` continuing
-  ///   through `self` + `capacity` * `strideof(T.self)`
+  ///   through `self` + `count` * `strideof(T.self)`
   ///
   /// - Warning: Binding memory to a type is potentially undefined if the
   ///   memory is ever accessed as an unrelated type.
@@ -336,6 +336,10 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: The memory is initialized to a value of some type, `U`,
   ///   such that `T` is layout compatible with `U`.
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
+    _debugPrecondition(0 == (UInt(bitPattern: self + offset)
+        & (UInt(alignof(T.self)) - 1)),
+      "load from misaligned raw pointer")
+
     return Builtin.load((self + offset)._rawValue)
   }
 
@@ -373,9 +377,14 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as: T.Type
   ) {
+    _debugPrecondition(0 == (UInt(bitPattern: self + offset)
+        & (UInt(alignof(T.self)) - 1)),
+      "storeBytes to misaligned raw pointer")
+
     var temp = value
     withUnsafeMutablePointer(&temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue
+      // FIXME: to be replaced by _memcpy when conversions are implemented.
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
         (self + offset)._rawValue, rawSrc, UInt64(sizeof(T.self))._value,
         /*alignment:*/ Int32(0)._value,
@@ -385,6 +394,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   
   /// Copy `count` bytes from `source` into memory at `self`.
   ///  
+  /// - Precondition: `count` is non-negative.
+  ///
   /// - Precondition: The memory at `source..<source + count` is
   ///   initialized to some trivial type `T`.
   ///
@@ -399,27 +410,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   public func copyBytes(from source: UnsafeRawPointer, count: Int) {
     _debugPrecondition(
       count >= 0, "UnsafeMutableRawPointer.copyBytes with negative count")
-    if UnsafeRawPointer(self) < source
-       || (source + count) <= UnsafeRawPointer(self) {
-      // copy forward from a disjoint or following overlapping range.
-      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
-        _rawValue, source._rawValue, UInt64(count)._value,
-        /*alignment:*/ Int32(0)._value,
-        /*volatile:*/ false._value)
-    }
-    else {
-      // copy backward from a non-following overlapping range.
-      var destPtr = self + (count - 1)
-      var srcPtr = source + (count - 1)
-      while destPtr >= self {
-        Builtin.int_memcpy_RawPointer_RawPointer_Int64(
-          destPtr._rawValue, srcPtr._rawValue, Int64(1)._value,
-          /*alignment:*/ Int32(0)._value,
-          /*volatile:*/ false._value)
-        destPtr -= 1
-        srcPtr -= 1
-      }
-    }
+
+    _memmove(dest: self, src: source, size: UInt(count))
   }
 %  end # mutable
 
@@ -435,7 +427,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(_rawValue))
+    return Int(bitPattern: self)
   }
 
   /// Return `end - self`.

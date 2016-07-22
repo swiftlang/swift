@@ -322,7 +322,7 @@ public struct ${Self}<Pointee>
   ///   are uninitialized.
   public func moveAssign(from source: ${Self}, count: Int) {
     _debugPrecondition(
-      count >= 0, "${Self}.moveAssignFrom with negative count")
+      count >= 0, "${Self}.moveAssign(from:) with negative count")
     _debugPrecondition(
       self + count <= source || source + count <= self,
       "moveAssign overlapping range")
@@ -363,8 +363,8 @@ public struct ${Self}<Pointee>
   /// - Precondition: The memory `self..<self + count * strideof(T.self)`
   ///   is bound to `Pointee`.
   public func withMemoryRebound<T, Result>(to: T.Type, capacity count: Int,
-    _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result) rethrows
-  -> Result {
+    _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result
+  ) rethrows -> Result {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer {
       Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
@@ -405,7 +405,7 @@ public struct ${Self}<Pointee>
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(_rawValue))
+    return Int(bitPattern: self)
   }
 
   /// Returns the next consecutive position.

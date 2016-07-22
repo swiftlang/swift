@@ -199,7 +199,7 @@ func checkPtr(
   }
 }
 
-UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count") {
+UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count:") {
   let check = checkPtr(UnsafeMutableRawPointer.initializeMemory(as:from:count:))
   check(Check.Disjoint)
   // This check relies on _debugPrecondition() so will only trigger in
@@ -210,7 +210,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count") {
   }
 }
 
-UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count.Right") {
+UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count:.Right") {
   let check = checkPtr(UnsafeMutableRawPointer.initializeMemory(as:from:count:))
   // This check relies on _debugPrecondition() so will only trigger in
   // -Onone mode.
@@ -220,7 +220,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count.Right
   }
 }
 
-UnsafeMutableRawPointerExtraTestSuite.test("moveInitialize:from") {
+UnsafeMutableRawPointerExtraTestSuite.test("moveInitialize:from:") {
   let check =
     checkPtr(UnsafeMutableRawPointer.moveInitializeMemory(as:from:count:))
   check(Check.LeftOverlap)
