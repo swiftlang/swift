@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-swift-frontend -parse -verify %s -enable-id-as-any
 
 // REQUIRES: objc_interop
 
@@ -6,7 +6,7 @@ import Foundation
 
 public class BridgedClass : NSObject, NSCopying {
   @objc(copyWithZone:)
-  public func copy(with zone: NSZone?) -> AnyObject {
+  public func copy(with zone: NSZone?) -> Any {
     return self
   }
 }
@@ -325,4 +325,29 @@ func forceBridgeDiag(_ obj: BridgedClass!) -> BridgedStruct {
   return obj // expected-error{{'BridgedClass!' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}{{13-13= as BridgedStruct}}
 }
 
+struct KnownUnbridged {}
+class KnownClass {}
+protocol KnownClassProtocol: class {}
 
+func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: Any, d: KnownUnbridged, e: KnownClass, f: KnownClassProtocol, g: AnyObject, h: String) {
+  var z: AnyObject
+  z = a as AnyObject
+  z = b as AnyObject
+  z = c as AnyObject
+  z = d as AnyObject
+  z = e as AnyObject
+  z = f as AnyObject
+  z = g as AnyObject
+  z = h as AnyObject
+
+  z = a // expected-error{{does not conform to 'AnyObject'}}
+  z = b
+  z = c // expected-error{{does not conform to 'AnyObject'}}
+  z = d // expected-error{{does not conform to 'AnyObject'}}
+  z = e
+  z = f
+  z = g
+  z = h // todo{{does not conform to 'AnyObject'}}
+
+  _ = z
+}

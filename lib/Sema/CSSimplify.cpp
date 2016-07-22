@@ -1693,6 +1693,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
 
     if (kind == TypeMatchKind::ExplicitConversion) {
+      // Anything can be explicitly converted to AnyObject using the universal
+      // bridging conversion.
+      if (auto protoType2 = type2->getAs<ProtocolType>()) {
+        if (TC.Context.LangOpts.EnableIdAsAny
+            && protoType2->getDecl()
+              == TC.Context.getProtocol(KnownProtocolKind::AnyObject)
+            && !type1->mayHaveSuperclass()
+            && !type1->isClassExistentialType())
+          conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeToObjC);
+      }
+
       // Bridging from an Objective-C class type to a value type.
       // Note that specifically require a class or class-constrained archetype
       // here, because archetypes cannot be bridged.
@@ -4035,7 +4046,15 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   // T bridges to C and C < U ===> T <c U
   case ConversionRestrictionKind::BridgeToObjC: {
     auto objcClass = TC.getBridgedToObjC(DC, type1);
-    assert(objcClass && "type is not bridged to Objective-C?");
+    // If the type doesn't bridge any other way, we can still go straight to
+    // AnyObject by universal bridging.
+    if (!objcClass) {
+      assert(TC.Context.LangOpts.EnableIdAsAny
+             && "should only happen in id-as-any mode");
+      objcClass = TC.Context.getProtocol(KnownProtocolKind::AnyObject)
+        ->getDeclaredType();
+    }
+
     addContextualScore();
     increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
     if (worseThanBestSolution()) {

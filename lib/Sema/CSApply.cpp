@@ -1424,6 +1424,10 @@ namespace {
     ///
     /// \param value The value to be bridged.
     Expr *bridgeToObjectiveC(Expr *value) {
+      // TODO: It would be nicer to represent this as a special AST node
+      // instead of inlining the bridging calls in the AST. Doing so would
+      // simplify the AST and make it easier for SILGen to peephole bridging
+      // conversions.
       auto &tc = cs.getTypeChecker();
 
       // Find the _ObjectiveCBridgeable protocol.
@@ -1433,25 +1437,45 @@ namespace {
       // Find the conformance of the value type to _ObjectiveCBridgeable.
       ProtocolConformance *conformance = nullptr;
       Type valueType = value->getType()->getRValueType();
-      bool conforms =
+      bool conformsToBridgeable =
         tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
                               (ConformanceCheckFlags::InExpression|
                                ConformanceCheckFlags::Used),
                               &conformance);
 
-      // If there is no _ObjectiveCBridgeable conformance, treat this
-      // as bridging an error.
-      if (!conforms)
+      if (conformsToBridgeable) {
+        // Form the call.
+        return tc.callWitness(value, cs.DC, bridgedProto,
+                              conformance,
+                              tc.Context.Id_bridgeToObjectiveC,
+                              { }, diag::broken_bridged_to_objc_protocol);
+      }
+      
+      // If there is an Error conformance, try bridging as an error.
+      if (tc.isConvertibleTo(valueType,
+                             tc.Context.getProtocol(KnownProtocolKind::Error)
+                               ->getDeclaredType(),
+                             cs.DC))
         return bridgeErrorToObjectiveC(value);
 
-      assert(conforms && "Should already have checked the conformance");
-      (void)conforms;
-
-      // Form the call.
-      return tc.callWitness(value, cs.DC, bridgedProto,
-                            conformance,
-                            tc.Context.Id_bridgeToObjectiveC,
-                            { }, diag::broken_bridged_to_objc_protocol);
+      // Fall back to universal bridging.
+      auto bridgeAnything = tc.Context.getBridgeAnythingToObjectiveC(&tc);
+      value = tc.coerceToRValue(value);
+      auto valueSub = Substitution(valueType, {});
+      auto bridgeAnythingRef = ConcreteDeclRef(tc.Context, bridgeAnything,
+                                               valueSub);
+      auto bridgeTy = tc.Context.getProtocol(KnownProtocolKind::AnyObject)
+        ->getDeclaredType();
+      auto bridgeFnTy = FunctionType::get(valueType, bridgeTy);
+      auto fnRef = new (tc.Context) DeclRefExpr(bridgeAnythingRef,
+                                                DeclNameLoc(),
+                                                /*implicit*/ true,
+                                                AccessSemantics::Ordinary,
+                                                bridgeFnTy);
+      Expr *call = new (tc.Context) CallExpr(fnRef, value,
+                                             /*implicit*/ true,
+                                             bridgeTy);
+      return call;
     }
 
     /// Bridge the given object from Objective-C to its value type.
