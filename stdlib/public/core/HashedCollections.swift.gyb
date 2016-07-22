@@ -2289,9 +2289,8 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
         unsafeBitCast(cocoaStorage, to: _NSDictionary.self))
     }
   }
-#else
-  return _dictionaryDownCastConditional(source)!
 #endif
+  return _dictionaryDownCastConditional(source)!
 }
 
 /// Implements a conditional downcast.
