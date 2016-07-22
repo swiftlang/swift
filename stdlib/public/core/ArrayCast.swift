@@ -16,6 +16,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_silgen_name("_swift_arrayDownCastIndirect")
+public func _arrayDownCastIndirect<SourceValue, TargetValue>(
+  _ source: UnsafePointer<Array<SourceValue>>,
+  _ target: UnsafeMutablePointer<Array<TargetValue>>) {
+  target.initialize(to: _arrayForceCast(source.pointee))
+}
+
 /// Implements `source as! [TargetElement]`.
 ///
 /// - Note: When SourceElement and TargetElement are both bridged verbatim, type
@@ -50,6 +57,18 @@ extension Optional {
     if let x = self { return x }
     throw _UnwrappingFailed()
   }
+}
+
+@_silgen_name("_swift_arrayDownCastConditionalIndirect")
+public func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
+  _ source: UnsafePointer<Array<SourceValue>>,
+  _ target: UnsafeMutablePointer<Array<TargetValue>>
+) -> Bool {
+  if let result: Array<TargetValue> = _arrayConditionalCast(source.pointee) {
+    target.initialize(to: result)
+    return true
+  }
+  return false
 }
 
 /// Implements `source as? [TargetElement]`: convert each element of

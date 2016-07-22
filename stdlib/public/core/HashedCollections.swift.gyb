@@ -15,7 +15,7 @@ import SwiftShims
 // General Mutable, Value-Type Collections
 // =================================================
 //
-// Basic copy-on-write (COW) requires a container's data to be copied
+// Basic copy-on-write (COW) requires a container'dits data to be copied
 // into new storage before it is modified, to avoid changing the data
 // of other containers that may share the data.  There is one
 // exception: when we know the container has the only reference to the
@@ -1303,6 +1303,13 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
   return result
 }
 
+@_silgen_name("_swift_setDownCastIndirect")
+public func _setDownCastIndirect<SourceValue, TargetValue>(
+  _ source: UnsafePointer<Set<SourceValue>>,
+  _ target: UnsafeMutablePointer<Set<TargetValue>>) {
+  target.initialize(to: _setDownCast(source.pointee))
+}
+
 /// Implements a forced downcast.  This operation should have O(1) complexity.
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
@@ -1327,6 +1334,18 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
     _immutableCocoaSet:
     unsafeBitCast(cocoaStorage, to: _NSSet.self))
   }
+}
+
+@_silgen_name("_swift_setDownCastConditionalIndirect")
+public func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
+  _ source: UnsafePointer<Set<SourceValue>>,
+  _ target: UnsafeMutablePointer<Set<TargetValue>>
+) -> Bool {
+  if let result: Set<TargetValue> = _setDownCastConditional(source.pointee) {
+    target.initialize(to: result)
+    return true
+  }
+  return false
 }
 
 /// Implements a conditional downcast.
@@ -2264,6 +2283,14 @@ public func _dictionaryBridgeToObjectiveC<
   return result
 }
 
+@_silgen_name("_swift_dictionaryDownCastIndirect")
+public func _dictionaryDownCastIndirect<SourceKey, SourceValue,
+                                        TargetKey, TargetValue>(
+  _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
+  _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>) {
+  target.initialize(to: _dictionaryDownCast(source.pointee))
+}
+
 /// Implements a forced downcast.  This operation should have O(1) complexity.
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
@@ -2301,6 +2328,20 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
       _immutableCocoaDictionary:
         unsafeBitCast(cocoaStorage, to: _NSDictionary.self))
   }
+}
+
+@_silgen_name("_swift_dictionaryDownCastConditionalIndirect")
+public func _dictionaryDownCastConditionalIndirect<SourceKey, SourceValue,
+                                                   TargetKey, TargetValue>(
+  _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
+  _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>
+) -> Bool {
+  if let result: Dictionary<TargetKey, TargetValue>
+       = _dictionaryDownCastConditional(source.pointee) {
+    target.initialize(to: result)
+    return true
+  }
+  return false
 }
 
 /// Implements a conditional downcast.
