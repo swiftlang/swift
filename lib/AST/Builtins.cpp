@@ -713,8 +713,7 @@ static ValueDecl *getVoidErrorOperation(ASTContext &Context, Identifier Id) {
 static ValueDecl *getUnexpectedErrorOperation(ASTContext &Context,
                                               Identifier Id) {
   return getBuiltinFunction(Id, {Context.getExceptionType()},
-                            TupleType::getEmpty(Context),
-                            AnyFunctionType::ExtInfo().withIsNoReturn());
+                            Context.getNeverType());
 }
 
 static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier Id,
@@ -974,10 +973,8 @@ static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
 
 static ValueDecl *getUnreachableOperation(ASTContext &Context,
                                           Identifier Id) {
-  // @noreturn () -> ()
-  auto VoidTy = Context.TheEmptyTupleType;
-  return getBuiltinFunction(Id, {}, VoidTy,
-                            AnyFunctionType::ExtInfo().withIsNoReturn(true));
+  // () -> Never
+  return getBuiltinFunction(Id, {}, Context.getNeverType());
 }
 
 static ValueDecl *getOnceOperation(ASTContext &Context,
@@ -1192,7 +1189,7 @@ getSwiftFunctionTypeForIntrinsic(unsigned iid, ArrayRef<Type> TypeArgs,
   Info = FunctionType::ExtInfo();
   if (attrs.hasAttribute(llvm::AttributeSet::FunctionIndex,
                          llvm::Attribute::NoReturn))
-    Info = Info.withIsNoReturn(true);
+    ResultTy = Context.getNeverType();
   
   return true;
 }

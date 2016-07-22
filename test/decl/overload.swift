@@ -220,19 +220,11 @@ func != <T>(lhs : T, rhs : NoneType) -> Bool { // expected-error{{invalid redecl
 
 // throws
 func throwsFunc(code: Int) { } // expected-note{{previously declared}}
-@noreturn func throwsFunc(code: Int) throws { } // expected-error{{invalid redeclaration of 'throwsFunc(code:)'}}
+func throwsFunc(code: Int) throws { } // expected-error{{invalid redeclaration of 'throwsFunc(code:)'}}
 
 // throws function parameter -- OK
 func throwsFuncParam(_ fn: () throws -> ()) { }
 func throwsFuncParam(_ fn: () -> ()) { }
-
-// @noreturn
-func noreturn(code: Int) { } // expected-note{{previously declared}}
-@noreturn func noreturn(code: Int) { } // expected-error{{invalid redeclaration of 'noreturn(code:)'}}
-
-// <rdar://problem/19816831>
-func noreturn_1(x: @noreturn (Int) -> Int) { } // expected-note{{previously declared}}
-func noreturn_1(x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'noreturn_1(x:)'}}
 
 // @noescape
 func noescape(x: @noescape (Int) -> Int) { } // expected-note{{previously declared}}
@@ -264,10 +256,6 @@ protocol ProtocolWithMutating {
   mutating func test2(_ a: Int?) // expected-note {{previously declared}}
   func test2(_ a: Int!) // expected-error{{invalid redeclaration of 'test2'}}
 
-  @noreturn
-  mutating func test3() // expected-note {{previously declared}}
-  func test3() // expected-error {{invalid redeclaration of 'test3()'}}
-
   mutating static func classTest1() // expected-error {{static functions may not be declared mutating}} {{3-12=}} expected-note {{previously declared}}
   static func classTest1() // expected-error{{invalid redeclaration of 'classTest1()'}}
 }
@@ -278,10 +266,6 @@ struct StructWithMutating {
 
   mutating func test2(_ a: Int?) { } // expected-note {{previously declared}}
   func test2(_ a: Int!) { } // expected-error{{invalid redeclaration of 'test2'}}
-
-  @noreturn
-  mutating func test3() { } // expected-note {{previously declared}}
-  func test3() { } // expected-error {{invalid redeclaration of 'test3()'}}
 }
 
 enum EnumWithMutating {

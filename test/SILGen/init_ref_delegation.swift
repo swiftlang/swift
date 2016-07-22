@@ -29,6 +29,9 @@ struct S {
 
 // Initializer delegation within an enum
 enum E {
+  // We don't want the enum to be uninhabited
+  case Foo
+
   // CHECK-LABEL: sil hidden @_TFO19init_ref_delegation1EC{{.*}} : $@convention(method) (@thin E.Type) -> E
   init() {
     // CHECK: bb0([[E_META:%[0-9]+]] : $@thin E.Type):

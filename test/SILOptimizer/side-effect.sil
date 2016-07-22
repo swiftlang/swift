@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -side-effects-dump -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt %s -module-name Swift -side-effects-dump -o /dev/null | FileCheck %s
 
 // REQUIRES: asserts
 
@@ -7,6 +7,8 @@ import Builtin
 //////////////////
 // Declarations //
 //////////////////
+
+enum Never {}
 
 struct Int32 {
   var _value : Builtin.Int32
@@ -31,7 +33,7 @@ class X {
   init()
 }
 
-sil [_semantics "arc.programtermination_point"] @exitfunc : $@convention(thin) @noreturn () -> ()
+sil [_semantics "arc.programtermination_point"] @exitfunc : $@convention(thin) () -> Never
 sil [readnone] @pure_func : $@convention(thin) () -> ()
 sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()
 sil [readonly] @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
@@ -425,10 +427,18 @@ bb0:
   cond_br undef, bb1, bb2
 
 bb1:
+<<<<<<< HEAD
   %t = builtin "int_trap"() : $()
   %b = builtin "conditionallyUnreachable"() : $()
   %u = function_ref @exitfunc : $@convention(thin) @noreturn () -> ()
   %a = apply %u() : $@convention(thin) @noreturn () -> ()
+||||||| parent of 393dd83... AST: Implement SE-0102, introducing new semantics for Never alongside @noreturn
+  %u = function_ref @exitfunc : $@convention(thin) @noreturn () -> ()
+  %a = apply %u() : $@convention(thin) @noreturn () -> ()
+=======
+  %u = function_ref @exitfunc : $@convention(thin) () -> Never
+  %a = apply %u() : $@convention(thin) () -> Never
+>>>>>>> 393dd83... AST: Implement SE-0102, introducing new semantics for Never alongside @noreturn
   unreachable
 
 bb2:

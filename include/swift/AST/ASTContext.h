@@ -440,11 +440,15 @@ public:
   /// Retrieve the declaration of the "pointee" property of a pointer type.
   VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
 
+  /// Retrieve the declaration of Swift.Never.
+  NominalTypeDecl *getNeverDecl() const;
+  CanType getNeverType() const;
+
   /// Retrieve the declaration of Swift.Void.
   TypeAliasDecl *getVoidDecl() const;
 
   /// Retrieve the declaration of ObjectiveC.ObjCBool.
-  StructDecl *getObjCBoolDecl();
+  StructDecl *getObjCBoolDecl() const;
 
   /// Retrieve the declaration of Foundation.NSError.
   ClassDecl *getNSErrorDecl() const;
@@ -481,7 +485,7 @@ public:
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl(LazyResolver *resolver) const;
   
-  /// Retrieve the declaration of Swift._unimplemented_initializer.
+  /// Retrieve the declaration of Swift._unimplementedInitializer.
   FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of Swift._undefined.
@@ -491,7 +495,7 @@ public:
   FuncDecl *getIsOSVersionAtLeastDecl(LazyResolver *resolver) const;
   
   /// Look for the declaration with the given name within the
-  /// swift module.
+  /// Swift module.
   void lookupInSwiftModule(StringRef name,
                            SmallVectorImpl<ValueDecl *> &results) const;
 

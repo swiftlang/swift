@@ -2,7 +2,7 @@
 
 func markUsed<T>(_ t: T) {}
 
-@noreturn func trap() {
+func trap() -> Never {
   fatalError()
 }
 

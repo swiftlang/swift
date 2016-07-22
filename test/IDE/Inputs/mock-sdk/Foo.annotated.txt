@@ -74,8 +74,8 @@ func <loc>fooFunc1(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>)</loc> -> <re
 <decl:Func>func <loc>fooFunc3(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>, <decl:Param>_ b: <ref:Struct>Float</ref></decl>, <decl:Param>_ c: <ref:Struct>Double</ref></decl>, <decl:Param>_ d: <ref:Struct>UnsafeMutablePointer</ref><<ref:Struct>Int32</ref>>!</decl>)</loc> -> <ref:Struct>Int32</ref></decl>
 <decl:Func>func <loc>fooFuncWithBlock(<decl:Param>_ blk: ((<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)!</decl>)</loc></decl>
 <decl:Func>func <loc>fooFuncWithFunctionPointer(<decl:Param>_ fptr: (@convention(c) (<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)!</decl>)</loc></decl>
-<decl:Func>@noreturn func <loc>fooFuncNoreturn1()</loc></decl>
-<decl:Func>@noreturn func <loc>fooFuncNoreturn2()</loc></decl>
+<decl:Func>func <loc>fooFuncNoreturn1()</loc> -> <ref:Enum>Never</ref></decl>
+<decl:Func>func <loc>fooFuncNoreturn2()</loc> -> <ref:Enum>Never</ref></decl>
 
 <decl:Func>/**
  * Aaa.  fooFuncWithComment1.  Bbb.

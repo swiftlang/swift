@@ -124,10 +124,9 @@ bb2:
 // Other DCE Tests taken from diagnose_unreachable.sil //
 //////////////////////////////////////////////////////////
 
-sil @exit : $@convention(thin) @noreturn () -> () {
+sil @exit : $@convention(thin) () -> Never {
 bb0:
-  %1 = tuple ()
-  return %1 : $()
+  br bb0
 }
 
 // CHECK-LABEL: sil @removeTriviallyDeadInstructions
@@ -147,8 +146,8 @@ bb0(%0 : $B):
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject
   %7 = strong_release %3 : $B
   %8 = strong_release %1 : $@box B
-  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
+  %10 = apply %9() : $@convention(thin) () -> Never
   unreachable
 }
 
@@ -164,8 +163,8 @@ bb0(%0: $B, %1: $Builtin.Int1):
 bb1:
   %22 = br bb2
 bb2:
-  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
+  %10 = apply %9() : $@convention(thin) () -> Never
   unreachable
 }
 
@@ -2740,8 +2739,8 @@ bb0(%0 : $Int, %1 : $Double):
   cond_br undef, bb1, bb2
 
 bb1:
-  %f2 = function_ref @noreturn_func : $@convention(thin) @noreturn () -> ()
-  %a2 = apply %f2() : $@convention(thin) @noreturn () -> ()
+  %f2 = function_ref @noreturn_func : $@convention(thin) () -> Never
+  %a2 = apply %f2() : $@convention(thin) () -> Never
   unreachable
 
 bb2:
@@ -2751,7 +2750,7 @@ bb2:
 }
 
 sil @callee : $@convention(thin) (Double, @in_guaranteed Int) -> ()
-sil @noreturn_func : $@convention(thin) @noreturn () -> ()
+sil @noreturn_func : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil @remove_destroy_array
 // CHECK-NOT: destroyArray

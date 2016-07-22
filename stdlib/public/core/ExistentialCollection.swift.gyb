@@ -24,8 +24,11 @@ from gyb_stdlib_support import (
 
 import SwiftShims
 
-@noreturn @inline(never)
-internal func _abstract(_ file: StaticString = #file, line: UInt = #line) {
+@inline(never)
+internal func _abstract(
+  file: StaticString = #file,
+  line: UInt = #line
+) -> Never {
   fatalError("Method must be overridden", file: file, line: line)
 }
 

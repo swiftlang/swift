@@ -6184,31 +6184,25 @@ static bool checkNominalDeclCircularity(Decl *decl, NominalDeclSet &known,
 static bool deconstructTypeForDeclCircularity(Type type,
                                               NominalDeclSet &known) {
 
-  if (auto optional = dyn_cast<OptionalType>(type.getPointer())) {
-    // unwrap optionals, check again.
-    if (deconstructTypeForDeclCircularity(optional->getBaseType(), known)) {
-      return true;
-    }
-  } else if (auto tuple = type->getAs<TupleType>()) {
+  if (auto tuple = type->getAs<TupleType>()) {
     // check each element in tuple
     for (auto Elt: tuple->getElements()) {
       if (deconstructTypeForDeclCircularity(Elt.getType(), known)) {
         return true;
       }
     }
-  } else {
-    if (auto decl = type->getAnyNominal()) {
-      // Found a circularity! Stop checking from here on out.
-      if (known.count(decl)) {
-        return true;
-      }
+  }
 
-      bool isGenericArg = type->getAs<BoundGenericType>() != nullptr;
-      if (checkNominalDeclCircularity(decl, known, type, isGenericArg)) {
-        return true;
-      }
+  if (auto decl = type->getAnyNominal()) {
+    // Found a circularity! Stop checking from here on out.
+    if (known.count(decl)) {
+      return true;
     }
 
+    bool isGenericArg = type->getAs<BoundGenericType>() != nullptr;
+    if (checkNominalDeclCircularity(decl, known, type, isGenericArg)) {
+      return true;
+    }
   }
 
   return false;
@@ -6282,20 +6276,19 @@ static bool checkEnumDeclCircularity(EnumDecl *E, NominalDeclSet &known,
 }
 
 void TypeChecker::checkDeclCircularity(NominalTypeDecl *decl) {
-  llvm::SmallPtrSet<NominalTypeDecl *, 16> knownTypes;
-  auto ty = decl->getDeclaredInterfaceType();
-  if (auto structDecl = dyn_cast<StructDecl>(decl)) {
-    if (checkStructDeclCircularity(structDecl, knownTypes, ty)) {
+  llvm::SmallPtrSet<NominalTypeDecl *, 16> known;
+  auto baseType = decl->getDeclaredInterfaceType();
+
+  if (checkNominalDeclCircularity(decl, known, baseType)) {
+    if (isa<StructDecl>(decl)) {
       diagnose(decl->getLoc(),
                diag::unsupported_recursive_type,
                decl->getDeclaredTypeInContext());
-    }
-  } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
-    if (checkEnumDeclCircularity(enumDecl, knownTypes, ty)) {
+    } else if (isa<EnumDecl>(decl)) {
       diagnose(decl->getLoc(),
                diag::recursive_enum_not_indirect,
                decl->getDeclaredTypeInContext())
-      .fixItInsert(decl->getStartLoc(), "indirect ");
+        .fixItInsert(decl->getStartLoc(), "indirect ");
     }
   }
 }

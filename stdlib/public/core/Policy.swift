@@ -13,6 +13,23 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// Standardized uninhabited type
+//===----------------------------------------------------------------------===//
+/// The return type of functions that do not return normally; a type with no
+/// values.
+///
+/// Use `Never` as the return type when declarting a closure, function, or
+/// method that unconditionally throws an error, traps, or otherwise does
+/// not terminate.
+///
+///     func crashAndBurn() -> Never {
+///         fatalError("Something very, very bad happened")
+///     }
+
+@_fixed_layout
+public enum Never {}
+
+//===----------------------------------------------------------------------===//
 // Standardized aliases
 //===----------------------------------------------------------------------===//
 /// The return type of functions that don't explicitly specify a return type;

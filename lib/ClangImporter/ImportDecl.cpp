@@ -3428,10 +3428,6 @@ namespace {
 
     void finishFuncDecl(const clang::FunctionDecl *decl,
                         AbstractFunctionDecl *result) {
-      if (decl->isNoReturn())
-        result->getAttrs().add(new (Impl.SwiftContext)
-                                   NoReturnAttr(/*IsImplicit=*/false));
-
       // Keep track of inline function bodies so that we can generate
       // IR from them using Clang's IR generator.
       if ((decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>() ||

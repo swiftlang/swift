@@ -89,6 +89,15 @@ bool TypeBase::hasReferenceSemantics() {
   return getCanonicalType().hasReferenceSemantics();
 }
 
+bool TypeBase::isNever() {
+  if (auto nominalDecl = getAnyNominal())
+    if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
+      if (enumDecl->getAllElements().empty())
+        return true;
+
+  return false;
+}
+
 bool TypeBase::isAny() {
   return isEqual(getASTContext().TheAnyType);
 }
@@ -917,27 +926,6 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
   return FunctionType::get(input,
                            fnTy->getResult(),
                            fnTy->getExtInfo());
-}
-
-Type TypeBase::getWithoutNoReturn(unsigned UncurryLevel) {
-  if (UncurryLevel == 0)
-    return this;
-
-  auto *FnType = this->castTo<AnyFunctionType>();
-  Type InputType = FnType->getInput();
-  Type ResultType = FnType->getResult()->getWithoutNoReturn(UncurryLevel - 1);
-  auto TheExtInfo = FnType->getExtInfo().withIsNoReturn(false);
-  if (auto *GFT = dyn_cast<GenericFunctionType>(FnType)) {
-    return GenericFunctionType::get(GFT->getGenericSignature(),
-                                    InputType, ResultType,
-                                    TheExtInfo);
-  }
-  if (auto *PFT = dyn_cast<PolymorphicFunctionType>(FnType)) {
-    return PolymorphicFunctionType::get(InputType, ResultType,
-                                        &PFT->getGenericParams(),
-                                        TheExtInfo);
-  }
-  return FunctionType::get(InputType, ResultType, TheExtInfo);
 }
 
 /// Retrieve the object type for a 'self' parameter, digging into one-element

@@ -797,7 +797,7 @@ public:
     // Check that if the apply is of a noreturn callee, make sure that an
     // unreachable is the next instruction.
     if (AI->getModule().getStage() == SILStage::Raw ||
-        !AI->getCallee()->getType().getAs<SILFunctionType>()->isNoReturn())
+        !AI->isCalleeNoReturn())
       return;
     require(isa<UnreachableInst>(std::next(SILBasicBlock::iterator(AI))),
             "No return apply without an unreachable as a next instruction.");

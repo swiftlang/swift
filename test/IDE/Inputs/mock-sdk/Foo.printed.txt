@@ -98,8 +98,8 @@ func fooFuncWithBlock(_ blk: ((Float) -> Int32)!)
 
 func fooFuncWithFunctionPointer(_ fptr: (@convention(c) (Float) -> Int32)!)
 
-@noreturn func fooFuncNoreturn1()
-@noreturn func fooFuncNoreturn2()
+func fooFuncNoreturn1() -> Never
+func fooFuncNoreturn2() -> Never
 
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.

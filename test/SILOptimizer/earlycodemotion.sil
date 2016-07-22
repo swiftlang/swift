@@ -2,6 +2,8 @@
 
 import Builtin
 
+enum Never {}
+
 struct Int {
   var value : Builtin.Int64
 }
@@ -1270,7 +1272,7 @@ bb0(%0 : $*Builtin.NativeObject):
   return %9999 : $()
 }
 
-sil @no_return_func : $@convention(thin) @noreturn () -> ()
+sil @no_return_func : $@convention(thin) () -> Never
 
 // Make sure that we do not move retains over noreturn functions.
 // CHECK-LABEL: sil @no_return_stops_codemotion : $@convention(thin) (Builtin.NativeObject) -> () {
@@ -1280,8 +1282,8 @@ sil @no_return_stops_codemotion : $@convention(thin) (Builtin.NativeObject) -> (
 bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_ref $C
   strong_retain %1 : $C
-  %9999 = function_ref @no_return_func : $@convention(thin) @noreturn () -> ()
-  apply %9999() : $@convention(thin) @noreturn () -> ()
+  %9999 = function_ref @no_return_func : $@convention(thin) () -> Never
+  apply %9999() : $@convention(thin) () -> Never
   unreachable
 }
 

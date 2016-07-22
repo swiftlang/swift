@@ -461,11 +461,8 @@ func autorelease(_ o: O) {
 // CHECK-LABEL: sil hidden @_TF8builtins11unreachable
 // CHECK:         builtin "unreachable"()
 // CHECK:         return
-// CANONICAL-LABEL: sil hidden @_TF8builtins11unreachableFT_T_ : $@convention(thin) @noreturn () -> () {
-// CANONICAL-NOT:     builtin "unreachable"
-// CANONICAL-NOT:     return
-// CANONICAL:         unreachable
-@noreturn func unreachable() {
+// CANONICAL-LABEL: sil hidden @_TF8builtins11unreachableFT_T_ : $@convention(thin) () -> () {
+func unreachable() {
   Builtin.unreachable()
 }
 

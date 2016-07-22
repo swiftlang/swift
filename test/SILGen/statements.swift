@@ -18,8 +18,7 @@ var global_cond: Bool = false
 func bar(_ x: Int) {}
 func foo(_ x: Int, _ y: Bool) {}
 
-@noreturn
-func abort() { abort() }
+func abort() -> Never { abort() }
 
 
 
@@ -564,9 +563,9 @@ func testRequireOptional1(_ a : Int?) -> Int {
   guard let t = a else { abort() }
 
   // CHECK:  bb2:
-  // CHECK-NEXT:    // function_ref statements.abort () -> ()
-  // CHECK-NEXT:    %6 = function_ref @_TF10statements5abortFT_T_
-  // CHECK-NEXT:    %7 = apply %6() : $@convention(thin) @noreturn () -> ()
+  // CHECK-NEXT:    // function_ref statements.abort () -> Swift.Never
+  // CHECK-NEXT:    %6 = function_ref @_TF10statements5abortFT_Os5Never
+  // CHECK-NEXT:    %7 = apply %6() : $@convention(thin) () -> Never
   // CHECK-NEXT:    unreachable
   return t
 }
@@ -585,8 +584,8 @@ func testRequireOptional2(_ a : String?) -> String {
   // CHECK-NEXT:   return %4 : $String
 
   // CHECK:        bb2:
-  // CHECK-NEXT:   // function_ref statements.abort () -> ()
-  // CHECK-NEXT:   %8 = function_ref @_TF10statements5abortFT_T_
+  // CHECK-NEXT:   // function_ref statements.abort () -> Swift.Never
+  // CHECK-NEXT:   %8 = function_ref @_TF10statements5abortFT_Os5Never
   // CHECK-NEXT:   %9 = apply %8()
   // CHECK-NEXT:   unreachable
   return t
@@ -622,9 +621,9 @@ func testAddressOnlyEnumInRequire<T>(_ a: MyOptional<T>) -> T {
   // CHECK-NEXT:     return
 
   // CHECK:    bb3:
-  // CHECK-NEXT:     // function_ref statements.abort () -> ()
-  // CHECK-NEXT:     %18 = function_ref @_TF10statements5abortFT_T_
-  // CHECK-NEXT:     %19 = apply %18() : $@convention(thin) @noreturn () -> ()
+  // CHECK-NEXT:     // function_ref statements.abort () -> Swift.Never
+  // CHECK-NEXT:     %18 = function_ref @_TF10statements5abortFT_Os5Never
+  // CHECK-NEXT:     %19 = apply %18() : $@convention(thin) () -> Never
   // CHECK-NEXT:     unreachable
 
   return t

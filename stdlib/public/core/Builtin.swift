@@ -175,8 +175,8 @@ internal func _unreachable(_ condition: Bool = true) {
 
 /// Tell the optimizer that this code is unreachable if this builtin is
 /// reachable after constant folding build configuration builtins.
-@_versioned @_transparent @noreturn internal
-func _conditionallyUnreachable() {
+@_versioned @_transparent internal
+func _conditionallyUnreachable() -> Never {
   Builtin.conditionallyUnreachable()
 }
 

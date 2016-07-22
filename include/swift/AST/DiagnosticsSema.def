@@ -1015,7 +1015,7 @@ NOTE(note_no_in_class_init_3plus,none,
      "without initial values prevent synthesized initializers",
      (Identifier, Identifier, Identifier, bool))
 ERROR(missing_unimplemented_init_runtime,none,
-      "standard library error: missing _unimplemented_initializer", ())
+      "standard library error: missing _unimplementedInitializer", ())
 ERROR(missing_undefined_runtime,none,
       "standard library error: missing _undefined", ())
 WARNING(unsupported_synthesize_init_variadic,none,

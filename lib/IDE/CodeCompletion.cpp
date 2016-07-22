@@ -4063,7 +4063,7 @@ public:
         Options.setArchetypeSelfTransform(transformType, VD->getDeclContext());
       Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
-      Options.ExclusiveAttrList.push_back(DAK_NoReturn);
+      Options.SkipAttributes = true;
       Options.PrintOverrideKeyword = false;
       Options.PrintPropertyAccessors = false;
       VD->print(Printer, Options);
@@ -4141,7 +4141,7 @@ public:
       llvm::raw_svector_ostream OS(DeclStr);
       PrintOptions Options;
       Options.PrintImplicitAttrs = false;
-      Options.ExclusiveAttrList.push_back(DAK_NoReturn);
+      Options.SkipAttributes = true;
       Options.PrintDefaultParameterPlaceholder = false;
       CD->print(OS, Options);
     }
