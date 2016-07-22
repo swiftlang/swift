@@ -150,7 +150,8 @@
                 "swift-corelibs-xctest": "swift-3.0-preview-4-branch",
                 "swift-corelibs-foundation": "swift-3.0-preview-4-branch",
                 "swift-corelibs-libdispatch": "swift-3.0-preview-4-branch",
-                "swift-integration-tests": "swift-3.0-preview-4-branch"
+                "swift-integration-tests": "swift-3.0-preview-4-branch",
+                "swift-xcode-playground-support": "swift-3.0-preview-4-branch"
             }
         }
     }
