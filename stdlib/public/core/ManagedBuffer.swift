@@ -20,15 +20,46 @@ public class NonObjectiveCBase {
   public init() {}
 }
 
-/// A base class of `ManagedBuffer<Header, Element>`, used during
+/// A class whose instances contain a property of type `Header` and raw
+/// storage for an array of `Element`, whose size is determined at
 /// instance creation.
 ///
-/// During instance creation, in particular during
-/// `ManagedBuffer.create`'s call to initialize, `ManagedBuffer`'s
-/// `header` property is as-yet uninitialized, and therefore
-/// `ManagedProtoBuffer` does not offer access to the as-yet
-/// uninitialized `header` property of `ManagedBuffer`.
-public class ManagedProtoBuffer<Header, Element> : NonObjectiveCBase {
+/// Note that the `Element` array is suitably-aligned **raw memory**.
+/// You are expected to construct and---if necessary---destroy objects
+/// there yourself, using the APIs on `UnsafeMutablePointer<Element>`.
+/// Typical usage stores a count and capacity in `Header` and destroys
+/// any live elements in the `deinit` of a subclass.
+/// - Note: Subclasses must not have any stored properties; any storage
+///   needed should be included in `Header`.
+public class ManagedBuffer<Header, Element> : NonObjectiveCBase {
+
+  /// Create a new instance of the most-derived class, calling
+  /// `factory` on the partially-constructed object to generate
+  /// an initial `Header`.
+  public final class func create(
+    minimumCapacity: Int,
+    makingHeaderWith factory: (
+      ManagedBuffer<Header, Element>) throws -> Header
+  ) rethrows -> ManagedBuffer<Header, Element> {
+
+    let p = try ManagedBufferPointer<Header, Element>(
+      bufferClass: self,
+      minimumCapacity: minimumCapacity,
+      makingHeaderWith: { buffer, _ in
+        try factory(
+          unsafeDowncast(buffer, to: ManagedBuffer<Header, Element>.self))
+      })
+
+    return unsafeDowncast(p.buffer, to: ManagedBuffer<Header, Element>.self)
+  }
+
+  /// Destroy the stored Header.
+  deinit {
+    ManagedBufferPointer(self).withUnsafeMutablePointerToHeader {
+      _ = $0.deinitialize()
+    }
+  }
+
   /// The actual number of elements that can be stored in this object.
   ///
   /// This header may be nontrivial to compute; it is usually a good
@@ -72,56 +103,12 @@ public class ManagedProtoBuffer<Header, Element> : NonObjectiveCBase {
     return try ManagedBufferPointer(self).withUnsafeMutablePointers(body)
   }
 
-  //===--- internal/private API -------------------------------------------===//
-
-  /// Make ordinary initialization unavailable
-  internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Only initialize these by calling create")
-  }
-}
-
-/// A class whose instances contain a property of type `Header` and raw
-/// storage for an array of `Element`, whose size is determined at
-/// instance creation.
-///
-/// Note that the `Element` array is suitably-aligned **raw memory**.
-/// You are expected to construct and---if necessary---destroy objects
-/// there yourself, using the APIs on `UnsafeMutablePointer<Element>`.
-/// Typical usage stores a count and capacity in `Header` and destroys
-/// any live elements in the `deinit` of a subclass.
-/// - Note: Subclasses must not have any stored properties; any storage
-///   needed should be included in `Header`.
-public class ManagedBuffer<Header, Element>
-  : ManagedProtoBuffer<Header, Element> {
-
-  /// Create a new instance of the most-derived class, calling
-  /// `factory` on the partially-constructed object to generate
-  /// an initial `Header`.
-  public final class func create(
-    minimumCapacity: Int,
-    makingHeaderWith factory: (
-      ManagedProtoBuffer<Header, Element>) throws -> Header
-  ) rethrows -> ManagedBuffer<Header, Element> {
-
-    let p = try ManagedBufferPointer<Header, Element>(
-      bufferClass: self,
-      minimumCapacity: minimumCapacity,
-      makingHeaderWith: { buffer, _ in
-        try factory(
-          unsafeDowncast(buffer, to: ManagedProtoBuffer<Header, Element>.self))
-      })
-
-    return unsafeDowncast(p.buffer, to: ManagedBuffer<Header, Element>.self)
-  }
-
-  /// Destroy the stored Header.
-  deinit {
-    ManagedBufferPointer(self).withUnsafeMutablePointerToHeader {
-      _ = $0.deinitialize()
-    }
-  }
-
   /// The stored `Header` instance.
+  ///
+  /// During instance creation, in particular during
+  /// `ManagedBuffer.create`'s call to initialize, `ManagedBuffer`'s
+  /// `header` property is as-yet uninitialized, and therefore
+  /// reading the `header` property during `ManagedBuffer.create` is undefined.
   public final var header: Header {
     addressWithNativeOwner {
       return (
@@ -135,6 +122,13 @@ public class ManagedBuffer<Header, Element>
         ManagedBufferPointer(self).withUnsafeMutablePointerToHeader { $0 },
         Builtin.castToNativeObject(self))
     }
+  }
+
+  //===--- internal/private API -------------------------------------------===//
+
+  /// Make ordinary initialization unavailable
+  internal init(_doNotCallMe: ()) {
+    _sanityCheckFailure("Only initialize these by calling create")
   }
 }
 
@@ -364,7 +358,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   ///
   /// - Note: It is an error to use the `header` property of the resulting
   ///   instance unless it has been initialized.
-  internal init(_ buffer: ManagedProtoBuffer<Header, Element>) {
+  internal init(_ buffer: ManagedBuffer<Header, Element>) {
     _nativeBuffer = Builtin.castToNativeObject(buffer)
   }
 
