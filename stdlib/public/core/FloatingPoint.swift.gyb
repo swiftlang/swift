@@ -435,7 +435,7 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   /// values of type `Self`, including non-canonical encodings, signed zeros,
   /// and NaNs.  Because it is used much less frequently than the usual
   /// comparisons, there is no operator form of this relation.
-  func isTotallyOrdered(below other: Self) -> Bool
+  func isTotallyOrdered(belowOrEqualTo other: Self) -> Bool
 
   /// True if and only if `self` is normal.
   ///
@@ -708,7 +708,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
 
   func isLessThanOrEqualTo<Other: BinaryFloatingPoint>(other: Other) -> Bool
 
-  func isTotallyOrdered<Other: BinaryFloatingPoint>(below other: Other) -> Bool
+  func isTotallyOrdered<Other: BinaryFloatingPoint>(belowOrEqualTo other: Other) -> Bool
   */
 }
 
@@ -852,7 +852,7 @@ extension BinaryFloatingPoint {
       significandBitPattern: magnitudeOf.significandBitPattern)
   }
 
-  public func isTotallyOrdered(below other: Self) -> Bool {
+  public func isTotallyOrdered(belowOrEqualTo other: Self) -> Bool {
     // Quick return when possible.
     if self < other { return true }
     if other > self { return false }
@@ -909,7 +909,7 @@ extension BinaryFloatingPoint {
     return Other(self).isLessThanOrEqualTo(other)
   }
 
-  public func isTotallyOrdered<Other: BinaryFloatingPoint>(before other: Other) -> Bool {
+  public func isTotallyOrdered<Other: BinaryFloatingPoint>(belowOrEqualTo other: Other) -> Bool {
     if Self.significandBitCount >= Other.significandBitCount {
       return self.totalOrder(with: Self(other))
     }
