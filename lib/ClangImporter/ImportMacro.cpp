@@ -346,7 +346,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       } else {
         return nullptr;
       }
-      if (!castType->getTypePtr()->isBuiltinType() && !castTypeIsId) {
+      if (!castClangType->isBuiltinType() && !castTypeIsId) {
         return nullptr;
       }
     } else {
