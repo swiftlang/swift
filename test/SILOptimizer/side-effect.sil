@@ -427,18 +427,10 @@ bb0:
   cond_br undef, bb1, bb2
 
 bb1:
-<<<<<<< HEAD
   %t = builtin "int_trap"() : $()
   %b = builtin "conditionallyUnreachable"() : $()
-  %u = function_ref @exitfunc : $@convention(thin) @noreturn () -> ()
-  %a = apply %u() : $@convention(thin) @noreturn () -> ()
-||||||| parent of 393dd83... AST: Implement SE-0102, introducing new semantics for Never alongside @noreturn
-  %u = function_ref @exitfunc : $@convention(thin) @noreturn () -> ()
-  %a = apply %u() : $@convention(thin) @noreturn () -> ()
-=======
   %u = function_ref @exitfunc : $@convention(thin) () -> Never
   %a = apply %u() : $@convention(thin) () -> Never
->>>>>>> 393dd83... AST: Implement SE-0102, introducing new semantics for Never alongside @noreturn
   unreachable
 
 bb2:
