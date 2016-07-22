@@ -22,14 +22,6 @@ import Foundation
 // Check that the generic parameters are called 'Header' and 'Element'.
 protocol TestProtocol1 {}
 
-extension ManagedProtoBuffer
-  where Header : TestProtocol1, Element : TestProtocol1 {
-
-  var _valueAndElementAreTestProtocol1: Bool {
-    fatalError("not implemented")
-  }
-}
-
 extension ManagedBuffer
   where Header : TestProtocol1, Element : TestProtocol1 {
 
