@@ -1077,9 +1077,11 @@ IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
   for (VarDecl *VD : D->getStoredProperties()) {
     auto memberTy =
         BaseTy->getTypeOfMember(IGM.getSwiftModule(), VD, nullptr);
-    DebugTypeInfo DbgTy(VD, IGM.getTypeInfoForUnlowered(
-                                IGM.getSILTypes().getAbstractionPattern(VD),
-                                memberTy));
+    DebugTypeInfo DbgTy(
+        VD->getType(),
+        IGM.getTypeInfoForUnlowered(IGM.getSILTypes().getAbstractionPattern(VD),
+                                    memberTy),
+        nullptr);
     Elements.push_back(createMemberType(DbgTy, VD->getName().str(),
                                         OffsetInBits, Scope, File, Flags));
   }
