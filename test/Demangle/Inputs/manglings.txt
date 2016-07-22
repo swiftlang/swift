@@ -16,8 +16,8 @@ _TtSi ---> Swift.Int
 _TtSq ---> Swift.Optional
 _TtSS ---> Swift.String
 _TtSu ---> Swift.UInt
-_TtGSP ---> Swift.UnsafePointer
-_TtGSp ---> Swift.UnsafeMutablePointer
+_TtGSPSi_ ---> Swift.UnsafePointer<Swift.Int>
+_TtGSpSi_ ---> Swift.UnsafeMutablePointer<Swift.Int>
 _TtSV ---> Swift.UnsafeRawPointer
 _TtSv ---> Swift.UnsafeMutableRawPointer
 _TtGSaSS_ ---> [Swift.String]
