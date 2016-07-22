@@ -4068,22 +4068,26 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       return SolutionKind::Error;
     }
 
-    // If the bridged value type is generic, the generic arguments
-    // must be bridged to Objective-C for bridging to succeed.
-    if (auto bgt1 = type1->getAs<BoundGenericType>()) {
-      unsigned argIdx = 0;
-      for (auto arg: bgt1->getGenericArgs()) {
-        addConstraint(
-          Constraint::create(*this,
-                             ConstraintKind::BridgedToObjectiveC,
-                             arg, Type(), DeclName(),
-                             getConstraintLocator(
-                               locator.withPathElement(
-                                 LocatorPathElt::getGenericArgument(
-                                   argIdx++)))));
+    // TODO: Under id-as-any, container bridging is unconstrained. This check
+    // can go away.
+    if (!TC.Context.LangOpts.EnableIdAsAny) {
+      // If the bridged value type is generic, the generic arguments
+      // must be bridged to Objective-C for bridging to succeed.
+      if (auto bgt1 = type1->getAs<BoundGenericType>()) {
+        unsigned argIdx = 0;
+        for (auto arg: bgt1->getGenericArgs()) {
+          addConstraint(
+            Constraint::create(*this,
+                               ConstraintKind::BridgedToObjectiveC,
+                               arg, Type(), DeclName(),
+                               getConstraintLocator(
+                                 locator.withPathElement(
+                                   LocatorPathElt::getGenericArgument(
+                                     argIdx++)))));
+        }
       }
     }
-
+    
     return matchTypes(objcClass, type2, TypeMatchKind::Subtype, subFlags,
                       locator);
   }

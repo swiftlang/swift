@@ -3921,15 +3921,19 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   if (auto ntd = type->getAnyNominal())
     knownBridgedToObjC = isStandardLibraryTypeBridgedInFoundation(ntd);
 
-  // If the type is generic, check whether its generic arguments are also
-  // bridged to Objective-C.
-  if (auto bgt = type->getAs<BoundGenericType>()) {
-    for (auto arg : bgt->getGenericArgs()) {
-      if (arg->hasTypeVariable())
-        continue;
+  // TODO: Under id-as-any, container bridging is unconstrained. This check can
+  // go away.
+  if (!LangOpts.EnableIdAsAny) {
+    // If the type is generic, check whether its generic arguments are also
+    // bridged to Objective-C.
+    if (auto bgt = type->getAs<BoundGenericType>()) {
+      for (auto arg : bgt->getGenericArgs()) {
+        if (arg->hasTypeVariable())
+          continue;
 
-      if (!getBridgedToObjC(dc, arg, resolver))
-        return None;
+        if (!getBridgedToObjC(dc, arg, resolver))
+          return None;
+      }
     }
   }
 
