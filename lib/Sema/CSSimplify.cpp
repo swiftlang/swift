@@ -630,48 +630,6 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   auto haveOneNonUserConversion =
           (subKind != TypeMatchKind::OperatorArgumentConversion);
   
-  auto haveNilArgument = false;
-  auto nilLiteralProto = cs.TC.getProtocol(SourceLoc(),
-                                           KnownProtocolKind::
-                                              ExpressibleByNilLiteral);
-  
-  auto isNilLiteral = [&](Type t) -> bool {
-    if (auto tyvar = t->getAs<TypeVariableType>()) {
-      return tyvar->getImpl().literalConformanceProto == nilLiteralProto;
-    }
-    return false;
-  };
-
-  // If we're applying an operator function to a nil literal operand, we
-  // disallow value-to-optional conversions from taking place so as not to
-  // select an overly permissive overload.
-  auto allowOptionalConversion = [&](Type t) -> bool {
-    
-    if (t->isLValueType())
-      t = t->getLValueOrInOutObjectType();
-    
-    if (!t->getAnyOptionalObjectType().isNull())
-      return true;
-    
-    if (isNilLiteral(t))
-      return true;
-    
-    if (auto nt = t->getNominalOrBoundGenericNominal()) {
-      return nt->getName() == cs.TC.Context.Id_OptionalNilComparisonType;
-    }
-    
-    return false;
-  };
-  
-  // Pre-scan operator arguments for nil literals.
-  if (subKind == TypeMatchKind::OperatorArgumentConversion) {
-    for (auto arg : args) {
-      if (isNilLiteral(arg.Ty)) {
-        haveNilArgument = true;
-        break;
-      }
-    }
-  }
   
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
@@ -690,10 +648,6 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
                                                                paramIdx));
       auto argTy = args[argIdx].Ty;
 
-      if (haveNilArgument && !allowOptionalConversion(argTy)) {
-        subflags |= ConstraintSystem::TMF_ApplyingOperatorWithNil;
-      }
-      
       if (!haveOneNonUserConversion) {
         subflags |= ConstraintSystem::TMF_ApplyingOperatorParameter;
       }
@@ -1949,12 +1903,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           }
         }
         
-        // Do not attempt a value-to-optional conversion when resolving the
-        // applicable overloads for an operator application with nil operands.
-        if (!(subFlags & TMF_ApplyingOperatorWithNil)) {
-          conversionsOrFixes.push_back(
-              ConversionRestrictionKind::ValueToOptional);
-        }
+        conversionsOrFixes.push_back(
+            ConversionRestrictionKind::ValueToOptional);
       }
     }
   }

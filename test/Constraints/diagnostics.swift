@@ -213,7 +213,7 @@ class r20201968C {
 
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(_ a : Int) {
-  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{type 'Int' is not optional, value can never be nil}}
+  assert(a != nil, "ASSERT COMPILATION ERROR")
 }
 
 
@@ -590,7 +590,7 @@ func r21684487() {
 func r18397777(_ d : r21447318?) {
   let c = r21447318()
 
-  if c != nil { // expected-error {{type 'r21447318' is not optional, value can never be nil}}
+  if c != nil {
   }
   
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
@@ -773,29 +773,29 @@ class SR1594 {
   func sr1594(bytes : UnsafeMutablePointer<Int>, _ i : Int?) {
     _ = (i === nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15===}}
     _ = (bytes === nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self === nil) // expected-error {{type 'SR1594' is not optional, value can never be nil}}
+    _ = (self === nil)
     _ = (i !== nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15=!=}}
     _ = (bytes !== nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self !== nil) // expected-error {{type 'SR1594' is not optional, value can never be nil}}
+    _ = (self !== nil)
   }
 }
 
 func nilComparison(i: Int, o: AnyObject) {
-  _ = i == nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil == i  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i != nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil != i  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i < nil   // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil < i   // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i <= nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil <= i  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i > nil   // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil > i   // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i >= nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil >= i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i == nil
+  _ = nil == i
+  _ = i != nil
+  _ = nil != i
+  _ = i < nil
+  _ = nil < i
+  _ = i <= nil
+  _ = nil <= i
+  _ = i > nil
+  _ = nil > i
+  _ = i >= nil
+  _ = nil >= i
 
-  _ = o === nil // expected-error {{type 'AnyObject' is not optional, value can never be nil}}
-  _ = o !== nil // expected-error {{type 'AnyObject' is not optional, value can never be nil}}
+  _ = o === nil
+  _ = o !== nil
 }
 
 // FIXME: Bad diagnostic
