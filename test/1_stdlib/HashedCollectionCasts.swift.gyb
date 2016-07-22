@@ -15,7 +15,6 @@
 // RUN: %line-directive %t/HashedCollectionCasts.swift -- %target-build-swift -Xfrontend -enable-experimental-collection-casts %t/HashedCollectionCasts.swift -o %t/a.out
 // RUN: %line-directive %t/HashedCollectionCasts.swift -- %target-run %t/a.out 2>&1
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 
 import StdlibUnittest
 
