@@ -137,6 +137,14 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
   EnumElementDecl *ImplicitlyUnwrappedOptionalNoneDecl = nullptr;
   
+  /// The declaration of Swift.UnsafeMutableRawPointer.
+  NominalTypeDecl *UnsafeMutableRawPointerDecl = nullptr;
+  VarDecl *UnsafeMutableRawPointerMemoryDecl = nullptr;
+
+  /// The declaration of Swift.UnsafeRawPointer.
+  NominalTypeDecl *UnsafeRawPointerDecl = nullptr;
+  VarDecl *UnsafeRawPointerMemoryDecl = nullptr;
+
   /// The declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *UnsafeMutablePointerDecl = nullptr;
   VarDecl *UnsafeMutablePointerMemoryDecl = nullptr;
@@ -702,11 +710,27 @@ NominalTypeDecl *ASTContext::getOptionSetDecl() const {
   return Impl.OptionSetDecl;
 }
 
+NominalTypeDecl *ASTContext::getUnsafeMutableRawPointerDecl() const {
+  if (!Impl.UnsafeMutableRawPointerDecl)
+    Impl.UnsafeMutableRawPointerDecl = findStdlibType(
+      *this, "UnsafeMutableRawPointer", 0);
+  
+  return Impl.UnsafeMutableRawPointerDecl;
+}
+
+NominalTypeDecl *ASTContext::getUnsafeRawPointerDecl() const {
+  if (!Impl.UnsafeRawPointerDecl)
+    Impl.UnsafeRawPointerDecl = findStdlibType(
+      *this, "UnsafeRawPointer", 0);
+
+  return Impl.UnsafeRawPointerDecl;
+}
+
 NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
   if (!Impl.UnsafeMutablePointerDecl)
     Impl.UnsafeMutablePointerDecl = findStdlibType(
       *this, "UnsafeMutablePointer", 1);
-  
+
   return Impl.UnsafeMutablePointerDecl;
 }
 
@@ -771,6 +795,14 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
 VarDecl *
 ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
   switch (ptrKind) {
+  case PTK_UnsafeMutableRawPointer:
+    return getPointeeProperty(Impl.UnsafeMutableRawPointerMemoryDecl,
+                             &ASTContext::getUnsafeMutableRawPointerDecl,
+                             *this);
+  case PTK_UnsafeRawPointer:
+    return getPointeeProperty(Impl.UnsafeRawPointerMemoryDecl,
+                             &ASTContext::getUnsafeRawPointerDecl,
+                             *this);
   case PTK_UnsafeMutablePointer:
     return getPointeeProperty(Impl.UnsafeMutablePointerMemoryDecl,
                              &ASTContext::getUnsafeMutablePointerDecl,
@@ -1100,7 +1132,9 @@ bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {
 }
 
 bool ASTContext::hasPointerArgumentIntrinsics(LazyResolver *resolver) const {
-  return getUnsafeMutablePointerDecl()
+  return getUnsafeMutableRawPointerDecl()
+    && getUnsafeRawPointerDecl()
+    && getUnsafeMutablePointerDecl()
     && getUnsafePointerDecl()
     && (!LangOpts.EnableObjCInterop || getAutoreleasingUnsafeMutablePointerDecl())
     && getConvertPointerToPointerArgument(resolver)

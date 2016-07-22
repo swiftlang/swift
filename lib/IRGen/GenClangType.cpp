@@ -213,6 +213,8 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
                    ctx.VoidPtrTy);
   CHECK_NAMED_TYPE("ObjCBool", ctx.ObjCBuiltinBoolTy);
   CHECK_NAMED_TYPE("Selector", getClangSelectorType(ctx));
+  CHECK_NAMED_TYPE("UnsafeRawPointer", ctx.VoidPtrTy);
+  CHECK_NAMED_TYPE("UnsafeMutableRawPointer", ctx.VoidPtrTy);
 #undef CHECK_NAMED_TYPE
 
   // Map vector types to the corresponding C vectors.

@@ -1725,6 +1725,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       if (Type pointeeTy =
               unwrappedType2->getAnyPointerElementType(pointerKind)) {
         switch (pointerKind) {
+        case PTK_UnsafeRawPointer:
+        case PTK_UnsafeMutableRawPointer:
         case PTK_UnsafePointer:
         case PTK_UnsafeMutablePointer:
           // UnsafeMutablePointer can be converted from an inout reference to a
@@ -1775,20 +1777,29 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                 unwrappedType1->getAnyPointerElementType(type1PointerKind)};
             bool optionalityMatches =
                 type1OptionalKind == OTK_None || type2OptionalKind != OTK_None;
-            if (type1IsPointer && optionalityMatches &&
-                type1PointerKind == PTK_UnsafeMutablePointer) {
-              // Favor an UnsafeMutablePointer-to-UnsafeMutablePointer
-              // conversion.
-              if (type1PointerKind != pointerKind)
-                increaseScore(ScoreKind::SK_ScalarPointerConversion);
-              conversionsOrFixes.push_back(
-                                   ConversionRestrictionKind::PointerToPointer);
+            if (type1IsPointer && optionalityMatches) {
+              if (type1PointerKind == PTK_UnsafeMutablePointer) {
+                // Favor an UnsafeMutablePointer-to-UnsafeMutablePointer
+                // conversion.
+                if (type1PointerKind != pointerKind)
+                  increaseScore(ScoreKind::SK_ScalarPointerConversion);
+                conversionsOrFixes.push_back(
+                  ConversionRestrictionKind::PointerToPointer);
+              }
+              // UnsafeMutableRawPointer -> UnsafeRawPointer
+              else if (type1PointerKind == PTK_UnsafeMutableRawPointer &&
+                       pointerKind == PTK_UnsafeRawPointer) {
+                if (type1PointerKind != pointerKind)
+                  increaseScore(ScoreKind::SK_ScalarPointerConversion);
+                conversionsOrFixes.push_back(
+                  ConversionRestrictionKind::PointerToPointer);              
+              }
             }
-
-            // UnsafePointer can also be converted from an array
-            // or string value, or a UnsafePointer or
+            // UnsafePointer and UnsafeRawPointer can also be converted from an
+            // array or string value, or a UnsafePointer or
             // AutoreleasingUnsafeMutablePointer.
-            if (pointerKind == PTK_UnsafePointer) {
+            if (pointerKind == PTK_UnsafePointer
+                || pointerKind == PTK_UnsafeRawPointer) {
               if (isArrayType(type1)) {
                 conversionsOrFixes.push_back(
                                      ConversionRestrictionKind::ArrayToPointer);

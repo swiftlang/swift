@@ -617,8 +617,18 @@ CanType CanType::getAnyOptionalObjectTypeImpl(CanType type,
 }
 
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
+  auto &C = getASTContext();
+  if (auto nominalTy = getAs<NominalType>()) {
+    if (nominalTy->getDecl() == C.getUnsafeMutableRawPointerDecl()) {
+      PTK = PTK_UnsafeMutableRawPointer;
+      return C.TheEmptyTupleType;
+    }
+    if (nominalTy->getDecl() == C.getUnsafeRawPointerDecl()) {
+      PTK = PTK_UnsafeRawPointer;
+      return C.TheEmptyTupleType;
+    }
+  }
   if (auto boundTy = getAs<BoundGenericType>()) {
-    auto &C = getASTContext();
     if (boundTy->getDecl() == C.getUnsafeMutablePointerDecl()) {
       PTK = PTK_UnsafeMutablePointer;
     } else if (boundTy->getDecl() == C.getUnsafePointerDecl()) {
@@ -2214,6 +2224,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   PointerTypeKind pointerKind;
   if (auto pointerElt = type->getAnyPointerElementType(pointerKind)) {
     switch (pointerKind) {
+    case PTK_UnsafeMutableRawPointer:
+    case PTK_UnsafeRawPointer:
     case PTK_UnsafeMutablePointer:
     case PTK_UnsafePointer:
       // An UnsafeMutablePointer<T> or UnsafePointer<T> is

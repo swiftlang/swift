@@ -3299,7 +3299,7 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   (void)elt;
 
   AccessKind accessKind =
-    (pointerKind == PTK_UnsafePointer
+    ((pointerKind == PTK_UnsafePointer || pointerKind == PTK_UnsafeRawPointer)
        ? AccessKind::Read : AccessKind::ReadWrite);
 
   // Get the original lvalue.
@@ -3327,10 +3327,11 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
         != loweredTy.getSwiftRValueType()) {
     lv.addSubstToOrigComponent(opaqueTy, loweredTy);
   }
-
   switch (pointerKind) {
   case PTK_UnsafeMutablePointer:
   case PTK_UnsafePointer:
+  case PTK_UnsafeMutableRawPointer:
+  case PTK_UnsafeRawPointer:
     // +1 is fine.
     break;
 

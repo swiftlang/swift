@@ -424,7 +424,13 @@ public:
   
   /// Retrieve the declaration of Swift.COpaquePointer.
   NominalTypeDecl *getOpaquePointerDecl() const;
-  
+
+  /// Retrieve the declaration of Swift.UnsafeMutableRawPointer.
+  NominalTypeDecl *getUnsafeMutableRawPointerDecl() const;
+
+  /// Retrieve the declaration of Swift.UnsafeRawPointer.
+  NominalTypeDecl *getUnsafeRawPointerDecl() const;
+
   /// Retrieve the declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *getUnsafeMutablePointerDecl() const;
 
