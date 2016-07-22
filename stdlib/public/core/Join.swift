@@ -160,7 +160,7 @@ extension Sequence where Iterator.Element : Sequence {
   /// another `[Int]` instance as the separator:
   ///
   ///     let nestedNumbers = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-  ///     let joined = nestedNumbers.join(separator: [-1, -2])
+  ///     let joined = nestedNumbers.joined(separator: [-1, -2])
   ///     print(Array(joined))
   ///     // Prints "[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]"
   ///
