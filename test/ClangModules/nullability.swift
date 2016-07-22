@@ -5,16 +5,21 @@
 import CoreCooling
 
 func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
-  var ao1: AnyObject = sc.methodA(osc)
+  let ao1: AnyObject = sc.methodA(osc)
+  _ = ao1
   if sc.methodA(osc) == nil { } // expected-error{{type 'AnyObject' is not optional, value can never be nil}}
 
-  var ao2: AnyObject = sc.methodB(nil)
+  let ao2: AnyObject = sc.methodB(nil)
+  _ = ao2
   if sc.methodA(osc) == nil { } // expected-error{{type 'AnyObject' is not optional, value can never be nil}}
 
-  var ao3: AnyObject = sc.property // expected-error{{value of optional type 'AnyObject?' not unwrapped; did you mean to use '!' or '?'?}} {{35-35=!}}
-  var ao3_ok: AnyObject? = sc.property // okay
+  let ao3: AnyObject = sc.property // expected-error{{value of optional type 'AnyObject?' not unwrapped; did you mean to use '!' or '?'?}} {{35-35=!}}
+  _ = ao3
+  let ao3_ok: AnyObject? = sc.property // okay
+  _ = ao3_ok
 
-  var ao4: AnyObject = sc.methodD()
+  let ao4: AnyObject = sc.methodD()
+  _ = ao4
   if sc.methodD() == nil { } // expected-error{{type 'AnyObject' is not optional, value can never be nil}}
 
   sc.methodE(sc)
@@ -29,16 +34,19 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   sc.methodG(sc, second: osc) 
 
   let ci: CInt = 1
-  var sc2 = SomeClass(int: ci)
-  var sc2a: SomeClass = sc2
+  let sc2 = SomeClass(int: ci)
+  let sc2a: SomeClass = sc2
+  _ = sc2a
   if sc2 == nil { } // expected-error{{type 'SomeClass' is not optional, value can never be nil}}
 
-  var sc3 = SomeClass(double: 1.5)
+  let sc3 = SomeClass(double: 1.5)
   if sc3 == nil { } // okay
-  var sc3a: SomeClass = sc3 // expected-error{{value of optional type 'SomeClass?' not unwrapped}} {{28-28=!}}
+  let sc3a: SomeClass = sc3 // expected-error{{value of optional type 'SomeClass?' not unwrapped}} {{28-28=!}}
+  _ = sc3a
 
-  var sc4 = sc.returnMe()
-  var sc4a: SomeClass = sc4
+  let sc4 = sc.returnMe()
+  let sc4a: SomeClass = sc4
+  _ = sc4a
   if sc4 == nil { } // expected-error{{type 'SomeClass' is not optional, value can never be nil}}
 }
 
