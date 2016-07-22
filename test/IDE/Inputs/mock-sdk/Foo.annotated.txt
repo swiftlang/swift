@@ -48,6 +48,7 @@ struct <loc>FooRuncingOptions</loc> : <ref:Protocol>OptionSet</ref> {
   <decl:Constructor><loc>init()</loc></decl>
   <decl:Constructor><loc>init(<decl:Param>x: <ref:Struct>Int32</ref></decl>, <decl:Param>y: <ref:Struct>Double</ref></decl>)</loc></decl>
 }</decl>
+<decl:TypeAlias>typealias <loc>FooStruct1Pointer</loc> = <ref:Struct>UnsafeMutablePointer</ref><<ref:Struct>FooStruct1</ref>></decl>
 <decl:Struct>struct <loc>FooStruct2</loc> {
   <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Var>var <loc>y</loc>: <ref:Struct>Double</ref></decl>

@@ -44,6 +44,7 @@ struct FooStruct1 {
   int x;
   double y;
 };
+typedef struct FooStruct1 *FooStruct1Pointer;
 
 typedef struct FooStruct2 {
   int x;
@@ -198,6 +199,7 @@ typedef int typedef_int_t;
 #define FOO_MACRO_AND (FOO_MACRO_2 & FOO_MACRO_6)
 #define FOO_MACRO_BITWIDTH (FOO_MACRO_4 & FOO_MACRO_5)
 #define FOO_MACRO_SIGNED (FOO_MACRO_2 & FOO_MACRO_4)
+#define FOO_MACRO_TYPEDEF ((FooStruct1Pointer) 1)
 
 #define FOO_MACRO_UNDEF_1 0
 #undef FOO_MACRO_UNDEF_1

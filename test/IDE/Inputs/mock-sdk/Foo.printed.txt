@@ -62,6 +62,7 @@ struct FooStruct1 {
   init()
   init(x: Int32, y: Double)
 }
+typealias FooStruct1Pointer = UnsafeMutablePointer<FooStruct1>
 
 struct FooStruct2 {
   var x: Int32
