@@ -1655,6 +1655,7 @@ getActualAccessibility(uint8_t raw) {
   case serialization::AccessibilityKind::NAME: \
     return Accessibility::NAME;
   CASE(Private)
+  CASE(FilePrivate)
   CASE(Internal)
   CASE(Public)
 #undef CASE

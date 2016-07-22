@@ -9,10 +9,10 @@
 // CHECK-LABEL: internal var AA_defaultGlobal
 var AA_defaultGlobal = 0
 
-// CHECK: private{{(\*/)?}} var AB_privateGlobal
-// CHECK: internal{{(\*/)?}} var AC_internalGlobal
-// CHECK: public{{(\*/)?}} var AD_publicGlobal
-// CHECK: {{^}}private{{(\*/)?}} var AE_fileprivateGlobal
+// CHECK: {{^}}private{{(\*/)?}} var AB_privateGlobal
+// CHECK: {{^}}internal{{(\*/)?}} var AC_internalGlobal
+// CHECK: {{^}}public{{(\*/)?}} var AD_publicGlobal
+// CHECK: {{^}}fileprivate{{(\*/)?}} var AE_fileprivateGlobal
 private var AB_privateGlobal = 0
 internal var AC_internalGlobal = 0
 public var AD_publicGlobal = 0
@@ -56,12 +56,12 @@ public struct BE_PublicStructPrivateMembers {
   // CHECK: internal init()
 } // CHECK: {{^[}]}}
 
-// CHECK-LABEL: {{^}}private{{(\*/)?}} struct BF_FilePrivateStruct {
+// CHECK-LABEL: {{^}}fileprivate{{(\*/)?}} struct BF_FilePrivateStruct {
 fileprivate struct BF_FilePrivateStruct {
   // CHECK: {{^}} internal var x
   var x = 0
-  // CHECK: {{^}} private init(x: Int)
-  // CHECK: {{^}} private init()
+  // CHECK: {{^}} fileprivate init(x: Int)
+  // CHECK: {{^}} fileprivate init()
 } // CHECK: {{^[}]}}
 
 

@@ -502,7 +502,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     auto access = llvm::StringSwitch<Accessibility>(AttrName)
       .Case("private", Accessibility::Private)
-      .Case("fileprivate", Accessibility::Private) // FIXME: For migration purposes.
+      .Case("fileprivate", Accessibility::FilePrivate)
       .Case("internal", Accessibility::Internal)
       .Case("public", Accessibility::Public);
 

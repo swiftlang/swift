@@ -251,6 +251,7 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
     if (!AI.getModule().isWholeModule())
       return false;
     break;
+  case Accessibility::FilePrivate:
   case Accessibility::Private:
     break;
   }

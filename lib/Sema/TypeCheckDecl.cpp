@@ -871,7 +871,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
   bool isCascading = true;
   if (current->hasAccessibility())
-    isCascading = (current->getFormalAccess() > Accessibility::Private);
+    isCascading = (current->getFormalAccess() > Accessibility::FilePrivate);
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitionsVec;
@@ -1264,7 +1264,8 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
       !ED->getExtendedType()->is<ErrorType>()) {
     if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
       validateDecl(nominal);
-      maxAccess = nominal->getFormalAccess();
+      maxAccess = std::max(nominal->getFormalAccess(),
+                           Accessibility::FilePrivate);
     }
   }
 
@@ -1288,7 +1289,7 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
       // reference declarations not at the top level. (And any such references
       // should be diagnosed elsewhere.) This code should not crash if that
       // occurs, though.
-      return Accessibility::Private;
+      return Accessibility::FilePrivate;
     };
 
     // Only check the trailing 'where' requirements. Other requirements come
@@ -1309,7 +1310,7 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
 
   Accessibility defaultAccess;
   if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
-    defaultAccess = AA->getAccess();
+    defaultAccess = std::max(AA->getAccess(), Accessibility::FilePrivate);
   else
     defaultAccess = Accessibility::Internal;
 
@@ -1515,6 +1516,21 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
   }
 }
 
+/// Returns the access level associated with \p accessScope, for diagnostic
+/// purposes.
+///
+/// \sa ValueDecl::getFormalAccessScope
+static Accessibility
+accessibilityFromScopeForDiagnostics(const DeclContext *accessScope) {
+  if (!accessScope)
+    return Accessibility::Public;
+  if (isa<ModuleDecl>(accessScope))
+    return Accessibility::Internal;
+  if (accessScope->isModuleScopeContext())
+    return Accessibility::FilePrivate;
+  return Accessibility::Private;
+}
+
 static void checkGenericParamAccessibility(TypeChecker &TC,
                                            const GenericParamList *params,
                                            const Decl *owner,
@@ -1581,9 +1597,7 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
   }
 
   if (minAccessScope) {
-    auto minAccess = Accessibility::Private;
-    if (isa<Module>(minAccessScope))
-      minAccess = Accessibility::Internal;
+    auto minAccess = accessibilityFromScopeForDiagnostics(minAccessScope);
 
     bool isExplicit =
       owner->getAttrs().hasAttribute<AccessibilityAttr>() ||
@@ -1602,19 +1616,6 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
   checkGenericParamAccessibility(TC, params, owner,
                                  owner->getFormalAccessScope(),
                                  owner->getFormalAccess());
-}
-
-/// Returns the access level associated with \p accessScope, for diagnostic
-/// purposes.
-///
-/// \sa ValueDecl::getFormalAccessScope
-static Accessibility
-accessibilityFromScopeForDiagnostics(const DeclContext *accessScope) {
-  if (!accessScope)
-    return Accessibility::Public;
-  if (isa<ModuleDecl>(accessScope))
-    return Accessibility::Internal;
-  return Accessibility::Private;
 }
 
 /// Checks the given declaration's accessibility to make sure it is valid given
@@ -2055,7 +2056,7 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // Implicitly generated declarations are not @objc, except for constructors.
   else if (!allowImplicit && VD->isImplicit())
     return None;
-  else if (VD->getFormalAccess() == Accessibility::Private)
+  else if (VD->getFormalAccess() <= Accessibility::FilePrivate)
     return None;
 
   // If this declaration is part of a class with implicitly @objc members,
@@ -3472,7 +3473,7 @@ public:
       TypeResolutionOptions options;
       if (!TAD->getDeclContext()->isTypeContext())
         options |= TR_GlobalTypeAlias;
-      if (TAD->getFormalAccess() == Accessibility::Private)
+      if (TAD->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
       
       if (TAD->getDeclContext()->isModuleScopeContext()) {
@@ -3829,7 +3830,8 @@ public:
 
         if (auto *SF = CD->getParentSourceFile()) {
           if (auto *tracker = SF->getReferencedNameTracker()) {
-            bool isPrivate = CD->getFormalAccess() == Accessibility::Private;
+            bool isPrivate =
+                CD->getFormalAccess() <= Accessibility::FilePrivate;
             tracker->addUsedMember({Super, Identifier()}, !isPrivate);
           }
         }
@@ -3903,7 +3905,8 @@ public:
 
       if (auto *SF = PD->getParentSourceFile()) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
-          bool isNonPrivate = (PD->getFormalAccess() != Accessibility::Private);
+          bool isNonPrivate =
+              (PD->getFormalAccess() > Accessibility::FilePrivate);
           for (auto *parentProto : PD->getInheritedProtocols(nullptr))
             tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
         }
@@ -5888,6 +5891,8 @@ public:
         const DeclContext *desiredAccessScope;
         switch (AA->getAccess()) {
         case Accessibility::Private:
+          // TODO: Implement 'private'.
+        case Accessibility::FilePrivate:
           desiredAccessScope = ED->getModuleScopeContext();
           break;
         case Accessibility::Internal:

@@ -269,6 +269,7 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
 
   switch (classType->getEffectiveAccess()) {
     case Accessibility::Private:
+    case Accessibility::FilePrivate:
       return SILFunction::NotRelevant;
     case Accessibility::Internal:
       return SILFunction::InternalClass;

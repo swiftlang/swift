@@ -541,16 +541,16 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// An encoding of the default and maximum access level for this extension.
     ///
-    /// This is encoded as (1 << maxAccess) | (1 << defaultAccess), which
-    /// works because the maximum is always greater than or equal to the
-    /// default. 0 represents an uncomputed value.
+    /// This is encoded as (1 << (maxAccess-1)) | (1 << (defaultAccess-1)),
+    /// which works because the maximum is always greater than or equal to the
+    /// default, and 'private' is never used. 0 represents an uncomputed value.
     unsigned DefaultAndMaxAccessLevel : 3;
 
     /// Whether there is an active conformance loader for this
     /// extension.
     unsigned HaveConformanceLoader : 1;
   };
-  enum { NumExtensionDeclBits = NumDeclBits + 5 };
+  enum { NumExtensionDeclBits = NumDeclBits + 6 };
   static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -1699,10 +1699,10 @@ public:
   Accessibility getDefaultAccessibility() const {
     assert(hasDefaultAccessibility() && "not computed yet");
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << static_cast<unsigned>(Accessibility::Private)))
-      return Accessibility::Private;
+        (1 << (static_cast<unsigned>(Accessibility::FilePrivate) - 1)))
+      return Accessibility::FilePrivate;
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << static_cast<unsigned>(Accessibility::Internal)))
+        (1 << (static_cast<unsigned>(Accessibility::Internal) - 1)))
       return Accessibility::Internal;
     return Accessibility::Public;
   }
@@ -1710,21 +1710,23 @@ public:
   Accessibility getMaxAccessibility() const {
     assert(hasDefaultAccessibility() && "not computed yet");
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << static_cast<unsigned>(Accessibility::Public)))
+        (1 << (static_cast<unsigned>(Accessibility::Public) - 1)))
       return Accessibility::Public;
     if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
-        (1 << static_cast<unsigned>(Accessibility::Internal)))
+        (1 << (static_cast<unsigned>(Accessibility::Internal) - 1)))
       return Accessibility::Internal;
-    return Accessibility::Private;
+    return Accessibility::FilePrivate;
   }
 
   void setDefaultAndMaxAccessibility(Accessibility defaultAccess,
                                      Accessibility maxAccess) {
     assert(!hasDefaultAccessibility() && "default accessibility already set");
     assert(maxAccess >= defaultAccess);
+    assert(maxAccess != Accessibility::Private && "private not valid");
+    assert(defaultAccess != Accessibility::Private && "private not valid");
     ExtensionDeclBits.DefaultAndMaxAccessLevel =
-        (1 << static_cast<unsigned>(defaultAccess)) |
-        (1 << static_cast<unsigned>(maxAccess));
+        (1 << (static_cast<unsigned>(defaultAccess) - 1)) |
+        (1 << (static_cast<unsigned>(maxAccess) - 1));
     assert(getDefaultAccessibility() == defaultAccess && "not enough bits");
     assert(getMaxAccessibility() == maxAccess && "not enough bits");
   }
@@ -2084,7 +2086,7 @@ public:
 class ValueDecl : public Decl {
   DeclName Name;
   SourceLoc NameLoc;
-  llvm::PointerIntPair<Type, 2, OptionalEnum<Accessibility>> TypeAndAccess;
+  llvm::PointerIntPair<Type, 3, OptionalEnum<Accessibility>> TypeAndAccess;
 
 protected:
   ValueDecl(DeclKind K,
@@ -3873,8 +3875,8 @@ private:
   void configureObservingRecord(ObservingRecord *record,
                                 FuncDecl *willSet, FuncDecl *didSet);
 
-  llvm::PointerIntPair<GetSetRecord*, 2, OptionalEnum<Accessibility>> GetSetInfo;
-  llvm::PointerIntPair<BehaviorRecord*, 2, OptionalEnum<Accessibility>>
+  llvm::PointerIntPair<GetSetRecord*, 3, OptionalEnum<Accessibility>> GetSetInfo;
+  llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<Accessibility>>
     BehaviorInfo;
 
   ObservingRecord &getDidSetInfo() const {

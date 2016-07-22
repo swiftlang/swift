@@ -329,7 +329,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
 static bool matchesDiscriminator(Identifier discriminator,
                                  const ValueDecl *value) {
-  if (value->getFormalAccess() != Accessibility::Private)
+  if (value->getFormalAccess() > Accessibility::FilePrivate)
     return false;
 
   auto containingFile =
@@ -1019,6 +1019,8 @@ static bool checkAccessibility(const DeclContext *useDC,
 
   switch (access) {
   case Accessibility::Private:
+    // TODO: Implement 'private'.
+  case Accessibility::FilePrivate:
     return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
   case Accessibility::Internal: {
     const Module *sourceModule = sourceDC->getParentModule();

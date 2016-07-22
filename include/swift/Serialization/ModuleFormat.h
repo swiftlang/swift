@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 256; // Last change: remove noreturn bit
+const uint16_t VERSION_MINOR = 257; // Last change: private/fileprivate
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -287,6 +287,7 @@ using LibraryKindField = BCFixed<1>;
 // VERSION_MAJOR.
 enum class AccessibilityKind : uint8_t {
   Private = 0,
+  FilePrivate,
   Internal,
   Public,
 };

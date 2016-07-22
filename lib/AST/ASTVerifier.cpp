@@ -689,6 +689,21 @@ struct ASTNodeBase {};
       if (D->hasType())
         verifyChecked(D->getType());
 
+      if (D->hasAccessibility()) {
+        PrettyStackTraceDecl debugStack("verifying access", D);
+        if (D->getFormalAccessScope() == nullptr &&
+            D->getFormalAccess() != Accessibility::Public) {
+          Out << "non-public decl has no formal access scope\n";
+          D->dump(Out);
+          abort();
+        }
+        if (D->getEffectiveAccess() == Accessibility::Private) {
+          Out << "effective access should use 'fileprivate' for 'private'\n";
+          D->dump(Out);
+          abort();
+        }
+      }
+
       if (auto Overridden = D->getOverriddenDecl()) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
           PrettyStackTraceDecl debugStack("verifying overridden", D);

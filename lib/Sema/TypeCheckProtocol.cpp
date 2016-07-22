@@ -4555,8 +4555,8 @@ static void diagnosePotentialWitness(TypeChecker &tc,
                 witness->getFullName(), static_cast<unsigned>(*move));
   }
 
-  // If adding 'private' or 'internal' can help, suggest that.
-  if (accessibility != Accessibility::Private &&
+  // If adding 'private', 'fileprivate', or 'internal' can help, suggest that.
+  if (accessibility > Accessibility::FilePrivate &&
       !witness->getAttrs().hasAttribute<AccessibilityAttr>()) {
     tc.diagnose(witness, diag::optional_req_near_match_accessibility,
                 witness->getFullName(),
@@ -4654,7 +4654,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     if (tracker)
       tracker->addUsedMember({conformance->getProtocol(), Identifier()},
-                             defaultAccessibility != Accessibility::Private);
+                             defaultAccessibility > Accessibility::FilePrivate);
   }
 
   // Diagnose any conflicts attributed to this declaration context.
