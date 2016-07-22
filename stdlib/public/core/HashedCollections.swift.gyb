@@ -1330,12 +1330,12 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
     case _VariantSetStorage.native(let nativeOwner):
       return Set(
         _immutableCocoaSet:
-        unsafeBitCast(nativeOwner, to: _NSSetCore.self))
+        unsafeBitCast(nativeOwner, to: _NSSet.self))
 
     case _VariantSetStorage.cocoa(let cocoaStorage):
       return Set(
         _immutableCocoaSet:
-        unsafeBitCast(cocoaStorage, to: _NSSetCore.self))
+        unsafeBitCast(cocoaStorage, to: _NSSet.self))
     }
   }
 #endif
