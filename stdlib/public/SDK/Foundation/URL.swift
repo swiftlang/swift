@@ -36,7 +36,7 @@ public struct URLThumbnailSizeKey : RawRepresentable, Hashable {
  As a convenience, volume resource values can be requested from any file system URL. The value returned will reflect the property value for the volume on which the resource is located.
 */
 public struct URLResourceValues {
-    private var _values: [URLResourceKey: AnyObject]
+    private var _values: [URLResourceKey: Any]
     private var _keys: Set<URLResourceKey>
     
     public init() {
@@ -44,7 +44,7 @@ public struct URLResourceValues {
         _keys = []
     }
     
-    private init(keys: Set<URLResourceKey>, values: [URLResourceKey: AnyObject]) {
+    private init(keys: Set<URLResourceKey>, values: [URLResourceKey: Any]) {
         _values = values
         _keys = keys
     }
@@ -63,7 +63,7 @@ public struct URLResourceValues {
         return (_values[key] as? NSNumber)?.intValue
     }
     
-    private mutating func _set(_ key : URLResourceKey, newValue : AnyObject?) {
+    private mutating func _set(_ key : URLResourceKey, newValue : Any?) {
         _keys.insert(key)
         _values[key] = newValue
     }
@@ -103,7 +103,7 @@ public struct URLResourceValues {
     /// A loosely-typed dictionary containing all keys and values.
     ///
     /// If you have set temporary keys or non-standard keys, you can find them in here.
-    public var allValues : [URLResourceKey : AnyObject] {
+    public var allValues : [URLResourceKey : Any] {
         return _values
     }
     
@@ -286,7 +286,7 @@ public struct URLResourceValues {
 #if os(OSX)
     /// The quarantine properties as defined in LSQuarantine.h. To remove quarantine information from a file, pass `nil` as the value when setting this property.
     @available(OSX 10.10, *)
-    public var quarantineProperties: [String : AnyObject]? {
+    public var quarantineProperties: [String : Any]? {
         get { return _get(.quarantinePropertiesKey) }
         set { _set(.quarantinePropertiesKey, newValue: newValue as NSObject?) }
     }
@@ -1025,7 +1025,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     /// Temporary resource values are for client use. Temporary resource values exist only in memory and are never written to the resource's backing store. Once set, a temporary resource value can be copied from the URL object with `func resourceValues(forKeys:)`. The values are stored in the loosely-typed `allValues` dictionary property.
     ///
     /// To remove a temporary resource value from the URL object, use `func removeCachedResourceValue(forKey:)`. Care should be taken to ensure the key that identifies a temporary resource value is unique and does not conflict with system defined keys (using reverse domain name notation in your temporary resource value keys is recommended). This method is currently applicable only to URLs for file system resources.
-    public mutating func setTemporaryResourceValue(_ value : AnyObject, forKey key: URLResourceKey) {
+    public mutating func setTemporaryResourceValue(_ value : Any, forKey key: URLResourceKey) {
         _url.setTemporaryResourceValue(value, forKey: key)
     }
     
@@ -1104,7 +1104,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
         // Future readers: file reference URL here is not the same as playgrounds "file reference"
         if url.isFileReferenceURL() {
             // Convert to a file path URL, or use an invalid scheme
-            return url.filePathURL ?? URL(string: "com-apple-unresolvable-file-reference-url:")!
+            return (url.filePathURL ?? URL(string: "com-apple-unresolvable-file-reference-url:")!) as NSURL
         } else {
             return url
         }

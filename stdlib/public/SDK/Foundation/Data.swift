@@ -253,7 +253,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     ///
     /// - parameter reference: The instance of `NSData` that you wish to wrap. This instance will be copied by `struct Data`.
     public init(referencing reference: NSData) {
-        _wrapped = _SwiftNSData(immutableObject: reference.copy())
+        _wrapped = _SwiftNSData(immutableObject: reference.copy() as AnyObject)
     }
     
     // -----------------------------------

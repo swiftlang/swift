@@ -107,7 +107,7 @@ public struct Calendar : CustomStringConvertible, CustomDebugStringConvertible, 
     ///
     /// - parameter identifier: The kind of calendar to use.
     public init(identifier: Identifier) {
-        let result = __NSCalendarInit(Calendar._toNSCalendarIdentifier(identifier))!
+        let result = __NSCalendarInit(Calendar._toNSCalendarIdentifier(identifier).rawValue as NSString)!
         _handle = _MutableHandle(adoptingReference: result)
         _autoupdating = false
     }

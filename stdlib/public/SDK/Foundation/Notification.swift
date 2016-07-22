@@ -31,7 +31,7 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
     /// An object that the poster wishes to send to observers.
     ///
     /// Typically this is the object that posted the notification.
-    public var object: AnyObject?
+    public var object: Any?
     
     /// Storage for values or objects related to this notification.
     public var userInfo: [String : Any]?
@@ -39,7 +39,7 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
     /// Initialize a new `Notification`.
     ///
     /// The default value for `userInfo` is nil.
-    public init(name: Name, object: AnyObject? = nil, userInfo: [String : Any]? = nil) {
+    public init(name: Name, object: Any? = nil, userInfo: [String : Any]? = nil) {
         self.name = name
         self.object = object
         self.userInfo = userInfo
@@ -69,7 +69,7 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
         }
         if let lhsObj = lhs.object {
             if let rhsObj = rhs.object {
-                if lhsObj !== rhsObj {
+                if lhsObj as AnyObject !== rhsObj as AnyObject {
                     return false
                 }
             } else {
@@ -106,7 +106,7 @@ extension Notification : _ObjectiveCBridgeable {
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSNotification {
         if let info = userInfo {
-            return __NSNotificationCreate(name.rawValue as NSString, object, _NSUserInfoDictionary.bridgeValue(from: info))
+            return __NSNotificationCreate(name.rawValue as NSString, object.map { $0 as AnyObject }, _NSUserInfoDictionary.bridgeValue(from: info))
         }
 
         return NSNotification(name: name, object: object, userInfo: nil)    

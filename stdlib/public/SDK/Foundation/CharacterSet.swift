@@ -51,12 +51,12 @@ internal final class _SwiftNSCharacterSet : _SwiftNativeNSCharacterSet, _SwiftNa
     }
 
     @objc(copyWithZone:)
-    func copy(with zone: NSZone? = nil) -> AnyObject {
+    func copy(with zone: NSZone? = nil) -> Any {
         return _mapUnmanaged { $0.copy(with: zone) }
     }
 
     @objc(mutableCopyWithZone:)
-    func mutableCopy(with zone: NSZone? = nil) -> AnyObject {
+    func mutableCopy(with zone: NSZone? = nil) -> Any {
         return _mapUnmanaged { $0.mutableCopy(with: zone) }
     }
 
@@ -84,7 +84,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     
     private init(_bridged characterSet: NSCharacterSet) {
         // We must copy the input because it might be mutable; just like storing a value type in ObjC
-        _wrapped = _SwiftNSCharacterSet(immutableObject: characterSet.copy())
+        _wrapped = _SwiftNSCharacterSet(immutableObject: characterSet.copy() as AnyObject)
     }
     
     /// Initialize an empty instance.

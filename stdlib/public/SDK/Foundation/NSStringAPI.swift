@@ -1170,7 +1170,7 @@ extension String {
   /// Parses the `String` as a text representation of a
   /// property list, returning an NSString, NSData, NSArray, or
   /// NSDictionary object, according to the topmost element.
-  public func propertyList() -> AnyObject {
+  public func propertyList() -> Any {
     return _ns.propertyList()
   }
 

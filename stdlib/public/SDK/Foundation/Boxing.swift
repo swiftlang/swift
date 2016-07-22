@@ -75,7 +75,7 @@ internal protocol _SwiftNativeFoundationType : class {
     init(unmanagedImmutableObject: Unmanaged<ImmutableType>)
     init(unmanagedMutableObject: Unmanaged<MutableType>)
     
-    func mutableCopy(with zone : NSZone) -> AnyObject
+    func mutableCopy(with zone : NSZone?) -> Any
     
     var hashValue: Int { get }
     var description: String { get }
@@ -115,7 +115,7 @@ extension _SwiftNativeFoundationType {
         }
     }
     
-    func mutableCopy(with zone : NSZone) -> AnyObject {
+    func mutableCopy(with zone : NSZone?) -> Any {
         return _mapUnmanaged { $0.mutableCopy() }
     }
     

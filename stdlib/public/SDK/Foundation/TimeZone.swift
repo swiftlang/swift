@@ -77,7 +77,7 @@ public struct TimeZone : CustomStringConvertible, CustomDebugStringConvertible, 
     /// - parameter seconds: The number of seconds from GMT.
     /// - returns: A time zone, or `nil` if a valid time zone could not be created from `seconds`.
     public init?(secondsFromGMT seconds: Int) {
-        if let r = NSTimeZone(forSecondsFromGMT: seconds) as TimeZone? {
+        if let r = NSTimeZone(forSecondsFromGMT: seconds) as NSTimeZone? {
             _wrapped = r
             _autoupdating = false
         } else {

@@ -95,7 +95,7 @@ extension String : _ObjectiveCBridgeable {
     // This method should not do anything extra except calling into the
     // implementation inside core.  (These two entry points should be
     // equivalent.)
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSString.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject, to: NSString.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -378,7 +378,7 @@ public let NSNotFound: Int = .max
 
 extension NSArray : ExpressibleByArrayLiteral {
   /// Create an instance initialized with `elements`.
-  public required convenience init(arrayLiteral elements: AnyObject...) {
+  public required convenience init(arrayLiteral elements: Any...) {
     // Let bridging take care of it.
     self.init(array: elements)
   }
@@ -405,7 +405,7 @@ extension Array : _ObjectiveCBridgeable {
     // and watchOS.
     self = Array(
       _immutableCocoaArray:
-        unsafeBitCast(_cocoaArray.copy(), to: _NSArrayCore.self))
+        unsafeBitCast(_cocoaArray.copy() as AnyObject, to: _NSArrayCore.self))
   }
 
   public static func _isBridgedToObjectiveC() -> Bool {
@@ -414,7 +414,7 @@ extension Array : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSArray {
-    return unsafeBitCast(self._buffer._asCocoaArray(), to: NSArray.self)
+    return unsafeBitCast(self._buffer._asCocoaArray() as AnyObject, to: NSArray.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -455,10 +455,6 @@ extension Array : _ObjectiveCBridgeable {
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSArray?
   ) -> Array {
-    _precondition(
-      Swift._isBridgedToObjectiveC(Element.self),
-      "array element type is not bridged to Objective-C")
-
     // `nil` has historically been used as a stand-in for an empty
     // array; map it to an empty array instead of failing.
     if _slowPath(source == nil) { return Array() }
@@ -514,7 +510,8 @@ extension Dictionary {
     // and watchOS.
     self = Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copy(with: nil), to: _NSDictionary.self))
+        unsafeBitCast(_cocoaDictionary.copy(with: nil) as AnyObject,
+                      to: _NSDictionary.self))
   }
 }
 
@@ -522,7 +519,8 @@ extension Dictionary {
 extension Dictionary : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSDictionary {
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSDictionary.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject,
+                         to: NSDictionary.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -538,7 +536,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
       result = [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d, to: _NSDictionary.self))
+        _cocoaDictionary: unsafeBitCast(d as AnyObject, to: _NSDictionary.self))
       return
     }
 
@@ -546,8 +544,10 @@ extension Dictionary : _ObjectiveCBridgeable {
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d.count)
     d.enumerateKeysAndObjects({
-      (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
+      (anyKey: Any, anyValue: Any,
        stop: UnsafeMutablePointer<ObjCBool>) in
+      let anyObjectKey = anyKey as AnyObject
+      let anyObjectValue = anyValue as AnyObject
       builder.add(
           key: Swift._forceBridgeFromObjectiveC(anyObjectKey, Key.self),
           value: Swift._forceBridgeFromObjectiveC(anyObjectValue, Value.self))
@@ -590,18 +590,18 @@ extension Dictionary : _ObjectiveCBridgeable {
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
       return [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d!, to: _NSDictionary.self))
+        _cocoaDictionary: unsafeBitCast(d! as AnyObject, to: _NSDictionary.self))
     }
 
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d!.count)
     d!.enumerateKeysAndObjects({
-      (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
+      (anyKey: Any, anyValue: Any,
        stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(
-          key: Swift._forceBridgeFromObjectiveC(anyObjectKey, Key.self),
-          value: Swift._forceBridgeFromObjectiveC(anyObjectValue, Value.self))
+          key: Swift._forceBridgeFromObjectiveC(anyKey as AnyObject, Key.self),
+          value: Swift._forceBridgeFromObjectiveC(anyValue as AnyObject, Value.self))
     })
     return builder.take()
   }
@@ -644,14 +644,14 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
 
   var objects: [Unmanaged<AnyObject>?]
 
-  public func next() -> AnyObject? {
+  public func next() -> Any? {
     if n == count {
       // FIXME: Is this check necessary before refresh()?
       if count == 0 { return nil }
       refresh()
       if count == 0 { return nil }
     }
-    let next: AnyObject = state[0].itemsPtr![n]!
+    let next: Any = state[0].itemsPtr![n]!
     n += 1
     return next
   }
@@ -720,7 +720,7 @@ extension Set {
     // and watchOS.
     self = Set(
       _immutableCocoaSet:
-        unsafeBitCast(_cocoaSet.copy(with: nil), to: _NSSet.self))
+        unsafeBitCast(_cocoaSet.copy(with: nil) as AnyObject, to: _NSSet.self))
   }
 }
 
@@ -784,7 +784,7 @@ extension NSIndexSet : Sequence {
 extension Set : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSSet {
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSSet.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject, to: NSSet.self)
   }
 
   public static func _forceBridgeFromObjectiveC(_ s: NSSet, result: inout Set?) {
@@ -804,9 +804,9 @@ extension Set : _ObjectiveCBridgeable {
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s.count)
     s.enumerateObjects({
-      (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
+      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
-        anyObjectMember, Element.self))
+        anyMember as AnyObject, Element.self))
     })
     result = builder.take()
   }
@@ -836,16 +836,17 @@ extension Set : _ObjectiveCBridgeable {
     }
 
     if _isBridgedVerbatimToObjectiveC(Element.self) {
-      return Set<Element>(_cocoaSet: unsafeBitCast(s!, to: _NSSet.self))
+      return Set<Element>(_cocoaSet: unsafeBitCast(s! as AnyObject,
+                                                   to: _NSSet.self))
     }
 
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s!.count)
     s!.enumerateObjects({
-      (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
+      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
-        anyObjectMember, Element.self))
+        anyMember as AnyObject, Element.self))
     })
     return builder.take()
   }
@@ -864,7 +865,7 @@ extension NSDictionary : Sequence {
       return _fastIterator.enumerable as! NSDictionary
     }
 
-    public func next() -> (key: AnyObject, value: AnyObject)? {
+    public func next() -> (key: Any, value: Any)? {
       if let key = _fastIterator.next() {
         // Deliberately avoid the subscript operator in case the dictionary
         // contains non-copyable keys. This is rare since NSMutableDictionary
@@ -1071,33 +1072,33 @@ extension NSMutableString {
 
 extension NSArray {
   // Overlay: - (instancetype)initWithObjects:(id)firstObj, ...
-  public convenience init(objects elements: AnyObject...) {
+  public convenience init(objects elements: Any...) {
     self.init(array: elements)
   }
 }
 
 extension NSOrderedSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
-  public convenience init(objects elements: AnyObject...) {
+  public convenience init(objects elements: Any...) {
     self.init(array: elements)
   }
 }
 
 extension NSSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
-  public convenience init(objects elements: AnyObject...) {
+  public convenience init(objects elements: Any...) {
     self.init(array: elements)
   }
 }
 
 extension NSSet : ExpressibleByArrayLiteral {
-  public required convenience init(arrayLiteral elements: AnyObject...) {
+  public required convenience init(arrayLiteral elements: Any...) {
     self.init(array: elements)
   }
 }
 
 extension NSOrderedSet : ExpressibleByArrayLiteral {
-  public required convenience init(arrayLiteral elements: AnyObject...) {
+  public required convenience init(arrayLiteral elements: Any...) {
     self.init(array: elements)
   }
 }
@@ -1248,20 +1249,20 @@ extension NSCoder {
   }
 
   @nonobjc
-  public func decodeObject(of classes: [AnyClass]?, forKey key: String) -> AnyObject? {
+  public func decodeObject(of classes: [AnyClass]?, forKey key: String) -> Any? {
     var classesAsNSObjects: NSSet? = nil
     if let theClasses = classes {
       classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }
-    return NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, nil)
+    return NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, nil).map { $0 as Any }
   }
 
   @available(OSX 10.11, iOS 9.0, *)
-  public func decodeTopLevelObject() throws -> AnyObject? {
+  public func decodeTopLevelObject() throws -> Any? {
     var error: NSError?
     let result = NS_Swift_NSCoder_decodeObject(self as AnyObject, &error)
     try resolveError(error)
-    return result
+    return result.map { $0 as Any }
   }
 
   @available(*, unavailable, renamed: "decodeTopLevelObject(forKey:)")
@@ -1302,7 +1303,7 @@ extension NSCoder {
   }
 
   @available(OSX 10.11, iOS 9.0, *)
-  public func decodeTopLevelObject(of classes: [AnyClass]?, forKey key: String) throws -> AnyObject? {
+  public func decodeTopLevelObject(of classes: [AnyClass]?, forKey key: String) throws -> Any? {
     var error: NSError? = nil
     var classesAsNSObjects: NSSet? = nil
     if let theClasses = classes {
@@ -1310,7 +1311,7 @@ extension NSCoder {
     }
     let result = NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, &error)
     try resolveError(error)
-    return result
+    return result.map { $0 as Any }
   }
 }
 
