@@ -796,7 +796,7 @@ SILCloner<ImplClass>::visitBindMemoryInst(BindMemoryInst *Inst) {
     getBuilder().createBindMemory(getOpLocation(Inst->getLoc()),
                                   getOpValue(Inst->getBase()),
                                   getOpValue(Inst->getIndex()),
-                                  Inst->getBoundType()));
+                                  getOpType(Inst->getBoundType())));
 }
 
 template<typename ImplClass>

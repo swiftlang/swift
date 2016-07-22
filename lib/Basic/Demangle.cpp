@@ -1037,6 +1037,10 @@ private:
       return createSwiftType(Node::Kind::Structure, "Float");
     if (Mangled.nextIf('i'))
       return createSwiftType(Node::Kind::Structure, "Int");
+    if (Mangled.nextIf('V'))
+      return createSwiftType(Node::Kind::Structure, "UnsafeRawPointer");
+    if (Mangled.nextIf('v'))
+      return createSwiftType(Node::Kind::Structure, "UnsafeMutableRawPointer");
     if (Mangled.nextIf('P'))
       return createSwiftType(Node::Kind::Structure, "UnsafePointer");
     if (Mangled.nextIf('p'))

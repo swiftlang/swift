@@ -199,6 +199,24 @@ func _memcpy(
     /*volatile:*/ false._value)
 }
 
+/// Copy `count` bytes of memory from `src` into `dest`.
+///
+/// The memory regions `source..<source + count` and
+/// `dest..<dest + count` may overlap.
+func _memmove(
+  dest destination: UnsafeMutableRawPointer,
+  src: UnsafeRawPointer,
+  size: UInt
+) {
+  let dest = destination._rawValue
+  let src = src._rawValue
+  let size = UInt64(size)._value
+  Builtin.int_memmove_RawPointer_RawPointer_Int64(
+    dest, src, size,
+    /*alignment:*/ Int32()._value,
+    /*volatile:*/ false._value)
+}
+
 @available(*, unavailable, renamed: "OpaquePointer")
 public struct COpaquePointer {}
 

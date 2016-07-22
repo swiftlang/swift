@@ -129,8 +129,10 @@ public struct ${Self}<Pointee>
   static public func allocate(capacity count: Int)
     -> UnsafeMutablePointer<Pointee> {
     let size = strideof(Pointee.self) * count
-    return UnsafeMutablePointer(
-      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self)))
+    let rawPtr =
+      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self))
+    Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
+    return UnsafeMutablePointer(rawPtr)
   }
 
   /// Deallocate uninitialized memory allocated for `count` instances
@@ -169,7 +171,8 @@ public struct ${Self}<Pointee>
   /// Initialize `self.pointee` with `count` consecutive copies of `newValue`
   ///
   /// - Precondition: The pointee is not initialized.
-  ///             `count` is non-negative.
+  ///
+  /// - Precondition: `count` is non-negative.
   ///
   /// - Postcondition: The pointee is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
@@ -262,8 +265,7 @@ public struct ${Self}<Pointee>
   }
 
   /// Initialize memory starting at `self` with `count` `Pointee`s
-  /// beginning at `source`, proceeding forward from `self` to `self +
-  /// count - 1`.
+  /// beginning at `source`.
   ///
   /// - Precondition: `count >= 0`
   ///
@@ -320,7 +322,7 @@ public struct ${Self}<Pointee>
   ///   are uninitialized.
   public func moveAssign(from source: ${Self}, count: Int) {
     _debugPrecondition(
-      count >= 0, "${Self}.moveAssignFrom with negative count")
+      count >= 0, "${Self}.moveAssign(from:) with negative count")
     _debugPrecondition(
       self + count <= source || source + count <= self,
       "moveAssign overlapping range")
@@ -336,17 +338,39 @@ public struct ${Self}<Pointee>
   /// De-initialize the `count` `Pointee`s starting at `self`, returning
   /// their memory to an uninitialized state.
   ///
+  /// Returns an UnsafeMutableRawPointer to this memory.
+  ///
   /// - Precondition: The `Pointee`s at `self..<self + count` are
   ///   initialized.
   ///
   /// - Postcondition: The memory is uninitialized.
-  public func deinitialize(count: Int = 1) {
+  @discardableResult
+  public func deinitialize(count: Int = 1) -> UnsafeMutableRawPointer {
     _debugPrecondition(count >= 0, "${Self}.deinitialize with negative count")
     // FIXME: optimization should be implemented, where if the `count` value
     // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
+    return UnsafeMutableRawPointer(self)
   }
 %  end
+
+  /// Rebind memory at `self` to type `T` with capacity to hold `count` adjacent
+  /// `T` values while executing the `body` closure. After executing the
+  /// closure, rebind memory back to `Pointee`.
+  ///
+  /// - Precondition: Type 'T' is layout compatible with type 'Pointee'.
+  ///
+  /// - Precondition: The memory `self..<self + count * strideof(T.self)`
+  ///   is bound to `Pointee`.
+  public func withMemoryRebound<T, Result>(to: T.Type, capacity count: Int,
+    _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result
+  ) rethrows -> Result {
+    Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
+    defer {
+      Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
+    }
+    return try body(UnsafeMutablePointer<T>(_rawValue))
+  }
 
   /// Access the pointee at `self + i`.
   ///
@@ -381,7 +405,7 @@ public struct ${Self}<Pointee>
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(_rawValue))
+    return Int(bitPattern: self)
   }
 
   /// Returns the next consecutive position.

@@ -1221,6 +1221,8 @@ Predefined Substitutions
   known-nominal-type ::= 'Sd'                // Swift.Float64
   known-nominal-type ::= 'Sf'                // Swift.Float32
   known-nominal-type ::= 'Si'                // Swift.Int
+  known-nominal-type ::= 'SV'                // Swift.UnsafeRawPointer
+  known-nominal-type ::= 'Sv'                // Swift.UnsafeMutableRawPointer
   known-nominal-type ::= 'SP'                // Swift.UnsafePointer
   known-nominal-type ::= 'Sp'                // Swift.UnsafeMutablePointer
   known-nominal-type ::= 'SQ'                // Swift.ImplicitlyUnwrappedOptional
