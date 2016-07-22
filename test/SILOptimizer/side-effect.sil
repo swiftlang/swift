@@ -31,7 +31,7 @@ class X {
   init()
 }
 
-sil @exitfunc : $@convention(thin) @noreturn () -> ()
+sil [_semantics "arc.programtermination_point"] @exitfunc : $@convention(thin) @noreturn () -> ()
 sil [readnone] @pure_func : $@convention(thin) () -> ()
 sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()
 sil [readonly] @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
@@ -425,6 +425,8 @@ bb0:
   cond_br undef, bb1, bb2
 
 bb1:
+  %t = builtin "int_trap"() : $()
+  %b = builtin "conditionallyUnreachable"() : $()
   %u = function_ref @exitfunc : $@convention(thin) @noreturn () -> ()
   %a = apply %u() : $@convention(thin) @noreturn () -> ()
   unreachable
