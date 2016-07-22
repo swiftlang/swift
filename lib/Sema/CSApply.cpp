@@ -3897,6 +3897,27 @@ resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
     }
   }
 
+  if (auto subscript = dyn_cast<SubscriptExpr>(anchor)) {
+    // Subscript expressions may have a declaration. If so, use it.
+    if (subscript->hasDecl())
+      return subscript->getDecl();
+
+    // Otherwise, find the resolved overload.
+    auto anchorLocator =
+      cs.getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
+    if (auto selected = findOvlChoice(anchorLocator)) {
+      if (selected->choice.isDecl())
+        return getConcreteDeclRef(selected->choice.getDecl(),
+                                  selected->openedType,
+                                  anchorLocator);
+    }
+  }
+
+  if (auto subscript = dyn_cast<DynamicSubscriptExpr>(anchor)) {
+    // Dynamic subscripts are always resolved.
+    return subscript->getMember();
+  }
+
   return ConcreteDeclRef();
 }
 
@@ -3951,11 +3972,15 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
     return nullptr;
 
   // If the locator points to a function application, find the function itself.
-  if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument) {
+  bool isSubscript =
+    locator->getPath().back().getKind() == ConstraintLocator::SubscriptIndex;
+  if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument ||
+      isSubscript) {
     assert(locator->getPath().back().getNewSummaryFlags() == 0 &&
-           "ApplyArgument adds no flags");
+           "ApplyArgument/SubscriptIndex adds no flags");
     SmallVector<LocatorPathElt, 4> newPath;
     newPath.append(locator->getPath().begin(), locator->getPath().end()-1);
+
     unsigned newFlags = locator->getSummaryFlags();
 
     // If we have an interpolation argument, dig out the constructor if we
@@ -3973,6 +3998,8 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
           return cast<AbstractFunctionDecl>(choice.getDecl());
       }
       return nullptr;
+    } else if (isSubscript) {
+      newPath.push_back(ConstraintLocator::SubscriptMember);
     } else {
       newPath.push_back(ConstraintLocator::ApplyFunction);
     }
@@ -6341,10 +6368,13 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   // synthesized type variable during diagnostic generation, we may not have
   // a valid locator.
   if (!locator)
-    return false;  
+    return false;
 
   // Resolve the locator to a specific expression.
   SourceRange range;
+  bool isSubscriptMember =
+    (!locator->getPath().empty() &&
+     locator->getPath().back().getKind() == ConstraintLocator::SubscriptMember);
   ConstraintLocator *resolved = simplifyLocator(*this, locator, range);
 
   // If we didn't manage to resolve directly to an expression, we don't
@@ -6355,6 +6385,13 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   
   Expr *affected = resolved->getAnchor();
 
+  // FIXME: Work around an odd locator representation that doesn't separate the
+  // base of a subscript member from the member access.
+  if (isSubscriptMember) {
+    if (auto subscript = dyn_cast<SubscriptExpr>(affected))
+      affected = subscript->getBase();
+  }
+    
   switch (fix.first.getKind()) {
   case FixKind::None:
     llvm_unreachable("no-fix marker should never make it into solution");

@@ -477,10 +477,11 @@ getCalleeDecl(ConstraintSystem &cs, ConstraintLocatorBuilder callLocator) {
   auto callExpr = callLocator.getLocatorParts(path);
   if (!callExpr) return { nullptr, 0 };
 
-  // Our remaining path can only be 'ApplyArgument'.
+  // Our remaining path can only be 'ApplyArgument' or 'SubscriptIndex'.
   if (!path.empty() &&
       !(path.size() == 1 &&
-        path.back().getKind() == ConstraintLocator::ApplyArgument))
+        (path.back().getKind() == ConstraintLocator::ApplyArgument ||
+         path.back().getKind() == ConstraintLocator::SubscriptIndex)))
     return { nullptr, 0 };
 
   // Dig out the callee.
@@ -488,6 +489,8 @@ getCalleeDecl(ConstraintSystem &cs, ConstraintLocatorBuilder callLocator) {
   if (auto call = dyn_cast<CallExpr>(callExpr))
     calleeExpr = call->getDirectCallee();
   else if (isa<UnresolvedMemberExpr>(callExpr))
+    calleeExpr = callExpr;
+  else if (isa<SubscriptExpr>(callExpr))
     calleeExpr = callExpr;
   else
     return { nullptr, 0 };
