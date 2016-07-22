@@ -125,14 +125,6 @@ public:
           return Action::Continue;
         }
 
-        // ObjC generic type parameters don't have a runtime representation,
-        // so they don't count as captures.
-        if (auto bgt = t->getAs<BoundGenericClassType>()) {
-          if (bgt->getDecl()->hasClangNode()) {
-            return Action::SkipChildren;
-          }
-        }
-
         return Action::Continue;
       }
     };
