@@ -63,7 +63,7 @@ public struct Bool {
   @_transparent
   public init() {
     let zero: Int8 = 0
-    self._value = Builtin.trunc_Int8_Int1(zero._value)
+    self._value = Builtin.trunc_Int8_Int1(zero._storage)
   }
 
   @_versioned

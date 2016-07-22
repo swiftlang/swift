@@ -27,7 +27,7 @@ public protocol ${Self} : ${Conformance} {
   // FIXME(ABI)(compiler limitation): We'd like to name this type "Distance"
   // but for <rdar://problem/17619038>
   /// A type that can represent the distance between two values of `Self`.
-  associatedtype Stride : SignedNumber
+  associatedtype Stride : SignedArithmetic
 
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
@@ -64,6 +64,8 @@ public func == <T : Strideable>(x: T, y: T) -> Bool {
   return x.distance(to: y) == 0
 }
 
+// FIXME(integers): uncomment the block
+#if false
 public func + <T : Strideable>(lhs: T, rhs: T.Stride) -> T {
   return lhs.advanced(by: rhs)
 }
@@ -87,6 +89,7 @@ public func += <T : Strideable>(lhs: inout T, rhs: T.Stride) {
 public func -= <T : Strideable>(lhs: inout T, rhs: T.Stride) {
   lhs = lhs.advanced(by: -rhs)
 }
+#endif
 
 //===--- Deliberately-ambiguous operators for UnsignedIntegerTypes --------===//
 // The UnsignedIntegerTypes all have a signed Stride type.  Without these     //

@@ -24,6 +24,8 @@ UIntMax = 'UInt%s' % int_max_bits
 
 //===--- Parsing helpers --------------------------------------------------===//
 
+// FIXME(integers): Needs to get rid of `IntMax`
+#if false
 /// If text is an ASCII representation in the given `radix` of a
 /// non-negative number <= `maximum`, return that number.  Otherwise,
 /// return `nil`.
@@ -105,6 +107,7 @@ internal func _parseAsciiAsIntMax(
   // Convert to signed.
   return IntMax(bitPattern: hasMinus ? 0 &- absValue : absValue)
 }
+#endif
 
 /// Strip an optional single leading ASCII plus/minus sign from `utf16`.
 private func _parseOptionalAsciiSign(
@@ -129,14 +132,16 @@ extension ${Self} {
   /// "[+-]?[0-9a-zA-Z]+", or the value it denotes in the given `radix`
   /// is not representable, the result is `nil`.
   public init?(_ text: String, radix: Int = 10) {
-    if let value = _parseAsciiAs${'' if signed else 'U'}IntMax(
-      text.utf16, radix, ${'' if signed else 'U'}IntMax(${Self}.max)) {
-      self.init(
-        ${'' if Self in (IntMax, UIntMax) else 'truncatingBitPattern:'} value)
-    }
-    else {
-      return nil
-    }
+    // FIXME(integers): implement
+    fatalError()
+    //if let value = _parseAsciiAs${'' if signed else 'U'}IntMax(
+      //text.utf16, radix, ${'' if signed else 'U'}IntMax(${Self}.max)) {
+      //self.init(
+        //${'' if Self in (IntMax, UIntMax) else 'truncatingBitPattern:'} value)
+    //}
+    //else {
+      //return nil
+    //}
   }
 }
 

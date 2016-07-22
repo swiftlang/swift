@@ -834,12 +834,16 @@ extension FloatingPoint {
   }
 %end
 
+  // FIXME(integers): maybe uncomment it back
+#if false
   @_transparent
   public func negated() -> Self {
     var rhs = self
     rhs.negate()
     return rhs
   }
+#endif
+
 }
 
 extension BinaryFloatingPoint {

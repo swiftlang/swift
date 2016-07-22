@@ -386,7 +386,6 @@ public protocol CustomLeafReflectable : CustomReflectable {}
 /// Do not declare new conformances to this protocol; they will not
 /// work as expected.
 public protocol MirrorPath {}
-extension IntMax : MirrorPath {}
 extension Int : MirrorPath {}
 extension String : MirrorPath {}
 

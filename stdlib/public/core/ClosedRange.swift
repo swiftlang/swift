@@ -17,7 +17,7 @@ internal enum _ClosedRangeIndexRepresentation<Bound>
   where
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
   Bound : _Strideable & Comparable,
-  Bound.Stride : Integer {
+  Bound.Stride : BinaryInteger {
   case pastEnd
   case inRange(Bound)
 }

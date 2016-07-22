@@ -49,7 +49,6 @@ set(SWIFTLIB_ESSENTIAL
   ErrorType.swift
   Existential.swift
   Filter.swift.gyb
-  FixedPoint.swift.gyb
   FlatMap.swift
   Flatten.swift.gyb
   FloatingPoint.swift.gyb

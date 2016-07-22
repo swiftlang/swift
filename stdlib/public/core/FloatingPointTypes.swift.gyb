@@ -67,14 +67,15 @@ def intFormatFix(bits):
     return bits
 }%
 
-//  TODO: remove once integer proposal is available ----------------------------
+// TODO: remove once integer proposal is available ----------------------------
+// FIXME(integers): ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 %for bits in [32,64]:
 extension UInt${bits} {
   var signBitIndex: Int {
-    return ${bits-1} - Int(Int${bits}(Builtin.int_ctlz_Int${bits}(self._value, false._value)))
+    return ${bits-1} - Int(Int${bits}(Builtin.int_ctlz_Int${bits}(self._storage, false._value)))
   }
   var countTrailingZeros: Int {
-    return Int(Int${bits}(Builtin.int_cttz_Int${bits}(self._value, false._value)))
+    return Int(Int${bits}(Builtin.int_cttz_Int${bits}(self._storage, false._value)))
   }
 }
 %end
@@ -114,10 +115,10 @@ public struct ${Self} {
   var _value: Builtin.FPIEEE${bits}
 
   /// Create an instance initialized to zero.
-  @_transparent public
-  init() {
+  @_transparent
+  public init() {
     let zero: Int64 = 0
-    self._value = Builtin.sitofp_Int64_FPIEEE${bits}(zero._value)
+    self._value = Builtin.sitofp_Int64_FPIEEE${bits}(zero._storage)
   }
 
   @_transparent 
@@ -190,7 +191,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   public init(bitPattern: UInt${bits}) {
-    self.init(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bitPattern._value))
+    self.init(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bitPattern._storage))
   }
 
   public var sign: FloatingPointSign {
@@ -675,7 +676,7 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
 
   /// Create an instance initialized to `value`.
   public init(integerLiteral value: Int64) {
-    self = ${Self}(_bits: Builtin.sitofp_Int64_FPIEEE${bits}(value._value))
+    self = ${Self}(_bits: Builtin.sitofp_Int64_FPIEEE${bits}(value._storage))
   }
 }
 
@@ -748,7 +749,7 @@ extension ${Self} : Hashable {
   }
 }
 
-extension ${Self} : Arithmetic {
+extension ${Self} : SignedArithmetic {
   @_transparent
   public var magnitude: ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(_value))
@@ -782,7 +783,7 @@ extension ${Self} {
 %    ThatBuiltinName = builtinIntName(srcBits)
 %    sign = 's' if srcSigned else 'u'
   public init(_ v: ${That}) {
-    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
+    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._storage)
   }
 % end
 }
@@ -986,7 +987,7 @@ extension ${Self} {
       "${That} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
     _precondition(other < ${str(upper)}.0,
       "${That} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
-    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(other._value)
+    self._storage = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(other._value)
   }
 %     if srcBits == 80:
 #endif

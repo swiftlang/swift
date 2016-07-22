@@ -14,7 +14,7 @@
 # Utility code for later in this template
 #
 
-from SwiftIntTypes import all_integer_types
+from SwiftIntTypes import all_integer_types, int_max_bits
 
 from string import maketrans, capitalize
 
@@ -57,7 +57,16 @@ maskingShifts = [
       operator='&<<', nonMaskingOperator='<<', description='left shift',
       name='maskingShiftLeft', llvmName=lambda _: 'shl'),
 ]
+
+IntMax = 'Int%s' % int_max_bits
+UIntMax = 'UInt%s' % int_max_bits
 }%
+
+// FIXME(integers): remove these two aliases
+/// The largest native signed integer type.
+public typealias IntMax = ${IntMax}
+/// The largest native unsigned integer type.
+public typealias UIntMax = ${UIntMax}
 
 infix operator &<< : BitwiseShiftPrecedence
 infix operator &<<= : AssignmentPrecedence
@@ -149,9 +158,12 @@ public protocol SignedArithmetic : Arithmetic {
 }
 
 extension SignedArithmetic {
+  @_transparent
   public func negated() -> Self {
     return Self().subtracting(self)
   }
+
+  @_transparent
   public mutating func negate() {
     self = negated()
   }
@@ -186,7 +198,7 @@ public prefix func - <T: SignedArithmetic>(x: T) -> T {
 //===----------------------------------------------------------------------===//
 
 public protocol BinaryInteger :
-  Comparable, Arithmetic, CustomStringConvertible {
+  Comparable, Hashable, Arithmetic, CustomStringConvertible, Strideable {
 
   static var isSigned: Bool { get }
 
@@ -252,6 +264,25 @@ extension BinaryInteger {
     return (self.divided(by: rhs), self.remainder(dividingBy: rhs))
   }
 }
+
+// Strideable conformance
+extension BinaryInteger {
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func distance(to other: Self) -> Int {
+    // FIXME(integers)
+    fatalError()
+  }
+
+  // FIXME(ABI): using Int as the return value is wrong.
+  @_transparent
+  public func advanced(by n: Int) -> Self {
+    // FIXME(integers)
+    fatalError()
+  }
+}
+
+
 
 //===----------------------------------------------------------------------===//
 //===--- Homogeneous comparison -------------------------------------------===//
@@ -607,7 +638,18 @@ public func &${x.operator} <T: FixedWidthInteger>(lhs: T, rhs: T) -> T {
 //===--- UnsignedInteger --------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public protocol UnsignedInteger : BinaryInteger {
+/// This protocol is an implementation detail of `UnsignedInteger`;
+/// do not use it directly.
+@_show_in_interface
+public protocol _DisallowMixedSignArithmetic : BinaryInteger {
+  // Used to create a deliberate ambiguity in cases like UInt(1) +
+  // Int(1), which would otherwise compile due to the arithmetic
+  // operators defined for Strideable types (unsigned types are
+  // Strideable).
+  associatedtype _DisallowMixedSignArithmetic : SignedInteger = Int
+}
+
+public protocol UnsignedInteger : _DisallowMixedSignArithmetic, BinaryInteger {
   associatedtype Magnitude : BinaryInteger
 }
 
@@ -738,7 +780,9 @@ extension SignedInteger where Self : FixedWidthInteger {
 % for self_type in all_integer_types(word_bits):
 %   bits = self_type.bits
 %   signed = self_type.is_signed
+%   BuiltinName = self_type.builtin_name
 %   Self = self_type.stdlib_name
+%   OtherSelf = self_type.get_opposite_signedness().stdlib_name
 %   Unsigned = 'Signed' if signed else 'Unsigned'
 %   u = 's' if signed else 'u'
 %   U = 'U' if signed else ''
@@ -756,8 +800,13 @@ public struct ${Self}
           _storage), x))
   }
 
+  /// Construct a `${Self}` having the same memory representation as
+  /// the `${OtherSelf}` `bitPattern`.  No range or overflow checking
+  /// occurs, and the resulting `${Self}` may not have the same numeric
+  /// value as `bitPattern`--it is only guaranteed to use the same
+  /// pattern of bits.
   @_transparent
-  public init(bitPattern x: ${U}Int${bits}) {
+  public init(bitPattern x: ${OtherSelf}) {
     _storage = x._storage
   }
 
@@ -889,6 +938,8 @@ public struct ${Self}
   }
 
 % if signed:
+  public typealias Magnitude = U${Self}
+
   @_transparent
   public var magnitude: U${Self} {
     let base = U${Self}(_storage)
@@ -918,6 +969,84 @@ public struct ${Self}
   }
 
   public var _storage: Builtin.Int${bits}
+
+  // Implementation details
+
+% if self_type.is_word:
+  @_transparent
+  public // @testable
+  init(_ _v: Builtin.Word) {
+% if BuiltinName == 'Int32':
+    self._storage = Builtin.truncOrBitCast_Word_Int32(_v)
+% elif BuiltinName == 'Int64':
+    self._storage = Builtin.zextOrBitCast_Word_Int64(_v)
+% end
+  }
+
+  @_transparent
+  public // @testable
+  var _builtinWordValue: Builtin.Word {
+% if BuiltinName == 'Int32':
+    return Builtin.zextOrBitCast_Int32_Word(_storage)
+% elif BuiltinName == 'Int64':
+    return Builtin.truncOrBitCast_Int64_Word(_storage)
+% end
+  }
+% end
+}
+%# end of concrete type: ${Self}
+
+extension ${Self} : Hashable {
+  /// The hash value.
+  ///
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
+  ///
+  /// - Note: The hash value is not guaranteed to be stable across
+  ///   different invocations of the same program.  Do not persist the
+  ///   hash value across program runs.
+  public var hashValue: Int {
+    @inline(__always)
+    get {
+% if bits <= word_bits and signed:
+      // Sign extend the value.
+      return Int(self)
+% elif bits <= word_bits and not signed:
+      // Sign extend the value.
+      return Int(${OtherSelf}(bitPattern: self))
+% elif bits == word_bits * 2:
+      // We have twice as many bits as we need to return.
+      return
+        Int(extendingOrTruncating: self) ^
+        Int(extendingOrTruncating: self &>> 32)
+% else:
+      _Unimplemented()
+% end
+    }
+  }
 }
 
+
+// Create an ambiguity when indexing or slicing
+// Range[OfStrideable]<${Self}> outside a generic context.  See
+// Range.swift for details.
+extension ${Self} {
+  public typealias _DisabledRangeIndex = ${Self}
+}
+
+% if signed:
+// TODO: Consider removing the underscore.
+/// Returns the argument and specifies that the value is not negative.
+/// It has only an effect if the argument is a load or call.
+@_transparent
+public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
+  _sanityCheck(x >= 0)
+  return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._storage))
+}
 % end
+
+% end
+
+// FIXME(integers): inline manually everywhere
+public func numericCast<T : BinaryInteger, U : BinaryInteger>(_ x: T) -> U {
+  return U(x)
+}

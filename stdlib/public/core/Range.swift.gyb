@@ -579,7 +579,7 @@ public func ..< <Bound>(
   where
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : _Strideable & Comparable,
-  Bound.Stride : Integer {
+  Bound.Stride : BinaryInteger {
 
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(minimum <= maximum,
