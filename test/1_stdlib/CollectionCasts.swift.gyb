@@ -1,4 +1,4 @@
-//===--- HashedCollectionCasts.swift.gyb ----------------------------------===//
+//===--- CollectionCasts.swift.gyb ----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %gyb %s -o %t/HashedCollectionCasts.swift
-// RUN: %line-directive %t/HashedCollectionCasts.swift -- %target-build-swift -Xfrontend -enable-experimental-collection-casts %t/HashedCollectionCasts.swift -o %t/a.out
-// RUN: %line-directive %t/HashedCollectionCasts.swift -- %target-run %t/a.out 2>&1
+// RUN: %gyb %s -o %t/CollectionCasts.swift
+// RUN: %line-directive %t/CollectionCasts.swift -- %target-build-swift -Xfrontend -enable-experimental-collection-casts %t/CollectionCasts.swift -o %t/a.out
+// RUN: %line-directive %t/CollectionCasts.swift -- %target-run %t/a.out 2>&1
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -39,7 +39,7 @@ protocol AnyFoo {
 }
 extension Int : AnyFoo { }
 
-var tests = TestSuite("HashedCollectionCasts")
+var tests = TestSuite("CollectionCasts")
 
 // A wrapper for an as? cast that suppresses warnings when the cast always
 // succeeds.
@@ -60,50 +60,53 @@ nonClassValues = ('Int', 'AnyFoo', 'Any')
 %   for ki0, Key0 in enumerate(keys):
 %     DynamicKey = keys[0] if Key0.startswith('Any') else Key0
 %     for Key1 in keys[ki0:]:
+%       for Collection in 'Array', 'Set':
 
-tests.test("Set/Up/${Key0}=>${Key1}") {
+tests.test("${Collection}/Up/${Key0}=>${Key1}") {
 
-  let source : Set = [
+  let source : ${Collection} = [
     ${DynamicKey}(42) as ${Key0},
     ${DynamicKey}(17) as ${Key0}]
 
-  let upcasted = source as Set<${Key1}>
-
+  let upcasted = source as ${Collection}<${Key1}>
+  
   expectEqual(source.count, upcasted.count)
   for x in source {
     expectTrue(upcasted.contains(x))
   }
 }
 
-% if Key1 != Key0:
-%   for method in 'Direct', 'Indirect':
-tests.test("Set/Down/${method}/${Key1}=>${Key0}") {
+%         if Key1 != Key0:
+%           for method in 'Direct', 'Indirect':
+tests.test("${Collection}/Down/${method}/${Key1}=>${Key0}") {
 
-  let source : Set = [
+  let source : ${Collection} = [
     ${DynamicKey}(42) as ${Key1},
     ${DynamicKey}(17) as ${Key1}]
 
-  % if method == 'Direct':
+%             if method == 'Direct':
   
-  guard let downcasted = expectNotEmpty(source as? Set<${Key0}>)
+  guard let downcasted = expectNotEmpty(source as? ${Collection}<${Key0}>)
   else { return }
   
-  % else:
+%             else:
   
   // FIXME Set<Base> => Set<Derived> fails dynamically, and never even reaches
   // one of my runtime entry points.
-  guard let downcasted = expectNotEmpty(cast(source, to: Set<${Key0}>.self))
+  guard let downcasted = expectNotEmpty(cast(source, to: ${Collection}<${Key0}>.self))
   else { return }
   
-  % end
+%             end
   
   expectEqual(source.count, downcasted.count)
   for x in downcasted {
     expectTrue(source.contains(x))
   }
 }
-%   end
-% end
+%           end
+%         end
+%       end
+
 
 %       for vi0, Value0 in enumerate(values):
 %         DynamicValue = values[0] if Value0.startswith('Any') else Value0
