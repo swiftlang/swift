@@ -3,6 +3,10 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SR-2131](https://bugs.swift.org/browse/SR-2131):
+  The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a
+  prefix and suffix of all strings.
+
 * [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md):
   The `protocol<...>` composition construct has been removed. In its
   place, an infix type operator `&` has been introduced.
