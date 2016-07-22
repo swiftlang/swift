@@ -1986,11 +1986,11 @@ static ForeignRepresentableKind
 getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   // @objc metatypes are representable when their instance type is.
   if (auto metatype = type->getAs<AnyMetatypeType>()) {
-    // If the instance type is not representable, the metatype is not
+    // If the instance type is not representable verbatim, the metatype is not
     // representable.
     auto instanceType = metatype->getInstanceType();
     if (getObjCObjectRepresentable(instanceType, dc)
-          == ForeignRepresentableKind::None)
+          != ForeignRepresentableKind::Object)
       return ForeignRepresentableKind::None;
 
     // Objective-C metatypes are trivially representable.
