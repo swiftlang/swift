@@ -49,7 +49,7 @@ public:
     }
   };
 
-  struct Value : public ThreadSafeRefCountedBase<Value> {
+  struct Value : public llvm::ThreadSafeRefCountedBase<Value> {
     llvm::sys::TimeValue ModuleModificationTime;
     CodeCompletionResultSink Sink;
   };
