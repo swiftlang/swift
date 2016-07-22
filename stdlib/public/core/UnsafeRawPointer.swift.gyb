@@ -194,7 +194,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
       "UnsafeMutableRawPointer.initializeMemory: negative count")
 
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
-    var nextPtr = self + index * strideof(T.self)
+    var nextPtr = self + index &* strideof(T.self)
     for _ in 0..<count {
       Builtin.initialize(value, nextPtr._rawValue)
       nextPtr += strideof(T.self)
@@ -430,58 +430,29 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     return Int(bitPattern: self)
   }
 
-  /// Return `end - self`.
+  /// Return `x - self`.
   public func distance(to x: ${Self}) -> Int {
-    return x - self
+    return Int(Builtin.sub_Word(Builtin.ptrtoint_Word(x._rawValue),
+        Builtin.ptrtoint_Word(_rawValue)))
   }
 
   /// Return `self + n`.
   public func advanced(by n: Int) -> ${Self} {
-    return self + n
+    return ${Self}(Builtin.gep_Word(_rawValue, n._builtinWordValue))
   }
 }
 
+/// - Note: This may be more efficient than Strideable's implementation
+///   calling ${Self}.distance().
 @_transparent
 public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
+/// - Note: This is an unsigned comparison unlike Strideable's implementation.
 @_transparent
 public func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
-}
-
-@_transparent
-public func + (lhs: ${Self}, rhs: Int) -> ${Self} {
-  return ${Self}(Builtin.gep_Word(
-      lhs._rawValue, rhs._builtinWordValue))
-}
-
-@_transparent
-public func + (lhs: Int, rhs: ${Self}) -> ${Self} {
-  return rhs + lhs
-}
-
-@_transparent
-public func - (lhs: ${Self}, rhs: Int) -> ${Self} {
-  return lhs + -rhs
-}
-
-@_transparent
-public func - (lhs: ${Self}, rhs: ${Self}) -> Int {
-  return
-    Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
-                         Builtin.ptrtoint_Word(rhs._rawValue)))
-}
-
-@_transparent
-public func += (lhs: inout ${Self}, rhs: Int) {
-  lhs = lhs + rhs
-}
-
-@_transparent
-public func -= (lhs: inout ${Self}, rhs: Int) {
-  lhs = lhs - rhs
 }
 
 extension Unsafe${Mutable}RawPointer : CustomDebugStringConvertible {

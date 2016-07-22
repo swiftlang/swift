@@ -291,7 +291,7 @@ func checkPtr(
   }
 }
 
-UnsafeMutablePointerTestSuite.test("moveAssign:from") {
+UnsafeMutablePointerTestSuite.test("moveAssign:from:") {
   let check = checkPtr(UnsafeMutablePointer.moveAssign, true)
   check(Check.Disjoint)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
@@ -301,7 +301,7 @@ UnsafeMutablePointerTestSuite.test("moveAssign:from") {
   }
 }
 
-UnsafeMutablePointerTestSuite.test("moveAssign:from.Right") {
+UnsafeMutablePointerTestSuite.test("moveAssign:from:.Right") {
   let check = checkPtr(UnsafeMutablePointer.moveAssign, true)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
@@ -310,21 +310,21 @@ UnsafeMutablePointerTestSuite.test("moveAssign:from.Right") {
   }
 }
 
-UnsafeMutablePointerTestSuite.test("assign:from") {
+UnsafeMutablePointerTestSuite.test("assign:from:") {
   let check = checkPtr(UnsafeMutablePointer.assign, true)
   check(Check.LeftOverlap)
   check(Check.Disjoint)
   check(Check.RightOverlap)
 }
 
-UnsafeMutablePointerTestSuite.test("moveInitialize:from") {
+UnsafeMutablePointerTestSuite.test("moveInitialize:from:") {
   let check = checkPtr(UnsafeMutablePointer.moveInitialize, false)
   check(Check.LeftOverlap)
   check(Check.Disjoint)
   check(Check.RightOverlap)
 }
 
-UnsafeMutablePointerTestSuite.test("initialize:from") {
+UnsafeMutablePointerTestSuite.test("initialize:from:") {
   let check = checkPtr(UnsafeMutablePointer.initialize(from:count:), false)
   check(Check.Disjoint)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
@@ -334,7 +334,7 @@ UnsafeMutablePointerTestSuite.test("initialize:from") {
   }
 }
 
-UnsafeMutablePointerTestSuite.test("initialize:from.Right") {
+UnsafeMutablePointerTestSuite.test("initialize:from:.Right") {
   let check = checkPtr(UnsafeMutablePointer.initialize(from:count:), false)
   // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
@@ -343,7 +343,7 @@ UnsafeMutablePointerTestSuite.test("initialize:from.Right") {
   }
 }
 
-UnsafeMutablePointerTestSuite.test("initialize:from/immutable") {
+UnsafeMutablePointerTestSuite.test("initialize:from:/immutable") {
   var ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 3)
   defer {
     ptr.deinitialize(count: 3)
