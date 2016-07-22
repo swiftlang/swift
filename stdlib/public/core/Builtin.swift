@@ -593,3 +593,19 @@ func _isOptional<T>(_ type: T.Type) -> Bool {
 public func unsafeUnwrap<T>(_ nonEmpty: T?) -> T {
   Builtin.unreachable()
 }
+
+/// Extract an object reference from an Any known to contain an object.
+internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
+  _sanityCheck(any.dynamicType is AnyObject.Type
+               || any.dynamicType is AnyObject.Protocol,
+               "Any expected to contain object reference")
+  // With a SIL instruction, we could more efficiently grab the object reference
+  // out of the Any's inline storage.
+
+  // On Linux, bridging isn't supported, so this is a force cast.
+#if _runtime(_ObjC)
+  return any as AnyObject
+#else
+  return any as! AnyObject
+#endif
+}

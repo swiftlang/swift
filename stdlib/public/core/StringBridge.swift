@@ -24,7 +24,7 @@ public // @testable
 func _stdlib_binary_CFStringCreateCopy(
   _ source: _CocoaString
 ) -> _CocoaString {
-  let result = _swift_stdlib_CFStringCreateCopy(nil, source)
+  let result = _swift_stdlib_CFStringCreateCopy(nil, source) as AnyObject
   Builtin.release(result)
   return result
 }
@@ -109,9 +109,9 @@ internal func _cocoaStringSlice(
     _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")
 
-  let cfResult: AnyObject = _swift_stdlib_CFStringCreateWithSubstring(
+  let cfResult = _swift_stdlib_CFStringCreateWithSubstring(
     nil, cfSelf, _swift_shims_CFRange(
-      location: bounds.lowerBound, length: bounds.count))
+      location: bounds.lowerBound, length: bounds.count)) as AnyObject
 
   return String(_cocoaString: cfResult)._core
 }
@@ -149,8 +149,8 @@ extension String {
     // "copy" it into a value to be sure nobody will modify behind
     // our backs.  In practice, when value is already immutable, this
     // just does a retain.
-    let cfImmutableValue: _swift_shims_CFStringRef
-      = _stdlib_binary_CFStringCreateCopy(_cocoaString)
+    let cfImmutableValue
+      = _stdlib_binary_CFStringCreateCopy(_cocoaString) as AnyObject
 
     let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
 
@@ -177,7 +177,7 @@ extension String {
       count: length,
       elementShift: isUTF16 ? 1 : 0,
       hasCocoaBuffer: true,
-      owner: unsafeBitCast(cfImmutableValue, to: Optional<AnyObject>.self))
+      owner: cfImmutableValue)
   }
 }
 

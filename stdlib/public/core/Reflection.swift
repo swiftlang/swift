@@ -214,10 +214,9 @@ internal func _dump_unlocked<TargetStream : TextOutputStream>(
   _dumpPrint_unlocked(value, mirror, &target)
 
   let id: ObjectIdentifier?
-  if let classInstance = value as? AnyObject,
-     value.dynamicType is AnyObject.Type {
+  if value.dynamicType is AnyObject.Type {
     // Object is a class (but not an ObjC-bridged struct)
-    id = ObjectIdentifier(classInstance)
+    id = ObjectIdentifier(_unsafeDowncastToAnyObject(fromAny: value))
   } else if let metatypeInstance = value as? Any.Type {
     // Object is a metatype
     id = ObjectIdentifier(metatypeInstance)
@@ -382,7 +381,7 @@ public struct _MagicMirrorData {
     return result
   }
 
-  public func _loadValue<T>() -> T {
+  public func _loadValue<T>(ofType _: T.Type) -> T {
     return Builtin.load(ptr) as T
   }
 }
@@ -557,7 +556,7 @@ struct _ClassMirror : _Mirror {
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? {
-    return data._loadValue() as ObjectIdentifier
+    return data._loadValue(ofType: ObjectIdentifier.self)
   }
   var count: Int {
     return _getClassCount(data)
@@ -609,7 +608,7 @@ struct _MetatypeMirror : _Mirror {
   var valueType: Any.Type { return data.valueType }
 
   var objectIdentifier: ObjectIdentifier? {
-    return data._loadValue() as ObjectIdentifier
+    return data._loadValue(ofType: ObjectIdentifier.self)
   }
 
   var count: Int {
@@ -619,7 +618,7 @@ struct _MetatypeMirror : _Mirror {
     _preconditionFailure("no children")
   }
   var summary: String {
-    return _typeName(data._loadValue() as Any.Type)
+    return _typeName(data._loadValue(ofType: Any.Type.self))
   }
   var quickLookObject: PlaygroundQuickLook? { return nil }
 
