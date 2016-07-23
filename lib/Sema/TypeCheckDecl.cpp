@@ -1378,7 +1378,12 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     case DeclContextKind::ExtensionDecl: {
       auto extension = cast<ExtensionDecl>(DC);
       computeDefaultAccessibility(extension);
-      D->setAccessibility(extension->getDefaultAccessibility());
+      auto access = extension->getDefaultAccessibility();
+      if (access == Accessibility::FilePrivate &&
+          !Context.LangOpts.EnableSwift3Private) {
+        access = Accessibility::Private;
+      }
+      D->setAccessibility(access);
     }
     }
   }
@@ -1526,8 +1531,10 @@ accessibilityFromScopeForDiagnostics(const DeclContext *accessScope) {
     return Accessibility::Public;
   if (isa<ModuleDecl>(accessScope))
     return Accessibility::Internal;
-  if (accessScope->isModuleScopeContext())
+  if (accessScope->isModuleScopeContext() &&
+      accessScope->getASTContext().LangOpts.EnableSwift3Private) {
     return Accessibility::FilePrivate;
+  }
   return Accessibility::Private;
 }
 

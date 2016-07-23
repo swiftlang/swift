@@ -500,11 +500,16 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
     }
 
-    auto access = llvm::StringSwitch<Accessibility>(AttrName)
+    Accessibility access = llvm::StringSwitch<Accessibility>(AttrName)
       .Case("private", Accessibility::Private)
       .Case("fileprivate", Accessibility::FilePrivate)
       .Case("internal", Accessibility::Internal)
       .Case("public", Accessibility::Public);
+
+    if (access == Accessibility::FilePrivate &&
+        !Context.LangOpts.EnableSwift3Private) {
+      access = Accessibility::Private;
+    }
 
     if (!consumeIf(tok::l_paren)) {
       // Normal accessibility attribute.

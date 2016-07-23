@@ -1350,7 +1350,13 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
 
   } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
     TC.computeDefaultAccessibility(extension);
-    if (attr->getAccess() > extension->getMaxAccessibility()) {
+    Accessibility maxAccess = extension->getMaxAccessibility();
+    if (attr->getAccess() > maxAccess) {
+      if (maxAccess == Accessibility::FilePrivate &&
+          !TC.Context.LangOpts.EnableSwift3Private) {
+        maxAccess = Accessibility::Private;
+      }
+
       // FIXME: It would be nice to say what part of the requirements actually
       // end up being problematic.
       auto diag =
@@ -1358,9 +1364,8 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
                       diag::access_control_ext_requirement_member_more,
                       attr->getAccess(),
                       D->getDescriptiveKind(),
-                      extension->getMaxAccessibility());
-      swift::fixItAccessibility(diag, cast<ValueDecl>(D),
-                                extension->getMaxAccessibility());
+                      maxAccess);
+      swift::fixItAccessibility(diag, cast<ValueDecl>(D), maxAccess);
       return;
     }
 

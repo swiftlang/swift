@@ -150,6 +150,10 @@ namespace swift {
     /// new enough?
     bool EnableTargetOSChecking = true;
 
+    /// Should 'private' use Swift 3's lexical scoping, or the Swift 2 behavior
+    /// of 'fileprivate'?
+    bool EnableSwift3Private = true;
+
     /// Whether to use the import as member inference system
     ///
     /// When importing a global, try to infer whether we can import it as a
