@@ -140,6 +140,7 @@ public class MutableCollectionLog : CollectionLog {
   }
   public static var subscriptIndexSet = TypeIndexed(0)
   public static var subscriptRangeSet = TypeIndexed(0)
+  public static var partitionBy = TypeIndexed(0)
   public static var _withUnsafeMutableBufferPointerIfSupported = TypeIndexed(0)
   public static var _withUnsafeMutableBufferPointerIfSupportedNonNilReturns =
     TypeIndexed(0)
@@ -440,6 +441,13 @@ public struct ${Self}<
 %     end
 
 %     if Kind == 'MutableCollection':
+  public mutating func partition(
+    by belongsInSecondPartition: @noescape (Iterator.Element) throws -> Bool
+  ) rethrows -> Index {
+    Log.partitionBy[selfType] += 1
+    return try base.partition(by: belongsInSecondPartition)
+  }
+
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
@@ -563,6 +571,95 @@ public struct ${Self}<
 %     end
 }
 %   end
+% end
+
+//===----------------------------------------------------------------------===//
+// Collections that count calls to `_withUnsafeMutableBufferPointerIfSupported`
+//===----------------------------------------------------------------------===//
+
+% for Traversal in TRAVERSALS:
+%   Self = 'BufferAccessLoggingMutable' + collectionForTraversal(Traversal)
+/// Interposes between `_withUnsafeMutableBufferPointerIfSupported` method calls
+/// to increment a counter. Calls to this method from within dispatched methods
+/// are uncounted by the standard logging collection wrapper.
+public struct ${Self}<
+  Base : MutableCollection & ${collectionForTraversal(Traversal)}
+> : MutableCollection, ${collectionForTraversal(Traversal)}, LoggingType {
+
+  public var base: Base
+
+  public typealias Log = MutableCollectionLog
+
+  public typealias SubSequence = Base.SubSequence
+
+  public typealias Iterator = Base.Iterator
+
+  public init(wrapping base: Base) {
+    self.base = base
+  }
+
+  public func makeIterator() -> Iterator {
+    return base.makeIterator()
+  }
+
+  public typealias Index = Base.Index
+
+  public var startIndex: Index {
+    return base.startIndex
+  }
+
+  public var endIndex: Index {
+    return base.endIndex
+  }
+
+  public subscript(position: Index) -> Base.Iterator.Element {
+    get {
+      return base[position]
+    }
+    set {
+      base[position] = newValue
+    }
+  }
+
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    get {
+      return base[bounds]
+    }
+    set {
+      base[bounds] = newValue
+    }
+  }
+
+  public func index(after i: Index) -> Index {
+    return base.index(after: i)
+  }
+
+%     if Traversal in ['Bidirectional', 'RandomAccess']:
+  public func index(before i: Index) -> Index {
+    return base.index(before: i)
+  }
+%     end
+
+  public func index(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
+    return base.index(i, offsetBy: n)
+  }
+
+  public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
+    return base.distance(from: start, to: end)
+  }
+
+  public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+    _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+  ) rethrows -> R? {
+    print("Log._withUnsafeMutableBufferPointerIfSupported[selfType] += 1")
+    Log._withUnsafeMutableBufferPointerIfSupported[selfType] += 1
+    let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
+    if result != nil {
+      Log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[selfType] += 1
+    }
+    return result
+  }
+}
 % end
 
 //===----------------------------------------------------------------------===//
