@@ -65,7 +65,7 @@ struct _UnsafeBitMap {
     nonmutating set {
       _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
       let wordIdx = _UnsafeBitMap.wordIndex(i)
-      let bitMask = 1 << _UnsafeBitMap.bitIndex(i)
+      let bitMask = (1 as UInt) &<< _UnsafeBitMap.bitIndex(i)
       if newValue {
         values[wordIdx] = values[wordIdx] | bitMask
       } else {

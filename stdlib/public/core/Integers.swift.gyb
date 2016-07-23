@@ -1134,8 +1134,6 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 % end # end of concrete FixedWidthInteger section
 
 
-
-
 //===----------------------------------------------------------------------===//
 // FIXME(integers): Remove these operators in favour of the generic ones on
 //                  Arithmetic

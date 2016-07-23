@@ -210,10 +210,10 @@ func _memmove(
 ) {
   let dest = destination._rawValue
   let src = src._rawValue
-  let size = UInt64(size)._value
+  let size = UInt64(size)._storage
   Builtin.int_memmove_RawPointer_RawPointer_Int64(
     dest, src, size,
-    /*alignment:*/ Int32()._value,
+    /*alignment:*/ Int32()._storage,
     /*volatile:*/ false._value)
 }
 

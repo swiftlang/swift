@@ -360,7 +360,9 @@ extension ${Self}: BinaryFloatingPoint {
     if exponentBitPattern > UInt(${Self}.significandBitCount) {
       // self is large enough that self.ulp is normal, so we just compute its
       // exponent and construct it with a significand of zero.
-      let ulpExponent = exponentBitPattern - UInt(${Self}.significandBitCount)
+      // FIXME(integers): explicit type should not be necessary here
+      let ulpExponent: UInt =
+        exponentBitPattern - UInt(${Self}.significandBitCount)
       return ${Self}(sign: .plus,
         exponentBitPattern: ulpExponent,
         significandBitPattern: 0)
