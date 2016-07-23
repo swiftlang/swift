@@ -1898,7 +1898,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLVM_ENABLE_ASSERTIONS}")
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}"
-                    -DLLVM_INCLUDE_TESTS:BOOL=$(true_false "${SOURCE_TREE_INCLUDES_TESTS}")
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     "${llvm_cmake_options[@]}"
