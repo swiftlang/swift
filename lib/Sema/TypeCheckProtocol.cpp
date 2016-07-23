@@ -1231,7 +1231,7 @@ checkWitnessAccessibility(Accessibility *requiredAccess,
   *requiredAccess = std::min(Proto->getFormalAccess(), *requiredAccess);
 
   if (*requiredAccess > Accessibility::Private) {
-    if (witness->getFormalAccess() < *requiredAccess)
+    if (witness->getFormalAccess(DC) < *requiredAccess)
       return true;
 
     if (requirement->isSettable(DC)) {
@@ -4609,7 +4609,13 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     // For anything with a Clang node, lazily check conformances.
     if (ext->hasClangNode()) return;
 
-    defaultAccessibility = ext->getDefaultAccessibility();
+    Type extendedTy = ext->getExtendedType();
+    if (!extendedTy)
+      return;
+    const NominalTypeDecl *nominal = extendedTy->getAnyNominal();
+    if (!nominal)
+      return;
+    defaultAccessibility = nominal->getFormalAccess();
   } else {
     // For anything with a Clang node, lazily check conformances.
     auto nominal = cast<NominalTypeDecl>(dc);

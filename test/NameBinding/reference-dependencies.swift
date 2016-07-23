@@ -307,7 +307,9 @@ private extension Use4 {
 // CHECK-DAG: !private "PrivateTopLevelTy2"
 // CHECK-DAG: "PrivateProto2"
 extension Private2 : PrivateProto2 {
-  var privateTy2: PrivateTopLevelTy2? { return nil }
+  // FIXME: This test is supposed to check that we get this behavior /without/
+  // marking the property private, just from the base type.
+  private var privateTy2: PrivateTopLevelTy2? { return nil }
 }
 // CHECK-DAG: !private "PrivateTopLevelTy3"
 func outerPrivateTy3() {

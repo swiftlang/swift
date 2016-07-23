@@ -1847,6 +1847,57 @@ Accessibility ValueDecl::getEffectiveAccess() const {
   return effectiveAccess;
 }
 
+Accessibility ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
+  assert(getFormalAccess() == Accessibility::Internal &&
+         "should be able to fast-path non-internal cases");
+  assert(useDC && "should fast-path non-scoped cases");
+  if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
+    if (useSF->hasTestableImport(getModuleContext()))
+      return Accessibility::Public;
+  return Accessibility::Internal;
+}
+
+const DeclContext *
+ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
+  const DeclContext *result = getDeclContext();
+  Accessibility access = getFormalAccess(useDC);
+
+  while (!result->isModuleScopeContext()) {
+    if (result->isLocalContext())
+      return result;
+
+    if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {
+      access = std::min(access, enclosingNominal->getFormalAccess(useDC));
+
+    } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(result)) {
+      // Just check the base type. If it's a constrained extension, Sema should
+      // have already enforced access more strictly.
+      if (auto extendedTy = enclosingExt->getExtendedType()) {
+        if (auto nominal = extendedTy->getAnyNominal()) {
+          access = std::min(access, nominal->getFormalAccess(useDC));
+        }
+      }
+
+    } else {
+      llvm_unreachable("unknown DeclContext kind");
+    }
+
+    result = result->getParent();
+  }
+
+  switch (access) {
+  case Accessibility::Private:
+    assert(result->isModuleScopeContext());
+    return result;
+  case Accessibility::Internal:
+    return result->getParentModule();
+  case Accessibility::Public:
+    return nullptr;
+  }
+
+  return result;
+}
+
 
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this)) {

@@ -158,7 +158,7 @@ internal struct InternalStruct {} // expected-note * {{declared here}}
 private struct PrivateStruct {} // expected-note * {{declared here}}
 
 protocol InternalProto { // expected-note * {{declared here}}
-  associatedtype Assoc // expected-note {{type declared here}}
+  associatedtype Assoc
 }
 public extension InternalProto {} // expected-error {{extension of internal protocol cannot be declared public}} {{1-8=}}
 internal extension InternalProto where Assoc == PublicStruct {}
@@ -169,7 +169,7 @@ private extension InternalProto where Assoc == InternalStruct {}
 private extension InternalProto where Assoc == PrivateStruct {}
 
 public protocol PublicProto {
-  associatedtype Assoc // expected-note * {{type declared here}}
+  associatedtype Assoc
 }
 public extension PublicProto {}
 public extension PublicProto where Assoc == PublicStruct {}
