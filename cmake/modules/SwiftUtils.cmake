@@ -27,6 +27,34 @@ function(precondition var)
   endif()
 endfunction()
 
+# Assert is 'NOT ${LHS} ${OP} ${RHS}' is true.
+function(precondition_binary_op OP LHS RHS)
+  cmake_parse_arguments(
+    PRECONDITIONBINOP # prefix
+    "NEGATE" # options
+    "MESSAGE" # single-value args
+    "" # multi-value args
+    ${ARGN})
+
+  if (PRECONDITIONBINOP_NEGATE)
+    if (${LHS} ${OP} ${RHS})
+      if (PRECONDITIONBINOP_MESSAGE)
+        message(FATAL_ERROR "Error! ${PRECONDITIONBINOP_MESSAGE}")
+      else()
+        message(FATAL_ERROR "Error! ${LHS} ${OP} ${RHS} is true!")
+      endif()
+    endif()
+  else()
+    if (NOT ${LHS} ${OP} ${RHS})
+      if (PRECONDITIONBINOP_MESSAGE)
+        message(FATAL_ERROR "Error! ${PRECONDITIONBINOP_MESSAGE}")
+      else()
+        message(FATAL_ERROR "Error! ${LHS} ${OP} ${RHS} is false!")
+      endif()
+    endif()
+  endif()
+endfunction()
+
 # Translate a yes/no variable to the presence of a given string in a
 # variable.
 #
