@@ -20,9 +20,8 @@
 public protocol RangeExpression {
   associatedtype Bound : Comparable
   
-  /// Returns `self` expressed as a `Range<Bound>`, within a collection 
-  /// running from `startIndex` to `endIndex` with `offset` used to 
-  /// move indices.
+  /// Returns `self` expressed as a `Range<Bound>` suitable for 
+  /// slicing a collection with the indicated properties.
   /// 
   /// -Note: The return value's bounds are *not* guaranteed to be in 
   ///        `startIndex ..< endIndex`. Callers should apply the same 
@@ -38,7 +37,7 @@ public protocol RangeExpression {
   // 
   // WORKAROUND unfiled - We want to have this requirement, but it triggers a generics bug
   // func relative<C: Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound
-  func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound>
+  func relative<BoundDistance: SignedInteger>(to bounds: Range<Bound>, offsettingBy offset: (Bound, BoundDistance) -> Bound) -> Range<Bound>
 }
 
 extension RangeExpression {
@@ -49,45 +48,47 @@ extension RangeExpression {
   ///        preconditions to the return value as they would to a range 
   ///        provided directly.
   /// 
-  /// -RecommendedOver: `relativeTo(start:end:offset:)`
+  /// -RecommendedOver: `relative(to:offsettingBy:)`
   public func relative<C: Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
-    return relativeTo(start: collection.startIndex, end: collection.endIndex, offset: collection.index(_:offsetBy:))
+    let bounds = Range(uncheckedBounds: (lower: collection.startIndex, upper: collection.endIndex))
+    return relative(to: bounds, offsettingBy: collection.index(_:offsetBy:))
   }
 }
 
 extension Range: RangeExpression {
-  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+  public func relative<BoundDistance: SignedInteger>(to bounds: Range<Bound>, offsettingBy offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
     return self
   }
 }
 
 extension CountableRange: RangeExpression {
-  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+  public func relative<BoundDistance: SignedInteger>(to bounds: Range<Bound>, offsettingBy offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
     return Range(self)
   }
 }
 
 extension ClosedRange: RangeExpression {
-  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+  public func relative<BoundDistance: SignedInteger>(to bounds: Range<Bound>, offsettingBy offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
     return Range(uncheckedBounds: (lower: lowerBound, upper: offset(upperBound, 1)))
   }
 }
 
 extension CountableClosedRange: RangeExpression {
-  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
-    return CountableRange(self).relativeTo(start: startIndex, end: endIndex, offset: offset)
+  public func relative<BoundDistance: SignedInteger>(to bounds: Range<Bound>, offsettingBy offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+    return CountableRange(self).relative(to: bounds, offsettingBy: offset)
   }
 }
 
 extension IncompleteRange: RangeExpression {
-  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
-    return completed(by: Range(uncheckedBounds: (startIndex, endIndex)))
+  public func relative<BoundDistance: SignedInteger>(to bounds: Range<Bound>, offsettingBy offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+    return completed(by: bounds)
   }
 }
 
 extension IncompleteClosedRange: RangeExpression {
-  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
-    return completed(by: ClosedRange(uncheckedBounds: (startIndex, endIndex))).relativeTo(start: startIndex, end: endIndex, offset: offset)
+  public func relative<BoundDistance: SignedInteger>(to bounds: Range<Bound>, offsettingBy offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+    let closedBounds = ClosedRange(uncheckedBounds: (bounds.lowerBound, bounds.upperBound))
+    return completed(by: closedBounds).relative(to: bounds, offsettingBy: offset)
   }
 }
 
