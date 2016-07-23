@@ -84,6 +84,7 @@ set(SWIFTLIB_ESSENTIAL
   Print.swift
   RandomAccessCollection.swift
   Range.swift.gyb
+  RangeExpression.swift.gyb
   RangeReplaceableCollection.swift.gyb
   Reflection.swift
   Repeat.swift

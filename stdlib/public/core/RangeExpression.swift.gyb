@@ -1,0 +1,210 @@
+//===--- RangeExpression.swift.gyb ----------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+/// A type which can be used to slice a collection. A `RangeExpression` can 
+/// convert itself to a `Range<Bound>` of indices within a given collection; 
+/// the collection can then slice itself with that `Range`.
+/// 
+/// -Warning: The requirements of RangeExpressible will change in future versions 
+///           of Swift. Conform to it at your own peril.
+public protocol RangeExpression {
+  associatedtype Bound : Comparable
+  
+  // WORKAROUND unfiled - We want to have this requirement, but it triggers a generics bug
+  // func relative<C: Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound
+  
+  func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound>
+}
+
+extension RangeExpression {
+  func relative<C: Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
+    return relativeTo(start: collection.startIndex, end: collection.endIndex, offset: collection.index(_:offsetBy:))
+  }
+}
+
+// extension Range: RangeExpression {
+//   public func relative<C: Collection>(to collection: C) -> Range<Bound> where C.Index == Bound {
+//     return self
+//   }
+// }
+
+extension CountableRange: RangeExpression {
+  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+    return Range(self)
+  }
+}
+
+extension ClosedRange: RangeExpression {
+  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+    return Range(uncheckedBounds: (lower: lowerBound, upper: offset(upperBound, 1)))
+  }
+}
+
+extension CountableClosedRange: RangeExpression {
+  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+    return CountableRange(self).relativeTo(start: startIndex, end: endIndex, offset: offset)
+  }
+}
+
+extension IncompleteRange: RangeExpression {
+  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+    return completed(by: Range(uncheckedBounds: (startIndex, endIndex)))
+  }
+}
+
+extension IncompleteClosedRange: RangeExpression {
+  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+    return completed(by: ClosedRange(uncheckedBounds: (startIndex, endIndex))).relativeTo(start: startIndex, end: endIndex, offset: offset)
+  }
+}
+
+// WORKAROUND unfiled - Should be generic subscripts, not generated code for each conforming type
+% for R in ['CountableRange', 'ClosedRange', 'CountableClosedRange', 'IncompleteRange', 'IncompleteClosedRange']:
+// WORKAROUND rdar://25214066 - should be on Collection
+extension Indexable
+% if 'Countable' in R:
+  where Index : Strideable, Index.Stride : SignedInteger
+% end
+{
+  /// Accesses a contiguous subrange of the collection's elements.
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice of an array of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     print(streetsSlice)
+  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     print(streets[index!])
+  ///     // Prints "Evarts"
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
+  public subscript(bounds: ${R}<Index>) -> SubSequence {
+    get {
+      return self[bounds.relative(to: self)]
+    }
+  }
+}
+
+// WORKAROUND rdar://25214066 - should be on Collection
+extension MutableIndexable
+% if 'Countable' in R:
+  where Index : Strideable, Index.Stride : SignedInteger
+% end
+{
+  /// Accesses a contiguous subrange of the collection's elements.
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice of an array of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     print(streetsSlice)
+  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     streets[index!] = "Eustace"
+  ///     print(streets[index!])
+  ///     // Prints "Eustace"
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
+  public subscript(bounds: ${R}<Index>) -> SubSequence {
+    get {
+      return self[bounds.relative(to: self)]
+    }
+    set {
+      self[bounds.relative(to: self)] = newValue
+    }
+  }
+}
+
+% end
+extension RangeReplaceableCollection {
+  /// Replaces the specified subrange of elements with the given collection.
+  ///
+  /// This method has the effect of removing the specified range of elements
+  /// from the collection and inserting the new elements at the same location.
+  /// The number of new elements need not match the number of elements being
+  /// removed.
+  ///
+  /// In this example, three elements in the middle of an array of integers are
+  /// replaced by the five elements of a `Repeated<Int>` instance.
+  ///
+  ///      var nums = [10, 20, 30, 40, 50]
+  ///      nums.replaceSubrange(1...3, with: repeatElement(1, count: 5))
+  ///      print(nums)
+  ///      // Prints "[10, 1, 1, 1, 1, 1, 50]"
+  ///
+  /// If you pass a zero-length range as the `subrange` parameter, this method
+  /// inserts the elements of `newElements` at `subrange.startIndex`. Calling
+  /// the `insert(contentsOf:at:)` method instead is preferred.
+  ///
+  /// Likewise, if you pass a zero-length collection as the `newElements`
+  /// parameter, this method removes the elements in the given subrange
+  /// without replacement. Calling the `removeSubrange(_:)` method instead is
+  /// preferred.
+  ///
+  /// Calling this method may invalidate any existing indices for use with this
+  /// collection.
+  ///
+  /// - Parameters:
+  ///   - subrange: The subrange of the collection to replace. The bounds of
+  ///     the range must be valid indices of the collection.
+  ///   - newElements: The new elements to add to the collection.
+  ///
+  /// - Complexity: O(*m*), where *m* is the combined length of the collection
+  ///   and `newElements`. If the call to `replaceSubrange` simply appends the
+  ///   contents of `newElements` to the collection, the complexity is O(*n*),
+  ///   where *n* is the length of `newElements`.
+  public mutating func replaceSubrange<R, C>(
+    _ subrange: R,
+    with newElements: C
+  ) where R : RangeExpression, R.Bound == Index, C : Collection, C.Iterator.Element == Iterator.Element {
+    replaceSubrange(subrange.relative(to: self), with: newElements)
+  }
+
+  /// Removes the elements in the specified subrange from the collection.
+  ///
+  /// All the elements following the specified position are moved to close the
+  /// gap. This example removes two elements from the middle of an array of
+  /// measurements.
+  ///
+  ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.5]
+  ///     measurements.removeSubrange(1..<3)
+  ///     print(measurements)
+  ///     // Prints "[1.2, 1.5]"
+  ///
+  /// Calling this method may invalidate any existing indices for use with this
+  /// collection.
+  ///
+  /// - Parameter bounds: The range of the collection to be removed. The
+  ///   bounds of the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  public mutating func removeSubrange<R>(_ bounds: R) where R : RangeExpression, R.Bound == Index {
+    removeSubrange(bounds.relative(to: self))
+  }
+}

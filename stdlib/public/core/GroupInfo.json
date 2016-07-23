@@ -39,6 +39,7 @@
     "Sort.swift",
     "Range.swift",
     "ClosedRange.swift",
+    "RangeExpression.swift",
     "CollectionOfOne.swift",
     "HeapBuffer.swift",
     "Sequence.swift",
