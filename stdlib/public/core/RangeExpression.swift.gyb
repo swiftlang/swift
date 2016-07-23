@@ -14,28 +14,52 @@
 /// convert itself to a `Range<Bound>` of indices within a given collection; 
 /// the collection can then slice itself with that `Range`.
 /// 
-/// -Warning: The requirements of RangeExpressible will change in future versions 
-///           of Swift. Conform to it at your own peril.
+/// -Warning: The requirements of RangeExpressible will change in a future version 
+///           of Swift. If you conform your own types to RangeExpressible, be 
+///           prepared to migrate them.
 public protocol RangeExpression {
   associatedtype Bound : Comparable
   
+  /// Returns `self` expressed as a `Range<Bound>`, within a collection 
+  /// running from `startIndex` to `endIndex` with `offset` used to 
+  /// move indices.
+  /// 
+  /// -Note: The return value's bounds are *not* guaranteed to be in 
+  ///        `startIndex ..< endIndex`. Callers should apply the same 
+  ///        preconditions to the return value as they would to a range 
+  ///        provided directly by the user.
+  /// 
+  /// -Warning: This method is likely to be replaced in a future version of Swift.
+  ///           If you are calling this method, we recommend using the 
+  ///           `relative(to:)` extension method instead. If you are implementing 
+  ///           it, be prepared to migrate your code.
+  /// 
+  /// -Recommended: `relative(to:)`
+  // 
   // WORKAROUND unfiled - We want to have this requirement, but it triggers a generics bug
   // func relative<C: Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound
-  
   func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound>
 }
 
 extension RangeExpression {
-  func relative<C: Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
+  /// Returns `self` expressed as a range of indices within `collection`.
+  /// 
+  /// -Note: The return value is *not* guaranteed to be in the range 
+  ///        `startIndex ..< endIndex`. Callers should apply the same 
+  ///        preconditions to the return value as they would to a range 
+  ///        provided directly.
+  /// 
+  /// -RecommendedOver: `relativeTo(start:end:offset:)`
+  public func relative<C: Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
     return relativeTo(start: collection.startIndex, end: collection.endIndex, offset: collection.index(_:offsetBy:))
   }
 }
 
-// extension Range: RangeExpression {
-//   public func relative<C: Collection>(to collection: C) -> Range<Bound> where C.Index == Bound {
-//     return self
-//   }
-// }
+extension Range: RangeExpression {
+  public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
+    return self
+  }
+}
 
 extension CountableRange: RangeExpression {
   public func relativeTo<BoundDistance: SignedInteger>(start startIndex: Bound, end endIndex: Bound, offset: (Bound, BoundDistance) -> Bound) -> Range<Bound> {
