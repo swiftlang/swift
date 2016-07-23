@@ -39,7 +39,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   ///     let str0: CFString = "boxcar"
   ///     let bits = Unmanaged.passUnretained(str0)
-  ///     let str1 = Unmanaged<CFString>(bits).object
+  ///     let ptr = bits.toOpaque()
   @_transparent
   public func toOpaque() -> UnsafeMutablePointer<Void> {
     return unsafeBitCast(_value, to: UnsafeMutablePointer<Void>.self)
