@@ -214,6 +214,7 @@ class r20201968C {
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(_ a : Int) {
   assert(a != nil, "ASSERT COMPILATION ERROR")
+  // expected-warning @-1 {{comparing non-optional value to nil always returns true}}
 }
 
 
@@ -781,10 +782,10 @@ class SR1594 {
 }
 
 func nilComparison(i: Int, o: AnyObject) {
-  _ = i == nil
-  _ = nil == i
-  _ = i != nil
-  _ = nil != i
+  _ = i == nil // expected-warning {{comparing non-optional value to nil always returns false}}
+  _ = nil == i // expected-warning {{comparing non-optional value to nil always returns false}}
+  _ = i != nil // expected-warning {{comparing non-optional value to nil always returns true}}
+  _ = nil != i // expected-warning {{comparing non-optional value to nil always returns true}}
   _ = i < nil
   _ = nil < i
   _ = i <= nil

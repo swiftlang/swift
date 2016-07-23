@@ -88,6 +88,7 @@ static void diagSelfAssignment(TypeChecker &TC, const Expr *E) {
 ///     argument lists.
 ///   - 'self.init' and 'super.init' cannot be wrapped in a larger expression
 ///     or statement.
+///   - Warn about promotions to optional in specific syntactic forms.
 ///
 static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                                          const DeclContext *DC,
@@ -268,6 +269,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
+        // Warn about surprising implicit optional promotions.
+        checkOptionalPromotions(Call);
+        
         // Check for tuple splat.
         checkTupleSplat(Call);
 
@@ -592,6 +596,72 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         TC.diagnose(DRE->getLoc(), topLevelDiag,
                     namePlusDot, k, pair.first->getName())
           .fixItInsert(DRE->getStartLoc(), namePlusDot);
+      }
+    }
+    
+    /// Return true if this expression is an implicit promotion from T to T?.
+    static bool isImplicitPromotionToOptional(Expr *E) {
+      return E->isImplicit() && isa<InjectIntoOptionalExpr>(E);
+    }
+    
+    /// Return true if this is 'nil' type checked as an Optional.  This looks
+    /// like this:
+    ///   (call_expr implicit type='Int?'
+    ///     (constructor_ref_call_expr implicit
+    ///       (declref_expr implicit decl=Optional.init(nilLiteral:)
+    static bool isTypeCheckedOptionalNil(Expr *E) {
+      auto CE = dyn_cast<CallExpr>(E->getSemanticsProvidingExpr());
+      if (!CE || !CE->isImplicit() ||
+          !CE->getType()->getAnyOptionalObjectType())
+        return false;
+      
+      auto CRCE = dyn_cast<ConstructorRefCallExpr>(CE->getSemanticFn());
+      if (!CRCE || !CRCE->isImplicit()) return false;
+      
+      auto DRE = dyn_cast<DeclRefExpr>(CRCE->getSemanticFn());
+      
+      SmallString<32> NameBuffer;
+      auto name = DRE->getDecl()->getFullName().getString(NameBuffer);
+      return name == "init(nilLiteral:)";
+    }
+    
+    
+    /// Warn about surprising implicit optional promotions involving operands to
+    /// calls.  Specifically, we warn about these expressions when the 'x'
+    /// operand is implicitly promoted to optional:
+    ///
+    ///       x ?? y
+    ///       x == nil    // also !=
+    ///
+    void checkOptionalPromotions(ApplyExpr *call) {
+      auto DRE = dyn_cast<DeclRefExpr>(call->getSemanticFn());
+      auto args = dyn_cast<TupleExpr>(call->getArg());
+      if (!DRE || !DRE->getDecl()->isOperator() ||
+          !args || args->getNumElements() != 2)
+        return;
+      
+      auto lhs = args->getElement(0);
+      auto rhs = args->getElement(1);
+      auto calleeName = DRE->getDecl()->getName().str();
+      
+      if (calleeName == "??" && isImplicitPromotionToOptional(lhs)) {
+        TC.diagnose(DRE->getLoc(), diag::use_of_qq_on_non_optional_value)
+          .highlight(lhs->getSourceRange())
+          .fixItRemove(SourceRange(DRE->getLoc(), rhs->getEndLoc()));
+        return;
+      }
+      
+      if (calleeName == "==" || calleeName == "!=") {
+        if ((isImplicitPromotionToOptional(lhs) &&
+             isTypeCheckedOptionalNil(rhs)) ||
+            (isTypeCheckedOptionalNil(lhs) &&
+             isImplicitPromotionToOptional(rhs))) {
+          TC.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_nil,
+                      calleeName == "!=")
+            .highlight(lhs->getSourceRange())
+            .highlight(rhs->getSourceRange());
+          return;
+        }
       }
     }
   };
