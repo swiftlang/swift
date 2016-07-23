@@ -15,7 +15,6 @@
 // RUN: %line-directive %t/CollectionCasts.swift -- %target-build-swift -Xfrontend -enable-experimental-collection-casts %t/CollectionCasts.swift -o %t/a.out
 // RUN: %line-directive %t/CollectionCasts.swift -- %target-run %t/a.out 2>&1
 // REQUIRES: executable_test
-// XFAIL: *
 
 import StdlibUnittest
 
@@ -92,8 +91,6 @@ tests.test("${Collection}/Down/${method}/${Key1}=>${Key0}") {
   
 %             else:
   
-  // FIXME Set<Base> => Set<Derived> fails dynamically, and never even reaches
-  // one of my runtime entry points.
   guard let downcasted = expectNotEmpty(cast(source, to: ${Collection}<${Key0}>.self))
   else { return }
   
@@ -128,9 +125,6 @@ tests.test(
 %   if method == 'Direct':
   let upcasted = source as [${Key1}:${Value1}]
 %   else:
-  // FIXME: Conditional casting fails to dynamically type-check, and never even
-  // reaches one of my runtime entry points unless the source type is identical
-  // to the destination type.
   let upcasted_ = source as Any as? [${Key1}:${Value1}]
   
   guard let upcasted = expectNotEmpty(upcasted_) else { return }
@@ -163,21 +157,6 @@ tests.test(
     ${DynamicKey}(42) as ${Key1} : ${DynamicValue}(42) as ${Value1},
     ${DynamicKey}(17) as ${Key1} : ${DynamicValue}(17) as ${Value1}]
 
-  // FIXME: The following are routed through
-  // _dictionaryBridgeFromObjectiveCConditional, causing the test to crash, but
-  // there's no reason for bridging in these cases:
-  //
-  // [Derived:Any] => [Derived:AnyObject]
-  // [Derived:Any] => [Derived:Base]
-  // [Base:Any] => [Derived:Derived]
-  // [Base:Any] => [Derived:Base]
-  // [Base:Any] => [Derived:AnyObject]
-  // [Base:Any] => [Base:Derived]
-  // [Base:Any] => [Base:Base]
-  // [Base:Any] => [Base:AnyObject]
-  // [Int:AnyFoo] => [Int:Int]
-  // [Int:Any] => [Int:Int]
-  // [Int:Any] => [Int:AnyFoo]
   guard let downcasted = expectNotEmpty(source as? [${Key0}:${Value0}])
   else { return }
 
