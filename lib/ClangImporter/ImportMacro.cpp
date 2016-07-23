@@ -346,11 +346,16 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       } else {
         return nullptr;
       }
+      if (!castClangType->isBuiltinType() && !castTypeIsId) {
+        return nullptr;
+      }
     } else {
       auto builtinType = builtinTypeForToken(tokenI[1],
                                              impl.getClangASTContext());
       if (builtinType) {
         castType = &builtinType.getValue();
+      } else {
+        return nullptr;
       }
     }
     tokenI += 3;
