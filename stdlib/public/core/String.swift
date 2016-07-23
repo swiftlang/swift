@@ -516,7 +516,7 @@ public func _stdlib_compareNSStringDeterministicUnicodeCollationPointer(
 #endif
 
 extension String : Equatable {
-  public static func ==(lhs: String, rhs: String) -> Bool {
+  public static func == (lhs: String, rhs: String) -> Bool {
     if lhs._core.isASCII && rhs._core.isASCII {
       if lhs._core.count != rhs._core.count {
         return false
@@ -530,7 +530,7 @@ extension String : Equatable {
 }
 
 extension String : Comparable {
-  public static func <(lhs: String, rhs: String) -> Bool {
+  public static func < (lhs: String, rhs: String) -> Bool {
     return lhs._compareString(rhs) < 0
   }
 }

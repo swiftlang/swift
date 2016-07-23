@@ -246,8 +246,10 @@ public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
 @_silgen_name("_forceBridgeFromObjectiveC_bridgeable")
-public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>
-  (_ x: T._ObjectiveCType, _: T.Type) -> T {
+public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
+  _ x: T._ObjectiveCType,
+  _: T.Type
+) -> T {
   var result: T?
   T._forceBridgeFromObjectiveC(x, result: &result)
   return result!
@@ -483,7 +485,7 @@ extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
 }
 
 @_transparent
-public func == <Pointee> (
+public func == <Pointee>(
   lhs: AutoreleasingUnsafeMutablePointer<Pointee>,
   rhs: AutoreleasingUnsafeMutablePointer<Pointee>
 ) -> Bool {

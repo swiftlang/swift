@@ -220,7 +220,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
 
 // HeapBuffers are equal when they reference the same buffer
 public // @testable
-func == <Value, Element> (
+func == <Value, Element>(
   lhs: _HeapBuffer<Value, Element>,
   rhs: _HeapBuffer<Value, Element>) -> Bool {
   return lhs._nativeObject == rhs._nativeObject

@@ -129,22 +129,22 @@ internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
 }
 
 @_transparent
-func ==(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
+func == (lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
-func !=(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
+func != (lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return !(lhs == rhs)
 }
 
 @_transparent
-func ==(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
+func == (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
-func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
+func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
 }
 

@@ -304,7 +304,7 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
     line: UInt(_line))
 }
 
-public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
+public func == <T: Equatable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
     return l == r
@@ -315,7 +315,7 @@ public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-public func != <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
+public func != <T : Equatable>(lhs: T?, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
 
@@ -380,7 +380,7 @@ public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
-public func < <T : Comparable> (lhs: T?, rhs: T?) -> Bool {
+public func < <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
     return l < r
@@ -451,7 +451,7 @@ public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 ///   - defaultValue: A value to use as a default. `defaultValue` is the same
 ///     type as the `Wrapped` type of `optional`.
 @_transparent
-public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T)
+public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
     rethrows -> T {
   switch optional {
   case .some(let value):
@@ -504,7 +504,7 @@ public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T)
 ///   - defaultValue: A value to use as a default. `defaultValue` and
 ///     `optional` have the same type.
 @_transparent
-public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T?)
+public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
     rethrows -> T? {
   switch optional {
   case .some(let value):

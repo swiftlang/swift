@@ -76,7 +76,7 @@
 /// `Equatable`.
 ///
 ///     extension StreetAddress: Equatable {
-///       static func ==(lhs: StreetAddress, rhs: StreetAddress) -> Bool {
+///       static func == (lhs: StreetAddress, rhs: StreetAddress) -> Bool {
 ///         return
 ///             lhs.number == rhs.number &&
 ///             lhs.street == rhs.street &&
@@ -132,7 +132,7 @@
 ///             self.value = value
 ///         }
 ///
-///         static func ==(lhs: IntegerRef, rhs: IntegerRef) -> Bool {
+///         static func == (lhs: IntegerRef, rhs: IntegerRef) -> Bool {
 ///             return lhs.value == rhs.value
 ///         }
 ///     }

@@ -546,7 +546,7 @@ public func ^= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
 
 // Equatable types can be matched in patterns by value equality.
 @_transparent
-public func ~= <T : Equatable> (a: T, b: T) -> Bool {
+public func ~= <T : Equatable>(a: T, b: T) -> Bool {
   return a == b
 }
 

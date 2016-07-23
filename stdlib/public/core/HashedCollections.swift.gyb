@@ -4548,7 +4548,7 @@ internal struct _Cocoa${Self}Index : Comparable {
 }
 
 extension _Cocoa${Self}Index {
-  internal static func ==(
+  internal static func == (
     lhs: _Cocoa${Self}Index,
     rhs: _Cocoa${Self}Index
   ) -> Bool {
@@ -4560,7 +4560,7 @@ extension _Cocoa${Self}Index {
     return lhs.currentKeyIndex == rhs.currentKeyIndex
   }
 
-  internal static func <(
+  internal static func < (
     lhs: _Cocoa${Self}Index,
     rhs: _Cocoa${Self}Index
   ) -> Bool {

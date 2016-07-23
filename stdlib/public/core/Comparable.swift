@@ -83,7 +83,7 @@
 /// `Comparable` and implement the `<` operator function.
 ///
 ///     extension Date: Comparable {
-///         static func <(lhs: Date, rhs: Date) -> Bool {
+///         static func < (lhs: Date, rhs: Date) -> Bool {
 ///             if lhs.year != rhs.year {
 ///                 return lhs.year < rhs.year
 ///             } else if lhs.month != rhs.month {
@@ -102,7 +102,7 @@
 /// Next, implement the `==` operator function, the requirement inherited from
 /// the `Equatable` protocol.
 ///
-///     func ==(lhs: Date, rhs: Date) -> Bool {
+///     func == (lhs: Date, rhs: Date) -> Bool {
 ///         return lhs.year == rhs.year && lhs.month == rhs.month
 ///             && lhs.day == rhs.day
 ///     }

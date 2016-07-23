@@ -175,7 +175,7 @@ public func ${x.operator}= <T: ${Protocol}>(lhs: inout T, rhs: T) {
 % end
 
 @_transparent
-public prefix func -<T: SignedArithmetic>(x: T) -> T {
+public prefix func - <T: SignedArithmetic>(x: T) -> T {
   return x.negated()
 }
 

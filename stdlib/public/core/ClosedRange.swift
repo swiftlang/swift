@@ -395,7 +395,7 @@ public struct ClosedRange<
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-public func ... <Bound : Comparable> (minimum: Bound, maximum: Bound)
+public func ... <Bound : Comparable>(minimum: Bound, maximum: Bound)
   -> ClosedRange<Bound> {
   _precondition(
     minimum <= maximum, "Can't form Range with upperBound < lowerBound")
@@ -414,7 +414,7 @@ public func ... <Bound : Comparable> (minimum: Bound, maximum: Bound)
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-public func ... <Bound> (
+public func ... <Bound>(
   minimum: Bound, maximum: Bound
 ) -> CountableClosedRange<Bound>
   where
