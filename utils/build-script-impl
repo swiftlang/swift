@@ -123,7 +123,6 @@ KNOWN_SETTINGS=(
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
-    skip-test-llvm              ""              "set to skip testing LLVM. Set to true by default"
     skip-test-llbuild           ""               "set to skip testing llbuild"
     skip-test-swiftpm           ""               "set to skip testing swiftpm"
     skip-test-xctest            ""               "set to skip testing xctest"
@@ -161,7 +160,8 @@ KNOWN_SETTINGS=(
     build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     check-incremental-compilation "0"            "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
-    source-tree-includes-tests  "1"              "set to 0 to allow the build to proceed when 'test' directory is missing (required for B&I builds)"
+    llvm-include-tests          "1"              "Set to true to generate testing targets for LLVM. Set to true by default."
+    swift-include-tests         "1"              "Set to true to generate testing targets for Swift. This allows the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
@@ -313,6 +313,83 @@ function is_swift_lto_enabled() {
     else
         echo "FALSE"
     fi
+}
+
+# Compute the cmake flags related to disabling llvm tools as a result of our
+# needs for testing LLVM/Swift.
+function compute_cmake_llvm_tool_disable_flags() {
+    if [[ $(false_true "${LLVM_INCLUDE_TESTS}") == "FALSE" ]]; then
+        return
+    fi
+
+    local OUTPUT=()
+    local EXTRA_LLVM_CMAKE_OPTIONS=(
+        # Do not include LLVM tests.
+        -DLLVM_INCLUDE_TESTS:BOOL=NO
+        -DCLANG_INCLUDE_TESTS:BOOL=NO
+    )
+
+    # Disable LLVM Tools that Swift does not use for testing.
+    local LLVM_TOOLS_TO_DISABLE=(
+        BUGPOINT BUGPOINT_PASSES GOLD LLI LLVM_AS_FUZZER LLVM_C_TEST
+        LLVM_CXXDUMP LLVM_DIFF LLVM_DIS LLVM_DWP LLVM_EXTRACT LLVM_GO
+        LLVM_JITLISTENER LLVM_LTO LLVM_MC LLVM_MC_FUZZER LLVM_MCMARKUP
+        LLVM_PDBDUMP LLVM_READOBJ LLVM_RTDYLD LLVM_SHLIB LLVM_SIZE LLVM_SPLIT
+        LLVM_STRESS LLVM_SYMBOLIZER MSBUILD OBJ2YAML OPT SANCOV SANSTATS
+        VERIFY_USELISTORDER XCODE_TOOLCHAIN YAML2OBJ
+    )
+
+    # Disable Clang Tools that Swift does not use for testing.
+    local CLANG_TOOLS_TO_DISABLE=(
+        CLANG_CHECK DIAGTOOL SCAN_BUILD SCAN_VIEW CLANG_FORMAT
+    )
+
+    # If in addition we are asked to not generate targets for swift tests,
+    # then we can disable the building of even more of LLVM.
+    if [[ $(false_true "${SWIFT_INCLUDE_TESTS}") == "TRUE" ]]; then
+        EXTRA_LLVM_CMAKE_OPTIONS+=(
+            # We do not need gtest/FileCheck and friends since we are not
+            # running any tests.
+            -DLLVM_INCLUDE_UTILS:BOOL=NO
+        )
+
+        # Disable the rest of the LLVM tools. We do not need any of them.
+        LLVM_TOOLS_TO_DISABLE+=(
+            DSYMUTIL LLC LLVM_AR LLVM_AS LLVM_BCANALYZER LLVM_COV
+            LLVM_DWARFDUMP LLVM_LINK LLVM_NM LLVM_OBJDUMP LLVM_PROFDATA
+        )
+
+        # Disable the rest of the Clang tools. We do not need them.
+        CLANG_TOOLS_TO_DISABLE+=(
+            ARCMT_TEST C_ARCMT_TEST C_INDEX_TEST
+        )
+
+        # If in addition, we are not building compiler-rt, then we do not
+        # even need to build clang.
+        #
+        # *NOTE* This may change once we start building the standard library
+        # *with the just built clang.
+        if [[ $(true_false "${SKIP_BUILD_COMPILER_RT}") == "TRUE" ]]; then
+            CLANG_TOOLS_TO_DISABLE+=(
+                DRIVER
+            )
+        fi
+    fi
+
+    for arg in "${EXTRA_LLVM_CMAKE_ARGS[@]}"; do
+        OUTPUT+=( ${arg} )
+    done
+    for tool in "${LLVM_TOOLS_TO_DISABLE[@]}"; do
+        OUTPUT+=(
+            -DLLVM_TOOL_${tool}_BUILD:BOOL=NO
+        )
+    done
+    for tool in "${CLANG_TOOLS_TO_DISABLE[@]}"; do
+        OUTPUT+=(
+            -DCLANG_TOOL_${tool}_BUILD:BOOL=NO
+        )
+    done
+    echo "${OUTPUT[@]}"
 }
 
 # Support for performing isolated actions.
@@ -669,43 +746,15 @@ function set_build_options_for_host() {
         -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
     )
 
-    # If we are asked to not test LLVM, do not include tools that are not used
-    # to test Swift.
+    # If we are asked to not generate test targets for LLVM and or Swift,
+    # disable as many LLVM tools as we can. This improves compile time when
+    # compiling with LTO.
     #
     # *NOTE* Currently we do not support testing LLVM via build-script. But in a
     # future commit we will.
-    if [[ $(true_false "${SKIP_TEST_LLVM}") == "TRUE" ]]; then
-        llvm_cmake_options+=(
-            # Do not include LLVM tests.
-            -DLLVM_INCLUDE_TESTS:BOOL=NO
-            -DCLANG_INCLUDE_TESTS:BOOL=NO
-        )
-
-        # Disable LLVM Tools that we do not use.
-        LLVM_TOOLS_TO_DISABLE=(
-            BUGPOINT BUGPOINT_PASSES GOLD LLI LLVM_AS_FUZZER LLVM_C_TEST
-            LLVM_CXXDUMP LLVM_DIFF LLVM_DIS LLVM_DWP LLVM_EXTRACT LLVM_GO
-            LLVM_JITLISTENER LLVM_LTO LLVM_MC LLVM_MC_FUZZER LLVM_MCMARKUP
-            LLVM_PDBDUMP LLVM_READOBJ LLVM_RTDYLD LLVM_SHLIB LLVM_SIZE LLVM_SPLIT
-            LLVM_STRESS LLVM_SYMBOLIZER MSBUILD OBJ2YAML OPT SANCOV SANSTATS
-            VERIFY_USELISTORDER XCODE_TOOLCHAIN YAML2OBJ
-        )
-        for tool in "${LLVM_TOOLS_TO_DISABLE[@]}"; do
-            llvm_cmake_options+=(
-                -DLLVM_TOOL_${tool}_BUILD:BOOL=NO
-            )
-        done
-
-        # Disable Clang Tools that we do not use.
-        CLANG_TOOLS_TO_DISABLE=(
-            CLANG_CHECK DIAGTOOL SCAN_BUILD SCAN_VIEW CLANG_FORMAT
-        )
-        for tool in "${CLANG_TOOLS_TO_DISABLE[@]}"; do
-            llvm_cmake_options+=(
-                -DCLANG_TOOL_${tool}_BUILD:BOOL=NO
-            )
-        done    
-    fi
+    for arg in "$(compute_cmake_llvm_tool_disable_flags)"; do
+        llvm_cmake_options+=( ${arg} )
+    done
 
     if [[ "${llvm_target_arch}" ]] ; then
         llvm_cmake_options+=(
@@ -1898,7 +1947,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLVM_ENABLE_ASSERTIONS}")
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}"
-                    -DLLVM_INCLUDE_TESTS:BOOL=$(true_false "${SOURCE_TREE_INCLUDES_TESTS}")
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     "${llvm_cmake_options[@]}"
@@ -1955,7 +2003,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     native_swift_tools_path="$(build_directory "${LOCAL_HOST}" swift)/bin"
                 else
                     build_perf_testsuite_this_time=$(true_false "$(not ${SKIP_BUILD_BENCHMARKS})")
-                    build_tests_this_time=${SOURCE_TREE_INCLUDES_TESTS}
+                    build_tests_this_time=${SWIFT_INCLUDE_TESTS}
                 fi
 
                 # Command-line parameters override any autodetection that we
