@@ -141,7 +141,7 @@ extension Bool : Equatable, Hashable {
   }
 
   @_transparent
-  public static func ==(lhs: Bool, rhs: Bool) -> Bool {
+  public static func == (lhs: Bool, rhs: Bool) -> Bool {
     return Bool(Builtin.cmp_eq_Int1(lhs._value, rhs._value))
   }
 }
@@ -167,7 +167,7 @@ extension Bool {
   ///
   /// - Parameter a: The Boolean value to negate.
   @_transparent
-  public static prefix func !(a: Bool) -> Bool {
+  public static prefix func ! (a: Bool) -> Bool {
     return Bool(Builtin.xor_Int1(a._value, true._value))
   }
 }
@@ -206,7 +206,7 @@ extension Bool {
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
   @inline(__always)
-  public static func &&(lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
+  public static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
       -> Bool{
     return lhs ? try rhs() : false
   }
@@ -245,7 +245,7 @@ extension Bool {
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
   @inline(__always)
-  public static func ||(lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
+  public static func || (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
       -> Bool {
     return lhs ? true : try rhs()
   }

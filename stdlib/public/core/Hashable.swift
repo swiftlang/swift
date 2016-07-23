@@ -59,7 +59,7 @@
 ///             return x.hashValue ^ y.hashValue
 ///         }
 ///
-///         static func ==(lhs: GridPoint, rhs: GridPoint) -> Bool {
+///         static func == (lhs: GridPoint, rhs: GridPoint) -> Bool {
 ///             return lhs.x == rhs.x && lhs.y == rhs.y
 ///         }
 ///     }

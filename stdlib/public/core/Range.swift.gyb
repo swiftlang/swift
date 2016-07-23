@@ -553,7 +553,7 @@ extension ${Self} where Bound : _Strideable, Bound.Stride : SignedInteger {
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
+public func ..< <Bound : Comparable>(minimum: Bound, maximum: Bound)
   -> Range<Bound> {
   _precondition(minimum <= maximum,
     "Can't form Range with upperBound < lowerBound")

@@ -162,7 +162,7 @@ extension UInt {
 }
 
 extension OpaquePointer : Equatable {
-  public static func ==(lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
+  public static func == (lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
 }

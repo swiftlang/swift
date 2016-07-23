@@ -392,7 +392,7 @@ internal var _minASCIICharReprBuiltin: Builtin.Int63 {
 }
 
 extension Character : Equatable {
-  public static func ==(lhs: Character, rhs: Character) -> Bool {
+  public static func == (lhs: Character, rhs: Character) -> Bool {
     switch (lhs._representation, rhs._representation) {
     case let (.small(lbits), .small(rbits)) where
       Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
@@ -407,7 +407,7 @@ extension Character : Equatable {
 }
 
 extension Character : Comparable {
-  public static func <(lhs: Character, rhs: Character) -> Bool {
+  public static func < (lhs: Character, rhs: Character) -> Bool {
     switch (lhs._representation, rhs._representation) {
     case let (.small(lbits), .small(rbits)) where
       // Note: This is consistent with Foundation but unicode incorrect.

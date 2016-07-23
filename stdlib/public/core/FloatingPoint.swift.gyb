@@ -541,12 +541,12 @@ public enum FloatingPointRoundingRule {
 }
 
 @_transparent
-public prefix func +<T : FloatingPoint>(x: T) -> T {
+public prefix func + <T : FloatingPoint>(x: T) -> T {
   return x
 }
 
 @_transparent
-public prefix func -<T : FloatingPoint>(x: T) -> T {
+public prefix func - <T : FloatingPoint>(x: T) -> T {
   return x.negated()
 }
 
@@ -573,7 +573,7 @@ public func ${op[0]}=<T : FloatingPoint>(lhs: inout T, rhs: T) {
 %end
 
 @_transparent
-public func ==<T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
+public func == <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return lhs.isEqual(to: rhs)
 }
 
