@@ -123,7 +123,6 @@ KNOWN_SETTINGS=(
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
-    skip-test-llvm              ""              "set to skip testing LLVM. Set to true by default"
     skip-test-llbuild           ""               "set to skip testing llbuild"
     skip-test-swiftpm           ""               "set to skip testing swiftpm"
     skip-test-xctest            ""               "set to skip testing xctest"
@@ -161,6 +160,7 @@ KNOWN_SETTINGS=(
     build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     check-incremental-compilation "0"            "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
+    llvm-include-tests          "1"              "Set to true to generate testing targets for LLVM. Set to true by default."
     source-tree-includes-tests  "1"              "set to 0 to allow the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
@@ -669,12 +669,12 @@ function set_build_options_for_host() {
         -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
     )
 
-    # If we are asked to not test LLVM, do not include tools that are not used
-    # to test Swift.
+    # If we are asked to not generate test targets LLVM, do not generate targets
+    # for LLVM tools that are used to test LLVM, but are not used to test Swift.
     #
     # *NOTE* Currently we do not support testing LLVM via build-script. But in a
     # future commit we will.
-    if [[ $(true_false "${SKIP_TEST_LLVM}") == "TRUE" ]]; then
+    if [[ $(false_true "${LLVM_INCLUDE_TESTS}") == "TRUE" ]]; then
         llvm_cmake_options+=(
             # Do not include LLVM tests.
             -DLLVM_INCLUDE_TESTS:BOOL=NO
