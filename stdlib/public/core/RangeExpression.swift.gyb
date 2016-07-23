@@ -14,19 +14,30 @@
 /// convert itself to a `Range<Bound>` of indices within a given collection; 
 /// the collection can then slice itself with that `Range`.
 /// 
-/// -Warning: The requirements of RangeExpressible will change in a future version 
-///           of Swift. If you conform your own types to RangeExpressible, be 
-///           prepared to migrate them.
+/// -Warning: The requirements of RangeExpressible are likely to change 
+///           in a future version of Swift. If you conform your own 
+///           types to `RangeExpressible`, be prepared to migrate them.
 public protocol RangeExpression {
+  /// The type of the bounds of the `Range` produced by this 
+  /// type when used as a `RangeExpression`.
   associatedtype Bound : Comparable
   
   /// Returns `self` expressed as a `Range<Bound>` suitable for 
   /// slicing a collection with the indicated properties.
   /// 
-  /// -Note: The return value's bounds are *not* guaranteed to be in 
-  ///        `startIndex ..< endIndex`. Callers should apply the same 
-  ///        preconditions to the return value as they would to a range 
-  ///        provided directly by the user.
+  /// -Parameter bounds: The range of indices in the collection.
+  ///                    Equivalent to `startIndex ..< endIndex`
+  ///                    in `Collection`.
+  /// 
+  /// -Parameter offset: A function which can be used to add to or 
+  ///                    subtract from a bound. Equivalent to 
+  ///                    `index(_:offsetBy:)` in `Collection`.
+  /// 
+  /// -Returns: A `Range<Bound>` suitable for slicing a collection. 
+  ///           The return value is *not* guaranteed to be inside 
+  ///           `bounds`. Callers should apply the same preconditions 
+  ///           to the return value as they would to a range provided 
+  ///           directly by the user.
   /// 
   /// -Warning: This method is likely to be replaced in a future version of Swift.
   ///           If you are calling this method, we recommend using the 
@@ -43,10 +54,14 @@ public protocol RangeExpression {
 extension RangeExpression {
   /// Returns `self` expressed as a range of indices within `collection`.
   /// 
-  /// -Note: The return value is *not* guaranteed to be in the range 
-  ///        `startIndex ..< endIndex`. Callers should apply the same 
-  ///        preconditions to the return value as they would to a range 
-  ///        provided directly.
+  /// -Parameter collection: The collection `self` should be 
+  ///                        relative to.
+  /// 
+  /// -Returns: A `Range<Bound>` suitable for slicing `collection`. 
+  ///           The return value is *not* guaranteed to be inside 
+  ///           its bounds. Callers should apply the same preconditions 
+  ///           to the return value as they would to a range provided 
+  ///           directly by the user.
   /// 
   /// -RecommendedOver: `relative(to:offsettingBy:)`
   public func relative<C: Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
