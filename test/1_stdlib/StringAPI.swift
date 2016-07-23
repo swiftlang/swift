@@ -371,6 +371,47 @@ func asCCharArray(_ a: [UInt8]) -> [CChar] {
   return a.map { CChar(bitPattern: $0) }
 }
 
+func getCStringLength(_ cString: UnsafePointer<CChar>) -> Int {
+  var length = 0
+  while cString[length] != 0 {
+    length += 1
+  }
+  return length
+}
+
+func bindAsUTF8(_ cString: UnsafePointer<CChar>) -> UnsafePointer<UInt8> {
+  return UnsafeRawPointer(cString).bindMemory(to: UInt8.self,
+    capacity: getCStringLength(cString))
+}
+
+func expectEqualCString(_ lhs: UnsafePointer<CChar>,
+  _ rhs: UnsafePointer<CChar>) {
+
+  var index = 0
+  while lhs[index] != 0 {
+    expectEqual(lhs[index], rhs[index])
+    index += 1
+  }
+  expectEqual(0, rhs[index])
+}
+
+func expectEqualCString(_ lhs: UnsafePointer<CChar>,
+  _ rhs: ContiguousArray<CChar>) {
+  rhs.withUnsafeBufferPointer {
+    expectEqualCString(lhs, $0.baseAddress!)
+  }
+}
+
+func expectEqualCString(_ lhs: UnsafePointer<CChar>,
+  _ rhs: ContiguousArray<UInt8>) {
+  rhs.withUnsafeBufferPointer {
+    $0.baseAddress!.withMemoryRebound(
+      to: CChar.self, capacity: rhs.count) {
+      expectEqualCString(lhs, $0)
+    }
+  }
+}
+
 CStringTests.test("String.init(validatingUTF8:)") {
   do {
     let (s, dealloc) = getASCIICString()
@@ -394,18 +435,24 @@ CStringTests.test("String(cString:)") {
     let (s, dealloc) = getASCIICString()
     let result = String(cString: s)
     expectEqual("ab", result)
+    let su = bindAsUTF8(s)
+    expectEqual("ab", String(cString: su))
     dealloc()
   }
   do {
     let (s, dealloc) = getNonASCIICString()
     let result = String(cString: s)
     expectEqual("аб", result)
+    let su = bindAsUTF8(s)
+    expectEqual("аб", String(cString: su))
     dealloc()
   }
   do {
     let (s, dealloc) = getIllFormedUTF8String1()
     let result = String(cString: s)
     expectEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
+    let su = bindAsUTF8(s)
+    expectEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", String(cString: su))
     dealloc()
   }
 }
@@ -432,6 +479,23 @@ CStringTests.test("String.decodeCString") {
     let result = String.decodeCString(
       UnsafePointer(s), as: UTF8.self, repairingInvalidCodeUnits: false)
     expectEmpty(result)
+    dealloc()
+  }
+}
+
+CStringTests.test("String.nulTerminatedUTF8") {
+  do {
+    let (cstr, dealloc) = getASCIICString()
+    let str = String(cString: cstr)
+    expectEqualCString(cstr, str.nulTerminatedUTF8)
+    expectEqualCString(cstr, str.nulTerminatedUTF8CString)
+    dealloc()
+  }
+  do {
+    let (cstr, dealloc) = getNonASCIICString()
+    let str = String(cString: cstr)
+    expectEqualCString(cstr, str.nulTerminatedUTF8)
+    expectEqualCString(cstr, str.nulTerminatedUTF8CString)
     dealloc()
   }
 }

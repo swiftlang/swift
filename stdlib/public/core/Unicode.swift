@@ -429,6 +429,10 @@ public struct UTF8 : UnicodeCodec {
   public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
     return Int(_swift_stdlib_strlen(UnsafePointer(input)))
   }
+  // Support parsing C strings as-if they are UTF8 strings.
+  public static func _nullCodeUnitOffset(in input: UnsafePointer<CChar>) -> Int {
+    return Int(_swift_stdlib_strlen(input))
+  }
 }
 
 /// A codec for translating between Unicode scalar values and UTF-16 code
