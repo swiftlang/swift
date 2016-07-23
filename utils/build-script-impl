@@ -123,7 +123,7 @@ KNOWN_SETTINGS=(
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
-    skip-test-llvm              ""              "set to skip testing LLVM. Set to true by default"
+    skip-test-llvm              "1"              "set to skip testing LLVM. Set to true by default"
     skip-test-llbuild           ""               "set to skip testing llbuild"
     skip-test-swiftpm           ""               "set to skip testing swiftpm"
     skip-test-xctest            ""               "set to skip testing xctest"
