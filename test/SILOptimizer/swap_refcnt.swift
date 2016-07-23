@@ -13,7 +13,7 @@
 //
 // But really the strong_retains here should be optimized away.
 
-// REQUIRES: swift_test_mode_optimize_none
+// XFAIL: optimized_stdlib
 
 
 // CHECK-LABEL: sil @_TF11swap_refcnt11swapByIndex
