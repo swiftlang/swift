@@ -144,7 +144,7 @@ namespace swift {
     bool EnableExperimentalNestedGenericTypes = false;
 
     /// \brief Enable generalized collection casting.
-    bool EnableExperimentalCollectionCasts = false;
+    bool EnableExperimentalCollectionCasts = true;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
