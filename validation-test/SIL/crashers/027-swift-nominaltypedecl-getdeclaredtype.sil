@@ -1,5 +1,5 @@
 // RUN: not --crash %target-sil-opt %s
-// REQUIRES: asserts
+// REQUIRES: asserts, OS=linux-gnu
 bb0(@test_existential_metatype : $Int
 %0 to $@callee_owned (thin) -> ("01234567-cdef-> (thin) -> @owned @callee_owned (Int
 bb0:
