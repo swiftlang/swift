@@ -161,7 +161,7 @@ KNOWN_SETTINGS=(
     build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     check-incremental-compilation "0"            "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
     llvm-include-tests          "1"              "Set to true to generate testing targets for LLVM. Set to true by default."
-    source-tree-includes-tests  "1"              "set to 0 to allow the build to proceed when 'test' directory is missing (required for B&I builds)"
+    swift-include-tests         "1"              "Set to true to generate testing targets for Swift. This allows the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
@@ -1954,7 +1954,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     native_swift_tools_path="$(build_directory "${LOCAL_HOST}" swift)/bin"
                 else
                     build_perf_testsuite_this_time=$(true_false "$(not ${SKIP_BUILD_BENCHMARKS})")
-                    build_tests_this_time=${SOURCE_TREE_INCLUDES_TESTS}
+                    build_tests_this_time=${SWIFT_INCLUDE_TESTS}
                 fi
 
                 # Command-line parameters override any autodetection that we
