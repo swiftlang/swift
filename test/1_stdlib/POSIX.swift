@@ -100,7 +100,7 @@ POSIXTests.test("ioctl(CInt, UInt, CInt): fail") {
 
 #if os(Linux)
 // Successful creation of a socket and listing interfaces
-POSIXTests.test("ioctl(CInt, UInt, UnsafeMutablePointer<Void>): listing interfaces success") {
+POSIXTests.test("ioctl(CInt, UInt, UnsafeMutableRawPointer): listing interfaces success") {
   // Create a socket
   let sock = socket(PF_INET, 1, 0)
   expectGT(Int(sock), 0)
@@ -184,7 +184,7 @@ POSIXTests.test("fcntl(CInt, CInt, CInt): block and unblocking sockets success")
   expectEqual(0, rc)
 }
 
-POSIXTests.test("fcntl(CInt, CInt, UnsafeMutablePointer<Void>): locking and unlocking success") {
+POSIXTests.test("fcntl(CInt, CInt, UnsafeMutableRawPointer): locking and unlocking success") {
   // Create the file and add data to it...
   var fd = open(fn, O_CREAT | O_WRONLY, 0o666)
   expectGT(Int(fd), 0)

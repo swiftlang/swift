@@ -72,7 +72,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public func withUnsafeBytes<Result, ContentType>(
 		body: @noescape (UnsafePointer<ContentType>) throws -> Result) rethrows -> Result
 	{
-		var ptr: UnsafePointer<Void>? = nil
+		var ptr: UnsafeRawPointer? = nil
 		var size = 0
 		let data = __dispatch_data_create_map(__wrapped, &ptr, &size)
 		defer { _fixLifetime(data) }
@@ -82,7 +82,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public func enumerateBytes(
 		block: @noescape (buffer: UnsafeBufferPointer<UInt8>, byteIndex: Int, stop: inout Bool) -> Void) 
 	{
-		_swift_dispatch_data_apply(__wrapped) { (data: __DispatchData, offset: Int, ptr: UnsafePointer<Void>, size: Int) in
+		_swift_dispatch_data_apply(__wrapped) { (data: __DispatchData, offset: Int, ptr: UnsafeRawPointer, size: Int) in
 			let bp = UnsafeBufferPointer(start: UnsafePointer<UInt8>(ptr), count: size)
 			var stop = false
 			block(buffer: bp, byteIndex: offset, stop: &stop)
@@ -116,7 +116,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 
 	private func _copyBytesHelper(to pointer: UnsafeMutablePointer<UInt8>, from range: CountableRange<Index>) {
 		var copiedCount = 0
-		__dispatch_data_apply(__wrapped) { (data: __DispatchData, offset: Int, ptr: UnsafePointer<Void>, size: Int) in
+		__dispatch_data_apply(__wrapped) { (data: __DispatchData, offset: Int, ptr: UnsafeRawPointer, size: Int) in
 			let limit = Swift.min((range.endIndex - range.startIndex) - copiedCount, size)
 			memcpy(pointer + copiedCount, ptr, limit)
 			copiedCount += limit
@@ -179,7 +179,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 		var offset = 0
 		let subdata = __dispatch_data_copy_region(__wrapped, index, &offset)
 
-		var ptr: UnsafePointer<Void>? = nil
+		var ptr: UnsafeRawPointer? = nil
 		var size = 0
 		let map = __dispatch_data_create_map(subdata, &ptr, &size)
 		defer { _fixLifetime(map) }
@@ -235,7 +235,7 @@ public struct DispatchDataIterator : IteratorProtocol, Sequence {
 
 	/// Create an iterator over the given DispatchData
 	public init(_data: DispatchData) {
-		var ptr: UnsafePointer<Void>?
+		var ptr: UnsafeRawPointer?
 		self._count = 0
 		self._data = __dispatch_data_create_map(
 			_data as __DispatchData, &ptr, &self._count)
@@ -283,7 +283,7 @@ extension DispatchData {
 	}
 }
 
-typealias _swift_data_applier = @convention(block) @noescape (__DispatchData, Int, UnsafePointer<Void>, Int) -> Bool
+typealias _swift_data_applier = @convention(block) @noescape (__DispatchData, Int, UnsafeRawPointer, Int) -> Bool
 
 @_silgen_name("_swift_dispatch_data_apply")
 internal func _swift_dispatch_data_apply(_ data: __DispatchData, _ block: _swift_data_applier)

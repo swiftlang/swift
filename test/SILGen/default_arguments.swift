@@ -189,7 +189,7 @@ func testTakeDefaultArgUnnamed(_ i: Int) {
   takeDefaultArgUnnamed(i)
 }
 
-func takeDSOHandle(_ handle: UnsafeMutablePointer<Void> = #dsohandle) { }
+func takeDSOHandle(_ handle: UnsafeMutableRawPointer = #dsohandle) { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments13testDSOHandleFT_T_
 func testDSOHandle() {

@@ -52,7 +52,7 @@ func curry_bridged(_ x: CurryTest) -> (String!) -> String! {
 // CHECK:   strong_release %1
 // CHECK:   return {{%.*}} : $ImplicitlyUnwrappedOptional<String>
 
-func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutablePointer<Void>! {
+func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer! {
   return x.returnsInnerPointer
 }
 // CHECK-LABEL: sil hidden @_TF13objc_currying25curry_returnsInnerPointerFCSo9CurryTestFT_GSQGSpT___ : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>> {
@@ -131,6 +131,6 @@ func curry_returnsSelf_AnyObject(_ x: AnyObject) -> () -> AnyObject! {
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])
 // CHECK:         [[PA]]{{.*}}@owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>>
 
-func curry_returnsInnerPointer_AnyObject(_ x: AnyObject) -> () -> UnsafeMutablePointer<Void>! {
+func curry_returnsInnerPointer_AnyObject(_ x: AnyObject) -> () -> UnsafeMutableRawPointer! {
   return x.returnsInnerPointer!
 }
