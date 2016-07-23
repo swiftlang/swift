@@ -586,6 +586,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
   ManagedValue block = gen.emitManagedRValueWithCleanup(blockV);
 
   // Call the block.
+  // TODO: Emit directly into the indirect result.
   ManagedValue result = gen.emitMonomorphicApply(loc, block, args,
                            resultType,
                            ApplyOptions::None,
@@ -1128,6 +1129,18 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   }
 
   SmallVector<SILValue, 8> params;
+  
+  // Introduce indirect returns if necessary.
+  // TODO: Handle exploded results? We don't currently need to since the only
+  // bridged indirect type is Any.
+  SILValue indirectResult;
+  if (!nativeFnTy->getIndirectResults().empty()) {
+    assert(nativeFnTy->getIndirectResults().size() == 1
+           && "bridged exploded result?!");
+    indirectResult = new (F.getModule()) SILArgument(F.begin(),
+                             nativeFnTy->getIndirectResults()[0].getSILType());
+  }
+  
   for (auto *paramList : reversed(forwardedParameters))
     bindParametersForForwarding(paramList, params);
 
@@ -1190,11 +1203,16 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           break;
         case ParameterConvention::Indirect_Inout:
         case ParameterConvention::Indirect_InoutAliasable:
-          param = ManagedValue::forUnmanaged(paramValue);
+          param = ManagedValue::forLValue(paramValue);
           break;
         case ParameterConvention::Indirect_In:
+          param = emitManagedRValueWithCleanup(paramValue);
+          break;
         case ParameterConvention::Indirect_In_Guaranteed:
-          llvm_unreachable("indirect args in foreign thunked method not implemented");
+          auto tmp = emitTemporaryAllocation(fd, paramValue->getType());
+          B.createCopyAddr(fd, paramValue, tmp, IsNotTake, IsInitialization);
+          param = emitManagedRValueWithCleanup(tmp);
+          break;
         }
 
         maybeAddForeignErrorArg();
@@ -1251,17 +1269,23 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     CanType substResultTy{
         ArchetypeBuilder::mapTypeIntoContext(fd, nativeFormalResultTy)};
 
-    result = emitApply(fd, ManagedValue::forUnmanaged(fn),
+    auto resultMV = emitApply(fd, ManagedValue::forUnmanaged(fn),
                        subs, args, fnType,
                        AbstractionPattern(nativeFnTy->getGenericSignature(),
                                           nativeFormalResultTy),
                        substResultTy,
                        ApplyOptions::None, None, foreignError,
                        SGFContext())
-      .forwardAsSingleValue(*this, fd);
+      .getAsSingleValue(*this, fd);
+    // TODO: Emit directly into the indirect result.
+    if (indirectResult) {
+      resultMV.forwardInto(*this, fd, indirectResult);
+      result = emitEmptyTuple(fd);
+    } else {
+      result = resultMV.forward(*this);
+    }
   }
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(fd), result);
-
   // Emit the throw destination.
   emitRethrowEpilog(fd);
 }
