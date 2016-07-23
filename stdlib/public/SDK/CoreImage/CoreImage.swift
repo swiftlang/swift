@@ -49,10 +49,10 @@ extension CIFilter {
 #if os(OSX)
 extension CISampler {
   // - (id)initWithImage:(CIImage *)im keysAndValues:key0, ...;
-  convenience init(im: CIImage, elements: (String, AnyObject)...) {
-    var dict: [String : AnyObject] = [:]
+  convenience init(im: CIImage, elements: (String, Any)...) {
+    var dict: [NSObject : Any] = [:]
     for (key, value) in elements {
-      dict[key] = value
+      dict[key as NSObject] = value
     }
 
     // @objc(initWithImage:options:)
