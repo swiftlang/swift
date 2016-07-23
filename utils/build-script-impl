@@ -675,13 +675,13 @@ function set_build_options_for_host() {
     # *NOTE* Currently we do not support testing LLVM via build-script. But in a
     # future commit we will.
     if [[ $(false_true "${LLVM_INCLUDE_TESTS}") == "TRUE" ]]; then
-        llvm_cmake_options+=(
+        EXTRA_LLVM_CMAKE_OPTIONS=(
             # Do not include LLVM tests.
             -DLLVM_INCLUDE_TESTS:BOOL=NO
             -DCLANG_INCLUDE_TESTS:BOOL=NO
         )
 
-        # Disable LLVM Tools that we do not use.
+        # Disable LLVM Tools that Swift does not use for testing.
         LLVM_TOOLS_TO_DISABLE=(
             BUGPOINT BUGPOINT_PASSES GOLD LLI LLVM_AS_FUZZER LLVM_C_TEST
             LLVM_CXXDUMP LLVM_DIFF LLVM_DIS LLVM_DWP LLVM_EXTRACT LLVM_GO
@@ -690,21 +690,58 @@ function set_build_options_for_host() {
             LLVM_STRESS LLVM_SYMBOLIZER MSBUILD OBJ2YAML OPT SANCOV SANSTATS
             VERIFY_USELISTORDER XCODE_TOOLCHAIN YAML2OBJ
         )
+
+        # Disable Clang Tools that Swift does not use for testing.
+        CLANG_TOOLS_TO_DISABLE=(
+            CLANG_CHECK DIAGTOOL SCAN_BUILD SCAN_VIEW CLANG_FORMAT
+        )
+
+        # If in addition we are asked to not generate targets for swift tests,
+        # then we can disable the building of even more of LLVM.
+        if [[ $(false_true "${SWIFT_INCLUDE_TESTS}") == "TRUE" ]]; then
+            EXTRA_LLVM_CMAKE_OPTIONS+=(
+                # We do not need gtest/FileCheck and friends since we are not
+                # running any tests.
+                -DLLVM_INCLUDE_UTILS:BOOL=NO
+            )
+
+            # Disable the rest of the LLVM tools. We do not need any of them.
+            LLVM_TOOLS_TO_DISABLE+=(
+                DSYMUTIL LLC LLVM_AR LLVM_AS LLVM_BCANALYZER LLVM_COV
+                LLVM_DWARFDUMP LLVM_LINK LLVM_NM LLVM_OBJDUMP LLVM_PROFDATA
+            )
+
+            # Disable the rest of the Clang tools. We do not need them.
+            CLANG_TOOLS_TO_DISABLE+=(
+                ARCMT_TEST C_ARCMT_TEST C_INDEX_TEST
+            )
+
+            # If in addition, we are not building compiler-rt, then we do not
+            # even need to build clang.
+            #
+            # *NOTE* This may change once we start building the standard library
+            # *with the just built clang.
+            if [[ $(true_false "${SKIP_BUILD_COMPILER_RT}") == "TRUE" ]]; then
+                CLANG_TOOLS_TO_DISABLE+=(
+                    DRIVER
+                )
+            fi
+        fi
+
+        for arg in "${EXTRA_LLVM_CMAKE_ARGS[@]}"; do
+            llvm_cmake_options+=( "${arg}" )
+        done
         for tool in "${LLVM_TOOLS_TO_DISABLE[@]}"; do
             llvm_cmake_options+=(
                 -DLLVM_TOOL_${tool}_BUILD:BOOL=NO
             )
         done
 
-        # Disable Clang Tools that we do not use.
-        CLANG_TOOLS_TO_DISABLE=(
-            CLANG_CHECK DIAGTOOL SCAN_BUILD SCAN_VIEW CLANG_FORMAT
-        )
         for tool in "${CLANG_TOOLS_TO_DISABLE[@]}"; do
             llvm_cmake_options+=(
                 -DCLANG_TOOL_${tool}_BUILD:BOOL=NO
             )
-        done    
+        done
     fi
 
     if [[ "${llvm_target_arch}" ]] ; then
