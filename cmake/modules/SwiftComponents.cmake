@@ -1,3 +1,5 @@
+include(SwiftList)
+
 # Swift Components
 # ----------------
 #
@@ -67,10 +69,34 @@
 set(_SWIFT_DEFINED_COMPONENTS
   "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
+# Configure the "Swift Component" system.
+#
+# *NOTE* We generally prefer functions over macros, but in this case, we need a
+# macro to insure that SWIFT_{INCLUDE,BUILD,INSTALL}_COMPONENTS are
+# available/cached at the top CMake scope.
 macro(swift_configure_components)
-  # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
+  # Define our sets of components. By default, all components are "install
+  # components".
+  set(SWIFT_INCLUDE_COMPONENTS "" CACHE STRING
+    "A semicolon-separated list of components to generate cmake targets for. \
+Must be disjoint from SWIFT_BUILD_COMPONENTS and SWIFT_INSTALL_COMPONENTS")
+  set(SWIFT_BUILD_COMPONENTS "" CACHE STRING
+    "A semicolon-separated list of components to build by default. Must be \
+disjoint from SWIFT_INCLUDE_COMPONENTS and SWIFT_INSTALL_COMPONENTS")
   set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_DEFINED_COMPONENTS}" CACHE STRING
     "A semicolon-separated list of components to install ${_SWIFT_DEFINED_COMPONENTS}")
+
+  # Make sure each component set does not have duplicates. This is necessary
+  # since these sets are represented in cmake as lists.
+  precondition_list_is_set(SWIFT_INCLUDE_COMPONENTS)
+  precondition_list_is_set(SWIFT_BUILD_COMPONENTS)
+  precondition_list_is_set(SWIFT_INSTALL_COMPONENTS)
+
+  # Then make sure that each one of our sets are disjoint.
+  precondition_list_is_disjoint(
+    SWIFT_INCLUDE_COMPONENTS
+    SWIFT_BUILD_COMPONENTS
+    SWIFT_INSTALL_COMPONENTS)
 
   foreach(component ${_SWIFT_DEFINED_COMPONENTS})
     string(TOUPPER "${component}" var_name_piece)
