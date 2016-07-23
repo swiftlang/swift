@@ -7,8 +7,8 @@ import Foundation
 
 func takesMutablePointer(_ x: UnsafeMutablePointer<Int>) {}
 func takesConstPointer(_ x: UnsafePointer<Int>) {}
-func takesMutableVoidPointer(_ x: UnsafeMutablePointer<Void>) {}
-func takesConstVoidPointer(_ x: UnsafePointer<Void>) {}
+func takesMutableVoidPointer(_ x: UnsafeMutableRawPointer) {}
+func takesConstVoidPointer(_ x: UnsafeRawPointer) {}
 func takesMutableRawPointer(_ x: UnsafeMutableRawPointer) {}
 func takesConstRawPointer(_ x: UnsafeRawPointer) {}
 

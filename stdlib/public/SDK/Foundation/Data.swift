@@ -13,13 +13,13 @@
 @_exported import Foundation // Clang module
 
 @_silgen_name("__NSDataInvokeDeallocatorVM")
-internal func __NSDataInvokeDeallocatorVM(_ mem: UnsafeMutablePointer<Void>, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorVM(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
 
 @_silgen_name("__NSDataInvokeDeallocatorUnmap")
-internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutablePointer<Void>, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
 
 @_silgen_name("__NSDataInvokeDeallocatorFree")
-internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutablePointer<Void>, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
 
 @_silgen_name("_NSWriteDataToFile_Swift")
 internal func _NSWriteDataToFile_Swift(url: URL, data: NSData, options: UInt, error: NSErrorPointer) -> Bool
@@ -103,7 +103,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
         /// A custom deallocator.
         case custom((UnsafeMutablePointer<UInt8>, Int) -> Void)
         
-        fileprivate var _deallocator : ((UnsafeMutablePointer<Void>, Int) -> Void)? {
+        fileprivate var _deallocator : ((UnsafeMutableRawPointer, Int) -> Void)? {
             switch self {
             case .virtualMemory:
                 return { __NSDataInvokeDeallocatorVM($0, $1) }
@@ -270,7 +270,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     }
 
 
-    private func _getUnsafeBytesPointer() -> UnsafePointer<Void> {
+    private func _getUnsafeBytesPointer() -> UnsafeRawPointer {
         return _mapUnmanaged { return $0.bytes }
     }
     
@@ -283,7 +283,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
         return try body(UnsafePointer(bytes))
     }
     
-    private mutating func _getUnsafeMutableBytesPointer() -> UnsafeMutablePointer<Void> {
+    private mutating func _getUnsafeMutableBytesPointer() -> UnsafeMutableRawPointer {
         return _applyUnmanagedMutation {
             return $0.mutableBytes
         }
@@ -665,10 +665,10 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     }
     
     @available(*, unavailable, message: "use withUnsafeBytes instead")
-    public var bytes: UnsafePointer<Void> { fatalError() }
+    public var bytes: UnsafeRawPointer { fatalError() }
     
     @available(*, unavailable, message: "use withUnsafeMutableBytes instead")
-    public var mutableBytes: UnsafeMutablePointer<Void> { fatalError() }
+    public var mutableBytes: UnsafeMutableRawPointer { fatalError() }
 
     /// Returns `true` if the two `Data` arguments are equal.
     public static func ==(d1 : Data, d2 : Data) -> Bool {
@@ -717,7 +717,7 @@ extension _SwiftNSData {
     }
     
     @objc(bytes)
-    var bytes : UnsafePointer<Void> {
+    var bytes : UnsafeRawPointer {
         return _mapUnmanaged { $0.bytes }
     }
     
@@ -727,12 +727,12 @@ extension _SwiftNSData {
     }
     
     @objc(getBytes:length:)
-    func getBytes(_ buffer: UnsafeMutablePointer<Void>, length: Int) {
+    func getBytes(_ buffer: UnsafeMutableRawPointer, length: Int) {
         return _mapUnmanaged { $0.getBytes(buffer, length: length) }
     }
     
     @objc(getBytes:range:)
-    func getBytes(_ buffer: UnsafeMutablePointer<Void>, range: NSRange) {
+    func getBytes(_ buffer: UnsafeMutableRawPointer, range: NSRange) {
         return _mapUnmanaged { $0.getBytes(buffer, range: range) }
     }
     
@@ -754,7 +754,7 @@ extension _SwiftNSData {
     }
     
     @objc(enumerateByteRangesUsingBlock:)
-    func enumerateByteRanges(using block: @noescape (UnsafePointer<Void>, NSRange, UnsafeMutablePointer<ObjCBool>) -> Void) {
+    func enumerateByteRanges(using block: @noescape (UnsafeRawPointer, NSRange, UnsafeMutablePointer<ObjCBool>) -> Void) {
         return _mapUnmanaged { $0.enumerateBytes(block) }
     }
     

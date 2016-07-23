@@ -39,7 +39,7 @@ extension AudioBuffer {
     numberOfChannels: Int
   ) {
     self.mNumberChannels = UInt32(numberOfChannels)
-    self.mData = UnsafeMutablePointer<Void>(typedBuffer.baseAddress)
+    self.mData = UnsafeMutableRawPointer(typedBuffer.baseAddress)
     self.mDataByteSize = UInt32(typedBuffer.count * strideof(Element.self))
   }
 }

@@ -35,7 +35,7 @@ class TestData : TestDataSuper {
     class AllOnesData : NSMutableData {
         
         private var _length : Int
-        var _pointer : UnsafeMutableBufferPointer<Void>? {
+        var _pointer : UnsafeMutableBufferPointer<UInt8>? {
             willSet {
                 if let p = _pointer { free(p.baseAddress) }
             }
@@ -78,7 +78,7 @@ class TestData : TestDataSuper {
             }
         }
         
-        override var bytes : UnsafePointer<Void> {
+        override var bytes : UnsafeRawPointer {
             if let d = _pointer {
                 return UnsafePointer(d.baseAddress!)
             } else {
@@ -92,7 +92,7 @@ class TestData : TestDataSuper {
             }
         }
         
-        override var mutableBytes: UnsafeMutablePointer<Void> {
+        override var mutableBytes: UnsafeMutableRawPointer {
             let newBufferLength = _length
             let newBuffer = malloc(newBufferLength)
             if let ptr = _pointer {
@@ -109,7 +109,7 @@ class TestData : TestDataSuper {
             return result.baseAddress!
         }
         
-        override func getBytes(_ buffer: UnsafeMutablePointer<Void>, length: Int) {
+        override func getBytes(_ buffer: UnsafeMutableRawPointer, length: Int) {
             if let d = _pointer {
                 // Get the real data from the buffer
                 memmove(buffer, d.baseAddress, length)
@@ -442,7 +442,7 @@ class TestData : TestDataSuper {
             let buffer = malloc(16)!
             var data = Data(bytesNoCopy: UnsafeMutablePointer<UInt8>(buffer), count: 16, deallocator: .custom({ (ptr, size) in
                 deallocatorCalled = true
-                free(UnsafeMutablePointer<Void>(ptr))
+                free(UnsafeMutableRawPointer(ptr))
             }))
             // Use the data
             data[0] = 1

@@ -154,7 +154,7 @@ func maybeApplyBlock(_ f: (@convention(block) (Gizmo) -> Gizmo)?, x: Gizmo) -> G
   return f?(x)
 }
 
-func useInnerPointer(_ p: UnsafeMutablePointer<Void>) {}
+func useInnerPointer(_ p: UnsafeMutableRawPointer) {}
 
 // Handle inner-pointer methods by autoreleasing self after the call.
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions18innerPointerMethod

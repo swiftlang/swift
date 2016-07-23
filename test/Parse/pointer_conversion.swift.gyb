@@ -22,7 +22,7 @@ class C {}
 class D {}
 
 func takesMutablePointer(_ x: UnsafeMutablePointer<Int>${suffix}) {}
-func takesMutableVoidPointer(_ x: UnsafeMutablePointer<Void>${suffix}) {}
+func takesMutableVoidPointer(_ x: UnsafeMutableRawPointer${suffix}) {}
 func takesMutableRawPointer(_ x: UnsafeMutableRawPointer${suffix}) {}
 func takesMutableInt8Pointer(_ x: UnsafeMutablePointer<Int8>${suffix}) {}
 func takesMutableArrayPointer(_ x: UnsafeMutablePointer<[Int]>${suffix}) {}
@@ -30,7 +30,7 @@ func takesMutableArrayPointer(_ x: UnsafeMutablePointer<[Int]>${suffix}) {}
 func takesConstPointer(_ x: UnsafePointer<Int>${suffix}) -> Character { return "x" }
 func takesConstInt8Pointer(_ x: UnsafePointer<Int8>${suffix}) {}
 func takesConstUInt8Pointer(_ x: UnsafePointer<UInt8>${suffix}) {}
-func takesConstVoidPointer(_ x: UnsafePointer<Void>${suffix}) {}
+func takesConstVoidPointer(_ x: UnsafeRawPointer${suffix}) {}
 func takesConstRawPointer(_ x: UnsafeRawPointer${suffix}) {}
 
 func mutablePointerArguments(_ p: UnsafeMutablePointer<Int>,
@@ -74,26 +74,26 @@ func mutableVoidPointerArguments(_ p: UnsafeMutablePointer<Int>,
 
   takesMutableVoidPointer(p)
   takesMutableVoidPointer(fp)
-  takesMutableVoidPointer(cp) // expected-error{{cannot convert value of type 'UnsafePointer<Int>' to expected argument type 'UnsafeMutablePointer<Void>${suffix}'}}
+  takesMutableVoidPointer(cp) // expected-error{{cannot convert value of type 'UnsafePointer<Int>' to expected argument type 'UnsafeMutableRawPointer${suffix}'}}
   var i: Int = 0
   var f: Float = 0
   takesMutableVoidPointer(&i)
   takesMutableVoidPointer(&f)
-  takesMutableVoidPointer(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'UnsafeMutablePointer<Void>${suffix}'}}
-  takesMutableVoidPointer(f) // expected-error{{cannot convert value of type 'Float' to expected argument type 'UnsafeMutablePointer<Void>${suffix}'}}
+  takesMutableVoidPointer(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'UnsafeMutableRawPointer${suffix}'}}
+  takesMutableVoidPointer(f) // expected-error{{cannot convert value of type 'Float' to expected argument type 'UnsafeMutableRawPointer${suffix}'}}
   var ii: [Int] = [0, 1, 2]
   var dd: [CInt] = [1, 2, 3]
   var ff: [Int] = [0, 1, 2]
   takesMutableVoidPointer(&ii)
   takesMutableVoidPointer(&dd)
   takesMutableVoidPointer(&ff)
-  takesMutableVoidPointer(ii) // expected-error{{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutablePointer<Void>${suffix}'}}
-  takesMutableVoidPointer(ff) // expected-error{{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutablePointer<Void>${suffix}'}}
+  takesMutableVoidPointer(ii) // expected-error{{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutableRawPointer${suffix}'}}
+  takesMutableVoidPointer(ff) // expected-error{{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutableRawPointer${suffix}'}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeMutablePointer<Void> = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeMutablePointer<Void>'}}
-  x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeMutablePointer<Void>'}}
-  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' (aka 'inout Array<Int>') to type 'UnsafeMutablePointer<Void>'}}
+  var x: UnsafeMutableRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeMutableRawPointer'}}
+  x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeMutableRawPointer'}}
+  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' (aka 'inout Array<Int>') to type 'UnsafeMutableRawPointer'}}
   _ = x
 }
 
@@ -192,12 +192,12 @@ func constVoidPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesConstVoidPointer([0.0, 1.0, 2.0])  // expected-error {{cannot convert value of type 'Double' to expected element type '()'}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafePointer<Void> = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = ii // expected-error{{cannot assign value of type '[Int]' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = fp // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Float>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = cp // expected-error{{cannot assign value of type 'UnsafePointer<Int>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = cfp // expected-error{{cannot assign value of type 'UnsafePointer<Float>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
+  var x: UnsafeRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeRawPointer' (aka 'UnsafePointer<()>')}}
+  x = ii // expected-error{{cannot assign value of type '[Int]' to type 'UnsafeRawPointer' (aka 'UnsafePointer<()>')}}
+  x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeRawPointer' (aka 'UnsafePointer<()>')}}
+  x = fp // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Float>' to type 'UnsafeRawPointer' (aka 'UnsafePointer<()>')}}
+  x = cp // expected-error{{cannot assign value of type 'UnsafePointer<Int>' to type 'UnsafeRawPointer' (aka 'UnsafePointer<()>')}}
+  x = cfp // expected-error{{cannot assign value of type 'UnsafePointer<Float>' to type 'UnsafeRawPointer' (aka 'UnsafePointer<()>')}}
   _ = x
 }
 
@@ -250,7 +250,7 @@ func stringArguments(_ s: String) {
   takesConstUInt8Pointer(s)
   takesConstPointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafePointer<Int>${suffix}'}}
 
-  takesMutableVoidPointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafeMutablePointer<Void>${suffix}'}}
+  takesMutableVoidPointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafeMutableRawPointer${suffix}'}}
   takesMutableRawPointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafeMutableRawPointer${suffix}'}}
   takesMutableInt8Pointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafeMutablePointer<Int8>${suffix}'}}
   takesMutableInt8Pointer(&s) // expected-error{{cannot convert value of type 'String' to expected argument type 'Int8'}}
@@ -315,8 +315,8 @@ func f19478919() {
   GLKProject(&viewport)  // expected-error {{cannot convert value of type 'Int' to expected argument type 'Int32'}}
 
   func GLKProjectUP(_ a : UnsafePointer<Int32>) {}
-  func UP_Void(_ a : UnsafePointer<Void>) {}
-  func UMP_Void(_ a : UnsafeMutablePointer<Void>) {}
+  func UP_Void(_ a : UnsafeRawPointer) {}
+  func UMP_Void(_ a : UnsafeMutableRawPointer) {}
   UP_Void(&viewport)
   UMP_Void(&viewport)
 
