@@ -21,12 +21,12 @@ func test_UnicodeScalarDoesNotImplementArithmetic(_ us: UnicodeScalar, i: Int) {
   let b4 = us / us // expected-error {{binary operator '/' cannot be applied to two 'UnicodeScalar' operands}}
   // expected-note @-1 {{overloads for '/' exist with these partially matching parameter lists:}}
 
-  let c1 = us + i // expected-error {{binary operator '+' cannot be applied to operands of type 'UnicodeScalar' and 'Int'}} expected-note{{overloads for '+' exist with these partially matching parameter lists:}}
-  let c2 = us - i // expected-error {{binary operator '-' cannot be applied to operands of type 'UnicodeScalar' and 'Int'}} expected-note{{overloads for '-' exist with these partially matching parameter lists:}}
+  let c1 = us + i // expected-error {{binary operator '+' cannot be applied to operands of type 'UnicodeScalar' and 'Int'}} expected-note{{expected an argument list of type '(Int, Int)'}}
+  let c2 = us - i // expected-error {{binary operator '-' cannot be applied to operands of type 'UnicodeScalar' and 'Int'}} expected-note{{expected an argument list of type '(Int, Int)'}}
   let c3 = us * i // expected-error {{binary operator '*' cannot be applied to operands of type 'UnicodeScalar' and 'Int'}} expected-note {{expected an argument list of type '(Int, Int)'}}
   let c4 = us / i // expected-error {{binary operator '/' cannot be applied to operands of type 'UnicodeScalar' and 'Int'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
-  let d1 = i + us // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UnicodeScalar'}} expected-note{{overloads for '+' exist with these partially matching parameter lists:}}
+  let d1 = i + us // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UnicodeScalar'}} expected-note{{expected an argument list of type '(Int, Int)'}}
   let d2 = i - us // expected-error {{binary operator '-' cannot be applied to operands of type 'Int' and 'UnicodeScalar'}} expected-note {{expected an argument list of type '(Int, Int)'}}
   let d3 = i * us // expected-error {{binary operator '*' cannot be applied to operands of type 'Int' and 'UnicodeScalar'}} expected-note {{expected an argument list of type '(Int, Int)'}}
   let d4 = i / us // expected-error {{binary operator '/' cannot be applied to operands of type 'Int' and 'UnicodeScalar'}} expected-note {{expected an argument list of type '(Int, Int)'}}
