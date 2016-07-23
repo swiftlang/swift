@@ -3692,7 +3692,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
         }
       }
     } else if (contextDecl == CS->TC.Context.getUnsafePointerDecl() ||
-               contextDecl == CS->TC.Context.getUnsafeMutablePointerDecl()) {
+               contextDecl == CS->TC.Context.getUnsafeMutablePointerDecl() ||
+               contextDecl == CS->TC.Context.getUnsafeRawPointerDecl() ||
+               contextDecl == CS->TC.Context.getUnsafeMutableRawPointerDecl()) {
       SmallVector<Type, 4> scratch;
       for (Type arg : contextualType->getAllGenericArgs(scratch)) {
         if (arg->isEqual(exprType) && expr->getType()->isLValueType()) {
@@ -5080,7 +5082,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
           unwrappedType->getAnyPointerElementType(pointerKind)) {
 
       // If the element type is Void, then we allow any input type, since
-      // everything is convertible to UnsafePointer<Void>
+      // everything is convertible to UnsafeRawPointer
       if (pointerEltType->isVoid())
         contextualType = Type();
       else
@@ -5094,7 +5096,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
         // it is mutable.
         if (pointerKind == PTK_UnsafeMutablePointer) {
           contextualType = ArraySliceType::get(contextualType);
-        } else if (pointerKind == PTK_UnsafePointer) {
+        } else if (pointerKind == PTK_UnsafePointer || pointerKind == PTK_UnsafeRawPointer) {
           // If we're converting to an UnsafePointer, then the programmer
           // specified an & unnecessarily.  Produce a fixit hint to remove it.
           diagnose(IOE->getLoc(), diag::extra_address_of_unsafepointer,

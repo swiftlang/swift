@@ -134,20 +134,20 @@ public func identityComp(_ element: MinimalComparableValue)
 }
 
 public func expectEqual<T : Equatable>(_ expected: T, _ actual: T, ${TRACE}) {
-  expectEqual(expected, actual, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected, actual, ${trace}, showFrame: false) {$0 == $1}
 }
 
 public func expectEqual<T : Equatable, U : Equatable>(
   _ expected: (T, U), _ actual: (T, U), ${TRACE}) {
-  expectEqual(expected.0, actual.0, ${trace}, showFrame: false) {$0 == $1}
-  expectEqual(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.0, actual.0, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
 }
 
 public func expectEqual<T : Equatable, U : Equatable, V : Equatable>(
   _ expected: (T, U, V), _ actual: (T, U, V), ${TRACE}) {
-  expectEqual(expected.0, actual.0, ${trace}, showFrame: false) {$0 == $1}
-  expectEqual(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
-  expectEqual(expected.2, actual.2, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.0, actual.0, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.2, actual.2, ${trace}, showFrame: false) {$0 == $1}
 }
 
 public func expectationFailure(
@@ -160,7 +160,10 @@ public func expectationFailure(
   print(message, terminator: message == "" ? "" : "\n")
 }
 
-public func expectEqual<T>(
+// Renamed to avoid collision with expectEqual(_, _, TRACE).
+// See <rdar://26058520> Generic type constraints incorrectly applied to
+// functions with the same name
+public func expectEqualTest<T>(
   _ expected: T, _ actual: T, ${TRACE}, sameValue equal: (T, T) -> Bool
 ) {
   if !equal(expected, actual) {
@@ -230,7 +233,7 @@ public func expectNotEqual<T : Equatable>(
 public func expectEqual${Generic}(
   _ expected: ${EquatableType}, _ actual: ${EquatableType}, ${TRACE}
 ) {
-  expectEqual(expected, actual, ${trace}, showFrame: false) { $0 == $1 }
+  expectEqualTest(expected, actual, ${trace}, showFrame: false) { $0 == $1 }
 }
 
 public func expectOptionalEqual${Generic}(

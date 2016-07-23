@@ -2712,6 +2712,8 @@ enum { NumOptionalTypeKinds = 2 };
   
 // Kinds of pointer types.
 enum PointerTypeKind : unsigned {
+  PTK_UnsafeMutableRawPointer,
+  PTK_UnsafeRawPointer,
   PTK_UnsafeMutablePointer,
   PTK_UnsafePointer,
   PTK_AutoreleasingUnsafeMutablePointer,
