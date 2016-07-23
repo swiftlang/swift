@@ -181,7 +181,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// methods are fully applied when they can't support partial application.
     void checkInvalidPartialApplication(Expr *E) {
       if (auto AE = dyn_cast<ApplyExpr>(E)) {
-        Expr *fnExpr = AE->getFn()->getSemanticsProvidingExpr();
+        Expr *fnExpr = AE->getSemanticFn();
         if (auto forceExpr = dyn_cast<ForceValueExpr>(fnExpr))
           fnExpr = forceExpr->getSubExpr()->getSemanticsProvidingExpr();
         if (auto dotSyntaxExpr = dyn_cast<DotSyntaxBaseIgnoredExpr>(fnExpr))

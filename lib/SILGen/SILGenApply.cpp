@@ -843,8 +843,7 @@ public:
         // actually be using the allocating constructor. Update the type
         // appropriately.
         // FIXME: Re-derive the type from the declaration + substitutions?
-        auto ctorRef = cast<OtherConstructorDeclRefExpr>(
-                         site->getFn()->getSemanticsProvidingExpr());
+        auto ctorRef = cast<OtherConstructorDeclRefExpr>(site->getSemanticFn());
         auto fnType = ctorRef->getType()->castTo<FunctionType>();
         auto selfTy = MetatypeType::get(
                         fnType->getInput()->getInOutObjectType());

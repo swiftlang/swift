@@ -4709,7 +4709,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       if (!apply)
         return { true, E };
 
-      auto Callee = apply->getFn()->getSemanticsProvidingExpr();
+      auto Callee = apply->getSemanticFn();
       
       Expr *arg;
 

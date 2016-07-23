@@ -2561,7 +2561,7 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 
     if (parts.back().getKind() == ConstraintLocator::ApplyFunction) {
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        anchor = applyExpr->getFn()->getSemanticsProvidingExpr();
+        anchor = applyExpr->getSemanticFn();
       }
       parts.pop_back();
       continue;

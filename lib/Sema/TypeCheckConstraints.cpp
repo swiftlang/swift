@@ -779,7 +779,7 @@ namespace {
 
               // If the function being called is not our unresolved initializer
               // reference, we're done.
-              if (apply->getFn()->getSemanticsProvidingExpr() != unresolvedDot)
+              if (apply->getSemanticFn() != unresolvedDot)
                 break;
 
               foundApply = true;

@@ -3176,7 +3176,8 @@ protected:
 public:
   Expr *getFn() const { return Fn; }
   void setFn(Expr *e) { Fn = e; }
-
+  Expr *getSemanticFn() const { return Fn->getSemanticsProvidingExpr(); }
+  
   Expr *getArg() const { return ArgAndIsSuper.getPointer(); }
   void setArg(Expr *e) {
     assert((getKind() != ExprKind::Binary || isa<TupleExpr>(e)) &&
