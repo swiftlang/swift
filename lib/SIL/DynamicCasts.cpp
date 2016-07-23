@@ -19,12 +19,6 @@
 using namespace swift;
 using namespace Lowering;
 
-static DynamicCastFeasibility weakenSuccess(DynamicCastFeasibility v) {
-  if (v == DynamicCastFeasibility::WillSucceed)
-    return DynamicCastFeasibility::MaySucceed;
-  return v;
-}
-
 static unsigned getAnyMetatypeDepth(CanType type) {
   unsigned depth = 0;
   while (auto metatype = dyn_cast<AnyMetatypeType>(type)) {
@@ -183,6 +177,14 @@ bool swift::isError(Module *M, CanType Ty) {
   return false;
 }
 
+/// Given that a type is not statically known to be an optional type, check whether
+/// it might dynamically be an optional type.
+static bool canDynamicallyBeOptionalType(CanType type) {
+  assert(!type.getAnyOptionalObjectType());
+  return (isa<ArchetypeType>(type) || type.isExistentialType())
+      && !type.isAnyClassReferenceType();
+}
+
 /// Try to classify the dynamic-cast relationship between two types.
 DynamicCastFeasibility
 swift::classifyDynamicCast(Module *M,
@@ -195,21 +197,30 @@ swift::classifyDynamicCast(Module *M,
   auto sourceObject = source.getAnyOptionalObjectType();
   auto targetObject = target.getAnyOptionalObjectType();
 
-  // A common level of optionality doesn't affect the feasibility.
+  // A common level of optionality doesn't affect the feasibility,
+  // except that we can't fold things to failure because nil inhabits
+  // both types.
   if (sourceObject && targetObject) {
-    return classifyDynamicCast(M, sourceObject, targetObject);
+    return atWorst(classifyDynamicCast(M, sourceObject, targetObject),
+                   DynamicCastFeasibility::MaySucceed);
 
-  // Nor does casting to a more optional type.
+  // Casting to a more optional type follows the same rule unless we
+  // know that the source cannot dynamically be an optional value,
+  // in which case we'll always just cast and inject into an optional.
   } else if (targetObject) {
-    return classifyDynamicCast(M, source, targetObject,
-                               /* isSourceTypeExact */ false,
-                               isWholeModuleOpts);
+    auto result = classifyDynamicCast(M, source, targetObject,
+                                      /* isSourceTypeExact */ false,
+                                      isWholeModuleOpts);
+    if (canDynamicallyBeOptionalType(source))
+      result = atWorst(result, DynamicCastFeasibility::MaySucceed);
+    return result;
 
   // Casting to a less-optional type can always fail.
   } else if (sourceObject) {
-    return weakenSuccess(classifyDynamicCast(M, sourceObject, target,
-                                             /* isSourceTypeExact */ false,
-                                             isWholeModuleOpts));
+    return atBest(classifyDynamicCast(M, sourceObject, target,
+                                      /* isSourceTypeExact */ false,
+                                      isWholeModuleOpts),
+                  DynamicCastFeasibility::MaySucceed);
   }
   assert(!sourceObject && !targetObject);
 
@@ -470,6 +481,40 @@ swift::classifyDynamicCast(Module *M,
   if (isError(M, source) && isError(M, target)) {
     // TODO: Cast to NSError succeeds always.
     return DynamicCastFeasibility::MaySucceed;
+  }
+
+  // Check for a viable collection cast.
+  if (auto sourceStruct = dyn_cast<BoundGenericStructType>(source)) {
+    if (auto targetStruct = dyn_cast<BoundGenericStructType>(target)) {
+
+      // Both types have to be the same kind of collection.
+      auto typeDecl = sourceStruct->getDecl();
+      if (typeDecl == targetStruct->getDecl()) {
+        auto sourceArgs = sourceStruct.getGenericArgs();
+        auto targetArgs = targetStruct.getGenericArgs();
+
+        // Note that we can never say that a collection cast is impossible:
+        // a cast can always succeed on an empty collection.
+
+        // Arrays and sets.
+        if (typeDecl == M->getASTContext().getArrayDecl() ||
+            typeDecl == M->getASTContext().getSetDecl()) {
+          auto valueFeasibility =
+            classifyDynamicCast(M, sourceArgs[0], targetArgs[0]);
+          return atWorst(valueFeasibility,
+                         DynamicCastFeasibility::MaySucceed);
+
+        // Dictionaries.
+        } else if (typeDecl == M->getASTContext().getDictionaryDecl()) {
+          auto keyFeasibility =
+            classifyDynamicCast(M, sourceArgs[0], targetArgs[0]);
+          auto valueFeasibility =
+            classifyDynamicCast(M, sourceArgs[1], targetArgs[1]);
+          return atWorst(atBest(keyFeasibility, valueFeasibility),
+                         DynamicCastFeasibility::MaySucceed);
+        }
+      }
+    }
   }
 
   return DynamicCastFeasibility::WillFail;

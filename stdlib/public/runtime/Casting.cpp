@@ -2148,6 +2148,133 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
 }
 #endif
 
+/// Nominal type descriptor for Swift.Array.
+extern "C" const NominalTypeDescriptor _TMnSa;
+
+/// Nominal type descriptor for Swift.Dictionary.
+extern "C" const NominalTypeDescriptor _TMnVs10Dictionary;
+
+/// Nominal type descriptor for Swift.Set.
+extern "C" const NominalTypeDescriptor _TMnVs3Set;
+
+SWIFT_CC(swift)
+extern "C"
+void _swift_arrayDownCastIndirect(OpaqueValue *destination,
+                                  OpaqueValue *source,
+                                  const Metadata *sourceValueType,
+                                  const Metadata *targetValueType);
+
+SWIFT_CC(swift)
+extern "C"
+bool _swift_arrayDownCastConditionalIndirect(OpaqueValue *destination,
+                                             OpaqueValue *source,
+                                             const Metadata *sourceValueType,
+                                             const Metadata *targetValueType);
+
+SWIFT_CC(swift)
+extern "C"
+void _swift_setDownCastIndirect(OpaqueValue *destination,
+                                OpaqueValue *source,
+                                const Metadata *sourceValueType,
+                                const Metadata *targetValueType);
+
+SWIFT_CC(swift)
+extern "C"
+bool _swift_setDownCastConditionalIndirect(OpaqueValue *destination,
+                                           OpaqueValue *source,
+                                           const Metadata *sourceValueType,
+                                           const Metadata *targetValueType);
+
+SWIFT_CC(swift)
+extern "C"
+void _swift_dictionaryDownCastIndirect(OpaqueValue *destination,
+                                       OpaqueValue *source,
+                                       const Metadata *sourceKeyType,
+                                       const Metadata *sourceValueType,
+                                       const Metadata *targetKeyType,
+                                       const Metadata *targetValueType);
+
+SWIFT_CC(swift)
+extern "C"
+bool _swift_dictionaryDownCastConditionalIndirect(OpaqueValue *destination,
+                                                  OpaqueValue *source,
+                                            const Metadata *sourceKeyType,
+                                            const Metadata *sourceValueType,
+                                            const Metadata *targetKeyType,
+                                            const Metadata *targetValueType);
+
+static bool _dynamicCastStructToStruct(OpaqueValue *destination,
+                                       OpaqueValue *source,
+                                       const StructMetadata *sourceType,
+                                       const StructMetadata *targetType,
+                                       DynamicCastFlags flags) {
+  if (sourceType == targetType)
+    return _succeed(destination, source, sourceType, flags);
+
+  // The two types have to be instantiations of the same type.
+  auto descriptor = sourceType->Description.get();
+  if (descriptor != targetType->Description.get())
+    return _fail(source, sourceType, targetType, flags);
+
+  auto sourceArgs = sourceType->getGenericArgs();
+  auto targetArgs = targetType->getGenericArgs();
+
+  bool result;
+
+  // Arrays.
+  if (descriptor == &_TMnSa) {
+    if (flags & DynamicCastFlags::Unconditional) {
+      _swift_arrayDownCastIndirect(source, destination,
+                                   sourceArgs[0], targetArgs[0]);
+      result = true;
+    } else {
+      result =
+        _swift_arrayDownCastConditionalIndirect(source, destination,
+                                                sourceArgs[0], targetArgs[0]);
+    }
+
+  // Dictionaries.
+  } else if (descriptor == &_TMnVs10Dictionary) {
+    if (flags & DynamicCastFlags::Unconditional) {
+      _swift_dictionaryDownCastIndirect(source, destination,
+                                        sourceArgs[0], sourceArgs[1],
+                                        targetArgs[0], targetArgs[1]);
+      result = true;
+    } else {
+      result =
+        _swift_dictionaryDownCastConditionalIndirect(source, destination,
+                                        sourceArgs[0], sourceArgs[1],
+                                        targetArgs[0], targetArgs[1]);
+    }
+
+  // Sets.
+  } else if (descriptor == &_TMnVs10Dictionary) {
+    if (flags & DynamicCastFlags::Unconditional) {
+      _swift_setDownCastIndirect(source, destination,
+                                 sourceArgs[0], targetArgs[0]);
+      result = true;
+    } else {
+      result =
+        _swift_setDownCastConditionalIndirect(source, destination,
+                                              sourceArgs[0], targetArgs[0]);
+    }
+
+  // Other struct types don't support dynamic covariance for now.
+  } else {
+    return _fail(source, sourceType, targetType, flags);
+  }
+
+  // The intrinsics above never consume the source value.
+  bool shouldDestroySource =
+    result ? flags & DynamicCastFlags::TakeOnSuccess
+           : flags & DynamicCastFlags::DestroyOnFailure;
+  if (shouldDestroySource) {
+    sourceType->vw_destroy(source);
+  }
+
+  return result;
+}
+
 /// Perform a dynamic cast to an arbitrary type.
 SWIFT_RT_ENTRY_VISIBILITY
 bool swift::swift_dynamicCast(OpaqueValue *dest,
@@ -2307,6 +2434,16 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
       break;
     }
 
+    case MetadataKind::Struct:
+      // Collection casts.
+      if (targetType->getKind() == MetadataKind::Struct) {
+        return _dynamicCastStructToStruct(dest, src,
+                                          cast<StructMetadata>(srcType),
+                                          cast<StructMetadata>(targetType),
+                                          flags);
+      }
+      break;
+
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Enum:
     case MetadataKind::Optional:
@@ -2316,7 +2453,6 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     case MetadataKind::ErrorObject:
     case MetadataKind::Metatype:
     case MetadataKind::Opaque:
-    case MetadataKind::Struct:
     case MetadataKind::Tuple:
       break;
     }
