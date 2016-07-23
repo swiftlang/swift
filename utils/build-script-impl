@@ -674,7 +674,7 @@ function set_build_options_for_host() {
     #
     # *NOTE* Currently we do not support testing LLVM via build-script. But in a
     # future commit we will.
-    if [[ "${SKIP_TEST_LLVM}" ]]; then
+    if [[ $(true_false "${SKIP_TEST_LLVM}") == "TRUE" ]]; then
         llvm_cmake_options+=(
             # Do not include LLVM tests.
             -DLLVM_INCLUDE_TESTS:BOOL=NO
