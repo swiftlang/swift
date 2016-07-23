@@ -1,6 +1,21 @@
+include(CMakeParseArguments)
+
 function(precondition var)
-  if (NOT ${var})
-    message(FATAL_ERROR "Error! Variable ${var} is false or not set!")
+  cmake_parse_arguments(
+    PRECONDITION # prefix
+    "NEGATE" # options
+    "" # single-value args
+    "" # multi-value args
+    ${ARGN})
+
+  if (PRECONDITION_NEGATE)
+    if (${var})
+      message(FATAL_ERROR "Error! Variable ${var} is true.")
+    endif()
+  else()
+    if (NOT ${var})
+      message(FATAL_ERROR "Error! Variable ${var} is false or not set.")
+    endif()
   endif()
 endfunction()
 
