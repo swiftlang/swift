@@ -23,19 +23,19 @@ struct _UnsafeBitMap {
   static func wordIndex(_ i: Int) -> Int {
     // Note: We perform the operation on UInts to get faster unsigned math
     // (shifts).
-    return Int(bitPattern: UInt(bitPattern: i) / UInt(UInt._sizeInBits))
+    return Int(bitPattern: UInt(bitPattern: i) / UInt(UInt.bitWidth))
   }
 
   public // @testable
   static func bitIndex(_ i: Int) -> UInt {
     // Note: We perform the operation on UInts to get faster unsigned math
     // (shifts).
-    return UInt(bitPattern: i) % UInt(UInt._sizeInBits)
+    return UInt(bitPattern: i) % UInt(UInt.bitWidth)
   }
 
   public // @testable
   static func sizeInWords(forSizeInBits bitCount: Int) -> Int {
-    return (bitCount + Int._sizeInBits - 1) / Int._sizeInBits
+    return (bitCount + Int.bitWidth - 1) / Int.bitWidth
   }
 
   public // @testable

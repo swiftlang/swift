@@ -208,11 +208,11 @@ struct _${name}Bitmap {
 
   subscript(i: Int) -> Bool {
     get {
-      precondition(i >= 0 && i < Int(${underlyingType}._sizeInBits)) // sanity check
+      precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
       return _bits & (1 << ${underlyingType}(i)) != 0
     }
     set {
-      precondition(i >= 0 && i < Int(${underlyingType}._sizeInBits)) // sanity check
+      precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
 %   if underlyingType == 'UInt':
       let iAsUnderlyingType = UInt(bitPattern: i)
 %   elif underlyingType == 'UInt32':
@@ -225,7 +225,7 @@ struct _${name}Bitmap {
   }
 
   func countBitsSetBelow(_ i: Int) -> Int {
-    precondition(i >= 0 && i < Int(${underlyingType}._sizeInBits)) // sanity check
+    precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
 %   if underlyingType == 'UInt':
       let iAsUnderlyingType = UInt(bitPattern: i)
 %   elif underlyingType == 'UInt32':

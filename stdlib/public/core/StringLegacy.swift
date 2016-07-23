@@ -257,7 +257,9 @@ extension String {
   ///     print("\(max) has \(max.utf16.count) digits.")
   ///     // Prints "18446744073709551615 has 20 digits."
   public init<T : UnsignedInteger>(_ v: T) {
-    self = _uint64ToString(v.toUIntMax())
+    // FIXME(integers): get rid of toUIntMax()
+    fatalError()
+    //self = _uint64ToString(v.toUIntMax())
   }
 
   /// Creates a string representing the given value in the specified base.
@@ -316,8 +318,10 @@ extension String {
     _ value: T, radix: Int, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
-    self = _uint64ToString(
-      value.toUIntMax(), radix: Int64(radix), uppercase: uppercase)
+    // FIXME(integers): fix toIntMax
+    fatalError()
+    //self = _uint64ToString(
+      //value.toUIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
 }
 

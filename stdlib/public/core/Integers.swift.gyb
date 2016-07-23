@@ -14,7 +14,7 @@
 # Utility code for later in this template
 #
 
-from SwiftIntTypes import all_integer_types, int_max_bits
+from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
 
 from string import maketrans, capitalize
 
@@ -295,6 +295,17 @@ public func == <T : BinaryInteger>(lhs: T, rhs: T) -> Bool {
 
 @_transparent
 public func < <T : BinaryInteger>(lhs: T, rhs: T) -> Bool {
+  return lhs.isLess(than: rhs)
+}
+
+// FIXME(integers): these seem to be important for Int-backed enums
+@_transparent
+public func ==(lhs: Int, rhs: Int) -> Bool {
+  return lhs.isEqual(to: rhs)
+}
+
+@_transparent
+public func < (lhs: Int, rhs: Int) -> Bool {
   return lhs.isLess(than: rhs)
 }
 
@@ -968,9 +979,58 @@ public struct ${Self}
 %       end
   }
 
-  public var _storage: Builtin.Int${bits}
+%  if bits > 8:
+  /// Creates an integer from its big-endian representation, changing the
+  /// byte order if necessary.
+  @_transparent
+  public init(bigEndian value: ${Self}) {
+#if _endian(big)
+    self = value
+#else
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._storage) )
+#endif
+  }
+
+  /// Creates an integer from its little-endian representation, changing the
+  /// byte order if necessary.
+  @_transparent
+  public init(littleEndian value: ${Self}) {
+#if _endian(little)
+    self = value
+#else
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._storage) )
+#endif
+  }
+
+  /// Returns the big-endian representation of the integer, changing the
+  /// byte order if necessary.
+  public var bigEndian: ${Self} {
+#if _endian(big)
+    return self
+#else
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_storage))
+#endif
+  }
+
+  /// Returns the little-endian representation of the integer, changing the
+  /// byte order if necessary.
+  public var littleEndian: ${Self} {
+#if _endian(little)
+    return self
+#else
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_storage))
+#endif
+  }
+
+  /// Returns the current integer with the byte order swapped.
+  public var byteSwapped: ${Self} {
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_storage))
+  }
+%  end
 
   // Implementation details
+
+  public var _storage: Builtin.Int${bits}
 
 % if self_type.is_word:
   @_transparent
@@ -1033,6 +1093,33 @@ extension ${Self} {
   public typealias _DisabledRangeIndex = ${Self}
 }
 
+
+% for src_type in all_integer_types(word_bits):
+%    srcBits = src_type.bits
+%    srcSigned = src_type.is_signed
+%    Src = src_type.stdlib_name
+// FIXME(integers): consider merging with
+//                  FixedWidthInteger.init(_truncatingBits:)
+%   if should_define_truncating_bit_pattern_init(src_ty=src_type, dst_ty=self_type):
+extension ${Self} {
+  /// Construct a `${Self}` having the same bitwise representation as
+  /// the least significant bits of the provided bit pattern.
+  ///
+  /// No range or overflow checking occurs.
+  @_transparent
+  public init(truncatingBitPattern: ${Src}) {
+    let src = truncatingBitPattern._storage
+%     if self_type.bits == src_type.bits:
+    let dstNotWord = src
+%     else:
+    let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(src)
+%     end
+    self._storage = dstNotWord
+  }
+}
+%   end
+% end
+
 % if signed:
 // TODO: Consider removing the underscore.
 /// Returns the argument and specifies that the value is not negative.
@@ -1044,9 +1131,60 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 }
 % end
 
+% end # end of concrete FixedWidthInteger section
+
+
+
+
+//===----------------------------------------------------------------------===//
+// FIXME(integers): Remove these operators in favour of the generic ones on
+//                  Arithmetic
+//===----------------------------------------------------------------------===//
+// Operations with potentially-static overflow checking
+//
+// FIXME: must use condfail in these operators, rather than
+// overflowChecked, pending <rdar://problem/16271923> so that we don't
+// foil static checking for numeric overflows.
+% for op, method, label in [
+%    ('+', 'adding', ''),
+%    ('*', 'multiplied', 'by: '),
+%    ('-','subtracting', ''),
+%    ('/', 'divided', 'by: '),
+%    ('%', 'remainder', 'dividingBy: ')
+%  ]:
+@_transparent
+public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+  return lhs.${method}(${label}rhs)
+}
 % end
+//===--- end of FIXME(integers) -------------------------------------------===//
+
 
 // FIXME(integers): inline manually everywhere
 public func numericCast<T : BinaryInteger, U : BinaryInteger>(_ x: T) -> U {
   return U(x)
+}
+
+internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
+#if INTERNAL_CHECKS_ENABLED
+  return lhs + rhs
+#else
+  return lhs &+ rhs
+#endif
+}
+
+internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
+#if INTERNAL_CHECKS_ENABLED
+  return lhs - rhs
+#else
+  return lhs &- rhs
+#endif
+}
+
+internal func _unsafeMultiply(_ lhs: Int, _ rhs: Int) -> Int {
+#if INTERNAL_CHECKS_ENABLED
+  return lhs * rhs
+#else
+  return lhs &* rhs
+#endif
 }
