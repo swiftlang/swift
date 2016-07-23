@@ -1,5 +1,9 @@
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
 // RUN: %target-build-swift %s -Xfrontend -enable-experimental-collection-casts -o %t/main
+// RUN: %target-build-swift %s -Xfrontend -enable-experimental-collection-casts -o %t/main-optimized
 // RUN: %target-run %t/main | FileCheck %s
+// RUN: %target-run %t/main-optimized | FileCheck %s
 // REQUIRES: executable_test
 
 protocol Preening {
