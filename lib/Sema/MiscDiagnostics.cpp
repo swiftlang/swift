@@ -615,8 +615,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     ///       (declref_expr implicit decl=Optional.init(nilLiteral:)
     static bool isTypeCheckedOptionalNil(Expr *E) {
       auto CE = dyn_cast<CallExpr>(E->getSemanticsProvidingExpr());
-      if (!CE || !CE->isImplicit() ||
-          !CE->getType()->getAnyOptionalObjectType())
+      if (!CE || !CE->isImplicit())
         return false;
       
       auto CRCE = dyn_cast<ConstructorRefCallExpr>(CE->getSemanticFn());

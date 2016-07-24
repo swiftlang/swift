@@ -7,11 +7,11 @@ import CoreCooling
 func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   let ao1: AnyObject = sc.methodA(osc)
   _ = ao1
-  if sc.methodA(osc) == nil { }
+  if sc.methodA(osc) == nil { } // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
 
   let ao2: AnyObject = sc.methodB(nil)
   _ = ao2
-  if sc.methodA(osc) == nil { }
+  if sc.methodA(osc) == nil { }// expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
 
   let ao3: AnyObject = sc.property // expected-error{{value of optional type 'AnyObject?' not unwrapped; did you mean to use '!' or '?'?}} {{35-35=!}}
   _ = ao3
@@ -20,7 +20,7 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
 
   let ao4: AnyObject = sc.methodD()
   _ = ao4
-  if sc.methodD() == nil { }
+  if sc.methodD() == nil { } // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
 
   sc.methodE(sc)
   sc.methodE(osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
@@ -37,7 +37,7 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   let sc2 = SomeClass(int: ci)
   let sc2a: SomeClass = sc2
   _ = sc2a
-  if sc2 == nil { }
+  if sc2 == nil { } // expected-warning {{comparing non-optional value of type 'SomeClass' to nil always returns false}}
 
   let sc3 = SomeClass(double: 1.5)
   if sc3 == nil { } // okay
@@ -47,7 +47,7 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   let sc4 = sc.returnMe()
   let sc4a: SomeClass = sc4
   _ = sc4a
-  if sc4 == nil { }
+  if sc4 == nil { } // expected-warning {{comparing non-optional value of type 'SomeClass' to nil always returns false}}
 }
 
 // Nullability with CF types.

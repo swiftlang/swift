@@ -591,7 +591,7 @@ func r21684487() {
 func r18397777(_ d : r21447318?) {
   let c = r21447318()
 
-  if c != nil {
+  if c != nil { // expected-warning {{comparing non-optional value of type 'r21447318' to nil always returns true}}
   }
   
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
