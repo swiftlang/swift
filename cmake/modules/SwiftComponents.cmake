@@ -143,13 +143,14 @@ function(swift_is_installing_component component result_var_name)
 
   if("${component}" STREQUAL "never_install")
     set("${result_var_name}" FALSE PARENT_SCOPE)
-  else()
-    precondition_list_contains_element(_SWIFT_DEFINED_COMPONENTS "${component}")
-
-    string(TOUPPER "${component}" var_name_piece)
-    string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
-    set("${result_var_name}" "${SWIFT_INSTALL_${var_name_piece}}" PARENT_SCOPE)
+    return()
   endif()
+
+  precondition_list_contains_element(_SWIFT_DEFINED_COMPONENTS "${component}")
+
+  string(TOUPPER "${component}" var_name_piece)
+  string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
+  set("${result_var_name}" "${SWIFT_INSTALL_${var_name_piece}}" PARENT_SCOPE)
 endfunction()
 
 # swift_install_in_component(<COMPONENT NAME>
