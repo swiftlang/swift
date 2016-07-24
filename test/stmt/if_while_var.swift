@@ -68,6 +68,11 @@ if 1 != 2, let x = opt,
 
 // <rdar://problem/20457938> typed pattern is not allowed on if/let condition
 if 1 != 2, let x : Int? = opt {}
+// expected-warning @-1 {{explicitly specified type 'Int?' adds an additional level of optional to the initializer, making the optional check always succeed}} {{20-26=Int}}
+
+if 1 != 2, case let x? : Int? = 42 {}
+// expected-warning @-1 {{non-optional expression of type 'Int' used in a check for optionals}}
+
 
 
 // Test error recovery.

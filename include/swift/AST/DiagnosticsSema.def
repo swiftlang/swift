@@ -2220,6 +2220,17 @@ WARNING(use_of_qq_on_non_optional_value,none,
 WARNING(nonoptional_compare_to_nil,none,
         "comparing non-optional value to nil always returns"
         " %select{false|true}0", (bool))
+WARNING(optional_check_nonoptional,none,
+        "non-optional expression of type %0 used in a check for optionals",
+        (Type))
+WARNING(optional_check_promotion,none,
+        "explicitly specified type %0 adds an additional level of optional to"
+        " the initializer, making the optional check always succeed",
+        (Type))
+WARNING(optional_pattern_match_promotion,none,
+        "pattern match introduces an implicit promotion from %0 to %1",
+        (Type, Type))
+
 
 ERROR(type_of_metatype,none,
       "'.dynamicType' is not allowed after a type name", ())

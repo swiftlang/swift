@@ -28,6 +28,15 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
+/// Return true if this expression is an implicit promotion from T to T?.
+static Expr *isImplicitPromotionToOptional(Expr *E) {
+  if (E->isImplicit())
+    if (auto IIOE = dyn_cast<InjectIntoOptionalExpr>(
+                                               E->getSemanticsProvidingExpr()))
+      return IIOE->getSubExpr();
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // Diagnose assigning variable to itself.
 //===----------------------------------------------------------------------===//
@@ -599,11 +608,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
     }
     
-    /// Return true if this expression is an implicit promotion from T to T?.
-    static bool isImplicitPromotionToOptional(Expr *E) {
-      return E->isImplicit() && isa<InjectIntoOptionalExpr>(E);
-    }
-    
     /// Return true if this is 'nil' type checked as an Optional.  This looks
     /// like this:
     ///   (call_expr implicit type='Int?'
@@ -651,13 +655,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
       }
       
-      if (calleeName == "==" || calleeName == "!=") {
+      if (calleeName == "==" || calleeName == "!=" ||
+          calleeName == "===" || calleeName == "!==") {
         if ((isImplicitPromotionToOptional(lhs) &&
              isTypeCheckedOptionalNil(rhs)) ||
             (isTypeCheckedOptionalNil(lhs) &&
              isImplicitPromotionToOptional(rhs))) {
-          TC.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_nil,
-                      calleeName == "!=")
+          bool isTrue = calleeName == "!=" || calleeName == "!==";
+              
+          TC.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_nil, isTrue)
             .highlight(lhs->getSourceRange())
             .highlight(rhs->getSourceRange());
           return;
@@ -3382,6 +3388,45 @@ static void diagDeprecatedObjCSelectors(TypeChecker &tc, const DeclContext *dc,
   const_cast<Expr *>(expr)->walk(ObjCSelectorWalker(tc, dc, selectorTy));
 }
 
+        
+        
+/// Diagnose things like this, where 'i' is an Int, not an Int?
+///     if let x: Int = i {
+static void
+checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
+                                   TypeChecker &TC) {
+  auto *p = cond.getPatternOrNull();
+  if (!p) return;
+  
+  if (auto *subExpr = isImplicitPromotionToOptional(cond.getInitializer())) {
+    // If the subexpression was actually optional, then the pattern must be
+    // checking for a type, which forced it to be promoted to a double optional
+    // type.
+    if (auto ooType = subExpr->getType()->getAnyOptionalObjectType()) {
+      if (auto TP = dyn_cast<TypedPattern>(p))
+        // Check for 'if let' to produce a tuned diagnostic.
+        if (isa<OptionalSomePattern>(TP->getSubPattern()) &&
+            TP->getSubPattern()->isImplicit()) {
+          TC.diagnose(cond.getIntroducerLoc(), diag::optional_check_promotion,
+                      subExpr->getType())
+            .highlight(subExpr->getSourceRange())
+            .fixItReplace(TP->getTypeLoc().getSourceRange(),
+                          ooType->getString());
+          return;
+        }
+      TC.diagnose(cond.getIntroducerLoc(),
+                  diag::optional_pattern_match_promotion,
+                  subExpr->getType(), cond.getInitializer()->getType())
+        .highlight(subExpr->getSourceRange());
+      return;
+    }
+    
+    TC.diagnose(cond.getIntroducerLoc(), diag::optional_check_nonoptional,
+                subExpr->getType())
+      .highlight(subExpr->getSourceRange());
+  }
+}
+        
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -3409,6 +3454,11 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
     checkSwitch(TC, switchStmt);
 
   checkStmtConditionTrailingClosure(TC, S);
+  
+  // Check for implicit optional promotions in stmt-condition patterns.
+  if (auto *lcs = dyn_cast<LabeledConditionalStmt>(S))
+    for (const auto &elt : lcs->getCond())
+      checkImplicitPromotionsInCondition(elt, TC);
 }
 
 //===----------------------------------------------------------------------===//

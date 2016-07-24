@@ -774,10 +774,10 @@ class SR1594 {
   func sr1594(bytes : UnsafeMutablePointer<Int>, _ i : Int?) {
     _ = (i === nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15===}}
     _ = (bytes === nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self === nil)
+    _ = (self === nil) // expected-warning {{comparing non-optional value to nil always returns false}}
     _ = (i !== nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15=!=}}
     _ = (bytes !== nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self !== nil)
+    _ = (self !== nil) // expected-warning {{comparing non-optional value to nil always returns true}}
   }
 }
 
@@ -786,6 +786,8 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = nil == i // expected-warning {{comparing non-optional value to nil always returns false}}
   _ = i != nil // expected-warning {{comparing non-optional value to nil always returns true}}
   _ = nil != i // expected-warning {{comparing non-optional value to nil always returns true}}
+  
+  // These should all be illegal when SE-0121 lands.
   _ = i < nil
   _ = nil < i
   _ = i <= nil
@@ -795,8 +797,8 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = i >= nil
   _ = nil >= i
 
-  _ = o === nil
-  _ = o !== nil
+  _ = o === nil // expected-warning {{comparing non-optional value to nil always returns false}}
+  _ = o !== nil // expected-warning {{comparing non-optional value to nil always returns true}}
 }
 
 // FIXME: Bad diagnostic
