@@ -1541,8 +1541,6 @@ bool TypeBase::isSpelledLike(Type other) {
       return false;
     if (fMe->getRepresentation() != fThem->getRepresentation())
       return false;
-    if (fMe->isNoReturn() != fThem->isNoReturn())
-      return false;
     if (!fMe->getInput()->isSpelledLike(fThem->getInput()))
       return false;
     if (!fMe->getResult()->isSpelledLike(fThem->getResult()))
@@ -2421,13 +2419,10 @@ static bool canOverride(CanType t1, CanType t2,
     if (!fn1)
       return false;
 
-    // Allow ExtInfos to differ in these ways:
-    //   - the overriding type may be noreturn even if the base type isn't
-    //   - the base type may be throwing even if the overriding type isn't
+    // Allow the base type to be throwing even if the overriding type isn't
     auto ext1 = fn1->getExtInfo();
     auto ext2 = fn2->getExtInfo();
     if (ext2.throws()) ext1 = ext1.withThrows(true);
-    if (ext1.isNoReturn()) ext2 = ext2.withIsNoReturn(true);
     if (ext1 != ext2)
       return false;
 

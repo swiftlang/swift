@@ -4004,8 +4004,11 @@ public:
       } else if (e - i - 1 == 0 && outerGenericParams) {
         params = outerGenericParams;
       }
-      
-      auto Info = TC.applyFunctionTypeAttributes(FD, i);
+
+      // 'throws' only applies to the innermost function.
+      AnyFunctionType::ExtInfo Info;
+      if (i == 0 && FD->hasThrows())
+        Info = Info.withThrows();
       
       if (params) {
         funcTy = PolymorphicFunctionType::get(argTy, funcTy, params, Info);
@@ -4561,7 +4564,7 @@ public:
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       if (func->hasDynamicSelf()) {
         type = type->replaceCovariantResultType(subclass,
-                                                func->getNaturalArgumentCount());
+                                                func->getNumParameterLists());
       }
     } else if (isa<ConstructorDecl>(decl)) {
       type = type->replaceCovariantResultType(subclass, /*uncurryLevel=*/2);
@@ -4799,10 +4802,12 @@ public:
   }
 
   static void adjustFunctionTypeForOverride(Type &type) {
-    // Drop 'noreturn' and 'throws'.
+    // Drop 'throws'.
+    // FIXME: Do we want to allow overriding a function returning a value
+    // with one returning Never?
     auto fnType = type->castTo<AnyFunctionType>();
     auto extInfo = fnType->getExtInfo();
-    extInfo = extInfo.withThrows(false).withIsNoReturn(false);
+    extInfo = extInfo.withThrows(false);
     if (fnType->getExtInfo() != extInfo)
       type = fnType->withExtInfo(extInfo);
   }
@@ -5366,6 +5371,7 @@ public:
     UNINTERESTING_ATTR(Mutating)
     UNINTERESTING_ATTR(NonMutating)
     UNINTERESTING_ATTR(NonObjC)
+    UNINTERESTING_ATTR(NoReturn)
     UNINTERESTING_ATTR(NSApplicationMain)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)
@@ -5450,15 +5456,6 @@ public:
       }
 
       TC.diagnose(Base, diag::overridden_here);
-    }
-
-    void visitNoReturnAttr(NoReturnAttr *attr) {
-      // Disallow overriding a @noreturn function with a returning one.
-      if (Base->getAttrs().hasAttribute<NoReturnAttr>() &&
-          !Override->getAttrs().hasAttribute<NoReturnAttr>()) {
-        TC.diagnose(Override, diag::override_noreturn_with_return);
-        TC.diagnose(Base, diag::overridden_here);
-      }
     }
 
     void visitDynamicAttr(DynamicAttr *attr) {

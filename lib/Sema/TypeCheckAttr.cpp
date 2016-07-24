@@ -59,7 +59,6 @@ public:
   IGNORED_ATTR(Inline)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
-  IGNORED_ATTR(NoReturn)
   IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(ObjC)
   IGNORED_ATTR(ObjCBridged)
@@ -83,6 +82,65 @@ public:
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(DiscardableResult)
 #undef IGNORED_ATTR
+
+  // @noreturn has been replaced with a 'Never' return type.
+  void visitNoReturnAttr(NoReturnAttr *attr) {
+    if (auto FD = dyn_cast<FuncDecl>(D)) {
+      auto &SM = TC.Context.SourceMgr;
+
+      auto diag = TC.diagnose(attr->getLocation(),
+                              diag::noreturn_not_supported);
+      auto range = attr->getRangeWithAt();
+      if (range.isValid())
+        range.End = range.End.getAdvancedLoc(1);
+      diag.fixItRemove(range);
+
+      auto *last = FD->getParameterList(FD->getNumParameterLists() - 1);
+
+      // If the declaration already has a result type, we're going
+      // to change it to 'Never'.
+      bool hadResultType = false;
+      bool isEndOfLine = false;
+      SourceLoc resultLoc;
+      if (FD->getBodyResultTypeLoc().hasLocation()) {
+        const auto &typeLoc = FD->getBodyResultTypeLoc();
+        hadResultType = true;
+        resultLoc = typeLoc.getSourceRange().Start;
+
+      // If the function 'throws', insert the result type after the
+      // 'throws'.
+      } else {
+        if (FD->getThrowsLoc().isValid()) {
+          resultLoc = FD->getThrowsLoc();
+
+        // Otherwise, insert the result type after the final parameter
+        // list.
+        } else if (last->getRParenLoc().isValid()) {
+          resultLoc = last->getRParenLoc();
+        }
+
+        if (Lexer::getLocForEndOfToken(SM, resultLoc).getAdvancedLoc(1) ==
+            Lexer::getLocForEndOfLine(SM, resultLoc))
+          isEndOfLine = true;
+
+        resultLoc = Lexer::getLocForEndOfToken(SM, resultLoc);
+      }
+
+      if (hadResultType) {
+        diag.fixItReplace(resultLoc, "Never");
+      } else {
+        std::string fix = " -> Never";
+
+        if (!isEndOfLine)
+          fix = fix + " ";
+
+        diag.fixItInsert(resultLoc, fix);
+      }
+
+      FD->getBodyResultTypeLoc() = TypeLoc::withoutLoc(
+          TC.Context.getNeverType());
+    }
+  }
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
     // Alignment must be a power of two.
@@ -1649,21 +1707,6 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
 
   // Change the type to the appropriate reference storage type.
   var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
-}
-
-AnyFunctionType::ExtInfo
-TypeChecker::applyFunctionTypeAttributes(AbstractFunctionDecl *func,
-                                         unsigned i) {
-  auto info = AnyFunctionType::ExtInfo();
-
-  // For curried functions, 'throws' and 'noreturn' only applies to the
-  // innermost function.
-  if (i == 0) {
-    info = info.withIsNoReturn(func->getAttrs().hasAttribute<NoReturnAttr>());
-    info = info.withThrows(func->hasThrows());
-  }
-
-  return info;
 }
 
 Optional<Diag<>>

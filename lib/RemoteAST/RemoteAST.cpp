@@ -274,7 +274,6 @@ public:
     }
 
     auto einfo = AnyFunctionType::ExtInfo(representation,
-                                          /*noreturn*/ false,
                                           /*throws*/ flags.throws());
 
     // The result type must be materializable.

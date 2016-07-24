@@ -633,7 +633,10 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
         initArgTy = argTy;
     }
 
-    auto info = applyFunctionTypeAttributes(func, i);
+    // 'throws' only applies to the innermost function.
+    AnyFunctionType::ExtInfo info;
+    if (i == 0 && func->hasThrows())
+      info = info.withThrows();
 
     if (sig && i == e-1) {
       funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);

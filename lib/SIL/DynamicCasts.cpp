@@ -343,12 +343,6 @@ swift::classifyDynamicCast(Module *M,
       if (sourceFunction->throws() && !targetFunction->throws())
         return DynamicCastFeasibility::WillFail;
       
-      // A noreturn source function can be cast to a returning target type,
-      // but not vice versa.
-      // (noreturn isn't really reified at runtime though.)
-      if (targetFunction->isNoReturn() && !sourceFunction->isNoReturn())
-        return DynamicCastFeasibility::WillFail;
-      
       // The cast can't change the representation at runtime.
       if (targetFunction->getRepresentation()
             != sourceFunction->getRepresentation())

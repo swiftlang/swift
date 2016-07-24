@@ -2949,7 +2949,6 @@ void Serializer::writeType(Type ty) {
            addTypeRef(fnTy->getResult()),
            getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
            fnTy->isAutoClosure(),
-           fnTy->isNoReturn(),
            fnTy->isNoEscape(),
            fnTy->isExplicitlyEscaping(),
            fnTy->throws());
@@ -2967,7 +2966,6 @@ void Serializer::writeType(Type ty) {
             addTypeRef(fnTy->getResult()),
             dID,
             getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-            fnTy->isNoReturn(),
             fnTy->throws());
     if (!genericContext)
       writeGenericParams(&fnTy->getGenericParams(), DeclTypeAbbrCodes);
@@ -2984,7 +2982,6 @@ void Serializer::writeType(Type ty) {
             addTypeRef(fnTy->getInput()),
             addTypeRef(fnTy->getResult()),
             getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-            fnTy->isNoReturn(),
             fnTy->throws(),
             genericParams);
 
@@ -3049,7 +3046,6 @@ void Serializer::writeType(Type ty) {
     SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
           stableCalleeConvention,
           stableRepresentation,
-          fnTy->isNoReturn(),
           fnTy->isPseudogeneric(),
           fnTy->hasErrorResult(),
           fnTy->getParameters().size(),

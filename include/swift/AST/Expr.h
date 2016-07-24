@@ -2844,8 +2844,6 @@ public:
     return parameterList ? parameterList : ArrayRef<const ParameterList *>();
   }
 
-  unsigned getNaturalArgumentCount() const { return 1; }
-
   /// \brief Retrieve the result type of this closure.
   Type getResultType() const;
 

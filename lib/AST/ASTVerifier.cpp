@@ -2304,7 +2304,7 @@ struct ASTNodeBase {};
       // If a decl has the Throws bit set, the function type should throw,
       // and vice versa.
       auto fnTy = AFD->getType()->castTo<AnyFunctionType>();
-      for (unsigned i = 1, e = AFD->getNaturalArgumentCount(); i != e; ++i)
+      for (unsigned i = 1, e = AFD->getNumParameterLists(); i != e; ++i)
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
 
       if (AFD->hasThrows() != fnTy->getExtInfo().throws()) {

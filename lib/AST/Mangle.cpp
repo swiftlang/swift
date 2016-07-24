@@ -979,7 +979,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     // <impl-function-attribute> ::= 'Cc'             // C global function
     // <impl-function-attribute> ::= 'Cm'             // Swift method
     // <impl-function-attribute> ::= 'CO'             // ObjC method
-    // <impl-function-attribute> ::= 'N'              // noreturn
     // <impl-function-attribute> ::= 'g'              // pseudogeneric
     // <impl-function-attribute> ::= 'G'              // generic
     // <impl-parameter> ::= <impl-convention> <type>
@@ -1042,7 +1041,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
       break;
     }
     
-    if (fn->isNoReturn()) Buffer << 'N';
     if (fn->isPolymorphic()) {
       Buffer << (fn->isPseudogeneric() ? 'g' : 'G');
       mangleGenericSignature(fn->getGenericSignature());

@@ -1426,12 +1426,12 @@ static Type mapSignatureParamType(ASTContext &ctx, Type type) {
 /// we may need to compare the extended information.
 ///
 /// In the type of the function declaration, none of the extended information
-/// is relevant. We cannot overload purely on @noreturn, 'throws', or the
-/// calling convention of the declaration itself.
+/// is relevant. We cannot overload purely on 'throws' or the calling
+/// convention of the declaration itself.
 ///
 /// For function parameter types, we do want to be able to overload on
 /// 'throws', since that is part of the mangled symbol name, but not
-/// @noreturn or @noescape.
+/// @noescape.
 static AnyFunctionType::ExtInfo
 mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
                     bool topLevelFunction) {
@@ -4415,7 +4415,7 @@ Type FuncDecl::getResultType() const {
   if (resultTy->is<ErrorType>())
     return resultTy;
 
-  for (unsigned i = 0, e = getNaturalArgumentCount(); i != e; ++i)
+  for (unsigned i = 0, e = getNumParameterLists(); i != e; ++i)
     resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
 
   if (!resultTy)
