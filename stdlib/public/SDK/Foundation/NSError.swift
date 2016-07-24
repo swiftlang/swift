@@ -71,7 +71,7 @@ class _NSErrorRecoveryAttempter {
   }
 }
 
-/// Describes an error that may be recoverably by presenting several
+/// Describes an error that may be recoverable by presenting several
 /// potential recovery options to the user.
 public protocol RecoverableError : Error {
   /// Provides a set of possible recovery options to present to the user.
@@ -93,7 +93,7 @@ public protocol RecoverableError : Error {
   ///
   /// This entry point is used for recovery of errors handled at
   /// the "application" granularity, where nothing else in the
-  /// application can proceed until the attmpted error recovery
+  /// application can proceed until the attempted error recovery
   /// completes.
   func attemptRecovery(optionIndex recoveryOptionIndex: Int) -> Bool
 }

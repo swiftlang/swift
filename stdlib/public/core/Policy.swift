@@ -18,7 +18,7 @@
 /// The return type of functions that do not return normally; a type with no
 /// values.
 ///
-/// Use `Never` as the return type when declarting a closure, function, or
+/// Use `Never` as the return type when declaring a closure, function, or
 /// method that unconditionally throws an error, traps, or otherwise does
 /// not terminate.
 ///

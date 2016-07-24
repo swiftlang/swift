@@ -79,7 +79,7 @@ public:
   SourceTextInfo Info;
   // This is the non-typechecked AST for the generated interface source.
   CompilerInstance TextCI;
-  // Syncronize access to the embedded compiler instance (if we don't have an
+  // Synchronize access to the embedded compiler instance (if we don't have an
   // ASTUnit).
   WorkQueue Queue{WorkQueue::Dequeuing::Serial,
                   "sourcekit.swift.InterfaceGenContext"};

@@ -49,7 +49,7 @@ public:
 
   const SILFunction &getFunction() const { return F; }
 
-  // Register a definiton of a given opened archetype.
+  // Register a definition of a given opened archetype.
   void addOpenedArchetypeDef(Type archetype, SILValue Def);
 
   void removeOpenedArchetypeDef(Type archetype, SILValue Def) {

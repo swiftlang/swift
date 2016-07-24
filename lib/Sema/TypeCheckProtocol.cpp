@@ -1993,7 +1993,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
     llvm_unreachable("Unknown adopter kind");
   }
 
-  // FIXME: Infer body indention from the source rather than hard-coding
+  // FIXME: Infer body indentation from the source rather than hard-coding
   // 4 spaces.
   std::string ExtraIndent = "    ";
   StringRef CurrentIndent = Lexer::getIndentationForLine(TC.Context.SourceMgr,

@@ -757,7 +757,7 @@ func r24251022() {
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
   // https://twitter.com/_jlfischer/status/712337382175952896
-  // TODO: <rdar://problem/27391581> QoI: Nonsensitical "binary operator '&&' cannot be applied to two 'Bool' operands"
+  // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
   return a == b && 1 == 2  // expected-error {{binary operator '&&' cannot be applied to two 'Bool' operands}}
   // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
 }
@@ -820,7 +820,7 @@ class Foo23752537 {
 
 extension Foo23752537 {
   func isEquivalent(other: Foo23752537) {
-    // TODO: <rdar://problem/27391581> QoI: Nonsensitical "binary operator '&&' cannot be applied to two 'Bool' operands"
+    // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
     // expected-error @+1 {{binary operator '&&' cannot be applied to two 'Bool' operands}}
     return (self.title != other.title && self.message != other.message)
     // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}

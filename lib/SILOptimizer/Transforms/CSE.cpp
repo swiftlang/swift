@@ -673,7 +673,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   SILOpenedArchetypesTracker OpenedArchetypesTracker(*Inst->getFunction());
   // Register the new archetype to be used.
   OpenedArchetypesTracker.registerOpenedArchetypes(dyn_cast<SILInstruction>(V));
-  // Use a cloner. It makes copying the instruction and remaping of
+  // Use a cloner. It makes copying the instruction and remapping of
   // opened archetypes trivial.
   InstructionCloner Cloner(I->getFunction());
   Cloner.registerOpenedExistentialRemapping(
@@ -744,7 +744,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (ValueBase *V = AvailableValues->lookup(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *V << '\n');
       // Instructions producing a new opened archetype need a special handling,
-      // because replacing these intructions may require a replacement
+      // because replacing these instructions may require a replacement
       // of the opened archetype type operands in some of the uses.
       if (!isa<OpenExistentialRefInst>(Inst) ||
           processOpenExistentialRef(Inst, V, I)) {

@@ -1317,7 +1317,7 @@ private:
       if (CurrentInfo.isContainedIn(NewConstraint)) {
         DiagnosticEngine &Diags = TC.Diags;
         // Some availability checks will always pass because the minimum
-        // deployment target gurantees they will never be false. We don't
+        // deployment target guarantees they will never be false. We don't
         // diagnose these checks as useless because the source file may
         // be shared with other projects/targets having older deployment
         // targets. We don't currently have a mechanism for the user to

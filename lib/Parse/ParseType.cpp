@@ -417,8 +417,8 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       SourceLoc RAngleLoc = consumeStartingGreater();
       auto AnyRange = SourceRange(ProtocolLoc, RAngleLoc);
       
-      // Warn that 'protocol<>' is depreacted and offer to
-      // repalace with the 'Any' keyword
+      // Warn that 'protocol<>' is deprecated and offer to
+      // replace with the 'Any' keyword
       diagnose(LAngleLoc, diag::deprecated_any_composition)
         .fixItReplace(AnyRange, "Any");
       
