@@ -14,9 +14,9 @@
 /// convert itself to a `Range<Bound>` of indices within a given collection; 
 /// the collection can then slice itself with that `Range`.
 /// 
-/// -Warning: The requirements of RangeExpressible are likely to change 
+/// -Warning: The requirements of `RangeExpression` are likely to change 
 ///           in a future version of Swift. If you conform your own 
-///           types to `RangeExpressible`, be prepared to migrate them.
+///           types to `RangeExpression`, be prepared to migrate them.
 public protocol RangeExpression {
   /// The type of the bounds of the `Range` produced by this 
   /// type when used as a `RangeExpression`.
