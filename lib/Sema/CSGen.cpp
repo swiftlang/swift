@@ -595,9 +595,6 @@ namespace {
         }
       }
 
-      // If there might be replacement constraints, get them now.
-      SmallVector<Constraint *, 4> replacementConstraints;
-
       // Copy over the existing bindings, dividing the constraints up
       // into "favored" and non-favored lists.
       SmallVector<Constraint *, 4> favoredConstraints;
