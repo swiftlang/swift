@@ -32,7 +32,7 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
     target._rawValue,
     UInt(bitPattern: expected.pointee)._builtinWordValue,
     UInt(bitPattern: desired)._builtinWordValue)
-  expected.pointee = UnsafeMutablePointer(bitPattern: Int(oldValue))
+  expected.pointee = UnsafeMutableRawPointer(bitPattern: Int(oldValue))
   return Bool(won)
 }
 

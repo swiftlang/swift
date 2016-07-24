@@ -161,12 +161,13 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         if count == 0 {
             _indexes = []
         } else {
-            var ptr = UnsafeMutablePointer<Element>(malloc(count * sizeof(Element.self)))
+            var ptr = malloc(count * sizeof(Element.self))
             defer { free(ptr) }
+
+            let elementPtr = ptr!.bindMemory(to: Element.self, capacity: count)
+            nsIndexPath.getIndexes(elementPtr, range: NSMakeRange(0, count))
             
-            nsIndexPath.getIndexes(ptr!, range: NSMakeRange(0, count))
-            
-            let buffer = UnsafeBufferPointer(start: ptr, count: count)
+            let buffer = UnsafeBufferPointer(start: elementPtr, count: count)
             _indexes = buffer.map { $0 }
         }
     }
