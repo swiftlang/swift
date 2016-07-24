@@ -245,7 +245,7 @@ extension UnsafeMutablePointer : CVarArg {
 }
 
 #if _runtime(_ObjC)
-extension AutoreleasingUnsafeMutablePointer : CVarArg {
+extension _AutoreleasingUnsafeMutablePointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {

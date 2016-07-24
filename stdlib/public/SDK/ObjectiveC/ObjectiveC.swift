@@ -243,3 +243,29 @@ extension NSObject : CVarArg {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// AutoreleasingUnsafeMutablePointer
+//===----------------------------------------------------------------------===//
+
+/// A mutable pointer-to-ObjC-pointer argument.
+///
+/// This type has implicit conversions to allow passing any of the following
+/// to a C or ObjC API:
+///
+/// - `nil`, which gets passed as a null pointer,
+/// - an inout argument of the referenced type, which gets passed as a pointer
+///   to a writeback temporary with autoreleasing ownership semantics,
+/// - an `UnsafeMutablePointer<Pointee>`, which is passed as-is.
+///
+/// Passing pointers to mutable arrays of ObjC class pointers is not
+/// directly supported. Unlike `UnsafeMutablePointer<Pointee>`,
+/// `AutoreleasingUnsafeMutablePointer<Pointee>` must reference storage that
+/// does not own a reference count to the referenced
+/// value. UnsafeMutablePointer's operations, by contrast, assume that
+/// the referenced storage owns values loaded from or stored to it.
+///
+/// This type does not carry an owner pointer unlike the other C*Pointer types
+/// because it only needs to reference the results of inout conversions, which
+/// already have writeback-scoped lifetime.
+public typealias AutoreleasingUnsafeMutablePointer<Pointee> =
+  _AutoreleasingUnsafeMutablePointer<Pointee>

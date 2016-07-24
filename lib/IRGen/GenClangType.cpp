@@ -442,7 +442,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     .Case("UnsafeMutablePointer", StructKind::UnsafeMutablePointer)
     .Case("UnsafePointer", StructKind::UnsafePointer)
     .Case(
-      "AutoreleasingUnsafeMutablePointer",
+      "_AutoreleasingUnsafeMutablePointer",
         StructKind::AutoreleasingUnsafeMutablePointer)
     .Case("Unmanaged", StructKind::Unmanaged)
     .Case("CFunctionPointer", StructKind::CFunctionPointer)

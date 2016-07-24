@@ -351,7 +351,7 @@ namespace {
           quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone) {
         return {
           Impl.getNamedSwiftTypeSpecialization(
-            Impl.getStdlibModule(), "AutoreleasingUnsafeMutablePointer",
+            Impl.getStdlibModule(), "_AutoreleasingUnsafeMutablePointer",
             pointeeType),
           ImportHint::OtherPointer};
       }
@@ -1179,7 +1179,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     if (importKind == ImportTypeKind::CFRetainedOutParameter)
       pointerName = "UnsafeMutablePointer";
     else
-      pointerName = "AutoreleasingUnsafeMutablePointer";
+      pointerName = "_AutoreleasingUnsafeMutablePointer";
 
     resultTy = impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
                                                     pointerName,

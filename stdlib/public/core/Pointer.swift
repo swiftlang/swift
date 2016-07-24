@@ -12,7 +12,7 @@
 
 /// A stdlib-internal protocol modeled by the intrinsic pointer types,
 /// UnsafeMutablePointer, UnsafePointer, and
-/// AutoreleasingUnsafeMutablePointer.
+/// _AutoreleasingUnsafeMutablePointer.
 public protocol _Pointer {
   /// The underlying raw pointer value.
   var _rawValue: Builtin.RawPointer { get }
