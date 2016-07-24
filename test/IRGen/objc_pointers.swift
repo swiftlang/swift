@@ -8,7 +8,7 @@
 import Foundation
 
 @objc class Foo : NSObject {
-  // CHECK: define internal void @_TToFC13objc_pointers3Foo16pointerArgumentsfTGSpSi_1yGSpT__1zGSPSi_1wGVs33AutoreleasingUnsafeMutablePointerGSqS0____T_(%0*, i8*, i64*, i8*, i64*, %0**)
+  // CHECK: define internal void @_TToFC13objc_pointers3Foo16pointerArgumentsfTGSpSi_1ySv1zGSPSi_1wGVs33AutoreleasingUnsafeMutablePointerGSqS0____T_(%0*, i8*, i64*, i8*, i64*, %0**)
   @objc func pointerArguments(_ x: UnsafeMutablePointer<Int>,
                               y: UnsafeMutableRawPointer,
                               z: UnsafePointer<Int>,

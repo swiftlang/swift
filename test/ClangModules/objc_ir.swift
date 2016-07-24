@@ -158,8 +158,8 @@ func pointerProperties(_ obj: PointerWrapper) {
   // CHECK: load i8*, i8** @"\01L_selector(setVoidPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIntPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIdPtr:)"
-  obj.voidPtr = nil as UnsafeMutablePointer?
-  obj.intPtr = nil as UnsafeMutablePointer?
+  obj.voidPtr = nil as UnsafeMutableRawPointer?
+  obj.intPtr = nil as UnsafeMutableRawPointer?
   obj.idPtr = nil as AutoreleasingUnsafeMutablePointer?
 }
 
