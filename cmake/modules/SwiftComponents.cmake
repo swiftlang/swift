@@ -70,6 +70,12 @@ include(SwiftList)
 set(_SWIFT_DEFINED_COMPONENTS
   "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
+function(_translate_component_name_to_variable_form component outvar)
+  string(TOUPPER "${component}" result)
+  string(REPLACE "-" "_" result "${result}")
+  set(${outvar} "${result}" PARENT_SCOPE)
+endfunction()
+
 # A helper macro that creates *_INCLUDE, *_BUILD, *_INSTALL variables for the
 # list of components passed in depending on the state of the passed in options
 # INCLUDE, BUILD, INSTALL.
@@ -84,8 +90,7 @@ macro(_swift_components_initialize components)
   foreach(component ${${components}})
     precondition_list_contains_element(_SWIFT_DEFINED_COMPONENTS "${component}")
 
-    string(TOUPPER "${component}" var_name_piece)
-    string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
+    _translate_component_name_to_variable_form("${component}" var_name_piece)
 
     translate_flag(SWIFTCOMPINIT_INCLUDE TRUE SWIFT_INCLUDE_${var_name_piece})
     translate_flag(SWIFTCOMPINIT_BUILD TRUE SWIFT_BUILD_${var_name_piece})
@@ -148,8 +153,7 @@ function(swift_is_installing_component component result_var_name)
 
   precondition_list_contains_element(_SWIFT_DEFINED_COMPONENTS "${component}")
 
-  string(TOUPPER "${component}" var_name_piece)
-  string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
+  _translate_component_name_to_variable_form("${component}" var_name_piece)
   set("${result_var_name}" "${SWIFT_INSTALL_${var_name_piece}}" PARENT_SCOPE)
 endfunction()
 
