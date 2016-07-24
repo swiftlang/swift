@@ -94,3 +94,9 @@ function(precondition_list_is_disjoint first)
     list_union(RESULT "${${l}}" "${RESULT}")
   endforeach()
 endfunction()
+
+function(precondition_list_contains_element l elt)
+  list(FIND ${l} "${elt}" index)
+  precondition_binary_op(EQUAL ${index} -1 NEGATE
+    MESSAGE "List ${l} does not contain element ${elt}")
+endfunction()
