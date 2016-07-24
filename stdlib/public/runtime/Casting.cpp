@@ -2837,6 +2837,60 @@ extern "C" const Metadata *_swift_getBridgedNonVerbatimObjectiveCType(
   return nullptr;
 }
 
+// @_silgen_name("_swift_bridgeNonVerbatimFromObjectiveCToAny")
+// func _bridgeNonVerbatimFromObjectiveCToAny(
+//     x: AnyObject,
+//     inout result: Any?
+// )
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" void
+_swift_bridgeNonVerbatimFromObjectiveCToAny(HeapObject *sourceValue,
+                                            OpaqueValue *destValue);
+
+// @_silgen_name("_swift_bridgeNonVerbatimBoxedValue")
+// func _bridgeNonVerbatimBoxedValue<NativeType>(
+//     x: UnsafePointer<NativeType>,
+//     inout result: NativeType?
+// )
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" void
+_swift_bridgeNonVerbatimBoxedValue(const OpaqueValue *sourceValue,
+                                   OpaqueValue *destValue,
+                                   const Metadata *nativeType);
+
+// Try bridging by conversion to Any or boxing if applicable.
+static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
+  HeapObject *sourceValue,
+  const Metadata *nativeType,
+  OpaqueValue *destValue
+) {
+  // If the type is the Any type, we can bridge by "upcasting" the object
+  // to Any.
+  if (auto nativeExistential = dyn_cast<ExistentialTypeMetadata>(nativeType)) {
+    if (nativeExistential->Protocols.NumProtocols == 0) {
+      _swift_bridgeNonVerbatimFromObjectiveCToAny(sourceValue,
+                                                  destValue);
+      return true;
+    }
+  }
+  
+  // Check if the value is a box containing a value of the desired type.
+  if (auto srcBox = getAsSwiftValue((id)sourceValue)) {
+    const Metadata *sourceType;
+    const OpaqueValue *sourceBoxedValue;
+    
+    std::tie(sourceType, sourceBoxedValue) = getValueFromSwiftValue(srcBox);
+    if (sourceType == nativeType) {
+      _swift_bridgeNonVerbatimBoxedValue(sourceBoxedValue,
+                                         destValue,
+                                         nativeType);
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 // @_silgen_name("_swift_bridgeNonVerbatimFromObjectiveC")
 // func _bridgeNonVerbatimFromObjectiveC<NativeType>(
 //     x: AnyObject, 
@@ -2851,32 +2905,31 @@ _swift_bridgeNonVerbatimFromObjectiveC(
   OpaqueValue *destValue,
   const Metadata *nativeType_
 ) {
+  if (tryBridgeNonVerbatimFromObjectiveCUniversal(sourceValue, nativeType,
+                                                  destValue))
+    return;
+
   // Check if the type conforms to _BridgedToObjectiveC.
   if (const auto *bridgeWitness = findBridgeWitness(nativeType)) {
-    // if the type also conforms to _ConditionallyBridgedToObjectiveC,
-    // make sure it bridges at runtime
-    if (bridgeWitness->isBridgedToObjectiveC(nativeType, nativeType,
-                                             bridgeWitness)) {
-      // Check if sourceValue has the _ObjectiveCType type required by the
-      // protocol.
-      const Metadata *objectiveCType =
-          bridgeWitness->ObjectiveCType(nativeType, bridgeWitness);
-        
-      auto sourceValueAsObjectiveCType =
-          const_cast<void*>(swift_dynamicCastUnknownClass(sourceValue,
-                                                          objectiveCType));
-        
-      if (sourceValueAsObjectiveCType) {
-        // The type matches.  _forceBridgeFromObjectiveC returns `Self`, so
-        // we can just return it directly.
-        bridgeWitness->forceBridgeFromObjectiveC(
-          static_cast<HeapObject*>(sourceValueAsObjectiveCType),
-          destValue, nativeType, nativeType, bridgeWitness);
-        return;
-      }
+    // Check if sourceValue has the _ObjectiveCType type required by the
+    // protocol.
+    const Metadata *objectiveCType =
+        bridgeWitness->ObjectiveCType(nativeType, bridgeWitness);
+      
+    auto sourceValueAsObjectiveCType =
+        const_cast<void*>(swift_dynamicCastUnknownClass(sourceValue,
+                                                        objectiveCType));
+      
+    if (sourceValueAsObjectiveCType) {
+      // The type matches.  _forceBridgeFromObjectiveC returns `Self`, so
+      // we can just return it directly.
+      bridgeWitness->forceBridgeFromObjectiveC(
+        static_cast<HeapObject*>(sourceValueAsObjectiveCType),
+        destValue, nativeType, nativeType, bridgeWitness);
+      return;
     }
   }
-
+  
   // Fail.
   swift::crash("value type is not bridged to Objective-C");
 }
@@ -2895,12 +2948,16 @@ _swift_bridgeNonVerbatimFromObjectiveCConditional(
   OpaqueValue *destValue,
   const Metadata *nativeType_
 ) {
+  if (tryBridgeNonVerbatimFromObjectiveCUniversal(sourceValue, nativeType,
+                                                  destValue))
+    return true;
+
   // Local function that releases the source and returns false.
   auto fail = [&] () -> bool {
     swift_unknownRelease(sourceValue);
     return false;
   };
-
+  
   // Check if the type conforms to _BridgedToObjectiveC.
   const auto *bridgeWitness = findBridgeWitness(nativeType);
   if (!bridgeWitness)

@@ -246,6 +246,27 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
   _ result: inout T?
 )
 
+/// Helper stub to upcast to Any and store the result to an inout Any?
+/// on the C++ runtime's behalf.
+// COMPILER_INTRINSIC
+@_silgen_name("_swift_bridgeNonVerbatimFromObjectiveCToAny")
+public func _bridgeNonVerbatimFromObjectiveCToAny(
+    _ x: AnyObject,
+    _ result: inout Any?
+) {
+  result = x as Any
+}
+
+/// Helper stub to upcast to Optional on the C++ runtime's behalf.
+// COMPILER_INTRINSIC
+@_silgen_name("_swift_bridgeNonVerbatimBoxedValue")
+public func _bridgeNonVerbatimBoxedValue<NativeType>(
+    _ x: UnsafePointer<NativeType>,
+    _ result: inout NativeType?
+) {
+  result = x.pointee
+}
+
 /// Runtime optional to conditionally perform a bridge from an object to a value
 /// type.
 ///
