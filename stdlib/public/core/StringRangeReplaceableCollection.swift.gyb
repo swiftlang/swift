@@ -163,7 +163,6 @@ extension String {
     }
   }
 
-% for (Generic, Range, condition) in [('', 'Range<Index>', ''), ('R', 'R', 'R: RangeExpression, R.Bound == Index')]:
   /// Replaces the text within the specified bounds with the given characters.
   ///
   /// Calling this method invalidates any existing indices for use with this
@@ -178,19 +177,8 @@ extension String {
   ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
   ///   removes text at the end of the string, the complexity is O(*n*), where
   ///   *n* is equal to `bounds.count`.
-  public mutating func replaceSubrange<
-%   if Generic:
-      ${Generic},
-%   end
-      C
-    >(
-    _ bounds: ${Range},
-    with newElements: C
-  ) where 
-%   if condition:
-    ${condition},
-%   end  
-    C : Collection, C.Iterator.Element == Character {
+  public mutating func replaceSubrange<R, C>(_ bounds: R, with newElements: C)
+    where R : RangeExpression, R.Bound == Index, C : Collection, C.Iterator.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView)
       in v.replaceSubrange(bounds, with: newElements)
@@ -211,42 +199,11 @@ extension String {
   ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
   ///   removes text at the end of the string, the complexity is O(*n*), where
   ///   *n* is equal to `bounds.count`.
-  public mutating func replaceSubrange
-%   if Generic:
-    <${Generic}>
-%   end
-  (
-    _ bounds: ${Range}, with newElements: String
-  )
-%   if condition:
-    where ${condition}
-%   end
-  {
+  public mutating func replaceSubrange<R>(_ bounds: R, with newElements: String)
+    where R : RangeExpression, R.Bound == Index {
     replaceSubrange(bounds, with: newElements.characters)
   }
   
-  /// Removes the characters in the given range.
-  ///
-  /// Calling this method invalidates any existing indices for use with this
-  /// string.
-  ///
-  /// - Parameter bounds: The range of the elements to remove. The upper and
-  ///   lower bounds of `bounds` must be valid indices of the string.
-  public mutating func removeSubrange
-%   if Generic:
-    <${Generic}>
-%   end
-  (_ bounds: ${Range})
-%   if condition:
-    where ${condition}
-%   end
-  {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.removeSubrange(bounds)
-    }
-  }
-% end
-
   /// Inserts a new character at the specified position.
   ///
   /// Calling this method invalidates any existing indices for use with this
@@ -308,6 +265,20 @@ extension String {
   public mutating func remove(at i: Index) -> Character {
     return withMutableCharacters {
       (v: inout CharacterView) in v.remove(at: i)
+    }
+  }
+
+  /// Removes the characters in the given range.
+  ///
+  /// Calling this method invalidates any existing indices for use with this
+  /// string.
+  ///
+  /// - Parameter bounds: The range of the elements to remove. The upper and
+  ///   lower bounds of `bounds` must be valid indices of the string.
+  public mutating func removeSubrange<R>(_ bounds: R)
+    where R : RangeExpression, R.Bound == Index {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.removeSubrange(bounds)
     }
   }
 
