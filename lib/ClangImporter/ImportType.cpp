@@ -2235,6 +2235,11 @@ Type ClangImporter::Implementation::importMethodType(
       if (!nonOptionalTy)
         nonOptionalTy = swiftResultTy;
 
+      // Undo 'Any' bridging.
+      if (nonOptionalTy->isAny())
+        nonOptionalTy = SwiftContext.getProtocol(KnownProtocolKind::AnyObject)
+          ->getDeclaredType();
+
       if (nonOptionalTy->isAnyClassReferenceType()) {
         swiftResultTy = getUnmanagedType(*this, nonOptionalTy);
         if (OptionalityOfReturn != OTK_None)
