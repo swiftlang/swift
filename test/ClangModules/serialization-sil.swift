@@ -20,10 +20,10 @@ public func testPartialApply(_ obj: Test) {
   if let curried2 = obj.innerPointer {
     // CHECK: dynamic_method_br [[CURRIED2_OBJ:%.+]] : $@opened([[CURRIED2_EXISTENTIAL:.+]]) Test, #Test.innerPointer!1.foreign, [[CURRIED2_TRUE:[^,]+]], [[CURRIED2_FALSE:[^,]+]]
     // CHECK: [[CURRIED2_FALSE]]:
-    // CHECK: [[CURRIED2_TRUE]]([[CURRIED2_METHOD:%.+]] : $@convention(objc_method) (@opened([[CURRIED2_EXISTENTIAL]]) Test) -> @unowned_inner_pointer UnsafeMutablePointer<()>):
-    // CHECK: [[CURRIED2_PARTIAL:%.+]] = partial_apply [[CURRIED2_METHOD]]([[CURRIED2_OBJ]]) : $@convention(objc_method) (@opened([[CURRIED2_EXISTENTIAL]]) Test) -> @unowned_inner_pointer UnsafeMutablePointer<()>
-    // CHECK: [[CURRIED2_THUNK:%.+]] = function_ref @_TTRXFo__dGSpT___XFo_iT__iGSpT___ : $@convention(thin) (@in (), @owned @callee_owned () -> UnsafeMutablePointer<()>) -> @out UnsafeMutablePointer<()>
-    // CHECK: = partial_apply [[CURRIED2_THUNK]]([[CURRIED2_PARTIAL]]) : $@convention(thin) (@in (), @owned @callee_owned () -> UnsafeMutablePointer<()>) -> @out UnsafeMutablePointer<()>
+    // CHECK: [[CURRIED2_TRUE]]([[CURRIED2_METHOD:%.+]] : $@convention(objc_method) (@opened([[CURRIED2_EXISTENTIAL]]) Test) -> @unowned_inner_pointer UnsafeMutableRawPointer):
+    // CHECK: [[CURRIED2_PARTIAL:%.+]] = partial_apply [[CURRIED2_METHOD]]([[CURRIED2_OBJ]]) : $@convention(objc_method) (@opened([[CURRIED2_EXISTENTIAL]]) Test) -> @unowned_inner_pointer UnsafeMutableRawPointer
+    // CHECK: [[CURRIED2_THUNK:%.+]] = function_ref @_TTRXFo__dGSpT___XFo_iT__iSv_ : $@convention(thin) (@in (), @owned @callee_owned () -> UnsafeMutableRawPointer) -> @out UnsafeMutableRawPointer
+    // CHECK: = partial_apply [[CURRIED2_THUNK]]([[CURRIED2_PARTIAL]]) : $@convention(thin) (@in (), @owned @callee_owned () -> UnsafeMutableRawPointer) -> @out UnsafeMutableRawPointer
     curried2()
   }
   if let prop1 = obj.normalObjectProp {
@@ -37,9 +37,9 @@ public func testPartialApply(_ obj: Test) {
   if let prop2 = obj.innerPointerProp {
     // CHECK: dynamic_method_br [[PROP2_OBJ:%.+]] : $@opened([[PROP2_EXISTENTIAL:.+]]) Test, #Test.innerPointerProp!getter.1.foreign, [[PROP2_TRUE:[^,]+]], [[PROP2_FALSE:[^,]+]]
     // CHECK: [[PROP2_FALSE]]:
-    // CHECK: [[PROP2_TRUE]]([[PROP2_METHOD:%.+]] : $@convention(objc_method) (@opened([[PROP2_EXISTENTIAL]]) Test) -> @unowned_inner_pointer UnsafeMutablePointer<()>):
-    // CHECK: [[PROP2_PARTIAL:%.+]] = partial_apply [[PROP2_METHOD]]([[PROP2_OBJ]]) : $@convention(objc_method) (@opened([[PROP2_EXISTENTIAL]]) Test) -> @unowned_inner_pointer UnsafeMutablePointer<()>
-    // CHECK: = apply [[PROP2_PARTIAL]]() : $@callee_owned () -> UnsafeMutablePointer<()>
+    // CHECK: [[PROP2_TRUE]]([[PROP2_METHOD:%.+]] : $@convention(objc_method) (@opened([[PROP2_EXISTENTIAL]]) Test) -> @unowned_inner_pointer UnsafeMutableRawPointer):
+    // CHECK: [[PROP2_PARTIAL:%.+]] = partial_apply [[PROP2_METHOD]]([[PROP2_OBJ]]) : $@convention(objc_method) (@opened([[PROP2_EXISTENTIAL]]) Test) -> @unowned_inner_pointer UnsafeMutableRawPointer
+    // CHECK: = apply [[PROP2_PARTIAL]]() : $@callee_owned () -> UnsafeMutableRawPointer
     _ = prop2
   }
 } // CHECK: {{^}$}}

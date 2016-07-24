@@ -40,7 +40,7 @@ func pointerArgumentsObjC(ap: AutoreleasingUnsafeMutablePointer<Int>,
   takesConstVoidPointer(afp)
 
   var x: UnsafeRawPointer
-  x = ap // expected-error{{cannot assign value of type 'AutoreleasingUnsafeMutablePointer<Int>' to type 'UnsafeRawPointer' (aka 'UnsafePointer<()>')}}
+  x = ap // expected-error{{cannot assign value of type 'AutoreleasingUnsafeMutablePointer<Int>' to type 'UnsafeRawPointer'}}
   _ = x
 }
 

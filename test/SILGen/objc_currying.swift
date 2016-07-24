@@ -55,7 +55,7 @@ func curry_bridged(_ x: CurryTest) -> (String!) -> String! {
 func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer! {
   return x.returnsInnerPointer
 }
-// CHECK-LABEL: sil hidden @_TF13objc_currying25curry_returnsInnerPointerFCSo9CurryTestFT_GSQGSpT___ : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>> {
+// CHECK-LABEL: sil hidden @_TF13objc_currying25curry_returnsInnerPointerFCSo9CurryTestFT_GSQSv_ : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>> {
 // CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER:@_TTOFCSo9CurryTest19returnsInnerPointerFT_GSQGSpT___]]
 // CHECK:         [[FN:%.*]] = apply [[THUNK]](%0)
 // CHECK:         return [[FN]]

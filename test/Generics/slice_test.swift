@@ -42,7 +42,8 @@ class Vector<T> {
     if length == capacity {
       let newcapacity = capacity * 2 + 2
       let size = Int(Builtin.sizeof(T.self))
-      let newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size))
+      let newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size)!
+        .bindMemory(to: T.self, capacity: newCapacity))
       for i in 0..<length {
         (newbase + i).initialize(to: (base+i).move())
       }

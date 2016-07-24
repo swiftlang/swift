@@ -704,7 +704,7 @@ _ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an op
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis
 func f23433271(_ x : UnsafePointer<Int>) {}
 func segfault23433271(_ a : UnsafeMutableRawPointer) {
-  f23433271(a[0])  // expected-error {{cannot convert value of type 'Void' (aka '()') to expected argument type 'UnsafePointer<Int>'}}
+  f23433271(a[0])  // expected-error {{type 'UnsafeMutableRawPointer' has no subscript members}}
 }
 
 // <rdar://problem/22058555> crash in cs diags in withCString
@@ -835,7 +835,7 @@ func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
 func read<T : Integer>() -> T? {
   var buffer : T 
   let n = withUnsafePointer(&buffer) { (p) in
-    read2(UnsafePointer(p), maxLength: sizeof(T)) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer' (aka 'UnsafeMutablePointer<()>')}}
+    read2(UnsafePointer(p), maxLength: sizeof(T)) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer')}}
   }
 }
 

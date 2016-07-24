@@ -1068,7 +1068,7 @@ class infer_instanceVar1 {
   var var_UnsafeMutablePointer11: UnsafeMutablePointer<PlainProtocol>
   var var_UnsafeMutablePointer12: UnsafeMutablePointer<AnyObject>
   var var_UnsafeMutablePointer13: UnsafeMutablePointer<AnyObject.Type>
-  var var_UnsafeMutablePointer100: UnsafeMutablePointer<()>
+  var var_UnsafeMutablePointer100: UnsafeMutableRawPointer
   var var_UnsafeMutablePointer101: UnsafeMutableRawPointer
   var var_UnsafeMutablePointer102: UnsafeMutablePointer<(Int, Int)>
 // CHECK-LABEL: @objc var var_UnsafeMutablePointer1: UnsafeMutablePointer<Int>
@@ -1084,7 +1084,7 @@ class infer_instanceVar1 {
 // CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer11: UnsafeMutablePointer<PlainProtocol>
 // CHECK-LABEL: @objc var var_UnsafeMutablePointer12: UnsafeMutablePointer<AnyObject>
 // CHECK-LABEL: var var_UnsafeMutablePointer13: UnsafeMutablePointer<AnyObject.Type>
-// CHECK-LABEL: {{^}} @objc var var_UnsafeMutablePointer100: UnsafeMutablePointer<()>
+// CHECK-LABEL: {{^}} @objc var var_UnsafeMutablePointer100: UnsafeMutableRawPointer
 // CHECK-LABEL: {{^}} @objc var var_UnsafeMutablePointer101: UnsafeMutableRawPointer
 // CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer102: UnsafeMutablePointer<(Int, Int)>
 
