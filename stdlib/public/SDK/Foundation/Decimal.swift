@@ -99,7 +99,7 @@ extension Decimal {
         return order == .orderedAscending || order == .orderedSame
     }
 
-    public func isTotallyOrdered(below other: Decimal) -> Bool {
+    public func isTotallyOrdered(belowOrEqualTo other: Decimal) -> Bool {
         // Notes: Decimal does not have -0 or infinities to worry about
         if self.isNaN {
             return false
