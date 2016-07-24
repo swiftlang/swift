@@ -1540,7 +1540,10 @@ namespace {
           if (!DC) return nullptr;
 
           auto loc = Impl.importSourceLoc(Decl->getLocStart());
-          auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
+          
+          // Leave behind a typealias for 'id' marked unavailable, to instruct
+          // people to use Any instead.
+          auto unavailableAlias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                           Decl, loc, Name, loc,
                           TypeLoc::withoutLoc(Impl.SwiftContext.TheAnyType),
                           /*genericparams*/nullptr, DC);
@@ -1549,8 +1552,8 @@ namespace {
                         Impl.SwiftContext, "'id' is not available in Swift; use 'Any'",
                         "", UnconditionalAvailabilityKind::UnavailableInSwift);
 
-          Result->getAttrs().add(attr);
-          return Result;
+          unavailableAlias->getAttrs().add(attr);
+          return nullptr;
         }
       
         bool IsError;
