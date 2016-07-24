@@ -26,7 +26,7 @@ internal func __NSTimeZoneCurrent() -> NSTimeZone
  
  `TimeZone` provides two static functions to get time zone values: `current` and `autoupdatingCurrent`. The `autoupdatingCurrent` time zone automatically tracks updates made by the user.
  
- Note that time zone database entries such as “America/Los_Angeles” are IDs, not names. An example of a time zone name is “Pacific Daylight Time”. Although many `TimeZone` functions include the word “name”, they refer to IDs.
+ Note that time zone database entries such as "America/Los_Angeles" are IDs, not names. An example of a time zone name is "Pacific Daylight Time". Although many `TimeZone` functions include the word "name", they refer to IDs.
  
  Cocoa does not provide any API to change the time zone of the computer, or of other applications.
  */
@@ -87,7 +87,7 @@ public struct TimeZone : CustomStringConvertible, CustomDebugStringConvertible, 
     
     /// Returns a time zone identified by a given abbreviation.
     ///
-    /// In general, you are discouraged from using abbreviations except for unique instances such as “GMT”. Time Zone abbreviations are not standardized and so a given abbreviation may have multiple meanings—for example, “EST” refers to Eastern Time in both the United States and Australia
+    /// In general, you are discouraged from using abbreviations except for unique instances such as "GMT". Time Zone abbreviations are not standardized and so a given abbreviation may have multiple meanings—for example, "EST" refers to Eastern Time in both the United States and Australia
     ///
     /// - parameter abbreviation: The abbreviation for the time zone.
     /// - returns: A time zone identified by abbreviation determined by resolving the abbreviation to a identifier using the abbreviation dictionary and then returning the time zone for that identifier. Returns `nil` if there is no match for abbreviation.
@@ -141,7 +141,7 @@ public struct TimeZone : CustomStringConvertible, CustomDebugStringConvertible, 
     
     /// Returns the abbreviation for the time zone at a given date.
     ///
-    /// Note that the abbreviation may be different at different dates. For example, during daylight saving time the US/Eastern time zone has an abbreviation of “EDT.” At other times, its abbreviation is “EST.”
+    /// Note that the abbreviation may be different at different dates. For example, during daylight saving time the US/Eastern time zone has an abbreviation of "EDT." At other times, its abbreviation is "EST."
     /// - parameter date: The date to use for the calculation. The default value is the current date.
     public func abbreviation(for date: Date = Date()) -> String? {
         return _wrapped.abbreviation(for: date)
