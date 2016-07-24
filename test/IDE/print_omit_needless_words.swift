@@ -35,28 +35,28 @@
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector)
 
 // Note: "with" parameters.
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?)
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?, with: AnyObject?)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: Any?)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: Any?, with: Any?)
 
 // Note: don't prefix-strip swift_bridged classes or their subclasses.
 // CHECK-FOUNDATION: func mutableCopy() -> NSMutableArray
 
 // Note: id -> "Object".
-// CHECK-FOUNDATION: func index(of: AnyObject) -> Int
+// CHECK-FOUNDATION: func index(of: Any) -> Int
 
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKind(of aClass: AnyClass) -> Bool
 
 // Note: Pointer-to-struct name matching; preposition splitting.
 //
-// CHECK-FOUNDATION: func copy(with: NSZone? = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copy(with: NSZone? = nil) -> Any!
 
 // Note: Objective-C type parameter names.
-// CHECK-FOUNDATION: func object(forKey: NSCopying) -> AnyObject?
+// CHECK-FOUNDATION: func object(forKey: NSCopying) -> Any?
 // CHECK-FOUNDATION: func removeObject(forKey: NSCopying)
 
 // Note: Don't drop the name of the first parameter in an initializer entirely.
-// CHECK-FOUNDATION: init(array: [AnyObject])
+// CHECK-FOUNDATION: init(array: [Any])
 
 // Note: struct name matching; don't drop "With".
 // CHECK-FOUNDATION: class func withRange(_: NSRange) -> NSValue
@@ -107,7 +107,7 @@
 // CHECK-FOUNDATION: func startShopping(_: Bee)
 
 // Note: Removing plural forms when working with collections
-// CHECK-FOUNDATION: func add(_: [AnyObject])
+// CHECK-FOUNDATION: func add(_: [Any])
 
 // Note: Int and Index match.
 // CHECK-FOUNDATION: func slice(from: Int, to: Int) -> String
@@ -136,11 +136,11 @@
 // CHECK-FOUNDATION: static var reverse: EnumerationOptions
 
 // Note: usingBlock -> body
-// CHECK-FOUNDATION: func enumerateObjects(_: ((AnyObject?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(options: EnumerationOptions = [], using: ((AnyObject?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: ((Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(options: EnumerationOptions = [], using: ((Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
-// CHECK-FOUNDATION: func enumerateObjectsRandomly(block: ((AnyObject?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)? = nil)
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(block: ((Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomething(with: NSCopying)
@@ -149,10 +149,10 @@
 // CHECK-FOUNDATION: func doSomethingElse(with: NSCopying & NSObjectProtocol)
 
 // Note: Function type -> "Function".
-// CHECK-FOUNDATION: func sort(_: @convention(c) (AnyObject, AnyObject) -> Int)
+// CHECK-FOUNDATION: func sort(_: @convention(c) (Any, Any) -> Int)
 
 // Note: Plural: NSArray without type arguments -> "Objects".
-// CHECK-FOUNDATION: func remove(_: [AnyObject])
+// CHECK-FOUNDATION: func remove(_: [Any])
 
 // Note: Skipping "Type" suffix.
 // CHECK-FOUNDATION: func doSomething(with: UnderlyingType)
@@ -163,7 +163,7 @@
 // CHECK-FOUNDATION: func normalizingXMLPreservingComments(_: Bool)
 
 // Collection element types.
-// CHECK-FOUNDATION: func adding(_: AnyObject) -> Set<NSObject>
+// CHECK-FOUNDATION: func adding(_: Any) -> Set<NSObject>
 
 // Boolean properties follow the getter.
 // CHECK-FOUNDATION: var empty: Bool { get }
@@ -209,7 +209,7 @@
 // CHECK-APPKIT: func drawInAir(at: Point3D)
 
 // Note: with<something> -> <something>
-// CHECK-APPKIT: func draw(at: Point3D, withAttributes: [String : AnyObject]? = [:])
+// CHECK-APPKIT: func draw(at: Point3D, withAttributes: [String : Any]? = [:])
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
 // CHECK-APPKIT: func setTextColor(_: NSColor?)
@@ -218,8 +218,8 @@
 // CHECK-APPKIT: func draw(in: NSView?)
 
 // Note: NSDictionary default arguments for "options"
-// CHECK-APPKIT: func drawAnywhere(in: NSView?, options: [NSObject : AnyObject] = [:])
-// CHECK-APPKIT: func drawAnywhere(options: [NSObject : AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(in: NSView?, options: [NSObject : Any] = [:])
+// CHECK-APPKIT: func drawAnywhere(options: [NSObject : Any] = [:])
 
 // Note: no lowercasing of initialisms when there might be a prefix.
 // CHECK-CORECOOLING: func CFBottom() ->
@@ -268,11 +268,11 @@
 // CHECK-OMIT-NEEDLESS-WORDS:   static var toXMLHex: OMWWobbleOptions
 
 // CHECK-OMIT-NEEDLESS-WORDS: func jump(to: NSURL)
-// CHECK-OMIT-NEEDLESS-WORDS: func objectIs(compatibleWith: AnyObject) -> Bool
+// CHECK-OMIT-NEEDLESS-WORDS: func objectIs(compatibleWith: Any) -> Bool
 // CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x: Int, y: Int)
-// CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: AnyObject)
-// CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: AnyObject)
-// CHECK-OMIT-NEEDLESS-WORDS: func removeWithNoRemorse(_: AnyObject)
+// CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: Any)
+// CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: Any)
+// CHECK-OMIT-NEEDLESS-WORDS: func removeWithNoRemorse(_: Any)
 // CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with: [NSURL])
 // CHECK-OMIT-NEEDLESS-WORDS: func save(to: NSURL, forSaveOperation: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed: String)
@@ -286,13 +286,13 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func append(withContentsOf: String)
 
 // Leave subscripts alone
-// CHECK-OMIT-NEEDLESS-WORDS: subscript(_: UInt) -> AnyObject { get }
-// CHECK-OMIT-NEEDLESS-WORDS: func objectAtIndexedSubscript(_: UInt) -> AnyObject
+// CHECK-OMIT-NEEDLESS-WORDS: subscript(_: UInt) -> Any { get }
+// CHECK-OMIT-NEEDLESS-WORDS: func objectAtIndexedSubscript(_: UInt) -> Any
 
 // CHECK-OMIT-NEEDLESS-WORDS: func exportPresets(bestMatching: String)
 // CHECK-OMIT-NEEDLESS-WORDS: func `is`(compatibleWith: String)
 
-// CHECK-OMIT-NEEDLESS-WORDS: func add(_: AnyObject)
+// CHECK-OMIT-NEEDLESS-WORDS: func add(_: Any)
 
 // CHECK-OMIT-NEEDLESS-WORDS: func slobbering(_: String) -> OmitNeedlessWords
 

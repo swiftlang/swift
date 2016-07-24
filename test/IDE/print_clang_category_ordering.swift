@@ -7,7 +7,7 @@
 // CHECK: }
 
 // CHECK-LABEL: protocol Foo {
-// CHECK: var foo: AnyObject
+// CHECK: var foo: Any
 // CHECK: }
 
 // CHECK-LABEL: class Sub : Base {
@@ -17,7 +17,7 @@
 // CHECK-PROTO-FIRST-NEXT: }
 
 // CHECK-LABEL: extension Sub {
-// CHECK: var foo: AnyObject!
+// CHECK: var foo: Any!
 // CHECK: }
 
 // CHECK-PROP-FIRST-LABEL: extension Sub : Foo {
