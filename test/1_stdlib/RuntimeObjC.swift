@@ -51,11 +51,6 @@ struct SwiftObjectCanaryStruct {
   var value: Int
 }
 
-struct NotBridgedValueType {
-  // Keep it pointer-sized.
-  var canaryRef = SwiftObjectCanary()
-}
-
 struct BridgedValueType : _ObjectiveCBridgeable {
   init(value: Int) {
     self.value = value
@@ -162,52 +157,6 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
   var canaryRef = SwiftObjectCanary()
 }
 
-
-struct ConditionallyBridgedValueType<T> : _ObjectiveCBridgeable {
-  init(value: Int) {
-    self.value = value
-  }
-
-  func _bridgeToObjectiveC() -> ClassA {
-    return ClassA(value: value)
-  }
-
-  static func _forceBridgeFromObjectiveC(
-    _ x: ClassA,
-    result: inout ConditionallyBridgedValueType?
-  ) {
-    assert(x.value % 2 == 0, "not bridged from Objective-C")
-    result = ConditionallyBridgedValueType(value: x.value)
-  }
-
-  static func _conditionallyBridgeFromObjectiveC(
-    _ x: ClassA,
-    result: inout ConditionallyBridgedValueType?
-  ) -> Bool {
-    if x.value % 2 == 0 {
-      result = ConditionallyBridgedValueType(value: x.value)
-      return true
-    }
-
-    result = nil
-    return false
-  }
-
-  static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
-      -> ConditionallyBridgedValueType {
-    var result: ConditionallyBridgedValueType? = nil
-    _forceBridgeFromObjectiveC(source!, result: &result)
-    return result!
-  }
-
-  static func _isBridgedToObjectiveC() -> Bool {
-    return ((T.self as Any) as? String.Type) == nil
-  }
-
-  var value: Int
-  var canaryRef = SwiftObjectCanary()
-}
-
 class BridgedVerbatimRefType {
   var value: Int = 42
   var canaryRef = SwiftObjectCanary()
@@ -287,56 +236,29 @@ Runtime.test("_canBeClass") {
 }
 
 Runtime.test("bridgeToObjectiveC") {
-  expectEmpty(_bridgeToObjectiveC(NotBridgedValueType()))
+  expectEqual(42, (_bridgeAnythingToObjectiveC(BridgedValueType(value: 42)) as! ClassA).value)
 
-  expectEqual(42, (_bridgeToObjectiveC(BridgedValueType(value: 42)) as! ClassA).value)
-
-  expectEqual(42, (_bridgeToObjectiveC(BridgedLargeValueType(value: 42)) as! ClassA).value)
-
-  expectEqual(42, (_bridgeToObjectiveC(ConditionallyBridgedValueType<Int>(value: 42)) as! ClassA).value)
-
-  expectEmpty(_bridgeToObjectiveC(ConditionallyBridgedValueType<String>(value: 42)))
+  expectEqual(42, (_bridgeAnythingToObjectiveC(BridgedLargeValueType(value: 42)) as! ClassA).value)
 
   var bridgedVerbatimRef = BridgedVerbatimRefType()
-  expectTrue(_bridgeToObjectiveC(bridgedVerbatimRef) === bridgedVerbatimRef)
+  expectTrue(_bridgeAnythingToObjectiveC(bridgedVerbatimRef) === bridgedVerbatimRef)
 }
 
 Runtime.test("bridgeToObjectiveC/NoLeak") {
   withSwiftObjectCanary(
-    { NotBridgedValueType() },
-    { expectEmpty(_bridgeToObjectiveC($0)) })
-
-  withSwiftObjectCanary(
     { BridgedValueType(value: 42) },
-    { expectEqual(42, (_bridgeToObjectiveC($0) as! ClassA).value) })
+    { expectEqual(42, (_bridgeAnythingToObjectiveC($0) as! ClassA).value) })
 
   withSwiftObjectCanary(
     { BridgedLargeValueType(value: 42) },
-    { expectEqual(42, (_bridgeToObjectiveC($0) as! ClassA).value) })
-
-  withSwiftObjectCanary(
-    { ConditionallyBridgedValueType<Int>(value: 42) },
-    { expectEqual(42, (_bridgeToObjectiveC($0) as! ClassA).value) })
-
-  withSwiftObjectCanary(
-    { ConditionallyBridgedValueType<String>(value: 42) },
-    { expectEmpty(_bridgeToObjectiveC($0)) })
+    { expectEqual(42, (_bridgeAnythingToObjectiveC($0) as! ClassA).value) })
 
   withSwiftObjectCanary(
     { BridgedVerbatimRefType() },
-    { expectTrue(_bridgeToObjectiveC($0) === $0) })
+    { expectTrue(_bridgeAnythingToObjectiveC($0) === $0) })
 }
 
 Runtime.test("forceBridgeFromObjectiveC") {
-  // Bridge back using NotBridgedValueType.
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
-      ClassA(value: 21), NotBridgedValueType.self))
-
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
-      ClassA(value: 42), NotBridgedValueType.self))
-
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
-      BridgedVerbatimRefType(), NotBridgedValueType.self))
 
   // Bridge back using BridgedValueType.
   expectEmpty(_conditionallyBridgeFromObjectiveC(
@@ -378,13 +300,11 @@ Runtime.test("forceBridgeFromObjectiveC") {
 
 
 Runtime.test("isBridgedToObjectiveC") {
-  expectFalse(_isBridgedToObjectiveC(NotBridgedValueType))
   expectTrue(_isBridgedToObjectiveC(BridgedValueType))
   expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType))
 }
 
 Runtime.test("isBridgedVerbatimToObjectiveC") {
-  expectFalse(_isBridgedVerbatimToObjectiveC(NotBridgedValueType))
   expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType))
   expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
 }
