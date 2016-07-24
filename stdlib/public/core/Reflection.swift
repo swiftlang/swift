@@ -510,7 +510,7 @@ public func _swift_ClassMirror_quickLookObject(_: _MagicMirrorData) -> AnyObject
 func _swift_isKind(_ object: AnyObject, of: AnyObject) -> Bool
 
 func _isKind(_ object: AnyObject, of: String) -> Bool {
-  return _swift_isKind(object, of: _bridgeToObjectiveC(of)!)
+  return _swift_isKind(object, of: _bridgeAnythingToObjectiveC(of))
 }
 
 func _getClassPlaygroundQuickLook(_ object: AnyObject) -> PlaygroundQuickLook? {

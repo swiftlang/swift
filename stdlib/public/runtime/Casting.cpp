@@ -2516,11 +2516,6 @@ struct _ObjectiveCBridgeableWitnessTable {
                      const Metadata *parentMetadata,
                      const _ObjectiveCBridgeableWitnessTable *witnessTable);
 
-  // class func _isBridgedToObjectiveC() -> bool
-  bool (*isBridgedToObjectiveC)(
-         const Metadata *value, const Metadata *T,
-         const _ObjectiveCBridgeableWitnessTable *witnessTable);
-
   // func _bridgeToObjectiveC() -> _ObjectiveCType
   HeapObject *(*bridgeToObjectiveC)(
                 OpaqueValue *self, const Metadata *Self,
@@ -2561,12 +2556,6 @@ static bool _dynamicCastValueToClassViaObjCBridgeable(
                const Metadata *targetType,
                const _ObjectiveCBridgeableWitnessTable *srcBridgeWitness,
                DynamicCastFlags flags) {
-  // Check whether the source is bridged to Objective-C.
-  if (!srcBridgeWitness->isBridgedToObjectiveC(srcType, srcType,
-                                               srcBridgeWitness)) {
-    return _fail(src, srcType, targetType, flags);
-  }
-
   // Bridge the source value to an object.
   auto srcBridgedObject =
     srcBridgeWitness->bridgeToObjectiveC(src, srcType, srcBridgeWitness);
@@ -2604,12 +2593,6 @@ static bool _dynamicCastValueToClassExistentialViaObjCBridgeable(
               const ExistentialTypeMetadata *targetType,
               const _ObjectiveCBridgeableWitnessTable *srcBridgeWitness,
               DynamicCastFlags flags) {
-  // Check whether the source is bridged to Objective-C.
-  if (!srcBridgeWitness->isBridgedToObjectiveC(srcType, srcType,
-                                               srcBridgeWitness)) {
-    return _fail(src, srcType, targetType, flags);
-  }
-
   // Bridge the source value to an object.
   auto srcBridgedObject =
     srcBridgeWitness->bridgeToObjectiveC(src, srcType, srcBridgeWitness);
@@ -2646,12 +2629,6 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
                const Metadata *targetType,
                const _ObjectiveCBridgeableWitnessTable *targetBridgeWitness,
                DynamicCastFlags flags) {
-  // Check whether the target is bridged to Objective-C.
-  if (!targetBridgeWitness->isBridgedToObjectiveC(targetType, targetType,
-                                                  targetBridgeWitness)) {
-    return _fail(src, srcType, targetType, flags);
-  }
-
   // Determine the class type to which the target value type is bridged.
   auto targetBridgedClass =
     targetBridgeWitness->ObjectiveCType(targetType, targetBridgeWitness);
@@ -2772,12 +2749,6 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
   }
   
   if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
-    // Check whether the source is bridged to Objective-C.
-    if (!srcBridgeWitness->isBridgedToObjectiveC(srcType, srcType,
-                                                 srcBridgeWitness)) {
-      return nil;
-    }
-
     // Bridge the source value to an object.
     auto srcBridgedObject =
       srcBridgeWitness->bridgeToObjectiveC(src, srcType, srcBridgeWitness);
@@ -2847,30 +2818,6 @@ findBridgeWitness(const Metadata *T) {
   case MetadataKind::ErrorObject:
     break;
   }
-  return nullptr;
-}
-
-/// \param value passed at +1, consumed.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" HeapObject *_swift_bridgeNonVerbatimToObjectiveC(
-  OpaqueValue *value, const Metadata *T
-) {
-  assert(!swift_isClassOrObjCExistentialTypeImpl(T));
-
-  if (const auto *bridgeWitness = findBridgeWitness(T)) {
-    if (!bridgeWitness->isBridgedToObjectiveC(T, T, bridgeWitness)) {
-      // Witnesses take 'self' at +0, so we still need to consume the +1 argument.
-      T->vw_destroy(value);
-      return nullptr;
-    }
-    auto result = bridgeWitness->bridgeToObjectiveC(value, T, bridgeWitness);
-    // Witnesses take 'self' at +0, so we still need to consume the +1 argument.
-    T->vw_destroy(value);
-    return result;
-  }
-
-  // Consume the +1 argument.
-  T->vw_destroy(value);
   return nullptr;
 }
 
@@ -2987,8 +2934,7 @@ extern "C" bool _swift_isBridgedNonVerbatimToObjectiveC(
   assert(!swift_isClassOrObjCExistentialTypeImpl(T));
 
   auto bridgeWitness = findBridgeWitness(T);
-  return bridgeWitness && bridgeWitness->isBridgedToObjectiveC(value, T,
-                                                               bridgeWitness);
+  return (bool)bridgeWitness;
 }
 #endif
 

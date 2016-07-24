@@ -292,10 +292,6 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
 // MARK: - Bridging
 
 extension DateComponents : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSDateComponents.self
     }

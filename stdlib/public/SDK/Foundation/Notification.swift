@@ -95,10 +95,6 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
 }
 
 extension Notification : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSNotification.self
     }

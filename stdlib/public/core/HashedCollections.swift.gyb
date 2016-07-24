@@ -1184,7 +1184,7 @@ extension Set {
       var i = lhsNative.startIndex
       while i != endIndex {
         let key = lhsNative.assertingGet(i)
-        let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
+        let bridgedKey: AnyObject = _bridgeAnythingToObjectiveC(key)
         let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
         if let rhsValue = optRhsValue {
           if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
@@ -1301,10 +1301,8 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
     if valueBridgesDirectly {
       bridgedMember = unsafeBitCast(member, to: ObjCValue.self)
     } else {
-      let bridged: AnyObject? = _bridgeToObjectiveC(member)
-      _precondition(bridged != nil,
-      "set member cannot be bridged to Objective-C")
-      bridgedMember = unsafeBitCast(bridged!, to: ObjCValue.self)
+      let bridged: AnyObject = _bridgeAnythingToObjectiveC(member)
+      bridgedMember = unsafeBitCast(bridged, to: ObjCValue.self)
     }
     result.insert(bridgedMember)
   }
@@ -2109,7 +2107,7 @@ extension Dictionary where Key : Equatable, Value : Equatable {
       while index != endIndex {
         let (key, value) = lhsNative.assertingGet(index)
         let optRhsValue: AnyObject? =
-          rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))
+          rhsCocoa.maybeGet(_bridgeAnythingToObjectiveC(key))
         // TODO: swift-3-indexing-model: change 'if' into 'guard'.
         if let rhsValue = optRhsValue {
           if value == _forceBridgeFromObjectiveC(rhsValue, Value.self) {
@@ -2245,9 +2243,8 @@ public func _dictionaryBridgeToObjectiveC<
     if keyBridgesDirectly {
       bridgedKey = unsafeBitCast(key, to: ObjCKey.self)
     } else {
-      let bridged: AnyObject? = _bridgeToObjectiveC(key)
-      _precondition(bridged != nil, "dictionary key cannot be bridged to Objective-C")
-      bridgedKey = unsafeBitCast(bridged!, to: ObjCKey.self)
+      let bridged: AnyObject = _bridgeAnythingToObjectiveC(key)
+      bridgedKey = unsafeBitCast(bridged, to: ObjCKey.self)
     }
 
     // Bridge the value
@@ -2255,10 +2252,8 @@ public func _dictionaryBridgeToObjectiveC<
     if valueBridgesDirectly {
       bridgedValue = unsafeBitCast(value, to: ObjCValue.self)
     } else {
-      let bridged: AnyObject? = _bridgeToObjectiveC(value)
-      _precondition(bridged != nil,
-          "dictionary value cannot be bridged to Objective-C")
-      bridgedValue = unsafeBitCast(bridged!, to: ObjCValue.self)
+      let bridged: AnyObject? = _bridgeAnythingToObjectiveC(value)
+      bridgedValue = unsafeBitCast(bridged, to: ObjCValue.self)
     }
 
     result[bridgedKey] = bridgedValue
@@ -3410,11 +3405,11 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     // Bridge everything.
     for i in 0..<nativeStorage.capacity {
       if nativeStorage.isInitializedEntry(at: i) {
-        let key = _bridgeToObjectiveCUnconditional(nativeStorage.key(at: i))
+        let key = _bridgeAnythingToObjectiveC(nativeStorage.key(at: i))
 %if Self == 'Set':
         bridged.initializeKey(key, at: i)
 %elif Self == 'Dictionary':
-        let val = _bridgeToObjectiveCUnconditional(nativeStorage.value(at: i))
+        let val = _bridgeAnythingToObjectiveC(nativeStorage.value(at: i))
         bridged.initializeKey(key, value: val, at: i)
 %end
       }
@@ -3433,9 +3428,9 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     AnyObject {
     if _fastPath(_isClassOrObjCExistential(Key.self)) {
 %if Self == 'Set':
-      return _bridgeToObjectiveCUnconditional(nativeStorage.assertingGet(i))
+      return _bridgeAnythingToObjectiveC(nativeStorage.assertingGet(i))
 %elif Self == 'Dictionary':
-      return _bridgeToObjectiveCUnconditional(nativeStorage.assertingGet(i).0)
+      return _bridgeAnythingToObjectiveC(nativeStorage.assertingGet(i).0)
 %end
     }
     bridgeEverything()
@@ -3451,7 +3446,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   internal func _getBridgedValue(_ i: _Native${Self}Index<${TypeParameters}>) ->
     AnyObject {
     if _fastPath(_isClassOrObjCExistential(Value.self)) {
-      return _bridgeToObjectiveCUnconditional(nativeStorage.assertingGet(i))
+      return _bridgeAnythingToObjectiveC(nativeStorage.assertingGet(i))
     }
     bridgeEverything()
     return bridgedNativeStorage.assertingGet(i.offset)
@@ -3462,7 +3457,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   internal func _getBridgedValue(_ i: _Native${Self}Index<${TypeParameters}>)
     -> AnyObject {
     if _fastPath(_isClassOrObjCExistential(Value.self)) {
-      return _bridgeToObjectiveCUnconditional(nativeStorage.assertingGet(i).1)
+      return _bridgeAnythingToObjectiveC(nativeStorage.assertingGet(i).1)
     }
     bridgeEverything()
     return bridgedNativeStorage.assertingGet(i.offset).1
@@ -3952,7 +3947,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       return nil
     case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
-      let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
+      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
       if let cocoaIndex = cocoaStorage.index(forKey: anyObjectKey) {
         return ._cocoa(cocoaIndex)
       }
@@ -4001,7 +3996,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
       // FIXME: This assumes that Key and Value are bridged verbatim.
-      let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
+      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
       let anyObjectValue: AnyObject = cocoaStorage.assertingGet(anyObjectKey)
       return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
 #else
@@ -4016,7 +4011,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   internal static func maybeGetFromCocoaStorage(
     _ cocoaStorage : CocoaStorage, forKey key: Key
   ) -> Value? {
-    let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
+    let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
     if let anyObjectValue = cocoaStorage.maybeGet(anyObjectKey) {
       return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
     }
@@ -4322,7 +4317,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       return nativeRemoveObject(forKey: key)
     case .cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
-      let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
+      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
       if cocoaStorage.maybeGet(anyObjectKey) == nil {
         return nil
       }
@@ -5033,13 +5028,6 @@ extension ${Self} {
   public func _bridgeToObjectiveCImpl() -> _NS${Self}Core {
     switch _variantStorage {
     case _Variant${Self}Storage.native(let nativeOwner):
-%if Self == 'Set':
-      _precondition(_isBridgedToObjectiveC(Element.self),
-        "Key is not bridged to Objective-C")
-%elif Self == 'Dictionary':
-      _precondition(_isBridgedToObjectiveC(Value.self),
-        "Value is not bridged to Objective-C")
-%end
       return nativeOwner as _Native${Self}StorageOwner<${TypeParameters}>
 
     case _Variant${Self}Storage.cocoa(let cocoaStorage):

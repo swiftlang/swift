@@ -264,10 +264,6 @@ extension AffineTransform : ReferenceConvertible, Hashable, CustomStringConverti
 }
 
 extension AffineTransform : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSAffineTransform.self
     }

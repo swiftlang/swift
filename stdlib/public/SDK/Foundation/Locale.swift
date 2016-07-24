@@ -441,10 +441,6 @@ public struct Locale : CustomStringConvertible, CustomDebugStringConvertible, Ha
 
 
 extension Locale : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSLocale {
         return _wrapped

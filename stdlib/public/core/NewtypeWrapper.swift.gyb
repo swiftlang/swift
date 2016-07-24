@@ -30,10 +30,6 @@ public func ${op} <T: _SwiftNewtypeWrapper>(lhs: T, rhs: T) -> Bool
 
 #if _runtime(_ObjC)
 extension _SwiftNewtypeWrapper where Self.RawValue : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return Self.RawValue._isBridgedToObjectiveC()
-  }
-
   public func _bridgeToObjectiveC() -> Self.RawValue._ObjectiveCType {
     return rawValue._bridgeToObjectiveC()
   }

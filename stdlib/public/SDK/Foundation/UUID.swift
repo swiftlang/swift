@@ -107,10 +107,6 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
 }
 
 extension UUID : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSUUID {
         return reference

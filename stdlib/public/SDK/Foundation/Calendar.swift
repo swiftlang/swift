@@ -1082,10 +1082,6 @@ public struct Calendar : CustomStringConvertible, CustomDebugStringConvertible, 
 }
 
 extension Calendar : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSCalendar {
         return _handle._copiedReference()

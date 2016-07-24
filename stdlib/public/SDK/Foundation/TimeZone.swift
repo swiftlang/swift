@@ -230,10 +230,6 @@ public struct TimeZone : CustomStringConvertible, CustomDebugStringConvertible, 
 }
 
 extension TimeZone : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSTimeZone {
         // _wrapped is immutable

@@ -71,7 +71,7 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
       _preconditionFailure("attempt to bridge an implicitly unwrapped optional containing nil")
 
     case .some(let x):
-      return Swift._bridgeToObjectiveC(x)!
+      return Swift._bridgeAnythingToObjectiveC(x)
     }
   }
 

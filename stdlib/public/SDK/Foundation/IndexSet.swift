@@ -852,10 +852,6 @@ private func _toNSRange(_ r : Range<IndexSet.Element>) -> NSRange {
 }
 
 extension IndexSet : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSIndexSet.self
     }

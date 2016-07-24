@@ -1124,10 +1124,6 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
 }
 
 extension URL : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSURL {
         return _url

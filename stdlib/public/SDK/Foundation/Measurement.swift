@@ -253,10 +253,6 @@ extension Measurement {
 
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension Measurement : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSMeasurement {
         return NSMeasurement(doubleValue: value, unit: unit)

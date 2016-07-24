@@ -678,10 +678,6 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
 
 /// Provides bridging functionality for struct Data to class NSData and vice-versa.
 extension Data : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSData {
         return unsafeBitCast(_wrapped, to: NSData.self)
