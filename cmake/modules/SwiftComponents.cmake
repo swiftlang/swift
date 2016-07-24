@@ -143,18 +143,31 @@ disjoint from SWIFT_INCLUDE_COMPONENTS and SWIFT_INSTALL_COMPONENTS")
   _swift_components_initialize(SWIFT_INSTALL_COMPONENTS INCLUDE BUILD INSTALL)
 endmacro()
 
-function(swift_is_installing_component component result_var_name)
-  precondition(component MESSAGE "Component name is required")
+function(_swift_component_is_in_set set_name component result_var_name)
+  precondition(component)
+  precondition_list_contains_element(_SWIFT_DEFINED_COMPONENTS "${component}")
+  _translate_component_name_to_variable_form("${component}" var_name_piece)
+  set("${result_var_name}" "${SWIFT_${set_name}_${var_name_piece}}" PARENT_SCOPE)
+endfunction()
 
+function(swift_is_including_component component result_var_name)
+  _swift_component_is_in_set(INCLUDE "${component}" output)
+  set(${result_var_name} "${output}" PARENT_SCOPE)
+endfunction()
+
+function(swift_is_building_component component result_var_name)
+  _swift_component_is_in_set(BUILD "${component}" output)
+  set(${result_var_name} "${output}" PARENT_SCOPE)
+endfunction()
+
+function(swift_is_installing_component component result_var_name)
   if("${component}" STREQUAL "never_install")
     set("${result_var_name}" FALSE PARENT_SCOPE)
     return()
   endif()
 
-  precondition_list_contains_element(_SWIFT_DEFINED_COMPONENTS "${component}")
-
-  _translate_component_name_to_variable_form("${component}" var_name_piece)
-  set("${result_var_name}" "${SWIFT_INSTALL_${var_name_piece}}" PARENT_SCOPE)
+  _swift_component_is_in_set(INSTALL "${component}" output)
+  set(${result_var_name} "${output}" PARENT_SCOPE)
 endfunction()
 
 # swift_install_in_component(<COMPONENT NAME>
