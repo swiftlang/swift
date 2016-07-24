@@ -68,7 +68,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     _rawValue = other._rawValue
   }
 
-  /// Convert an Unsafe${Mutable}Pointer ${a_Self}.
+  /// Convert an Unsafe${Mutable}Pointer to ${a_Self}.
   ///
   /// Returns nil if `other` is nil.
   @_transparent
@@ -77,14 +77,29 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     _rawValue = unwrapped._rawValue
   }
 
-%  if not mutable:
-  /// Convert an UnsafeMutableRawPointer ${a_Self}.
+%  if mutable:
+  /// Convert an UnsafeRawPointer to ${a_Self}.
+  @_transparent
+  public init(mutating other: UnsafeRawPointer) {
+    _rawValue = other._rawValue
+  }
+
+  /// Convert an UnsafeRawPointer to ${a_Self}.
+  ///
+  /// Returns nil if `other` is nil.
+  @_transparent
+  public init?(mutating other: UnsafeRawPointer?) {
+    guard let unwrapped = other else { return nil }
+    _rawValue = unwrapped._rawValue
+  }
+%  else: # !mutable
+  /// Convert an UnsafeMutableRawPointer to ${a_Self}.
   @_transparent
   public init(_ other: UnsafeMutableRawPointer) {
     _rawValue = other._rawValue
   }
 
-  /// Convert an UnsafeMutableRawPointer ${a_Self}.
+  /// Convert an UnsafeMutableRawPointer to ${a_Self}.
   ///
   /// Returns nil if `other` is nil.
   @_transparent
@@ -93,13 +108,13 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     _rawValue = unwrapped._rawValue
   }
 
-  /// Convert an UnsafeMutablePointer ${a_Self}.
+  /// Convert an UnsafeMutablePointer to ${a_Self}.
   @_transparent
   public init<T>(_ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
-  /// Convert an UnsafeMutablePointer ${a_Self}.
+  /// Convert an UnsafeMutablePointer to ${a_Self}.
   ///
   /// Returns nil if `other` is nil.
   @_transparent
