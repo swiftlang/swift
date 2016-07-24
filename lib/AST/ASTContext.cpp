@@ -169,9 +169,6 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Void.
   TypeAliasDecl *VoidDecl = nullptr;
 
-  /// The declaration of Swift.Any.
-  TypeAliasDecl *AnyDecl = nullptr;
-
   /// The declaration of ObjectiveC.ObjCBool.
   StructDecl *ObjCBoolDecl = nullptr;
 
