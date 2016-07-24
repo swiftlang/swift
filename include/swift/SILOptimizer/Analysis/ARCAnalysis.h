@@ -393,8 +393,8 @@ SILInstruction *findReleaseToMatchUnsafeGuaranteedValue(
 
 namespace swift {
 
-/// EpilogueARCBlockState - Keep track of whether a epilogue ARC instruction has
-/// been found.
+/// EpilogueARCBlockState - Keep track of whether an epilogue ARC instruction
+/// has been found.
 struct EpilogueARCBlockState {
   /// Keep track of whether a eplogue release has been found before and after
   /// this basic block.

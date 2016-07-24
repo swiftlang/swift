@@ -561,7 +561,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
         bookmarkDataIsStale = stale.boolValue
     }
     
-    /// Creates and initializes a NSURL that refers to the location specified by resolving the alias file at url. If the url argument does not refer to an alias file as defined by the NSURLIsAliasFileKey property, the NSURL returned is the same as url argument. This method fails and returns nil if the url argument is unreachable, or if the original file or directory could not be located or is not reachable, or if the original file or directory is on a volume that could not be located or mounted. The URLBookmarkResolutionWithSecurityScope option is not supported by this method.
+    /// Creates and initializes an NSURL that refers to the location specified by resolving the alias file at url. If the url argument does not refer to an alias file as defined by the NSURLIsAliasFileKey property, the NSURL returned is the same as url argument. This method fails and returns nil if the url argument is unreachable, or if the original file or directory could not be located or is not reachable, or if the original file or directory is on a volume that could not be located or mounted. The URLBookmarkResolutionWithSecurityScope option is not supported by this method.
     @available(OSX 10.10, iOS 8.0, *)
     public init(resolvingAliasFileAt url: URL, options: BookmarkResolutionOptions = []) throws {
         self.init(reference: try NSURL(resolvingAliasFileAt: url, options: options))
@@ -1085,7 +1085,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
         return result as Data
     }
     
-    /// Given a NSURL created by resolving a bookmark data created with security scope, make the resource referenced by the url accessible to the process. When access to this resource is no longer needed the client must call stopAccessingSecurityScopedResource. Each call to startAccessingSecurityScopedResource must be balanced with a call to stopAccessingSecurityScopedResource (Note: this is not reference counted).
+    /// Given an NSURL created by resolving a bookmark data created with security scope, make the resource referenced by the url accessible to the process. When access to this resource is no longer needed the client must call stopAccessingSecurityScopedResource. Each call to startAccessingSecurityScopedResource must be balanced with a call to stopAccessingSecurityScopedResource (Note: this is not reference counted).
     @available(OSX 10.7, iOS 8.0, *)
     public func startAccessingSecurityScopedResource() -> Bool {
         return _url.startAccessingSecurityScopedResource()

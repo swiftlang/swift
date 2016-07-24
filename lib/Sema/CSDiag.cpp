@@ -2438,7 +2438,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
 
         // See through function decl context
         if (auto parent = CS->DC->getParent())
-        // If we are in an protocol extension of 'Proto' and we see
+        // If we are in a protocol extension of 'Proto' and we see
         // 'Proto.static', suggest 'Self.static'
         if (auto extensionContext = parent->getAsProtocolExtensionContext()) {
           if (extensionContext->getDeclaredType()->getCanonicalType()
