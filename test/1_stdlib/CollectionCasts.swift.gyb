@@ -108,7 +108,6 @@ tests.test("${Collection}/Down/${method}/${Key1}=>${Key0}") {
 
 %       for vi0, Value0 in enumerate(values):
 %         DynamicValue = values[0] if Value0.startswith('Any') else Value0
-%         def makeValue(i): return '%s(%s) as %s' % (DynamicValue, i, Value0)
 %         for Value1 in values[vi0:]:
 
 %           for method in 'Direct', 'Indirect':
