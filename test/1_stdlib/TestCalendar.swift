@@ -219,7 +219,7 @@ class TestCalendar : TestCalendarSuper {
             // Find the days numbered '31' after 'd', allowing the algorithm to move to the next day if required
             c.enumerateDates(startingAfter: d, matching: DateComponents(day: 31), matchingPolicy: .nextTime) { result, exact, stop in
                 // Just stop some arbitrary time in the future
-                if result > d + 86400*365 { stop = true }
+                if result! > d + 86400*365 { stop = true }
                 count += 1
                 if exact { exactCount += 1 }
             }

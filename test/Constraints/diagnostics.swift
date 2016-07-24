@@ -787,15 +787,14 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = i != nil // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
   _ = nil != i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
   
-  // These should all be illegal when SE-0121 lands.
-  _ = i < nil
-  _ = nil < i
-  _ = i <= nil
-  _ = nil <= i
-  _ = i > nil
-  _ = nil > i
-  _ = i >= nil
-  _ = nil >= i
+  _ = i < nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil < i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i <= nil // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil <= i // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i > nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil > i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i >= nil // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil >= i // expected-error {{type 'Int' is not optional, value can never be nil}}
 
   _ = o === nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
   _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
