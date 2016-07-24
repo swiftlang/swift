@@ -1,3 +1,4 @@
+include(CMakeParseArguments)
 include(SwiftList)
 
 # Swift Components
@@ -69,6 +70,32 @@ include(SwiftList)
 set(_SWIFT_DEFINED_COMPONENTS
   "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
+# A helper macro that creates *_INCLUDE, *_BUILD, *_INSTALL variables for the
+# list of components passed in depending on the state of the passed in options
+# INCLUDE, BUILD, INSTALL.
+macro(_swift_components_initialize components)
+  cmake_parse_arguments(
+    SWIFTCOMPINIT # prefix
+    "INCLUDE;BUILD;INSTALL" # options
+    "" # single-value args
+    "" # multi-value args
+    ${ARGN})
+
+  foreach(component ${${components}})
+    list(FIND _SWIFT_DEFINED_COMPONENTS "${component}" index)
+    if(${index} EQUAL -1)
+      message(FATAL_ERROR "undefined component: ${component}. Can not include.")
+    endif()
+
+    string(TOUPPER "${component}" var_name_piece)
+    string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
+
+    translate_flag(SWIFTCOMPINIT_INCLUDE TRUE SWIFT_INCLUDE_${var_name_piece})
+    translate_flag(SWIFTCOMPINIT_BUILD TRUE SWIFT_BUILD_${var_name_piece})
+    translate_flag(SWIFTCOMPINIT_INSTALL TRUE SWIFT_INSTALL_${var_name_piece})
+  endforeach()
+endmacro()
+
 # Configure the "Swift Component" system.
 #
 # *NOTE* We generally prefer functions over macros, but in this case, we need a
@@ -76,8 +103,10 @@ set(_SWIFT_DEFINED_COMPONENTS
 # available/cached at the top CMake scope.
 macro(swift_configure_components)
   # Define our sets of components. By default, all components are "install
-  # components".
-  set(SWIFT_INCLUDE_COMPONENTS "${_SWIFT_DEFINED_COMPONENTS}" CACHE STRING
+  # components". Since builds sometimes specify install components without
+  # having been updated, we also make all components build components so that
+  # this change can be eased in without disruption.
+  set(SWIFT_INCLUDE_COMPONENTS "" CACHE STRING
     "A semicolon-separated list of components to generate cmake targets for. \
 Must be disjoint from SWIFT_BUILD_COMPONENTS and SWIFT_INSTALL_COMPONENTS")
   set(SWIFT_BUILD_COMPONENTS "${_SWIFT_DEFINED_COMPONENTS}" CACHE STRING
@@ -96,24 +125,20 @@ disjoint from SWIFT_INCLUDE_COMPONENTS and SWIFT_INSTALL_COMPONENTS")
   precondition_list_is_disjoint(
     SWIFT_INCLUDE_COMPONENTS
     SWIFT_BUILD_COMPONENTS
-    SWIFT_INSTALL_COMPONENTS)
 
-  foreach(component ${_SWIFT_DEFINED_COMPONENTS})
-    string(TOUPPER "${component}" var_name_piece)
-    string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
-    set(SWIFT_INSTALL_${var_name_piece} FALSE)
-  endforeach()
+    # For now, do not enforce this condition on SWIFT_INSTALL_COMPONENTS This is
+    # because certain builds use SWIFT_INSTALL_COMPONENTS causing our definition
+    # of SWIFT_INSTALL_COMPONENTS to not be used thus causing targets to not be
+    # created (and thus break builds). This code should be uncomments in the
+    # commit where all presets are updated.
+    #
+    #SWIFT_INSTALL_COMPONENTS
+    )
 
-  foreach(component ${SWIFT_INSTALL_COMPONENTS})
-    list(FIND _SWIFT_DEFINED_COMPONENTS "${component}" index)
-    if(${index} EQUAL -1)
-      message(FATAL_ERROR "unknown install component: ${component}")
-    endif()
-
-    string(TOUPPER "${component}" var_name_piece)
-    string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
-    set(SWIFT_INSTALL_${var_name_piece} TRUE)
-  endforeach()
+  # Initialize each set.
+  _swift_components_initialize(SWIFT_INCLUDE_COMPONENTS INCLUDE)
+  _swift_components_initialize(SWIFT_BUILD_COMPONENTS INCLUDE BUILD)
+  _swift_components_initialize(SWIFT_INSTALL_COMPONENTS INCLUDE BUILD INSTALL)
 endmacro()
 
 function(swift_is_installing_component component result_var_name)
