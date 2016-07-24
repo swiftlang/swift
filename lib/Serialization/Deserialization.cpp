@@ -3434,13 +3434,13 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID inputID;
     TypeID resultID;
     uint8_t rawRepresentation;
-    bool autoClosure, noreturn, noescape, explicitlyEscaping, throws;
+    bool autoClosure, noreturn, isEscaping, explicitlyEscaping, throws;
 
     decls_block::FunctionTypeLayout::readRecord(scratch, inputID, resultID,
                                                 rawRepresentation,
                                                 autoClosure,
                                                 noreturn,
-                                                noescape,
+                                                isEscaping,
                                                 explicitlyEscaping,
                                                 throws);
     auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
@@ -3449,10 +3449,12 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
     
-    auto Info = FunctionType::ExtInfo(*representation,
-                               noreturn, autoClosure, noescape,
-                               explicitlyEscaping, throws);
-    
+    auto Info = FunctionType::ExtInfo(
+        *representation,
+        /*IsNoReturn=*/noreturn, /*IsAutoClosure=*/autoClosure,
+        /*IsEscaping=*/isEscaping, /*IsExplicitlyEscaping=*/explicitlyEscaping,
+        /*Throws=*/throws);
+
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
                                      Info);
     break;

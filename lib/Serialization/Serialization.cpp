@@ -2950,7 +2950,7 @@ void Serializer::writeType(Type ty) {
            getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
            fnTy->isAutoClosure(),
            fnTy->isNoReturn(),
-           fnTy->isNoEscape(),
+           fnTy->isEscaping(),
            fnTy->isExplicitlyEscaping(),
            fnTy->throws());
     break;

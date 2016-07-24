@@ -38,29 +38,36 @@ class CapturedValue {
   llvm::PointerIntPair<ValueDecl*, 2, unsigned> Value;
 
   explicit CapturedValue(llvm::PointerIntPair<ValueDecl*, 2, unsigned> V) : Value(V) {}
-
-public:
-  friend struct llvm::DenseMapInfo<CapturedValue>;
+  CapturedValue(ValueDecl *D, unsigned Flags) : Value(D, Flags) {}
 
   enum {
     /// IsDirect is set when a VarDecl with storage *and* accessors is captured
     /// by its storage address.  This happens in the accessors for the VarDecl.
     IsDirect = 1 << 0,
 
-    /// IsNoEscape is set when a vardecl is captured by a noescape closure, and
-    /// thus has its lifetime guaranteed.  It can be closed over by a fixed
-    /// address if it has storage.
-    IsNoEscape = 1 << 1
+    /// IsEscaping is set when a vardecl is captured by an escaping closure. If
+    /// not set, the vardecl has its lifetime guaranteed and can be closed over
+    /// by a fixed address if it has storage.
+    IsEscaping = 1 << 1
   };
 
-  CapturedValue(ValueDecl *D, unsigned Flags) : Value(D, Flags) {}
+  // TODO: Switch to 0 when we default to no escape
+  enum { DefaultFlags = IsEscaping };
+
+public:
+  friend struct llvm::DenseMapInfo<CapturedValue>;
+
+  CapturedValue(ValueDecl *D, bool isDirect, bool isEscaping)
+      : Value(D, (isDirect ? IsDirect : 0) | (isEscaping ? IsEscaping : 0)) {}
+  CapturedValue(ValueDecl *D)
+      : CapturedValue(D, /*isDirect=*/false, /*isEscaping=*/true) {}
 
   static CapturedValue getDynamicSelfMetadata() {
-    return CapturedValue(nullptr, 0);
+    return CapturedValue(nullptr, DefaultFlags);
   }
 
   bool isDirect() const { return Value.getInt() & IsDirect; }
-  bool isNoEscape() const { return Value.getInt() & IsNoEscape; }
+  bool isEscaping() const { return Value.getInt() & IsEscaping; }
 
   bool isDynamicSelfMetadata() const { return !Value.getPointer(); }
 

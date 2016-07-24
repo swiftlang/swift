@@ -111,8 +111,8 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
 
       // If captured directly, the variable is captured by box or pointer.
       assert(var->hasStorage());
-      return capture.isNoEscape() ?
-        CaptureKind::StorageAddress : CaptureKind::Box;
+      return capture.isEscaping() ? CaptureKind::Box
+                                  : CaptureKind::StorageAddress;
 
     case VarDecl::Stored:
       // If this is a non-address-only stored 'let' constant, we can capture it
@@ -123,8 +123,8 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
 
       // If we're capturing into a non-escaping closure, we can generally just
       // capture the address of the value as no-escape.
-      return capture.isNoEscape() ?
-        CaptureKind::StorageAddress : CaptureKind::Box;
+      return capture.isEscaping() ? CaptureKind::Box
+                                  : CaptureKind::StorageAddress;
     }
     llvm_unreachable("bad storage kind");
   }

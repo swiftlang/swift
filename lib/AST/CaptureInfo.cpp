@@ -63,7 +63,7 @@ void CaptureInfo::print(raw_ostream &OS) const {
     
     if (capture.isDirect())
       OS << "<direct>";
-    if (capture.isNoEscape())
+    if (!capture.isEscaping())
       OS << "<noescape>";
   }
   OS << ')';

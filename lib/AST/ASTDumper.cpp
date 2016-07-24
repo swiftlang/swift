@@ -2871,7 +2871,7 @@ namespace {
 
       printFlag(T->isNoReturn(), "noreturn");
       printFlag(T->isAutoClosure(), "autoclosure");
-      printFlag(T->isNoEscape(), "noescape");
+      printFlag(!T->isEscaping(), "noescape");
       printFlag(T->isExplicitlyEscaping(), "escaping");
       printFlag(T->throws(), "throws");
 

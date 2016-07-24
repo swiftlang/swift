@@ -1433,7 +1433,7 @@ static Type applyNoEscape(Type type) {
   // Apply @noescape to function types.
   if (auto funcType = type->getAs<FunctionType>()) {
     return FunctionType::get(funcType->getInput(), funcType->getResult(),
-                             funcType->getExtInfo().withNoEscape());
+                             funcType->getExtInfo().withEscaping(false));
   }
 
   return type;

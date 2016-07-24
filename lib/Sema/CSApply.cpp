@@ -5596,14 +5596,18 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // throwing subexpressions. We also don't want to change the convention
       // of the original closure.
       auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
-      if ((toEI.isNoEscape() && !fromEI.isNoEscape()) ||
+      bool fromEscaping = fromEI.isEscaping(), toEscaping = toEI.isEscaping();
+      if ((!toEscaping && fromEscaping) ||
           (toEI.isNoReturn() && !fromEI.isNoReturn())) {
-        swift::AnyFunctionType::ExtInfo newEI(fromEI.getRepresentation(),
-                                        toEI.isNoReturn() | fromEI.isNoReturn(),
-                                        toEI.isAutoClosure(),
-                                        toEI.isNoEscape() | fromEI.isNoEscape(),
-                                        toEI.isExplicitlyEscaping() | fromEI.isExplicitlyEscaping(),
-                                        toEI.throws() & fromEI.throws());
+        bool isEscaping = toEscaping && fromEscaping;
+        swift::AnyFunctionType::ExtInfo newEI(
+            fromEI.getRepresentation(),
+            /*IsNoReturn=*/toEI.isNoReturn() | fromEI.isNoReturn(),
+            /*IsAutoClosure=*/toEI.isAutoClosure(),
+            /*IsEscaping=*/isEscaping,
+            /*IsExplicitlyEscaping=*/toEI.isExplicitlyEscaping() |
+                fromEI.isExplicitlyEscaping(),
+            /*Throws=*/toEI.throws() & fromEI.throws());
         auto newToType = FunctionType::get(fromFunc->getInput(),
                                            fromFunc->getResult(), newEI);
         if (applyTypeToClosureExpr(expr, newToType)) {
@@ -6025,7 +6029,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       bool isNoEscape = false;
       while (1) {
         if (auto AFT = arg->getType()->getAs<AnyFunctionType>()) {
-          isNoEscape = isNoEscape || AFT->isNoEscape();
+          isNoEscape = isNoEscape || !AFT->isEscaping();
         }
 
         if (auto conv = dyn_cast<ImplicitConversionExpr>(arg))

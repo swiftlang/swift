@@ -155,9 +155,10 @@ public:
       // If this already had an entry in the capture list, make sure to merge
       // the information together.  If one is noescape but the other isn't,
       // then the result is escaping.
-      unsigned Flags =
-        Captures[entryNumber-1].getFlags() & capture.getFlags();
-      capture = CapturedValue(VD, Flags);
+      auto priorEntry = Captures[entryNumber-1];
+      capture = CapturedValue(
+          VD, /*isDirect=*/priorEntry.isDirect() & capture.isDirect(),
+          /*isEscaping=*/priorEntry.isEscaping() | capture.isEscaping());
       Captures[entryNumber-1] = capture;
     }
 
@@ -171,8 +172,8 @@ public:
     // If VD is a noescape decl, then the closure we're computing this for
     // must also be noescape.
     if (VD->hasType() && VD->getType()->is<AnyFunctionType>() &&
-        VD->getType()->castTo<AnyFunctionType>()->isNoEscape() &&
-        !capture.isNoEscape() &&
+        !VD->getType()->castTo<AnyFunctionType>()->isEscaping() &&
+        capture.isEscaping() &&
         // Don't repeatedly diagnose the same thing.
         Diagnosed.insert(VD).second) {
 
@@ -322,18 +323,17 @@ public:
     }
 
     // We're going to capture this, compute flags for the capture.
-    unsigned Flags = 0;
 
     // If this is a direct reference to underlying storage, then this is a
     // capture of the storage address - not a capture of the getter/setter.
-    if (DRE->getAccessSemantics() == AccessSemantics::DirectToStorage)
-      Flags |= CapturedValue::IsDirect;
+    bool isDirect = DRE->getAccessSemantics() == AccessSemantics::DirectToStorage;
 
     // If the closure is noescape, then we can capture the decl as noescape.
-    if (AFR.isKnownNoEscape())
-      Flags |= CapturedValue::IsNoEscape;
+    bool isEscaping = !AFR.isKnownNoEscape();
 
-    addCapture(CapturedValue(D, Flags), DRE->getStartLoc());
+    auto capture =
+        CapturedValue(D, /*isDirect=*/isDirect, /*isEscaping=*/isEscaping);
+    addCapture(capture, DRE->getStartLoc());
     return { false, DRE };
   }
 
@@ -351,18 +351,18 @@ public:
         continue;
 
       // Compute adjusted flags.
-      unsigned Flags = capture.getFlags();
 
       // The decl is captured normally, even if it was captured directly
       // in the subclosure.
-      Flags &= ~CapturedValue::IsDirect;
+      bool isDirect = false;
 
       // If this is an escaping closure, then any captured decls are also
       // escaping, even if they are coming from an inner noescape closure.
-      if (!isNoEscapeClosure)
-        Flags &= ~CapturedValue::IsNoEscape;
+      bool isEscaping = capture.isEscaping() || !isNoEscapeClosure;
 
-      addCapture(CapturedValue(capture.getDecl(), Flags), captureLoc);
+      addCapture(CapturedValue(capture.getDecl(), /*isDirect=*/isDirect,
+                               /*isEscaping=*/isEscaping),
+                 captureLoc);
     }
 
     if (GenericParamCaptureLoc.isInvalid())
@@ -528,7 +528,7 @@ public:
     if (auto *superE = dyn_cast<SuperRefExpr>(E)) {
       auto CurDC = AFR.getAsDeclContext();
       if (CurDC->isChildContextOf(superE->getSelf()->getDeclContext()))
-        addCapture(CapturedValue(superE->getSelf(), 0), superE->getLoc());
+        addCapture(CapturedValue(superE->getSelf()), superE->getLoc());
       return { false, superE };
     }
 
