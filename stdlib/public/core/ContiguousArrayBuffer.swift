@@ -453,7 +453,7 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// Two buffers address the same elements when they have the same
   /// identity and count.
   public var identity: UnsafeRawPointer {
-    return UnsafePointer(firstElementAddress)
+    return UnsafeRawPointer(firstElementAddress)
   }
   
   /// Returns `true` iff we have storage for elements of the given

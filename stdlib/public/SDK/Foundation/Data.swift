@@ -116,7 +116,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 return nil
             case .custom(let b):
                 return { (ptr, len) in
-                    b(UnsafeMutablePointer<UInt8>(ptr), len)
+                    // Bind memory to UInt8 since that is what the public deallocation function expects.
+                    let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: len)
+                    b(bytePtr, len)
                 }
             }
         }
@@ -281,7 +283,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public func withUnsafeBytes<ResultType, ContentType>(_ body: @noescape (UnsafePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         let bytes =  _getUnsafeBytesPointer()
         defer { _fixLifetime(self)}
-        return try body(UnsafePointer(bytes))
+        let contentPtr = bytes.bindMemory(to: ContentType.self, capacity: count / strideof(ContentType.self))
+        return try body(contentPtr)
     }
     
     private mutating func _getUnsafeMutableBytesPointer() -> UnsafeMutableRawPointer {
@@ -297,7 +300,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public mutating func withUnsafeMutableBytes<ResultType, ContentType>(_ body: @noescape (UnsafeMutablePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         let mutableBytes = _getUnsafeMutableBytesPointer()
         defer { _fixLifetime(self)}
-        return try body(UnsafeMutablePointer(mutableBytes))
+        let contentPtr = mutableBytes.bindMemory(to: ContentType.self, capacity: count / strideof(ContentType.self))
+        return try body(UnsafeMutablePointer(contentPtr))
     }
     
     // MARK: -
@@ -426,7 +430,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         _mapUnmanaged {
             $0.enumerateBytes { (ptr, range, stop) in
                 var stopv = false
-                block(buffer: UnsafeBufferPointer(start: UnsafePointer<UInt8>(ptr), count: range.length), byteIndex: range.length, stop: &stopv)
+                let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: range.length)
+                block(buffer: UnsafeBufferPointer(start: bytePtr, count: range.length), byteIndex: range.length, stop: &stopv)
                 if stopv {
                     stop.pointee = true
                 }

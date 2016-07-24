@@ -158,6 +158,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Warning: Binding memory to a type is potentially undefined if the
   ///   memory is ever accessed as an unrelated type.
   @_transparent
+  @discardableResult
   public func bindMemory<T>(to type: T.Type, capacity count: Int)
   -> Unsafe${Mutable}Pointer<T> {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)

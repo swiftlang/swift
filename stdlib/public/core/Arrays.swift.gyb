@@ -1489,10 +1489,10 @@ extension ${Self} {
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
-      return (_owner, UnsafePointer(p))
+      return (_owner, UnsafeRawPointer(p))
     }
     let n = ContiguousArray(self._buffer)._buffer
-    return (n.owner, UnsafePointer(n.firstElementAddress))
+    return (n.owner, UnsafeRawPointer(n.firstElementAddress))
   }
 }
 

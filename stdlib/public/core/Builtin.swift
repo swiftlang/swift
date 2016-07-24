@@ -208,7 +208,7 @@ internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
 /// object.
 @_transparent
 public func unsafeAddress(of object: AnyObject) -> UnsafeRawPointer {
-  return UnsafePointer(Builtin.bridgeToRawPointer(object))
+  return UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
 }
 
 @available(*, unavailable, renamed: "unsafeAddress(of:)")
