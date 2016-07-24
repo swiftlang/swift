@@ -214,7 +214,7 @@ class r20201968C {
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(_ a : Int) {
   assert(a != nil, "ASSERT COMPILATION ERROR")
-  // expected-warning @-1 {{comparing non-optional value to nil always returns true}}
+  // expected-warning @-1 {{comparing non-optional value of type 'Int' to nil always returns true}}
 }
 
 
@@ -774,18 +774,18 @@ class SR1594 {
   func sr1594(bytes : UnsafeMutablePointer<Int>, _ i : Int?) {
     _ = (i === nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15===}}
     _ = (bytes === nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self === nil) // expected-warning {{comparing non-optional value to nil always returns false}}
+    _ = (self === nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
     _ = (i !== nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15=!=}}
     _ = (bytes !== nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self !== nil) // expected-warning {{comparing non-optional value to nil always returns true}}
+    _ = (self !== nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
   }
 }
 
 func nilComparison(i: Int, o: AnyObject) {
-  _ = i == nil // expected-warning {{comparing non-optional value to nil always returns false}}
-  _ = nil == i // expected-warning {{comparing non-optional value to nil always returns false}}
-  _ = i != nil // expected-warning {{comparing non-optional value to nil always returns true}}
-  _ = nil != i // expected-warning {{comparing non-optional value to nil always returns true}}
+  _ = i == nil // expected-warning {{comparing non-optional value of type 'Int' to nil always returns false}}
+  _ = nil == i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns false}}
+  _ = i != nil // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
+  _ = nil != i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
   
   // These should all be illegal when SE-0121 lands.
   _ = i < nil
@@ -797,8 +797,8 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = i >= nil
   _ = nil >= i
 
-  _ = o === nil // expected-warning {{comparing non-optional value to nil always returns false}}
-  _ = o !== nil // expected-warning {{comparing non-optional value to nil always returns true}}
+  _ = o === nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
+  _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
 }
 
 // FIXME: Bad diagnostic

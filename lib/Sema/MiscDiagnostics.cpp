@@ -648,8 +648,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       auto rhs = args->getElement(1);
       auto calleeName = DRE->getDecl()->getName().str();
       
-      if (calleeName == "??" && isImplicitPromotionToOptional(lhs)) {
-        TC.diagnose(DRE->getLoc(), diag::use_of_qq_on_non_optional_value)
+      Expr *subExpr = nullptr;
+      if (calleeName == "??" &&
+          (subExpr = isImplicitPromotionToOptional(lhs))) {
+        TC.diagnose(DRE->getLoc(), diag::use_of_qq_on_non_optional_value,
+                    subExpr->getType())
           .highlight(lhs->getSourceRange())
           .fixItRemove(SourceRange(DRE->getLoc(), rhs->getEndLoc()));
         return;
@@ -657,13 +660,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       
       if (calleeName == "==" || calleeName == "!=" ||
           calleeName == "===" || calleeName == "!==") {
-        if ((isImplicitPromotionToOptional(lhs) &&
+        if (((subExpr = isImplicitPromotionToOptional(lhs)) &&
              isTypeCheckedOptionalNil(rhs)) ||
             (isTypeCheckedOptionalNil(lhs) &&
-             isImplicitPromotionToOptional(rhs))) {
+             (subExpr = isImplicitPromotionToOptional(rhs)))) {
           bool isTrue = calleeName == "!=" || calleeName == "!==";
               
-          TC.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_nil, isTrue)
+          TC.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_nil,
+                      subExpr->getType(), isTrue)
             .highlight(lhs->getSourceRange())
             .highlight(rhs->getSourceRange());
           return;
