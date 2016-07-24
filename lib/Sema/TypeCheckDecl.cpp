@@ -6636,6 +6636,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     // Validate the generic type signature, which is just <Self : P>.
     auto gp = proto->getGenericParams();
+    (void) gp;
 
     validateGenericTypeSignature(proto);
 
