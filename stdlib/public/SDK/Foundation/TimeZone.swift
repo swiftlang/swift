@@ -90,7 +90,7 @@ public struct TimeZone : CustomStringConvertible, CustomDebugStringConvertible, 
     /// In general, you are discouraged from using abbreviations except for unique instances such as “GMT”. Time Zone abbreviations are not standardized and so a given abbreviation may have multiple meanings—for example, “EST” refers to Eastern Time in both the United States and Australia
     ///
     /// - parameter abbreviation: The abbreviation for the time zone.
-    /// - returns: A time zone identified by abbreviation determined by resolving the abbreviation to a identifier using the abbreviation dictionary and then returning the time zone for that identifier. Returns `nil` if there is no match for abbreviation.
+    /// - returns: A time zone identified by abbreviation determined by resolving the abbreviation to an identifier using the abbreviation dictionary and then returning the time zone for that identifier. Returns `nil` if there is no match for abbreviation.
     public init?(abbreviation: String) {
         if let r = NSTimeZone(abbreviation: abbreviation) {
             _wrapped = r
