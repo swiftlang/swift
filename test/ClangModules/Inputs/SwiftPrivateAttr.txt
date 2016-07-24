@@ -3,8 +3,8 @@ import Foundation
 protocol __PrivProto {
 }
 class Foo : NSObject, __PrivProto {
-  var __privValue: AnyObject!
-  class var __privClassValue: AnyObject!
+  var __privValue: Any!
+  class var __privClassValue: Any!
   func __noArgs()
   func __oneArg(_ arg: Int32)
   func __twoArgs(_ arg: Int32, other arg2: Int32)
@@ -19,10 +19,10 @@ class Foo : NSObject, __PrivProto {
   convenience init!(__ arg: Int32)
   @available(*, unavailable, message: "use object construction 'Foo(__:)'")
   class func __foo(_ arg: Int32) -> Self!
-  func objectForKeyedSubscript(_ index: AnyObject!) -> AnyObject!
-  func __setObject(_ object: AnyObject!, forKeyedSubscript index: AnyObject!)
-  func __objectAtIndexedSubscript(_ index: Int32) -> AnyObject!
-  func setObject(_ object: AnyObject!, atIndexedSubscript index: Int32)
+  func objectForKeyedSubscript(_ index: Any!) -> Any!
+  func __setObject(_ object: Any!, forKeyedSubscript index: Any!)
+  func __objectAtIndexedSubscript(_ index: Int32) -> Any!
+  func setObject(_ object: Any!, atIndexedSubscript index: Int32)
   init()
 }
 class Bar : NSObject {

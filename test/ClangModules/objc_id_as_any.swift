@@ -20,7 +20,7 @@ var xAsAny = x as Any
 idLover.takesArray(ofId: &xAsAny)  // expected-error{{argument type 'Any' does not conform to expected type 'AnyObject'}}
 
 var y: Any = NSObject()
-idLover.takesArray(ofId: &y)
+idLover.takesArray(ofId: &y) // expected-error{{argument type 'Any' does not conform to expected type 'AnyObject'}}
 
 idLover.takesId(x)
 idLover.takesId(y)

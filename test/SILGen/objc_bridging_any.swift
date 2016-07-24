@@ -486,4 +486,13 @@ class SwiftIdLover : NSObject, Anyable {
   dynamic required convenience init(anyMaybe: Any?) { self.init() }
   dynamic var anyProperty: Any
   dynamic var maybeAnyProperty: Any?
+
+  subscript(_: IndexForAnySubscript) -> Any { get {} set {} }
+}
+
+class IndexForAnySubscript {}
+
+func dynamicLookup(x: AnyObject) {
+  _ = x.anyProperty
+  _ = x[IndexForAnySubscript()]
 }

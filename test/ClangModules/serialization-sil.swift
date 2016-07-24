@@ -13,8 +13,8 @@ public func testPartialApply(_ obj: Test) {
     // CHECK: [[CURRIED1_FALSE]]:
     // CHECK: [[CURRIED1_TRUE]]([[CURRIED1_METHOD:%.+]] : $@convention(objc_method) (@opened([[CURRIED1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject):
     // CHECK: [[CURRIED1_PARTIAL:%.+]] = partial_apply [[CURRIED1_METHOD]]([[CURRIED1_OBJ]]) : $@convention(objc_method) (@opened([[CURRIED1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject
-    // CHECK: [[CURRIED1_THUNK:%.+]] = function_ref @_TTRXFo__oPs9AnyObject__XFo_iT__iPS___ : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnyObject) -> @out AnyObject
-    // CHECK: = partial_apply [[CURRIED1_THUNK]]([[CURRIED1_PARTIAL]]) : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnyObject) -> @out AnyObject
+    // CHECK: [[CURRIED1_THUNK:%.+]] = function_ref @_TTRXFo__oPs9AnyObject__XFo__iP__ : $@convention(thin) (@owned @callee_owned () -> @owned AnyObject) -> @out Any
+    // CHECK: = partial_apply [[CURRIED1_THUNK]]([[CURRIED1_PARTIAL]])
     curried1()
   }
   if let curried2 = obj.innerPointer {
