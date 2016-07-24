@@ -488,6 +488,8 @@ class SwiftIdLover : NSObject, Anyable {
   dynamic var maybeAnyProperty: Any?
 
   subscript(_: IndexForAnySubscript) -> Any { get {} set {} }
+
+  func methodReturningAnyOrError() throws -> Any {}
 }
 
 class IndexForAnySubscript {}

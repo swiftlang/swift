@@ -1011,6 +1011,11 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     {
       B.emitBlock(normalBB);
       SILValue nativeResult = normalBB->createBBArg(swiftResultTy);
+      
+      if (substTy->hasIndirectResults()) {
+        assert(substTy->getNumAllResults() == 1);
+        nativeResult = args[0];
+      }
 
       // In this branch, the eventual return value is mostly created
       // by bridging the native return value, but we may need to
