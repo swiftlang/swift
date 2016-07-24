@@ -1,4 +1,4 @@
-//===--- DispatchShims.mm - Dispatch helper shims --------------===//
+//===--- DispatchShims.mm - Dispatch helper shims -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

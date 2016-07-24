@@ -1,4 +1,4 @@
-//===--- SwiftValue.h - Boxed Swift value class ---------------------------===//
+//===--- SwiftValue.h - Boxed Swift value class -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

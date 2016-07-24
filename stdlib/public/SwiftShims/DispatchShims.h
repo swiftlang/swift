@@ -1,4 +1,4 @@
-//===--- DispatchShims.h - Compatibility declarations for Dispatch-*- C++ -*-===//
+//===--- DispatchShims.h - Compatibility decls. for Dispatch ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
