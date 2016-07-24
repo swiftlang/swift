@@ -670,7 +670,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
     llvm::raw_svector_ostream OS(SS);
     SwiftLangSupport::printTypeUSR(ContainerTy, OS);
   }
-  unsigned MangedContainerTypeEnd = SS.size();
+  unsigned MangledContainerTypeEnd = SS.size();
 
   unsigned DocCommentBegin = SS.size();
   {
@@ -791,7 +791,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
                                 MangledTypeEnd - MangledTypeStart);
 
   StringRef ContainerTypeUsr = StringRef(SS.begin()+MangledContainerTypeStart,
-                            MangedContainerTypeEnd - MangledContainerTypeStart);
+                            MangledContainerTypeEnd - MangledContainerTypeStart);
   StringRef DocComment = StringRef(SS.begin()+DocCommentBegin,
                                    DocCommentEnd-DocCommentBegin);
   StringRef AnnotatedDecl = StringRef(SS.begin()+DeclBegin,

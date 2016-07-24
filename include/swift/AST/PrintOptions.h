@@ -313,7 +313,7 @@ struct PrintOptions {
   /// \brief The information for converting archetypes to specialized types.
   std::shared_ptr<TypeTransformContext> TransformContext;
 
-  /// \brief If this is not \c nullptr then functions (incuding accessors and
+  /// \brief If this is not \c nullptr then functions (including accessors and
   /// constructors) will be printed with a body that is determined by this
   /// function.
   std::function<std::string(const ValueDecl *)> FunctionBody;

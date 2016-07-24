@@ -1388,7 +1388,7 @@ namespace {
     Expr *bridgeErrorToObjectiveC(Expr *value) {
       auto &tc = cs.getTypeChecker();
 
-      // Use _bridgeErrorToNSError to conver to an NSError.
+      // Use _bridgeErrorToNSError to convert to an NSError.
       auto fn = tc.Context.getBridgeErrorToNSError(&tc);
       SourceLoc loc = value->getLoc();
       if (!fn) {

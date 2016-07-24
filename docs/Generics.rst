@@ -855,7 +855,7 @@ is effectively parsed as::
 
 by splitting the '>>' operator token into two '>' operator tokens.
 
-However, this is manageable, and is already implemented for the (now depreacted)
+However, this is manageable, and is already implemented for the (now deprecated)
 protocol composition syntax (protocol<>). The larger problem occurs at expression
 context, where the parser cannot disambiguate the tokens::
 

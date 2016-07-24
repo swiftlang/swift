@@ -2279,7 +2279,7 @@ diagnoseEnumInstanceMemberLookup(EnumElementDecl *enumElementDecl,
         if (decl0->getName() == decl0->getASTContext().Id_MatchOperator) {
           assert(binaryExpr->getArg()->getElements().size() == 2);
 
-          // If the rhs of '~=' is the enum type, a single dot suffices
+          // If the rhs of '~=' is the enum type, a single dot suffixes
           // since the type can be inferred
           Type secondArgType = binaryExpr->getArg()->getElement(1)->getType();
           if (secondArgType->isEqual(enumMetatype->getInstanceType())) {
@@ -2580,7 +2580,7 @@ bool FailureDiagnosis::diagnoseConversionToBool(Expr *expr, Type exprType) {
   }
   
   // If we're trying to convert something from optional type to Bool, then a
-  // comparision against nil was probably expected.
+  // comparison against nil was probably expected.
   // TODO: It would be nice to handle "!x" --> x == false, but we have no way
   // to get to the parent expr at present.
   if (exprType->getAnyOptionalObjectType()) {

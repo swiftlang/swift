@@ -383,7 +383,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Note: Storing a copy of a nontrivial value into memory
   ///   requires that the user know the type of value previously in
   ///   memory, and requires initialization or assignment of the
-  ///   memory. This can be acheived via a typed `UnsafeMutablePointer`
+  ///   memory. This can be achieved via a typed `UnsafeMutablePointer`
   ///   or via a raw pointer `self`, as follows, where `U` is the
   ///   previous type and `T` is the copied value's type:
   ///   `let typedPtr = self.bindMemory(to: U.self, capacity: 1)`
