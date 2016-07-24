@@ -98,7 +98,7 @@ void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
   // The type part of a NamedTypeRepr will get the callback.
   if (!isa<NamedTypeRepr>(this))
     Printer.printTypePre(TypeLoc(const_cast<TypeRepr *>(this)));
-  defer {
+  SWIFT_DEFER {
     if (!isa<NamedTypeRepr>(this))
       Printer.printTypePost(TypeLoc(const_cast<TypeRepr *>(this)));
   };
@@ -210,8 +210,8 @@ TypeRepr *CloneVisitor::visitProtocolCompositionTypeRepr(
   }
 
   return new (Ctx) ProtocolCompositionTypeRepr(protocols,
-                                               T->getProtocolLoc(),
-                                               T->getAngleBrackets());
+                                               T->getStartLoc(),
+                                               T->getCompositionRange());
 }
 
 TypeRepr *CloneVisitor::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
@@ -283,6 +283,7 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   case 2: Printer << "@autoclosure(escaping) "; break;
   case 3: Printer << "@autoclosure "; break;
   }
+  if (Attrs.has(TAK_escaping))     Printer << "@escaping ";
   if (Attrs.has(TAK_thin))         Printer << "@thin ";
   if (Attrs.has(TAK_thick))        Printer << "@thick ";
   if (Attrs.convention.hasValue()) {
@@ -397,7 +398,7 @@ TupleTypeRepr *TupleTypeRepr::create(ASTContext &C,
 void TupleTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
   Printer.callPrintStructurePre(PrintStructureKind::TupleType);
-  defer { Printer.printStructurePost(PrintStructureKind::TupleType); };
+  SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
 
   Printer << "(";
 
@@ -425,24 +426,26 @@ void NamedTypeRepr::printImpl(ASTPrinter &Printer,
 ProtocolCompositionTypeRepr *
 ProtocolCompositionTypeRepr::create(ASTContext &C,
                                     ArrayRef<IdentTypeRepr *> Protocols,
-                                    SourceLoc ProtocolLoc,
-                                    SourceRange AngleBrackets) {
+                                    SourceLoc FirstTypeLoc,
+                                    SourceRange CompositionRange) {
   return new (C) ProtocolCompositionTypeRepr(C.AllocateCopy(Protocols),
-                                             ProtocolLoc, AngleBrackets);
+                                             FirstTypeLoc, CompositionRange);
 }
 
 void ProtocolCompositionTypeRepr::printImpl(ASTPrinter &Printer,
                                             const PrintOptions &Opts) const {
-  Printer << "protocol<";
-  bool First = true;
-  for (auto Proto : Protocols) {
-    if (First)
-      First = false;
-    else
-      Printer << ", ";
-    printTypeRepr(Proto, Printer, Opts);
+  if (Protocols.empty()) {
+    Printer << "Any";
+  } else {
+    bool First = true;
+    for (auto Proto : Protocols) {
+      if (First)
+        First = false;
+      else
+        Printer << " & ";
+      printTypeRepr(Proto, Printer, Opts);
+    }
   }
-  Printer << ">";
 }
 
 void MetatypeTypeRepr::printImpl(ASTPrinter &Printer,

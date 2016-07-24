@@ -126,10 +126,13 @@ public struct ${Self}<Pointee>
   /// instances of `Pointee`.
   ///
   /// - Postcondition: The pointee is allocated, but not initialized.
-  public init(allocatingCapacity count: Int) {
+  static public func allocate(capacity count: Int)
+    -> UnsafeMutablePointer<Pointee> {
     let size = strideof(Pointee.self) * count
-    self._rawValue =
+    let rawPtr =
       Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self))
+    Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
+    return UnsafeMutablePointer(rawPtr)
   }
 
   /// Deallocate uninitialized memory allocated for `count` instances
@@ -138,8 +141,8 @@ public struct ${Self}<Pointee>
   /// - Precondition: The memory is not initialized.
   ///
   /// - Postcondition: The memory has been deallocated.
-  public func deallocateCapacity(_ num: Int) {
-    let size = strideof(Pointee.self) * num
+  public func deallocate(capacity: Int) {
+    let size = strideof(Pointee.self) * capacity
     Builtin.deallocRaw(
       _rawValue, size._builtinWordValue, Builtin.alignof(Pointee.self))
   }
@@ -168,14 +171,15 @@ public struct ${Self}<Pointee>
   /// Initialize `self.pointee` with `count` consecutive copies of `newValue`
   ///
   /// - Precondition: The pointee is not initialized.
-  ///             `count` is non-negative.
+  ///
+  /// - Precondition: `count` is non-negative.
   ///
   /// - Postcondition: The pointee is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
-  // FIXME: add tests (since the `count` has been added)
-  public func initialize(with newValue: Pointee, count: Int = 1) {
+  public func initialize(to newValue: Pointee, count: Int = 1) {
+    // FIXME: add tests (since the `count` has been added)
     _debugPrecondition(count >= 0,
-      "${Self}.initialize(with:): negative count")
+      "${Self}.initialize(to:): negative count")
     // Must not use `initializeFrom` with a `Collection` as that will introduce
     // a cycle.
     for offset in 0..<count {
@@ -197,63 +201,36 @@ public struct ${Self}<Pointee>
   }
 
   /// Replace `count` initialized `Pointee`s starting at `self` with
-  /// the `count` `Pointee`s at `source`, proceeding forward from
-  /// `self` to `self + count - 1`.
+  /// the `count` `Pointee`s at `source`.
   ///
   /// - Precondition: `count >= 0`
   ///
-  /// - Precondition: `self` either precedes `source` or follows
-  ///   `source + count - 1`.
-  ///
   /// - Precondition: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
-  public func assignFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+  public func assign(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
-      count >= 0, "${Self}.assignFrom with negative count")
-    _debugPrecondition(
-      UnsafePointer(self) < source || UnsafePointer(self) >= source + count,
-      "assignFrom non-following overlapping range; use assignBackwardFrom")
-    for i in 0..<count {
-      self[i] = source[i]
+      count >= 0, "${Self}.assign with negative count")
+    if UnsafePointer(self) < source || UnsafePointer(self) >= source + count {
+      // assign forward from a disjoint or following overlapping range.
+      for i in 0..<count {
+        self[i] = source[i]
+      }
     }
-  }
-
-  /// Replace `count` initialized `Pointee`s starting at `self` with
-  /// the `count` `Pointee`s at `source`, proceeding backward from
-  /// `self + count - 1` to `self`.
-  ///
-  /// Use `assignBackwardFrom` when copying elements into later memory
-  /// that may overlap with the source range.
-  ///
-  /// - Precondition: `count >= 0`
-  ///
-  /// - Precondition: `source` either precedes `self` or follows
-  ///   `self + count - 1`.
-  ///
-  /// - Precondition: The `Pointee`s at `self..<self + count` and
-  ///   `source..<source + count` are initialized.
-  public func assignBackwardFrom(_ source: UnsafePointer<Pointee>, count: Int) {
-    _debugPrecondition(
-      count >= 0, "${Self}.assignBackwardFrom with negative count")
-    _debugPrecondition(
-      source < UnsafePointer(self) || source >= UnsafePointer(self) + count,
-      "${Self}.assignBackwardFrom non-preceding overlapping range; use assignFrom instead")
-    var i = count-1
-    while i >= 0 {
-      self[i] = source[i]
-      i -= 1
+    else {
+      // assign backward from a non-following overlapping range.
+      var i = count-1
+      while i >= 0 {
+        self[i] = source[i]
+        i -= 1
+      }
     }
   }
 
   /// Initialize memory starting at `self` with `count` `Pointee`s
-  /// beginning at `source`, proceeding forward from `self` to `self +
-  /// count - 1`, and returning the source memory to an uninitialized
-  /// state.
+  /// beginning at `source`, and returning the source memory to an
+  /// uninitialized state.
   ///
   /// - Precondition: `count >= 0`
-  ///
-  /// - Precondition: `self` either precedes `source` or follows `source +
-  ///   count - 1`.
   ///
   /// - Precondition: The memory at `self..<self + count` is uninitialized
   ///   and the `Pointees` at `source..<source + count` are
@@ -262,61 +239,38 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The `Pointee`s at `self..<self + count` are
   ///   initialized and the memory at `source..<source + count` is
   ///   uninitialized.
-  public func moveInitializeFrom(_ source: ${Self}, count: Int) {
+  public func moveInitialize(from source: ${Self}, count: Int) {
     _debugPrecondition(
-      count >= 0, "${Self}.moveInitializeFrom with negative count")
-    _debugPrecondition(
-      self < source || self >= source + count,
-      "${Self}.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
-    Builtin.takeArrayFrontToBack(
-      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
-    // This builtin is equivalent to:
-    // for i in 0..<count {
-    //   (self + i).initialize(with: (source + i).move())
-    // }
+      count >= 0, "${Self}.moveInitialize with negative count")
+    if self < source || self >= source + count {
+      // initialize forward from a disjoint or following overlapping range.
+      Builtin.takeArrayFrontToBack(
+        Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      // This builtin is equivalent to:
+      // for i in 0..<count {
+      //   (self + i).initialize(to: (source + i).move())
+      // }
+    }
+    else {
+      // initialize backward from a non-following overlapping range.
+      Builtin.takeArrayBackToFront(
+        Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      // This builtin is equivalent to:
+      // var src = source + count
+      // var dst = self + count
+      // while dst != self {
+      //   (--dst).initialize(to: (--src).move())
+      // }
+    }
   }
 
   /// Initialize memory starting at `self` with `count` `Pointee`s
-  /// beginning at `source`, proceeding backward from `self + count - 1`
-  /// to `self`, and returning the source memory to an uninitialized
-  /// state.
+  /// beginning at `source`.
   ///
   /// - Precondition: `count >= 0`
   ///
-  /// - Precondition: `source` either precedes `self` or follows
-  ///   `self + count - 1`.
-  ///
-  /// - Precondition: The memory at `self..<self + count` is uninitialized
-  ///   and the `Pointees` at `source..<source + count` are
-  ///   initialized.
-  ///
-  /// - Postcondition: The `Pointee`s at `self..<self + count` are
-  ///   initialized and the memory at `source..<source + count` is
-  ///   uninitialized.
-  public func moveInitializeBackwardFrom(_ source: ${Self}, count: Int) {
-    _debugPrecondition(
-      count >= 0, "${Self}.moveInitializeBackwardFrom with negative count")
-    _debugPrecondition(
-      source < self || source >= self + count,
-      "${Self}.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
-    Builtin.takeArrayBackToFront(
-      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
-    // This builtin is equivalent to:
-    // var src = source + count
-    // var dst = self + count
-    // while dst != self {
-    //   (--dst).initialize(with: (--src).move())
-    // }
-  }
-
-  /// Initialize memory starting at `self` with `count` `Pointee`s
-  /// beginning at `source`, proceeding forward from `self` to `self +
-  /// count - 1`.
-  ///
-  /// - Precondition: `count >= 0`
-  ///
-  /// - Precondition: `self` either precedes `source` or follows `source +
-  ///   count - 1`.
+  /// - Precondition: The memory regions `source..<source + count`
+  ///   and `self..<self + count` do not overlap.
   ///
   /// - Precondition: The memory at `self..<self + count` is uninitialized
   ///   and the `Pointees` at `source..<source + count` are
@@ -324,18 +278,18 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
-  public func initializeFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+  public func initialize(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
-      count >= 0, "${Self}.initializeFrom with negative count")
+      count >= 0, "${Self}.initialize with negative count")
     _debugPrecondition(
       UnsafePointer(self) + count <= source || 
       source + count <= UnsafePointer(self),
-      "${Self}.initializeFrom non-following overlapping range")
+      "${Self}.initialize overlapping range")
     Builtin.copyArray(
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
-    //   (self + i).initialize(with: source[i])
+    //   (self + i).initialize(to: source[i])
     // }
   }
 
@@ -346,7 +300,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The `Pointee`s at `self..<self + count` are
   ///   initialized.
-  public func initializeFrom<C : Collection>(_ source: C)
+  public func initialize<C : Collection>(from source: C)
     where C.Iterator.Element == Pointee {
     source._copyContents(initializing: self)
   }
@@ -357,7 +311,8 @@ public struct ${Self}<Pointee>
   ///
   /// - Precondition: `count >= 0`
   ///
-  /// - Precondition: The source and destination ranges do not overlap
+  /// - Precondition: The memory regions `source..<source + count`
+  ///   and `self..<self + count` do not overlap.
   ///
   /// - Precondition: The `Pointee`s at `self..<self + count` and
   ///   `source..<source + count` are initialized.
@@ -365,12 +320,12 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The `Pointee`s at `self..<self + count` are
   ///   initialized and the `Pointees` at `source..<source + count`
   ///   are uninitialized.
-  public func moveAssignFrom(_ source: ${Self}, count: Int) {
+  public func moveAssign(from source: ${Self}, count: Int) {
     _debugPrecondition(
-      count >= 0, "${Self}.moveAssignFrom with negative count")
+      count >= 0, "${Self}.moveAssign(from:) with negative count")
     _debugPrecondition(
       self + count <= source || source + count <= self,
-      "moveAssignFrom overlapping range")
+      "moveAssign overlapping range")
     Builtin.destroyArray(Pointee.self, self._rawValue, count._builtinWordValue)
     Builtin.takeArrayFrontToBack(
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
@@ -383,17 +338,39 @@ public struct ${Self}<Pointee>
   /// De-initialize the `count` `Pointee`s starting at `self`, returning
   /// their memory to an uninitialized state.
   ///
+  /// Returns an UnsafeMutableRawPointer to this memory.
+  ///
   /// - Precondition: The `Pointee`s at `self..<self + count` are
   ///   initialized.
   ///
   /// - Postcondition: The memory is uninitialized.
-  public func deinitialize(count: Int = 1) {
+  @discardableResult
+  public func deinitialize(count: Int = 1) -> UnsafeMutableRawPointer {
     _debugPrecondition(count >= 0, "${Self}.deinitialize with negative count")
     // FIXME: optimization should be implemented, where if the `count` value
     // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
+    return UnsafeMutableRawPointer(self)
   }
 %  end
+
+  /// Rebind memory at `self` to type `T` with capacity to hold `count` adjacent
+  /// `T` values while executing the `body` closure. After executing the
+  /// closure, rebind memory back to `Pointee`.
+  ///
+  /// - Precondition: Type 'T' is layout compatible with type 'Pointee'.
+  ///
+  /// - Precondition: The memory `self..<self + count * strideof(T.self)`
+  ///   is bound to `Pointee`.
+  public func withMemoryRebound<T, Result>(to: T.Type, capacity count: Int,
+    _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result
+  ) rethrows -> Result {
+    Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
+    defer {
+      Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
+    }
+    return try body(UnsafeMutablePointer<T>(_rawValue))
+  }
 
   /// Access the pointee at `self + i`.
   ///
@@ -428,7 +405,7 @@ public struct ${Self}<Pointee>
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(_rawValue))
+    return Int(bitPattern: self)
   }
 
   /// Returns the next consecutive position.
@@ -478,6 +455,8 @@ extension ${Self} : CustomPlaygroundQuickLookable {
   }
 }
 
+/// - Note: Strideable's implementation is potentially less efficient and cannot
+///   handle misaligned pointers.
 @_transparent
 public func == <Pointee>(
   lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>
@@ -485,11 +464,18 @@ public func == <Pointee>(
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
+/// - Note: Strideable's implementation is potentially less efficient and cannot
+///   handle misaligned pointers.
+///
+/// - Note: This is an unsigned comparison unlike Strideable's implementation.
 @_transparent
 public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
+/// - Note: The following family of operator overloads are redundant
+///   with Strideable. However, optimizer improvements are needed
+///   before they can be removed without affecting performance.
 @_transparent
 public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return ${Self}(Builtin.gep_Word(
@@ -534,28 +520,48 @@ extension ${Self} {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, message: "use the '${Self}(allocatingCapacity:)' initializer")
+% if mutable:
+  @available(*, unavailable, renamed: "allocate(capacity:)")
   public static func alloc(_ num: Int) -> ${Self} {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "deallocateCapacity")
+  @available(*, unavailable, message: "use '${Self}.allocate(capacity:)'")
+  public init(allocatingCapacity: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "deallocate(capacity:)")
   public func dealloc(_ num: Int) {
     Builtin.unreachable()
   }
+
+  @available(*, unavailable, renamed: "deallocate(capacity:)")
+  public func deallocateCapacity(_ num: Int) {
+    Builtin.unreachable()
+  }
+% end
 
   @available(*, unavailable, renamed: "pointee")
   public var memory: Pointee {
     get {
       Builtin.unreachable()
     }
+% if mutable:
     set {
       Builtin.unreachable()
     }
+% end
   }
 
-  @available(*, unavailable, renamed: "initialize(with:)")
+% if mutable:
+  @available(*, unavailable, renamed: "initialize(to:)")
   public func initialize(_ newvalue: Pointee) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "initialize(to:count:)")
+  public func initialize(with newvalue: Pointee, count: Int = 1) {
     Builtin.unreachable()
   }
 
@@ -568,6 +574,38 @@ extension ${Self} {
   public func destroy(_ count: Int) {
     Builtin.unreachable()
   }
+
+  @available(*, unavailable, renamed: "initialize(from:count:)")
+  public func initializeFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "assign(from:count:)")
+  public func assignFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "assign(from:count:)")
+  public func assignBackwardFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "moveInitialize(from:count:)")
+  public func moveInitializeFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "moveInitialize(from:count:)")
+  public func moveInitializeBackwardFrom(_ source: UnsafePointer<Pointee>,
+    count: Int) {
+    Builtin.unreachable()
+  }
+  
+  @available(*, unavailable, renamed: "moveAssign(from:count:)")
+  public func moveAssignFrom(_ source: UnsafePointer<Pointee>, count: Int) {
+    Builtin.unreachable()
+  }
+% end
 }
 
 extension Int {

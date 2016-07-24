@@ -69,12 +69,10 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     if (Tok.is(tok::colon)) {
       (void)consumeToken();
       ParserResult<TypeRepr> Ty;
-      if (Tok.getKind() == tok::identifier ||
-          Tok.getKind() == tok::code_complete) {
-        Ty = parseTypeIdentifier();
-      } else if (Tok.getKind() == tok::kw_protocol) {
-        Ty = parseTypeComposition();
-      } else if (Tok.getKind() == tok::kw_class) {
+      
+      if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol, tok::kw_Any)) {
+        Ty = parseTypeIdentifierOrTypeComposition();
+      } else if (Tok.is(tok::kw_class)) {
         diagnose(Tok, diag::unexpected_class_constraint);
         diagnose(Tok, diag::suggest_anyobject, Name)
           .fixItReplace(Tok.getLoc(), "AnyObject");
@@ -212,12 +210,8 @@ ParserStatus Parser::parseGenericWhereClause(
       SourceLoc ColonLoc = consumeToken();
 
       // Parse the protocol or composition.
-      ParserResult<TypeRepr> Protocol;
-      if (Tok.is(tok::kw_protocol)) {
-        Protocol = parseTypeComposition();
-      } else {
-        Protocol = parseTypeIdentifier();
-      }
+      ParserResult<TypeRepr> Protocol = parseTypeIdentifierOrTypeComposition();
+      
       if (Protocol.isNull()) {
         Status.setIsParseError();
         if (Protocol.hasCodeCompletion())

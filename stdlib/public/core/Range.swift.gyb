@@ -81,7 +81,7 @@ public enum _DisabledRangeIndex_ {}
 public struct CountableRange<Bound> : RandomAccessCollection
   where
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>,
+  Bound : _Strideable & Comparable,
   Bound.Stride : SignedInteger {
 
   /// The range's lower bound.
@@ -500,16 +500,16 @@ extension ${Self} : CustomReflectable {
   }
 }
 
-extension ${Self} : Equatable {}
+extension ${Self} : Equatable {
+  public static func == (lhs: ${Self}<Bound>, rhs: ${Self}<Bound>) -> Bool {
+    return
+      lhs.lowerBound == rhs.lowerBound &&
+      lhs.upperBound == rhs.upperBound
+  }
 
-public func == <Bound>(lhs: ${Self}<Bound>, rhs: ${Self}<Bound>) -> Bool {
-  return
-    lhs.lowerBound == rhs.lowerBound &&
-    lhs.upperBound == rhs.upperBound
-}
-
-public func ~= <Bound> (pattern: ${Self}<Bound>, value: Bound) -> Bool {
-  return pattern.contains(value)
+  public static func ~= (pattern: ${Self}<Bound>, value: Bound) -> Bool {
+    return pattern.contains(value)
+  }
 }
 % end
 
@@ -553,7 +553,7 @@ extension ${Self} where Bound : _Strideable, Bound.Stride : SignedInteger {
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
+public func ..< <Bound : Comparable>(minimum: Bound, maximum: Bound)
   -> Range<Bound> {
   _precondition(minimum <= maximum,
     "Can't form Range with upperBound < lowerBound")
@@ -578,7 +578,7 @@ public func ..< <Bound>(
 ) -> CountableRange<Bound>
   where
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>,
+  Bound : _Strideable & Comparable,
   Bound.Stride : Integer {
 
   // FIXME: swift-3-indexing-model: tests for traps.

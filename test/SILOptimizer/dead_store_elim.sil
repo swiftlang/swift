@@ -386,9 +386,9 @@ bb0:
   %1 = integer_literal $Builtin.Int32, 64
   %2 = function_ref @escaped_a : $@convention(thin) () -> Builtin.RawPointer
   %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
-  %4 = pointer_to_address %3 : $Builtin.RawPointer to $*Builtin.Int32
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Int32
   %5 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
-  %6 = pointer_to_address %5 : $Builtin.RawPointer to $*Builtin.Int32
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*Builtin.Int32
   cond_br undef, bb1, bb2
 
 bb1:
@@ -1289,13 +1289,13 @@ bb2:
 /// CHECK-LABEL: tbaa_no_alias_no_dead_store
 /// CHECK: {{ store}}
 /// CHECK: load
-sil @tbaa_no_alias_no_dead_store : $@convention(thin) (Optional<protocol<>.Type>) -> Int {
-bb0(%0 : $Optional<protocol<>.Type>):
-  %2 = alloc_stack $Optional<protocol<>.Type>
-  store %0 to %2 : $*Optional<protocol<>.Type>
-  %17 = unchecked_addr_cast %2 : $*Optional<protocol<>.Type> to $*Int
+sil @tbaa_no_alias_no_dead_store : $@convention(thin) (Optional<Any.Type>) -> Int {
+bb0(%0 : $Optional<Any.Type>):
+  %2 = alloc_stack $Optional<Any.Type>
+  store %0 to %2 : $*Optional<Any.Type>
+  %17 = unchecked_addr_cast %2 : $*Optional<Any.Type> to $*Int
   %18 = load %17 : $*Int
-  dealloc_stack %2 : $*Optional<protocol<>.Type>
+  dealloc_stack %2 : $*Optional<Any.Type>
   return %18 : $Int
 }
 
@@ -1306,13 +1306,13 @@ bb0(%0 : $Optional<protocol<>.Type>):
 /// CHECK: load
 /// CHECK-NOT: {{ store}}
 /// CHECK: return 
-sil @local_dead_store : $@convention(thin) (Optional<protocol<>.Type>) -> Int {
-bb0(%0 : $Optional<protocol<>.Type>):
-  %2 = alloc_stack $Optional<protocol<>.Type>
-  %17 = unchecked_addr_cast %2 : $*Optional<protocol<>.Type> to $*Int
+sil @local_dead_store : $@convention(thin) (Optional<Any.Type>) -> Int {
+bb0(%0 : $Optional<Any.Type>):
+  %2 = alloc_stack $Optional<Any.Type>
+  %17 = unchecked_addr_cast %2 : $*Optional<Any.Type> to $*Int
   %18 = load %17 : $*Int
-  store %0 to %2 : $*Optional<protocol<>.Type>
-  dealloc_stack %2 : $*Optional<protocol<>.Type>
+  store %0 to %2 : $*Optional<Any.Type>
+  dealloc_stack %2 : $*Optional<Any.Type>
   return %18 : $Int
 }
 

@@ -27,7 +27,7 @@ using namespace swift;
 using namespace importer;
 
 /// Classify the given Clang enumeration to describe how to import it.
-void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
+void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
                             clang::Preprocessor &pp) {
   // Anonymous enumerations simply get mapped to constants of the
   // underlying type of the enum, because there is no way to conjure up a
@@ -40,7 +40,7 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
   // First, check for attributes that denote the classification
   if (auto domainAttr = decl->getAttr<clang::NSErrorDomainAttr>()) {
     kind = EnumKind::Enum;
-    attribute = domainAttr;
+    nsErrorDomain = ctx.AllocateCopy(domainAttr->getErrorDomain()->getName());
     return;
   }
 

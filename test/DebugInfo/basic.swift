@@ -1,15 +1,18 @@
 // A (no longer) basic test for debug info.
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info by default.
-// RUN: %target-swift-frontend %s -emit-ir -o - | FileCheck %s --check-prefix NDEBUG
+// RUN: %target-swift-frontend %s -emit-ir -o - \
+// RUN:   | FileCheck %s --check-prefix NDEBUG
 // NDEBUG-NOT: !dbg
 // NDEBUG-NOT: DW_TAG
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info with -gnone.
-// RUN: %target-swift-frontend %s -emit-ir -gnone -o - | FileCheck %s --check-prefix NDEBUG
+// RUN: %target-swift-frontend %s -emit-ir -gnone -o - \
+// RUN:   | FileCheck %s --check-prefix NDEBUG
 // --------------------------------------------------------------------
 // Verify that we don't emit any type info with -gline-tables-only.
-// RUN: %target-swift-frontend %s -emit-ir -gline-tables-only -o - | FileCheck %s --check-prefix CHECK-LINETABLES
+// RUN: %target-swift-frontend %s -emit-ir -gline-tables-only -o - \
+// RUN:   | FileCheck %s --check-prefix CHECK-LINETABLES
 // CHECK: !dbg
 // CHECK-LINETABLES-NOT: DW_TAG_{{.*}}variable
 // CHECK-LINETABLES-NOT: DW_TAG_structure_type
@@ -17,7 +20,11 @@
 // --------------------------------------------------------------------
 // Now check that we do generate line+scope info with -g.
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
-// RUN: %target-swift-frontend %s -emit-ir -g -o - -disable-sil-linking | FileCheck %s --check-prefix=CHECK-NOSIL
+// RUN: %target-swift-frontend %s -emit-ir -g -o - -disable-sil-linking \
+// RUN:   | FileCheck %s --check-prefix=CHECK-NOSIL
+// --------------------------------------------------------------------
+// Currently -gdwarf-types should give the same results as -g.
+// RUN: %target-swift-frontend %s -emit-ir -gdwarf-types -o - | FileCheck %s
 // --------------------------------------------------------------------
 //
 // CHECK: foo
@@ -44,7 +51,7 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
        // CHECK-DAG: smul{{.*}}, !dbg ![[MUL:[0-9]+]]
        // CHECK-DAG: [[MUL]] = !DILocation(line: [[@LINE+4]], column: 16,
        // Runtime call to multiply function:
-       // CHECK-NOSIL: @_TZFsoi1mFTVs5Int64S__S_{{.*}}, !dbg ![[MUL:[0-9]+]]
+       // CHECK-NOSIL: @_TFsoi1mFTVs5Int64S__S_{{.*}}, !dbg ![[MUL:[0-9]+]]
        // CHECK-NOSIL: [[MUL]] = !DILocation(line: [[@LINE+1]], column: 16,
        return a*b
      } else {

@@ -19,6 +19,8 @@
 
 #include "swift/Basic/RelativePointer.h"
 
+const uint16_t SWIFT_REFLECTION_METADATA_VERSION = 1;
+
 namespace swift {
 namespace reflection {
 
@@ -27,19 +29,21 @@ namespace reflection {
 class FieldRecordFlags {
   using int_type = uint32_t;
   enum : int_type {
-    IsObjC = 0x00000001,
+    // Is this an indirect enum case?
+    IsIndirectCase = 0x1
   };
   int_type Data;
+
 public:
-  bool isObjC() const {
-    return Data & IsObjC;
+  bool isIndirectCase() const {
+    return (Data & IsIndirectCase) == IsIndirectCase;
   }
 
-  void setIsObjC(bool ObjC) {
-    if (ObjC)
-      Data |= IsObjC;
+  void setIsIndirectCase(bool IndirectCase=true) {
+    if (IndirectCase)
+      Data |= IsIndirectCase;
     else
-      Data &= ~IsObjC;
+      Data &= ~IsIndirectCase;
   }
 
   int_type getRawValue() const {
@@ -69,8 +73,8 @@ public:
     return "";
   }
 
-  bool isObjC() const {
-    return Flags.isObjC();
+  bool isIndirectCase() const {
+    return Flags.isIndirectCase();
   }
 };
 
@@ -109,6 +113,14 @@ enum class FieldDescriptorKind : uint16_t {
   Class,
   Enum,
 
+  // Fixed-size multi-payload enums have a special descriptor format that
+  // encodes spare bits.
+  //
+  // FIXME: Actually implement this. For now, a descriptor with this kind
+  // just means we also have a builtin descriptor from which we get the
+  // size and alignment.
+  MultiPayloadEnum,
+
   // A Swift opaque protocol. There are no fields, just a record for the
   // type itself.
   Protocol,
@@ -142,6 +154,22 @@ public:
   const uint32_t NumFields;
 
   using const_iterator = FieldRecordIterator;
+
+  bool isEnum() const {
+    return (Kind == FieldDescriptorKind::Enum ||
+            Kind == FieldDescriptorKind::MultiPayloadEnum);
+  }
+
+  bool isClass() const {
+    return (Kind == FieldDescriptorKind::Class ||
+            Kind == FieldDescriptorKind::ObjCClass);
+  }
+
+  bool isProtocol() const {
+    return (Kind == FieldDescriptorKind::Protocol ||
+            Kind == FieldDescriptorKind::ClassProtocol ||
+            Kind == FieldDescriptorKind::ObjCProtocol);
+  }
 
   const_iterator begin() const {
     auto Begin = getFieldRecordBuffer();

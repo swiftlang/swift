@@ -862,16 +862,16 @@ public:
                                                  const TypeLowering &optTL,
                                                  SGFContext C = SGFContext());
 
-  typedef std::function<ManagedValue(SILGenFunction &gen,
-                                     SILLocation loc,
-                                     ManagedValue input,
-                                     SILType loweredResultTy)> ValueTransform;
+  typedef llvm::function_ref<ManagedValue(SILGenFunction &gen,
+                                    SILLocation loc,
+                                    ManagedValue input,
+                                    SILType loweredResultTy)> ValueTransformRef;
 
   /// Emit a transformation on the value of an optional type.
   ManagedValue emitOptionalToOptional(SILLocation loc,
                                       ManagedValue input,
                                       SILType loweredResultTy,
-                                      const ValueTransform &transform);
+                                      ValueTransformRef transform);
 
   /// Emit a reinterpret-cast from one pointer type to another, using a library
   /// intrinsic.
@@ -1016,6 +1016,7 @@ public:
   /// Emit 'undef' in a particular formal type.
   ManagedValue emitUndef(SILLocation loc, Type type);
   ManagedValue emitUndef(SILLocation loc, SILType type);
+  RValue emitUndefRValue(SILLocation loc, Type type);
   
   std::pair<ManagedValue, SILValue>
   emitUninitializedArrayAllocation(Type ArrayTy,
@@ -1392,11 +1393,11 @@ public:
                                         SILFunctionTypeRepresentation srcRep,
                                         CanType nativeTy);
 
-  /// Convert a bridged error type to the native Swift ErrorProtocol
+  /// Convert a bridged error type to the native Swift Error
   /// representation.  The value may be optional.
   ManagedValue emitBridgedToNativeError(SILLocation loc, ManagedValue v);
 
-  /// Convert a value in the native Swift ErrorProtocol representation to
+  /// Convert a value in the native Swift Error representation to
   /// a bridged error type representation.
   ManagedValue emitNativeToBridgedError(SILLocation loc, ManagedValue v,
                                         CanType bridgedType);

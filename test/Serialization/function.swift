@@ -101,19 +101,19 @@ if raw == 5 {
   testNoReturnAttr()
   testNoReturnAttrPoly(x: 5)
 }
-// SIL: {{%.+}} = function_ref @_TF8def_func16testNoReturnAttrFT_T_ : $@convention(thin) @noreturn () -> ()
-// SIL: {{%.+}} = function_ref @_TF8def_func20testNoReturnAttrPoly{{.*}} : $@convention(thin) @noreturn <τ_0_0> (@in τ_0_0) -> ()
+// SIL: {{%.+}} = function_ref @_TF8def_func16testNoReturnAttrFT_Os5Never : $@convention(thin) () -> Never
+// SIL: {{%.+}} = function_ref @_TF8def_func20testNoReturnAttrPoly{{.*}} : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Never
 
 
-// SIL: sil @_TF8def_func16testNoReturnAttrFT_T_ : $@convention(thin) @noreturn () -> ()
-// SIL: sil @_TF8def_func20testNoReturnAttrPoly{{.*}} : $@convention(thin) @noreturn <τ_0_0> (@in τ_0_0) -> ()
+// SIL: sil @_TF8def_func16testNoReturnAttrFT_Os5Never : $@convention(thin) () -> Never
+// SIL: sil @_TF8def_func20testNoReturnAttrPoly{{.*}} : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Never
 
 do {
   try throws1()
   _ = try throws2(1)
 } catch _ {}
-// SIL: sil @_TF8def_func7throws1FzT_T_ : $@convention(thin) () -> @error ErrorProtocol
-// SIL: sil @_TF8def_func7throws2{{.*}} : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorProtocol)
+// SIL: sil @_TF8def_func7throws1FzT_T_ : $@convention(thin) () -> @error Error
+// SIL: sil @_TF8def_func7throws2{{.*}} : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error Error)
 
 // LLVM: }
 

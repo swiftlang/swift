@@ -239,7 +239,8 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
       new (Context) ClosureExpr(params, SourceLoc(), SourceLoc(), SourceLoc(),
                                 TypeLoc(), discriminator, newTopLevel);
 
-  CE->setType(ParameterList::getFullType(TupleType::getEmpty(Context), params));
+  CE->setType(ParameterList::getFullInterfaceType(
+      TupleType::getEmpty(Context), params, newTopLevel));
   
   // Convert the pattern to a string we can print.
   llvm::SmallString<16> PrefixString;

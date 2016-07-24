@@ -59,7 +59,8 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
-     ("${SDK}" STREQUAL "ANDROID"))
+     ("${SDK}" STREQUAL "ANDROID") OR
+     ("${SDK}" STREQUAL "WINDOWS"))
     # No extra dependencies.
   else()
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
@@ -92,7 +93,7 @@ if(PYTHONINTERP_FOUND)
 
   set(SWIFT_TEST_EXTRA_ARGS)
 
-  if(NOT SWIFT_BUILD_TOOLS)
+  if(NOT SWIFT_INCLUDE_TOOLS)
     list(APPEND SWIFT_TEST_EXTRA_ARGS
          "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
          "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
@@ -147,25 +148,12 @@ if(PYTHONINTERP_FOUND)
       set(VARIANT_SDK "${SWIFT_SDK_${SDK}_PATH}")
 
       # A directory where to put the xUnit-style XML test results.
-      set(swift_test_results_dir
+      set(SWIFT_TEST_RESULTS_DIR
           "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
 
-      if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
-          set(command_profdata_merge_start
-              COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}"
-              -l "${swift_test_results_dir}/profdata_merge.log"
-              start
-              -o "${swift_test_results_dir}")
-          set(command_profdata_merge_stop
-              COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" stop)
-      else()
-          set(command_profdata_merge_start)
-          set(command_profdata_merge_stop)
-      endif()
-
       set(command_clean_test_results_dir
-          COMMAND "${CMAKE_COMMAND}" -E remove_directory "${swift_test_results_dir}"
-          COMMAND "${CMAKE_COMMAND}" -E make_directory "${swift_test_results_dir}")
+          COMMAND "${CMAKE_COMMAND}" -E remove_directory "${SWIFT_TEST_RESULTS_DIR}"
+          COMMAND "${CMAKE_COMMAND}" -E make_directory "${SWIFT_TEST_RESULTS_DIR}")
 
       set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}")
       set(validation_test_bin_dir
@@ -205,6 +193,12 @@ if(PYTHONINTERP_FOUND)
         # These are supported testing SDKs, but their implementation of
         # `command_upload_stdlib` is hidden.
       elseif("${SDK}" STREQUAL "ANDROID")
+        if("${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}" STREQUAL "")
+          message(FATAL_ERROR
+              "When running Android host tests, you must specify the directory on the device "
+              "to which Swift build products will be deployed.")
+        endif()
+
         # Warning: This step will fail if you do not have an Android device
         #          connected via USB. See docs/Android.md for details on
         #          how to run the test suite for Android.
@@ -240,7 +234,7 @@ if(PYTHONINTERP_FOUND)
               "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
         endif()
 
-        list(APPEND LIT_ARGS "--xunit-xml-output=${swift_test_results_dir}/lit-tests.xml")
+        list(APPEND LIT_ARGS "--xunit-xml-output=${SWIFT_TEST_RESULTS_DIR}/lit-tests.xml")
 
         foreach(test_subset ${TEST_SUBSETS})
           set(directories)
@@ -274,14 +268,12 @@ if(PYTHONINTERP_FOUND)
               ${command_upload_stdlib}
               ${command_upload_swift_reflection_test}
               ${command_clean_test_results_dir}
-              ${command_profdata_merge_start}
               COMMAND
                 ${PYTHON_EXECUTABLE} "${LIT}"
                 ${LIT_ARGS}
                 "--param" "swift_test_subset=${test_subset}"
                 "--param" "swift_test_mode=${test_mode}"
                 ${directories}
-              ${command_profdata_merge_stop}
               DEPENDS ${dependencies}
               COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
               ${cmake_3_2_USES_TERMINAL})

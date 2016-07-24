@@ -13,5 +13,5 @@ func test(_ b : BaseInHead) {
 // CHECK: source.lang.swift.ref.function.method.instance ({{.*}}Inputs/header.h:4:9-4:23)
 // CHECK: doIt(_:)
 // CHECK: c:objc(cs)BaseInHead(im)doIt:
-// CHECK: BaseInHead -> (Int32) -> Void
+// CHECK: (BaseInHead) -> (Int32) -> Void
 // CHECK: <Declaration>func doIt(_ arg: <Type usr="s:Vs5Int32">Int32</Type>)</Declaration>

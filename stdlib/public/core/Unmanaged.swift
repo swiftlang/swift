@@ -39,7 +39,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   ///     let str0: CFString = "boxcar"
   ///     let bits = Unmanaged.passUnretained(str0)
-  ///     let str1 = Unmanaged<CFString>(bits).object
+  ///     let ptr = bits.toOpaque()
   @_transparent
   public func toOpaque() -> UnsafeMutablePointer<Void> {
     return unsafeBitCast(_value, to: UnsafeMutablePointer<Void>.self)
@@ -136,7 +136,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///  }
   ///
   ///  class Owner {
-  ///    final var owned : Owned
+  ///    final var owned: Owned
   ///
   ///    func foo() {
   ///        withExtendedLifetime(self) {
@@ -168,7 +168,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///   }
   ///
   ///  class Owner {
-  ///    final var owned : Owned
+  ///    final var owned: Owned
   ///
   ///    func foo() {
   ///        withExtendedLifetime(self) {
@@ -183,10 +183,10 @@ public struct Unmanaged<Instance : AnyObject> {
   ///    }
   ///  }
   public func _withUnsafeGuaranteedRef<Result>(
-    _ closure: @noescape (Instance) throws -> Result
+    _ body: @noescape (Instance) throws -> Result
   ) rethrows -> Result {
     let (guaranteedInstance, token) = Builtin.unsafeGuaranteed(_value)
-    let result = try closure(guaranteedInstance)
+    let result = try body(guaranteedInstance)
     Builtin.unsafeGuaranteedEnd(token)
     return result
   }

@@ -54,6 +54,9 @@ function(handle_swift_sources
   if (NOT SWIFTSOURCES_IS_MAIN)
     list(APPEND swift_compile_flags "-module-link-name" "${name}")
   endif()
+  if("${SWIFTSOURCES_SDK}" STREQUAL "CYGWIN")
+    list(APPEND swift_compile_flags -DCYGWIN)
+  endif()
 
   if(swift_sources)
     # Special-case hack to create Swift.o for the core standard library.
@@ -320,7 +323,7 @@ function(_compile_swift_files dependency_target_out_var_name)
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
   set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
   set(swift_compiler_tool_dep)
-  if(SWIFT_BUILD_TOOLS)
+  if(SWIFT_INCLUDE_TOOLS)
     # Depend on the binary itself, in addition to the symlink.
     set(swift_compiler_tool_dep "swift")
   endif()

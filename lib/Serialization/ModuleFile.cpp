@@ -755,7 +755,8 @@ ModuleFile::ModuleFile(
       ModuleInputReader(getStartBytePtr(this->ModuleInputBuffer.get()),
                         getEndBytePtr(this->ModuleInputBuffer.get())),
       ModuleDocInputReader(getStartBytePtr(this->ModuleDocInputBuffer.get()),
-                           getEndBytePtr(this->ModuleDocInputBuffer.get())) {
+                           getEndBytePtr(this->ModuleDocInputBuffer.get())),
+      DeserializedTypeCallback([](Type ty) {}) {
   assert(getStatus() == Status::Valid);
   Bits.IsFramework = isFramework;
 

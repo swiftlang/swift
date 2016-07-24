@@ -63,10 +63,10 @@ func createNSStringTemporaryFile()
 var NSStringAPIs = TestSuite("NSStringAPIs")
 
 NSStringAPIs.test("Encodings") {
-  let availableEncodings: [String.Encoding] = String.availableStringEncodings()
+  let availableEncodings: [String.Encoding] = String.availableStringEncodings
   expectNotEqual(0, availableEncodings.count)
 
-  let defaultCStringEncoding = String.defaultCStringEncoding()
+  let defaultCStringEncoding = String.defaultCStringEncoding
   expectTrue(availableEncodings.contains(defaultCStringEncoding))
 
   expectNotEqual("", String.localizedName(of: .utf8))
@@ -192,12 +192,12 @@ NSStringAPIs.test("init(contentsOf:usedEncoding:error:)") {
 NSStringAPIs.test("init(cString_:encoding:)") {
   expectOptionalEqual("foo, a basmati bar!",
       String(cString: 
-          "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
+          "foo, a basmati bar!", encoding: String.defaultCStringEncoding))
 }
 
 NSStringAPIs.test("init(utf8String:)") {
   var s = "foo あいう"
-  var up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
+  var up = UnsafeMutablePointer<UInt8>.allocate(capacity: 100)
   var i = 0
   for b in s.utf8 {
     up[i] = b
@@ -205,7 +205,7 @@ NSStringAPIs.test("init(utf8String:)") {
   }
   up[i] = 0
   expectOptionalEqual(s, String(utf8String: UnsafePointer(up)))
-  up.deallocateCapacity(100)
+  up.deallocate(capacity: 100)
 }
 
 NSStringAPIs.test("canBeConvertedToEncoding(_:)") {
@@ -262,22 +262,18 @@ func expectLocalizedEquality(
   _ localeID: String? = nil,
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
 
   let locale = localeID.map {
-    Locale(localeIdentifier: $0)
-  } ?? Locale.current()
+    Locale(identifier: $0)
+  } ?? Locale.current
   
   expectEqual(
     expected, op(locale),
-    message(), stackTrace: trace)
-  
-  expectEqual(
-    op(Locale.system()), op(nil),
-    message(), stackTrace: trace)
+    message(), stackTrace: trace)  
 }
 
 NSStringAPIs.test("capitalizedString(with:)") {
@@ -360,9 +356,9 @@ NSStringAPIs.test("compare(_:options:range:locale:)") {
   }
 
   expectEqual(ComparisonResult.orderedSame,
-      "abc".compare("abc", locale: Locale.current()))
+      "abc".compare("abc", locale: Locale.current))
   expectEqual(ComparisonResult.orderedSame,
-      "абв".compare("абв", locale: Locale.current()))
+      "абв".compare("абв", locale: Locale.current))
 }
 
 NSStringAPIs.test("completePath(into:caseSensitive:matchesInto:filterTypes)") {
@@ -580,7 +576,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
 }
 
 NSStringAPIs.test("fastestEncoding") {
-  let availableEncodings: [String.Encoding] = String.availableStringEncodings()
+  let availableEncodings: [String.Encoding] = String.availableStringEncodings
   expectTrue(availableEncodings.contains("abc".fastestEncoding))
 }
 
@@ -834,8 +830,6 @@ NSStringAPIs.test("init(format:locale:_:...)") {
   var world: NSString = "world"
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, world, 42))
-  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: Locale.system(), world, 42))
 }
 
 NSStringAPIs.test("init(format:locale:arguments:)") {
@@ -843,8 +837,6 @@ NSStringAPIs.test("init(format:locale:arguments:)") {
   let args: [CVarArg] = [ world, 42 ]
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, arguments: args))
-  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: Locale.system(), arguments: args))
 }
 
 NSStringAPIs.test("lastPathComponent") {
@@ -1327,7 +1319,7 @@ NSStringAPIs.test("localizedStandardRange(of:)") {
 }
 
 NSStringAPIs.test("smallestEncoding") {
-  let availableEncodings: [String.Encoding] = String.availableStringEncodings()
+  let availableEncodings: [String.Encoding] = String.availableStringEncodings
   expectTrue(availableEncodings.contains("abc".smallestEncoding))
 }
 

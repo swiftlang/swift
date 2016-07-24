@@ -2,6 +2,8 @@
 // RUN: mkdir -p %t
 
 // REQUIRES: objc_interop
+// FIXME: this is failing on simulators
+// REQUIRES: OS=macosx
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t -enable-strip-ns-prefix %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/ObjectiveC.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t -enable-strip-ns-prefix %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/CoreGraphics.swift
@@ -119,8 +121,8 @@
 // Note: Noun phrase puts preposition inside.
 // CHECK-FOUNDATION: func url(withAddedString: String) -> NSURL?
 
-// Note: CalendarUnits is not a set of "Options".
-// CHECK-FOUNDATION: class func forCalendarUnits(_: Calendar.Unit) -> String!
+// Note: NSCalendarUnits is not a set of "Options".
+// CHECK-FOUNDATION: class func forCalendarUnits(_: NSCalendar.Unit) -> String!
 
 // Note: <property type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }
@@ -144,7 +146,7 @@
 // CHECK-FOUNDATION: func doSomething(with: NSCopying)
 
 // Note: NSObject<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomethingElse(with: protocol<NSCopying, NSObjectProtocol>)
+// CHECK-FOUNDATION: func doSomethingElse(with: NSCopying & NSObjectProtocol)
 
 // Note: Function type -> "Function".
 // CHECK-FOUNDATION: func sort(_: @convention(c) (AnyObject, AnyObject) -> Int)
@@ -234,7 +236,7 @@
 
 // Make sure we're removing redundant context type info at both the
 // beginning and the end of a property.
-// CHECK-APPKIT: var flattening: NSBezierPath { get }
+// CHECK-APPKIT: var flattened: NSBezierPath { get }
 
 // CHECK-APPKIT: func dismiss(animated: Bool)
 

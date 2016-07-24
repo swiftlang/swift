@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// Disabled because of a crash with a debug stdlib - rdar://problem/27226313
+// REQUIRES: optimized_stdlib
+
 // REQUIRES: objc_interop
 
 import StdlibUnittest
@@ -35,11 +38,11 @@ WeakReferenceRaceTests.test("class instance property [SR-192] (copy)") {
       _blackHole(nbox)
     }
 
-    q.asynchronously(execute: closure)
-    q.asynchronously(execute: closure)
+    q.async(execute: closure)
+    q.async(execute: closure)
   }
 
-  q.asynchronously(flags: .barrier) {}
+  q.async(flags: .barrier) {}
 }
 
 WeakReferenceRaceTests.test("class instance property [SR-192] (load)") {
@@ -55,11 +58,11 @@ WeakReferenceRaceTests.test("class instance property [SR-192] (load)") {
       }
     }
 
-    q.asynchronously(execute: closure)
-    q.asynchronously(execute: closure)
+    q.async(execute: closure)
+    q.async(execute: closure)
   }
 
-  q.asynchronously(flags: .barrier) {}
+  q.async(flags: .barrier) {}
 }
 
 WeakReferenceRaceTests.test("direct capture (copy)") {
@@ -74,11 +77,11 @@ WeakReferenceRaceTests.test("direct capture (copy)") {
       _blackHole(nbox)
     }
 
-    q.asynchronously(execute: closure)
-    q.asynchronously(execute: closure)
+    q.async(execute: closure)
+    q.async(execute: closure)
   }
 
-  q.asynchronously(flags: .barrier) {}
+  q.async(flags: .barrier) {}
 }
 
 WeakReferenceRaceTests.test("direct capture (load)") {
@@ -93,11 +96,11 @@ WeakReferenceRaceTests.test("direct capture (load)") {
       }
     }
 
-    q.asynchronously(execute: closure)
-    q.asynchronously(execute: closure)
+    q.async(execute: closure)
+    q.async(execute: closure)
   }
 
-  q.asynchronously(flags: .barrier) {}
+  q.async(flags: .barrier) {}
 }
 
 runAllTests()

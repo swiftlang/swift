@@ -231,23 +231,23 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   switch (kind) {
 #define PROTOCOL_WITH_NAME(Id, Name) \
   case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
-#define LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(Id, Name)
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name)
 #include "swift/AST/KnownProtocols.def"
 
-  case KnownProtocolKind::ArrayLiteralConvertible:     index = 0; break;
-  case KnownProtocolKind::DictionaryLiteralConvertible:index = 1; break;
-  case KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible: index = 2;
+  case KnownProtocolKind::ExpressibleByArrayLiteral:     index = 0; break;
+  case KnownProtocolKind::ExpressibleByDictionaryLiteral:index = 1; break;
+  case KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral: index = 2;
     break;
-  case KnownProtocolKind::FloatLiteralConvertible: index = 3; break;
-  case KnownProtocolKind::IntegerLiteralConvertible: index = 4; break;
-  case KnownProtocolKind::StringInterpolationConvertible: index = 5; break;
-  case KnownProtocolKind::StringLiteralConvertible: index = 6; break;
-  case KnownProtocolKind::NilLiteralConvertible: index = 7; break;
-  case KnownProtocolKind::BooleanLiteralConvertible: index = 8; break;
-  case KnownProtocolKind::UnicodeScalarLiteralConvertible: index = 9; break;
-  case KnownProtocolKind::ColorLiteralConvertible: index = 10; break;
-  case KnownProtocolKind::ImageLiteralConvertible: index = 11; break;
-  case KnownProtocolKind::FileReferenceLiteralConvertible: index = 12; break;
+  case KnownProtocolKind::ExpressibleByFloatLiteral: index = 3; break;
+  case KnownProtocolKind::ExpressibleByIntegerLiteral: index = 4; break;
+  case KnownProtocolKind::ExpressibleByStringInterpolation: index = 5; break;
+  case KnownProtocolKind::ExpressibleByStringLiteral: index = 6; break;
+  case KnownProtocolKind::ExpressibleByNilLiteral: index = 7; break;
+  case KnownProtocolKind::ExpressibleByBooleanLiteral: index = 8; break;
+  case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral: index = 9; break;
+  case KnownProtocolKind::ExpressibleByColorLiteral: index = 10; break;
+  case KnownProtocolKind::ExpressibleByImageLiteral: index = 11; break;
+  case KnownProtocolKind::ExpressibleByFileReferenceLiteral: index = 12; break;
   }
 
   // If we already looked for alternative literal types, return those results.
@@ -269,38 +269,38 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   switch (kind) {
 #define PROTOCOL_WITH_NAME(Id, Name) \
   case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
-#define LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(Id, Name)
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name)
 #include "swift/AST/KnownProtocols.def"
 
-  case KnownProtocolKind::ArrayLiteralConvertible:
-  case KnownProtocolKind::DictionaryLiteralConvertible:
+  case KnownProtocolKind::ExpressibleByArrayLiteral:
+  case KnownProtocolKind::ExpressibleByDictionaryLiteral:
     break;
 
-  case KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible:
-  case KnownProtocolKind::StringInterpolationConvertible:
-  case KnownProtocolKind::StringLiteralConvertible:
-  case KnownProtocolKind::UnicodeScalarLiteralConvertible:
+  case KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral:
+  case KnownProtocolKind::ExpressibleByStringInterpolation:
+  case KnownProtocolKind::ExpressibleByStringLiteral:
+  case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
     break;
 
-  case KnownProtocolKind::IntegerLiteralConvertible:
+  case KnownProtocolKind::ExpressibleByIntegerLiteral:
     // Integer literals can be treated as floating point literals.
     if (auto floatProto = TC.Context.getProtocol(
-                            KnownProtocolKind::FloatLiteralConvertible)) {
+                            KnownProtocolKind::ExpressibleByFloatLiteral)) {
       if (auto defaultType = TC.getDefaultType(floatProto, DC)) {
         types.push_back(defaultType);
       }
     }
     break;
 
-  case KnownProtocolKind::FloatLiteralConvertible:
+  case KnownProtocolKind::ExpressibleByFloatLiteral:
     break;
 
-  case KnownProtocolKind::NilLiteralConvertible:
-  case KnownProtocolKind::BooleanLiteralConvertible:
+  case KnownProtocolKind::ExpressibleByNilLiteral:
+  case KnownProtocolKind::ExpressibleByBooleanLiteral:
     break;
-  case KnownProtocolKind::ColorLiteralConvertible:
-  case KnownProtocolKind::ImageLiteralConvertible:
-  case KnownProtocolKind::FileReferenceLiteralConvertible:
+  case KnownProtocolKind::ExpressibleByColorLiteral:
+  case KnownProtocolKind::ExpressibleByImageLiteral:
+  case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
     break;
   }
 
@@ -593,8 +593,8 @@ namespace {
         // pointing at a generic TypeAliasDecl here. If we find a way to
         // handle generic TypeAliases elsewhere, this can just become a
         // call to BoundGenericType::get().
-        return cs.TC.applyUnboundGenericArguments(unbound, SourceLoc(), cs.DC,
-                                                  arguments,
+        return cs.TC.applyUnboundGenericArguments(unbound, unboundDecl,
+                                                  SourceLoc(), cs.DC, arguments,
                                                   /*isGenericSignature*/false,
                                                   /*resolver*/nullptr);
       }
@@ -809,13 +809,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       openedFnType = openedType->castTo<FunctionType>();
     }
 
-    // The 'Self' type must be bound to an archetype.
-    // FIXME: We eventually want to loosen this constraint, to allow us
-    // to find operator functions both in classes and in protocols to which
-    // a class conforms (if there's a default implementation).
-    addArchetypeConstraint(openedFnType->getInput()->getRValueInstanceType(),
-                           getConstraintLocator(locator));
-
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
 
@@ -1015,8 +1008,8 @@ void ConstraintSystem::openGeneric(
       // Determine whether this is the protocol 'Self' constraint we should
       // skip.
       if (skipProtocolSelfConstraint &&
-          protoDecl == outerDC->getAsProtocolOrProtocolExtensionContext() &&
-          (protoDecl->getProtocolSelf()->getDeclaredType()->getCanonicalType() ==
+          protoDecl == outerDC &&
+          (protoDecl->getSelfInterfaceType()->getCanonicalType() ==
            req.getFirstType()->getCanonicalType())) {
         break;
       }
@@ -1218,8 +1211,8 @@ ConstraintSystem::getTypeOfMemberReference(
 
       if (outerDC->getAsProtocolOrProtocolExtensionContext()) {
         // Retrieve the type variable for 'Self'.
-        selfTy = replacements[outerDC->getProtocolSelf()->getDeclaredType()
-                                ->getCanonicalType()];
+        selfTy = replacements[outerDC->getSelfInterfaceType()
+                                     ->getCanonicalType()];
       } else {
         // Open the nominal type.
         selfTy = openType(nominal->getDeclaredInterfaceType(), locator,

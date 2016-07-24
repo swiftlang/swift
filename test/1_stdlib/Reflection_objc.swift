@@ -93,10 +93,10 @@ switch PlaygroundQuickLook(reflecting: somesubclassofnsstring) {
 }
 
 // CHECK-NEXT: got the expected quick look attributed string
-let astr = AttributedString(string: "yizzle pizzle")
-switch PlaygroundQuickLook(reflecting: astr as AttributedString) {
-case .attributedString(let astr2 as AttributedString)
-where astr === astr2:
+let astr = NSAttributedString(string: "yizzle pizzle")
+switch PlaygroundQuickLook(reflecting: astr) {
+case .attributedString(let astr2 as NSAttributedString)
+where astr == astr2:
   print("got the expected quick look attributed string")
 case _:
   print("got something else")
@@ -138,7 +138,7 @@ case _:
 // CHECK-NEXT: got the expected quick look color
 // CHECK-NEXT: got the expected quick look bezier path
 
-let image = OSImage(contentsOfFile:Process.arguments[1])!
+let image = OSImage(contentsOfFile:CommandLine.arguments[1])!
 switch PlaygroundQuickLook(reflecting: image) {
 case .image(let image2 as OSImage) where image === image2:
   print("got the expected quick look image")
@@ -242,7 +242,7 @@ class HasNumberQLO : CanaryBase {
 
 class HasAttributedQLO : CanaryBase {
   @objc var debugQuickLookObject: AnyObject {
-    let str = AttributedString(string: "attributed string")
+    let str = NSAttributedString(string: "attributed string")
     objc_setAssociatedObject(str, &CanaryHandle, CanaryBase(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     return str

@@ -376,7 +376,7 @@ internal struct _UnmanagedAnyObjectArray {
 ///     }
 ///     // Prints "We have 4 primes."
 ///
-///     let primesSum = primes.reduce(0, combine: +)
+///     let primesSum = primes.reduce(0, +)
 ///     // 'primesSum' == 17
 ///
 ///     let primeStrings = primes.sorted().map(String.init)
@@ -430,7 +430,7 @@ internal struct _UnmanagedAnyObjectArray {
 /// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Set<Element : Hashable> :
-  SetAlgebra, Hashable, Collection, ArrayLiteralConvertible {
+  SetAlgebra, Hashable, Collection, ExpressibleByArrayLiteral {
 
   internal typealias _Self = Set<Element>
   internal typealias _VariantStorage = _VariantSetStorage<Element>
@@ -677,7 +677,7 @@ public struct Set<Element : Hashable> :
   }
 
   //
-  // `ArrayLiteralConvertible` conformance
+  // `ExpressibleByArrayLiteral` conformance
   //
   /// Creates a set containing the elements of the given array literal.
   ///
@@ -1132,79 +1132,81 @@ internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
   return (true, lhs.count == rhs.count)
 }
 
-/// Returns a Boolean value indicating whether two sets have equal elements.
-///
-/// - Parameters:
-///   - lhs: A set.
-///   - rhs: Another set.
-/// - Returns: `true` if the `lhs` and `rhs` have the same elements; otherwise,
-///   `false`.
-public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Bool {
-  switch (lhs._variantStorage, rhs._variantStorage) {
-  case (.native(let lhsNativeOwner), .native(let rhsNativeOwner)):
-    let lhsNative = lhsNativeOwner.nativeStorage
-    let rhsNative = rhsNativeOwner.nativeStorage
+extension Set {
+  /// Returns a Boolean value indicating whether two sets have equal elements.
+  ///
+  /// - Parameters:
+  ///   - lhs: A set.
+  ///   - rhs: Another set.
+  /// - Returns: `true` if the `lhs` and `rhs` have the same elements; otherwise,
+  ///   `false`.
+  public static func == (lhs: Set<Element>, rhs: Set<Element>) -> Bool {
+    switch (lhs._variantStorage, rhs._variantStorage) {
+    case (.native(let lhsNativeOwner), .native(let rhsNativeOwner)):
+      let lhsNative = lhsNativeOwner.nativeStorage
+      let rhsNative = rhsNativeOwner.nativeStorage
 
-    if lhsNativeOwner === rhsNativeOwner {
-      return true
-    }
+      if lhsNativeOwner === rhsNativeOwner {
+        return true
+      }
 
-    if lhsNative.count != rhsNative.count {
-      return false
-    }
-
-    for member in lhs {
-      let (_, found) =
-        rhsNative._find(member, startBucket: rhsNative._bucket(member))
-      if !found {
+      if lhsNative.count != rhsNative.count {
         return false
       }
-    }
-    return true
 
-  case (_VariantSetStorage.cocoa(let lhsCocoa),
-      _VariantSetStorage.cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    return _stdlib_NSObject_isEqual(lhsCocoa.cocoaSet, rhsCocoa.cocoaSet)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa set")
-#endif
-
-  case (_VariantSetStorage.native(let lhsNativeOwner),
-    _VariantSetStorage.cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    let lhsNative = lhsNativeOwner.nativeStorage
-
-    if lhsNative.count != rhsCocoa.count {
-      return false
-    }
-
-    let endIndex = lhsNative.endIndex
-    var i = lhsNative.startIndex
-    while i != endIndex {
-      let key = lhsNative.assertingGet(i)
-      let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
-      let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
-      if let rhsValue = optRhsValue {
-        if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
-          i = i.successor()
-          continue
+      for member in lhs {
+        let (_, found) =
+          rhsNative._find(member, startBucket: rhsNative._bucket(member))
+        if !found {
+          return false
         }
       }
-      i = i.successor()
-      return false
-    }
-    return true
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa set")
-#endif
+      return true
 
-  case (_VariantSetStorage.cocoa, _VariantSetStorage.native):
-#if _runtime(_ObjC)
-    return rhs == lhs
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa set")
-#endif
+    case (_VariantSetStorage.cocoa(let lhsCocoa),
+        _VariantSetStorage.cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      return _stdlib_NSObject_isEqual(lhsCocoa.cocoaSet, rhsCocoa.cocoaSet)
+  #else
+        _sanityCheckFailure("internal error: unexpected cocoa set")
+  #endif
+
+    case (_VariantSetStorage.native(let lhsNativeOwner),
+      _VariantSetStorage.cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      let lhsNative = lhsNativeOwner.nativeStorage
+
+      if lhsNative.count != rhsCocoa.count {
+        return false
+      }
+
+      let endIndex = lhsNative.endIndex
+      var i = lhsNative.startIndex
+      while i != endIndex {
+        let key = lhsNative.assertingGet(i)
+        let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
+        let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
+        if let rhsValue = optRhsValue {
+          if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
+            i = i.successor()
+            continue
+          }
+        }
+        i = i.successor()
+        return false
+      }
+      return true
+  #else
+        _sanityCheckFailure("internal error: unexpected cocoa set")
+  #endif
+
+    case (_VariantSetStorage.cocoa, _VariantSetStorage.native):
+  #if _runtime(_ObjC)
+      return rhs == lhs
+  #else
+        _sanityCheckFailure("internal error: unexpected cocoa set")
+  #endif
+    }
   }
 }
 
@@ -1253,22 +1255,29 @@ internal func _stdlib_NSSet_allObjects(_ nss: _NSSet) ->
 
 //===--- Compiler conversion/casting entry points for Set<Element> --------===//
 
-#if _runtime(_ObjC)
+func _impossible<T>(_:T.Type) -> T {
+  Builtin.unreachable()
+}
+
+func _unsafeUpcast<T, U>(_ x: T, to: U.Type) -> U {
+  _sanityCheck(x is U)
+  return x as? U ?? _impossible(U.self)
+}
+
 /// Perform a non-bridged upcast that always succeeds.
 ///
 /// - Precondition: `BaseValue` is a base class or base `@objc`
 ///   protocol (such as `AnyObject`) of `DerivedValue`.
 public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
   -> Set<BaseValue> {
-  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
-  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
-
   var builder = _SetBuilder<BaseValue>(count: source.count)
-  for member in source {
-    builder.add(member: unsafeBitCast(member, to: BaseValue.self))
+  for x in source {
+    builder.add(member: _unsafeUpcast(x, to: BaseValue.self))
   }
   return builder.take()
 }
+
+#if _runtime(_ObjC)
 
 /// Implements an unconditional upcast that involves bridging.
 ///
@@ -1286,6 +1295,7 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
   let valueBridgesDirectly =
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
     _isBridgedVerbatimToObjectiveC(ObjCValue.self)
+
   for member in source {
     var bridgedMember: ObjCValue
     if valueBridgesDirectly {
@@ -1301,6 +1311,15 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
   return result
 }
 
+#endif
+
+@_silgen_name("_swift_setDownCastIndirect")
+public func _setDownCastIndirect<SourceValue, TargetValue>(
+  _ source: UnsafePointer<Set<SourceValue>>,
+  _ target: UnsafeMutablePointer<Set<TargetValue>>) {
+  target.initialize(to: _setDownCast(source.pointee))
+}
+
 /// Implements a forced downcast.  This operation should have O(1) complexity.
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
@@ -1311,20 +1330,35 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
 public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   -> Set<DerivedValue> {
 
-  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
-  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
+#if _runtime(_ObjC)
+  if _isClassOrObjCExistential(BaseValue.self)
+  && _isClassOrObjCExistential(DerivedValue.self) {
+    switch source._variantStorage {
+    case _VariantSetStorage.native(let nativeOwner):
+      return Set(
+        _immutableCocoaSet:
+        unsafeBitCast(nativeOwner, to: _NSSet.self))
 
-  switch source._variantStorage {
-  case _VariantSetStorage.native(let nativeOwner):
-    return Set(
-    _immutableCocoaSet:
-    unsafeBitCast(nativeOwner, to: _NSSet.self))
-
-  case _VariantSetStorage.cocoa(let cocoaStorage):
-    return Set(
-    _immutableCocoaSet:
-    unsafeBitCast(cocoaStorage, to: _NSSet.self))
+    case _VariantSetStorage.cocoa(let cocoaStorage):
+      return Set(
+        _immutableCocoaSet:
+        unsafeBitCast(cocoaStorage, to: _NSSet.self))
+    }
   }
+#endif
+  return _setDownCastConditional(source)!
+}
+
+@_silgen_name("_swift_setDownCastConditionalIndirect")
+public func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
+  _ source: UnsafePointer<Set<SourceValue>>,
+  _ target: UnsafeMutablePointer<Set<TargetValue>>
+) -> Bool {
+  if let result: Set<TargetValue> = _setDownCastConditional(source.pointee) {
+    target.initialize(to: result)
+    return true
+  }
+  return false
 }
 
 /// Implements a conditional downcast.
@@ -1337,19 +1371,13 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
 public func _setDownCastConditional<BaseValue, DerivedValue>(
   _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {
-  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
-  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
-
-  var result = Set<DerivedValue>(minimumCapacity: source.count)
-  for member in source {
-    if let derivedMember = member as? DerivedValue {
-      result.insert(derivedMember)
-      continue
-    }
-    return nil
-  }
-  return result
+  return try? Set(
+    source.lazy.map {
+      try ($0 as? DerivedValue).unwrappedOrError()
+    })
 }
+
+#if _runtime(_ObjC)
 
 /// Implements an unconditional downcast that involves bridging.
 ///
@@ -1404,6 +1432,7 @@ public func _setBridgeFromObjectiveCConditional<
   }
   return result
 }
+
 #endif
 
 //===--- APIs unique to Dictionary<Key, Value> ----------------------------===//
@@ -1501,7 +1530,7 @@ public func _setBridgeFromObjectiveCConditional<
 ///                               "triangular": [1, 3, 6, 10, 15, 21, 28],
 ///                               "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
 ///     for key in interestingNumbers.keys {
-///         interestingNumbers[key]?.sort(isOrderedBefore: >)
+///         interestingNumbers[key]?.sort(by: >)
 ///     }
 ///
 ///     print(interestingNumbers["primes"]!)
@@ -1586,7 +1615,7 @@ public func _setBridgeFromObjectiveCConditional<
 /// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Dictionary<Key : Hashable, Value> :
-  Collection, DictionaryLiteralConvertible {
+  Collection, ExpressibleByDictionaryLiteral {
 
   internal typealias _Self = Dictionary<Key, Value>
   internal typealias _VariantStorage = _VariantDictionaryStorage<Key, Value>
@@ -1936,7 +1965,7 @@ public struct Dictionary<Key : Hashable, Value> :
   }
 
   //
-  // DictionaryLiteralConvertible conformance
+  // ExpressibleByDictionaryLiteral conformance
   //
 
   /// Creates a dictionary initialized with a dictionary literal.
@@ -1956,7 +1985,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// - Parameter elements: The key-value pairs that will make up the new
   ///   dictionary. Each key in `elements` must be unique.
   ///
-  /// - SeeAlso: `DictionaryLiteralConvertible`
+  /// - SeeAlso: `ExpressibleByDictionaryLiteral`
   @effects(readonly)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.init(_nativeStorage: _NativeDictionaryStorage.fromArray(elements))
@@ -2026,91 +2055,87 @@ public struct Dictionary<Key : Hashable, Value> :
 
 }
 
-public func == <Key : Equatable, Value : Equatable>(
-  lhs: [Key : Value],
-  rhs: [Key : Value]
-) -> Bool {
-  switch (lhs._variantStorage, rhs._variantStorage) {
-  case (.native(let lhsNativeOwner), .native(let rhsNativeOwner)):
-    let lhsNative = lhsNativeOwner.nativeStorage
-    let rhsNative = rhsNativeOwner.nativeStorage
+extension Dictionary where Key : Equatable, Value : Equatable {
+  public static func == (lhs: [Key : Value], rhs: [Key : Value]) -> Bool {
+    switch (lhs._variantStorage, rhs._variantStorage) {
+    case (.native(let lhsNativeOwner), .native(let rhsNativeOwner)):
+      let lhsNative = lhsNativeOwner.nativeStorage
+      let rhsNative = rhsNativeOwner.nativeStorage
 
-    if lhsNativeOwner === rhsNativeOwner {
-      return true
-    }
+      if lhsNativeOwner === rhsNativeOwner {
+        return true
+      }
 
-    if lhsNative.count != rhsNative.count {
-      return false
-    }
-
-    for (k, v) in lhs {
-      let (pos, found) = rhsNative._find(k, startBucket: rhsNative._bucket(k))
-      // FIXME: Can't write the simple code pending
-      // <rdar://problem/15484639> Refcounting bug
-      /*
-      if !found || rhs[pos].value != lhsElement.value {
+      if lhsNative.count != rhsNative.count {
         return false
       }
-      */
-      if !found {
-        return false
-      }
-      if rhsNative.value(at: pos.offset) != v {
-        return false
-      }
-    }
-    return true
 
-  case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    return _stdlib_NSObject_isEqual(
-      lhsCocoa.cocoaDictionary, rhsCocoa.cocoaDictionary)
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
-
-  case (.native(let lhsNativeOwner), .cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    let lhsNative = lhsNativeOwner.nativeStorage
-
-    if lhsNative.count != rhsCocoa.count {
-      return false
-    }
-
-    let endIndex = lhsNative.endIndex
-    var index = lhsNative.startIndex
-    while index != endIndex {
-      let (key, value) = lhsNative.assertingGet(index)
-      let optRhsValue: AnyObject? =
-        rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))
-      // TODO: swift-3-indexing-model: change 'if' into 'guard'.
-      if let rhsValue = optRhsValue {
-        if value == _forceBridgeFromObjectiveC(rhsValue, Value.self) {
-          lhsNative.formIndex(after: &index)
-          continue
+      for (k, v) in lhs {
+        let (pos, found) = rhsNative._find(k, startBucket: rhsNative._bucket(k))
+        // FIXME: Can't write the simple code pending
+        // <rdar://problem/15484639> Refcounting bug
+        /*
+        if !found || rhs[pos].value != lhsElement.value {
+          return false
+        }
+        */
+        if !found {
+          return false
+        }
+        if rhsNative.value(at: pos.offset) != v {
+          return false
         }
       }
-      return false
+      return true
+
+    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      return _stdlib_NSObject_isEqual(
+        lhsCocoa.cocoaDictionary, rhsCocoa.cocoaDictionary)
+  #else
+      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
+  #endif
+
+    case (.native(let lhsNativeOwner), .cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      let lhsNative = lhsNativeOwner.nativeStorage
+
+      if lhsNative.count != rhsCocoa.count {
+        return false
+      }
+
+      let endIndex = lhsNative.endIndex
+      var index = lhsNative.startIndex
+      while index != endIndex {
+        let (key, value) = lhsNative.assertingGet(index)
+        let optRhsValue: AnyObject? =
+          rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))
+        // TODO: swift-3-indexing-model: change 'if' into 'guard'.
+        if let rhsValue = optRhsValue {
+          if value == _forceBridgeFromObjectiveC(rhsValue, Value.self) {
+            lhsNative.formIndex(after: &index)
+            continue
+          }
+        }
+        return false
+      }
+      return true
+  #else
+      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
+  #endif
+
+    case (.cocoa, .native):
+  #if _runtime(_ObjC)
+      return rhs == lhs
+  #else
+      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
+  #endif
     }
-    return true
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
-
-  case (.cocoa, .native):
-#if _runtime(_ObjC)
-    return rhs == lhs
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-#endif
   }
-}
 
-public func != <Key : Equatable, Value : Equatable>(
-  lhs: [Key : Value],
-  rhs: [Key : Value]
-) -> Bool {
-  return !(lhs == rhs)
+  public static func != (lhs: [Key : Value], rhs: [Key : Value]) -> Bool {
+    return !(lhs == rhs)
+  }
 }
 
 extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
@@ -2163,7 +2188,6 @@ internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
 
 //===--- Compiler conversion/casting entry points for Dictionary<K, V> ----===//
 
-#if _runtime(_ObjC)
 /// Perform a non-bridged upcast that always succeeds.
 ///
 /// - Precondition: `BaseKey` and `BaseValue` are base classes or base `@objc`
@@ -2172,21 +2196,16 @@ internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
 public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
     _ source: Dictionary<DerivedKey, DerivedValue>
 ) -> Dictionary<BaseKey, BaseValue> {
-  // FIXME: This crappy implementation is O(n) because it copies the
-  // data; a proper implementation would be O(1).
-
-  _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
-  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
-  _sanityCheck(_isClassOrObjCExistential(DerivedKey.self))
-  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
-
   var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
+
   for (k, v) in source {
-    result[unsafeBitCast(k, to: BaseKey.self)] =
-      unsafeBitCast(v, to: BaseValue.self)
+    result[_unsafeUpcast(k, to: BaseKey.self)]
+      = _unsafeUpcast(v, to: BaseValue.self)
   }
   return result
 }
+
+#if _runtime(_ObjC)
 
 /// Implements an unconditional upcast that involves bridging.
 ///
@@ -2247,6 +2266,15 @@ public func _dictionaryBridgeToObjectiveC<
 
   return result
 }
+#endif
+
+@_silgen_name("_swift_dictionaryDownCastIndirect")
+public func _dictionaryDownCastIndirect<SourceKey, SourceValue,
+                                        TargetKey, TargetValue>(
+  _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
+  _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>) {
+  target.initialize(to: _dictionaryDownCast(source.pointee))
+}
 
 /// Implements a forced downcast.  This operation should have O(1) complexity.
 ///
@@ -2258,33 +2286,52 @@ public func _dictionaryBridgeToObjectiveC<
 public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue> {
-  _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
-  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
-  _sanityCheck(_isClassOrObjCExistential(DerivedKey.self))
-  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
-  switch source._variantStorage {
-  case .native(let nativeOwner):
-    // FIXME(performance): this introduces an indirection through Objective-C
-    // runtime, even though we access native storage.  But we cannot
-    // unsafeBitCast the owner object, because that would change the generic
-    // arguments.
-    //
-    // One way to solve this is to add a third, read-only, representation to
-    // variant storage: like _NativeDictionaryStorageOwner, but it would
-    // perform casts when accessing elements.
-    //
-    // Note: it is safe to treat the storage as immutable here because
-    // Dictionary will not mutate storage with reference count greater than 1.
-    return Dictionary(
-      _immutableCocoaDictionary:
+#if _runtime(_ObjC)
+  if _isClassOrObjCExistential(BaseKey.self)
+  && _isClassOrObjCExistential(BaseValue.self)
+  && _isClassOrObjCExistential(DerivedKey.self)
+  && _isClassOrObjCExistential(DerivedValue.self) {
+
+    switch source._variantStorage {
+    case .native(let nativeOwner):
+      // FIXME(performance): this introduces an indirection through Objective-C
+      // runtime, even though we access native storage.  But we cannot
+      // unsafeBitCast the owner object, because that would change the generic
+      // arguments.
+      //
+      // One way to solve this is to add a third, read-only, representation to
+      // variant storage: like _NativeDictionaryStorageOwner, but it would
+      // perform casts when accessing elements.
+      //
+      // Note: it is safe to treat the storage as immutable here because
+      // Dictionary will not mutate storage with reference count greater than 1.
+      return Dictionary(
+        _immutableCocoaDictionary:
         unsafeBitCast(nativeOwner, to: _NSDictionary.self))
 
-  case .cocoa(let cocoaStorage):
-    return Dictionary(
-      _immutableCocoaDictionary:
+    case .cocoa(let cocoaStorage):
+      return Dictionary(
+        _immutableCocoaDictionary:
         unsafeBitCast(cocoaStorage, to: _NSDictionary.self))
+    }
   }
+#endif
+  return _dictionaryDownCastConditional(source)!
+}
+
+@_silgen_name("_swift_dictionaryDownCastConditionalIndirect")
+public func _dictionaryDownCastConditionalIndirect<SourceKey, SourceValue,
+                                                   TargetKey, TargetValue>(
+  _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
+  _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>
+) -> Bool {
+  if let result: Dictionary<TargetKey, TargetValue>
+       = _dictionaryDownCastConditional(source.pointee) {
+    target.initialize(to: result)
+    return true
+  }
+  return false
 }
 
 /// Implements a conditional downcast.
@@ -2299,27 +2346,17 @@ public func _dictionaryDownCastConditional<
 >(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue>? {
-  _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
-  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
-  _sanityCheck(_isClassOrObjCExistential(DerivedKey.self))
-  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
-
+  
   var result = Dictionary<DerivedKey, DerivedValue>()
-  for (key, value) in source {
-    if let derivedKey = key as? DerivedKey {
-      if let derivedValue = value as? DerivedValue {
-        result[derivedKey] = derivedValue
-        continue
-      }
-    }
-
-    // Either the key or the value wasn't of the appropriate derived
-    // type. Fail.
-    return nil
+  for (k, v) in source {
+    guard let k1 = k as? DerivedKey, let v1 = v as? DerivedValue
+    else { return nil }
+    result[k1] = v1
   }
   return result
 }
 
+#if _runtime(_ObjC)
 /// Implements an unconditional downcast that involves bridging.
 ///
 /// - Precondition: At least one of `SwiftKey` or `SwiftValue` is a bridged value
@@ -2402,7 +2439,6 @@ public func _dictionaryBridgeFromObjectiveCConditional<
   return result
 }
 #endif
-
 //===--- APIs templated for Dictionary and Set ----------------------------===//
 
 %{
@@ -2502,44 +2538,50 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     return BufferPointer(self)
   }
 
-  // All underscored functions are unsafe and need a _fixLifetime in the caller.
+  // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _body: _HashedContainerStorageHeader {
     unsafeAddress {
-      return UnsafePointer(buffer._valuePointer)
+      return UnsafePointer(buffer._headerPointer)
     }
     unsafeMutableAddress {
-      return buffer._valuePointer
+      return buffer._headerPointer
     }
   }
 
   @_versioned
   internal var _capacity: Int {
+    defer { _fixLifetime(self) }
     return _body.capacity
   }
 
   @_versioned
   internal var _count: Int {
     set {
+      defer { _fixLifetime(self) }
       _body.count = newValue
     }
     get {
+      defer { _fixLifetime(self) }
       return _body.count
     }
   }
 
-  internal var _maxLoadFactorInverse : Double {
+  internal var _maxLoadFactorInverse: Double {
+    defer { _fixLifetime(self) }
     return _body.maxLoadFactorInverse
   }
 
+  // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal
   var _initializedHashtableEntriesBitMapStorage: UnsafeMutablePointer<UInt> {
     return _roundUp(buffer._elementPointer, toAlignmentOf: UInt.self)
   }
 
+  // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _keys: UnsafeMutablePointer<Key> {
     let bitMapSizeInBytes =
       _unsafeMultiply(
-        _UnsafeBitMap.sizeInWords(forSizeInBits: _capacity),
+        _UnsafeBitMap.sizeInWords(forSizeInBits: _body.capacity),
         strideof(UInt.self))
     let start =
       UnsafeMutablePointer<UInt8>(_initializedHashtableEntriesBitMapStorage)
@@ -2548,8 +2590,9 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   }
 
 %if Self == 'Dictionary':
+  // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _values: UnsafeMutablePointer<Value> {
-    let keysSizeInBytes = _unsafeMultiply(_capacity, strideof(Key.self))
+    let keysSizeInBytes = _unsafeMultiply(_body.capacity, strideof(Key.self))
     let start = UnsafeMutablePointer<UInt8>(_keys) + keysSizeInBytes
     return _roundUp(start, toAlignmentOf: Value.self)
   }
@@ -2601,7 +2644,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
       }
     }
 %end
-    buffer._valuePointer.deinitialize()
+    buffer._headerPointer.deinitialize()
     _fixLifetime(self)
   }
 }
@@ -2660,30 +2703,23 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   public // @testable
   var capacity: Int {
-    let result = buffer._capacity
-    _fixLifetime(buffer)
-    return result
+    return buffer._capacity
   }
 
   @_versioned
   @_transparent
   internal var count: Int {
     get {
-      let result = buffer._count
-      _fixLifetime(buffer)
-      return result
+      return buffer._count
     }
     nonmutating set(newValue) {
       buffer._count = newValue
-      _fixLifetime(buffer)
     }
   }
 
   @_transparent
   internal var maxLoadFactorInverse: Double {
-    let result = buffer._maxLoadFactorInverse
-    _fixLifetime(buffer)
-    return result
+    return buffer._maxLoadFactorInverse
   }
 
   @_versioned
@@ -2719,7 +2755,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal func initializeKey(_ k: Key, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
 
-    (keys + i).initialize(with: k)
+    (keys + i).initialize(to: k)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -2727,7 +2763,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func moveInitializeEntry(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
-    (keys + toEntryAt).initialize(with: (from.keys + at).move())
+    (keys + toEntryAt).initialize(to: (from.keys + at).move())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }
@@ -2745,8 +2781,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   internal func initializeKey(_ k: Key, value v: Value, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
 
-    (keys + i).initialize(with: k)
-    (values + i).initialize(with: v)
+    (keys + i).initialize(to: k)
+    (values + i).initialize(to: v)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -2754,8 +2790,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   internal func moveInitializeEntry(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
-    (keys + toEntryAt).initialize(with: (from.keys + at).move())
-    (values + toEntryAt).initialize(with: (from.values + at).move())
+    (keys + toEntryAt).initialize(to: (from.keys + at).move())
+    (values + toEntryAt).initialize(to: (from.values + at).move())
     from.initializedEntries[at] = false
     initializedEntries[toEntryAt] = true
   }
@@ -3093,7 +3129,7 @@ internal struct _BridgedNative${Self}Storage {
   internal func initializeKey(_ k: AnyObject, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
 
-    (keys + i).initialize(with: k)
+    (keys + i).initialize(to: k)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -3103,8 +3139,8 @@ internal struct _BridgedNative${Self}Storage {
   ) {
     _sanityCheck(!isInitializedEntry(at: i))
 
-    (keys + i).initialize(with: k)
-    (values + i).initialize(with: v)
+    (keys + i).initialize(to: k)
+    (values + i).initialize(to: v)
     initializedEntries[i] = true
     _fixLifetime(self)
   }
@@ -4429,22 +4465,24 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
   }
 }
 
-internal func == <${TypeParametersDecl}> (
-  lhs: _Native${Self}Index<${TypeParameters}>,
-  rhs: _Native${Self}Index<${TypeParameters}>
-) -> Bool {
-  // FIXME: assert that lhs and rhs are from the same dictionary.
-  return lhs.offset == rhs.offset
-}
+extension _Native${Self}Index {
+  internal static func == (
+    lhs: _Native${Self}Index<${TypeParameters}>,
+    rhs: _Native${Self}Index<${TypeParameters}>
+  ) -> Bool {
+    // FIXME: assert that lhs and rhs are from the same dictionary.
+    return lhs.offset == rhs.offset
+  }
 
-internal func < <${TypeParametersDecl}> (
-  lhs: _Native${Self}Index<${TypeParameters}>,
-  rhs: _Native${Self}Index<${TypeParameters}>
-) -> Bool {
-  // FIXME: assert that lhs and rhs are from the same dictionary.
-  return lhs.offset < rhs.offset
+  internal static func < (
+    lhs: _Native${Self}Index<${TypeParameters}>,
+    rhs: _Native${Self}Index<${TypeParameters}>
+  ) -> Bool {
+    // FIXME: assert that lhs and rhs are from the same dictionary.
+    return lhs.offset < rhs.offset
+  }
+  // TODO: swift-3-indexing-model: forward all Comparable operations.
 }
-// TODO: swift-3-indexing-model: forward all Comparable operations.
 
 #if _runtime(_ObjC)
 @_versioned
@@ -4507,22 +4545,30 @@ internal struct _Cocoa${Self}Index : Comparable {
   }
 }
 
-internal func ==(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
-  _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
-    "cannot compare indexes pointing to different ${Self}s")
-  _precondition(lhs.allKeys.value == rhs.allKeys.value,
-    "one or both of the indexes have been invalidated")
+extension _Cocoa${Self}Index {
+  internal static func == (
+    lhs: _Cocoa${Self}Index,
+    rhs: _Cocoa${Self}Index
+  ) -> Bool {
+    _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
+      "cannot compare indexes pointing to different ${Self}s")
+    _precondition(lhs.allKeys.value == rhs.allKeys.value,
+      "one or both of the indexes have been invalidated")
 
-  return lhs.currentKeyIndex == rhs.currentKeyIndex
-}
+    return lhs.currentKeyIndex == rhs.currentKeyIndex
+  }
 
-internal func <(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
-  _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
-    "cannot compare indexes pointing to different ${Self}s")
-  _precondition(lhs.allKeys.value == rhs.allKeys.value,
-    "one or both of the indexes have been invalidated")
+  internal static func < (
+    lhs: _Cocoa${Self}Index,
+    rhs: _Cocoa${Self}Index
+  ) -> Bool {
+    _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
+      "cannot compare indexes pointing to different ${Self}s")
+    _precondition(lhs.allKeys.value == rhs.allKeys.value,
+      "one or both of the indexes have been invalidated")
 
-  return lhs.currentKeyIndex < rhs.currentKeyIndex
+    return lhs.currentKeyIndex < rhs.currentKeyIndex
+  }
 }
 #else
 internal struct _Cocoa${Self}Index {}
@@ -4640,47 +4686,49 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   }
 }
 
-public func == <${TypeParametersDecl}> (
-  lhs: ${Self}Index<${TypeParameters}>,
-  rhs: ${Self}Index<${TypeParameters}>
-) -> Bool {
-  if _fastPath(lhs._guaranteedNative) {
-    return lhs._nativeIndex == rhs._nativeIndex
+extension ${Self}Index {
+  public static func == (
+    lhs: ${Self}Index<${TypeParameters}>,
+    rhs: ${Self}Index<${TypeParameters}>
+  ) -> Bool {
+    if _fastPath(lhs._guaranteedNative) {
+      return lhs._nativeIndex == rhs._nativeIndex
+    }
+
+    switch (lhs._value, rhs._value) {
+    case (._native(let lhsNative), ._native(let rhsNative)):
+      return lhsNative == rhsNative
+    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      return lhsCocoa == rhsCocoa
+  #else
+      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
+  #endif
+    default:
+      _preconditionFailure("comparing indexes from different sets")
+    }
   }
 
-  switch (lhs._value, rhs._value) {
-  case (._native(let lhsNative), ._native(let rhsNative)):
-    return lhsNative == rhsNative
-  case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    return lhsCocoa == rhsCocoa
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
-  default:
-    _preconditionFailure("comparing indexes from different sets")
-  }
-}
+  public static func < (
+    lhs: ${Self}Index<${TypeParameters}>,
+    rhs: ${Self}Index<${TypeParameters}>
+  ) -> Bool {
+    if _fastPath(lhs._guaranteedNative) {
+      return lhs._nativeIndex < rhs._nativeIndex
+    }
 
-public func < <${TypeParametersDecl}> (
-  lhs: ${Self}Index<${TypeParameters}>,
-  rhs: ${Self}Index<${TypeParameters}>
-) -> Bool {
-  if _fastPath(lhs._guaranteedNative) {
-    return lhs._nativeIndex < rhs._nativeIndex
-  }
-
-  switch (lhs._value, rhs._value) {
-  case (._native(let lhsNative), ._native(let rhsNative)):
-    return lhsNative < rhsNative
-  case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
-#if _runtime(_ObjC)
-    return lhsCocoa < rhsCocoa
-#else
-    _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
-  default:
-    _preconditionFailure("comparing indexes from different sets")
+    switch (lhs._value, rhs._value) {
+    case (._native(let lhsNative), ._native(let rhsNative)):
+      return lhsNative < rhsNative
+    case (._cocoa(let lhsCocoa), ._cocoa(let rhsCocoa)):
+  #if _runtime(_ObjC)
+      return lhsCocoa < rhsCocoa
+  #else
+      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
+  #endif
+    default:
+      _preconditionFailure("comparing indexes from different sets")
+    }
   }
 }
 
@@ -5206,7 +5254,7 @@ extension Set {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> SetIterator<Element> {
     Builtin.unreachable()
   }
@@ -5233,7 +5281,7 @@ extension Dictionary {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> DictionaryIterator<Key, Value> {
     Builtin.unreachable()
   }

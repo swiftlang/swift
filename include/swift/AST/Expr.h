@@ -38,6 +38,7 @@ namespace swift {
   class Type;
   class ValueDecl;
   class Decl;
+  class DeclRefExpr;
   class Pattern;
   class SubscriptDecl;
   class Stmt;
@@ -395,7 +396,7 @@ public:
   /// getStartLoc - Return the location of the start of the expression.
   SourceLoc getStartLoc() const;
 
-  /// \brief Retrieve the location of the end of the expression.
+  /// \brief Retrieve the location of the last token of the expression.
   SourceLoc getEndLoc() const;
   
   /// getLoc - Return the caret location of this expression.
@@ -431,6 +432,10 @@ public:
   const Expr *getValueProvidingExpr() const {
     return const_cast<Expr *>(this)->getValueProvidingExpr();
   }
+
+  /// If this is a reference to an operator written as a member of a type (or
+  /// extension thereof), return the underlying operator reference.
+  DeclRefExpr *getMemberOperatorRef();
 
   /// This recursively walks the AST rooted at this expression.
   Expr *walk(ASTWalker &walker);
@@ -1135,7 +1140,6 @@ public:
 class OverloadedDeclRefExpr : public OverloadSetRefExpr {
   DeclNameLoc Loc;
   bool IsSpecialized = false;
-  bool IsPotentiallyDelayedGlobalOperator = false;
 
 public:
   OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, DeclNameLoc Loc,
@@ -1153,13 +1157,6 @@ public:
   /// specialized by <...>.
   bool isSpecialized() const { return IsSpecialized; }
   
-  void setIsPotentiallyDelayedGlobalOperator() {
-    IsPotentiallyDelayedGlobalOperator = true;
-  }
-  bool isPotentiallyDelayedGlobalOperator() const {
-    return IsPotentiallyDelayedGlobalOperator;
-  }
-
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OverloadedDeclRef;
   }
@@ -2505,16 +2502,51 @@ public:
 /// elements have type U, where U is a subtype of T.
 class CollectionUpcastConversionExpr : public ImplicitConversionExpr {
 public:
+  struct ConversionPair {
+    OpaqueValueExpr *OrigValue;
+    Expr *Conversion;
+
+    explicit operator bool() const { return OrigValue != nullptr; }
+  };
+private:
+  ConversionPair KeyConversion;
+  ConversionPair ValueConversion;
+public:
   CollectionUpcastConversionExpr(Expr *subExpr, Type type,
+                                 ConversionPair keyConversion,
+                                 ConversionPair valueConversion,
                                  bool bridgesToObjC)
     : ImplicitConversionExpr(
-        ExprKind::CollectionUpcastConversion, subExpr, type) {
+        ExprKind::CollectionUpcastConversion, subExpr, type),
+      KeyConversion(keyConversion), ValueConversion(valueConversion) {
+    assert((!KeyConversion || ValueConversion)
+           && "key conversion without value conversion");
     CollectionUpcastConversionExprBits.BridgesToObjC = bridgesToObjC;
   }
 
   /// Whether this upcast bridges the source elements to Objective-C.
   bool bridgesToObjC() const {
     return CollectionUpcastConversionExprBits.BridgesToObjC;
+  }
+
+  /// Returns the expression that should be used to perform a
+  /// conversion of the collection's values; null if the conversion
+  /// is formally trivial because the key type does not change.
+  const ConversionPair &getKeyConversion() const {
+    return KeyConversion;
+  }
+  void setKeyConversion(const ConversionPair &pair) {
+    KeyConversion = pair;
+  }
+
+  /// Returns the expression that should be used to perform a
+  /// conversion of the collection's values; null if the conversion
+  /// is formally trivial because the value type does not change.
+  const ConversionPair &getValueConversion() const {
+    return ValueConversion;
+  }
+  void setValueConversion(const ConversionPair &pair) {
+    ValueConversion = pair;
   }
 
   static bool classof(const Expr *E) {
@@ -3144,7 +3176,8 @@ protected:
 public:
   Expr *getFn() const { return Fn; }
   void setFn(Expr *e) { Fn = e; }
-
+  Expr *getSemanticFn() const { return Fn->getSemanticsProvidingExpr(); }
+  
   Expr *getArg() const { return ArgAndIsSuper.getPointer(); }
   void setArg(Expr *e) {
     assert((getKind() != ExprKind::Binary || isa<TupleExpr>(e)) &&

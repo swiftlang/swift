@@ -24,7 +24,7 @@
       key.bodylength: 36,
       key.substructure: [
         {
-          key.kind: source.lang.swift.decl.var.parameter,
+          key.kind: source.lang.swift.expr.argument,
           key.name: "red",
           key.offset: 173,
           key.length: 6,
@@ -34,7 +34,7 @@
           key.bodylength: 1
         },
         {
-          key.kind: source.lang.swift.decl.var.parameter,
+          key.kind: source.lang.swift.expr.argument,
           key.name: "green",
           key.offset: 181,
           key.length: 8,
@@ -44,7 +44,7 @@
           key.bodylength: 1
         },
         {
-          key.kind: source.lang.swift.decl.var.parameter,
+          key.kind: source.lang.swift.expr.argument,
           key.name: "blue",
           key.offset: 191,
           key.length: 7,
@@ -54,7 +54,7 @@
           key.bodylength: 1
         },
         {
-          key.kind: source.lang.swift.decl.var.parameter,
+          key.kind: source.lang.swift.expr.argument,
           key.name: "alpha",
           key.offset: 200,
           key.length: 8,
@@ -86,7 +86,7 @@
       key.bodylength: 26,
       key.substructure: [
         {
-          key.kind: source.lang.swift.decl.var.parameter,
+          key.kind: source.lang.swift.expr.argument,
           key.name: "resourceName",
           key.offset: 240,
           key.length: 25,

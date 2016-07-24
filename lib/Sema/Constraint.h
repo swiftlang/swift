@@ -205,8 +205,6 @@ enum class ConversionRestrictionKind {
   BridgeToObjC,
   /// Explicit bridging from an Objective-C class to a value type.
   BridgeFromObjC,
-  /// Explicit bridging from an ErrorType to an Objective-C NSError.
-  BridgeToNSError,
   /// Implicit conversion from a CF type to its toll-free-bridged Objective-C
   /// class type.
   CFTollFreeBridgeToObjC,
@@ -243,9 +241,6 @@ enum class FixKind : uint8_t {
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
-  
-  /// Introduce a '!= nil' to convert an Optional to a Boolean expression.
-  OptionalToBoolean,
   
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,

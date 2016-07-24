@@ -12,9 +12,9 @@ public class Foo {
       // CHECK1-SAME:                      metadata ![[TYPE:.*]], metadata
       // CHECK1: ![[TYPE]] = !DILocalVariable(name: "type",
       // CHECK1-SAME:                         line: [[@LINE+4]],
-      // CHECK1-SAME:                         type: ![[FOO:[0-9]+]]
-      // CHECK1: ![[FOO]] = !DICompositeType(tag: DW_TAG_structure_type,
-      // CHECK1-SAME:                        line: [[@LINE+1]], align: 8, flags:
+      // CHECK1-SAME:                         type: ![[METAFOO:[0-9]+]]
+      // CHECK1: ![[METAFOO]] = !DICompositeType(tag: DW_TAG_structure_type,
+      // CHECK1-SAME:                            align: 8, flags:
             let type = self.dynamicType
             used(type)
         }()

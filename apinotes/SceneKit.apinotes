@@ -1,0 +1,17 @@
+---
+Name: SceneKit
+
+Protocols:
+# The below are methods for which overlays provide better implementations
+- Name: SCNBoundingVolume
+  Methods:
+  - Selector: 'getBoundingBoxMin:max:'
+    SwiftPrivate: true
+    MethodKind: Instance
+  - Selector: 'setBoundingBoxMin:max:'
+    SwiftPrivate: true
+    MethodKind: Instance
+  - Selector: 'getBoundingSphereCenter:radius:'
+    SwiftPrivate: true
+    MethodKind: Instance
+

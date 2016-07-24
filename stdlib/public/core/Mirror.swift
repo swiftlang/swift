@@ -129,7 +129,7 @@ public struct Mirror {
   ///     }
   public typealias Children = AnyCollection<Child>
 
-  /// A suggestion of how a `Mirror`'s is to be interpreted.
+  /// A suggestion of how a `Mirror`'s `subject` is to be interpreted.
   ///
   /// Playgrounds and the debugger will show a representation similar
   /// to the one used for instances of the kind indicated by the
@@ -162,7 +162,7 @@ public struct Mirror {
     return nil
   }
   
-  internal static func _superclassIterator<Subject : Any>(
+  internal static func _superclassIterator<Subject>(
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
   ) -> () -> Mirror? {
 
@@ -784,7 +784,7 @@ public protocol _DefaultCustomPlaygroundQuickLookable {
 ///     let pairs = IntPairs([1: 2, 1: 1, 3: 4, 2: 1])
 ///     print(pairs.elements)
 ///     // Prints "[(1, 2), (1, 1), (3, 4), (2, 1)]"
-public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
+public struct DictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
   /// Creates a new `DictionaryLiteral` instance from the given dictionary
   /// literal.
   ///

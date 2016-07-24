@@ -14,7 +14,7 @@
 // for performance measuring.
 import TestsUtils
 
-var words=[
+var words = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
   "Charles", "Thomas", "Christopher", "Daniel", "Matthew", "Donald", "Anthony",
   "Paul", "Mark", "George", "Steven", "Kenneth", "Andrew", "Edward", "Brian",
@@ -27,12 +27,13 @@ var words=[
   "Terry", "Joe", "Sean", "Willie", "Jesse", "Ralph", "Billy", "Austin", "Bruce",
   "Christian", "Roy", "Bryan", "Eugene", "Louis", "Harry", "Wayne", "Ethan",
   "Jordan", "Russell", "Alan", "Philip", "Randy", "Juan", "Howard", "Vincent",
-  "Bobby", "Dylan", "Johnny", "Phillip", "Craig"]
+  "Bobby", "Dylan", "Johnny", "Phillip", "Craig"
+]
 
 // This is a phone book record.
 struct Record : Comparable {
-  var first : String
-  var last : String
+  var first: String
+  var last: String
 
   init(_ first_ : String,_ last_ : String) {
     first = first_
@@ -68,7 +69,7 @@ public func run_Phonebook(_ N: Int) {
     }
   }
   for _ in 1...N {
-    var t = Names;
+    var t = Names
     t.sort()
   }
 }

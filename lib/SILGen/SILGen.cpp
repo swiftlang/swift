@@ -144,13 +144,29 @@ GET_BRIDGING_FN(Darwin, REQUIRED, Bool, REQUIRED, DarwinBoolean)
 GET_BRIDGING_FN(Darwin, REQUIRED, DarwinBoolean, REQUIRED, Bool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, Bool, REQUIRED, ObjCBool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, ObjCBool, REQUIRED, Bool)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, ErrorProtocol)
-GET_BRIDGING_FN(Foundation, REQUIRED, ErrorProtocol, REQUIRED, NSError)
+GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, Error)
+GET_BRIDGING_FN(Foundation, REQUIRED, Error, REQUIRED, NSError)
 
 #undef GET_BRIDGING_FN
 #undef REQUIRED
 #undef OPTIONAL
 #undef GENERIC
+
+static FuncDecl *diagnoseMissingIntrinsic(SILGenModule &sgm,
+                                          SILLocation loc,
+                                          const char *name) {
+  sgm.diagnose(loc, diag::bridging_function_missing,
+               sgm.getASTContext().StdlibModuleName.str(), name);
+  return nullptr;
+}
+
+#define FUNC_DECL(NAME, ID)                             \
+  FuncDecl *SILGenModule::get##NAME(SILLocation loc) {  \
+    if (auto fn = getASTContext().get##NAME(nullptr))   \
+      return fn;                                        \
+    return diagnoseMissingIntrinsic(*this, loc, ID);    \
+  }
+#include "swift/AST/KnownDecls.def"
 
 ProtocolDecl *SILGenModule::getObjectiveCBridgeable(SILLocation loc) {
   if (ObjectiveCBridgeable)
@@ -488,10 +504,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
                          Types.getConstantInfo(constant).ContextGenericParams);
 
   // Create a debug scope for the function using astNode as source location.
-  F->setDebugScope(new (M) SILDebugScope(RegularLocation(astNode), F));
-
-  F->setLocation(Loc);
-
+  F->setDebugScope(new (M) SILDebugScope(Loc, F));
   F->setDeclContext(astNode);
 
   DEBUG(llvm::dbgs() << "lowering ";
@@ -881,12 +894,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                        makeModuleFragile
                            ? IsFragile
                            : IsNotFragile);
-  f->setDebugScope(
-      new (M) SILDebugScope(RegularLocation(binding->getInit(pbdEntry)), f));
-  f->setLocation(binding);
-
+  f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding, pbdEntry);
-
   f->verify();
 
   return f;
@@ -1134,11 +1143,12 @@ static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
 
 void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   // We don't need to emit dependent conformances.
-  if (conformanceRef.isAbstract())
+  if (conformanceRef.isAbstract()) 
     return;
 
   auto conformance = conformanceRef.getConcrete();
   auto root = conformance->getRootNormalConformance();
+
   // If we already emitted this witness table, we don't need to track the fact
   // we need it.
   if (emittedWitnessTables.count(root))

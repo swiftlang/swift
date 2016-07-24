@@ -128,17 +128,17 @@ struct Large : P {
 struct ContainsP { var p: P }
 
 func exerciseArrayValueWitnesses<T>(_ value: T) {
-  let buf = UnsafeMutablePointer<T>(allocatingCapacity: 5)
+  let buf = UnsafeMutablePointer<T>.allocate(capacity: 5)
 
-  (buf + 0).initialize(with: value)
-  (buf + 1).initialize(with: value)
+  (buf + 0).initialize(to: value)
+  (buf + 1).initialize(to: value)
   
   Builtin.copyArray(T.self, (buf + 2)._rawValue, buf._rawValue, 2._builtinWordValue)
   Builtin.takeArrayBackToFront(T.self, (buf + 1)._rawValue, buf._rawValue, 4._builtinWordValue)
   Builtin.takeArrayFrontToBack(T.self, buf._rawValue, (buf + 1)._rawValue, 4._builtinWordValue)
   Builtin.destroyArray(T.self, buf._rawValue, 4._builtinWordValue)
 
-  buf.deallocateCapacity(5)
+  buf.deallocate(capacity: 5)
 }
 
 tests.test("array value witnesses") {

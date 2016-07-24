@@ -98,7 +98,7 @@ func test10(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
   // CHECK:      strong_retain [[G]]
   // CHECK-NEXT: [[NS_G:%[0-9]+]] = upcast [[G:%[0-9]+]] : $Gizmo to $NSObject
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.classProp!getter.1.foreign : NSObject -> () -> AnyObject.Type! , $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type! , $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
   // CHECK:      select_enum [[OPT_OBJC]]
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
@@ -116,16 +116,18 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
   // CHECK: strong_retain [[G]]
   // CHECK: [[NS_G:%[0-9]+]] = upcast [[G:%[0-9]+]] : $Gizmo to $NSObject
-  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : NSObject -> () -> AnyObject.Type! , $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
-  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type! , $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype NSAnsing.Type>
+  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype NSAnsing.Type>
   // CHECK:      select_enum [[OPT_OBJC]]
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
-  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[THICK]]
+  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<NSAnsing.Type>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[THICK]]
   // CHECK:      [[RES:%.*]] = unchecked_enum_data
+  // CHECK:      [[OPENED:%.*]] = open_existential_metatype [[RES]]
+  // CHECK:      [[RES_ANY:%.*]] = init_existential_metatype [[OPENED]]
   // CHECK:      strong_release [[G]] : $Gizmo
   // CHECK:      strong_release [[G]] : $Gizmo
-  // CHECK-NEXT: return [[RES]] : $@thick AnyObject.Type
+  // CHECK-NEXT: return [[RES_ANY]] : $@thick AnyObject.Type
   return g.qualifiedClassProp
 }
 
@@ -147,7 +149,7 @@ func applyBlock(_ f: @convention(block) (Gizmo) -> Gizmo, x: Gizmo) -> Gizmo {
 
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions15maybeApplyBlock
 func maybeApplyBlock(_ f: (@convention(block) (Gizmo) -> Gizmo)?, x: Gizmo) -> Gizmo? {
-  // CHECK:     bb0([[BLOCK:%.*]] : $Optional<@convention(block) Gizmo -> Gizmo>, [[ARG:%.*]] : $Gizmo):
+  // CHECK:     bb0([[BLOCK:%.*]] : $Optional<@convention(block) (Gizmo) -> Gizmo>, [[ARG:%.*]] : $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   return f?(x)
 }
@@ -157,7 +159,7 @@ func useInnerPointer(_ p: UnsafeMutablePointer<Void>) {}
 // Handle inner-pointer methods by autoreleasing self after the call.
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions18innerPointerMethod
 // CHECK:         [[USE:%.*]] = function_ref @_TF26objc_ownership_conventions15useInnerPointer
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.getBytes!1.foreign : Gizmo -> () -> UnsafeMutablePointer<()> , $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutablePointer<()>
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.getBytes!1.foreign : (Gizmo) -> () -> UnsafeMutablePointer<()> , $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutablePointer<()>
 // CHECK:         strong_retain %0
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]](%0)
 // CHECK:         autorelease_value %0
@@ -169,7 +171,7 @@ func innerPointerMethod(_ g: Gizmo) {
 
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions20innerPointerProperty
 // CHECK:         [[USE:%.*]] = function_ref @_TF26objc_ownership_conventions15useInnerPointer
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : Gizmo -> () -> UnsafeMutablePointer<()> , $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutablePointer<()>
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : (Gizmo) -> () -> UnsafeMutablePointer<()> , $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutablePointer<()>
 // CHECK:         strong_retain %0
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]](%0)
 // CHECK:         autorelease_value %0

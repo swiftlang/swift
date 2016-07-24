@@ -257,12 +257,6 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
     conformance->getWitness(requirement, &tc).getDecl());
 }
 
-static VarDecl *findNamedPropertyWitness(TypeChecker &tc, DeclContext *dc,
-                                         Type type, ProtocolDecl *proto,
-                                         Identifier name, Diag<> diag) {
-  return findNamedWitnessImpl<VarDecl>(tc, dc, type, proto, name, diag);
-}
-
 static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
                                         DeclContext *DC) {
   // This only matters for stored properties.
@@ -354,19 +348,16 @@ namespace {
     bool SuppressDiagnostics;
     bool SkipClosures;
 
-  private:
     /// Recognize used conformances from an imported type when we must emit
     /// the witness table.
     ///
-    /// This arises in _BridgedNSError, where we wouldn't otherwise pull in
-    /// the witness table, causing dynamic casts to perform incorrectly.
+    /// This arises in _BridgedStoredNSError, where we wouldn't
+    /// otherwise pull in the witness table, causing dynamic casts to
+    /// perform incorrectly, and _ErrorCodeProtocol, where we need to
+    /// check for _BridgedStoredNSError conformances on the
+    /// corresponding ErrorType.
     void checkForImportedUsedConformances(Type toType) {
-      if (auto bridgedNSErrorProtocol = cs.getASTContext().getProtocol(
-              KnownProtocolKind::BridgedNSError)) {
-        // Force it as "Used", if it conforms
-        cs.getTypeChecker().conformsToProtocol(toType, bridgedNSErrorProtocol,
-                                               dc, ConformanceCheckFlags::Used);
-      }
+      cs.getTypeChecker().useBridgedNSErrorConformances(dc, toType);
     }
 
     /// \brief Coerce the given tuple to another tuple type.
@@ -451,19 +442,72 @@ namespace {
       // member with an implied base type.
       if (decl->getDeclContext()->isTypeContext() && isa<FuncDecl>(decl)) {
         assert(cast<FuncDecl>(decl)->isOperator() && "Must be an operator");
+
         auto openedFnType = openedType->castTo<FunctionType>();
-        auto baseTy = simplifyType(openedFnType->getInput())
-                        ->getRValueInstanceType();
+        auto simplifiedFnType
+          = simplifyType(openedFnType)->castTo<FunctionType>();
+        auto baseTy = simplifiedFnType->getInput()->getRValueInstanceType();
+
+        // Handle operator requirements found in protocols.
+        if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+          // If we don't have an archetype or existential, we have to call the
+          // witness.
+          // FIXME: This is awful. We should be able to handle this as a call to
+          // the protocol requirement with Self == the concrete type, and SILGen
+          // (or later) can devirtualize as appropriate.
+          if (!baseTy->is<ArchetypeType>() && !baseTy->isAnyExistentialType()) {
+            auto &tc = cs.getTypeChecker();
+            ProtocolConformance *conformance = nullptr;
+            (void)tc.conformsToProtocol(baseTy, proto, cs.DC,
+                                        (ConformanceCheckFlags::InExpression|
+                                         ConformanceCheckFlags::Used),
+                                        &conformance);
+            if (conformance) {
+              if (auto witnessRef = conformance->getWitness(decl, &tc)) {
+                // Hack up an AST that we can type-check (independently) to get
+                // it into the right form.
+                // FIXME: the hope through 'getDecl()' is because
+                // SpecializedProtocolConformance doesn't substitute into
+                // witnesses' ConcreteDeclRefs.
+                Type expectedFnType = simplifiedFnType->getResult();
+                Expr *refExpr;
+                ValueDecl *witness = witnessRef.getDecl();
+                if (witness->getDeclContext()->isTypeContext()) {
+                  Expr *base =
+                    TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
+                                                 ctx);
+                  refExpr = new (ctx) MemberRefExpr(base, SourceLoc(), witness,
+                                                    loc, /*Implicit=*/true);
+                } else {
+                  refExpr = new (ctx) DeclRefExpr(witness, loc,
+                                                  /*Implicit=*/false);
+                }
+
+                if (tc.typeCheckExpression(refExpr, cs.DC,
+                                           TypeLoc::withoutLoc(expectedFnType),
+                                           CTP_CannotFail))
+                  return nullptr;
+
+               // Remove an outer function-conversion expression. This
+               // happens when we end up referring to a witness for a
+               // superclass conformance, and 'Self' differs.
+               if (auto fnConv = dyn_cast<FunctionConversionExpr>(refExpr))
+                 refExpr = fnConv->getSubExpr();
+
+                return refExpr;
+              }
+            }
+          }
+        }
+
+        // Build a reference to the protocol requirement.
         Expr *base = TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
                                                   ctx);
-        auto result = buildMemberRef(base, openedType, SourceLoc(), decl,
-                                     loc, openedFnType->getResult(),
-                                     locator, locator, implicit, semantics,
-                                     /*isDynamic=*/false);
-        if (!result)
-          return nullptr;
 
-        return result;
+        return buildMemberRef(base, openedType, SourceLoc(), decl,
+                              loc, openedFnType->getResult(),
+                              locator, locator, implicit, semantics,
+                              /*isDynamic=*/false);
       }
 
       // If this is a declaration with generic function type, build a
@@ -1309,8 +1353,8 @@ namespace {
 
       // Compute the concrete reference.
       ConcreteDeclRef ref;
-      Type resultTy;
-      if (ctor->getInterfaceType()->is<GenericFunctionType>()) {
+      Type resultTy = ctor->getInitializerInterfaceType();
+      if (resultTy->is<GenericFunctionType>()) {
         // Compute the reference to the generic constructor.
         SmallVector<Substitution, 4> substitutions;
         resultTy = solution.computeSubstitutions(
@@ -1333,12 +1377,44 @@ namespace {
                                      resultFnTy->getExtInfo());
       } else {
         ref = ConcreteDeclRef(ctor);
-        resultTy = ctor->getInitializerType();
       }
 
       // Build the constructor reference.
       return new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit,
                                                    resultTy);
+    }
+
+    /// Bridge the given value (which is an error type) to NSError.
+    Expr *bridgeErrorToObjectiveC(Expr *value) {
+      auto &tc = cs.getTypeChecker();
+
+      // Use _bridgeErrorToNSError to conver to an NSError.
+      auto fn = tc.Context.getBridgeErrorToNSError(&tc);
+      SourceLoc loc = value->getLoc();
+      if (!fn) {
+        tc.diagnose(loc, diag::missing_nserror_bridging_function);
+        return nullptr;
+      }
+      tc.validateDecl(fn);
+
+      ConcreteDeclRef fnDeclRef(fn);
+      Expr *fnRef = new (tc.Context) DeclRefExpr(fnDeclRef,
+                                                 DeclNameLoc(loc),
+                                                 /*Implicit=*/true);
+      fnRef->setType(fn->getInterfaceType());
+      Expr *call = new (tc.Context) CallExpr(fnRef, value,
+                                             /*implicit*/ true);
+      if (tc.typeCheckExpressionShallow(call, dc))
+        return nullptr;
+    
+      // The return type of _bridgeErrorToNSError is formally
+      // 'AnyObject' to avoid stdlib-to-Foundation dependencies, but it's
+      // really NSError.  Abuse CovariantReturnConversionExpr to fix this.
+      auto nsErrorDecl = tc.Context.getNSErrorDecl();
+      assert(nsErrorDecl && "Missing NSError?");
+      Type nsErrorType = nsErrorDecl->getDeclaredInterfaceType();
+      return new (tc.Context) CovariantReturnConversionExpr(call,
+                                                            nsErrorType);
     }
 
     /// Bridge the given value to its corresponding Objective-C object
@@ -1348,28 +1424,58 @@ namespace {
     ///
     /// \param value The value to be bridged.
     Expr *bridgeToObjectiveC(Expr *value) {
+      // TODO: It would be nicer to represent this as a special AST node
+      // instead of inlining the bridging calls in the AST. Doing so would
+      // simplify the AST and make it easier for SILGen to peephole bridging
+      // conversions.
       auto &tc = cs.getTypeChecker();
 
-      // Find the _BridgedToObjectiveC protocol.
+      // Find the _ObjectiveCBridgeable protocol.
       auto bridgedProto
         = tc.Context.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
-      // Find the conformance of the value type to _BridgedToObjectiveC.
-      Type valueType = value->getType()->getRValueType();
+      // Find the conformance of the value type to _ObjectiveCBridgeable.
       ProtocolConformance *conformance = nullptr;
-      bool conforms =
+      Type valueType = value->getType()->getRValueType();
+      bool conformsToBridgeable =
         tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
                               (ConformanceCheckFlags::InExpression|
                                ConformanceCheckFlags::Used),
                               &conformance);
-      assert(conforms && "Should already have checked the conformance");
-      (void)conforms;
 
-      // Form the call.
-      return tc.callWitness(value, cs.DC, bridgedProto,
-                            conformance,
-                            tc.Context.Id_bridgeToObjectiveC,
-                            { }, diag::broken_bridged_to_objc_protocol);
+      if (conformsToBridgeable) {
+        // Form the call.
+        return tc.callWitness(value, cs.DC, bridgedProto,
+                              conformance,
+                              tc.Context.Id_bridgeToObjectiveC,
+                              { }, diag::broken_bridged_to_objc_protocol);
+      }
+      
+      // If there is an Error conformance, try bridging as an error.
+      if (tc.isConvertibleTo(valueType,
+                             tc.Context.getProtocol(KnownProtocolKind::Error)
+                               ->getDeclaredType(),
+                             cs.DC))
+        return bridgeErrorToObjectiveC(value);
+
+      // Fall back to universal bridging.
+      auto bridgeAnything = tc.Context.getBridgeAnythingToObjectiveC(&tc);
+      value = tc.coerceToRValue(value);
+      auto valueSub = Substitution(valueType, {});
+      auto bridgeAnythingRef = ConcreteDeclRef(tc.Context, bridgeAnything,
+                                               valueSub);
+      auto bridgeTy = tc.Context.getProtocol(KnownProtocolKind::AnyObject)
+        ->getDeclaredType();
+      auto bridgeFnTy = FunctionType::get(valueType, bridgeTy);
+      auto fnRef = new (tc.Context) DeclRefExpr(bridgeAnythingRef,
+                                                DeclNameLoc(),
+                                                /*implicit*/ true,
+                                                AccessSemantics::Ordinary,
+                                                bridgeFnTy);
+      Expr *call = new (tc.Context) CallExpr(fnRef, value,
+                                             /*implicit*/ true,
+                                             bridgeTy);
+      return call;
     }
 
     /// Bridge the given object from Objective-C to its value type.
@@ -1558,10 +1664,10 @@ namespace {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::IntegerLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByIntegerLiteral);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BuiltinIntegerLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1572,7 +1678,7 @@ namespace {
       }
       if (auto floatProtocol
             = tc.getProtocol(expr->getLoc(),
-                             KnownProtocolKind::FloatLiteralConvertible)) {
+                             KnownProtocolKind::ExpressibleByFloatLiteral)) {
         if (auto defaultFloatType = tc.getDefaultType(floatProtocol, dc)) {
           if (defaultFloatType->isEqual(type))
             type = defaultFloatType;
@@ -1624,7 +1730,7 @@ namespace {
     Expr *visitNilLiteralExpr(NilLiteralExpr *expr) {
       auto &tc = cs.getTypeChecker();
       auto *protocol = tc.getProtocol(expr->getLoc(),
-                                      KnownProtocolKind::NilLiteralConvertible);
+                                      KnownProtocolKind::ExpressibleByNilLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1661,10 +1767,10 @@ namespace {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::FloatLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByFloatLiteral);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BuiltinFloatLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByBuiltinFloatLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1721,10 +1827,10 @@ namespace {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BooleanLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByBooleanLiteral);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BuiltinBooleanLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral);
       if (!protocol || !builtinProtocol)
         return nullptr;
 
@@ -1764,24 +1870,24 @@ namespace {
       bool isStringLiteral = true;
       bool isGraphemeClusterLiteral = false;
       ProtocolDecl *protocol = tc.getProtocol(
-          expr->getLoc(), KnownProtocolKind::StringLiteralConvertible);
+          expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
 
       if (!tc.conformsToProtocol(type, protocol, cs.DC,
                                  ConformanceCheckFlags::InExpression)) {
-        // If the type does not conform to StringLiteralConvertible, it should
-        // be ExtendedGraphemeClusterLiteralConvertible.
+        // If the type does not conform to ExpressibleByStringLiteral, it should
+        // be ExpressibleByExtendedGraphemeClusterLiteral.
         protocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible);
+            KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral);
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
       }
       if (!tc.conformsToProtocol(type, protocol, cs.DC,
                                  ConformanceCheckFlags::InExpression)) {
-        // ... or it should be UnicodeScalarLiteralConvertible.
+        // ... or it should be ExpressibleByUnicodeScalarLiteral.
         protocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::UnicodeScalarLiteralConvertible);
+            KnownProtocolKind::ExpressibleByUnicodeScalarLiteral);
         isStringLiteral = false;
         isGraphemeClusterLiteral = false;
       }
@@ -1826,7 +1932,7 @@ namespace {
         // UTF-16 string literals, prefer them.
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::BuiltinUTF16StringLiteralConvertible);
+            KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral);
         if (!forceASCII &&
             tc.conformsToProtocol(type, builtinProtocol, cs.DC,
                                   ConformanceCheckFlags::InExpression)) {
@@ -1849,7 +1955,7 @@ namespace {
           // Otherwise, fall back to UTF-8.
           builtinProtocol = tc.getProtocol(
               expr->getLoc(),
-              KnownProtocolKind::BuiltinStringLiteralConvertible);
+              KnownProtocolKind::ExpressibleByBuiltinStringLiteral);
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_builtinStringLiteral,
@@ -1883,7 +1989,7 @@ namespace {
 
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::BuiltinExtendedGraphemeClusterLiteralConvertible);
+            KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral);
         elements.push_back(
           TupleTypeElt(tc.Context.TheRawPointerType,
                        tc.Context.Id_builtinExtendedGraphemeClusterLiteral));
@@ -1910,10 +2016,10 @@ namespace {
 
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible);
+            KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral);
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible);
+            KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral);
 
         elements.push_back(BuiltinIntegerType::get(32, tc.Context));
 
@@ -1953,7 +2059,7 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto interpolationProto
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::StringInterpolationConvertible);
+                         KnownProtocolKind::ExpressibleByStringInterpolation);
       assert(interpolationProto && "Missing string interpolation protocol?");
 
       DeclName name(tc.Context, tc.Context.Id_init,
@@ -2183,7 +2289,8 @@ namespace {
     }
 
     Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *expr) {
-      expr->setType(expr->getDecl()->getInitializerType());
+      assert(!expr->getDeclRef().isSpecialized());
+      expr->setType(expr->getDecl()->getInitializerInterfaceType());
       return expr;
     }
 
@@ -2565,7 +2672,7 @@ namespace {
 
       ProtocolDecl *arrayProto
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ArrayLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByArrayLiteral);
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
       ProtocolConformance *conformance = nullptr;
@@ -2631,7 +2738,7 @@ namespace {
 
       ProtocolDecl *dictionaryProto
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::DictionaryLiteralConvertible);
+                         KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
       ProtocolConformance *conformance = nullptr;
       bool conforms = tc.conformsToProtocol(dictionaryTy, dictionaryProto,
@@ -2886,7 +2993,8 @@ namespace {
       case CheckedCastKind::ValueCast:
         // Check the cast target is a non-foreign type
         if (auto cls = toType->getAs<ClassType>()) {
-          if (cls->getDecl()->isForeign()) {
+          if (cls->getDecl()->getForeignClassKind() ==
+                ClassDecl::ForeignKind::CFType) {
             tc.diagnose(expr->getLoc(), diag::isa_is_foreign_check, toType);
           }
         }
@@ -2975,7 +3083,8 @@ namespace {
         if (auto metaTy = destObjectType->getAs<MetatypeType>())
           destObjectType = metaTy->getInstanceType();
         if (auto destClass = destObjectType->getClassOrBoundGenericClass()) {
-          if (destClass->isForeign()) {
+          if (destClass->getForeignClassKind() ==
+                ClassDecl::ForeignKind::CFType) {
             if (SuppressDiagnostics)
               return nullptr;
 
@@ -3812,6 +3921,27 @@ resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
     }
   }
 
+  if (auto subscript = dyn_cast<SubscriptExpr>(anchor)) {
+    // Subscript expressions may have a declaration. If so, use it.
+    if (subscript->hasDecl())
+      return subscript->getDecl();
+
+    // Otherwise, find the resolved overload.
+    auto anchorLocator =
+      cs.getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
+    if (auto selected = findOvlChoice(anchorLocator)) {
+      if (selected->choice.isDecl())
+        return getConcreteDeclRef(selected->choice.getDecl(),
+                                  selected->openedType,
+                                  anchorLocator);
+    }
+  }
+
+  if (auto subscript = dyn_cast<DynamicSubscriptExpr>(anchor)) {
+    // Dynamic subscripts are always resolved.
+    return subscript->getMember();
+  }
+
   return ConcreteDeclRef();
 }
 
@@ -3866,11 +3996,15 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
     return nullptr;
 
   // If the locator points to a function application, find the function itself.
-  if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument) {
+  bool isSubscript =
+    locator->getPath().back().getKind() == ConstraintLocator::SubscriptIndex;
+  if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument ||
+      isSubscript) {
     assert(locator->getPath().back().getNewSummaryFlags() == 0 &&
-           "ApplyArgument adds no flags");
+           "ApplyArgument/SubscriptIndex adds no flags");
     SmallVector<LocatorPathElt, 4> newPath;
     newPath.append(locator->getPath().begin(), locator->getPath().end()-1);
+
     unsigned newFlags = locator->getSummaryFlags();
 
     // If we have an interpolation argument, dig out the constructor if we
@@ -3888,6 +4022,8 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
           return cast<AbstractFunctionDecl>(choice.getDecl());
       }
       return nullptr;
+    } else if (isSubscript) {
+      newPath.push_back(ConstraintLocator::SubscriptMember);
     } else {
       newPath.push_back(ConstraintLocator::ApplyFunction);
     }
@@ -4136,10 +4272,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
       toSugarFields.push_back(TupleTypeElt(fromEltType,
                                            toElt.getName(),
-                                           toElt.getDefaultArgKind(),
                                            toElt.isVararg()));
       fromTupleExprFields[sources[i]] = fromElt;
-      hasInits |= toElt.hasDefaultArg();
       continue;
     }
 
@@ -4175,13 +4309,10 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     // Record the sugared field name.
     toSugarFields.push_back(TupleTypeElt(convertedElt->getType(),
                                          toElt.getName(),
-                                         toElt.getDefaultArgKind(),
                                          toElt.isVararg()));
     fromTupleExprFields[sources[i]] = TupleTypeElt(convertedElt->getType(),
                                                    fromElt.getName(),
-                                                   fromElt.getDefaultArgKind(),
                                                    fromElt.isVararg());
-    hasInits |= toElt.hasDefaultArg();
   }
 
   // Convert all of the variadic arguments to the destination type.
@@ -4221,7 +4352,6 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       fromTupleExprFields[fromFieldIdx] = TupleTypeElt(
                                             convertedElt->getType(),
                                             fromElt.getName(),
-                                            fromElt.getDefaultArgKind(),
                                             fromElt.isVararg());
     }
 
@@ -4310,11 +4440,6 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   bool hasInit = false;
   int i = 0;
   for (auto &field : toTuple->getElements()) {
-    if (field.hasDefaultArg()) {
-      hasInit = true;
-      break;
-    }
-
     if (i == toScalarIdx) {
       if (field.isVararg()) {
         assert(expr->getType()->isEqual(field.getVarargBaseTy()) &&
@@ -4322,7 +4447,6 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 
         sugarFields.push_back(TupleTypeElt(field.getType(),
                                            field.getName(),
-                                           field.getDefaultArgKind(),
                                            true));
       }
       else {
@@ -4357,26 +4481,9 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
       }
     }
 
-    // If this is the scalar field, act like we're shuffling the 0th element.
-    if (i == toScalarIdx) {
-      elements.push_back(0);
-      ++i;
-      continue;
-    }
-
-    assert(field.hasDefaultArg() && "Expected a default argument");
-
-    // Create a caller-side default argument, if we need one.
-    if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
-                                          callee, i).first) {
-      // Record the caller-side default argument expression.
-      // FIXME: Do we need to record what this was synthesized from?
-      elements.push_back(TupleShuffleExpr::CallerDefaultInitialize);
-      callerDefaultArgs.push_back(defArg);
-    } else {
-      // Record the owner of the default argument.
-      elements.push_back(TupleShuffleExpr::DefaultInitialize);
-    }
+    // This is the scalar field, so act like we're shuffling the 0th element.
+    assert(i == toScalarIdx);
+    elements.push_back(0);
     ++i;
   }
 
@@ -4717,8 +4824,7 @@ Expr *ExprRewriter::coerceCallArguments(
       auto paramBaseType = param.Ty;
       assert(sliceType.isNull() && "Multiple variadic parameters?");
       sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
-      toSugarFields.push_back(TupleTypeElt(sliceType, param.Label,
-                                           DefaultArgumentKind::None, true));
+      toSugarFields.push_back(TupleTypeElt(sliceType, param.Label, true));
       anythingShuffled = true;
       sources.push_back(TupleShuffleExpr::Variadic);
 
@@ -4767,7 +4873,6 @@ Expr *ExprRewriter::coerceCallArguments(
                                                          param.Ty)
                                   : param.Ty,
                                 param.Label,
-                                defArgKind,
                                 param.Variadic));
 
       if (defArg) {
@@ -5024,6 +5129,32 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
   }
 }
 
+static CollectionUpcastConversionExpr::ConversionPair
+buildElementConversion(ExprRewriter &rewriter,
+                       Type srcCollectionType,
+                       Type destCollectionType,
+                       ConstraintLocatorBuilder locator,
+                       unsigned typeArgIndex) {
+  // We don't need this stuff unless we've got generalized casts.
+  auto &ctx = rewriter.cs.getASTContext();
+  if (!ctx.LangOpts.EnableExperimentalCollectionCasts)
+    return {};
+
+  Type srcType = srcCollectionType->castTo<BoundGenericType>()
+                                  ->getGenericArgs()[typeArgIndex];
+  Type destType = destCollectionType->castTo<BoundGenericType>()
+                                    ->getGenericArgs()[typeArgIndex];
+
+  // Build the conversion.
+  auto opaque = new (ctx) OpaqueValueExpr(SourceLoc(), srcType);
+  auto conversion =
+    rewriter.coerceToType(opaque, destType,
+           locator.withPathElement(
+             ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)));
+
+  return { opaque, conversion };
+}
+
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator,
                                  Optional<Pattern*> typeFromPattern) {
@@ -5174,10 +5305,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
       }
 
+      // Build the value conversion.
+      auto conv =
+        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+
       // Form the upcast.
       bool isBridged = !cs.getBaseTypeForArrayType(fromType.getPointer())
                           ->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
+                                                             {}, conv,
                                                              isBridged);
     }
 
@@ -5188,6 +5324,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
       }
 
+      // Build the key and value conversions.
+      auto keyConv =
+        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+      auto valueConv =
+        buildElementConversion(*this, expr->getType(), toType, locator, 1);
+
       // If the source key and value types are object types, this is an upcast.
       // Otherwise, it's bridged.
       Type sourceKey, sourceValue;
@@ -5196,6 +5338,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       bool isBridged = !sourceKey->isBridgeableObjectType() ||
                        !sourceValue->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
+                                                             keyConv, valueConv,
                                                              isBridged);
     }
 
@@ -5206,9 +5349,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
       }
 
+      // Build the value conversion.
+      auto conv =
+        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+
       bool isBridged = !cs.getBaseTypeForSetType(fromType.getPointer())
                           ->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
+                                                             {}, conv,
                                                              isBridged);
     }
 
@@ -5296,31 +5444,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return coerceToType(objcExpr, toType, locator);
     }
     
-    case ConversionRestrictionKind::BridgeToNSError: {
-      // Tell the ErrorProtocol to become an NSError, using
-      // _bridgeErrorProtocolToNSError.
-      auto fn = tc.Context.getBridgeErrorProtocolToNSError(&tc);
-      if (!fn) {
-        tc.diagnose(expr->getLoc(), diag::missing_nserror_bridging_function);
-        return nullptr;
-      }
-      tc.validateDecl(fn);
-      ConcreteDeclRef fnDeclRef(fn);
-      Expr *fnRef = new (tc.Context) DeclRefExpr(fnDeclRef,
-                                                 DeclNameLoc(expr->getLoc()),
-                                                 /*Implicit=*/true);
-      fnRef->setType(fn->getInterfaceType());
-      Expr *call = new (tc.Context) CallExpr(fnRef, expr,
-                                             /*implicit*/ true);
-      if (tc.typeCheckExpressionShallow(call, dc))
-        return nullptr;
-      
-      // The return type of _bridgeErrorProtocolToNSError is formally
-      // 'AnyObject' to avoid stdlib-to-Foundation dependencies, but it's really
-      // NSError.  Abuse CovariantReturnConversionExpr to fix this.
-      return new (tc.Context) CovariantReturnConversionExpr(call, toType);
-    }
-
     case ConversionRestrictionKind::BridgeFromObjC:
       return forceBridgeFromObjectiveC(expr, toType);
 
@@ -5479,6 +5602,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                         toEI.isNoReturn() | fromEI.isNoReturn(),
                                         toEI.isAutoClosure(),
                                         toEI.isNoEscape() | fromEI.isNoEscape(),
+                                        toEI.isExplicitlyEscaping() | fromEI.isExplicitlyEscaping(),
                                         toEI.throws() & fromEI.throws());
         auto newToType = FunctionType::get(fromFunc->getInput(),
                                            fromFunc->getResult(), newEI);
@@ -6224,7 +6348,10 @@ namespace {
     }
 
     Expr *walkToExprPost(Expr *expr) override {
-      return Rewriter.walkToExprPost(expr);
+      Expr *result = Rewriter.walkToExprPost(expr);
+      if (result && result->getType())
+        Rewriter.checkForImportedUsedConformances(result->getType());
+      return result;
     }
 
     /// \brief Ignore statements.
@@ -6265,30 +6392,30 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   // synthesized type variable during diagnostic generation, we may not have
   // a valid locator.
   if (!locator)
-    return false;  
+    return false;
 
   // Resolve the locator to a specific expression.
   SourceRange range;
+  bool isSubscriptMember =
+    (!locator->getPath().empty() &&
+     locator->getPath().back().getKind() == ConstraintLocator::SubscriptMember);
   ConstraintLocator *resolved = simplifyLocator(*this, locator, range);
 
   // If we didn't manage to resolve directly to an expression, we don't
   // have a great diagnostic to give, so bail.
-  if (!resolved || !resolved->getAnchor())
+  if (!resolved || !resolved->getAnchor() ||
+      !resolved->getPath().empty())
     return false;
   
-  if (!resolved->getPath().empty()) {
-    // We allow OptionalToBoolean fixes with an opened type to refer to the
-    // Boolean conformance.
-    if (fix.first.getKind() == FixKind::OptionalToBoolean &&
-        resolved->getPath().size() == 1 &&
-        resolved->getPath()[0].getKind() == ConstraintLocator::OpenedGeneric)
-      ; /* ok */
-    else
-      return false;
-  }
-
   Expr *affected = resolved->getAnchor();
 
+  // FIXME: Work around an odd locator representation that doesn't separate the
+  // base of a subscript member from the member access.
+  if (isSubscriptMember) {
+    if (auto subscript = dyn_cast<SubscriptExpr>(affected))
+      affected = subscript->getBase();
+  }
+    
   switch (fix.first.getKind()) {
   case FixKind::None:
     llvm_unreachable("no-fix marker should never make it into solution");
@@ -6374,74 +6501,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
                   ->getRValueObjectType();
     TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
       .fixItInsert(affected->getStartLoc(), "&");
-    return true;
-  }
-
-  case FixKind::OptionalToBoolean: {
-    // If we're implicitly trying to treat an optional type as a boolean,
-    // let the user know that they should be testing for a value manually
-    // instead.
-    Expr *errorExpr = expr;
-    StringRef prefix = "((";
-    StringRef suffix = ") != nil)";
-    
-    // In the common case of a !x, post the error against the inner
-    // expression as an == comparison.
-    if (auto PUE =
-        dyn_cast<PrefixUnaryExpr>(errorExpr->getSemanticsProvidingExpr())){
-      bool isNot = false;
-      if (auto *D = PUE->getCalledValue())
-        isNot = D->getNameStr() == "!";
-      else if (auto *ODR = dyn_cast<OverloadedDeclRefExpr>(PUE->getFn()))
-        isNot = ODR->getDecls()[0]->getNameStr() == "!";
-      
-      if (isNot) {
-        suffix = ") == nil)";
-        errorExpr = PUE->getArg();
-        
-        // Check if we need the inner parentheses.
-        // Technically we only need them if there's something in 'expr' with
-        // lower precedence than '!=', but the code actually comes out nicer
-        // in most cases with parens on anything non-trivial.
-        if (errorExpr->canAppendCallParentheses()) {
-          prefix = prefix.drop_back();
-          suffix = suffix.drop_front();
-        }
-        // FIXME: The outer parentheses may be superfluous too.
-
-        
-        TC.diagnose(errorExpr->getLoc(),diag::optional_used_as_true_boolean,
-                    simplifyType(errorExpr->getType())->getRValueType())
-          .fixItRemove(PUE->getLoc())
-          .fixItInsert(errorExpr->getStartLoc(), prefix)
-          .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
-        return true;
-      }
-    }
-    
-    // If we can, post the fix-it to the sub-expression if it's a better
-    // fit.
-    if (auto ifExpr = dyn_cast<IfExpr>(errorExpr))
-      errorExpr = ifExpr->getCondExpr();
-    if (auto prefixUnaryExpr = dyn_cast<PrefixUnaryExpr>(errorExpr))
-      errorExpr = prefixUnaryExpr->getArg();
-    
-
-    // Check if we need the inner parentheses.
-    // Technically we only need them if there's something in 'expr' with
-    // lower precedence than '!=', but the code actually comes out nicer
-    // in most cases with parens on anything non-trivial.
-    if (errorExpr->canAppendCallParentheses()) {
-      prefix = prefix.drop_back();
-      suffix = suffix.drop_front();
-    }
-    // FIXME: The outer parentheses may be superfluous too.
-
-    TC.diagnose(errorExpr->getLoc(), diag::optional_used_as_boolean,
-                simplifyType(errorExpr->getType())->getRValueType())
-      .fixItInsert(errorExpr->getStartLoc(), prefix)
-      .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
-    
     return true;
   }
 
@@ -6741,25 +6800,16 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 /// conforms to the give \c protocol.
 /// \param expr The expression to convert.
 /// \param locator The locator describing where the conversion occurs.
-/// \param protocol The protocol to use for conversion.
-/// \param generalName The name of the protocol method to use for the
-/// conversion.
 /// \param builtinName The name of the builtin method to use for the
 /// last step of the conversion.
-/// \param brokenProtocolDiag Diagnostic to emit if the protocol
-/// definition is missing.
 /// \param brokenBuiltinDiag Diagnostic to emit if the builtin definition
 /// is broken.
 ///
 /// \returns the converted expression.
-static Expr *convertViaBuiltinProtocol(const Solution &solution,
-                                       Expr *expr,
-                                       ConstraintLocator *locator,
-                                       ProtocolDecl *protocol,
-                                       Identifier generalName,
-                                       Identifier builtinName,
-                                       Diag<> brokenProtocolDiag,
-                                       Diag<> brokenBuiltinDiag) {
+static Expr *convertViaMember(const Solution &solution, Expr *expr,
+                              ConstraintLocator *locator,
+                              Identifier builtinName,
+                              Diag<> brokenBuiltinDiag) {
   auto &cs = solution.getConstraintSystem();
 
   // FIXME: Cache name.
@@ -6772,66 +6822,17 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isa<AbstractFunctionDecl>(cs.DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto witnesses = tc.lookupMember(cs.DC, type->getRValueType(), builtinName,
+  auto members = tc.lookupMember(cs.DC, type->getRValueType(), builtinName,
                                    lookupOptions);
-  if (!witnesses) {
-    auto protocolType = protocol->getType()->
-                        getAs<MetatypeType>()->getInstanceType();
-    
-    // Find the witness we need to use.
-    ValueDecl *witness = nullptr;
-    
-    if (!protocolType->isEqual(type)) {
-      witness = findNamedPropertyWitness(tc, cs.DC, type -> getRValueType(),
-                                         protocol, generalName,
-                                         brokenProtocolDiag);
-    } else {
-      // If the expression is already typed to the protocol, lookup the protocol
-      // method directly.
-      witnesses = tc.lookupMember(cs.DC, type->getRValueType(), generalName,
-                                  lookupOptions);
-      if (!witnesses) {
-        tc.diagnose(protocol->getLoc(), brokenProtocolDiag);
-        return nullptr;
-      }
-      witness = witnesses[0];
-    }
-    
-    // Form a reference to this member.
-    Expr *memberRef = new (ctx) MemberRefExpr(expr, expr->getStartLoc(),
-                                              witness,
-                                              DeclNameLoc(expr->getEndLoc()),
-                                              /*Implicit=*/true);
-    bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-    if (failed) {
-      // If the member reference expression failed to type check, the Expr's
-      // type does not conform to the given protocol.
-      tc.diagnose(expr->getLoc(),
-                  diag::type_does_not_conform,
-                  type,
-                  protocol->getType());
-      return nullptr;
-    }
-    expr = memberRef;
-
-    // At this point, we must have a type with the builtin member.
-    type = expr->getType();
-    witnesses = tc.lookupMember(cs.DC, type->getRValueType(), builtinName,
-                                lookupOptions);
-    if (!witnesses) {
-      tc.diagnose(protocol->getLoc(), brokenProtocolDiag);
-      return nullptr;
-    }
-  }
-
+  
   // Find the builtin method.
-  if (witnesses.size() != 1) {
-    tc.diagnose(protocol->getLoc(), brokenBuiltinDiag);
+  if (members.size() != 1) {
+    tc.diagnose(expr->getLoc(), brokenBuiltinDiag);
     return nullptr;
   }
-  FuncDecl *builtinMethod = dyn_cast<FuncDecl>(witnesses[0].Decl);
+  FuncDecl *builtinMethod = dyn_cast<FuncDecl>(members[0].Decl);
   if (!builtinMethod) {
-    tc.diagnose(protocol->getLoc(), brokenBuiltinDiag);
+    tc.diagnose(expr->getLoc(), brokenBuiltinDiag);
     return nullptr;
 
   }
@@ -6860,15 +6861,9 @@ Expr *
 Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) const {
   auto &tc = getConstraintSystem().getTypeChecker();
 
-  // FIXME: Cache names.
-  auto result = convertViaBuiltinProtocol(
-                  *this, expr, locator,
-                  tc.getProtocol(expr->getLoc(),
-                                 KnownProtocolKind::Boolean),
-                  tc.Context.Id_boolValue,
-                  tc.Context.Id_getBuiltinLogicValue,
-                  diag::condition_broken_proto,
-                  diag::broken_bool);
+  auto result = convertViaMember(*this, expr, locator,
+                                 tc.Context.Id_getBuiltinLogicValue,
+                                 diag::broken_bool);
   if (result && !result->getType()->isBuiltinIntegerType(1)) {
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return nullptr;

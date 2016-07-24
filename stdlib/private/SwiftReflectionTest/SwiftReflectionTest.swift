@@ -24,7 +24,7 @@ import Darwin
 let RequestInstanceKind = "k"
 let RequestInstanceAddress = "i"
 let RequestReflectionInfos = "r"
-let RequestReadBytes = "b";
+let RequestReadBytes = "b"
 let RequestSymbolAddress = "s"
 let RequestStringLength = "l"
 let RequestDone = "d"
@@ -282,9 +282,9 @@ internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
     case String(validatingUTF8: RequestStringLength)!:
       sendStringLength()
     case String(validatingUTF8: RequestPointerSize)!:
-      sendPointerSize();
+      sendPointerSize()
     case String(validatingUTF8: RequestDone)!:
-      return;
+      return
     default:
       fatalError("Unknown request received: '\(Array(command.utf8))'!")
     }
@@ -356,21 +356,21 @@ public func reflect(object: AnyObject) {
 /// an Any existential.
 public func reflect<T>(any: T) {
   let any: Any = any
-  let anyPointer = UnsafeMutablePointer<Any>(allocatingCapacity: sizeof(Any.self))
-  anyPointer.initialize(with: any)
+  let anyPointer = UnsafeMutablePointer<Any>.allocate(capacity: sizeof(Any.self))
+  anyPointer.initialize(to: any)
   let anyPointerValue = unsafeBitCast(anyPointer, to: UInt.self)
   reflect(instanceAddress: anyPointerValue, kind: .Existential)
-  anyPointer.deallocateCapacity(sizeof(Any.self))
+  anyPointer.deallocate(capacity: sizeof(Any.self))
 }
 
-// Reflect an `ErrorProtocol`, a.k.a. an "error existential".
+// Reflect an `Error`, a.k.a. an "error existential".
 //
 // These are always boxed on the heap, with the following layout:
 //
 // - Word 0: Metadata Pointer
 // - Word 1: 2x 32-bit reference counts
 //
-// If Objective-C interop is available, an ErrorProtocol is also an
+// If Objective-C interop is available, an Error is also an
 // `NSError`, and so has:
 //
 // - Word 2: code (NSInteger)
@@ -381,12 +381,12 @@ public func reflect<T>(any: T) {
 //
 // - Word 2 or 5: Instance type metadata pointer
 // - Word 3 or 6: Instance witness table for conforming
-//   to `Swift.ErrorProtocol`.
+//   to `Swift.Error`.
 //
-// Following that is the instance that conforms to `ErrorProtocol`,
+// Following that is the instance that conforms to `Error`,
 // rounding up to its alignment.
-public func reflect<T: ErrorProtocol>(error: T) {
-  let error: ErrorProtocol = error
+public func reflect<T: Error>(error: T) {
+  let error: Error = error
   let errorPointerValue = unsafeBitCast(error, to: UInt.self)
   reflect(instanceAddress: errorPointerValue, kind: .ErrorExistential)
 }
@@ -419,61 +419,62 @@ struct ThickFunctionParts {
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
 public func reflect(function: () -> ()) {
-  let fn = UnsafeMutablePointer<ThickFunction0>(
-      allocatingCapacity: sizeof(ThickFunction0.self))
-  fn.initialize(with: ThickFunction0(function: function))
+  let fn = UnsafeMutablePointer<ThickFunction0>.allocate(
+    capacity: sizeof(ThickFunction0.self))
+  fn.initialize(to: ThickFunction0(function: function))
 
   let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
   let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocateCapacity(sizeof(ThickFunction0.self))
+  fn.deallocate(capacity: sizeof(ThickFunction0.self))
 }
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
 public func reflect(function: (Int) -> ()) {
-  let fn = UnsafeMutablePointer<ThickFunction1>(
-      allocatingCapacity: sizeof(ThickFunction1.self))
-  fn.initialize(with: ThickFunction1(function: function))
+  let fn =
+  UnsafeMutablePointer<ThickFunction1>.allocate(
+    capacity: sizeof(ThickFunction1.self))
+  fn.initialize(to: ThickFunction1(function: function))
 
   let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
   let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocateCapacity(sizeof(ThickFunction1.self))
+  fn.deallocate(capacity: sizeof(ThickFunction1.self))
 }
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
 public func reflect(function: (Int, String) -> ()) {
-  let fn = UnsafeMutablePointer<ThickFunction2>(
-      allocatingCapacity: sizeof(ThickFunction2.self))
-  fn.initialize(with: ThickFunction2(function: function))
+  let fn = UnsafeMutablePointer<ThickFunction2>.allocate(
+      capacity: sizeof(ThickFunction2.self))
+  fn.initialize(to: ThickFunction2(function: function))
 
   let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
   let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocateCapacity(sizeof(ThickFunction2.self))
+  fn.deallocate(capacity: sizeof(ThickFunction2.self))
 }
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
 public func reflect(function: (Int, String, AnyObject?) -> ()) {
-  let fn = UnsafeMutablePointer<ThickFunction3>(
-      allocatingCapacity: sizeof(ThickFunction3.self))
-  fn.initialize(with: ThickFunction3(function: function))
+  let fn = UnsafeMutablePointer<ThickFunction3>.allocate(
+      capacity: sizeof(ThickFunction3.self))
+  fn.initialize(to: ThickFunction3(function: function))
 
   let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
   let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocateCapacity(sizeof(ThickFunction3.self))
+  fn.deallocate(capacity: sizeof(ThickFunction3.self))
 }
 
 /// Call this function to indicate to the parent that there are

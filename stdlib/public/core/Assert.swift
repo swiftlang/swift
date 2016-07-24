@@ -123,11 +123,11 @@ public func assertionFailure(
 /// * In -Ounchecked builds, the optimizer may assume that this
 ///   function will never be called. Failure to satisfy that assumption
 ///   is a serious programming error.
-@_transparent @noreturn
+@_transparent
 public func preconditionFailure(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
-) {
+) -> Never {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
     _assertionFailed("fatal error", message(), file, line,
@@ -139,11 +139,11 @@ public func preconditionFailure(
 }
 
 /// Unconditionally print a `message` and stop execution.
-@_transparent @noreturn
+@_transparent
 public func fatalError(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
-) {
+) -> Never {
   _assertionFailed("fatal error", message(), file, line,
     flags: _fatalErrorFlags())
 }
@@ -171,11 +171,11 @@ public func _precondition(
   }
 }
 
-@_transparent @noreturn
+@_transparent
 public func _preconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
-) {
+) -> Never {
   _precondition(false, message, file: file, line: line)
   _conditionallyUnreachable()
 }
@@ -222,10 +222,11 @@ public func _debugPrecondition(
   }
 }
 
-@_transparent @noreturn
+@_transparent
 public func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
-  file: StaticString = #file, line: UInt = #line) {
+  file: StaticString = #file, line: UInt = #line
+) -> Never {
   if _isDebugAssertConfiguration() {
     _precondition(false, message, file: file, line: line)
   }
@@ -251,11 +252,11 @@ public func _sanityCheck(
 #endif
 }
 
-@_transparent @noreturn
+@_transparent
 public func _sanityCheckFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
-) {
+) -> Never {
   _sanityCheck(false, message, file: file, line: line)
   _conditionallyUnreachable()
 }

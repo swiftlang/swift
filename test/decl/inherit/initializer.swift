@@ -142,3 +142,11 @@ class SuperVariadic {
 
 class SubVariadic : SuperVariadic { } // expected-warning 4{{synthesizing a variadic inherited initializer for subclass 'SubVariadic' is unsupported}}
 
+// Don't crash with invalid nesting of class in generic function
+
+func testClassInGenericFunc<T>(t: T) {
+  class A { init(t: T) {} } // expected-error {{type 'A' cannot be nested in generic function 'testClassInGenericFunc'}}
+  class B : A {} // expected-error {{type 'B' cannot be nested in generic function 'testClassInGenericFunc'}}
+
+  _ = B(t: t)
+}

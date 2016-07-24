@@ -9,15 +9,18 @@ set(sourcekitdAPI_sources
 
 set(sourcekitdAPI_Darwin_sources
   sourcekitdAPI-XPC.cpp)
-set(LLVM_OPTIONAL_SOURCES ${sourcekitdAPI_Darwin_sources})
+set(sourcekitdAPI_NonDarwin_InProc_sources
+  sourcekitdAPI-InProc.cpp)
+set(LLVM_OPTIONAL_SOURCES ${sourcekitdAPI_Darwin_sources} ${sourcekitdAPI_NonDarwin_InProc_sources})
+
 if(APPLE)
   list(APPEND sourcekitdAPI_sources ${sourcekitdAPI_Darwin_sources})
+elseif(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
+  list(APPEND sourcekitdAPI_sources ${sourcekitdAPI_NonDarwin_InProc_sources})
 endif()
 
 add_sourcekit_library(sourcekitdAPI
   ${sourcekitdAPI_sources}
   DEPENDS
       SourceKitSupport SourceKitSwiftLang
-      # Clang dependencies, required by SourceKitSwiftLang
-      clangFormat clangToolingCore clangDriver
 )

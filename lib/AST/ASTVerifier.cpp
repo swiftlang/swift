@@ -641,6 +641,24 @@ struct ASTNodeBase {};
       OptionalEvaluations.pop_back();
     }
 
+    // Register the OVEs in a collection upcast.
+    bool shouldVerify(CollectionUpcastConversionExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      if (auto keyConversion = expr->getKeyConversion())
+        OpaqueValues[keyConversion.OrigValue] = 0;
+      if (auto valueConversion = expr->getValueConversion())
+        OpaqueValues[valueConversion.OrigValue] = 0;
+      return true;
+    }
+    void cleanup(CollectionUpcastConversionExpr *expr) {
+      if (auto keyConversion = expr->getKeyConversion())
+        OpaqueValues.erase(keyConversion.OrigValue);
+      if (auto valueConversion = expr->getValueConversion())
+        OpaqueValues.erase(valueConversion.OrigValue);
+    }
+
     /// Canonicalize the given DeclContext pointer, in terms of
     /// producing something that can be looked up in
     /// ClosureDiscriminators.
@@ -1144,7 +1162,7 @@ struct ASTNodeBase {};
         Out << "\n";
         abort();
       }
-      if (PTK != PTK_UnsafePointer) {
+      if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeRawPointer) {
         Out << "StringToPointer converts to non-const pointer:\n";
         E->print(Out);
         Out << "\n";
@@ -1467,10 +1485,6 @@ struct ASTNodeBase {};
 
       TupleType *TT = E->getType()->getAs<TupleType>();
       TupleType *SubTT = E->getSubExpr()->getType()->getAs<TupleType>();
-      if (!TT || (!SubTT && !E->isSourceScalar())) {
-        Out << "Unexpected types in TupleShuffleExpr\n";
-        abort();
-      }
       auto getSubElementType = [&](unsigned i) {
         if (E->isSourceScalar()) {
           assert(i == 0);
@@ -1478,6 +1492,17 @@ struct ASTNodeBase {};
         } else {
           return SubTT->getElementType(i);
         }
+      };
+
+      /// Retrieve the ith element type from the resulting tuple type.
+      auto getOuterElementType = [&](unsigned i) -> Type {
+        if (!TT) {
+          if (auto parenTy = dyn_cast<ParenType>(E->getType().getPointer()))
+            return parenTy->getUnderlyingType();
+          return E->getType();
+        }
+
+        return TT->getElementType(i);
       };
 
       unsigned varargsIndex = 0;
@@ -1494,13 +1519,13 @@ struct ASTNodeBase {};
         }
         if (subElem == TupleShuffleExpr::CallerDefaultInitialize) {
           auto init = E->getCallerDefaultArgs()[callerDefaultArgIndex++];
-          if (!TT->getElementType(i)->isEqual(init->getType())) {
+          if (!getOuterElementType(i)->isEqual(init->getType())) {
             Out << "Type mismatch in TupleShuffleExpr\n";
             abort();
           }
           continue;
         }
-        if (!TT->getElementType(i)->isEqual(getSubElementType(subElem))) {
+        if (!getOuterElementType(i)->isEqual(getSubElementType(subElem))) {
           Out << "Type mismatch in TupleShuffleExpr\n";
           abort();
         }
@@ -2603,7 +2628,7 @@ struct ASTNodeBase {};
     }
 
     Type checkExceptionTypeExists(const char *where) {
-      auto exn = Ctx.getErrorProtocolDecl();
+      auto exn = Ctx.getErrorDecl();
       if (exn) return exn->getDeclaredType();
 
       Out << "exception type does not exist in " << where << "\n";

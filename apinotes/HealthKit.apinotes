@@ -1,0 +1,5 @@
+---
+Name:            HealthKit
+Tags:
+- Name: HKErrorCode
+  NSErrorDomain: HKErrorDomain

@@ -230,7 +230,7 @@ class Foo {
   // x86_64-macosx:      [[VALUE:%[0-9]+]] = call [[TYPE:%.*]] @_TFC8abitypes3Foo13copyProtoComp
   // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[TYPE]] [[VALUE]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
-  dynamic func copyProtoComp(_ a: protocol<P1, P2>) -> protocol<P1, P2> {
+  dynamic func copyProtoComp(_ a: P1 & P2) -> P1 & P2 {
     return a
   }
 

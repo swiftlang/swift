@@ -11,7 +11,7 @@ add_swift_library(swiftSema STATIC
   CSSimplify.cpp
   CSSolver.cpp
   DerivedConformanceEquatableHashable.cpp
-  DerivedConformanceErrorProtocol.cpp
+  DerivedConformanceError.cpp
   DerivedConformanceRawRepresentable.cpp
   DerivedConformances.cpp
   ITCDecl.cpp
@@ -27,6 +27,7 @@ add_swift_library(swiftSema STATIC
   TypeCheckConstraints.cpp
   TypeCheckDecl.cpp
   TypeChecker.cpp
+  TypeCheckCaptures.cpp
   TypeCheckError.cpp
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp

@@ -192,8 +192,16 @@ struct S<T> {
 
   func subscribe<Object: AnyObject where Object: Hashable>(object: Object?, method: (Object, T) -> ()) {
     let wrappedMethod = { (object: AnyObject, value: T) in }
-    // expected-error @+1 {{cannot convert value of type '(AnyObject, T) -> ()' to expected argument type '(AnyObject, _) -> ()'}}
+    // expected-error @+1 {{value of optional type 'Object?' not unwrapped; did you mean to use '!' or '?'?}}
     cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }
   }
 }
 
+// Make sure we cannot infer an () argument from an empty parameter list.
+func acceptNothingToInt (_: @noescape () -> Int) {}
+func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
+  // expected-note@-1{{parameter 'ac1' is implicitly @noescape because it was declared @autoclosure}}
+  acceptNothingToInt({ac1($0)})
+  // expected-error@-1{{cannot convert value of type '(_) -> Int' to expected argument type '() -> Int'}}
+  // FIXME: expected-error@-2{{closure use of @noescape parameter 'ac1' may allow it to escape}}
+}

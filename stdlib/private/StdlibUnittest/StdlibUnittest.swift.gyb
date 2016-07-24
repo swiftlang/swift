@@ -20,7 +20,7 @@ import SwiftPrivateLibcExtras
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
 #endif
 
@@ -91,7 +91,7 @@ public struct SourceLocStack {
 }
 
 func _printStackTrace(_ stackTrace: SourceLocStack?) {
-  guard let s = stackTrace where !s.locs.isEmpty else { return }
+  guard let s = stackTrace, !s.locs.isEmpty else { return }
   print("stacktrace:")
   for (i, loc) in s.locs.reversed().enumerated() {
     let comment = (loc.comment != nil) ? " ; \(loc.comment!)" : ""
@@ -107,7 +107,7 @@ var _seenExpectCrash = false
 /// Run `body` and expect a failure to happen.
 ///
 /// The check passes iff `body` triggers one or more failures.
-public func expectFailure(${TRACE}, body: () -> Void) {
+public func expectFailure(${TRACE}, invoking body: () -> Void) {
   let startAnyExpectFailed = _anyExpectFailed
   _anyExpectFailed = false
   body()
@@ -134,20 +134,20 @@ public func identityComp(_ element: MinimalComparableValue)
 }
 
 public func expectEqual<T : Equatable>(_ expected: T, _ actual: T, ${TRACE}) {
-  expectEqual(expected, actual, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected, actual, ${trace}, showFrame: false) {$0 == $1}
 }
 
 public func expectEqual<T : Equatable, U : Equatable>(
   _ expected: (T, U), _ actual: (T, U), ${TRACE}) {
-  expectEqual(expected.0, actual.0, ${trace}, showFrame: false) {$0 == $1}
-  expectEqual(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.0, actual.0, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
 }
 
 public func expectEqual<T : Equatable, U : Equatable, V : Equatable>(
   _ expected: (T, U, V), _ actual: (T, U, V), ${TRACE}) {
-  expectEqual(expected.0, actual.0, ${trace}, showFrame: false) {$0 == $1}
-  expectEqual(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
-  expectEqual(expected.2, actual.2, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.0, actual.0, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.2, actual.2, ${trace}, showFrame: false) {$0 == $1}
 }
 
 public func expectationFailure(
@@ -160,7 +160,10 @@ public func expectationFailure(
   print(message, terminator: message == "" ? "" : "\n")
 }
 
-public func expectEqual<T>(
+// Renamed to avoid collision with expectEqual(_, _, TRACE).
+// See <rdar://26058520> Generic type constraints incorrectly applied to
+// functions with the same name
+public func expectEqualTest<T>(
   _ expected: T, _ actual: T, ${TRACE}, sameValue equal: (T, T) -> Bool
 ) {
   if !equal(expected, actual) {
@@ -230,7 +233,7 @@ public func expectNotEqual<T : Equatable>(
 public func expectEqual${Generic}(
   _ expected: ${EquatableType}, _ actual: ${EquatableType}, ${TRACE}
 ) {
-  expectEqual(expected, actual, ${trace}, showFrame: false) { $0 == $1 }
+  expectEqualTest(expected, actual, ${trace}, showFrame: false) { $0 == $1 }
 }
 
 public func expectOptionalEqual${Generic}(
@@ -273,7 +276,7 @@ public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
 extension Range
 %   if 'Countable' in OtherRange:
   where
-  Bound : protocol<Comparable, _Strideable>, Bound.Stride : SignedInteger
+  Bound : Comparable & _Strideable, Bound.Stride : SignedInteger
 %   end
 {
   internal func _contains(_ other: ${OtherRange}<Bound>) -> Bool {
@@ -448,15 +451,9 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
   X.Indices.Index == X.Index,
   X.Indices.SubSequence == X.Indices {}
   
-public func expectIsBooleanType<X : Boolean>(_ x: inout X) -> X { return x }
-
-public struct AssertionResult : CustomStringConvertible, Boolean {
+public struct AssertionResult : CustomStringConvertible {
   init(isPass: Bool) {
     self._isPass = isPass
-  }
-
-  public var boolValue: Bool {
-    return _isPass
   }
 
   public func withDescription(_ description: String) -> AssertionResult {
@@ -482,26 +479,34 @@ public func expectUnreachable(${TRACE}) {
   expectationFailure("this code should not be executed", trace: ${trace})
 }
 
-public func expectUnreachableCatch(_ error: ErrorProtocol, ${TRACE}) {
+public func expectUnreachableCatch(_ error: Error, ${TRACE}) {
   expectationFailure(
     "error should not be thrown: \"\(error)\"", trace: ${trace})
 }
 
-%for BoolType in ['Bool', 'AssertionResult']:
+public func expectTrue(_ actual: AssertionResult, ${TRACE}) {
+  if !actual._isPass {
+    expectationFailure("expected: true", trace: ${trace})
+  }
+}
 
-public func expectTrue(_ actual: ${BoolType}, ${TRACE}) {
+public func expectFalse(_ actual: AssertionResult, ${TRACE}) {
+  if actual._isPass {
+    expectationFailure("expected: false", trace: ${trace})
+  }
+}
+
+public func expectTrue(_ actual: Bool, ${TRACE}) {
   if !actual {
     expectationFailure("expected: true", trace: ${trace})
   }
 }
 
-public func expectFalse(_ actual: ${BoolType}, ${TRACE}) {
+public func expectFalse(_ actual: Bool, ${TRACE}) {
   if actual {
     expectationFailure("expected: false", trace: ${trace})
   }
 }
-
-%end
 
 public func expectEmpty<T>(_ value: T?, ${TRACE}) {
   if value != nil {
@@ -582,7 +587,7 @@ func _stdlib_getline() -> String? {
 
 func _printDebuggingAdvice(_ fullTestName: String) {
   print("To debug, run:")
-  var invocation = [Process.arguments[0]]
+  var invocation = [CommandLine.arguments[0]]
   let interpreter = getenv("SWIFT_INTERPRETER")
   if interpreter != nil {
     if let interpreterCmd = String(validatingUTF8: interpreter!) {
@@ -1003,8 +1008,8 @@ struct _ParentProcess {
             testName += String(testParameter)
           }
           let fullTestName = "\(testSuite.name).\(testName)"
-          if let filter = _filter
-            where findSubstring(fullTestName, filter) == nil {
+          if let filter = _filter,
+             findSubstring(fullTestName, filter) == nil {
 
             continue
           }
@@ -1120,7 +1125,7 @@ public func runAllTests() {
 #endif
 
   let _isChildProcess: Bool =
-    Process.arguments.contains("--stdlib-unittest-run-child")
+    CommandLine.arguments.contains("--stdlib-unittest-run-child")
 
   if _isChildProcess {
     _childProcess()
@@ -1130,15 +1135,15 @@ public func runAllTests() {
     var args = [String]()
     var i = 0
     i += 1 // Skip the name of the executable.
-    while i < Process.arguments.count {
-      let arg = Process.arguments[i]
+    while i < CommandLine.arguments.count {
+      let arg = CommandLine.arguments[i]
       if arg == "--stdlib-unittest-in-process" {
         runTestsInProcess = true
         i += 1
         continue
       }
       if arg == "--stdlib-unittest-filter" {
-        filter = Process.arguments[i + 1]
+        filter = CommandLine.arguments[i + 1]
         i += 2
         continue
       }
@@ -1156,7 +1161,7 @@ public func runAllTests() {
       }
 
       // Pass through unparsed arguments to the child process.
-      args.append(Process.arguments[i])
+      args.append(CommandLine.arguments[i])
 
       i += 1
     }
@@ -1166,6 +1171,15 @@ public func runAllTests() {
     parent.run()
   }
 }
+
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+
+@_silgen_name("swift_leaks_startTrackingObjects")
+func startTrackingObjects(_: UnsafePointer<CChar>)
+@_silgen_name("swift_leaks_stopTrackingObjects")
+func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
+
+#endif
 
 public final class TestSuite {
   public init(_ name: String) {
@@ -1225,6 +1239,11 @@ public final class TestSuite {
       f()
     }
     let test = _testByName(testName)
+
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    startTrackingObjects(name)
+#endif
+
     switch test.code {
     case .single(let code):
       precondition(
@@ -1234,11 +1253,16 @@ public final class TestSuite {
     case .parameterized(code: let code, _):
       code(parameter!)
     }
+
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    _ = stopTrackingObjects(name)
+#endif
+
     if let f = _testTearDownCode {
       f()
     }
     expectEqual(
-      0, LifetimeTracked.instances, "leaked LifetimeTracked instances:",
+      0, LifetimeTracked.instances, "Found leaked LifetimeTracked instances.",
       file: test.testLoc.file, line: test.testLoc.line)
   }
 
@@ -1387,6 +1411,7 @@ public enum OSVersion : CustomStringConvertible {
   case linux
   case freeBSD
   case android
+  case ps4
 
   public var description: String {
     switch self {
@@ -1408,6 +1433,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Linux"
     case .freeBSD:
       return "FreeBSD"
+    case .ps4:
+      return "PS4"
     case .android:
       return "Android"
     }
@@ -1444,6 +1471,8 @@ func _getOSVersion() -> OSVersion {
   return .linux
 #elseif os(FreeBSD)
   return .freeBSD
+#elseif os(PS4)
+  return .ps4
 #elseif os(Android)
   return .android
 #else
@@ -1519,6 +1548,8 @@ public enum TestRunPredicate : CustomStringConvertible {
   case linuxAny(reason: String)
 
   case freeBSDAny(reason: String)
+
+  case ps4Any(reason: String)
 
   case androidAny(reason: String)
 
@@ -1604,6 +1635,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case .freeBSDAny(reason: let reason):
       return "freeBSDAny(*, reason: \(reason))"
+
+    case .ps4Any(reason: let reason):
+      return "ps4Any(*, reason: \(reason))"
 
     case .objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
@@ -1862,6 +1896,14 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
+    case .ps4Any:
+      switch _getRunningOSVersion() {
+      case .ps4:
+        return true
+      default:
+        return false
+      }
+
     case .objCRuntime:
 #if _runtime(_ObjC)
       return true
@@ -1914,14 +1956,23 @@ public func checkEquatable<Instances : Collection>(
       let y = instances[j]
 
       let xy = x == y
-      expectEqual(predictedXY, xy, ${trace})
+      expectEqual(
+        predictedXY, xy,
+        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        stackTrace: ${stackTrace})
 
       // Not-equal is an inverse of equal
-      expectNotEqual(xy, x != y, ${trace})
-      
+      expectNotEqual(
+        xy, x != y,
+        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        stackTrace: ${stackTrace})
+
       // Symmetry
-      expectEqual(xy, y == x, ${trace})
-      
+      expectEqual(
+        xy, y == x,
+        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        stackTrace: ${stackTrace})
+
       for k in instances.indices {
         let z = instances[k]
         // Transitivity
@@ -1961,10 +2012,15 @@ public func checkHashable<Instances : Collection>(
   
   checkEquatable(instances, oracle: equalityOracle, ${trace})
   
-  for x in instances {
-    for y in instances {
+  for i in instances.indices {
+    let x = instances[i]
+    for j in instances.indices {
+      let y = instances[j]
       if x == y {
-        expectEqual(x.hashValue, y.hashValue, ${trace})
+        expectEqual(
+          x.hashValue, y.hashValue,
+          "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+          stackTrace: ${stackTrace})
       }
     }
   }
@@ -2191,7 +2247,7 @@ public func expectEqualSequence<
 ) where
   Expected.Iterator.Element == Actual.Iterator.Element {
 
-  if !expected.elementsEqual(actual, isEquivalent: sameValue) {
+  if !expected.elementsEqual(actual, by: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
@@ -2209,9 +2265,9 @@ public func expectEqualsUnordered<
   Expected.Iterator.Element == Actual.Iterator.Element {
   
   let x: [Expected.Iterator.Element] =
-    expected.sorted(isOrderedBefore: compose(compare, { $0.isLT() }))
+    expected.sorted(by: compose(compare, { $0.isLT() }))
   let y: [Actual.Iterator.Element] =
-    actual.sorted(isOrderedBefore: compose(compare, { $0.isLT() }))
+    actual.sorted(by: compose(compare, { $0.isLT() }))
   expectEqualSequence(
     x, y, ${trace}, sameValue: compose(compare, { $0.isEQ() }))
 }
@@ -2308,10 +2364,10 @@ public func expectEqualsUnordered<
   }
 
   let x: [(T, T)] =
-    expected.sorted(isOrderedBefore: comparePairLess)
+    expected.sorted(by: comparePairLess)
   let y: [(T, T)] =
     actual.map { ($0.0, $0.1) }
-      .sorted(isOrderedBefore: comparePairLess)
+      .sorted(by: comparePairLess)
 
   func comparePairEquals(_ lhs: (T, T), rhs: (key: T, value: T)) -> Bool {
     return lhs.0 == rhs.0 && lhs.1 == rhs.1

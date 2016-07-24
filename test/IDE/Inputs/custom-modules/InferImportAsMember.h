@@ -110,5 +110,7 @@ extern unsigned IAMClassGetTypeID(void);
 extern IAMClassRef IAMClassCreate(double i);
 extern void IAMClassInvert(IAMOtherName iamOtherName);
 
+// Test collision where we can see the getter, but not setter
+extern float IAMStruct1GetCollisionNonProperty(struct IAMStruct1, int);
 
 #endif // INFER_IMPORT_AS_MEMBER_H

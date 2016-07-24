@@ -3,6 +3,147 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SR-2131](https://bugs.swift.org/browse/SR-2131):
+  The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a
+  prefix and suffix of all strings.
+
+* [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md):
+  The `protocol<...>` composition construct has been removed. In its
+  place, an infix type operator `&` has been introduced.
+
+  ```swift
+  let a: Foo & Bar
+  let b = value as? A & B & C
+  func foo<T : Foo & Bar>(x: T) { … }
+  func bar(x: Foo & Bar) { … }
+  typealias G = GenericStruct<Foo & Bar>
+  ```
+
+  The empty protocol composition, the `Any` type, was previously 
+  defined as being `protocol<>`. This has been removed from the 
+  standard library and `Any` is now a keyword with the same behaviour.
+
+* [SE-0091](https://github.com/apple/swift-evolution/blob/master/proposals/0091-improving-operators-in-protocols.md):
+  Operators can now be defined within types or extensions thereof. For example:
+
+  ```swift
+  struct Foo: Equatable {
+    let value: Int
+
+    static func ==(lhs: Foo, rhs: Foo) -> Bool {
+      return lhs.value == rhs.value
+    }
+  }
+  ```
+
+  Such operators must be declared as `static` (or, within a class, `class
+  final`), and have the same signature as their global counterparts. As part of
+  this change, operator requirements declared in protocols must also be
+  explicitly declared `static`:
+
+  ```swift
+  protocol Equatable {
+    static func ==(lhs: Self, rhs: Self) -> Bool
+  }
+  ```
+
+  Note that the type checker performance optimization described by SE-0091 is
+  not yet implemented.
+
+* [SE-0099](https://github.com/apple/swift-evolution/blob/master/proposals/0099-conditionclauses.md):
+  Condition clauses in `if`, `guard`, and `while` statements now use a more
+  regular syntax. Each pattern or optional binding must be prefixed with `case`
+  or `let` respectively, and all conditions are separated by `,` instead of
+  `where`.
+
+  ```swift
+  // before
+  if let a = a, b = b where a == b { }
+
+  // after
+  if let a = a, let b = b, a == b { }
+  ```
+
+* [SE-0112](https://github.com/apple/swift-evolution/blob/master/proposals/0112-nserror-bridging.md):
+  The `NSError` type is now bridged to the Swift `Error` protocol type
+  (formerly called `ErrorProtocol` in Swift 3, `ErrorType` in Swift 2)
+  in Objective-C APIs, much like other Objective-C types are
+  bridged to Swift (e.g., `NSString` being bridged to `String`). For
+  example, the `UIApplicationDelegate` method
+  `applicate(_:didFailToRegisterForRemoteNotificationsWithError:)`
+  changes from accepting an `NSError` argument:
+
+  ```swift
+  optional func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: NSError)
+  ```
+
+  to accepting an `Error` argument:
+
+  ```swift
+  optional func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error)
+  ```
+
+  Additionally, error types imported from Cocoa[Touch] maintain all of
+  the information in the corresponding `NSError`, so it is no longer
+  necessary to `catch let as NSError` to extract (e.g.) the user-info
+  dictionary. Specific also error types contain typed accessors for
+  their common user-info keys. For example:
+
+  ```swift
+  catch let error as CocoaError where error.code == .fileReadNoSuchFileError {
+    print("No such file: \(error.url)")
+  }
+  ```
+
+  Finally, Swift-defined error types can provide localized error
+  descriptions by adopting the new `LocalizedError` protocol, e.g.,
+
+  ```swift
+  extension HomeworkError : LocalizedError {
+    var errorDescription: String? {
+      switch self {
+      case .forgotten: return NSLocalizedString("I forgot it")
+      case .lost: return NSLocalizedString("I lost it")
+      case .dogAteIt: return NSLocalizedString("The dog ate it")
+      }
+    }
+  }
+  ```
+
+  Similarly, the new `RecoverableError` and `CustomNSError` protocols
+  allow additional control over the handling of the error.
+
+
+* [SE-0060](https://github.com/apple/swift-evolution/blob/master/proposals/0060-defaulted-parameter-order.md):
+  Function parameters with default arguments must now be specified in
+  declaration order. A call site must always supply the arguments it provides
+  to a function in their declared order:
+
+    ```swift
+    func requiredArguments(a: Int, b: Int, c: Int) {}
+    func defaultArguments(a: Int = 0, b: Int = 0, c: Int = 0) {}
+
+    requiredArguments(a: 0, b: 1, c: 2)
+    requiredArguments(b: 0, a: 1, c: 2) // error
+    defaultArguments(a: 0, b: 1, c: 2)
+    defaultArguments(b: 0, a: 1, c: 2) // error
+    ```
+
+    Arbitrary labeled parameters with default arguments may still be elided, as
+    long as the specified arguments follow declaration order:
+
+    ```swift
+    defaultArguments(a: 0) // ok
+    defaultArguments(b: 1) // ok
+    defaultArguments(c: 2) // ok
+    defaultArguments(a: 1, c: 2) // ok
+    defaultArguments(b: 1, c: 2) // ok
+    defaultArguments(c: 1, b: 2) // error
+    ```
+
+* Traps from force-unwrapping nil `Optional`s now show the source location
+  of the force unwrap operator.
+
 * [SE-0093](https://github.com/apple/swift-evolution/blob/master/proposals/0093-slice-base.md): Slice types now have a `base` property that allows public readonly access to their base collections.
 
 * Nested generic functions may now capture bindings from the environment, for example:
@@ -108,6 +249,9 @@ Swift 3.0
   - Foundation container classes `NS[Mutable]Array`, `NS[Mutable]Set`, and
     `NS[Mutable]Dictionary` are still imported as nongeneric classes for
     the time being.
+
+* [SE-0036](https://github.com/apple/swift-evolution/blob/master/proposals/0036-enum-dot.md): 
+  Enum elements can no longer be accessed as instance members in instance methods.
 
 * As part of the changes for SE-0055 (see below), the *pointee* types of
   imported pointers (e.g. the `id` in `id *`) are no longer assumed to always
@@ -280,8 +424,7 @@ Swift 3.0
     person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
     ```
 
-* Traps from force-unwrapping nil `Optional`s now show the source location
-  of the force unwrap operator.
+**If you are adding a new entry, add it to the top of the file, not here!**
 
 
 Swift 2.2
@@ -5021,15 +5164,15 @@ Swift 2.2
     var x = Int8(-129)
     // error: integer literal overflows when stored into 'Int8'
 
-    var y : Int = 0xFFFF_FFFF_FFFF_FFFF_F
+    var y: Int = 0xFFFF_FFFF_FFFF_FFFF_F
     // error: integer literal overflows when stored into 'Int'
     ```
 
   Overflows in constant integer expressions are also reported by the compiler.
 
     ```swift
-    var x : Int8 = 125
-    var y : Int8 = x + 125
+    var x: Int8 = 125
+    var y: Int8 = x + 125
     // error: arithmetic operation '125 + 125' (on type 'Int8') results in
     //        an overflow
     ```

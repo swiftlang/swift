@@ -719,18 +719,6 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
                                                TypeSubstitutions);
   }
 
-  SILOpenedArchetypesTracker *OldOpenedArchetypesTracker =
-      Builder.getOpenedArchetypesTracker();
-
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(*AI.getFunction());
-
-  if (ConcreteType->isOpenedExistential()) {
-    // Prepare a mini-mapping for opened archetypes.
-    // SILOpenedArchetypesTracker OpenedArchetypesTracker(*AI.getFunction());
-    OpenedArchetypesTracker.addOpenedArchetypeDef(ConcreteType, ConcreteTypeDef);
-    Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  }
-
   FullApplySite NewAI;
   Builder.setCurrentDebugScope(AI.getDebugScope());
 
@@ -748,9 +736,6 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   if (isa<ApplyInst>(NewAI))
     replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction());
   eraseInstFromFunction(*AI.getInstruction());
-
-  if (ConcreteType->isOpenedExistential())
-    Builder.setOpenedArchetypesTracker(OldOpenedArchetypesTracker);
 
   return NewAI.getInstruction();
 }
@@ -858,14 +843,31 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   CanType ConcreteType = std::get<1>(*ConformanceAndConcreteType);
   SILValue ConcreteTypeDef = std::get<2>(*ConformanceAndConcreteType);
 
+  SILOpenedArchetypesTracker *OldOpenedArchetypesTracker =
+      Builder.getOpenedArchetypesTracker();
+
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(*AI.getFunction());
+
+  if (ConcreteType->isOpenedExistential()) {
+    // Prepare a mini-mapping for opened archetypes.
+    // SILOpenedArchetypesTracker OpenedArchetypesTracker(*AI.getFunction());
+    OpenedArchetypesTracker.addOpenedArchetypeDef(ConcreteType, ConcreteTypeDef);
+    Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
+  }
+
   // Propagate the concrete type into the callee-operand if required.
   Propagate(ConcreteType, Conformance);
 
   // Create a new apply instruction that uses the concrete type instead
   // of the existential type.
-  return createApplyWithConcreteType(AI, NewSelf, Self,
-                                     ConcreteType, ConcreteTypeDef, Conformance,
-                                     OpenedArchetype);
+  auto *NewAI = createApplyWithConcreteType(AI, NewSelf, Self, ConcreteType,
+                                            ConcreteTypeDef, Conformance,
+                                            OpenedArchetype);
+
+  if (ConcreteType->isOpenedExistential())
+    Builder.setOpenedArchetypesTracker(OldOpenedArchetypesTracker);
+
+  return NewAI;
 }
 
 SILInstruction *

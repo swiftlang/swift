@@ -44,7 +44,21 @@ extension String {
   ///
   /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
   public init(cString: UnsafePointer<CChar>) {
-    self = String.decodeCString(UnsafePointer(cString), as: UTF8.self,
+    let len = UTF8._nullCodeUnitOffset(in: cString)
+    let (result, _) = cString.withMemoryRebound(to: UInt8.self, capacity: len) {
+      _decodeCString($0, as: UTF8.self, length: len,
+        repairingInvalidCodeUnits: true)!
+    }
+    self = result
+  }
+
+  /// Creates a new string by copying the null-terminated UTF-8 data referenced
+  /// by the given pointer.
+  ///
+  /// This is identical to init(cString: UnsafePointer<CChar> but operates on an
+  /// unsigned sequence of bytes.
+  public init(cString: UnsafePointer<UInt8>) {
+    self = String.decodeCString(cString, as: UTF8.self,
       repairingInvalidCodeUnits: true)!.result
   }
 
@@ -75,10 +89,13 @@ extension String {
   ///
   /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
-    guard let (result, _) = String.decodeCString(
-        UnsafePointer(cString),
-        as: UTF8.self,
-        repairingInvalidCodeUnits: false) else {
+    let len = UTF8._nullCodeUnitOffset(in: cString)
+    guard let (result, _) =
+    cString.withMemoryRebound(to: UInt8.self, capacity: len, {
+        _decodeCString($0, as: UTF8.self, length: len,
+          repairingInvalidCodeUnits: false)
+      })
+    else {
       return nil
     }
     self = result
@@ -138,14 +155,8 @@ extension String {
       return nil
     }
     let len = encoding._nullCodeUnitOffset(in: cString)
-    let buffer = UnsafeBufferPointer<Encoding.CodeUnit>(
-      start: cString, count: len)
-
-    let (stringBuffer, hadError) = _StringBuffer.fromCodeUnits(
-      buffer, encoding: encoding, repairIllFormedSequences: isRepairing)
-    return stringBuffer.map {
-      (result: String(_storage: $0), repairsMade: hadError)
-    }
+    return _decodeCString(cString, as: encoding, length: len,
+      repairingInvalidCodeUnits: isRepairing)
   }
 
 }
@@ -163,6 +174,26 @@ public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
     result[i] = s[i]
   }
   return result
+}
+
+/// Creates a new string by copying the null-terminated data referenced by
+/// the given pointer using the specified encoding.
+///
+/// This internal helper takes the string length as an argument.
+func _decodeCString<Encoding : UnicodeCodec>(
+  _ cString: UnsafePointer<Encoding.CodeUnit>,
+  as encoding: Encoding.Type, length: Int,
+  repairingInvalidCodeUnits isRepairing: Bool = true)
+-> (result: String, repairsMade: Bool)? {
+
+  let buffer = UnsafeBufferPointer<Encoding.CodeUnit>(
+    start: cString, count: length)
+
+  let (stringBuffer, hadError) = _StringBuffer.fromCodeUnits(
+    buffer, encoding: encoding, repairIllFormedSequences: isRepairing)
+  return stringBuffer.map {
+    (result: String(_storage: $0), repairsMade: hadError)
+  }
 }
 
 extension String {

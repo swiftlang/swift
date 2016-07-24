@@ -899,6 +899,9 @@ public:
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
 
+  /// The original CS if this CS was created as a simplification of another CS
+  ConstraintSystem *baseCS = nullptr;
+
 private:
 
   /// \brief Allocator used for all of the related constraint systems.
@@ -1246,6 +1249,10 @@ public:
 
   TypeLoc getContextualTypeLoc() const {
     return contextualType;
+  }
+
+  const Expr *getContextualTypeNode() const {
+    return contextualTypeNode;
   }
 
   ContextualTypePurpose getContextualTypePurpose() const {
@@ -1721,10 +1728,6 @@ public:
     /// Indicates we're unwrapping an optional type for a value-to-optional
     /// conversion.
     TMF_UnwrappingOptional = 0x8,
-    
-    /// Indicates we're applying an operator function with a nil-literal
-    /// argument.
-    TMF_ApplyingOperatorWithNil = 0x10,
   };
 
 private:
@@ -2130,43 +2133,6 @@ static inline bool computeTupleShuffle(TupleType *fromTuple,
 /// \brief Return whether the function argument indicated by `locator` has a
 /// trailing closure.
 bool hasTrailingClosure(const ConstraintLocatorBuilder &locator);
-
-/// A call argument or parameter.
-struct LLVM_LIBRARY_VISIBILITY CallArgParam {
-  /// The type of the argument or parameter. For a variadic parameter,
-  /// this is the element type.
-  Type Ty;
-
-  // The label associated with the argument or parameter, if any.
-  Identifier Label;
-
-  /// Whether the parameter has a default argument.  Not valid for arguments.
-  bool HasDefaultArgument = false;
-
-  /// Whether the parameter is variadic. Not valid for arguments.
-  bool Variadic = false;
-
-  /// Whether the argument or parameter has a label.
-  bool hasLabel() const { return !Label.empty(); }
-};
-
-/// Break an argument type into an array of \c CallArgParams.
-///
-/// \param type The type to decompose.
-SmallVector<CallArgParam, 4> decomposeArgType(Type type);
-
-/// Break a parameter type into an array of \c CallArgParams.
-///
-/// \param paramOwner The declaration that owns this parameter.
-/// \param level The level of parameters that are being decomposed.
-SmallVector<CallArgParam, 4> decomposeParamType(
-                               Type type,
-                               ValueDecl *paramOwner,
-                               unsigned level);
-
-/// Turn a param list into a symbolic and printable representation that does not
-/// include the types, something like (: , b:, c:)
-std::string getParamListAsString(ArrayRef<CallArgParam> parameters);
 
 /// Describes the arguments to which a parameter binds.
 /// FIXME: This is an awful data structure. We want the equivalent of a

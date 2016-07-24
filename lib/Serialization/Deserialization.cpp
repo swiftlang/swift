@@ -1556,6 +1556,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
     declContextOrOffset = AFD;
   } else if (auto SD = dyn_cast<SubscriptDecl>(D)) {
     declContextOrOffset = SD;
+  } else if (auto TAD = dyn_cast<TypeAliasDecl>(D)) {
+    declContextOrOffset = TAD;
   } else {
     llvm_unreachable("Unknown Decl : DeclContext kind");
   }
@@ -2161,6 +2163,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                            genericParams, DC);
     declOrOffset = alias;
 
+    if (genericParams) {
+      SmallVector<GenericTypeParamType *, 4> paramTypes;
+      for (auto &genericParam : *genericParams) {
+        paramTypes.push_back(genericParam->getDeclaredType()
+                               ->castTo<GenericTypeParamType>());
+      }
+
+      // Read the generic requirements.
+      SmallVector<Requirement, 4> requirements;
+      readGenericRequirements(requirements);
+
+      auto sig = GenericSignature::get(paramTypes, requirements);
+      alias->setGenericSignature(sig);
+    }
+
     alias->computeType();
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -2395,24 +2412,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       ctor->setInterfaceType(interfaceType);
     }
 
-    // Set the initializer type of the constructor.
-    auto allocType = ctor->getType();
-    auto selfTy = ctor->computeSelfType();
-    if (auto polyFn = allocType->getAs<PolymorphicFunctionType>()) {
-      ctor->setInitializerType(
-        PolymorphicFunctionType::get(selfTy, polyFn->getResult(),
-                                     &polyFn->getGenericParams(),
-                                     polyFn->getExtInfo()));
-    } else {
-      auto fn = allocType->castTo<FunctionType>();
-      ctor->setInitializerType(FunctionType::get(selfTy,
-                                                 fn->getResult(),
-                                                 fn->getExtInfo()));
-    }
-
     // Set the initializer interface type of the constructor.
-    allocType = ctor->getInterfaceType();
-    selfTy = ctor->computeInterfaceSelfType(/*isInitializingCtor=*/true);
+    auto allocType = ctor->getInterfaceType();
+    auto selfTy = ctor->computeInterfaceSelfType(/*isInitializingCtor=*/true);
     if (auto polyFn = allocType->getAs<GenericFunctionType>()) {
       ctor->setInitializerInterfaceType(
               GenericFunctionType::get(polyFn->getGenericSignature(),
@@ -2853,7 +2855,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isObjC, requiresStoredPropertyInits, foreign;
+    bool isImplicit, isObjC, requiresStoredPropertyInits;
     TypeID superclassID;
     uint8_t rawAccessLevel;
     unsigned numConformances;
@@ -2861,7 +2863,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          requiresStoredPropertyInits,
-                                         foreign, superclassID, rawAccessLevel,
+                                         superclassID, rawAccessLevel,
                                          numConformances,
                                          rawInheritedIDs);
 
@@ -2890,8 +2892,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theClass->setSuperclass(getType(superclassID));
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
-    if (foreign)
-      theClass->setForeign();
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *theClass->getGenericParams()) {
@@ -3419,16 +3419,11 @@ Type ModuleFile::getType(TypeID TID) {
 
       IdentifierID nameID;
       TypeID typeID;
-      uint8_t rawDefArg;
       bool isVararg;
       decls_block::TupleTypeEltLayout::readRecord(scratch, nameID, typeID,
-                                                  rawDefArg, isVararg);
+                                                  isVararg);
 
-      DefaultArgumentKind defArg = DefaultArgumentKind::None;
-      if (auto actualDefArg = getActualDefaultArgKind(rawDefArg))
-        defArg = *actualDefArg;
-      elements.push_back({getType(typeID), getIdentifier(nameID), defArg,
-                          isVararg});
+      elements.push_back({getType(typeID), getIdentifier(nameID), isVararg});
     }
 
     typeOrOffset = TupleType::get(elements, ctx);
@@ -3439,13 +3434,14 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID inputID;
     TypeID resultID;
     uint8_t rawRepresentation;
-    bool autoClosure, noreturn, noescape, throws;
+    bool autoClosure, noreturn, noescape, explicitlyEscaping, throws;
 
     decls_block::FunctionTypeLayout::readRecord(scratch, inputID, resultID,
                                                 rawRepresentation,
                                                 autoClosure,
                                                 noreturn,
                                                 noescape,
+                                                explicitlyEscaping,
                                                 throws);
     auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
     if (!representation.hasValue()) {
@@ -3454,7 +3450,8 @@ Type ModuleFile::getType(TypeID TID) {
     }
     
     auto Info = FunctionType::ExtInfo(*representation,
-                               noreturn, autoClosure, noescape, throws);
+                               noreturn, autoClosure, noescape,
+                               explicitlyEscaping, throws);
     
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
                                      Info);
@@ -4074,6 +4071,9 @@ Type ModuleFile::getType(TypeID TID) {
     error();
     return nullptr;
   }
+
+  // Invoke the callback on the deserialized type.
+  DeserializedTypeCallback(typeOrOffset);
 
   return typeOrOffset;
 }

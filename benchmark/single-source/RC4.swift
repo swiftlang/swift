@@ -16,8 +16,8 @@ import TestsUtils
 
 struct RC4 {
   var State : [UInt8]
-  var I : UInt8 = 0
-  var J : UInt8 = 0
+  var I: UInt8 = 0
+  var J: UInt8 = 0
 
   init() {
     State = [UInt8](repeating: 0, count: 256)
@@ -29,7 +29,7 @@ struct RC4 {
       State[i] = UInt8(i)
     }
 
-    var j : UInt8 = 0
+    var j: UInt8 = 0
     for i in 0..<256 {
       let K : UInt8 = Key[i % Key.count]
       let S : UInt8 = State[i]

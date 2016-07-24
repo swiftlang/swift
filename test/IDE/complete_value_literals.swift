@@ -45,27 +45,27 @@ func testAll0() {
 // NO_CONTEXT_0: End completions
 }
 
-struct MyNil1: NilLiteralConvertible {
+struct MyNil1: ExpressibleByNilLiteral {
   init(nilLiteral: ()) {}
 }
-struct MyBool1: BooleanLiteralConvertible {
+struct MyBool1: ExpressibleByBooleanLiteral {
   init(booleanLiteral value: Bool) {}
 }
-struct MyInt1: IntegerLiteralConvertible {
+struct MyInt1: ExpressibleByIntegerLiteral {
   init(integerLiteral value: Int) {}
 }
-struct MyDouble1: FloatLiteralConvertible {
+struct MyDouble1: ExpressibleByFloatLiteral {
   init(floatLiteral value: Double) {}
 }
-struct MyString1: StringLiteralConvertible {
+struct MyString1: ExpressibleByStringLiteral {
   init(unicodeScalarLiteral value: Character) {}
   init(extendedGraphemeClusterLiteral value: String) {}
   init(stringLiteral value: String) {}
 }
-struct MyArray1<Element>: ArrayLiteralConvertible {
+struct MyArray1<Element>: ExpressibleByArrayLiteral {
   init(arrayLiteral value: Element...) {}
 }
-struct MyDict1<Key, Value>: DictionaryLiteralConvertible {
+struct MyDict1<Key, Value>: ExpressibleByDictionaryLiteral {
   init(dictionaryLiteral elements: (Key, Value)...) {}
 }
 
@@ -200,7 +200,7 @@ func testTuple2() {
 // FIXME: should we extend the tuple to have the right number of elements?
 // TUPLE_2: Literal[Tuple]/None/TypeRelation[Identical]: ({#(values)#})[#(MyInt1, MyString1, MyDouble1)#];
 
-struct MyColor1: _ColorLiteralConvertible {
+struct MyColor1: _ExpressibleByColorLiteral {
   init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
 }
 func testColor0() {
@@ -218,7 +218,7 @@ func testColor2() {
 }
 // COLOR_2: Literal[_Color]/None/TypeRelation[Convertible]: #colorLiteral({#red: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})[#MyColor1#];
 
-struct MyImage1: _ImageLiteralConvertible {
+struct MyImage1: _ExpressibleByImageLiteral {
   init(imageLiteralResourceName: String) {}
 }
 func testImage0() {

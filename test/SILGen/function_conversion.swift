@@ -23,16 +23,16 @@ func cToBlock(_ arg: @convention(c) (Int) -> Int) -> @convention(block) (Int) ->
 
 // ==== Throws variance
 
-// CHECK-LABEL: sil hidden @_TF19function_conversion12funcToThrowsFFT_T_FzT_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> @owned @callee_owned () -> @error ErrorProtocol
-// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned () -> () to $@callee_owned () -> @error ErrorProtocol
+// CHECK-LABEL: sil hidden @_TF19function_conversion12funcToThrowsFFT_T_FzT_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> @owned @callee_owned () -> @error Error
+// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned () -> () to $@callee_owned () -> @error Error
 // CHECK:         return [[FUNC]]
 func funcToThrows(_ x: () -> ()) -> () throws -> () {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF19function_conversion12thinToThrowsFXfT_T_XfzT_T_ : $@convention(thin) (@convention(thin) () -> ()) -> @convention(thin) () -> @error ErrorProtocol
-// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@convention(thin) () -> () to $@convention(thin) () -> @error ErrorProtocol
-// CHECK:         return [[FUNC]] : $@convention(thin) () -> @error ErrorProtocol
+// CHECK-LABEL: sil hidden @_TF19function_conversion12thinToThrowsFXfT_T_XfzT_T_ : $@convention(thin) (@convention(thin) () -> ()) -> @convention(thin) () -> @error Error
+// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@convention(thin) () -> () to $@convention(thin) () -> @error Error
+// CHECK:         return [[FUNC]] : $@convention(thin) () -> @error Error
 func thinToThrows(_ x: @convention(thin) () -> ()) -> @convention(thin) () throws -> () {
   return x
 }
@@ -340,23 +340,23 @@ func convUpcastMetatype(_ c4: (Parent.Type, Trivial?) -> Child.Type,
 
 // ==== Function to existential -- make sure we maximally abstract it
 
-// CHECK-LABEL: sil hidden @_TF19function_conversion19convFuncExistentialFFP_FSiSiT_ : $@convention(thin) (@owned @callee_owned (@in protocol<>) -> @owned @callee_owned (Int) -> Int) -> ()
+// CHECK-LABEL: sil hidden @_TF19function_conversion19convFuncExistentialFFP_FSiSiT_ : $@convention(thin) (@owned @callee_owned (@in Any) -> @owned @callee_owned (Int) -> Int) -> ()
 func convFuncExistential(_ f1: (Any) -> (Int) -> Int) {
 // CHECK:         function_ref @_TTRXFo_iP__oXFo_dSi_dSi__XFo_oXFo_dSi_dSi__iP__
 // CHECK:         partial_apply %3(%0)
   let _: ((Int) -> Int) -> Any = f1
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP__oXFo_dSi_dSi__XFo_oXFo_dSi_dSi__iP__ : $@convention(thin) (@owned @callee_owned (Int) -> Int, @owned @callee_owned (@in protocol<>) -> @owned @callee_owned (Int) -> Int) -> @out protocol<>
-// CHECK:         alloc_stack $protocol<>
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP__oXFo_dSi_dSi__XFo_oXFo_dSi_dSi__iP__ : $@convention(thin) (@owned @callee_owned (Int) -> Int, @owned @callee_owned (@in Any) -> @owned @callee_owned (Int) -> Int) -> @out Any
+// CHECK:         alloc_stack $Any
 // CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK-NEXT:    partial_apply
-// CHECK-NEXT:    init_existential_addr %3 : $*protocol<>, $Int -> Int
+// CHECK-NEXT:    init_existential_addr %3 : $*Any, $(Int) -> Int
 // CHECK-NEXT:    store
 // CHECK-NEXT:    apply
 // CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK-NEXT:    partial_apply
-// CHECK-NEXT:    init_existential_addr %0 : $*protocol<>, $Int -> Int
+// CHECK-NEXT:    init_existential_addr %0 : $*Any, $(Int) -> Int
 // CHECK-NEXT:    store {{.*}} to {{.*}} : $*@callee_owned (@in Int) -> @out Int
 // CHECK:         return
 

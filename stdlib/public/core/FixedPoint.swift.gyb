@@ -50,8 +50,8 @@ public typealias UIntMax = ${UIntMax}
 /// not use it directly.
 @_show_in_interface
 public protocol _Integer
-  : _BuiltinIntegerLiteralConvertible,
-    IntegerLiteralConvertible,
+  : _ExpressibleByBuiltinIntegerLiteral,
+    ExpressibleByIntegerLiteral,
     CustomStringConvertible,
     Hashable,
     IntegerArithmetic,
@@ -460,7 +460,7 @@ fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_fun
   result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(src), false._value)
 %       end
 % 
-% if not safelyConvertable:
+% if not safelyConvertible:
   ${error_check}
 % end
   self._value = result.value
@@ -472,7 +472,7 @@ fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_fun
 %    srcSigned = src_ty.is_signed
 %    Src = src_ty.stdlib_name
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
-%    safelyConvertable = (srcBits < bits and (srcSign == sign or signed)) or (srcBits == bits and srcSign == sign)
+%    safelyConvertible = (srcBits < bits and (srcSign == sign or signed)) or (srcBits == bits and srcSign == sign)
 
 @_transparent
 extension ${Self} {
@@ -487,7 +487,7 @@ extension ${Self} {
     }
   }
     
-% if safelyConvertable: 
+% if safelyConvertible:
   @available(*, message: "Converting ${Src} to ${Self} will always succeed.")
 % end
   @_transparent 
@@ -570,7 +570,7 @@ public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 ///
 /// - SeeAlso: `BitwiseOperations`
 @_transparent
-public prefix func ~(rhs: ${Self}) -> ${Self} {
+public prefix func ~ (rhs: ${Self}) -> ${Self} {
   let mask = ${Self}.subtractWithOverflow(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs._value, mask._value))
 }

@@ -3,6 +3,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL3 | FileCheck %s -check-prefix=LITERAL3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL4 | FileCheck %s -check-prefix=LITERAL4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL5 | FileCheck %s -check-prefix=LITERAL5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL6 | FileCheck %s -check-prefix=LITERAL6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL7 | FileCheck %s -check-prefix=LITERAL7
 
 {
   1.#^LITERAL1^#
@@ -28,7 +30,6 @@
   true.#^LITERAL3^#
 }
 // LITERAL3:         Begin completions
-// LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal:      boolValue[#Bool#]; name=boolValue{{$}}
 // LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal:      description[#String#]; name=description{{$}}
 // LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal:      hashValue[#Int#]; name=hashValue{{$}}
 
@@ -37,7 +38,7 @@
 }
 
 // LITERAL4:         Begin completions
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   withCString({#(f): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(f: (UnsafePointer<Int8>) throws -> Result) rethrows{{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   withCString({#(body): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(body: (UnsafePointer<Int8>) throws -> Result) rethrows{{$}}
 
 // FIXME: we should show the qualified String.Index type.
 // rdar://problem/20788802
@@ -59,3 +60,19 @@ func giveMeAString() -> Int {
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#contentsOf: S#})[#Void#]{{; name=.+$}}
+
+struct MyColor: _ExpressibleByColorLiteral {
+  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) { red = colorLiteralRed }
+  var red: Float
+}
+public typealias _ColorLiteralType = MyColor
+func testColor11() {
+  let y: MyColor
+  y = #colorLiteral(red: 1.0, green: 0.1, blue: 0.5, alpha: 1.0).#^LITERAL6^#
+}
+// LITERAL6: Decl[InstanceVar]/CurrNominal:      red[#Float#]; name=red
+func testColor12() {
+  let y: MyColor
+  y = #colorLiteral(red: 1.0, green: 0.1, blue: 0.5, alpha: 1.0) #^LITERAL7^#
+}
+// LITERAL7: Decl[InstanceVar]/CurrNominal:      .red[#Float#]; name=red

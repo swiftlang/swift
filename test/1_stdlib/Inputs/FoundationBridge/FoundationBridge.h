@@ -1,4 +1,4 @@
-//===--- FoundationBridge.h -------------------------------------*- C++ -*-===//
+//===--- FoundationBridge.h -----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -51,5 +51,22 @@ typedef NS_ENUM(NSInteger, ObjectBehaviorAction) {
 void takesData(NSData *object);
 NSData *returnsData();
 BOOL identityOfData(NSData *data);
+
+#pragma mark - NSCalendar verification
+
+@interface CalendarBridgingTester : NSObject
+- (NSCalendar *)autoupdatingCurrentCalendar;
+- (BOOL)verifyAutoupdatingCalendar:(NSCalendar *)calendar;
+@end
+
+@interface TimeZoneBridgingTester : NSObject
+- (NSTimeZone *)autoupdatingCurrentTimeZone;
+- (BOOL)verifyAutoupdatingTimeZone:(NSTimeZone *)tz;
+@end
+
+@interface LocaleBridgingTester : NSObject
+- (NSLocale *)autoupdatingCurrentLocale;
+- (BOOL)verifyAutoupdatingLocale:(NSLocale *)locale;
+@end
 
 NS_ASSUME_NONNULL_END

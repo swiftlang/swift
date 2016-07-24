@@ -66,14 +66,14 @@ StrideTestSuite.test("Double") {
     // Work on Doubles
     expectEqual(
       sum,
-      stride(from: start, to: end, by: stepSize).reduce(0.0, combine: +))
+      stride(from: start, to: end, by: stepSize).reduce(0.0, +))
   }
   
   func checkClosed(from start: Double, through end: Double, by stepSize: Double, sum: Double) {
     // Work on Doubles
     expectEqual(
       sum,
-      stride(from: start, through: end, by: stepSize).reduce(0.0, combine: +))
+      stride(from: start, through: end, by: stepSize).reduce(0.0, +))
   }
   
   checkOpen(from: 1.0, to: 15.0, by: 3.0, sum: 35.0)
@@ -104,7 +104,8 @@ StrideTestSuite.test("HalfOpen") {
     // Work on Ints
     expectEqual(
       sum,
-      stride(from: start, to: end, by: stepSize).reduce(0, combine: +))
+      stride(from: start, to: end, by: stepSize).reduce(
+        0, +))
 
     // Work on an arbitrary RandomAccessIndex
     expectEqual(
@@ -129,12 +130,15 @@ StrideTestSuite.test("Closed") {
     // Work on Ints
     expectEqual(
       sum,
-      stride(from: start, through: end, by: stepSize).reduce(0, combine: +))
+      stride(from: start, through: end, by: stepSize).reduce(
+        0, +))
 
     // Work on an arbitrary RandomAccessIndex
     expectEqual(
       sum,
-      stride(from: R(start), through: R(end), by: stepSize).reduce(0) { $0 + $1.x })
+      stride(from: R(start), through: R(end), by: stepSize).reduce(
+        0, { $0 + $1.x })
+    )
   }
   
   check(from: 1, through: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
@@ -202,6 +206,36 @@ StrideTestSuite.test("ErrorAccumulation") {
   expectEqual(Float(2.0), a.last)
   let b = Array(stride(from: Float(1.0), to: Float(10.0), by: Float(0.9)))
   expectEqual(10, b.count)
+}
+
+func strideIteratorTest<
+  Stride : Sequence
+>(_ stride: Stride, nonNilResults: Int) {
+  var i = stride.makeIterator()
+  for _ in 0..<nonNilResults {
+     expectNotEmpty(i.next())
+  }
+  for _ in 0..<10 {
+    expectEmpty(i.next())
+  }
+}
+
+StrideTestSuite.test("StrideThroughIterator/past end") {
+  strideIteratorTest(stride(from: 0, through: 3, by: 1), nonNilResults: 4)
+  strideIteratorTest(
+    stride(from: UInt8(0), through: 255, by: 5), nonNilResults: 52)
+}
+
+StrideTestSuite.test("StrideThroughIterator/past end/backward") {
+  strideIteratorTest(stride(from: 3, through: 0, by: -1), nonNilResults: 4)
+}
+
+StrideTestSuite.test("StrideToIterator/past end") {
+  strideIteratorTest(stride(from: 0, to: 3, by: 1), nonNilResults: 3)
+}
+
+StrideTestSuite.test("StrideToIterator/past end/backward") {
+  strideIteratorTest(stride(from: 3, to: 0, by: -1), nonNilResults: 3)
 }
 
 runAllTests()

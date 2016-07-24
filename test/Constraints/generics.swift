@@ -3,7 +3,7 @@
 infix operator +++ {}
 
 protocol ConcatToAnything {
-  func +++ <T>(lhs: Self, other: T)
+  static func +++ <T>(lhs: Self, other: T)
 }
 
 func min<T : Comparable>(_ x: T, y: T) -> T {
@@ -225,4 +225,16 @@ func test9215114<T: P19215114, U: Q19215114>(_ t: T) -> (U) -> () {
   let f = body9215114(t)  // expected-error {{generic parameter 'T' could not be inferred}}
   return f
 }
+
+// <rdar://problem/21718970> QoI: [uninferred generic param] cannot invoke 'foo' with an argument list of type '(Int)'
+class Whatever<A: IntegerArithmetic, B: IntegerArithmetic> {  // expected-note 2 {{'A' declared as parameter to type 'Whatever'}}
+  static func foo(a: B) {}
+  
+  static func bar() {}
+
+}
+Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be inferred}}
+
+// <rdar://problem/21718955> Swift useless error: cannot invoke 'foo' with no arguments
+Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}}
 

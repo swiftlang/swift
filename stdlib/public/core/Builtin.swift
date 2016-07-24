@@ -124,27 +124,27 @@ public func unsafeBitCast<T, U>(_ x: T, to: U.Type) -> U {
 
 /// `unsafeBitCast` something to `AnyObject`.
 @_transparent
-public func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
+internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
   return unsafeBitCast(x, to: AnyObject.self)
 }
 
 @_transparent
-func ==(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
+func == (lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
-func !=(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
+func != (lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return !(lhs == rhs)
 }
 
 @_transparent
-func ==(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
+func == (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
-func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
+func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
 }
 
@@ -175,8 +175,8 @@ internal func _unreachable(_ condition: Bool = true) {
 
 /// Tell the optimizer that this code is unreachable if this builtin is
 /// reachable after constant folding build configuration builtins.
-@_versioned @_transparent @noreturn internal
-func _conditionallyUnreachable() {
+@_versioned @_transparent internal
+func _conditionallyUnreachable() -> Never {
   Builtin.conditionallyUnreachable()
 }
 
@@ -264,23 +264,22 @@ public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
 @_versioned
 @_transparent
 @_semantics("branchhint")
-internal func _branchHint<C : Boolean>(_ actual: C, expected: Bool)
-  -> Bool {
-  return Bool(Builtin.int_expect_Int1(actual.boolValue._value, expected._value))
+internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
+  return Bool(Builtin.int_expect_Int1(actual._value, expected._value))
 }
 
 /// Optimizer hint that `x` is expected to be `true`.
 @_transparent
 @_semantics("fastpath")
-public func _fastPath<C: Boolean>(_ x: C) -> Bool {
-  return _branchHint(x.boolValue, expected: true)
+public func _fastPath(_ x: Bool) -> Bool {
+  return _branchHint(x, expected: true)
 }
 
 /// Optimizer hint that `x` is expected to be `false`.
 @_transparent
 @_semantics("slowpath")
-public func _slowPath<C : Boolean>(_ x: C) -> Bool {
-  return _branchHint(x.boolValue, expected: false)
+public func _slowPath(_ x: Bool) -> Bool {
+  return _branchHint(x, expected: false)
 }
 
 /// Optimizer hint that the code where this function is called is on the fast

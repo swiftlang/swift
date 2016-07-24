@@ -253,6 +253,8 @@ struct CursorInfo {
   StringRef Name;
   StringRef USR;
   StringRef TypeName;
+  StringRef TypeUSR;
+  StringRef ContainerTypeUSR;
   StringRef DocComment;
   StringRef TypeInterface;
   StringRef GroupName;
@@ -410,6 +412,10 @@ public:
                                    ArrayRef<const char *> Args,
                                    bool SynthesizedExtensions,
                                    Optional<StringRef> InterestedUSR) = 0;
+
+  virtual void editorOpenTypeInterface(EditorConsumer &Consumer,
+                                       ArrayRef<const char *> Args,
+                                       StringRef TypeUSR) = 0;
 
   virtual void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                          StringRef Name,

@@ -392,6 +392,11 @@ Classes:
     SwiftName: remove(contentsOf:)
     MethodKind: Instance
 - Name: NSBezierPath
+  Properties:
+  - Name: bezierPathByFlatteningPath
+    SwiftName: flattened
+  - Name: bezierPathByReversingPath
+    SwiftName: reversed
   Methods:
   - Selector: 'clipRect:'
     SwiftName: clip(_:)
@@ -1102,6 +1107,73 @@ Protocols:
   - Selector: 'windowDidFailToExitFullScreen:'
     SwiftName: windowDidFailToExitFullScreen(_:)
     MethodKind: Instance
+Globals:
+- Name: NSAccessibilityMainWindowChangedNotification
+  SwiftName: NSAccessibilityMainWindowChangedNotification
+- Name: NSAccessibilityFocusedWindowChangedNotification
+  SwiftName: NSAccessibilityFocusedWindowChangedNotification
+- Name: NSAccessibilityFocusedUIElementChangedNotification
+  SwiftName: NSAccessibilityFocusedUIElementChangedNotification
+- Name: NSAccessibilityApplicationActivatedNotification
+  SwiftName: NSAccessibilityApplicationActivatedNotification
+- Name: NSAccessibilityApplicationDeactivatedNotification
+  SwiftName: NSAccessibilityApplicationDeactivatedNotification
+- Name: NSAccessibilityApplicationHiddenNotification
+  SwiftName: NSAccessibilityApplicationHiddenNotification
+- Name: NSAccessibilityApplicationShownNotification
+  SwiftName: NSAccessibilityApplicationShownNotification
+- Name: NSAccessibilityWindowCreatedNotification
+  SwiftName: NSAccessibilityWindowCreatedNotification
+- Name: NSAccessibilityWindowMovedNotification
+  SwiftName: NSAccessibilityWindowMovedNotification
+- Name: NSAccessibilityWindowResizedNotification
+  SwiftName: NSAccessibilityWindowResizedNotification
+- Name: NSAccessibilityWindowMiniaturizedNotification
+  SwiftName: NSAccessibilityWindowMiniaturizedNotification
+- Name: NSAccessibilityWindowDeminiaturizedNotification
+  SwiftName: NSAccessibilityWindowDeminiaturizedNotification
+- Name: NSAccessibilityDrawerCreatedNotification
+  SwiftName: NSAccessibilityDrawerCreatedNotification
+- Name: NSAccessibilitySheetCreatedNotification
+  SwiftName: NSAccessibilitySheetCreatedNotification
+- Name: NSAccessibilityUIElementDestroyedNotification
+  SwiftName: NSAccessibilityUIElementDestroyedNotification
+- Name: NSAccessibilityValueChangedNotification
+  SwiftName: NSAccessibilityValueChangedNotification
+- Name: NSAccessibilityTitleChangedNotification
+  SwiftName: NSAccessibilityTitleChangedNotification
+- Name: NSAccessibilityResizedNotification
+  SwiftName: NSAccessibilityResizedNotification
+- Name: NSAccessibilityMovedNotification
+  SwiftName: NSAccessibilityMovedNotification
+- Name: NSAccessibilityCreatedNotification
+  SwiftName: NSAccessibilityCreatedNotification
+- Name: NSAccessibilityLayoutChangedNotification
+  SwiftName: NSAccessibilityLayoutChangedNotification
+- Name: NSAccessibilityHelpTagCreatedNotification
+  SwiftName: NSAccessibilityHelpTagCreatedNotification
+- Name: NSAccessibilitySelectedTextChangedNotification
+  SwiftName: NSAccessibilitySelectedTextChangedNotification
+- Name: NSAccessibilityRowCountChangedNotification
+  SwiftName: NSAccessibilityRowCountChangedNotification
+- Name: NSAccessibilitySelectedChildrenChangedNotification
+  SwiftName: NSAccessibilitySelectedChildrenChangedNotification
+- Name: NSAccessibilitySelectedRowsChangedNotification
+  SwiftName: NSAccessibilitySelectedRowsChangedNotification
+- Name: NSAccessibilitySelectedColumnsChangedNotification
+  SwiftName: NSAccessibilitySelectedColumnsChangedNotification
+- Name: NSAccessibilityRowExpandedNotification
+  SwiftName: NSAccessibilityRowExpandedNotification
+- Name: NSAccessibilityRowCollapsedNotification
+  SwiftName: NSAccessibilityRowCollapsedNotification
+- Name: NSAccessibilitySelectedCellsChangedNotification
+  SwiftName: NSAccessibilitySelectedCellsChangedNotification
+- Name: NSAccessibilityUnitsChangedNotification
+  SwiftName: NSAccessibilityUnitsChangedNotification
+- Name: NSAccessibilitySelectedChildrenMovedNotification
+  SwiftName: NSAccessibilitySelectedChildrenMovedNotification
+- Name: NSAccessibilityAnnouncementRequestedNotification
+  SwiftName: NSAccessibilityAnnouncementRequestedNotification
 Enumerators:
 - Name: NSFPPreviewButton
   Availability: nonswift

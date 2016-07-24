@@ -286,7 +286,7 @@ struct ErrorTypeInVarDecl8 {
 }
 
 struct ErrorTypeInVarDecl9 {
-  var v1 : protocol // expected-error {{expected '<' in protocol composition type}}
+  var v1 : protocol // expected-error {{expected identifier for type name}}
   var v2 : Int
 }
 
@@ -301,13 +301,30 @@ struct ErrorTypeInVarDecl11 {
 }
 
 func ErrorTypeInPattern1(_: protocol<) { } // expected-error {{expected identifier for type name}}
-
 func ErrorTypeInPattern2(_: protocol<F) { } // expected-error {{expected '>' to complete protocol composition type}}
-// expected-note@-1 {{to match this opening '<'}}
-// expected-error@-2 {{use of undeclared type 'F'}}
+                                            // expected-note@-1 {{to match this opening '<'}}
+                                            // expected-error@-2 {{use of undeclared type 'F'}}
 
 func ErrorTypeInPattern3(_: protocol<F,) { } // expected-error {{expected identifier for type name}}
-// expected-error@-1 {{use of undeclared type 'F'}}
+                                             // expected-error@-1 {{use of undeclared type 'F'}}
+
+struct ErrorTypeInVarDecl12 {
+  var v1 : FooProtocol & // expected-error{{expected identifier for type name}}
+  var v2 : Int
+}
+
+struct ErrorTypeInVarDecl13 { // expected-note {{in declaration of 'ErrorTypeInVarDecl13'}}
+  var v1 : & FooProtocol // expected-error {{expected type}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error{{expected declaration}} 
+  var v2 : Int
+}
+
+struct ErrorTypeInVarDecl16 {
+  var v1 : FooProtocol & // expected-error {{expected identifier for type name}}
+  var v2 : Int
+}
+
+func ErrorTypeInPattern4(_: FooProtocol & ) { } // expected-error {{expected identifier for type name}}
+
 
 struct ErrorGenericParameterList1< // expected-error {{expected an identifier to name generic parameter}} expected-error {{expected '{' in struct}}
 
@@ -405,7 +422,6 @@ struct MissingInitializer1 {
 
 func exprPostfix1(x : Int) {
   x. // expected-error {{expected member name following '.'}}
-    // expected-warning @-1 {{expression of type 'Int' is unused}}
 }
 
 func exprPostfix2() {
@@ -424,7 +440,7 @@ class ExprSuper1 {
 
 class ExprSuper2 {
   init() {
-    super. // expected-error {{expected member name following '.'}} expected-error {{expected '.' or '[' after 'super'}}
+    super. // expected-error {{expected member name following '.'}} 
   }
 }
 
@@ -542,19 +558,24 @@ func f1() {
 
 // <rdar://problem/20489838> QoI: Nonsensical error and fixit if "let" is missing between 'if let ... where' clauses
 func testMultiPatternConditionRecovery(x: Int?) {
-  // expected-error@+1 {{binding ended by previous 'where' clause; use 'let' to introduce a new one}} {{30-30=let }}
-  if let y = x where y == 0, z = x {
+  // expected-warning@+1 {{expected ',' joining parts of a multi-clause condition}} {{16-21=,}}
+  if let y = x where y == 0, let z = x {
     _ = y
     _ = z
   }
 
-  // expected-error@+1 {{binding ended by previous 'where' clause; use 'var' to introduce a new one}} {{30-30=var }}
-  if var y = x where y == 0, z = x {
+  if var y = x, y == 0, var z = x {
     z = y; y = z
   }
 
+  if var y = x, z = x { // expected-warning {{expected 'var' in conditional}} {{17-17=var }}
+    z = y; y = z
+  }
+
+
   // <rdar://problem/20883210> QoI: Following a "let" condition with boolean condition spouts nonsensical errors
-  guard let x: Int? = 1, x == 1 else {  } // expected-error {{boolean condition requires 'where' to separate it from variable binding}} {{24-25= where}}
+  guard let x: Int? = 1, x == 1 else {  }
+  // expected-warning @-1 {{explicitly specified type 'Int?' adds an additional level of optional to the initializer, making the optional check always succeed}} {{16-22=Int}}
 }
 
 // rdar://20866942
@@ -647,16 +668,9 @@ func postfixDot(a : String) {
   _ = a.   utf8  // expected-error {{extraneous whitespace after '.' is not permitted}} {{9-12=}}
   _ = a.       // expected-error {{expected member name following '.'}}
     a.         // expected-error {{expected member name following '.'}}
-  // expected-warning @-1 {{expression of type 'String' is unused}}
 }
 
-// <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics
-func r23036383(arr : [Int]?) {
-  if let _ = arr?.map {$0+1} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{14-14=(}} {{29-29=)}}
-  }
-
-  let numbers = [1, 2]
-  for _ in numbers.filter {$0 > 4} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{12-12=(}} {{35-35=)}}
-  }
+// <rdar://problem/22290244> QoI: "UIColor." gives two issues, should only give one
+func f() {
+  _ = ClassWithStaticDecls.  // expected-error {{expected member name following '.'}}
 }
-

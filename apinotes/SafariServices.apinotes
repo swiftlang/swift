@@ -1,0 +1,7 @@
+---
+Name: SafariServices
+Tags:
+- Name: SFErrorCode
+  SwiftName: SFErrorDomain
+- Name: SSReadingListErrorCode
+  SwiftName: SSReadingListErrorDomain

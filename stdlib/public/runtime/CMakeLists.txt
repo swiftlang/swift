@@ -17,29 +17,16 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
-set(swift_runtime_port_sources)
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-  set(swift_runtime_port_sources
-      MutexWin32.cpp
-      CygwinPort.cpp)
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
-  set(swift_runtime_port_sources
-      MutexPThread.cpp
-      CygwinPort.cpp)
-else()
-  set(swift_runtime_port_sources
-      MutexPThread.cpp)
-endif()
-
 list(APPEND swift_runtime_compile_flags
      "-D__SWIFT_CURRENT_DYLIB=swiftCore")
-    
+
 set(swift_runtime_objc_sources)
 set(swift_runtime_unicode_normalization_sources)
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   set(swift_runtime_objc_sources
       ErrorObject.mm
       SwiftObject.mm
+      SwiftValue.mm
       Remangle.cpp
       Reflection.mm)
 else()
@@ -47,6 +34,7 @@ endif()
 
 set(swift_runtime_sources
     Casting.cpp
+    CygwinPort.cpp
     Demangle.cpp
     Enum.cpp
     ErrorObjectNative.cpp
@@ -56,6 +44,8 @@ set(swift_runtime_sources
     KnownMetadata.cpp
     Metadata.cpp
     MetadataLookup.cpp
+    MutexPThread.cpp
+    MutexWin32.cpp
     Once.cpp
     Portability.cpp
     ProtocolConformance.cpp
@@ -78,8 +68,7 @@ add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
-  ${swift_runtime_port_sources}
-  C_COMPILE_FLAGS ${swift_runtime_compile_flags}
+  C_COMPILE_FLAGS ${swift_runtime_compile_flags} -DswiftCore_EXPORTS
   INSTALL_IN_COMPONENT never_install)
 
 set(ELFISH_SDKS)

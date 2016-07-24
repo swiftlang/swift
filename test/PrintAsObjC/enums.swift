@@ -99,21 +99,21 @@ import Foundation
   func methodNotExportedToObjC() {}
 }
 
-// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, SomeErrorProtocol) {
-// CHECK-NEXT:   SomeErrorProtocolBadness = 9001,
-// CHECK-NEXT:   SomeErrorProtocolWorseness = 9002,
+// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, SomeError) {
+// CHECK-NEXT:   SomeErrorBadness = 9001,
+// CHECK-NEXT:   SomeErrorWorseness = 9002,
 // CHECK-NEXT: };
-// CHECK-NEXT: static NSString * _Nonnull const SomeErrorProtocolDomain = @"enums.SomeErrorProtocol";
-@objc enum SomeErrorProtocol: Int, ErrorProtocol {
+// CHECK-NEXT: static NSString * _Nonnull const SomeErrorDomain = @"enums.SomeError";
+@objc enum SomeError: Int, Error {
   case Badness = 9001
   case Worseness
 }
 
-// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, SomeOtherErrorProtocol) {
-// CHECK-NEXT:   SomeOtherErrorProtocolDomain = 0,
+// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, SomeOtherError) {
+// CHECK-NEXT:   SomeOtherErrorDomain = 0,
 // CHECK-NEXT: };
-// NEGATIVE-NOT: NSString * _Nonnull const SomeOtherErrorProtocolDomain
-@objc enum SomeOtherErrorProtocol: Int, ErrorProtocol {
+// NEGATIVE-NOT: NSString * _Nonnull const SomeOtherErrorDomain
+@objc enum SomeOtherError: Int, Error {
   case Domain // collision!
 }
 
@@ -121,7 +121,7 @@ import Foundation
 // CHECK-NEXT:   ObjcErrorTypeBadStuff = 0,
 // CHECK-NEXT: };
 // CHECK-NEXT: static NSString * _Nonnull const ObjcErrorTypeDomain = @"enums.SomeRenamedErrorType";
-@objc(ObjcErrorType) enum SomeRenamedErrorType: Int, ErrorProtocol {
+@objc(ObjcErrorType) enum SomeRenamedErrorType: Int, Error {
   case BadStuff
 }
 

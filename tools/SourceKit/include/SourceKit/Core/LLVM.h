@@ -43,6 +43,7 @@ namespace llvm {
   // Reference counting.
   template <typename T> class IntrusiveRefCntPtr;
   template <typename T> struct IntrusiveRefCntPtrInfo;
+  template <class Derived> class ThreadSafeRefCountedBase;
 
   class raw_ostream;
   // TODO: DenseMap, ...
@@ -69,7 +70,6 @@ namespace llvm {
 }
 
 namespace swift {
-  template <class Derived> class ThreadSafeRefCountedBase;
   class ThreadSafeRefCountedBaseVPTR;
 }
 
@@ -95,7 +95,7 @@ namespace SourceKit {
   // Reference counting.
   using llvm::IntrusiveRefCntPtr;
   using llvm::IntrusiveRefCntPtrInfo;
-  using swift::ThreadSafeRefCountedBase;
+  using llvm::ThreadSafeRefCountedBase;
   using swift::ThreadSafeRefCountedBaseVPTR;
   template <typename T> class ThreadSafeRefCntPtr;
 

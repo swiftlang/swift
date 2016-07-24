@@ -267,7 +267,8 @@ func testSwitchEnumBoolTuple(_ b1: Bool, b2: Bool, xi: Int) -> Int {
 }
 
 
-@noreturn @_silgen_name("exit") func exit() -> ()
+@_silgen_name("exit") func exit() -> Never
+
 func reachableThroughNonFoldedPredecessor(fn: @autoclosure () -> Bool = false) {
   if !_fastPath(fn()) {
     exit()
@@ -335,8 +336,7 @@ class r20097963MyClass {
   }
 }
 
-@noreturn
-func die() { die() }
+func die() -> Never { die() }
 
 func testGuard(_ a : Int) {
   guard case 4 = a else {  }  // expected-error {{'guard' body may not fall through, consider using 'return' or 'break'}}
@@ -356,16 +356,16 @@ public func testFailingCast(_ s:String) -> Int {
    return s as! Int // expected-warning {{cast from 'String' to unrelated type 'Int' always fails}}
 }
 
-enum MyError : ErrorProtocol { case A }
+enum MyError : Error { case A }
 
-@noreturn func raise() throws { throw MyError.A }
+func raise() throws -> Never { throw MyError.A }
 
 func test_raise_1() throws -> Int {
   try raise()
 }
 
 func test_raise_2() throws -> Int {
-  try raise() // expected-note {{a call to a noreturn function}}
+  try raise() // expected-note {{a call to a never-returning function}}
   try raise() // expected-warning {{will never be executed}}
 }
 
@@ -374,7 +374,7 @@ func test_raise_2() throws -> Int {
 struct Algol {
   var x: [UInt8]
 
-  @noreturn func fail() throws { throw MyError.A }
+  func fail() throws -> Never { throw MyError.A }
 
   mutating func blah() throws -> Int {
     try fail() // no-warning
@@ -382,7 +382,7 @@ struct Algol {
 }
 
 class Lisp {
-  @noreturn func fail() throws { throw MyError.A }
+  func fail() throws -> Never { throw MyError.A }
 }
 
 func transform<Scheme : Lisp>(_ s: Scheme) throws {
@@ -408,7 +408,7 @@ func deferTryNoReturn() throws {
 func noReturnInDefer() {
   defer {
     _ = Lisp()
-    die() // expected-note {{a call to a noreturn function}}
+    die() // expected-note {{a call to a never-returning function}}
     die() // expected-warning {{will never be executed}}
   }
 }

@@ -279,6 +279,11 @@ namespace {
       return (X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest());
     }
 
+    bool visitBindMemoryInst(const BindMemoryInst *RHS) {
+      auto *X = cast<BindMemoryInst>(LHS);
+      return X->getBoundType() == RHS->getBoundType();
+    }
+
     bool visitFunctionRefInst(const FunctionRefInst *RHS) {
       auto *X = cast<FunctionRefInst>(LHS);
       return X->getReferencedFunction() == RHS->getReferencedFunction();
@@ -517,7 +522,7 @@ namespace {
     }
 
     bool visitPointerToAddressInst(PointerToAddressInst *RHS) {
-      return true;
+      return cast<PointerToAddressInst>(LHS)->isStrict() == RHS->isStrict();
     }
 
     bool visitRefToRawPointerInst(RefToRawPointerInst *RHS) {
@@ -619,6 +624,14 @@ namespace {
       return true;
     }
 
+    bool visitMarkDependenceInst(const MarkDependenceInst *RHS) {
+       return true;
+    }
+
+    bool visitOpenExistentialRefInst(const OpenExistentialRefInst *RHS) {
+      return true;
+    }
+
   private:
     const SILInstruction *LHS;
   };
@@ -702,6 +715,23 @@ namespace {
     }
 #include "swift/SIL/SILNodes.def"
   };
+
+  class MayHaveOpenedArchetypeOperandsAccessor
+      : public SILVisitor<MayHaveOpenedArchetypeOperandsAccessor,
+                          bool> {
+  public:
+#define VALUE(CLASS, PARENT)                                                   \
+  bool visit##CLASS(const CLASS *I) {                                          \
+    llvm_unreachable("accessing non-instruction " #CLASS);                     \
+  }
+#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)                    \
+  bool visit##CLASS(const CLASS *I) {                                          \
+    return IMPLEMENTS_METHOD(CLASS, SILInstruction,                            \
+                             getOpenedArchetypeOperands,                       \
+                             ArrayRef<Operand>() const);                       \
+  }
+#include "swift/SIL/SILNodes.def"
+  };
 } // end anonymous namespace
 
 ArrayRef<Operand> SILInstruction::getAllOperands() const {
@@ -719,6 +749,11 @@ ArrayRef<Operand> SILInstruction::getOpenedArchetypeOperands() const {
 
 MutableArrayRef<Operand> SILInstruction::getOpenedArchetypeOperands() {
   return OpenedArchetypeOperandsMutableAccessor().visit(this);
+}
+
+bool SILInstruction::mayHaveOpenedArchetypeOperands() const {
+  return MayHaveOpenedArchetypeOperandsAccessor().visit(
+      const_cast<SILInstruction *>(this));
 }
 
 /// getOperandNumber - Return which operand this is in the operand list of the

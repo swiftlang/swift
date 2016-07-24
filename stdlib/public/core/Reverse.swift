@@ -48,21 +48,21 @@ public struct ReversedIndex<Base : Collection> : Comparable {
 
   /// The position corresponding to `self` in the underlying collection.
   public let base: Base.Index
-}
 
-public func == <Base : Collection>(
-  lhs: ReversedIndex<Base>,
-  rhs: ReversedIndex<Base>
-) -> Bool {
-  return lhs.base == rhs.base
-}
+  public static func == (
+    lhs: ReversedIndex<Base>,
+    rhs: ReversedIndex<Base>
+  ) -> Bool {
+    return lhs.base == rhs.base
+  }
 
-public func < <Base : Collection>(
-  lhs: ReversedIndex<Base>,
-  rhs: ReversedIndex<Base>
-) -> Bool {
-  // Note ReversedIndex has inverted logic compared to base Base.Index
-  return lhs.base > rhs.base
+  public static func < (
+    lhs: ReversedIndex<Base>,
+    rhs: ReversedIndex<Base>
+  ) -> Bool {
+    // Note ReversedIndex has inverted logic compared to base Base.Index
+    return lhs.base > rhs.base
+  }
 }
 
 /// A Collection that presents the elements of its `Base` collection
@@ -159,21 +159,21 @@ public struct ReversedRandomAccessIndex<
 
   /// The position corresponding to `self` in the underlying collection.
   public let base: Base.Index
-}
 
-public func == <Base : Collection>(
-  lhs: ReversedRandomAccessIndex<Base>,
-  rhs: ReversedRandomAccessIndex<Base>
-) -> Bool {
-  return lhs.base == rhs.base
-}
+  public static func == (
+    lhs: ReversedRandomAccessIndex<Base>,
+    rhs: ReversedRandomAccessIndex<Base>
+  ) -> Bool {
+    return lhs.base == rhs.base
+  }
 
-public func < <Base : Collection>(
-  lhs: ReversedRandomAccessIndex<Base>,
-  rhs: ReversedRandomAccessIndex<Base>
-) -> Bool {
-  // Note ReversedRandomAccessIndex has inverted logic compared to base Base.Index
-  return lhs.base > rhs.base
+  public static func < (
+    lhs: ReversedRandomAccessIndex<Base>,
+    rhs: ReversedRandomAccessIndex<Base>
+  ) -> Bool {
+    // Note ReversedRandomAccessIndex has inverted logic compared to base Base.Index
+    return lhs.base > rhs.base
+  }
 }
 
 /// A Collection that presents the elements of its `Base` collection
@@ -366,14 +366,14 @@ extension ReversedRandomAccessCollection {
 }
 
 extension BidirectionalCollection {
-  @available(*, unavailable, renamed: "reversed")
+  @available(*, unavailable, renamed: "reversed()")
   public func reverse() -> ReversedCollection<Self> {
     Builtin.unreachable()
   }
 }
 
 extension RandomAccessCollection {
-  @available(*, unavailable, renamed: "reversed")
+  @available(*, unavailable, renamed: "reversed()")
   public func reverse() -> ReversedRandomAccessCollection<Self> {
     Builtin.unreachable()
   }
@@ -385,7 +385,7 @@ extension LazyCollectionProtocol
   Elements : BidirectionalCollection
 {
 
-  @available(*, unavailable, renamed: "reversed")
+  @available(*, unavailable, renamed: "reversed()")
   public func reverse() -> LazyCollection<
     ReversedCollection<Elements>
   > {
@@ -398,7 +398,7 @@ extension LazyCollectionProtocol
   Self : RandomAccessCollection,
   Elements : RandomAccessCollection
 {
-  @available(*, unavailable, renamed: "reversed")
+  @available(*, unavailable, renamed: "reversed()")
   public func reverse() -> LazyCollection<
     ReversedRandomAccessCollection<Elements>
   > {

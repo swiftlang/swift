@@ -525,6 +525,13 @@ HeaderToPrint("header-to-print",
 static llvm::cl::opt<std::string>
 LineColumnPair("pos", llvm::cl::desc("Line:Column pair"));
 
+static llvm::cl::opt<std::string>
+USR("usr", llvm::cl::desc("USR"));
+
+static llvm::cl::opt<std::string>
+ModuleName("module-name", llvm::cl::desc("The module name of the given test."),
+           llvm::cl::init("swift_ide_test"));
+
 static llvm::cl::opt<bool>
 NoEmptyLineBetweenMembers("no-empty-line-between-members",
                           llvm::cl::desc("Print no empty line between members."),
@@ -945,6 +952,7 @@ private:
 
   static StringRef getTagName(SyntaxStructureKind K) {
     switch (K) {
+      case SyntaxStructureKind::Argument: return "arg";
       case SyntaxStructureKind::Class: return "class";
       case SyntaxStructureKind::Struct: return "struct";
       case SyntaxStructureKind::Protocol: return "protocol";
@@ -1976,7 +1984,7 @@ public:
       return true;
 
     swift::markup::MarkupContext MC;
-    auto DC = getDocComment(MC, D);
+    auto DC = getSingleDocComment(MC, D);
     if (DC.hasValue())
       swift::markup::dump(DC.getValue()->getDocument(), OS);
 
@@ -2358,7 +2366,36 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
     llvm::errs() << "Cannot get type of the sema token.\n";
     return 1;
   }
-  ASTPrinter::printTypeInterface(SemaT.Ty, SemaT.DC, llvm::outs());
+  StreamPrinter Printer(llvm::outs());
+  std::string Error;
+  std::string TypeName;
+  if (printTypeInterface(SemaT.DC->getParentModule(), SemaT.Ty, Printer,
+                         TypeName, Error)) {
+    llvm::errs() << Error;
+    return 1;
+  }
+  return 0;
+}
+
+static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvok,
+                                          const StringRef FileName,
+                                          const StringRef Usr) {
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(FileName);
+  CompilerInstance CI;
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+  DeclContext *DC = CI.getMainModule()->getModuleContext();
+  assert(DC && "no decl context?");
+  StreamPrinter Printer(llvm::outs());
+  std::string TypeName;
+  std::string Error;
+  if (printTypeInterface(DC->getParentModule(), Usr, Printer, TypeName,
+                         Error)) {
+    llvm::errs() << Error;
+    return 1;
+  }
   return 0;
 }
 
@@ -2665,8 +2702,7 @@ int main(int argc, char *argv[]) {
   InitInvok.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(argv[0],
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
-
-  InitInvok.setModuleName("swift_ide_test");
+  InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);
   if (!options::Triple.empty())
@@ -2892,9 +2928,14 @@ int main(int argc, char *argv[]) {
     ExitCode = doPrintUSRs(InitInvok, options::SourceFilename);
     break;
   case ActionType::PrintTypeInterface:
-    ExitCode = doPrintTypeInterface(InitInvok,
-                                    options::SourceFilename,
-                                    options::LineColumnPair);
+    if (options::LineColumnPair.getNumOccurrences() == 1)
+      ExitCode = doPrintTypeInterface(InitInvok,
+                                      options::SourceFilename,
+                                      options::LineColumnPair);
+    else
+      ExitCode = doPrintTypeInterfaceForTypeUsr(InitInvok,
+                                                options::SourceFilename,
+                                                options::USR);
     break;
   case ActionType::ReconstructType:
     ExitCode = doReconstructType(InitInvok, options::SourceFilename);

@@ -453,7 +453,7 @@ func getFridge(_ home: APPHouse) -> Refrigerator {
 // CHECK: bb0([[HOME:%[0-9]+]] : $APPHouse, [[DELTA:%[0-9]+]] : $Double):
 func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   // +=
-  // CHECK: [[PLUS_EQ:%[0-9]+]] = function_ref @_TZFsoi2peFTRSdSd_T_
+  // CHECK: [[PLUS_EQ:%[0-9]+]] = function_ref @_TFsoi2peFTRSdSd_T_
 
   // Temporary fridge
   // CHECK: [[TEMP_FRIDGE:%[0-9]+]]  = alloc_stack $Refrigerator

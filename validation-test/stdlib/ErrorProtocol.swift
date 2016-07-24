@@ -8,15 +8,15 @@ import StdlibUnittest
 import Foundation
 
 
-enum SomeError : ErrorProtocol {
+enum SomeError : Error {
   case GoneToFail
 }
 
-struct ErrorProtocolAsNSErrorRaceTest : RaceTestWithPerTrialData {
+struct ErrorAsNSErrorRaceTest : RaceTestWithPerTrialData {
   class RaceData {
-    let error: ErrorProtocol
+    let error: Error
 
-    init(error: ErrorProtocol) {
+    init(error: Error) {
       self.error = error
     }
   }
@@ -45,8 +45,8 @@ struct ErrorProtocolAsNSErrorRaceTest : RaceTestWithPerTrialData {
   }
 }
 
-var ErrorProtocolRaceTestSuite = TestSuite("ErrorProtocol races")
-ErrorProtocolRaceTestSuite.test("NSError bridging") {
-  runRaceTest(ErrorProtocolAsNSErrorRaceTest.self, operations: 1000)
+var ErrorRaceTestSuite = TestSuite("Error races")
+ErrorRaceTestSuite.test("NSError bridging") {
+  runRaceTest(ErrorAsNSErrorRaceTest.self, operations: 1000)
 }
 runAllTests()

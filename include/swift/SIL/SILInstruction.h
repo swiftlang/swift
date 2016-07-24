@@ -178,6 +178,10 @@ public:
   /// Return the array of opened archetypes operands for this instruction.
   MutableArrayRef<Operand> getOpenedArchetypeOperands();
 
+  /// Returns true if a given kind of instruction may have opened archetype
+  /// operands.
+  bool mayHaveOpenedArchetypeOperands() const;
+
   unsigned getNumOperands() const { return getAllOperands().size(); }
 
   unsigned getNumOpenedArchetypeOperands() const {
@@ -507,7 +511,6 @@ public:
   }
 };
 
-
 /// Holds common debug information about local variables and function
 /// arguments that are needed by DebugValueInst, DebugValueAddrInst,
 /// AllocStackInst, and AllocBoxInst.
@@ -591,18 +594,36 @@ public:
 
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
-class AllocStackInst final : public AllocationInst,
-    private llvm::TrailingObjects<AllocStackInst, char> {
+class AllocStackInst final
+    : public AllocationInst,
+      private llvm::TrailingObjects<AllocStackInst, Operand, char> {
   friend TrailingObjects;
   friend class SILBuilder;
+
+  unsigned NumOperands;
   TailAllocatedDebugVariable VarInfo;
 
-  AllocStackInst(SILDebugLocation Loc, SILType elementType, SILFunction &F,
+  AllocStackInst(SILDebugLocation Loc, SILType elementType,
+                 ArrayRef<SILValue> OpenedArchetypeOperands,
+                 SILFunction &F,
                  SILDebugVariable Var);
+
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
-                                SILFunction &F, SILDebugVariable Var);
+                                SILFunction &F,
+                                SILOpenedArchetypesState &OpenedArchetypes,
+                                SILDebugVariable Var);
+
+  size_t numTrailingObjects(OverloadToken<Operand>) const {
+    return NumOperands;
+  }
 
 public:
+  ~AllocStackInst() {
+    Operand *Operands = getTrailingObjects<Operand>();
+    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+      Operands[i].~Operand();
+    }
+  }
 
   /// Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
@@ -620,8 +641,21 @@ public:
     return getType().getObjectType();
   }
 
-  ArrayRef<Operand> getAllOperands() const { return {}; }
-  MutableArrayRef<Operand> getAllOperands() { return {}; }
+  ArrayRef<Operand> getAllOperands() const {
+    return { getTrailingObjects<Operand>(), NumOperands };
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return { getTrailingObjects<Operand>(), NumOperands };
+  }
+
+  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+    return getAllOperands();
+  }
+
+  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+    return getAllOperands();
+  }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocStackInst;
@@ -631,17 +665,45 @@ public:
 /// AllocRefInst - This represents the primitive allocation of an instance
 /// of a reference type. Aside from the reference count, the instance is
 /// returned uninitialized.
-class AllocRefInst : public AllocationInst, public StackPromotable {
+class AllocRefInst final
+    : public AllocationInst,
+      public StackPromotable,
+      private llvm::TrailingObjects<AllocRefInst, Operand> {
+  friend TrailingObjects;
   friend class SILBuilder;
-  bool ObjC;
+  unsigned NumOperands : 31;
+  bool ObjC : 1;
 
   AllocRefInst(SILDebugLocation Loc, SILType type, SILFunction &F, bool objc,
-               bool canBeOnStack);
+               bool canBeOnStack, ArrayRef<SILValue> OpenedArchetypeOperands);
+
+  static AllocRefInst *create(SILDebugLocation Loc, SILType type,
+                              SILFunction &F, bool objc, bool canBeOnStack,
+                              SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
+  ~AllocRefInst() {
+    Operand *Operands = getTrailingObjects<Operand>();
+    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+      Operands[i].~Operand();
+    }
+  }
 
-  ArrayRef<Operand> getAllOperands() const { return {}; }
-  MutableArrayRef<Operand> getAllOperands() { return {}; }
+  ArrayRef<Operand> getAllOperands() const {
+    return { getTrailingObjects<Operand>(), NumOperands };
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return { getTrailingObjects<Operand>(), NumOperands };
+  }
+
+  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+    return getAllOperands();
+  }
+
+  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+    return getAllOperands();
+  }
 
   /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
   bool isObjC() const { return ObjC; }
@@ -655,32 +717,45 @@ public:
 /// an instance of a reference type whose runtime type is provided by
 /// the given metatype value. Aside from the reference count, the
 /// instance is returned uninitialized.
-class AllocRefDynamicInst
-  : public UnaryInstructionBase<ValueKind::AllocRefDynamicInst, AllocationInst>
-{
+class AllocRefDynamicInst final
+    : public UnaryInstructionWithOpenArchetypesBase<
+                                  ValueKind::AllocRefDynamicInst,
+                                  AllocRefDynamicInst,
+                                  AllocationInst,
+                                  true> {
   friend class SILBuilder;
 
   bool ObjC;
 
-  AllocRefDynamicInst(SILDebugLocation DebugLoc, SILValue operand, SILType ty,
-                      bool objc)
-      : UnaryInstructionBase(DebugLoc, operand, ty), ObjC(objc) {}
+  AllocRefDynamicInst(SILDebugLocation DebugLoc, SILValue operand,
+                      ArrayRef<SILValue> OpenedArchetypeOperands, SILType ty,
+                      bool objc);
+
+  static AllocRefDynamicInst *
+  create(SILDebugLocation DebugLoc, SILValue operand, SILType ty, bool objc,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-
   /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
   bool isObjC() const { return ObjC; }
 };
 
 /// AllocValueBufferInst - Allocate memory in a value buffer.
-class AllocValueBufferInst :
-  public UnaryInstructionBase<ValueKind::AllocValueBufferInst,
-                              AllocationInst> {
+class AllocValueBufferInst final
+    : public UnaryInstructionWithOpenArchetypesBase<
+                                  ValueKind::AllocValueBufferInst,
+                                  AllocValueBufferInst,
+                                  AllocationInst,
+                                  true> {
   friend class SILBuilder;
 
   AllocValueBufferInst(SILDebugLocation DebugLoc, SILType valueType,
-                       SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, valueType.getAddressType()) {}
+                       SILValue operand,
+                       ArrayRef<SILValue> OpenedArchetypeOperands);
+
+  static AllocValueBufferInst *
+  create(SILDebugLocation DebugLoc, SILType valueType, SILValue operand,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
 
@@ -692,23 +767,40 @@ public:
 /// pointer with Builtin.NativeObject type.  The second return value
 /// is an address pointing to the contained element. The contained
 /// element is uninitialized.
-class AllocBoxInst final : public AllocationInst,
-    private llvm::TrailingObjects<AllocBoxInst, char> {
+class AllocBoxInst final
+    : public AllocationInst,
+      private llvm::TrailingObjects<AllocBoxInst, Operand, char> {
   friend TrailingObjects;
   friend class SILBuilder;
 
+  unsigned NumOperands;
+
   TailAllocatedDebugVariable VarInfo;
 
-  AllocBoxInst(SILDebugLocation DebugLoc, SILType ElementType, SILFunction &F,
+  AllocBoxInst(SILDebugLocation DebugLoc, SILType ElementType,
+               ArrayRef<SILValue> OpenedArchetypeOperands, SILFunction &F,
                SILDebugVariable Var);
+
   static AllocBoxInst *create(SILDebugLocation Loc, SILType elementType,
-                              SILFunction &F, SILDebugVariable Var);
+                              SILFunction &F,
+                              SILOpenedArchetypesState &OpenedArchetypes,
+                              SILDebugVariable Var);
+
+  size_t numTrailingObjects(OverloadToken<Operand>) const {
+    return NumOperands;
+  }
 
 public:
+  ~AllocBoxInst() {
+    Operand *Operands = getTrailingObjects<Operand>();
+    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+      Operands[i].~Operand();
+    }
+  }
 
   SILType getElementType() const {
-    return SILType::getPrimitiveObjectType(getType().castTo<SILBoxType>()->
-                                           getBoxedType());
+    return SILType::getPrimitiveObjectType(
+        getType().castTo<SILBoxType>()->getBoxedType());
   }
 
   /// Return the underlying variable declaration associated with this
@@ -720,8 +812,21 @@ public:
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
 
-  ArrayRef<Operand> getAllOperands() const { return {}; }
-  MutableArrayRef<Operand> getAllOperands() { return {}; }
+  ArrayRef<Operand> getAllOperands() const {
+    return {getTrailingObjects<Operand>(), NumOperands};
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return {getTrailingObjects<Operand>(), NumOperands};
+  }
+
+  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+    return getAllOperands();
+  }
+
+  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+    return getAllOperands();
+  }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocBoxInst;
@@ -733,36 +838,57 @@ public:
 /// pointer, which has the existential type.  The second return value
 /// is an address pointing to the contained element. The contained
 /// value is uninitialized.
-class AllocExistentialBoxInst : public AllocationInst {
+class AllocExistentialBoxInst final
+    : public AllocationInst,
+      private llvm::TrailingObjects<AllocExistentialBoxInst, Operand> {
+  friend TrailingObjects;
   friend class SILBuilder;
+  unsigned NumOperands;
   CanType ConcreteType;
   ArrayRef<ProtocolConformanceRef> Conformances;
 
   AllocExistentialBoxInst(SILDebugLocation DebugLoc, SILType ExistentialType,
                           CanType ConcreteType,
                           ArrayRef<ProtocolConformanceRef> Conformances,
+                          ArrayRef<SILValue> OpenedArchetypeOperands,
                           SILFunction *Parent);
 
   static AllocExistentialBoxInst *
   create(SILDebugLocation DebugLoc, SILType ExistentialType,
-         CanType ConcreteType,
-         ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
+         CanType ConcreteType, ArrayRef<ProtocolConformanceRef> Conformances,
+         SILFunction *Parent, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  CanType getFormalConcreteType() const {
-    return ConcreteType;
+  ~AllocExistentialBoxInst() {
+    Operand *Operands = getTrailingObjects<Operand>();
+    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+      Operands[i].~Operand();
+    }
   }
-  
-  SILType getExistentialType() const {
-    return getType();
-  }
+
+  CanType getFormalConcreteType() const { return ConcreteType; }
+
+  SILType getExistentialType() const { return getType(); }
 
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
-  
-  ArrayRef<Operand> getAllOperands() const { return {}; }
-  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  ArrayRef<Operand> getAllOperands() const {
+    return {getTrailingObjects<Operand>(), NumOperands};
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return {getTrailingObjects<Operand>(), NumOperands};
+  }
+
+  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+    return getAllOperands();
+  }
+
+  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+    return getAllOperands();
+  }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocExistentialBoxInst;
@@ -874,6 +1000,10 @@ public:
   }
   SILType getSubstCalleeSILType() const {
     return SubstCalleeType;
+  }
+
+  bool isCalleeNoReturn() const {
+    return getSubstCalleeSILType().isNoReturnFunction();
   }
 
   bool isCalleeThin() const {
@@ -1446,6 +1576,10 @@ public:
   }
 };
 
+//===----------------------------------------------------------------------===//
+// Memory instructions.
+//===----------------------------------------------------------------------===//
+
 /// StringLiteralInst::Encoding hashes to its underlying integer representation.
 static inline llvm::hash_code hash_value(StringLiteralInst::Encoding E) {
   return llvm::hash_value(size_t(E));
@@ -1920,6 +2054,83 @@ public:
   }
 };
 
+/// BindMemoryInst -
+/// "bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T"
+/// Binds memory at the raw pointer %0 to type $T with enough capacity
+/// to hold $1 values.
+class BindMemoryInst final :
+    public SILInstruction,
+    protected llvm::TrailingObjects<BindMemoryInst, Operand> {
+
+  typedef llvm::TrailingObjects<BindMemoryInst, Operand> TrailingBase;
+  friend TrailingBase;
+  using TrailingBase::totalSizeToAlloc;
+
+  friend class SILBuilder;
+
+  enum { BaseOperIdx, IndexOperIdx, NumFixedOpers };
+
+  SILType BoundType;
+
+  // Fixed operands + opened archetype operands.
+  unsigned NumOperands;
+
+  static BindMemoryInst *create(
+    SILDebugLocation Loc, SILValue Base, SILValue Index, SILType BoundType,
+    SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+
+  BindMemoryInst(SILDebugLocation Loc, SILValue Base, SILValue Index,
+                 SILType BoundType,
+                 ArrayRef<SILValue> OpenedArchetypeOperands);
+
+public:
+  // Destruct tail allocated objects.
+  ~BindMemoryInst() {
+    Operand *Operands = &getAllOperands()[0];
+    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+      Operands[i].~Operand();
+    }
+  }
+
+  SILValue getBase() const { return getAllOperands()[BaseOperIdx].get(); }
+
+  SILValue getIndex() const { return getAllOperands()[IndexOperIdx].get(); }
+
+  SILType getBoundType() const { return BoundType ; }
+
+  // Implement llvm::TrailingObjects.
+  size_t numTrailingObjects(
+      typename TrailingBase::template OverloadToken<Operand>) const {
+    return NumOperands;
+  }
+
+  ArrayRef<Operand> getAllOperands() const {
+    return {TrailingBase::template getTrailingObjects<Operand>(),
+            static_cast<size_t>(NumOperands)};
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return {TrailingBase::template getTrailingObjects<Operand>(),
+            static_cast<size_t>(NumOperands)};
+  }
+
+  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+    return getAllOperands().slice(2);
+  }
+
+  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+    return getAllOperands().slice(2);
+  }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::BindMemoryInst;
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Conversion instructions.
+//===----------------------------------------------------------------------===//
+
 /// ConversionInst - Abstract class representing instructions that convert
 /// values.
 ///
@@ -2004,8 +2215,17 @@ class PointerToAddressInst
 {
   friend class SILBuilder;
 
-  PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+  bool IsStrict;
+
+  PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+                       bool IsStrict)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty), IsStrict(IsStrict) {}
+
+public:
+  /// Whether the returned address adheres to strict aliasing.
+  /// If true, then the type of each memory access dependent on
+  /// this address must be consistent with the memory's bound type.
+  bool isStrict() const { return IsStrict; }
 };
 
 /// Convert a heap object reference to a different type without any runtime
@@ -4053,7 +4273,7 @@ public:
   }
 };
 
-/// IndexAddrInst - "%2 : $*T = index_addr %0 : $*T, %1 : $Builtin.Int64"
+/// IndexAddrInst - "%2 : $*T = index_addr %0 : $*T, %1 : $Builtin.Word"
 /// This takes an address and indexes it, striding by the pointed-
 /// to type.  This is used to index into arrays of uniform elements.
 class IndexAddrInst : public IndexingInst {
@@ -4072,7 +4292,7 @@ public:
 
 /// IndexRawPointerInst
 /// %2 : $Builtin.RawPointer \
-///   = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Int64
+///   = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
 /// This takes an address and indexes it, striding by the pointed-
 /// to type.  This is used to index into arrays of uniform elements.
 class IndexRawPointerInst : public IndexingInst {
@@ -4859,6 +5079,11 @@ public:
   }
   SILType getSubstCalleeSILType() const {
     FOREACH_IMPL_RETURN(getSubstCalleeSILType());
+  }
+
+  /// Check if this is a call of a never-returning function.
+  bool isCalleeNoReturn() const {
+    FOREACH_IMPL_RETURN(isCalleeNoReturn());
   }
 
   bool isCalleeThin() const {

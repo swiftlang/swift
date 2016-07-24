@@ -157,7 +157,6 @@ namespace {
   /// the fill operations that the compiler emits for the bound decl.
   ///
   /// FIXME: Rework to use GenericSignature instead of AllArchetypes
-  /// FIXME: Rework for nested generics
   struct GenericArguments {
     /// The values to use to initialize the arguments structure.
     SmallVector<llvm::Value *, 8> Values;
@@ -190,11 +189,23 @@ namespace {
       }
     }
 
-    void collect(IRGenFunction &IGF, CanBoundGenericType type) {
-      GenericTypeRequirements requirements(IGF.IGM, type->getDecl());
+    void collect(IRGenFunction &IGF, CanType type) {
+      NominalTypeDecl *decl;
+      CanType parentType;
+
+      if (auto nominalType = dyn_cast<NominalType>(type)) {
+        decl = nominalType->getDecl();
+        parentType = nominalType.getParent();
+      } else {
+        auto boundType = cast<BoundGenericType>(type);
+        decl = boundType->getDecl();
+        parentType = boundType.getParent();
+      }
+
+      GenericTypeRequirements requirements(IGF.IGM, decl);
 
       if (requirements.hasParentType()) {
-        Values.push_back(IGF.emitTypeMetadataRef(type.getParent()));
+        Values.push_back(IGF.emitTypeMetadataRef(parentType));
       }
 
       auto subs =
@@ -209,7 +220,7 @@ namespace {
         }
       });
 
-      collectTypes(IGF.IGM, type->getDecl());
+      collectTypes(IGF.IGM, decl);
       assert(Types.size() == Values.size());
     }
   };
@@ -281,10 +292,8 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
     if (doesClassMetadataRequireDynamicInitialization(IGM, theDecl))
       return nullptr;
 
-  // Otherwise, just respect genericity and Objective-C runtime visibility.
-  } else if ((theDecl->isGenericContext()
-              && !isTypeErasedGenericClass(theDecl))
-             || theDecl->isOnlyObjCRuntimeVisible()) {
+  // Otherwise, just respect genericity.
+  } else if (theDecl->isGenericContext() && !isTypeErasedGenericClass(theDecl)){
     return nullptr;
   }
 
@@ -320,12 +329,14 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
                                             bool allowUninitialized) {
   // If the class is visible only through the Objective-C runtime, form the
   // appropriate runtime call.
-  if (theClass->isOnlyObjCRuntimeVisible()) {
+  if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::RuntimeOnly) {
     SmallString<64> scratch;
     auto className =
         IGF.IGM.getAddrOfGlobalString(theClass->getObjCRuntimeName(scratch));
     return IGF.Builder.CreateCall(IGF.IGM.getLookUpClassFn(), className);
   }
+
+  assert(!theClass->isForeign());
 
   Address classRef = IGF.IGM.getAddrOfObjCClassRef(theClass);
   auto classObject = IGF.Builder.CreateLoad(classRef);
@@ -373,8 +384,8 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   }
 
   // We are applying generic parameters to a generic type.
-  auto boundGeneric = cast<BoundGenericType>(theType);
-  assert(boundGeneric->getDecl() == theDecl);
+  assert(theType->isSpecialized() &&
+         theType->getAnyNominal() == theDecl);
 
   // Check to see if we've maybe got a local reference already.
   if (auto cache = IGF.tryGetLocalTypeData(theType,
@@ -383,7 +394,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
 
   // Grab the substitutions.
   GenericArguments genericArgs;
-  genericArgs.collect(IGF, boundGeneric);
+  genericArgs.collect(IGF, theType);
   assert(genericArgs.Values.size() > 0 && "no generic args?!");
 
   // Call the generic metadata accessor function.
@@ -452,8 +463,6 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   // access if it contains a resilient type.
   if (isa<StructType>(type) || isa<EnumType>(type)) {
     auto nominalType = cast<NominalType>(type);
-    assert(!nominalType->getDecl()->isGenericContext() &&
-           "shouldn't be called for a generic type");
 
     // Imported type metadata always requires an accessor.
     if (nominalType->getDecl()->hasClangNode())
@@ -530,9 +539,9 @@ irgen::getTypeMetadataAccessStrategy(IRGenModule &IGM, CanType type) {
     // Metadata accessors for fully-substituted generic types are
     // emitted with shared linkage.
     if (nominal->isGenericContext() && !nominal->isObjC()) {
-      if (isa<BoundGenericType>(type))
+      if (type->isSpecialized())
         return MetadataAccessStrategy::NonUniqueAccessor;
-      assert(isa<UnboundGenericType>(type));
+      assert(type->hasUnboundGenericType());
     }
 
     // If the type doesn't guarantee that it has an access function,
@@ -1072,7 +1081,6 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   accessor->setDoesNotAccessMemory();
 
   IRGenFunction IGF(IGM, accessor);
-
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
 
@@ -3969,10 +3977,13 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
   auto *metadataTy = cast<llvm::PointerType>(metadata->getType());
 
   // Create the alias.
-  llvm::GlobalAlias::create(metadataTy->getElementType(),
-                            metadataTy->getAddressSpace(),
-                            metadata->getLinkage(), classSymbol.str(),
-                            metadata, IGM.getModule());
+  auto *alias = llvm::GlobalAlias::create(metadataTy->getElementType(),
+                                          metadataTy->getAddressSpace(),
+                                          metadata->getLinkage(),
+                                          classSymbol.str(), metadata,
+                                          IGM.getModule());
+  if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::COFF)
+    alias->setDLLStorageClass(metadata->getDLLStorageClass());
 }
 
 /// Emit the type metadata or metadata template for a class.
@@ -5488,13 +5499,12 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   switch (*known) {
   case KnownProtocolKind::AnyObject:
     return SpecialProtocol::AnyObject;
-  case KnownProtocolKind::ErrorProtocol:
-    return SpecialProtocol::ErrorProtocol;
+  case KnownProtocolKind::Error:
+    return SpecialProtocol::Error;
     
   // The other known protocols aren't special at runtime.
   case KnownProtocolKind::Sequence:
   case KnownProtocolKind::IteratorProtocol:
-  case KnownProtocolKind::Boolean:
   case KnownProtocolKind::RawRepresentable:
   case KnownProtocolKind::Equatable:
   case KnownProtocolKind::Hashable:
@@ -5502,28 +5512,30 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ObjectiveCBridgeable:
   case KnownProtocolKind::DestructorSafeContainer:
   case KnownProtocolKind::SwiftNewtypeWrapper:
-  case KnownProtocolKind::ArrayLiteralConvertible:
-  case KnownProtocolKind::BooleanLiteralConvertible:
-  case KnownProtocolKind::DictionaryLiteralConvertible:
-  case KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible:
-  case KnownProtocolKind::FloatLiteralConvertible:
-  case KnownProtocolKind::IntegerLiteralConvertible:
-  case KnownProtocolKind::StringInterpolationConvertible:
-  case KnownProtocolKind::StringLiteralConvertible:
-  case KnownProtocolKind::NilLiteralConvertible:
-  case KnownProtocolKind::UnicodeScalarLiteralConvertible:
-  case KnownProtocolKind::ColorLiteralConvertible:
-  case KnownProtocolKind::ImageLiteralConvertible:
-  case KnownProtocolKind::FileReferenceLiteralConvertible:
-  case KnownProtocolKind::BuiltinBooleanLiteralConvertible:
-  case KnownProtocolKind::BuiltinExtendedGraphemeClusterLiteralConvertible:
-  case KnownProtocolKind::BuiltinFloatLiteralConvertible:
-  case KnownProtocolKind::BuiltinIntegerLiteralConvertible:
-  case KnownProtocolKind::BuiltinStringLiteralConvertible:
-  case KnownProtocolKind::BuiltinUTF16StringLiteralConvertible:
-  case KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible:
+  case KnownProtocolKind::ExpressibleByArrayLiteral:
+  case KnownProtocolKind::ExpressibleByBooleanLiteral:
+  case KnownProtocolKind::ExpressibleByDictionaryLiteral:
+  case KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral:
+  case KnownProtocolKind::ExpressibleByFloatLiteral:
+  case KnownProtocolKind::ExpressibleByIntegerLiteral:
+  case KnownProtocolKind::ExpressibleByStringInterpolation:
+  case KnownProtocolKind::ExpressibleByStringLiteral:
+  case KnownProtocolKind::ExpressibleByNilLiteral:
+  case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
+  case KnownProtocolKind::ExpressibleByColorLiteral:
+  case KnownProtocolKind::ExpressibleByImageLiteral:
+  case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinFloatLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinStringLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral:
   case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:
+  case KnownProtocolKind::BridgedStoredNSError:
+  case KnownProtocolKind::ErrorCodeProtocol:
     return SpecialProtocol::None;
   }
 }
@@ -5669,6 +5681,9 @@ namespace {
 /// the protocol descriptor, and for ObjC interop, references to the descriptor
 /// that the ObjC runtime uses for uniquing.
 void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
+  // Emit remote reflection metadata for the protocol.
+  emitFieldMetadataRecord(protocol);
+
   // If the protocol is Objective-C-compatible, go through the path that
   // produces an ObjC-compatible protocol_t.
   if (protocol->isObjC()) {
@@ -5698,8 +5713,6 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
                                                    init->getType()));
   var->setConstant(true);
   var->setInitializer(init);
-
-  emitFieldMetadataRecord(protocol);
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.

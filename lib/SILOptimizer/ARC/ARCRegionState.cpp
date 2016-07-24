@@ -474,6 +474,7 @@ bool ARCRegionState::processLoopTopDown(
   }
 
   auto *PredRegion = LRFI->getRegion(*R->pred_begin());
+  (void) PredRegion;
   assert(PredRegion->isBlock() && "Expected the predecessor region to be a "
                                   "block");
 

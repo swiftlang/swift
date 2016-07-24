@@ -117,8 +117,8 @@ protocol P1 {
 func genReq<U, V: P1 where V.T == U>(_ u: U, v: V) {}
 
 @objc class C5 {
+
   @objc(mmm1)
-  @noreturn
   func m1() {}
 
   private(set)
@@ -196,6 +196,8 @@ func tupleResult1() -> (Int, Int) {}
 func tupleResult2(f: () -> Void) {}
 typealias MyVoid = ()
 
+func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -208,8 +210,9 @@ typealias MyVoid = ()
 // RUN: %sourcekitd-test -req=cursor -pos=9:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK2 %s
 // CHECK2:      source.lang.swift.ref.function.operator.infix ()
 // CHECK2-NEXT: +
-// CHECK2-NEXT: s:ZFsoi1pFTSiSi_Si
+// CHECK2-NEXT: s:Fsoi1pFTSiSi_Si
 // CHECK2-NEXT: (Int, Int) -> Int{{$}}
+// CHECK2-NEXT: _TtFTSiSi_Si
 // CHECK2-NEXT: Swift{{$}}
 // CHECK2-NEXT: <Group>Math/Integers</Group>
 // CHECK2-NEXT: SYSTEM
@@ -221,6 +224,7 @@ typealias MyVoid = ()
 // CHECK3-NEXT: x{{$}}
 // CHECK3-NEXT: s:vF11cursor_info3gooFSiT_L_1xSi{{$}}
 // CHECK3-NEXT: Int{{$}}
+// CHECK3-NEXT: _TtSi
 // CHECK3-NEXT: <Declaration>let x: <Type usr="s:Si">Int</Type></Declaration>
 // CHECK3-NEXT: <decl.var.parameter><syntaxtype.keyword>let</syntaxtype.keyword> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
 
@@ -229,6 +233,7 @@ typealias MyVoid = ()
 // CHECK4-NEXT: fooIntVar{{$}}
 // CHECK4-NEXT: c:@fooIntVar{{$}}
 // CHECK4-NEXT: Int32{{$}}
+// CHECK4-NEXT: _TtVs5Int32
 // CHECK4-NEXT: Foo{{$}}
 // CHECK4-NEXT: <Declaration>var fooIntVar: <Type usr="s:Vs5Int32">Int32</Type></Declaration>
 // CHECK4-NEXT: <decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.struct usr="s:Vs5Int32">Int32</ref.struct></decl.var.type></decl.var.global>
@@ -245,6 +250,7 @@ typealias MyVoid = ()
 // CHECK6-NEXT: fooSwiftFunc
 // CHECK6-NEXT: s:F14FooSwiftModule12fooSwiftFuncFT_Si
 // CHECK6-NEXT: () -> Int
+// CHECK6-NEXT: _TtFT_Si
 // CHECK6-NEXT: FooSwiftModule
 // CHECK6-NEXT: <Declaration>func fooSwiftFunc() -&gt; <Type usr="s:Si">Int</Type></Declaration>
 // CHECK6-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSwiftFunc</decl.name>() -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.free>
@@ -255,6 +261,7 @@ typealias MyVoid = ()
 // CHECK7-NEXT: S1
 // CHECK7-NEXT: s:V11cursor_info2S1
 // CHECK7-NEXT: S1.Type
+// CHECK7-NEXT: _Tt
 // CHECK7-NEXT: <Declaration>struct S1</Declaration>
 // CHECK7-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
 // CHECK7-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="13" column="8"><Name>S1</Name><USR>s:V11cursor_info2S1</USR><Declaration>struct S1</Declaration><Abstract><Para>Aaa.  S1.  Bbb.</Para></Abstract></Class>
@@ -263,7 +270,9 @@ typealias MyVoid = ()
 // CHECK8:      source.lang.swift.ref.function.constructor (18:3-18:15)
 // CHECK8-NEXT: init
 // CHECK8-NEXT: s:FC11cursor_info2CCcFT1xSi_S0_
-// CHECK8-NEXT: CC.Type -> (x: Int) -> CC
+// CHECK8-NEXT: (CC.Type) -> (x: Int) -> CC
+// CHECK8-NEXT: _TtFT1xSi_C11cursor_info2CC
+// CHECK8-NEXT: <Container>_TtC11cursor_info2CC</Container>
 // CHECK8-NEXT: <Declaration>convenience init(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK8-NEXT: <decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -367,7 +376,8 @@ typealias MyVoid = ()
 // CHECK29: source.lang.swift.decl.function.destructor (74:3-74:9)
 // CHECK29-NEXT: deinit
 // CHECK29-NEXT: s:FC11cursor_info2C3d
-// CHECK29-NEXT: C3 -> ()
+// CHECK29-NEXT: (C3) -> ()
+// CHECK29-NEXT: _TtFT_T_
 // CHECK29-NEXT: <Declaration>deinit</Declaration>
 // CHECK29-NEXT: <decl.function.destructor><syntaxtype.keyword>deinit</syntaxtype.keyword></decl.function.destructor>
 
@@ -375,7 +385,8 @@ typealias MyVoid = ()
 // CHECK30: source.lang.swift.decl.function.constructor (75:3-75:16)
 // CHECK30-NEXT: init(x:)
 // CHECK30-NEXT: s:FC11cursor_info2C3cFT1xSi_GSQS0__
-// CHECK30-NEXT: C3.Type -> (x: Int) -> C3!
+// CHECK30-NEXT: (C3.Type) -> (x: Int) -> C3!
+// CHECK30-NEXT: _TtFT1xSi_GSQC11cursor_info2C3_
 // CHECK30-NEXT: <Declaration>init!(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK30-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>!(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -383,7 +394,8 @@ typealias MyVoid = ()
 // CHECK31: source.lang.swift.decl.function.constructor (76:3-76:16)
 // CHECK31-NEXT: init(y:)
 // CHECK31-NEXT: s:FC11cursor_info2C3cFT1ySi_GSqS0__
-// CHECK31-NEXT: C3.Type -> (y: Int) -> C3?
+// CHECK31-NEXT: (C3.Type) -> (y: Int) -> C3?
+// CHECK31-NEXT: _TtFT1ySi_GSqC11cursor_info2C3_
 // CHECK31-NEXT: <Declaration>init?(y: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK31-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>?(<decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -391,7 +403,8 @@ typealias MyVoid = ()
 // CHECK32: source.lang.swift.decl.function.constructor (77:3-77:15)
 // CHECK32-NEXT: init(z:)
 // CHECK32-NEXT: s:FC11cursor_info2C3cFzT1zSi_S0_
-// CHECK32-NEXT: C3.Type -> (z: Int) throws -> C3
+// CHECK32-NEXT: (C3.Type) -> (z: Int) throws -> C3
+// CHECK32-NEXT: _TtFzT1zSi_C11cursor_info2C3
 // CHECK32-NEXT: <Declaration>init(z: <Type usr="s:Si">Int</Type>) throws</Declaration>
 // CHECK32-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>z</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>throws</syntaxtype.keyword></decl.function.constructor>
 
@@ -400,7 +413,7 @@ typealias MyVoid = ()
 // CHECK33-NEXT: S2
 // CHECK33-NEXT: s:V11cursor_info2S2
 // CHECK33-NEXT: S2.Type
-// CHECK33-NEXT: <Declaration>struct S2&lt;T, U&gt;</Declaration>
+// CHECK33: <Declaration>struct S2&lt;T, U&gt;</Declaration>
 // CHECK33-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S2</decl.name>&lt;<decl.generic_type_param usr="s:tV11cursor_info2S21TMx"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt;</decl.struct>
 
 // RUN: %sourcekitd-test -req=cursor -pos=81:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK34
@@ -408,7 +421,7 @@ typealias MyVoid = ()
 // CHECK34-NEXT: foo(_:)
 // CHECK34-NEXT: s:FV11cursor_info2S23foou0_rFFT_T_FT_T_
 // CHECK34-NEXT: <T, U> (S2<T, U>) -> <V, W> (() -> ()) -> () -> ()
-// CHECK34-NEXT: <Declaration>func foo&lt;V, W&gt;(_ closure: () -&gt; ()) -&gt; () -&gt; ()</Declaration>
+// CHECK34: <Declaration>func foo&lt;V, W&gt;(_ closure: () -&gt; ()) -&gt; () -&gt; ()</Declaration>
 // CHECK34-NEXT: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>V</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>W</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>closure</decl.var.parameter.name>: <decl.var.parameter.type>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.function.returntype></decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=83:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK35
@@ -416,7 +429,7 @@ typealias MyVoid = ()
 // CHECK35-NEXT: C4
 // CHECK35-NEXT: s:C11cursor_info2C4
 // CHECK35-NEXT: C4.Type
-// CHECK35-NEXT: <Declaration>class C4&lt;T, U&gt;</Declaration>
+// CHECK35: <Declaration>class C4&lt;T, U&gt;</Declaration>
 // CHECK35-NEXT: <decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>C4</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt;</decl.class>
 
 // RUN: %sourcekitd-test -req=cursor -pos=84:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK36
@@ -424,7 +437,7 @@ typealias MyVoid = ()
 // CHECK36-NEXT: E1
 // CHECK36-NEXT: s:O11cursor_info2E1
 // CHECK36-NEXT: E1.Type
-// CHECK36-NEXT: <Declaration>enum E1&lt;T, U&gt;</Declaration>
+// CHECK36: <Declaration>enum E1&lt;T, U&gt;</Declaration>
 // CHECK36-NEXT: <decl.enum><syntaxtype.keyword>enum</syntaxtype.keyword> <decl.name>E1</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt;</decl.enum>
 
 // RUN: %sourcekitd-test -req=cursor -pos=86:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK37
@@ -432,7 +445,7 @@ typealias MyVoid = ()
 // CHECK37-NEXT: nonDefaultArgNames(external1:_:external3:external4:_:)
 // CHECK37-NEXT: s:F11cursor_info18nonDefaultArgNamesFT9external1SiSi9external3Si9external4SiSi_T_
 // CHECK37-NEXT: (external1: Int, Int, external3: Int, external4: Int, Int) -> ()
-// CHECK37-NEXT: <Declaration>func nonDefaultArgNames(external1 local1: <Type usr="s:Si">Int</Type>, _ local2: <Type usr="s:Si">Int</Type>, external3 local3: <Type usr="s:Si">Int</Type>, external4 _: <Type usr="s:Si">Int</Type>, _: <Type usr="s:Si">Int</Type>)</Declaration>
+// CHECK37: <Declaration>func nonDefaultArgNames(external1 local1: <Type usr="s:Si">Int</Type>, _ local2: <Type usr="s:Si">Int</Type>, external3 local3: <Type usr="s:Si">Int</Type>, external4 _: <Type usr="s:Si">Int</Type>, _: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK37-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>nonDefaultArgNames</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>external1</decl.var.parameter.argument_label> <decl.var.parameter.name>local1</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>local2</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>external3</decl.var.parameter.argument_label> <decl.var.parameter.name>local3</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>external4</decl.var.parameter.argument_label> <decl.var.parameter.name>_</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=88:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK38
@@ -442,24 +455,24 @@ typealias MyVoid = ()
 // CHECK39: source.lang.swift.decl.enumelement (91:8-91:10)
 // CHECK39-NEXT: C1
 // CHECK39-NEXT: s:FO11cursor_info2E22C1FMS0_S0_
-// CHECK39-NEXT: E2.Type -> E2
-// CHECK39-NEXT: <Declaration>case C1</Declaration>
+// CHECK39-NEXT: (E2.Type) -> E2
+// CHECK39: <Declaration>case C1</Declaration>
 // CHECK39-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C1</decl.name></decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=92:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK40
 // CHECK40: source.lang.swift.decl.enumelement (92:8-92:10)
 // CHECK40-NEXT: C2
 // CHECK40-NEXT: s:FO11cursor_info2E22C2FMS0_FT1xSi1ySS_S0_
-// CHECK40-NEXT: E2.Type -> (x: Int, y: String) -> E2
-// CHECK40-NEXT: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
+// CHECK40-NEXT: (E2.Type) -> (x: Int, y: String) -> E2
+// CHECK40: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
 // CHECK40-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name><tuple>(<tuple.element><tuple.element.argument_label>x</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>y</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:SS">String</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=92:31 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK41
 // CHECK41: source.lang.swift.decl.enumelement (92:31-92:33)
 // CHECK41-NEXT: C3
 // CHECK41-NEXT: s:FO11cursor_info2E22C3FMS0_FSiS0_
-// CHECK41-NEXT: E2.Type -> (Int) -> E2
-// CHECK41-NEXT: <Declaration>case C3(<Type usr="s:Si">Int</Type>)</Declaration>
+// CHECK41-NEXT: (E2.Type) -> (Int) -> E2
+// CHECK41: <Declaration>case C3(<Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK41-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C3</decl.name>(<ref.struct usr="s:Si">Int</ref.struct>)</decl.enumelement>
 // FIXME: Wrap parameters in <decl.var.parameter>
 
@@ -467,8 +480,8 @@ typealias MyVoid = ()
 // CHECK42: source.lang.swift.decl.enumelement (96:8-96:9)
 // CHECK42-NEXT: C
 // CHECK42-NEXT: s:FO11cursor_info2E31CFMS0_S0_
-// CHECK42-NEXT: E3.Type -> E3
-// CHECK42-NEXT: <Declaration>case C = &quot;a&quot;</Declaration>
+// CHECK42-NEXT: (E3.Type) -> E3
+// CHECK42: <Declaration>case C = &quot;a&quot;</Declaration>
 // CHECK42-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C</decl.name> = <syntaxtype.string>&quot;a&quot;</syntaxtype.string></decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=100:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK43
@@ -500,7 +513,7 @@ typealias MyVoid = ()
 // CHECK47-NEXT: T
 // CHECK47-NEXT: s:tV11cursor_info2S21TMx
 // CHECK47-NEXT: T.Type
-// CHECK47-NEXT: <Declaration>T</Declaration>
+// CHECK47: <Declaration>T</Declaration>
 // CHECK47-NEXT: <decl.generic_type_param><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>
 
 // RUN: %sourcekitd-test -req=cursor -pos=107:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK48
@@ -534,7 +547,7 @@ typealias MyVoid = ()
 
 // RUN: %sourcekitd-test -req=cursor -pos=122:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK55
 // CHECK55: source.lang.swift.decl.function.method.instance (122:8-122:12)
-// CHECK55: <decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@objc</syntaxtype.attribute.name>(mmm1)</syntaxtype.attribute.builtin> <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@noreturn</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func
+// CHECK55: <decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@objc</syntaxtype.attribute.name>(mmm1)</syntaxtype.attribute.builtin> <syntaxtype.keyword>func
 
 // RUN: %sourcekitd-test -req=cursor -pos=126:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK56
 // CHECK56: source.lang.swift.decl.var.instance (126:7-126:9)
@@ -576,7 +589,7 @@ typealias MyVoid = ()
 // CHECK67-NEXT: T
 // CHECK67-NEXT: s:P11cursor_info2P11T
 // CHECK67-NEXT: T.Type
-// CHECK67-NEXT: <Declaration>associatedtype T</Declaration>
+// CHECK67: <Declaration>associatedtype T</Declaration>
 // CHECK67-NEXT: <decl.associatedtype><syntaxtype.keyword>associatedtype</syntaxtype.keyword> <decl.name>T</decl.name></decl.associatedtype>
 
 // RUN: %sourcekitd-test -req=cursor -pos=152:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK68
@@ -584,7 +597,7 @@ typealias MyVoid = ()
 // CHECK68-NEXT: MyAlias
 // CHECK68-NEXT: s:11cursor_info7MyAlias
 // CHECK68-NEXT: MyAlias.Type
-// CHECK68-NEXT: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>, <Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>)</Declaration>
+// CHECK68: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>, <Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>)</Declaration>
 // CHECK68-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyAlias</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <tuple>(<tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>)</tuple></decl.typealias>
 
 // RUN: %sourcekitd-test -req=cursor -pos=153:28 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK69
@@ -592,7 +605,7 @@ typealias MyVoid = ()
 // CHECK69-NEXT: MyAlias
 // CHECK69-NEXT: s:11cursor_info7MyAlias
 // CHECK69-NEXT: MyAlias.Type
-// CHECK69-NEXT: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>, <Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>)</Declaration>
+// CHECK69: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>, <Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>)</Declaration>
 // CHECK69-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyAlias</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <tuple>(<tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>)</tuple></decl.typealias>
 
 // RUN: %sourcekitd-test -req=cursor -pos=155:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck %s -check-prefix=CHECK70
@@ -666,3 +679,10 @@ typealias MyVoid = ()
 
 // RUN: %sourcekitd-test -req=cursor -pos=197:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK84 %s
 // CHECK84: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyVoid</decl.name> = <tuple>()</tuple></decl.typealias>
+
+// RUN: %sourcekitd-test -req=cursor -pos=199:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | FileCheck -check-prefix=CHECK85 %s
+// CHECK85-NOT: @rethrows
+// CHECK85: <Declaration>func rethrowingFunction1({{.*}}) rethrows</Declaration>
+// CHECK85-NOT: @rethrows
+// CHECK85: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>rethrowingFunction1</decl.name>({{.*}}) <syntaxtype.keyword>rethrows</syntaxtype.keyword></decl.function.free>
+// CHECK85-NOT: @rethrows

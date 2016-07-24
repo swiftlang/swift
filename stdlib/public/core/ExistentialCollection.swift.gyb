@@ -24,8 +24,11 @@ from gyb_stdlib_support import (
 
 import SwiftShims
 
-@noreturn @inline(never)
-internal func _abstract(_ file: StaticString = #file, line: UInt = #line) {
+@inline(never)
+internal func _abstract(
+  file: StaticString = #file,
+  line: UInt = #line
+) -> Never {
   fatalError("Method must be overridden", file: file, line: line)
 }
 
@@ -115,10 +118,6 @@ internal final class _IteratorBox<
   internal var _base: Base
 }
 
-internal func _typeID(_ instance: AnyObject) -> ObjectIdentifier {
-  return ObjectIdentifier(instance.dynamicType)
-}
-
 //===--- Sequence ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
@@ -151,7 +150,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   internal func _filter(
-    _ includeElement: @noescape (Element) throws -> Bool
+    _ isIncluded: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
     _abstract()
   }
@@ -174,7 +173,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  internal func __copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
+  internal func __copyToContiguousArray() -> ContiguousArray<Element> {
     _abstract()
   }
 
@@ -204,7 +203,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   internal func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     _abstract()
   }
@@ -339,9 +338,9 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     return try _base.map(transform)
   }
   internal override func _filter(
-    _ includeElement: @noescape (Element) throws -> Bool
+    _ isIncluded: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
-    return try _base.filter(includeElement)
+    return try _base.filter(isIncluded)
   }
   internal override func _forEach(
     _ body: @noescape (Element) throws -> Void
@@ -358,8 +357,8 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   ) rethrows -> R? {
     return try _base._preprocessingPass(preprocess)
   }
-  internal override func __copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
-    return _base._copyToNativeArrayBuffer()._storage
+  internal override func __copyToContiguousArray() -> ContiguousArray<Element> {
+    return _base._copyToContiguousArray()
   }
   internal override func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
@@ -380,12 +379,12 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
 %   for ResultKind in EqualAndWeakerKinds:
   internal override func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${ResultKind}<Element>] {
     return try _base.split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: isSeparator)
+      whereSeparator: isSeparator)
       .map {
         Any${ResultKind}(_box: _${Kind}Box<S.SubSequence>(_base: $0))
       }
@@ -583,9 +582,9 @@ extension Any${Kind} {
   }
 
   public func filter(
-    _ includeElement: @noescape (Element) throws -> Bool
+    _ isIncluded: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
-    return try _box._filter(includeElement)
+    return try _box._filter(isIncluded)
   }
 
   public func forEach(
@@ -613,12 +612,12 @@ extension Any${Kind} {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     return try _box._split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: isSeparator)
+      whereSeparator: isSeparator)
   }
 
   public func _preprocessingPass<R>(
@@ -627,8 +626,8 @@ extension Any${Kind} {
     return try _box.__preprocessingPass(preprocess)
   }
 
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
-    return _ContiguousArrayBuffer(self._box.__copyToNativeArrayBuffer())
+  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+    return self._box.__copyToContiguousArray()
   }
 
   public func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)
@@ -646,17 +645,9 @@ internal protocol _AnyIndexBox : class {
 
   func _unbox<T : Comparable>() -> T?
 
-  func _equal(to rhs: _AnyIndexBox) -> Bool
+  func _isEqual(to rhs: _AnyIndexBox) -> Bool
 
-  func _notEqual(to rhs: _AnyIndexBox) -> Bool
-
-  func _less(than rhs: _AnyIndexBox) -> Bool
-
-  func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool
-
-  func _greater(than rhs: _AnyIndexBox) -> Bool
-
-  func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool
+  func _isLess(than rhs: _AnyIndexBox) -> Bool
 }
 
 internal final class _IndexBox<
@@ -673,35 +664,19 @@ internal final class _IndexBox<
   }
 
   internal var _typeID: ObjectIdentifier {
-    return Swift._typeID(self)
+    return ObjectIdentifier(self.dynamicType)
   }
 
   internal func _unbox<T : Comparable>() -> T? {
     return (self as _AnyIndexBox as? _IndexBox<T>)?._base
   }
 
-  internal func _equal(to rhs: _AnyIndexBox) -> Bool {
+  internal func _isEqual(to rhs: _AnyIndexBox) -> Bool {
     return _base == _unsafeUnbox(rhs)
   }
 
-  internal func _notEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base != _unsafeUnbox(rhs)
-  }
-
-  internal func _less(than rhs: _AnyIndexBox) -> Bool {
+  internal func _isLess(than rhs: _AnyIndexBox) -> Bool {
     return _base < _unsafeUnbox(rhs)
-  }
-
-  internal func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base <= _unsafeUnbox(rhs)
-  }
-
-  internal func _greater(than rhs: _AnyIndexBox) -> Bool {
-    return _base > _unsafeUnbox(rhs)
-  }
-
-  internal func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base >= _unsafeUnbox(rhs)
   }
 }
 
@@ -709,7 +684,7 @@ internal final class _IndexBox<
 /// the specific underlying type.
 ///
 /// - SeeAlso: `AnyCollection`
-public struct AnyIndex : Comparable {
+public struct AnyIndex {
   /// Creates a new index wrapping `base`.
   public init<BaseIndex : Comparable>(_ base: BaseIndex) {
     self._box = _IndexBox(_base: base)
@@ -726,38 +701,20 @@ public struct AnyIndex : Comparable {
   internal var _box: _AnyIndexBox
 }
 
-/// Returns `true` iff `lhs` and `rhs` wrap equal underlying indices.
-///
-/// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
-///   identical.
-public func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._equal(to: rhs._box)
-}
+extension AnyIndex : Comparable {
+  /// Returns `true` iff `lhs` and `rhs` wrap equal underlying indices.
+  ///
+  /// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
+  ///   identical.
+  public static func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    return lhs._box._isEqual(to: rhs._box)
+  }
 
-public func != (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._notEqual(to: rhs._box)
-}
-
-public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._less(than: rhs._box)
-}
-
-public func <= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._lessOrEqual(to: rhs._box)
-}
-
-public func > (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._greater(than: rhs._box)
-}
-
-public func >= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._greaterOrEqual(to: rhs._box)
+  public static func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    return lhs._box._isLess(than: rhs._box)
+  }
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -1010,7 +967,7 @@ public struct ${Self}<Element>
 public struct AnyGenerator<Element> {}
 
 extension AnyIterator {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> AnyIterator<Element> {
     Builtin.unreachable()
   }
@@ -1020,7 +977,7 @@ extension AnyIterator {
 extension Any${Kind} {
 
   @available(*, unavailable, message: "Please use underestimatedCount property instead.")
-  public var underestimateCount: Int {
+  public func underestimateCount() -> Int {
     Builtin.unreachable()
   }
 }
@@ -1030,7 +987,7 @@ extension Any${Kind} {
 public typealias AnyCollectionType = AnyCollectionProtocol
 
 extension AnyCollectionProtocol {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> AnyIterator<Iterator.Element> {
     Builtin.unreachable()
   }
@@ -1040,3 +997,14 @@ extension AnyCollectionProtocol {
 @available(*, unavailable, renamed: "AnyIndex")
 public typealias Any${Traversal}Index = AnyIndex
 % end
+
+
+@available(*, unavailable, renamed: "AnyIterator.init(_:)")
+public func anyGenerator<G : IteratorProtocol>(_ base: G) -> AnyIterator<G.Element> {
+    Builtin.unreachable()
+}
+
+@available(*, unavailable, renamed: "AnyIterator.init(_:)")
+public func anyGenerator<Element>(_ body: () -> Element?) -> AnyIterator<Element> {
+  Builtin.unreachable()
+}

@@ -13,10 +13,11 @@
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
 #endif
 
+#if !os(Windows) || CYGWIN
 public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CInt {
 #if os(Android)
   preconditionFailure("mkstemps doesn't work on Android")
@@ -25,13 +26,14 @@ public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CIn
   let (fd, fileName) = utf8.withUnsafeMutableBufferPointer {
     (utf8) -> (CInt, String) in
     let fd = mkstemps(UnsafeMutablePointer(utf8.baseAddress!), suffixlen)
-    let fileName = String(cString: UnsafePointer(utf8.baseAddress!))
+    let fileName = String(cString: utf8.baseAddress!)
     return (fd, fileName)
   }
   template = fileName
   return fd
 #endif
 }
+#endif
 
 public var _stdlib_FD_SETSIZE: CInt {
   return 1024
@@ -81,6 +83,7 @@ public struct _stdlib_fd_set {
   }
 }
 
+#if !os(Windows) || CYGWIN
 public func _stdlib_select(
   _ readfds: inout _stdlib_fd_set, _ writefds: inout _stdlib_fd_set,
   _ errorfds: inout _stdlib_fd_set, _ timeout: UnsafeMutablePointer<timeval>?
@@ -104,6 +107,7 @@ public func _stdlib_select(
     }
   }
 }
+#endif
 
 //
 // Functions missing in `Darwin` module.

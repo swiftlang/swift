@@ -168,6 +168,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              /*GenericParams=*/nullptr,
                              paramList, FnType,
                              TypeLoc::withoutLoc(ResType), DC);
+  FD->setInterfaceType(FnType);
   FD->setImplicit();
   FD->setAccessibility(Accessibility::Public);
   return FD;
@@ -656,6 +657,15 @@ static ValueDecl *getIsUniqueOperation(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
+static ValueDecl *getBindMemoryOperation(ASTContext &Context, Identifier Id) {
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.addParameter(makeConcrete(BuiltinIntegerType::getWordType(Context)));
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(TupleType::getEmpty(Context)));
+  return builder.build(Id);
+}
+
 static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
                                             Identifier Id) {
   GenericSignatureBuilder builder(Context);
@@ -703,8 +713,7 @@ static ValueDecl *getVoidErrorOperation(ASTContext &Context, Identifier Id) {
 static ValueDecl *getUnexpectedErrorOperation(ASTContext &Context,
                                               Identifier Id) {
   return getBuiltinFunction(Id, {Context.getExceptionType()},
-                            TupleType::getEmpty(Context),
-                            AnyFunctionType::ExtInfo().withIsNoReturn());
+                            Context.getNeverType());
 }
 
 static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier Id,
@@ -964,10 +973,8 @@ static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
 
 static ValueDecl *getUnreachableOperation(ASTContext &Context,
                                           Identifier Id) {
-  // @noreturn () -> ()
-  auto VoidTy = Context.TheEmptyTupleType;
-  return getBuiltinFunction(Id, {}, VoidTy,
-                            AnyFunctionType::ExtInfo().withIsNoReturn(true));
+  // () -> Never
+  return getBuiltinFunction(Id, {}, Context.getNeverType());
 }
 
 static ValueDecl *getOnceOperation(ASTContext &Context,
@@ -1182,7 +1189,7 @@ getSwiftFunctionTypeForIntrinsic(unsigned iid, ArrayRef<Type> TypeArgs,
   Info = FunctionType::ExtInfo();
   if (attrs.hasAttribute(llvm::AttributeSet::FunctionIndex,
                          llvm::Attribute::NoReturn))
-    Info = Info.withIsNoReturn(true);
+    ResultTy = Context.getNeverType();
   
   return true;
 }
@@ -1472,6 +1479,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getRefCountingOperation(Context, Id);
       
   case BuiltinValueKind::Load:
+  case BuiltinValueKind::LoadRaw:
   case BuiltinValueKind::Take:
     if (!Types.empty()) return nullptr;
     return getLoadOperation(Context, Id);
@@ -1501,6 +1509,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::IsUniqueOrPinned_native:
     if (!Types.empty()) return nullptr;
     return getIsUniqueOperation(Context, Id);
+
+  case BuiltinValueKind::BindMemory:
+    if (!Types.empty()) return nullptr;
+    return getBindMemoryOperation(Context, Id);
 
   case BuiltinValueKind::Sizeof:
   case BuiltinValueKind::Strideof:

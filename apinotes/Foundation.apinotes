@@ -15,49 +15,36 @@ Classes:
 - Name: NSCharacterSet
   SwiftName: NSCharacterSet
   SwiftBridge: CharacterSet
+  Properties:
+  - Name: controlCharacterSet
+    SwiftName: controlCharacters
+  - Name: whitespaceCharacterSet
+    SwiftName: whitespaces
+  - Name: whitespaceAndNewlineCharacterSet
+    SwiftName: whitespacesAndNewlines
+  - Name: decimalDigitCharacterSet
+    SwiftName: decimalDigits
+  - Name: letterCharacterSet
+    SwiftName: letters
+  - Name: lowercaseLetterCharacterSet
+    SwiftName: lowercaseLetters
+  - Name: uppercaseLetterCharacterSet
+    SwiftName: uppercaseLetters
+  - Name: nonBaseCharacterSet
+    SwiftName: nonBaseCharacters
+  - Name: alphanumericCharacterSet
+    SwiftName: alphanumerics
+  - Name: decomposableCharacterSet
+    SwiftName: decomposables
+  - Name: illegalCharacterSet
+    SwiftName: illegalCharacters
+  - Name: capitalizedLetterCharacterSet
+    SwiftName: capitalizedLetters
+  - Name: symbolCharacterSet
+    SwiftName: symbols
+  - Name: newlineCharacterSet
+    SwiftName: newlines
   Methods:
-  - Selector: controlCharacterSet
-    SwiftName: controlCharacters()
-    MethodKind: Class
-  - Selector: whitespaceCharacterSet
-    SwiftName: whitespaces()
-    MethodKind: Class
-  - Selector: whitespaceAndNewlineCharacterSet
-    SwiftName: whitespacesAndNewlines()
-    MethodKind: Class
-  - Selector: decimalDigitCharacterSet
-    SwiftName: decimalDigits()
-    MethodKind: Class
-  - Selector: letterCharacterSet
-    SwiftName: letters()
-    MethodKind: Class
-  - Selector: lowercaseLetterCharacterSet
-    SwiftName: lowercaseLetters()
-    MethodKind: Class
-  - Selector: uppercaseLetterCharacterSet
-    SwiftName: uppercaseLetters()
-    MethodKind: Class
-  - Selector: nonBaseCharacterSet
-    SwiftName: nonBaseCharacters()
-    MethodKind: Class
-  - Selector: alphanumericCharacterSet
-    SwiftName: alphanumerics()
-    MethodKind: Class
-  - Selector: decomposableCharacterSet
-    SwiftName: decomposables()
-    MethodKind: Class
-  - Selector: illegalCharacterSet
-    SwiftName: illegalCharacters()
-    MethodKind: Class
-  - Selector: capitalizedLetterCharacterSet
-    SwiftName: capitalizedLetters()
-    MethodKind: Class
-  - Selector: symbolCharacterSet
-    SwiftName: symbols()
-    MethodKind: Class
-  - Selector: newlineCharacterSet
-    SwiftName: newlines()
-    MethodKind: Class
   - Selector: 'hasMemberInPlane:'
     SwiftName: hasMemberInPlane(_:)
     MethodKind: Instance
@@ -81,7 +68,7 @@ Classes:
     SwiftName: dataWithContentsOfMappedFile(_:)
     MethodKind: Class
 - Name: NSCountedSet
-  SwiftName: CountedSet
+  SwiftName: NSCountedSet
 - Name: NSDate
   SwiftName: NSDate
   SwiftBridge: Date
@@ -102,7 +89,7 @@ Classes:
   SwiftName: NSDateInterval
   SwiftBridge: DateInterval
 - Name: NSError
-  SwiftName: NSError
+  SwiftBridge: Swift.Error
   Methods:
   - Selector: 'setUserInfoValueProviderForDomain:provider:'
     SwiftName: setUserInfoValueProvider(forDomain:provider:)
@@ -173,6 +160,28 @@ Classes:
   - Selector: 'notificationCenterForType:'
     MethodKind: Class
     FactoryAsInit: C
+- Name: NSKeyedArchiver
+  SwiftName: NSKeyedArchiver
+  Methods:
+  - Selector: 'encodeInt:forKey:'
+    Availability: nonswift
+    AvailabilityMsg: Use 'encodeInt32(_:forKey:)' instead
+    MethodKind: Instance
+  - Selector: 'decodeIntForKey:'
+    Availability: nonswift
+    AvailabilityMsg: Use 'decodeInt32(forKey:)' instead
+    MethodKind: Instance
+- Name: NSKeyedUnarchiver
+  SwiftName: NSKeyedUnarchiver
+  Methods:
+  - Selector: 'encodeInt:forKey:'
+    Availability: nonswift
+    AvailabilityMsg: Use 'encodeInt32(_:forKey:)' instead
+    MethodKind: Instance
+  - Selector: 'decodeIntForKey:'
+    Availability: nonswift
+    AvailabilityMsg: Use 'decodeInt32(forKey:)' instead
+    MethodKind: Instance
 - Name: NSCoder
   SwiftName: NSCoder
   Methods:
@@ -181,10 +190,16 @@ Classes:
     Availability: nonswift
     AvailabilityMsg: use generic 'decodeObjectOfClass(_:forKey:)'
   - Selector: 'encodeInt:forKey:'
-    Availability: nonswift
+    SwiftName: encodeCInt(_:forKey:)
     MethodKind: Instance
   - Selector: 'decodeIntForKey:'
-    Availability: nonswift
+    SwiftName: decodeCInt(forKey:)
+    MethodKind: Instance
+  - Selector: 'encodeDataObject:'
+    SwiftName: encode(_:)
+    MethodKind: Instance
+  - Selector: 'decodeDataObject'
+    SwiftName: decodeData()
     MethodKind: Instance
 - Name: NSNotification
   SwiftName: NSNotification
@@ -295,10 +310,9 @@ Classes:
 - Name: NSDecimalNumber
   SwiftName: NSDecimalNumber
   SwiftBridge: Decimal
-  Methods:
-  - Selector: notANumber
-    SwiftName: notANumber()
-    MethodKind: Class
+  Properties:
+  - Name: notANumber
+    SwiftName: notANumber
 - Name: NSDecimalNumberHandler
   SwiftName: NSDecimalNumberHandler
 - Name: NSDeleteCommand
@@ -489,7 +503,10 @@ Classes:
     SwiftName: intValue
   - Name: unsignedIntegerValue
     SwiftName: uintValue
+- Name: NSAttributedString
+  SwiftName: NSAttributedString
 - Name: NSOrderedSet
+  SwiftName: NSOrderedSet
   Methods:
   - Selector: 'enumerateObjectsWithOptions:usingBlock:'
     SwiftName: enumerateObjects(options:using:)
@@ -559,10 +576,6 @@ Classes:
   SwiftName: NSArchiver
 - Name: NSUnarchiver
   SwiftName: NSUnarchiver
-- Name: NSKeyedArchiver
-  SwiftName: NSKeyedArchiver
-- Name: NSKeyedUnarchiver
-  SwiftName: NSKeyedUnarchiver
 - Name: NSUniqueIDSpecifier
   SwiftName: NSUniqueIDSpecifier
 - Name: NSUserActivity
@@ -595,47 +608,72 @@ Classes:
   SwiftName: NSXPCListenerEndpoint
 - Name: NSAppleScript
   SwiftName: NSAppleScript
+- Name: NSBundleResourceRequest
+  SwiftName: NSBundleResourceRequest
 - Name: NSBundle
   Methods:
   - Selector: 'URLForAuxiliaryExecutable:'
-    SwiftName: urlForAuxiliaryExecutable(_:)
+    SwiftName: url(forAuxiliaryExecutable:)
     MethodKind: Instance
   - Selector: 'pathForAuxiliaryExecutable:'
-    SwiftName: pathForAuxiliaryExecutable(_:)
+    SwiftName: path(forAuxiliaryExecutable:)
     MethodKind: Instance
   - Selector: 'URLForResource:withExtension:subdirectory:inBundleWithURL:'
-    SwiftName: urlForResource(_:withExtension:subdirectory:inBundleWith:)
+    SwiftName: url(forResource:withExtension:subdirectory:in:)
+    MethodKind: Class
+  - Selector: 'URLsForResourcesWithExtension:subdirectory:inBundleWithURL:'
+    SwiftName: urls(forResourcesWithExtension:subdirectory:in:)
     MethodKind: Class
   - Selector: 'URLForResource:withExtension:'
-    SwiftName: urlForResource(_:withExtension:)
+    SwiftName: url(forResource:withExtension:)
     MethodKind: Instance
   - Selector: 'URLForResource:withExtension:subdirectory:'
-    SwiftName: urlForResource(_:withExtension:subdirectory:)
+    SwiftName: url(forResource:withExtension:subdirectory:)
     MethodKind: Instance
-  - Selector: 'URLForResource:withExtension:subdirectory:localization:'
-    SwiftName: urlForResource(_:withExtension:subdirectory:localization:)
+  - Selector: 'URLsForResourcesWithExtension:subdirectory:'
+    SwiftName: urls(forResourcesWithExtension:subdirectory:)
+    MethodKind: Instance
+  - Selector: 'URLsForResourcesWithExtension:subdirectory:localization:'
+    SwiftName: urls(forResourcesWithExtension:subdirectory:localization:)
     MethodKind: Instance
   - Selector: 'pathForResource:ofType:inDirectory:'
-    SwiftName: pathForResource(_:ofType:inDirectory:)
+    SwiftName: path(forResource:ofType:inDirectory:)
+    MethodKind: Class
+  - Selector: 'pathsForResourcesOfType:inDirectory:'
+    SwiftName: paths(forResourcesOfType:inDirectory:)
     MethodKind: Class
   - Selector: 'pathForResource:ofType:'
-    SwiftName: pathForResource(_:ofType:)
+    SwiftName: path(forResource:ofType:)
     MethodKind: Instance
   - Selector: 'pathForResource:ofType:inDirectory:'
-    SwiftName: pathForResource(_:ofType:inDirectory:)
+    SwiftName: path(forResource:ofType:inDirectory:)
     MethodKind: Instance
   - Selector: 'pathForResource:ofType:inDirectory:forLocalization:'
-    SwiftName: pathForResource(_:ofType:inDirectory:forLocalization:)
+    SwiftName: path(forResource:ofType:inDirectory:forLocalization:)
+    MethodKind: Instance
+  - Selector: 'pathsForResourcesOfType:inDirectory:'
+    SwiftName: paths(forResourcesOfType:inDirectory:)
+    MethodKind: Instance
+  - Selector: 'pathsForResourcesOfType:inDirectory:forLocalization:'
+    SwiftName: paths(forResourcesOfType:inDirectory:forLocalization:)
     MethodKind: Instance
   - Selector: 'objectForInfoDictionaryKey:'
-    SwiftName: objectForInfoDictionaryKey(_:)
+    SwiftName: object(forInfoDictionaryKey:)
     MethodKind: Instance
 - Name: NSByteCountFormatter
   Methods:
   - Selector: 'stringFromByteCount:'
     SwiftName: stringFromByteCount(_:)
     MethodKind: Instance
+- Name: NSLocale
+  SwiftName: NSLocale
+  SwiftBridge: Locale
+- Name: NSTimeZone
+  SwiftName: NSTimeZone
+  SwiftBridge: TimeZone
 - Name: NSCalendar
+  SwiftName: NSCalendar
+  SwiftBridge: Calendar
   Methods:
   - Selector: 'dateWithEra:year:month:day:hour:minute:second:nanosecond:'
     SwiftName: date(era:year:month:day:hour:minute:second:nanosecond:)
@@ -704,35 +742,34 @@ Classes:
     SwiftName: prepare(forReadingItemsAt:options:writingItemsAt:options:error:byAccessor:)
     MethodKind: Instance
 - Name: NSFileHandle
-  Methods:
-  - Selector: fileHandleWithStandardInput
-    SwiftName: standardInput()
-    MethodKind: Class
-  - Selector: fileHandleWithStandardOutput
-    SwiftName: standardOutput()
-    MethodKind: Class
-  - Selector: fileHandleWithStandardError
-    SwiftName: standardError()
-    MethodKind: Class
-  - Selector: fileHandleWithNullDevice
-    SwiftName: nullDevice()
-    MethodKind: Class
+  Properties:
+  - Name: fileHandleWithStandardInput
+    SwiftName: standardInput
+  - Name: fileHandleWithStandardOutput
+    SwiftName: standardOutput
+  - Name: fileHandleWithStandardError
+    SwiftName: standardError
+  - Name: fileHandleWithNullDevice
+    SwiftName: nullDevice
 - Name: NSFileManager
   Methods:
   - Selector: 'mountedVolumeURLsIncludingResourceValuesForKeys:options:'
     SwiftName: mountedVolumeURLs(includingResourceValuesForKeys:options:)
     MethodKind: Instance
   - Selector: 'URLsForDirectory:inDomains:'
-    SwiftName: urlsForDirectory(_:inDomains:)
+    SwiftName: urls(for:in:)
     MethodKind: Instance
   - Selector: 'URLForDirectory:inDomain:appropriateForURL:create:error:'
-    SwiftName: urlForDirectory(_:in:appropriateFor:create:)
+    SwiftName: url(for:in:appropriateFor:create:)
     MethodKind: Instance
   - Selector: 'URLForUbiquityContainerIdentifier:'
-    SwiftName: urlForUbiquityContainerIdentifier(_:)
+    SwiftName: url(forUbiquityContainerIdentifier:)
     MethodKind: Instance
   - Selector: 'containerURLForSecurityApplicationGroupIdentifier:'
-    SwiftName: containerURLForSecurityApplicationGroupIdentifier(_:)
+    SwiftName: containerURL(forSecurityApplicationGroupIdentifier:)
+    MethodKind: Instance
+  - Selector: 'URLForPublishingUbiquitousItemAtURL:expirationDate:error:'
+    SwiftName: url(forPublishingUbiquitousItemAt:expiration:)
     MethodKind: Instance
 - Name: NSFileVersion
   SwiftName: NSFileVersion
@@ -751,6 +788,7 @@ Classes:
     SwiftName: isPartialStringValid(_:newEditingString:errorDescription:)
     MethodKind: Instance
 - Name: NSConditionLock
+  SwiftName: NSConditionLock
   Methods:
   - Selector: 'tryLockWhenCondition:'
     SwiftName: tryLock(whenCondition:)
@@ -808,7 +846,11 @@ Classes:
     SwiftName: scanUpTo(_:into:)
     MethodKind: Instance
 - Name: NSTextCheckingResult
+  SwiftName: NSTextCheckingResult
   Methods:
+  - Selector: 'rangeAtIndex:'
+    SwiftName: rangeAt(_:)
+    MethodKind: Instance
   - Selector: 'resultByAdjustingRangesWithOffset:'
     SwiftName: resultByAdjustingRangesWithOffset(_:)
     MethodKind: Instance
@@ -918,6 +960,9 @@ Classes:
     MethodKind: Instance
 - Name: NSUserDefaults
   Methods:
+  - Selector: 'registerDefaults:'
+    SwiftName: register(defaults:)
+    MethodKind: Instance
   - Selector: 'setObject:forKey:'
     SwiftName: set(_:forKey:)
     MethodKind: Instance
@@ -931,6 +976,9 @@ Classes:
     SwiftName: set(_:forKey:)
     MethodKind: Instance
   - Selector: 'setBool:forKey:'
+    SwiftName: set(_:forKey:)
+    MethodKind: Instance
+  - Selector: 'setURL:forKey:'
     SwiftName: set(_:forKey:)
     MethodKind: Instance
   - Selector: 'addSuiteNamed:'
@@ -961,7 +1009,39 @@ Classes:
   SwiftName: NSMachPort
 - Name: NSOutputStream
   SwiftName: NSOutputStream
+- Name: NSRegularExpression
+  SwiftName: NSRegularExpression
+- Name: NSComparisonPredicate
+  SwiftName: NSComparisonPredicate
+- Name: NSCompoundPredicate
+  SwiftName: NSCompoundPredicate
+- Name: NSPredicate
+  SwiftName: NSPredicate
+- Name: NSMapTable
+  SwiftName: NSMapTable
+- Name: NSHashTable
+  SwiftName: NSHashTable
+- Name: NSPointerArray
+  SwiftName: NSPointerArray
+- Name: NSPointerFunctions
+  SwiftName: NSPointerFunctions
+- Name: NSCache
+  SwiftName: NSCache
+- Name: NSPurgeableData
+  SwiftName: NSPurgeableData
+- Name: NSLock
+  SwiftName: NSLock
+- Name: NSCondition
+  SwiftName: NSCondition
+- Name: NSDistributedLock
+  SwiftName: NSDistributedLock
+- Name: NSRecursiveLock
+  SwiftName: NSRecursiveLock
+- Name: NSSortDescriptor
+  SwiftName: NSSortDescriptor
 Protocols:
+- Name: NSLocking
+  SwiftName: NSLocking
 - Name: NSMetadataQueryDelegate
   SwiftName: NSMetadataQueryDelegate
 - Name: NSCopying
@@ -1004,6 +1084,7 @@ Protocols:
     SwiftName: presentedSubitem(at:didResolve:)
     MethodKind: Instance
 - Name: NSDiscardableContent
+  SwiftName: NSDiscardableContent
   Methods:
   - Selector: beginContentAccess
     SwiftName: beginContentAccess()
@@ -1023,6 +1104,8 @@ Protocols:
   SwiftName: NSURLHandleClient
 - Name: NSMachPortDelegate
   SwiftName: NSMachPortDelegate
+- Name: NSCacheDelegate
+  SwiftName: NSCacheDelegate
 Tags:
 - Name: NSActivityOptions
   SwiftName: ProcessInfo.ActivityOptions
@@ -1057,19 +1140,19 @@ Tags:
 - Name: NSByteCountFormatterCountStyle
   SwiftName: ByteCountFormatter.CountStyle
 - Name: NSCalendarUnit
-  SwiftName: Calendar.Unit
+  SwiftName: NSCalendar.Unit
 - Name: NSCalendarOptions
-  SwiftName: Calendar.Options
+  SwiftName: NSCalendar.Options
 - Name: NSDecodingFailurePolicy
   SwiftName: NSCoder.DecodingFailurePolicy
 - Name: NSComparisonPredicateOptions
-  SwiftName: ComparisonPredicate.Options
+  SwiftName: NSComparisonPredicate.Options
 - Name: NSComparisonPredicateModifier
-  SwiftName: ComparisonPredicate.Modifier
+  SwiftName: NSComparisonPredicate.Modifier
 - Name: NSPredicateOperatorType
-  SwiftName: ComparisonPredicate.Operator
+  SwiftName: NSComparisonPredicate.Operator
 - Name: NSCompoundPredicateType
-  SwiftName: CompoundPredicate.LogicalType
+  SwiftName: NSCompoundPredicate.LogicalType
 - Name: NSDateFormatterStyle
   SwiftName: DateFormatter.Style
 - Name: NSDateFormatterBehavior
@@ -1155,11 +1238,11 @@ Tags:
 - Name: NSPropertyListFormat
   SwiftName: PropertyListSerialization.PropertyListFormat
 - Name: NSRegularExpressionOptions
-  SwiftName: RegularExpression.Options
+  SwiftName: NSRegularExpression.Options
 - Name: NSMatchingOptions
-  SwiftName: RegularExpression.MatchingOptions
+  SwiftName: NSRegularExpression.MatchingOptions
 - Name: NSMatchingFlags
-  SwiftName: RegularExpression.MatchingFlags
+  SwiftName: NSRegularExpression.MatchingFlags
 - Name: NSStreamStatus
   SwiftName: Stream.Status
 - Name: NSStreamEvent
@@ -1167,11 +1250,12 @@ Tags:
 - Name: NSTaskTerminationReason
   SwiftName: Task.TerminationReason
 - Name: NSTextCheckingType
-  SwiftName: TextCheckingResult.CheckingType
+  SwiftName: NSTextCheckingResult.CheckingType
 - Name: NSTextCheckingTypes
-  SwiftName: TextCheckingResult.CheckingTypes
+  Availability: nonswift
+  AvailabilityMsg: Use 'NSTextCheckingResult.CheckingType'
 - Name: NSTimeZoneNameStyle
-  SwiftName: TimeZone.NameStyle
+  SwiftName: NSTimeZone.NameStyle
 - Name: NSURLCacheStoragePolicy
   SwiftName: URLCache.StoragePolicy
 - Name: NSURLCredentialPersistence
@@ -1186,14 +1270,18 @@ Tags:
   SwiftName: URLSession.AuthChallengeDisposition
 - Name: NSURLSessionResponseDisposition
   SwiftName: URLSession.ResponseDisposition
+- Name: NSURLSessionTaskMetricsResourceFetchType
+  SwiftName: URLSessionTaskMetrics.ResourceFetchType
 - Name: NSUserNotificationActivationType
   SwiftName: NSUserNotification.ActivationType
 - Name: NSXMLDocumentContentKind
   SwiftName: XMLDocument.ContentKind
 - Name: NSXMLDTDNodeKind
-  SwiftName: XMLDTDNode.Kind
+  SwiftName: XMLDTDNode.DTDKind
 - Name: NSXMLNodeKind
   SwiftName: XMLNode.Kind
+- Name: NSXMLNodeOptions
+  SwiftName: XMLNode.Options
 - Name: NSXMLParserError
   SwiftName: XMLParser.ErrorCode
 - Name: NSXMLParserExternalEntityResolvingPolicy
@@ -1213,17 +1301,17 @@ Tags:
 - Name: NSCalculationError
   SwiftName: NSDecimalNumber.CalculationError
 - Name: NSAttributedStringEnumerationOptions
-  SwiftName: AttributedString.EnumerationOptions
+  SwiftName: NSAttributedString.EnumerationOptions
 - Name: NSDateComponentsFormatterUnitsStyle
   SwiftName: DateComponentsFormatter.UnitsStyle
 - Name: NSDateComponentsFormatterZeroFormattingBehavior
   SwiftName: DateComponentsFormatter.ZeroFormattingBehavior
 - Name: NSLocaleLanguageDirection
-  SwiftName: Locale.LanguageDirection
+  SwiftName: NSLocale.LanguageDirection
 - Name: NSNetServiceOptions
   SwiftName: NSNetService.Options
 - Name: NSPointerFunctionsOptions
-  SwiftName: PointerFunctions.Options
+  SwiftName: NSPointerFunctions.Options
 - Name: NSSearchPathDirectory
   SwiftName: FileManager.SearchPathDirectory
 - Name: NSSearchPathDomainMask
@@ -1238,8 +1326,6 @@ Tags:
   SwiftName: NSString.EnumerationOptions
 - Name: NSURLBookmarkCreationOptions
   SwiftName: NSURL.BookmarkCreationOptions
-- Name: NSURLBookmarkFileCreationOptions
-  SwiftName: NSURL.BookmarkFileCreationOptions
 - Name: NSURLBookmarkResolutionOptions
   SwiftName: NSURL.BookmarkResolutionOptions
 - Name: NSURLHandleStatus
@@ -1288,13 +1374,13 @@ Typedefs:
 - Name: NSBackgroundActivityCompletionHandler
   SwiftName: NSBackgroundActivityScheduler.CompletionHandler
 - Name: NSCalendarIdentifier
-  SwiftName: Calendar.Identifier
+  SwiftName: NSCalendar.Identifier
 - Name: NSItemProviderCompletionHandler
   SwiftName: NSItemProvider.CompletionHandler
 - Name: NSItemProviderLoadHandler
   SwiftName: NSItemProvider.LoadHandler
 - Name: NSLocaleKey
-  SwiftName: Locale.Key
+  SwiftName: NSLocale.Key
 - Name: NSNotificationName
   SwiftName: NSNotification.Name
 - Name: NSProgressFileOperationKind
@@ -1335,6 +1421,16 @@ Typedefs:
   SwiftName: DistributedNotificationCenter.CenterType
 - Name: NSURLFileProtectionType
   SwiftName: URLFileProtection
+- Name: NSURLBookmarkFileCreationOptions
+  SwiftName: NSURL.BookmarkFileCreationOptions
+- Name: NSMapTableValueCallBacks
+  SwiftName: NSMapTableValueCallBacks
+- Name: NSKeyValueOperator
+  SwiftName: NSKeyValueOperator
+- Name: NSValueTransformerName
+  SwiftName: NSValueTransformerName
+- Name: NSErrorDomain
+  SwiftName: NSErrorDomain
 Globals:
 - Name: NSAppleScriptErrorMessage
   SwiftName: NSAppleScript.errorMessage
@@ -1353,7 +1449,7 @@ Globals:
 - Name: NSItemProviderErrorDomain
   SwiftName: NSItemProvider.errorDomain
 - Name: NSCurrentLocaleDidChangeNotification
-  SwiftName: Locale.currentLocaleDidChangeNotification
+  SwiftName: NSLocale.currentLocaleDidChangeNotification
 - Name: NSNetServicesErrorDomain
   SwiftName: NSNetService.errorDomain
 - Name: NSNetServicesErrorCode
@@ -1367,11 +1463,11 @@ Globals:
 - Name: NSTaskDidTerminateNotification
   SwiftName: Task.didTerminateNotification
 - Name: NSTextCheckingAllSystemTypes
-  SwiftName: TextCheckingResult.CheckingType.allSystemTypes
+  SwiftName: NSTextCheckingResult.CheckingType.allSystemTypes
 - Name: NSTextCheckingAllCustomTypes
-  SwiftName: TextCheckingResult.CheckingType.allCustomTypes
+  SwiftName: NSTextCheckingResult.CheckingType.allCustomTypes
 - Name: NSTextCheckingAllTypes
-  SwiftName: TextCheckingResult.CheckingType.allTypes
+  SwiftName: NSTextCheckingResult.CheckingType.allTypes
 - Name: NSUbiquitousKeyValueStoreDidChangeExternallyNotification
   SwiftName: NSUbiquitousKeyValueStore.didChangeExternallyNotification
 - Name: NSURLSessionTaskPriorityDefault
@@ -1533,6 +1629,10 @@ Enumerators:
   SwiftName: currencyPlural
 - Name: NSNumberFormatterCurrencyAccountingStyle
   SwiftName: currencyAccounting
+- Name: NSPointerFunctionsStrongMemory
+  SwiftName: strongMemory
+- Name: NSPointerFunctionsObjectPersonality
+  SwiftName: objectPersonality
 - Name: NSXMLDocumentXMLKind
   SwiftName: xml
 - Name: NSXMLDocumentXHTMLKind

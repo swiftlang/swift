@@ -45,7 +45,7 @@ public protocol IntegerArithmetic : _IntegerArithmetic, Comparable {
 % for name, op, Action, result in integerBinaryOps:
   /// ${Action} `lhs` and `rhs`, returning ${result} and trapping in case of
   /// arithmetic overflow (except in -Ounchecked builds).
-  func ${op} (lhs: Self, rhs: Self) -> Self
+  static func ${op} (lhs: Self, rhs: Self) -> Self
 % end
   
   /// Explicitly convert to `IntMax`, trapping on overflow (except in
@@ -91,15 +91,15 @@ public func ${op}= <T : _IntegerArithmetic>(lhs: inout T, rhs: T) {
 /// - `x - 0 == x`
 /// - `-x == 0 - x`
 /// - `-(-x) == x`
-public protocol SignedNumber : Comparable, IntegerLiteralConvertible {
+public protocol SignedNumber : Comparable, ExpressibleByIntegerLiteral {
   /// Returns the result of negating `x`.
-  prefix func - (x: Self) -> Self
+  static prefix func - (x: Self) -> Self
 
   /// Returns the difference between `lhs` and `rhs`.
-  func - (lhs: Self, rhs: Self) -> Self
+  static func - (lhs: Self, rhs: Self) -> Self
   
   // Do not use this operator directly; call abs(x) instead
-  func ~> (_:Self,_:(_Abs, ())) -> Self
+  static func ~> (_:Self,_:(_Abs, ())) -> Self
 }
 
 // Unary negation in terms of subtraction.  This is a default

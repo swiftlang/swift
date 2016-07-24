@@ -31,7 +31,7 @@ namespace SourceKit {
   typedef IntrusiveRefCntPtr<ASTUnit> ASTUnitRef;
 
 class SwiftInterfaceGenContext :
-  public swift::ThreadSafeRefCountedBase<SwiftInterfaceGenContext> {
+  public llvm::ThreadSafeRefCountedBase<SwiftInterfaceGenContext> {
 public:
   static SwiftInterfaceGenContextRef create(StringRef DocumentName,
                                             bool IsModule,
@@ -41,6 +41,11 @@ public:
                                             std::string &ErrorMsg,
                                             bool SynthesizedExtensions,
                                             Optional<StringRef> InterestedUSR);
+
+  static SwiftInterfaceGenContextRef
+    createForTypeInterface(swift::CompilerInvocation Invocation,
+                           StringRef TypeUSR,
+                           std::string &ErrorMsg);
 
   static SwiftInterfaceGenContextRef createForSwiftSource(StringRef DocumentName,
                                                           StringRef SourceFileName,
@@ -55,6 +60,7 @@ public:
 
   bool matches(StringRef ModuleName, const swift::CompilerInvocation &Invok);
 
+  /// Note: requires exclusive access to the underlying AST.
   void reportEditorInfo(EditorConsumer &Consumer) const;
 
   struct ResolvedEntity {
@@ -71,8 +77,12 @@ public:
     bool isResolved() const { return Dcl || Mod; }
   };
 
+  /// Provides exclusive access to the underlying AST.
+  void accessASTAsync(std::function<void()> Fn);
+
   /// Returns the resolved entity along with a boolean indicating if it is a
   /// reference or not.
+  /// Note: requires exclusive access to the underlying AST. See accessASTAsync.
   ResolvedEntity resolveEntityForOffset(unsigned Offset) const;
 
   /// Searches for a declaration with the given USR and returns the

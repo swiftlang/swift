@@ -13,7 +13,7 @@
 // CHECK-NEXT: "Subclass"
 // CHECK-NEXT: "MyArray"
 // CHECK-NEXT: "someGlobal"
-// CHECK-NEXT: "ExtraFloatLiteralConvertible"
+// CHECK-NEXT: "ExpressibleByExtraFloatLiteral"
 // CHECK-NEXT: "~~~"
 // CHECK-NEXT: "ThreeTilde"
 // CHECK-NEXT: "overloadedOnProto"
@@ -38,13 +38,13 @@
 // CHECK-NEXT: - ["V4main10IntWrapper", ""]
 // CHECK-NEXT: - ["VV4main10IntWrapper16InnerForNoReason", ""]
 // CHECK-NEXT: - ["C4main8Subclass", ""]
-// CHECK-NEXT: - ["Ps23ArrayLiteralConvertible", ""]
+// CHECK-NEXT: - ["Ps25ExpressibleByArrayLiteral", ""]
 // CHECK-NEXT: - ["Sb", ""]
 // CHECK-NEXT: - ["VE4mainSb11InnerToBool", ""]
 // CHECK: - ["V4main9Sentinel1", ""]
 // CHECK-NEXT: - ["V4main9Sentinel2", ""]
-// CHECK: - ["Ps23ArrayLiteralConvertible", "useless"]
-// CHECK-NEXT: - ["Ps23ArrayLiteralConvertible", "useless2"]
+// CHECK: - ["Ps25ExpressibleByArrayLiteral", "useless"]
+// CHECK-NEXT: - ["Ps25ExpressibleByArrayLiteral", "useless2"]
 // CHECK-NEXT: - ["Sb", "InnerToBool"]
 
 // CHECK-LABEL: {{^depends-top-level:$}}
@@ -90,13 +90,13 @@ class Subclass : ClassFromOtherFile {}
 // CHECK-DAG: "Array"
 typealias MyArray = Array<Bool>
 
-// CHECK-DAG: "ArrayLiteralConvertible"
-extension ArrayLiteralConvertible {
+// CHECK-DAG: "ExpressibleByArrayLiteral"
+extension ExpressibleByArrayLiteral {
   final func useless() {}
 }
 
 // CHECK-DAG: OtherFileElementType
-extension ArrayLiteralConvertible where Element == OtherFileElementType {
+extension ExpressibleByArrayLiteral where Element == OtherFileElementType {
   final func useless2() {}
 }
 
@@ -107,12 +107,12 @@ extension Bool {
   struct InnerToBool {}
 }
 
-// CHECK-DAG: - "OtherFileAliasForFloatLiteralConvertible"
-protocol ExtraFloatLiteralConvertible
-    : OtherFileAliasForFloatLiteralConvertible {
+// CHECK-DAG: - "ExpressibleByOtherFileAliasForFloatLiteral"
+protocol ExpressibleByExtraFloatLiteral
+    : ExpressibleByOtherFileAliasForFloatLiteral {
 }
-// CHECK-DAG: !private "UnicodeScalarLiteralConvertible"
-private protocol ExtraCharLiteralConvertible : UnicodeScalarLiteralConvertible {
+// CHECK-DAG: !private "ExpressibleByUnicodeScalarLiteral"
+private protocol ExpressibleByExtraCharLiteral : ExpressibleByUnicodeScalarLiteral {
 }
 
 prefix operator ~~~ {}
@@ -139,7 +139,7 @@ func lookUpManyTopLevelNames() {
 
   // CHECK-DAG: !private "UInt"
   // CHECK-DAG: !private "+"
-  let _: UInt = [1, 2].reduce(0, combine: +)
+  let _: UInt = [1, 2].reduce(0, +)
   
   // CHECK-DAG: !private "-"
   let _: UInt = 3 - 2 - 1
@@ -307,7 +307,9 @@ private extension Use4 {
 // CHECK-DAG: !private "PrivateTopLevelTy2"
 // CHECK-DAG: "PrivateProto2"
 extension Private2 : PrivateProto2 {
-  var privateTy2: PrivateTopLevelTy2? { return nil }
+  // FIXME: This test is supposed to check that we get this behavior /without/
+  // marking the property private, just from the base type.
+  private var privateTy2: PrivateTopLevelTy2? { return nil }
 }
 // CHECK-DAG: !private "PrivateTopLevelTy3"
 func outerPrivateTy3() {
@@ -359,8 +361,8 @@ struct Sentinel2 {}
 // CHECK-DAG: - ["Ps10Comparable", ""]
 // CHECK-DAG: - ["C4main18ClassFromOtherFile", ""]
 // CHECK-DAG: - !private ["Si", "max"]
-// CHECK-DAG: - ["Ps23FloatLiteralConvertible", ""]
-// CHECK-DAG: - !private ["Ps31UnicodeScalarLiteralConvertible", ""]
+// CHECK-DAG: - ["Ps25ExpressibleByFloatLiteral", ""]
+// CHECK-DAG: - !private ["Ps33ExpressibleByUnicodeScalarLiteral", ""]
 // CHECK-DAG: - !private ["Ps10Strideable", "Stride"]
 // CHECK-DAG: - !private ["Sa", "Element"]
 // CHECK-DAG: - !private ["Sa", "reduce"]
@@ -404,8 +406,8 @@ struct Sentinel2 {}
 // CHECK-DAG: - "Ps10Comparable"
 // CHECK-DAG: - "C4main18ClassFromOtherFile"
 // CHECK-DAG: !private "Si"
-// CHECK-DAG: - "Ps23FloatLiteralConvertible"
-// CHECK-DAG: !private "Ps31UnicodeScalarLiteralConvertible"
+// CHECK-DAG: - "Ps25ExpressibleByFloatLiteral"
+// CHECK-DAG: !private "Ps33ExpressibleByUnicodeScalarLiteral"
 // CHECK-DAG: !private "Ps10Strideable"
 // CHECK-DAG: !private "Sa"
 // CHECK-DAG: - "Sb"
@@ -446,7 +448,7 @@ struct Sentinel2 {}
 // NEGATIVE-NOT: "String"
 // NEGATIVE-NOT: "SS"
 // These are used by the other file in this module, but not by this one.
-// NEGATIVE-NOT: "FloatLiteralConvertible"
+// NEGATIVE-NOT: "ExpressibleByFloatLiteral"
 // NEGATIVE-NOT: "Int16"
 // NEGATIVE-NOT: "OtherFileProto"
 // NEGATIVE-NOT: "OtherFileProtoImplementor"

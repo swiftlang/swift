@@ -43,7 +43,7 @@ protocol P8 {
 
 // Inheritable: operator requirement.
 protocol P9 {
-  func ==(x: Self, y: Self) -> Bool 
+  static func ==(x: Self, y: Self) -> Bool 
 }
 
 // Never inheritable: method with 'Self' in a non-contravariant position.

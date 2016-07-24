@@ -14,7 +14,7 @@
 ///
 /// *Deprecated.*
 @_fixed_layout
-public enum ImplicitlyUnwrappedOptional<Wrapped> : NilLiteralConvertible {
+public enum ImplicitlyUnwrappedOptional<Wrapped> : ExpressibleByNilLiteral {
   // The compiler has special knowledge of the existence of
   // `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
   // the library intrinsics below.

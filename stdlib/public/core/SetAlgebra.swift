@@ -52,7 +52,7 @@
 /// - `x.isStrictSubset(of: y)` if and only if `x.isSubset(of: y) && x != y`
 /// 
 /// - SeeAlso: `OptionSet`, `Set`
-public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
+public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   // FIXME: write tests for SetAlgebra
   
   /// A type for which the conforming type provides a containment test.
@@ -549,27 +549,27 @@ extension SetAlgebra {
 public typealias SetAlgebraType = SetAlgebra
 
 extension SetAlgebra {
-  @available(*, unavailable, renamed: "intersection")
+  @available(*, unavailable, renamed: "intersection(_:)")
   public func intersect(_ other: Self) -> Self {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "symmetricDifference")
+  @available(*, unavailable, renamed: "symmetricDifference(_:)")
   public func exclusiveOr(_ other: Self) -> Self {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "formUnion")
+  @available(*, unavailable, renamed: "formUnion(_:)")
   public mutating func unionInPlace(_ other: Self) {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "formIntersection")
+  @available(*, unavailable, renamed: "formIntersection(_:)")
   public mutating func intersectInPlace(_ other: Self) {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "formSymmetricDifference")
+  @available(*, unavailable, renamed: "formSymmetricDifference(_:)")
   public mutating func exclusiveOrInPlace(_ other: Self) {
     Builtin.unreachable()
   }
@@ -589,7 +589,7 @@ extension SetAlgebra {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "subtract")
+  @available(*, unavailable, renamed: "subtract(_:)")
   public mutating func subtractInPlace(_ other: Self) {
     Builtin.unreachable()
   }

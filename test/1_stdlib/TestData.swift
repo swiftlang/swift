@@ -190,7 +190,7 @@ class TestData : TestDataSuper {
     
     func testCustomData() {
         let length = 5
-        let allOnesData = Data(reference: AllOnesData(length: length))
+        let allOnesData = Data(referencing: AllOnesData(length: length))
         expectEqual(1, allOnesData[0], "First byte of all 1s data should be 1")
         
         // Double the length
@@ -246,15 +246,15 @@ class TestData : TestDataSuper {
         let allOnes = AllOnesData(length: 64)
         
         // Type-erased
-        let data = Data(reference: allOnes)
+        let data = Data(referencing: allOnes)
         
         // Create a home for our test data
         let dirPath = (NSTemporaryDirectory() as NSString).appendingPathComponent(NSUUID().uuidString)
-        try! FileManager.`default`().createDirectory(atPath: dirPath, withIntermediateDirectories: true, attributes: nil)
+        try! FileManager.default.createDirectory(atPath: dirPath, withIntermediateDirectories: true, attributes: nil)
         let filePath = (dirPath as NSString).appendingPathComponent("temp_file")
-        guard FileManager.`default`().createFile(atPath: filePath, contents: nil, attributes: nil) else { expectTrue(false, "Unable to create temporary file"); return}
+        guard FileManager.default.createFile(atPath: filePath, contents: nil, attributes: nil) else { expectTrue(false, "Unable to create temporary file"); return}
         guard let fh = FileHandle(forWritingAtPath: filePath) else { expectTrue(false, "Unable to open temporary file"); return }
-        defer { try! FileManager.`default`().removeItem(atPath: dirPath) }
+        defer { try! FileManager.default.removeItem(atPath: dirPath) }
         
         // Now use this data with some Objective-C code that takes NSData arguments
         fh.write(data)
@@ -291,7 +291,7 @@ class TestData : TestDataSuper {
         expectEqual(s.count, 2, "Expected only two entries in the Set")
     }
     
-    func testReplaceBytes() {
+    func testReplaceSubrange() {
         var hello = dataFrom("Hello")
         let world = dataFrom("World")
         
@@ -302,11 +302,11 @@ class TestData : TestDataSuper {
         let goodbye = dataFrom("Goodbye")
         let expected = dataFrom("Goodbye World")
         
-        goodbyeWorld.replaceBytes(in: 0..<5, with: goodbye)
+        goodbyeWorld.replaceSubrange(0..<5, with: goodbye)
         expectEqual(goodbyeWorld, expected)
     }
     
-    func testReplaceBytes2() {
+    func testReplaceSubrange2() {
         let hello = dataFrom("Hello")
         let world = dataFrom(" World")
         let goodbye = dataFrom("Goodbye")
@@ -316,12 +316,12 @@ class TestData : TestDataSuper {
         mutateMe.append(world)
 
         if let found = mutateMe.range(of: hello) {
-            mutateMe.replaceBytes(in: found, with: goodbye)
+            mutateMe.replaceSubrange(found, with: goodbye)
         }
         expectEqual(mutateMe, expected)
     }
     
-    func testReplaceBytes3() {
+    func testReplaceSubrange3() {
         // The expected result
         let expectedBytes : [UInt8] = [1, 2, 9, 10, 11, 12, 13]
         let expected = expectedBytes.withUnsafeBufferPointer {
@@ -337,9 +337,44 @@ class TestData : TestDataSuper {
         // The bytes we'll insert
         let b : [UInt8] = [9, 10, 11, 12, 13]
         b.withUnsafeBufferPointer {
-            a.replaceBytes(in: 2..<5, with: $0)
+            a.replaceSubrange(2..<5, with: $0)
         }
         expectEqual(expected, a)
+    }
+    
+    func testReplaceSubrange4() {
+        let expectedBytes : [UInt8] = [1, 2, 9, 10, 11, 12, 13]
+        let expected = Data(bytes: expectedBytes)
+        
+        // The data we'll mutate
+        let someBytes : [UInt8] = [1, 2, 3, 4, 5]
+        var a = Data(bytes: someBytes)
+        
+        // The bytes we'll insert
+        let b : [UInt8] = [9, 10, 11, 12, 13]
+        a.replaceSubrange(2..<5, with: b)
+        expectEqual(expected, a)
+    }
+    
+    func testReplaceSubrange5() {
+        var d = Data(bytes: [1, 2, 3])
+        d.replaceSubrange(0..<0, with: [4])
+        expectEqual(Data(bytes: [4, 1, 2, 3]), d)
+        
+        d.replaceSubrange(0..<4, with: [9])
+        expectEqual(Data(bytes: [9]), d)
+        
+        d.replaceSubrange(0..<d.count, with: [])
+        expectEqual(Data(), d)
+        
+        d.replaceSubrange(0..<0, with: [1, 2, 3, 4])
+        expectEqual(Data(bytes: [1, 2, 3, 4]), d)
+        
+        d.replaceSubrange(1..<3, with: [9, 8])
+        expectEqual(Data(bytes: [1, 9, 8, 4]), d)
+        
+        d.replaceSubrange(d.count..<d.count, with: [5])
+        expectEqual(Data(bytes: [1, 9, 8, 4, 5]), d)
     }
 
     func testRange() {
@@ -369,8 +404,8 @@ class TestData : TestDataSuper {
         let expected = dataFrom("Hello World")
         var helloWorld = dataFrom("")
         
-        helloWorld.replaceBytes(in: 0..<0, with: world)
-        helloWorld.replaceBytes(in: 0..<0, with: hello)
+        helloWorld.replaceSubrange(0..<0, with: world)
+        helloWorld.replaceSubrange(0..<0, with: hello)
         
         expectEqual(helloWorld, expected)
     }
@@ -424,7 +459,7 @@ class TestData : TestDataSuper {
         buffer[0] = 0
         buffer[1] = 0
         
-        var data = Data(capacity: c * strideof(UInt16.self))!
+        var data = Data(capacity: c * strideof(UInt16.self))
         data.resetBytes(in: 0..<c * strideof(UInt16.self))
         data[0] = 0xFF
         data[1] = 0xFF
@@ -594,13 +629,7 @@ class TestData : TestDataSuper {
     }
 
     func test_basicReadWrite() {
-        let url : URL
-        do {
-            url = try URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true).appendingPathComponent("testfile")
-        } catch {
-            expectTrue(false, "Should not have thrown")
-            return
-        }
+        let url = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true).appendingPathComponent("testfile")
 
         let count = 1 << 24
         let randomMemory = malloc(count)!
@@ -615,7 +644,45 @@ class TestData : TestDataSuper {
         }
         
         do {
-            try FileManager.`default`().removeItem(at: url)
+            try FileManager.default.removeItem(at: url)
+        } catch {
+            // ignore
+        }
+    }
+
+    func test_writeFailure() {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true).appendingPathComponent("testfile")
+        
+        let data = Data()
+        do {
+            try data.write(to: url)
+        } catch let error as NSError {
+            print(error)
+            expectTrue(false, "Should not have thrown")
+        }
+        
+        do {
+            try data.write(to: url, options: [.withoutOverwriting])
+            expectTrue(false, "Should have thrown")
+        } catch let error as NSError {
+            expectEqual(error.code, NSFileWriteFileExistsError)
+        }
+        
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch {
+            // ignore
+        }
+        
+        // Make sure clearing the error condition allows the write to succeed
+        do {
+            try data.write(to: url, options: [.withoutOverwriting])
+        } catch {
+            expectTrue(false, "Should not have thrown")
+        }
+        
+        do {
+            try FileManager.default.removeItem(at: url)
         } catch {
             // ignore
         }
@@ -782,6 +849,15 @@ class TestData : TestDataSuper {
         }
     }
     
+
+    // MARK: -
+    func test_classForCoder() {
+        // confirm internal bridged impl types are not exposed to archival machinery
+        let d = Data() as NSData
+        let expected: AnyClass = NSData.self as AnyClass
+        expectTrue(d.classForCoder == expected)
+        expectTrue(d.classForKeyedArchiver == expected)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -795,9 +871,11 @@ DataTests.test("testBridgingMutable") { TestData().testBridgingMutable() }
 DataTests.test("testBridgingCustom") { TestData().testBridgingCustom() }
 DataTests.test("testEquality") { TestData().testEquality() }
 DataTests.test("testDataInSet") { TestData().testDataInSet() }
-DataTests.test("testReplaceBytes") { TestData().testReplaceBytes() }
-DataTests.test("testReplaceBytes2") { TestData().testReplaceBytes2() }
-DataTests.test("testReplaceBytes3") { TestData().testReplaceBytes3() }
+DataTests.test("testReplaceSubrange") { TestData().testReplaceSubrange() }
+DataTests.test("testReplaceSubrange2") { TestData().testReplaceSubrange2() }
+DataTests.test("testReplaceSubrange3") { TestData().testReplaceSubrange3() }
+DataTests.test("testReplaceSubrange4") { TestData().testReplaceSubrange4() }
+DataTests.test("testReplaceSubrange5") { TestData().testReplaceSubrange5() }
 DataTests.test("testRange") { TestData().testRange() }
 DataTests.test("testInsertData") { TestData().testInsertData() }
 DataTests.test("testLoops") { TestData().testLoops() }
@@ -812,6 +890,7 @@ DataTests.test("test_base64Data_medium") { TestData().test_base64Data_medium() }
 DataTests.test("test_dataHash") { TestData().test_dataHash() }
 DataTests.test("test_discontiguousEnumerateBytes") { TestData().test_discontiguousEnumerateBytes() }
 DataTests.test("test_basicReadWrite") { TestData().test_basicReadWrite() }
+DataTests.test("test_writeFailure") { TestData().test_writeFailure() }
 DataTests.test("test_bridgeOverrides") { TestData().test_bridgeOverrides() }
 DataTests.test("test_genericBuffers") { TestData().test_genericBuffers() }
 DataTests.test("test_basicDataMutation") { TestData().test_basicDataMutation() }
@@ -819,6 +898,7 @@ DataTests.test("test_basicMutableDataMutation") { TestData().test_basicMutableDa
 DataTests.test("test_roundTrip") { TestData().test_roundTrip() }
 DataTests.test("test_passing") { TestData().test_passing() }
 DataTests.test("test_bufferSizeCalculation") { TestData().test_bufferSizeCalculation() }
+DataTests.test("test_classForCoder") { TestData().test_classForCoder() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
@@ -830,7 +910,7 @@ DataTests.test("bounding failure subdata") {
 DataTests.test("bounding failure replace") {
     var data = "Hello World".data(using: .utf8)!
     expectCrashLater()
-    data.replaceBytes(in: 5..<200, with: Data())
+    data.replaceSubrange(5..<200, with: Data())
 }
 
 DataTests.test("bounding failure replace2") {
@@ -839,7 +919,7 @@ DataTests.test("bounding failure replace2") {
     expectCrashLater()
     bytes.withUnsafeBufferPointer {
         // lowerBound ok, upperBound after end of data
-        data.replaceBytes(in: 0..<2, with: $0)
+        data.replaceSubrange(0..<2, with: $0)
     }
 }
 
@@ -849,8 +929,16 @@ DataTests.test("bounding failure replace3") {
     expectCrashLater()
     bytes.withUnsafeBufferPointer {
         // lowerBound is > length
-        data.replaceBytes(in: 2..<4, with: $0)
+        data.replaceSubrange(2..<4, with: $0)
     }
+}
+
+DataTests.test("bounding failure replace4") {
+    var data = "a".data(using: .utf8)!
+    var bytes : [UInt8] = [1, 2, 3]
+    expectCrashLater()
+    // lowerBound is > length
+    data.replaceSubrange(2..<4, with: bytes)
 }
 
 DataTests.test("bounding failure reset range") {

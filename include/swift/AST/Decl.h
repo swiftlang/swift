@@ -458,8 +458,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// This is a value of \c StoredInheritsSuperclassInits.
     unsigned InheritsSuperclassInits : 2;
 
-    /// Whether this class is "foreign".
-    unsigned Foreign : 1;
+    /// \see ClassDecl::ForeignKind
+    unsigned RawForeignKind : 2;
     
     /// Whether this class contains a destructor decl.
     ///
@@ -468,7 +468,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// control inserting the implicit destructor.
     unsigned HasDestructorDecl : 1;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 7 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 8 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class StructDeclBitfields {
@@ -2167,15 +2167,41 @@ public:
     return TypeAndAccess.getInt().hasValue();
   }
 
+  /// \see getFormalAccess
+  Accessibility getFormalAccessImpl(const DeclContext *useDC) const;
+
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
   /// This is the access used when calculating if access control is being used
-  /// consistently.
-  Accessibility getFormalAccess() const {
+  /// consistently. If \p useDC is provided (the location where the value is
+  /// being used), features that affect formal access such as \c \@testable are
+  /// taken into account.
+  ///
+  /// \sa getFormalAccessScope
+  Accessibility getFormalAccess(const DeclContext *useDC = nullptr) const {
     assert(hasAccessibility() && "accessibility not computed yet");
-    return TypeAndAccess.getInt().getValue();
+    Accessibility result = TypeAndAccess.getInt().getValue();
+    if (useDC && result == Accessibility::Internal)
+      return getFormalAccessImpl(useDC);
+    return result;
   }
+
+  /// Returns the outermost DeclContext from which this declaration can be
+  /// accessed, or null if the declaration is public.
+  ///
+  /// This is used when calculating if access control is being used
+  /// consistently. If \p useDC is provided (the location where the value is
+  /// being used), features that affect formal access such as \c \@testable are
+  /// taken into account.
+  ///
+  /// \invariant
+  /// <code>value.isAccessibleFrom(value.getFormalAccessScope())</code>
+  ///
+  /// \sa getFormalAccess
+  /// \sa isAccessibleFrom
+  const DeclContext *
+  getFormalAccessScope(const DeclContext *useDC = nullptr) const;
 
   /// Returns the access level that actually controls how a declaration should
   /// be emitted and may be used.
@@ -2686,6 +2712,8 @@ enum { NumOptionalTypeKinds = 2 };
   
 // Kinds of pointer types.
 enum PointerTypeKind : unsigned {
+  PTK_UnsafeMutableRawPointer,
+  PTK_UnsafeRawPointer,
   PTK_UnsafeMutablePointer,
   PTK_UnsafePointer,
   PTK_AutoreleasingUnsafeMutablePointer,
@@ -3212,9 +3240,7 @@ public:
   ClassDecl *getSuperclassDecl() const;
 
   /// Set the superclass of this class.
-  void setSuperclass(Type superclass) {
-    LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
-  }
+  void setSuperclass(Type superclass);
 
   /// Retrieve the status of circularity checking for class inheritance.
   CircularityCheck getCircularityCheck() const {
@@ -3238,6 +3264,19 @@ public:
     ClassDeclBits.RequiresStoredPropertyInits = requiresInits;
   }
 
+  /// \see getForeignClassKind
+  enum class ForeignKind : uint8_t {
+    /// A normal Swift or Objective-C class.
+    Normal = 0,
+    /// An imported Core Foundation type. These are AnyObject-compatible but
+    /// do not have runtime metadata.
+    CFType,
+    /// An imported Objective-C type whose class and metaclass symbols are not
+    /// both available at link-time but can be accessed through the Objective-C
+    /// runtime.
+    RuntimeOnly
+  };
+
   /// Whether this class is "foreign", meaning that it is implemented
   /// by a runtime that Swift does not have first-class integration
   /// with.  This generally means that:
@@ -3248,11 +3287,18 @@ public:
   ///
   /// We may find ourselves wanting to break this bit into more
   /// precise chunks later.
-  bool isForeign() const {
-    return ClassDeclBits.Foreign;
+  ForeignKind getForeignClassKind() const {
+    return static_cast<ForeignKind>(ClassDeclBits.RawForeignKind);
   }
-  void setForeign(bool isForeign = true) {
-    ClassDeclBits.Foreign = isForeign;
+  void setForeignClassKind(ForeignKind kind) {
+    ClassDeclBits.RawForeignKind = static_cast<unsigned>(kind);
+  }
+
+  /// Returns true if this class is any kind of "foreign class".
+  ///
+  /// \see getForeignClassKind
+  bool isForeign() const {
+    return getForeignClassKind() != ForeignKind::Normal;
   }
 
   /// Find a method of a class that overrides a given method.
@@ -3294,10 +3340,6 @@ public:
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
-
-  /// Determine whether the class is only visible to the Objective-C runtime
-  /// and not to the linker.
-  bool isOnlyObjCRuntimeVisible() const;
 
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.
@@ -4306,6 +4348,11 @@ public:
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
 
+  /// Retrieve the default Objective-C selector for the getter of a
+  /// property of the given name.
+  static ObjCSelector getDefaultObjCGetterSelector(ASTContext &ctx,
+                                                   Identifier propertyName);
+
   /// Retrieve the default Objective-C selector for the setter of a
   /// property of the given name.
   static ObjCSelector getDefaultObjCSetterSelector(ASTContext &ctx,
@@ -4949,8 +4996,8 @@ class FuncDecl final : public AbstractFunctionDecl,
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
-  llvm::PointerUnion3<FuncDecl *, NominalTypeDecl*, BehaviorRecord *>
-    OverriddenOrDerivedForOrBehaviorParamDecl;
+  llvm::PointerUnion<FuncDecl *, BehaviorRecord *>
+    OverriddenOrBehaviorParamDecl;
   llvm::PointerIntPair<OperatorDecl *, 3,
                        AddressorKind> OperatorAndAddressorKind;
 
@@ -4967,9 +5014,10 @@ class FuncDecl final : public AbstractFunctionDecl,
                            NumParameterLists, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       AccessorKeywordLoc(AccessorKeywordLoc),
-      OverriddenOrDerivedForOrBehaviorParamDecl(),
+      OverriddenOrBehaviorParamDecl(),
       OperatorAndAddressorKind(nullptr, AddressorKind::NotAddressor) {
-    FuncDeclBits.IsStatic = StaticLoc.isValid() || getName().isOperator();
+    FuncDeclBits.IsStatic =
+      StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
     setType(Ty);
@@ -5208,48 +5256,32 @@ public:
   
   /// Get the supertype method this method overrides, if any.
   FuncDecl *getOverriddenDecl() const {
-    return OverriddenOrDerivedForOrBehaviorParamDecl.dyn_cast<FuncDecl *>();
+    return OverriddenOrBehaviorParamDecl.dyn_cast<FuncDecl *>();
   }
   void setOverriddenDecl(FuncDecl *over) {
     // A function cannot be an override if it is also a derived global decl
     // (since derived decls are at global scope).
-    assert((!OverriddenOrDerivedForOrBehaviorParamDecl
-            || !OverriddenOrDerivedForOrBehaviorParamDecl.is<FuncDecl*>())
+    assert((!OverriddenOrBehaviorParamDecl
+            || !OverriddenOrBehaviorParamDecl.is<FuncDecl*>())
          && "function can only be one of override, derived, or behavior param");
-    OverriddenOrDerivedForOrBehaviorParamDecl = over;
+    OverriddenOrBehaviorParamDecl = over;
     over->setIsOverridden();
-  }
-  
-  /// Get the type this function was implicitly generated on the behalf of for
-  /// a derived protocol conformance, if any.
-  NominalTypeDecl *getDerivedForTypeDecl() const {
-    return OverriddenOrDerivedForOrBehaviorParamDecl
-      .dyn_cast<NominalTypeDecl *>();
-  }
-  void setDerivedForTypeDecl(NominalTypeDecl *ntd) {
-    // A function cannot be an override if it is also a derived global decl
-    // (since derived decls are at global scope).
-    assert((!OverriddenOrDerivedForOrBehaviorParamDecl
-            || !OverriddenOrDerivedForOrBehaviorParamDecl
-                  .is<NominalTypeDecl *>())
-         && "function can only be one of override, derived, or behavior param");
-    OverriddenOrDerivedForOrBehaviorParamDecl = ntd;
   }
   
   /// Get the property behavior this function serves as a parameter for, if
   /// any.
   BehaviorRecord *getParamBehavior() const {
-    return OverriddenOrDerivedForOrBehaviorParamDecl
+    return OverriddenOrBehaviorParamDecl
       .dyn_cast<BehaviorRecord *>();
   }
   
   void setParamBehavior(BehaviorRecord *behavior) {
     // Behavior param blocks cannot be overrides or derived.
-    assert((!OverriddenOrDerivedForOrBehaviorParamDecl
-            || !OverriddenOrDerivedForOrBehaviorParamDecl
+    assert((!OverriddenOrBehaviorParamDecl
+            || !OverriddenOrBehaviorParamDecl
                   .is<BehaviorRecord *>())
          && "function can only be one of override, derived, or behavior param");
-    OverriddenOrDerivedForOrBehaviorParamDecl = behavior;
+    OverriddenOrBehaviorParamDecl = behavior;
   }
   
   OperatorDecl *getOperatorDecl() const {
@@ -5489,9 +5521,6 @@ class ConstructorDecl : public AbstractFunctionDecl {
 
   ParameterList *ParameterLists[2];
 
-  /// The type of the initializing constructor.
-  Type InitializerType;
-
   /// The interface type of the initializing constructor.
   Type InitializerInterfaceType;
 
@@ -5522,10 +5551,6 @@ public:
 
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
-
-  /// Get the type of the initializing constructor.
-  Type getInitializerType() const { return InitializerType; }
-  void setInitializerType(Type t) { InitializerType = t; }
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();
@@ -5928,24 +5953,6 @@ inline bool ValueDecl::isSettable(const DeclContext *UseDC,
     return sd->isSettable();
   } else
     return false;
-}
-
-namespace impl {
-  bool isInternalDeclEffectivelyPublic(const ValueDecl *VD);
-}
-
-inline Accessibility ValueDecl::getEffectiveAccess() const {
-  switch (getFormalAccess()) {
-  case Accessibility::Public:
-    return Accessibility::Public;
-  case Accessibility::Internal:
-    if (impl::isInternalDeclEffectivelyPublic(this)) {
-      return Accessibility::Public;
-    }
-    return Accessibility::Internal;
-  case Accessibility::Private:
-    return Accessibility::Private;
-  }
 }
 
 inline Optional<VarDecl *>

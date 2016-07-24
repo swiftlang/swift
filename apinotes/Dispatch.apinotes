@@ -72,7 +72,7 @@ Classes:
   SwiftName: __DispatchData
 Protocols:
 - Name: OS_dispatch_source
-  SwiftName: DispatchSourceType
+  SwiftName: DispatchSourceProtocol
 - Name: OS_dispatch_source_mach_send
   SwiftName: DispatchSourceMachSend
 - Name: OS_dispatch_source_mach_recv
@@ -198,7 +198,7 @@ Functions:
   AvailabilityMsg: 'Use DispatchWorkItem.isCancelled'
 # dispatch_data
 - Name: dispatch_data_create
-  SwiftPrivate: true
+  Availability: nonswift
 - Name: dispatch_data_get_size
   SwiftPrivate: true
 - Name: dispatch_data_apply

@@ -18,18 +18,12 @@ import os.path
 import platform
 import sys
 
+from . import product
 from .. import cache_util
 from .. import shell
 
 
-class Ninja(object):
-
-    def __init__(self, args, toolchain, source_dir, build_dir):
-        self.args = args
-        self.toolchain = toolchain
-        self.source_dir = source_dir
-        self.build_dir = build_dir
-
+class Ninja(product.Product):
     @cache_util.reify
     def ninja_bin_path(self):
         return os.path.join(self.build_dir, 'ninja')

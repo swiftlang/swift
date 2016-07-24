@@ -743,6 +743,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalNestedGenericTypes |=
     Args.hasArg(OPT_enable_experimental_nested_generic_types);
 
+  Opts.EnableExperimentalCollectionCasts |=
+    Args.hasArg(OPT_enable_experimental_collection_casts);
+
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   
@@ -776,6 +779,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
   Opts.EnableProtocolTypealiases |= Args.hasArg(OPT_enable_protocol_typealiases);
+  Opts.EnableIdAsAny |= Args.hasArg(OPT_enable_id_as_any);
 
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
                                OPT_disable_objc_attr_requires_foundation_module)) {
@@ -1142,11 +1146,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.DebugInfoKind = IRGenDebugInfoKind::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
       Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+    else if (A->getOption().matches(options::OPT_gdwarf_types))
+      Opts.DebugInfoKind = IRGenDebugInfoKind::DwarfTypes;
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
 
-    if (Opts.DebugInfoKind == IRGenDebugInfoKind::Normal) {
+    if (Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
       ArgStringList RenderedArgs;
       for (auto A : Args)
         A->render(Args, RenderedArgs);
@@ -1283,6 +1289,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_reflection_names)) {
     Opts.EnableReflectionNames = false;
   }
+
+  for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
+    Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
 
   return false;
 }

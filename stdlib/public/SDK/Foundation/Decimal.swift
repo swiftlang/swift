@@ -99,7 +99,7 @@ extension Decimal {
         return order == .orderedAscending || order == .orderedSame
     }
 
-    public func isTotallyOrdered(below other: Decimal) -> Bool {
+    public func isTotallyOrdered(belowOrEqualTo other: Decimal) -> Bool {
         // Notes: Decimal does not have -0 or infinities to worry about
         if self.isNaN {
             return false
@@ -123,38 +123,39 @@ extension Decimal {
     public var nextDown: Decimal {
         return self - Decimal(_exponent: _exponent, _length: 1, _isNegative: 0, _isCompact: 1, _reserved: 0, _mantissa: (0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000))
     }
-}
 
-public func +(lhs: Decimal, rhs: Decimal) -> Decimal {
-    var res = Decimal()
-    var leftOp = lhs
-    var rightOp = rhs
-    NSDecimalAdd(&res, &leftOp, &rightOp, .plain)
-    return res
-}
+    public static func +(lhs: Decimal, rhs: Decimal) -> Decimal {
+        var res = Decimal()
+        var leftOp = lhs
+        var rightOp = rhs
+        NSDecimalAdd(&res, &leftOp, &rightOp, .plain)
+        return res
+    }
 
-public func -(lhs: Decimal, rhs: Decimal) -> Decimal {
-    var res = Decimal()
-    var leftOp = lhs
-    var rightOp = rhs
-    NSDecimalSubtract(&res, &leftOp, &rightOp, .plain)
-    return res
-}
+    public static func -(lhs: Decimal, rhs: Decimal) -> Decimal {
+        var res = Decimal()
+        var leftOp = lhs
+        var rightOp = rhs
+        NSDecimalSubtract(&res, &leftOp, &rightOp, .plain)
+        return res
+    }
 
-public func /(lhs: Decimal, rhs: Decimal) -> Decimal {
-    var res = Decimal()
-    var leftOp = lhs
-    var rightOp = rhs
-    NSDecimalDivide(&res, &leftOp, &rightOp, .plain)
-    return res
-}
+    public static func /(lhs: Decimal, rhs: Decimal) -> Decimal {
+        var res = Decimal()
+        var leftOp = lhs
+        var rightOp = rhs
+        NSDecimalDivide(&res, &leftOp, &rightOp, .plain)
+        return res
+    }
 
-public func *(lhs: Decimal, rhs: Decimal) -> Decimal {
-    var res = Decimal()
-    var leftOp = lhs
-    var rightOp = rhs
-    NSDecimalMultiply(&res, &leftOp, &rightOp, .plain)
-    return res
+    public static func *(lhs: Decimal, rhs: Decimal) -> Decimal {
+        var res = Decimal()
+        var leftOp = lhs
+        var rightOp = rhs
+        NSDecimalMultiply(&res, &leftOp, &rightOp, .plain)
+        return res
+    }
+
 }
 
 public func pow(_ x: Decimal, _ y: Int) -> Decimal {
@@ -218,27 +219,27 @@ extension Decimal : Hashable, Comparable {
     public var hashValue: Int {
         return Int(bitPattern: __CFHashDouble(doubleValue))
     }
+
+    public static func ==(lhs: Decimal, rhs: Decimal) -> Bool {
+        var lhsVal = lhs
+        var rhsVal = rhs
+        return NSDecimalCompare(&lhsVal, &rhsVal) == .orderedSame
+    }
+
+    public static func <(lhs: Decimal, rhs: Decimal) -> Bool {
+        var lhsVal = lhs
+        var rhsVal = rhs
+        return NSDecimalCompare(&lhsVal, &rhsVal) == .orderedAscending
+    }
 }
 
-public func ==(lhs: Decimal, rhs: Decimal) -> Bool {
-    var lhsVal = lhs
-    var rhsVal = rhs
-    return NSDecimalCompare(&lhsVal, &rhsVal) == .orderedSame
-}
-
-public func <(lhs: Decimal, rhs: Decimal) -> Bool {
-    var lhsVal = lhs
-    var rhsVal = rhs
-    return NSDecimalCompare(&lhsVal, &rhsVal) == .orderedAscending
-}
-
-extension Decimal : FloatLiteralConvertible {
+extension Decimal : ExpressibleByFloatLiteral {
     public init(floatLiteral value: Double) {
         self.init(value)
     }
 }
 
-extension Decimal : IntegerLiteralConvertible {
+extension Decimal : ExpressibleByIntegerLiteral {
     public init(integerLiteral value: Int) {
         self.init(value)
     }

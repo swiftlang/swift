@@ -153,6 +153,8 @@ void IterativeTypeChecker::processTypeCheckSuperclass(
   }
 
   // Set the superclass type.
+  if (classDecl->isInvalid())
+    superclassType = ErrorType::get(getASTContext());
   classDecl->setSuperclass(superclassType);
 }
 

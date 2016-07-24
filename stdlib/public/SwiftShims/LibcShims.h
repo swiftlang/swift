@@ -33,9 +33,9 @@ namespace swift { extern "C" {
 typedef           int __swift_ssize_t;
 #elif defined(_MSC_VER)
 #if defined(_M_ARM) || defined(_M_IX86)
-typedef           int __swift_size_t;
+typedef           int __swift_ssize_t;
 #elif defined(_M_X64)
-typedef long long int __swift_size_t;
+typedef long long int __swift_ssize_t;
 #else
 #error unsupported machine type
 #endif
@@ -82,6 +82,21 @@ __swift_uint32_t _swift_stdlib_cxx11_mt19937(void);
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint32_t
 _swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
+  
+// Math library functions
+SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_remainderf(float, float);
+SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_squareRootf(float);
+  
+SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_remainder(double, double);
+SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_squareRoot(double);
+  
+// TODO: Remove horrible workaround when importer does Float80 <-> long double.
+#if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_stdlib_remainderl(void *_self, const void *_other);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_stdlib_squareRootl(void *_self);
+#endif
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

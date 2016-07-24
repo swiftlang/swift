@@ -190,12 +190,12 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     _sanityCheck(bounds.upperBound >= bounds.lowerBound)
     _sanityCheck(bounds.upperBound <= endIndex)
     let c = bounds.count
-    target.initializeFrom(subscriptBaseAddress + bounds.lowerBound, count: c)
+    target.initialize(from: subscriptBaseAddress + bounds.lowerBound, count: c)
     return target + c
   }
 
   /// True, if the array is native and does not need a deferred type check.
-  var arrayPropertyIsNativeTypeChecked : Bool {
+  var arrayPropertyIsNativeTypeChecked: Bool {
     return _hasNativeBuffer
   }
 
@@ -327,19 +327,19 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
 }
 
 extension _SliceBuffer {
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
+  public func _copyToContiguousArray() -> ContiguousArray<Element> {
     if _hasNativeBuffer {
       let n = nativeBuffer
       if count == n.count {
-        return n
+        return ContiguousArray(_buffer: n)
       }
     }
 
     let result = _ContiguousArrayBuffer<Element>(
       uninitializedCount: count,
       minimumCapacity: 0)
-    result.firstElementAddress.initializeFrom(
-      firstElementAddress, count: count)
-    return result
+    result.firstElementAddress.initialize(
+      from: firstElementAddress, count: count)
+    return ContiguousArray(_buffer: result)
   }
 }

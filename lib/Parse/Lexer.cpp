@@ -755,8 +755,7 @@ void Lexer::lexOperatorIdentifier() {
 
       // Otherwise, it is probably a missing member.
       diagnose(TokStart, diag::expected_member_name);
-      //return formToken(tok::unknown, TokStart);
-      return lexImpl();
+      return formToken(tok::unknown, TokStart);
     }
     case '?':
       if (leftBound)

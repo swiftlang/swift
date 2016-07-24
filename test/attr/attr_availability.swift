@@ -31,6 +31,13 @@ typealias int = Int // expected-note {{'int' has been explicitly marked unavaila
 @available(*, unavailable, renamed: "Float")
 typealias float = Float // expected-note {{'float' has been explicitly marked unavailable here}}
 
+protocol MyNewerProtocol {}
+
+@available(*, unavailable, renamed: "MyNewerProtocol")
+protocol MyOlderProtocol {} // expected-note {{'MyOlderProtocol' has been explicitly marked unavailable here}}
+
+extension Int: MyOlderProtocol {} // expected-error {{'MyOlderProtocol' has been renamed to 'MyNewerProtocol'}} 
+
 struct MyCollection<Element> {
   @available(*, unavailable, renamed: "Element")
   typealias T = Element // expected-note 2{{'T' has been explicitly marked unavailable here}}
@@ -226,7 +233,7 @@ func someFuncUsingOldAttribute() { }
 
 
 // <rdar://problem/23853709> Compiler crash on call to unavailable "print"
-func OutputStreamTest(message: String, to: inout OutputStream) {
+func TextOutputStreamTest(message: String, to: inout TextOutputStream) {
   print(message, &to)  // expected-error {{'print' is unavailable: Please use the 'to' label for the target stream: 'print((...), to: &...)'}}
 }
 
@@ -679,4 +686,76 @@ class Sub : Base {
   override func unavailableTooMany(a: Int) {} // expected-error {{'unavailableTooMany(a:)' has been renamed to 'shinyLabeledArguments(x:b:)'}} {{none}}
   override func unavailableNoArgsTooMany() {} // expected-error {{'unavailableNoArgsTooMany()' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}}
   override func unavailableHasType() {} // expected-error {{'unavailableHasType()' has been replaced by 'Base.shinyLabeledArguments()'}} {{none}}
+}
+
+// U: Unnamed, L: Labeled
+@available(*, unavailable, renamed: "after(fn:)")
+func closure_U_L(_ x: () -> Int) {} // expected-note 3 {{here}}
+@available(*, unavailable, renamed: "after(fn:)")
+func closure_L_L(x: () -> Int) {} // expected-note 3 {{here}}
+@available(*, unavailable, renamed: "after(_:)")
+func closure_L_U(x: () -> Int) {} // expected-note 3 {{here}}
+
+@available(*, unavailable, renamed: "after(arg:fn:)")
+func closure_UU_LL(_ x: Int, _ y: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:fn:)")
+func closure_LU_LL(x: Int, _ y: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:fn:)")
+func closure_LL_LL(x: Int, y: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:fn:)")
+func closure_UU_LL_ne(_ x: Int, _ y: @noescape () -> Int) {} // expected-note 2 {{here}}
+
+@available(*, unavailable, renamed: "after(arg:_:)")
+func closure_UU_LU(_ x: Int, _ closure: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:_:)")
+func closure_LU_LU(x: Int, _ closure: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:_:)")
+func closure_LL_LU(x: Int, y: () -> Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(arg:_:)")
+func closure_UU_LU_ne(_ x: Int, _ y: @noescape () -> Int) {} // expected-note 2 {{here}}
+
+func testTrailingClosure() {
+  closure_U_L { 0 } // expected-error {{'closure_U_L' has been renamed to 'after(fn:)'}} {{3-14=after}} {{none}}
+  closure_U_L() { 0 } // expected-error {{'closure_U_L' has been renamed to 'after(fn:)'}} {{3-14=after}} {{none}}
+  closure_U_L({ 0 }) // expected-error {{'closure_U_L' has been renamed to 'after(fn:)'}} {{3-14=after}} {{15-15=fn: }} {{none}}
+
+  closure_L_L { 0 } // expected-error {{'closure_L_L(x:)' has been renamed to 'after(fn:)'}} {{3-14=after}} {{none}}
+  closure_L_L() { 0 } // expected-error {{'closure_L_L(x:)' has been renamed to 'after(fn:)'}} {{3-14=after}} {{none}}
+  closure_L_L(x: { 0 }) // expected-error {{'closure_L_L(x:)' has been renamed to 'after(fn:)'}} {{3-14=after}} {{15-16=fn}} {{none}}
+
+  closure_L_U { 0 } // expected-error {{'closure_L_U(x:)' has been renamed to 'after(_:)'}} {{3-14=after}} {{none}}
+  closure_L_U() { 0 } // expected-error {{'closure_L_U(x:)' has been renamed to 'after(_:)'}} {{3-14=after}} {{none}}
+  closure_L_U(x: { 0 }) // expected-error {{'closure_L_U(x:)' has been renamed to 'after(_:)'}} {{3-14=after}} {{15-18=}} {{none}}
+
+  closure_UU_LL(0) { 0 } // expected-error {{'closure_UU_LL' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-17=arg: }} {{none}}
+  closure_UU_LL(0, { 0 }) // expected-error {{'closure_UU_LL' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-17=arg: }} {{20-20=fn: }} {{none}}
+
+  closure_LU_LL(x: 0) { 0 } // expected-error {{'closure_LU_LL(x:_:)' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-18=arg}} {{none}}
+  closure_LU_LL(x: 0, { 0 }) // expected-error {{'closure_LU_LL(x:_:)' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-18=arg}} {{23-23=fn: }} {{none}}
+
+  closure_LL_LL(x: 1) { 1 } // expected-error {{'closure_LL_LL(x:y:)' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-18=arg}} {{none}}
+  closure_LL_LL(x: 1, y: { 0 }) // expected-error {{'closure_LL_LL(x:y:)' has been renamed to 'after(arg:fn:)'}} {{3-16=after}} {{17-18=arg}} {{23-24=fn}} {{none}}
+
+  closure_UU_LL_ne(1) { 1 } // expected-error {{'closure_UU_LL_ne' has been renamed to 'after(arg:fn:)'}} {{3-19=after}} {{20-20=arg: }} {{none}}
+  closure_UU_LL_ne(1, { 0 }) // expected-error {{'closure_UU_LL_ne' has been renamed to 'after(arg:fn:)'}} {{3-19=after}} {{20-20=arg: }} {{23-23=fn: }} {{none}}
+
+  closure_UU_LU(0) { 0 } // expected-error {{'closure_UU_LU' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-17=arg: }} {{none}}
+  closure_UU_LU(0, { 0 }) // expected-error {{'closure_UU_LU' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-17=arg: }} {{none}}
+
+  closure_LU_LU(x: 0) { 0 } // expected-error {{'closure_LU_LU(x:_:)' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-18=arg}} {{none}}
+  closure_LU_LU(x: 0, { 0 }) // expected-error {{'closure_LU_LU(x:_:)' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-18=arg}} {{none}}
+
+  closure_LL_LU(x: 1) { 1 } // expected-error {{'closure_LL_LU(x:y:)' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-18=arg}} {{none}}
+  closure_LL_LU(x: 1, y: { 0 }) // expected-error {{'closure_LL_LU(x:y:)' has been renamed to 'after(arg:_:)'}} {{3-16=after}} {{17-18=arg}} {{23-26=}} {{none}}
+
+  closure_UU_LU_ne(1) { 1 } // expected-error {{'closure_UU_LU_ne' has been renamed to 'after(arg:_:)'}} {{3-19=after}} {{20-20=arg: }} {{none}}
+  closure_UU_LU_ne(1, { 0 }) // expected-error {{'closure_UU_LU_ne' has been renamed to 'after(arg:_:)'}} {{3-19=after}} {{20-20=arg: }} {{none}}
+}
+
+@available(*, unavailable, renamed: "after(x:y:)")
+func variadic1(a: Int ..., b: Int = 0) {} // expected-note {{here}}
+
+func testVariadic() {
+  // FIXME: fix-it should be: {{1-9=newFn7}} {{10-11=x}} {{none}}
+  variadic1(a: 1, 1) // expected-error {{'variadic1(a:b:)' has been renamed to 'after(x:y:)'}} {{3-12=after}} {{none}}
 }

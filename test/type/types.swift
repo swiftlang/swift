@@ -157,7 +157,7 @@ class r21949448 {
 }
 
 // SE-0066 - Standardize function type argument syntax to require parentheses
-let _ : Int -> Float // expected-warning {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}}
+let _ : Int -> Float // expected-error {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}}
 
 
 

@@ -46,7 +46,7 @@ public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// The spare bits that are set when a native array needs deferred
   /// element type checking.
-  var deferredTypeCheckMask : Int { return 1 }
+  var deferredTypeCheckMask: Int { return 1 }
   
   /// Returns an `_ArrayBuffer<U>` containing the same elements,
   /// deferring checking each element's `U`-ness until it is accessed.
@@ -89,7 +89,7 @@ extension _ArrayBuffer {
   }
 
   /// `true`, if the array is native and does not need a deferred type check.
-  var arrayPropertyIsNativeTypeChecked : Bool {
+  var arrayPropertyIsNativeTypeChecked: Bool {
     return _isNativeTypeChecked
   }
 
@@ -217,7 +217,7 @@ extension _ArrayBuffer {
     // Make another pass to retain the copied objects
     var result = target
     for _ in CountableRange(bounds) {
-      result.initialize(with: result.pointee)
+      result.initialize(to: result.pointee)
       result += 1
     }
     return result

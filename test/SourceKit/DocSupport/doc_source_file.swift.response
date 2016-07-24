@@ -522,7 +522,7 @@
   {
     key.kind: source.lang.swift.ref.function.operator.infix,
     key.name: "+(_:_:)",
-    key.usr: "s:ZF8__main__oi1pFTCS_2CCCS_3CC0_S0_",
+    key.usr: "s:F8__main__oi1pFTCS_2CCCS_3CC0_S0_",
     key.offset: 526,
     key.length: 1
   },
@@ -1083,7 +1083,7 @@
   {
     key.kind: source.lang.swift.ref.function.operator.infix,
     key.name: "+(_:_:)",
-    key.usr: "s:ZFsoi1pFTSiSi_Si",
+    key.usr: "s:Fsoi1pFTSiSi_Si",
     key.offset: 1217,
     key.length: 1
   },
@@ -1218,7 +1218,7 @@
   {
     key.kind: source.lang.swift.ref.function.operator.infix,
     key.name: "+=(_:_:)",
-    key.usr: "s:ZFsoi2peFTRSiSi_T_",
+    key.usr: "s:Fsoi2peFTRSiSi_T_",
     key.offset: 1343,
     key.length: 2
   },
@@ -1317,7 +1317,7 @@
   {
     key.kind: source.lang.swift.ref.function.operator.infix,
     key.name: "+=(_:_:)",
-    key.usr: "s:ZFsoi2peFTRSiSi_T_",
+    key.usr: "s:Fsoi2peFTRSiSi_T_",
     key.offset: 1383,
     key.length: 2
   },
@@ -1808,40 +1808,45 @@
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1973,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1980,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1980,
+    key.offset: 1987,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1980,
+    key.offset: 1987,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Self",
     key.usr: "s:tP8__main__5Prot34SelfMx",
-    key.offset: 1983,
+    key.offset: 1990,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1989,
+    key.offset: 1996,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1989,
+    key.offset: 1996,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Self",
     key.usr: "s:tP8__main__5Prot34SelfMx",
-    key.offset: 1992,
+    key.offset: 1999,
     key.length: 4
   }
 ]
@@ -1959,7 +1964,7 @@
   {
     key.kind: source.lang.swift.decl.function.operator.infix,
     key.name: "+(_:_:)",
-    key.usr: "s:ZF8__main__oi1pFTCS_2CCCS_3CC0_S0_",
+    key.usr: "s:F8__main__oi1pFTCS_2CCCS_3CC0_S0_",
     key.offset: 288,
     key.length: 42,
     key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>+</decl.name>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr=\"s:C8__main__2CC\">CC</ref.class></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr=\"s:C8__main__3CC0\">CC0</ref.class></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.class usr=\"s:C8__main__2CC\">CC</ref.class></decl.function.returntype></decl.function.operator.infix>",
@@ -2586,9 +2591,19 @@
         key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>Element</decl.name> = <ref.struct usr=\"s:Si\">Int</ref.struct></decl.typealias>",
         key.conforms: [
           {
-            key.kind: source.lang.swift.ref.associatedtype,
-            key.name: "Element",
-            key.usr: "s:P8__main__5Prot27Element"
+            key.kind: source.lang.swift.ref.protocol,
+            key.name: "SignedInteger",
+            key.usr: "s:Ps13SignedInteger"
+          },
+          {
+            key.kind: source.lang.swift.ref.protocol,
+            key.name: "Comparable",
+            key.usr: "s:Ps10Comparable"
+          },
+          {
+            key.kind: source.lang.swift.ref.protocol,
+            key.name: "Equatable",
+            key.usr: "s:Ps9Equatable"
           }
         ]
       },
@@ -2655,7 +2670,7 @@
     key.name: "Prot3",
     key.usr: "s:P8__main__5Prot3",
     key.offset: 1954,
-    key.length: 44,
+    key.length: 51,
     key.fully_annotated_decl: "<decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>Prot3</decl.name></decl.protocol>",
     key.entities: [
       {
@@ -2663,21 +2678,21 @@
         key.name: "+(_:_:)",
         key.usr: "s:ZFP8__main__5Prot3oi1pFTxx_T_",
         key.offset: 1973,
-        key.length: 23,
-        key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>+</decl.name>(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tP8__main__5Prot34SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>y</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tP8__main__5Prot34SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.operator.infix>",
+        key.length: 30,
+        key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>+</decl.name>(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tP8__main__5Prot34SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>y</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:tP8__main__5Prot34SelfMx\">Self</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.operator.infix>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "x",
-            key.offset: 1983,
+            key.offset: 1990,
             key.length: 4
           },
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "y",
-            key.offset: 1992,
+            key.offset: 1999,
             key.length: 4
           }
         ]

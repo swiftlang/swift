@@ -25,6 +25,7 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <string.h>
 #include "swift/Runtime/Config.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
@@ -1089,6 +1090,13 @@ template <typename Runtime> struct TargetOpaqueMetadata;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
 
+extern uint64_t RelativeDirectPointerNullPtr;
+
+#define RelativeDirectPointerNullPtrRef                                        \
+  *reinterpret_cast<ConstTargetFarRelativeDirectPointer<                       \
+      Runtime, TargetNominalTypeDescriptor, /*nullable*/ true> *>(             \
+      &RelativeDirectPointerNullPtr)
+
 /// The common structure of all type metadata.
 template <typename Runtime>
 struct TargetMetadata {
@@ -1221,16 +1229,17 @@ public:
   
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
-  ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor,
-                                      /*nullable*/ true>
+  const ConstTargetFarRelativeDirectPointer<Runtime,
+                                            TargetNominalTypeDescriptor,
+                                            /*nullable*/ true> &
   getNominalTypeDescriptor() const {
     switch (getKind()) {
     case MetadataKind::Class: {
       const auto cls = static_cast<const TargetClassMetadata<Runtime> *>(this);
       if (!cls->isTypeMetadata())
-        return 0;
+        return RelativeDirectPointerNullPtrRef;
       if (cls->isArtificialSubclass())
-        return 0;
+        return RelativeDirectPointerNullPtrRef;
       return cls->getDescription();
     }
     case MetadataKind::Struct:
@@ -1248,7 +1257,7 @@ public:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
-      return 0;
+      return RelativeDirectPointerNullPtrRef;
     }
   }
   
@@ -1559,6 +1568,11 @@ struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
       Reserved(0), ClassSize(classSize), ClassAddressPoint(classAddressPoint),
       Description(nullptr), IVarDestroyer(ivarDestroyer) {}
 
+  TargetClassMetadata(const TargetClassMetadata& other): Description(other.getDescription().get()) {
+    memcpy(this, &other, sizeof(*this));
+    setDescription(other.getDescription().get());
+  }
+
   /// The metadata for the superclass.  This is null for the root class.
   ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> SuperClass;
 
@@ -1634,8 +1648,10 @@ private:
   //   - "tabulated" virtual methods
 
 public:
-  ConstTargetFarRelativeDirectPointer<Runtime, TargetNominalTypeDescriptor,
-  /*nullable*/ true> getDescription() const {
+  const ConstTargetFarRelativeDirectPointer<Runtime,
+                                            TargetNominalTypeDescriptor,
+                                            /*nullable*/ true> &
+  getDescription() const {
     assert(isTypeMetadata());
     assert(!isArtificialSubclass());
     return Description;
@@ -2329,8 +2345,8 @@ enum class ExistentialTypeRepresentation {
   Opaque,
   /// The type uses a class existential representation.
   Class,
-  /// The type uses the ErrorProtocol boxed existential representation.
-  ErrorProtocol,
+  /// The type uses the Error boxed existential representation.
+  Error,
 };
 
 /// The structure of existential type metadata.

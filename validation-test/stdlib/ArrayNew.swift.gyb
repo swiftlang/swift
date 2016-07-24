@@ -386,7 +386,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
   let source = [ 10, 20, 30 ]
   let nsa = getAsNSMutableArray(source)
-  var result = nsa as! Array<TestBridgedValueTy>
+  var result = nsa as AnyObject as! Array<TestBridgedValueTy>
   expectTrue(isNativeArray(result))
 
   // Delete the value from NSMutableArray.
@@ -565,7 +565,7 @@ for indexRange in [
     .code {
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
       numElements: 0, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+    let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
     a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
     expectCrashLater()
@@ -580,7 +580,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
     .code {
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
       numElements: 3, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+    let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
     a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
     expectCrashLater()
@@ -591,7 +591,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
-  let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+  let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
   a.available_getObjects(
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
@@ -613,7 +613,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
     expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
   }
 
-  buffer.deallocateCapacity(3)
+  buffer.deallocate(capacity: 3)
   _fixLifetime(a)
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
@@ -740,8 +740,9 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
   // Bridge back to native array.
-  var native: [TestObjCValueTy] = convertNSArrayToArray(
-    getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3))
+  var native: [TestObjCValueTy] = 
+    getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3) as! Array
+  
   let identity1 = unsafeBitCast(native, to: UInt.self)
 
   // Mutate elements, but don't change count.
@@ -838,7 +839,7 @@ for indexRange in [
     .code {
     let a = getBridgedNSArrayOfValueTypeCustomBridged(
       numElements: 0, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+    let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
     a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
     expectCrashLater()
@@ -853,7 +854,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
     .code {
     let a = getBridgedNSArrayOfValueTypeCustomBridged(
       numElements: 3, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+    let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
     a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
     expectCrashLater()
@@ -864,7 +865,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
 
 ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
-  let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+  let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
   a.available_getObjects(
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
@@ -886,7 +887,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
     expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
   }
 
-  buffer.deallocateCapacity(3)
+  buffer.deallocate(capacity: 3)
   _fixLifetime(a)
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)

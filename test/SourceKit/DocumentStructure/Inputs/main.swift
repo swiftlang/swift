@@ -75,9 +75,9 @@ var (sd2: Qtys)
 
 for i in 0...5 {}
 for var i = 0, i2 = 1; i == 0; ++i {}
-while var v = o, z = o where v > z {}
+while var v = o, var z = o, v > z {}
 repeat {} while v == 0
-if var v = o, z = o where v > z {}
+if var v = o, var z = o, v > z {}
 switch v {
   case 1: break;
   case 2, 3: break;

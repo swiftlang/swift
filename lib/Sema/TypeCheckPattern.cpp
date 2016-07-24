@@ -57,6 +57,14 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
   if (!ctorExpr)
     return nullptr;
 
+  // If the declaration we found isn't in the same nominal type as the
+  // constant, ignore it.
+  if (ctorExpr->getDecl()->getDeclContext()
+          ->getAsNominalTypeOrNominalTypeExtensionContext() != 
+        constant->getDeclContext()
+          ->getAsNominalTypeOrNominalTypeExtensionContext())
+    return nullptr;
+
   return dyn_cast<EnumElementDecl>(ctorExpr->getDecl());
 }
 
@@ -70,9 +78,14 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
 
-  for (ValueDecl *e : foundElements) {
+  for (LookupResult::Result result : foundElements) {
+    ValueDecl *e = result.Decl;
     assert(e);
     if (e->isInvalid()) {
+      continue;
+    }
+    // Skip if the enum element was referenced as an instance member
+    if (!result.Base || !result.Base->getType()->is<MetatypeType>()) {
       continue;
     }
 
@@ -359,10 +372,9 @@ public:
   
   // Convert a paren expr to a pattern if it contains a pattern.
   Pattern *visitParenExpr(ParenExpr *E) {
-    if (Pattern *subPattern = visit(E->getSubExpr()))
-      return new (TC.Context) ParenPattern(E->getLParenLoc(), subPattern,
-                                           E->getRParenLoc());
-    return nullptr;
+    Pattern *subPattern = getSubExprPattern(E->getSubExpr());
+    return new (TC.Context) ParenPattern(E->getLParenLoc(), subPattern,
+                                         E->getRParenLoc());
   }
   
   // Convert all tuples to patterns.
@@ -1298,11 +1310,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 
     auto castType = IP->getCastTypeLoc().getType();
 
-    if (auto bridgedNSErrorProtocol =
-            Context.getProtocol(KnownProtocolKind::BridgedNSError)) {
-      conformsToProtocol(castType, bridgedNSErrorProtocol, dc,
-                         ConformanceCheckFlags::Used);
-    }
+    // Make sure we use any bridged NSError-related conformances.
+    useBridgedNSErrorConformances(dc, castType);
 
     // Determine whether we have an imbalance in the number of optionals.
     SmallVector<Type, 2> inputTypeOptionals;
@@ -1411,8 +1420,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                           /*special kind*/0, Rename.str())
                 .fixItReplace(EEP->getLoc(), Rename.str());
 
+              return true;
             }
-            return true;
           }
 
           diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,

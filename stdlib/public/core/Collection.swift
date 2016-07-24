@@ -1140,7 +1140,6 @@ extension Collection where SubSequence == Slice<Self> {
   }
 }
 
-// TODO: swift-3-indexing-model - review the following
 extension Collection where SubSequence == Self {
   /// Removes and returns the first element of the collection.
   ///
@@ -1149,6 +1148,7 @@ extension Collection where SubSequence == Self {
   ///
   /// - Complexity: O(1)
   public mutating func popFirst() -> Iterator.Element? {
+    // TODO: swift-3-indexing-model - review the following
     guard !isEmpty else { return nil }
     let element = first!
     self = self[index(after: startIndex)..<endIndex]
@@ -1196,7 +1196,8 @@ extension Collection {
     var i = makeIterator()
     return i.next()
   }
-// TODO: swift-3-indexing-model - uncomment and replace above ready (or should we still use the iterator one?)
+  
+  // TODO: swift-3-indexing-model - uncomment and replace above ready (or should we still use the iterator one?)
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   ///
   /// - Complexity: O(1)
@@ -1204,13 +1205,13 @@ extension Collection {
   //    return isEmpty ? nil : self[startIndex]
   //  }
 
-// TODO: swift-3-indexing-model - review the following
   /// A value less than or equal to the number of elements in the collection.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
   public var underestimatedCount: Int {
+    // TODO: swift-3-indexing-model - review the following
     return numericCast(count)
   }
 
@@ -1223,7 +1224,7 @@ extension Collection {
     return distance(from: startIndex, to: endIndex)
   }
 
-// TODO: swift-3-indexing-model - rename the following to _customIndexOfEquatable(element)?
+  // TODO: swift-3-indexing-model - rename the following to _customIndexOfEquatable(element)?
   /// Customization point for `Collection.index(of:)`.
   ///
   /// Define this method if the collection can find an element in less than
@@ -1245,7 +1246,6 @@ extension Collection {
 //===----------------------------------------------------------------------===//
 
 extension Collection {
-// TODO: swift-3-indexing-model - review the following
   /// Returns an array containing the results of mapping the given closure
   /// over the sequence's elements.
   ///
@@ -1266,6 +1266,7 @@ extension Collection {
   public func map<T>(
     _ transform: @noescape (Iterator.Element) throws -> T
   ) rethrows -> [T] {
+    // TODO: swift-3-indexing-model - review the following
     let count: Int = numericCast(self.count)
     if count == 0 {
       return []
@@ -1470,10 +1471,12 @@ extension Collection {
     return prefix(upTo: index(after: position))
   }
 
-  // TODO: swift-3-indexing-model - review the following
-  /// Returns the longest possible subsequences of the sequence, in order, that
-  /// don't contain elements satisfying the given predicate. Elements that are
-  /// used to split the sequence are not returned as part of any subsequence.
+  /// Returns the longest possible subsequences of the collection, in order,
+  /// that don't contain elements satisfying the given predicate.
+  ///
+  /// The resulting array consists of at most `maxSplits + 1` subsequences.
+  /// Elements that are used to split the sequence are not returned as part of
+  /// any subsequence.
   ///
   /// The following examples show the effects of the `maxSplits` and
   /// `omittingEmptySubsequences` parameters when splitting a string using a
@@ -1481,44 +1484,50 @@ extension Collection {
   /// that was originally separated by one or more spaces.
   ///
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.characters.split(isSeparator: { $0 == " " })
+  ///     print(line.characters.split(whereSeparator: { $0 == " " })
   ///                          .map(String.init))
-  ///     // Prints "["BLANCHE:", "I", "don't", "want", "realism.", "I", "want", "magic!"]"
+  ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
   ///
-  ///     print(line.characters.split(maxSplits: 1, isSeparator: { $0 == " " })
-  ///                           .map(String.init))
+  ///     print(
+  ///         line.characters.split(
+  ///             maxSplits: 1, whereSeparator: { $0 == " " }
+  ///             ).map(String.init))
   ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
   ///
   /// The final example passes `false` for the `omittingEmptySubsequences`
   /// parameter, so the returned array contains empty strings where spaces
   /// were repeated.
   ///
-  ///     print(line.characters.split(omittingEmptySubsequences: false, isSeparator: { $0 == " " })
+  ///     print(line.characters.split(omittingEmptySubsequences: false, whereSeparator: { $0 == " " })
   ///                           .map(String.init))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// - Parameters:
-  ///   - maxSplits: The maximum number of times to split the sequence, or one
-  ///     less than the number of subsequences to return. If `maxSplits + 1`
-  ///     subsequences are returned, the last one is a suffix of the original
-  ///     sequence containing the remaining elements. `maxSplits` must be
-  ///     greater than or equal to zero.
+  ///   - maxSplits: The maximum number of times to split the collection, or
+  ///     one less than the number of subsequences to return. If
+  ///     `maxSplits + 1` subsequences are returned, the last one is a suffix
+  ///     of the original collection containing the remaining elements.
+  ///     `maxSplits` must be greater than or equal to zero. The default value
+  ///     is `Int.max`.
   ///   - omittingEmptySubsequences: If `false`, an empty subsequence is
   ///     returned in the result for each pair of consecutive elements
   ///     satisfying the `isSeparator` predicate and for each element at the
-  ///     start or end of the sequence satisfying the `isSeparator` predicate.
+  ///     start or end of the collection satisfying the `isSeparator`
+  ///     predicate. The default value is `true`.
   ///   - isSeparator: A closure that takes an element as an argument and
-  ///     returns a Boolean value indicating whether the sequence should be
+  ///     returns a Boolean value indicating whether the collection should be
   ///     split at that element.
-  /// - Returns: An array of subsequences, split from this sequence's elements.
+  /// - Returns: An array of subsequences, split from this collection's
+  ///   elements.
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    isSeparator: @noescape (Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
+    // TODO: swift-3-indexing-model - review the following
     _precondition(maxSplits >= 0, "Must take zero or more splits")
 
     var result: [SubSequence] = []
@@ -1560,26 +1569,28 @@ extension Collection {
   }
 }
 
-// TODO: swift-3-indexing-model - review the following
 extension Collection where Iterator.Element : Equatable {
-  /// Returns the longest possible subsequences of the sequence, in order, that
-  /// don't contain elements satisfying the given predicate. Elements that are
-  /// used to split the sequence are not returned as part of any subsequence.
+  /// Returns the longest possible subsequences of the collection, in order,
+  /// around elements equal to the given element.
+  ///
+  /// The resulting array consists of at most `maxSplits + 1` subsequences.
+  /// Elements that are used to split the collection are not returned as part
+  /// of any subsequence.
   ///
   /// The following examples show the effects of the `maxSplits` and
-  /// `omittingEmptySubsequences` parameters when splitting a string using a
-  /// closure that matches spaces. The first use of `split` returns each word
-  /// that was originally separated by one or more spaces.
+  /// `omittingEmptySubsequences` parameters when splitting a string at each
+  /// space character (" "). The first use of `split` returns each word that
+  /// was originally separated by one or more spaces.
   ///
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.characters.split(isSeparator: { $0 == " " })
+  ///     print(line.characters.split(separator: " ")
   ///                          .map(String.init))
-  ///     // Prints "["BLANCHE:", "I", "don't", "want", "realism.", "I", "want", "magic!"]"
+  ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
   ///
-  ///     print(line.characters.split(maxSplits: 1, isSeparator: { $0 == " " })
+  ///     print(line.characters.split(separator: " ", maxSplits: 1)
   ///                           .map(String.init))
   ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
   ///
@@ -1587,37 +1598,38 @@ extension Collection where Iterator.Element : Equatable {
   /// parameter, so the returned array contains empty strings where spaces
   /// were repeated.
   ///
-  ///     print(line.characters.split(omittingEmptySubsequences: false, isSeparator: { $0 == " " })
+  ///     print(line.characters.split(separator: " ", omittingEmptySubsequences: false)
   ///                           .map(String.init))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// - Parameters:
-  ///   - maxSplits: The maximum number of times to split the sequence, or one
-  ///     less than the number of subsequences to return. If `maxSplits + 1`
-  ///     subsequences are returned, the last one is a suffix of the original
-  ///     sequence containing the remaining elements. `maxSplits` must be
-  ///     greater than or equal to zero.
+  ///   - separator: The element that should be split upon.
+  ///   - maxSplits: The maximum number of times to split the collection, or
+  ///     one less than the number of subsequences to return. If
+  ///     `maxSplits + 1` subsequences are returned, the last one is a suffix
+  ///     of the original collection containing the remaining elements.
+  ///     `maxSplits` must be greater than or equal to zero. The default value
+  ///     is `Int.max`.
   ///   - omittingEmptySubsequences: If `false`, an empty subsequence is
-  ///     returned in the result for each pair of consecutive elements
-  ///     satisfying the `isSeparator` predicate and for each element at the
-  ///     start or end of the sequence satisfying the `isSeparator` predicate.
-  ///   - isSeparator: A closure that takes an element as an argument and
-  ///     returns a Boolean value indicating whether the sequence should be
-  ///     split at that element.
-  /// - Returns: An array of subsequences, split from this sequence's elements.
+  ///     returned in the result for each consecutive pair of `separator`
+  ///     elements in the collection and for each instance of `separator` at
+  ///     the start or end of the collection. If `true`, only nonempty
+  ///     subsequences are returned. The default value is `true`.
+  /// - Returns: An array of subsequences, split from this collection's
+  ///   elements.
   public func split(
     separator: Iterator.Element,
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true
   ) -> [SubSequence] {
-  return split(
-    maxSplits: maxSplits,
-    omittingEmptySubsequences: omittingEmptySubsequences,
-    isSeparator: { $0 == separator })
+    // TODO: swift-3-indexing-model - review the following
+    return split(
+      maxSplits: maxSplits,
+      omittingEmptySubsequences: omittingEmptySubsequences,
+      whereSeparator: { $0 == separator })
   }
 }
 
-// TODO: swift-3-indexing-model - review the following
 extension Collection where SubSequence == Self {
   /// Removes and returns the first element of the collection.
   ///
@@ -1629,6 +1641,7 @@ extension Collection where SubSequence == Self {
   /// - SeeAlso: `popFirst()`
   @discardableResult
   public mutating func removeFirst() -> Iterator.Element {
+    // TODO: swift-3-indexing-model - review the following
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
     self = self[index(after: startIndex)..<endIndex]
@@ -1663,13 +1676,13 @@ extension Sequence
   ) -> UnsafeMutablePointer<Iterator.Element> {
     if let s = self._baseAddressIfContiguous {
       let count = self.count
-      ptr.initializeFrom(s, count: count)
+      ptr.initialize(from: s, count: count)
       _fixLifetime(self._owner)
       return ptr + count
     } else {
       var p = ptr
       for x in self {
-        p.initialize(with: x)
+        p.initialize(to: x)
         p += 1
       }
       return p
@@ -1698,7 +1711,7 @@ extension Collection {
   @available(*, unavailable, renamed: "Iterator")
   public typealias Generator = Iterator
 
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> Iterator {
     Builtin.unreachable()
   }
@@ -1708,11 +1721,11 @@ extension Collection {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, message: "Please use split(maxSplits:omittingEmptySubsequences:isSeparator:) instead")
+  @available(*, unavailable, message: "Please use split(maxSplits:omittingEmptySubsequences:whereSeparator:) instead")
   public func split(
     _ maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
-    isSeparator: @noescape (Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     Builtin.unreachable()
   }

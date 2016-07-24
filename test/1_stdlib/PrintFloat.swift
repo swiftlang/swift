@@ -6,7 +6,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-#if os(Linux) || os(FreeBSD) || os(Android)
+#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
   import Glibc
 #else
   import Darwin
@@ -17,8 +17,8 @@ import PrintTestTypes
 let PrintTests = TestSuite("PrintFloat")
 
 PrintTests.setUp {
-  if let localeArgIndex = Process.arguments.index(of: "--locale") {
-    let locale = Process.arguments[localeArgIndex + 1]
+  if let localeArgIndex = CommandLine.arguments.index(of: "--locale") {
+    let locale = CommandLine.arguments[localeArgIndex + 1]
     expectEqual("ru_RU.UTF-8", locale)
     setlocale(LC_ALL, locale)
   } else {

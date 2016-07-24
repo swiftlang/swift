@@ -83,9 +83,9 @@ enum MyEnumType : UInt32 {
 }
 _ = MyEnumType(MyEnumType.invalid)
 
-func goo(var e : ErrorProtocol) {
+func goo(var e : Error) {
 }
-func goo2(var e: ErrorProtocol) {}
+func goo2(var e: Error) {}
 func goo3(var e: Int) { e = 3 }
 protocol A {
   func bar(var s: Int)
@@ -180,3 +180,32 @@ func evilCommas(s: String) {
 
 import Empty
 func testGenericSig(x: Empty<Int>) -> Empty<String> {}
+
+class NonObjC {}
+protocol NonObjCProtocol {}
+@objc class IBIssues {
+  @IBOutlet static private var ibout1: IBIssues!
+  @IBOutlet private var ibout2: NonObjC!
+  @IBOutlet private var ibout3: NonObjCProtocol!
+  @IBOutlet private let ibout4: IBIssues!
+  @IBOutlet private var ibout5: [[IBIssues]]!
+  @IBOutlet private var ibout6: [String:String]!
+  @IBInspectable static private var ibinspect1: IBIssues!
+  @IBAction static func ibact() {}
+}
+
+@IBDesignable extension SomeProt {}
+
+func attrNowOnType(@noescape foo: ()->()) {}
+
+class InitDynType {
+  init() {}
+  func notInit() {
+    self.init()
+  }
+}
+
+class NoSemi {
+  enum Bar { case bar }
+  var foo: .Bar = .bar
+}

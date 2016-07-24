@@ -10,22 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Customizes the result of `_reflect(x)`, where `x` is a conforming
-/// type.
-public protocol _Reflectable {
-  // The runtime has inappropriate knowledge of this protocol and how its
-  // witness tables are laid out. Changing this protocol requires a
-  // corresponding change to Reflection.cpp.
-
-  /// Returns a mirror that reflects `self`.
-  func _getMirror() -> _Mirror
-}
-
 /// A unique identifier for a class instance or metatype.
 ///
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
-public struct ObjectIdentifier : Hashable, Comparable {
+public struct ObjectIdentifier : Hashable {
   internal let _value: Builtin.RawPointer
 
   // FIXME: Better hashing algorithm
@@ -51,25 +40,34 @@ public struct ObjectIdentifier : Hashable, Comparable {
   }
 }
 
-public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
-  return UInt(lhs) < UInt(rhs)
+extension ObjectIdentifier : CustomDebugStringConvertible {
+  /// A textual representation of `self`, suitable for debugging.
+  public var debugDescription: String {
+    return "ObjectIdentifier(\(_rawPointerToString(_value)))"
+  }
 }
 
-public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
+extension ObjectIdentifier : Comparable {
+  public static func < (lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
+    return UInt(bitPattern: lhs) < UInt(bitPattern: rhs)
+  }
+
+  public static func == (x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
+  }
 }
 
 extension UInt {
   /// Create a `UInt` that captures the full value of `objectID`.
-  public init(_ objectID: ObjectIdentifier) {
+  public init(bitPattern objectID: ObjectIdentifier) {
     self.init(Builtin.ptrtoint_Word(objectID._value))
   }
 }
 
 extension Int {
   /// Create an `Int` that captures the full value of `objectID`.
-  public init(_ objectID: ObjectIdentifier) {
-    self.init(bitPattern: UInt(objectID))
+  public init(bitPattern objectID: ObjectIdentifier) {
+    self.init(bitPattern: UInt(bitPattern: objectID))
   }
 }
 
@@ -134,19 +132,17 @@ public protocol _Mirror {
 @_silgen_name("swift_getSummary")
 public // COMPILER_INTRINSIC
 func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
-  out.initialize(with: String(reflecting: x))
+  out.initialize(to: String(reflecting: x))
 }
 
-/// Produce a mirror for any value. If the value's type conforms to
-/// `_Reflectable`, invoke its `_getMirror()` method; otherwise, fall back
-/// to an implementation in the runtime that structurally reflects values
-/// of any type.
+/// Produce a mirror for any value.  The runtime produces a mirror that
+/// structurally reflects values of any type.
 @_silgen_name("swift_reflectAny")
 internal func _reflect<T>(_ x: T) -> _Mirror
 
 /// Dump an object's contents using its mirror to the specified output stream.
 @discardableResult
-public func dump<T, TargetStream : OutputStream>(
+public func dump<T, TargetStream : TextOutputStream>(
   _ value: T,
   to target: inout TargetStream,
   name: String? = nil,
@@ -189,7 +185,7 @@ public func dump<T>(
 }
 
 /// Dump an object's contents. User code should use dump().
-internal func _dump_unlocked<TargetStream : OutputStream>(
+internal func _dump_unlocked<TargetStream : TextOutputStream>(
   _ value: Any,
   to target: inout TargetStream,
   name: String?,
@@ -218,7 +214,8 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
   _dumpPrint_unlocked(value, mirror, &target)
 
   let id: ObjectIdentifier?
-  if let classInstance = value as? AnyObject where value.dynamicType is AnyObject.Type {
+  if let classInstance = value as? AnyObject,
+     value.dynamicType is AnyObject.Type {
     // Object is a class (but not an ObjC-bridged struct)
     id = ObjectIdentifier(classInstance)
   } else if let metatypeInstance = value as? Any.Type {
@@ -287,7 +284,7 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
 
 /// Dump information about an object's superclass, given a mirror reflecting
 /// that superclass.
-internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
+internal func _dumpSuperclass_unlocked<TargetStream : TextOutputStream>(
   mirror: Mirror,
   to target: inout TargetStream,
   indent: Int,
@@ -633,6 +630,20 @@ struct _MetatypeMirror : _Mirror {
 extension ObjectIdentifier {
   @available(*, unavailable, message: "use the 'UInt(_:)' initializer")
   public var uintValue: UInt {
+    Builtin.unreachable()
+  }
+}
+
+extension UInt {
+  @available(*, unavailable, renamed: "init(bitPattern:)")
+  public init(_ objectID: ObjectIdentifier) {
+    Builtin.unreachable()
+  }
+}
+
+extension Int {
+  @available(*, unavailable, renamed: "init(bitPattern:)")
+  public init(_ objectID: ObjectIdentifier) {
     Builtin.unreachable()
   }
 }

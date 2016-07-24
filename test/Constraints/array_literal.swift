@@ -1,31 +1,31 @@
 // RUN: %target-parse-verify-swift
 
-struct IntList : ArrayLiteralConvertible {
+struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
   init(arrayLiteral elements: Int...) {}
 }
 
-struct DoubleList : ArrayLiteralConvertible {
+struct DoubleList : ExpressibleByArrayLiteral {
   typealias Element = Double
   init(arrayLiteral elements: Double...) {}
 }
 
-struct IntDict : ArrayLiteralConvertible {
+struct IntDict : ExpressibleByArrayLiteral {
   typealias Element = (String, Int)
   init(arrayLiteral elements: Element...) {}
 }
 
-final class DoubleDict : ArrayLiteralConvertible {
+final class DoubleDict : ExpressibleByArrayLiteral {
   typealias Element = (String, Double)
   init(arrayLiteral elements: Element...) {}
 }
 
-final class List<T> : ArrayLiteralConvertible {
+final class List<T> : ExpressibleByArrayLiteral {
   typealias Element = T
   init(arrayLiteral elements: T...) {}
 }
 
-final class Dict<K,V> : ArrayLiteralConvertible {
+final class Dict<K,V> : ExpressibleByArrayLiteral {
   typealias Element = (K,V)
 
   init(arrayLiteral elements: (K,V)...) {}
@@ -73,7 +73,7 @@ var b2 : [Double] = b
 
 var arrayOfStreams = [1..<2, 3..<4]
 
-struct MyArray : ArrayLiteralConvertible {
+struct MyArray : ExpressibleByArrayLiteral {
   typealias Element = Double
 
   init(arrayLiteral elements: Double...) {

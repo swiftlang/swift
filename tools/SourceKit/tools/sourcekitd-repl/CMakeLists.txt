@@ -8,6 +8,10 @@ if(HAVE_UNICODE_LIBEDIT)
     set(SOURCEKITD_REPL_DEPEND sourcekitd)
   endif()
 
+  if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+    set(SOURCEKITD_REPL_DEPEND ${SOURCEKITD_REPL_DEPEND} dispatch swiftCore)
+  endif()
+
   add_sourcekit_executable(sourcekitd-repl
     sourcekitd-repl.cpp
     DEPENDS ${SOURCEKITD_REPL_DEPEND} edit
@@ -18,11 +22,10 @@ if(HAVE_UNICODE_LIBEDIT)
     set_target_properties(sourcekitd-repl
       PROPERTIES
       LINK_FLAGS "-Wl,-rpath -Wl,@executable_path/../lib")
-
-    if(SWIFT_ANALYZE_CODE_COVERAGE)
-      set_property(TARGET sourcekitd-repl APPEND_STRING PROPERTY
-        LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
-    endif()
+  endif()
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
+    set_property(TARGET sourcekitd-repl APPEND_STRING PROPERTY
+      LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
   endif()
 
   swift_install_in_component(tools

@@ -483,9 +483,9 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
     ReturnValue = NormalBlock->createBBArg(ResultType, 0);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
-    SILType ErrorProtocol =
+    SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createBBArg(ErrorProtocol, 0);
+    auto *ErrorArg = ErrorBlock->createBBArg(Error, 0);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
@@ -499,7 +499,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   }
 
   // Set up the return results.
-  if (NewF->getLoweredFunctionType()->isNoReturn()) {
+  if (NewF->isNoReturnFunction()) {
     Builder.createUnreachable(Loc);
   } else {
     Builder.createReturn(Loc, ReturnValue);

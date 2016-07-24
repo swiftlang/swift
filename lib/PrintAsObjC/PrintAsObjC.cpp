@@ -193,7 +193,7 @@ private:
 
   void printDocumentationComment(Decl *D) {
     swift::markup::MarkupContext MC;
-    auto DC = getDocComment(MC, D);
+    auto DC = getSingleDocComment(MC, D);
     if (DC.hasValue())
       ide::getDocumentationCommentAsDoxygen(DC.getValue(), os);
   }
@@ -611,7 +611,8 @@ private:
     if (auto weakTy = ty->getAs<WeakStorageType>()) {
       auto innerTy = weakTy->getReferentType()->getAnyOptionalObjectType();
       auto innerClass = innerTy->getClassOrBoundGenericClass();
-      if ((innerClass && !innerClass->isForeign()) ||
+      if ((innerClass &&
+           innerClass->getForeignClassKind()!=ClassDecl::ForeignKind::CFType) ||
           (innerTy->isObjCExistentialType() && !isCFTypeRef(innerTy))) {
         os << ", weak";
       }
@@ -653,7 +654,8 @@ private:
           break;
         }
       } else if ((dyn_cast_or_null<ClassDecl>(nominal) &&
-                  !cast<ClassDecl>(nominal)->isForeign()) ||
+                  cast<ClassDecl>(nominal)->getForeignClassKind() !=
+                    ClassDecl::ForeignKind::CFType) ||
                  (copyTy->isObjCExistentialType() && !isCFTypeRef(copyTy))) {
         os << ", strong";
       }
@@ -665,7 +667,8 @@ private:
     // Handle custom accessor names.
     llvm::SmallString<64> buffer;
     if (hasReservedName ||
-        VD->getObjCGetterSelector() != ObjCSelector(ctx, 0, { objCName })) {
+        VD->getObjCGetterSelector() !=
+          VarDecl::getDefaultObjCGetterSelector(ctx, objCName)) {
       os << ", getter=" << VD->getObjCGetterSelector().getString(buffer);
     }
     if (isSettable) {
@@ -1617,8 +1620,10 @@ public:
   }
 
   bool forwardDeclare(const ClassDecl *CD) {
-    if (!CD->isObjC() || CD->isForeign())
+    if (!CD->isObjC() ||
+        CD->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       return false;
+    }
     forwardDeclare(CD, [&]{ os << "@class " << getNameForObjC(CD) << ";\n"; });
     return true;
   }
@@ -1784,7 +1789,7 @@ public:
     ASTContext &ctx = M.getASTContext();
 
     auto protos = ED->getAllProtocols();
-    auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::ErrorProtocol);
+    auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::Error);
     if (std::find(protos.begin(), protos.end(), errorTypeProto) !=
         protos.end()) {
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),

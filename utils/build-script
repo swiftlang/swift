@@ -53,7 +53,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'android'))
 import adb.commands  # noqa (E402)
 
 
-def call_without_sleeping(command, env=None, dry_run=False):
+build_script_impl = os.path.join(
+    SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl")
+
+
+def call_without_sleeping(command, env=None, dry_run=False, echo=False):
     """
     Execute a command during which system sleep is disabled.
 
@@ -65,7 +69,7 @@ def call_without_sleeping(command, env=None, dry_run=False):
         # Don't mutate the caller's copy of the arguments.
         command = ["caffeinate"] + list(command)
 
-    shell.call(command, env=env, dry_run=dry_run)
+    shell.call(command, env=env, dry_run=dry_run, echo=echo)
 
 
 class HostSpecificConfiguration(object):
@@ -245,6 +249,13 @@ class BuildScriptInvocation(object):
         if args.build_variant is None:
             args.build_variant = "Debug"
 
+        # Set the default stdlib-deployment-targets, if none were provided.
+        if args.stdlib_deployment_targets is None:
+            stdlib_targets = \
+                StdlibDeploymentTarget.default_stdlib_deployment_targets()
+            args.stdlib_deployment_targets = [
+                target.name for target in stdlib_targets]
+
         # Propagate the default build variant.
         if args.cmark_build_variant is None:
             args.cmark_build_variant = args.build_variant
@@ -317,6 +328,8 @@ class BuildScriptInvocation(object):
             args.build_xctest = False
             args.build_foundation = False
             args.build_libdispatch = False
+            args.build_playgroundlogger = False
+            args.build_playgroundsupport = False
 
         # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
         # merely shorthands for --skip-build-{**os}-{device,simulator}
@@ -562,6 +575,8 @@ class BuildScriptInvocation(object):
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
             "--lldb-build-type", args.lldb_build_variant,
             "--foundation-build-type", args.foundation_build_variant,
+            "--libdispatch-build-type", args.libdispatch_build_variant,
+            "--xctest-build-type", args.build_variant,
             "--llvm-enable-assertions", str(args.llvm_assertions).lower(),
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
@@ -597,7 +612,7 @@ class BuildScriptInvocation(object):
             impl_args += ["--enable-ubsan"]
         if args.clang_compiler_version:
             impl_args += [
-                "--clang-compiler-version=%s.%s.%s" % (
+                "--clang-compiler-version=%s" % (
                     args.clang_compiler_version)
             ]
         if args.verbose_build:
@@ -625,8 +640,20 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-libdispatch"]
         if not args.build_swiftpm:
             impl_args += ["--skip-build-swiftpm"]
+        if not args.build_playgroundlogger:
+            impl_args += ["--skip-build-playgroundlogger"]
+        if not args.build_playgroundsupport:
+            impl_args += ["--skip-build-playgroundsupport"]
+        if args.build_swift_dynamic_stdlib:
+            impl_args += ["--build-swift-dynamic-stdlib"]
+        if args.build_swift_static_stdlib:
+            impl_args += ["--build-swift-static-stdlib"]
         if args.build_swift_stdlib_unittest_extra:
             impl_args += ["--build-swift-stdlib-unittest-extra"]
+        if args.build_swift_dynamic_sdk_overlay:
+            impl_args += ["--build-swift-dynamic-sdk-overlay"]
+        if args.build_swift_static_sdk_overlay:
+            impl_args += ["--build-swift-static-sdk-overlay"]
 
         if args.skip_build_linux:
             impl_args += ["--skip-build-linux"]
@@ -660,7 +687,9 @@ class BuildScriptInvocation(object):
                           "--skip-test-swiftpm",
                           "--skip-test-xctest",
                           "--skip-test-foundation",
-                          "--skip-test-libdispatch"]
+                          "--skip-test-libdispatch",
+                          "--skip-test-playgroundlogger",
+                          "--skip-test-playgroundsupport"]
         if args.skip_test_linux:
             impl_args += ["--skip-test-linux"]
         if args.skip_test_freebsd:
@@ -755,6 +784,9 @@ class BuildScriptInvocation(object):
         if args.dry_run:
             impl_args += ["--dry-run"]
 
+        if args.lit_args:
+            impl_args += ["--llvm-lit-args=%s" % args.lit_args]
+
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
@@ -797,6 +829,115 @@ class BuildScriptInvocation(object):
             }
 
         return options
+
+    def compute_product_classes(self):
+        """compute_product_classes() -> list
+
+        Compute the list of all Product classes used in this build. This list
+        is constructed in dependency order.
+        """
+
+        # FIXME: This is a weird division (returning a list of class objects),
+        # but it matches the existing structure of the `build-script-impl`.
+
+        product_classes = []
+        product_classes.append(products.CMark)
+        product_classes.append(products.LLVM)
+        product_classes.append(products.Swift)
+        if self.args.build_lldb:
+            product_classes.append(products.LLDB)
+        if self.args.build_llbuild:
+            product_classes.append(products.LLBuild)
+        if self.args.build_libdispatch:
+            product_classes.append(products.LibDispatch)
+        if self.args.build_foundation:
+            product_classes.append(products.Foundation)
+        if self.args.build_xctest:
+            product_classes.append(products.XCTest)
+        if self.args.build_swiftpm:
+            product_classes.append(products.SwiftPM)
+        return product_classes
+
+    def execute(self):
+        """Execute the invocation with the configured arguments."""
+
+        # Convert to a build-script-impl invocation.
+        (impl_env, impl_args) = self.convert_to_impl_arguments()
+
+        # If using the legacy implementation, delegate all behavior to
+        # `build-script-impl`.
+        if self.args.legacy_impl:
+            # Execute the underlying build script implementation.
+            call_without_sleeping([build_script_impl] + impl_args,
+                                  env=impl_env, echo=True)
+            return
+
+        # Otherwise, we compute and execute the individual actions ourselves.
+
+        def execute_one_impl_action(host=None, product_class=None, name=None):
+            if host is None:
+                assert (product_class is None and
+                        name == "merged-hosts-lipo"), "invalid action"
+                action_name = name
+            elif product_class is None:
+                assert name == "package", "invalid action"
+                action_name = "{}-{}".format(host.name, name)
+            else:
+                assert name is not None, "invalid action"
+                action_name = "{}-{}-{}".format(
+                    host.name, product_class.product_name(), name)
+            call_without_sleeping(
+                [build_script_impl] + impl_args + [
+                    "--only-execute", action_name],
+                env=impl_env, echo=self.args.verbose_build)
+
+        # Compute the list of hosts to operate on.
+        all_host_names = [
+            self.args.host_target] + self.args.cross_compile_hosts
+        all_hosts = [StdlibDeploymentTarget.get_target_for_name(name)
+                     for name in all_host_names]
+
+        # Compute the list of product classes to operate on.
+        #
+        # FIXME: This should really be per-host, but the current structure
+        # matches that of `build-script-impl`.
+        product_classes = self.compute_product_classes()
+
+        # Execute each "pass".
+
+        # Build...
+        for host_target in all_hosts:
+            # FIXME: We should only compute these once.
+            config = HostSpecificConfiguration(host_target.name, self)
+            print("Building the standard library for: {}".format(
+                " ".join(config.swift_stdlib_build_targets)))
+            if config.swift_test_run_targets and (
+                    self.args.test or self.args.long_test):
+                print("Running Swift tests for: {}".format(
+                    " ".join(config.swift_test_run_targets)))
+            if config.swift_benchmark_run_targets and self.args.benchmark:
+                print("Running Swift benchmarks for: {}".format(
+                    " ".join(config.swift_benchmark_run_targets)))
+
+            for product_class in product_classes:
+                execute_one_impl_action(host_target, product_class, "build")
+
+        # Test...
+        for host_target in all_hosts:
+            for product_class in product_classes:
+                execute_one_impl_action(host_target, product_class, "test")
+
+        # Install...
+        for host_target in all_hosts:
+            for product_class in product_classes:
+                execute_one_impl_action(host_target, product_class, "install")
+
+        # Package...
+        for host_target in all_hosts:
+            execute_one_impl_action(host_target, name="package")
+
+        # Lipo...
+        execute_one_impl_action(name="merged-hosts-lipo")
 
 
 # Main entry point for the preset mode.
@@ -1073,6 +1214,11 @@ details of the setups of other systems or automated environments.""")
              "them",
         action="store_true",
         default=False)
+    parser.add_argument(
+        "--no-legacy-impl", dest="legacy_impl",
+        help="avoid legacy implementation",
+        action="store_false",
+        default=True)
 
     targets_group = parser.add_argument_group(
         title="Host and cross-compilation targets")
@@ -1088,15 +1234,12 @@ details of the setups of other systems or automated environments.""")
              "tools for. Can be used multiple times.",
         action=arguments.action.concat, type=arguments.type.shell_split,
         default=[])
-    stdlib_targets = StdlibDeploymentTarget.default_stdlib_deployment_targets()
     targets_group.add_argument(
         "--stdlib-deployment-targets",
         help="list of targets to compile or cross-compile the Swift standard "
              "library for. %(default)s by default.",
-        nargs="*",
-        default=[
-            target.name
-            for target in stdlib_targets])
+        action=arguments.action.concat, type=arguments.type.shell_split,
+        default=None)
     targets_group.add_argument(
         "--build-stdlib-deployment-targets",
         help="A space-separated list that filters which of the configured "
@@ -1135,6 +1278,14 @@ details of the setups of other systems or automated environments.""")
         help="build libdispatch",
         action=arguments.action.optional_bool,
         dest="build_libdispatch")
+    projects_group.add_argument("--playgroundlogger",
+        help="build playgroundlogger",
+        action="store_true",
+        dest="build_playgroundlogger")
+    projects_group.add_argument("--playgroundsupport",
+        help="build PlaygroundSupport",
+        action="store_true",
+        dest="build_playgroundsupport")
     projects_group.add_argument(
         "--build-ninja",
         help="build the Ninja tool",
@@ -1385,13 +1536,31 @@ details of the setups of other systems or automated environments.""")
         help="Use the host compiler, not the self-built one to compile the "
              "Swift runtime",
         action=arguments.action.optional_bool)
-    parser.add_argument(
-        "--build-swift-stdlib-unittest-extra",
-        help="Build optional StdlibUnittest components",
-        action=arguments.action.optional_bool)
 
     run_build_group = parser.add_argument_group(
         title="Run build")
+    run_build_group.add_argument(
+        "--build-swift-dynamic-stdlib",
+        help="build dynamic variants of the Swift standard library",
+        action=arguments.action.optional_bool,
+        default=True)
+    run_build_group.add_argument(
+        "--build-swift-static-stdlib",
+        help="build static variants of the Swift standard library",
+        action=arguments.action.optional_bool)
+    run_build_group.add_argument(
+        "--build-swift-dynamic-sdk-overlay",
+        help="build dynamic variants of the Swift SDK overlay",
+        action=arguments.action.optional_bool,
+        default=True)
+    run_build_group.add_argument(
+        "--build-swift-static-sdk-overlay",
+        help="build static variants of the Swift SDK overlay",
+        action=arguments.action.optional_bool)
+    run_build_group.add_argument(
+        "--build-swift-stdlib-unittest-extra",
+        help="Build optional StdlibUnittest components",
+        action=arguments.action.optional_bool)
     run_build_group.add_argument(
         "-S", "--skip-build",
         help="generate build directory only without building",
@@ -1651,6 +1820,7 @@ details of the setups of other systems or automated environments.""")
         help="Path on an Android device to which built Swift stdlib products "
              "will be deployed. If running host tests, specify the '{}' "
              "directory.".format(adb.commands.DEVICE_TEMP_DIR),
+        default=adb.commands.DEVICE_TEMP_DIR,
         metavar="PATH")
 
     parser.add_argument(
@@ -1762,10 +1932,13 @@ details of the setups of other systems or automated environments.""")
         "--skip-test-optimized",
         action=arguments.action.unavailable)
 
-    args = migration.parse_args(parser, sys.argv[1:])
+    parser.add_argument(
+        "--lit-args",
+        help="lit args to use when testing",
+        metavar="LITARGS",
+        default="-sv")
 
-    build_script_impl = os.path.join(
-        SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl")
+    args = migration.parse_args(parser, sys.argv[1:])
 
     if args.build_script_impl_args:
         # If we received any impl args, check if `build-script-impl` would
@@ -1820,13 +1993,8 @@ details of the setups of other systems or automated environments.""")
     if args.build_ninja:
         invocation.build_ninja()
 
-    # Convert to a build-script-impl invocation.
-    (build_script_impl_env, build_script_impl_args) = \
-        invocation.convert_to_impl_arguments()
-
     # Execute the underlying build script implementation.
-    call_without_sleeping([build_script_impl] + build_script_impl_args,
-                          env=build_script_impl_env)
+    invocation.execute()
 
     if args.symbols_package:
         print('--- Creating symbols package ---')

@@ -9,22 +9,24 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+import SwiftShims
 
 // TODO: API review
 /// A type representing an error value that can be thrown.
 ///
-/// Any type that declares conformance to `ErrorProtocol` can be used to
-/// represent an error in Swift's error handling system. Because
-/// `ErrorProtocol` has no requirements of its own, you can declare
-/// conformance on any custom type you create.
+/// Any type that declares conformance to the `Error` protocol can be used to
+/// represent an error in Swift's error handling system. Because the `Error`
+/// protocol has no requirements of its own, you can declare conformance on
+/// any custom type you create.
 ///
 /// Using Enumerations as Errors
 /// ============================
 ///
 /// Swift's enumerations are well suited to represent simple errors. Create an
-/// enumeration that conforms to `ErrorProtocol` with a case for each possible
-/// error. If there are additional details about the error that could be
-/// helpful for recovery, use associated values to include that information.
+/// enumeration that conforms to the `Error` protocol with a case for each
+/// possible error. If there are additional details about the error that could
+/// be helpful for recovery, use associated values to include that
+/// information.
 ///
 /// The following example shows an `IntParsingError` enumeration that captures
 /// two different kinds of errors that can occur when parsing an integer from
@@ -32,7 +34,7 @@
 /// for the integer data type, and invalid input, where nonnumeric characters
 /// are found within the input.
 ///
-///     enum IntParsingError: ErrorProtocol {
+///     enum IntParsingError: Error {
 ///         case overflow
 ///         case invalidInput(String)
 ///     }
@@ -78,7 +80,7 @@
 /// uses a structure to represent an error when parsing an XML document,
 /// including the line and column numbers where the error occurred:
 ///
-///     struct XMLParsingError: ErrorProtocol {
+///     struct XMLParsingError: Error {
 ///         enum ErrorKind {
 ///             case invalidCharacter
 ///             case mismatchedTag
@@ -108,49 +110,73 @@
 ///         print("Other error: \(error)")
 ///     }
 ///     // Prints "Parsing error: mismatchedTag [19:5]"
-public protocol ErrorProtocol {
+public protocol Error {
   var _domain: String { get }
   var _code: Int { get }
-}
-
-extension ErrorProtocol {
-  public var _domain: String {
-    return String(reflecting: self.dynamicType)
-  }
+  var _userInfo: AnyObject? { get }
 }
 
 #if _runtime(_ObjC)
-// Helper functions for the C++ runtime to have easy access to domain and
-// code as Objective-C values.
+// Helper functions for the C++ runtime to have easy access to domain,
+// code, and userInfo as Objective-C values.
 @_silgen_name("swift_stdlib_getErrorDomainNSString")
-public func _stdlib_getErrorDomainNSString<T : ErrorProtocol>(_ x: UnsafePointer<T>)
+public func _stdlib_getErrorDomainNSString<T : Error>(_ x: UnsafePointer<T>)
 -> AnyObject {
   return x.pointee._domain._bridgeToObjectiveCImpl()
 }
 
 @_silgen_name("swift_stdlib_getErrorCode")
-public func _stdlib_getErrorCode<T : ErrorProtocol>(_ x: UnsafePointer<T>) -> Int {
+public func _stdlib_getErrorCode<T : Error>(_ x: UnsafePointer<T>) -> Int {
   return x.pointee._code
 }
 
-// Known function for the compiler to use to coerce `ErrorProtocol` instances
+// Helper functions for the C++ runtime to have easy access to domain and
+// code as Objective-C values.
+@_silgen_name("swift_stdlib_getErrorUserInfoNSDictionary")
+public func _stdlib_getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>)
+-> AnyObject? {
+  return x.pointee._userInfo
+}
+
+@_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
+public func _stdlib_getErrorDefaultUserInfo(_ error: Error) -> AnyObject?
+
+// Known function for the compiler to use to coerce `Error` instances
 // to `NSError`.
-@_silgen_name("swift_bridgeErrorProtocolToNSError")
-public func _bridgeErrorProtocolToNSError(_ error: ErrorProtocol) -> AnyObject
+@_silgen_name("swift_bridgeErrorToNSError")
+public func _bridgeErrorToNSError(_ error: Error) -> AnyObject
 #endif
 
 /// Invoked by the compiler when the subexpression of a `try!` expression
 /// throws an error.
 @_silgen_name("swift_unexpectedError")
-public func _unexpectedError(_ error: ErrorProtocol) {
+public func _unexpectedError(_ error: Error) {
   preconditionFailure("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught error.
 @_silgen_name("swift_errorInMain")
-public func _errorInMain(_ error: ErrorProtocol) {
+public func _errorInMain(_ error: Error) {
   fatalError("Error raised at top level: \(String(reflecting: error))")
 }
 
-@available(*, unavailable, renamed: "ErrorProtocol")
-public typealias ErrorType = ErrorProtocol
+@available(*, unavailable, renamed: "Error")
+public typealias ErrorType = Error
+
+@available(*, unavailable, renamed: "Error")
+public typealias ErrorProtocol = Error
+
+
+extension Error {
+  public var _domain: String {
+    return String(reflecting: self.dynamicType)
+  }
+
+  public var _userInfo: AnyObject? {
+#if _runtime(_ObjC)
+    return _stdlib_getErrorDefaultUserInfo(self)
+#else
+    return nil
+#endif
+  }
+}

@@ -7,17 +7,17 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_TF10objc_error28NSErrorErrorProtocol_erasureFCSo7NSErrorPs13ErrorProtocol_
-// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $NSError : $NSError, $ErrorProtocol
+// CHECK-LABEL: sil hidden @_TF10objc_error20NSErrorError_erasureFCSo7NSErrorPs5Error_
+// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $NSError : $NSError, $Error
 // CHECK:         return [[ERROR_TYPE]]
-func NSErrorErrorProtocol_erasure(_ x: NSError) -> ErrorProtocol {
+func NSErrorError_erasure(_ x: NSError) -> Error {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF10objc_error38NSErrorErrorProtocol_archetype_erasure
-// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $T : $T, $ErrorProtocol
+// CHECK-LABEL: sil hidden @_TF10objc_error30NSErrorError_archetype_erasure
+// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $T : $T, $Error
 // CHECK:         return [[ERROR_TYPE]]
-func NSErrorErrorProtocol_archetype_erasure<T : NSError>(_ t: T) -> ErrorProtocol {
+func NSErrorError_archetype_erasure<T : NSError>(_ t: T) -> Error {
   return t
 }
 
@@ -26,7 +26,7 @@ func NSErrorErrorProtocol_archetype_erasure<T : NSError>(_ t: T) -> ErrorProtoco
 func test_doesnt_throw() {
   do {
     throw NSError(domain: "", code: 1, userInfo: [:])
-  } catch is ErrorProtocol {  // expected-warning {{'is' test is always true}}
+  } catch is Error {  // expected-warning {{'is' test is always true}}
   }
 
   do {
@@ -36,7 +36,7 @@ func test_doesnt_throw() {
   }
 }
 
-class ErrorClass: ErrorProtocol {
+class ErrorClass: Error {
   let _domain = ""
   let _code = 0
 }
@@ -48,13 +48,13 @@ class ErrorClass: ErrorProtocol {
 func test_cast_to_nserror() {
   let e = ErrorClass()
 
-  // CHECK: function_ref @swift_bridgeErrorProtocolToNSError
-  let nsCoerced = e as NSError
+  // CHECK: function_ref @swift_bridgeErrorToNSError
+  let nsCoerced = e as Error as NSError
 
   // CHECK: unconditional_checked_cast_addr {{.*}} AnyObject in {{%.*}} : $*AnyObject to NSError in {{%.*}} : $*NSError
   let nsForcedCast = (e as AnyObject) as! NSError
 
-  // CHECK: checked_cast_addr_br {{.*}} ErrorProtocol in {{%.*}} : $*ErrorProtocol to NSError in {{%.*}} : $*NSError, bb3, bb4
+  // CHECK: checked_cast_addr_br {{.*}} Error in {{%.*}} : $*Error to NSError in {{%.*}} : $*NSError, bb3, bb4
   do {
     throw e
   } catch _ as NSError {
@@ -69,4 +69,29 @@ func test_cast_to_class_archetype<T: AnyObject>(_: T) {
   // CHECK: unconditional_checked_cast_addr {{.*}} ErrorClass in {{%.*}} : $*ErrorClass to T in {{.*}} : $*T
   let e = ErrorClass()
   let forcedCast = e as! T
+}
+
+// CHECK-LABEL: sil hidden @_TF10objc_error15testAcceptError
+func testAcceptError(error: Error) {
+  // CHECK-NOT: return
+  // CHECK: function_ref @swift_convertErrorToNSError
+  acceptError(error)
+}
+
+// CHECK-LABEL: sil hidden @_TF10objc_error16testProduceError
+func testProduceError() -> Error {
+  // CHECK: function_ref @produceError : $@convention(c) () -> @autoreleased NSError
+  // CHECK-NOT: return
+  // CHECK: enum $Optional<NSError>, #Optional.some!enumelt.1
+  // CHECK-NOT: return
+  // CHECK: function_ref @swift_convertNSErrorToError
+  return produceError()
+}
+
+// CHECK-LABEL: sil hidden @_TF10objc_error24testProduceOptionalError
+func testProduceOptionalError() -> Error? {
+  // CHECK: function_ref @produceOptionalError
+  // CHECK-NOT: return
+  // CHECK: function_ref @swift_convertNSErrorToError
+  return produceOptionalError();
 }

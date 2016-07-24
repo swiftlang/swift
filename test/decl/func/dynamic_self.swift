@@ -35,6 +35,30 @@ protocol P0 {
   func g(_ ds: Self) // okay
 }
 
+extension P0 {
+  func h() -> Self { // okay
+    func g(_ t : Self) -> Self { // okay
+      return t
+    }
+    return g(self)
+  }
+}
+
+protocol P1: class {
+  func f() -> Self // okay
+
+  func g(_ ds: Self) // okay
+}
+
+extension P1 {
+  func h() -> Self { // okay
+    func g(_ t : Self) -> Self { // okay
+      return t
+    }
+    return g(self)
+  }
+}
+
 // ----------------------------------------------------------------------------
 // The 'self' type of a Self method is based on Self
 class C1 {

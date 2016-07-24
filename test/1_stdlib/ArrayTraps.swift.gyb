@@ -138,7 +138,7 @@ ArrayTraps.test("unsafeLength")
 
   expectCrashLater()
 
-  a.withUnsafeBufferPointer {
+  _ = a.withUnsafeBufferPointer {
     UnsafeBufferPointer(start: $0.baseAddress, count: -1)
   }
 }

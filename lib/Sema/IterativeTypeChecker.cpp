@@ -84,7 +84,7 @@ void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
 
   // Add this request to the stack of active requests.
   ActiveRequests.push_back(request);
-  defer { ActiveRequests.pop_back(); };
+  SWIFT_DEFER { ActiveRequests.pop_back(); };
 
   while (true) {
     // Process this requirement, enumerating dependencies if anything else needs
@@ -112,6 +112,20 @@ void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
   }
 }
 
+static bool isSelfRedefinedTypeAliasDecl(const TypeCheckRequest &Request) {
+  if (Request.getKind() == TypeCheckRequest::Kind::ResolveTypeDecl) {
+    if (auto TAD = dyn_cast<TypeAliasDecl>(Request.getAnchor())) {
+      SourceRange SR = TAD->getUnderlyingTypeLoc().getSourceRange();
+      SourceManager &SM = TAD->getASTContext().SourceMgr;
+      CharSourceRange CR = CharSourceRange(SM, SR.Start,
+                                           Lexer::getLocForEndOfToken(SM,
+                                                                      SR.End));
+      return CR.str() == TAD->getNameStr();
+    }
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
@@ -119,9 +133,14 @@ void IterativeTypeChecker::diagnoseCircularReference(
        ArrayRef<TypeCheckRequest> requests) {
   bool isFirst = true;
   for (const auto &request : requests) {
-    diagnose(request.getLoc(),
-             isFirst ? diag::circular_reference
-                     : diag::circular_reference_through);
+    if (isSelfRedefinedTypeAliasDecl(request)) {
+      diagnose(request.getLoc(), diag::redundant_type_alias_define).
+        fixItRemove(request.getAnchor()->getSourceRange());
+    } else {
+      diagnose(request.getLoc(),
+               isFirst ? diag::circular_reference :
+                         diag::circular_reference_through);
+    }
 
     isFirst = false;
   }

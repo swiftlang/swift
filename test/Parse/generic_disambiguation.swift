@@ -42,7 +42,7 @@ A<[[Int]]>.c()
 A<[[A<B>]]>.c()
 A<(Int, UnicodeScalar)>.c()
 A<(a:Int, b:UnicodeScalar)>.c()
-A<protocol<Runcible, Fungible>>.c()
+A<Runcible & Fungible>.c()
 
 A<B>(x: 0) // expected-warning{{unused}}
 

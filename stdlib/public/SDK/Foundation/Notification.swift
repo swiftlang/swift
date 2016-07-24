@@ -59,39 +59,39 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
 
     // FIXME: Handle directly via API Notes
     public typealias Name = NSNotification.Name
-}
 
-/// Compare two notifications for equality.
-///
-/// - note: Notifications that contain non NSObject values in userInfo will never compare as equal. This is because the type information is not preserved in the `userInfo` dictionary.
-public func ==(lhs: Notification, rhs: Notification) -> Bool {
-    if lhs.name.rawValue != rhs.name.rawValue {
-        return false
-    }
-    if let lhsObj = lhs.object {
-        if let rhsObj = rhs.object {
-            if lhsObj !== rhsObj {
-                return false
-            }
-        } else {
+    /// Compare two notifications for equality.
+    ///
+    /// - note: Notifications that contain non NSObject values in userInfo will never compare as equal. This is because the type information is not preserved in the `userInfo` dictionary.
+    public static func ==(lhs: Notification, rhs: Notification) -> Bool {
+        if lhs.name.rawValue != rhs.name.rawValue {
             return false
         }
-    } else if rhs.object != nil {
-        return false
-    }
-    if let lhsUserInfo = lhs.userInfo {
-        if let rhsUserInfo = rhs.userInfo {
-            if lhsUserInfo.count != rhsUserInfo.count {
+        if let lhsObj = lhs.object {
+            if let rhsObj = rhs.object {
+                if lhsObj !== rhsObj {
+                    return false
+                }
+            } else {
                 return false
             }
-            return _NSUserInfoDictionary.compare(lhsUserInfo, rhsUserInfo)
-        } else {
+        } else if rhs.object != nil {
             return false
         }
-    } else if rhs.userInfo != nil {
-        return false
+        if let lhsUserInfo = lhs.userInfo {
+            if let rhsUserInfo = rhs.userInfo {
+                if lhsUserInfo.count != rhsUserInfo.count {
+                    return false
+                }
+                return _NSUserInfoDictionary.compare(lhsUserInfo, rhsUserInfo)
+            } else {
+                return false
+            }
+        } else if rhs.userInfo != nil {
+            return false
+        }
+        return true
     }
-    return true
 }
 
 extension Notification : _ObjectiveCBridgeable {
@@ -139,13 +139,4 @@ extension Notification : _ObjectiveCBridgeable {
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }
-}
-
-extension NotificationCenter {
-  // Note: rdar://problem/26177286
-  // Note: should be removed with Foundation epoch 8 along with the signature
-  // below.
-  @nonobjc public final func addObserver(_ observer: AnyObject, selector aSelector: Selector, name aName: Notification.Name, object anObject: AnyObject?) {
-    self.addObserver(observer, selector: aSelector, name: aName.rawValue, object: anObject)
-  }
 }

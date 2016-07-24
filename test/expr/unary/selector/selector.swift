@@ -111,3 +111,27 @@ func testParseErrors4() {
   // Subscripts
   _ = #selector(C1.subscript) // expected-error{{type 'C1.Type' has no subscript members}}
 }
+
+// SR-1827
+
+let optionalSel: Selector? = nil
+
+switch optionalSel {
+case #selector(C1.method1)?:
+  break
+}
+
+@objc class SR1827 {
+  func bar() {}
+}
+
+switch optionalSel {
+case #selector(SR1827.bar): // expected-error{{expression pattern of type 'Selector' cannot match values of type 'Selector?'}} {{26-26=?}}
+  break
+case #selector(SR1827.bar)!: // expected-error{{cannot force unwrap value of non-optional type 'Selector'}}
+  break
+case #selector(SR1827.bar)?:
+  break
+default:
+  break
+}

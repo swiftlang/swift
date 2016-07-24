@@ -65,18 +65,18 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 
 /// Invoke `body` with a C `va_list` argument derived from `args`.
 public func withVaList<R>(_ args: [CVarArg],
-  invoke body: @noescape (CVaListPointer) -> R) -> R {
+  _ body: @noescape (CVaListPointer) -> R) -> R {
   let builder = _VaListBuilder()
   for a in args {
     builder.append(a)
   }
-  return _withVaList(builder, invoke: body)
+  return _withVaList(builder, body)
 }
 
 /// Invoke `body` with a C `va_list` argument derived from `builder`.
 internal func _withVaList<R>(
   _ builder: _VaListBuilder,
-  invoke body: @noescape (CVaListPointer) -> R
+  _ body: @noescape (CVaListPointer) -> R
 ) -> R {
   let result = body(builder.va_list())
   _fixLifetime(builder)
@@ -113,7 +113,7 @@ public func _encodeBitsAsWords<T : CVarArg>(_ x: T) -> [Int] {
     count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self))
   _sanityCheck(result.count > 0)
   var tmp = x
-  // FIXME: use UnsafeMutablePointer.assignFrom() instead of memcpy.
+  // FIXME: use UnsafeMutablePointer.assign(from:) instead of memcpy.
   _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous!),
           src: UnsafeMutablePointer(Builtin.addressof(&tmp)),
           size: UInt(sizeof(T.self)))
@@ -121,7 +121,7 @@ public func _encodeBitsAsWords<T : CVarArg>(_ x: T) -> [Int] {
 }
 
 // CVarArg conformances for the integer types.  Everything smaller
-// than a CInt must be promoted to CInt or CUnsignedInt before
+// than an Int32 must be promoted to Int32 or CUnsignedInt before
 // encoding.
 
 // Signed types
@@ -160,7 +160,7 @@ extension Int16 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(CInt(self))
+    return _encodeBitsAsWords(Int32(self))
   }
 }
 
@@ -168,7 +168,7 @@ extension Int8 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(CInt(self))
+    return _encodeBitsAsWords(Int32(self))
   }
 }
 
@@ -336,7 +336,7 @@ final internal class _VaListBuilder {
       // count is updated below
 
       if let allocatedOldStorage = oldStorage {
-        newStorage.moveInitializeFrom(allocatedOldStorage, count: oldCount)
+        newStorage.moveInitialize(from: allocatedOldStorage, count: oldCount)
         deallocStorage(wordCount: oldAllocated, storage: allocatedOldStorage)
       }
     }

@@ -15,36 +15,9 @@
 
 #include <atomic>
 #include <cassert>
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 
 namespace swift {
-
-/// A thread-safe version of \c llvm::RefCountedBase.
-///
-/// A generic base class for objects that wish to have their lifetimes managed
-/// using reference counts. Classes subclass \c ThreadSafeRefCountedBase to
-/// obtain such functionality, and are typically handled with
-/// \c IntrusiveRefCntPtr "smart pointers" which automatically handle the
-/// management of reference counts.
-/// FIXME: This should eventually move to llvm.
-template <class Derived>
-class ThreadSafeRefCountedBase {
-  mutable std::atomic<unsigned> ref_cnt;
-
-protected:
-  ThreadSafeRefCountedBase() : ref_cnt(0) {}
-
-public:
-  void Retain() const {
-    ref_cnt.fetch_add(1, std::memory_order_acq_rel);
-  }
-
-  void Release() const {
-    int refCount =
-        static_cast<int>(ref_cnt.fetch_sub(1, std::memory_order_acq_rel));
-    assert(refCount >= 0 && "Reference count was already zero.");
-    if (refCount == 0) delete static_cast<const Derived*>(this);
-  }
-};
 
 /// A class that has the same function as \c ThreadSafeRefCountedBase, but with
 /// a virtual destructor.
@@ -62,12 +35,11 @@ protected:
 
 public:
   void Retain() const {
-    ref_cnt.fetch_add(1, std::memory_order_acq_rel);
+    ref_cnt += 1;
   }
 
   void Release() const {
-    int refCount =
-        static_cast<int>(ref_cnt.fetch_sub(1, std::memory_order_acq_rel));
+    int refCount = static_cast<int>(--ref_cnt);
     assert(refCount >= 0 && "Reference count was already zero.");
     if (refCount == 0) delete this;
   }

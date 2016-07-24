@@ -99,10 +99,10 @@ if True:
 ///
 /// You can call any method on the slices that you might have called on the
 /// `absences` array. To learn which half had more absences, use the
-/// `reduce(_:combine:)` method to calculate each sum.
+/// `reduce(_:)` method to calculate each sum.
 ///
-///     let firstHalfSum = firstHalf.reduce(0, combine: +)
-///     let secondHalfSum = secondHalf.reduce(0, combine: +)
+///     let firstHalfSum = firstHalf.reduce(0, +)
+///     let secondHalfSum = secondHalf.reduce(0, +)
 ///
 ///     if firstHalfSum > secondHalfSum {
 ///         print("More absences in the first half.")
@@ -229,7 +229,7 @@ if True:
 /// array's first and last elements. If the array is empty, these properties
 /// are `nil`.
 ///
-///     if let firstElement = oddNumbers.first, lastElement = oddNumbers.last {
+///     if let firstElement = oddNumbers.first, let lastElement = oddNumbers.last {
 ///         print(firstElement, lastElement, separator: ", ")
 ///     }
 ///     // Prints "1, 15"
@@ -732,7 +732,7 @@ public struct ${Self}<Element>
     get {
       _checkIndex(bounds.lowerBound)
       _checkIndex(bounds.upperBound)
-      return ArraySlice(_buffer[bounds])
+      return ArraySlice(_buffer: _buffer[bounds])
     }
     set(rhs) {
       _checkIndex(bounds.lowerBound)
@@ -884,14 +884,24 @@ public struct ${Self}<Element>
 
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
-  public init(_ _buffer: _Buffer) {
+  public // @testable
+  init(_buffer: _Buffer) {
     self._buffer = _buffer
   }
+
+%if Self == 'ArraySlice':
+  /// Initialization from an existing buffer does not have "array.init"
+  /// semantics because the caller may retain an alias to buffer.
+  public // @testable
+  init(_buffer: _ContiguousArrayBuffer<Element>) {
+    self.init(_buffer: _Buffer(_buffer, shiftedToStartIndex: 0))
+  }
+%end
 
   public var _buffer: _Buffer
 }
 
-extension ${Self} : ArrayLiteralConvertible {
+extension ${Self} : ExpressibleByArrayLiteral {
 %if Self == 'Array':
   // Optimized implementation for Array
   /// Creates an array from the given array literal.
@@ -926,7 +936,7 @@ extension ${Self} : ArrayLiteralConvertible {
   ///
   /// - Parameter elements: A variadic list of elements of the new array.
   public init(arrayLiteral elements: Element...) {
-    self.init(_extractOrCopyToNativeArrayBuffer(elements._buffer))
+    self.init(_buffer: ContiguousArray(elements)._buffer)
   }
 %end
 }
@@ -1027,7 +1037,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   public init<S : Sequence>(_ s: S)
     where S.Iterator.Element == Element {
 
-    self = ${Self}(_Buffer(s._copyToNativeArrayBuffer(),
+    self = ${Self}(
+      _buffer: _Buffer(s._copyToContiguousArray()._buffer,
       shiftedToStartIndex: 0))
   }
 
@@ -1050,7 +1061,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     var p: UnsafeMutablePointer<Element>
     (self, p) = ${Self}._allocateUninitialized(count)
     for _ in 0..<count {
-      p.initialize(with: repeatedValue)
+      p.initialize(to: repeatedValue)
       p += 1
     }
   }
@@ -1114,7 +1125,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
         storage, to: _ContiguousArrayStorage<Element>.self))
     
     return (
-      Array(_Buffer(innerBuffer, shiftedToStartIndex: 0)),
+      Array(_buffer: _Buffer(innerBuffer, shiftedToStartIndex: 0)),
         innerBuffer.firstElementAddress)
   }
 
@@ -1241,7 +1252,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     _sanityCheck(_buffer.capacity >= _buffer.count + 1)
 
     _buffer.count = oldCount + 1
-    (_buffer.firstElementAddress + oldCount).initialize(with: newElement)
+    (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
   }
 
   /// Adds a new element at the end of the array.
@@ -1322,7 +1333,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       Swift.max(newCount, _growArrayCapacity(capacity))
       : newCount)
 
-    (self._buffer.firstElementAddress + oldCount).initializeFrom(newElements)
+    (self._buffer.firstElementAddress + oldCount).initialize(from: newElements)
     self._buffer.count = newCount
   }
 
@@ -1416,8 +1427,11 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     }
   }
 
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
-    return _extractOrCopyToNativeArrayBuffer(self._buffer)
+  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+    if let n = _buffer.requestNativeBuffer() {
+      return ContiguousArray(_buffer: n)
+    }
+    return _copyCollectionToContiguousArray(_buffer)
   }
 }
 
@@ -1477,10 +1491,9 @@ extension ${Self} {
     if _fastPath(p != nil || isEmpty) {
       return (_owner, UnsafePointer(p))
     }
-    let n = _extractOrCopyToNativeArrayBuffer(self._buffer)
+    let n = ContiguousArray(self._buffer)._buffer
     return (n.owner, UnsafePointer(n.firstElementAddress))
   }
-
 }
 
 extension ${Self} {
@@ -1603,7 +1616,7 @@ internal struct _InitializeMemoryFromCollection<
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<count {
-      p.initialize(with: newValues[q])
+      p.initialize(to: newValues[q])
       newValues.formIndex(after: &q)
       p += 1
     }
@@ -1875,7 +1888,7 @@ internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
     backingStart.deinitialize(count: sourceOffset)
 
     // Move the head items
-    destStart.moveInitializeFrom(sourceStart, count: headCount)
+    destStart.moveInitialize(from: sourceStart, count: headCount)
 
     // Destroy unused source items
     oldStart.deinitialize(count: oldCount)
@@ -1883,7 +1896,7 @@ internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
     initializeNewElements.call(newStart, count: newCount)
 
     // Move the tail items
-    newEnd.moveInitializeFrom(oldStart + oldCount, count: tailCount)
+    newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
 
     // Destroy any items that may be lurking in a _SliceBuffer after
     // its real last element
@@ -1910,7 +1923,7 @@ internal struct _InitializePointer<T> : _PointerFunction {
   internal func call(_ rawMemory: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 1)
     // FIXME: it would be better if we could find a way to move, here
-    rawMemory.initialize(with: newValue)
+    rawMemory.initialize(to: newValue)
   }
 
   @_transparent
@@ -1966,20 +1979,6 @@ internal func _arrayReserve<_Buffer>(
   _arrayOutOfPlaceUpdate(&buffer, &newBuffer, count, 0, _IgnorePointer())
 }
 
-public // SPI(Foundation)
-func _extractOrCopyToNativeArrayBuffer<Buffer>(
-  _ source: Buffer
-) -> _ContiguousArrayBuffer<Buffer.Iterator.Element>
-  where
-  Buffer : _ArrayBufferProtocol,
-  Buffer.Iterator.Element == Buffer.Element {
-
-  if let n = source.requestNativeBuffer() {
-    return n
-  }
-  return _copyCollectionToNativeArrayBuffer(source)
-}
-
 /// Append items from `newItems` to `buffer`.
 internal func _arrayAppendSequence<Buffer, S>(
   _ buffer: inout Buffer, _ newItems: S
@@ -2004,7 +2003,7 @@ internal func _arrayAppendSequence<Buffer, S>(
     let base = buffer.firstElementAddress
 
     while (nextItem != nil) && count < capacity {
-      (base + count).initialize(with: nextItem!)
+      (base + count).initialize(to: nextItem!)
       count += 1
       nextItem = stream.next()
     }
@@ -2074,19 +2073,6 @@ public func != <Element : Equatable>(
 %end
 
 #if _runtime(_ObjC)
-/// Returns an `Array<Base>` containing the same elements as `a` in
-/// O(1).
-///
-/// - Precondition: `Base` is a base class or base `@objc` protocol (such
-///   as `AnyObject`) of `Derived`.
-public func _arrayUpCast<Derived, Base>(_ a: Array<Derived>) -> Array<Base> {
-  // FIXME: Dynamic casting is currently not possible without the objc runtime:
-  // rdar://problem/18801510
-  return Array(a._buffer.cast(toBufferOf: Base.self))
-}
-#endif
-
-#if _runtime(_ObjC)
 extension Array {
   /// Tries to downcast the source `NSArray` as our native buffer type.
   /// If it succeeds, creates a new `Array` around it and returns that.
@@ -2096,13 +2082,12 @@ extension Array {
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ source: AnyObject
   ) -> Array? {
-    if let deferred = source as? _SwiftDeferredNSArray {
-      if let nativeStorage =
-        deferred._nativeStorage as? _ContiguousArrayStorage<Element> {
-        return Array(_ContiguousArrayBuffer(nativeStorage))
-      }
+    // If source is deferred, we indirect to get its native storage
+    let maybeNative = (source as? _SwiftDeferredNSArray)?._nativeStorage ?? source
+
+    return (maybeNative as? _ContiguousArrayStorage<Element>).map {
+      Array(_ContiguousArrayBuffer($0))
     }
-    return nil
   }
 
   /// Private initializer used for bridging.
@@ -2113,7 +2098,7 @@ extension Array {
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
   public init(_immutableCocoaArray: _NSArrayCore) {
-    self = Array(_ArrayBuffer(nsArray: _immutableCocoaArray))
+    self = Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
   }
 }
 #endif
@@ -2159,7 +2144,7 @@ extension ${Self} {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "replaceSubrange")
+  @available(*, unavailable, renamed: "replaceSubrange(_:with:)")
   public mutating func replaceRange<C>(
     _ subRange: Range<Int>,
     with newElements: C

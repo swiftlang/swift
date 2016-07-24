@@ -70,6 +70,74 @@
 using namespace swift;
 using namespace irgen;
 
+namespace {
+
+/// A class for computing how to pass arguments to a polymorphic
+/// function.  The subclasses of this are the places which need to
+/// be updated if the convention changes.
+class PolymorphicConvention {
+protected:
+  IRGenModule &IGM;
+  ModuleDecl &M;
+  CanSILFunctionType FnType;
+
+  CanGenericSignature Generics;
+
+  std::vector<MetadataSource> Sources;
+
+  FulfillmentMap Fulfillments;
+
+  GenericSignature::ConformsToArray getConformsTo(Type t) {
+    return Generics->getConformsTo(t, M);
+  }
+
+public:
+  PolymorphicConvention(IRGenModule &IGM, CanSILFunctionType fnType);
+
+  ArrayRef<MetadataSource> getSources() const { return Sources; }
+
+  using RequirementCallback =
+    llvm::function_ref<void(GenericRequirement requirement)>;
+
+  void enumerateRequirements(const RequirementCallback &callback);
+
+  void enumerateUnfulfilledRequirements(const RequirementCallback &callback);
+
+  /// Returns a Fulfillment for a type parameter requirement, or
+  /// nullptr if it's unfulfilled.
+  const Fulfillment *getFulfillmentForTypeMetadata(CanType type) const;
+
+  /// Return the source of type metadata at a particular source index.
+  const MetadataSource &getSource(size_t SourceIndex) const {
+    return Sources[SourceIndex];
+  }
+
+private:
+  void initGenerics();
+  void considerNewTypeSource(MetadataSource::Kind kind, unsigned paramIndex,
+                             CanType type, IsExact_t isExact);
+  bool considerType(CanType type, IsExact_t isExact,
+                    unsigned sourceIndex, MetadataPath &&path);
+
+  /// Testify to generic parameters in the Self type of a protocol
+  /// witness method.
+  void considerWitnessSelf(CanSILFunctionType fnType);
+
+  /// Testify to generic parameters in the Self type of an @objc
+  /// generic or protocol method.
+  void considerObjCGenericSelf(CanSILFunctionType fnType);
+
+  void considerParameter(SILParameterInfo param, unsigned paramIndex,
+                         bool isSelfParameter);
+
+  void addSelfMetadataFulfillment(CanType arg);
+  void addSelfWitnessTableFulfillment(CanType arg, ProtocolDecl *proto);
+
+  void addPseudogenericFulfillments();
+};
+
+} // end anonymous namespace
+
 PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
                                              CanSILFunctionType fnType)
   : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType) {
@@ -196,7 +264,7 @@ void PolymorphicConvention::initGenerics() {
   Generics = FnType->getGenericSignature();
 }
 
-void PolymorphicConvention::considerNewTypeSource(SourceKind kind,
+void PolymorphicConvention::considerNewTypeSource(MetadataSource::Kind kind,
                                                   unsigned paramIndex,
                                                   CanType type,
                                                   IsExact_t isExact) {
@@ -241,7 +309,8 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
   CanType selfTy = fnType->getSelfInstanceType();
 
   // First, bind type metadata for Self.
-  Sources.emplace_back(SourceKind::SelfMetadata, InvalidSourceIndex,
+  Sources.emplace_back(MetadataSource::Kind::SelfMetadata,
+                       MetadataSource::InvalidSourceIndex,
                        selfTy);
 
   if (auto *proto = fnType->getDefaultWitnessMethodProtocol(M)) {
@@ -249,7 +318,8 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
     addSelfMetadataFulfillment(selfTy);
 
     // Look at the witness table for the conformance.
-    Sources.emplace_back(SourceKind::SelfWitnessTable, InvalidSourceIndex,
+    Sources.emplace_back(MetadataSource::Kind::SelfWitnessTable,
+                         MetadataSource::InvalidSourceIndex,
                          selfTy);
     addSelfWitnessTableFulfillment(selfTy, proto);
   } else {
@@ -266,7 +336,7 @@ void PolymorphicConvention::considerObjCGenericSelf(CanSILFunctionType fnType) {
   unsigned paramIndex = fnType->getParameters().size() - 1;
 
   // Bind type metadata for Self.
-  Sources.emplace_back(SourceKind::ClassPointer, paramIndex,
+  Sources.emplace_back(MetadataSource::Kind::ClassPointer, paramIndex,
                        selfTy);
 
   if (isa<GenericTypeParamType>(selfTy))
@@ -290,7 +360,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Indirect_InoutAliasable:
       if (!isSelfParameter) return;
       if (type->getNominalOrBoundGenericNominal()) {
-        considerNewTypeSource(SourceKind::GenericLValueMetadata,
+        considerNewTypeSource(MetadataSource::Kind::GenericLValueMetadata,
                               paramIndex, type, IsExact);
       }
       return;
@@ -301,8 +371,8 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Deallocating:
       // Classes are sources of metadata.
       if (type->getClassOrBoundGenericClass()) {
-        considerNewTypeSource(SourceKind::ClassPointer, paramIndex, type,
-                              IsInexact);
+        considerNewTypeSource(MetadataSource::Kind::ClassPointer,
+                              paramIndex, type, IsInexact);
         return;
       }
 
@@ -318,8 +388,8 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
           if (classDecl->usesObjCGenericsModel())
             return;
 
-        considerNewTypeSource(SourceKind::Metadata, paramIndex, objTy,
-                              IsInexact);
+        considerNewTypeSource(MetadataSource::Kind::Metadata,
+                              paramIndex, objTy, IsInexact);
         return;
       }
 
@@ -343,6 +413,62 @@ PolymorphicConvention::getFulfillmentForTypeMetadata(CanType type) const {
   return Fulfillments.getTypeMetadata(type);
 }
 
+void irgen::enumerateGenericParamFulfillments(IRGenModule &IGM,
+                                  CanSILFunctionType fnType,
+                                  GenericParamFulfillmentCallback callback) {
+  PolymorphicConvention convention(IGM, fnType);
+
+  // Check if any requirements were fulfilled by metadata stored inside a
+  // captured value.
+  auto generics = fnType->getGenericSignature();
+
+  for (auto genericParam : generics->getGenericParams()) {
+    auto genericParamType = genericParam->getCanonicalType();
+
+    auto fulfillment
+      = convention.getFulfillmentForTypeMetadata(genericParamType);
+    if (fulfillment == nullptr)
+      continue;
+
+    auto &source = convention.getSource(fulfillment->SourceIndex);
+    callback(genericParamType, source, fulfillment->Path);
+  }
+}
+
+namespace {
+
+/// A class for binding type parameters of a generic function.
+class EmitPolymorphicParameters : public PolymorphicConvention {
+  IRGenFunction &IGF;
+  SILFunction &Fn;
+
+public:
+  EmitPolymorphicParameters(IRGenFunction &IGF, SILFunction &Fn);
+
+  void emit(Explosion &in, WitnessMetadata *witnessMetadata,
+            const GetParameterFn &getParameter);
+
+private:
+  CanType getTypeInContext(CanType type) const;
+
+  CanType getArgTypeInContext(unsigned paramIndex) const;
+
+  /// Fulfill local type data from any extra information associated with
+  /// the given source.
+  void bindExtraSource(const MetadataSource &source, Explosion &in,
+                       WitnessMetadata *witnessMetadata);
+
+  void bindParameterSources(const GetParameterFn &getParameter);
+
+  void bindParameterSource(SILParameterInfo param, unsigned paramIndex,
+                           const GetParameterFn &getParameter) ;
+  // Did the convention decide that the parameter at the given index
+  // was a class-pointer source?
+  bool isClassPointerSource(unsigned paramIndex);
+};
+
+} // end anonymous namespace
+
 EmitPolymorphicParameters::EmitPolymorphicParameters(IRGenFunction &IGF,
                           SILFunction &Fn)
   : PolymorphicConvention(IGF.IGM, Fn.getLoweredFunctionType()),
@@ -357,15 +483,16 @@ CanType EmitPolymorphicParameters::getArgTypeInContext(unsigned paramIndex) cons
   return getTypeInContext(FnType->getParameters()[paramIndex].getType());
 }
 
-void EmitPolymorphicParameters::bindExtraSource(const Source &source, Explosion &in,
-                     WitnessMetadata *witnessMetadata) {
+void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
+                                                Explosion &in,
+                                         WitnessMetadata *witnessMetadata) {
   switch (source.getKind()) {
-    case SourceKind::Metadata:
-    case SourceKind::ClassPointer:
+    case MetadataSource::Kind::Metadata:
+    case MetadataSource::Kind::ClassPointer:
       // Ignore these, we'll get to them when we walk the parameter list.
       return;
 
-    case SourceKind::GenericLValueMetadata: {
+    case MetadataSource::Kind::GenericLValueMetadata: {
       CanType argTy = getArgTypeInContext(source.getParamIndex());
 
       llvm::Value *metadata = in.claimNext();
@@ -375,7 +502,7 @@ void EmitPolymorphicParameters::bindExtraSource(const Source &source, Explosion 
       return;
     }
 
-    case SourceKind::SelfMetadata: {
+    case MetadataSource::Kind::SelfMetadata: {
       assert(witnessMetadata && "no metadata for witness method");
       llvm::Value *metadata = witnessMetadata->SelfMetadata;
       assert(metadata && "no Self metadata for witness method");
@@ -384,11 +511,17 @@ void EmitPolymorphicParameters::bindExtraSource(const Source &source, Explosion 
       auto selfTy = FnType->getSelfInstanceType();
       CanType argTy = getTypeInContext(selfTy);
       setTypeMetadataName(IGF.IGM, metadata, argTy);
-      IGF.bindLocalTypeDataFromTypeMetadata(argTy, IsExact, metadata);
+      auto *CD = selfTy.getClassOrBoundGenericClass();
+      // The self metadata here corresponds to the conforming type.
+      // For an inheritable conformance, that may be a subclass of the static
+      // type, and so the self metadata will be inexact. Currently, all
+      // conformances are inheritable.
+      IGF.bindLocalTypeDataFromTypeMetadata(
+          argTy, (!CD || CD->isFinal()) ? IsExact : IsInexact, metadata);
       return;
     }
 
-    case SourceKind::SelfWitnessTable: {
+    case MetadataSource::Kind::SelfWitnessTable: {
       assert(witnessMetadata && "no metadata for witness method");
       llvm::Value *wtable = witnessMetadata->SelfWitnessTable;
       assert(wtable && "no Self witness table for witness method");
@@ -460,7 +593,7 @@ void EmitPolymorphicParameters::bindParameterSource(SILParameterInfo param, unsi
 
 bool EmitPolymorphicParameters::isClassPointerSource(unsigned paramIndex) {
   for (auto &source : getSources()) {
-    if (source.getKind() == SourceKind::ClassPointer &&
+    if (source.getKind() == MetadataSource::Kind::ClassPointer &&
         source.getParamIndex() == paramIndex) {
       return true;
     }
@@ -1669,54 +1802,11 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
   }
 }
 
-/// Emit a polymorphic parameters clause, binding all the metadata necessary.
-void EmitPolymorphicParameters::emit(Explosion &in,
-                                     WitnessMetadata *witnessMetadata,
-                                     const GetParameterFn &getParameter) {
-  // Collect any early sources and bind local type data from them.
-  for (const Source &source : getSources()) {
-    bindExtraSource(source, in, witnessMetadata);
-  }
-
-  // Collect any concrete type metadata that's been passed separately.
-  enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
-    auto value = in.claimNext();
-    bindGenericRequirement(IGF, requirement, value,
-                           [&](CanType type) { return getTypeInContext(type);});
-  });
-
-  // Bind all the fulfillments we can from the formal parameters.
-  bindParameterSources(getParameter);
-
-  // Bind all the archetype access paths.
-  bindArchetypeAccessPaths();
-}
-
-void EmitPolymorphicParameters::bindArchetypeAccessPaths() {
-  if (!Generics) return;
-
-  // Remember all the extra ways we have of reaching the parameter
-  // archetypes due to type equality constraints.
-  for (auto reqt : Generics->getRequirements()) {
-    // Ignore non-same-type requirements in this pass.
-    if (reqt.getKind() != RequirementKind::SameType) continue;
-
-    // Ignore equality constraints to concrete types.  This is really
-    // just a fast-path; we still have to handle this case later.
-    // TODO: This might be a faster / better-cached way to materialize
-    // local type data for the concrete type.
-    if (!reqt.getSecondType()->isTypeParameter()) continue;
-
-    auto firstType = reqt.getFirstType()->getCanonicalType();
-    auto secondType = reqt.getSecondType()->getCanonicalType();
-
-    addPotentialArchetypeAccessPath(firstType, secondType);
-    addPotentialArchetypeAccessPath(secondType, firstType);
-  }
-}
-
-void EmitPolymorphicParameters::
-addPotentialArchetypeAccessPath(CanType targetDepType, CanType sourceDepType) {
+static
+void addPotentialArchetypeAccessPath(IRGenFunction &IGF,
+                                     CanType targetDepType,
+                                     CanType sourceDepType,
+                                     GetTypeParameterInContextFn getInContext) {
   assert(targetDepType->isTypeParameter());
   assert(sourceDepType->isTypeParameter());
 
@@ -1732,14 +1822,65 @@ addPotentialArchetypeAccessPath(CanType targetDepType, CanType sourceDepType) {
   // These can end up as non-archetypes because of multiple levels of
   // equality.
   auto destArchetype =
-    dyn_cast<ArchetypeType>(getTypeInContext(targetDepType));
+    dyn_cast<ArchetypeType>(getInContext(targetDepType));
   if (!destArchetype) return;
   auto srcBaseArchetype =
-    dyn_cast<ArchetypeType>(getTypeInContext(sourceDepMemberType.getBase()));
+    dyn_cast<ArchetypeType>(getInContext(sourceDepMemberType.getBase()));
   if (!srcBaseArchetype) return;
 
   IGF.addArchetypeAccessPath(destArchetype,
                              {srcBaseArchetype, association});
+}
+
+static void bindArchetypeAccessPaths(IRGenFunction &IGF,
+                                     GenericSignature *Generics,
+                                     GetTypeParameterInContextFn getInContext) {
+  // Remember all the extra ways we have of reaching the parameter
+  // archetypes due to type equality constraints.
+  for (auto reqt : Generics->getRequirements()) {
+    // Ignore non-same-type requirements in this pass.
+    if (reqt.getKind() != RequirementKind::SameType) continue;
+
+    // Ignore equality constraints to concrete types.  This is really
+    // just a fast-path; we still have to handle this case later.
+    // TODO: This might be a faster / better-cached way to materialize
+    // local type data for the concrete type.
+    if (!reqt.getSecondType()->isTypeParameter()) continue;
+
+    auto firstType = reqt.getFirstType()->getCanonicalType();
+    auto secondType = reqt.getSecondType()->getCanonicalType();
+
+    addPotentialArchetypeAccessPath(IGF, firstType, secondType, getInContext);
+    addPotentialArchetypeAccessPath(IGF, secondType, firstType, getInContext);
+  }
+}
+
+/// Emit a polymorphic parameters clause, binding all the metadata necessary.
+void EmitPolymorphicParameters::emit(Explosion &in,
+                                     WitnessMetadata *witnessMetadata,
+                                     const GetParameterFn &getParameter) {
+  // Collect any early sources and bind local type data from them.
+  for (auto &source : getSources()) {
+    bindExtraSource(source, in, witnessMetadata);
+  }
+  
+  auto getInContext = [&](CanType type) -> CanType {
+    return getTypeInContext(type);
+  };
+
+  // Collect any concrete type metadata that's been passed separately.
+  enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
+    auto value = in.claimNext();
+    bindGenericRequirement(IGF, requirement, value, getInContext);
+  });
+
+  // Bind all the fulfillments we can from the formal parameters.
+  bindParameterSources(getParameter);
+
+  if (!Generics) return;
+  
+  // Bind all the archetype access paths.
+  bindArchetypeAccessPaths(IGF, Generics, getInContext);
 }
 
 void IRGenFunction::addArchetypeAccessPath(CanArchetypeType targetArchetype,
@@ -2222,20 +2363,20 @@ namespace {
       for (auto &source : getSources()) {
         switch (source.getKind()) {
         // Already accounted for in the parameters.
-        case SourceKind::ClassPointer:
-        case SourceKind::Metadata:
+        case MetadataSource::Kind::ClassPointer:
+        case MetadataSource::Kind::Metadata:
           continue;
 
         // Needs a special argument.
-        case SourceKind::GenericLValueMetadata: {
+        case MetadataSource::Kind::GenericLValueMetadata: {
           out.add(IGF.emitTypeMetadataRef(getSubstSelfType(substFnType)));
           continue;
         }
 
         // Witness 'Self' arguments are added as a special case in
         // EmitPolymorphicArguments::emit.
-        case SourceKind::SelfMetadata:
-        case SourceKind::SelfWitnessTable:
+        case MetadataSource::Kind::SelfMetadata:
+        case MetadataSource::Kind::SelfWitnessTable:
           continue;
         }
         llvm_unreachable("bad source kind!");
@@ -2273,23 +2414,23 @@ void EmitPolymorphicArguments::emit(CanSILFunctionType substFnType,
   // For a witness call, add the Self argument metadata arguments last.
   for (auto &source : getSources()) {
     switch (source.getKind()) {
-    case SourceKind::Metadata:
-    case SourceKind::ClassPointer:
+    case MetadataSource::Kind::Metadata:
+    case MetadataSource::Kind::ClassPointer:
       // Already accounted for in the arguments.
       continue;
 
-    case SourceKind::GenericLValueMetadata:
+    case MetadataSource::Kind::GenericLValueMetadata:
       // Added in the early phase.
       continue;
 
-    case SourceKind::SelfMetadata: {
+    case MetadataSource::Kind::SelfMetadata: {
       assert(witnessMetadata && "no metadata structure for witness method");
       auto self = IGF.emitTypeMetadataRef(getSubstSelfType(substFnType));
       witnessMetadata->SelfMetadata = self;
       continue;
     }
 
-    case SourceKind::SelfWitnessTable: {
+    case MetadataSource::Kind::SelfWitnessTable: {
       // Added later.
       continue;
     }
@@ -2339,19 +2480,19 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
   //   - extra sources
   for (auto &source : convention.getSources()) {
     switch (source.getKind()) {
-    case PolymorphicConvention::SourceKind::Metadata:
-    case PolymorphicConvention::SourceKind::ClassPointer:
+    case MetadataSource::Kind::Metadata:
+    case MetadataSource::Kind::ClassPointer:
       continue;
 
-    case PolymorphicConvention::SourceKind::GenericLValueMetadata:
+    case MetadataSource::Kind::GenericLValueMetadata:
       bindings.addTypeMetadata(getSubstSelfType(substType));
       continue;
 
-    case PolymorphicConvention::SourceKind::SelfMetadata:
+    case MetadataSource::Kind::SelfMetadata:
       bindings.addTypeMetadata(getSubstSelfType(substType));
       continue;
 
-    case PolymorphicConvention::SourceKind::SelfWitnessTable:
+    case MetadataSource::Kind::SelfWitnessTable:
       // We'll just pass undef in cases like this.
       continue;
     }
@@ -2507,6 +2648,12 @@ void GenericTypeRequirements::bindFromBuffer(IRGenFunction &IGF,
                                              Address buffer,
                                     GetTypeParameterInContextFn getInContext) {
   bindFromGenericRequirementsBuffer(IGF, Requirements, buffer, getInContext);
+
+  auto Generics = TheDecl->getGenericSignature();
+  if (!Generics) return;
+
+  // Bind all the archetype access paths in the signature's requirements.
+  bindArchetypeAccessPaths(IGF, Generics, getInContext);
 }
 
 void irgen::bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
@@ -2575,15 +2722,15 @@ namespace {
 
   private:
     /// Add signature elements for the source metadata.
-    void addEarlySource(const Source &source,
+    void addEarlySource(const MetadataSource &source,
                         SmallVectorImpl<llvm::Type*> &out) {
       switch (source.getKind()) {
-      case SourceKind::ClassPointer: return; // already accounted for
-      case SourceKind::Metadata: return; // already accounted for
-      case SourceKind::GenericLValueMetadata:
+      case MetadataSource::Kind::ClassPointer: return; // already accounted for
+      case MetadataSource::Kind::Metadata: return; // already accounted for
+      case MetadataSource::Kind::GenericLValueMetadata:
         return out.push_back(IGM.TypeMetadataPtrTy);
-      case SourceKind::SelfMetadata:
-      case SourceKind::SelfWitnessTable:
+      case MetadataSource::Kind::SelfMetadata:
+      case MetadataSource::Kind::SelfWitnessTable:
         return; // handled as a special case in expand()
       }
       llvm_unreachable("bad source kind");

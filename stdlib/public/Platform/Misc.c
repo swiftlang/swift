@@ -10,19 +10,35 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <errno.h>
 #include <fcntl.h>
+#if !defined(_WIN32) || defined(__CYGWIN__)
 #include <semaphore.h>
+#endif
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#include <io.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
+#if !defined(_WIN32) || defined(__CYGWIN__)
 #include <sys/ioctl.h>
+#endif
 
 #include "swift/Runtime/Config.h"
 
+#if !defined(_WIN32) || defined(__CYGWIN__)
 SWIFT_CC(swift)
 extern int _swift_Platform_open(const char *path, int oflag, mode_t mode) {
   return open(path, oflag, mode);
 }
+#else
+SWIFT_CC(swift)
+extern int _swift_Platform_open(const char *path, int oflag, int mode) {
+  return _open(path, oflag, mode);
+}
+#endif
 
+#if !defined(_WIN32) || defined(__CYGWIN__)
 SWIFT_CC(swift)
 extern int _swift_Platform_openat(int fd, const char *path, int oflag,
                                   mode_t mode) {
@@ -61,7 +77,8 @@ extern int
 _swift_Platform_ioctlPtr(int fd, unsigned long int request, void* ptr) {
   return ioctl(fd, request, ptr);
 }
- 
+#endif
+
 #if defined(__APPLE__)
 #define _REENTRANT
 #include <math.h>
@@ -88,3 +105,14 @@ SWIFT_CC(swift) extern char **_swift_FreeBSD_getEnv() {
   return environ;
 }
 #endif // defined(__FreeBSD__)
+
+SWIFT_CC(swift)
+extern int _swift_Platform_getErrno() {
+  return errno;
+}
+
+SWIFT_CC(swift)
+extern void _swift_Platform_setErrno(int value) {
+  errno = value;
+}
+

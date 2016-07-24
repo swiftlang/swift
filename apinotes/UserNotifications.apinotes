@@ -1,0 +1,6 @@
+---
+Name: UserNotifications
+Tags:
+- Name: UNErrorCode
+  NSErrorDomain: UNErrorDomain
+

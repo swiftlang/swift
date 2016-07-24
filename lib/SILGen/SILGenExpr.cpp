@@ -1047,20 +1047,27 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto toCollection = cast<BoundGenericStructType>(
                         E->getType()->getCanonicalType());
 
+  bool bridgesToObjC = E->bridgesToObjC();
+  if (SGF.getASTContext().LangOpts.EnableExperimentalCollectionCasts)
+    bridgesToObjC = false;
+
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
   if (fromCollection->getDecl() == ctx.getArrayDecl()) {
-    fn = ctx.getArrayForceCast(nullptr);
+    fn = SGF.SGM.getArrayForceCast(loc);
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
-    fn = E->bridgesToObjC() ? ctx.getDictionaryBridgeToObjectiveC(nullptr)
-                            : ctx.getDictionaryUpCast(nullptr);
+    fn = bridgesToObjC ? SGF.SGM.getDictionaryBridgeToObjectiveC(loc)
+                       : SGF.SGM.getDictionaryUpCast(loc);
   } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
-    fn = E->bridgesToObjC() ? ctx.getSetBridgeToObjectiveC(nullptr)
-                            : ctx.getSetUpCast(nullptr);
+    fn = bridgesToObjC ? SGF.SGM.getSetBridgeToObjectiveC(loc)
+                       : SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
+
+  // This will have been diagnosed by the accessors above.
+  if (!fn) return SGF.emitUndefRValue(E, E->getType());
   
   auto fnArcheTypes = fn->getGenericParams()->getPrimaryArchetypes();
   auto fromSubsts = fromCollection->gatherAllSubstitutions(
@@ -1508,8 +1515,8 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &gen, SILLocation loc,
   auto &baseTL = gen.getTypeLowering(baseAbstraction, baseTy);
 
   // Turn the pointer into an address.
-  basePtr = gen.B.createPointerToAddress(loc, basePtr,
-                                     baseTL.getLoweredType().getAddressType());
+  basePtr = gen.B.createPointerToAddress(
+    loc, basePtr, baseTL.getLoweredType().getAddressType(), /*isStrict*/ true);
 
   return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction);
 }
@@ -3292,7 +3299,7 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   (void)elt;
 
   AccessKind accessKind =
-    (pointerKind == PTK_UnsafePointer
+    ((pointerKind == PTK_UnsafePointer || pointerKind == PTK_UnsafeRawPointer)
        ? AccessKind::Read : AccessKind::ReadWrite);
 
   // Get the original lvalue.
@@ -3320,10 +3327,11 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
         != loweredTy.getSwiftRValueType()) {
     lv.addSubstToOrigComponent(opaqueTy, loweredTy);
   }
-
   switch (pointerKind) {
   case PTK_UnsafeMutablePointer:
   case PTK_UnsafePointer:
+  case PTK_UnsafeMutableRawPointer:
+  case PTK_UnsafeRawPointer:
     // +1 is fine.
     break;
 
@@ -3517,16 +3525,16 @@ ManagedValue SILGenFunction::emitRValueAsSingleValue(Expr *E, SGFContext C) {
   return std::move(rv).getAsSingleValue(*this, E);
 }
 
-static ManagedValue emitUndef(SILGenFunction &gen, SILLocation loc,
-                              const TypeLowering &undefTL) {
-  SILValue undef = SILUndef::get(undefTL.getLoweredType(), gen.SGM.M);
-  return gen.emitManagedRValueWithCleanup(undef, undefTL);
+RValue SILGenFunction::emitUndefRValue(SILLocation loc, Type type) {
+  return RValue(*this, loc, type->getCanonicalType(),
+                emitUndef(loc, getLoweredType(type)));
 }
 
 ManagedValue SILGenFunction::emitUndef(SILLocation loc, Type type) {
-  return ::emitUndef(*this, loc, getTypeLowering(type));
+  return emitUndef(loc, getLoweredType(type));
 }
 
 ManagedValue SILGenFunction::emitUndef(SILLocation loc, SILType type) {
-  return ::emitUndef(*this, loc, getTypeLowering(type));
+  SILValue undef = SILUndef::get(type, SGM.M);
+  return ManagedValue::forUnmanaged(undef);
 }

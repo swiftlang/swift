@@ -3,30 +3,29 @@ set(swift_platform_flags)
 set(swift_platform_sources
     Platform.swift
     Misc.c
+    TiocConstants.swift
     tgmath.swift.gyb)
 
-if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
-  set(swift_platform_name swiftDarwin)
-  set(swift_platform_sources
-      Darwin.swift
-      ${swift_platform_sources}
-      POSIXError.swift
-      MachError.swift)
-  set(swift_platform_flags
-      SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module
-      API_NOTES_NON_OVERLAY)
-else()
-  set(swift_platform_name swiftGlibc)
-  set(swift_platform_sources
-      Glibc.swift
-      ${swift_platform_sources})
-  set(swift_platform_flags
-      DEPENDS glibc_modulemap)
-endif()
-
-add_swift_library(${swift_platform_name} ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    Darwin.swift
     ${swift_platform_sources}
-    ${swift_platform_flags})
+    POSIXError.swift
+    MachError.swift
+
+    SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module
+    TARGET_SDKS IOS IOS_SIMULATOR OSX TVOS TVOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR
+    API_NOTES_NON_OVERLAY)
+
+add_swift_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    Glibc.swift
+    ${swift_platform_sources}
+    TARGET_SDKS ANDROID CYGWIN FREEBSD LINUX
+    DEPENDS glibc_modulemap)
+
+add_swift_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    msvcrt.swift
+    ${swift_platform_sources}
+    TARGET_SDKS WINDOWS)
 
 set(glibc_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})

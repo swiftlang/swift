@@ -460,12 +460,18 @@ public:
   /// during type checking.
   llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
 
-  /// Caches whether a particular type is accessible from a particular file
-  /// unit.
+  using TypeAccessScopeCacheMap = llvm::DenseMap<Type, const DeclContext *>;
+
+  /// Caches the outermost scope where a particular type can be used, relative
+  /// to a particular file.
+  ///
+  /// The file is used to handle things like \c \@testable. A null-but-present
+  /// value means the type is public.
   ///
   /// This can't use CanTypes because typealiases may have more limited types
   /// than their underlying types.
-  llvm::DenseMap<Type, Accessibility> TypeAccessibilityCache;
+  llvm::DenseMap<const SourceFile *, TypeAccessScopeCacheMap>
+    TypeAccessScopeCache;
 
   // Caches whether a given declaration is "as specialized" as another.
   llvm::DenseMap<std::pair<ValueDecl*, ValueDecl*>, bool> 
@@ -774,6 +780,7 @@ public:
   /// to be in a correct and valid form.
   ///
   /// \param type The generic type to which to apply arguments.
+  /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param generic The arguments to apply with the angle bracket range for
@@ -786,8 +793,8 @@ public:
   /// error.
   ///
   /// \see applyUnboundGenericArguments
-  Type applyGenericArguments(Type type, SourceLoc loc, DeclContext *dc,
-                             GenericIdentTypeRepr *generic,
+  Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
+                             DeclContext *dc, GenericIdentTypeRepr *generic,
                              bool isGenericSignature,
                              GenericTypeResolver *resolver);
 
@@ -797,7 +804,8 @@ public:
   /// number of generic arguments given, whereas applyGenericArguments emits
   /// diagnostics in those cases.
   ///
-  /// \param unbound The unbound generic type to which to apply arguments.
+  /// \param type The unbound generic type to which to apply arguments.
+  /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param genericArgs The list of generic arguments to apply to the type.
@@ -809,8 +817,8 @@ public:
   /// error.
   ///
   /// \see applyGenericArguments
-  Type applyUnboundGenericArguments(UnboundGenericType *unbound, SourceLoc loc,
-                                    DeclContext *dc,
+  Type applyUnboundGenericArguments(Type type, GenericTypeDecl *decl,
+                                    SourceLoc loc, DeclContext *dc,
                                     MutableArrayRef<TypeLoc> genericArgs,
                                     bool isGenericSignature,
                                     GenericTypeResolver *resolver);
@@ -1195,12 +1203,17 @@ public:
   /// events in the type checking of this expression, and which can introduce
   /// additional constraints.
   ///
+  /// \param baseCS If this type checking process is the simplification of
+  /// another constraint system, set the original constraint system. \c null
+  /// otherwise
+  ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            TypeLoc convertType = TypeLoc(),
                            ContextualTypePurpose convertTypePurpose =CTP_Unused,
                            TypeCheckExprOptions options =TypeCheckExprOptions(),
-                           ExprTypeCheckListener *listener = nullptr);
+                           ExprTypeCheckListener *listener = nullptr,
+                           constraints::ConstraintSystem *baseCS = nullptr);
 
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            ExprTypeCheckListener *listener) {
@@ -1585,6 +1598,10 @@ public:
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
 
+  /// Mark any _BridgedNSError/_BridgedStoredNSError/related
+  /// conformances in the given type as "used".
+  void useBridgedNSErrorConformances(DeclContext *dc, Type type);
+
   /// If this bound-generic type is bridged, mark any
   /// _ObjectiveCBridgeable conformances in the generic arguments of
   /// the given type as "used".
@@ -1957,6 +1974,7 @@ public:
   /// Check for a typo correction.
   void performTypoCorrection(DeclContext *DC,
                              DeclRefKind refKind,
+                             Type baseTypeOrNull,
                              DeclName name,
                              SourceLoc lookupLoc,
                              NameLookupOptions lookupOptions,

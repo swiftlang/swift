@@ -131,13 +131,11 @@
 // CHECK:   (enum TypesToReflect.E)
 // CHECK:   (struct Swift.Int))
 
-// CHECK: Metatype: TypesToReflect.E.Type
-// CHECK: (metatype
-// CHECK:   (enum TypesToReflect.E))
-
 // CHECK: NestedStruct: TypesToReflect.S.NestedS
 // CHECK: (struct TypesToReflect.S.NestedS
 // CHECK:   (struct TypesToReflect.S))
+
+// CHECK: Metatype
 
 // CHECK: EmptyCase
 

@@ -18,7 +18,7 @@ DispatchAPI.test("constants") {
 
   // This is a lousy test, but really we just care that
   // DISPATCH_QUEUE_CONCURRENT comes through at all.
-  _ = DispatchQueueAttributes.concurrent
+  _ = DispatchQueue.Attributes.concurrent
 }
 
 DispatchAPI.test("OS_OBJECT support") {
@@ -56,8 +56,15 @@ if #available(OSX 10.10, iOS 8.0, *) {
       _ = 1
     }
 
-    DispatchQueue.main.asynchronously(execute: block)
+    DispatchQueue.main.async(execute: block)
     // This will trap if the block's pointer identity is not preserved.
     block.cancel()
   }
+}
+
+DispatchAPI.test("dispatch_data_t enumeration") {
+	// Ensure we can iterate the empty iterator
+	for x in DispatchData.empty {
+		_ = 1
+	}
 }

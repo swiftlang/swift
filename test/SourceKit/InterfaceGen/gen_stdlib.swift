@@ -33,6 +33,7 @@ var x: Int
 // CHECK1-NEXT: Int
 // CHECK1-NEXT: s:Si
 // CHECK1-NEXT: Int.Type
+// CHECK1-NEXT: _Tt
 // CHECK1-NEXT: Swift{{$}}
 // CHECK1-NEXT: <Group>Math/Integers</Group>
 // CHECK1-NEXT: /<interface-gen>{{$}}
@@ -46,8 +47,7 @@ var x: Int
 
 // RUN: %sourcekitd-test -req=interface-gen -module Swift -group-name Bool > %t.Bool.response
 // RUN: FileCheck -check-prefix=CHECK-BOOL -input-file %t.Bool.response %s
-// CHECK-BOOL-DAG: extension Bool : Boolean {
-// CHECK-BOOL-DAG: extension Bool : BooleanLiteralConvertible {
+// CHECK-BOOL-DAG: extension Bool : ExpressibleByBooleanLiteral {
 
 // These are not in the bool group:
 // CHECK-BOOL-NOT: Zip2Iterator

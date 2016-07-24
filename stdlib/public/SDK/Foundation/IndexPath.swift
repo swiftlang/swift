@@ -20,7 +20,7 @@
  
  Each index in an index path represents the index into an array of children from one node in the tree to another, deeper, node.
 */
-public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableCollection, RandomAccessCollection, Comparable, ArrayLiteralConvertible {
+public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableCollection, RandomAccessCollection, Comparable, ExpressibleByArrayLiteral {
     public typealias ReferenceType = NSIndexPath
     public typealias Element = Int
     public typealias Index = Array<Int>.Index
@@ -177,36 +177,35 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         }
     }
 
-}
+    public static func ==(lhs: IndexPath, rhs: IndexPath) -> Bool {
+        return lhs._indexes == rhs._indexes
+    }
 
-public func ==(lhs: IndexPath, rhs: IndexPath) -> Bool {
-    return lhs._indexes == rhs._indexes
-}
+    public static func +(lhs: IndexPath, rhs: IndexPath) -> IndexPath {
+        return lhs.appending(rhs)
+    }
 
-public func +(lhs: IndexPath, rhs: IndexPath) -> IndexPath {
-    return lhs.appending(rhs)
-}
+    public static func +=(lhs: inout IndexPath, rhs: IndexPath) {
+        lhs.append(rhs)
+    }
 
-public func +=(lhs: inout IndexPath, rhs: IndexPath) {
-    lhs.append(rhs)
-}
+    public static func <(lhs: IndexPath, rhs: IndexPath) -> Bool {
+        return lhs.compare(rhs) == ComparisonResult.orderedAscending
+    }
 
-public func <(lhs: IndexPath, rhs: IndexPath) -> Bool {
-    return lhs.compare(rhs) == ComparisonResult.orderedAscending
-}
+    public static func <=(lhs: IndexPath, rhs: IndexPath) -> Bool {
+        let order = lhs.compare(rhs)
+        return order == ComparisonResult.orderedAscending || order == ComparisonResult.orderedSame
+    }
 
-public func <=(lhs: IndexPath, rhs: IndexPath) -> Bool {
-    let order = lhs.compare(rhs)
-    return order == ComparisonResult.orderedAscending || order == ComparisonResult.orderedSame
-}
+    public static func >(lhs: IndexPath, rhs: IndexPath) -> Bool {
+        return lhs.compare(rhs) == ComparisonResult.orderedDescending
+    }
 
-public func >(lhs: IndexPath, rhs: IndexPath) -> Bool {
-    return lhs.compare(rhs) == ComparisonResult.orderedDescending
-}
-
-public func >=(lhs: IndexPath, rhs: IndexPath) -> Bool {
-    let order = lhs.compare(rhs)
-    return order == ComparisonResult.orderedDescending || order == ComparisonResult.orderedSame
+    public static func >=(lhs: IndexPath, rhs: IndexPath) -> Bool {
+        let order = lhs.compare(rhs)
+        return order == ComparisonResult.orderedDescending || order == ComparisonResult.orderedSame
+    }
 }
 
 extension IndexPath : _ObjectiveCBridgeable {

@@ -97,13 +97,13 @@ var implicitGet1: X {
 var implicitGet2: Int {
   var zzz = 0
   // For the purpose of this test, any other function attribute work as well.
-  @noreturn
+  @inline(__always)
   func foo() {}
   return 0
 }
 
 var implicitGet3: Int {
-  @noreturn
+  @inline(__always)
   func foo() {}
   return 0
 }
@@ -148,7 +148,7 @@ func disambiguateGetSet2() {
 func disambiguateGetSet2Attr() {
   func get(_ fn: () -> ()) {}
   var a: Int = takeTrailingClosure {
-    @noreturn
+    @inline(__always)
     func foo() {}
     get {}
   }
@@ -168,7 +168,7 @@ func disambiguateGetSet3() {
 func disambiguateGetSet3Attr() {
   func set(_ fn: () -> ()) {}
   var a: Int = takeTrailingClosure {
-    @noreturn
+    @inline(__always)
     func foo() {}
     set {}
   }
@@ -190,7 +190,7 @@ func disambiguateGetSet4Attr() {
   func set(_ x: Int, fn: () -> ()) {}
   var newValue: Int = 0
   var a: Int = takeTrailingClosure {
-    @noreturn
+    @inline(__always)
     func foo() {}
     set(newValue) {}
   }
@@ -771,7 +771,7 @@ struct WillSetDidSetProperties {
   }
 
   var disambiguate6: Int = takeTrailingClosure {
-    @noreturn
+    @inline(__always)
     func f() {}
     return ()
   }

@@ -18,7 +18,6 @@
 #define SWIFT_TYPES_H
 
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
@@ -103,10 +102,9 @@ public:
     /// function input.
     HasInOut             = 0x10,
 
-    /// This type expression contains a tuple with default arguments
-    /// other than as a function input.
-    HasDefaultParameter  = 0x20,
-    
+    /// Whether this type expression contains an unbound generic type.
+    HasUnboundGeneric    = 0x20,
+
     /// This type expression contains an LValueType other than as a
     /// function input, and can be loaded to convert to an rvalue.
     IsLValue             = 0x40,
@@ -117,10 +115,7 @@ public:
     /// This type expression contains a DynamicSelf type.
     HasDynamicSelf       = 0x100,
 
-    /// Whether this type expression contains an unbound generic type.
-    HasUnboundGeneric    = 0x200,
-
-    IsNotMaterializable  = (HasInOut | HasDefaultParameter | IsLValue)
+    IsNotMaterializable  = (HasInOut | IsLValue)
   };
 
 private:
@@ -151,11 +146,6 @@ public:
   /// Does a type with these properties structurally contain an
   /// inout, except as the parameter of a function?
   bool hasInOut() const { return Bits & HasInOut; }
-  
-  /// Does a type with these properties structurally contain a
-  /// tuple with default argument values, except as the parameter
-  /// of a function?
-  bool hasDefaultArg() const { return Bits & HasDefaultParameter; }
   
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
@@ -403,6 +393,12 @@ public:
   /// semantics?
   bool hasReferenceSemantics();
 
+  /// Is this an uninhabited type, such as 'Never'?
+  bool isNever();
+
+  /// Is this the 'Any' type?
+  bool isAny();
+
   /// Are values of this type essentially just class references,
   /// possibly with some sort of additional information?
   ///
@@ -432,12 +428,6 @@ public:
   /// as a function input.
   bool hasInOut() const {
     return getRecursiveProperties().hasInOut();
-  }
-
-  /// \brief Determine whether the type involves a tuple type with a
-  /// default argument, except as a function input.
-  bool hasDefaultArg() const {
-    return getRecursiveProperties().hasDefaultArg();
   }
 
   /// \brief Determine whether the type involves an archetype.
@@ -598,6 +588,9 @@ public:
   /// \brief Check if this type is equal to the empty tuple type.
   bool isVoid();
 
+  /// \brief Check if this type is equal to Swift.Bool.
+  bool isBool();
+
   /// \brief Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
 
@@ -740,9 +733,6 @@ public:
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
 
-  /// \brief Retrieve the type without any default arguments.
-  Type getWithoutDefaultArgs(const ASTContext &Context);
-
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
 
@@ -763,10 +753,6 @@ public:
   /// Returns a new function type exactly like this one but with the self
   /// parameter replaced. Only makes sense for function members of types.
   Type replaceSelfParameterType(Type newSelf);
-
-  /// Returns a function type that is not 'noreturn', but is otherwise the same
-  /// as this type.
-  Type getWithoutNoReturn(unsigned UncurryLevel);
 
   /// getRValueType - For an @lvalue type, retrieves the underlying object type.
   /// Otherwise, returns the type itself.
@@ -881,6 +867,10 @@ public:
   
   /// Whether this is an empty existential composition ("{}").
   bool isEmptyExistentialComposition();
+
+  /// Whether this is an existential composition containing
+  /// Error.
+  bool isExistentialWithError();
 
   void dump() const LLVM_ATTRIBUTE_USED;
   void dump(raw_ostream &os, unsigned indent = 0) const;
@@ -1317,22 +1307,16 @@ class TupleTypeElt {
   /// \brief This is the type of the field.
   Type ElementType;
 
-  /// The default argument,
-  DefaultArgumentKind DefaultArg;
-
   friend class TupleType;
 
 public:
   TupleTypeElt() = default;
   inline /*implicit*/ TupleTypeElt(Type ty,
                                    Identifier name = Identifier(),
-                                   DefaultArgumentKind defaultArg =
-                                     DefaultArgumentKind::None,
                                    bool isVariadic = false);
 
   /*implicit*/ TupleTypeElt(TypeBase *Ty)
-    : NameAndVariadic(Identifier(), false),
-      ElementType(Ty), DefaultArg(DefaultArgumentKind::None) { }
+    : NameAndVariadic(Identifier(), false), ElementType(Ty) { }
 
   bool hasName() const { return !NameAndVariadic.getPointer().empty(); }
   Identifier getName() const { return NameAndVariadic.getPointer(); }
@@ -1342,14 +1326,6 @@ public:
   /// Determine whether this field is variadic.
   bool isVararg() const {
     return NameAndVariadic.getInt();
-  }
-
-  /// Retrieve the kind of default argument available on this field.
-  DefaultArgumentKind getDefaultArgKind() const { return DefaultArg; }
-
-  /// Whether we have a default argument.
-  bool hasDefaultArg() const {
-    return getDefaultArgKind() != DefaultArgumentKind::None;
   }
 
   static inline Type getVarargBaseTy(Type VarArgT);
@@ -1363,7 +1339,7 @@ public:
 
   /// Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
-    return TupleTypeElt(T, getName(), getDefaultArgKind(), isVararg());
+    return TupleTypeElt(T, getName(), isVararg());
   }
 };
 
@@ -1413,10 +1389,6 @@ public:
   /// getNamedElementId - If this tuple has an element with the specified name,
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
-  
-  /// hasAnyDefaultValues - Return true if any of our elements has a default
-  /// value.
-  bool hasAnyDefaultValues() const;
   
   /// getElementForScalarInit - If a tuple of this type can be initialized with
   /// a scalar, return the element number that the scalar is assigned to.  If
@@ -2156,11 +2128,12 @@ public:
     //   |representation|isAutoClosure|noReturn|noEscape|throws|
     //   |    0 .. 3    |      4      |   5    |    6   |   7  |
     //
-    enum : uint16_t { RepresentationMask = 0x00F };
-    enum : uint16_t { AutoClosureMask    = 0x010 };
-    enum : uint16_t { NoReturnMask       = 0x020 };
-    enum : uint16_t { NoEscapeMask       = 0x040 };
-    enum : uint16_t { ThrowsMask         = 0x080 };
+    enum : uint16_t { RepresentationMask     = 0x00F };
+    enum : uint16_t { AutoClosureMask        = 0x010 };
+    enum : uint16_t { NoReturnMask           = 0x020 };
+    enum : uint16_t { NoEscapeMask           = 0x040 };
+    enum : uint16_t { ThrowsMask             = 0x080 };
+    enum : uint16_t { ExplicitlyEscapingMask = 0x100 };
 
     uint16_t Bits;
 
@@ -2183,15 +2156,18 @@ public:
 
     // Constructor with no defaults.
     ExtInfo(Representation Rep, bool IsNoReturn,
-            bool IsAutoClosure, bool IsNoEscape, bool Throws)
+            bool IsAutoClosure, bool IsNoEscape, bool IsExplicitlyEscaping,
+            bool Throws)
       : ExtInfo(Rep, IsNoReturn, Throws) {
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
+      Bits |= (IsExplicitlyEscaping ? ExplicitlyEscapingMask : 0);
     }
 
     bool isNoReturn() const { return Bits & NoReturnMask; }
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
+    bool isExplicitlyEscaping() const { return Bits & ExplicitlyEscapingMask; }
     bool throws() const { return Bits & ThrowsMask; }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
@@ -2324,6 +2300,12 @@ public:
   bool isNoEscape() const {
     return getExtInfo().isNoEscape();
   }
+
+  /// \brief True if the parameter declaration it is attached to has explicitly
+  /// been marked with the @escaping attribute. This is a temporary measure.
+  bool isExplicitlyEscaping() const {
+    return getExtInfo().isExplicitlyEscaping();
+  }
   
   bool throws() const {
     return getExtInfo().throws();
@@ -2385,7 +2367,42 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
     return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  
+
+/// A call argument or parameter.
+struct CallArgParam {
+  /// The type of the argument or parameter. For a variadic parameter,
+  /// this is the element type.
+  Type Ty;
+
+  // The label associated with the argument or parameter, if any.
+  Identifier Label;
+
+  /// Whether the parameter has a default argument.  Not valid for arguments.
+  bool HasDefaultArgument = false;
+
+  /// Whether the parameter is variadic. Not valid for arguments.
+  bool Variadic = false;
+
+  /// Whether the argument or parameter has a label.
+  bool hasLabel() const { return !Label.empty(); }
+};
+
+/// Break an argument type into an array of \c CallArgParams.
+///
+/// \param type The type to decompose.
+SmallVector<CallArgParam, 4> decomposeArgType(Type type);
+
+/// Break a parameter type into an array of \c CallArgParams.
+///
+/// \param paramOwner The declaration that owns this parameter.
+/// \param level The level of parameters that are being decomposed.
+SmallVector<CallArgParam, 4>
+decomposeParamType(Type type, const ValueDecl *paramOwner, unsigned level);
+
+/// Turn a param list into a symbolic and printable representation that does not
+/// include the types, something like (: , b:, c:)
+std::string getParamListAsString(ArrayRef<CallArgParam> parameters);
+
 /// PolymorphicFunctionType - A polymorphic function type.
 class PolymorphicFunctionType : public AnyFunctionType {
   // TODO: storing a GenericParamList* here is really the wrong solution;
@@ -2495,7 +2512,7 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
                                     CanType input, CanType result,
                                     const ExtInfo &info) {
     // Knowing that the argument types are independently canonical is
-    // not suffiicient to guarantee that the function type will be canonical.
+    // not sufficient to guarantee that the function type will be canonical.
     auto fnType = GenericFunctionType::get(sig, input, result, info);
     return cast<GenericFunctionType>(fnType->getCanonicalType());
   }
@@ -3458,7 +3475,7 @@ END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 /// \code
 /// protocol P { /* ... */ }
 /// protocol Q { /* ... */ }
-/// var x : protocol<P, Q>
+/// var x : P & Q
 /// \endcode
 ///
 /// Here, the type of x is a composition of the protocols 'P' and 'Q'.
@@ -4466,10 +4483,8 @@ inline bool TypeBase::mayHaveSuperclass() {
 
 inline TupleTypeElt::TupleTypeElt(Type ty,
                                   Identifier name,
-                                  DefaultArgumentKind defArg,
                                   bool isVariadic)
-  : NameAndVariadic(name, isVariadic),
-    ElementType(ty), DefaultArg(defArg)
+  : NameAndVariadic(name, isVariadic), ElementType(ty)
 {
   assert(!isVariadic ||
          isa<ErrorType>(ty.getPointer()) ||

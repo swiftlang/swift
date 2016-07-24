@@ -193,6 +193,35 @@ func _bridgeToObjectiveCUnconditionalAutorelease<T>(_ x: T) -> AnyObject
 @_silgen_name("_swift_bridgeNonVerbatimToObjectiveC")
 func _bridgeNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject?
 
+/// Bridge an arbitrary value to an Objective-C object.
+///
+/// - If `T` is a class type, it is always bridged verbatim, the function
+///   returns `x`;
+///
+/// - otherwise, `T` conforms to `_ObjectiveCBridgeable`:
+///   + if `T._isBridgedToObjectiveC()` returns `false`, then
+///     we fall back to boxing (below);
+///   + otherwise, returns the result of `x._bridgeToObjectiveC()`;
+///
+/// - otherwise, we use **boxing** to bring the value into Objective-C.
+///   The value is wrapped in an instance of a private Objective-C class
+///   that is `id`-compatible and dynamically castable back to the type of
+///   the boxed value, but is otherwise opaque.
+///
+/// TODO: This should subsume `_bridgeToObjectiveC` above.
+/// COMPILER_INTRINSIC
+public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
+  if _fastPath(_isClassOrObjCExistential(T.self)) {
+    return unsafeBitCast(x, to: AnyObject.self)
+  }
+  return _bridgeAnythingNonVerbatimToObjectiveC(x)
+}
+
+// TODO: This should subsume `_bridgeNonVerbatimToObjectiveC` above.
+/// COMPILER_INTRINSIC
+@_silgen_name("_swift_bridgeAnythingNonVerbatimToObjectiveC")
+public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject
+
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
 ///
@@ -217,8 +246,10 @@ public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
 @_silgen_name("_forceBridgeFromObjectiveC_bridgeable")
-public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>
-  (_ x: T._ObjectiveCType, _: T.Type) -> T {
+public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
+  _ x: T._ObjectiveCType,
+  _: T.Type
+) -> T {
   var result: T?
   T._forceBridgeFromObjectiveC(x, result: &result)
   return result!
@@ -454,7 +485,7 @@ extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
 }
 
 @_transparent
-public func == <Pointee> (
+public func == <Pointee>(
   lhs: AutoreleasingUnsafeMutablePointer<Pointee>,
   rhs: AutoreleasingUnsafeMutablePointer<Pointee>
 ) -> Bool {
@@ -523,4 +554,5 @@ extension AutoreleasingUnsafeMutablePointer {
     Builtin.unreachable()
   }
 }
+
 #endif

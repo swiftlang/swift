@@ -13,7 +13,7 @@
 public // @testable
 protocol _ArrayProtocol
   : RangeReplaceableCollection,
-    ArrayLiteralConvertible
+    ExpressibleByArrayLiteral
 {
   //===--- public interface -----------------------------------------------===//
   /// The number of elements the Array stores.
@@ -45,7 +45,7 @@ protocol _ArrayProtocol
   mutating func reserveCapacity(_ minimumCapacity: Int)
 
   /// Operator form of `append(contentsOf:)`.
-  func += <S : Sequence>(lhs: inout Self, rhs: S)
+  static func += <S : Sequence>(lhs: inout Self, rhs: S)
     where S.Iterator.Element == Iterator.Element
 
   /// Insert `newElement` at index `i`.

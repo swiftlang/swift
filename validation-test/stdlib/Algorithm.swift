@@ -144,12 +144,14 @@ func randomArray() -> A<Int> {
 Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
     var a = randomArray()
-    _blackHole(a.sorted(isOrderedBefore: $0))
+    _blackHole(a.sorted(by: $0))
   }
   withInvalidOrderings {
     var a: A<Int>
     a = randomArray()
-    _ = a.partition(isOrderedBefore: $0)
+    let lt = $0
+    let first = a.first
+    _ = a.partition(by: { !lt($0, first!) })
   }
   /*
   // FIXME: Disabled due to <rdar://problem/17734737> Unimplemented:
@@ -188,7 +190,7 @@ func makeQSortKiller(_ len: Int) -> [Int] {
   var ary = [Int](repeating: 0, count: len)
   var ret = [Int](repeating: 0, count: len)
   for i in 0..<len { ary[i] = i }
-  ary = ary.sorted(isOrderedBefore: Compare)
+  ary = ary.sorted(by: Compare)
   for i in 0..<len {
     ret[ary[i]] = i
   }

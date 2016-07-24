@@ -43,13 +43,13 @@ public struct LazyFilterIterator<
   }
 
   /// Creates an instance that produces the elements `x` of `base`
-  /// for which `predicate(x) == true`.
+  /// for which `isIncluded(x) == true`.
   internal init(
     _base: Base,
-    whereElementsSatisfy predicate: (Base.Element) -> Bool
+    _ isIncluded: (Base.Element) -> Bool
   ) {
     self._base = _base
-    self._predicate = predicate
+    self._predicate = isIncluded
   }
 
   /// The underlying iterator whose elements are being filtered.
@@ -75,18 +75,18 @@ public struct LazyFilterSequence<Base : Sequence>
   /// - Complexity: O(1).
   public func makeIterator() -> LazyFilterIterator<Base.Iterator> {
     return LazyFilterIterator(
-      _base: base.makeIterator(), whereElementsSatisfy: _include)
+      _base: base.makeIterator(), _include)
   }
 
   /// Creates an instance consisting of the elements `x` of `base` for
-  /// which `predicate(x) == true`.
+  /// which `isIncluded(x) == true`.
   public // @testable
   init(
     _base base: Base,
-    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+    _ isIncluded: (Base.Iterator.Element) -> Bool
   ) {
     self.base = base
-    self._include = predicate
+    self._include = isIncluded
   }
 
   /// The underlying sequence whose elements are being filtered
@@ -108,52 +108,54 @@ public struct LazyFilterSequence<Base : Sequence>
 ///   depends on how sparsely the filtering predicate is satisfied,
 ///   and may not offer the usual performance given by models of
 ///   `Collection`.
-public struct LazyFilterIndex<Base : Collection> : Comparable {
+public struct LazyFilterIndex<Base : Collection> {
 
   /// The position corresponding to `self` in the underlying collection.
   public let base: Base.Index
 }
 
-public func == <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
-) -> Bool {
-  return lhs.base == rhs.base
-}
+extension LazyFilterIndex : Comparable {
+  public static func == (
+    lhs: LazyFilterIndex<Base>,
+    rhs: LazyFilterIndex<Base>
+  ) -> Bool {
+    return lhs.base == rhs.base
+  }
 
-public func != <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
-) -> Bool {
-  return lhs.base != rhs.base
-}
+  public static func != (
+    lhs: LazyFilterIndex<Base>,
+    rhs: LazyFilterIndex<Base>
+  ) -> Bool {
+    return lhs.base != rhs.base
+  }
 
-public func < <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
-) -> Bool {
-  return lhs.base < rhs.base
-}
+  public static func < (
+    lhs: LazyFilterIndex<Base>,
+    rhs: LazyFilterIndex<Base>
+  ) -> Bool {
+    return lhs.base < rhs.base
+  }
 
-public func <= <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
-) -> Bool {
-  return lhs.base <= rhs.base
-}
+  public static func <= (
+    lhs: LazyFilterIndex<Base>,
+    rhs: LazyFilterIndex<Base>
+  ) -> Bool {
+    return lhs.base <= rhs.base
+  }
 
-public func >= <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
-) -> Bool {
-  return lhs.base >= rhs.base
-}
+  public static func >= (
+    lhs: LazyFilterIndex<Base>,
+    rhs: LazyFilterIndex<Base>
+  ) -> Bool {
+    return lhs.base >= rhs.base
+  }
 
-public func > <Base : Collection>(
-  lhs: LazyFilterIndex<Base>,
-  rhs: LazyFilterIndex<Base>
-) -> Bool {
-  return lhs.base > rhs.base
+  public static func > (
+    lhs: LazyFilterIndex<Base>,
+    rhs: LazyFilterIndex<Base>
+  ) -> Bool {
+    return lhs.base > rhs.base
+  }
 }
 
 // FIXME(ABI)(compiler limitation): `LazyFilter*Collection` types should be
@@ -186,14 +188,14 @@ public struct ${Self}<
   public typealias IndexDistance = Base.IndexDistance
 
   /// Construct an instance containing the elements of `base` that
-  /// satisfy `predicate`.
+  /// satisfy `isIncluded`.
   public // @testable
   init(
     _base: Base,
-    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+    _ isIncluded: (Base.Iterator.Element) -> Bool
   ) {
     self._base = _base
-    self._predicate = predicate
+    self._predicate = isIncluded
   }
 
   /// The position of the first element in a non-empty collection.
@@ -281,7 +283,7 @@ public struct ${Self}<
   /// - Complexity: O(1).
   public func makeIterator() -> LazyFilterIterator<Base.Iterator> {
     return LazyFilterIterator(
-      _base: _base.makeIterator(), whereElementsSatisfy: _predicate)
+      _base: _base.makeIterator(), _predicate)
   }
 
   var _base: Base
@@ -291,17 +293,17 @@ public struct ${Self}<
 % end
 
 extension LazySequenceProtocol {
-  /// Returns the elements of `self` that satisfy `predicate`.
+  /// Returns the elements of `self` that satisfy `isIncluded`.
   ///
   /// - Note: The elements of the result are computed on-demand, as
   ///   the result is used. No buffering storage is allocated and each
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   public func filter(
-    _ predicate: (Elements.Iterator.Element) -> Bool
+    _ isIncluded: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(
-      _base: self.elements, whereElementsSatisfy: predicate)
+      _base: self.elements, isIncluded)
   }
 }
 
@@ -319,10 +321,10 @@ extension LazyCollectionProtocol
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   public func filter(
-    _ predicate: (Elements.Iterator.Element) -> Bool
+    _ isIncluded: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilter${collectionForTraversal(Traversal)}<Self.Elements> {
     return LazyFilter${collectionForTraversal(Traversal)}(
-      _base: self.elements, whereElementsSatisfy: predicate)
+      _base: self.elements, isIncluded)
   }
 }
 
@@ -350,7 +352,7 @@ extension LazyFilterSequence {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     Builtin.unreachable()
   }
@@ -365,7 +367,7 @@ extension LazyFilterCollection {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     Builtin.unreachable()
   }

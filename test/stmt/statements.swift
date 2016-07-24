@@ -53,8 +53,8 @@ func funcdecl5(_ a: Int, y: Int) {
   } else if (y == 2) {
   }
 
-  // FIXME: This diagnostic is terrible - rdar://12939553
-  if x {}   // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
+  // This diagnostic is terrible - rdar://12939553
+  if x {}   // expected-error {{'Int' is not convertible to 'Bool'}}
 
   if true {
     if (B) {
@@ -94,7 +94,7 @@ struct infloopbool {
 }
 
 func infloopbooltest() {
-  if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'Boolean'}}
+  if (infloopbool()) {} // expected-error {{'infloopbool' is not convertible to 'Bool'}}
 }
 
 // test "builder" API style
@@ -347,25 +347,25 @@ class SomeTestClass {
 }
 
 
-func test_require(_ x : Int, y : Int??, cond : Bool) {
+func test_guard(_ x : Int, y : Int??, cond : Bool) {
   
   // These are all ok.
   guard let a = y else {}
   markUsed(a)
-  guard let b = y where cond else {}
-  guard case let c = x where cond else {}
+  guard let b = y, cond else {}
+  guard case let c = x, cond else {}
   guard case let Optional.some(d) = y else {}
   guard x != 4, case _ = x else { }
 
 
-  guard let e where cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
-  guard case let f? : Int? where cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
+  guard let e, cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
+  guard case let f? : Int?, cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
 
   guard let g = y else {
     markUsed(g)  // expected-error {{variable declared in 'guard' condition is not usable in its body}}
   }
 
-  guard let h = y where cond {}  // expected-error {{expected 'else' after 'guard' condition}}
+  guard let h = y, cond {}  // expected-error {{expected 'else' after 'guard' condition}}
 
 
   guard case _ = x else {}  // expected-warning {{'guard' condition is always true, body is unreachable}}
@@ -399,7 +399,7 @@ func r18776073(_ a : Int?) {
 
 // <rdar://problem/22491782> unhelpful error message from "throw nil"
 func testThrowNil() throws {
-  throw nil  // expected-error {{cannot infer concrete ErrorProtocol for thrown 'nil' value}}
+  throw nil  // expected-error {{cannot infer concrete Error for thrown 'nil' value}}
 }
 
 
@@ -407,7 +407,7 @@ func testThrowNil() throws {
 // Even if the condition fails to typecheck, save it in the AST anyway; the old
 // condition may have contained a SequenceExpr.
 func r23684220(_ b: Any) {
-  if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any' (aka 'protocol<>')}}
+  if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any'}}
 }
 
 

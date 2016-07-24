@@ -48,7 +48,9 @@ enum class IRGenOutputKind : unsigned {
 enum class IRGenDebugInfoKind : unsigned {
   None,       /// No debug info.
   LineTables, /// Line tables only.
-  Normal      /// Line tables + DWARF types.
+  ASTTypes,   /// Line tables + AST type references.
+  DwarfTypes, /// Line tables + AST type references + DWARF types.
+  Normal = ASTTypes /// The setting LLDB prefers.
 };
 
 enum class IRGenEmbedMode : unsigned {

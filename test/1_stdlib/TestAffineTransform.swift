@@ -22,7 +22,7 @@ import StdlibUnittest
 class TestAffineTransformSuper { }
 #endif
 
-func expectEqualWithAccuracy(_ lhs: Double, _ rhs: Double, accuracy: Double, file: String = #file, line: UInt = #line, _ message: String = "") {
+func expectEqualWithAccuracy(_ lhs: Double, _ rhs: Double, accuracy: Double, _ message: String = "", file: String = #file, line: UInt = #line) {
     expectTrue(fabs(lhs - rhs) < accuracy, message, file: file, line: line)
 }
 
@@ -37,27 +37,27 @@ class TestAffineTransform : TestAffineTransformSuper {
     
     func checkPointTransformation(_ transform: AffineTransform, point: NSPoint, expectedPoint: NSPoint, _ message: String = "", file: String = #file, line: UInt = #line) {
         let newPoint = transform.transform(point)
-        expectEqualWithAccuracy(Double(newPoint.x), Double(expectedPoint.x), accuracy: accuracyThreshold, file: file, line: line,
-                                   "x (expected: \(expectedPoint.x), was: \(newPoint.x)): \(message)")
-        expectEqualWithAccuracy(Double(newPoint.y), Double(expectedPoint.y), accuracy: accuracyThreshold, file: file, line: line,
-                                   "y (expected: \(expectedPoint.y), was: \(newPoint.y)): \(message)")
+        expectEqualWithAccuracy(Double(newPoint.x), Double(expectedPoint.x), accuracy: accuracyThreshold,
+                                   "x (expected: \(expectedPoint.x), was: \(newPoint.x)): \(message)", file: file, line: line)
+        expectEqualWithAccuracy(Double(newPoint.y), Double(expectedPoint.y), accuracy: accuracyThreshold,
+                                   "y (expected: \(expectedPoint.y), was: \(newPoint.y)): \(message)", file: file, line: line)
     }
     
     func checkSizeTransformation(_ transform: AffineTransform, size: NSSize, expectedSize: NSSize, _ message: String = "", file: String = #file, line: UInt = #line) {
         let newSize = transform.transform(size)
-        expectEqualWithAccuracy(Double(newSize.width), Double(expectedSize.width), accuracy: accuracyThreshold, file: file, line: line,
-                                   "width (expected: \(expectedSize.width), was: \(newSize.width)): \(message)")
-        expectEqualWithAccuracy(Double(newSize.height), Double(expectedSize.height), accuracy: accuracyThreshold, file: file, line: line,
-                                   "height (expected: \(expectedSize.height), was: \(newSize.height)): \(message)")
+        expectEqualWithAccuracy(Double(newSize.width), Double(expectedSize.width), accuracy: accuracyThreshold,
+                                   "width (expected: \(expectedSize.width), was: \(newSize.width)): \(message)", file: file, line: line)
+        expectEqualWithAccuracy(Double(newSize.height), Double(expectedSize.height), accuracy: accuracyThreshold,
+                                   "height (expected: \(expectedSize.height), was: \(newSize.height)): \(message)", file: file, line: line)
     }
     
     func checkRectTransformation(_ transform: AffineTransform, rect: NSRect, expectedRect: NSRect, _ message: String = "", file: String = #file, line: UInt = #line) {
         let newRect = transform.transform(rect)
         
-        checkPointTransformation(transform, point: newRect.origin, expectedPoint: expectedRect.origin, file: file, line: line,
-                                 "origin (expected: \(expectedRect.origin), was: \(newRect.origin)): \(message)")
-        checkSizeTransformation(transform, size: newRect.size, expectedSize: expectedRect.size, file: file, line: line,
-                                "size (expected: \(expectedRect.size), was: \(newRect.size)): \(message)")
+        checkPointTransformation(transform, point: newRect.origin, expectedPoint: expectedRect.origin,
+                                 "origin (expected: \(expectedRect.origin), was: \(newRect.origin)): \(message)", file: file, line: line)
+        checkSizeTransformation(transform, size: newRect.size, expectedSize: expectedRect.size,
+                                "size (expected: \(expectedRect.size), was: \(newRect.size)): \(message)", file: file, line: line)
     }
     
     func test_BasicConstruction() {

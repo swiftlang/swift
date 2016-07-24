@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This implements the object representation of the standard ErrorProtocol
+// This implements the object representation of the standard Error
 // type, which represents recoverable errors in the language. This
 // implementation is designed to interoperate efficiently with Cocoa libraries
 // by:
 // - allowing for NSError and CFError objects to "toll-free bridge" to
-//   ErrorProtocol existentials, which allows for cheap Cocoa to Swift interop
+//   Error existentials, which allows for cheap Cocoa to Swift interop
 // - allowing a native Swift error to lazily "become" an NSError when
 //   passed into Cocoa, allowing for cheap Swift to Cocoa interop
 //
@@ -43,7 +43,8 @@ using namespace swift;
 
 @implementation _SwiftNativeNSError
 
-+ (instancetype)alloc {
++ (instancetype)allocWithZone:(NSZone *)zone {
+  (void)zone;
   swift::crash("_SwiftNativeNSError cannot be instantiated");
 }
 
@@ -65,7 +66,7 @@ using namespace swift;
   // been initialized yet as an NSError.
   auto domain = error->domain.load(SWIFT_MEMORY_ORDER_CONSUME);
   assert(domain
-         && "ErrorProtocol box used as NSError before initialization");
+         && "Error box used as NSError before initialization");
   // Don't need to .retain.autorelease since it's immutable.
   return (NSString*)domain;
 }
@@ -188,7 +189,7 @@ swift::swift_deallocError(SwiftError *error, const Metadata *type) {
   return _swift_deallocError(error, type);
 }
 
-static const WitnessTable *getNSErrorConformanceToErrorProtocol() {
+static const WitnessTable *getNSErrorConformanceToError() {
   // CFError and NSError are toll-free-bridged, so we can use either type's
   // witness table interchangeably. CFError's is potentially slightly more
   // efficient since it doesn't need to dispatch for an unsubclassed NSCFError.
@@ -197,9 +198,9 @@ static const WitnessTable *getNSErrorConformanceToErrorProtocol() {
   // Swift source.
   
   auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
-                                   "_TWPCSo7CFErrors13ErrorProtocol10Foundation"));
+                                   "_TWPCSo7CFErrors5Error10Foundation"));
   assert(TheWitnessTable &&
-         "Foundation overlay not loaded, or CFError: ErrorProtocol conformance "
+         "Foundation overlay not loaded, or CFError: Error conformance "
          "not available");
   
   return reinterpret_cast<const WitnessTable *>(TheWitnessTable);
@@ -222,12 +223,12 @@ const Metadata *SwiftError::getType() const {
 
 const WitnessTable *SwiftError::getErrorConformance() const {
   if (isPureNSError()) {
-    return getNSErrorConformanceToErrorProtocol();
+    return getNSErrorConformanceToError();
   }
   return errorConformance;
 }
 
-/// Extract a pointer to the value, the type metadata, and the ErrorProtocol
+/// Extract a pointer to the value, the type metadata, and the Error
 /// protocol witness from an error object.
 ///
 /// The "scratch" pointer should point to an uninitialized word-sized
@@ -250,7 +251,7 @@ _swift_getErrorValue_(const SwiftError *errorObject,
     out->value = (const OpaqueValue *)scratch;
     out->type = swift_getObjCClassMetadata((ClassMetadata*)[asError class]);
 
-    out->errorConformance = getNSErrorConformanceToErrorProtocol();
+    out->errorConformance = getNSErrorConformanceToError();
     return;
   }
   
@@ -271,23 +272,51 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
 }
 
 // @_silgen_name("swift_stdlib_getErrorDomainNSString")
-// public func _stdlib_getErrorDomainNSString<T : ErrorProtocol>
+// public func _stdlib_getErrorDomainNSString<T : Error>
 //   (x: UnsafePointer<T>) -> AnyObject
 SWIFT_CC(swift)
 extern "C" NSString *swift_stdlib_getErrorDomainNSString(
                                                  const OpaqueValue *error,
                                                  const Metadata *T,
-                                                 const WitnessTable *ErrorProtocol);
+                                                 const WitnessTable *Error);
 // @_silgen_name("swift_stdlib_getErrorCode")
-// public func _stdlib_getErrorCode<T : ErrorProtocol>(x: UnsafePointer<T>) -> Int
+// public func _stdlib_getErrorCode<T : Error>(x: UnsafePointer<T>) -> Int
 SWIFT_CC(swift)
 extern "C" NSInteger swift_stdlib_getErrorCode(const OpaqueValue *error,
                                                const Metadata *T,
-                                               const WitnessTable *ErrorProtocol);
+                                               const WitnessTable *Error);
 
-/// Take an ErrorProtocol box and turn it into a valid NSError instance.
+//@_silgen_name("swift_stdlib_getErrorUserInfoNSDictionary")
+//public func _stdlib_getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>) -> AnyObject
 SWIFT_CC(swift)
-static id _swift_bridgeErrorProtocolToNSError_(SwiftError *errorObject) {
+extern "C" NSDictionary *swift_stdlib_getErrorUserInfoNSDictionary(
+                           const OpaqueValue *error,
+                           const Metadata *T,
+                           const WitnessTable *Error);
+
+//@_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
+//public func _stdlib_getErrorDefaultUserInfo<T : Error>(_ x: UnsafePointer<T>) -> AnyObject
+SWIFT_CC(swift) SWIFT_RT_ENTRY_VISIBILITY
+extern "C" NSDictionary *swift_stdlib_getErrorDefaultUserInfo(
+                           const OpaqueValue *error,
+                           const Metadata *T,
+                           const WitnessTable *Error) {
+  typedef SWIFT_CC(swift)
+    NSDictionary *GetDefaultFn(const OpaqueValue *error,
+                               const Metadata *T,
+                               const WitnessTable *Error);
+
+  auto foundationGetDefaultUserInfo = SWIFT_LAZY_CONSTANT(
+        reinterpret_cast<GetDefaultFn*>
+          (dlsym(RTLD_DEFAULT, "swift_Foundation_getErrorDefaultUserInfo")));
+  if (!foundationGetDefaultUserInfo) { return nullptr; }
+
+  return foundationGetDefaultUserInfo(error, T, Error);
+}
+
+/// Take an Error box and turn it into a valid NSError instance.
+SWIFT_CC(swift)
+static id _swift_bridgeErrorToNSError_(SwiftError *errorObject) {
   auto ns = reinterpret_cast<NSError *>(errorObject);
 
   // If we already have a domain set, then we've already initialized.
@@ -302,21 +331,30 @@ static id _swift_bridgeErrorProtocolToNSError_(SwiftError *errorObject) {
   
   NSString *domain = swift_stdlib_getErrorDomainNSString(value, type, witness);
   NSInteger code = swift_stdlib_getErrorCode(value, type, witness);
-  // TODO: user info?
-  
+  NSDictionary *userInfo =
+    swift_stdlib_getErrorUserInfoNSDictionary(value, type, witness);
+
   // The error code shouldn't change, so we can store it blindly, even if
   // somebody beat us to it. The store can be relaxed, since we'll do a
   // store(release) of the domain last thing to publish the initialized
   // NSError.
   errorObject->code.store(code, std::memory_order_relaxed);
 
-  // However, we need to cmpxchg in the domain; if somebody beat us to it,
+  // However, we need to cmpxchg the userInfo; if somebody beat us to it,
+  // we need to release.
+  CFDictionaryRef expectedUserInfo = nullptr;
+  if (!errorObject->userInfo.compare_exchange_strong(expectedUserInfo,
+                                                     (CFDictionaryRef)userInfo,
+                                                     std::memory_order_acq_rel))
+    objc_release(userInfo);
+
+  // We also need to cmpxchg in the domain; if somebody beat us to it,
   // we need to release.
   //
   // Storing the domain must be the LAST THING we do, since it's
   // the signal that the NSError has been initialized.
-  CFStringRef expected = nullptr;
-  if (!errorObject->domain.compare_exchange_strong(expected,
+  CFStringRef expectedDomain = nullptr;
+  if (!errorObject->domain.compare_exchange_strong(expectedDomain,
                                                    (CFStringRef)domain,
                                                    std::memory_order_acq_rel))
     objc_release(domain);
@@ -325,11 +363,11 @@ static id _swift_bridgeErrorProtocolToNSError_(SwiftError *errorObject) {
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_bridgeErrorProtocolToNSError = _swift_bridgeErrorProtocolToNSError_;
+extern "C" auto *_swift_bridgeErrorToNSError = _swift_bridgeErrorToNSError_;
 
 id
-swift::swift_bridgeErrorProtocolToNSError(SwiftError *errorObject) {
-  return _swift_bridgeErrorProtocolToNSError(errorObject);
+swift::swift_bridgeErrorToNSError(SwiftError *errorObject) {
+  return _swift_bridgeErrorToNSError(errorObject);
 }
 
 bool
@@ -341,23 +379,23 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   Class NSErrorClass = getNSErrorClass();
   
   auto CFErrorTypeID = SWIFT_LAZY_CONSTANT(CFErrorGetTypeID());
-  // @_silgen_name("swift_stdlib_bridgeNSErrorToErrorProtocol")
-  // public func _stdlib_bridgeNSErrorToErrorProtocol<
-  //   T : _ObjectiveCBridgeableErrorProtocol
+  // @_silgen_name("swift_stdlib_bridgeNSErrorToError")
+  // public func _stdlib_bridgeNSErrorToError<
+  //   T : _ObjectiveCBridgeableError
   // >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
   typedef SWIFT_CC(swift)
     bool BridgeFn(NSError *, OpaqueValue*, const Metadata *,
                   const WitnessTable *);
-  auto bridgeNSErrorToErrorProtocol = SWIFT_LAZY_CONSTANT(
+  auto bridgeNSErrorToError = SWIFT_LAZY_CONSTANT(
         reinterpret_cast<BridgeFn*>
-          (dlsym(RTLD_DEFAULT, "swift_stdlib_bridgeNSErrorToErrorProtocol")));
-  // protocol _ObjectiveCBridgeableErrorProtocol
-  auto TheObjectiveCBridgeableErrorProtocolProtocol = SWIFT_LAZY_CONSTANT(
+          (dlsym(RTLD_DEFAULT, "swift_stdlib_bridgeNSErrorToError")));
+  // protocol _ObjectiveCBridgeableError
+  auto TheObjectiveCBridgeableError = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<const ProtocolDescriptor *>(dlsym(RTLD_DEFAULT,
-                         "_TMp10Foundation34_ObjectiveCBridgeableErrorProtocol")));
+                         "_TMp10Foundation26_ObjectiveCBridgeableError")));
 
   // If the Foundation overlay isn't loaded, then NSErrors can't be bridged.
-  if (!bridgeNSErrorToErrorProtocol || !TheObjectiveCBridgeableErrorProtocolProtocol)
+  if (!bridgeNSErrorToError || !TheObjectiveCBridgeableError)
     return false;
   
   // Is the input type an NSError?
@@ -400,7 +438,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   
   // Is the target type a bridgeable error?
   auto witness = swift_conformsToProtocol(destType,
-                                      TheObjectiveCBridgeableErrorProtocolProtocol);
+                                          TheObjectiveCBridgeableError);
   
   if (!witness)
     return false;
@@ -408,7 +446,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   // If so, attempt the bridge.
   NSError *srcInstance = *reinterpret_cast<NSError * const*>(src);
   objc_retain(srcInstance);
-  if (bridgeNSErrorToErrorProtocol(srcInstance, dest, destType, witness)) {
+  if (bridgeNSErrorToError(srcInstance, dest, destType, witness)) {
     if (flags & DynamicCastFlags::TakeOnSuccess)
       objc_release(srcInstance);
     return true;

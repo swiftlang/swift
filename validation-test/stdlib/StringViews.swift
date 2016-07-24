@@ -676,7 +676,7 @@ tests.test("UTF8 indexes") {
       for n0 in 0..<8 {
         var u8i1b = u8i1
         for n1 in 0..<8 {
-          expectEqual(u8i0b, u8i1b, sameValue: n0 == n1 ? (==) : (!=))
+          expectEqualTest(u8i0b, u8i1b, sameValue: n0 == n1 ? (==) : (!=))
           if u8i1b == u8.endIndex { break }
           u8i1b = u8.index(u8i1b, offsetBy: 1)
         }
@@ -685,6 +685,14 @@ tests.test("UTF8 indexes") {
       }
     }
   }
+}
+
+tests.test("index/Comparable")
+  .forEach(in: [summer, winter]) { str in
+  checkComparable(str.characters.indices, oracle: <=>)
+  checkComparable(str.unicodeScalars.indices, oracle: <=>)
+  checkComparable(str.utf16.indices, oracle: <=>)
+  checkComparable(str.utf8.indices, oracle: <=>)
 }
 
 tests.test("UTF16->String") {

@@ -477,7 +477,7 @@ class FormatWalker : public SourceEntityWalker {
         return;
       SourceLoc PrevLoc;
       auto FindAlignLoc = [&](SourceLoc Loc) {
-        if (PrevLoc.isValid() &&
+        if (PrevLoc.isValid() && Loc.isValid() &&
             SM.getLineNumber(PrevLoc) == SM.getLineNumber(Loc))
           return PrevLoc;
         return PrevLoc = Loc;
@@ -845,15 +845,15 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
                                                        CodeFormatOptions Options,
                                                        SourceManager &SM,
                                                        SourceFile &SF) {
-            FormatWalker walker(SF, SM);
-            auto SourceBufferID = SF.getBufferID().getValue();
-            StringRef Text = SM.getLLVMSourceMgr()
-                               .getMemoryBuffer(SourceBufferID)->getBuffer();
-            size_t Offset = getOffsetOfTrimmedLine(Range.startLine(), Text);
-            SourceLoc Loc = SM.getLocForBufferStart(SourceBufferID)
-                              .getAdvancedLoc(Offset);
-            FormatContext FC = walker.walkToLocation(Loc);
-            CodeFormatter CF(Options);
-            return CF.indent(Range.startLine(), FC, Text);
+  FormatWalker walker(SF, SM);
+  auto SourceBufferID = SF.getBufferID().getValue();
+  StringRef Text = SM.getLLVMSourceMgr()
+    .getMemoryBuffer(SourceBufferID)->getBuffer();
+  size_t Offset = getOffsetOfTrimmedLine(Range.startLine(), Text);
+  SourceLoc Loc = SM.getLocForBufferStart(SourceBufferID)
+    .getAdvancedLoc(Offset);
+  FormatContext FC = walker.walkToLocation(Loc);
+  CodeFormatter CF(Options);
+  return CF.indent(Range.startLine(), FC, Text);
 }
 

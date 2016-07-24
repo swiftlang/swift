@@ -25,7 +25,7 @@ class HasGenericFunc {
 
 class HasProp {
   var HasProp: HasProp {
-    return HasProp() // expected-error {{cannot call value of non-function type 'HasProp'}}
+    return HasProp() // expected-error {{cannot call value of non-function type 'HasProp'}}{{19-21=}}
   }
   var SomethingElse: SomethingElse? { // expected-error 2 {{use of undeclared type 'SomethingElse'}}
     return nil

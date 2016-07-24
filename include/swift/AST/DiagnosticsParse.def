@@ -289,8 +289,6 @@ ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
 
 
 // Func
-ERROR(func_decl_nonglobal_operator,none,
-      "operators are only allowed at global scope", ())
 ERROR(func_decl_without_paren,PointsToFirstBadToken,
       "expected '(' in argument list of function declaration", ())
 ERROR(static_func_decl_global_scope,none,
@@ -298,6 +296,9 @@ ERROR(static_func_decl_global_scope,none,
       (StaticSpellingKind))
 ERROR(func_decl_expected_arrow,none,
       "expected '->' after function parameter tuple", ())
+WARNING(operator_static_in_protocol,none,
+        "operator '%0' declared in protocol must be 'static'",
+        (StringRef))
 
 // Enum
 ERROR(expected_lbrace_enum,PointsToFirstBadToken,
@@ -604,9 +605,9 @@ ERROR(generic_non_function,PointsToFirstBadToken,
       "only syntactic function types can be generic", ())
 ERROR(rethrowing_function_type,PointsToFirstBadToken,
       "only function declarations may be marked 'rethrows'", ())
-ERROR(throws_after_function_result,none,
+ERROR(throws_in_wrong_position,none,
       "'throws' may only occur before '->'", ())
-ERROR(rethrows_after_function_result,none,
+ERROR(rethrows_in_wrong_position,none,
       "'rethrows' may only occur before '->'", ())
 ERROR(throw_in_function_type,none,
       "expected throwing specifier; did you mean 'throws'?", ())
@@ -647,12 +648,17 @@ ERROR(protocol_init_argument_init,none,
       "default argument not permitted in a protocol initializer", ())
 
 // Protocol Types
-ERROR(expected_langle_protocol,PointsToFirstBadToken,
-      "expected '<' in protocol composition type", ())
 ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol composition type", ())
 ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
       "protocol composition is neither allowed nor needed here", ())
+
+WARNING(deprecated_protocol_composition,none,
+        "'protocol<...>' composition syntax is deprecated; join the protocols using '&'", ())
+WARNING(deprecated_protocol_composition_single,none,
+        "'protocol<...>' composition syntax is deprecated and not needed here", ())
+WARNING(deprecated_any_composition,none,
+        "'protocol<>' syntax is deprecated; use 'Any' instead", ())
 
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
@@ -797,29 +803,27 @@ ERROR(expected_lbrace_after_defer,PointsToFirstBadToken,
       "expected '{' after 'defer'", ())
 
 // If/While/Guard Conditions
-ERROR(expected_expr_conditional_letbinding,none,
-      "expected 'let' or 'var' in conditional", ())
-ERROR(expected_expr_conditional_letbinding_bool_conditions,none,
-      "expected 'let' or 'var' in conditional; "
-      "use '&&' to join boolean conditions", ())
 ERROR(expected_comma_stmtcondition,none,
       "expected ',' joining parts of a multi-clause condition", ())
 
+ERROR(expected_expr_conditional,PointsToFirstBadToken,
+      "expected expression in conditional", ())
+
+// FIXME: Upgrade these two diagnostics to errors in Swift 3.
+WARNING(expected_binding_keyword,none,
+      "expected '%0' in conditional", (StringRef))
+// FIXME: just replace with expected_comma_stmtcondition
+WARNING(expected_comma_stmtcondition_w,none,
+        "expected ',' joining parts of a multi-clause condition", ())
+
+
 ERROR(expected_expr_conditional_var,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
-ERROR(expected_expr_conditional_where,PointsToFirstBadToken,
-      "expected expression in conditional binding 'where' clause", ())
 ERROR(conditional_var_initializer_required,none,
       "variable binding in a condition requires an initializer", ())
 ERROR(wrong_condition_case_location,none,
       "pattern matching binding is spelled with 'case %0', not '%0 case'",
       (StringRef))
-ERROR(where_end_of_binding_use_letvar,none,
-      "binding ended by previous 'where' clause; "
-      "use '%0' to introduce a new one", (StringRef))
-ERROR(comma_should_be_where,none,
-      "boolean condition requires 'where' to separate it from variable binding",
-      ())
 
 // If Statement
 ERROR(expected_condition_if,PointsToFirstBadToken,
@@ -999,10 +1003,6 @@ ERROR(unexpected_tokens_before_closure_in,none,
    "unexpected tokens prior to 'in'", ())
 ERROR(expected_closure_rbrace,none,
       "expected '}' at end of closure", ())
-
-ERROR(trailing_closure_requires_parens,none,
-      "trailing closure requires parentheses for disambiguation in this"
-      " context", ())
 
 WARNING(trailing_closure_excess_newlines,none,
         "trailing closure is separated from call site by multiple newlines", ())
@@ -1249,7 +1249,6 @@ ERROR(attr_swift3_migration_expected_rparen,none,
 ERROR(attr_bad_swift_name,none,
       "ill-formed Swift name '%0'", (StringRef))
 
-
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,
       "expected 'safe' or 'unsafe'", ())
@@ -1261,6 +1260,10 @@ WARNING(attr_warn_unused_result_removed,none,
         "'warn_unused_result' attribute behavior is now the default", ())
 ERROR(attr_warn_unused_result_expected_rparen,none,
       "expected ')' after 'warn_unused_result' attribute", ())
+
+// escaping
+ERROR(attr_escaping_conflicts_noescape,none,
+      "@escaping conflicts with @noescape", ())
 
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics

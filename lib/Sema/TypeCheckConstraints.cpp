@@ -186,13 +186,8 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
       continue;
     }
 
-    // If there aren't any more inputs, we can use a default argument.
+    // If there aren't any more inputs, we are done.
     if (fromNext == fromLast) {
-      if (elt2.hasDefaultArg()) {
-        sources[i] = TupleShuffleExpr::DefaultInitialize;
-        continue;
-      }
-
       return true;
     }
 
@@ -458,8 +453,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // one, but we should also try to propagate labels into this.
     DeclNameLoc nameLoc = UDRE->getNameLoc();
 
-    performTypoCorrection(DC, UDRE->getRefKind(), Name, Loc, LookupOptions,
-                          Lookup);
+    performTypoCorrection(DC, UDRE->getRefKind(), Type(), Name, Loc,
+                          LookupOptions, Lookup);
 
     diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
       .highlight(UDRE->getSourceRange());
@@ -784,7 +779,7 @@ namespace {
 
               // If the function being called is not our unresolved initializer
               // reference, we're done.
-              if (apply->getFn()->getSemanticsProvidingExpr() != unresolvedDot)
+              if (apply->getSemanticFn() != unresolvedDot)
                 break;
 
               foundApply = true;
@@ -1126,6 +1121,62 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
                                         ResultTypeRepr);
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
+  
+  // Fold 'P & Q' into a composition type
+  if (auto *binaryExpr = dyn_cast<BinaryExpr>(E)) {
+    bool isComposition = false;
+    // look at the name of the operator, if it is a '&' we can create the
+    // composition TypeExpr
+    auto fn = binaryExpr->getFn();
+    if (auto Overload = dyn_cast<OverloadedDeclRefExpr>(fn)) {
+      for (auto Decl : Overload->getDecls())
+        if (Decl->getName().str() == "&") {
+          isComposition = true;
+          break;
+        }
+    } else if (auto *Decl = dyn_cast<UnresolvedDeclRefExpr>(fn)) {
+      if (Decl->getName().isSimpleName() &&
+            Decl->getName().getBaseName().str() == "&")
+        isComposition = true;
+    }
+
+    if (isComposition) {
+      // The protocols we are composing
+      SmallVector<IdentTypeRepr *, 4> Protocols;
+
+      auto lhsExpr = binaryExpr->getArg()->getElement(0);
+      if (auto *lhs = dyn_cast<TypeExpr>(lhsExpr)) {
+        if (auto *repr = dyn_cast<IdentTypeRepr>(lhs->getTypeRepr()))
+          Protocols.push_back(repr);
+      }
+      // If the lhs is another binary expression, we have a multi element
+      // composition: 'A & B & C' is parsed as ((A & B) & C); we get
+      // the protocols from the lhs here
+      else if (isa<BinaryExpr>(lhsExpr)) {
+        if (auto expr = simplifyTypeExpr(lhsExpr))
+          if (auto *repr = dyn_cast<ProtocolCompositionTypeRepr>(expr->getTypeRepr()))
+            // add the protocols to our list
+            for (auto proto : repr->getProtocols())
+              Protocols.push_back(proto);
+          else
+            return nullptr;
+        else
+          return nullptr;
+      }
+
+      // Add the rhs which is just a TypeExpr
+      auto *rhs = dyn_cast<TypeExpr>(binaryExpr->getArg()->getElement(1));
+      if (!rhs) return nullptr;
+
+      if (auto *repr = dyn_cast<IdentTypeRepr>(rhs->getTypeRepr()))
+        Protocols.push_back(repr);
+
+      auto CompRepr = new (TC.Context) ProtocolCompositionTypeRepr(
+                        TC.Context.AllocateCopy(Protocols),
+                        binaryExpr->getLoc(), binaryExpr->getSourceRange());
+      return new (TC.Context) TypeExpr(TypeLoc(CompRepr, Type()));
+    }
+  }
 
   return nullptr;
 }
@@ -1365,7 +1416,8 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
                                       ContextualTypePurpose convertTypePurpose,
                                       TypeCheckExprOptions options,
-                                      ExprTypeCheckListener *listener) {
+                                      ExprTypeCheckListener *listener,
+                                      ConstraintSystem *baseCS) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.
@@ -1373,6 +1425,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::PreferForceUnwrapToOptional))
     csOptions |= ConstraintSystemFlags::PreferForceUnwrapToOptional;
   ConstraintSystem cs(*this, dc, csOptions);
+  cs.baseCS = baseCS;
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
   ExprCleanser cleanup2(expr);
 
@@ -1697,7 +1750,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
       // Apply the solution to the pattern as well.
       Type patternType = expr->getType();
-      patternType = patternType->getWithoutDefaultArgs(tc.Context);
 
       TypeResolutionOptions options;
       options |= TR_OverrideType;
@@ -2036,20 +2088,15 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       // Save the original expression.
       OrigExpr = expr;
       
-      // Otherwise, the result must be a Boolean.
-      auto &tc = cs.getTypeChecker();
-      auto logicValueProto = tc.getProtocol(expr->getLoc(),
-                                            KnownProtocolKind::Boolean);
-      if (!logicValueProto)
+      // Otherwise, the result must be convertible to Bool.
+      auto boolDecl = cs.getASTContext().getBoolDecl();
+      if (!boolDecl)
         return true;
-
-      auto logicValueType = logicValueProto->getDeclaredType();
-
-      // We use SelfObjectOfProtocol because an existential Boolean is
-      // allowed as a condition, but Boolean is not self-conforming.
-      cs.addConstraint(ConstraintKind::SelfObjectOfProtocol,
-                       expr->getType(), logicValueType,
-                       cs.getConstraintLocator(OrigExpr), /*isFavored*/true);
+      
+      // Condition must convert to Bool.
+      cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+                       boolDecl->getDeclaredType(),
+                       cs.getConstraintLocator(expr));
       return false;
     }
 
@@ -2150,6 +2197,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          Context.getIdentifier("$match"),
                                          rhsType,
                                          DC);
+
+  matchVar->setImplicit();
   EP->setMatchVar(matchVar);
   matchVar->setHasNonPatternBindingInit();
   
@@ -2837,17 +2886,17 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  // We can conditionally cast from NSError to an ErrorProtocol-conforming
+  // We can conditionally cast from NSError to an Error-conforming
   // type.  This is handled in the runtime, so it doesn't need a special cast
   // kind.
-  if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::ErrorProtocol)) {
+  if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
     if (conformsToProtocol(toType, errorTypeProto, dc,
                            (ConformanceCheckFlags::InExpression|
                             ConformanceCheckFlags::Used)))
       if (auto NSErrorTy = getNSErrorType(dc))
         if (isSubtypeOf(fromType, NSErrorTy, dc)
             // Don't mask "always true" warnings if NSError is cast to
-            // ErrorProtocol itself.
+            // Error itself.
             && !isSubtypeOf(fromType, toType, dc))
           return CheckedCastKind::ValueCast;
   }
@@ -2856,7 +2905,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
   auto clas = toType->getClassOrBoundGenericClass();
-  if (clas && clas->isForeign())
+  if (clas && clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return CheckedCastKind::ValueCast;
   
   // Don't warn on casts that change the generic parameters of ObjC generic

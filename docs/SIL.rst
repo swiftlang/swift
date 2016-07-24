@@ -2240,6 +2240,20 @@ index_raw_pointer
 Given a ``Builtin.RawPointer`` value ``%0``, returns a pointer value at the
 byte offset ``%1`` relative to ``%0``.
 
+bind_memory
+```````````
+
+::
+
+  sil-instruction ::= 'bind_memory' sil-operand ',' sil-operand 'to' sil-type
+
+  bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T
+  // %0 must be of $Builtin.RawPointer type
+  // %1 must be of $Builtin.Word type
+
+Binds memory at ``Builtin.RawPointer`` value ``%0`` to type ``$T`` with enough
+capacity to hold ``%1`` values. See SE-0107: UnsafeRawPointer.
+   
 Reference Counting
 ~~~~~~~~~~~~~~~~~~
 
@@ -3415,7 +3429,7 @@ container may use one of several representations:
   * `init_existential_metatype`_
   * `open_existential_metatype`_
 
-- **Boxed existential containers**: The standard library ``ErrorProtocol`` protocol
+- **Boxed existential containers**: The standard library ``Error`` protocol
   uses a size-optimized reference-counted container, which indirectly stores
   the conforming value. Boxed existential containers can be ``retain``-ed
   and ``release``-d. The following instructions manipulate boxed existential
@@ -3428,22 +3442,22 @@ container may use one of several representations:
 
 Some existential types may additionally support specialized representations
 when they contain certain known concrete types. For example, when Objective-C
-interop is available, the ``ErrorProtocol`` protocol existential supports
+interop is available, the ``Error`` protocol existential supports
 a class existential container representation for ``NSError`` objects, so it
 can be initialized from one using ``init_existential_ref`` instead of the
 more expensive ``alloc_existential_box``::
 
   bb(%nserror: $NSError):
-    // The slow general way to form an ErrorProtocol, allocating a box and
+    // The slow general way to form an Error, allocating a box and
     // storing to its value buffer:
-    %error1 = alloc_existential_box $ErrorProtocol, $NSError
-    %addr = project_existential_box $NSError in %error1 : $ErrorProtocol
+    %error1 = alloc_existential_box $Error, $NSError
+    %addr = project_existential_box $NSError in %error1 : $Error
     strong_retain %nserror: $NSError
     store %nserror to %addr : $NSError
 
     // The fast path supported for NSError:
     strong_retain %nserror: $NSError
-    %error2 = init_existential_ref %nserror: $NSError, $ErrorProtocol
+    %error2 = init_existential_ref %nserror: $NSError, $Error
 
 init_existential_addr
 `````````````````````
@@ -3700,9 +3714,9 @@ pointer_to_address
 ``````````````````
 ::
 
-  sil-instruction ::= 'pointer_to_address' sil-operand 'to' sil-type
+  sil-instruction ::= 'pointer_to_address' sil-operand 'to' ('[' 'strict' ']')? sil-type
 
-  %1 = pointer_to_address %0 : $Builtin.RawPointer to $*T
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
   // %1 will be of type $*T
 
 Creates an address value corresponding to the ``Builtin.RawPointer`` value
@@ -3712,6 +3726,14 @@ address. It is undefined behavior to cast the ``RawPointer`` back to any type
 other than its original address type or `layout compatible types`_. It is
 also undefined behavior to cast a ``RawPointer`` from a heap object to any
 address type.
+
+The ``strict`` flag indicates whether the returned address adheres to
+strict aliasing.  If true, then the type of each memory access
+dependent on this address must be consistent with the memory's bound
+type. A memory access from an address that is not strict cannot have
+its address substituted with a strict address, even if other nearby
+memory accesses at the same location are strict.
+
 
 unchecked_ref_cast
 ``````````````````

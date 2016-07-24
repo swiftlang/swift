@@ -47,7 +47,7 @@ using namespace swift;
 
 namespace {
   
-/// The layout of protocol<>.
+/// The layout of Any.
 using Any = OpaqueExistentialContainer;
 
 // Swift assumes Any is returned in memory. 
@@ -60,12 +60,6 @@ struct AnyReturn {
   ~AnyReturn() { }
 };
 
-/// A _Reflectable witness table.
-struct _ReflectableWitnessTable {
-  /// func _getMirror() -> Mirror
-  Mirror (*getMirror)(OpaqueValue *self, const Metadata *Self);
-};
-  
 struct MagicMirrorData;
   
 struct String;
@@ -116,10 +110,7 @@ struct String {
 
 /// A Mirror witness table for use by MagicMirror.
 struct MirrorWitnessTable;
-  
-/// The protocol descriptor for _Reflectable from the stdlib.
-extern "C" const ProtocolDescriptor _TMps12_Reflectable;
-  
+
 // This structure needs to mirror _MagicMirrorData in the stdlib.
 struct MagicMirrorData {
   /// The owner pointer for the buffer the value lives in. For class values
@@ -298,7 +289,7 @@ void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
       new (result) String("(Heap Generic Local Variable)");
       break;
     case MetadataKind::ErrorObject:
-      new (result) String("(ErrorProtocol Object)");
+      new (result) String("(Error Object)");
       break;
   }
 }
@@ -313,71 +304,25 @@ const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
   return swift_getObjCClassMetadata(isa);
 }
  
-static std::tuple<const _ReflectableWitnessTable *, const Metadata *,
-                  const OpaqueValue *>
-getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
-recur:
+static std::tuple<const Metadata *, const OpaqueValue *>
+unwrapExistential(const Metadata *T, const OpaqueValue *Value) {
   // If the value is an existential container, look through it to reflect the
   // contained value.
-  switch (T->getKind()) {
-  case MetadataKind::Tuple:
-  case MetadataKind::Struct:
-  case MetadataKind::ForeignClass:
-  case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::Class:
-  case MetadataKind::Opaque:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-  case MetadataKind::Function:
-  case MetadataKind::Metatype:
-    break;
-      
-  case MetadataKind::Existential: {
+  // TODO: Should look through existential metatypes too, but it doesn't
+  // really matter yet since we don't have any special mirror behavior for
+  // concrete metatypes yet.
+  while (T->getKind() == MetadataKind::Existential) {
     auto existential
       = static_cast<const ExistentialTypeMetadata *>(T);
-    
-    // If the existential happens to include the _Reflectable protocol, use
-    // the witness table from the container.
-    unsigned wtOffset = 0;
-    for (unsigned i = 0; i < existential->Protocols.NumProtocols; ++i) {
-      if (existential->Protocols[i] == &_TMps12_Reflectable) {
-        return std::make_tuple(
-            reinterpret_cast<const _ReflectableWitnessTable*>(
-              existential->getWitnessTable(Value, wtOffset)),
-            existential->getDynamicType(Value),
-            existential->projectValue(Value));
-      }
-      if (existential->Protocols[i]->Flags.needsWitnessTable())
-        ++wtOffset;
-    }
-    
-    // Otherwise, unwrap the existential container and do a runtime lookup on
-    // its contained value as usual.
+
+    // Unwrap the existential container.
     T = existential->getDynamicType(Value);
     Value = existential->projectValue(Value);
 
     // Existential containers can end up nested in some cases due to generic
-    // abstraction barriers. Recur in case we have a nested existential.
-    goto recur;
+    // abstraction barriers.  Repeat in case we have a nested existential.
   }
-  case MetadataKind::ExistentialMetatype:
-    // TODO: Should look through existential metatypes too, but it doesn't
-    // really matter yet since we don't have any special mirror behavior for
-    // concrete metatypes yet.
-    break;
-      
-  // Types can't have these kinds.
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-  case MetadataKind::ErrorObject:
-    swift::crash("Swift mirror lookup failure");
-  }
-  
-  return std::make_tuple(
-      reinterpret_cast<const _ReflectableWitnessTable*>(
-        swift_conformsToProtocol(T, &_TMps12_Reflectable)),
-      T,
-      Value);
+  return std::make_tuple(T, Value);
 }
 
 /// Produce a mirror for any value, like swift_reflectAny, but do not consume
@@ -389,20 +334,11 @@ recur:
 static Mirror reflect(HeapObject *owner,
                       const OpaqueValue *value,
                       const Metadata *T) {
-  const _ReflectableWitnessTable *witness;
   const Metadata *mirrorType;
   const OpaqueValue *mirrorValue;
-  std::tie(witness, mirrorType, mirrorValue)
-    = getReflectableConformance(T, value);
-  
-  // Use the _Reflectable conformance if the object has one.
-  if (witness) {
-    auto result =
-    witness->getMirror(const_cast<OpaqueValue*>(mirrorValue), mirrorType);
-    swift_release(owner);
-    return MirrorReturn(result);
-  }
-  // Otherwise, fall back to MagicMirror.
+  std::tie(mirrorType, mirrorValue) = unwrapExistential(T, value);
+
+  // Use MagicMirror.
   // Consumes 'owner'.
   Mirror result;
   ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
@@ -572,20 +508,15 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C"
 const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *type) {
   // Build a magic mirror. Unconditionally destroy the value at the end.
-  const _ReflectableWitnessTable *witness;
   const Metadata *mirrorType;
   const OpaqueValue *cMirrorValue;
-  std::tie(witness, mirrorType, cMirrorValue) = getReflectableConformance(type, value);
-  
+  std::tie(mirrorType, cMirrorValue) = unwrapExistential(type, value);
+
   OpaqueValue *mirrorValue = const_cast<OpaqueValue*>(cMirrorValue);
   Mirror mirror;
 
-  if (witness) {
-    mirror = witness->getMirror(mirrorValue, mirrorType);
-  } else {
-    bool take = mirrorValue == value;
-    ::new (&mirror) MagicMirror(mirrorValue, mirrorType, take);
-  }
+  bool take = mirrorValue == value;
+  ::new (&mirror) MagicMirror(mirrorValue, mirrorType, take);
 
   MagicMirror *theMirror = reinterpret_cast<MagicMirror *>(&mirror);
   MagicMirrorData data = theMirror->Data;
@@ -1158,31 +1089,19 @@ MagicMirror::MagicMirror(HeapObject *owner,
 
 /// func reflect<T>(x: T) -> Mirror
 ///
-/// Produce a mirror for any value. If the value's type conforms to _Reflectable,
-/// invoke its _getMirror() method; otherwise, fall back to an implementation
-/// in the runtime that structurally reflects values of any type.
+/// Produce a mirror for any value.  The runtime produces a mirror that
+/// structurally reflects values of any type.
 ///
 /// This function consumes 'value', following Swift's +1 convention for "in"
 /// arguments.
 MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
-  const _ReflectableWitnessTable *witness;
   const Metadata *mirrorType;
   const OpaqueValue *cMirrorValue;
-  std::tie(witness, mirrorType, cMirrorValue)
-    = getReflectableConformance(T, value);
-  
+  std::tie(mirrorType, cMirrorValue) = unwrapExistential(T, value);
+
   OpaqueValue *mirrorValue = const_cast<OpaqueValue*>(cMirrorValue);
-  
-  // Use the _Reflectable conformance if the object has one.
-  if (witness) {
-    auto result = witness->getMirror(mirrorValue, mirrorType);
-    // 'self' of witnesses is passed at +0, so we still need to consume the
-    // value.
-    T->vw_destroy(value);
-    return MirrorReturn(result);
-  }
-  
-  // Otherwise, fall back to MagicMirror.
+
+  // Use MagicMirror.
   Mirror result;
   // Take the value, unless we projected a subvalue from it. We don't want to
   // deal with partial value deinitialization.

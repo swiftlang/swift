@@ -23,19 +23,6 @@ set -e
 
 umask 0022
 
-#
-# Options that can be "configured" by editing this file.
-#
-# These options are not exposed as command line options on purpose.  If you
-# need to change any of these, you should do so on trunk or in a branch.
-#
-
-LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64;PowerPC;SystemZ"
-
-#
-# End of configurable options.
-#
-
 # Declare the set of known settings along with each one's description
 #
 # If you add a user-settable variable, add it to this list.
@@ -85,6 +72,10 @@ KNOWN_SETTINGS=(
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
+    libdispatch-build-type      "Debug"          "the build variant for libdispatch"
+    playgroundlogger-build-type "Debug"          "the build variant for PlaygroundLogger"
+    playgroundsupport-build-type "Debug"         "the build variant for PlaygroundSupport"
+    xctest-build-type           "Debug"          "the build variant for xctest"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
     enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
@@ -107,6 +98,7 @@ KNOWN_SETTINGS=(
     swift-primary-variant-arch  ""               "default arch for target binaries"
     skip-build-cmark            ""               "set to skip building CommonMark"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
+    skip-build-compiler-rt      ""               "set to skip building Compiler-RT"
     skip-build-swift            ""               "set to skip building Swift"
     skip-build-linux            ""               "set to skip building Swift stdlibs for Linux"
     skip-build-freebsd          ""               "set to skip building Swift stdlibs for FreeBSD"
@@ -126,6 +118,8 @@ KNOWN_SETTINGS=(
     skip-build-foundation       ""               "set to skip building foundation"
     skip-build-libdispatch      ""               "set to skip building libdispatch"
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
+    skip-build-playgroundlogger ""               "set to skip building PlaygroundLogger"
+    skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
@@ -134,6 +128,8 @@ KNOWN_SETTINGS=(
     skip-test-xctest            ""               "set to skip testing xctest"
     skip-test-foundation        ""               "set to skip testing foundation"
     skip-test-libdispatch       ""               "set to skip testing libdispatch"
+    skip-test-playgroundlogger  ""               "set to skip testing PlaygroundLogger"
+    skip-test-playgroundsupport ""               "set to skip testing PlaygroundSupport"
     skip-test-linux             ""               "set to skip testing Swift stdlibs for Linux"
     skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
     skip-test-cygwin            ""               "set to skip testing Swift stdlibs for Cygwin"
@@ -154,15 +150,18 @@ KNOWN_SETTINGS=(
     enable-llvm-assertions      "1"              "set to enable llvm assertions"
     build-llvm                  "1"              "set to 1 to build LLVM and Clang"
     build-swift-tools           "1"              "set to 1 to build Swift host tools"
-    build-swift-stdlib          "1"              "set to 1 to build the Swift standard library"
+    build-swift-dynamic-stdlib  ""               "set to 1 to build dynamic variants of the Swift standard library"
+    build-swift-static-stdlib   ""               "set to 1 to build static variants of the Swift standard library"
     build-swift-stdlib-unittest-extra "0"        "set to 1 to build optional StdlibUnittest components"
-    build-swift-sdk-overlay     "1"              "set to 1 to build the Swift SDK overlay"
-    build-swift-static-stdlib   "0"              "set to 1 to build static versions of the Swift standard library and SDK overlay"
+    build-swift-dynamic-sdk-overlay   ""         "set to 1 to build dynamic variants of the Swift SDK overlay"
+    build-swift-static-sdk-overlay    ""         "set to 1 to build static variants of the Swift SDK overlay"
     build-swift-examples        "1"              "set to 1 to build examples"
+    build-swift-remote-mirror   "1"              "set to 1 to build the Swift Remote Mirror library"
     build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     check-incremental-compilation "0"            "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
-    source-tree-includes-tests  "1"              "set to 0 to allow the build to proceed when 'test' directory is missing (required for B&I builds)"
+    llvm-include-tests          "1"              "Set to true to generate testing targets for LLVM. Set to true by default."
+    swift-include-tests         "1"              "Set to true to generate testing targets for Swift. This allows the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
@@ -182,6 +181,8 @@ KNOWN_SETTINGS=(
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
     install-libdispatch         ""               "whether to install libdispatch"
+    install-playgroundlogger    ""               "whether to install PlaygroundLogger"
+    install-playgroundsupport   ""               "whether to install PlaygroundSupport"
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
     host-target                 ""               "The host target. LLVM, Clang, and Swift will be built for this target. The built LLVM and Clang will be used to compile Swift for the cross-compilation targets. **This argument is required**"
     stdlib-deployment-targets   ""               "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
@@ -223,6 +224,8 @@ KNOWN_SETTINGS=(
     # TODO: Remove this some time later.
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
+    llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
+    llvm-targets-to-build              "X86;ARM;AArch64;PowerPC;SystemZ" "The code generators that LLVM should build"
 )
 
 # Centralized access point for traced command invocation.
@@ -263,9 +266,12 @@ function quoted_print() {
     python -c 'import pipes; import sys; print(" ".join(pipes.quote(arg) for arg in sys.argv[1:]))' "$@"
 }
 
-
 function toupper() {
     echo "$@" | tr '[:lower:]' '[:upper:]'
+}
+
+function tolower() {
+    echo "$@" | tr '[:upper:]' '[:lower:]'
 }
 
 function true_false() {
@@ -307,6 +313,83 @@ function is_swift_lto_enabled() {
     else
         echo "FALSE"
     fi
+}
+
+# Compute the cmake flags related to disabling llvm tools as a result of our
+# needs for testing LLVM/Swift.
+function compute_cmake_llvm_tool_disable_flags() {
+    if [[ $(false_true "${LLVM_INCLUDE_TESTS}") == "FALSE" ]]; then
+        return
+    fi
+
+    local OUTPUT=()
+    local EXTRA_LLVM_CMAKE_OPTIONS=(
+        # Do not include LLVM tests.
+        -DLLVM_INCLUDE_TESTS:BOOL=NO
+        -DCLANG_INCLUDE_TESTS:BOOL=NO
+    )
+
+    # Disable LLVM Tools that Swift does not use for testing.
+    local LLVM_TOOLS_TO_DISABLE=(
+        BUGPOINT BUGPOINT_PASSES GOLD LLI LLVM_AS_FUZZER LLVM_C_TEST
+        LLVM_CXXDUMP LLVM_DIFF LLVM_DIS LLVM_DWP LLVM_EXTRACT LLVM_GO
+        LLVM_JITLISTENER LLVM_LTO LLVM_MC LLVM_MC_FUZZER LLVM_MCMARKUP
+        LLVM_PDBDUMP LLVM_READOBJ LLVM_RTDYLD LLVM_SHLIB LLVM_SIZE LLVM_SPLIT
+        LLVM_STRESS LLVM_SYMBOLIZER MSBUILD OBJ2YAML OPT SANCOV SANSTATS
+        VERIFY_USELISTORDER XCODE_TOOLCHAIN YAML2OBJ
+    )
+
+    # Disable Clang Tools that Swift does not use for testing.
+    local CLANG_TOOLS_TO_DISABLE=(
+        CLANG_CHECK DIAGTOOL SCAN_BUILD SCAN_VIEW CLANG_FORMAT
+    )
+
+    # If in addition we are asked to not generate targets for swift tests,
+    # then we can disable the building of even more of LLVM.
+    if [[ $(false_true "${SWIFT_INCLUDE_TESTS}") == "TRUE" ]]; then
+        EXTRA_LLVM_CMAKE_OPTIONS+=(
+            # We do not need gtest/FileCheck and friends since we are not
+            # running any tests.
+            -DLLVM_INCLUDE_UTILS:BOOL=NO
+        )
+
+        # Disable the rest of the LLVM tools. We do not need any of them.
+        LLVM_TOOLS_TO_DISABLE+=(
+            DSYMUTIL LLC LLVM_AR LLVM_AS LLVM_BCANALYZER LLVM_COV
+            LLVM_DWARFDUMP LLVM_LINK LLVM_NM LLVM_OBJDUMP LLVM_PROFDATA
+        )
+
+        # Disable the rest of the Clang tools. We do not need them.
+        CLANG_TOOLS_TO_DISABLE+=(
+            ARCMT_TEST C_ARCMT_TEST C_INDEX_TEST
+        )
+
+        # If in addition, we are not building compiler-rt, then we do not
+        # even need to build clang.
+        #
+        # *NOTE* This may change once we start building the standard library
+        # *with the just built clang.
+        if [[ $(true_false "${SKIP_BUILD_COMPILER_RT}") == "TRUE" ]]; then
+            CLANG_TOOLS_TO_DISABLE+=(
+                DRIVER
+            )
+        fi
+    fi
+
+    for arg in "${EXTRA_LLVM_CMAKE_ARGS[@]}"; do
+        OUTPUT+=( ${arg} )
+    done
+    for tool in "${LLVM_TOOLS_TO_DISABLE[@]}"; do
+        OUTPUT+=(
+            -DLLVM_TOOL_${tool}_BUILD:BOOL=NO
+        )
+    done
+    for tool in "${CLANG_TOOLS_TO_DISABLE[@]}"; do
+        OUTPUT+=(
+            -DCLANG_TOOL_${tool}_BUILD:BOOL=NO
+        )
+    done
+    echo "${OUTPUT[@]}"
 }
 
 # Support for performing isolated actions.
@@ -387,6 +470,14 @@ function set_build_options_for_host() {
             case ${host} in
                 linux-x86_64)
                     SWIFT_HOST_VARIANT_ARCH="x86_64"
+                    playgroundlogger_build_cmd="${PLAYGROUNDLOGGER_SOURCE_DIR}/build.py"
+                    playgroundlogger_build_options=(
+                        --swiftc "$(build_directory_bin ${host} swift)"
+                        --foundation "$(build_directory ${host} foundation)"
+                        --build-dir "$(build_directory ${host} playgroundlogger)"
+                        --swift-build-dir "$(build_directory ${host} swift)"
+                        --$(tolower "${PLAYGROUNDLOGGER_BUILD_TYPE}")
+                    )
                     ;;
                 linux-armv6)
                     SWIFT_HOST_VARIANT_ARCH="armv6"
@@ -434,6 +525,9 @@ function set_build_options_for_host() {
                     swiftpm_bootstrap_options=(
                         --sysroot="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_TestDriver")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="MacOSX.platform"
                     ;;
                 iphonesimulator-i386)
                     xcrun_sdk_name="iphonesimulator"
@@ -449,6 +543,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_iOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="iPhoneSimulator.platform"
                     ;;
                 iphonesimulator-x86_64)
                     xcrun_sdk_name="iphonesimulator"
@@ -464,6 +561,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_iOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="iPhoneSimulator.platform"
                     ;;
                 iphoneos-armv7)
                     xcrun_sdk_name="iphoneos"
@@ -479,6 +579,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_iOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="iPhoneOS.platform"
                     ;;
                 iphoneos-armv7s)
                     xcrun_sdk_name="iphoneos"
@@ -494,6 +597,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_iOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="iPhoneOS.platform"
                     ;;
                 iphoneos-arm64)
                     xcrun_sdk_name="iphoneos"
@@ -509,6 +615,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_iOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="iPhoneOS.platform"
                     ;;
                 appletvsimulator-x86_64)
                     xcrun_sdk_name="appletvsimulator"
@@ -524,6 +633,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_tvOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="AppleTVSimulator.platform"
                     ;;
                 appletvos-arm64)
                     xcrun_sdk_name="appletvos"
@@ -539,6 +651,9 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
+                    playgroundlogger_build_cmd="xcodebuild"
+                    playgroundlogger_build_target=("PlaygroundLogger_tvOS")
+                    PLAYGROUNDLOGGER_INSTALL_PLATFORM="AppleTVOS.platform"
                     ;;
                 watchsimulator-i386)
                     xcrun_sdk_name="watchsimulator"
@@ -580,8 +695,6 @@ function set_build_options_for_host() {
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
-                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_COMPILER_RT})"
-                -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_COMPILER_RT})"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
@@ -627,6 +740,22 @@ function set_build_options_for_host() {
             ;;
     esac
 
+
+    llvm_cmake_options+=(
+        -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+        -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+    )
+
+    # If we are asked to not generate test targets for LLVM and or Swift,
+    # disable as many LLVM tools as we can. This improves compile time when
+    # compiling with LTO.
+    #
+    # *NOTE* Currently we do not support testing LLVM via build-script. But in a
+    # future commit we will.
+    for arg in "$(compute_cmake_llvm_tool_disable_flags)"; do
+        llvm_cmake_options+=( ${arg} )
+    done
+
     if [[ "${llvm_target_arch}" ]] ; then
         llvm_cmake_options+=(
             -DLLVM_TARGET_ARCH="${llvm_target_arch}"
@@ -649,6 +778,15 @@ function set_build_options_for_host() {
         -DSWIFT_HOST_VARIANT_SDK="${SWIFT_HOST_VARIANT_SDK}"
         -DSWIFT_HOST_VARIANT_ARCH="${SWIFT_HOST_VARIANT_ARCH}"
     )
+
+    if [[ "${LLVM_LIT_ARGS}" ]]; then
+        llvm_cmake_options+=(
+            -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS}"
+        )
+        swift_cmake_options+=(
+            -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS}"
+        )
+    fi
 }
 
 function configure_default_options() {
@@ -802,12 +940,12 @@ fi
 # FIXME: We currently do not support building compiler-rt with the
 # Xcode generator.
 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
-    SKIP_COMPILER_RT=1
+    SKIP_BUILD_COMPILER_RT=1
 fi
 
 # FIXME: We currently do not support cross-compiling swift with compiler-rt.
 if [[ "${CROSS_COMPILE_HOSTS}" ]]; then
-    SKIP_COMPILER_RT=1
+    SKIP_BUILD_COMPILER_RT=1
 fi
 
 # WORKSPACE, BUILD_DIR and INSTALLABLE_PACKAGE must be absolute paths
@@ -1074,6 +1212,8 @@ SWIFTPM_SOURCE_DIR="${WORKSPACE}/swiftpm"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
+PLAYGROUNDLOGGER_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundLogger"
+PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundSupport"
 
 if [[ ! -d ${CMARK_SOURCE_DIR} ]]; then
     echo "Couldn't find cmark source directory."
@@ -1102,6 +1242,16 @@ fi
 
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" && ! -d ${LIBDISPATCH_SOURCE_DIR} ]]; then
     echo "Couldn't find libdispatch source directory."
+    exit 1
+fi
+
+if [[ ! "${SKIP_BUILD_PLAYGROUNDLOGGER}" && ! -d ${PLAYGROUNDLOGGER_SOURCE_DIR} ]]; then
+    echo "Couldn't find PlaygroundLogger source directory."
+    exit 1
+fi
+
+if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
+    echo "Couldn't find PlaygroundSupport source directory."
     exit 1
 fi
 
@@ -1140,6 +1290,12 @@ fi
 # added to the list of build products first.
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
+fi
+if [[ ! "${SKIP_BUILD_PLAYGROUNDLOGGER}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" playgroundlogger)
+fi
+if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" playgroundsupport)
 fi
 # SwiftPM is dependent on XCTest, so XCTest must be added to the list of
 # build products first.
@@ -1400,7 +1556,14 @@ function build_directory_bin() {
                 echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
                 ;;
             libdispatch)
-                echo "${root}/bin"
+                echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
+                ;;
+            playgroundlogger)
+                # FIXME: var name for build type
+                echo "${root}/${PLAYGROUNDLOGGER_BUILD_TYPE}/bin"
+                ;;
+            playgroundsupport)
+                echo "${root}/${PLAYGROUNDSUPPORT_BUILD_TYPE}/bin"
                 ;;
             *)
                 echo "error: unknown product: ${product}"
@@ -1512,6 +1675,13 @@ function cmake_config_opt() {
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
                 ;;            
             libdispatch)
+                ;;
+            playgroundlogger)
+                # FIXME: var name
+                echo "--config ${PLAYGROUNDLOGGER_BUILD_TYPE}"
+                ;;
+            playgroundsupport)
+                echo "--config ${PLAYGROUNDSUPPORT_BUILD_TYPE}"
                 ;;
             *)
                 echo "error: unknown product: ${product}"
@@ -1668,7 +1838,7 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
-    if [[ "${ENABLE_ASAN}" ]] ; then
+    if [[ "${ENABLE_ASAN}" || "$(uname -s)" == "Linux" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
             -DSWIFT_SOURCEKIT_USE_INPROC_LIBRARY:BOOL=TRUE
@@ -1759,7 +1929,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [ "${SKIP_BUILD_LLVM}" ] ; then
                     # We can't skip the build completely because the standalone
                     # build of Swift depend on these.
-                    build_targets=(llvm-config llvm-tblgen clang-headers)
+                    build_targets=(llvm-tblgen clang-headers)
                 fi
 
                 # Note: we set the variable:
@@ -1777,7 +1947,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLVM_ENABLE_ASSERTIONS}")
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}"
-                    -DLLVM_INCLUDE_TESTS:BOOL=$(true_false "${SOURCE_TREE_INCLUDES_TESTS}")
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     "${llvm_cmake_options[@]}"
@@ -1832,18 +2001,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     native_llvm_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
                     native_clang_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
                     native_swift_tools_path="$(build_directory "${LOCAL_HOST}" swift)/bin"
-
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DLLVM_TOOLS_BINARY_DIR:PATH=$(build_directory ${host} llvm)/bin
-                        -DLLVM_LIBRARY_DIR:PATH=$(build_directory ${host} llvm)/lib
-                        -DLLVM_MAIN_INCLUDE_DIR:PATH=$(build_directory ${host} llvm)/include
-                        -DLLVM_BINARY_DIR:PATH=$(build_directory ${host} llvm)
-                        -DLLVM_MAIN_SRC_DIR:PATH="${LLVM_SOURCE_DIR}"
-                    )
                 else
                     build_perf_testsuite_this_time=$(true_false "$(not ${SKIP_BUILD_BENCHMARKS})")
-                    build_tests_this_time=${SOURCE_TREE_INCLUDES_TESTS}
+                    build_tests_this_time=${SWIFT_INCLUDE_TESTS}
                 fi
 
                 # Command-line parameters override any autodetection that we
@@ -1862,10 +2022,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DLLVM_TOOLS_BINARY_DIR:PATH=/tmp/dummy
-                        -DLLVM_LIBRARY_DIR:PATH="${build_dir}"
-                        -DLLVM_MAIN_INCLUDE_DIR:PATH=/tmp/dummy
-                        -DLLVM_BINARY_DIR:PATH=$(build_directory ${host} llvm)
-                        -DLLVM_MAIN_SRC_DIR:PATH="${LLVM_SOURCE_DIR}"
                     )
                 fi
 
@@ -1883,13 +2039,15 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
-                    -DSWIFT_BUILD_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
-                    -DSWIFT_BUILD_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STDLIB}")
+                    -DSWIFT_INCLUDE_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
+                    -DSWIFT_BUILD_REMOTE_MIRROR:BOOL=$(true_false "${BUILD_SWIFT_REMOTE_MIRROR}")
                     -DSWIFT_SERIALIZE_STDLIB_UNITTEST:BOOL=$(true_false "${BUILD_SERIALIZED_STDLIB_UNITTEST}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_CHECK_INCREMENTAL_COMPILATION:BOOL=$(true_false "${CHECK_INCREMENTAL_COMPILATION}")
-                    -DSWIFT_BUILD_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_SDK_OVERLAY}")
+                    -DSWIFT_BUILD_DYNAMIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_DYNAMIC_STDLIB}")
                     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STATIC_STDLIB}")
+                    -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_DYNAMIC_SDK_OVERLAY}")
+                    -DSWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_STATIC_SDK_OVERLAY}")
                     -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")
                     -DSWIFT_BUILD_EXAMPLES:BOOL=$(true_false "${BUILD_SWIFT_EXAMPLES}")
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
@@ -1903,13 +2061,14 @@ for host in "${ALL_HOSTS[@]}"; do
                 cmake_options=(
                     "${cmake_options[@]}"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                    -DLLVM_CONFIG:PATH="$(build_directory_bin ${host} llvm)/llvm-config"
                     -DSWIFT_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                     -DSWIFT_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
                     -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${host} cmark)"
+                    -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
+                    -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                 )
 
                 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
@@ -2115,13 +2274,19 @@ for host in "${ALL_HOSTS[@]}"; do
                     copy_swift_stdlib_tool_substitute "$(build_directory_bin ${host} swift)/swift-stdlib-tool"
                 fi
 
-                # FIXME: Use XCTEST_BUILD_TYPE (which is never properly
-                #        set) to build either --debug or --release.
+                # Use XCTEST_BUILD_TYPE to build either --debug or --release.
+                if [[ "${XCTEST_BUILD_TYPE}" ==  "Debug" ]] ; then
+                    XCTEST_BUILD_ARGS="--debug"
+                else
+                    XCTEST_BUILD_ARGS="--release"
+                fi
+
                 call "${XCTEST_SOURCE_DIR}"/build_script.py \
                     --swiftc="${SWIFTC_BIN}" \
                     --build-dir="${XCTEST_BUILD_DIR}" \
                     --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
-                    $LIBDISPATCH_BUILD_ARGS
+                    $LIBDISPATCH_BUILD_ARGS \
+                    $XCTEST_BUILD_ARGS
 
                 # XCTest builds itself and doesn't rely on cmake
                 continue
@@ -2181,13 +2346,21 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
                     # First time building; need to run autotools and configure
+                    if [[ "$LIBDISPATCH_BUILD_TYPE" == "Release" ]] ; then
+                        dispatch_build_variant_arg="release"
+                    elif [[ "$LIBDISPATCH_BUILD_TYPE" == "RelWithDebInfo" ]]; then
+                        dispatch_build_variant_arg="releasedebuginfo"
+                    else
+                        dispatch_build_variant_arg="debug"
+                    fi
                     call mkdir -p "${LIBDISPATCH_BUILD_DIR}"
                     with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
                         call autoreconf -fvi
                     with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                               call env CC="${LLVM_BIN}/clang" CCX="${LLVM_BIN}/clang" SWIFTC="${SWIFTC_BIN}" \
-                               "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
-                               --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
+                        call env CC="${LLVM_BIN}/clang" CXX="${LLVM_BIN}/clang++" SWIFTC="${SWIFTC_BIN}" \
+                            "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
+                            --with-build-variant=$dispatch_build_variant_arg \
+                            --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
 
                 fi
                 with_pushd "${LIBDISPATCH_BUILD_DIR}" \
@@ -2196,6 +2369,30 @@ for host in "${ALL_HOSTS[@]}"; do
                     call make build-tests
 
                 # libdispatch builds itself and doesn't use cmake
+                continue
+                ;;
+            playgroundlogger)
+                PLAYGROUNDLOGGER_BUILD_DIR=$(build_directory ${host} ${product})
+                SWIFTC_BIN="$(build_directory_bin ${host} swift)/swiftc"
+
+                set -x
+                pushd "${PLAYGROUNDLOGGER_SOURCE_DIR}"
+                mkdir -p "${PLAYGROUNDLOGGER_BUILD_DIR}"
+                "${playgroundlogger_build_cmd}" -configuration "${PLAYGROUNDLOGGER_BUILD_TYPE}" -target "${playgroundlogger_build_target}" install SWIFT_EXEC="${SWIFTC_BIN}" DSTROOT=${build_dir} INSTALL_PATH="/" SKIP_INSTALL=NO
+                popd
+                { set +x; } 2>/dev/null
+                continue
+                ;;
+            playgroundsupport)
+                PLAYGROUNDSUPPORT_BUILD_DIR=$(build_directory ${host} ${product})
+                SWIFTC_BIN="$(build_directory_bin ${host} swift)/swiftc"
+
+                set -x
+                pushd "${PLAYGROUNDSUPPORT_SOURCE_DIR}"
+                mkdir -p "${PLAYGROUNDSUPPORT_BUILD_DIR}"
+                "xcodebuild" -configuration "${PLAYGROUNDSUPPORT_BUILD_TYPE}" -target AllProducts SWIFT_EXEC="${SWIFTC_BIN}" DSTROOT="$(get_host_install_destdir ${host})"
+                popd
+                { set +x; } 2>/dev/null
                 continue
                 ;;
             *)
@@ -2406,6 +2603,19 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ "${SKIP_TEST_XCTEST}" ]]; then
                     continue
                 fi
+                # If libdispatch is being built then XCTest will need access to it
+                if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
+                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
+                    LIBDISPATCH_BUILD_ARGS="--libdispatch-src-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
+                fi
+
+                # Use XCTEST_BUILD_TYPE to build either --debug or --release.
+                if [[ "${XCTEST_BUILD_TYPE}" ==  "Debug" ]] ; then
+                    XCTEST_BUILD_ARGS="--debug"
+                else
+                    XCTEST_BUILD_ARGS="--release"
+                fi
+
                 echo "--- Running tests for ${product} ---"
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
@@ -2413,6 +2623,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 call "${XCTEST_SOURCE_DIR}"/build_script.py test \
                     --swiftc="${SWIFTC_BIN}" \
                     --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
+                    ${LIBDISPATCH_BUILD_ARGS} \
+                    $XCTEST_BUILD_ARGS \
                     "${XCTEST_BUILD_DIR}"
                 echo "--- Finished tests for ${product} ---"
                 continue
@@ -2426,12 +2638,18 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ "${SKIP_TEST_FOUNDATION}" ]]; then
                     continue
                 fi
+                # If libdispatch is being built, TestFoundation will need access to it
+                if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
+                    LIBDISPATCH_LIB_DIR=":$(build_directory ${host} libdispatch)/src/.libs"
+                else
+                    LIBDISPATCH_LIB_DIR=""
+                fi
                 echo "--- Running tests for ${product} ---"
                 build_dir=$(build_directory ${host} ${product})
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call ${NINJA_BIN} TestFoundation
-                call env LD_LIBRARY_PATH="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"/lib/swift/:"${build_dir}/Foundation":"${XCTEST_BUILD_DIR}":${LD_LIBRARY_PATH} "${build_dir}"/TestFoundation/TestFoundation
+                call env LD_LIBRARY_PATH="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"/lib/swift/:"${build_dir}/Foundation":"${XCTEST_BUILD_DIR}""${LIBDISPATCH_LIB_DIR}":${LD_LIBRARY_PATH} "${build_dir}"/TestFoundation/TestFoundation
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
@@ -2446,6 +2664,19 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
+           playgroundlogger)
+               SWIFT_DYLIB_PATH=$(build_directory ${host} swift)/lib/swift/macosx/
+               PLAYGROUNDLOGGER_FRAMEWORK_PATH=$(build_directory ${host} ${product})
+               set -x
+               pushd "${PLAYGROUNDLOGGER_FRAMEWORK_PATH}"
+               DYLD_LIBRARY_PATH=$SWIFT_DYLIB_PATH DYLD_FRAMEWORK_PATH=$PLAYGROUNDLOGGER_FRAMEWORK_PATH ./PlaygroundLogger_TestDriver
+               popd
+               { set +x; } 2>/dev/null
+               continue
+               ;;
+           playgroundsupport)
+               continue
+               ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -2663,6 +2894,64 @@ for host in "${ALL_HOSTS[@]}"; do
                 # As libdispatch installation is self-contained, we break early here.
                 continue
                 ;;
+            playgroundlogger)
+                if [[ -z "${INSTALL_PLAYGROUNDLOGGER}" ]] ; then
+                    continue
+                fi
+                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                    echo "--install-destdir is required to install products."
+                    exit 1
+                fi
+
+                echo "--- Installing ${product} ---"
+                PLAYGROUNDLOGGER_BUILD_DIR=$(build_directory ${host} playgroundlogger)
+                PLAYGROUNDLOGGER_INSTALL_PREFIX="${INSTALL_DESTDIR}"
+                # Note that installing directly to /usr/lib/swift usually
+                # requires root permissions.
+                set -x
+                case "$(uname -s)" in
+                    Linux)
+                        PLAYGROUNDLOGGER_INSTALL_DIR="$(get_host_install_destdir ${host})/$(get_host_install_prefix ${host})/lib/swift/linux"
+                        mkdir -p "${PLAYGROUNDLOGGER_INSTALL_DIR}"
+                        cp -R "${PLAYGROUNDLOGGER_BUILD_DIR}"/libPlaygroundLogger.so "${PLAYGROUNDLOGGER_INSTALL_DIR}"
+                        ;;
+                    Darwin)
+                        pushd "${PLAYGROUNDLOGGER_SOURCE_DIR}"
+                        xcodebuild -target "All Platforms Logger" -configuration Toolchain_${PLAYGROUNDLOGGER_BUILD_TYPE} install SWIFT_EXEC="${SWIFTC_BIN}" DT_TOOLCHAIN_DIR="${TOOLCHAIN_PREFIX}" DSTROOT="$(get_host_install_destdir ${host})"
+                        popd
+                        continue
+                        ;;
+                    *)
+                        echo "error: --install-playgroundlogger is not supported on this platform"
+                        exit 1
+                        ;;
+                esac
+                { set +x; } 2>/dev/null
+
+                # As XCTest installation is self-contained, we break early here.
+                continue
+                ;;
+            playgroundsupport)
+                set -x
+                if [[ -z "${INSTALL_PLAYGROUNDSUPPORT}" ]] ; then
+                    continue
+                fi
+                case "$(uname -s)" in
+                    Linux)
+                        ;;
+                    FreeBSD)
+                        ;;
+                    CYGWIN_NT-10.0)
+                        ;;
+                    Darwin)
+                        pushd "${PLAYGROUNDSUPPORT_SOURCE_DIR}"
+                        xcodebuild -target AllProducts -configuration ${PLAYGROUNDSUPPORT_BUILD_TYPE} install SWIFT_EXEC="${SWIFTC_BIN}" DT_TOOLCHAIN_DIR="${TOOLCHAIN_PREFIX}" DSTROOT="$(get_host_install_destdir ${host})"
+                        popd
+                        continue
+                        ;;
+                esac
+                { set +x; } 2>/dev/null
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -2708,7 +2997,7 @@ for host in "${ALL_HOSTS[@]}"; do
             # Strip executables, shared libraries and static libraries in
             # `host_install_destdir`.
             find "${host_install_destdir}${TOOLCHAIN_PREFIX}/" \
-              -perm -0111 -or -name "*.a" -type f -print | \
+              '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
               xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
 
             { set +x; } 2>/dev/null

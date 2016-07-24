@@ -131,7 +131,6 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_STRUCT_INHERITANCE_4 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_STRUCT_INHERITANCE_5 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
@@ -147,7 +146,6 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_STRUCT_INHERITANCE_8 > %t.types.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_CLASS_INHERITANCE_1 > %t.types.txt
@@ -454,7 +452,7 @@ protocol TestSelf1 {
 
 func testTypeInParamGeneric1<
     GenericFoo : FooProtocol,
-    GenericBar : protocol<FooProtocol, BarProtocol>,
+    GenericBar : FooProtocol & BarProtocol,
     GenericBaz>(a: #^TYPE_IN_FUNC_PARAM_GENERIC_1^#
 
 // TYPE_IN_FUNC_PARAM_GENERIC_1: Begin completions
@@ -466,7 +464,7 @@ func testTypeInParamGeneric1<
 
 struct TestTypeInParamGeneric2<
     StructGenericFoo : FooProtocol,
-    StructGenericBar : protocol<FooProtocol, BarProtocol>,
+    StructGenericBar : FooProtocol & BarProtocol,
     StructGenericBaz> {
   func testTypeInParamGeneric2(a: #^TYPE_IN_FUNC_PARAM_GENERIC_2^#
 }
@@ -480,7 +478,7 @@ struct TestTypeInParamGeneric2<
 struct TestTypeInParamGeneric3 {
   func testTypeInParamGeneric3<
       GenericFoo : FooProtocol,
-      GenericBar : protocol<FooProtocol, BarProtocol>,
+      GenericBar : FooProtocol & BarProtocol,
       GenericBaz>(a: #^TYPE_IN_FUNC_PARAM_GENERIC_3^#
 }
 
@@ -492,11 +490,11 @@ struct TestTypeInParamGeneric3 {
 
 struct TestTypeInParamGeneric4<
     StructGenericFoo : FooProtocol,
-    StructGenericBar : protocol<FooProtocol, BarProtocol>,
+    StructGenericBar : FooProtocol & BarProtocol,
     StructGenericBaz> {
   func testTypeInParamGeneric4<
       GenericFoo : FooProtocol,
-      GenericBar : protocol<FooProtocol, BarProtocol>,
+      GenericBar : FooProtocol & BarProtocol,
       GenericBaz>(a: #^TYPE_IN_FUNC_PARAM_GENERIC_4^#
 }
 
@@ -530,7 +528,7 @@ struct TestTypeInParamGeneric5<StructGenericFoo> {
 
 struct TestTypeInConstructorParamGeneric1<
     StructGenericFoo : FooProtocol,
-    StructGenericBar : protocol<FooProtocol, BarProtocol>,
+    StructGenericBar : FooProtocol & BarProtocol,
     StructGenericBaz> {
   init(a: #^TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1^#
 }
@@ -543,7 +541,7 @@ struct TestTypeInConstructorParamGeneric1<
 
 struct TestTypeInConstructorParamGeneric2 {
   init<GenericFoo : FooProtocol,
-       GenericBar : protocol<FooProtocol, BarProtocol>,
+       GenericBar : FooProtocol & BarProtocol,
        GenericBaz>(a: #^TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_2^#
 }
 
@@ -555,10 +553,10 @@ struct TestTypeInConstructorParamGeneric2 {
 
 struct TestTypeInConstructorParamGeneric3<
     StructGenericFoo : FooProtocol,
-    StructGenericBar : protocol<FooProtocol, BarProtocol>,
+    StructGenericBar : FooProtocol & BarProtocol,
     StructGenericBaz> {
   init<GenericFoo : FooProtocol,
-       GenericBar : protocol<FooProtocol, BarProtocol>,
+       GenericBar : FooProtocol & BarProtocol,
        GenericBaz>(a: #^TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3^#
 }
 
@@ -973,7 +971,7 @@ func testTypeIdentifierGeneric1<
 // TYPE_IDENTIFIER_GENERIC_1-NEXT: End completions
 
 func testTypeIdentifierGeneric2<
-    GenericFoo : protocol<FooProtocol, BarProtocol>
+    GenericFoo : FooProtocol & BarProtocol
     >(a: GenericFoo.#^TYPE_IDENTIFIER_GENERIC_2^#
 
 // TYPE_IDENTIFIER_GENERIC_2: Begin completions

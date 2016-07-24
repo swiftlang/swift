@@ -92,11 +92,13 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   case IRGenDebugInfoKind::LineTables:
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
- case IRGenDebugInfoKind::Normal:
+  case IRGenDebugInfoKind::ASTTypes:
+    // TODO: Enable -gmodules for the clang code generator.
+  case IRGenDebugInfoKind::DwarfTypes:
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
-  if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
+  if (Opts.DebugInfoKind > IRGenDebugInfoKind::None) {
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
     CGO.DwarfDebugFlags = Opts.DWARFDebugFlags;
@@ -383,16 +385,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // Only use the new calling conventions on platforms that support it.
   auto Arch = Triple.getArch();
   if (SWIFT_RT_USE_RegisterPreservingCC &&
-      Arch == llvm::Triple::ArchType::aarch64) {
+      Arch == llvm::Triple::ArchType::aarch64)
     RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
-  }
-  else {
+  else
     RegisterPreservingCC = DefaultCC;
-  }
 
-  if (IRGen.Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
+  if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
     DebugInfo = new IRGenDebugInfo(IRGen.Opts, *CI, *this, Module, SF);
-  }
 
   initClangTypeConverter();
 }
@@ -452,6 +451,11 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
     fn->setCallingConv(cc);
 
+    if (llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF() &&
+        (fn->getLinkage() == llvm::GlobalValue::ExternalLinkage ||
+         fn->getLinkage() == llvm::GlobalValue::AvailableExternallyLinkage))
+      fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+
     llvm::AttrBuilder buildFnAttr;
     llvm::AttrBuilder buildRetAttr;
 
@@ -510,6 +514,7 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
     // and leave only one copy.
     fun->setLinkage(llvm::Function::LinkOnceODRLinkage);
     fun->setVisibility(llvm::Function::HiddenVisibility);
+    fun->setDLLStorageClass(llvm::Function::DefaultStorageClass);
     fun->setDoesNotThrow();
 
     // Add the body of a wrapper.
@@ -526,6 +531,8 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
     auto *globalFnPtr =
         new llvm::GlobalVariable(Module, fnPtrTy, false,
                                  llvm::GlobalValue::ExternalLinkage, 0, symbol);
+    if (llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF())
+      globalFnPtr->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
     // Forward all arguments.
     llvm::SmallVector<llvm::Value *, 4> args;
@@ -640,17 +647,25 @@ llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
   if (EmptyTupleMetadata)
     return EmptyTupleMetadata;
 
-  return EmptyTupleMetadata =
-    Module.getOrInsertGlobal("_TMT_", FullTypeMetadataStructTy);
+  EmptyTupleMetadata =
+      Module.getOrInsertGlobal("_TMT_", FullTypeMetadataStructTy);
+  if (Triple.isOSBinFormatCOFF())
+    cast<llvm::GlobalVariable>(EmptyTupleMetadata)
+        ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+  return EmptyTupleMetadata;
 }
 
 llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
-  if (ObjCEmptyCachePtr) return ObjCEmptyCachePtr;
+  if (ObjCEmptyCachePtr)
+    return ObjCEmptyCachePtr;
 
   if (ObjCInterop) {
     // struct objc_cache _objc_empty_cache;
     ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
                                                  OpaquePtrTy->getElementType());
+    if (Triple.isOSBinFormatCOFF())
+      cast<llvm::GlobalVariable>(ObjCEmptyCachePtr)
+          ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
   } else {
     // FIXME: Remove even the null value per rdar://problem/18801263
     ObjCEmptyCachePtr = llvm::ConstantPointerNull::get(OpaquePtrTy);
@@ -680,7 +695,10 @@ Address IRGenModule::getAddrOfObjCISAMask() {
   // isa masking.
   assert(TargetInfo.hasISAMasking());
   if (!ObjCISAMaskPtr) {
-    ObjCISAMaskPtr =  Module.getOrInsertGlobal("swift_isaMask", IntPtrTy);
+    ObjCISAMaskPtr = Module.getOrInsertGlobal("swift_isaMask", IntPtrTy);
+    if (Triple.isOSBinFormatCOFF())
+      cast<llvm::GlobalVariable>(ObjCISAMaskPtr)
+          ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
   }
   return Address(ObjCISAMaskPtr, getPointerAlignment());
 }
@@ -781,18 +799,47 @@ static StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
   return os.str();
 }
 
+llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
+                                                      StringRef library) {
+  llvm::SmallString<32> buffer;
+
+  if (T.isWindowsMSVCEnvironment() || T.isWindowsItaniumEnvironment()) {
+    bool quote = library.find(' ') != StringRef::npos;
+
+    buffer += "/DEFAULTLIB:";
+    if (quote)
+      buffer += '"';
+    buffer += library;
+    if (!library.endswith_lower(".lib"))
+      buffer += ".lib";
+    if (quote)
+      buffer += '"';
+  } else if (T.isPS4()) {
+    bool quote = library.find(' ') != StringRef::npos;
+
+    buffer += "\01";
+    if (quote)
+      buffer += '"';
+    buffer += library;
+    if (quote)
+      buffer += '"';
+  } else {
+    buffer += "-l";
+    buffer += library;
+  }
+
+  return buffer;
+}
+
 void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   llvm::LLVMContext &ctx = Module.getContext();
 
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
-    // FIXME: Use target-independent linker option.
-    // Clang uses CGM.getTargetCodeGenInfo().getDependentLibraryOption(...).
-    llvm::SmallString<32> buf;
-    buf += "-l";
-    buf += linkLib.getName();
-    auto flag = llvm::MDString::get(ctx, buf);
-    AutolinkEntries.push_back(llvm::MDNode::get(ctx, flag));
+    llvm::SmallString<32> opt =
+        getTargetDependentLibraryOption(Triple, linkLib.getName());
+    AutolinkEntries.push_back(
+        llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
     break;
   }
   case LibraryKind::Framework: {
@@ -815,6 +862,9 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto symbolAddr = Module.getOrInsertGlobal(buf.str(), Int1Ty);
+    if (Triple.isOSBinFormatCOFF())
+      cast<llvm::GlobalVariable>(symbolAddr)
+          ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
     buf += "_$";
     appendEncodedName(buf, IRGen.Opts.ModuleName);
@@ -877,11 +927,9 @@ void IRGenModule::emitAutolinkInfo() {
                                        }),
                         AutolinkEntries.end());
 
-  switch (TargetInfo.OutputObjectFormat) {
-  case llvm::Triple::UnknownObjectFormat:
-    llvm_unreachable("unknown object format");
-  case llvm::Triple::COFF:
-  case llvm::Triple::MachO: {
+  if (TargetInfo.OutputObjectFormat == llvm::Triple::COFF ||
+      TargetInfo.OutputObjectFormat == llvm::Triple::MachO ||
+      Triple.isPS4()) {
     llvm::LLVMContext &ctx = Module.getContext();
 
     if (!LinkerOptions) {
@@ -897,9 +945,10 @@ void IRGenModule::emitAutolinkInfo() {
       (void)FoundOldEntry;
       assert(FoundOldEntry && "Could not replace old linker options entry?");
     }
-    break;
-  }
-  case llvm::Triple::ELF: {
+  } else {
+    assert(TargetInfo.OutputObjectFormat == llvm::Triple::ELF &&
+           "expected ELF output format");
+
     // Merge the entries into null-separated string.
     llvm::SmallString<64> EntriesString;
     for (auto &EntryNode : AutolinkEntries) {
@@ -911,28 +960,28 @@ void IRGenModule::emitAutolinkInfo() {
       }
     }
     auto EntriesConstant = llvm::ConstantDataArray::getString(
-      LLVMContext, EntriesString, /*AddNull=*/false);
+        LLVMContext, EntriesString, /*AddNull=*/false);
 
-    auto var = new llvm::GlobalVariable(*getModule(), 
-                                        EntriesConstant->getType(), true,
-                                        llvm::GlobalValue::PrivateLinkage,
-                                        EntriesConstant, 
-                                        "_swift1_autolink_entries");
+    auto var =
+        new llvm::GlobalVariable(*getModule(), EntriesConstant->getType(), true,
+                                 llvm::GlobalValue::PrivateLinkage,
+                                 EntriesConstant, "_swift1_autolink_entries");
     var->setSection(".swift1_autolink_entries");
     var->setAlignment(getPointerAlignment().getValue());
 
     addUsedGlobal(var);
-    break;
-  }
   }
 
   if (!IRGen.Opts.ForceLoadSymbolName.empty()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
-    (void)new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/false,
-                                   llvm::GlobalValue::CommonLinkage,
-                                   llvm::Constant::getNullValue(Int1Ty),
-                                   buf.str());
+    auto symbol =
+        new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/false,
+                                 llvm::GlobalValue::CommonLinkage,
+                                 llvm::Constant::getNullValue(Int1Ty),
+                                 buf.str());
+    if (Triple.isOSBinFormatCOFF())
+      symbol->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
   }
 }
 

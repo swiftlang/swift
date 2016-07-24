@@ -737,7 +737,7 @@ namespace {
     
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type) {
       printCommon(D, Type, FuncColor);
-      if (!D->getCaptureInfo().empty()) {
+      if (!D->getCaptureInfo().isTrivial()) {
         OS << " ";
         D->getCaptureInfo().print(OS);
       }
@@ -1497,6 +1497,15 @@ public:
     Indent -= 2;
   }
 
+  void printRecLabelled(Expr *E, StringRef label) {
+    Indent += 2;
+    OS.indent(Indent);
+    OS << '(' << label << '\n';
+    printRec(E);
+    OS << ')';
+    Indent -= 2;
+  }
+
   /// FIXME: This should use ExprWalker to print children.
 
   void printRec(Decl *D) { D->dump(OS, Indent + 2); }
@@ -1894,6 +1903,14 @@ public:
       OS << " bridges_to_objc";
     OS << '\n';
     printRec(E->getSubExpr());
+    if (auto keyConversion = E->getKeyConversion()) {
+      OS << '\n';
+      printRecLabelled(keyConversion.Conversion, "key_conversion");
+    }
+    if (auto valueConversion = E->getValueConversion()) {
+      OS << '\n';
+      printRecLabelled(valueConversion.Conversion, "value_conversion");
+    }
     OS << ')';
   }
   void visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
@@ -2014,7 +2031,7 @@ public:
   llvm::raw_ostream &printClosure(AbstractClosureExpr *E, char const *name) {
     printCommon(E, name);
     OS << " discriminator=" << E->getDiscriminator();
-    if (!E->getCaptureInfo().empty()) {
+    if (!E->getCaptureInfo().isTrivial()) {
       OS << " ";
       E->getCaptureInfo().print(OS);
     }
@@ -2642,50 +2659,6 @@ namespace {
           printField("name", elt.getName().str());
         if (elt.isVararg())
           printFlag("vararg");
-        switch (elt.getDefaultArgKind()) {
-        case DefaultArgumentKind::None:
-          break;
-
-        case DefaultArgumentKind::Column:
-          printField("default_arg", "#column");
-          break;
-
-        case DefaultArgumentKind::DSOHandle:
-          printField("default_arg", "#dsohandle");
-          break;
-
-        case DefaultArgumentKind::File:
-          printField("default_arg", "#file");
-          break;
-
-        case DefaultArgumentKind::Function:
-          printField("default_arg", "#function");
-          break;
-
-        case DefaultArgumentKind::Inherited:
-          printField("default_arg", "inherited");
-          break;
-
-        case DefaultArgumentKind::Line:
-          printField("default_arg", "#line");
-          break;
-
-        case DefaultArgumentKind::Nil:
-          printField("default_arg", "nil");
-          break;
-
-        case DefaultArgumentKind::EmptyArray:
-          printField("default_arg", "[]");
-          break;
-
-        case DefaultArgumentKind::EmptyDictionary:
-          printField("default_arg", "[:]");
-          break;
-
-        case DefaultArgumentKind::Normal:
-          printField("default_arg", "normal");
-          break;
-        }
 
         printRec(elt.getType());
         OS << ")";
@@ -2899,6 +2872,7 @@ namespace {
       printFlag(T->isNoReturn(), "noreturn");
       printFlag(T->isAutoClosure(), "autoclosure");
       printFlag(T->isNoEscape(), "noescape");
+      printFlag(T->isExplicitlyEscaping(), "escaping");
       printFlag(T->throws(), "throws");
 
       printRec("input", T->getInput());

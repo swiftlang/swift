@@ -32,7 +32,7 @@ using namespace swift;
 using namespace Lowering;
 
 // Collect used open archetypes from a given type into the \p openedArchetypes.
-// \p openedArchetyes is being used as a set  We don't use a real set type here
+// \p openedArchetypes is being used as a set. We don't use a real set type here
 // for performance reasons.
 static void
 collectOpenedArchetypes(CanType Ty,
@@ -118,8 +118,11 @@ static void collectOpenedArchetypeOperands(CanType Ty,
 //===----------------------------------------------------------------------===//
 
 template <typename INST>
-static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var) {
-  return M.allocateInst(sizeof(INST) + Var.Name.size(), alignof(INST));
+static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var,
+                                          ArrayRef<SILValue> Operands = {}) {
+  return M.allocateInst(sizeof(INST) + Var.Name.size() +
+                            sizeof(Operand) * Operands.size(),
+                        alignof(INST));
 }
 
 TailAllocatedDebugVariable::TailAllocatedDebugVariable(SILDebugVariable Var,
@@ -135,17 +138,30 @@ StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
 }
 
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
-                               SILFunction &F, SILDebugVariable Var)
+                               ArrayRef<SILValue> OpenedArchetypeOperands,
+                               SILFunction &F,
+                               SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocStackInst, Loc,
                      elementType.getAddressType()),
-      VarInfo(Var, getTrailingObjects<char>()) {}
+      NumOperands(OpenedArchetypeOperands.size()),
+      VarInfo(Var, getTrailingObjects<char>()) {
+  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
+                                         OpenedArchetypeOperands);
+}
 
-AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
-                                       SILType elementType, SILFunction &F,
-                                       SILDebugVariable Var) {
-  void *buf = allocateDebugVarCarryingInst<AllocStackInst>(F.getModule(), Var);
-  return ::new (buf)
-      AllocStackInst(Loc, elementType, F, Var);
+AllocStackInst *
+AllocStackInst::create(SILDebugLocation Loc,
+                       SILType elementType, SILFunction &F,
+                       SILOpenedArchetypesState &OpenedArchetypes,
+                       SILDebugVariable Var) {
+  SmallVector<SILValue, 8> OpenedArchetypeOperands;
+  collectOpenedArchetypeOperands(elementType.getSwiftRValueType(),
+                                 OpenedArchetypeOperands,
+                                 OpenedArchetypes, F.getModule());
+  void *Buffer = allocateDebugVarCarryingInst<AllocStackInst>(
+      F.getModule(), Var, OpenedArchetypeOperands);
+  return ::new (Buffer)
+      AllocStackInst(Loc, elementType, OpenedArchetypeOperands, F, Var);
 }
 
 /// getDecl - Return the underlying variable declaration associated with this
@@ -155,21 +171,79 @@ VarDecl *AllocStackInst::getDecl() const {
 }
 
 AllocRefInst::AllocRefInst(SILDebugLocation Loc, SILType elementType,
-                           SILFunction &F, bool objc, bool canBeOnStack)
+                           SILFunction &F, bool objc, bool canBeOnStack,
+                           ArrayRef<SILValue> OpenedArchetypeOperands)
     : AllocationInst(ValueKind::AllocRefInst, Loc, elementType),
-      StackPromotable(canBeOnStack), ObjC(objc) {}
+      StackPromotable(canBeOnStack),
+      NumOperands(OpenedArchetypeOperands.size()), ObjC(objc) {
+  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
+                                         OpenedArchetypeOperands);
+}
+
+AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILType elementType,
+                           SILFunction &F, bool objc, bool canBeOnStack,
+                           SILOpenedArchetypesState &OpenedArchetypes) {
+  SmallVector<SILValue, 8> OpenedArchetypeOperands;
+  collectOpenedArchetypeOperands(elementType.getSwiftRValueType(),
+                                 OpenedArchetypeOperands,
+                                 OpenedArchetypes, F.getModule());
+  void *Buffer = F.getModule().allocateInst(
+      sizeof(AllocRefInst) +
+          sizeof(Operand) * (OpenedArchetypeOperands.size()),
+      alignof(AllocRefInst));
+  return ::new (Buffer) AllocRefInst(Loc, elementType, F, objc, canBeOnStack,
+                                     OpenedArchetypeOperands);
+}
+
+AllocRefDynamicInst::AllocRefDynamicInst(
+    SILDebugLocation DebugLoc, SILValue operand,
+    ArrayRef<SILValue> OpenedArchetypeOperands, SILType ty, bool objc)
+    : UnaryInstructionWithOpenArchetypesBase(DebugLoc, operand,
+                                             OpenedArchetypeOperands, ty),
+      ObjC(objc) {
+}
+
+AllocRefDynamicInst *
+AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILValue operand,
+                            SILType ty, bool objc,
+                            SILFunction &F,
+                            SILOpenedArchetypesState &OpenedArchetypes) {
+  SmallVector<SILValue, 8> OpenedArchetypeOperands;
+  collectOpenedArchetypeOperands(ty.getSwiftRValueType(),
+                                 OpenedArchetypeOperands,
+                                 OpenedArchetypes, F.getModule());
+  void *Buffer = F.getModule().allocateInst(
+      sizeof(AllocRefDynamicInst) +
+          sizeof(Operand) * (OpenedArchetypeOperands.size() + 1),
+      alignof(AllocRefDynamicInst));
+  return ::new (Buffer)
+      AllocRefDynamicInst(DebugLoc, operand, OpenedArchetypeOperands, ty, objc);
+}
 
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, SILType ElementType,
+                           ArrayRef<SILValue> OpenedArchetypeOperands,
                            SILFunction &F, SILDebugVariable Var)
     : AllocationInst(ValueKind::AllocBoxInst, Loc,
                      SILType::getPrimitiveObjectType(
                        SILBoxType::get(ElementType.getSwiftRValueType()))),
-      VarInfo(Var, getTrailingObjects<char>()) {}
+      NumOperands(OpenedArchetypeOperands.size()),
+      VarInfo(Var, getTrailingObjects<char>()) {
+  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
+                                         OpenedArchetypeOperands);
+}
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc, SILType ElementType,
-                                   SILFunction &F, SILDebugVariable Var) {
-  void *buf = allocateDebugVarCarryingInst<AllocStackInst>(F.getModule(), Var);
-  return ::new (buf) AllocBoxInst(Loc, ElementType, F, Var);
+                                   SILFunction &F,
+                                   SILOpenedArchetypesState &OpenedArchetypes,
+                                   SILDebugVariable Var) {
+  SmallVector<SILValue, 8> OpenedArchetypeOperands;
+  collectOpenedArchetypeOperands(ElementType.getSwiftRValueType(),
+                                 OpenedArchetypeOperands,
+                                 OpenedArchetypes, F.getModule());
+  void *Buffer = allocateDebugVarCarryingInst<AllocBoxInst>(
+      F.getModule(), Var, OpenedArchetypeOperands);
+  return ::new (Buffer)
+      AllocBoxInst(Loc, ElementType, OpenedArchetypeOperands, F, Var);
 }
 
 /// getDecl - Return the underlying variable declaration associated with this
@@ -211,10 +285,15 @@ VarDecl *DebugValueAddrInst::getDecl() const {
 
 AllocExistentialBoxInst::AllocExistentialBoxInst(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
-    ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent)
+    ArrayRef<ProtocolConformanceRef> Conformances,
+    ArrayRef<SILValue> OpenedArchetypeOperands, SILFunction *Parent)
     : AllocationInst(ValueKind::AllocExistentialBoxInst, Loc,
                      ExistentialType.getObjectType()),
-      ConcreteType(ConcreteType), Conformances(Conformances) {}
+      NumOperands(OpenedArchetypeOperands.size()),
+      ConcreteType(ConcreteType), Conformances(Conformances) {
+  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
+                                         OpenedArchetypeOperands);
+}
 
 static void declareWitnessTable(SILModule &Mod,
                                 ProtocolConformanceRef conformanceRef) {
@@ -229,16 +308,48 @@ static void declareWitnessTable(SILModule &Mod,
 AllocExistentialBoxInst *AllocExistentialBoxInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     ArrayRef<ProtocolConformanceRef> Conformances,
-    SILFunction *F) {
+    SILFunction *F,
+    SILOpenedArchetypesState &OpenedArchetypes) {
+  SmallVector<SILValue, 8> OpenedArchetypeOperands;
+  collectOpenedArchetypeOperands(ConcreteType,
+                                 OpenedArchetypeOperands,
+                                 OpenedArchetypes, F->getModule());
   SILModule &Mod = F->getModule();
-  void *Buffer = Mod.allocateInst(sizeof(AllocExistentialBoxInst),
-                                  alignof(AllocExistentialBoxInst));
+  void *Buffer =
+      Mod.allocateInst(sizeof(AllocExistentialBoxInst) +
+                           sizeof(Operand) * (OpenedArchetypeOperands.size()),
+                       alignof(AllocExistentialBoxInst));
   for (ProtocolConformanceRef C : Conformances)
     declareWitnessTable(Mod, C);
   return ::new (Buffer) AllocExistentialBoxInst(Loc,
                                                 ExistentialType,
                                                 ConcreteType,
-                                                Conformances, F);
+                                                Conformances,
+                                                OpenedArchetypeOperands,
+                                                F);
+}
+
+AllocValueBufferInst::AllocValueBufferInst(
+    SILDebugLocation DebugLoc, SILType valueType, SILValue operand,
+    ArrayRef<SILValue> OpenedArchetypeOperands)
+    : UnaryInstructionWithOpenArchetypesBase(DebugLoc, operand,
+                                             OpenedArchetypeOperands,
+                                             valueType.getAddressType()) {}
+
+AllocValueBufferInst *
+AllocValueBufferInst::create(SILDebugLocation DebugLoc, SILType valueType,
+                             SILValue operand, SILFunction &F,
+                             SILOpenedArchetypesState &OpenedArchetypes) {
+  SmallVector<SILValue, 8> OpenedArchetypeOperands;
+  collectOpenedArchetypeOperands(valueType.getSwiftRValueType(),
+                                 OpenedArchetypeOperands,
+                                 OpenedArchetypes, F.getModule());
+  void *Buffer = F.getModule().allocateInst(
+      sizeof(AllocValueBufferInst) +
+          sizeof(Operand) * (OpenedArchetypeOperands.size() + 1),
+      alignof(AllocValueBufferInst));
+  return ::new (Buffer) AllocValueBufferInst(DebugLoc, valueType, operand,
+                                             OpenedArchetypeOperands);
 }
 
 BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
@@ -581,6 +692,33 @@ CopyAddrInst::CopyAddrInst(SILDebugLocation Loc, SILValue SrcLValue,
     : SILInstruction(ValueKind::CopyAddrInst, Loc), IsTakeOfSrc(isTakeOfSrc),
       IsInitializationOfDest(isInitializationOfDest),
       Operands(this, SrcLValue, DestLValue) {}
+
+BindMemoryInst *
+BindMemoryInst::create(SILDebugLocation Loc, SILValue Base, SILValue Index,
+                       SILType BoundType, SILFunction &F,
+                       SILOpenedArchetypesState &OpenedArchetypes) {
+  SmallVector<SILValue, 8> OpenedArchetypeOperands;
+  collectOpenedArchetypeOperands(BoundType.getSwiftRValueType(),
+                                 OpenedArchetypeOperands,
+                                 OpenedArchetypes, F.getModule());
+  void *Buffer = F.getModule().allocateInst(
+      sizeof(BindMemoryInst) +
+          sizeof(Operand) * (OpenedArchetypeOperands.size() + NumFixedOpers),
+      alignof(BindMemoryInst));
+  return ::new (Buffer)
+    BindMemoryInst(Loc, Base, Index, BoundType, OpenedArchetypeOperands);
+}
+
+BindMemoryInst::BindMemoryInst(SILDebugLocation Loc, SILValue Base,
+                               SILValue Index,
+                               SILType BoundType,
+                               ArrayRef<SILValue> OpenedArchetypeOperands)
+  : SILInstruction(ValueKind::BindMemoryInst, Loc),
+    BoundType(BoundType),
+    NumOperands(NumFixedOpers + OpenedArchetypeOperands.size()) {
+  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
+                                         Base, Index, OpenedArchetypeOperands);
+}
 
 UncheckedRefCastAddrInst::UncheckedRefCastAddrInst(SILDebugLocation Loc,
                                                    SILValue src,

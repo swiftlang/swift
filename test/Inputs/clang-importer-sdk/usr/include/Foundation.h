@@ -1034,6 +1034,17 @@ extern NSString *NSHTTPRequestKey;
 
 @end
 
+@interface NSIdLover: NSObject
+
+- (id _Nonnull)makesId;
+- (void)takesId:(id _Nonnull)x;
+- (void)takesArrayOfId:(const id _Nonnull * _Nonnull)x;
+- (void)takesNullableId:(id _Nullable)x;
+
+@property (strong) id propertyOfId;
+
+@end
+
 #define NSTimeIntervalSince1970 978307200.0
 #define NS_DO_SOMETHING 17
 
@@ -1044,3 +1055,7 @@ typedef NS_ENUM(NSUInteger, NSClothingStyle) {
   NSClothingStyleHippie
 };
 static const NSClothingStyle NSClothingStyleOfficeCasual __attribute__((availability(swift,unavailable,replacement="NSClothingStyleSemiFormal"))) = NSClothingStyleSemiFormal;
+
+void acceptError(NSError * _Nonnull error);
+NSError * _Nonnull produceError(void);
+NSError * _Nullable produceOptionalError(void);

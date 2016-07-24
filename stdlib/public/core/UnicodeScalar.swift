@@ -33,8 +33,8 @@
 ///     // Prints "✈︎"
 @_fixed_layout
 public struct UnicodeScalar :
-  _BuiltinUnicodeScalarLiteralConvertible,
-  UnicodeScalarLiteralConvertible {
+  _ExpressibleByBuiltinUnicodeScalarLiteral,
+  ExpressibleByUnicodeScalarLiteral {
 
   var _value: UInt32
 
@@ -314,15 +314,16 @@ extension UInt64 {
   }
 }
 
-extension UnicodeScalar : Comparable, Equatable {
+extension UnicodeScalar : Equatable {
+  public static func == (lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
+    return lhs.value == rhs.value
+  }
 }
 
-public func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
-  return lhs.value == rhs.value
-}
-
-public func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
-  return lhs.value < rhs.value
+extension UnicodeScalar : Comparable {
+  public static func < (lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
+    return lhs.value < rhs.value
+  }
 }
 
 extension UnicodeScalar {
@@ -377,7 +378,7 @@ extension UnicodeScalar {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "escaped")
+  @available(*, unavailable, renamed: "escaped(asASCII:)")
   public func escape(asASCII forceASCII: Bool) -> String {
     Builtin.unreachable()
   }

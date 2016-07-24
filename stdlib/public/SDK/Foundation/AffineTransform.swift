@@ -254,12 +254,13 @@ extension AffineTransform : ReferenceConvertible, Hashable, CustomStringConverti
     public var debugDescription: String {
         return description
     }
-}
 
-public func ==(lhs: AffineTransform, rhs: AffineTransform) -> Bool {
-    return lhs.m11 == rhs.m11 && lhs.m12 == rhs.m12 &&
-           lhs.m21 == rhs.m21 && lhs.m22 == rhs.m22 &&
-           lhs.tX == rhs.tX && lhs.tY == rhs.tY
+    public static func ==(lhs: AffineTransform, rhs: AffineTransform) -> Bool {
+        return lhs.m11 == rhs.m11 && lhs.m12 == rhs.m12 &&
+               lhs.m21 == rhs.m21 && lhs.m22 == rhs.m22 &&
+               lhs.tX == rhs.tX && lhs.tY == rhs.tY
+    }
+
 }
 
 extension AffineTransform : _ObjectiveCBridgeable {

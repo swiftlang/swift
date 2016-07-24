@@ -217,16 +217,20 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     ///
     /// The calendar and timeZone and isLeapMonth properties cannot be set by this method.
     @available(OSX 10.9, iOS 8.0, *)
-    public mutating func setValue(_ value: Int?, forComponent unit: Calendar.Unit) {
-        _applyMutation { $0.setValue(_setter(value), forComponent: unit) }
+    public mutating func setValue(_ value: Int?, for component: Calendar.Component) {
+        _applyMutation {
+            $0.setValue(_setter(value), forComponent: Calendar._toCalendarUnit([component]))
+        }
     }
     
     /// Returns the value of one of the properties, using an enumeration value instead of a property name.
     ///
     /// The calendar and timeZone and isLeapMonth property values cannot be retrieved by this method.
     @available(OSX 10.9, iOS 8.0, *)
-    public func value(forComponent unit: Calendar.Unit) -> Int? {
-        return _handle.map { $0.value(forComponent: unit) }
+    public func value(for component: Calendar.Component) -> Int? {
+        return _handle.map {
+            $0.value(forComponent: Calendar._toCalendarUnit([component]))
+        }
     }
     
     // MARK: -
@@ -277,12 +281,13 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
         _handle = _MutableHandle(reference: reference)
     }
 
+    public static func ==(lhs : DateComponents, rhs: DateComponents) -> Bool {
+        // Don't copy references here; no one should be storing anything
+        return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+    }
+
 }
 
-public func ==(lhs : DateComponents, rhs: DateComponents) -> Bool {
-    // Don't copy references here; no one should be storing anything
-    return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
-}
 
 // MARK: - Bridging
 

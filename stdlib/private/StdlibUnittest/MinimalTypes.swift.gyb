@@ -114,6 +114,11 @@ public struct ${Self} : Equatable, Hashable {
   public static var timesEqualEqualWasCalled: Int = 0
   public static var timesHashValueWasCalled: Int = 0
 
+  public static var equalImpl =
+    ResettableValue<(Int, Int) -> Bool>({ $0 == $1 })
+  public static var hashValueImpl =
+    ResettableValue<(Int) -> Int>({ $0.hashValue })
+
   public var value: Int
   public var identity: Int
 
@@ -129,7 +134,7 @@ public struct ${Self} : Equatable, Hashable {
 
   public var hashValue: Int {
     ${Self}.timesHashValueWasCalled += 1
-    return value.hashValue
+    return ${Self}.hashValueImpl.value(value)
   }
 }
 
@@ -138,7 +143,7 @@ public func == (
   rhs: ${Self}
 ) -> Bool {
   ${Self}.timesEqualEqualWasCalled += 1
-  return lhs.value == rhs.value
+  return ${Self}.equalImpl.value(lhs.value, rhs.value)
 }
 
 % end

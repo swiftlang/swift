@@ -13,9 +13,23 @@
 @_exported import Contacts
 import Foundation
 
-@available(OSX, introduced: 10.11)
-@available(iOS, introduced: 9.0)
-extension CNErrorCode : _BridgedNSError {
-  public static var _nsErrorDomain: String { return CNErrorDomain }
-}
+@available(macOS 10.11, iOS 9.0, *)
+extension CNError {
+  /// One or more CNContact, CNGroup or CNContainer objects for which
+  /// the error applies.
+  public var affectedRecords: [AnyObject]? {
+    return userInfo[CNErrorUserInfoAffectedRecordsKey] as? [AnyObject]
+  }
 
+  /// The record identifiers to which this error applies.
+  public var affectedRecordIdentifiers: [String]? {
+    return userInfo[CNErrorUserInfoAffectedRecordIdentifiersKey] as? [String]
+  }
+
+  /// The key paths associated with a given error. For validation
+  /// errors this will contain key paths to specific object
+  /// properties.
+  public var keyPaths: [String]? {
+    return userInfo[CNErrorUserInfoKeyPathsKey] as? [String]
+  }
+}

@@ -53,9 +53,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_hashValue))
       return getRequirement(KnownProtocolKind::Hashable);
 
-    // ErrorProtocol._code
+    // Error._code
     if (name.isSimpleName(ctx.Id_code_))
-      return getRequirement(KnownProtocolKind::ErrorProtocol);
+      return getRequirement(KnownProtocolKind::Error);
 
     // _BridgedNSError._nsErrorDomain
     if (name.isSimpleName(ctx.Id_nsErrorDomain))
@@ -91,26 +91,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   }
 
   return nullptr;
-}
-
-void DerivedConformance::insertOperatorDecl(ASTContext &C,
-                                            IterableDeclContext *scope,
-                                            Decl *member) {
-  // Find the module.
-  auto mod = member->getModuleContext();
-
-  // Add it to the module in a DerivedFileUnit.
-  mod->getDerivedFileUnit().addDerivedDecl(cast<FuncDecl>(member));
-
-  // Add it as a derived global decl to the nominal type.
-  auto oldDerived = scope->getDerivedGlobalDecls();
-  auto oldSize = std::distance(oldDerived.begin(), oldDerived.end());
-  auto newDerived = C.Allocate<Decl*>(oldSize + 1);
-
-  std::move(oldDerived.begin(), oldDerived.end(), newDerived.begin());
-  newDerived[oldSize] = member;
-
-  scope->setDerivedGlobalDecls(newDerived);
 }
 
 DeclRefExpr *

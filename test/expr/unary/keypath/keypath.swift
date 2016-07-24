@@ -6,7 +6,7 @@ import Foundation
 
 @objc class A : NSObject {
   @objc var propB: B = B()
-  @objc var propString: String = ""
+  @objc var propString: String = "" // expected-note {{did you mean 'propString'}}
   @objc var propArray: [String] = []
   @objc var propDict: [String: B] = [:]
   @objc var propSet: Set<String> = []
@@ -109,4 +109,8 @@ func testParseErrors() {
   let _: String = #keyPath(A(b:c:d:).propSet); // expected-error{{cannot use compound name 'A(b:c:d:)' in '#keyPath' expression}}
   let _: String = #keyPath(A.propString; // expected-error{{expected ')' to complete '#keyPath' expression}}
     // expected-note@-1{{to match this opening '('}}
+}
+
+func testTypoCorrection() {
+  let _: String = #keyPath(A.proString) // expected-error {{type 'A' has no member 'proString'}}
 }

@@ -240,10 +240,10 @@ public struct URLRequest : ReferenceConvertible, CustomStringConvertible, Equata
     public var debugDescription: String {
         return _handle.map { $0.debugDescription }
     }
-}
 
-public func ==(lhs: URLRequest, rhs: URLRequest) -> Bool {
-    return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+    public static func ==(lhs: URLRequest, rhs: URLRequest) -> Bool {
+        return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+    }
 }
 
 extension URLRequest : _ObjectiveCBridgeable {

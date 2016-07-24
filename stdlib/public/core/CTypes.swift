@@ -77,7 +77,7 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 @_fixed_layout
-public struct OpaquePointer : Equatable, Hashable {
+public struct OpaquePointer : Hashable {
   internal var _rawValue: Builtin.RawPointer
 
   @_versioned
@@ -161,8 +161,10 @@ extension UInt {
   }
 }
 
-public func ==(lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+extension OpaquePointer : Equatable {
+  public static func == (lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 }
 
 /// The corresponding Swift type to `va_list` in imported C APIs.
@@ -192,6 +194,24 @@ func _memcpy(
   let src = src._rawValue
   let size = UInt64(size)._value
   Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+    dest, src, size,
+    /*alignment:*/ Int32()._value,
+    /*volatile:*/ false._value)
+}
+
+/// Copy `count` bytes of memory from `src` into `dest`.
+///
+/// The memory regions `source..<source + count` and
+/// `dest..<dest + count` may overlap.
+func _memmove(
+  dest destination: UnsafeMutableRawPointer,
+  src: UnsafeRawPointer,
+  size: UInt
+) {
+  let dest = destination._rawValue
+  let src = src._rawValue
+  let size = UInt64(size)._value
+  Builtin.int_memmove_RawPointer_RawPointer_Int64(
     dest, src, size,
     /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)

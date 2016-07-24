@@ -32,12 +32,14 @@ sys.path.append(os.path.join(SCRIPT_DIR, 'swift_build_support'))
 from swift_build_support import shell  # noqa (E402)
 
 
-def update_single_repository(repo_path, branch):
+def update_single_repository(repo_path, branch, reset_to_remote):
     if not os.path.isdir(repo_path):
         return
 
     print("--- Updating '" + repo_path + "' ---")
     with shell.pushd(repo_path, dry_run=False, echo=False):
+        shell.call(["git", "fetch"], echo=False)
+
         if branch:
             status = shell.capture(['git', 'status', '--porcelain', '-uno'],
                                    echo=False)
@@ -47,10 +49,16 @@ def update_single_repository(repo_path, branch):
                 exit(1)
             shell.call(['git', 'checkout', branch], echo=False)
 
+            # If we were asked to reset to the specified branch, do the hard
+            # reset and return.
+            if reset_to_remote:
+                shell.call(['git', 'reset', '--hard', "origin/%s" % branch],
+                           echo=False)
+                return
+
         # Prior to Git 2.6, this is the way to do a "git pull
         # --rebase" that respects rebase.autostash.  See
         # http://stackoverflow.com/a/30209750/125349
-        shell.call(["git", "fetch"], echo=False)
         shell.call(["git", "rebase", "FETCH_HEAD"], echo=False)
         shell.call(["git", "submodule", "update", "--recursive"],
                    echo=False)
@@ -74,7 +82,8 @@ def update_all_repositories(args, config, scheme_name):
                 break
 
         update_single_repository(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
-                                 repo_branch)
+                                 repo_branch,
+                                 args.reset_to_remote)
 
 
 def obtain_additional_swift_sources(
@@ -182,6 +191,10 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         metavar='BRANCH',
         dest='scheme')
     parser.add_argument(
+        '--reset-to-remote',
+        help='Reset each branch to the remote state.',
+        action='store_true')
+    parser.add_argument(
         "--config",
         default=os.path.join(SCRIPT_DIR, "update-checkout-config.json"),
         help="Configuration file to use")
@@ -196,12 +209,12 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         config = json.load(f)
     validate_config(config)
 
-    # If branch is None, default to using the default branch alias specified by
-    # our configuration file.
-    if scheme is None:
-        scheme = config['default-branch-scheme']
-
     if clone or clone_with_ssh:
+        # If branch is None, default to using the default branch alias
+        # specified by our configuration file.
+        if scheme is None:
+            scheme = config['default-branch-scheme']
+
         obtain_additional_swift_sources(
             config, clone_with_ssh, scheme, skip_history,
             args.skip_repository_list)

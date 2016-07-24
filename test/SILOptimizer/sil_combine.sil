@@ -124,10 +124,9 @@ bb2:
 // Other DCE Tests taken from diagnose_unreachable.sil //
 //////////////////////////////////////////////////////////
 
-sil @exit : $@convention(thin) @noreturn () -> () {
+sil @exit : $@convention(thin) () -> Never {
 bb0:
-  %1 = tuple ()
-  return %1 : $()
+  br bb0
 }
 
 // CHECK-LABEL: sil @removeTriviallyDeadInstructions
@@ -147,8 +146,8 @@ bb0(%0 : $B):
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject
   %7 = strong_release %3 : $B
   %8 = strong_release %1 : $@box B
-  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
+  %10 = apply %9() : $@convention(thin) () -> Never
   unreachable
 }
 
@@ -164,8 +163,8 @@ bb0(%0: $B, %1: $Builtin.Int1):
 bb1:
   %22 = br bb2
 bb2:
-  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
+  %10 = apply %9() : $@convention(thin) () -> Never
   unreachable
 }
 
@@ -384,8 +383,8 @@ bb0(%0 : $Builtin.Int8, %1 : $Builtin.NativeObject):
 sil @a2p_p2a_test : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> (Builtin.Word, Builtin.RawPointer) {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
-  %3 = pointer_to_address %1 : $Builtin.RawPointer to $*Builtin.Word
-  %4 = pointer_to_address %2 : $Builtin.RawPointer to $*Builtin.Word
+  %3 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.Word
+  %4 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Builtin.Word
   %5 = address_to_pointer %3 : $*Builtin.Word to $Builtin.RawPointer
   %6 = load %4 : $*Builtin.Word
   %7 = tuple(%6 : $Builtin.Word, %5 : $Builtin.RawPointer)
@@ -400,7 +399,7 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
 sil @a2p_p2a_reinterpret_cast_word_raw_pointer : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int32
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int32
   %4 = load %3 : $*Int32
   return %4 : $Int32
 }
@@ -828,23 +827,6 @@ bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32, %2 : $@callee_owned (Builtin.Int3
   return %5 : $()
 }
 
-//CHECK-LABEL: remove_init_ex
-//CHECK: alloc_stack $Bool
-//CHECK-NOT: init_existential_addr
-//CHECK: return
-sil @remove_init_ex : $@convention(thin) (Int) -> () {
-bb0(%0 : $Int):
-  %1 = alloc_stack $Boolean
-  %2 = init_existential_addr %1 : $*Boolean, $Bool
-  %3 = integer_literal $Builtin.Int1, 1
-  %4 = struct $Bool (%3 : $Builtin.Int1)
-  store %4 to %2 : $*Bool
-  destroy_addr %1 : $*Boolean
-  dealloc_stack %1 : $*Boolean
-  %8 = tuple ()
-  return %8 : $()
-}
-
 // CHECK-LABEL: sil @generic_is_objc
 sil @generic_is_objc : $@convention(thin) <T> (@in T) -> Int8 {
 bb0(%0 : $*T):
@@ -1101,7 +1083,7 @@ bb0:
 sil @unchecked_addr_cast_formation : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 bb0(%0 : $*Builtin.NativeObject):
   %1 = address_to_pointer %0 : $*Builtin.NativeObject to $Builtin.RawPointer
-  %2 = pointer_to_address %1 : $Builtin.RawPointer to $*Builtin.Word
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.Word
   %3 = load %2 : $*Builtin.Word
   return %3 : $Builtin.Word
 }
@@ -1271,7 +1253,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %7 = builtin "smul_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %6 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Word, Builtin.Int1), 0
   %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int8
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Int8
   %11 = load %10 : $*Int8
   return %11 : $Int8
 }
@@ -1290,7 +1272,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %7 = builtin "smul_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %6 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Word, Builtin.Int1), 0
   %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int8
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Int8
   %11 = load %10 : $*Int8
   return %11 : $Int8
 }
@@ -1305,7 +1287,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %7 = builtin "smul_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %6 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Word, Builtin.Int1), 0
   %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int32
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Int32
   %11 = load %10 : $*Int32
   return %11 : $Int32
 }
@@ -1327,7 +1309,7 @@ bb0(%0 : $Builtin.RawPointer, %1: $Builtin.Int64):
   %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
   %8 = builtin "truncOrBitCast_Int64_Word"(%7 : $Builtin.Int64) : $Builtin.Word
   %9 = index_raw_pointer %0 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int32
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*Int32
   %11 =  load %10 : $*Int32
   return %11 : $Int32
 }
@@ -1685,11 +1667,11 @@ bb0(%0 : $*SSS):
 
 sil [readonly] @read_only_in : $@convention(thin) (@in SSS) -> ()
 
-struct MyError : ErrorProtocol {
+struct MyError : Error {
 }
 
 sil @unknown : $@convention(thin) () -> ()
-sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
+sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error)
 
 //CHECK-LABEL: sil @test_delete_readonly_try_apply
 //CHECK:      bb0(%0 : $ZZZ): 
@@ -1704,15 +1686,15 @@ sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @er
 //CHECK:        return
 sil @test_delete_readonly_try_apply : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorProtocol):
-  strong_release %8 : $ErrorProtocol
+bb2(%8 : $Error):
+  strong_release %8 : $Error
   br bb3
 
 bb3:
@@ -1724,18 +1706,18 @@ bb3:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply1 : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorProtocol):
+bb2(%8 : $Error):
   // Additional instructions in error block.
   %u = function_ref @unknown : $@convention(thin) () -> ()
   %r = apply %u() : $@convention(thin) () -> ()
-  strong_release %8 : $ErrorProtocol
+  strong_release %8 : $Error
   br bb3
 
 bb3:
@@ -1747,8 +1729,8 @@ bb3:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply2 : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   // Additional instructions in normal return block.
@@ -1757,8 +1739,8 @@ bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorProtocol):
-  strong_release %8 : $ErrorProtocol
+bb2(%8 : $Error):
+  strong_release %8 : $Error
   br bb3
 
 bb3:
@@ -1770,15 +1752,15 @@ bb3:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply3 : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3
 
-bb2(%8 : $ErrorProtocol):
-  strong_release %8 : $ErrorProtocol
+bb2(%8 : $Error):
+  strong_release %8 : $Error
   // Normal and error block don't have a common successor block.
   br bb4
 
@@ -1796,15 +1778,15 @@ bb4:
 //CHECK: try_apply %{{[0-9]+}}(%0)
 sil @test_dont_delete_readonly_try_apply4 : $@convention(thin) (@owned ZZZ, @owned ZZZ) -> @owned ZZZ {
 bb0(%0 : $ZZZ, %1 : $ZZZ):
-  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol)
-  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorProtocol), normal bb1, error bb2
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error), normal bb1, error bb2
 
 bb1(%4 : $ZZZ):
   strong_release %4 : $ZZZ
   br bb3(%0 : $ZZZ)
 
-bb2(%8 : $ErrorProtocol):
-  strong_release %8 : $ErrorProtocol
+bb2(%8 : $Error):
+  strong_release %8 : $Error
   // Normal and error block don't use the same block arguments for the common successor.
   br bb3(%1 : $ZZZ)
 
@@ -1923,7 +1905,7 @@ bb0(%0: $MyClass):
   %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
   %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
   %3 = ref_to_raw_pointer %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.RawPointer
-  %4 = pointer_to_address %3 : $Builtin.RawPointer to $*Builtin.Word
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Word
   %5 = integer_literal $Builtin.Word, 5
   store %5 to %4: $*Builtin.Word
   %6 = tuple ()
@@ -2145,11 +2127,11 @@ bb0(%0 : $Builtin.Int1):
 // CHECK-LABEL: sil @builtin_array_opt_index_raw_pointer_to_index_addr
 // CHECK:  [[MT:%.*]] = metatype $@thick Int32.Type
 // CHECK:  [[ONE:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK:  [[PTA1:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*Int32
+// CHECK:  [[PTA1:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:  [[CAST1:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
 // CHECK:  [[IAD1:%.*]] = index_addr [[PTA1]] : $*Int32, [[CAST1]] : $Builtin.Word
 // CHECK:  [[ATP1:%.*]] = address_to_pointer [[IAD1]] : $*Int32 to $Builtin.RawPointer
-// CHECK:  [[PTA2:%.*]] = pointer_to_address %2 : $Builtin.RawPointer to $*Int32
+// CHECK:  [[PTA2:%.*]] = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:  [[CAST2:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
 // CHECK:  [[IAD2:%.*]] = index_addr [[PTA2]] : $*Int32, [[CAST2]] : $Builtin.Word
 // CHECK:  [[ATP2:%.*]] = address_to_pointer [[IAD2]] : $*Int32 to $Builtin.RawPointer
@@ -2479,7 +2461,7 @@ bb0(%0 : $@sil_unowned NClass, %1 : $@sil_unowned NClass):
 }
 
 
-enum VendingMachineError: ErrorProtocol {
+enum VendingMachineError: Error {
     case InvalidSelection
     case InsufficientFunds(required: Double)
     case OutOfStock
@@ -2491,7 +2473,7 @@ enum VendingMachineError: ErrorProtocol {
 // CHECK-NOT: alloc_existential_box
 // CHECK-NOT: enum $VendingMachineError
 // CHECK: return
-sil hidden @RemoveUnusedException : $@convention(thin) (Int32) -> (Double, @error ErrorProtocol) {
+sil hidden @RemoveUnusedException : $@convention(thin) (Int32) -> (Double, @error Error) {
 bb0(%0 : $Int32):
   debug_value %0 : $Int32, let, name "x" // id: %1
   %2 = integer_literal $Builtin.Int32, 10         // user: %4
@@ -2500,15 +2482,15 @@ bb0(%0 : $Int32):
   cond_br %4, bb1, bb2                            // id: %5
 
 bb1:                                              // Preds: bb0
-  %6 = alloc_existential_box $ErrorProtocol, $VendingMachineError // users: %8, %9, %13
-  %6a = project_existential_box $VendingMachineError in %6 : $ErrorProtocol
+  %6 = alloc_existential_box $Error, $VendingMachineError // users: %8, %9, %13
+  %6a = project_existential_box $VendingMachineError in %6 : $Error
   %7 = enum $VendingMachineError, #VendingMachineError.OutOfStock!enumelt // user: %8
   store %7 to %6a : $*VendingMachineError        // id: %8
-  debug_value %6 : $ErrorProtocol, let, name "error" // id: %9
+  debug_value %6 : $Error, let, name "error" // id: %9
   %10 = float_literal $Builtin.FPIEEE80, 0x3FFF8000000000000000 // 1 // user: %11
   %11 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%10 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64 // user: %12
   %12 = struct $Double (%11 : $Builtin.FPIEEE64)  // user: %14
-  strong_release %6 : $ErrorProtocol                // id: %13
+  strong_release %6 : $Error                // id: %13
   br bb3(%12 : $Double)                           // id: %14
 
 bb2:                                              // Preds: bb0
@@ -2676,7 +2658,7 @@ bb0(%0 : $*Optional<CC2>, %1 : $CC1, %2 : $CC3, %3 : $CC4, %4 : $CC2):
   %12 = partial_apply %5(%1, %8, %9) : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
   dealloc_stack %9 : $*CC4
   dealloc_stack %6 : $*CC3
-  %15 = convert_function %12 : $@callee_owned (@in CC2) -> Optional<Int> to $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
+  %15 = convert_function %12 : $@callee_owned (@in CC2) -> Optional<Int> to $@callee_owned (@in CC2) -> (Optional<Int>, @error Error)
   %16 = alloc_stack $Optional<Int>
   %17 = alloc_stack $Optional<CC2>
   copy_addr %0 to [initialization] %17 : $*Optional<CC2>
@@ -2690,7 +2672,7 @@ bb1:
   %24 = alloc_stack $CC2
   copy_addr %22 to [initialization] %24 : $*CC2
   destroy_addr %22 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
+  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error Error)
   %28 = apply %12(%24) : $@callee_owned (@in CC2) -> Optional<Int>
   store %28 to %16 : $*Optional<Int>
   dealloc_stack %24 : $*CC2
@@ -2701,7 +2683,7 @@ bb1:
   %104 = alloc_stack $CC2
   copy_addr %102 to [initialization] %104 : $*CC2
   destroy_addr %102 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
+  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error Error)
   %108 = apply %12(%104) : $@callee_owned (@in CC2) -> Optional<Int>
   store %108 to %16 : $*Optional<Int>
   dealloc_stack %104 : $*CC2
@@ -2714,7 +2696,7 @@ bb1:
 bb2:
   %39 = alloc_stack $CC2
   store %4 to %39 : $*CC2
-  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
+  strong_retain %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error Error)
   %42 = apply %12(%39) : $@callee_owned (@in CC2) -> Optional<Int>
   store %42 to %16 : $*Optional<Int>
   dealloc_stack %39 : $*CC2
@@ -2723,7 +2705,7 @@ bb2:
 
 bb3:
   destroy_addr %0 : $*Optional<CC2>
-  strong_release %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error ErrorProtocol)
+  strong_release %15 : $@callee_owned (@in CC2) -> (Optional<Int>, @error Error)
   %36 = load %16 : $*Optional<Int>
   dealloc_stack %16 : $*Optional<Int>
   return %36 : $Optional<Int>
@@ -2757,8 +2739,8 @@ bb0(%0 : $Int, %1 : $Double):
   cond_br undef, bb1, bb2
 
 bb1:
-  %f2 = function_ref @noreturn_func : $@convention(thin) @noreturn () -> ()
-  %a2 = apply %f2() : $@convention(thin) @noreturn () -> ()
+  %f2 = function_ref @noreturn_func : $@convention(thin) () -> Never
+  %a2 = apply %f2() : $@convention(thin) () -> Never
   unreachable
 
 bb2:
@@ -2768,7 +2750,7 @@ bb2:
 }
 
 sil @callee : $@convention(thin) (Double, @in_guaranteed Int) -> ()
-sil @noreturn_func : $@convention(thin) @noreturn () -> ()
+sil @noreturn_func : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil @remove_destroy_array
 // CHECK-NOT: destroyArray

@@ -25,8 +25,7 @@
     "UnavailableStringAPIs.swift"
   ],
   "Bool": [
-    "Bool.swift",
-    "Boolean.swift"
+    "Bool.swift"
   ],
   "Collection": [
     "Collection.swift",
@@ -100,6 +99,7 @@
     "BuiltinMath.swift",
     {
     "Integers": [
+      "Integers.swift",
       "IntegerArithmetic.swift",
       "FixedPoint.swift",
       "IntegerParsing.swift"],
@@ -115,6 +115,7 @@
   "Pointer": [
     "Pointer.swift",
     "UnsafePointer.swift",
+    "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift"
   ],
   "Protocols": [
@@ -138,9 +139,13 @@
     "Shims.swift",
     "Unmanaged.swift",
     "Availability.swift",
-    "Process.swift",
+    "CommandLine.swift",
     "Tuple.swift",
     "NewtypeWrapper.swift",
-    "UnsafeBitMap.swift"
+    "UnsafeBitMap.swift",
+    "DebuggerSupport.swift",
+    "Equatable.swift",
+    "Comparable.swift",
+    "Hashable.swift"
   ]
 }

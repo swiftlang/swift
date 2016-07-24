@@ -22,6 +22,11 @@ using namespace swift::remote;
 using NativeReflectionContext
   = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
 
+uint16_t
+swift_reflection_getSupportedMetadataVersion() {
+  return SWIFT_REFLECTION_METADATA_VERSION;
+}
+
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
                                          PointerSizeFunction getPointerSize,
@@ -128,10 +133,18 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   case TypeInfoKind::Record: {
     auto &RecordTI = cast<RecordTypeInfo>(TI);
     switch (RecordTI.getRecordKind()) {
+    case RecordKind::Invalid:
+      return SWIFT_UNKNOWN;
     case RecordKind::Tuple:
       return SWIFT_TUPLE;
     case RecordKind::Struct:
       return SWIFT_STRUCT;
+    case RecordKind::NoPayloadEnum:
+      return SWIFT_NO_PAYLOAD_ENUM;
+    case RecordKind::SinglePayloadEnum:
+      return SWIFT_SINGLE_PAYLOAD_ENUM;
+    case RecordKind::MultiPayloadEnum:
+      return SWIFT_MULTI_PAYLOAD_ENUM;
     case RecordKind::ThickFunction:
       return SWIFT_THICK_FUNCTION;
     case RecordKind::OpaqueExistential:

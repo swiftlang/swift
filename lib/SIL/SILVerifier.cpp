@@ -30,6 +30,7 @@
 #include "swift/Basic/Range.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 using namespace swift;
@@ -629,6 +630,8 @@ public:
     require(AI->getType().isAddress(),
             "result of alloc_stack must be an address type");
 
+    verifyOpenedArchetype(AI, AI->getElementType().getSwiftRValueType());
+
     // Scan the parent block of AI and check that the users of AI inside this
     // block are inside the lifetime of the allocated memory.
     SILBasicBlock *SBB = AI->getParent();
@@ -657,6 +660,7 @@ public:
 
   void checkAllocRefInst(AllocRefInst *AI) {
     requireReferenceValue(AI, "Result of alloc_ref");
+    verifyOpenedArchetype(AI, AI->getType().getSwiftRValueType());
   }
 
   void checkAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
@@ -673,6 +677,7 @@ public:
       require(metaTy->getRepresentation() == MetatypeRepresentation::Thick,
               "alloc_ref_dynamic requires operand of thick metatype");
     }
+    verifyOpenedArchetype(ARDI, ARDI->getType().getSwiftRValueType());
   }
 
   /// Check the substitutions passed to an apply or partial_apply.
@@ -792,7 +797,7 @@ public:
     // Check that if the apply is of a noreturn callee, make sure that an
     // unreachable is the next instruction.
     if (AI->getModule().getStage() == SILStage::Raw ||
-        !AI->getCallee()->getType().getAs<SILFunctionType>()->isNoReturn())
+        !AI->isCalleeNoReturn())
       return;
     require(isa<UnreachableInst>(std::next(SILBasicBlock::iterator(AI))),
             "No return apply without an unreachable as a next instruction.");
@@ -1181,6 +1186,7 @@ public:
             "Operand value should be an address");
     require(I->getOperand()->getType().is<BuiltinUnsafeValueBufferType>(),
             "Operand value should be a Builtin.UnsafeValueBuffer");
+    verifyOpenedArchetype(I, I->getValueType().getSwiftRValueType());
   }
 
   void checkProjectValueBufferInst(ProjectValueBufferInst *I) {
@@ -1366,6 +1372,23 @@ public:
     if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
       formalType = CanType(dynamicSelf->getSelfType());
 
+    // Optional of dynamic self has the same lowering as its contained type.
+    OptionalTypeKind loweredOptionalKind;
+    OptionalTypeKind formalOptionalKind;
+
+    CanType loweredObjectType = loweredType.getSwiftRValueType()
+        .getAnyOptionalObjectType(loweredOptionalKind);
+    CanType formalObjectType = formalType
+        .getAnyOptionalObjectType(formalOptionalKind);
+
+    if (loweredOptionalKind != OTK_None) {
+      if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalObjectType)) {
+        formalObjectType = dynamicSelf->getSelfType()->getCanonicalType();
+      }
+      return ((loweredOptionalKind == formalOptionalKind) &&
+              loweredObjectType == formalObjectType);
+    }
+
     // Metatypes preserve their instance type through lowering.
     if (auto loweredMT = loweredType.getAs<MetatypeType>()) {
       if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
@@ -1496,6 +1519,7 @@ public:
 
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
+    verifyOpenedArchetype(AI, AI->getElementType().getSwiftRValueType());
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {
@@ -1513,6 +1537,16 @@ public:
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
     require(DI->getOperand()->getType().isAddress(),
             "Operand of destroy_addr must be address");
+  }
+
+  void checkBindMemoryInst(BindMemoryInst *BI) {
+    require(!BI->getType(), "BI must not produce a type");
+    require(BI->getBoundType(), "BI must have a bound type");
+    require(BI->getBase()->getType().is<BuiltinRawPointerType>(),
+            "bind_memory base be a RawPointer");
+    require(BI->getIndex()->getType()
+            == SILType::getBuiltinWordType(F.getASTContext()),
+            "bind_memory index must be a Word");
   }
 
   void checkIndexAddrInst(IndexAddrInst *IAI) {
@@ -1696,12 +1730,19 @@ public:
   // Get the expected type of a dynamic method reference.
   SILType getDynamicMethodType(SILType selfType, SILDeclRef method) {
     auto &C = F.getASTContext();
-    
+
     // The type of the dynamic method must match the usual type of the method,
     // but with the more opaque Self type.
-    auto methodTy = F.getModule().Types.getConstantType(method)
-      .castTo<SILFunctionType>();
-    
+    auto constantInfo = F.getModule().Types.getConstantInfo(method);
+    auto methodTy = constantInfo.SILFnType;
+
+    // Map interface types to archetypes.
+    if (auto *params = constantInfo.ContextGenericParams)
+      methodTy = methodTy->substGenericArgs(F.getModule(), M,
+                                            params->getForwardingSubstitutions(C));
+    assert(!methodTy->isPolymorphic());
+
+    // Replace Self parameter with type of 'self' at the call site.
     auto params = methodTy->getParameters();
     SmallVector<SILParameterInfo, 4>
       dynParams(params.begin(), params.end() - 1);
@@ -1732,10 +1773,7 @@ public:
                                      dynResults,
                                      methodTy->getOptionalErrorResult(),
                                      F.getASTContext());
-    auto boundFnTy = ArchetypeBuilder::mapTypeIntoContext(
-        method.getDecl()->getDeclContext(), fnTy)
-      ->getCanonicalType();
-    return SILType::getPrimitiveObjectType(boundFnTy);
+    return SILType::getPrimitiveObjectType(fnTy);
   }
   
   void checkDynamicMethodInst(DynamicMethodInst *EMI) {
@@ -1941,6 +1979,7 @@ public:
             "type");
     
     checkExistentialProtocolConformances(exType, AEBI->getConformances());
+    verifyOpenedArchetype(AEBI, AEBI->getFormalConcreteType());
   }
 
   void checkInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
@@ -3188,6 +3227,27 @@ public:
     SILVisitor::visitSILBasicBlock(BB);
   }
 
+  void visitSILBasicBlocks(SILFunction *F) {
+    // Visit all basic blocks in the RPOT order.
+    // This ensures that any open_existential instructions, which
+    // open archetypes, are seen before the uses of these archetypes.
+    llvm::ReversePostOrderTraversal<SILFunction *> RPOT(F);
+    llvm::DenseSet<SILBasicBlock *> VisitedBBs;
+    for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
+      auto *BB = *Iter;
+      VisitedBBs.insert(BB);
+      visitSILBasicBlock(BB);
+    }
+
+    // Visit all basic blocks that were not visited during the RPOT traversal,
+    // e.g. unreachable basic blocks.
+    for (auto &BB : *F) {
+      if (VisitedBBs.count(&BB))
+        continue;
+      visitSILBasicBlock(&BB);
+    }
+  }
+
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
@@ -3238,8 +3298,13 @@ public:
     verifyEpilogBlocks(F);
     verifyStackHeight(F);
     verifyBranches(F);
+
+    visitSILBasicBlocks(F);
+
+    // Verify archetypes after all basic blocks are visited,
+    // because we build the map of archetypes as we visit the
+    // instructions.
     verifyOpenedArchetypes(F);
-    SILVisitor::visitSILFunction(F);
   }
 
   void verify() {

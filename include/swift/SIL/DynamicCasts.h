@@ -39,6 +39,16 @@ enum class DynamicCastFeasibility {
   WillFail,
 };
 
+static inline DynamicCastFeasibility
+atWorst(DynamicCastFeasibility feasibility, DynamicCastFeasibility worstCase) {
+  return (feasibility > worstCase ? worstCase : feasibility);
+}
+
+static inline DynamicCastFeasibility
+atBest(DynamicCastFeasibility feasibility, DynamicCastFeasibility bestCase) {
+  return (feasibility < bestCase ? bestCase : feasibility);
+}
+
 /// Classify the feasibility of a dynamic cast.  The source and target
 /// types should be unlowered formal types.
 DynamicCastFeasibility classifyDynamicCast(
@@ -77,8 +87,8 @@ void emitIndirectConditionalCastWithScalar(
 /// \brief Does the type conform to the _ObjectiveCBridgeable protocol.
 bool isObjectiveCBridgeable(ModuleDecl *M, CanType Ty);
 
-/// \brief Does the type conform to ErrorProtocol.
-bool isErrorProtocol(ModuleDecl *M, CanType Ty);
+/// \brief Does the type conform to Error.
+bool isError(ModuleDecl *M, CanType Ty);
 } // end namespace swift
 
 #endif

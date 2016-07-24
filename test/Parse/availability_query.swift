@@ -14,7 +14,7 @@ let x = #available(OSX 10.51, *)  // expected-error {{#available may only be use
 
 if !#available(OSX 10.52, *) { // expected-error {{#available may only be used as condition of an}}
 }
-if let _ = Optional(5) where !#available(OSX 10.52, *) { // expected-error {{#available may only be used as condition}}
+if let _ = Optional(5), !#available(OSX 10.52, *) { // expected-error {{#available may only be used as condition}}
 }
 
 if #available(OSX 10.51, *) && #available(OSX 10.52, *) { // expected-error {{expected ',' joining parts of a multi-clause condition}} {{29-31=,}}
@@ -99,5 +99,8 @@ if 1 != 2, #available(iOS 8.0, *) {}
 if case 42 = 42, #available(iOS 8.0, *) {}
 if let x = Optional(42), #available(iOS 8.0, *) {}
 
+// Allow "macOS" as well.
+if #available(macOS 10.51, *) {
+}
 
 

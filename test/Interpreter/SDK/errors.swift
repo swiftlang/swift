@@ -11,7 +11,7 @@
 
 import StdlibUnittest
 
-struct Problem : ErrorProtocol {}
+struct Problem : Error {}
 
 class ErrorImpl : NSObject, ErrorTest {
   func succeed() throws -> AnyObject { return self }

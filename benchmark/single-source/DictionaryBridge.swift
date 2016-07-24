@@ -45,7 +45,7 @@ class Thing : NSObject {
 }
 
 class Stuff {
-  var c : Thing = Thing.mk()
+  var c: Thing = Thing.mk()
   init() {
 
   }

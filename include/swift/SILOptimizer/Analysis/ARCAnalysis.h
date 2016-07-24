@@ -16,6 +16,10 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
@@ -385,5 +389,185 @@ SILInstruction *findReleaseToMatchUnsafeGuaranteedValue(
     RCIdentityFunctionInfo &RCFI);
 
 } // end namespace swift
+
+
+namespace swift {
+
+/// EpilogueARCBlockState - Keep track of whether a epilogue ARC instruction has
+/// been found.
+struct EpilogueARCBlockState {
+  /// Keep track of whether a eplogue release has been found before and after
+  /// this basic block.
+  bool BBSetIn;
+  /// The basic block local SILValue we are interested to find epilogue ARC in.
+  SILValue LocalArg;
+  /// Constructor, we only compute epilogue ARC instruction for 1 argument at
+  /// a time.
+  /// Optimistic data flow.
+  EpilogueARCBlockState() { BBSetIn = true; LocalArg = SILValue(); }
+};
+
+/// EpilogueARCContext - This class implements a data flow with which epilogue
+/// retains or releases for a SILValue are found.
+///
+/// NOTE:
+/// In case of release finder, this function assumes the SILArgument has
+/// @owned semantic.
+/// In case of retain finder, this class assumes Arg is one of the return value
+/// of the function.
+class EpilogueARCContext {
+public:
+  enum EpilogueARCKind { Retain = 0, Release = 1 };
+
+private:
+  // Are we finding retains or releases.
+  EpilogueARCKind Kind;
+
+  // The argument we are looking for epilogue ARC instruction for.
+  SILValue Arg;
+
+  /// The allocator we are currently using.
+  llvm::SpecificBumpPtrAllocator<EpilogueARCBlockState> BPA;
+
+  /// Current function we are analyzing.
+  SILFunction *F;
+
+  /// Current post-order we are using.
+  PostOrderFunctionInfo *PO;
+
+  /// Current alias analysis we are using.
+  AliasAnalysis *AA;
+
+  /// Current rc-identity we are using.
+  RCIdentityFunctionInfo *RCFI;
+
+  /// The epilogue retains or releases.
+  llvm::SmallVector<SILInstruction *, 1> EpilogueARCInsts; 
+
+  /// All the retain/release block state for all the basic blocks in the function. 
+  llvm::DenseMap<SILBasicBlock *, EpilogueARCBlockState *> EpilogueARCBlockStates;
+
+  /// The exit blocks of the function.
+  llvm::SmallPtrSet<SILBasicBlock *, 2> ExitBlocks;
+
+  /// Return true if this is a function exit block.
+  bool isExitBlock(SILBasicBlock *BB) {
+    return ExitBlocks.count(BB);
+  }
+
+  /// Return true if this is a retain instruction.
+  bool isRetainInstruction(SILInstruction *II) {
+    return isa<RetainValueInst>(II) || isa<StrongRetainInst>(II);
+  }
+
+  /// Return true if this is a release instruction.
+  bool isReleaseInstruction(SILInstruction *II) {
+    return isa<ReleaseValueInst>(II) || isa<StrongReleaseInst>(II);
+  }
+
+  SILValue getArg(SILBasicBlock *B) {
+    SILValue A = EpilogueARCBlockStates[B]->LocalArg;
+    if (A)
+      return A;
+    return Arg;
+  }
+
+public:
+  /// Constructor.
+  EpilogueARCContext(EpilogueARCKind Kind, SILValue Arg, SILFunction *F,
+                     PostOrderFunctionInfo *PO, AliasAnalysis *AA,
+                     RCIdentityFunctionInfo *RCFI)
+    : Kind(Kind), Arg(Arg), F(F), PO(PO), AA(AA), RCFI(RCFI) {}
+
+  /// Run the data flow to find the epilogue retains or releases.
+  bool run() {
+    // Initialize the epilogue arc data flow context.
+    initializeDataflow();
+    // Converge the data flow.
+    convergeDataflow();
+    // Lastly, find the epilogue ARC instructions.
+    return computeEpilogueARC();
+  }
+
+  /// Reset the epilogue arc instructions. 
+  void resetEpilogueARCInsts() { EpilogueARCInsts.clear(); }
+  llvm::SmallVector<SILInstruction *, 1> getEpilogueARCInsts() {
+    return EpilogueARCInsts;
+  }
+
+  /// Initialize the data flow.
+  void initializeDataflow();
+
+  /// Keep iterating until the data flow is converged.
+  void convergeDataflow();
+
+  /// Find the epilogue ARC instructions.
+  bool computeEpilogueARC();
+
+  /// This instruction prevents looking further for epilogue retains on the
+  /// current path.
+  bool mayBlockEpilogueRetain(SILInstruction *II, SILValue Ptr) { 
+    // reference decrementing instruction prevents any retain to be identified as
+    // epilogue retains.
+    if (mayDecrementRefCount(II, Ptr, AA))
+      return true;
+    // Handle self-recursion. A self-recursion can be considered a +1 on the
+    // current argument.
+    if (ApplyInst *AI = dyn_cast<ApplyInst>(II))
+     if (AI->getCalleeFunction() == II->getParent()->getParent())
+       return true;
+    return false;
+  } 
+
+  /// This instruction prevents looking further for epilogue releases on the
+  /// current path.
+  bool mayBlockEpilogueRelease(SILInstruction *II, SILValue Ptr) { 
+    // Check whether this instruction read reference count, i.e. uniqueness
+    // check. Moving release past that may result in additional COW.
+   if (II->mayReleaseOrReadRefCount())
+      return true;
+    return false;
+  } 
+
+  /// Does this instruction block the interested ARC instruction ?
+  bool mayBlockEpilogueARC(SILInstruction *II, SILValue Ptr) { 
+    if (Kind == EpilogueARCKind::Retain)
+      return mayBlockEpilogueRetain(II, Ptr);
+    return mayBlockEpilogueRelease(II, Ptr);
+  }
+
+  /// This is the type of instructions the data flow is interested in.
+  bool isInterestedInstruction(SILInstruction *II) {
+    // We are checking for release.
+    if (Kind == EpilogueARCKind::Release)
+      return isReleaseInstruction(II) &&
+             RCFI->getRCIdentityRoot(II->getOperand(0)) ==
+             RCFI->getRCIdentityRoot(getArg(II->getParent()));
+    // We are checking for retain. If this is a self-recursion. call
+    // to the function (which returns an owned value) can be treated as
+    // the retain instruction.
+    if (ApplyInst *AI = dyn_cast<ApplyInst>(II))
+     if (AI->getCalleeFunction() == II->getParent()->getParent())
+       return true;
+    // Check whether this is a retain instruction and the argument it
+    // retains.
+    return isRetainInstruction(II) &&
+           RCFI->getRCIdentityRoot(II->getOperand(0)) ==
+           RCFI->getRCIdentityRoot(getArg(II->getParent()));
+  }
+};
+
+/// Compute the epilogue ARC instructions for a given SILValue. Return an
+/// empty set if no epilogue ARC instructions can be found.
+///
+/// NOTE: This function assumes Arg is has @owned semantic.
+llvm::SmallVector<SILInstruction *, 1> 
+computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind Kind,
+                               SILValue Arg, SILFunction *F,
+                               PostOrderFunctionInfo *PO, AliasAnalysis *AA,
+                               RCIdentityFunctionInfo *RCFI); 
+
+} // end namespace swift
+
 
 #endif

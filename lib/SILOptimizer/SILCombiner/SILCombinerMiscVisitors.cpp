@@ -37,11 +37,11 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   // Optimize away the pattern below that happens when exceptions are created
   // and in some cases, due to inlining, are not needed.
   //
-  //   %6 = alloc_existential_box $ErrorProtocol, $ColorError
+  //   %6 = alloc_existential_box $Error, $ColorError
   //   %7 = enum $VendingMachineError, #ColorError.Red
   //   store %7 to %6#1 : $*ColorError
-  //   debug_value %6#0 : $ErrorProtocol
-  //   strong_release %6#0 : $ErrorProtocol
+  //   debug_value %6#0 : $Error
+  //   strong_release %6#0 : $Error
 
   StoreInst *SingleStore = nullptr;
   StrongReleaseInst *SingleRelease = nullptr;

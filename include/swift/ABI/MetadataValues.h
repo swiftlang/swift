@@ -227,8 +227,8 @@ enum class SpecialProtocol: uint8_t {
   None = 0,
   /// The AnyObject protocol.
   AnyObject = 1,
-  /// The ErrorProtocol protocol.
-  ErrorProtocol = 2,
+  /// The Error protocol.
+  Error = 2,
 };
 
 /// Identifiers for protocol method dispatch strategies.

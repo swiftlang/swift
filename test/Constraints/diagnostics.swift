@@ -161,10 +161,10 @@ func rdar20142523() {
   })
 }
 
-// <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, IntegerLiteralConvertible)' is not convertible to 'IntegerLiteralConvertible
+// <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, ExpressibleByIntegerLiteral)' is not convertible to 'ExpressibleByIntegerLiteral
 func rdar21080030() {
   var s = "Hello"
-  if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'IndexDistance'}}
+  if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'IndexDistance'}}{{24-26=}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -192,10 +192,10 @@ func r17224804(_ monthNumber : Int) {
 
 // <rdar://problem/17020197> QoI: Operand of postfix '!' should have optional type; type is 'Int?'
 func r17020197(_ x : Int?, y : Int) {
-  if x! {  }  // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
+  if x! {  }  // expected-error {{'Int' is not convertible to 'Bool'}}
 
   // <rdar://problem/12939553> QoI: diagnostic for using an integer in a condition is utterly terrible
-  if y {}    // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
+  if y {}    // expected-error {{'Int' is not convertible to 'Bool'}}
 }
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
@@ -213,7 +213,8 @@ class r20201968C {
 
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(_ a : Int) {
-  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{type 'Int' is not optional, value can never be nil}}
+  assert(a != nil, "ASSERT COMPILATION ERROR")
+  // expected-warning @-1 {{comparing non-optional value of type 'Int' to nil always returns true}}
 }
 
 
@@ -290,7 +291,7 @@ _ = { $0 }  // expected-error {{unable to infer closure return type in current c
 
 
 
-_ = 4()   // expected-error {{cannot call value of non-function type 'Int'}}
+_ = 4()   // expected-error {{cannot call value of non-function type 'Int'}}{{6-8=}}
 _ = 4(1)  // expected-error {{cannot call value of non-function type 'Int'}}
 
 
@@ -492,7 +493,7 @@ func rdar20868864(_ s: String) {
 
 // <rdar://problem/20491794> Error message does not tell me what the problem is
 enum Color {
-  case Red
+  case Red // expected-note 2 {{did you mean 'Red'?}}
   case Unknown(description: String)
 
   static func rainbow() -> Color {}
@@ -554,7 +555,7 @@ func r22020088bar(_ p: r22020088P?) {
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
 func f(_ arguments: [String]) -> [ArraySlice<String>] {
-  return arguments.split(maxSplits: 1, omittingEmptySubsequences: false, isSeparator: { $0 == "--" })
+  return arguments.split(maxSplits: 1, omittingEmptySubsequences: false, whereSeparator: { $0 == "--" })
 }
 
 
@@ -590,16 +591,17 @@ func r21684487() {
 func r18397777(_ d : r21447318?) {
   let c = r21447318()
 
-  if c != nil { // expected-error {{type 'r21447318' is not optional, value can never be nil}}
+  if c != nil { // expected-warning {{comparing non-optional value of type 'r21447318' to nil always returns true}}
   }
   
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
   }
   
-  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
+  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{8-8= != nil)}}
+
   }
 
-  if !Optional(c) { // expected-error {{optional type 'Optional<_>' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
+  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{18-18= != nil)}}
   }
 }
 
@@ -755,7 +757,9 @@ func r24251022() {
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
   // https://twitter.com/_jlfischer/status/712337382175952896
-  return a == b && 1 == 2  // expected-error {{'&&' produces 'Bool', not the expected contextual result type 'Int'}}
+  // TODO: <rdar://problem/27391581> QoI: Nonsensitical "binary operator '&&' cannot be applied to two 'Bool' operands"
+  return a == b && 1 == 2  // expected-error {{binary operator '&&' cannot be applied to two 'Bool' operands}}
+  // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
 }
 
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
@@ -770,11 +774,86 @@ class SR1594 {
   func sr1594(bytes : UnsafeMutablePointer<Int>, _ i : Int?) {
     _ = (i === nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15===}}
     _ = (bytes === nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self === nil) // expected-error {{type 'SR1594' is not optional, value can never be nil}}
+    _ = (self === nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
     _ = (i !== nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15=!=}}
     _ = (bytes !== nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self !== nil) // expected-error {{type 'SR1594' is not optional, value can never be nil}}
+    _ = (self !== nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
+  }
+}
+
+func nilComparison(i: Int, o: AnyObject) {
+  _ = i == nil // expected-warning {{comparing non-optional value of type 'Int' to nil always returns false}}
+  _ = nil == i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns false}}
+  _ = i != nil // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
+  _ = nil != i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
+  
+  // These should all be illegal when SE-0121 lands.
+  _ = i < nil
+  _ = nil < i
+  _ = i <= nil
+  _ = nil <= i
+  _ = i > nil
+  _ = nil > i
+  _ = i >= nil
+  _ = nil >= i
+
+  _ = o === nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
+  _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
+}
+
+// FIXME: Bad diagnostic
+func secondArgumentNotLabeled(a:Int, _ b: Int) { }
+secondArgumentNotLabeled(10, 20)
+// expected-error@-1 {{unnamed parameter #1 must precede unnamed parameter #0}}
+
+// <rdar://problem/23709100> QoI: incorrect ambiguity error due to implicit conversion
+func testImplConversion(a : Float?) -> Bool {}
+func testImplConversion(a : Int?) -> Bool {
+  let someInt = 42
+  let a : Int = testImplConversion(someInt) // expected-error {{'testImplConversion' produces 'Bool', not the expected contextual result type 'Int'}}
+}
+
+// <rdar://problem/23752537> QoI: Bogus error message: Binary operator '&&' cannot be applied to two 'Bool' operands
+class Foo23752537 {
+  var title: String?
+  var message: String?
+}
+
+extension Foo23752537 {
+  func isEquivalent(other: Foo23752537) {
+    // TODO: <rdar://problem/27391581> QoI: Nonsensitical "binary operator '&&' cannot be applied to two 'Bool' operands"
+    // expected-error @+1 {{binary operator '&&' cannot be applied to two 'Bool' operands}}
+    return (self.title != other.title && self.message != other.message)
+    // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
   }
 }
 
 
+// <rdar://problem/22276040> QoI: not great error message with "withUnsafePointer" sametype constraints
+func read2(_ p: UnsafeMutablePointer<Void>, maxLength: Int) {}
+func read<T : Integer>() -> T? {
+  var buffer : T 
+  let n = withUnsafePointer(&buffer) { (p) in
+    read2(UnsafePointer(p), maxLength: sizeof(T)) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
+  }
+}
+
+func f23213302() {
+  var s = Set<Int>()
+  s.subtractInPlace(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Set<Int>'}}
+}
+
+// <rdar://problem/24202058> QoI: Return of call to overloaded function in void-return context
+func rdar24202058(a : Int) {
+  return a <= 480 // expected-error {{'<=' produces 'Bool', not the expected contextual result type '()'}}
+}
+
+// SR-1752: Warning about unused result with ternary operator
+
+struct SR1752 {
+  func foo() {}
+}
+
+let sr1752: SR1752? = nil
+
+true ? nil : sr1752?.foo() // don't generate a warning about unused result since foo returns Void

@@ -357,6 +357,7 @@ void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
 
 static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
                                  unsigned ArgNo) {
+
   auto *VD = capture.getDecl();
   auto type = VD->getType();
   SILLocation Loc(VD);
@@ -428,8 +429,21 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
   auto captureInfo = SGM.Types.getLoweredLocalCaptures(TheClosure);
-  for (auto capture : captureInfo.getCaptures())
+  for (auto capture : captureInfo.getCaptures()) {
+    if (capture.isDynamicSelfMetadata()) {
+      auto selfMetatype = MetatypeType::get(
+          captureInfo.getDynamicSelfType()->getSelfType(),
+          MetatypeRepresentation::Thick)
+              ->getCanonicalType();
+      SILType ty = SILType::getPrimitiveObjectType(selfMetatype);
+      SILValue val = new (SGM.M) SILArgument(F.begin(), ty);
+      (void) val;
+
+      return;
+    }
+
     emitCaptureArguments(*this, capture, ++ArgNo);
+  }
 }
 
 static void emitIndirectResultParameters(SILGenFunction &gen, Type resultType,

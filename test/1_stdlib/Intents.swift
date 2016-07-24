@@ -1,24 +1,24 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: objc_interop
 
-// Intents is only public on OS X and iOS
-// UNSUPPORTED: OS=watchos, OS=tvos
-
-// FIXME: un-XFAIL the test once the build bots have been updated to the
-//        more recent SDK versions.
-// XFAIL: *
+// UNSUPPORTED: OS=watchos
+// UNSUPPORTED: OS=tvos
 
 import Intents
 import StdlibUnittest
 
 let IntentsTestSuite = TestSuite("Intents")
 
-IntentsTestSuite.test("ErrorDomain") {
-  expectEqual("INIntentErrorDomain", INIntentErrorDomain)
-}
+if #available(OSX 10.12, iOS 10.0, *) {
 
-IntentsTestSuite.test("extension") {
-  expectEqual("INIntentErrorDomain", INIntentErrorCode._nsErrorDomain)
+  IntentsTestSuite.test("ErrorDomain") {
+    expectEqual("IntentsErrorDomain", INIntentErrorDomain)
+  }
+
+  IntentsTestSuite.test("extension") {
+    expectEqual("IntentsErrorDomain", INIntentError._nsErrorDomain)
+  }
 }
 
 runAllTests()

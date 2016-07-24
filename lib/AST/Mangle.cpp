@@ -379,6 +379,26 @@ static OperatorFixity getDeclFixity(const ValueDecl *decl) {
   llvm_unreachable("bad UnaryOperatorKind");
 }
 
+/// Returns true if one of the ancestor DeclContexts of \p D is either marked
+/// private or is a local context.
+static bool isInPrivateOrLocalContext(const ValueDecl *D) {
+  const DeclContext *DC = D->getDeclContext();
+  if (!DC->isTypeContext()) {
+    assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
+           "unexpected context kind");
+    return DC->isLocalContext();
+  }
+
+  auto declaredType = DC->getDeclaredTypeOfContext();
+  if (!declaredType || declaredType->is<ErrorType>())
+    return false;
+
+  auto *nominal = declaredType->getAnyNominal();
+  if (nominal->getFormalAccess() == Accessibility::Private)
+    return true;
+  return isInPrivateOrLocalContext(nominal);
+}
+
 void Mangler::mangleDeclName(const ValueDecl *decl) {
   if (decl->getDeclContext()->isLocalContext()) {
     // Mangle local declarations with a numeric discriminator.
@@ -387,47 +407,28 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
     // Fall through to mangle the <identifier>.
 
   } else if (decl->hasAccessibility() &&
-             decl->getFormalAccess() == Accessibility::Private) {
+             decl->getFormalAccess() == Accessibility::Private &&
+             !isInPrivateOrLocalContext(decl)) {
     // Mangle non-local private declarations with a textual discriminator
     // based on their enclosing file.
     // decl-name ::= 'P' identifier identifier
 
-    // Don't bother to use the private discriminator if the enclosing context
-    // is also private.
-    auto isWithinPrivateNominal = [](const Decl *D) -> bool {
-      const DeclContext *DC = D->getDeclContext();
-      if (!DC->isTypeContext()) {
-        assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
-               "do we need a private discriminator for this context?");
-        return false;
-      }
+    // The first <identifier> is a discriminator string unique to the decl's
+    // original source file.
+    auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
+    auto fileUnit = cast<FileUnit>(topLevelContext);
 
-      auto declaredType = DC->getDeclaredTypeOfContext();
-      if (!declaredType || declaredType->is<ErrorType>())
-        return false;
+    Identifier discriminator =
+      fileUnit->getDiscriminatorForPrivateValue(decl);
+    assert(!discriminator.empty());
+    assert(!isNonAscii(discriminator.str()) &&
+           "discriminator contains non-ASCII characters");
+    (void)isNonAscii;
+    assert(!clang::isDigit(discriminator.str().front()) &&
+           "not a valid identifier");
 
-      return (declaredType->getAnyNominal()->getFormalAccess()
-              == Accessibility::Private);
-    };
-
-    if (!isWithinPrivateNominal(decl)) {
-      // The first <identifier> is a discriminator string unique to the decl's
-      // original source file.
-      auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
-      auto fileUnit = cast<FileUnit>(topLevelContext);
-
-      Identifier discriminator =
-        fileUnit->getDiscriminatorForPrivateValue(decl);
-      assert(!discriminator.empty());
-      assert(!isNonAscii(discriminator.str()) &&
-             "discriminator contains non-ASCII characters");
-      (void) isNonAscii;
-      assert(!clang::isDigit(discriminator.str().front()) &&
-             "not a valid identifier");
-
-      Buffer << 'P';
-      mangleIdentifier(discriminator);
-    }
+    Buffer << 'P';
+    mangleIdentifier(discriminator);
     // Fall through to mangle the name.
   }
 
@@ -940,32 +941,17 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     Buffer << '_';
     return;
 
-  case TypeKind::UnboundGeneric: {
-    // We normally reject unbound types in IR-generation, but there
-    // are several occasions in which we'd like to mangle them in the
-    // abstract.
-    auto decl = cast<UnboundGenericType>(tybase)->getDecl();
-    mangleNominalType(cast<NominalTypeDecl>(decl));
-    return;
-  }
-
+  case TypeKind::UnboundGeneric:
   case TypeKind::Class:
   case TypeKind::Enum:
-  case TypeKind::Struct: {
-    return mangleNominalType(cast<NominalType>(tybase)->getDecl());
-  }
-
+  case TypeKind::Struct:
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
-    // type ::= 'G' <type> <type>+ '_'
-    auto *boundType = cast<BoundGenericType>(tybase);
-    Buffer << 'G';
-    mangleNominalType(boundType->getDecl());
-    for (auto arg : boundType->getGenericArgs()) {
-      mangleType(arg, /*uncurry*/ 0);
-    }
-    Buffer << '_';
+    if (type->isSpecialized())
+      mangleBoundGenericType(type);
+    else
+      mangleNominalType(tybase->getAnyNominal());
     return;
   }
 
@@ -1332,6 +1318,46 @@ void Mangler::mangleNominalType(const NominalTypeDecl *decl) {
   addSubstitution(key);
 }
 
+static void
+collectBoundGenericArgs(Type type,
+                        SmallVectorImpl<SmallVector<Type, 2>> &genericArgs) {
+  if (auto *unboundType = type->getAs<UnboundGenericType>()) {
+    if (auto parent = unboundType->getParent())
+      collectBoundGenericArgs(parent, genericArgs);
+    genericArgs.push_back({});
+  } else if (auto *nominalType = type->getAs<NominalType>()) {
+    if (auto parent = nominalType->getParent())
+      collectBoundGenericArgs(parent, genericArgs);
+    genericArgs.push_back({});
+  } else {
+    auto *boundType = type->castTo<BoundGenericType>();
+    if (auto parent = boundType->getParent())
+      collectBoundGenericArgs(parent, genericArgs);
+
+    SmallVector<Type, 2> args;
+    for (auto arg : boundType->getGenericArgs())
+      args.push_back(arg);
+    genericArgs.push_back(args);
+  }
+}
+
+void Mangler::mangleBoundGenericType(Type type) {
+  // type ::= 'G' <type> (<type>+ '_')+
+  Buffer << 'G';
+  auto *nominal = type->getAnyNominal();
+  mangleNominalType(nominal);
+
+  SmallVector<SmallVector<Type, 2>, 2> genericArgs;
+  collectBoundGenericArgs(type, genericArgs);
+  assert(!genericArgs.empty());
+
+  for (auto args : genericArgs) {
+    for (auto arg : args)
+      mangleType(arg, /*uncurry*/ 0);
+    Buffer << '_';
+  }
+}
+
 void Mangler::mangleProtocolDecl(const ProtocolDecl *protocol) {
   Buffer << 'P';
   mangleContextOf(protocol);
@@ -1366,6 +1392,12 @@ bool Mangler::tryMangleStandardSubstitution(const NominalTypeDecl *decl) {
     return true;
   } else if (name == "Float") {
     Buffer << "Sf";
+    return true;
+  } else if (name == "UnsafeRawPointer") {
+    Buffer << "SV";
+    return true;
+  } else if (name == "UnsafeMutableRawPointer") {
+    Buffer << "Sv";
     return true;
   } else if (name == "UnsafePointer") {
     Buffer << "SP";

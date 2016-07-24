@@ -110,6 +110,49 @@ func getset(p p: FooProto) {
   p.bar = prop
 }
 
+// CHECK-LABEL: define hidden %swift.type* @_TF7objc_ir16protocolMetatypeFT1pPSo8FooProto__PMPS0__(%objc_object*) {{.*}} {
+func protocolMetatype(p: FooProto) -> FooProto.Type {
+  // CHECK: = call %swift.type* @swift_getObjectType(%objc_object* %0)
+  // CHECK-NOT: {{retain|release}}
+  // CHECK: [[RAW_RESULT:%.+]] = call i8* @processFooType(i8* {{%.+}})
+  // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
+  // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
+  // CHECK: call void @swift_unknownRelease(%objc_object* %0)
+  // CHECK: ret %swift.type* [[SWIFT_RESULT]]
+  let type = processFooType(p.dynamicType)
+  return type
+} // CHECK: }
+
+class Impl: FooProto, AnotherProto {
+  @objc var bar: Int32 = 0
+}
+
+// CHECK-LABEL: define hidden %swift.type* @_TF7objc_ir27protocolCompositionMetatypeFT1pCS_4Impl_PMPSo12AnotherProtoSo8FooProto_(%C7objc_ir4Impl*) {{.*}} {
+func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
+  // CHECK: = getelementptr inbounds %C7objc_ir4Impl, %C7objc_ir4Impl* %0, i32 0, i32 0, i32 0
+  // CHECK-NOT: {{retain|release}}
+  // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType(i8* {{%.+}})
+  // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
+  // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
+  // CHECK: call void bitcast (void (%swift.refcounted*)* @rt_swift_release to void (%C7objc_ir4Impl*)*)(%C7objc_ir4Impl* %0)
+  // CHECK: ret %swift.type* [[SWIFT_RESULT]]
+  let type = processComboType(p.dynamicType)
+  return type
+} // CHECK: }
+
+// CHECK-LABEL: define hidden %swift.type* @_TF7objc_ir28protocolCompositionMetatype2FT1pCS_4Impl_PMPSo12AnotherProtoSo8FooProto_(%C7objc_ir4Impl*) {{.*}} {
+func protocolCompositionMetatype2(p: Impl) -> (FooProto & AnotherProto).Type {
+  // CHECK: = getelementptr inbounds %C7objc_ir4Impl, %C7objc_ir4Impl* %0, i32 0, i32 0, i32 0
+  // CHECK-NOT: {{retain|release}}
+  // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType2(i8* {{%.+}})
+  // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
+  // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
+  // CHECK: call void bitcast (void (%swift.refcounted*)* @rt_swift_release to void (%C7objc_ir4Impl*)*)(%C7objc_ir4Impl* %0)
+  // CHECK: ret %swift.type* [[SWIFT_RESULT]]
+  let type = processComboType2(p.dynamicType)
+  return type
+} // CHECK: }
+
 // CHECK-LABEL: define hidden void @_TF7objc_ir17pointerPropertiesFCSo14PointerWrapperT_(%CSo14PointerWrapper*) {{.*}} {
 func pointerProperties(_ obj: PointerWrapper) {
   // CHECK: load i8*, i8** @"\01L_selector(setVoidPtr:)"

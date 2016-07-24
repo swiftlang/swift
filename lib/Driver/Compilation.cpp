@@ -631,8 +631,16 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   const char *ExecPath = Cmd->getExecutable();
   const char **argv = Argv.data();
 
-  for (auto &envPair : Cmd->getExtraEnvironment())
+  for (auto &envPair : Cmd->getExtraEnvironment()) {
+#if defined(_MSC_VER)
+    llvm::SmallString<256> envStr = StringRef(envPair.first);
+    envStr.append(StringRef("="));
+    envStr.append(StringRef(envPair.second));
+    _putenv(envStr.c_str());
+#else
     setenv(envPair.first, envPair.second, /*replacing=*/true);
+#endif
+  }
 
   return ExecuteInPlace(ExecPath, argv);
 }

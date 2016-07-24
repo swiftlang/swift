@@ -118,7 +118,6 @@ static Type stripInitializers(Type origType) {
                for (const auto &field : tupleTy->getElements()) {
                  fields.push_back(TupleTypeElt(field.getType(),
                                                field.getName(),
-                                               DefaultArgumentKind::None,
                                                field.isVararg()));
                                                
                }
@@ -646,11 +645,17 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         break;
 
       case SelfTypeRelationship::ConformsTo:
-        cs.addConstraint(ConstraintKind::ConformsTo, selfTy1, selfTy2, locator);
+        cs.addConstraint(ConstraintKind::ConformsTo, selfTy1,
+                         cast<ProtocolDecl>(decl2->getDeclContext())
+                           ->getDeclaredType(),
+                         locator);
         break;
 
       case SelfTypeRelationship::ConformedToBy:
-        cs.addConstraint(ConstraintKind::ConformsTo, selfTy2, selfTy1, locator);
+        cs.addConstraint(ConstraintKind::ConformsTo, selfTy2,
+                         cast<ProtocolDecl>(decl1->getDeclContext())
+                           ->getDeclaredType(),
+                         locator);
         break;
       }
 

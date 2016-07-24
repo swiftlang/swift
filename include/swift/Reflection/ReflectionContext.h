@@ -162,7 +162,7 @@ public:
     }
 
     case MetadataKind::ErrorObject:
-      // ErrorProtocol boxed existential on non-Objective-C runtime target
+      // Error boxed existential on non-Objective-C runtime target
       return nullptr;
 
     default:
@@ -190,7 +190,8 @@ public:
     // Class existentials have trivial layout.
     // It is itself the pointer to the instance followed by the witness tables.
     case RecordKind::ClassExistential:
-      *OutInstanceTR = getBuilder().getTypeConverter().getUnknownObjectTypeRef();
+      // This is just Builtin.UnknownObject
+      *OutInstanceTR = ExistentialRecordTI->getFields()[0].TR;
       *OutInstanceAddress = ExistentialAddress;
       return true;
 
@@ -300,7 +301,7 @@ public:
         return false;
 
       // Now we need to skip over the instance metadata pointer and instance's
-      // conformance pointer for Swift.ErrorProtocol.
+      // conformance pointer for Swift.Error.
       StoredPointer InstanceAddress = InstanceMetadataAddressAddress +
         2 * sizeof(StoredPointer);
 
@@ -342,11 +343,13 @@ private:
       return nullptr;
 
     // Initialize the builder.
-    Builder.addField(OffsetToFirstCapture.second, sizeof(StoredPointer));
+    Builder.addField(OffsetToFirstCapture.second, sizeof(StoredPointer),
+                     /*numExtraInhabitants=*/0);
 
     // Skip the closure's necessary bindings struct, if it's present.
     auto SizeOfNecessaryBindings = Info.NumBindings * sizeof(StoredPointer);
-    Builder.addField(SizeOfNecessaryBindings, sizeof(StoredPointer));
+    Builder.addField(SizeOfNecessaryBindings, sizeof(StoredPointer),
+                     /*numExtraInhabitants=*/0);
 
     // FIXME: should be unordered_set but I'm too lazy to write a hash
     // functor

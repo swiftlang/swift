@@ -39,7 +39,7 @@ class Y : P {
   init() {} 
 
   @objc func foo(_ s: String) { }
-  @objc func wibble() { }
+  @objc func wibble() { } // expected-note 2 {{did you mean 'wibble'?}}
 
   @objc func ovl1() -> A { }
 
@@ -197,7 +197,7 @@ var prop3ResultB : (() -> Int)? = obj.prop3
 var prop3ResultC = obj.prop3
 let prop3ResultCChecked: Int? = prop3ResultC
 
-var obj2 : protocol<AnyObject, P> = Y()
+var obj2 : AnyObject & P = Y()
 
 class Z2 : AnyObject { }
 class Z3<T : AnyObject> { }

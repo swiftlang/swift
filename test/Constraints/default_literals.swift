@@ -19,7 +19,7 @@ _ = ternary(false, 2.5, 1)
 _ = ternary(false, 1, 2 as Int32)
 _ = ternary(false, 1, 2 as Float)
 
-func genericFloatingLiteral<T : FloatLiteralConvertible>(_ x: T) {
+func genericFloatingLiteral<T : ExpressibleByFloatLiteral>(_ x: T) {
   var _ : T = 2.5
 }
 

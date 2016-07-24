@@ -119,7 +119,7 @@ self value looks like it should have been consumed but it wasn't.
 
 It is also difficult to encode this tri-state return for throwing initializers.
 One can imagine changing the try_apply and throw SIL instructions to support
-returning a pair (ErrorProtocol, AnyObject) instead of a single ErrorProtocol. But
+returning a pair (Error, AnyObject) instead of a single Error. But
 this would ripple changes throughout various SIL analyses, and require IRGen
 to encode the pair return value in an efficient way.
 

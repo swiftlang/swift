@@ -238,7 +238,8 @@ public:
                                    SILDebugVariable Var = SILDebugVariable()) {
     Loc.markAsPrologue();
     return insert(AllocStackInst::create(getSILDebugLocation(Loc),
-                                         elementType, F, Var));
+                                         elementType, F, OpenedArchetypes,
+                                         Var));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType elementType, bool objc,
@@ -246,8 +247,9 @@ public:
     // AllocRefInsts expand to function calls and can therefore not be
     // counted towards the function prologue.
     assert(!Loc.isInPrologue());
-    return insert(new (F.getModule()) AllocRefInst(
-        getSILDebugLocation(Loc), elementType, F, objc, canAllocOnStack));
+    return insert(AllocRefInst::create(getSILDebugLocation(Loc), elementType, F,
+                                       objc, canAllocOnStack,
+                                       OpenedArchetypes));
   }
 
   AllocRefDynamicInst *createAllocRefDynamic(SILLocation Loc, SILValue operand,
@@ -255,21 +257,21 @@ public:
     // AllocRefDynamicInsts expand to function calls and can therefore
     // not be counted towards the function prologue.
     assert(!Loc.isInPrologue());
-    return insert(new (F.getModule()) AllocRefDynamicInst(
-        getSILDebugLocation(Loc), operand, type, objc));
+    return insert(AllocRefDynamicInst::create(getSILDebugLocation(Loc), operand,
+                                              type, objc, F, OpenedArchetypes));
   }
 
   AllocValueBufferInst *
   createAllocValueBuffer(SILLocation Loc, SILType valueType, SILValue operand) {
-    return insert(new (F.getModule()) AllocValueBufferInst(
-        getSILDebugLocation(Loc), valueType, operand));
+    return insert(AllocValueBufferInst::create(
+        getSILDebugLocation(Loc), valueType, operand, F, OpenedArchetypes));
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType,
                                SILDebugVariable Var = SILDebugVariable()) {
     Loc.markAsPrologue();
-    return insert(
-        AllocBoxInst::create(getSILDebugLocation(Loc), ElementType, F, Var));
+    return insert(AllocBoxInst::create(getSILDebugLocation(Loc), ElementType, F,
+                                       OpenedArchetypes, Var));
   }
 
   AllocExistentialBoxInst *
@@ -277,8 +279,8 @@ public:
                             CanType ConcreteType,
                             ArrayRef<ProtocolConformanceRef> Conformances) {
     return insert(AllocExistentialBoxInst::create(
-        getSILDebugLocation(Loc), ExistentialType, ConcreteType,
-        Conformances, &F));
+        getSILDebugLocation(Loc), ExistentialType, ConcreteType, Conformances,
+        &F, OpenedArchetypes));
   }
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn, SILType SubstFnTy,
@@ -516,6 +518,12 @@ public:
         getSILDebugLocation(Loc), srcAddr, destAddr, isTake, isInitialize));
   }
 
+  BindMemoryInst *createBindMemory(SILLocation Loc, SILValue base,
+                                   SILValue index, SILType boundType) {
+    return insert(BindMemoryInst::create(getSILDebugLocation(Loc), base, index,
+                                         boundType, F, OpenedArchetypes));
+  }
+
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
     return insert(new (F.getModule())
@@ -546,9 +554,9 @@ public:
   }
 
   PointerToAddressInst *createPointerToAddress(SILLocation Loc, SILValue Op,
-                                               SILType Ty) {
+                                               SILType Ty, bool isStrict) {
     return insert(new (F.getModule()) PointerToAddressInst(
-        getSILDebugLocation(Loc), Op, Ty));
+                    getSILDebugLocation(Loc), Op, Ty, isStrict));
   }
 
   UncheckedRefCastInst *createUncheckedRefCast(SILLocation Loc, SILValue Op,

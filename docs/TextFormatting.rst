@@ -109,18 +109,18 @@ Design Details
 Output Streams
 ..............
 
-The most fundamental part of this design is ``OutputStream``, a thing
+The most fundamental part of this design is ``TextOutputStream``, a thing
 into which we can stream text: [#character1]_
 
 ::
 
-  protocol OutputStream {
+  protocol TextOutputStream {
     func append(_ text: String)
   }
 
-Every ``String`` can be used as an ``OutputStream`` directly::
+Every ``String`` can be used as an ``TextOutputStream`` directly::
 
-  extension String : OutputStream {
+  extension String : TextOutputStream {
     func append(_ text: String)
   }
 
@@ -142,7 +142,7 @@ need to declare conformance: simply give the type a ``debugFormat()``::
 
 Because ``String`` is a ``Streamable``, your implementation of
 ``debugFormat`` can just return a ``String``. If want to write
-directly to the ``OutputStream`` for efficiency reasons,
+directly to the ``TextOutputStream`` for efficiency reasons,
 (e.g. if your representation is huge), you can return a custom
 ``DebugRepresentation`` type.
 
@@ -197,11 +197,11 @@ implement::
 Because it's not always efficient to construct a ``String``
 representation before writing an object to a stream, we provide a
 ``Streamable`` protocol, for types that can write themselves into an
-``OutputStream``. Every ``Streamable`` is also a ``CustomStringConvertible``,
+``TextOutputStream``. Every ``Streamable`` is also a ``CustomStringConvertible``,
 naturally::
 
   protocol Streamable : CustomStringConvertible {
-    func writeTo<T: OutputStream>(_ target: [inout] T)
+    func writeTo<T: TextOutputStream>(_ target: [inout] T)
 
     // You'll never want to reimplement this
     func format() -> PrintRepresentation {
@@ -224,7 +224,7 @@ adds surrounding quotes and escapes special characters::
   struct EscapedStringRepresentation : Streamable {
     var _value: String
 
-    func writeTo<T: OutputStream>(_ target: [inout] T) {
+    func writeTo<T: TextOutputStream>(_ target: [inout] T) {
       target.append("\"")
       for c in _value {
         target.append(c.escape())
@@ -233,11 +233,11 @@ adds surrounding quotes and escapes special characters::
     }
   }
 
-Besides modeling ``OutputStream``, ``String`` also conforms to
+Besides modeling ``TextOutputStream``, ``String`` also conforms to
 ``Streamable``::
 
   extension String : Streamable {
-    func writeTo<T: OutputStream>(_ target: [inout] T) {
+    func writeTo<T: TextOutputStream>(_ target: [inout] T) {
       target.append(self) // Append yourself to the stream
     }
 
@@ -259,7 +259,7 @@ used for ``Int``. It represents an example of how a relatively
 complicated ``format(…)`` might be written::
 
   protocol CustomStringConvertibleInteger 
-    : IntegerLiteralConvertible, Comparable, SignedNumber, CustomStringConvertible {
+    : ExpressibleByIntegerLiteral, Comparable, SignedNumber, CustomStringConvertible {
     func %(lhs: Self, rhs: Self) -> Self
     func /(lhs: Self, rhs: Self) -> Self
     constructor(x: Int)
@@ -275,12 +275,12 @@ complicated ``format(…)`` might be written::
   struct RadixFormat<T: CustomStringConvertibleInteger> : Streamable {
     var value: T, radix = 10, fill = " ", width = 0
 
-    func writeTo<S: OutputStream>(_ target: [inout] S) {
+    func writeTo<S: TextOutputStream>(_ target: [inout] S) {
       _writeSigned(value, &target)
     }
 
     // Write the given positive value to stream
-    func _writePositive<T:CustomStringConvertibleInteger, S: OutputStream>( 
+    func _writePositive<T:CustomStringConvertibleInteger, S: TextOutputStream>(
       _ value: T, stream: [inout] S
     ) -> Int {
       if value == 0 { return 0 }
@@ -293,7 +293,7 @@ complicated ``format(…)`` might be written::
       return nDigits + 1
     }
 
-    func _writeSigned<T:CustomStringConvertibleInteger, S: OutputStream>(
+    func _writeSigned<T:CustomStringConvertibleInteger, S: TextOutputStream>(
       _ value: T, target: [inout] S
     ) {
       var width = 0
@@ -333,15 +333,15 @@ considerable thought, they are included here for completeness and to
 ensure our proposed design doesn't rule out important directions of
 evolution.
 
-``OutputStream`` Adapters
-.........................
+``TextOutputStream`` Adapters
+.............................
 
 Most text transformations can be expressed as adapters over generic
-``OutputStream``\ s. For example, it's easy to imagine an upcasing
+``TextOutputStream``\ s. For example, it's easy to imagine an upcasing
 adapter that transforms its input to upper case before writing it to
 an underlying stream::
 
-  struct UpperStream<UnderlyingStream:OutputStream> : OutputStream {
+  struct UpperStream<UnderlyingStream:TextOutputStream> : TextOutputStream {
     func append(_ x: String) { base.append(x.toUpper()) }
     var base: UnderlyingStream
   }
@@ -353,26 +353,26 @@ processed and written to the underlying stream:
 
 .. parsed-literal::
 
-  struct TrimStream<UnderlyingStream:OutputStream> : OutputStream {
+  struct TrimStream<UnderlyingStream:TextOutputStream> : TextOutputStream {
     func append(_ x: String) { ... }
     **func close() { ... }**
     var base: UnderlyingStream
     var bufferedWhitespace: String
   }
 
-This makes general ``OutputStream`` adapters more complicated to write
-and use than ordinary ``OutputStream``\ s.
+This makes general ``TextOutputStream`` adapters more complicated to write
+and use than ordinary ``TextOutputStream``\ s.
 
 ``Streamable`` Adapters
 .......................
 
-For every conceivable ``OutputStream`` adaptor there's a corresponding
+For every conceivable ``TextOutputStream`` adaptor there's a corresponding
 ``Streamable`` adaptor. For example::
 
   struct UpperStreamable<UnderlyingStreamable:Streamable> {
     var base: UnderlyingStreamable
 
-    func writeTo<T: OutputStream>(_ target: [inout] T) {
+    func writeTo<T: TextOutputStream>(_ target: [inout] T) {
       var adaptedStream = UpperStream(target)
       self.base.writeTo(&adaptedStream)
       target = adaptedStream.base
@@ -418,12 +418,12 @@ least until we do, we opt not to trade away any CPU, memory, and
 power.
 
 If we were willing to say that only ``class``\ es can conform to
-``OutputStream``, we could eliminate the explicit ``[inout]`` where
-``OutputStream``\ s are passed around. Then, we'd simply need a
+``TextOutputStream``, we could eliminate the explicit ``[inout]`` where
+``TextOutputStream``\ s are passed around. Then, we'd simply need a
 ``class StringStream`` for creating ``String`` representations. It
-would also make ``OutputStream`` adapters a *bit* simpler to use
+would also make ``TextOutputStream`` adapters a *bit* simpler to use
 because you'd never need to "write back" explicitly onto the target
-stream. However, stateful ``OutputStream`` adapters would still need a
+stream. However, stateful ``TextOutputStream`` adapters would still need a
 ``close()`` method, which makes a perfect place to return a copy of
 the underlying stream, which can then be "written back":
 
@@ -431,7 +431,7 @@ the underlying stream, which can then be "written back":
 
   struct AdaptedStreamable<T:Streamable> {
     ...
-    func writeTo<Target: OutputStream>(_ target: [inout] Target) {
+    func writeTo<Target: TextOutputStream>(_ target: [inout] Target) {
       // create the stream that transforms the representation
       var adaptedTarget = adapt(target, adapter);
       // write the Base object to the target stream
@@ -444,7 +444,7 @@ the underlying stream, which can then be "written back":
   }
 
 We think anyone writing such adapters can handle the need for explicit
-write-back, and the ability to use ``String`` as an ``OutputStream``
+write-back, and the ability to use ``String`` as an ``TextOutputStream``
 without additionally allocating a ``StringStream`` on the heap seems
 to tip the balance in favor of the current design.
 

@@ -413,7 +413,7 @@ static void setOutsideBlockUsesToUndef(SILInstruction *I) {
 
 static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {
   if (auto *AI = dyn_cast<ApplyInst>(I))
-    if (AI->getOrigCalleeType()->isNoReturn())
+    if (AI->isCalleeNoReturn())
       return AI;
   
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
@@ -448,7 +448,7 @@ static SILInstruction *getPrecedingCallToNoReturn(SILBasicBlock &BB) {
     // The predecessor must be the normal edge from a try_apply
     // that invokes a noreturn function.
     if (auto TAI = dyn_cast<TryApplyInst>((*i)->getTerminator())) {
-      if (TAI->getOrigCalleeType()->isNoReturn() &&
+      if (TAI->isCalleeNoReturn() &&
           TAI->isNormalSuccessorRef(i.getSuccessorRef())) {
         if (!first) first = TAI;
         continue;

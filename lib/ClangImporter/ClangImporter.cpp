@@ -48,6 +48,7 @@
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Rewrite/Frontend/FrontendActions.h"
 #include "clang/Rewrite/Frontend/Rewriters.h"
@@ -316,22 +317,25 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
-  invocationArgStrs.insert(invocationArgStrs.end(), {
-    // Enable modules.
-    "-fmodules",
+  invocationArgStrs.insert(
+      invocationArgStrs.end(),
+      {
 
-    // Enable implicit module maps (this option is implied by "-fmodules").
-    "-fimplicit-module-maps",
+          // Enable modules
+          "-fmodules",
+          "-fmodules-validate-system-headers",
+          "-Werror=non-modular-include-in-framework-module",
+          // Enable implicit module maps (implied by "-fmodules")
+          "-fimplicit-module-maps",
+          "-Xclang", "-fmodule-feature", "-Xclang", "swift",
 
-    // Don't emit LLVM IR.
-    "-fsyntax-only",
+          // Don't emit LLVM IR.
+          "-fsyntax-only",
 
-    SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
-    "-fretain-comments-from-system-headers",
-    "-fmodules-validate-system-headers",
-    "-Werror=non-modular-include-in-framework-module",
-    "-Xclang", "-fmodule-feature", "-Xclang", "swift",
-  });
+          "-fretain-comments-from-system-headers",
+
+          SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
+      });
 
   // Set C language options.
   if (triple.isOSDarwin()) {
@@ -354,7 +358,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-D_ISO646_H_", "-D__ISO646_H",
 
       // Request new APIs from Foundation.
-      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=7",
+      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=8",
 
       // Request new APIs from SceneKit.
       "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=2",
@@ -1289,12 +1293,12 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
   else if (ctx.LangOpts.Target.isMacOSX()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
-      [](StringRef Platform) { return Platform == "macosx"; };
+      [](StringRef Platform) { return Platform == "macos"; };
     } else {
       PlatformAvailabilityFilter =
       [](StringRef Platform) {
-        return Platform == "macosx" ||
-               Platform == "macosx_app_extension"; };
+        return Platform == "macos" ||
+               Platform == "macos_app_extension"; };
     }
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
     DeprecatedAsUnavailableFilter =
@@ -2712,12 +2716,24 @@ auto ClangImporter::Implementation::importFullName(
   bool strippedPrefix = false;
   if (isa<clang::EnumConstantDecl>(D)) {
     auto enumDecl = cast<clang::EnumDecl>(D->getDeclContext());
-    StringRef removePrefix =
-      getEnumConstantNamePrefix(enumDecl, &clangSema.getPreprocessor());
+    auto enumInfo = getEnumInfo(enumDecl, &clangSema.getPreprocessor());
+
+    StringRef removePrefix = enumInfo.getConstantNamePrefix();
     if (!removePrefix.empty() && baseName.startswith(removePrefix)) {
       baseName = baseName.substr(removePrefix.size());
       strippedPrefix = true;
     }
+  }
+
+  // If the error is an error enum, it will be mapped to the 'Code'
+  // enum nested within an NSError-containing struct. Strip the word
+  // "Code" off the end of the name, if it's there, because it's
+  // redundant.
+  if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
+    auto enumInfo = getEnumInfo(enumDecl, &clangSema.getPreprocessor());
+    if (enumInfo.isErrorEnum() && baseName.size() > 4 &&
+        camel_case::getLastWord(baseName) == "Code")
+      baseName = baseName.substr(0, baseName.size() - 4);
   }
 
   auto hasConflict = [&](const clang::IdentifierInfo *proposedName,
@@ -3259,12 +3275,11 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
 
     if (objcClass) {
       if (auto objcSuperclass = objcClass->getSuperClass()) {
-        if (auto getterMethod
-              = objcSuperclass->lookupInstanceMethod(
-                  objcProperty->getGetterName())) {
-          if (!shouldSuppressDeclImport(getterMethod))
-            return true;
-        }
+        auto getterMethod =
+            objcSuperclass->lookupMethod(objcProperty->getGetterName(),
+                                         objcProperty->isInstanceProperty());
+        if (getterMethod && !shouldSuppressDeclImport(getterMethod))
+          return true;
       }
     }
 

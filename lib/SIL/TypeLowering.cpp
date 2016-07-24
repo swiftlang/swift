@@ -1817,6 +1817,8 @@ static Type replaceDynamicSelfWithSelf(Type t) {
 
 /// Replace any DynamicSelf types with their underlying Self type.
 static CanType replaceDynamicSelfWithSelf(CanType t) {
+  if (!t->hasDynamicSelfType())
+    return t;
   return replaceDynamicSelfWithSelf(Type(t))->getCanonicalType();
 }
 
@@ -2074,13 +2076,14 @@ getAnyFunctionRefFromCapture(CapturedValue capture) {
 CaptureInfo
 TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   // First, bail out if there are no local captures at all.
-  if (!fn.getCaptureInfo().hasLocalCaptures()) {
+  if (!fn.getCaptureInfo().hasLocalCaptures() &&
+      !fn.getCaptureInfo().hasDynamicSelfCapture()) {
     CaptureInfo info;
     info.setGenericParamCaptures(
         fn.getCaptureInfo().hasGenericParamCaptures());
     return info;
   };
-  
+
   // See if we've cached the lowered capture list for this function.
   auto found = LoweredCaptures.find(fn);
   if (found != LoweredCaptures.end())
@@ -2089,7 +2092,13 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
   llvm::SetVector<CapturedValue> captures;
+
+  // If there is a capture of 'self' with dynamic 'Self' type, it goes last so
+  // that IRGen can pass dynamic 'Self' metadata.
+  Optional<CapturedValue> selfCapture;
+
   bool capturesGenericParams = false;
+  DynamicSelfType *capturesDynamicSelf = nullptr;
   
   std::function<void (AnyFunctionRef)> collectFunctionCaptures
   = [&](AnyFunctionRef curFn) {
@@ -2098,6 +2107,8 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   
     if (curFn.getCaptureInfo().hasGenericParamCaptures())
       capturesGenericParams = true;
+    if (curFn.getCaptureInfo().hasDynamicSelfCapture())
+      capturesDynamicSelf = curFn.getCaptureInfo().getDynamicSelfType();
 
     SmallVector<CapturedValue, 4> localCaptures;
     curFn.getCaptureInfo().getLocalCaptures(localCaptures);
@@ -2108,7 +2119,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
         collectFunctionCaptures(*capturedFn);
         continue;
       }
-      
+
       // If the capture is of a computed property, grab the transitive captures
       // of its accessors.
       if (auto capturedVar = dyn_cast<VarDecl>(capture.getDecl())) {
@@ -2127,10 +2138,10 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           // Directly capture storage if we're supposed to.
           if (capture.isDirect())
             goto capture_value;
-            
+
           // Otherwise, transitively capture the accessors.
           SWIFT_FALLTHROUGH;
-          
+
         case VarDecl::Computed: {
           collectFunctionCaptures(capturedVar->getGetter());
           if (auto setter = capturedVar->getSetter())
@@ -2138,9 +2149,26 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           continue;
         }
 
-        case VarDecl::Stored:
+        case VarDecl::Stored: {
           // We can always capture the storage in these cases.
+          Type captureType;
+          if (auto *selfType = capturedVar->getType()->getAs<DynamicSelfType>()) {
+            captureType = selfType->getSelfType();
+            if (auto *metatypeType = captureType->getAs<MetatypeType>())
+              captureType = metatypeType->getInstanceType();
+
+            // We're capturing a 'self' value with dynamic 'Self' type;
+            // handle it specially.
+            if (!selfCapture &&
+                captureType->getClassOrBoundGenericClass()) {
+              selfCapture = capture;
+              continue;
+            }
+          }
+
+          // Otherwise just fall through.
           goto capture_value;
+        }
         }
       }
       
@@ -2150,12 +2178,23 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
     }
   };
   collectFunctionCaptures(fn);
-  
+
+  // If we captured the dynamic 'Self' type and we have a 'self' value also,
+  // add it as the final capture. Otherwise, add a fake hidden capture for
+  // the dynamic 'Self' metatype.
+  if (selfCapture.hasValue()) {
+    captures.insert(*selfCapture);
+  } else if (capturesDynamicSelf) {
+    selfCapture = CapturedValue::getDynamicSelfMetadata();
+    captures.insert(*selfCapture);
+  }
+
   // Cache the uniqued set of transitive captures.
   auto inserted = LoweredCaptures.insert({fn, CaptureInfo()});
   assert(inserted.second && "already in map?!");
   auto &cachedCaptures = inserted.first->second;
   cachedCaptures.setGenericParamCaptures(capturesGenericParams);
+  cachedCaptures.setDynamicSelfType(capturesDynamicSelf);
   cachedCaptures.setCaptures(Context.AllocateCopy(captures));
   
   return cachedCaptures;

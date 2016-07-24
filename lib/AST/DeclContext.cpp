@@ -127,8 +127,10 @@ enum class DeclTypeKind : unsigned {
 };
 
 static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
-  auto type = ED->getExtendedType();
+  if (ED->isInvalid())
+    return ErrorType::get(ED->getASTContext());
 
+  auto type = ED->getExtendedType();
   if (!type)
     return Type();
 

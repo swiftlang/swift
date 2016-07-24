@@ -2191,6 +2191,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 typeAlias->isImplicit(),
                                 rawAccessLevel);
     writeGenericParams(typeAlias->getGenericParams(), DeclTypeAbbrCodes);
+    writeRequirements(typeAlias->getGenericRequirements());
     break;
   }
 
@@ -2309,6 +2310,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Class: {
     auto theClass = cast<ClassDecl>(D);
     verifyAttrSerializable(theClass);
+    assert(!theClass->isForeign());
 
     auto contextID = addDeclContextRef(theClass->getDeclContext());
 
@@ -2330,7 +2332,6 @@ void Serializer::writeDecl(const Decl *D) {
                             theClass->isImplicit(),
                             theClass->isObjC(),
                             theClass->requiresStoredPropertyInits(),
-                            theClass->isForeign(),
                             addTypeRef(theClass->getSuperclass()),
                             rawAccessLevel,
                             conformances.size(),
@@ -2778,12 +2779,9 @@ void Serializer::writeType(Type ty) {
 
     abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
-      uint8_t rawDefaultArg
-        = getRawStableDefaultArgumentKind(elt.getDefaultArgKind());
       TupleTypeEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                      addIdentifierRef(elt.getName()),
                                      addTypeRef(elt.getType()),
-                                     rawDefaultArg,
                                      elt.isVararg());
     }
 
@@ -2953,6 +2951,7 @@ void Serializer::writeType(Type ty) {
            fnTy->isAutoClosure(),
            fnTy->isNoReturn(),
            fnTy->isNoEscape(),
+           fnTy->isExplicitlyEscaping(),
            fnTy->throws());
     break;
   }
@@ -3919,9 +3918,6 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
       addOperatorsAndTopLevel(S, iterable->getMembers(),
                              operatorMethodDecls, topLevelDecls, objcMethods,
                              false);
-      addOperatorsAndTopLevel(S, iterable->getDerivedGlobalDecls(),
-                             operatorMethodDecls, topLevelDecls, objcMethods,
-                             true);
     }
 
     // Record Objective-C methods.
@@ -3992,9 +3988,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         addOperatorsAndTopLevel(*this, IDC->getMembers(),
                                 operatorMethodDecls, topLevelDecls,
                                 objcMethods, false);
-        addOperatorsAndTopLevel(*this, IDC->getDerivedGlobalDecls(),
-                                operatorMethodDecls, topLevelDecls,
-                                objcMethods, true);
       }
     }
 
@@ -4016,9 +4009,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         addOperatorsAndTopLevel(*this, IDC->getMembers(),
                                 operatorMethodDecls, topLevelDecls,
                                 objcMethods, false, /*isLocal=*/true);
-        addOperatorsAndTopLevel(*this, IDC->getDerivedGlobalDecls(),
-                                operatorMethodDecls, topLevelDecls,
-                                objcMethods, true, /*isLocal=*/true);
       }
     }
   }
