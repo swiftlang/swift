@@ -122,10 +122,6 @@ set(SWIFT_ENABLE_LLD_LINKER FALSE CACHE BOOL
 set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
-# Configure and initialize swift components.
-include(SwiftComponents)
-swift_configure_components()
-
 set(SWIFT_SDKS "" CACHE STRING
     "If non-empty, limits building target binaries only to specified SDKs (despite other SDKs being available)")
 
@@ -327,6 +323,7 @@ set(CMAKE_CXX_ARCHIVE_FINISH "")
 
 include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
+include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
 include(SwiftSource)
@@ -335,7 +332,8 @@ include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(SwiftList)
 
-swift_configure_install_components("${SWIFT_INSTALL_COMPONENTS}")
+# Configure swift include, install, build components.
+swift_configure_components()
 
 if("${CMAKE_VERSION}" VERSION_LESS "3.0")
   set(SWIFT_CMAKE_HAS_GENERATOR_EXPRESSIONS FALSE)
