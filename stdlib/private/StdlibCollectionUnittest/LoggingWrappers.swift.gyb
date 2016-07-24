@@ -651,7 +651,6 @@ public struct ${Self}<
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
-    print("Log._withUnsafeMutableBufferPointerIfSupported[selfType] += 1")
     Log._withUnsafeMutableBufferPointerIfSupported[selfType] += 1
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
     if result != nil {
