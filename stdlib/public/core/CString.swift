@@ -180,7 +180,7 @@ public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
 /// the given pointer using the specified encoding.
 ///
 /// This internal helper takes the string length as an argument.
-public func _decodeCString<Encoding : UnicodeCodec>(
+func _decodeCString<Encoding : UnicodeCodec>(
   _ cString: UnsafePointer<Encoding.CodeUnit>,
   as encoding: Encoding.Type, length: Int,
   repairingInvalidCodeUnits isRepairing: Bool = true)
