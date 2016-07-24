@@ -1192,6 +1192,86 @@ ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
 }
 
+CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, Expr *arg,
+                           bool implicit, Type type) {
+  return new (ctx) CallExpr(fn, arg, implicit, type);
+}
+
+CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn,
+                           SourceLoc lParenLoc,
+                           ArrayRef<Expr *> args,
+                           ArrayRef<Identifier> argLabels,
+                           ArrayRef<SourceLoc> argLabelLocs,
+                           SourceLoc rParenLoc,
+                           Expr *trailingClosure,
+                           bool implicit) {
+  // Local function to compute the type of the argument, if all of its pieces
+  // have a type.
+  auto computeArgType = [&](Expr *arg) {
+    // Propagate 'implicit' to the argument.
+    if (implicit)
+      arg->setImplicit(true);
+
+    // Handle parenthesized expressions.
+    if (auto paren = dyn_cast<ParenExpr>(arg)) {
+      if (auto type = paren->getSubExpr()->getType()) {
+        arg->setType(ParenType::get(ctx, type));
+      }
+      return;
+    }
+
+    // Handle tuples.
+    auto tuple = dyn_cast<TupleExpr>(arg);
+    SmallVector<TupleTypeElt, 4> typeElements;
+    for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+      auto type = tuple->getElement(i)->getType();
+      if (!type) return;
+
+      typeElements.push_back(TupleTypeElt(type, tuple->getElementName(i)));
+    }
+    arg->setType(TupleType::get(typeElements, ctx));
+  };
+
+  // Construct a TupleExpr or ParenExpr, as appropriate, for the argument.
+  if (!trailingClosure) {
+    // Do we have a single, unlabeled argument?
+    if (args.size() == 1 && (argLabels.empty() || argLabels[0].empty())) {
+      auto arg = new (ctx) ParenExpr(lParenLoc, args[0], rParenLoc,
+                                     /*hasTrailingClosure=*/false);
+      computeArgType(arg);
+      return new (ctx) CallExpr(fn, arg, implicit);
+    }
+
+    // Construct the argument tuple.
+    auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels, argLabelLocs,
+                                 rParenLoc, /*hasTrailingClosure=*/false,
+                                 /*implicit=*/false);
+    computeArgType(arg);
+    return new (ctx) CallExpr(fn, arg, implicit);
+  }
+
+  // If we have no other arguments, represent the trailing closure as a
+  // parenthesized expression.
+  if (args.size() == 0) {
+    auto arg = new (ctx) ParenExpr(lParenLoc, trailingClosure, rParenLoc,
+                                   /*hasTrailingClosure=*/true);
+    computeArgType(arg);
+    return new (ctx) CallExpr(fn, arg, implicit);
+  }
+
+  // Form a tuple, including the trailing closure.
+  SmallVector<Expr *, 4> completeArgs;
+  completeArgs.reserve(args.size() + 1);
+  completeArgs.append(args.begin(), args.end());
+  completeArgs.push_back(trailingClosure);
+  auto arg = TupleExpr::create(ctx, lParenLoc, completeArgs, argLabels,
+                               argLabelLocs, rParenLoc,
+                               /*hasTrailingClosure=*/true,
+                               /*implicit=*/false);
+  computeArgType(arg);
+  return new (ctx) CallExpr(fn, arg, implicit);
+}
+
 Expr *CallExpr::getDirectCallee() const {
   auto fn = getFn();
   while (true) {

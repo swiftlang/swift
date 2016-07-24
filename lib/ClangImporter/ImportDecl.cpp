@@ -387,8 +387,8 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
     = cast<FuncDecl>(getBuiltinValueDecl(C,C.getIdentifier("reinterpretCast")));
   auto reinterpretCastRef
     = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
-  auto reinterpreted = new (C) CallExpr(reinterpretCastRef, paramRef,
-                                        /*implicit*/ true);
+  auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
+                                                { paramRef }, { Identifier() });
   auto assign = new (C) AssignExpr(selfRef, SourceLoc(), reinterpreted,
                                    /*implicit*/ true);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assign), SourceLoc(),
@@ -451,8 +451,8 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
     = cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
   auto reinterpretCastRef
     = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
-  auto reinterpreted = new (C) CallExpr(reinterpretCastRef, selfRef,
-                                        /*implicit*/ true);
+  auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
+                                                { selfRef }, { Identifier() });
   auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
@@ -643,8 +643,9 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
         C, C.getIdentifier("reinterpretCast")));
     auto reinterpretCastRef
       = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
-    auto reinterpreted = new (C) CallExpr(reinterpretCastRef, selfRef,
-                                          /*implicit*/ true);
+    auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
+                                                  { selfRef },
+                                                  { Identifier() });
     auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
@@ -670,17 +671,16 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
       C, C.getIdentifier("addressof")));
     auto addressofFnRef
       = new (C) DeclRefExpr(addressofFn, DeclNameLoc(), /*implicit*/ true);
-    auto selfPointer = new (C) CallExpr(addressofFnRef, inoutSelf,
-                                          /*implicit*/ true);
+    auto selfPointer = CallExpr::createImplicit(C, addressofFnRef,
+                                                { inoutSelf },
+                                                { Identifier() });
     auto initializeFn = cast<FuncDecl>(getBuiltinValueDecl(
       C, C.getIdentifier("initialize")));
     auto initializeFnRef
       = new (C) DeclRefExpr(initializeFn, DeclNameLoc(), /*implicit*/ true);
-    auto initializeArgs = TupleExpr::createImplicit(C,
-                                                   { newValueRef, selfPointer },
-                                                   {});
-    auto initialize = new (C) CallExpr(initializeFnRef, initializeArgs,
-                                       /*implicit*/ true);
+    auto initialize = CallExpr::createImplicit(C, initializeFnRef,
+                                               { newValueRef, selfPointer },
+                                               { Identifier(), Identifier() });
     auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
                                   /*implicit*/ true);
     setterDecl->setBody(body);
@@ -1767,11 +1767,8 @@ namespace {
         auto zeroInitializerRef = new (context) DeclRefExpr(zeroInitializerFunc,
                                                             DeclNameLoc(),
                                                             /*implicit*/ true);
-        auto emptyTuple = TupleExpr::createEmpty(context, SourceLoc(),
-                                                 SourceLoc(),
-                                                 /*implicit*/ true);
-        auto call = new (context) CallExpr(zeroInitializerRef, emptyTuple,
-                                           /*implicit*/ true);
+        auto call = CallExpr::createImplicit(context, zeroInitializerRef,
+                                             { }, { });
 
         auto assign = new (context) AssignExpr(lhs, SourceLoc(), call,
                                                /*implicit*/ true);
@@ -7075,12 +7072,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     case ConstantConvertKind::ConstructionWithUnwrap: {
       auto typeRef = TypeExpr::createImplicit(type, C);
       
-      // make a "(rawValue: <subexpr>)" tuple.
-      expr = TupleExpr::create(C, SourceLoc(), expr,
-                               C.Id_rawValue, SourceLoc(),
-                               SourceLoc(), /*trailingClosure*/false,
-                               /*implicit*/true);
-      expr = new (C) CallExpr(typeRef, expr, /*Implicit=*/true);
+      expr = CallExpr::createImplicit(C, typeRef, { expr }, { C.Id_rawValue });
       if (convertKind == ConstantConvertKind::ConstructionWithUnwrap)
         expr = new (C) ForceValueExpr(expr, SourceLoc());
       break;

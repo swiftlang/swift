@@ -1402,8 +1402,7 @@ namespace {
                                                  DeclNameLoc(loc),
                                                  /*Implicit=*/true);
       fnRef->setType(fn->getInterfaceType());
-      Expr *call = new (tc.Context) CallExpr(fnRef, value,
-                                             /*implicit*/ true);
+      Expr *call = CallExpr::createImplicit(tc.Context, fnRef, { value }, { });
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
     
@@ -1472,9 +1471,9 @@ namespace {
                                                 /*implicit*/ true,
                                                 AccessSemantics::Ordinary,
                                                 bridgeFnTy);
-      Expr *call = new (tc.Context) CallExpr(fnRef, value,
-                                             /*implicit*/ true,
-                                             bridgeTy);
+      Expr *call = CallExpr::createImplicit(tc.Context, fnRef, value,
+                                            { Identifier() });
+      call->setType(bridgeTy);
       return call;
     }
 
@@ -1592,17 +1591,9 @@ namespace {
       };
       args[1]->setImplicit();
 
-      // Form the argument tuple.
-      Expr *argTuple = TupleExpr::createImplicit(tc.Context, args, {});
-      argTuple->setImplicit();
-      TupleTypeElt tupleTypeFields[2] = {
-        args[0]->getType(),
-        args[1]->getType()
-      };
-      argTuple->setType(TupleType::get(tupleTypeFields, tc.Context));
-
       // Form the call and type-check it.
-      Expr *call = new (tc.Context) CallExpr(fnRef, argTuple, /*Implicit=*/true);
+      Expr *call = CallExpr::createImplicit(tc.Context, fnRef, args,
+                                            { Identifier(), Identifier() });
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
 
@@ -2107,17 +2098,6 @@ namespace {
         // Find the initializer we chose.
         auto choice = getOverloadChoice(locator);
 
-        auto arg = TupleExpr::create(
-                     tc.Context, SourceLoc(), { segment },
-                     { tc.Context.Id_stringInterpolationSegment },
-                     { }, SourceLoc(), /*HasTrailingClosure=*/false,
-                     /*Implicit=*/true,
-                     TupleType::get(
-                       { TupleTypeElt(
-                           segment->getType(),
-                           tc.Context.Id_stringInterpolationSegment) },
-                       tc.Context));
-
         auto memberRef = buildMemberRef(
                            typeRef, choice.openedFullType,
                            segment->getStartLoc(), choice.choice.getDecl(),
@@ -2127,7 +2107,10 @@ namespace {
                            AccessSemantics::Ordinary,
                            /*isDynamic=*/false);
         ApplyExpr *apply =
-            new (tc.Context) CallExpr(memberRef, arg, /*Implicit=*/true);
+          CallExpr::createImplicit(
+            tc.Context, memberRef,
+            { segment },
+            { tc.Context.Id_stringInterpolationSegment });
 
         auto converted = finishApply(apply, openedType, locatorBuilder);
         if (!converted)
@@ -2136,30 +2119,15 @@ namespace {
         segments.push_back(converted);
 
         if (index == 1) {
-          typeElements.push_back(
-            TupleTypeElt(converted->getType(),
-                         tc.Context.Id_stringInterpolation));
           names.push_back(tc.Context.Id_stringInterpolation);
         } else {
-          typeElements.push_back(converted->getType());
           names.push_back(Identifier());
         }
       }
 
-      Expr *argument = TupleExpr::create(tc.Context,
-                                         expr->getStartLoc(),
-                                         segments,
-                                         names,
-                                         { },
-                                         expr->getStartLoc(),
-                                         /*hasTrailingClosure=*/false,
-                                         /*Implicit=*/true,
-                                         TupleType::get(typeElements,
-                                                        tc.Context));
-
       // Call the init(stringInterpolation:) initializer with the arguments.
-      ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, argument,
-                                                   /*Implicit=*/true);
+      ApplyExpr *apply = CallExpr::createImplicit(tc.Context, memberRef,
+                                                  segments, names);
       expr->setSemanticExpr(finishApply(apply, openedType, locatorBuilder));
       return expr;
     }
@@ -2421,8 +2389,8 @@ namespace {
 
       // If there was an argument, apply it.
       if (auto arg = expr->getArgument()) {
-        ApplyExpr *apply = new (tc.Context) CallExpr(result, arg, 
-                                                     /*Implicit=*/false);
+        ApplyExpr *apply = CallExpr::create(tc.Context, result, arg,
+                                            /*implicit=*/false);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
 
@@ -3466,9 +3434,8 @@ namespace {
       StringRef msg = "attempt to evaluate editor placeholder";
       Expr *argExpr = new (ctx) StringLiteralExpr(msg, E->getLoc(),
                                                   /*implicit*/true);
-      argExpr = new (ctx) ParenExpr(E->getLoc(), argExpr, E->getLoc(),
-                                    /*hasTrailingClosure*/false);
-      Expr *callExpr = new (ctx) CallExpr(fnRef, argExpr, /*implicit*/true);
+      Expr *callExpr = CallExpr::createImplicit(ctx, fnRef, { argExpr },
+                                                { Identifier() });
       bool invalid = tc.typeCheckExpression(callExpr, cs.DC,
                                             TypeLoc::withoutLoc(valueType),
                                             CTP_CannotFail);
@@ -6781,7 +6748,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                            /*isDynamic=*/false);
 
   // Call the witness.
-  ApplyExpr *apply = new (Context) CallExpr(memberRef, arg, /*Implicit=*/true);
+  ApplyExpr *apply = CallExpr::create(Context, memberRef, arg,
+                                      /*implicit=*/true);
   Expr *result = rewriter.finishApply(apply, openedType,
                                       cs.getConstraintLocator(arg));
   if (!result)
@@ -6845,9 +6813,7 @@ static Expr *convertViaMember(const Solution &solution, Expr *expr,
   (void)failed;
 
   // Call the builtin method.
-  Expr *arg = TupleExpr::createEmpty(ctx, expr->getStartLoc(), 
-                                     expr->getEndLoc(), /*Implicit=*/true);
-  expr = new (ctx) CallExpr(memberRef, arg, /*Implicit=*/true);
+  expr = CallExpr::createImplicit(ctx, memberRef, { }, { });
   failed = tc.typeCheckExpressionShallow(expr, cs.DC);
   assert(!failed && "Could not call witness?");
   (void)failed;

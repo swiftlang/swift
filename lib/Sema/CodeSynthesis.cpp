@@ -574,11 +574,9 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
                                          Ctx.getIdentifier("copy"),
                                          DeclNameLoc(), /*implicit*/true);
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
-  Nil = TupleExpr::create(Ctx, SourceLoc(), { Nil }, { Ctx.Id_with },
-                          { SourceLoc() }, SourceLoc(), false, true);
 
   //- (id)copyWithZone:(NSZone *)zone;
-  Expr *Call = new (Ctx) CallExpr(UDE, Nil, /*implicit*/true);
+  Expr *Call = CallExpr::createImplicit(Ctx, UDE, { Nil }, { Ctx.Id_with });
 
   TypeLoc ResultTy;
   ResultTy.setType(VD->getType(), true);
@@ -923,7 +921,8 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
                                             /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
     }
-    SetterBody.push_back(new (Ctx) CallExpr(Callee, ValueDRE, true));
+    SetterBody.push_back(CallExpr::createImplicit(Ctx, Callee, { ValueDRE },
+                                                  { Identifier() }));
 
     // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!willSet->isFinal() &&
@@ -950,7 +949,8 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
                                             /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
     }
-    SetterBody.push_back(new (Ctx) CallExpr(Callee, OldValueExpr, true));
+    SetterBody.push_back(CallExpr::createImplicit(Ctx, Callee, { OldValueExpr },
+                                                  { Identifier() }));
 
     // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!didSet->isFinal() &&
@@ -1208,7 +1208,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
     SelfApply->setType(InitStorageMethodTy);
     SelfApply->setThrows(false);
     
-    Expr *InitStorageParam;
+    SmallVector<Expr *, 1> InitStorageArgs;
+    SmallVector<Identifier, 1> InitStorageArgLabels;
     if (ParamInitStorage) {
       // Claim the var initializer as the parameter to the `initStorage`
       // method.
@@ -1228,16 +1229,13 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
       // Type-check the expression.
       typeCheckExpression(InitValue, DC);
 
-      InitStorageParam = InitValue;
-    } else {
-      InitStorageParam = TupleExpr::createEmpty(Context,
-                                                SourceLoc(), SourceLoc(),
-                                                /*implicit*/ true);
+      InitStorageArgs.push_back(InitValue);
+      InitStorageArgLabels.push_back(Identifier());
     }
     
-    auto InitStorageExpr = new (Context) CallExpr(SelfApply, InitStorageParam,
-                                                  /*implicit*/ true);
-    InitStorageExpr->setImplicit();
+    auto InitStorageExpr = CallExpr::createImplicit(Context,SelfApply,
+                                                    InitStorageArgs,
+                                                    InitStorageArgLabels);
     InitStorageExpr->setType(SubstStorageContextTy);
     InitStorageExpr->setThrows(false);
     
@@ -1423,13 +1421,8 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     argRefs.push_back(expr);
     argNames.push_back(DeclaredParams->get(i)->getName());
   }
-  auto argTuple = TupleExpr::create(Context, SourceLoc(), argRefs,
-                                    argNames,
-                                    {}, SourceLoc(),
-                                    /*trailing closure*/ false,
-                                    /*implicit*/ true);
-  auto apply = new (Context) CallExpr(VD->getBehavior()->Param, argTuple,
-                                      /*implicit*/ true);
+  auto apply = CallExpr::createImplicit(Context, VD->getBehavior()->Param,
+                                        argRefs, argNames);
   
   // Return the expression value.
   auto Ret = new (Context) ReturnStmt(SourceLoc(), apply,
@@ -2029,10 +2022,8 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
 
   Expr *className = new (tc.Context) StringLiteralExpr(fullClassName, loc,
                                                        /*Implicit=*/true);
-  className = TupleExpr::createImplicit(
-    tc.Context, {className}, {tc.Context.Id_className});
-  className->setImplicit();
-  Expr *call = new (tc.Context) CallExpr(fn, className, /*Implicit=*/true);
+  Expr *call = CallExpr::createImplicit(tc.Context, fn, { className },
+                                        { tc.Context.Id_className });
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(call),
                                   SourceLoc(),
@@ -2193,7 +2184,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     return ctor;
   }
 
-  Expr *superCall = new (ctx) CallExpr(ctorRef, ctorArgs, /*Implicit=*/true);
+  Expr *superCall = CallExpr::create(ctx, ctorRef, ctorArgs, /*Implicit=*/true);
   if (superclassCtor->hasThrows()) {
     superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
                                   /*Implicit=*/true);

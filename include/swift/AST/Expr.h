@@ -3220,9 +3220,48 @@ public:
 /// syntactically through juxtaposition with a TupleExpr whose
 /// leading '(' is unspaced.
 class CallExpr : public ApplyExpr {
-public:
   CallExpr(Expr *fn, Expr *arg, bool Implicit, Type ty = Type())
     : ApplyExpr(ExprKind::Call, fn, arg, Implicit, ty) {}
+
+public:
+  /// Create a new call expression.
+  ///
+  /// Note: prefer to use the second entry point, which separates out
+  /// arguments/labels/etc.
+  static CallExpr *create(ASTContext &ctx, Expr *fn, Expr *arg,
+                          bool implicit, Type type = Type());
+
+  /// Create a new implicit call expression without any source-location
+  /// information.
+  ///
+  /// \param fn The function being called
+  /// \param args The call arguments, not including a trailing closure (if any).
+  /// \param argLabels The argument labels, whose size must equal args.size(),
+  /// or which must be empty.
+  static CallExpr *createImplicit(ASTContext &ctx, Expr *fn,
+                                  ArrayRef<Expr *> args,
+                                  ArrayRef<Identifier> argLabels) {
+    return create(ctx, fn, SourceLoc(), args, argLabels, { }, SourceLoc(),
+                  /*trailingClosure=*/nullptr, /*implicit=*/true);
+  }
+
+  /// Create a new call expression.
+  ///
+  /// \param fn The function being called
+  /// \param args The call arguments, not including a trailing closure (if any).
+  /// \param argLabels The argument labels, whose size must equal args.size(),
+  /// or which must be empty.
+  /// \param argLabelLocs The locations of the argument labels, whose size must
+  /// equal args.size() or which must be empty.
+  /// \param trailingClosure The trailing closure, if any.
+  static CallExpr *create(ASTContext &ctx, Expr *fn,
+                          SourceLoc lParenLoc,
+                          ArrayRef<Expr *> args,
+                          ArrayRef<Identifier> argLabels,
+                          ArrayRef<SourceLoc> argLabelLocs,
+                          SourceLoc rParenLoc,
+                          Expr *trailingClosure,
+                          bool implicit);
 
   SourceLoc getStartLoc() const {
     SourceLoc fnLoc = getFn()->getStartLoc();
