@@ -5195,16 +5195,22 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     // Create the result value.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, operand,
                                               cast<FunctionType>(methodTy));
+    Scope applyScope(Cleanups, CleanupLocation(e));
+    RValue resultRV;
     if (isa<VarDecl>(e->getMember().getDecl())) {
-      result = B.createApply(e, result, result->getType(),
-                             getLoweredType(valueTy), {}, {});
+      resultRV = emitMonomorphicApply(e, ManagedValue::forUnmanaged(result),
+                                      {}, valueTy,
+                                      ApplyOptions::DoesNotThrow,
+                                      None, None);
+    } else {
+      resultRV = RValue(*this, e, valueTy,
+                        emitManagedRValueWithCleanup(result));
     }
 
     // Package up the result in an optional.
-    RValue resultRV = RValue(*this, e, valueTy,
-                             emitManagedRValueWithCleanup(result));
     emitInjectOptionalValueInto(e, {e, std::move(resultRV)}, optTemp, optTL);
 
+    applyScope.pop();
     // Branch to the continuation block.
     B.createBranch(e, contBB);
   }
@@ -5223,7 +5229,9 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   B.emitBlock(contBB);
 
   // Package up the result.
-  auto optResult = B.createLoad(e, optTemp);
+  auto optResult = optTemp;
+  if (optTL.isLoadable())
+    optResult = B.createLoad(e, optResult);
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }
 
@@ -5283,17 +5291,19 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, base,
                                               cast<FunctionType>(methodTy));
     // Emit the index.
-    llvm::SmallVector<SILValue, 1> indexArgs;
-    std::move(index).forwardAll(*this, indexArgs);
-    auto &valueTL = getTypeLowering(valueTy);
-    result = B.createApply(e, result, result->getType(),
-                           valueTL.getLoweredType(), {}, indexArgs);
+    llvm::SmallVector<ManagedValue, 2> indexArgs;
+    std::move(index).getAll(indexArgs);
+    
+    Scope applyScope(Cleanups, CleanupLocation(e));
+    auto resultRV = emitMonomorphicApply(e, ManagedValue::forUnmanaged(result),
+                                         indexArgs, valueTy,
+                                         ApplyOptions::DoesNotThrow,
+                                         None, None);
 
     // Package up the result in an optional.
-    RValue resultRV =
-      RValue(*this, e, valueTy, emitManagedRValueWithCleanup(result, valueTL));
     emitInjectOptionalValueInto(e, {e, std::move(resultRV)}, optTemp, optTL);
 
+    applyScope.pop();
     // Branch to the continuation block.
     B.createBranch(e, contBB);
   }
@@ -5312,6 +5322,8 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   B.emitBlock(contBB);
 
   // Package up the result.
-  auto optValue = B.createLoad(e, optTemp);
-  return RValue(*this, e, emitManagedRValueWithCleanup(optValue, optTL));
+  auto optResult = optTemp;
+  if (optTL.isLoadable())
+    optResult = B.createLoad(e, optResult);
+  return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }
