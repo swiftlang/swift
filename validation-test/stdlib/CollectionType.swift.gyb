@@ -779,6 +779,16 @@ CollectionTypeTests.test("Collection/suffix(from:)/dispatch") {
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// partition(by:)
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("partition(by:)/dispatch") {
+  var tester = MutableCollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.partition(by: { _ in true })
+  expectCustomizable(tester, tester.log.partitionBy)
+}
+
+//===----------------------------------------------------------------------===//
 // _withUnsafeMutableBufferPointerIfSupported()
 //===----------------------------------------------------------------------===//
 

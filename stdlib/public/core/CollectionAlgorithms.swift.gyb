@@ -142,148 +142,83 @@ orderingExplanation = """\
 // partition()
 //===----------------------------------------------------------------------===//
 
-% # Generate two versions: with explicit predicates and with
-% # a Comparable requirement.
-% for preds in [True, False]:
-
-%   if preds:
-
-extension MutableCollection where Self : RandomAccessCollection
-
-%   else:
-
-extension MutableCollection
-  where Self : RandomAccessCollection, ${IElement} : Comparable
-
-%   end
-{
-
-%   if preds:
-  /// Reorders the elements in the collection and returns a pivot index, using
-  /// the given predicate as the comparison between elements.
-  ///
-  /// This method is typically one step of a sorting algorithm. A collection is
-  /// partitioned around a pivot index when each of the elements before the
-  /// pivot is correctly ordered before each of the elements at or after the
-  /// pivot. The `partition(by:)` method reorders the elements of
-  /// the collection and returns a pivot index that satisfies this condition,
-  /// using the given predicate to determine the relative order of any two
-  /// elements.
-  ///
-${orderingExplanation}
-  /// Here's an example that uses a predicate that orders elements from largest
-  /// to smallest:
-  ///
-  ///     var numbers = [50, 30, 60, 50, 80, 10, 40, 30]
-  ///     let pivot = numbers.partition { a, b in a > b }
-  ///
-  ///     print(pivot)
-  ///     // Prints "2"
-  ///     print(numbers)
-  ///     // Prints "[60, 80, 50, 50, 30, 10, 40, 30]"
-  ///
-  /// The return value of the call to `numbers.partition()` is the pivot for
-  /// the rearranged `numbers` array. `pivot` divides the collection into two
-  /// subranges, `numbers[0..<pivot]` and `numbers[pivot..<8]`.
-  ///
-  ///     print(numbers[0..<pivot])
-  ///     // Prints "[60, 80]"
-  ///     print(numbers[pivot..<8])
-  ///     // Prints "[50, 50, 30, 10, 40, 30]"
-  ///
-  /// The elements of `numbers` are rearranged so that every element in the
-  /// subrange before `pivot` is ordered before every element in the subrange
-  /// after. Because the supplied predicate returns `true` when its first
-  /// argument is greater than its second argument, larger elements are
-  /// ordered before smaller elements.
-  ///
-  /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its first
-  ///   argument should be ordered before its second argument; otherwise,
-  ///   `false`.
-  /// - Returns: A pivot index, such that every element before the pivot is
-  ///   ordered before every element at or above the pivot, using
-  ///   `areInIncreasingOrder` to determine the relative order of any two elements.
-  ///   The returned pivot is equal to the collection's end index only if the
-  ///   collection is empty.
-  ///
-  /// - SeeAlso: `partition()`
+extension MutableCollection {
   public mutating func partition(
-    by areInIncreasingOrder: @noescape (${IElement}, ${IElement}) -> Bool
-  ) -> Index
+    by belongsInSecondPartition: @noescape (${IElement}) throws -> Bool
+  ) rethrows -> Index {
 
-%   else:
+    var pivot = startIndex
+    while true {
+      if pivot == endIndex {
+        return pivot
+      }
+      if try belongsInSecondPartition(self[pivot]) {
+        break
+      }
+      formIndex(after: &pivot)
+    }
 
-  /// Reorders the elements in the collection and returns a pivot index.
-  ///
-  /// This method is typically one step of a sorting algorithm. A collection is
-  /// partitioned around a pivot index when each of the elements before the
-  /// pivot are less than each of the elements at or after the pivot. The
-  /// `partition()` method reorders the elements of the collection and returns
-  /// a pivot index that satisfies this condition.
-  ///
-  /// For example:
-  ///
-  ///     var numbers = [50, 30, 60, 50, 80, 10, 40, 30]
-  ///     let pivot = numbers.partition()
-  ///
-  ///     print(pivot)
-  ///     // Prints "4"
-  ///     print(numbers)
-  ///     // Prints "[10, 30, 30, 40, 50, 80, 50, 60]"
-  ///
-  /// The return value of the call to `numbers.partition()` is the pivot for
-  /// the rearranged `numbers` array. `pivot` divides the collection into two
-  /// subranges, `numbers[0..<pivot]` and `numbers[pivot..<8]`.
-  ///
-  ///     print(numbers[0..<pivot])
-  ///     // Prints "[10, 30, 30, 40]"
-  ///     print(numbers[pivot..<8])
-  ///     // Prints "[50, 80, 50, 60]"
-  ///
-  /// The elements of `numbers` are rearranged so that every element in the
-  /// subrange before `pivot` is less than every element in the subrange
-  /// after.
-  ///
-  /// - Returns: A pivot index, such that every element before the pivot is
-  ///   less than every element at or above the pivot. The returned pivot is
-  ///   equal to the collection's end index only if the collection is empty.
-  ///
-  /// - SeeAlso: `partition(by:)`
-  public mutating func partition() -> Index
+    var i = index(after: pivot)
+    while i < endIndex {
+      if try !belongsInSecondPartition(self[i]) {
+        swap(&self[i], &self[pivot])
+        formIndex(after: &pivot)
+      }
+      formIndex(after: &i)
+    }
+    return pivot
+  }
+}
 
-%   end
-  {
-    let maybeOffset = _withUnsafeMutableBufferPointerIfSupported {
+extension MutableCollection where Self : BidirectionalCollection {
+  public mutating func partition(
+    by belongsInSecondPartition: @noescape (${IElement}) throws -> Bool
+  ) rethrows -> Index {
+    let maybeOffset = try _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Int in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      let unsafeBufferPivot = bufferPointer.partition(
-%   if preds:
-        by: areInIncreasingOrder
-%   end
-        )
+      let unsafeBufferPivot = try bufferPointer.partition(
+        by: belongsInSecondPartition)
       return unsafeBufferPivot - bufferPointer.startIndex
     }
     if let offset = maybeOffset {
       return index(startIndex, offsetBy: numericCast(offset))
     }
 
-%   if preds:
-    typealias EscapingBinaryPredicate =
-      (${IElement}, ${IElement}) -> Bool
-    var escapableIsOrderedBefore =
-      unsafeBitCast(areInIncreasingOrder, to: EscapingBinaryPredicate.self)
-    return _partition(
-      &self,
-      subRange: startIndex..<endIndex,
-      by: &escapableIsOrderedBefore)
-%   else:
-    return _partition(&self, subRange: startIndex..<endIndex)
-%   end
+    var lo = startIndex
+    var hi = endIndex
+
+    // 'Loop' invariants (at start of Loop, all are true):
+    // * lo < hi
+    // * predicate(self[i]) == false, for i in startIndex ..< lo
+    // * predicate(self[i]) == true, for i in hi ..< endIndex
+
+    Loop: while true {
+      FindLo: repeat {
+        while lo < hi {
+          if try belongsInSecondPartition(self[lo]) { break FindLo }
+          formIndex(after: &lo)
+        }
+        break Loop
+      } while false
+
+      FindHi: repeat {
+        formIndex(before: &hi)
+        while lo < hi {
+          if try !belongsInSecondPartition(self[hi]) { break FindHi }
+          formIndex(before: &hi)
+        }
+        break Loop
+      } while false
+
+      swap(&self[lo], &self[hi])
+      formIndex(after: &lo)
+    }
+
+    return lo
   }
 }
-
-% end
 
 //===----------------------------------------------------------------------===//
 // sorted()
@@ -632,6 +567,12 @@ ${subscriptCommentPost}
 //===--- Unavailable stuff ------------------------------------------------===//
     
 extension MutableCollection where Self : RandomAccessCollection {
+  @available(*, unavailable, message: "call partition(by:)")
+  public mutating func partition(
+    isOrderedBefore: @noescape (${IElement}, ${IElement}) -> Bool
+  ) -> Index {
+    Builtin.unreachable()
+  }
 
   @available(*, unavailable, message: "slice the collection using the range, and call partition(by:)")
   public mutating func partition(
@@ -645,7 +586,12 @@ extension MutableCollection where Self : RandomAccessCollection {
 extension MutableCollection
   where Self : RandomAccessCollection, ${IElement} : Comparable {
 
-  @available(*, unavailable, message: "slice the collection using the range, and call partition()")
+  @available(*, unavailable, message: "call partition(by:)")
+  public mutating func partition() -> Index {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, message: "slice the collection using the range, and call partition(by:)")
   public mutating func partition(_ range: Range<Index>) -> Index {
     Builtin.unreachable()
   }
