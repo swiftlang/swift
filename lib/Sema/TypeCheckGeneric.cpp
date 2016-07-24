@@ -638,6 +638,11 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
     if (i == 0 && func->hasThrows())
       info = info.withThrows();
 
+    assert(!argTy->hasArchetype());
+    assert(!funcTy->hasArchetype());
+    if (initFuncTy)
+      assert(!initFuncTy->hasArchetype());
+
     if (sig && i == e-1) {
       funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
       if (initFuncTy)
@@ -650,12 +655,9 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
   }
 
   // Record the interface type.
-  assert(!funcTy->hasArchetype());
   func->setInterfaceType(funcTy);
-  if (initFuncTy) {
-    assert(!initFuncTy->hasArchetype());
+  if (initFuncTy)
     cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
-  }
 
   if (func->getGenericParams()) {
     // Collect all generic params referenced in parameter types,

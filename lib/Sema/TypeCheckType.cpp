@@ -519,8 +519,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     if (auto outerSig = TAD->getDeclContext()->getGenericSignatureOfContext()) {
       for (auto outerParam : outerSig->getGenericParams()) {
         subs[outerParam->getCanonicalType().getPointer()] =
-            ArchetypeBuilder::mapTypeIntoContext(TAD->getDeclContext(),
-                                                 outerParam);
+            resolver->resolveGenericTypeParamType(outerParam);
       }
     }
 
