@@ -71,6 +71,23 @@ macro(swift_configure_components)
   # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
   set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_DEFINED_COMPONENTS}" CACHE STRING
     "A semicolon-separated list of components to install ${_SWIFT_DEFINED_COMPONENTS}")
+
+  foreach(component ${_SWIFT_DEFINED_COMPONENTS})
+    string(TOUPPER "${component}" var_name_piece)
+    string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
+    set(SWIFT_INSTALL_${var_name_piece} FALSE)
+  endforeach()
+
+  foreach(component ${SWIFT_INSTALL_COMPONENTS})
+    list(FIND _SWIFT_DEFINED_COMPONENTS "${component}" index)
+    if(${index} EQUAL -1)
+      message(FATAL_ERROR "unknown install component: ${component}")
+    endif()
+
+    string(TOUPPER "${component}" var_name_piece)
+    string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
+    set(SWIFT_INSTALL_${var_name_piece} TRUE)
+  endforeach()
 endmacro()
 
 function(swift_is_installing_component component result_var_name)
@@ -105,22 +122,3 @@ function(swift_install_in_component component)
     install(${ARGN})
   endif()
 endfunction()
-
-macro(swift_configure_install_components install_components)
-  foreach(component ${_SWIFT_DEFINED_COMPONENTS})
-    string(TOUPPER "${component}" var_name_piece)
-    string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
-    set(SWIFT_INSTALL_${var_name_piece} FALSE)
-  endforeach()
-
-  foreach(component ${install_components})
-    list(FIND _SWIFT_DEFINED_COMPONENTS "${component}" index)
-    if(${index} EQUAL -1)
-      message(FATAL_ERROR "unknown install component: ${component}")
-    endif()
-
-    string(TOUPPER "${component}" var_name_piece)
-    string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
-    set(SWIFT_INSTALL_${var_name_piece} TRUE)
-  endforeach()
-endmacro()
