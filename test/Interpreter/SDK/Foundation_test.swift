@@ -79,7 +79,7 @@ FoundationTestSuite.test("NSArray") {
 
   // Iteration
   var result = [String]()
-  for x: AnyObject in nsArr {
+  for x: Any in nsArr {
     result.append((x as! NSObject).description)
   }
   expectEqualSequence(["1", "2.5", "Hello"], result)
@@ -127,8 +127,8 @@ FoundationTestSuite.test("NSDictionary") {
   assert((nsDict[2]! as! NSString).isEqual("World"))
 
   let nsMutableDict: NSMutableDictionary = ["Hello" : 1, "World" : 2]
-  assert(nsMutableDict["Hello"]!.isEqual(1))
-  assert(nsMutableDict["World"]!.isEqual(2))
+  assert((nsMutableDict["Hello"]! as AnyObject).isEqual(1))
+  assert((nsMutableDict["World"]! as AnyObject).isEqual(2))
 }
 
 //===----------------------------------------------------------------------===//
@@ -190,7 +190,7 @@ FoundationTestSuite.test("rdar://17584531") {
   // <rdar://problem/17584531>
   // Type checker used to be confused by this.
   var dict: NSDictionary = ["status": 200, "people": [["id": 255, "name": ["first": "John", "last": "Appleseed"]]]]
-  var dict2 = dict["people"]?[0] as! NSDictionary
+  var dict2 = dict["people"].map { $0 as AnyObject }?[0] as! NSDictionary
   expectEqual("Optional(255)", String(dict2["id"]))
 }
 
