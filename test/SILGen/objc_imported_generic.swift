@@ -92,5 +92,16 @@ public func arraysOfGenericParam<T: AnyObject>(y: Array<T>) {
   x.propertyArrayOfThings = y
 }
 
+// CHECK-LABEL: sil shared @_TFF21objc_imported_generic11genericFuncuRxs9AnyObjectrFMxT_U_FT_T_ : $@convention(thin) <V where V : AnyObject> () -> () {
+// CHECK:  [[INIT:%.*]] = function_ref @_TFCSo12GenericClassCfT_GS_x_ : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (@thick GenericClass<τ_0_0>.Type) -> @owned GenericClass<τ_0_0>
+// CHECK:  [[META:%.*]] = metatype $@thick GenericClass<V>.Type
+// CHECK:  apply [[INIT]]<V>([[META]])
+// CHECK:  return
+func genericFunc<V: AnyObject>(_ v: V.Type) {
+  let _ = {
+    var _ = GenericClass<V>()
+  }
+}
+
 // CHECK-LABEL: sil shared [thunk] @_TTOFCSo12GenericClasscfT13arrayOfThings
 // CHECK:         class_method [volatile] {{%.*}} : $GenericClass<T>, #GenericClass.init!initializer.1.foreign {{.*}}, $@convention(objc_method) @pseudogeneric <τ_0_0 where τ_0_0 : AnyObject> (NSArray, @owned GenericClass<τ_0_0>) -> @owned ImplicitlyUnwrappedOptional<GenericClass<τ_0_0>>
