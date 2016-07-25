@@ -3779,6 +3779,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type baseType2 = getBaseTypeForArrayType(t2);
 
     if (TC.getLangOpts().EnableExperimentalCollectionCasts) {
+      increaseScore(SK_CollectionUpcastConversion);
       return matchTypes(baseType1,
                         baseType2,
                         matchKind,
@@ -3841,15 +3842,17 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     std::tie(key2, value2) = *isDictionaryType(t2);
 
     if (TC.getLangOpts().EnableExperimentalCollectionCasts) {
+      auto subMatchKind = matchKind; // TODO: Restrict this?
+      increaseScore(SK_CollectionUpcastConversion);
       // The source key and value types must be subtypes of the destination
       // key and value types, respectively.
-      auto result = matchTypes(key1, key2, matchKind, subFlags, 
+      auto result = matchTypes(key1, key2, subMatchKind, subFlags,
                                locator.withPathElement(
                       ConstraintLocator::PathElement::getGenericArgument(0)));
       if (result == SolutionKind::Error)
         return result;
 
-      switch (matchTypes(value1, value2, matchKind, subFlags, 
+      switch (matchTypes(value1, value2, subMatchKind, subFlags,
                          locator.withPathElement(
                     ConstraintLocator::PathElement::getGenericArgument(1)))) {
       case SolutionKind::Solved:
@@ -3970,6 +3973,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type baseType2 = getBaseTypeForSetType(t2);
 
     if (TC.getLangOpts().EnableExperimentalCollectionCasts) {
+      increaseScore(SK_CollectionUpcastConversion);
       return matchTypes(baseType1,
                         baseType2,
                         matchKind,
