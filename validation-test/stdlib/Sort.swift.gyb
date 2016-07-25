@@ -13,10 +13,10 @@ var Algorithm = TestSuite("Algorithm")
 // Check if one array is a correctly sorted version of another array.
 // We can't simply sort both arrays and compare them, because it is needed to
 // check correctness of sorting itself.
-func expectSortedCollection(_ sortedAry: [Int], _ originalAry: [Int]) {
+func expectSortedCollection<T where T: Comparable, T: Hashable>(_ sortedAry: [T], _ originalAry: [T]) {
   expectEqual(sortedAry.count, originalAry.count)
-  var sortedVals = [Int:Int]()
-  var originalVals = [Int:Int]()
+  var sortedVals = [T:Int]()
+  var originalVals = [T:Int]()
   // Keep track of what values we have in sortedAry.
   for e in sortedAry {
     if let v = sortedVals[e] {
@@ -54,6 +54,21 @@ func expectSortedCollection(
 
 func expectSortedCollection(_ sortedAry: ArraySlice<Int>, _ originalAry: ArraySlice<Int>) {
   expectSortedCollection([Int](sortedAry), [Int](originalAry))
+}
+
+func expectSortedCollectionIgnoringNaN(_ sortedAry: [Double]) {
+  // Perform check for sorted array while ignoring NaN
+  // values, as standard check of each element against the
+  // previous breaks given NaN inequality rules
+  var minElementFound = Double(Int.min)-1
+  for i in 0..<sortedAry.count {
+    guard !sortedAry[i].isNaN else {
+      continue
+    }
+
+    expectTrue(minElementFound <= sortedAry[i])
+    minElementFound = sortedAry[i]
+  }
 }
 
 class OffsetCollection : MutableCollection, RandomAccessCollection {
@@ -155,6 +170,22 @@ Algorithm.test("partition/CrashOnSingleElement") {
   var a = DefaultedMutableRandomAccessCollection([10])
   let first = a.first!
   expectEqual(a.startIndex, a.partition(by: {$0 >= first}))
+}
+
+Algorithm.test("sort/SmallCollectionsWithNaNValues") {
+  // Count must be < 20 to trigger insertion sort
+  let count = 18
+  var ary = randArray(count).map { return Double($0) }
+
+  // Add NaN values throughout the array
+  let nanCount = 4
+  for _ in 0 ..< nanCount {
+      let aryInd = (abs(randInt()) % count)
+      ary[aryInd] = .nan
+  }
+
+  let sortedAry = ary.sorted()
+  expectSortedCollectionIgnoringNaN(sortedAry)
 }
 
 runAllTests()

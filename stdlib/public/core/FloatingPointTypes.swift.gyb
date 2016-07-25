@@ -755,6 +755,8 @@ extension ${Self} : Arithmetic {
   }
 }
 
+extension ${Self} : _SupportsNaNCheck {}
+
 @_transparent
 public prefix func + (x: ${Self}) -> ${Self} {
   return x
