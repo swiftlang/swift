@@ -1217,7 +1217,7 @@ flow, such as a non-``Void`` function failing to ``return`` a value, or a
 The guaranteed dead code elimination pass can eliminate truly unreachable
 basic blocks, or ``unreachable`` instructions may be dominated by applications
 of functions returning uninhabited types. An ``unreachable`` instruction that
-survives guaranteed DCE and is not immediately preceded by an no-return
+survives guaranteed DCE and is not immediately preceded by a no-return
 application is a dataflow error.
 
 Runtime Failure
