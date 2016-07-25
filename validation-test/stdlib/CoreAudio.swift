@@ -42,9 +42,7 @@ CoreAudioTestSuite.test("UnsafeBufferPointer.init(_: AudioBuffer)") {
       mNumberChannels: 2, mDataByteSize: 1024,
       mData: UnsafeMutableRawPointer(bitPattern: 0x1234_5678))
     let result: UnsafeBufferPointer<Float> = UnsafeBufferPointer(audioBuffer)
-    expectEqual(
-      UnsafePointer<Float>(audioBuffer.mData!),
-      result.baseAddress)
+    expectEqual(audioBuffer.mData, UnsafeRawPointer(result.baseAddress!))
     expectEqual(256, result.count)
   }
 }
@@ -65,9 +63,7 @@ CoreAudioTestSuite.test("UnsafeMutableBufferPointer.init(_: AudioBuffer)") {
       mData: UnsafeMutableRawPointer(bitPattern: 0x1234_5678))
     let result: UnsafeMutableBufferPointer<Float> =
       UnsafeMutableBufferPointer(audioBuffer)
-    expectEqual(
-      UnsafeMutablePointer<Float>(audioBuffer.mData!),
-      result.baseAddress)
+    expectEqual(audioBuffer.mData!, UnsafeMutableRawPointer(result.baseAddress!))
     expectEqual(256, result.count)
   }
 }
