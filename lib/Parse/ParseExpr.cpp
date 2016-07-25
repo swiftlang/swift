@@ -845,7 +845,8 @@ ParserResult<Expr> Parser::parseExprSuper() {
       return makeParserCodeCompletionResult<Expr>();
     if (idx.isNull())
       return nullptr;
-    return makeParserResult(new (Context) SubscriptExpr(superRef, idx.get()));
+    return makeParserResult(
+             SubscriptExpr::create(Context, superRef, idx.get()));
   }
 
   if (Tok.is(tok::code_complete)) {
@@ -1529,7 +1530,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       if (Idx.isNull() || Result.isNull())
         return nullptr;
       Result = makeParserResult(
-          new (Context) SubscriptExpr(Result.get(), Idx.get()));
+                 SubscriptExpr::create(Context, Result.get(), Idx.get()));
       continue;
     }
 

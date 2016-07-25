@@ -1327,12 +1327,11 @@ namespace {
 
         // Form the generic subscript expression.
         auto subscriptExpr
-          = new (tc.Context) SubscriptExpr(base, index,
-                                           ConcreteDeclRef(tc.Context,
-                                                           subscript,
-                                                           substitutions),
-                                           isImplicit,
-                                           semantics);
+          = SubscriptExpr::create(tc.Context, base, index,
+                                  ConcreteDeclRef(tc.Context, subscript,
+                                                  substitutions),
+                                  isImplicit,
+                                  semantics);
         subscriptExpr->setType(resultTy);
         subscriptExpr->setIsSuper(isSuper);
 
@@ -1354,8 +1353,8 @@ namespace {
 
       // Form a normal subscript.
       auto *subscriptExpr
-        = new (tc.Context) SubscriptExpr(base, index, subscript,
-                                         isImplicit, semantics);
+        = SubscriptExpr::create(tc.Context, base, index, subscript,
+                                isImplicit, semantics);
       subscriptExpr->setType(resultTy);
       subscriptExpr->setIsSuper(isSuper);
       Expr *result = subscriptExpr;
@@ -2620,9 +2619,8 @@ namespace {
     }
 
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
-      SmallVector<Identifier, 2> argLabelsScratch;
       return buildSubscript(expr->getBase(), expr->getIndex(),
-                            expr->getArgumentLabels(argLabelsScratch),
+                            expr->getArgumentLabels(),
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(),
                             expr->getAccessSemantics());

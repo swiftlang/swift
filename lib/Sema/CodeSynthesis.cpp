@@ -479,8 +479,8 @@ static Expr *buildStorageReference(
 
   if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
     Expr *indices = referenceContext.getIndexRefExpr(ctx, subscript);
-    return new (ctx) SubscriptExpr(selfDRE, indices, storage,
-                                   IsImplicit, semantics);
+    return SubscriptExpr::create(ctx, selfDRE, indices, storage,
+                                 IsImplicit, semantics);
   }
 
   // This is a potentially polymorphic access, which is unnecessary;
