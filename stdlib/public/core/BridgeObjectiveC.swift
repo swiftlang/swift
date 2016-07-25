@@ -408,15 +408,22 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     @_transparent nonmutating set {
       // Autorelease the object reference.
       typealias OptionalAnyObject = AnyObject?
-      Builtin.retain(unsafeBitCast(newValue, to: OptionalAnyObject.self))
-      Builtin.autorelease(unsafeBitCast(newValue, to: OptionalAnyObject.self))
+      let newAnyObject = unsafeBitCast(newValue, to: OptionalAnyObject.self)
+      Builtin.retain(newAnyObject)
+      Builtin.autorelease(newAnyObject)
       // Trivially assign it as an OpaquePointer; the pointer references an
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
-      typealias OptionalOpaquePointer = OpaquePointer?
-      let p = UnsafeMutablePointer<OptionalOpaquePointer>(
-        UnsafeMutablePointer<Pointee>(self))
-      p.pointee = unsafeBitCast(newValue, to: OptionalOpaquePointer.self)
+      typealias OptionalUnmanaged = Unmanaged<AnyObject>?
+      UnsafeMutablePointer<Pointee>(_rawValue).withMemoryRebound(
+        to: OptionalUnmanaged.self, capacity: 1) {
+        if let newAnyObject = newAnyObject {
+          $0.pointee = Unmanaged.passUnretained(newAnyObject)
+        }
+        else {
+          $0.pointee = nil
+        }
+      }
     }
   }
 
