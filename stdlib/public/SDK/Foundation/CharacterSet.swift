@@ -82,7 +82,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     
     // MARK: Init methods
     
-    private init(_bridged characterSet: NSCharacterSet) {
+    fileprivate init(_bridged characterSet: NSCharacterSet) {
         // We must copy the input because it might be mutable; just like storing a value type in ObjC
         _wrapped = _SwiftNSCharacterSet(immutableObject: characterSet.copy() as AnyObject)
     }

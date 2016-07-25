@@ -305,7 +305,7 @@ public struct URLComponents : ReferenceConvertible, Hashable, CustomStringConver
     
     // MARK: - Bridging
     
-    private init(reference: NSURLComponents) {
+    fileprivate init(reference: NSURLComponents) {
         _handle = _MutableHandle(reference: reference)
     }
     
@@ -349,14 +349,14 @@ extension URLComponents : _ObjectiveCBridgeable {
 public struct URLQueryItem : ReferenceConvertible, Hashable, Equatable, CustomStringConvertible {
     public typealias ReferenceType = NSURLQueryItem
     
-    private var _queryItem : NSURLQueryItem
+    fileprivate var _queryItem : NSURLQueryItem
     
     public init(name: String, value: String?) {
         _queryItem = NSURLQueryItem(name: name, value: value)
     }
     
-    private init(reference: NSURLQueryItem) { _queryItem = reference.copy() as! NSURLQueryItem }
-    private var reference : NSURLQueryItem { return _queryItem }
+    fileprivate init(reference: NSURLQueryItem) { _queryItem = reference.copy() as! NSURLQueryItem }
+    fileprivate var reference : NSURLQueryItem { return _queryItem }
     
     public var name : String {
         get { return _queryItem.name }

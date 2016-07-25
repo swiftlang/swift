@@ -46,8 +46,8 @@ internal class _NSUserInfoDictionaryKeyEnumerator : NSEnumerator {
 }
 
 internal class _NSUserInfoDictionary : NSMutableDictionary {
-    private var _objc = [NSObject : AnyObject]()
-    private var _swift = [NSObject : Any]()
+    fileprivate var _objc = [NSObject : AnyObject]()
+    fileprivate var _swift = [NSObject : Any]()
     
     /// Note: these two init methods are the only proper method of construction and must be marked as "convenience" and call super.init() because the overlay has required init methods in extensions
     private convenience init(objc: [NSObject : AnyObject], swift: [NSObject : Any]) {

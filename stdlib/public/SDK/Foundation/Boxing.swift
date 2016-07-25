@@ -16,7 +16,7 @@
 ///
 /// Note: This assumes that the result of calling copy() is mutable. The documentation says that classes which do not have a mutable/immutable distinction should just adopt NSCopying instead of NSMutableCopying.
 internal final class _MutableHandle<MutableType : NSObject where MutableType : NSCopying> {
-    private var _pointer : MutableType
+    fileprivate var _pointer : MutableType
     
     init(reference : MutableType) {
         _pointer = reference.copy() as! MutableType

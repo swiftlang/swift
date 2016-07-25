@@ -21,7 +21,7 @@ import CoreFoundation
 public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringConvertible {
     public typealias ReferenceType = NSDate
     
-    private var _time : TimeInterval
+    fileprivate var _time : TimeInterval
 
     /// The number of seconds from 1 January 1970 to the reference date, 1 January 2001.
     public static let timeIntervalBetween1970AndReferenceDate : TimeInterval = 978307200.0
