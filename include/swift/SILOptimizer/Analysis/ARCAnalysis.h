@@ -396,7 +396,7 @@ namespace swift {
 /// EpilogueARCBlockState - Keep track of whether an epilogue ARC instruction
 /// has been found.
 struct EpilogueARCBlockState {
-  /// Keep track of whether a epilogue release has been found before and after
+  /// Keep track of whether an epilogue release has been found before and after
   /// this basic block.
   bool BBSetIn;
   /// The basic block local SILValue we are interested to find epilogue ARC in.
