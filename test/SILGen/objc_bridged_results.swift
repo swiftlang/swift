@@ -7,21 +7,21 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results11testNonnullFCSo4TestGSaPs9AnyObject__
-func testNonnull(_ obj: Test) -> [AnyObject] {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullArray!getter.1.foreign : (Test) -> () -> [AnyObject] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+// CHECK-LABEL: sil hidden @_TF20objc_bridged_results11testNonnullFCSo4TestGSaP__
+func testNonnull(_ obj: Test) -> [Any] {
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullArray!getter.1.foreign : (Test) -> () -> [Any] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSa36_unconditionallyBridgeFromObjectiveCfGSqCSo7NSArray_GSax_
-  // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_VAL]], [[ARRAY_META]])
+  // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_VAL]], [[ARRAY_META]])
   // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $Array<AnyObject>
+  // CHECK: return [[RESULT]] : $Array<Any>
   return obj.nonnullArray
 } // CHECK: {{^}$}}
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results12testNullableFCSo4TestGSqGSaPs9AnyObject___
-func testNullable(_ obj: Test) -> [AnyObject]? {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullableArray!getter.1.foreign : (Test) -> () -> [AnyObject]? , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+// CHECK-LABEL: sil hidden @_TF20objc_bridged_results12testNullableFCSo4TestGSqGSaP___
+func testNullable(_ obj: Test) -> [Any]? {
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullableArray!getter.1.foreign : (Test) -> () -> [Any]? , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   
   // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $Optional<NSArray>
@@ -31,24 +31,24 @@ func testNullable(_ obj: Test) -> [AnyObject]? {
   // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $Optional<NSArray>, #Optional.some!enumelt.1
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSa36_unconditionallyBridgeFromObjectiveCfGSqCSo7NSArray_GSax_
   // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
-  // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type
-  // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_SOME_VAL]], [[ARRAY_META]])
-  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<AnyObject>>, #Optional.some!enumelt.1, [[RESULT_VAL]] : $Array<AnyObject>
-  // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $Optional<Array<AnyObject>>)
+  // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type
+  // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_SOME_VAL]], [[ARRAY_META]])
+  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.some!enumelt.1, [[RESULT_VAL]] : $Array<Any>
+  // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $Optional<Array<Any>>)
   
   // CHECK: [[CASE_NIL]]:
-  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<AnyObject>>, #Optional.none!enumelt
-  // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<AnyObject>>)
+  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.none!enumelt
+  // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<Any>>)
   
-  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $Optional<Array<AnyObject>>):
+  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $Optional<Array<Any>>):
   // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $Optional<Array<AnyObject>>
+  // CHECK: return [[RESULT]] : $Optional<Array<Any>>
   return obj.nullableArray
 } // CHECK: {{^}$}}
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results19testNullUnspecifiedFCSo4TestGSQGSaPs9AnyObject___
-func testNullUnspecified(_ obj: Test) -> [AnyObject]! {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : (Test) -> () -> [AnyObject]! , $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
+// CHECK-LABEL: sil hidden @_TF20objc_bridged_results19testNullUnspecifiedFCSo4TestGSQGSaP___
+func testNullUnspecified(_ obj: Test) -> [Any]! {
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : (Test) -> () -> [Any]! , $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
   // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $ImplicitlyUnwrappedOptional<NSArray>
   // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
@@ -57,31 +57,31 @@ func testNullUnspecified(_ obj: Test) -> [AnyObject]! {
   // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $ImplicitlyUnwrappedOptional<NSArray>, #ImplicitlyUnwrappedOptional.some!enumelt.1
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSa36_unconditionallyBridgeFromObjectiveCfGSqCSo7NSArray_GSax_
   // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
-  // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type
-  // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_SOME_VAL]], [[ARRAY_META]])
-  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[RESULT_VAL]] : $Array<AnyObject>
-  // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>)
+  // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type
+  // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_SOME_VAL]], [[ARRAY_META]])
+  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<Any>>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[RESULT_VAL]] : $Array<Any>
+  // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $ImplicitlyUnwrappedOptional<Array<Any>>)
   
   // CHECK: [[CASE_NIL]]:
-  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.none!enumelt
-  // CHECK: br [[FINISH]]([[RESULT_NONE]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>)
+  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<Any>>, #ImplicitlyUnwrappedOptional.none!enumelt
+  // CHECK: br [[FINISH]]([[RESULT_NONE]] : $ImplicitlyUnwrappedOptional<Array<Any>>)
 
-  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>):
+  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $ImplicitlyUnwrappedOptional<Array<Any>>):
   // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>
+  // CHECK: return [[RESULT]] : $ImplicitlyUnwrappedOptional<Array<Any>>
   return obj.nullUnspecifiedArray
 } // CHECK: {{^}$}}
 
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results21testNonnullDictionaryFCSo4TestGVs10DictionaryCSo8NSObjectPs9AnyObject__
-func testNonnullDictionary(_ obj: Test) -> [NSObject: AnyObject] {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullDictionary!getter.1.foreign : (Test) -> () -> [NSObject : AnyObject] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
+// CHECK-LABEL: sil hidden @_TF20objc_bridged_results21testNonnullDictionaryFCSo4TestGVs10DictionaryCSo8NSObjectP__
+func testNonnullDictionary(_ obj: Test) -> [NSObject: Any] {
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullDictionary!getter.1.foreign : (Test) -> () -> [NSObject : Any] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationVs10Dictionary36_unconditionallyBridgeFromObjectiveCfGSqCSo12NSDictionary_GS0_xq__
-  // CHECK: [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<NSObject, AnyObject>.Type
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<NSObject, AnyObject>([[COCOA_VAL]], [[DICT_META]])
+  // CHECK: [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<NSObject, Any>.Type
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<NSObject, Any>([[COCOA_VAL]], [[DICT_META]])
   // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $Dictionary<NSObject, AnyObject>
+  // CHECK: return [[RESULT]] : $Dictionary<NSObject, Any>
   return obj.nonnullDictionary
 } // CHECK: {{^}$}}
 
@@ -126,15 +126,15 @@ func testClassProp() -> String {
 // Note: This doesn't really "work" in that it doesn't accept a nil value the
 // way the others do, because subscripts are thunked. But the main thing is
 // not to crash trying to generate the thunk.
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results20testNonnullSubscriptFCSo4TestGSaPs9AnyObject__
-func testNonnullSubscript(_ obj: Test) -> [AnyObject] {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.subscript!getter.1.foreign : (Test) -> (Int) -> [AnyObject] , $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
+// CHECK-LABEL: sil hidden @_TF20objc_bridged_results20testNonnullSubscriptFCSo4TestGSaP__
+func testNonnullSubscript(_ obj: Test) -> [Any] {
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.subscript!getter.1.foreign : (Test) -> (Int) -> [Any] , $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, %0) : $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSa36_unconditionallyBridgeFromObjectiveCfGSqCSo7NSArray_GSax_
-  // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type,
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_VAL]], [[ARRAY_META]])
+  // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type,
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_VAL]], [[ARRAY_META]])
   // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $Array<AnyObject>
+  // CHECK: return [[RESULT]] : $Array<Any>
   return obj[0]
 } // CHECK: {{^}$}}
 
