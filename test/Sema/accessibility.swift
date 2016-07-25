@@ -476,3 +476,63 @@ public struct PrivateSettersForReadOnlyPublic : PublicReadOnlyOperations {
   }
 }
 
+
+public protocol PublicOperatorProto {
+  static prefix func !(_: Self) -> Self
+}
+
+internal protocol InternalOperatorProto {
+  static prefix func !(_: Self) -> Self
+}
+
+fileprivate protocol FilePrivateOperatorProto {
+  static prefix func !(_: Self) -> Self
+}
+
+private protocol PrivateOperatorProto {
+  static prefix func !(_: Self) -> Self
+}
+
+public struct PublicOperatorAdopter : PublicOperatorProto {
+  fileprivate struct Inner : PublicOperatorProto {
+  }
+}
+private prefix func !(input: PublicOperatorAdopter) -> PublicOperatorAdopter { // expected-error {{method '!' must be declared public because it matches a requirement in public protocol 'PublicOperatorProto'}} {{1-8=public}}
+  return input
+}
+private prefix func !(input: PublicOperatorAdopter.Inner) -> PublicOperatorAdopter.Inner {
+  return input
+}
+
+public struct InternalOperatorAdopter : InternalOperatorProto {
+  fileprivate struct Inner : InternalOperatorProto {
+  }
+}
+private prefix func !(input: InternalOperatorAdopter) -> InternalOperatorAdopter { // expected-error {{method '!' must be declared internal because it matches a requirement in internal protocol 'InternalOperatorProto'}} {{1-8=internal}}
+  return input
+}
+private prefix func !(input: InternalOperatorAdopter.Inner) -> InternalOperatorAdopter.Inner {
+  return input
+}
+
+public struct FilePrivateOperatorAdopter : FilePrivateOperatorProto {
+  fileprivate struct Inner : FilePrivateOperatorProto {
+  }
+}
+private prefix func !(input: FilePrivateOperatorAdopter) -> FilePrivateOperatorAdopter {
+  return input
+}
+private prefix func !(input: FilePrivateOperatorAdopter.Inner) -> FilePrivateOperatorAdopter.Inner {
+  return input
+}
+
+public struct PrivateOperatorAdopter : PrivateOperatorProto {
+  fileprivate struct Inner : PrivateOperatorProto {
+  }
+}
+private prefix func !(input: PrivateOperatorAdopter) -> PrivateOperatorAdopter {
+  return input
+}
+private prefix func !(input: PrivateOperatorAdopter.Inner) -> PrivateOperatorAdopter.Inner {
+  return input
+}

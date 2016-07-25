@@ -1220,20 +1220,30 @@ checkWitnessAccessibility(Accessibility *requiredAccess,
   // FIXME: Handle "private(set)" requirements.
   *requiredAccess = std::min(Proto->getFormalAccess(), *requiredAccess);
 
-  if (*requiredAccess > Accessibility::Private) {
-    if (witness->getFormalAccess(DC) < *requiredAccess)
+  if (*requiredAccess == Accessibility::Private)
+    return false;
+
+  Accessibility witnessAccess = witness->getFormalAccess(DC);
+
+  // Leave a hole for old-style top-level operators to be declared 'private' for
+  // a fileprivate conformance.
+  if (witnessAccess == Accessibility::Private &&
+      witness->getDeclContext()->isModuleScopeContext()) {
+    witnessAccess = Accessibility::FilePrivate;
+  }
+
+  if (witnessAccess < *requiredAccess)
+    return true;
+
+  if (requirement->isSettable(DC)) {
+    *isSetter = true;
+
+    auto ASD = cast<AbstractStorageDecl>(witness);
+    const DeclContext *accessDC = nullptr;
+    if (*requiredAccess == Accessibility::Internal)
+      accessDC = DC->getParentModule();
+    if (!ASD->isSetterAccessibleFrom(accessDC))
       return true;
-
-    if (requirement->isSettable(DC)) {
-      *isSetter = true;
-
-      auto ASD = cast<AbstractStorageDecl>(witness);
-      const DeclContext *accessDC = nullptr;
-      if (*requiredAccess == Accessibility::Internal)
-        accessDC = DC->getParentModule();
-      if (!ASD->isSetterAccessibleFrom(accessDC))
-        return true;
-    }
   }
 
   return false;
