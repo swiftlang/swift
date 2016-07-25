@@ -902,6 +902,12 @@ public:
   Expr *getArg() const { return Arg; }
   void setArg(Expr *arg) { Arg = arg; }
 
+  /// Retrieve the argument labels for the argument.
+  ///
+  /// \param scratch Scratch space that will be used when the argument labels
+  /// aren't already stored in the AST context.
+  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
 
@@ -1409,6 +1415,12 @@ public:
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
 
+  /// Retrieve the argument labels for the indices.
+  ///
+  /// \param scratch Scratch space that will be used when the argument labels
+  /// aren't already stored in the AST context.
+  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+
   /// Retrieve the member to which this access refers.
   ConcreteDeclRef getMember() const { return Member; }
 
@@ -1443,6 +1455,12 @@ public:
   SourceLoc getDotLoc() const { return DotLoc; }
   Expr *getArgument() const { return Argument; }
   void setArgument(Expr *argument) { Argument = argument; }
+
+  /// Retrieve the argument labels for the argument, if provided.
+  ///
+  /// \param scratch Scratch space that will be used when the argument labels
+  /// aren't already stored in the AST context.
+  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
 
@@ -1884,6 +1902,12 @@ public:
   /// "offset" into the base value.
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
+
+  /// Retrieve the argument labels for the indices.
+  ///
+  /// \param scratch Scratch space that will be used when the argument labels
+  /// aren't already stored in the AST context.
+  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
 
   /// Determine whether this subscript reference should bypass the
   /// ordinary accessors.
@@ -3209,6 +3233,12 @@ public:
   }
 
   ValueDecl *getCalledValue() const;
+
+  /// Retrieve the argument labels provided at the call site.
+  ///
+  /// \param scratch Scratch space that will be used when the argument labels
+  /// aren't already stored in the AST context.
+  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ApplyExpr &&

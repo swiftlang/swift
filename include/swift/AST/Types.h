@@ -2376,7 +2376,9 @@ struct CallArgParam {
 /// Break an argument type into an array of \c CallArgParams.
 ///
 /// \param type The type to decompose.
-SmallVector<CallArgParam, 4> decomposeArgType(Type type);
+/// \param argumentLabels The argument labels to use.
+SmallVector<CallArgParam, 4>
+decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 
 /// Break a parameter type into an array of \c CallArgParams.
 ///

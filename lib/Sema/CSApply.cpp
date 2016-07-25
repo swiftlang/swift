@@ -1179,12 +1179,14 @@ namespace {
     /// \param applyOrLevel For function applications, the ApplyExpr that forms
     /// the call. Otherwise, a specific level describing which parameter level
     /// we're applying.
+    /// \param argLabels The argument labels provided for the call.
     /// \param locator Locator used to describe where in this expression we are.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
     Expr *
     coerceCallArguments(Expr *arg, Type paramType,
                         llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
+                        ArrayRef<Identifier> argLabels,
                         ConstraintLocatorBuilder locator);
 
     /// \brief Coerce the given object argument (e.g., for the base of a
@@ -1212,6 +1214,7 @@ namespace {
     /// \param locator The locator used to refer to the subscript.
     /// \param isImplicit Whether this is an implicit subscript.
     Expr *buildSubscript(Expr *base, Expr *index,
+                         ArrayRef<Identifier> argLabels,
                          ConstraintLocatorBuilder locator,
                          bool isImplicit, AccessSemantics semantics) {
       // Determine the declaration selected for this subscript operation.
@@ -1255,7 +1258,7 @@ namespace {
 
       // Coerce the index argument.
       index = coerceCallArguments(
-          index, indexTy, LevelTy(1),
+          index, indexTy, LevelTy(1), argLabels,
           locator.withPathElement(ConstraintLocator::SubscriptIndex));
       if (!index)
         return nullptr;
@@ -2147,38 +2150,6 @@ namespace {
       }
     }
 
-    /// Adjust the type of the arguments to an object literal.
-    ///
-    /// The constraint system has verified that the arguments are convertible
-    /// to an idealized initializer signature, but we need them to be
-    /// convertible to the actual initializer signature, which differs only
-    /// by labels.  We make this work by rewriting the type of the argument
-    /// expression to use the correct labels.  This creates an inconsistency
-    /// between the labels of the TupleExpr and its type, but it has the
-    /// great merit of not requiring any complexity outside of the treatment
-    /// of object literals.
-    void adjustObjectLiteralArgumentType(Expr *arg, DeclName constrName) {
-      // If the argument expression isn't a tuple, propagating this type
-      // is more complicated than we can do here.  Bailing out will probably
-      // cause a terrible diagnostic, but fortunately, this is not a case we
-      // need excellent QoI for.
-      if (!isa<TupleExpr>(arg))
-        return;
-
-      auto paramLabels = constrName.getArgumentNames();
-
-      auto argType = arg->getType()->getAs<TupleType>();
-      if (!argType || argType->getNumElements() != paramLabels.size())
-        return;
-
-      SmallVector<TupleTypeElt, 4> newElts;
-      size_t index = 0;
-      for (auto &oldElt : argType->getElements()) {
-        newElts.push_back(TupleTypeElt(oldElt.getType(), paramLabels[index++]));
-      }
-      arg->setType(TupleType::get(newElts, cs.getASTContext()));
-    }
-
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       if (expr->getType() && !expr->getType()->hasTypeVariable())
         return expr;
@@ -2207,14 +2178,19 @@ namespace {
                                             &conformance);
       (void)conforms;
       assert(conforms && "object literal type conforms to protocol");
-        
-      DeclName constrName(tc.getObjectLiteralConstructorName(expr));
-      Expr *arg = expr->getArg();
-      adjustObjectLiteralArgumentType(arg, constrName);
+
       Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
                                                 ctx);
+        
+      SmallVector<Expr *, 4> args;
+      if (!isa<TupleExpr>(expr->getArg()))
+        return nullptr;
+      auto tupleArg = cast<TupleExpr>(expr->getArg());
+      for (auto elt : tupleArg->getElements())
+        args.push_back(elt);
+      DeclName constrName(tc.getObjectLiteralConstructorName(expr));
       Expr *semanticExpr = tc.callWitness(base, dc, proto, conformance,
-                                          constrName, arg,
+                                          constrName, args,
                                           diag::object_literal_broken_proto);
       expr->setSemanticExpr(semanticExpr);
       return expr;
@@ -2627,7 +2603,9 @@ namespace {
     }
 
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
+      SmallVector<Identifier, 2> argLabelsScratch;
       return buildSubscript(expr->getBase(), expr->getIndex(),
+                            expr->getArgumentLabels(argLabelsScratch),
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(),
                             expr->getAccessSemantics());
@@ -2769,7 +2747,9 @@ namespace {
     }
 
     Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
+      SmallVector<Identifier, 2> argLabelsScratch;
       return buildSubscript(expr->getBase(), expr->getIndex(),
+                            expr->getArgumentLabels(argLabelsScratch),
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(), AccessSemantics::Ordinary);
     }
@@ -4657,6 +4637,7 @@ static bool isReferenceToMetatypeMember(Expr *expr) {
 Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, Type paramType,
     llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
+    ArrayRef<Identifier> argLabels,
     ConstraintLocatorBuilder locator) {
 
   bool allParamsMatch = arg->getType()->isEqual(paramType);
@@ -4692,7 +4673,7 @@ Expr *ExprRewriter::coerceCallArguments(
 
   // Determine the parameter bindings.
   auto params = decomposeParamType(paramType, callee.getDecl(), level);
-  auto args = decomposeArgType(arg->getType());
+  auto args = decomposeArgType(arg->getType(), argLabels);
 
   // Quickly test if any further fix-ups for the argument types are necessary.
   // FIXME: This hack is only necessary to work around some problems we have
@@ -5938,10 +5919,12 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // For function application, convert the argument to the input type of
   // the function.
+  SmallVector<Identifier, 2> argLabelsScratch;
   if (auto fnType = fn->getType()->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
     Expr *arg = coerceCallArguments(origArg, fnType->getInput(),
                                     apply,
+                                    apply->getArgumentLabels(argLabelsScratch),
                                     locator.withPathElement(
                                       ConstraintLocator::ApplyArgument));
     if (!arg) {
@@ -6675,24 +6658,15 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Form the call argument.
   // FIXME: Standardize all callers to always provide all argument names,
   // rather than hack around this.
-  Expr *arg;
+  CallExpr *call;
   if (arguments.size() == 1 &&
       (isVariadicWitness(witness) ||
        argumentNamesMatch(arguments[0], 
                           witness->getFullName().getArgumentNames()))) {
-    arg = arguments[0];
+    call = CallExpr::create(Context, unresolvedDot, arguments[0],
+                            /*implicit=*/true);
   } else {
-    SmallVector<TupleTypeElt, 4> elementTypes;
     auto names = witness->getFullName().getArgumentNames();
-    unsigned i = 0;
-    for (auto elt : arguments) {
-      Identifier name;
-      if (i < names.size())
-        name = names[i];
-
-      elementTypes.push_back(TupleTypeElt(elt->getType(), name));
-      ++i;
-    }
 
     // The tuple should have the source range enclosing its arguments unless
     // they are invalid or there are no arguments.
@@ -6707,21 +6681,19 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
       }
     }
 
-    arg = TupleExpr::create(Context,
+    call = CallExpr::create(Context, unresolvedDot,
                             TupleStartLoc,
-                            arguments,
-                            names,
-                            { },
+                            arguments, names, { },
                             TupleEndLoc,
-                            /*hasTrailingClosure=*/false,
-                            /*Implicit=*/true,
-                            TupleType::get(elementTypes, Context));
+                            /*trailingClosure=*/nullptr,
+                            /*implicit=*/true);
   }
 
   // Add the conversion from the argument to the function parameter type.
-  cs.addConstraint(ConstraintKind::ArgumentTupleConversion, arg->getType(),
+  cs.addConstraint(ConstraintKind::ArgumentTupleConversion,
+                   call->getArg()->getType(),
                    openedType->castTo<FunctionType>()->getInput(),
-                   cs.getConstraintLocator(arg,
+                   cs.getConstraintLocator(call,
                                            ConstraintLocator::ApplyArgument));
 
   // Solve the system.
@@ -6746,12 +6718,11 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                            /*Implicit=*/true,
                                            AccessSemantics::Ordinary,
                                            /*isDynamic=*/false);
+  call->setFn(memberRef);
 
   // Call the witness.
-  ApplyExpr *apply = CallExpr::create(Context, memberRef, arg,
-                                      /*implicit=*/true);
-  Expr *result = rewriter.finishApply(apply, openedType,
-                                      cs.getConstraintLocator(arg));
+  Expr *result = rewriter.finishApply(call, openedType,
+                                      cs.getConstraintLocator(call));
   if (!result)
     return nullptr;
 

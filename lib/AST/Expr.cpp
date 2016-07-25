@@ -1007,6 +1007,44 @@ StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
       unicode::isSingleExtendedGraphemeCluster(Val);
 }
 
+static ArrayRef<Identifier>
+getArgumentLabelsFromArgument(Expr *arg, SmallVectorImpl<Identifier> &scratch) {
+  // A parenthesized expression is a single, unlabeled argument.
+  if (isa<ParenExpr>(arg)) {
+    scratch.clear();
+    scratch.push_back(Identifier());
+    return scratch;
+  }
+
+  // A tuple expression stores its element names, if they exist.
+  if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+    if (tuple->hasElementNames()) return tuple->getElementNames();
+    scratch.assign(tuple->getNumElements(), Identifier());
+    return scratch;
+  }
+
+  // Otherwise, use the type information.
+  auto type = arg->getType();
+  if (isa<ParenType>(type.getPointer())) {
+    scratch.clear();
+    scratch.push_back(Identifier());
+    return scratch;    
+  }
+
+  // FIXME: Should be a dyn_cast.
+  if (auto tupleTy = type->getAs<TupleType>()) {
+    scratch.clear();
+    for (const auto &elt : tupleTy->getElements())
+      scratch.push_back(elt.getName());
+    return scratch;
+  }
+
+  // FIXME: Shouldn't get here.
+  scratch.clear();
+  scratch.push_back(Identifier());
+  return scratch;    
+}
+
 StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
   switch (LitKind) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return #Name;
@@ -1021,6 +1059,11 @@ StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
 #include "swift/Parse/Tokens.def"    
   }
   llvm_unreachable("unspecified literal");
+}
+
+ArrayRef<Identifier>
+ObjectLiteralExpr::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
+  return getArgumentLabelsFromArgument(getArg(), scratch);
 }
 
 void DeclRefExpr::setSpecialized() {
@@ -1190,6 +1233,46 @@ static ValueDecl *getCalledValue(Expr *E) {
 
 ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
+}
+
+ArrayRef<Identifier>
+SubscriptExpr::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
+  return getArgumentLabelsFromArgument(getIndex(), scratch);
+}
+
+ArrayRef<Identifier>
+DynamicSubscriptExpr::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
+  return getArgumentLabelsFromArgument(getIndex(), scratch);
+}
+
+ArrayRef<Identifier>
+UnresolvedMemberExpr::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
+  if (!getArgument()) return { };
+  return getArgumentLabelsFromArgument(getArgument(), scratch);
+}
+
+ArrayRef<Identifier>
+ApplyExpr::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
+  // Unary operators and 'self' applications have a single, unlabeled argument.
+  if (isa<PrefixUnaryExpr>(this) || isa<PostfixUnaryExpr>(this) ||
+      isa<SelfApplyExpr>(this)) {
+    scratch.clear();
+    scratch.push_back(Identifier());
+    return scratch;
+  }
+
+  // Binary operators have two unlabeled arguments.
+  if (isa<BinaryExpr>(this)) {
+    scratch.clear();
+    scratch.reserve(2);
+    scratch.push_back(Identifier());
+    scratch.push_back(Identifier());
+    return scratch;    
+  }
+
+  // For calls, dig the argument labels out of the argument itself.
+  auto call = cast<CallExpr>(this);
+  return getArgumentLabelsFromArgument(call->getArg(), scratch);
 }
 
 CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, Expr *arg,
