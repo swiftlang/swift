@@ -1426,8 +1426,10 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
-  var nsd: NSDictionary = NSDictionary(dictionary:
-    getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]))
+  var nsd: NSDictionary = autoreleasepool {
+    NSDictionary(dictionary:
+      getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]))
+  }
 
   var d: [NSObject : AnyObject] = convertNSDictionaryToDictionary(nsd)
 
@@ -1443,8 +1445,10 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.NSDictionaryIsCopied") {
-  var nsd: NSDictionary = NSDictionary(dictionary:
-    getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]))
+  var nsd: NSDictionary = autoreleasepool {
+    NSDictionary(dictionary:
+      getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]))
+  }
 
   var d: [TestBridgedKeyTy : TestBridgedValueTy] =
     convertNSDictionaryToDictionary(nsd)
