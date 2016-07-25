@@ -3353,8 +3353,10 @@ static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
 ///   expected, by wrapping the expression in a call to the rawValue
 ///   accessor
 ///
+/// - Return true on the fixit is added, false otherwise.
+///
 /// This helps migration with SDK changes.
-static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
+static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
                                       ConstraintSystem *CS,
                                       Type fromType,
                                       Type toType,
@@ -3405,7 +3407,7 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
         convWrapAfter += ")";
       }
       fixIt(convWrapBefore, convWrapAfter);
-      return;
+      return true;
     }
   }
 
@@ -3419,9 +3421,10 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
         convWrapAfter += ")";
       }
       fixIt(convWrapBefore, convWrapAfter);
-      return;
+      return true;
     }
   }
+  return false;
 }
 
 /// Attempts to add fix-its for these two mistakes:
@@ -3432,14 +3435,16 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
 /// - Passing an integer but expecting different integer type. The fixit adds
 ///   a wrapping cast.
 ///
+/// - Return true on the fixit is added, false otherwise.
+///
 /// This helps migration with SDK changes.
-static void tryIntegerCastFixIts(InFlightDiagnostic &diag,
+static bool tryIntegerCastFixIts(InFlightDiagnostic &diag,
                                  ConstraintSystem *CS,
                                  Type fromType,
                                  Type toType,
                                  Expr *expr) {
   if (!isIntegerType(fromType, CS) || !isIntegerType(toType, CS))
-    return;
+    return false;
 
   auto getInnerCastedExpr = [&]() -> Expr* {
     CallExpr *CE = dyn_cast<CallExpr>(expr);
@@ -3459,7 +3464,7 @@ static void tryIntegerCastFixIts(InFlightDiagnostic &diag,
       // Remove the unnecessary cast.
       diag.fixItRemoveChars(expr->getLoc(), innerE->getStartLoc())
         .fixItRemove(expr->getEndLoc());
-      return;
+      return true;
     }
   }
 
@@ -3470,6 +3475,19 @@ static void tryIntegerCastFixIts(InFlightDiagnostic &diag,
   SourceRange exprRange = expr->getSourceRange();
   diag.fixItInsert(exprRange.Start, convWrapBefore);
   diag.fixItInsertAfter(exprRange.End, convWrapAfter);
+  return true;
+}
+
+static bool
+addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem *CS,
+                   Type fromType, Type toType, Expr *expr) {
+  SmallString<32> buffer;
+  llvm::raw_svector_ostream OS(buffer);
+  toType->print(OS);
+  diag.fixItInsert(Lexer::getLocForEndOfToken(CS->DC->getASTContext().SourceMgr,
+                                              expr->getEndLoc()),
+                   (llvm::Twine(" as! ") + OS.str()).str());
+  return true;
 }
 
 bool FailureDiagnosis::diagnoseContextualConversionError() {
@@ -3746,11 +3764,12 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   case CTP_DictionaryValue:
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
                               KnownProtocolKind::ExpressibleByIntegerLiteral,
-                              expr);
+                              expr) ||
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
                               KnownProtocolKind::ExpressibleByStringLiteral,
-                              expr);
-    tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr);
+                              expr) ||
+    tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr) ||
+    addTypeCoerceFixit(diag, CS, exprType, contextualType, expr);
     break;
 
   default:
