@@ -62,6 +62,7 @@ internal final class _SwiftNSData : _SwiftNativeNSData, _SwiftNativeFoundationTy
     }
 }
 
+
 /**
  `Data` is a `MutableCollection` of bytes.
  
@@ -69,7 +70,7 @@ internal final class _SwiftNSData : _SwiftNativeNSData, _SwiftNativeFoundationTy
  
  `Data` can be initialized with an `UnsafePointer` and count, an array of `UInt8` (the primitive byte type), or an `UnsafeBufferPointer`. The buffer-oriented functions provide an extra measure of safety by automatically performing the size calculation, as the type is known at compile time.
  */
-public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, Hashable, RandomAccessCollection, MutableCollection, RangeReplaceableCollection, _MutablePairBoxing {
+public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessCollection, MutableCollection, RangeReplaceableCollection, _MutablePairBoxing {
     /// The Objective-C bridged type of `Data`.
     public typealias ReferenceType = NSData
     
@@ -588,16 +589,6 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
         return _mapUnmanaged { $0.hashValue }
     }
     
-    /// A human-readable description for the data.
-    public var description: String {
-        return _mapUnmanaged { $0.description }
-    }
-    
-    /// A human-readable debug description for the data.
-    public var debugDescription: String {
-        return _mapUnmanaged { $0.debugDescription }
-    }
-    
     // MARK: -
     
     // MARK: -
@@ -675,6 +666,37 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
         return d1._wrapped.isEqual(to: d2)
     }
 }
+
+extension Data : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    /// A human-readable description for the data.
+    public var description: String {
+        return "\(self.count) bytes"
+    }
+    
+    /// A human-readable debug description for the data.
+    public var debugDescription: String {
+        return self.description
+    }
+
+    public var customMirror: Mirror {
+        let nBytes = self.count
+        var children: [(label: String?, value: Any)] = []
+        children.append((label: "count", value: nBytes))
+        
+        self.withUnsafeBytes { (bytes : UnsafePointer<UInt8>) in
+            children.append((label: "pointer", value: bytes))
+        }
+        
+        // Minimal size data is output as an array
+        if nBytes < 64 {
+            children.append((label: "bytes", value: self[0..<nBytes].map { $0 }))
+        }
+        
+        let m = Mirror(self, children:children, displayStyle: Mirror.DisplayStyle.struct)
+        return m
+    }
+}
+
 
 /// Provides bridging functionality for struct Data to class NSData and vice-versa.
 extension Data : _ObjectiveCBridgeable {

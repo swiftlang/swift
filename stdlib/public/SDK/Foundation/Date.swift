@@ -18,7 +18,7 @@ import CoreFoundation
  
  A `Date` is independent of a particular calendar or time zone. To represent a `Date` to a user, you must interpret it in the context of a `Calendar`.
 */
-public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringConvertible {
+public struct Date : ReferenceConvertible, Comparable, Equatable {
     public typealias ReferenceType = NSDate
     
     private var _time : TimeInterval
@@ -160,33 +160,6 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
         }
     }
     
-    /**
-    A string representation of the date object (read-only).
-     
-    The representation is useful for debugging only.
-     
-    There are a number of options to acquire a formatted string for a date including: date formatters (see
-     [NSDateFormatter](//apple_ref/occ/cl/NSDateFormatter) and [Data Formatting Guide](//apple_ref/doc/uid/10000029i)), and the `Date` functions `description(locale:)`.
-    */
-    public var description: String {
-        // Defer to NSDate for description
-        return NSDate(timeIntervalSinceReferenceDate: _time).description
-    }
-    
-    /**
-    Returns a string representation of the receiver using the given
-     locale.
-     
-    - Parameter locale: A `Locale` object. If you pass `nil`, `NSDate` formats the date in the same way as the `description` property.
-     
-    - Returns: A string representation of the receiver, using the given locale, or if the locale argument is `nil`, in the international format `YYYY-MM-DD HH:MM:SS ±HHMM`, where `±HHMM` represents the time zone offset in hours and minutes from UTC (for example, "`2001-03-24 10:45:32 +0600`").
-    */
-    public func description(with locale: Locale?) -> String {
-        return NSDate(timeIntervalSinceReferenceDate: _time).description(with: locale)
-    }
-    
-    public var debugDescription: String { return description }
-
     /// Returns true if the two `Date` values represent the same point in time.
     public static func ==(lhs: Date, rhs: Date) -> Bool {
         return lhs.timeIntervalSinceReferenceDate == rhs.timeIntervalSinceReferenceDate
@@ -226,6 +199,43 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
         lhs = lhs - rhs
     }
 
+}
+
+extension Date : CustomDebugStringConvertible, CustomStringConvertible, CustomReflectable {
+    /**
+     A string representation of the date object (read-only).
+     
+     The representation is useful for debugging only.
+     
+     There are a number of options to acquire a formatted string for a date including: date formatters (see
+     [NSDateFormatter](//apple_ref/occ/cl/NSDateFormatter) and [Data Formatting Guide](//apple_ref/doc/uid/10000029i)), and the `Date` function `description(locale:)`.
+     */
+    public var description: String {
+        // Defer to NSDate for description
+        return NSDate(timeIntervalSinceReferenceDate: _time).description
+    }
+    
+    /**
+     Returns a string representation of the receiver using the given
+     locale.
+     
+     - Parameter locale: A `Locale`. If you pass `nil`, `Date` formats the date in the same way as the `description` property.
+     
+     - Returns: A string representation of the `Date`, using the given locale, or if the locale argument is `nil`, in the international format `YYYY-MM-DD HH:MM:SS ±HHMM`, where `±HHMM` represents the time zone offset in hours and minutes from UTC (for example, "`2001-03-24 10:45:32 +0600`").
+     */
+    public func description(with locale: Locale?) -> String {
+        return NSDate(timeIntervalSinceReferenceDate: _time).description(with: locale)
+    }
+    
+    public var debugDescription: String {
+        return description
+    }
+
+    public var customMirror: Mirror {
+        var c: [(label: String?, value: Any)] = []
+        c.append((label: "timeIntervalSinceReferenceDate", value: timeIntervalSinceReferenceDate))
+        return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
+    }
 }
 
 extension Date : _ObjectiveCBridgeable {

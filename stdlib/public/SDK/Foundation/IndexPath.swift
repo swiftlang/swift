@@ -145,15 +145,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         let me = self.makeReference()
         return me.hash
     }
-    
-    public var description: String {
-        return _indexes.description
-    }
-    
-    public var debugDescription: String {
-        return _indexes.debugDescription
-    }
-    
+        
     // MARK: - Bridging Helpers
     
     private init(nsIndexPath: ReferenceType) {
@@ -205,6 +197,20 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     public static func >=(lhs: IndexPath, rhs: IndexPath) -> Bool {
         let order = lhs.compare(rhs)
         return order == ComparisonResult.orderedDescending || order == ComparisonResult.orderedSame
+    }
+}
+
+extension IndexPath : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    public var description: String {
+        return _indexes.description
+    }
+    
+    public var debugDescription: String {
+        return _indexes.debugDescription
+    }
+
+    public var customMirror: Mirror {
+        return _indexes.customMirror
     }
 }
 

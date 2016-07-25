@@ -30,7 +30,7 @@ internal func __NSTimeZoneCurrent() -> NSTimeZone
  
  Cocoa does not provide any API to change the time zone of the computer, or of other applications.
  */
-public struct TimeZone : CustomStringConvertible, CustomDebugStringConvertible, Hashable, Equatable, ReferenceConvertible {
+public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
     public typealias ReferenceType = NSTimeZone
     
     private var _wrapped : NSTimeZone
@@ -204,14 +204,6 @@ public struct TimeZone : CustomStringConvertible, CustomDebugStringConvertible, 
     
     // MARK: -
     
-    public var description: String {
-        return _wrapped.description
-    }
-    
-    public var debugDescription : String {
-        return _wrapped.debugDescription
-    }
-    
     public var hashValue : Int {
         if _autoupdating {
             return 1
@@ -226,6 +218,36 @@ public struct TimeZone : CustomStringConvertible, CustomDebugStringConvertible, 
         } else {
             return lhs._wrapped.isEqual(rhs._wrapped)
         }
+    }
+}
+
+extension TimeZone : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    private var _kindDescription : String {
+        if (self == TimeZone.autoupdatingCurrent) {
+            return "autoupdatingCurrent"
+        } else if (self == TimeZone.current) {
+            return "current"
+        } else {
+            return "fixed"
+        }
+    }
+    
+    public var customMirror : Mirror {
+        var c: [(label: String?, value: Any)] = []
+        c.append((label: "identifier", value: identifier))
+        c.append((label: "kind", value: _kindDescription))
+        c.append((label: "abbreviation", value: abbreviation()))
+        c.append((label: "secondsFromGMT", value: secondsFromGMT()))
+        c.append((label: "isDaylightSavingTime", value: isDaylightSavingTime()))
+        return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
+    }
+    
+    public var description: String {
+        return "\(identifier) (\(_kindDescription))"
+    }
+    
+    public var debugDescription : String {
+        return "\(identifier) (\(_kindDescription))"
     }
 }
 
