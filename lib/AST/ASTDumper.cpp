@@ -570,6 +570,9 @@ namespace {
         case Accessibility::Private:
           OS << "private";
           break;
+        case Accessibility::FilePrivate:
+          OS << "fileprivate";
+          break;
         case Accessibility::Internal:
           OS << "internal";
           break;

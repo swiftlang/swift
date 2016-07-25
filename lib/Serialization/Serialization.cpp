@@ -1545,6 +1545,7 @@ static uint8_t getRawStableAccessibility(Accessibility access) {
   case Accessibility::NAME: \
     return static_cast<uint8_t>(serialization::AccessibilityKind::NAME);
   CASE(Private)
+  CASE(FilePrivate)
   CASE(Internal)
   CASE(Public)
 #undef CASE
@@ -2020,7 +2021,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   if (auto *value = dyn_cast<ValueDecl>(D)) {
     if (value->hasAccessibility() &&
-        value->getFormalAccess() == Accessibility::Private &&
+        value->getFormalAccess() <= Accessibility::FilePrivate &&
         !value->getDeclContext()->isLocalContext()) {
       // FIXME: We shouldn't need to encode this for /all/ private decls.
       // In theory we can follow the same rules as mangling and only include

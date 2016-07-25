@@ -1135,6 +1135,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
     case Accessibility::Private:
       Printer << tok::kw_private;
       break;
+    case Accessibility::FilePrivate:
+      Printer << tok::kw_fileprivate;
+      break;
     case Accessibility::Internal:
       if (!Options.PrintInternalAccessibilityKeyword)
         return;

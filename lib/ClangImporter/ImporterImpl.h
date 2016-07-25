@@ -1391,10 +1391,16 @@ public:
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
     D->setEarlyAttrValidation(true);
-    if (auto VD = dyn_cast<ValueDecl>(D))
-      VD->setAccessibility(Accessibility::Public);
-    if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
-      ASD->setSetterAccessibility(Accessibility::Public);
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (auto *param = dyn_cast<ParamDecl>(D)) {
+        param->setAccessibility(Accessibility::Private);
+        param->setSetterAccessibility(Accessibility::Private);
+      } else {
+        VD->setAccessibility(Accessibility::Public);
+        if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
+          ASD->setSetterAccessibility(Accessibility::Public);
+      }
+    }
     return D;
   }
 

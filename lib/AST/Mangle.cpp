@@ -394,7 +394,7 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
     return false;
 
   auto *nominal = declaredType->getAnyNominal();
-  if (nominal->getFormalAccess() == Accessibility::Private)
+  if (nominal->getFormalAccess() <= Accessibility::FilePrivate)
     return true;
   return isInPrivateOrLocalContext(nominal);
 }
@@ -407,7 +407,7 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
     // Fall through to mangle the <identifier>.
 
   } else if (decl->hasAccessibility() &&
-             decl->getFormalAccess() == Accessibility::Private &&
+             decl->getFormalAccess() <= Accessibility::FilePrivate &&
              !isInPrivateOrLocalContext(decl)) {
     // Mangle non-local private declarations with a textual discriminator
     // based on their enclosing file.

@@ -1822,7 +1822,10 @@ Accessibility ValueDecl::getEffectiveAccess() const {
     if (isInternalDeclEffectivelyPublic(this))
       effectiveAccess = Accessibility::Public;
     break;
+  case Accessibility::FilePrivate:
+    break;
   case Accessibility::Private:
+    effectiveAccess = Accessibility::FilePrivate;
     break;
   }
 
@@ -1841,7 +1844,7 @@ Accessibility ValueDecl::getEffectiveAccess() const {
     }
 
   } else if (getDeclContext()->isLocalContext()) {
-    effectiveAccess = Accessibility::Private;
+    effectiveAccess = Accessibility::FilePrivate;
   }
 
   return effectiveAccess;
@@ -1887,6 +1890,8 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
 
   switch (access) {
   case Accessibility::Private:
+    // TODO: Implement 'private'
+  case Accessibility::FilePrivate:
     assert(result->isModuleScopeContext());
     return result;
   case Accessibility::Internal:

@@ -122,12 +122,12 @@ classifyDynamicCastToProtocol(CanType source,
     }
   }
 
-  // If the source type is private or target protocol is private,
+  // If the source type is file-private or target protocol is file-private,
   // then conformances cannot be changed at run-time, because only this
   // file could have implemented them, but no conformances were found.
   // Therefore it is safe to make a negative decision at compile-time.
-  if (SourceNominalTy->getEffectiveAccess() == Accessibility::Private ||
-      TargetProtocol->getEffectiveAccess() == Accessibility::Private) {
+  if (SourceNominalTy->getEffectiveAccess() <= Accessibility::FilePrivate ||
+      TargetProtocol->getEffectiveAccess() <= Accessibility::FilePrivate) {
     // This cast is always false. Replace it with a branch to the
     // failure block.
     return DynamicCastFeasibility::WillFail;
@@ -139,8 +139,8 @@ classifyDynamicCastToProtocol(CanType source,
   // module could have implemented them, but no conformances were found.
   // Therefore it is safe to make a negative decision at compile-time.
   if (isWholeModuleOpts &&
-      (SourceNominalTy->getEffectiveAccess() == Accessibility::Internal ||
-       TargetProtocol->getEffectiveAccess() == Accessibility::Internal)) {
+      (SourceNominalTy->getEffectiveAccess() <= Accessibility::Internal ||
+       TargetProtocol->getEffectiveAccess() <= Accessibility::Internal)) {
     return DynamicCastFeasibility::WillFail;
   }
 

@@ -3472,9 +3472,10 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
                                Accessibility desiredAccess, bool isForSetter) {
   StringRef fixItString;
   switch (desiredAccess) {
-  case Accessibility::Private:  fixItString = "private ";  break;
-  case Accessibility::Internal: fixItString = "internal "; break;
-  case Accessibility::Public:   fixItString = "public ";   break;
+  case Accessibility::Private:      fixItString = "private ";      break;
+  case Accessibility::FilePrivate:  fixItString = "fileprivate ";  break;
+  case Accessibility::Internal:     fixItString = "internal ";     break;
+  case Accessibility::Public:       fixItString = "public ";       break;
   }
 
   DeclAttributes &attrs = VD->getAttrs();
