@@ -1160,7 +1160,7 @@ public:
   Type getCFStringRefType();
 
   /// \brief Determines whether the given type matches an implicit type
-  /// bound of "NSObject", which is used to validate NSDictionary/NSSet.
+  /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
   bool matchesNSObjectBound(Type type);
 
   /// \brief Look up and attempt to import a Clang declaration with

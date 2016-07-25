@@ -163,7 +163,7 @@
 // CHECK-FOUNDATION: func normalizingXMLPreservingComments(_: Bool)
 
 // Collection element types.
-// CHECK-FOUNDATION: func adding(_: Any) -> Set<NSObject>
+// CHECK-FOUNDATION: func adding(_: Any) -> Set<AnyHashable>
 
 // Boolean properties follow the getter.
 // CHECK-FOUNDATION: var empty: Bool { get }
@@ -218,8 +218,8 @@
 // CHECK-APPKIT: func draw(in: NSView?)
 
 // Note: NSDictionary default arguments for "options"
-// CHECK-APPKIT: func drawAnywhere(in: NSView?, options: [NSObject : Any] = [:])
-// CHECK-APPKIT: func drawAnywhere(options: [NSObject : Any] = [:])
+// CHECK-APPKIT: func drawAnywhere(in: NSView?, options: [AnyHashable : Any] = [:])
+// CHECK-APPKIT: func drawAnywhere(options: [AnyHashable : Any] = [:])
 
 // Note: no lowercasing of initialisms when there might be a prefix.
 // CHECK-CORECOOLING: func CFBottom() ->

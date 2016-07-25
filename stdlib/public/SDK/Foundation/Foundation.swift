@@ -1237,7 +1237,8 @@ extension NSSet {
   ///   receiver.
   @objc(_swiftInitWithSet_NSSet:)
   public convenience init(set anSet: NSSet) {
-    self.init(set: anSet as Set)
+    // FIXME: This is a bit weird. Maybe there's a better way?
+    self.init(set: anSet as Set<NSObject> as Set<AnyHashable>)
   }
 }
 
@@ -1250,7 +1251,9 @@ extension NSDictionary {
   ///   found in `otherDictionary`.
   @objc(_swiftInitWithDictionary_NSDictionary:)
   public convenience init(dictionary otherDictionary: NSDictionary) {
-    self.init(dictionary: otherDictionary as Dictionary)
+    // FIXME: This is a bit weird. Maybe there's a better way?
+    self.init(dictionary: otherDictionary as [NSObject: AnyObject]
+                                          as [AnyHashable: Any])
   }
 }
 
