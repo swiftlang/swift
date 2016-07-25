@@ -125,7 +125,7 @@ class TestData : TestDataSuper {
     // String of course has its own way to get data, but this way tests our own data struct
     func dataFrom(_ string : String) -> Data {
         // Create a Data out of those bytes
-        return string.nulTerminatedUTF8.withUnsafeBufferPointer { (ptr) in
+        return string.nullTerminatedUTF8.withUnsafeBufferPointer { (ptr) in
             // Subtract 1 so we don't get the null terminator byte. This matches NSString behavior.
             return Data(bytes: ptr.baseAddress!, count: ptr.count - 1)
         }

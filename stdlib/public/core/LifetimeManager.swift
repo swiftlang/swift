@@ -43,7 +43,7 @@ extension String {
   public func withCString<Result>(
     _ body: @noescape (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
-    return try self.nulTerminatedUTF8.withUnsafeBufferPointer {
+    return try self.nullTerminatedUTF8.withUnsafeBufferPointer {
       try body(UnsafePointer($0.baseAddress!))
     }
   }

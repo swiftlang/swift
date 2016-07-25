@@ -390,7 +390,7 @@ extension String {
   /// `withUnsafeBufferPointer` on the array.
   ///
   ///     let s = "Hello!"
-  ///     let bytes = s.nulTerminatedUTF8
+  ///     let bytes = s.nullTerminatedUTF8
   ///     print(bytes)
   ///     // Prints "[72, 101, 108, 108, 111, 33, 0]"
   ///     
@@ -398,7 +398,7 @@ extension String {
   ///         print(strlen(UnsafePointer(ptr.baseAddress!)))
   ///     }
   ///     // Prints "6"
-  public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
+  public var nullTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
     var result = ContiguousArray<UTF8.CodeUnit>()
     result.reserveCapacity(utf8.count + 1)
     result += utf8
@@ -409,9 +409,9 @@ extension String {
   /// A contiguously stored null-terminated UTF-8 representation of
   /// the string.
   ///
-  /// This is a variation on nulTerminatedUTF8 that creates an array
-  /// of element type CChar for use with CString API's.
-  public var nulTerminatedUTF8CString: ContiguousArray<CChar> {
+  /// This is a variation on `nullTerminatedUTF8` that creates an array
+  /// of element type CChar for use with CString APIs.
+  public var utf8CString: ContiguousArray<CChar> {
     var result = ContiguousArray<CChar>()
     result.reserveCapacity(utf8.count + 1)
     for c in utf8 {
@@ -428,7 +428,7 @@ extension String {
     if ptr != nil {
       return try body(UnsafeBufferPointer(start: ptr, count: _core.count))
     }
-    return try nulTerminatedUTF8.withUnsafeBufferPointer(body)
+    return try nullTerminatedUTF8.withUnsafeBufferPointer(body)
   }
 
   /// Creates a string corresponding to the given sequence of UTF-8 code units.
@@ -725,3 +725,14 @@ extension String.UTF8View : CustomPlaygroundQuickLookable {
   }
 }
 
+extension String {
+  @available(*, unavailable, renamed: "nullTerminatedUTF8")
+  public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "utf8CString")
+  public var nulTerminatedUTF8CString: ContiguousArray<CChar> {
+    Builtin.unreachable()
+  }
+}
