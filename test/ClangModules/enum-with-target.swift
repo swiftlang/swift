@@ -14,7 +14,7 @@ let calendarUnitsDep: CalendarUnitDeprecated = [.eraCalendarUnitDeprecated, .yea
 // rdar://problem/21081557
 func pokeRawValue(_ random: SomeRandomEnum) {
   switch (random) {
-  case SomeRandomEnum.RawValue // expected-error{{enum case 'RawValue' not found in type 'SomeRandomEnum'}}
+  case SomeRandomEnum.RawValue // expected-error{{expression pattern of type 'RawValue.Type' (aka 'Int.Type') cannot match values of type 'SomeRandomEnum'}}
     // expected-error@-1{{expected ':' after 'case'}}
   }
 }
