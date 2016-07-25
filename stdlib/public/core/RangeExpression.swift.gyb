@@ -46,7 +46,7 @@ public protocol RangeExpression {
   /// 
   /// -Recommended: `relative(to:)`
   // 
-  // WORKAROUND unfiled - We want to have this requirement, but it triggers a generics bug
+  // WORKAROUND SR-2158 - We want to have this requirement, but it triggers a generics bug
   // func relative<C: Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound
   func relative<BoundDistance: SignedInteger>(to bounds: Range<Bound>, offsettingBy offset: (Bound, BoundDistance) -> Bound) -> Range<Bound>
 }
@@ -107,7 +107,7 @@ extension IncompleteClosedRange: RangeExpression {
   }
 }
 
-// WORKAROUND unfiled - Should be generic subscripts, not generated code for each conforming type
+// WORKAROUND SR-115 - Should be generic subscripts, not generated code for each conforming type
 % for R in ['CountableRange', 'ClosedRange', 'CountableClosedRange', 'IncompleteRange', 'IncompleteClosedRange']:
 // WORKAROUND rdar://25214066 - should be on Collection
 extension Indexable

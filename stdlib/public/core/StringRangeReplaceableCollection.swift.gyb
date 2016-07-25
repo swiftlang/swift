@@ -77,7 +77,7 @@ extension String {
   ///   string's end index.
   public subscript(i: Index) -> Character { return characters[i] }
 
-  // WORKAROUND unfiled - Should be generic subscripts, not generated code for each RangeExpression-conforming type
+  // WORKAROUND SR-115 - Should be generic subscripts, not generated code for each RangeExpression-conforming type
 % for Range in ['Range', 'ClosedRange', 'IncompleteRange', 'IncompleteClosedRange']:
   /// Accesses the text in the given range.
   ///
