@@ -192,7 +192,7 @@ func constVoidPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesConstVoidPointer([0.0, 1.0, 2.0])  // expected-error {{contextual type 'UnsafeRawPointer' cannot be used with array literal}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeRawPointer')}}
+  var x: UnsafeRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeRawPointer'}}
   x = ii // expected-error{{cannot assign value of type '[Int]' to type 'UnsafeRawPointer'}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeRawPointer'}}
   x = fp // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Float>' to type 'UnsafeRawPointer'}}

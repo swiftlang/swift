@@ -90,7 +90,7 @@ class TestData : TestDataSuper {
                 let bytePtr = buffer!.bindMemory(to: UInt8.self, capacity: length)
                 let result = UnsafeMutableBufferPointer(start: bytePtr, count: length)
                 _pointer = result
-                return UnsafePointer(result.baseAddress!)
+                return UnsafeRawPointer(result.baseAddress!)
             }
         }
         
@@ -108,7 +108,7 @@ class TestData : TestDataSuper {
             let result = UnsafeMutableBufferPointer(start: bytePtr, count: newBufferLength)
             _pointer = result
             _length = newBufferLength
-            return result.baseAddress!
+            return UnsafeMutableRawPointer(result.baseAddress!)
         }
         
         override func getBytes(_ buffer: UnsafeMutableRawPointer, length: Int) {
@@ -457,7 +457,7 @@ class TestData : TestDataSuper {
     func testCopyBytes() {
         let c = 10
         let underlyingBuffer = malloc(c * strideof(UInt16.self))!
-        let u16Ptr = buffer!.bindMemory(to: UInt16.self, capacity: c)
+        let u16Ptr = underlyingBuffer.bindMemory(to: UInt16.self, capacity: c)
         let buffer = UnsafeMutableBufferPointer<UInt16>(start: u16Ptr, count: c)
         
         buffer[0] = 0
@@ -637,8 +637,8 @@ class TestData : TestDataSuper {
 
         let count = 1 << 24
         let randomMemory = malloc(count)!
-        let ptr = randomMemory!.bindMemory(to: UInt8.self, capacity: count)
-        let data = Data(bytesNoCopy: ptr!, count: count, deallocator: .free)
+        let ptr = randomMemory.bindMemory(to: UInt8.self, capacity: count)
+        let data = Data(bytesNoCopy: ptr, count: count, deallocator: .free)
         do {
             try data.write(to: url)
             let readData = try Data(contentsOf: url)
@@ -824,7 +824,7 @@ class TestData : TestDataSuper {
             let underlyingBuffer = malloc(6 * strideof(MyStruct.self))!
             defer { free(underlyingBuffer) }
 
-            let ptr = underlyingBuffer!.bindMemory(to: MyStruct.self, capacity: 6)
+            let ptr = underlyingBuffer.bindMemory(to: MyStruct.self, capacity: 6)
             let buffer = UnsafeMutableBufferPointer<MyStruct>(start: ptr, count: 6)
             
             let byteCount = data.copyBytes(to: buffer)
@@ -836,7 +836,7 @@ class TestData : TestDataSuper {
             let underlyingBuffer = malloc(3 * strideof(MyStruct.self))!
             defer { free(underlyingBuffer) }
 
-            let ptr = underlyingBuffer!.bindMemory(to: MyStruct.self, capacity: 3)
+            let ptr = underlyingBuffer.bindMemory(to: MyStruct.self, capacity: 3)
             let buffer = UnsafeMutableBufferPointer<MyStruct>(start: ptr, count: 3)
             
             let byteCount = data.copyBytes(to: buffer)
@@ -848,7 +848,7 @@ class TestData : TestDataSuper {
             let underlyingBuffer = malloc(12 * strideof(MyStruct.self))!
             defer { free(underlyingBuffer) }
             
-            let ptr = underlyingBuffer!.bindMemory(to: MyStruct.self, capacity: 6)
+            let ptr = underlyingBuffer.bindMemory(to: MyStruct.self, capacity: 6)
             let buffer = UnsafeMutableBufferPointer<MyStruct>(start: ptr, count: 6)
             
             let byteCount = data.copyBytes(to: buffer)

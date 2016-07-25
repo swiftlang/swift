@@ -15,7 +15,7 @@ func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {
 
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
   a?.voidReturning()
-  // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeMutablePointer<()> to $Optional<UnsafeMutablePointer<()>>
+  // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeMutableRawPointer to $Optional<UnsafeMutableRawPointer>
   a?.voidPointerReturning()
   // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeMutablePointer<Int8> to $Optional<UnsafeMutablePointer<Int8>>
   a?.pointerReturning()
