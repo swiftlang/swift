@@ -1,7 +1,6 @@
 function(swift_is_installing_component component result_var_name)
-  if("${component}" STREQUAL "")
-    message(FATAL_ERROR "Component name is required")
-  endif()
+  precondition(component MESSAGE "Component name is required")
+
   if("${component}" STREQUAL "never_install")
     set("${result_var_name}" FALSE PARENT_SCOPE)
   else()
@@ -24,9 +23,8 @@ endfunction()
 #
 # This function accepts the same parameters as install().
 function(swift_install_in_component component)
-  if("${component}" STREQUAL "")
-    message(FATAL_ERROR "Component name is required")
-  endif()
+  precondition(component MESSAGE "Component name is required")
+
   swift_is_installing_component("${component}" is_installing)
   if(is_installing)
     install(${ARGN})
