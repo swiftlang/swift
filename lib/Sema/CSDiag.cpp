@@ -698,6 +698,20 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     .highlight(immInfo.first->getSourceRange());
 }
 
+/// Helper to gather the argument labels from a tuple or paren type, for use
+/// when the AST doesn't store argument-label information properly.
+static void gatherArgumentLabels(Type type,
+                                 SmallVectorImpl<Identifier> &labels) {
+  // Handle tuple types.
+  if (auto tupleTy = dyn_cast<TupleType>(type.getPointer())) {
+    for (auto i : range(tupleTy->getNumElements()))
+      labels.push_back(tupleTy->getElement(i).getName());
+    return;
+  }
+
+  labels.push_back(Identifier());
+}
+
 namespace {
   /// Each match in an ApplyExpr is evaluated for how close of a match it is.
   /// The result is captured in this enum value, where the earlier entries are
@@ -796,6 +810,45 @@ namespace {
       return Type();
     }
 
+    /// Retrieve the argument labels that should be used to invoke this
+    /// candidate.
+    ArrayRef<Identifier> getArgumentLabels(
+                           SmallVectorImpl<Identifier> &scratch) {
+      scratch.clear();
+      if (auto decl = getDecl()) {
+        if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+          // Retrieve the argument labels of the corresponding parameter list.
+          if (level < func->getNumParameterLists()) {
+            auto paramList = func->getParameterList(level);
+            for (auto param : *paramList) {
+              scratch.push_back(param->getArgumentName());
+            }
+            return scratch;
+          }
+        } else if (auto enumElt = dyn_cast<EnumElementDecl>(decl)) {
+          // 'self'
+          if (level == 0) {
+            scratch.push_back(Identifier());
+            return scratch;
+          }
+
+          // The associated data of the case.
+          if (level == 1) {
+            if (!enumElt->hasArgumentType()) return { };
+            gatherArgumentLabels(enumElt->getArgumentType(), scratch);
+            return scratch;
+          }
+        }
+      }
+
+      if (auto argType = getArgumentType()) {
+        gatherArgumentLabels(argType, scratch);
+        return scratch;
+      }
+
+      return { };
+    }
+
     void dump() const {
       if (auto decl = getDecl())
         decl->dumpRef(llvm::errs());
@@ -880,8 +933,8 @@ namespace {
                       ArrayRef<CallArgParam> actualArgs);
       
     void filterListArgs(ArrayRef<CallArgParam> actualArgs);
-    void filterList(Type actualArgsType) {
-      return filterListArgs(decomposeArgType(actualArgsType));
+    void filterList(Type actualArgsType, ArrayRef<Identifier> argLabels) {
+      return filterListArgs(decomposeArgType(actualArgsType, argLabels));
     }
     void filterList(ClosenessPredicate predicate);
     void filterContextualMemberList(Expr *argExpr);
@@ -1840,7 +1893,8 @@ public:
   /// Diagnose common failures due to applications of an argument list to an
   /// ApplyExpr or SubscriptExpr.
   bool diagnoseParameterErrors(CalleeCandidateInfo &CCI,
-                               Expr *fnExpr, Expr *argExpr);
+                               Expr *fnExpr, Expr *argExpr,
+                               ArrayRef<Identifier> argLabels);
 
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
@@ -4104,7 +4158,8 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 /// Emit a class of diagnostics that we only know how to generate when there is
 /// exactly one candidate we know about.  Return true if an error is emitted.
 static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
-                                            Expr *fnExpr, Expr *argExpr) {
+                                            Expr *fnExpr, Expr *argExpr,
+                                            ArrayRef<Identifier> argLabels) {
   // We only handle the situation where there is exactly one candidate here.
   if (CCI.size() != 1)
     return false;
@@ -4116,7 +4171,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
   if (!argTy) return false;
 
   auto params = decomposeParamType(argTy, candidate.getDecl(), candidate.level);
-  auto args = decomposeArgType(argExpr->getType());
+  auto args = decomposeArgType(argExpr->getType(), argLabels);
 
   // It is a somewhat common error to try to access an instance method as a
   // curried member on the type, instead of using an instance, e.g. the user
@@ -4371,7 +4426,8 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
 /// problem, e.g. that there are too few parameters specified or that argument
 /// labels don't match up, diagnose that error and return true.
 bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
-                                               Expr *fnExpr, Expr *argExpr) {
+                                               Expr *fnExpr, Expr *argExpr,
+                                               ArrayRef<Identifier> argLabels) {
   // If we are invoking a constructor and there are absolutely no candidates,
   // then they must all be private.
   if (auto *MTT = fnExpr->getType()->getAs<MetatypeType>()) {
@@ -4387,7 +4443,7 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
 
   // Do all the stuff that we only have implemented when there is a single
   // candidate.
-  if (diagnoseSingleCandidateFailures(CCI, fnExpr, argExpr))
+  if (diagnoseSingleCandidateFailures(CCI, fnExpr, argExpr, argLabels))
     return true;
 
   // If we have a failure where the candidate set differs on exactly one
@@ -4497,13 +4553,15 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
     --calleeInfo.candidates[i].level;
 
-  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr))
+  SmallVector<Identifier, 2> argLabelsScratch;
+  ArrayRef<Identifier> argLabels = SE->getArgumentLabels(argLabelsScratch);
+  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
     return true;
 
   auto indexType = indexExpr->getType();
 
-  auto decomposedBaseType = decomposeArgType(baseType);
-  auto decomposedIndexType = decomposeArgType(indexType);
+  auto decomposedBaseType = decomposeArgType(baseType, { Identifier() });
+  auto decomposedIndexType = decomposeArgType(indexType, argLabels);
   calleeInfo.filterList([&](UncurriedCandidate cand) ->
                                  CalleeCandidateInfo::ClosenessResultTy
   {
@@ -4571,7 +4629,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     return true;
   }
 
-  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr))
+  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
     return true;
 
   // Diagnose some simple and common errors.
@@ -4773,8 +4831,11 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Filter the candidate list based on the argument we may or may not have.
   calleeInfo.filterContextualMemberList(callExpr->getArg());
 
+  SmallVector<Identifier, 2> argLabelsScratch;
+  ArrayRef<Identifier> argLabels =
+    callExpr->getArgumentLabels(argLabelsScratch);
   if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(),
-                              callExpr->getArg()))
+                              callExpr->getArg(), argLabels))
     return true;
   
   Type argType;  // Type of the argument list, if knowable.
@@ -4798,9 +4859,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (!argExpr)
     return true; // already diagnosed.
 
-  calleeInfo.filterList(argExpr->getType());
+  calleeInfo.filterList(argExpr->getType(), argLabels);
 
-  if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(), argExpr))
+  if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(), argExpr,
+                              argLabels))
     return true;
 
   // Force recheck of the arg expression because we allowed unresolved types
@@ -4844,7 +4906,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   
   // Handle argument label mismatches when we have multiple candidates.
   if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
-    auto args = decomposeArgType(argExpr->getType());
+    auto args = decomposeArgType(argExpr->getType(), argLabels);
 
     // If we have multiple candidates that we fail to match, just say we have
     // the wrong labels and list the candidates out.
@@ -5739,7 +5801,10 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     // expected.
     assert(argumentTy &&
            "Candidate must expect an argument to have a label mismatch");
-    auto arguments = decomposeArgType(argumentTy);
+    SmallVector<Identifier, 2> argLabelsScratch;
+    auto arguments = decomposeArgType(argumentTy,
+                                      candidateInfo[0].getArgumentLabels(
+                                        argLabelsScratch));
     
     // TODO: This is probably wrong for varargs, e.g. calling "print" with the
     // wrong label.

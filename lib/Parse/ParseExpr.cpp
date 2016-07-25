@@ -1508,8 +1508,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         return SubResult;
       }
       ParserResult<Expr> Arg = parseExprList(tok::l_paren, tok::r_paren);
-      Result = makeParserResult(new (Context) CallExpr(Result.get(), Arg.get(),
-                                                       /*Implicit=*/false));
+      Result = makeParserResult(CallExpr::create(Context, Result.get(),
+                                                 Arg.get(),
+                                                 /*implicit=*/false));
       if (Arg.hasCodeCompletion())
         Result.setHasCodeCompletion();
 
@@ -1570,7 +1571,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         // The call node should still be marked as explicit
         Result = makeParserResult(
             ParserStatus(closure),
-            new (Context) CallExpr(Result.get(), arg, /*Implicit=*/false));
+              CallExpr::create(Context, Result.get(), arg, /*implicit=*/false));
       }
 
       if (Result.hasCodeCompletion())
@@ -2667,10 +2668,14 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn,
   if (peekToken().is(tok::code_complete) && CodeCompletion) {
     consumeToken(tok::l_paren);
     auto CCE = new (Context) CodeCompletionExpr(Tok.getRange());
-    auto Result = makeParserResult(new (Context) CallExpr(fn.get(),
-      new (Context) ParenExpr(SourceLoc(), CCE, SourceLoc(),
-                              /*hasTrailingClosure=*/false),
-                              /*Implicit=*/false));
+    auto Result = makeParserResult(
+      CallExpr::create(Context, fn.get(), SourceLoc(),
+                       { CCE },
+                       { Identifier() },
+                       { },
+                       SourceLoc(),
+                       /*trailingClosure=*/nullptr,
+                       /*implicit=*/false));
     CodeCompletion->completePostfixExprParen(fn.get(), CCE);
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
@@ -2681,8 +2686,9 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn,
   ParserResult<Expr> firstArg = parseExprList(Tok.getKind(), tok::r_paren);
 
   // Form the call.
-  auto Result = makeParserResult(new (Context) CallExpr(fn.get(), firstArg.get(),
-                                                        /*Implicit=*/false));
+  auto Result = makeParserResult(CallExpr::create(Context, fn.get(),
+                                                  firstArg.get(),
+                                                  /*implicit=*/false));
   if (fn.isParseError() || firstArg.isParseError())
     Result.setIsParseError();
 

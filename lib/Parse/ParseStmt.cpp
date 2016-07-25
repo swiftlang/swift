@@ -847,8 +847,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
   auto DRE = new (Context) DeclRefExpr(tempDecl, DeclNameLoc(loc),
                                        /*Implicit*/true,
                                        AccessSemantics::DirectToStorage);
-  auto args = TupleExpr::createEmpty(Context, loc, loc, true);
-  auto call = new (Context) CallExpr(DRE, args, /*implicit*/true);
+  auto call = CallExpr::createImplicit(Context, DRE, { }, { });
   
   auto DS = new (Context) DeferStmt(DeferLoc, tempDecl, call);
   return makeParserResult(Status, DS);
@@ -2114,9 +2113,7 @@ static BraceStmt *ConvertClosureToBraceStmt(Expr *E, ASTContext &Ctx) {
   // to just turn it into BraceStmt(CallExpr(TheClosure, VoidTuple)).  This also
   // more correctly handles the implicit ReturnStmt injected into single-expr
   // closures.
-  auto voidArg = TupleExpr::createEmpty(Ctx, CE->getEndLoc(), CE->getEndLoc(),
-                                        /*implicit*/true);
-  ASTNode theCall = new (Ctx) CallExpr(CE, voidArg, /*implicit*/true);
+  ASTNode theCall = CallExpr::createImplicit(Ctx, CE, { }, { });
   return BraceStmt::create(Ctx, CE->getStartLoc(), theCall, CE->getEndLoc(),
                            /*implicit*/true);
 }

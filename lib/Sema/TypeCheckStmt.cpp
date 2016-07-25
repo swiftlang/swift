@@ -1305,9 +1305,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   Expr *r = new (Context) UnresolvedDotExpr(superRef, SourceLoc(),
                                             Context.Id_init, DeclNameLoc(),
                                             /*Implicit=*/true);
-  Expr *args = TupleExpr::createEmpty(Context, SourceLoc(), SourceLoc(),
-                                      /*Implicit=*/true);
-  r = new (Context) CallExpr(r, args, /*Implicit=*/true);
+  r = CallExpr::createImplicit(Context, r, { }, { });
 
   if (ctor->hasThrows())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*Implicit=*/true);

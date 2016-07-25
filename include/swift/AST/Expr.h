@@ -902,6 +902,12 @@ public:
   Expr *getArg() const { return Arg; }
   void setArg(Expr *arg) { Arg = arg; }
 
+  /// Retrieve the argument labels for the argument.
+  ///
+  /// \param scratch Scratch space that will be used when the argument labels
+  /// aren't already stored in the AST context.
+  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
 
@@ -1409,6 +1415,12 @@ public:
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
 
+  /// Retrieve the argument labels for the indices.
+  ///
+  /// \param scratch Scratch space that will be used when the argument labels
+  /// aren't already stored in the AST context.
+  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+
   /// Retrieve the member to which this access refers.
   ConcreteDeclRef getMember() const { return Member; }
 
@@ -1443,6 +1455,12 @@ public:
   SourceLoc getDotLoc() const { return DotLoc; }
   Expr *getArgument() const { return Argument; }
   void setArgument(Expr *argument) { Argument = argument; }
+
+  /// Retrieve the argument labels for the argument, if provided.
+  ///
+  /// \param scratch Scratch space that will be used when the argument labels
+  /// aren't already stored in the AST context.
+  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
 
@@ -1884,6 +1902,12 @@ public:
   /// "offset" into the base value.
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
+
+  /// Retrieve the argument labels for the indices.
+  ///
+  /// \param scratch Scratch space that will be used when the argument labels
+  /// aren't already stored in the AST context.
+  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
 
   /// Determine whether this subscript reference should bypass the
   /// ordinary accessors.
@@ -3210,6 +3234,12 @@ public:
 
   ValueDecl *getCalledValue() const;
 
+  /// Retrieve the argument labels provided at the call site.
+  ///
+  /// \param scratch Scratch space that will be used when the argument labels
+  /// aren't already stored in the AST context.
+  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ApplyExpr &&
            E->getKind() <= ExprKind::Last_ApplyExpr;
@@ -3220,9 +3250,48 @@ public:
 /// syntactically through juxtaposition with a TupleExpr whose
 /// leading '(' is unspaced.
 class CallExpr : public ApplyExpr {
-public:
   CallExpr(Expr *fn, Expr *arg, bool Implicit, Type ty = Type())
     : ApplyExpr(ExprKind::Call, fn, arg, Implicit, ty) {}
+
+public:
+  /// Create a new call expression.
+  ///
+  /// Note: prefer to use the second entry point, which separates out
+  /// arguments/labels/etc.
+  static CallExpr *create(ASTContext &ctx, Expr *fn, Expr *arg,
+                          bool implicit, Type type = Type());
+
+  /// Create a new implicit call expression without any source-location
+  /// information.
+  ///
+  /// \param fn The function being called
+  /// \param args The call arguments, not including a trailing closure (if any).
+  /// \param argLabels The argument labels, whose size must equal args.size(),
+  /// or which must be empty.
+  static CallExpr *createImplicit(ASTContext &ctx, Expr *fn,
+                                  ArrayRef<Expr *> args,
+                                  ArrayRef<Identifier> argLabels) {
+    return create(ctx, fn, SourceLoc(), args, argLabels, { }, SourceLoc(),
+                  /*trailingClosure=*/nullptr, /*implicit=*/true);
+  }
+
+  /// Create a new call expression.
+  ///
+  /// \param fn The function being called
+  /// \param args The call arguments, not including a trailing closure (if any).
+  /// \param argLabels The argument labels, whose size must equal args.size(),
+  /// or which must be empty.
+  /// \param argLabelLocs The locations of the argument labels, whose size must
+  /// equal args.size() or which must be empty.
+  /// \param trailingClosure The trailing closure, if any.
+  static CallExpr *create(ASTContext &ctx, Expr *fn,
+                          SourceLoc lParenLoc,
+                          ArrayRef<Expr *> args,
+                          ArrayRef<Identifier> argLabels,
+                          ArrayRef<SourceLoc> argLabelLocs,
+                          SourceLoc rParenLoc,
+                          Expr *trailingClosure,
+                          bool implicit);
 
   SourceLoc getStartLoc() const {
     SourceLoc fnLoc = getFn()->getStartLoc();

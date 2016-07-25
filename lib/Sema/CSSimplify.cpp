@@ -469,31 +469,46 @@ matchCallArguments(ArrayRef<CallArgParam> args,
 
 /// Find the callee declaration and uncurry level for a given call
 /// locator.
-static std::pair<ValueDecl *, unsigned>
-getCalleeDecl(ConstraintSystem &cs, ConstraintLocatorBuilder callLocator) {
+static std::tuple<ValueDecl *, unsigned, ArrayRef<Identifier>>
+getCalleeDeclAndArgs(ConstraintSystem &cs,
+                     ConstraintLocatorBuilder callLocator,
+                     SmallVectorImpl<Identifier> &argLabelsScratch) {
+  ArrayRef<Identifier> argLabels;
+
   // If the call locator is not just a call expression, there's
   // nothing to do.
   SmallVector<LocatorPathElt, 2> path;
   auto callExpr = callLocator.getLocatorParts(path);
-  if (!callExpr) return { nullptr, 0 };
+  if (!callExpr) return std::make_tuple(nullptr, 0, argLabels);
 
   // Our remaining path can only be 'ApplyArgument' or 'SubscriptIndex'.
   if (!path.empty() &&
       !(path.size() == 1 &&
         (path.back().getKind() == ConstraintLocator::ApplyArgument ||
          path.back().getKind() == ConstraintLocator::SubscriptIndex)))
-    return { nullptr, 0 };
+    return std::make_tuple(nullptr, 0, argLabels);
 
   // Dig out the callee.
   Expr *calleeExpr;
-  if (auto call = dyn_cast<CallExpr>(callExpr))
+  if (auto call = dyn_cast<CallExpr>(callExpr)) {
     calleeExpr = call->getDirectCallee();
-  else if (isa<UnresolvedMemberExpr>(callExpr))
+    argLabels = call->getArgumentLabels(argLabelsScratch);
+  } else if (auto unresolved = dyn_cast<UnresolvedMemberExpr>(callExpr)) {
     calleeExpr = callExpr;
-  else if (isa<SubscriptExpr>(callExpr))
+    argLabels = unresolved->getArgumentLabels(argLabelsScratch);
+  } else if (auto subscript = dyn_cast<SubscriptExpr>(callExpr)) {
     calleeExpr = callExpr;
-  else
-    return { nullptr, 0 };
+    argLabels = subscript->getArgumentLabels(argLabelsScratch);
+  } else if (auto dynSubscript = dyn_cast<DynamicSubscriptExpr>(callExpr)) {
+    calleeExpr = callExpr;
+    argLabels = dynSubscript->getArgumentLabels(argLabelsScratch);
+  } else {
+    if (auto apply = dyn_cast<ApplyExpr>(callExpr))
+      argLabels = apply->getArgumentLabels(argLabelsScratch);
+    else if (auto objectLiteral = dyn_cast<ObjectLiteralExpr>(callExpr))
+      argLabels = objectLiteral->getArgumentLabels(argLabelsScratch);
+    return std::make_tuple(nullptr, 0, argLabels);
+  }
 
   // Determine the target locator.
   // FIXME: Check whether the callee is of an expression kind that
@@ -536,7 +551,7 @@ getCalleeDecl(ConstraintSystem &cs, ConstraintLocatorBuilder callLocator) {
   }
 
   // If we didn't find any matching overloads, we're done.
-  if (!choice) return { nullptr, 0 };
+  if (!choice) return std::make_tuple(nullptr, 0, argLabels);
 
   // If there's a declaration, return it.
   if (choice->isDecl()) {
@@ -555,10 +570,10 @@ getCalleeDecl(ConstraintSystem &cs, ConstraintLocatorBuilder callLocator) {
       }
     }
 
-    return { decl, level };
+    return std::make_tuple(decl, level, argLabels);
   }
 
-  return { nullptr, 0 };
+  return std::make_tuple(nullptr, 0, argLabels);
 }
 
 // Match the argument of a call to the parameter.
@@ -584,14 +599,17 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
     return ConstraintSystem::SolutionKind::Solved;
   }
 
-  // Extract the arguments.
-  auto args = decomposeArgType(argType);
-
   // Extract the parameters.
   ValueDecl *callee;
   unsigned calleeLevel;
-  std::tie(callee, calleeLevel) = getCalleeDecl(cs, locator);
+  ArrayRef<Identifier> argLabels;
+  SmallVector<Identifier, 2> argLabelsScratch;
+  std::tie(callee, calleeLevel, argLabels) =
+    getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
   auto params = decomposeParamType(paramType, callee, calleeLevel);
+
+  // Extract the arguments.
+  auto args = decomposeArgType(argType, argLabels);
 
   // Match up the call arguments to the parameters.
   MatchCallArgumentListener listener;
