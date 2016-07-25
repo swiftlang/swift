@@ -620,7 +620,7 @@ extension Incomplete${Closed}Range
 % if Countable == 'Countable':
   where
     // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-    Bound : protocol<_Strideable, Comparable>,
+    Bound : _Strideable & Comparable,
     Bound.Stride : SignedInteger {
 % else:
   {
