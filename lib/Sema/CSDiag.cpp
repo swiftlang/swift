@@ -3481,13 +3481,18 @@ static bool tryIntegerCastFixIts(InFlightDiagnostic &diag,
 static bool
 addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem *CS,
                    Type fromType, Type toType, Expr *expr) {
-  SmallString<32> buffer;
-  llvm::raw_svector_ostream OS(buffer);
-  toType->print(OS);
-  diag.fixItInsert(Lexer::getLocForEndOfToken(CS->DC->getASTContext().SourceMgr,
-                                              expr->getEndLoc()),
-                   (llvm::Twine(" as! ") + OS.str()).str());
-  return true;
+  if (CS->getTypeChecker().typeCheckCheckedCast(fromType, toType, CS->DC,
+      SourceLoc(), SourceRange(), SourceRange(), [](Type T) { return false; },
+      true) != CheckedCastKind::Unresolved) {
+    SmallString<32> buffer;
+    llvm::raw_svector_ostream OS(buffer);
+    toType->print(OS);
+    diag.fixItInsert(Lexer::getLocForEndOfToken(CS->DC->getASTContext().SourceMgr,
+                                                expr->getEndLoc()),
+                     (llvm::Twine(" as! ") + OS.str()).str());
+    return true;
+  }
+  return false;
 }
 
 bool FailureDiagnosis::diagnoseContextualConversionError() {
