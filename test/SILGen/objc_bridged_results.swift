@@ -73,27 +73,27 @@ func testNullUnspecified(_ obj: Test) -> [Any]! {
 } // CHECK: {{^}$}}
 
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results21testNonnullDictionaryFCSo4TestGVs10DictionaryCSo8NSObjectP__
-func testNonnullDictionary(_ obj: Test) -> [NSObject: Any] {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullDictionary!getter.1.foreign : (Test) -> () -> [NSObject : Any] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
+// CHECK-LABEL: sil hidden @_TF20objc_bridged_results21testNonnullDictionaryFCSo4TestGVs10DictionaryVs11AnyHashableP__
+func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullDictionary!getter.1.foreign : (Test) -> () -> [AnyHashable : Any] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationVs10Dictionary36_unconditionallyBridgeFromObjectiveCfGSqCSo12NSDictionary_GS0_xq__
-  // CHECK: [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<NSObject, Any>.Type
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<NSObject, Any>([[COCOA_VAL]], [[DICT_META]])
+  // CHECK: [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<AnyHashable, Any>.Type
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyHashable, Any>([[COCOA_VAL]], [[DICT_META]])
   // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $Dictionary<NSObject, Any>
+  // CHECK: return [[RESULT]] : $Dictionary<AnyHashable, Any>
   return obj.nonnullDictionary
 } // CHECK: {{^}$}}
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results14testNonnullSetFCSo4TestGVs3SetCSo8NSObject_
-func testNonnullSet(_ obj: Test) -> Set<NSObject> {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullSet!getter.1.foreign : (Test) -> () -> Set<NSObject> , $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
+// CHECK-LABEL: sil hidden @_TF20objc_bridged_results14testNonnullSetFCSo4TestGVs3SetVs11AnyHashable_
+func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullSet!getter.1.foreign : (Test) -> () -> Set<AnyHashable> , $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationVs3Set36_unconditionallyBridgeFromObjectiveCfGSqCSo5NSSet_GS0_x_
-  // CHECK: [[SET_META:%[0-9]+]] = metatype $@thin Set<NSObject>.Type
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<NSObject>([[COCOA_VAL]], [[SET_META]])
+  // CHECK: [[SET_META:%[0-9]+]] = metatype $@thin Set<AnyHashable>.Type
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyHashable>([[COCOA_VAL]], [[SET_META]])
   // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $Set<NSObject>
+  // CHECK: return [[RESULT]] : $Set<AnyHashable>
   return obj.nonnullSet
 } // CHECK: {{^}$}}
 

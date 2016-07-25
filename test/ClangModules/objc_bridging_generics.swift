@@ -13,7 +13,7 @@ func testNSDictionaryBridging(_ hive: Hive) {
   _ = hive.beesByName as [String : Bee] // expected-error{{value of optional type '[String : Bee]?' not unwrapped; did you mean to use '!' or '?'?}}
 
   var dict1 = hive.anythingToBees
-  let dict2: [NSObject : Bee] = dict1
+  let dict2: [AnyHashable : Bee] = dict1
   dict1 = dict2
 }
 

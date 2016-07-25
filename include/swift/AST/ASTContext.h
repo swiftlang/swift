@@ -395,6 +395,9 @@ public:
   /// Retrieve the declaration of Swift.Dictionary<K, V>.
   NominalTypeDecl *getDictionaryDecl() const;
 
+  /// Retrieve the declaration of Swift.AnyHashable.
+  NominalTypeDecl *getAnyHashableDecl() const;
+
   /// Retrieve the declaration of Swift.Optional or ImplicitlyUnwrappedOptional.
   EnumDecl *getOptionalDecl(OptionalTypeKind kind) const;
 
