@@ -66,43 +66,49 @@ bool IterativeTypeChecker::breakCycle(TypeCheckRequest request) {
 }
 
 void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
-  auto startingSize = ActiveRequests.size();
-  
-  auto addToActiveRequests = [&](TypeCheckRequest request) {
-    // Check for circular dependencies in our requests.
-    auto existingRequest = std::find(ActiveRequests.rbegin(),
-                                     ActiveRequests.rend(),
-                                     request);
-    if (existingRequest != ActiveRequests.rend()) {
-      auto first = existingRequest.base();
-      --first;
-      diagnoseCircularReference(llvm::makeArrayRef(&*first,
-                                                   &*ActiveRequests.end()));
-      return;
-    }
-    // Add this request to the stack of active requests.
-    ActiveRequests.push_back(request);
-  };
-  
-  addToActiveRequests(request);
+  // If the request has already been satisfied, we're done.
+  if (isSatisfied(request)) return;
+
+  // Check for circular dependencies in our requests.
+  // FIXME: This stack operation is painfully inefficient.
+  auto existingRequest = std::find(ActiveRequests.rbegin(),
+                                   ActiveRequests.rend(),
+                                   request);
+  if (existingRequest != ActiveRequests.rend()) {
+    auto first = existingRequest.base();
+    --first;
+    diagnoseCircularReference(llvm::makeArrayRef(&*first,
+                                                 &*ActiveRequests.end()));
+    return;
+  }
+
+  // Add this request to the stack of active requests.
+  ActiveRequests.push_back(request);
   SWIFT_DEFER { ActiveRequests.pop_back(); };
 
-  while (ActiveRequests.size() != startingSize) {
-    request = ActiveRequests.back();
-    // If the request has already been satisfied, we're done.
-    if (isSatisfied(request)) {
-      ActiveRequests.pop_back();
-      continue;
-    }
-    
+  while (true) {
     // Process this requirement, enumerating dependencies if anything else needs
     // to be handled first.
+    SmallVector<TypeCheckRequest, 4> unsatisfied;
     process(request, [&](TypeCheckRequest dependency) -> bool {
       if (isSatisfied(dependency)) return false;
+
       // Record the unsatisfied dependency.
-      addToActiveRequests(dependency);
+      unsatisfied.push_back(dependency);
       return true;
     });
+
+    // If there were no unsatisfied dependencies, we're done.
+    if (unsatisfied.empty()) {
+      assert(isSatisfied(request));
+      break;
+    }
+
+    // Recurse to satisfy any unsatisfied dependencies.
+    // FIXME: Don't recurse in the iterative type checker, silly!
+    for (auto dependency : unsatisfied) {
+      satisfy(dependency);
+    }
   }
 }
 
