@@ -7,10 +7,10 @@ import UIKit
 class ActionViewController
 {
   var imageView: UIImageView!
-  func viewDidLoad(_ inputItems: [AnyObject]) {
-    for item: AnyObject in inputItems {
+  func viewDidLoad(_ inputItems: [Any]) {
+    for item in inputItems {
       let inputItem = item as! NSExtensionItem
-      for provider: AnyObject in inputItem.attachments! {
+      for provider in inputItem.attachments! {
         let itemProvider = provider as! NSItemProvider
 // CHECK: load {{.*}}selector
 // CHECK:; <label>{{.*}}  ; preds = %{{[0-9]+}}
