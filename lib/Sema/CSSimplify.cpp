@@ -913,6 +913,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   unsigned subFlags = flags | TMF_GenerateConstraints;
 
+  increaseScore(ScoreKind::SK_FunctionConversion);
+
   // Input types can be contravariant (or equal).
   SolutionKind result = matchTypes(func2->getInput(), func1->getInput(),
                                    subKind, subFlags,
