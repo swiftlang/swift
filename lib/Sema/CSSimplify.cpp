@@ -1691,6 +1691,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // bridging conversion.
       if (auto protoType2 = type2->getAs<ProtocolType>()) {
         if (TC.Context.LangOpts.EnableIdAsAny
+            && TC.Context.LangOpts.EnableObjCInterop
             && protoType2->getDecl()
               == TC.Context.getProtocol(KnownProtocolKind::AnyObject)
             && !type1->mayHaveSuperclass()
@@ -4055,6 +4056,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     // AnyObject by universal bridging.
     if (!objcClass) {
       assert(TC.Context.LangOpts.EnableIdAsAny
+             && TC.Context.LangOpts.EnableObjCInterop
              && "should only happen in id-as-any mode");
       objcClass = TC.Context.getProtocol(KnownProtocolKind::AnyObject)
         ->getDeclaredType();
