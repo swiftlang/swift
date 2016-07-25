@@ -337,6 +337,19 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   return member->getAccessSemanticsFromContext(DC);
 }
 
+/// Determine whether the given expression has a trailing closure.
+static bool hasTrailingClosure(Expr *expr) {
+  if (!expr) return false;
+
+  if (ParenExpr *parenExpr = dyn_cast<ParenExpr>(expr))
+    return parenExpr->hasTrailingClosure();
+
+  if (TupleExpr *tupleExpr = dyn_cast<TupleExpr>(expr))
+   return tupleExpr->hasTrailingClosure();
+
+  return false;
+}
+
 namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
@@ -1180,6 +1193,8 @@ namespace {
     /// the call. Otherwise, a specific level describing which parameter level
     /// we're applying.
     /// \param argLabels The argument labels provided for the call.
+    /// \param hasTrailingClosure Whether the last argument is a trailing
+    /// closure.
     /// \param locator Locator used to describe where in this expression we are.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
@@ -1187,6 +1202,7 @@ namespace {
     coerceCallArguments(Expr *arg, Type paramType,
                         llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
                         ArrayRef<Identifier> argLabels,
+                        bool hasTrailingClosure,
                         ConstraintLocatorBuilder locator);
 
     /// \brief Coerce the given object argument (e.g., for the base of a
@@ -1259,6 +1275,7 @@ namespace {
       // Coerce the index argument.
       index = coerceCallArguments(
           index, indexTy, LevelTy(1), argLabels,
+          ::hasTrailingClosure(index),
           locator.withPathElement(ConstraintLocator::SubscriptIndex));
       if (!index)
         return nullptr;
@@ -4638,6 +4655,7 @@ Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, Type paramType,
     llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
     ArrayRef<Identifier> argLabels,
+    bool hasTrailingClosure,
     ConstraintLocatorBuilder locator) {
 
   bool allParamsMatch = arg->getType()->isEqual(paramType);
@@ -4704,7 +4722,7 @@ Expr *ExprRewriter::coerceCallArguments(
   
   SmallVector<ParamBinding, 4> parameterBindings;
   bool failed = constraints::matchCallArguments(args, params,
-                                                hasTrailingClosure(locator),
+                                                hasTrailingClosure,
                                                 /*allowFixes=*/false, listener,
                                                 parameterBindings);
   assert(!failed && "Call arguments did not match up?");
@@ -5922,9 +5940,12 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   SmallVector<Identifier, 2> argLabelsScratch;
   if (auto fnType = fn->getType()->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
+    bool hasTrailingClosure =
+      isa<CallExpr>(apply) && cast<CallExpr>(apply)->hasTrailingClosure();
     Expr *arg = coerceCallArguments(origArg, fnType->getInput(),
                                     apply,
                                     apply->getArgumentLabels(argLabelsScratch),
+                                    hasTrailingClosure,
                                     locator.withPathElement(
                                       ConstraintLocator::ApplyArgument));
     if (!arg) {

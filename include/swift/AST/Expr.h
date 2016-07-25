@@ -290,6 +290,19 @@ class alignas(8) Expr {
   enum { NumApplyExprBits = NumExprBits + 2 };
   static_assert(NumApplyExprBits <= 32, "fits in an unsigned");
 
+  class CallExprBitfields {
+    friend class CallExpr;
+    unsigned : NumApplyExprBits;
+    /// # of argument labels stored after the CallExpr.
+    unsigned NumArgLabels : 16;
+    /// Whether the CallExpr also has source locations for the argument label.
+    unsigned HasArgLabelLocs : 1;
+    /// Whether the last argument is a trailing closure.
+    unsigned HasTrailingClosure : 1;
+  };
+  enum { NumCallExprBits = NumApplyExprBits + 18 };
+  static_assert(NumCallExprBits <= 32, "fits in an unsigned");
+
   enum { NumCheckedCastKindBits = 4 };
   class CheckedCastExprBitfields {
     friend class CheckedCastExpr;
@@ -351,6 +364,7 @@ protected:
     ClosureExprBitfields ClosureExprBits;
     BindOptionalExprBitfields BindOptionalExprBits;
     ApplyExprBitfields ApplyExprBits;
+    CallExprBitfields CallExprBits;
     CheckedCastExprBitfields CheckedCastExprBits;
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
     TupleShuffleExprBitfields TupleShuffleExprBits;
@@ -906,7 +920,8 @@ public:
   ///
   /// \param scratch Scratch space that will be used when the argument labels
   /// aren't already stored in the AST context.
-  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+  ArrayRef<Identifier>
+  getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const;
 
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
@@ -1419,7 +1434,8 @@ public:
   ///
   /// \param scratch Scratch space that will be used when the argument labels
   /// aren't already stored in the AST context.
-  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+  ArrayRef<Identifier>
+  getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const;
 
   /// Retrieve the member to which this access refers.
   ConcreteDeclRef getMember() const { return Member; }
@@ -1460,7 +1476,8 @@ public:
   ///
   /// \param scratch Scratch space that will be used when the argument labels
   /// aren't already stored in the AST context.
-  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+  ArrayRef<Identifier>
+  getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const;
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
 
@@ -1907,7 +1924,8 @@ public:
   ///
   /// \param scratch Scratch space that will be used when the argument labels
   /// aren't already stored in the AST context.
-  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+  ArrayRef<Identifier>
+  getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const;
 
   /// Determine whether this subscript reference should bypass the
   /// ordinary accessors.
@@ -3238,7 +3256,8 @@ public:
   ///
   /// \param scratch Scratch space that will be used when the argument labels
   /// aren't already stored in the AST context.
-  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+  ArrayRef<Identifier>
+  getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ApplyExpr &&
@@ -3249,9 +3268,36 @@ public:
 /// CallExpr - Application of an argument to a function, which occurs
 /// syntactically through juxtaposition with a TupleExpr whose
 /// leading '(' is unspaced.
-class CallExpr : public ApplyExpr {
-  CallExpr(Expr *fn, Expr *arg, bool Implicit, Type ty = Type())
-    : ApplyExpr(ExprKind::Call, fn, arg, Implicit, ty) {}
+class CallExpr final :
+    public ApplyExpr,
+    private llvm::TrailingObjects<CallExpr, Identifier, SourceLoc> {
+  friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<Identifier>) const {
+    return CallExprBits.NumArgLabels;
+  }
+  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
+    return CallExprBits.HasArgLabelLocs ? CallExprBits.NumArgLabels : 0;
+  }
+
+  /// Retrieve the buffer containing the argument labels.
+  MutableArrayRef<Identifier> getArgumentLabelsBuffer() {
+    return { getTrailingObjects<Identifier>(), CallExprBits.NumArgLabels };
+  }
+
+  /// Retrieve the buffer containing the argument label locations.
+  MutableArrayRef<SourceLoc> getArgumentLabelLocsBuffer() {
+    if (!CallExprBits.HasArgLabelLocs)
+      return { };
+    
+    return { getTrailingObjects<SourceLoc>(), CallExprBits.NumArgLabels };
+  }
+
+  CallExpr(Expr *fn, Expr *arg, bool Implicit,
+           ArrayRef<Identifier> argLabels,
+           ArrayRef<SourceLoc> argLabelLocs,
+           bool hasTrailingClosure,
+           Type ty);
 
 public:
   /// Create a new call expression.
@@ -3306,6 +3352,14 @@ public:
     SourceLoc FnLoc = getFn()->getLoc(); 
     return FnLoc.isValid() ? FnLoc : getArg()->getLoc();
   }
+
+  /// Retrieve the argument labels provided at the call site.
+  ArrayRef<Identifier> getArgumentLabels() const {
+    return { getTrailingObjects<Identifier>(), CallExprBits.NumArgLabels };
+  }
+
+  /// Whether this call with written with a trailing closure.
+  bool hasTrailingClosure() const { return CallExprBits.HasTrailingClosure; }
 
   /// Retrieve the expression that direct represents the callee.
   ///

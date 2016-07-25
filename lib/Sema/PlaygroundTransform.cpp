@@ -1009,8 +1009,11 @@ public:
 
     LoggerRef->setImplicit(true);
 
+    SmallVector<Identifier, 4> ArgLabels(ArgsWithSourceRange.size(),
+                                         Identifier());
     ApplyExpr *LoggerCall = CallExpr::createImplicit(Context, LoggerRef,
-                                                     ArgsWithSourceRange, { });
+                                                     ArgsWithSourceRange,
+                                                     ArgLabels);
     Added<ApplyExpr*> AddedLogger(LoggerCall);
 
     if (!doTypeCheck(Context, TypeCheckDC, AddedLogger)) {

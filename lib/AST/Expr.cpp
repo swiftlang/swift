@@ -1008,17 +1008,34 @@ StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
 }
 
 static ArrayRef<Identifier>
-getArgumentLabelsFromArgument(Expr *arg, SmallVectorImpl<Identifier> &scratch) {
+getArgumentLabelsFromArgument(Expr *arg, SmallVectorImpl<Identifier> &scratch,
+                              SmallVectorImpl<SourceLoc> *sourceLocs = nullptr,
+                              bool *hasTrailingClosure = nullptr){
+  if (sourceLocs) sourceLocs->clear();
+  if (hasTrailingClosure) *hasTrailingClosure = false;
+
   // A parenthesized expression is a single, unlabeled argument.
-  if (isa<ParenExpr>(arg)) {
+  if (auto paren = dyn_cast<ParenExpr>(arg)) {
     scratch.clear();
     scratch.push_back(Identifier());
+    if (hasTrailingClosure) *hasTrailingClosure = paren->hasTrailingClosure();
     return scratch;
   }
 
   // A tuple expression stores its element names, if they exist.
   if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-    if (tuple->hasElementNames()) return tuple->getElementNames();
+    if (sourceLocs && tuple->hasElementNameLocs()) {
+      sourceLocs->append(tuple->getElementNameLocs().begin(),
+                         tuple->getElementNameLocs().end());
+    }
+
+    if (hasTrailingClosure) *hasTrailingClosure = tuple->hasTrailingClosure();
+
+    if (tuple->hasElementNames()) {
+      assert(tuple->getElementNames().size() == tuple->getNumElements());
+      return tuple->getElementNames();
+    }
+
     scratch.assign(tuple->getNumElements(), Identifier());
     return scratch;
   }
@@ -1061,8 +1078,8 @@ StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
   llvm_unreachable("unspecified literal");
 }
 
-ArrayRef<Identifier>
-ObjectLiteralExpr::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
+ArrayRef<Identifier> ObjectLiteralExpr::getArgumentLabels(
+    SmallVectorImpl<Identifier> &scratch) const {
   return getArgumentLabelsFromArgument(getArg(), scratch);
 }
 
@@ -1235,24 +1252,24 @@ ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
 }
 
-ArrayRef<Identifier>
-SubscriptExpr::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
+ArrayRef<Identifier> SubscriptExpr::getArgumentLabels(
+    SmallVectorImpl<Identifier> &scratch) const {
   return getArgumentLabelsFromArgument(getIndex(), scratch);
 }
 
-ArrayRef<Identifier>
-DynamicSubscriptExpr::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
+ArrayRef<Identifier> DynamicSubscriptExpr::getArgumentLabels(
+    SmallVectorImpl<Identifier> &scratch) const {
   return getArgumentLabelsFromArgument(getIndex(), scratch);
 }
 
-ArrayRef<Identifier>
-UnresolvedMemberExpr::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
+ArrayRef<Identifier> UnresolvedMemberExpr::getArgumentLabels(
+    SmallVectorImpl<Identifier> &scratch) const {
   if (!getArgument()) return { };
   return getArgumentLabelsFromArgument(getArgument(), scratch);
 }
 
-ArrayRef<Identifier>
-ApplyExpr::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
+ArrayRef<Identifier> ApplyExpr::getArgumentLabels(
+    SmallVectorImpl<Identifier> &scratch) const {
   // Unary operators and 'self' applications have a single, unlabeled argument.
   if (isa<PrefixUnaryExpr>(this) || isa<PostfixUnaryExpr>(this) ||
       isa<SelfApplyExpr>(this)) {
@@ -1270,14 +1287,49 @@ ApplyExpr::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
     return scratch;    
   }
 
-  // For calls, dig the argument labels out of the argument itself.
+  // For calls, get the argument labels directly.
   auto call = cast<CallExpr>(this);
-  return getArgumentLabelsFromArgument(call->getArg(), scratch);
+  return call->getArgumentLabels();
+}
+
+CallExpr::CallExpr(Expr *fn, Expr *arg, bool Implicit,
+                   ArrayRef<Identifier> argLabels,
+                   ArrayRef<SourceLoc> argLabelLocs,
+                   bool hasTrailingClosure,
+                   Type ty)
+    : ApplyExpr(ExprKind::Call, fn, arg, Implicit, ty)
+{
+  CallExprBits.NumArgLabels = argLabels.size();
+  if (!argLabels.empty()) {
+    std::uninitialized_copy(argLabels.begin(), argLabels.end(),
+                            getTrailingObjects<Identifier>());
+  }
+
+  CallExprBits.HasArgLabelLocs = !argLabelLocs.empty();
+  if (!argLabelLocs.empty())
+    std::uninitialized_copy(argLabelLocs.begin(), argLabelLocs.end(),
+                            getTrailingObjects<SourceLoc>());
+
+  CallExprBits.HasTrailingClosure = hasTrailingClosure;
 }
 
 CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, Expr *arg,
                            bool implicit, Type type) {
-  return new (ctx) CallExpr(fn, arg, implicit, type);
+  // Inspect the argument to dig out the argument labels, their location, and
+  // whether there is a trailing closure.
+  SmallVector<Identifier, 4> argLabelsScratch;
+  SmallVector<SourceLoc, 4> argLabelLocs;
+  bool hasTrailingClosure = false;
+  auto argLabels = getArgumentLabelsFromArgument(arg, argLabelsScratch,
+                                                 &argLabelLocs,
+                                                 &hasTrailingClosure);
+
+  size_t size = totalSizeToAlloc<Identifier, SourceLoc>(argLabels.size(),
+                                                        argLabelLocs.size());
+
+  void *memory = ctx.Allocate(size, alignof(CallExpr));
+  return new (memory) CallExpr(fn, arg, implicit, argLabels, argLabelLocs,
+                               hasTrailingClosure, type);
 }
 
 CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn,
@@ -1315,6 +1367,18 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn,
     arg->setType(TupleType::get(typeElements, ctx));
   };
 
+  /// Form the resulting call expression.
+  auto formCallExpr = [&](Expr *arg,
+                          ArrayRef<Identifier> argLabels,
+                          ArrayRef<SourceLoc> argLabelLocs) {
+    size_t size = totalSizeToAlloc<Identifier, SourceLoc>(argLabels.size(),
+                                                          argLabelLocs.size());
+
+    void *memory = ctx.Allocate(size, alignof(CallExpr));
+    return new (memory) CallExpr(fn, arg, implicit, argLabels, argLabelLocs,
+                                 trailingClosure != nullptr, Type());
+  };
+
   // Construct a TupleExpr or ParenExpr, as appropriate, for the argument.
   if (!trailingClosure) {
     // Do we have a single, unlabeled argument?
@@ -1322,7 +1386,7 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn,
       auto arg = new (ctx) ParenExpr(lParenLoc, args[0], rParenLoc,
                                      /*hasTrailingClosure=*/false);
       computeArgType(arg);
-      return new (ctx) CallExpr(fn, arg, implicit);
+      return formCallExpr(arg, { Identifier() }, { });
     }
 
     // Construct the argument tuple.
@@ -1330,7 +1394,7 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn,
                                  rParenLoc, /*hasTrailingClosure=*/false,
                                  /*implicit=*/false);
     computeArgType(arg);
-    return new (ctx) CallExpr(fn, arg, implicit);
+    return formCallExpr(arg, argLabels, argLabelLocs);
   }
 
   // If we have no other arguments, represent the trailing closure as a
@@ -1339,7 +1403,7 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn,
     auto arg = new (ctx) ParenExpr(lParenLoc, trailingClosure, rParenLoc,
                                    /*hasTrailingClosure=*/true);
     computeArgType(arg);
-    return new (ctx) CallExpr(fn, arg, implicit);
+    return formCallExpr(arg, { Identifier() }, { });
   }
 
   // Form a tuple, including the trailing closure.
@@ -1352,7 +1416,20 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn,
                                /*hasTrailingClosure=*/true,
                                /*implicit=*/false);
   computeArgType(arg);
-  return new (ctx) CallExpr(fn, arg, implicit);
+
+  SmallVector<Identifier, 4> completeArgLabels;
+  completeArgLabels.reserve(completeArgLabels.size() + 1);
+  completeArgLabels.append(argLabels.begin(), argLabels.end());
+  completeArgLabels.push_back(Identifier());
+
+  SmallVector<SourceLoc, 4> completeArgLabelLocs;
+  if (!argLabelLocs.empty() || argLabels.empty()) {
+    completeArgLabelLocs.reserve(argLabelLocs.size() + 1);
+    completeArgLabelLocs.append(argLabelLocs.begin(), argLabelLocs.end());
+    completeArgLabelLocs.push_back(SourceLoc());
+  }
+
+  return formCallExpr(arg, completeArgLabels, completeArgLabelLocs);
 }
 
 Expr *CallExpr::getDirectCallee() const {

@@ -1557,12 +1557,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       if (auto call = dyn_cast<CallExpr>(Result.get())) {
         // When a closure follows a call, it becomes the last argument of
         // that call.
+        // FIXME: Wasteful to allocate another CallExpr here. Delay the
+        // allocation.
         Expr *arg = addTrailingClosureToArgument(Context, call->getArg(),
                                                  closure.get());
-        call->setArg(arg);
-
-        if (closure.hasCodeCompletion())
-          Result.setHasCodeCompletion();
+        Result = makeParserResult(
+                   ParserStatus(closure),
+                   CallExpr::create(Context, call->getFn(), arg,
+                                    call->isImplicit()));
       } else {
         // Otherwise, the closure implicitly forms a call.
         Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
