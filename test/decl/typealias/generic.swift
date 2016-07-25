@@ -164,6 +164,12 @@ class GenericClass<T> {
   }
 }
 
+let gc = GenericClass<Double>()
+let fn: MyType<Double, Int> = gc.testCapture(s: 1, t: 1.0)
+
+func use<T>(_ t: T) {}
+use(fn)
+
 // Make sure we apply base substitutions to the interface type of the typealias
 class ConcreteClass : GenericClass<String> {
   func testSubstitutedCapture1<S>(s: S, t: String) -> TA<S> {
