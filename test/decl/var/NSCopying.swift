@@ -6,7 +6,7 @@ import Foundation
 
 class NotCopyable {}
 class CopyableClass : NSCopying {
-  @objc(copyWithZone:) func copy(with zone: NSZone?) -> AnyObject {
+  @objc(copyWithZone:) func copy(with zone: NSZone?) -> Any {
     return self
   }
 }

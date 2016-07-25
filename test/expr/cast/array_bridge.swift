@@ -40,7 +40,7 @@ struct B : _ObjectiveCBridgeable {
 var a: [A] = []
 var b: [B] = []
 
-a = b
+a = b as [A]
 
 b = a // expected-error {{cannot assign value of type '[A]' to type '[B]'}}
 
@@ -82,7 +82,7 @@ struct F : _ObjectiveCBridgeable {
 var e: [E] = []
 var f: [F] = []
 
-e = f
+e = f as [E]
 f = e // expected-error {{cannot assign value of type '[E]' to type '[F]'}}
 
 class G {
@@ -112,7 +112,7 @@ struct H : _ObjectiveCBridgeable {
 var g: [G] = []
 var h: [H] = []
 
-g = h // should type check, but cause a failure at runtime
+g = h as [G] // should type check, but cause a failure at runtime
 
 
 struct I : _ObjectiveCBridgeable {
@@ -139,5 +139,5 @@ struct I : _ObjectiveCBridgeable {
 var aoa: [AnyObject] = []
 var i: [I] = []
 
-aoa = i
+aoa = i as [AnyObject]
 i = aoa // expected-error {{cannot assign value of type '[AnyObject]' to type '[I]'}}
