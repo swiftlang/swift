@@ -651,6 +651,10 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   } else {
     // Validate the declaration.
     TC.validateDecl(typeDecl);
+
+    // FIXME: More principled handling of circularity.
+    if (!isa<AssociatedTypeDecl>(typeDecl) && !typeDecl->hasType())
+      return ErrorType::get(TC.Context);
   }
 
   // Resolve the type declaration to a specific type. How this occurs

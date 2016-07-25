@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-protocol-typealiases
+// RUN: %target-parse-verify-swift
 
 // Tests for typealias inside protocols
 

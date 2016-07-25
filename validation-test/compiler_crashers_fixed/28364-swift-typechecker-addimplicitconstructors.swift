@@ -5,6 +5,11 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 // REQUIRES: asserts
-struct A<f{protocol a{typealias f=B}struct B{let c=A.a as a
+{
+protocol d{
+func b:B<T>{}typealias e:AnyObject,b
+class d:b
+class b:d
+struct B<>:b
