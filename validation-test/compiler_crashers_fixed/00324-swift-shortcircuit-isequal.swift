@@ -15,7 +15,7 @@
 
 import Foundation
 class Test: NSObject {
-  override func isEqual(_ object: AnyObject?) -> Bool {
+  override func isEqual(_ object: Any?) -> Bool {
     return false && super.isEqual(object)
   }
 }
