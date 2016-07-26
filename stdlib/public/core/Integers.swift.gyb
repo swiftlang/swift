@@ -928,23 +928,18 @@ public struct ${Self}
   @_transparent
   public // transparent
   var _lowUWord: UInt {
-    // FIXME(integers): uncomment when Int conforms to Integer
-    fatalError()
     % truncOrExt = z + 'ext' if bits <= word_bits else 'trunc'
-    //return UInt(
-      //Builtin.${truncOrExt}OrBitCast_Int${bits}_Int${word_bits}(_value)
-    //)
+    return UInt(
+      Builtin.${truncOrExt}OrBitCast_Int${bits}_Int${word_bits}(_value)
+    )
   }
 
   //@_transparent
   public // transparent
   init(_truncatingBits bits: UInt) {
-    // FIXME(integers): uncomment when Int conforms to Integer
-    fatalError()
-    //
-    //% truncOrExt = 'zext' if bits > word_bits else 'trunc'
-    //self.init(
-      //Builtin.${truncOrExt}OrBitCast_Int${word_bits}_Int${bits}(bits._value))
+    % truncOrExt = 'zext' if bits > word_bits else 'trunc'
+    self.init(
+      Builtin.${truncOrExt}OrBitCast_Int${word_bits}_Int${bits}(bits._value))
   }
 
 % if signed:
