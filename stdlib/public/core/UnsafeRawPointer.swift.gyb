@@ -31,7 +31,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   // FIXME: Why is this necessary?
   @_transparent
   public init(_ other: Unsafe${Mutable}RawPointer) {
-    self._rawValue = other._rawValue
+    self = other
   }
 
   /// Convert a builtin raw pointer to ${a_Self}.
