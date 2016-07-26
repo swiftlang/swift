@@ -2370,9 +2370,11 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       complained = true;
     } 
 
-    // Single-element labeled tuples are not permitted, either.
-    if (elements.size() == 1 && elements[0].hasName() &&
-        !(options & TR_EnumCase)) {
+    // Single-element labeled tuples are not permitted outside of declarations
+    // or SIL, either.
+    if (elements.size() == 1 && elements[0].hasName()
+        && !(options & TR_SILType)
+        && !(options & TR_EnumCase)) {
       if (!complained) {
         auto named = cast<NamedTypeRepr>(repr->getElement(0));
         TC.diagnose(repr->getElement(0)->getStartLoc(),
