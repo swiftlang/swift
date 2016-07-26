@@ -1939,55 +1939,70 @@ public func checkEquatable<Instances : Collection>(
   Instances.Iterator.Element : Equatable,
   // FIXME(compiler limitation): these constraints should be applied to
   // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index {
+  Instances.Indices.Iterator.Element == Instances.Index
+{
+  let indices = Array(instances.indices)
+  _checkEquatableImpl(
+    Array(instances),
+    oracle: { oracle(indices[$0], indices[$1]) })
+}
+
+internal func _checkEquatableImpl<Instance : Equatable>(
+  _ instances: [Instance],
+  oracle: (Int, Int) -> Bool,
+  ${TRACE}
+) {
+  // For each index (which corresponds to an instance being tested) track the
+  // set of equal instances.
+  var transitivityScoreboard: [Box<Set<Int>>] =
+    instances.indices.map { _ in Box(Set()) }
 
   // TODO: swift-3-indexing-model: add tests for this function.
   for i in instances.indices {
-    expectTrue(oracle(i, i), "bad oracle: broken reflexivity at index \(i)")
     let x = instances[i]
-    // Reflexivity
-    expectEqual(x, x, ${trace})
+    expectTrue(oracle(i, i), "bad oracle: broken reflexivity at index \(i)")
+
     for j in instances.indices {
+      let y = instances[j]
+
       let predictedXY = oracle(i, j)
       expectEqual(
         predictedXY, oracle(j, i),
         "bad oracle: broken symmetry between indices \(i), \(j)")
-      
-      let y = instances[j]
 
-      let xy = x == y
+      let isEqualXY = x == y
       expectEqual(
-        predictedXY, xy,
+        predictedXY, isEqualXY,
         "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
         stackTrace: ${stackTrace})
 
-      // Not-equal is an inverse of equal
+      // Not-equal is an inverse of equal.
       expectNotEqual(
-        xy, x != y,
+        isEqualXY, x != y,
         "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
         stackTrace: ${stackTrace})
 
-      // Symmetry
-      expectEqual(
-        xy, y == x,
-        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
-        stackTrace: ${stackTrace})
-
-      for k in instances.indices {
-        let z = instances[k]
-        // Transitivity
-        let predictedYZ = oracle(j, k)
-        if predictedXY && predictedYZ {
-          expectTrue(
-            oracle(i, k),
-            "bad oracle: broken transitivity at indices \(i), \(j), \(k)")
-          expectEqual(y, z, ${trace})
-          expectEqual(x, z, ${trace})
+      // Check transitivity of the predicate represented by the oracle.
+      // If we are adding the instance `j` into an equivalence set, check that
+      // it is equal to every other instance in the set.
+      if predictedXY && i < j && transitivityScoreboard[i].value.insert(j).inserted {
+        if transitivityScoreboard[i].value.count == 1 {
+          transitivityScoreboard[i].value.insert(i)
         }
+        for k in transitivityScoreboard[i].value {
+          expectTrue(
+            oracle(j, k),
+            "bad oracle: broken transitivity at indices \(i), \(j), \(k)")
+            // No need to check equality between actual values, we will check
+            // them with the checks above.
+        }
+        precondition(transitivityScoreboard[j].value.isEmpty)
+        transitivityScoreboard[j] = transitivityScoreboard[i]
       }
     }
   }
 }
+
 
 public func checkEquatable<T : Equatable>(
   _ expectedEqual: Bool, _ lhs: T, _ rhs: T, ${TRACE}
