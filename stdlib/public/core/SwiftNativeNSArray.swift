@@ -82,11 +82,12 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 
       if objects.isEmpty { return }
 
-      // These objects are "returned" at +0, so treat them as values to
-      // avoid retains.
-      UnsafeMutablePointer<Int>(aBuffer).initialize(from: 
-        UnsafeMutablePointer(objects.baseAddress! + range.location),
-        count: range.length)
+      // These objects are "returned" at +0, so treat them as pointer values to
+      // avoid retains. Copy bytes via a raw pointer to circumvent reference
+      // counting while correctly aliasing with all other pointer types.
+      UnsafeMutableRawPointer(aBuffer).copyBytes(
+        from: objects.baseAddress! + range.location,
+        count: range.length * strideof(AnyObject.self))
     }
   }
 
