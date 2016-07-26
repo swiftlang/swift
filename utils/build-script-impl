@@ -1932,20 +1932,12 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=(llvm-tblgen clang-headers)
                 fi
 
-                # Note: we set the variable:
-                #
-                # LLVM_TOOL_SWIFT_BUILD
-                #
-                # below because this script builds swift separately, and people
-                # often have reasons to symlink the swift directory into
-                # llvm/tools, e.g. to build LLDB.
                 cmake_options=(
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLVM_ENABLE_ASSERTIONS}")
-                    -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}"
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
