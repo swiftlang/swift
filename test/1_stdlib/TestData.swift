@@ -858,6 +858,20 @@ class TestData : TestDataSuper {
         expectTrue(d.classForCoder == expected)
         expectTrue(d.classForKeyedArchiver == expected)
     }
+
+    func test_AnyHashableContainingData() {
+        let values = [
+            Data(base64Encoded: "AAAA")!,
+            Data(base64Encoded: "AAAB")!,
+            Data(base64Encoded: "AAAB")!,
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("Data", String(anyHashables[0].base.dynamicType))
+        expectEqual("Data", String(anyHashables[1].base.dynamicType))
+        expectEqual("Data", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -899,6 +913,7 @@ DataTests.test("test_roundTrip") { TestData().test_roundTrip() }
 DataTests.test("test_passing") { TestData().test_passing() }
 DataTests.test("test_bufferSizeCalculation") { TestData().test_bufferSizeCalculation() }
 DataTests.test("test_classForCoder") { TestData().test_classForCoder() }
+DataTests.test("test_AnyHashableContainingData") { TestData().test_AnyHashableContainingData() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

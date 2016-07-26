@@ -295,3 +295,10 @@ extension URLRequest : _ObjectiveCBridgeable {
         return result!
     }
 }
+
+extension NSURLRequest : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as URLRequest)
+    }
+}
+

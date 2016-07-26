@@ -481,3 +481,10 @@ extension Locale : _ObjectiveCBridgeable {
         return result!
     }
 }
+
+extension NSLocale : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as Locale)
+    }
+}
+

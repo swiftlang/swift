@@ -262,6 +262,12 @@ extension Date : _ObjectiveCBridgeable {
     }
 }
 
+extension NSDate : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as Date)
+    }
+}
+
 extension Date : CustomPlaygroundQuickLookable {
     var summary: String {
         let df = DateFormatter()

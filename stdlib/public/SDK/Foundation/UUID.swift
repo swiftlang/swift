@@ -137,3 +137,10 @@ extension UUID : _ObjectiveCBridgeable {
         return result!
     }
 }
+
+extension NSUUID : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as UUID)
+    }
+}
+

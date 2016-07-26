@@ -293,4 +293,10 @@ extension AffineTransform : _ObjectiveCBridgeable {
     }
 }
 
+extension NSAffineTransform : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as AffineTransform)
+    }
+}
+
 #endif

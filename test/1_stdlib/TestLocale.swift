@@ -108,6 +108,20 @@ class TestLocale : TestLocaleSuper {
         // Need to find a good test case for collator identifier
         // expectEqual("something", locale.collatorIdentifier)
     }
+
+    func test_AnyHashableContainingLocale() {
+        let values = [
+            Locale(identifier: "en"),
+            Locale(identifier: "uk"),
+            Locale(identifier: "uk"),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("Locale", String(anyHashables[0].base.dynamicType))
+        expectEqual("Locale", String(anyHashables[1].base.dynamicType))
+        expectEqual("Locale", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -116,5 +130,6 @@ LocaleTests.test("test_bridgingAutoupdating") { TestLocale().test_bridgingAutoup
 LocaleTests.test("test_equality") { TestLocale().test_equality() }
 LocaleTests.test("test_localizedStringFunctions") { TestLocale().test_localizedStringFunctions() }
 LocaleTests.test("test_properties") { TestLocale().test_properties() }
+LocaleTests.test("test_AnyHashableContainingLocale") { TestLocale().test_AnyHashableContainingLocale() }
 runAllTests()
 #endif

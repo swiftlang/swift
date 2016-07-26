@@ -1167,6 +1167,12 @@ extension URL : CustomStringConvertible, CustomDebugStringConvertible {
     }
 }
 
+extension NSURL : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as URL)
+    }
+}
+
 extension URL : CustomPlaygroundQuickLookable {
     public var customPlaygroundQuickLook: PlaygroundQuickLook {
         return .url(absoluteString)

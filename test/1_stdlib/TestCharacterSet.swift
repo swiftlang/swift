@@ -152,6 +152,20 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectTrue(cs.classForCoder == expected)
         expectTrue(cs.classForKeyedArchiver == expected)
     }
+
+    func test_AnyHashableContainingCharacterSet() {
+        let values = [
+            CharacterSet(charactersIn: "ABC"),
+            CharacterSet(charactersIn: "XYZ"),
+            CharacterSet(charactersIn: "XYZ")
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("CharacterSet", String(anyHashables[0].base.dynamicType))
+        expectEqual("CharacterSet", String(anyHashables[1].base.dynamicType))
+        expectEqual("CharacterSet", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 
@@ -165,6 +179,7 @@ CharacterSetTests.test("testRanges") { TestCharacterSet().testRanges() }
 CharacterSetTests.test("testInsertAndRemove") { TestCharacterSet().testInsertAndRemove() }
 CharacterSetTests.test("testBasics") { TestCharacterSet().testBasics() }
 CharacterSetTests.test("test_classForCoder") { TestCharacterSet().test_classForCoder() }
+CharacterSetTests.test("test_AnyHashableContainingCharacterSet") { TestCharacterSet().test_AnyHashableContainingCharacterSet() }
 runAllTests()
 #endif
 

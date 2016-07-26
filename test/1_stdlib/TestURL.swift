@@ -204,6 +204,64 @@ class TestURL : TestURLSuper {
             expectTrue(false, "Unable to get values")
         }
     }
+
+    func test_AnyHashableContainingURL() {
+        let values: [URL] = [
+            URL(string: "https://example.com/")!,
+            URL(string: "https://example.org/")!,
+            URL(string: "https://example.org/")!,
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("URL", String(anyHashables[0].base.dynamicType))
+        expectEqual("URL", String(anyHashables[1].base.dynamicType))
+        expectEqual("URL", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableContainingURLComponents() {
+        let values: [URLComponents] = [
+            URLComponents(string: "https://example.com/")!,
+            URLComponents(string: "https://example.org/")!,
+            URLComponents(string: "https://example.org/")!,
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("URLComponents", String(anyHashables[0].base.dynamicType))
+        expectEqual("URLComponents", String(anyHashables[1].base.dynamicType))
+        expectEqual("URLComponents", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableContainingURLQueryItem() {
+        if #available(OSX 10.10, iOS 8.0, *) {
+            let values = [
+                URLQueryItem(name: "foo", value: nil),
+                URLQueryItem(name: "bar", value: nil),
+                URLQueryItem(name: "bar", value: nil),
+            ]
+            let anyHashables = values.map(AnyHashable.init)
+            expectEqual("URLQueryItem", String(anyHashables[0].base.dynamicType))
+            expectEqual("URLQueryItem", String(anyHashables[1].base.dynamicType))
+            expectEqual("URLQueryItem", String(anyHashables[2].base.dynamicType))
+            expectNotEqual(anyHashables[0], anyHashables[1])
+            expectEqual(anyHashables[1], anyHashables[2])
+        }
+    }
+
+    func test_AnyHashableContainingURLRequest() {
+        let values = [
+            URLRequest(url: URL(string: "https://example.com/")!),
+            URLRequest(url: URL(string: "https://example.org/")!),
+            URLRequest(url: URL(string: "https://example.org/")!),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("URLRequest", String(anyHashables[0].base.dynamicType))
+        expectEqual("URLRequest", String(anyHashables[1].base.dynamicType))
+        expectEqual("URLRequest", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -214,5 +272,9 @@ URLTests.test("testSetProperties") { TestURL().testSetProperties() }
 URLTests.test("testMoreSetProperties") { TestURL().testMoreSetProperties() }
 URLTests.test("testURLComponents") { TestURL().testURLComponents() }
 URLTests.test("testURLResourceValues") { TestURL().testURLResourceValues() }
+URLTests.test("test_AnyHashableContainingURL") { TestURL().test_AnyHashableContainingURL() }
+URLTests.test("test_AnyHashableContainingURLComponents") { TestURL().test_AnyHashableContainingURLComponents() }
+URLTests.test("test_AnyHashableContainingURLQueryItem") { TestURL().test_AnyHashableContainingURLQueryItem() }
+URLTests.test("test_AnyHashableContainingURLRequest") { TestURL().test_AnyHashableContainingURLRequest() }
 runAllTests()
 #endif
