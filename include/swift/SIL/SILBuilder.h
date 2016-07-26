@@ -424,6 +424,7 @@ public:
   }
 
   LoadInst *createLoad(SILLocation Loc, SILValue LV) {
+    assert(LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV));
   }
