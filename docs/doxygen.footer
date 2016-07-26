@@ -1,13 +1,21 @@
-<hr>
-<p class="footer">
-Generated on $datetime for <a href="http://llvm.org/">$projectname</a> by
-<a href="http://www.doxygen.org"><img src="doxygen.png" alt="Doxygen"
-align="middle" border="0"/>$doxygenversion</a><br>
-Copyright &copy; 2003-2013 University of Illinois at Urbana-Champaign.
-All Rights Reserved.</p>
-
-<hr>
-<!--#include virtual="/attrib.incl" -->
-
+<!-- HTML footer for doxygen 1.8.11-->
+<!-- start footer part -->
+<!--BEGIN GENERATE_TREEVIEW-->
+<div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
+  <ul>
+    $navpath
+    <li class="footer">$generatedby
+    <a href="http://www.doxygen.org/index.html">
+    <img class="footer" src="$relpath^doxygen.png" alt="doxygen"/></a> $doxygenversion </li>
+  </ul>
+</div>
+<!--END GENERATE_TREEVIEW-->
+<!--BEGIN !GENERATE_TREEVIEW-->
+<hr class="footer"/><address class="footer"><small>
+$generatedby &#160;<a href="http://www.doxygen.org/index.html">
+<img class="footer" src="$relpath^doxygen.png" alt="doxygen"/>
+</a> $doxygenversion
+</small></address>
+<!--END !GENERATE_TREEVIEW-->
 </body>
 </html>

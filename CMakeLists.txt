@@ -814,10 +814,6 @@ if(LIBXML2_FOUND)
   set(SWIFT_HAVE_LIBXML 1)
 endif()
 
-if (LLVM_ENABLE_DOXYGEN)
-  message(STATUS "Doxygen: enabled")
-endif()
-
 #
 # Set up global CMake variables for API notes.
 #
