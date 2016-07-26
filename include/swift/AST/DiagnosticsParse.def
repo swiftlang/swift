@@ -379,32 +379,33 @@ ERROR(expected_operator_name_after_operator,PointsToFirstBadToken,
 ERROR(identifier_when_expecting_operator,PointsToFirstBadToken,
       "%0 is considered to be an identifier, not an operator", (Identifier))
 
+WARNING(deprecated_operator_body,PointsToFirstBadToken,
+        "operator should no longer be declared with body", ())
 ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
-ERROR(expected_lbrace_after_operator,PointsToFirstBadToken,
-      "expected '{' after operator name in 'operator' declaration", ())
-ERROR(expected_operator_attribute,none,
-      "expected operator attribute identifier in 'operator' declaration body", ())
-ERROR(unknown_prefix_operator_attribute,none,
-      "'%0' is not a valid prefix operator attribute", (StringRef))
-ERROR(unknown_postfix_operator_attribute,none,
-      "'%0' is not a valid postfix operator attribute", (StringRef))
-ERROR(unknown_infix_operator_attribute,none,
-      "'%0' is not a valid infix operator attribute", (StringRef))
-ERROR(operator_associativity_redeclared,none,
-      "'associativity' for infix operator declared multiple times", ())
-ERROR(expected_infix_operator_associativity,none,
-      "expected identifier after 'associativity' in 'operator' declaration body", ())
-ERROR(unknown_infix_operator_associativity,none,
-      "'%0' is not a valid infix operator associativity; must be 'none', 'left', or 'right'", (StringRef))
-ERROR(operator_precedence_redeclared,none,
-      "'precedence' for infix operator declared multiple times", ())
-ERROR(operator_assignment_redeclared,none,
-      "'assignment' for infix operator declared multiple times", ())
-ERROR(expected_infix_operator_precedence,none,
-      "expected integer literal after 'precedence' in 'operator' declaration body", ())
-ERROR(invalid_infix_operator_precedence,none,
-      "'precedence' must be in the range of 0 to 255", ())
+
+// PrecedenceGroup
+ERROR(expected_precedencegroup_name,none,
+      "expected identifier after 'precedencegroup'", ())
+ERROR(expected_precedencegroup_lbrace,none,
+      "expected '{' after name of precedence group", ())
+
+ERROR(expected_precedencegroup_attribute,none,
+      "expected operator attribute identifier in precedence group body", ())
+ERROR(unknown_precedencegroup_attribute,none,
+      "'%0' is not a valid precedence group attribute", (StringRef))
+ERROR(expected_precedencegroup_attribute_colon,none,
+      "expected colon after attribute name in precedence group", (StringRef))
+ERROR(precedencegroup_attribute_redeclared,none,
+      "'%0' attribute for precedence group declared multiple times",
+      (StringRef))
+ERROR(expected_precedencegroup_associativity,none,
+      "expected 'none', 'left', or 'right' after 'associativity'", ())
+ERROR(expected_precedencegroup_assignment,none,
+      "expected 'true' or 'false' after 'assignment'", ())
+ERROR(expected_precedencegroup_relation,none,
+      "expected name of related precedence group after '%0'",
+      (StringRef))
 
 // SIL
 ERROR(inout_not_attribute, none,

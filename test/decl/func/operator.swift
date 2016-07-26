@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
-infix operator %%% {}
-infix operator %%%% {}
+infix operator %%%
+infix operator %%%%
 
 func %%%() {} // expected-error {{operators must have one or two arguments}}
 func %%%%(a: Int, b: Int, c: Int) {} // expected-error {{operators must have one or two arguments}}
@@ -13,9 +13,10 @@ func +(lhs: X, rhs: X) -> X {} // okay
 
 func +++(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}
 
-infix operator ++++ {
-  precedence 195
-  associativity left
+infix operator ++++ : ReallyHighPrecedence
+precedencegroup ReallyHighPrecedence {
+  higherThan: BitwiseShiftPrecedence
+  associativity: left
 }
 
 infix func fn_binary(_ lhs: Int, rhs: Int) {}  // expected-error {{'infix' requires a function with an operator identifier}}
@@ -34,9 +35,9 @@ func test() {
   _ = x
 }
 
-prefix operator ~~ {}
-postfix operator ~~ {}
-infix operator ~~ {}
+prefix operator ~~
+postfix operator ~~
+infix operator ~~
 
 postfix func foo(_ x: Int) {} // expected-error {{'postfix' requires a function with an operator identifier}}
 postfix func ~~(x: Int) -> Float { return Float(x) }
@@ -46,7 +47,7 @@ func test_postfix(_ x: Int) {
   ~~x~~
 }
 
-prefix operator ~~~ {} // expected-note 2{{prefix operator found here}}
+prefix operator ~~~ // expected-note 2{{prefix operator found here}}
 
 // Unary operators require a prefix or postfix attribute
 func ~~~(x: Float) {} // expected-error{{prefix unary operator missing 'prefix' modifier}}{{1-1=prefix }}
@@ -69,20 +70,20 @@ func errors() {
   */+    // expected-error {{unexpected end of block comment}}
 }
 
-prefix operator ... {}
+prefix operator ...
 
 prefix func ... (arg: Int) -> Int { return arg }
 func resyncParser() {}
 
 // Operator decl refs (<op>)
 
-infix operator +-+ {}
-prefix operator +-+ {}
+infix operator +-+
+prefix operator +-+
 
-prefix operator -+- {}
-postfix operator -+- {}
+prefix operator -+-
+postfix operator -+-
 
-infix operator +-+= {}
+infix operator +-+=
 
 infix func +-+ (x: Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}}
 prefix func +-+ (x: Int) -> Int {}
@@ -122,8 +123,8 @@ var f6_s : f6_S
 var junk = f6_s[+]
 
 // Unicode operator names
-infix operator ☃ {}
-infix operator ☃⃠ {} // Operators can contain (but not start with) combining characters
+infix operator ☃
+infix operator ☃⃠ // Operators can contain (but not start with) combining characters
 
 func ☃(x: Int, y: Int) -> Bool { return x == y }
 func ☃⃠(x: Int, y: Int) -> Bool { return x != y }
@@ -146,12 +147,12 @@ postfix prefix func ++(x: Int) {} // expected-error {{attribute 'postfix' cannot
 
 // Don't allow one to define a postfix '!'; it's built into the
 // language.
-postfix operator! {}  // expected-error {{cannot declare a custom postfix '!' operator}}
-prefix operator & {}  // expected-error {{cannot declare a custom prefix '&' operator}}
+postfix operator!  // expected-error {{cannot declare a custom postfix '!' operator}}
+prefix operator &  // expected-error {{cannot declare a custom prefix '&' operator}}
 
 // <rdar://problem/14607026> Restrict use of '<' and '>' as prefix/postfix operator names
-postfix operator > {}  // expected-error {{cannot declare a custom postfix '>' operator}}
-prefix operator < {}  // expected-error {{cannot declare a custom prefix '<' operator}}
+postfix operator >  // expected-error {{cannot declare a custom postfix '>' operator}}
+prefix operator <  // expected-error {{cannot declare a custom prefix '<' operator}}
 
 postfix func !(x: Int) { } // expected-error{{cannot declare a custom postfix '!' operator}}
 postfix func!(x: Int8) { } // expected-error{{cannot declare a custom postfix '!' operator}}
@@ -162,9 +163,9 @@ func operator_in_func_bad () {
     prefix func + (input: String) -> String { return "+" + input } // expected-error {{operator functions can only be declared at global or in type scope}}
 }
 
-infix operator ? {}  // expected-error {{expected operator name in operator declaration}} 
+infix operator ?  // expected-error {{expected operator name in operator declaration}} 
 
-infix operator ??= {}
+infix operator ??=
 
 func ??= <T>(result : inout T?, rhs : Int) {  // ok
 }
@@ -175,9 +176,9 @@ func ??= <T>(result : inout T?, rhs : Int) {  // ok
 _ = n*-4       // expected-error {{missing whitespace between '*' and '-' operators}} {{6-6= }} {{7-7= }}
 if n==-1 {}    // expected-error {{missing whitespace between '==' and '-' operators}} {{5-5= }} {{7-7= }}
 
-prefix operator ☃⃠ {}
+prefix operator ☃⃠
 prefix func☃⃠(a : Int) -> Int { return a }
-postfix operator ☃⃠ {}
+postfix operator ☃⃠
 postfix func☃⃠(a : Int) -> Int { return a }
 
 _ = n☃⃠ ☃⃠ n   // Ok.

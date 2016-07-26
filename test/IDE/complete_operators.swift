@@ -304,14 +304,16 @@ struct S4 {}
 func +(x: S4, y: S4) -> S4 { return x }
 func ==(x: S4, y: S4) -> Bool { return true }
 
-infix operator +++ {
-  associativity left
-  precedence 1
+infix operator +++ : ReallyLowPrecedence
+precedencegroup ReallyLowPrecedence {
+  associativity: left
+  lowerThan: AssignmentPrecedence
 }
 func +++(x: S4, y: S4) -> S4 { return x }
-infix operator &&& {
-  associativity left
-  precedence 255
+infix operator &&& : ReallyHighPrecedence
+precedencegroup ReallyHighPrecedence {
+  associativity: left
+  higherThan: BitwiseShiftPrecedence
 }
 func &&&(x: Bool, y: Bool) -> S4 { return x }
 

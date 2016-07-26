@@ -585,6 +585,10 @@ public:
   /// Bad examples: 
   bool canAppendCallParentheses() const;
 
+  /// Returns true if this is an infix operator of some sort, including
+  /// a builtin operator.
+  bool isInfixOperator() const;
+
   /// Produce a mapping from each subexpression to its parent
   /// expression, with the provided expression serving as the root of
   /// the parent map.
@@ -3804,6 +3808,10 @@ public:
     return SubExpr->getLoc();
   }
 
+  SourceLoc getAsLoc() const {
+    return AsLoc;
+  }
+
   SourceRange getSourceRange() const {
     SourceRange castTyRange = CastTy.getSourceRange();
     if (castTyRange.isInvalid())
@@ -4421,6 +4429,12 @@ public:
     return E->getKind() == ExprKind::ObjCKeyPath;
   }
 };
+
+
+inline bool Expr::isInfixOperator() const {
+  return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
+         isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);
+}
 
 #undef SWIFT_FORWARD_SOURCE_LOCS_TO
   

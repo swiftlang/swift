@@ -78,6 +78,13 @@ IDENTIFIER(with)
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")
 IDENTIFIER_WITH_NAME(EqualsOperator, "==")
 
+// Precedence groups
+IDENTIFIER(AssignmentPrecedence)
+IDENTIFIER(CastingPrecedence)
+IDENTIFIER(DefaultPrecedence)
+IDENTIFIER(FunctionArrowPrecedence)
+IDENTIFIER(TernaryPrecedence)
+
 // Builtins and literals
 IDENTIFIER_(MaxBuiltinIntegerType)
 IDENTIFIER(IntegerLiteralType)

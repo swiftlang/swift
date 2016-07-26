@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen %s | FileCheck %s
 
+precedencegroup AssignmentPrecedence { assignment: true }
+
 typealias Int = Builtin.Int64
 
 var zero = getInt()

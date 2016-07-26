@@ -2,6 +2,10 @@
 
 // REQUIRES: CODEGENERATOR=ARM
 
+precedencegroup AssignmentPrecedence {
+  assignment: true
+}
+
 public enum Optional<Wrapped> {
   case none
   case some(Wrapped)

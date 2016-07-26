@@ -120,7 +120,7 @@ class SideEffect<In> : Bindable {
 
 struct Composed<Left: Bindable, Right: Observable> where Left.Input == Right.Output {}
 
-infix operator <- { associativity right precedence 90 }
+infix operator <- : AssignmentPrecedence
 
 func <- <
     Right : Observable

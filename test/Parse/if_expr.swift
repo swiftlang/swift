@@ -49,22 +49,21 @@ func telescoping_if(_ x: Bool, _ y: Int) -> Int {
 }
 
 // Operator with precedence above ? :
-infix operator +>> {
-  associativity left
-  precedence 110
+infix operator +>> : Rightwards
+precedencegroup Rightwards {
+  associativity: left
+  higherThan: TernaryPrecedence
 }
 
 // Operator with precedence below ? :
-infix operator +<< {
-  associativity left
-  precedence 90
+infix operator +<< : Leftwards
+precedencegroup Leftwards {
+  associativity: left
+  lowerThan: TernaryPrecedence
 }
 
 // Operator with precedence equal to ? :
-infix operator +== {
-  associativity right
-  precedence 100
-}
+infix operator +== : TernaryPrecedence
 
 func +>> (x: Bool, y: Bool) -> Bool {}
 func +<< (x: Bool, y: Bool) -> Bool {}

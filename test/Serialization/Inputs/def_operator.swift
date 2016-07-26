@@ -1,20 +1,23 @@
-prefix operator ~~~ {}
-postfix operator ^^ {}
+prefix operator ~~~
+postfix operator ^^
 
-infix operator *- {
-  associativity left
-  precedence 50
+infix operator *- : LowPrecedence
+precedencegroup LowPrecedence {
+  associativity: left
+  lowerThan: AssignmentPrecedence
+  higherThan: LollipopPrecedence 
 }
 
-infix operator -* {
-  associativity right
-  precedence 40
+infix operator -* : LollipopPrecedence
+precedencegroup LollipopPrecedence {
+  associativity: right
+  higherThan: DoubleLollipopPrecedence
 }
 
-infix operator *-* {
-  associativity none
-  precedence 10
-  assignment
+infix operator *-* : DoubleLollipopPrecedence
+precedencegroup DoubleLollipopPrecedence {
+  associativity: none
+  assignment: true
 }
 
 prefix public func ~~~(x: Bool) -> () {}

@@ -57,10 +57,10 @@ maskingShifts = [
 ]
 }%
 
-infix operator &<< { associativity none precedence 160 }
-infix operator &<<= { associativity right precedence 90 assignment }
-infix operator &>> { associativity none precedence 160 }
-infix operator &>>= { associativity right precedence 90 assignment }
+infix operator &<< : BitwiseShiftPrecedence
+infix operator &<<= : AssignmentPrecedence
+infix operator &>> : BitwiseShiftPrecedence
+infix operator &>>= : AssignmentPrecedence
 
 //===----------------------------------------------------------------------===//
 //===--- Bits for the Stdlib ----------------------------------------------===//

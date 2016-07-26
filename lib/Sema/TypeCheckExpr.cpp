@@ -121,79 +121,88 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   return E;
 }
 
-/// getInfixData - If the specified expression is an infix binary
-/// operator, return its infix operator attributes.
-static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
-  if (auto *ifExpr = dyn_cast<IfExpr>(E)) {
+/// Look up the builtin precedence group with the given name.
+static PrecedenceGroupDecl *
+getBuiltinPrecedenceGroup(TypeChecker &TC, DeclContext *DC, Identifier name,
+                          SourceLoc loc) {
+  auto group = TC.lookupPrecedenceGroup(DC, name,
+                                        /*suppress diags*/ SourceLoc());
+  if (!group) {
+    TC.diagnose(loc, diag::missing_builtin_precedence_group, name);
+  }
+  return group;
+}
+
+static PrecedenceGroupDecl *
+lookupPrecedenceGroupForOperator(TypeChecker &TC, DeclContext *DC,
+                                 Identifier name, SourceLoc loc) {
+  SourceFile *SF = DC->getParentSourceFile();
+  bool isCascading = DC->isCascadingContextForLookup(true);
+  if (auto op = SF->lookupInfixOperator(name, isCascading, loc)) {
+    TC.validateDecl(op);
+    return op->getPrecedenceGroup();
+  } else {
+    TC.diagnose(loc, diag::unknown_binop);
+  }
+  return nullptr;
+}
+
+PrecedenceGroupDecl *
+TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
+  if (auto ifExpr = dyn_cast<IfExpr>(E)) {
     // Ternary has fixed precedence.
-    assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
-    (void)ifExpr;
-    return InfixData(IntrinsicPrecedences::IfExpr,
-                     Associativity::Right,
-                     /*assignment*/ false);
-
+    return getBuiltinPrecedenceGroup(*this, DC, Context.Id_TernaryPrecedence,
+                                     ifExpr->getQuestionLoc());
   }
 
-  if (auto *assign = dyn_cast<AssignExpr>(E)) {
+  if (auto assignExpr = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
-    assert(!assign->isFolded() && "already folded assign expr in sequence?!");
-    (void)assign;
-    return InfixData(IntrinsicPrecedences::AssignExpr,
-                     Associativity::Right,
-                     /*assignment*/ true);
-
+    return getBuiltinPrecedenceGroup(*this, DC, Context.Id_AssignmentPrecedence,
+                                     assignExpr->getEqualLoc());
   }
 
-  if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
+  if (auto castExpr = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
-    assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
-    (void)as;
-    return InfixData(IntrinsicPrecedences::ExplicitCastExpr,
-                     Associativity::None,
-                     /*assignment*/ false);
-
+    return getBuiltinPrecedenceGroup(*this, DC, Context.Id_CastingPrecedence,
+                                     castExpr->getAsLoc());
   }
 
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    SourceFile *SF = DC->getParentSourceFile();
     Identifier name = DRE->getDecl()->getName();
-    bool isCascading = DC->isCascadingContextForLookup(true);
-    if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, isCascading,
-                                                        E->getLoc()))
-      return op->getInfixData();
-
+    return lookupPrecedenceGroupForOperator(*this, DC, name, DRE->getLoc());
   }
 
   if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
-    SourceFile *SF = DC->getParentSourceFile();
     Identifier name = OO->getDecls()[0]->getName();
-    bool isCascading = DC->isCascadingContextForLookup(true);
-    if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, isCascading,
-                                                        E->getLoc()))
-      return op->getInfixData();
+    return lookupPrecedenceGroupForOperator(*this, DC, name, OO->getLoc());
   }
 
-  if (isa<ArrowExpr>(E)) {
-    return InfixData(IntrinsicPrecedences::ArrowExpr,
-                     Associativity::Right,
-                     /*assignment*/ false);
+  if (auto arrowExpr = dyn_cast<ArrowExpr>(E)) {
+    return getBuiltinPrecedenceGroup(*this, DC,
+                                     Context.Id_FunctionArrowPrecedence,
+                                     arrowExpr->getArrowLoc());
+  }
+
+  // An already-folded binary operator comes up for non-primary use cases
+  // of this function.
+  if (auto binaryExpr = dyn_cast<BinaryExpr>(E)) {
+    return lookupPrecedenceGroupForInfixOperator(DC, binaryExpr->getFn());
   }
 
   // If E is already an ErrorExpr, then we've diagnosed it as invalid already,
   // otherwise emit an error.
   if (!isa<ErrorExpr>(E))
-    TC.diagnose(E->getLoc(), diag::unknown_binop);
+    diagnose(E->getLoc(), diag::unknown_binop);
 
-  // Recover with an infinite-precedence left-associative operator.
-  return InfixData((unsigned char)~0U, Associativity::Left,
-                   /*assignment*/ false);
+  return nullptr;
 }
 
 // The way we compute isEndOfSequence relies on the assumption that
 // the sequence-folding algorithm never recurses with a prefix of the
 // entire sequence.
 static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
-                       const InfixData &infixData, bool isEndOfSequence) {
+                       PrecedenceGroupDecl *opPrecedence,
+                       bool isEndOfSequence) {
   if (!LHS || !RHS)
     return nullptr;
 
@@ -206,7 +215,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   // If this is an assignment operator, and the left operand is an optional
   // evaluation, pull the operator into the chain.
   OptionalEvaluationExpr *optEval = nullptr;
-  if (infixData.isAssignment()) {
+  if (opPrecedence && opPrecedence->isAssignment()) {
     if ((optEval = dyn_cast<OptionalEvaluationExpr>(LHS))) {
       LHS = optEval->getSubExpr();
     }
@@ -250,7 +259,8 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
       llvm_unreachable("unknown try-like expression");
     }
 
-    if (isa<IfExpr>(Op) || infixData.isAssignment()) {
+    if (isa<IfExpr>(Op) ||
+        (opPrecedence && opPrecedence->isAssignment())) {
       if (!isEndOfSequence) {
         if (isa<IfExpr>(Op)) {
           TC.diagnose(RHS->getStartLoc(), diag::try_if_rhs_noncovering,
@@ -326,12 +336,31 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   return makeResultExpr(new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit()));
 }
 
+namespace {
+  class PrecedenceBound {
+    llvm::PointerIntPair<PrecedenceGroupDecl*,1,bool> GroupAndIsStrict;
+  public:
+    PrecedenceBound() {}
+    PrecedenceBound(PrecedenceGroupDecl *decl, bool isStrict)
+      : GroupAndIsStrict(decl, isStrict) {}
+
+    bool shouldConsider(TypeChecker &TC, PrecedenceGroupDecl *group) {
+      auto storedGroup = GroupAndIsStrict.getPointer();
+      if (!storedGroup) return true;
+      if (!group) return false;
+      if (storedGroup == group) return !GroupAndIsStrict.getInt();
+      return TC.Context.associateInfixOperators(group, storedGroup)
+               == Associativity::Left;
+    }
+  };
+}
+
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.
 static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
                           Expr *LHS,
                           ArrayRef<Expr*> &S,
-                          unsigned MinPrecedence) {
+                          PrecedenceBound precedenceBound) {
   // Invariant: S is even-sized.
   // Invariant: All elements at even indices are operator references.
   assert(!S.empty());
@@ -339,9 +368,9 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
   
   struct Op {
     Expr *op;
-    InfixData infixData;
+    PrecedenceGroupDecl *precedence;
     
-    explicit operator bool() const { return op; }
+    explicit operator bool() const { return op != nullptr; }
   };
   
   /// Get the operator, if appropriate to this pass.
@@ -349,14 +378,15 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     Expr *op = S[0];
 
     // If the operator's precedence is lower than the minimum, stop here.
-    InfixData opInfo = getInfixData(TC, DC, op);
-    if (opInfo.getPrecedence() < MinPrecedence) return {nullptr, {}};
-    return {op, opInfo};
+    auto opPrecedence = TC.lookupPrecedenceGroupForInfixOperator(DC, op);
+    if (!precedenceBound.shouldConsider(TC, opPrecedence))
+      return {nullptr, nullptr};
+    return {op, opPrecedence};
   };
 
   // Extract out the first operator.
-  Op Op1 = getNextOperator();
-  if (!Op1) return LHS;
+  Op op1 = getNextOperator();
+  if (!op1) return LHS;
   
   // We will definitely be consuming at least one operator.
   // Pull out the prospective RHS and slice off the first two elements.
@@ -365,36 +395,41 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
   
   while (!S.empty()) {
     assert((S.size() & 1) == 0);
-    assert(Op1.infixData.isValid() && "Not a valid operator to fold");
-    assert(Op1.infixData.getPrecedence() >= MinPrecedence);
+    assert(precedenceBound.shouldConsider(TC, op1.precedence));
 
     // If the operator is a cast operator, the RHS can't extend past the type
     // that's part of the cast production.
-    if (isa<ExplicitCastExpr>(Op1.op)) {
-      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData, S.empty());
-      Op1 = getNextOperator();
-      if (!Op1) return LHS;
+    if (isa<ExplicitCastExpr>(op1.op)) {
+      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+      op1 = getNextOperator();
+      if (!op1) return LHS;
       RHS = S[1];
       S = S.slice(2);
       continue;
     }
     
     // Pull out the next binary operator.
-    Expr *Op2 = S[0];
-  
-    InfixData Op2Info = getInfixData(TC, DC, Op2);
-    // If the second operator's precedence is lower than the min
-    // precedence, break out of the loop.
-    if (Op2Info.getPrecedence() < MinPrecedence) break;
-    
-    // If the first operator's precedence is higher than the second
-    // operator's precedence, or they have matching precedence and are
-    // both left-associative, fold LHS and RHS immediately.
-    if (Op1.infixData.getPrecedence() > Op2Info.getPrecedence() ||
-        (Op1.infixData == Op2Info && Op1.infixData.isLeftAssociative())) {
-      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData, S.empty());
-      Op1 = getNextOperator();
-      assert(Op1 && "should get a valid operator here");
+    Op op2 = { S[0], TC.lookupPrecedenceGroupForInfixOperator(DC, S[0]) };
+
+    // If the second operator's precedence is lower than the
+    // precedence bound, break out of the loop.
+    if (!precedenceBound.shouldConsider(TC, op2.precedence)) break;
+
+    // If we're missing precedence info for either operator, treat them
+    // as non-associative.
+    Associativity associativity;
+    if (!op1.precedence || !op2.precedence) {
+      associativity = Associativity::None;
+    } else {
+      associativity =
+        TC.Context.associateInfixOperators(op1.precedence, op2.precedence);
+    }
+
+    // Apply left-associativity immediately by folding the first two
+    // operands.
+    if (associativity == Associativity::Left) {
+      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+      op1 = op2;
       RHS = S[1];
       S = S.slice(2);
       continue;
@@ -404,48 +439,57 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // operator's precedence, recursively fold all such
     // higher-precedence operators starting from this point, then
     // repeat.
-    if (Op1.infixData.getPrecedence() < Op2Info.getPrecedence()) {
-      RHS = foldSequence(TC, DC, RHS, S, Op1.infixData.getPrecedence() + 1);
+    if (associativity == Associativity::Right &&
+        op1.precedence != op2.precedence) {
+      RHS = foldSequence(TC, DC, RHS, S,
+                         PrecedenceBound(op1.precedence, /*strict*/ true));
       continue;
     }
 
-    // If the first operator's precedence is the same as the second
-    // operator's precedence, and they're both right-associative,
-    // recursively fold operators starting from this point, then
-    // immediately fold LHS and RHS.
-    if (Op1.infixData == Op2Info && Op1.infixData.isRightAssociative()) {
-      RHS = foldSequence(TC, DC, RHS, S, Op1.infixData.getPrecedence());
-      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData, S.empty());
+    // Apply right-associativity by recursively folding operators
+    // starting from this point, then immediately folding the LHS and RHS.
+    if (associativity == Associativity::Right) {
+      RHS = foldSequence(TC, DC, RHS, S,
+                         PrecedenceBound(op1.precedence, /*strict*/ false));
+      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
 
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
 
       // Otherwise, start all over with our new LHS.
-      return foldSequence(TC, DC, LHS, S, MinPrecedence);
+      return foldSequence(TC, DC, LHS, S, precedenceBound);
     }
 
-    // If we ended up here, it's because we have two operators
-    // with mismatched or no associativity.
-    assert(Op1.infixData.getPrecedence() == Op2Info.getPrecedence());
-    assert(Op1.infixData.getAssociativity() != Op2Info.getAssociativity()
-           || Op1.infixData.isNonAssociative());
+    // If we ended up here, it's because we're either:
+    //   - missing precedence groups,
+    //   - have unordered precedence groups, or
+    //   - have the same precedence group with no associativity.
+    assert(associativity == Associativity::None);
 
-    if (Op1.infixData.isNonAssociative()) {
+    // Don't diagnose if we're missing a precedence group; this is
+    // an invalid-code situation.
+    if (!op1.precedence || !op2.precedence) {
+      // do nothing
+    } else if (op1.precedence == op2.precedence) {
+      assert(op1.precedence->isNonAssociative());
       // FIXME: QoI ranges
-      TC.diagnose(Op1.op->getLoc(), diag::non_assoc_adjacent);
-    } else if (Op2Info.isNonAssociative()) {
-      TC.diagnose(Op2->getLoc(), diag::non_assoc_adjacent);
+      TC.diagnose(op1.op->getLoc(), diag::non_associative_adjacent_operators,
+                  op1.precedence->getName())
+        .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));
+
     } else {
-      TC.diagnose(Op1.op->getLoc(), diag::incompatible_assoc);
+      TC.diagnose(op1.op->getLoc(), diag::unordered_adjacent_operators,
+                  op1.precedence->getName(), op2.precedence->getName())
+        .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));      
     }
     
     // Recover by arbitrarily binding the first two.
-    LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData, S.empty());
-    return foldSequence(TC, DC, LHS, S, MinPrecedence);
+    LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+    return foldSequence(TC, DC, LHS, S, precedenceBound);
   }
 
   // Fold LHS and RHS together and declare completion.
-  return makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData, S.empty());
+  return makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
 }
 
 Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
@@ -723,7 +767,8 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   Expr *LHS = Elts[0];
   Elts = Elts.slice(1);
 
-  Expr *Result = ::foldSequence(*this, dc, LHS, Elts, /*min precedence*/ 0);
+  Expr *Result = ::foldSequence(*this, dc, LHS, Elts, PrecedenceBound());
   assert(Elts.empty());
+
   return Result;
 }

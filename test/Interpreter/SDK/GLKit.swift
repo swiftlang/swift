@@ -27,8 +27,8 @@ print(GLKVector4DotProduct(x, y)) // CHECK-NEXT: 0.0
 let z2 = GLKVector4CrossProduct(x, y)
 print(GLKVector4AllEqualToVector4(z, z2)) // CHECK-NEXT: true
 
-infix operator • { precedence 150 associativity left }
-infix operator ⨉ { precedence 150 }
+infix operator • : MultiplicationPrecedence
+infix operator ⨉ : MultiplicationPrecedence
 func •(x: GLKVector4, y: GLKVector4) -> Float {
   return GLKVector4DotProduct(x, y)
 }

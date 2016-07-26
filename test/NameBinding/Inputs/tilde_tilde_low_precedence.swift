@@ -1,15 +1,14 @@
 // Part of operators.swift multi-file test.
 
-infix operator ~~ {
-  associativity none
-  precedence 5
+infix operator ~~ : LowPrecedence
+
+precedencegroup LowPrecedence {
+  associativity: none
+  lowerThan: AssignmentPrecedence
 }
 
 public func ~~(x: Int, y: Int) -> Bool {
   return x < y
 }
 
-infix operator ~~~ {
-  associativity none
-  precedence 5
-}
+infix operator ~~~ : LowPrecedence

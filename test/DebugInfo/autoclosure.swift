@@ -12,10 +12,7 @@ func get_truth(_ input: Int64) -> Int64 {
 }
 
 // Since this is an autoclosure test, don't use &&, which is transparent.
-infix operator &&&&& {
-  associativity left
-  precedence 120
-}
+infix operator &&&&& : LogicalConjunctionPrecedence
 
 func &&&&&(lhs: Bool, rhs: @autoclosure () -> Bool) -> Bool {
   return lhs ? rhs() : false

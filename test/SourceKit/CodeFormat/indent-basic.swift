@@ -13,7 +13,14 @@ foo(a: [
   3: 3
 ])
 
-operator <> {
+infix operator && : LogicalConjunction
+precedencegroup LogicalConjunction {
+  associativity: none
+  assignment: false
+  higherThan: LogicalDisjunction
+}
+
+precedencegroup Whatever {
 x
 }
 

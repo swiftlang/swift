@@ -592,6 +592,8 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
     return CodeCompletionDeclKind::PrefixOperatorFunction;
   case DeclKind::PostfixOperator:
     return CodeCompletionDeclKind::PostfixOperatorFunction;
+  case DeclKind::PrecedenceGroup:
+    return CodeCompletionDeclKind::PrecedenceGroup;
   case DeclKind::EnumElement:
     return CodeCompletionDeclKind::EnumElement;
   case DeclKind::Subscript:
@@ -671,6 +673,9 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
       break;
     case CodeCompletionDeclKind::Module:
       Prefix.append("[Module]");
+      break;
+    case CodeCompletionDeclKind::PrecedenceGroup:
+      Prefix.append("[PrecedenceGroup]");
       break;
     }
     break;
@@ -5398,6 +5403,7 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       if (R->getKind() != CodeCompletionResult::Declaration)
         return false;
       switch(R->getAssociatedDeclKind()) {
+      case CodeCompletionDeclKind::PrecedenceGroup:
       case CodeCompletionDeclKind::Module:
       case CodeCompletionDeclKind::Class:
       case CodeCompletionDeclKind::Struct:

@@ -123,18 +123,17 @@ func f(_ x: Shoes, asType t: Shoes.Type) {
   return t.select(x) // expected-error{{unexpected non-void return value in void function}}
 }
 
-infix operator **** {
-  associativity left
-  precedence 200
+precedencegroup Starry {
+  associativity: left
+  higherThan: MultiplicationPrecedence
 }
+
+infix operator **** : Starry
 
 func ****(_: Int, _: String) { }
 i **** i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
-infix operator ***~ {
-  associativity left
-  precedence 200
-}
+infix operator ***~ : Starry
 
 func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}

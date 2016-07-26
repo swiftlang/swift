@@ -2,20 +2,23 @@
 
 import Swift
 
-infix operator < {
-  associativity none
-  precedence 170
+infix operator < : ComparisonPrecedence
+precedencegroup ComparisonPrecedence {
+  associativity: none
+  higherThan: EqualityPrecedence
 }
 
-infix operator == {
-  associativity none
-  precedence 160
+infix operator == : EqualityPrecedence
+infix operator != : EqualityPrecedence
+precedencegroup EqualityPrecedence {
+  associativity: none
+  higherThan: AssignmentPrecedence
 }
 
-infix operator != {
-  associativity none
-  precedence 160
+precedencegroup AssignmentPrecedence {
+  assignment: true
 }
+
 
 func testslice(_ s: Array<Int>) {
   for i in 0..<s.count { print(s[i]+1) }

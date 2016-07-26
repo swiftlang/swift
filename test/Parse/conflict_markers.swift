@@ -2,14 +2,14 @@
 
 // Conflict marker parsing should never conflict with operator parsing.
 
-prefix operator <<<<<<< {}
-infix operator <<<<<<< {}
+prefix operator <<<<<<<
+infix operator <<<<<<<
 
 prefix func <<<<<<< (x : String) {}
 func <<<<<<< (x : String, y : String) {}
 
-prefix operator >>>>>>> {}
-infix operator >>>>>>> {}
+prefix operator >>>>>>>
+infix operator >>>>>>>
 
 prefix func >>>>>>> (x : String) {}
 func >>>>>>> (x : String, y : String) {}
