@@ -327,29 +327,29 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         return _handle.map { _toOptional($0.lastIndex) }
     }
     
-    /// Returns an integer contained in `self` which is greater than `integer`.
-    public func integerGreaterThan(_ integer: Element) -> Element {
-        return _handle.map { $0.indexGreaterThanIndex(integer) }
+    /// Returns an integer contained in `self` which is greater than `integer`, or `nil` if a result could not be found.
+    public func integerGreaterThan(_ integer: Element) -> Element? {
+        return _handle.map { _toOptional($0.indexGreaterThanIndex(integer)) }
     }
     
-    /// Returns an integer contained in `self` which is less than `integer`.
-    public func integerLessThan(_ integer: Element) -> Element {
-        return _handle.map { $0.indexLessThanIndex(integer) }
+    /// Returns an integer contained in `self` which is less than `integer`, or `nil` if a result could not be found.
+    public func integerLessThan(_ integer: Element) -> Element? {
+        return _handle.map { _toOptional($0.indexLessThanIndex(integer)) }
     }
     
-    /// Returns an integer contained in `self` which is greater than or equal to `integer`.
-    public func integerGreaterThanOrEqualTo(_ integer: Element) -> Element {
-        return _handle.map { $0.indexGreaterThanOrEqual(to: integer) }
+    /// Returns an integer contained in `self` which is greater than or equal to `integer`, or `nil` if a result could not be found.
+    public func integerGreaterThanOrEqualTo(_ integer: Element) -> Element? {
+        return _handle.map { _toOptional($0.indexGreaterThanOrEqual(to: integer)) }
     }
     
-    /// Returns an integer contained in `self` which is less than or equal to `integer`.
-    public func integerLessThanOrEqualTo(_ integer: Element) -> Element {
-        return _handle.map { $0.indexLessThanOrEqual(to: integer) }
+    /// Returns an integer contained in `self` which is less than or equal to `integer`, or `nil` if a result could not be found.
+    public func integerLessThanOrEqualTo(_ integer: Element) -> Element? {
+        return _handle.map { _toOptional($0.indexLessThanOrEqual(to: integer)) }
     }
     
     /// Return a `Range<IndexSet.Index>` which can be used to subscript the index set.
     ///
-    /// The resulting range is the range of the intersection of the integers in `range` with the index set.
+    /// The resulting range is the range of the intersection of the integers in `range` with the index set. The resulting range will be `isEmpty` if the intersection is empty.
     ///
     /// - parameter range: The range of integers to include.
     public func indexRange(in range: Range<Element>) -> Range<Index> {
@@ -363,9 +363,14 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
             return i..<i
         }
         
-        let resultFirst = _index(ofInteger: integerGreaterThanOrEqualTo(range.lowerBound))
-        let resultLast = _index(ofInteger: integerLessThanOrEqualTo(range.upperBound - 1))
-        return resultFirst..<index(after: resultLast)
+        if let start = integerGreaterThanOrEqualTo(range.lowerBound), let end = integerLessThanOrEqualTo(range.upperBound - 1) {
+            let resultFirst = _index(ofInteger: start)
+            let resultLast = _index(ofInteger: end)
+            return resultFirst..<index(after: resultLast)
+        } else {
+            let i = _index(ofInteger: 0)
+            return i..<i
+        }
     }
     
     /// Return a `Range<IndexSet.Index>` which can be used to subscript the index set.
