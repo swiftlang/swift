@@ -1746,6 +1746,8 @@ optimizeBridgedCasts(SILInstruction *Inst,
     return nullptr;
 
   auto BridgedSourceTy = getCastFromObjC(M, target, source);
+  if (!BridgedSourceTy)
+    return nullptr;
 
   CanType CanBridgedTargetTy(BridgedTargetTy);
   CanType CanBridgedSourceTy(BridgedSourceTy);
