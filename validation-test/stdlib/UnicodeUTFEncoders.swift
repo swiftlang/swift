@@ -60,7 +60,7 @@ func nthUnicodeScalar(_ n: UInt32) -> UnicodeScalar {
   for r in unicodeScalarRanges {
     count += r.upperBound - r.lowerBound
     if count > n {
-      return UnicodeScalar(r.upperBound - (count - n))
+      return UnicodeScalar(r.upperBound - (count - n))!
     }
   }
   _preconditionFailure("Index out of range")

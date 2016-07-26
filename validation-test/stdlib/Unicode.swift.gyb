@@ -764,6 +764,7 @@ UnicodeScalarTests.test("init") {
   expectEqual("g", UnicodeScalar(UInt32(103)))
   expectEqual("h", UnicodeScalar(UInt16(104)))
   expectEqual("i", UnicodeScalar(UInt8(105)))
+  expectEqual(nil, UnicodeScalar(UInt32(0xD800)))
 }
 
 var UTF8Decoder = TestSuite("UTF8Decoder")
@@ -2357,7 +2358,7 @@ StringCookedViews.test("UTF16") {
 
 StringCookedViews.test("UnicodeScalars") {
   for test in UTF8TestsSmokeTest {
-    let expectedScalars = test.scalars.map { UnicodeScalar($0) }
+    let expectedScalars = test.scalars.map { UnicodeScalar($0)! }
     let subject = NonContiguousNSString(test.scalars) as String
     checkSliceableWithBidirectionalIndex(
       expectedScalars, subject.unicodeScalars)
@@ -2366,7 +2367,7 @@ StringCookedViews.test("UnicodeScalars") {
   forStringsWithUnpairedSurrogates {
     (test: UTF16Test, subject: String) -> Void in
     let expectedScalars = (test.scalarsHead + test.scalarsRepairedTail).map {
-      UnicodeScalar($0)
+      UnicodeScalar($0)!
     }
     checkSliceableWithBidirectionalIndex(
       expectedScalars, subject.unicodeScalars)

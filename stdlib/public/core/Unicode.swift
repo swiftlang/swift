@@ -1097,7 +1097,7 @@ extension UTF16 {
           return nil
         }
         isAscii = false
-        count += width(UnicodeScalar(0xfffd))
+        count += width(UnicodeScalar(0xfffd)!)
       }
     }
     return (count, isAscii)

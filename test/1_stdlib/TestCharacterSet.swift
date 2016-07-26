@@ -21,9 +21,9 @@ class TestCharacterSetSuper { }
 #endif
 
 class TestCharacterSet : TestCharacterSetSuper {
-    let capitalA = UnicodeScalar(0x0041) // LATIN CAPITAL LETTER A
-    let capitalB = UnicodeScalar(0x0042) // LATIN CAPITAL LETTER B
-    let capitalC = UnicodeScalar(0x0043) // LATIN CAPITAL LETTER C
+    let capitalA = UnicodeScalar(0x0041)! // LATIN CAPITAL LETTER A
+    let capitalB = UnicodeScalar(0x0042)! // LATIN CAPITAL LETTER B
+    let capitalC = UnicodeScalar(0x0043)! // LATIN CAPITAL LETTER C
     
     func testBasicConstruction() {
         // Create a character set
@@ -87,14 +87,14 @@ class TestCharacterSet : TestCharacterSetSuper {
 
     func testRanges() {
         // Simple range check
-        let asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)...UnicodeScalar(0x5A))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)))
-        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x5B)))
+        let asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)!...UnicodeScalar(0x5A)!)
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
+        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x5B)!))
         
         // Some string filtering tests
-        let asciiLowercase = CharacterSet(charactersIn: UnicodeScalar(0x61)...UnicodeScalar(0x7B))
+        let asciiLowercase = CharacterSet(charactersIn: UnicodeScalar(0x61)!...UnicodeScalar(0x7B)!)
         let testString = "helloHELLOhello"
         let expected = "HELLO"
         
@@ -103,23 +103,23 @@ class TestCharacterSet : TestCharacterSetSuper {
     }
     
     func testInsertAndRemove() {
-        var asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)...UnicodeScalar(0x5A))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)))
+        var asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)!...UnicodeScalar(0x5A)!)
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
         
-        asciiUppercase.remove(UnicodeScalar(0x49))
-        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x49)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)))
+        asciiUppercase.remove(UnicodeScalar(0x49)!)
+        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x49)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
        
 
         // Zero-length range
-        asciiUppercase.remove(charactersIn: UnicodeScalar(0x41)..<UnicodeScalar(0x41))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)))
+        asciiUppercase.remove(charactersIn: UnicodeScalar(0x41)!..<UnicodeScalar(0x41)!)
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
 
-        asciiUppercase.remove(charactersIn: UnicodeScalar(0x41)..<UnicodeScalar(0x42))
-        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x41)))
+        asciiUppercase.remove(charactersIn: UnicodeScalar(0x41)!..<UnicodeScalar(0x42)!)
+        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x41)!))
         
         asciiUppercase.remove(charactersIn: "Z")
         expectTrue(!asciiUppercase.contains(UnicodeScalar(0x5A)))

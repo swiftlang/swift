@@ -33,9 +33,9 @@ PrintTests.test("CustomStringConvertible") {
   hasDescription(CInt(42))
   hasDescription(CLong(42))
   hasDescription(CLongLong(42))
-  hasDescription(CWideChar(42))
+  hasDescription(CWideChar(42)!)
   hasDescription(CChar16(42))
-  hasDescription(CChar32(42))
+  hasDescription(CChar32(42)!)
 }
 
 PrintTests.test("Printable") {
@@ -50,9 +50,9 @@ PrintTests.test("Printable") {
   expectPrinted("42", CInt(42))
   expectPrinted("42", CLong(42))
   expectPrinted("42", CLongLong(42))
-  expectPrinted("*", CWideChar(42))
+  expectPrinted("*", CWideChar(42)!)
   expectPrinted("42", CChar16(42))
-  expectPrinted("*", CChar32(42))
+  expectPrinted("*", CChar32(42)!)
 
   if (UInt64(Int.max) > 0x1_0000_0000 as UInt64) {
     expectPrinted("-9223372036854775808", Int.min)
@@ -141,9 +141,9 @@ PrintTests.test("Printable") {
   expectPrinted("42", CLong(42))
   expectPrinted("42", CLongLong(42))
 
-  expectPrinted("*", CWideChar(42))
+  expectPrinted("*", CWideChar(42)!)
   expectPrinted("42", CChar16(42))
-  expectPrinted("*", CChar32(42))
+  expectPrinted("*", CChar32(42)!)
 }
 
 runAllTests()

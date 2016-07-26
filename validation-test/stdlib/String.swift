@@ -1001,8 +1001,8 @@ StringTests.test("lowercased()") {
   let asciiDomain: [Int32] = Array(0..<128)
   expectEqualFunctionsForDomain(
     asciiDomain,
-    { String(UnicodeScalar(Int(tolower($0)))) },
-    { String(UnicodeScalar(Int($0))).lowercased() })
+    { String(UnicodeScalar(Int(tolower($0)))!) },
+    { String(UnicodeScalar(Int($0))!).lowercased() })
 
   expectEqual("", "".lowercased())
   expectEqual("abcd", "abCD".lowercased())
@@ -1035,8 +1035,8 @@ StringTests.test("uppercased()") {
   let asciiDomain: [Int32] = Array(0..<128)
   expectEqualFunctionsForDomain(
     asciiDomain,
-    { String(UnicodeScalar(Int(toupper($0)))) },
-    { String(UnicodeScalar(Int($0))).uppercased() })
+    { String(UnicodeScalar(Int(toupper($0)))!) },
+    { String(UnicodeScalar(Int($0))!).uppercased() })
 
   expectEqual("", "".uppercased())
   expectEqual("ABCD", "abCD".uppercased())

@@ -174,7 +174,7 @@ extension String {
       case .emptyInput:
         _sanityCheckFailure("cannot subscript using an endIndex")
       case .error:
-        return UnicodeScalar(0xfffd)
+        return UnicodeScalar(0xfffd)!
       }
     }
 
