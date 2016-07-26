@@ -18,7 +18,7 @@ NSEnumeratorAPI.test("Sequence") {
 NSEnumeratorAPI.test("keyEnumerator") {
   let result = [1 as NSNumber: "one", 2 as NSNumber: "two"]
   expectEqualsUnordered(
-    [1, 2], NSDictionary(dictionary: result).keyEnumerator()) {
+    [1, 2], NSDictionary(dictionary: result as [AnyHashable: Any]).keyEnumerator()) {
       switch ($0 as! Int, $1 as! Int) {
       case let (x, y) where x == y: return .eq
       case let (x, y) where x < y: return .lt

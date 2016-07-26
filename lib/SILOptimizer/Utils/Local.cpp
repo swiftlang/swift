@@ -1426,6 +1426,11 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   assert(Src->getType().isAddress() && "Source should have an address type");
   assert(Dest->getType().isAddress() && "Source should have an address type");
 
+  auto srcIsLoadable = Src->getType().isLoadable(M);
+  // TODO: Handle address-only types.
+  if (!srcIsLoadable)
+    return nullptr;
+
   if (SILBridgedTy != Src->getType()) {
     // Check if we can simplify a cast into:
     // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.

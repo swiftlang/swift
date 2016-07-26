@@ -316,7 +316,8 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
 
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == constantType);
-    assert(fn->getLinkage() == linkage);
+    assert(fn->getLinkage() == constant.getLinkage(ForDefinition)
+           || fn->getLinkage() == constant.getLinkage(NotForDefinition));
     if (forDefinition) {
       // In all the cases where getConstantLinkage returns something
       // different for ForDefinition, it returns an available-externally

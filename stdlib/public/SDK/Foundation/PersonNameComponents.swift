@@ -138,6 +138,8 @@ extension PersonNameComponents : _ObjectiveCBridgeable {
 
 @available(OSX 10.11, iOS 9.0, *)
 extension NSPersonNameComponents : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
     public func _toCustomAnyHashable() -> AnyHashable? {
         return AnyHashable(self as PersonNameComponents)
     }
