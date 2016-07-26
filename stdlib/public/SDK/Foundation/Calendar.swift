@@ -115,7 +115,7 @@ public struct Calendar : CustomStringConvertible, CustomDebugStringConvertible, 
     // MARK: -
     // MARK: Bridging
     
-    private init(reference : NSCalendar) {
+    fileprivate init(reference : NSCalendar) {
         _handle = _MutableHandle(reference: reference)
         if __NSCalendarIsAutoupdating(reference) {
             _autoupdating = true

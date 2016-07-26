@@ -156,7 +156,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     
     // MARK: - Bridging Helpers
     
-    private init(nsIndexPath: ReferenceType) {
+    fileprivate init(nsIndexPath: ReferenceType) {
         let count = nsIndexPath.length
         if count == 0 {
             _indexes = []
@@ -171,7 +171,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         }
     }
     
-    private func makeReference() -> ReferenceType {
+    fileprivate func makeReference() -> ReferenceType {
         return _indexes.withUnsafeBufferPointer {
             return ReferenceType(indexes: $0.baseAddress, length: $0.count)
         }

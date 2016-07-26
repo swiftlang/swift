@@ -36,15 +36,15 @@ public struct URLThumbnailSizeKey : RawRepresentable, Hashable {
  As a convenience, volume resource values can be requested from any file system URL. The value returned will reflect the property value for the volume on which the resource is located.
 */
 public struct URLResourceValues {
-    private var _values: [URLResourceKey: Any]
-    private var _keys: Set<URLResourceKey>
+    fileprivate var _values: [URLResourceKey: Any]
+    fileprivate var _keys: Set<URLResourceKey>
     
     public init() {
         _values = [:]
         _keys = []
     }
     
-    private init(keys: Set<URLResourceKey>, values: [URLResourceKey: Any]) {
+    fileprivate init(keys: Set<URLResourceKey>, values: [URLResourceKey: Any]) {
         _values = values
         _keys = keys
     }
@@ -477,7 +477,7 @@ public struct URLResourceValues {
 */
 public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     public typealias ReferenceType = NSURL
-    private var _url : NSURL
+    fileprivate var _url : NSURL
     
     public typealias BookmarkResolutionOptions = NSURL.BookmarkResolutionOptions
     public typealias BookmarkCreationOptions = NSURL.BookmarkCreationOptions
@@ -1130,7 +1130,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
         }
     }
     
-    private init(reference: NSURL) {
+    fileprivate init(reference: NSURL) {
         _url = URL._converted(from: reference).copy() as! NSURL
     }
     

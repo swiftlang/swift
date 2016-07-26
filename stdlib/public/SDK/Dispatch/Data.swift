@@ -29,7 +29,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 		/// A custom deallocator
 		case custom(DispatchQueue?, @convention(block) () -> Void)
 
-		private var _deallocator: (DispatchQueue?, @convention(block) () -> Void) {
+		fileprivate var _deallocator: (DispatchQueue?, @convention(block) () -> Void) {
 			switch self {
 			case .free: return (nil, _dispatch_data_destructor_free())
 			case .unmap: return (nil, _dispatch_data_destructor_munmap())
@@ -38,7 +38,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 		}
 	}
 
-	private var __wrapped: __DispatchData
+	fileprivate var __wrapped: __DispatchData
 
 	/// Initialize a `Data` with copied memory content.
 	///

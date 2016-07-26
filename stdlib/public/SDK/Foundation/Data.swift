@@ -103,7 +103,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
         /// A custom deallocator.
         case custom((UnsafeMutablePointer<UInt8>, Int) -> Void)
         
-        private var _deallocator : ((UnsafeMutablePointer<Void>, Int) -> Void)? {
+        fileprivate var _deallocator : ((UnsafeMutablePointer<Void>, Int) -> Void)? {
             switch self {
             case .virtualMemory:
                 return { __NSDataInvokeDeallocatorVM($0, $1) }

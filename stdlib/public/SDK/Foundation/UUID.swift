@@ -27,7 +27,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
         }
     }
     
-    private init(reference: NSUUID) {
+    fileprivate init(reference: NSUUID) {
         var bytes: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         withUnsafeMutablePointer(&bytes) {
             reference.getBytes(unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self))
@@ -79,7 +79,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     
     // MARK: - Bridging Support
     
-    private var reference: NSUUID {
+    fileprivate var reference: NSUUID {
         var bytes = uuid
         return withUnsafePointer(&bytes) {
             return NSUUID(uuidBytes: unsafeBitCast($0, to: UnsafePointer<UInt8>.self))

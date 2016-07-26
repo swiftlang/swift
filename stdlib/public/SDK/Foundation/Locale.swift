@@ -34,7 +34,7 @@ public struct Locale : CustomStringConvertible, CustomDebugStringConvertible, Ha
     
     public typealias LanguageDirection = NSLocale.LanguageDirection
     
-    private var _wrapped : NSLocale
+    fileprivate var _wrapped : NSLocale
     private var _autoupdating : Bool
 
     /// Returns a locale which tracks the user's current preferences.
@@ -61,7 +61,7 @@ public struct Locale : CustomStringConvertible, CustomDebugStringConvertible, Ha
         _autoupdating = false
     }
     
-    private init(reference: NSLocale) {
+    fileprivate init(reference: NSLocale) {
         _wrapped = reference.copy() as! NSLocale
         if __NSLocaleIsAutoupdating(reference) {
             _autoupdating = true
