@@ -11,8 +11,8 @@ Swift 3.0
   @noreturn func fatalError(msg: String) { ... }  // old
   func fatalError(msg: String) -> Never { ... }   // new
 
-  func performOperation<T>(continuation: T -> Never) { ... }         // old
-  func performOperation<T>(continuation: @noreturn T -> ()) { ... }  // new
+  func performOperation<T>(continuation: @noreturn T -> ()) { ... }  // old
+  func performOperation<T>(continuation: T -> Never) { ... }         // new
   ```
 
 * [SE-0116](https://github.com/apple/swift-evolution/blob/master/proposals/0116-id-as-any.md):
