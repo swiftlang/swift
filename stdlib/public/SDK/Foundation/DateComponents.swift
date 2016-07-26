@@ -267,14 +267,6 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
         return _handle.map { $0.hash }
     }
     
-    public var description: String {
-        return _handle.map { $0.description }
-    }
-    
-    public var debugDescription: String {
-        return _handle.map { $0.debugDescription }
-    }
-
     // MARK: - Bridging Helpers
     
     fileprivate init(reference: NSDateComponents) {
@@ -288,6 +280,40 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
 
 }
 
+extension DateComponents : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    
+    public var description: String {
+        return self.customMirror.children.reduce("") {
+            $0.appending("\($1.label ?? ""): \($1.value) ")
+        }
+    }
+    
+    public var debugDescription: String {
+        return self.description
+    }
+    
+    public var customMirror: Mirror {
+        var c: [(label: String?, value: Any)] = []
+        if let r = calendar { c.append((label: "calendar", value: r)) }
+        if let r = timeZone { c.append((label: "timeZone", value: r)) }
+        if let r = era { c.append((label: "era", value: r)) }
+        if let r = year { c.append((label: "year", value: r)) }
+        if let r = month { c.append((label: "month", value: r)) }
+        if let r = day { c.append((label: "day", value: r)) }
+        if let r = hour { c.append((label: "hour", value: r)) }
+        if let r = minute { c.append((label: "minute", value: r)) }
+        if let r = second { c.append((label: "second", value: r)) }
+        if let r = nanosecond { c.append((label: "nanosecond", value: r)) }
+        if let r = weekday { c.append((label: "weekday", value: r)) }
+        if let r = weekdayOrdinal { c.append((label: "weekdayOrdinal", value: r)) }
+        if let r = quarter { c.append((label: "quarter", value: r)) }
+        if let r = weekOfMonth { c.append((label: "weekOfMonth", value: r)) }
+        if let r = weekOfYear { c.append((label: "weekOfYear", value: r)) }
+        if let r = yearForWeekOfYear { c.append((label: "yearForWeekOfYear", value: r)) }
+        if let r = isLeapMonth { c.append((label: "isLeapMonth", value: r)) }
+        return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
+    }
+}
 
 // MARK: - Bridging
 

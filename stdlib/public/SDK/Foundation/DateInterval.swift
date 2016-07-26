@@ -161,14 +161,6 @@ public struct DateInterval : ReferenceConvertible, Comparable, Hashable {
         }
     }
     
-    public var description: String {
-        return "(Start Date) \(start) + (Duration) \(duration) seconds = (End Date) \(end)"
-    }
-    
-    public var debugDescription: String {
-        return description
-    }
-
     @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     public static func ==(lhs: DateInterval, rhs: DateInterval) -> Bool {
         return lhs.start == rhs.start && lhs.duration == rhs.duration
@@ -178,7 +170,25 @@ public struct DateInterval : ReferenceConvertible, Comparable, Hashable {
     public static func <(lhs: DateInterval, rhs: DateInterval) -> Bool {
         return lhs.compare(rhs) == .orderedAscending
     }
+}
 
+@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+extension DateInterval : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    public var description: String {
+        return "\(start) to \(end)"
+    }
+    
+    public var debugDescription: String {
+        return description
+    }
+
+    public var customMirror: Mirror {
+        var c: [(label: String?, value: Any)] = []
+        c.append((label: "start", value: start))
+        c.append((label: "end", value: end))
+        c.append((label: "duration", value: duration))
+        return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
+    }
 }
 
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)

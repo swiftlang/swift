@@ -724,14 +724,6 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     public mutating func shift(startingAt integer: Element, by delta: IndexSet.IndexDistance) {
         _applyMutation { $0.shiftIndexesStarting(at: integer, by: delta) }
     }
-
-    public var description: String {
-        return _handle.map { $0.description }
-    }
-    
-    public var debugDescription: String {
-        return _handle.map { $0.debugDescription }
-    }
     
     // Temporary boxing function, until we can get a native Swift type for NSIndexSet
     @inline(__always)
@@ -774,6 +766,22 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     
     fileprivate init(reference: NSIndexSet) {
         _handle = _MutablePairHandle(reference)
+    }
+}
+
+extension IndexSet : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    public var description: String {
+        return "\(count) indexes"
+    }
+    
+    public var debugDescription: String {
+        return "\(count) indexes"
+    }
+
+    public var customMirror: Mirror {
+        var c: [(label: String?, value: Any)] = []
+        c.append((label: "ranges", value: rangeView.map { $0 }))
+        return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
 }
 

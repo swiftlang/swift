@@ -94,6 +94,21 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
     }
 }
 
+extension Notification: CustomReflectable {
+    public var customMirror: Mirror {
+        var children: [(label: String?, value: Any)] = []
+        children.append((label: "name", value: self.name.rawValue))
+        if let o = self.object {
+            children.append((label: "object", value: o))
+        }
+        if let u = self.userInfo {
+            children.append((label: "userInfo", value: u))
+        }
+        let m = Mirror(self, children:children, displayStyle: Mirror.DisplayStyle.class)
+        return m
+    }
+}
+
 extension Notification : _ObjectiveCBridgeable {
     public static func _getObjectiveCType() -> Any.Type {
         return NSNotification.self

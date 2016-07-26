@@ -29,7 +29,7 @@ internal func __NSLocaleBackstop() -> NSLocale
  
  Locales are typically used to provide, format, and interpret information about and according to the user's customs and preferences. They are frequently used in conjunction with formatters. Although you can use many locales, you usually use the one associated with the current user.
 */
-public struct Locale : CustomStringConvertible, CustomDebugStringConvertible, Hashable, Equatable, ReferenceConvertible {
+public struct Locale : Hashable, Equatable, ReferenceConvertible {
     public typealias ReferenceType = NSLocale
     
     public typealias LanguageDirection = NSLocale.LanguageDirection
@@ -414,14 +414,6 @@ public struct Locale : CustomStringConvertible, CustomDebugStringConvertible, Ha
     // MARK: -
     //
     
-    public var description: String {
-        return _wrapped.description
-    }
-    
-    public var debugDescription : String {
-        return _wrapped.debugDescription
-    }
-    
     public var hashValue : Int {
         if _autoupdating {
             return 1
@@ -439,6 +431,32 @@ public struct Locale : CustomStringConvertible, CustomDebugStringConvertible, Ha
     }
 }
 
+extension Locale : CustomDebugStringConvertible, CustomStringConvertible, CustomReflectable {
+    private var _kindDescription : String {
+        if (self == Locale.autoupdatingCurrent) {
+            return "autoupdatingCurrent"
+        } else if (self == Locale.current) {
+            return "current"
+        } else {
+            return "fixed"
+        }
+    }
+    
+    public var customMirror : Mirror {
+        var c: [(label: String?, value: Any)] = []
+        c.append((label: "identifier", value: identifier))
+        c.append((label: "kind", value: _kindDescription))
+        return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
+    }
+    
+    public var description: String {
+        return "\(identifier) (\(_kindDescription))"
+    }
+    
+    public var debugDescription : String {
+        return "\(identifier) (\(_kindDescription))"
+    }
+}
 
 extension Locale : _ObjectiveCBridgeable {
     @_semantics("convertToObjectiveC")

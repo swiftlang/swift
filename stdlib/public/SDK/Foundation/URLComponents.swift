@@ -15,7 +15,7 @@
 /// A structure designed to parse URLs based on RFC 3986 and to construct URLs from their constituent parts. 
 /// 
 /// Its behavior differs subtly from the `URL` struct, which conforms to older RFCs. However, you can easily obtain a `URL` based on the contents of a `URLComponents` or vice versa.
-public struct URLComponents : ReferenceConvertible, Hashable, CustomStringConvertible, Equatable, _MutableBoxing {
+public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _MutableBoxing {
     public typealias ReferenceType = NSURLComponents
     
     internal var _handle: _MutableHandle<NSURLComponents>
@@ -291,14 +291,6 @@ public struct URLComponents : ReferenceConvertible, Hashable, CustomStringConver
         set { _applyMutation { $0.queryItems = newValue?.map { $0 } } }
     }
     
-    public var description: String {
-        return _handle.map { $0.description }
-    }
-    
-    public var debugDescription: String {
-        return _handle.map { $0.debugDescription }
-    }
-
     public var hashValue: Int {
         return _handle.map { $0.hash }
     }
@@ -312,6 +304,41 @@ public struct URLComponents : ReferenceConvertible, Hashable, CustomStringConver
     public static func ==(lhs: URLComponents, rhs: URLComponents) -> Bool {
         // Don't copy references here; no one should be storing anything
         return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+    }
+}
+
+extension URLComponents : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    
+    public var description: String {
+        if let u = url {
+            return u.description
+        } else {
+            return self.customMirror.children.reduce("") {
+                $0.appending("\($1.label ?? ""): \($1.value) ")
+            }
+        }
+    }
+    
+    public var debugDescription: String {
+        return self.description
+    }    
+
+    public var customMirror: Mirror {
+        var c: [(label: String?, value: Any)] = []
+        
+        if let s = self.scheme { c.append((label: "scheme", value: s)) }
+        if let u = self.user { c.append((label: "user", value: u)) }
+        if let pw = self.password { c.append((label: "password", value: pw)) }
+        if let h = self.host { c.append((label: "host", value: h)) }
+        if let p = self.port { c.append((label: "port", value: p)) }
+        
+        c.append((label: "path", value: self.path))
+        if #available(OSX 10.10, iOS 8.0, *) {
+            if let qi = self.queryItems { c.append((label: "queryItems", value: qi )) }
+        }
+        if let f = self.fragment { c.append((label: "fragment", value: f)) }
+        let m = Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
+        return m
     }
 }
 
@@ -346,7 +373,7 @@ extension URLComponents : _ObjectiveCBridgeable {
 
 /// A single name-value pair, for use with `URLComponents`.
 @available(OSX 10.10, iOS 8.0, *)
-public struct URLQueryItem : ReferenceConvertible, Hashable, Equatable, CustomStringConvertible {
+public struct URLQueryItem : ReferenceConvertible, Hashable, Equatable {
     public typealias ReferenceType = NSURLQueryItem
     
     fileprivate var _queryItem : NSURLQueryItem
@@ -368,13 +395,34 @@ public struct URLQueryItem : ReferenceConvertible, Hashable, Equatable, CustomSt
         set { _queryItem = NSURLQueryItem(name: name, value: newValue) }
     }
     
-    public var description: String { return _queryItem.description }
-    public var debugDescription: String { return _queryItem.debugDescription }
     public var hashValue: Int { return _queryItem.hash }
 
     @available(OSX 10.10, iOS 8.0, *)
     public static func ==(lhs: URLQueryItem, rhs: URLQueryItem) -> Bool {
         return lhs._queryItem.isEqual(rhs as NSURLQueryItem)
+    }
+}
+
+@available(OSX 10.10, iOS 8.0, *)
+extension URLQueryItem : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    
+    public var description: String {
+        if let v = value {
+            return "\(name)=\(v)"
+        } else {
+            return name
+        }
+    }
+    
+    public var debugDescription: String {
+        return self.description
+    }
+
+    public var customMirror: Mirror {
+        var c: [(label: String?, value: Any)] = []
+        c.append((label: "name", value: name))
+        c.append((label: "value", value: value))
+        return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
 }
 

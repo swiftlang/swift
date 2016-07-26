@@ -27,7 +27,7 @@ internal func __NSCalendarInit(_ identifier : NSString) -> NSCalendar?
 /**
  `Calendar` encapsulates information about systems of reckoning time in which the beginning, length, and divisions of a year are defined. It provides information about the calendar and support for calendrical computations such as determining the range of a given calendrical unit and adding units to a given absolute time.
 */
-public struct Calendar : CustomStringConvertible, CustomDebugStringConvertible, Hashable, Equatable, ReferenceConvertible, _MutableBoxing {
+public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxing {
     public typealias ReferenceType = NSCalendar
     
     private var _autoupdating: Bool
@@ -908,14 +908,6 @@ public struct Calendar : CustomStringConvertible, CustomDebugStringConvertible, 
     
     // MARK: -
     
-    public var description: String {
-        return _handle.map { $0.description }
-    }
-    
-    public var debugDescription : String {
-        return _handle.map { $0.debugDescription }
-    }
-    
     public var hashValue : Int {
         // We implement hash ourselves, because we need to make sure autoupdating calendars have the same hash
         if _autoupdating {
@@ -1079,6 +1071,37 @@ public struct Calendar : CustomStringConvertible, CustomDebugStringConvertible, 
         }
     }
 
+}
+
+extension Calendar : CustomDebugStringConvertible, CustomStringConvertible, CustomReflectable {
+    private var _kindDescription : String {
+        if (self == Calendar.autoupdatingCurrent) {
+            return "autoupdatingCurrent"
+        } else if (self == Calendar.current) {
+            return "current"
+        } else {
+            return "fixed"
+        }
+    }
+    
+    public var description: String {
+        return "\(identifier) (\(_kindDescription))"
+    }
+    
+    public var debugDescription : String {
+        return "\(identifier) (\(_kindDescription))"
+    }
+    
+    public var customMirror : Mirror {
+        var c: [(label: String?, value: Any)] = []
+        c.append((label: "identifier", value: identifier))
+        c.append((label: "kind", value: _kindDescription))
+        c.append((label: "locale", value: locale))
+        c.append((label: "timeZone", value: timeZone))
+        c.append((label: "firstWeekday", value: firstWeekday))
+        c.append((label: "minimumDaysInFirstWeek", value: minimumDaysInFirstWeek))
+        return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
+    }
 }
 
 extension Calendar : _ObjectiveCBridgeable {

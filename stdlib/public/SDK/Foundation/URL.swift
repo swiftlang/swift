@@ -475,7 +475,7 @@ public struct URLResourceValues {
  
  URLs are the preferred way to refer to local files. Most objects that read data from or write data to a file have methods that accept a URL instead of a pathname as the file reference. For example, you can get the contents of a local file URL as `String` by calling `func init(contentsOf:encoding) throws`, or as a `Data` by calling `func init(contentsOf:options) throws`.
 */
-public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
+public struct URL : ReferenceConvertible, Equatable {
     public typealias ReferenceType = NSURL
     fileprivate var _url : NSURL
     
@@ -572,16 +572,6 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
         _url = URL._converted(from: NSURL(fileURLWithFileSystemRepresentation: path, isDirectory: isDirectory, relativeTo: baseURL))
     }
     
-    // MARK: -
-    
-    public var description: String {
-        return _url.description
-    }
-
-    public var debugDescription: String {
-        return _url.debugDescription
-    }
-
     public var hashValue: Int {
         return _url.hash
     }
@@ -1164,6 +1154,16 @@ extension URL : _ObjectiveCBridgeable {
         var result: URL? = nil
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
+    }
+}
+
+extension URL : CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String {
+        return _url.description
+    }
+    
+    public var debugDescription: String {
+        return _url.debugDescription
     }
 }
 
