@@ -1112,7 +1112,7 @@ public:
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprKeyPath();
   ParserResult<Expr> parseExprSelector();
-  ParserResult<Expr> parseExprSuper();
+  ParserResult<Expr> parseExprSuper(bool isExprBasic);
   ParserResult<Expr> parseExprConfiguration();
   ParserResult<Expr> parseExprStringLiteral();
 
@@ -1180,6 +1180,19 @@ public:
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
 
+  /// Parse an expression list, keeping all of the pieces separated.
+  ParserStatus parseExprList(tok leftTok, tok rightTok,
+                             bool isPostfix,
+                             bool isExprBasic,
+                             SourceLoc &leftLoc,
+                             SmallVectorImpl<Expr *> &exprs,
+                             SmallVectorImpl<Identifier> &exprLabels,
+                             SmallVectorImpl<SourceLoc> &exprLabelLocs,
+                             SourceLoc &rightLoc,
+                             Expr *&trailingClosure);
+
+  ParserResult<Expr> parseTrailingClosure(SourceRange callee);
+
   // NOTE: used only for legacy support for old object literal syntax.
   // Will be removed in the future.
   bool isCollectionLiteralStartingWithLSquareLit();
@@ -1189,12 +1202,10 @@ public:
   /// \param LK The literal kind as determined by the first token.
   /// \param NewName New name for a legacy literal.
   ParserResult<Expr> parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LK,
+                                            bool isExprBasic,
                                             StringRef NewName = StringRef());
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
-                                         Identifier firstSelectorPiece
-                                           = Identifier(),
-                                         SourceLoc firstSelectorPieceLoc
-                                           = SourceLoc());
+                                         bool isExprBasic);
   ParserResult<Expr> parseExprCollection(SourceLoc LSquareLoc = SourceLoc());
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc, Expr *FirstExpr);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc, Expr *FirstKey);

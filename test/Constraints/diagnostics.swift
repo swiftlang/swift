@@ -319,9 +319,11 @@ func rdar19804707() {
 
   knownOps = .BinaryOperator({$1 - $0})
 
-  // FIXME: rdar://19804707 - These two statements should be accepted by the type checker.
-  knownOps = .BinaryOperator(){$1 - $0} // expected-error {{reference to member 'BinaryOperator' cannot be resolved without a contextual type}}
-  knownOps = .BinaryOperator{$1 - $0}   // expected-error {{reference to member 'BinaryOperator' cannot be resolved without a contextual type}}
+  // rdar://19804707 - trailing closures for contextual member references.
+  knownOps = .BinaryOperator(){$1 - $0}
+  knownOps = .BinaryOperator{$1 - $0}
+
+  _ = knownOps
 }
 
 

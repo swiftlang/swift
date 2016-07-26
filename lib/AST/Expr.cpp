@@ -1127,6 +1127,11 @@ static Expr *packSingleArgument(
     }
 
     // Construct the argument tuple.
+    if (argLabels.empty() && !args.empty()) {
+      argLabelsScratch.assign(args.size(), Identifier());
+      argLabels = argLabelsScratch;
+    }
+      
     auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels, argLabelLocs,
                                  rParenLoc, /*hasTrailingClosure=*/false,
                                  /*implicit=*/false);
@@ -1146,28 +1151,36 @@ static Expr *packSingleArgument(
     return arg;
   }
 
+  assert(argLabels.empty() || args.size() == argLabels.size());
+
   // Form a tuple, including the trailing closure.
   SmallVector<Expr *, 4> argsScratch;
   argsScratch.reserve(args.size() + 1);
   argsScratch.append(args.begin(), args.end());
   argsScratch.push_back(trailingClosure);
-  auto arg = TupleExpr::create(ctx, lParenLoc, argsScratch, argLabels,
+  args = argsScratch;
+
+  argLabelsScratch.reserve(args.size());
+  if (argLabels.empty()) {
+    argLabelsScratch.assign(args.size(), Identifier());
+  } else {
+    argLabelsScratch.append(argLabels.begin(), argLabels.end());
+    argLabelsScratch.push_back(Identifier());
+  }
+  argLabels = argLabelsScratch;
+
+  if (!argLabelLocs.empty()) {
+    argLabelLocsScratch.reserve(argLabelLocs.size() + 1);
+    argLabelLocsScratch.append(argLabelLocs.begin(), argLabelLocs.end());
+    argLabelLocsScratch.push_back(SourceLoc());
+    argLabelLocs = argLabelLocsScratch;
+  }
+
+  auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels,
                                argLabelLocs, rParenLoc,
                                /*hasTrailingClosure=*/true,
                                /*implicit=*/false);
   computeSingleArgumentType(ctx, arg, implicit);
-
-  argLabelsScratch.reserve(argLabelsScratch.size() + 1);
-  argLabelsScratch.append(argLabels.begin(), argLabels.end());
-  argLabelsScratch.push_back(Identifier());
-  argLabels = argLabelsScratch;
-
-  if (!argLabelLocs.empty() || argLabels.empty()) {
-    argLabelLocsScratch.reserve(argLabelLocs.size() + 1);
-    argLabelLocsScratch.append(argLabelLocs.begin(), argLabelLocs.end());
-    argLabelLocsScratch.push_back(SourceLoc());
-  }
-  argLabelLocs = argLabelLocsScratch;
 
   return arg;
 }
