@@ -1,0 +1,20 @@
+
+var INTEL_LENGTH: Int32 { get }
+var OID_ISO_CCITT_DIR_SERVICE: Int32 { get }
+var OID_DS: Int32 { get }
+var OID_DS_LENGTH: Int32 { get }
+var OID_ISO_STANDARD: Int32 { get }
+var OID_ISO_MEMBER: Int32 { get }
+var OID_ISO_IDENTIFIED_ORG: Int32 { get }
+var OID_ITU_RFCDATA_MEMBER_LENGTH: Int32 { get }
+var OID_ITU_RFCDATA: Int32 { get }
+var OID_ISO_MEMBER_LENGTH: Int32 { get }
+var OID_ANSI_X9_62_LEN: Int32 { get }
+var OID_PKIX_LENGTH: Int32 { get }
+var OID_ETSI_LENGTH: Int32 { get }
+var OID_ETSI_QCS_LENGTH: Int32 { get }
+var OID_OIW_LENGTH: Int32 { get }
+var OID_NIST_HASHALG_LENGTH: Int32 { get }
+var OID_KERBv5_LEN: Int32 { get }
+var OID_CERTICOM_LEN: Int32 { get }
+var NETSCAPE_BASE_OID_LEN: Int32 { get }

@@ -1,0 +1,11 @@
+
+typealias CMItemCount = Int
+typealias CMItemIndex = Int
+var COREMEDIA_DECLARE_NULLABILITY: Int32 { get }
+var COREMEDIA_DECLARE_NULLABILITY_BEGIN_END: Int32 { get }
+var COREMEDIA_DECLARE_BRIDGED_TYPES: Int32 { get }
+var COREMEDIA_DECLARE_RETURNS_RETAINED: Int32 { get }
+var COREMEDIA_DECLARE_RETURNS_RETAINED_ON_PARAMETERS: Int32 { get }
+var COREMEDIA_DECLARE_RETURNS_NOT_RETAINED_ON_PARAMETERS: Int32 { get }
+typealias CMPersistentTrackID = Int32
+var kCMPersistentTrackID_Invalid: CMPersistentTrackID { get }

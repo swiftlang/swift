@@ -1,0 +1,36 @@
+
+var NSCoreDataVersionNumber: Double
+var NSCoreDataVersionNumber10_4: Double { get }
+var NSCoreDataVersionNumber10_4_3: Double { get }
+var NSCoreDataVersionNumber10_5: Double { get }
+var NSCoreDataVersionNumber10_5_3: Double { get }
+var NSCoreDataVersionNumber10_6: Double { get }
+var NSCoreDataVersionNumber10_6_2: Double { get }
+var NSCoreDataVersionNumber10_6_3: Double { get }
+var NSCoreDataVersionNumber10_7: Double { get }
+var NSCoreDataVersionNumber10_7_2: Double { get }
+var NSCoreDataVersionNumber10_7_3: Double { get }
+var NSCoreDataVersionNumber10_7_4: Double { get }
+var NSCoreDataVersionNumber10_8: Double { get }
+var NSCoreDataVersionNumber10_8_2: Double { get }
+var NSCoreDataVersionNumber10_9: Double { get }
+var NSCoreDataVersionNumber10_9_2: Double { get }
+var NSCoreDataVersionNumber10_9_3: Double { get }
+var NSCoreDataVersionNumber10_10: Double { get }
+var NSCoreDataVersionNumber10_10_2: Double { get }
+var NSCoreDataVersionNumber10_10_3: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_3_0: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_3_1: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_3_2: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_4_0: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_4_1: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_4_2: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_4_3: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_5_0: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_5_1: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_6_0: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_6_1: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_7_0: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_7_1: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_8_0: Double { get }
+var NSCoreDataVersionNumber_iPhoneOS_8_3: Double { get }

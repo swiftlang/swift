@@ -1,0 +1,2 @@
+
+let GKVoiceChatServiceErrorDomain: String

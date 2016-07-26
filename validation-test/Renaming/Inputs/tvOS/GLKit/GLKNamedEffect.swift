@@ -1,0 +1,4 @@
+
+protocol GLKNamedEffect {
+  func prepareToDraw()
+}
