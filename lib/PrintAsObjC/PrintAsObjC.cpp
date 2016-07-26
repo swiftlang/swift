@@ -1246,7 +1246,7 @@ private:
     os << (isMetatype ? "Class" : "id");
 
     auto proto = PT->getDecl();
-    assert(proto->isObjC());
+    assert(proto->isObjC() || *proto->getKnownProtocolKind() == KnownProtocolKind::Error);
     if (auto knownKind = proto->getKnownProtocolKind()) {
       if (*knownKind == KnownProtocolKind::AnyObject) {
         printNullability(optionalKind);
@@ -1630,7 +1630,8 @@ public:
 
   void forwardDeclare(const ProtocolDecl *PD) {
     assert(PD->isObjC() ||
-           *PD->getKnownProtocolKind() == KnownProtocolKind::AnyObject);
+           *PD->getKnownProtocolKind() == KnownProtocolKind::AnyObject ||
+           *PD->getKnownProtocolKind() == KnownProtocolKind::Error);
     forwardDeclare(PD, [&]{
       os << "@protocol " << getNameForObjC(PD) << ";\n";
     });
