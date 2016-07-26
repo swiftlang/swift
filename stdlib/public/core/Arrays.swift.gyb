@@ -1484,8 +1484,6 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 extension ${Self} {
-  @_versioned
-  @_transparent
   internal func _cPointerArgs() -> (AnyObject?, UnsafePointer<Void>?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
