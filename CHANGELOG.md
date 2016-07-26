@@ -3,6 +3,11 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0131](https://github.com/apple/swift-evolution/blob/master/proposals/0131-anyhashable.md):
+  The standard library provides a new type `AnyHashable` for use in heterogenous
+  hashed collections. Untyped `NSDictionary` and `NSSet` APIs from Objective-C
+  now import as `[AnyHashable: Any]` and `Set<AnyHashable>`.
+
 * [SE-0102](https://github.com/apple/swift-evolution/blob/master/proposals/0102-noreturn-bottom-type.md)
   The `@noreturn` attribute on function declarations and function types has been removed,
   in favor of an empty `Never` type:
@@ -18,7 +23,7 @@ Swift 3.0
 * [SE-0116](https://github.com/apple/swift-evolution/blob/master/proposals/0116-id-as-any.md):
   Objective-C APIs using `id` now import into Swift as `Any` instead of as `AnyObject`.
   Similarly, APIs using untyped `NSArray` and `NSDictionary` import as `[Any]` and
-  `[NSObject: Any]`, respectively.
+  `[AnyHashable: Any]`, respectively.
 
 * [SE-0072](https://github.com/apple/swift-evolution/blob/master/proposals/0072-eliminate-implicit-bridging-conversions.md):
   Bridging conversions are no longer implicit. The conversion from a Swift value type to

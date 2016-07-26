@@ -97,10 +97,10 @@ ErrorBridgingTests.test("NSError-to-enum bridging") {
     let ns = NSError(domain: NSCocoaErrorDomain,
                      code: NSFileNoSuchFileError,
                      userInfo: [
-                       NSFilePathErrorKey as NSObject : "/dev/null",
-                       NSStringEncodingErrorKey as NSObject: /*ASCII=*/1,
-                       NSUnderlyingErrorKey as NSObject: underlyingError,
-                       NSURLErrorKey as NSObject: testURL
+                       AnyHashable(NSFilePathErrorKey): "/dev/null",
+                       AnyHashable(NSStringEncodingErrorKey): /*ASCII=*/1,
+                       AnyHashable(NSUnderlyingErrorKey): underlyingError,
+                       AnyHashable(NSURLErrorKey): testURL
                      ])
 
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
@@ -143,7 +143,7 @@ ErrorBridgingTests.test("NSError-to-enum bridging") {
     // URLError domain
     let nsURL = NSError(domain: NSURLErrorDomain,
                         code: NSURLErrorBadURL,
-                        userInfo: [NSURLErrorFailingURLErrorKey as NSObject : testURL])
+                        userInfo: [AnyHashable(NSURLErrorFailingURLErrorKey): testURL])
     let eURL: Error = nsURL
     let isBadURLError: Bool
     switch eURL {
@@ -162,7 +162,7 @@ ErrorBridgingTests.test("NSError-to-enum bridging") {
     // CoreLocation error domain
     let nsCL = NSError(domain: kCLErrorDomain,
                        code: CLError.headingFailure.rawValue,
-                       userInfo: [NSURLErrorKey as NSObject: testURL])
+                       userInfo: [AnyHashable(NSURLErrorKey): testURL])
     let eCL: Error = nsCL
     let isHeadingFailure: Bool
     switch eCL {
@@ -318,7 +318,7 @@ class SomeNSErrorSubclass: NSError {}
 ErrorBridgingTests.test("Thrown NSError identity is preserved") {
   do {
     let e = NSError(domain: "ClericalError", code: 219,
-                    userInfo: ["yeah": "yeah"])
+                    userInfo: [AnyHashable("yeah"): "yeah"])
     do {
       throw e
     } catch let e2 as NSError {
@@ -331,7 +331,7 @@ ErrorBridgingTests.test("Thrown NSError identity is preserved") {
 
   do {
     let f = SomeNSErrorSubclass(domain: "ClericalError", code: 219,
-                                userInfo: ["yeah": "yeah"])
+                                userInfo: [AnyHashable("yeah"): "yeah"])
     do {
       throw f
     } catch let f2 as NSError {
