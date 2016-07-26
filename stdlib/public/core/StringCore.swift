@@ -614,7 +614,7 @@ extension _StringCore : RangeReplaceableCollection {
     let appending = bounds.lowerBound == endIndex
 
     let existingStorage = !hasCocoaBuffer && (
-      appending || isUniquelyReferencedNonObjC(&_owner)
+      appending || isKnownUniquelyReferenced(&_owner)
     ) ? _claimCapacity(newCount, minElementWidth: width).1 : nil
 
     if _fastPath(existingStorage != nil) {
@@ -666,7 +666,7 @@ extension _StringCore : RangeReplaceableCollection {
 
   public mutating func reserveCapacity(_ n: Int) {
     if _fastPath(!hasCocoaBuffer) {
-      if _fastPath(isUniquelyReferencedNonObjC(&_owner)) {
+      if _fastPath(isKnownUniquelyReferenced(&_owner)) {
 
         let bounds: Range<UnsafePointer<_RawByte>>
           = UnsafePointer(_pointer(toElementAt:0))..<UnsafePointer(_pointer(toElementAt:count))

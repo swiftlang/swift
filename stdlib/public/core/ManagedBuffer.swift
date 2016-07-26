@@ -12,14 +12,6 @@
 
 import SwiftShims
 
-/// A common base class for classes that need to be non-`@objc`,
-/// recognizably in the type system.
-///
-/// - SeeAlso: `isUniquelyReferenced`
-public class NonObjectiveCBase {
-  public init() {}
-}
-
 /// A base class of `ManagedBuffer<Header, Element>`, used during
 /// instance creation.
 ///
@@ -28,7 +20,7 @@ public class NonObjectiveCBase {
 /// `header` property is as-yet uninitialized, and therefore
 /// `ManagedProtoBuffer` does not offer access to the as-yet
 /// uninitialized `header` property of `ManagedBuffer`.
-public class ManagedProtoBuffer<Header, Element> : NonObjectiveCBase {
+public class ManagedProtoBuffer<Header, Element> {
   /// The actual number of elements that can be stored in this object.
   ///
   /// This header may be nontrivial to compute; it is usually a good
@@ -299,16 +291,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// Returns `true` iff `self` holds the only strong reference to its buffer.
   ///
   /// See `isUniquelyReferenced` for details.
-  public mutating func holdsUniqueReference() -> Bool {
+  public mutating func isUniqueReference() -> Bool {
     return _isUnique(&_nativeBuffer)
-  }
-
-  /// Returns `true` iff either `self` holds the only strong reference
-  /// to its buffer or the pinned has been 'pinned'.
-  ///
-  /// See `isUniquelyReferenced` for details.
-  public mutating func holdsUniqueOrPinnedReference() -> Bool {
-    return _isUniqueOrPinned(&_nativeBuffer)
   }
 
   //===--- internal/private API -------------------------------------------===//
@@ -453,6 +437,10 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
       toAlignment: alignof(Element.self))
   }
 
+  internal mutating func _isUniqueOrPinnedReference() -> Bool {
+    return _isUniqueOrPinned(&_nativeBuffer)
+  }
+
   internal var _nativeBuffer: Builtin.NativeObject
 }
 
@@ -466,39 +454,7 @@ public func == <Header, Element>(
 // FIXME: when our calling convention changes to pass self at +0,
 // inout should be dropped from the arguments to these functions.
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with
-/// a single strong reference.
-///
-/// * Does *not* modify `object`; the use of `inout` is an
-///   implementation artifact.
-/// * If `object` is an Objective-C class instance, returns `false`.
-/// * Weak references do not affect the result of this function.
-///
-/// Useful for implementing the copy-on-write optimization for the
-/// deep storage of value types:
-///
-///     mutating func modifyMe(_ arg: X) {
-///       if isUniquelyReferencedNonObjC(&myStorage) {
-///         myStorage.modifyInPlace(arg)
-///       }
-///       else {
-///         myStorage = self.createModified(myStorage, arg)
-///       }
-///     }
-///
-/// This function is safe to use for `mutating` functions in
-/// multithreaded code because a false positive would imply that there
-/// is already a user-level data race on the value being mutated.
-public func isUniquelyReferencedNonObjC<T : AnyObject>(_ object: inout T) -> Bool
-{
-  return _isUnique(&object)
-}
-
-internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(_ object: inout T) -> Bool {
-  return _isUniqueOrPinned(&object)
-}
-
-/// Returns `true` iff `object` is a non-`@objc` class instance with a single
+/// Returns `true` iff `object` is known to be a class instance with a single
 /// strong reference.
 ///
 /// * Does *not* modify `object`; the use of `inout` is an
@@ -509,36 +465,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(_ object: inout
 /// deep storage of value types:
 ///
 ///     mutating func modifyMe(_ arg: X) {
-///       if isUniquelyReferenced(&myStorage) {
-///         myStorage.modifyInPlace(arg)
-///       }
-///       else {
-///         myStorage = myStorage.createModified(arg)
-///       }
-///     }
-///
-/// This function is safe to use for `mutating` functions in
-/// multithreaded code because a false positive would imply that there
-/// is already a user-level data race on the value being mutated.
-public func isUniquelyReferenced<T : NonObjectiveCBase>(
-  _ object: inout T
-) -> Bool {
-  return _isUnique(&object)
-}
-
-/// Returns `true` iff `object` is a non-`@objc` class instance with
-/// a single strong reference.
-///
-/// * Does *not* modify `object`; the use of `inout` is an
-///   implementation artifact.
-/// * If `object` is an Objective-C class instance, returns `false`.
-/// * Weak references do not affect the result of this function.
-///
-/// Useful for implementing the copy-on-write optimization for the
-/// deep storage of value types:
-///
-///     mutating func modifyMe(_ arg: X) {
-///       if isUniquelyReferencedNonObjC(&myStorage) {
+///       if isKnownUniquelyReferenced(&myStorage) {
 ///         myStorage.modifyInPlace(arg)
 ///       }
 ///       else {
@@ -549,7 +476,38 @@ public func isUniquelyReferenced<T : NonObjectiveCBase>(
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
-public func isUniquelyReferencedNonObjC<T : AnyObject>(
+public func isKnownUniquelyReferenced<T : AnyObject>(_ object: inout T) -> Bool
+{
+  return _isUnique(&object)
+}
+
+internal func _isKnownUniquelyReferencedOrPinned<T : AnyObject>(_ object: inout T) -> Bool {
+  return _isUniqueOrPinned(&object)
+}
+
+/// Returns `true` iff `object` is known to be a class instance with a single
+/// strong reference.
+///
+/// * Does *not* modify `object`; the use of `inout` is an
+///   implementation artifact.
+/// * Weak references do not affect the result of this function.
+///
+/// Useful for implementing the copy-on-write optimization for the
+/// deep storage of value types:
+///
+///     mutating func modifyMe(_ arg: X) {
+///       if isKnownUniquelyReferenced(&myStorage) {
+///         myStorage.modifyInPlace(arg)
+///       }
+///       else {
+///         myStorage = self.createModified(myStorage, arg)
+///       }
+///     }
+///
+/// This function is safe to use for `mutating` functions in
+/// multithreaded code because a false positive would imply that there
+/// is already a user-level data race on the value being mutated.
+public func isKnownUniquelyReferenced<T : AnyObject>(
   _ object: inout T?
 ) -> Bool {
   return _isUnique(&object)
@@ -560,4 +518,39 @@ extension ManagedBufferPointer {
   public var allocatedElementCount: Int {
     Builtin.unreachable()
   }
+
+  @available(*, unavailable, renamed: "isUniqueReference")
+  public mutating func holdsUniqueReference() -> Bool {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, message: "this API is no longer available")
+  public mutating func holdsUniqueOrPinnedReference() -> Bool {
+    Builtin.unreachable()
+  }
+}
+
+@available(*, unavailable, renamed: "isKnownUniquelyReferenced")
+public func isUniquelyReferenced<T>(
+  _ object: inout T
+) -> Bool {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message: "use isKnownUniquelyReferenced instead")
+public class NonObjectiveCBase {}
+
+
+@available(*, unavailable, renamed: "isKnownUniquelyReferenced")
+public func isUniquelyReferencedNonObjC<T : AnyObject>(
+_ object: inout T
+) -> Bool {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, renamed: "isKnownUniquelyReferenced")
+public func isUniquelyReferencedNonObjC<T : AnyObject>(
+  _ object: inout T?
+) -> Bool {
+  Builtin.unreachable()
 }

@@ -734,7 +734,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         case .Default(_):
             break
         case .Mutable(_):
-            unique = isUniquelyReferencedNonObjC(&_handle)
+            unique = isKnownUniquelyReferenced(&_handle)
         }
         
         switch _handle._pointer {
