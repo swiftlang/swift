@@ -363,6 +363,8 @@ extension CGFloat : CustomReflectable {
   }
 }
 
+extension CGFloat: _SupportsNaNCheck {}
+
 //===----------------------------------------------------------------------===//
 // Standard Operator Table
 //===----------------------------------------------------------------------===//

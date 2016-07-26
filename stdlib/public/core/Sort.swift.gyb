@@ -19,6 +19,16 @@ def cmp(a, b, p):
 
 }%
 
+/// Used to fix incorrect sorting result when NaN values are involved.
+/// While the FloatingPoint protocol has this same definition, its
+/// Self requirements mean we cannot use the `is` or `as` operators
+/// to check if a variable conforms. Marking the floating point types
+/// as conforming to this protocol allows us to both check if a variable
+/// supports the NaN check and to actually perform that check.
+public protocol _SupportsNaNCheck {
+  var isNaN: Bool { get }
+}
+
 // Generate two versions of sorting functions: one with an explicitly passed
 // predicate 'areInIncreasingOrder' and the other for Comparable types that don't
 // need such a predicate.
@@ -43,9 +53,39 @@ func _insertionSort<C>(
     // One element is trivially already-sorted, thus pre-increment
     // Continue until the sorted elements cover the whole sequence
     elements.formIndex(after: &sortedEnd)
+
+%     if not p:
+    // If NaN is encountered, we move it out of the way and
+    // update the range to be sorted; so we need variable access
+    // to range
+    var range = range
+
+    // If the elements in this collection can't be represented
+    // as NaN, don't attempt to repeatedly check for it later.
+    // Safe to find type from first element as the Comporable
+    // requirement forces a homogeneous array
+    let needsNaNCheck = elements[start] is _SupportsNaNCheck
+%     end
+
     while sortedEnd != range.upperBound {
       // get the first unsorted element
       let x: C.Iterator.Element = elements[sortedEnd]
+
+%       if not p:
+      // If checking for NaN was deemed a necesity, check if the value
+      // is equal to NaN. If so, move it to the end of the range being
+      // sorted and decrement the upper bound of the range; the position
+      // where the NaN is now held is no longer considered part of the
+      // continued sort
+      if needsNaNCheck && (x as? _SupportsNaNCheck)?.isNaN == true {
+        var newUpperBound = range.upperBound
+        elements.formIndex(before: &newUpperBound)
+
+        range = range.lowerBound ..< newUpperBound
+        swap(&elements[sortedEnd], &elements[range.upperBound])
+        continue
+      }
+%       end
 
       // Look backwards for x's position in the sorted sequence,
       // moving elements forward to make room.
