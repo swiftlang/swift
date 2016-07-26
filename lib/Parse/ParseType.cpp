@@ -189,6 +189,12 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   // Handle type-function if we have an arrow.
   SourceLoc arrowLoc;
   if (consumeIf(tok::arrow, arrowLoc)) {
+    if (!isa<TupleTypeRepr>(ty.get())) {
+      diagnose(ty.get()->getStartLoc(), diag::non_tuple_function_param_type)
+        .highlight(ty.get()->getSourceRange())
+        .fixItInsert(ty.get()->getStartLoc(), "(")
+        .fixItInsertAfter(ty.get()->getEndLoc(), ")");
+    }
     ParserResult<TypeRepr> SecondHalf =
       parseType(diag::expected_type_function_result);
     if (SecondHalf.hasCodeCompletion())
