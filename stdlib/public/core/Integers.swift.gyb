@@ -293,7 +293,7 @@ public func == <T : BinaryInteger>(lhs: T, rhs: T) -> Bool {
   return lhs.isEqual(to: rhs)
 }
 
-@_transparent
+//@_transparent
 public func < <T : BinaryInteger>(lhs: T, rhs: T) -> Bool {
   return lhs.isLess(than: rhs)
 }
@@ -304,7 +304,7 @@ public func ==(lhs: Int, rhs: Int) -> Bool {
   return lhs.isEqual(to: rhs)
 }
 
-@_transparent
+//@_transparent
 public func < (lhs: Int, rhs: Int) -> Bool {
   return lhs.isLess(than: rhs)
 }
@@ -327,8 +327,8 @@ public func != <T : BinaryInteger, U : BinaryInteger>(lhs:T, rhs: U) -> Bool {
 
 @_transparent
 public func < <T : BinaryInteger, U : BinaryInteger>(lhs: T, rhs: U) -> Bool {
-  let lhsSign = lhs < 0 ? -1 : lhs > 0 ? 1 : 0
-  let rhsSign = rhs < 0 ? -1 : rhs > 0 ? 1 : 0
+  let lhsSign = lhs < (0 as T) ? -1 : lhs > (0 as T) ? 1 : 0
+  let rhsSign = rhs < (0 as U) ? -1 : rhs > (0 as U) ? 1 : 0
   if lhsSign != rhsSign { return lhsSign < rhsSign }
 
   // if we get here, lhs and rhs have the same sign.  If they're
@@ -467,17 +467,17 @@ public func ${x.operator}= <T: FixedWidthInteger>(lhs: inout T, rhs: T) {
 
 % for x in maskingShifts:
 
-@_transparent
+//@_transparent
 public func ${x.operator} <T: FixedWidthInteger>(lhs: T, rhs: T) -> T {
   return lhs.${x.name}(rhs)
 }
 
-@_transparent
+//@_transparent
 public func ${x.operator}= <T: FixedWidthInteger>(lhs: inout T, rhs: T) {
   lhs = lhs ${x.operator} rhs
 }
 
-@_transparent
+//@_transparent
 public func ${x.operator} <
   T: FixedWidthInteger, U: BinaryInteger
 >(lhs: T, rhs: U) -> T {
@@ -491,41 +491,37 @@ public func ${x.operator}= <
   lhs = lhs ${x.operator} rhs
 }
 
-@_transparent
+//@_transparent
 public func ${x.nonMaskingOperator} <
   T: FixedWidthInteger, U: BinaryInteger
 >(lhs: T, rhs: U) -> T {
-  // FIXME(integers): uncomment once Int conforms to BinaryInteger
-  //let shift = rhs < -T.bitWidth ? -T.bitWidth
-            //: rhs > T.bitWidth ? T.bitWidth
-            //: Int(rhs)
-  //return lhs ${x.nonMaskingOperator} shift
-  fatalError()
+  let shift = rhs < -T.bitWidth ? -T.bitWidth
+            : rhs > T.bitWidth ? T.bitWidth
+            : Int(rhs)
+  return lhs ${x.nonMaskingOperator} shift
 }
 
 //===----------------------------------------------------------------------===//
 //=== "Smart ${x.description}", supporting overshifts and negative shifts -===//
 //===----------------------------------------------------------------------===//
 
-@_transparent
+//@_transparent
 public func ${x.nonMaskingOperator} <
   T: FixedWidthInteger
 >(lhs: T, rhs: Int) -> T {
-  // FIXME(integers): uncomment once Int conforms to BinaryInteger
-  fatalError()
-  //let overshiftR = T.isSigned ? lhs &>> (T.bitWidth - 1) : 0
-  //let overshiftL: T = 0
-  //if _fastPath(rhs >= 0) {
-    //if _fastPath(rhs < T.bitWidth) {
-      //return lhs.${x.name}(T(extendingOrTruncating: rhs))
-    //}
-    //return overshift${'LR'['R' in x.name]}
-  //}
+  let overshiftR = T.isSigned ? lhs &>> (T.bitWidth - 1) : 0
+  let overshiftL: T = 0
+  if _fastPath(rhs >= 0) {
+    if _fastPath(rhs < T.bitWidth) {
+      return lhs.${x.name}(T(extendingOrTruncating: rhs))
+    }
+    return overshift${'LR'['R' in x.name]}
+  }
 
-  //if _slowPath(rhs <= -T.bitWidth) {
-    //return overshift${'RL'['R' in x.name]}
-  //}
-  //return lhs ${x.operator.translate(maketrans('<>', '><'))} -rhs
+  if _slowPath(rhs <= -T.bitWidth) {
+    return overshift${'RL'['R' in x.name]}
+  }
+  return lhs ${x.operator.translate(maketrans('<>', '><'))} -rhs
 }
 
 @_transparent
@@ -600,7 +596,7 @@ extension FixedWidthInteger {
       self = Self.init(_truncatingBits: source.word(at: 0))
     }
     else {
-      var result: Self = source < 0 ? ~0 : 0
+      var result: Self = source < (0 as T) ? ~0 : 0
       // start with the most significant word
       var n = source.countRepresentedWords
       while n >= 0 {
@@ -620,9 +616,7 @@ extension FixedWidthInteger {
   // FIXME(integers): give it a better name. _highBitIndex is **NOT** what it is
   public // transparent
   static var _highBitIndex: Self {
-    // FIXME(integers): uncomment once UInt conforms to BinaryInteger
-    //return Self.init(_truncatingBits: UInt(Self.bitWidth._storage) &- 1)
-    fatalError()
+    return Self.init(_truncatingBits: UInt(Self.bitWidth._value) &- 1)
   }
 
   public var popcount: Int {
@@ -672,25 +666,23 @@ extension UnsignedInteger {
   public static var isSigned: Bool { return false }
 
   public var description: String {
-    // FIXME(integers): uncomment once Int conforms to BinaryInteger
-    fatalError()
-    //if self == 0 {
-      //return "0"
-    //}
+    if self == 0 {
+      return "0"
+    }
 
-    //let ascii0 = 48
-    //var buf: [UnicodeScalar] = []
+    let ascii0 = 48
+    var buf: [UnicodeScalar] = []
 
-    //var x = self
-    //repeat {
-      //let r = x % 10
-      //x /= 10
-      //buf.append(
-        //UnicodeScalar(
-          //ascii0 + Int(Word(extendingOrTruncating: r)._storage)))
-    //}
-    //while x != 0
-    //return String(buf.reversed().lazy.map { Character($0) })
+    var x = self
+    repeat {
+      let r = x % 10
+      x /= 10
+      buf.append(
+        UnicodeScalar(
+          ascii0 + Int(UInt(extendingOrTruncating: r)._value)))
+    }
+    while x != 0
+    return String(buf.reversed().lazy.map { Character($0) })
   }
 }
 
@@ -804,11 +796,11 @@ public struct ${Self}
 
   @_transparent
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
-    _storage = Builtin.truncOrBitCast_${IntLiteral}_Int${bits}(x)
+    _value = Builtin.truncOrBitCast_${IntLiteral}_Int${bits}(x)
     Builtin.condfail(
       Builtin.cmp_ne_${IntLiteral}(
         Builtin.${z}extOrBitCast_Int${bits}_${IntLiteral}(
-          _storage), x))
+          _value), x))
   }
 
   /// Construct a `${Self}` having the same memory representation as
@@ -818,15 +810,15 @@ public struct ${Self}
   /// pattern of bits.
   @_transparent
   public init(bitPattern x: ${OtherSelf}) {
-    _storage = x._storage
+    _value = x._value
   }
 
   public func isEqual(to rhs: ${Self}) -> Bool {
-    return Bool(Builtin.cmp_eq_Int${bits}(_storage, rhs._storage))
+    return Bool(Builtin.cmp_eq_Int${bits}(_value, rhs._value))
   }
 
   public func isLess(than rhs: ${Self}) -> Bool {
-    return Bool(Builtin.cmp_${u}lt_Int${bits}(_storage, rhs._storage))
+    return Bool(Builtin.cmp_${u}lt_Int${bits}(_value, rhs._value))
   }
 
 %       for x in [op for ops in binaryArithmetic.values() for op in ops]:
@@ -850,14 +842,14 @@ public struct ${Self}
     }
 
     let (newStorage, overflow) = (
-      Builtin.${u}${x.llvmName}_Int${bits}(self._storage, rhs._storage),
+      Builtin.${u}${x.llvmName}_Int${bits}(self._value, rhs._value),
       false._value)
 
 %         else:
 
     let (newStorage, overflow)
     = Builtin.${u}${x.llvmName}_with_overflow_Int${bits}(
-      self._storage, rhs._storage, false._value)
+      self._value, rhs._value, false._value)
 %         end
 
     return (
@@ -867,15 +859,22 @@ public struct ${Self}
 %       end
 
   @_transparent
-  public init(_ _storage: Builtin.Int${bits}) {
-    self._storage = _storage
+  public init(_ _value: Builtin.Int${bits}) {
+    self._value = _value
+  }
+
+  // FIXME(integers): in order to remove this, the simd.swift.gyb should be
+  // updated
+  @_transparent
+  public init(_bits: Builtin.Int${bits}) {
+    self._value = _bits
   }
 
 % for x in binaryBitwise:
   @_transparent
   public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
     return ${Self}(
-      Builtin.${x.llvmName}_Int${bits}(self._storage, rhs._storage))
+      Builtin.${x.llvmName}_Int${bits}(self._value, rhs._value))
   }
 % end
 
@@ -884,7 +883,7 @@ public struct ${Self}
   public func ${x.name}(_ rhs: ${Self}) -> ${Self} {
     let rhs_ = rhs & ${Self}._highBitIndex
     return ${Self}(
-      Builtin.${x.llvmName(signed)}_Int${bits}(self._storage, rhs_._storage))
+      Builtin.${x.llvmName(signed)}_Int${bits}(self._value, rhs_._value))
   }
 % end
 
@@ -907,45 +906,45 @@ public struct ${Self}
   @_transparent
   public var leadingZeros: Int {
     fatalError()
-    // FIXME(integers): uncomment when Int conforms to Integer
-    //return Int(
-      //${Self}(
-        //Builtin.int_ctlz_Int${bits}(self._storage, false._value)
-      //)._lowUWord._storage)
+    return Int(
+      ${Self}(
+        Builtin.int_ctlz_Int${bits}(self._value, false._value)
+      )._lowUWord._value)
   }
 
-  @_transparent
+  //@_transparent
   public func word(at n: Int) -> UInt {
-    fatalError()
-    // FIXME(integers): uncomment when Int conforms to Integer
-    /*_precondition(n >= 0, "Negative word index")*/
-    /*if _fastPath(n < countRepresentedWords) {*/
-      /*let shift = UInt(n._storage) &* ${word_bits}*/
-      /*let bitWidth = UInt(self.bitWidth._storage)*/
-      /*_sanityCheck(shift < bitWidth)*/
-      /*return (self &>> ${Self}(_truncatingBits: shift))._lowUWord*/
-    /*}*/
-    /*return self < 0 ? ~0 : 0*/
+    _precondition(n >= 0, "Negative word index")
+    if _fastPath(n < countRepresentedWords) {
+      let shift = UInt(n._value) &* ${word_bits}
+      let bitWidth = UInt(self.bitWidth._value)
+      _sanityCheck(shift < bitWidth)
+      return (self &>> ${Self}(_truncatingBits: shift))._lowUWord
+    }
+    return self < 0 ? ~0 : 0
   }
 
 
   @_transparent
   public // transparent
   var _lowUWord: UInt {
+    // FIXME(integers): uncomment when Int conforms to Integer
+    fatalError()
     % truncOrExt = z + 'ext' if bits <= word_bits else 'trunc'
-    return UInt(
-      Builtin.${truncOrExt}OrBitCast_Int${bits}_Int${word_bits}(_storage)
-    )
+    //return UInt(
+      //Builtin.${truncOrExt}OrBitCast_Int${bits}_Int${word_bits}(_value)
+    //)
   }
 
-  @_transparent
+  //@_transparent
   public // transparent
   init(_truncatingBits bits: UInt) {
     // FIXME(integers): uncomment when Int conforms to Integer
     fatalError()
-    /*% truncOrExt = 'zext' if bits > word_bits else 'trunc'*/
-    /*self.init(*/
-      /*Builtin.${truncOrExt}OrBitCast_Int${word_bits}_Int${bits}(bits._storage))*/
+    //
+    //% truncOrExt = 'zext' if bits > word_bits else 'trunc'
+    //self.init(
+      //Builtin.${truncOrExt}OrBitCast_Int${word_bits}_Int${bits}(bits._value))
   }
 
 % if signed:
@@ -953,7 +952,7 @@ public struct ${Self}
 
   @_transparent
   public var magnitude: U${Self} {
-    let base = U${Self}(_storage)
+    let base = U${Self}(_value)
     return self < 0 ? ~base + 1 : base
   }
 % end
@@ -964,18 +963,16 @@ public struct ${Self}
 %       if bits > 64:
     fatalError("${bits}-bit integer multiplication is not supported")
 %       else:
-    // FIXME(integers): uncomment when Int conforms to Integer
-    fatalError()
-    /*let lhs = Builtin.${z}ext_Int${bits}_Int${dbits}(self_._storage)*/
-    /*let rhs = Builtin.${z}ext_Int${bits}_Int${dbits}(other._storage)*/
+    let lhs = Builtin.${z}ext_Int${bits}_Int${dbits}(self_._value)
+    let rhs = Builtin.${z}ext_Int${bits}_Int${dbits}(other._value)
 
-    /*let res = Builtin.mul_Int${dbits}(lhs, rhs)*/
-    /*let low = ${Self}.Magnitude(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(res))*/
-    /*let shift: UInt8 = ${bits}*/
-    /*let shifted = Builtin.ashr_Int${dbits}(res,*/
-      /*Builtin.zextOrBitCast_Int8_Int${dbits}(shift._storage))*/
-    /*let high = ${Self}(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(shifted))*/
-    /*return (high: high, low: low)*/
+    let res = Builtin.mul_Int${dbits}(lhs, rhs)
+    let low = ${Self}.Magnitude(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(res))
+    let shift: UInt8 = ${bits}
+    let shifted = Builtin.ashr_Int${dbits}(res,
+      Builtin.zextOrBitCast_Int8_Int${dbits}(shift._value))
+    let high = ${Self}(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(shifted))
+    return (high: high, low: low)
 %       end
   }
 
@@ -987,7 +984,7 @@ public struct ${Self}
 #if _endian(big)
     self = value
 #else
-    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._storage) )
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
 #endif
   }
 
@@ -998,7 +995,7 @@ public struct ${Self}
 #if _endian(little)
     self = value
 #else
-    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._storage) )
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
 #endif
   }
 
@@ -1008,7 +1005,7 @@ public struct ${Self}
 #if _endian(big)
     return self
 #else
-    return ${Self}(Builtin.int_bswap_${BuiltinName}(_storage))
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
 #endif
   }
 
@@ -1018,28 +1015,28 @@ public struct ${Self}
 #if _endian(little)
     return self
 #else
-    return ${Self}(Builtin.int_bswap_${BuiltinName}(_storage))
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
 #endif
   }
 
   /// Returns the current integer with the byte order swapped.
   public var byteSwapped: ${Self} {
-    return ${Self}(Builtin.int_bswap_${BuiltinName}(_storage))
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
   }
 %  end
 
   // Implementation details
 
-  public var _storage: Builtin.Int${bits}
+  public var _value: Builtin.Int${bits}
 
 % if self_type.is_word:
   @_transparent
   public // @testable
   init(_ _v: Builtin.Word) {
 % if BuiltinName == 'Int32':
-    self._storage = Builtin.truncOrBitCast_Word_Int32(_v)
+    self._value = Builtin.truncOrBitCast_Word_Int32(_v)
 % elif BuiltinName == 'Int64':
-    self._storage = Builtin.zextOrBitCast_Word_Int64(_v)
+    self._value = Builtin.zextOrBitCast_Word_Int64(_v)
 % end
   }
 
@@ -1047,9 +1044,9 @@ public struct ${Self}
   public // @testable
   var _builtinWordValue: Builtin.Word {
 % if BuiltinName == 'Int32':
-    return Builtin.zextOrBitCast_Int32_Word(_storage)
+    return Builtin.zextOrBitCast_Int32_Word(_value)
 % elif BuiltinName == 'Int64':
-    return Builtin.truncOrBitCast_Int64_Word(_storage)
+    return Builtin.truncOrBitCast_Int64_Word(_value)
 % end
   }
 % end
@@ -1108,13 +1105,13 @@ extension ${Self} {
   /// No range or overflow checking occurs.
   @_transparent
   public init(truncatingBitPattern: ${Src}) {
-    let src = truncatingBitPattern._storage
+    let src = truncatingBitPattern._value
 %     if self_type.bits == src_type.bits:
     let dstNotWord = src
 %     else:
     let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(src)
 %     end
-    self._storage = dstNotWord
+    self._value = dstNotWord
   }
 }
 %   end
@@ -1127,7 +1124,7 @@ extension ${Self} {
 @_transparent
 public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
   _sanityCheck(x >= 0)
-  return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._storage))
+  return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
 % end
 

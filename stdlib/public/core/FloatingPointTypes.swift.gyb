@@ -72,10 +72,10 @@ def intFormatFix(bits):
 %for bits in [32,64]:
 extension UInt${bits} {
   var signBitIndex: Int {
-    return ${bits-1} - Int(Int${bits}(Builtin.int_ctlz_Int${bits}(self._storage, false._value)))
+    return ${bits-1} - Int(Int${bits}(Builtin.int_ctlz_Int${bits}(self._value, false._value)))
   }
   var countTrailingZeros: Int {
-    return Int(Int${bits}(Builtin.int_cttz_Int${bits}(self._storage, false._value)))
+    return Int(Int${bits}(Builtin.int_cttz_Int${bits}(self._value, false._value)))
   }
 }
 %end
@@ -118,7 +118,7 @@ public struct ${Self} {
   @_transparent
   public init() {
     let zero: Int64 = 0
-    self._value = Builtin.sitofp_Int64_FPIEEE${bits}(zero._storage)
+    self._value = Builtin.sitofp_Int64_FPIEEE${bits}(zero._value)
   }
 
   @_transparent 
@@ -191,7 +191,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   public init(bitPattern: UInt${bits}) {
-    self.init(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bitPattern._storage))
+    self.init(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bitPattern._value))
   }
 
   public var sign: FloatingPointSign {
@@ -678,7 +678,7 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
 
   /// Create an instance initialized to `value`.
   public init(integerLiteral value: Int64) {
-    self = ${Self}(_bits: Builtin.sitofp_Int64_FPIEEE${bits}(value._storage))
+    self = ${Self}(_bits: Builtin.sitofp_Int64_FPIEEE${bits}(value._value))
   }
 }
 
@@ -785,7 +785,7 @@ extension ${Self} {
 %    ThatBuiltinName = builtinIntName(srcBits)
 %    sign = 's' if srcSigned else 'u'
   public init(_ v: ${That}) {
-    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._storage)
+    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
 % end
 }
@@ -989,7 +989,7 @@ extension ${Self} {
       "${That} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
     _precondition(other < ${str(upper)}.0,
       "${That} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
-    self._storage = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(other._value)
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(other._value)
   }
 %     if srcBits == 80:
 #endif

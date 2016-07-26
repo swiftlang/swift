@@ -13,14 +13,16 @@
 import SwiftShims
 
 /// Convert the given numeric value to a hexadecimal string.
-public func asHex<T : Integer>(_ x: T) -> String {
-  return "0x" + String(x.toIntMax(), radix: 16)
+public func asHex<T : BinaryInteger>(_ x: T) -> String {
+  // FIXME(integers): get rid of toIntMax
+  fatalError()
+  //return "0x" + String(x.toIntMax(), radix: 16)
 }
 
 /// Convert the given sequence of numeric values to a string representing
 /// their hexadecimal values.
-public func asHex<S: Sequence>(_ x: S) -> String
-  where S.Iterator.Element : Integer {
+public func asHex<S : Sequence>(_ x: S) -> String
+  where S.Iterator.Element : BinaryInteger {
   return "[ " + x.lazy.map { asHex($0) }.joined(separator: ", ") + " ]"
 }
 

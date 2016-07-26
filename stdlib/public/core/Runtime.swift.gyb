@@ -109,8 +109,8 @@ func _stdlib_atomicCompareExchangeStrongUInt${bits}(
   desired: UInt${bits}) -> Bool {
 
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int${bits}(
-    target._rawValue, expected.pointee._storage, desired._storage)
-  expected.pointee._storage = oldValue
+    target._rawValue, expected.pointee._value, desired._value)
+  expected.pointee._value = oldValue
   return Bool(won)
 }
 
@@ -133,7 +133,7 @@ func _swift_stdlib_atomicStoreUInt${bits}(
   object target: UnsafeMutablePointer<UInt${bits}>,
   desired: UInt${bits}) {
 
-  Builtin.atomicstore_seqcst_Int${bits}(target._rawValue, desired._storage)
+  Builtin.atomicstore_seqcst_Int${bits}(target._rawValue, desired._value)
 }
 
 func _swift_stdlib_atomicStoreInt${bits}(
@@ -167,7 +167,7 @@ func _swift_stdlib_atomicFetch${operation}UInt${bits}(
   operand: UInt${bits}) -> UInt${bits} {
 
   let value = Builtin.atomicrmw_${operation.lower()}_seqcst_Int${bits}(
-    target._rawValue, operand._storage)
+    target._rawValue, operand._value)
 
   return UInt${bits}(value)
 }

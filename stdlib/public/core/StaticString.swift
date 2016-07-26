@@ -161,8 +161,8 @@ public struct StaticString
     self._startPtrOrData = Builtin.ptrtoint_Word(_start)
     self._utf8CodeUnitCount = utf8CodeUnitCount
     self._flags = Bool(isASCII)
-      ? (0x2 as UInt8)._storage
-      : (0x0 as UInt8)._storage
+      ? (0x2 as UInt8)._value
+      : (0x0 as UInt8)._value
   }
 
   @_versioned
@@ -173,8 +173,8 @@ public struct StaticString
     self._startPtrOrData = UInt(UInt32(unicodeScalar))._builtinWordValue
     self._utf8CodeUnitCount = 0._builtinWordValue
     self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII
-      ? (0x3 as UInt8)._storage
-      : (0x1 as UInt8)._storage
+      ? (0x3 as UInt8)._value
+      : (0x1 as UInt8)._value
   }
 
   @effects(readonly)

@@ -53,7 +53,7 @@ internal struct _ArrayBody {
   /// The number of elements that can be stored in this Array without
   /// reallocation.
   var capacity: Int {
-    return Int(_capacityAndFlags >> 1)
+    return Int(_capacityAndFlags &>> 1)
   }
 
   /// Is the Element type bitwise-compatible with some Objective-C
