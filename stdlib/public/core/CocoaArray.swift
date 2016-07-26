@@ -61,7 +61,7 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
     // subRange.upperBound items are stored contiguously.  This is an
     // acceptable conservative behavior, but could potentially be
     // optimized for other cases.
-    let contiguousCount = withUnsafeMutablePointer(&enumerationState) {
+    let contiguousCount = withUnsafeMutablePointer(to: &enumerationState) {
       self.buffer.countByEnumerating(with: $0, objects: nil, count: 0)
     }
     

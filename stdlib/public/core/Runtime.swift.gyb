@@ -379,7 +379,7 @@ func _float${bits}ToString(_ value: Float${bits}, debug: Bool) -> String {
   _sanityCheck(sizeof(_Buffer72.self) == 72)
 
   var buffer = _Buffer32()
-  return withUnsafeMutablePointer(&buffer) {
+  return withUnsafeMutablePointer(to: &buffer) {
     (bufferPtr) in
     let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
     let actualLength = _float${bits}ToStringImpl(bufferUTF8Ptr, 32, value, debug)
@@ -408,7 +408,7 @@ func _int64ToString(
 ) -> String {
   if radix >= 10 {
     var buffer = _Buffer32()
-    return withUnsafeMutablePointer(&buffer) {
+    return withUnsafeMutablePointer(to: &buffer) {
       (bufferPtr) in
       let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
@@ -420,7 +420,7 @@ func _int64ToString(
     }
   } else {
     var buffer = _Buffer72()
-    return withUnsafeMutablePointer(&buffer) {
+    return withUnsafeMutablePointer(to: &buffer) {
       (bufferPtr) in
       let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
@@ -445,7 +445,7 @@ func _uint64ToString(
 ) -> String {
   if radix >= 10 {
     var buffer = _Buffer32()
-    return withUnsafeMutablePointer(&buffer) {
+    return withUnsafeMutablePointer(to: &buffer) {
       (bufferPtr) in
       let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
@@ -457,7 +457,7 @@ func _uint64ToString(
     }
   } else {
     var buffer = _Buffer72()
-    return withUnsafeMutablePointer(&buffer) {
+    return withUnsafeMutablePointer(to: &buffer) {
       (bufferPtr) in
       let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =

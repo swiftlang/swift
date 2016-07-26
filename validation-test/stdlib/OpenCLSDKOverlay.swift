@@ -131,7 +131,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   program = KernelSource.withCString {
     (p: UnsafePointer<CChar>) -> cl_program in
     var s: UnsafePointer? = p
-    return withUnsafeMutablePointer(&s) {
+    return withUnsafeMutablePointer(to: &s) {
       return clCreateProgramWithSource(context, 1, $0, nil, &err)
     }
   }
@@ -186,9 +186,9 @@ tests.test("clSetKernelArgsListAPPLE") {
   // Set the arguments to our compute kernel
   //
   err = 0
-  err = withUnsafePointer(&input) {
-    inputPtr in withUnsafePointer(&output) {
-      outputPtr in withUnsafePointer(&count) {
+  err = withUnsafePointer(to: &input) {
+    inputPtr in withUnsafePointer(to: &output) {
+      outputPtr in withUnsafePointer(to: &count) {
         countPtr in
         clSetKernelArgsListAPPLE(
           kernel!, 3,

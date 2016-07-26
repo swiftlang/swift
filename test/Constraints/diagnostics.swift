@@ -833,7 +833,7 @@ extension Foo23752537 {
 func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
 func read<T : Integer>() -> T? {
   var buffer : T 
-  let n = withUnsafePointer(&buffer) { (p) in
+  let n = withUnsafePointer(to: &buffer) { (p) in
     read2(UnsafePointer(p), maxLength: sizeof(T)) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer'}}
   }
 }

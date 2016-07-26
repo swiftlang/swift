@@ -56,7 +56,7 @@ extension ${Self} {
     let u16 = text.utf16
     func parseNTBS(_ chars: UnsafePointer<CChar>) -> (${Self}, Int) {
       var result: ${Self} = 0
-      let endPtr = withUnsafeMutablePointer(&result) {
+      let endPtr = withUnsafeMutablePointer(to: &result) {
         _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(
           chars, UnsafeMutablePointer($0))
       }

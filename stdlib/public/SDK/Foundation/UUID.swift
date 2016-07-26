@@ -22,14 +22,14 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     
     /* Create a new UUID with RFC 4122 version 4 random bytes */
     public init() {
-        withUnsafeMutablePointer(&uuid) {
+        withUnsafeMutablePointer(to: &uuid) {
             uuid_generate_random(unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self))
         }
     }
     
     fileprivate init(reference: NSUUID) {
         var bytes: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        withUnsafeMutablePointer(&bytes) {
+        withUnsafeMutablePointer(to: &bytes) {
             reference.getBytes(unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self))
         }
         uuid = bytes
@@ -39,7 +39,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     /// 
     /// Returns nil for invalid strings.
     public init?(uuidString string: String) {
-        let res = withUnsafeMutablePointer(&uuid) {
+        let res = withUnsafeMutablePointer(to: &uuid) {
             return uuid_parse(string, unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self))
         }
         if res != 0 {
@@ -56,8 +56,8 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     public var uuidString: String {
         var bytes: uuid_string_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         var localValue = uuid
-        return withUnsafeMutablePointer(&localValue) { val in
-            withUnsafeMutablePointer(&bytes) { str in
+        return withUnsafeMutablePointer(to: &localValue) { val in
+            withUnsafeMutablePointer(to: &bytes) { str in
                 uuid_unparse(unsafeBitCast(val, to: UnsafePointer<UInt8>.self), unsafeBitCast(str, to: UnsafeMutablePointer<Int8>.self))
                 return String(cString: unsafeBitCast(str, to: UnsafePointer<CChar>.self), encoding: .utf8)!
             }
@@ -66,7 +66,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     
     public var hashValue: Int {
         var localValue = uuid
-        return withUnsafeMutablePointer(&localValue) {
+        return withUnsafeMutablePointer(to: &localValue) {
             return Int(bitPattern: CFHashBytes(unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self), CFIndex(sizeof(uuid_t.self))))
         }
     }
@@ -83,7 +83,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     
     fileprivate var reference: NSUUID {
         var bytes = uuid
-        return withUnsafePointer(&bytes) {
+        return withUnsafePointer(to: &bytes) {
             return NSUUID(uuidBytes: unsafeBitCast($0, to: UnsafePointer<UInt8>.self))
         }
     }

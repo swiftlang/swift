@@ -60,7 +60,7 @@ public func _fixLifetime<T>(_ x: T) {
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafeMutablePointer<T, Result>(
-  _ arg: inout T,
+  to arg: inout T,
   _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result
 ) rethrows -> Result
 {
@@ -71,9 +71,27 @@ public func withUnsafeMutablePointer<T, Result>(
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafePointer<T, Result>(
-  _ arg: inout T,
+  to arg: inout T,
   _ body: @noescape (UnsafePointer<T>) throws -> Result
 ) rethrows -> Result
 {
   return try body(UnsafePointer<T>(Builtin.addressof(&arg)))
+}
+
+@available(*, unavailable, renamed: "withUnsafeMutablePointer(to:_:)")
+public func withUnsafeMutablePointer<T, Result>(
+  _ arg: inout T,
+  _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result
+) rethrows -> Result
+{
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, renamed: "withUnsafePointer(to:_:)")
+public func withUnsafePointer<T, Result>(
+  _ arg: inout T,
+  _ body: @noescape (UnsafePointer<T>) throws -> Result
+) rethrows -> Result
+{
+  Builtin.unreachable()
 }

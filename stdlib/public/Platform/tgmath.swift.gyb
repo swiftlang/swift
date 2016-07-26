@@ -334,7 +334,7 @@ func _swift_Darwin_lgamma${f}_r(_: ${CT},
 @_transparent
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
   var sign = Int32(0)
-  let value = withUnsafeMutablePointer(&sign) { 
+  let value = withUnsafeMutablePointer(to: &sign) {
     (signp: UnsafeMutablePointer<Int32>) -> ${CT} in
     return _swift_Darwin_lgamma${f}_r(${CT}(x), signp)
   }

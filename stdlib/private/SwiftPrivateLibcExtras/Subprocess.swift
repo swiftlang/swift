@@ -118,7 +118,7 @@ public func spawnChild(_ args: [String])
     // parent write pipe.
     let errnoSize = sizeof(errno.dynamicType)
     var execveErrno = errno
-    let writtenBytes = withUnsafePointer(&execveErrno) {
+    let writtenBytes = withUnsafePointer(to: &execveErrno) {
       write(childToParentPipe.writeFD, UnsafePointer($0), errnoSize)
     }
 
