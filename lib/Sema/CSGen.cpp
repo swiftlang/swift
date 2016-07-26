@@ -2886,19 +2886,9 @@ namespace {
 
     using State = ConstraintSystem::ArgumentLabelState;
 
-    void associateArgumentLabels(Expr *arg, State labels,
+    void associateArgumentLabels(Expr *fn, State labels,
                                  bool labelsArePermanent) {
-      // Our parent must be a call.
-      auto call = dyn_cast_or_null<CallExpr>(ParentMap[arg]);
-      if (!call) 
-        return;
-
-      // We must have originated at the call argument.
-      if (arg != call->getArg())
-        return;
-
       // Dig out the function, looking through, parentheses, ?, and !.
-      auto fn = call->getFn();
       do {
         fn = fn->getSemanticsProvidingExpr();
 
@@ -2922,25 +2912,16 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (auto tuple = dyn_cast<TupleExpr>(expr)) {
-        if (tuple->hasElementNames())
-          associateArgumentLabels(expr,
-                                  { tuple->getElementNames(),
-                                    tuple->hasTrailingClosure() },
-                                  /*labelsArePermanent*/ true);
-        else {
-          llvm::SmallVector<Identifier, 4> names(tuple->getNumElements(),
-                                                 Identifier()); 
-          associateArgumentLabels(expr, { names, tuple->hasTrailingClosure() },
-                                  /*labelsArePermanent*/ false);
-        }
-      } else if (auto paren = dyn_cast<ParenExpr>(expr)) {
-        associateArgumentLabels(paren,
-                                { { Identifier() },
-                                  paren->hasTrailingClosure() },
-                                /*labelsArePermanent*/ false);
+      if (auto call = dyn_cast<CallExpr>(expr)) {
+        associateArgumentLabels(call->getFn(),
+                                { call->getArgumentLabels(),
+                                  call->hasTrailingClosure() },
+                                /*labelsArePermanent=*/true);
+        return { true, expr };
       }
 
+      // FIXME: other expressions have argument labels, but this is an
+      // optimization, so stage it in later.
       return { true, expr };
     }
   };
