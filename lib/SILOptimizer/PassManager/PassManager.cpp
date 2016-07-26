@@ -664,7 +664,7 @@ void SILPassManager::addPass(PassKind Kind) {
 }
 
 void SILPassManager::addPassForName(StringRef Name) {
-  auto P = llvm::StringSwitch<PassKind>(Name)
+  PassKind P = llvm::StringSwitch<PassKind>(Name)
 #define PASS(ID, NAME, DESCRIPTION) .Case(#ID, PassKind::ID)
 #include "swift/SILOptimizer/PassManager/Passes.def"
   ;
