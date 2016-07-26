@@ -137,7 +137,7 @@
             }
         },
         "swift-3.0-preview-4" : {
-            "aliases": ["swift-3.0-branch", "swift-3.0-preview-4-branch"],
+            "aliases": ["swift-3.0-preview-4-branch"],
             "repos": {
                 "llvm": "swift-3.0-branch",
                 "clang": "swift-3.0-branch",
@@ -152,6 +152,24 @@
                 "swift-corelibs-libdispatch": "swift-3.0-preview-4-branch",
                 "swift-integration-tests": "swift-3.0-preview-4-branch",
                 "swift-xcode-playground-support": "swift-3.0-preview-4-branch"
+            }
+        },
+        "swift-3.0-preview-5" : {
+            "aliases": ["swift-3.0-branch", "swift-3.0-preview-5-branch"],
+            "repos": {
+                "llvm": "swift-3.0-branch",
+                "clang": "swift-3.0-branch",
+                "swift": "swift-3.0-preview-5-branch",
+                "lldb": "swift-3.0-preview-5-branch",
+                "cmark": "swift-3.0-preview-5-branch",
+                "llbuild": "swift-3.0-preview-5-branch",
+                "swiftpm": "swift-3.0-preview-5-branch",
+                "compiler-rt": "swift-3.0-branch",
+                "swift-corelibs-xctest": "swift-3.0-preview-5-branch",
+                "swift-corelibs-foundation": "swift-3.0-preview-5-branch",
+                "swift-corelibs-libdispatch": "swift-3.0-preview-5-branch",
+                "swift-integration-tests": "swift-3.0-preview-5-branch",
+                "swift-xcode-playground-support": "swift-3.0-preview-5-branch"
             }
         }
     }
