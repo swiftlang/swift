@@ -3896,6 +3896,7 @@ bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
           nominal == getSetDecl() ||
           nominal == getStringDecl() ||
           nominal == getErrorDecl() ||
+          nominal == getAnyHashableDecl() ||
           // Weird one-off case where CGFloat is bridged to NSNumber.
           nominal->getName() == Id_CGFloat);
 }

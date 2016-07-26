@@ -72,6 +72,9 @@ extension NSString : ExpressibleByStringLiteral {
 }
 
 extension NSString : _HasCustomAnyHashableRepresentation {
+  // Must be @nonobjc to prevent infinite recursion trying to bridge
+  // AnyHashable to NSObject.
+  @nonobjc
   public func _toCustomAnyHashable() -> AnyHashable? {
     // Consistently use Swift equality and hashing semantics for all strings.
     return AnyHashable(self as String)
@@ -429,6 +432,9 @@ extension NSNumber
 }
 
 extension NSNumber : _HasCustomAnyHashableRepresentation {
+  // Must be @nonobjc to prevent infinite recursion trying to bridge
+  // AnyHashable to NSObject.
+  @nonobjc
   public func _toCustomAnyHashable() -> AnyHashable? {
     guard let kind = _SwiftTypePreservingNSNumberTag(
       rawValue: Int(_swift_Foundation_TypePreservingNSNumberGetKind(self))
@@ -1491,4 +1497,40 @@ typealias KeyedUnarchiver = NSKeyedUnarchiver
 
 @available(*, deprecated, renamed:"NSKeyedArchiver", message: "Please use NSKeyedArchiver")
 typealias KeyedArchiver = NSKeyedArchiver
+
+//===----------------------------------------------------------------------===//
+// AnyHashable
+//===----------------------------------------------------------------------===//
+
+extension AnyHashable : _ObjectiveCBridgeable {
+  public func _bridgeToObjectiveC() -> NSObject {
+    // This is unprincipled, but pretty much any object we'll encounter in
+    // Swift is NSObject-conforming enough to have -hash and -isEqual:.
+    return unsafeBitCast(base as AnyObject, to: NSObject.self)
+  }
+
+  public static func _forceBridgeFromObjectiveC(
+    _ x: NSObject,
+    result: inout AnyHashable?
+  ) {
+    result = AnyHashable(x)
+  }
+
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSObject,
+    result: inout AnyHashable?
+  ) -> Bool {
+    self._forceBridgeFromObjectiveC(x, result: &result)
+    return result != nil
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ source: NSObject?
+  ) -> AnyHashable {
+    // `nil` has historically been used as a stand-in for an empty
+    // string; map it to an empty string.
+    if _slowPath(source == nil) { return AnyHashable(String()) }
+    return AnyHashable(source!)
+  }
+}
 
