@@ -27,6 +27,13 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// Implements conformance to the public protocol `_Pointer`.
   public let _rawValue: Builtin.RawPointer
 
+  // Construct ${a_Self} from another ${a_Self}.
+  // FIXME: Why is this necessary?
+  @_transparent
+  public init(_ other: Unsafe${Mutable}RawPointer) {
+    self._rawValue = other._rawValue
+  }
+
   /// Convert a builtin raw pointer to ${a_Self}.
   @_transparent
   public init(_ _rawValue: Builtin.RawPointer) {
