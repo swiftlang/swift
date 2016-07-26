@@ -10,6 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FIXME(ABI)(compiler limitation): This protocol exists to identify
+// hashable types.  It is used for defining an imitation of a generic
+// subscript on `Dictionary<AnyHashable, *>`.
+public protocol _Hashable {
+  func _toAnyHashable() -> AnyHashable
+}
+
 /// A type that provides an integer hash value.
 ///
 /// You can use any type that conforms to the `Hashable` protocol in a set or
@@ -83,7 +90,7 @@
 ///         print("New tap detected at (\(nextTap.x), \(nextTap.y)).")
 ///     }
 ///     // Prints "New tap detected at (0, 1).")
-public protocol Hashable : Equatable {
+public protocol Hashable : _Hashable, Equatable {
   /// The hash value.
   ///
   /// Hash values are not guaranteed to be equal across different executions of

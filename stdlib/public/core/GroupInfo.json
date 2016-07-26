@@ -78,7 +78,9 @@
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
-        "HashedCollections.swift"]
+        "HashedCollections.swift",
+        "HashedCollectionsAnyHashableExtensions.swift"
+      ]
     }
   ],
   "C": [
