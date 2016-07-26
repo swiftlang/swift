@@ -20,7 +20,7 @@ func bytesFromNSData(_ data: NSData) -> [UInt8] {
 
 func floatsFromNSData(_ data: NSData) -> [Float] {
   let floatPtr = data.bytes.bindMemory(to: Float.self, capacity: data.length)
-  return Array(UnsafeBufferPointer(floatPtr, count: data.length / sizeof(Float)))
+  return Array(UnsafeBufferPointer(start: floatPtr, count: data.length / sizeof(Float)))
 }
 
 if #available(iOS 8.0, *) {
