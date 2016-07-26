@@ -752,7 +752,7 @@ function set_build_options_for_host() {
     #
     # *NOTE* Currently we do not support testing LLVM via build-script. But in a
     # future commit we will.
-    for arg in "$(compute_cmake_llvm_tool_disable_flags)"; do
+    for arg in $(compute_cmake_llvm_tool_disable_flags); do
         llvm_cmake_options+=( ${arg} )
     done
 
