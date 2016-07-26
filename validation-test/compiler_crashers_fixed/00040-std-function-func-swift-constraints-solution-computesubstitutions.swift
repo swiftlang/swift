@@ -11,6 +11,7 @@
 // rdar://18175202
 
 func d<b: Sequence, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
+  // expected-warning@-1 {{'where' clause next to generic parameters}}
   for mx : e? in c { // expected-warning {{immutable value 'mx' was never used}}
   }
 }

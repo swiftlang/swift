@@ -134,12 +134,12 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     if (startsWithGreater(Tok))
       RAngleLoc = consumeStartingGreater();
     else
-      RAngleLoc = Tok.getLoc();
+      Invalid = true;
   } else {
     RAngleLoc = consumeStartingGreater();
   }
 
-  if (GenericParams.empty())
+  if (GenericParams.empty() || Invalid)
     return nullptr;
 
   return makeParserResult(GenericParamList::create(Context, LAngleLoc,
@@ -167,6 +167,69 @@ ParserResult<GenericParamList> Parser::maybeParseGenericParams() {
     outer_gpl = gpl;
   } while (startsWithLess(Tok));
   return makeParserResult(gpl);
+}
+
+void
+Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
+                                              GenericParams) {
+  if (GenericParams == nullptr || GenericParams->getWhereLoc().isInvalid())
+    return;
+
+
+
+  auto WhereRangeInsideBrackets = GenericParams->getWhereClauseSourceRange();
+
+  // Move everything immediately following the last generic parameter
+  // as written all the way to the right angle bracket (">")
+  auto LastGenericParam = GenericParams->getParams().back();
+  auto EndOfLastGenericParam =
+  Lexer::getLocForEndOfToken(SourceMgr,
+                             LastGenericParam->getLoc());
+
+  // If the generic parameter list has inherited requirements attached
+  // directly to the parameters themselves, leave them in place.
+  auto InheritedGenericConstraints = LastGenericParam->getInherited();
+  if (!InheritedGenericConstraints.empty()) {
+    EndOfLastGenericParam =
+    Lexer::getLocForEndOfToken(SourceMgr,
+                               InheritedGenericConstraints.back().getLoc());
+  }
+
+  CharSourceRange RemoveWhereRange { SourceMgr,
+    EndOfLastGenericParam,
+    GenericParams->getRAngleLoc()
+  };
+
+  auto WhereCharRange =
+    Lexer::getCharSourceRangeFromSourceRange(SourceMgr,
+                                  GenericParams->getWhereClauseSourceRange());
+
+  SmallString<64> Buffer;
+  llvm::raw_svector_ostream WhereClauseText(Buffer);
+  WhereClauseText << SourceMgr.extractText(Tok.is(tok::kw_where)
+                                           ? WhereCharRange
+                                           : RemoveWhereRange);
+
+  // If, for some reason, there was a where clause in both locations, we're
+  // adding to the list of requirements, so tack on a comma here before
+  // inserting it at the head of the later where clause.
+  if (Tok.is(tok::kw_where))
+    WhereClauseText << ',';
+
+  auto Diag = diagnose(WhereRangeInsideBrackets.Start,
+                       diag::where_inside_brackets);
+
+  if (Tok.is(tok::kw_where)) {
+    Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
+                          RemoveWhereRange.getEnd())
+      .fixItReplace(Tok.getLoc(),
+                    WhereClauseText.str());
+  } else {
+    Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
+                          RemoveWhereRange.getEnd())
+      .fixItInsert(Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc),
+                   WhereClauseText.str());
+  }
 }
 
 /// parseGenericWhereClause - Parse a 'where' clause, which places additional

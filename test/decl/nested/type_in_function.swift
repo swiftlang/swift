@@ -14,12 +14,12 @@ protocol Racoon {
 func outerGenericFunction<T>(_ t: T) {
   struct InnerNonGeneric { // expected-error{{type 'InnerNonGeneric' cannot be nested in generic function 'outerGenericFunction'}}
     func nonGenericMethod(_ t: T) {}
-    func genericMethod<V where V : Racoon, V.Stripes == T>(_ t: T) -> V {}
+    func genericMethod<V>(_ t: T) -> V where V : Racoon, V.Stripes == T {}
   }
 
   struct InnerGeneric<U> { // expected-error{{type 'InnerGeneric' cannot be nested in generic function 'outerGenericFunction'}}
     func nonGenericMethod(_ t: T, u: U) {}
-    func genericMethod<V where V : Racoon, V.Stripes == T>(_ t: T, u: U) -> V {}
+    func genericMethod<V>(_ t: T, u: U) -> V where V : Racoon, V.Stripes == T {}
   }
 }
 

@@ -159,7 +159,7 @@ protocol Kingdom {
   associatedtype King
 }
 struct Victory<General> {
-  init<K: Kingdom where K.King == General>(_ king: K) {}
+  init<K: Kingdom>(_ king: K) where K.King == General {}
 }
 struct MagicKingdom<K> : Kingdom {
   typealias King = K

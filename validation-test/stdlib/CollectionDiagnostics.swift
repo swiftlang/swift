@@ -29,28 +29,17 @@ struct CollectionWithBadSubSequence : Collection {
   typealias SubSequence = OpaqueValue<Int8>
 }
 
-func useCollectionTypeSubSequenceIndex<
-  C : Collection
-  where
-  C.SubSequence.Index == C.Index
->(_ c: C) {}
+func useCollectionTypeSubSequenceIndex<C : Collection>(_ c: C)
+  where C.SubSequence.Index == C.Index {}
 
-func useCollectionTypeSubSequenceGeneratorElement<
-  C : Collection
-  where
-  C.SubSequence.Iterator.Element == C.Iterator.Element
->(_ c: C) {}
+func useCollectionTypeSubSequenceGeneratorElement<C : Collection>(_ c: C)
+  where C.SubSequence.Iterator.Element == C.Iterator.Element {}
 
 func sortResultIgnored<
-  S : Sequence, MC : MutableCollection
-  where
-  S.Iterator.Element : Comparable,
-  MC.Iterator.Element : Comparable
->(
-  _ sequence: S,
-  mutableCollection: MC,
-  array: [Int]
-) {
+  S : Sequence,
+  MC : MutableCollection
+>(_ sequence: S, mutableCollection: MC, array: [Int])
+  where S.Iterator.Element : Comparable, MC.Iterator.Element : Comparable {
   var sequence = sequence // expected-warning {{variable 'sequence' was never mutated; consider changing to 'let' constant}}
   var mutableCollection = mutableCollection // expected-warning {{variable 'mutableCollection' was never mutated; consider changing to 'let' constant}}
   var array = array // expected-warning {{variable 'array' was never mutated; consider changing to 'let' constant}}

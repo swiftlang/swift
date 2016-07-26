@@ -515,7 +515,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - precondition: The bounds of `subrange` must be valid indices of the collection.
     /// - parameter subrange: The range in the data to replace.
     /// - parameter newElements: The replacement bytes.
-    public mutating func replaceSubrange<ByteCollection : Collection where ByteCollection.Iterator.Element == Data.Iterator.Element>(_ subrange: Range<Index>, with newElements: ByteCollection) {
+    public mutating func replaceSubrange<ByteCollection : Collection>(_ subrange: Range<Index>, with newElements: ByteCollection)
+      where ByteCollection.Iterator.Element == Data.Iterator.Element {
         
         // Calculate this once, it may not be O(1)
         let replacementCount : Int = numericCast(newElements.count)

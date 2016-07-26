@@ -270,13 +270,9 @@ where E0.Element == E1.Element,
 {
 }
 
-func beginsWith3<
-     S0: P2, S1: P2
-     where 
-       S0.AssocP1.Element == S1.AssocP1.Element, 
-       S1.AssocP1.Element : EqualComparable
-     >(_ seq1: S0, _ seq2: S1) -> Bool
-{
+func beginsWith3<S0: P2, S1: P2>(_ seq1: S0, _ seq2: S1) -> Bool
+  where S0.AssocP1.Element == S1.AssocP1.Element,
+        S1.AssocP1.Element : EqualComparable {
   return beginsWith2(seq1.getAssocP1(), seq2.getAssocP1())
 }
 
@@ -287,18 +283,16 @@ func beginsWith3<
 //===----------------------------------------------------------------------===//
 // Bogus requirements
 //===----------------------------------------------------------------------===//
-func nonTypeReq<T where T : Wibble>(_: T) {} // expected-error{{use of undeclared type 'Wibble'}}
-func badProtocolReq<T where T : Int>(_: T) {} // expected-error{{type 'T' constrained to non-protocol type 'Int'}}
+func nonTypeReq<T>(_: T) where T : Wibble {} // expected-error{{use of undeclared type 'Wibble'}}
+func badProtocolReq<T>(_: T) where T : Int {} // expected-error{{type 'T' constrained to non-protocol type 'Int'}}
 
-func nonTypeSameType<T where T == Wibble>(_: T) {} // expected-error{{use of undeclared type 'Wibble'}}
-func nonTypeSameType2<T where Wibble == T>(_: T) {} // expected-error{{use of undeclared type 'Wibble'}}
-func sameTypeEq<T where T = T>(_: T) {} // expected-error{{use '==' for same-type requirements rather than '='}} {{27-28===}}
+func nonTypeSameType<T>(_: T) where T == Wibble {} // expected-error{{use of undeclared type 'Wibble'}}
+func nonTypeSameType2<T>(_: T) where Wibble == T {} // expected-error{{use of undeclared type 'Wibble'}}
+func sameTypeEq<T>(_: T) where T = T {} // expected-error{{use '==' for same-type requirements rather than '='}} {{34-35===}}
 
-func badTypeConformance1<T where Int : EqualComparable>(_: T) {} // expected-error{{type 'Int' in conformance requirement does not refer to a generic parameter or associated type}}
+func badTypeConformance1<T>(_: T) where Int : EqualComparable {} // expected-error{{type 'Int' in conformance requirement does not refer to a generic parameter or associated type}}
 
-func badTypeConformance2<T where T.Blarg : EqualComparable>(_: T) { } // expected-error{{'Blarg' is not a member type of 'T'}}
+func badTypeConformance2<T>(_: T) where T.Blarg : EqualComparable { } // expected-error{{'Blarg' is not a member type of 'T'}}
 
-func badSameType<T, U : GeneratesAnElement, V // expected-error{{generic parameter 'V' is not used in function signature}}
-                 where T == U.Element, 
-                          U.Element == V // expected-error{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
-                 >(_: T) {} 
+func badSameType<T, U : GeneratesAnElement, V>(_ : T) // expected-error{{generic parameter 'V' is not used in function signature}}
+  where T == U.Element, U.Element == V {} // expected-error{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}

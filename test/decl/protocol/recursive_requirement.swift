@@ -75,7 +75,7 @@ protocol Gamma {
   associatedtype Delta: Alpha // expected-error{{type may not reference itself as a requirement}}
 }
 
-struct Epsilon<T: Alpha, U: Gamma where T.Beta == U, U.Delta == T> { }
+struct Epsilon<T: Alpha, U: Gamma> where T.Beta == U, U.Delta == T {}
 
 // -----
 

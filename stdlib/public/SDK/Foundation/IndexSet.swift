@@ -913,7 +913,8 @@ private enum _MutablePair<ImmutableType, MutableType> {
 /// A class type which acts as a handle (pointer-to-pointer) to a Foundation reference type which has both an immutable and mutable class (e.g., NSData, NSMutableData).
 ///
 /// a.k.a. Box
-private final class _MutablePairHandle<ImmutableType : NSObject, MutableType : NSObject where ImmutableType : NSMutableCopying, MutableType : NSMutableCopying> {
+private final class _MutablePairHandle<ImmutableType : NSObject, MutableType : NSObject>
+  where ImmutableType : NSMutableCopying, MutableType : NSMutableCopying {
     fileprivate var _pointer: _MutablePair<ImmutableType, MutableType>
     
     /// Initialize with an immutable reference instance.

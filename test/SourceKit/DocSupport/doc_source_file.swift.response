@@ -1749,50 +1749,60 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1918,
+    key.offset: 1919,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1921,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1924,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1927,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "T",
     key.usr: "s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx",
-    key.offset: 1924,
+    key.offset: 1933,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.associatedtype,
     key.name: "Element",
     key.usr: "s:P8__main__5Prot27Element",
-    key.offset: 1926,
+    key.offset: 1935,
     key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 1919,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 1921,
+    key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 1937,
+    key.offset: 1946,
     key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1942,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1944,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1944,
-    key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "T",
     key.usr: "s:tF8__main__6genfoouRxS_5Prot2wx7ElementzSirFxT_L_1TMx",
-    key.offset: 1947,
+    key.offset: 1924,
     key.length: 1
   },
   {
@@ -2660,7 +2670,7 @@
         key.kind: source.lang.swift.decl.var.local,
         key.keyword: "_",
         key.name: "x",
-        key.offset: 1947,
+        key.offset: 1924,
         key.length: 1
       }
     ]

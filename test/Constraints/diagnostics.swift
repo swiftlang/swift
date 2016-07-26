@@ -29,7 +29,7 @@ func f4(_ x: Int) -> Int { }
 
 func f5<T : P2>(_ : T) { }
 
-func f6<T : P, U : P where T.SomeType == U.SomeType>(_ t: T, _ u: U) {}
+func f6<T : P, U : P>(_ t: T, _ u: U) where T.SomeType == U.SomeType {}
 
 var i : Int
 var d : Double
@@ -645,8 +645,8 @@ func r22470302(_ c: r22470302Class) {
 // <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
 extension String {
   @available(*, unavailable, message: "calling this is unwise")
-  func unavail<T : Sequence where T.Iterator.Element == String> // expected-note 2 {{'unavail' has been explicitly marked unavailable here}}
-    (_ a : T) -> String {}
+  func unavail<T : Sequence> // expected-note 2 {{'unavail' has been explicitly marked unavailable here}}
+    (_ a : T) -> String where T.Iterator.Element == String {}
 }
 extension Array {
   func g() -> String {

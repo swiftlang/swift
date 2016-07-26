@@ -2511,7 +2511,8 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     return;
   }
 
-  rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, rawTy);
+  if (ED->getGenericParamsOfContext() != nullptr)
+    rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, rawTy);
   if (rawTy->is<ErrorType>())
     return;
 

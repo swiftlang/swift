@@ -15,7 +15,8 @@
 /// A class type which acts as a handle (pointer-to-pointer) to a Foundation reference type which has only a mutable class (e.g., NSURLComponents).
 ///
 /// Note: This assumes that the result of calling copy() is mutable. The documentation says that classes which do not have a mutable/immutable distinction should just adopt NSCopying instead of NSMutableCopying.
-internal final class _MutableHandle<MutableType : NSObject where MutableType : NSCopying> {
+internal final class _MutableHandle<MutableType : NSObject>
+  where MutableType : NSCopying {
     fileprivate var _pointer : MutableType
     
     init(reference : MutableType) {
@@ -62,7 +63,8 @@ extension _MutableBoxing {
     }
 }
 
-internal enum _MutableUnmanagedWrapper<ImmutableType : NSObject, MutableType : NSObject where MutableType : NSMutableCopying> {
+internal enum _MutableUnmanagedWrapper<ImmutableType : NSObject, MutableType : NSObject>
+  where MutableType : NSMutableCopying{
     case Immutable(Unmanaged<ImmutableType>)
     case Mutable(Unmanaged<MutableType>)
 }

@@ -51,9 +51,8 @@ func typeInference_Strideable<S : Strideable>(v: S) {
   }
 }
 
-func typeInference_StrideableWithSignedIntegerStride<
-  S : Strideable where S.Stride : SignedInteger
->(v: S) {
+func typeInference_StrideableWithSignedIntegerStride<S : Strideable>(v: S)
+  where S.Stride : SignedInteger {
   do {
     var range = v..<v
     expectType(CountableRange<S>.self, &range)
