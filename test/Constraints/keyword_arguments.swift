@@ -135,7 +135,7 @@ variadics1(x: 1, y: 2, 1, 2)
 variadics1(x: 1, y: 2, 1, 2, 3)
 
 // Using various (out-of-order)
-variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{argument 'x' must precede unnamed parameter #0}} {{12-25=x: 6}} {{27-31=1, 2, 3, 4, 5}}
+variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{argument 'x' must precede unnamed argument #1}} {{12-25=x: 6}} {{27-31=1, 2, 3, 4, 5}}
 
 func variadics2(x: Int, y: Int = 2, z: Int...) { }
 
@@ -173,8 +173,8 @@ variadics3(1)
 variadics3()
 
 // Using variadics (out-of-order)
-variadics3(y: 0, 1, 2, 3) // expected-error{{unnamed parameter #1 must precede argument 'y'}} {{12-16=1, 2, 3}} {{18-25=y: 0}}
-variadics3(z: 1, 1) // expected-error{{unnamed parameter #1 must precede argument 'z'}} {{12-16=1}} {{18-19=z: 1}}
+variadics3(y: 0, 1, 2, 3) // expected-error{{unnamed argument #2 must precede argument 'y'}} {{12-16=1, 2, 3}} {{18-25=y: 0}}
+variadics3(z: 1, 1) // expected-error{{unnamed argument #2 must precede argument 'z'}} {{12-16=1}} {{18-19=z: 1}}
 
 func variadics4(x: Int..., y: Int = 2, z: Int = 3) { }
 
@@ -209,7 +209,7 @@ variadics5(1, y: 2, 1, 2)
 variadics5(1, y: 2, 1, 2, 3)
 
 // Using various (out-of-order)
-variadics5(1, 2, 3, 4, 5, 6, y: 7) // expected-error{{argument 'y' must precede unnamed parameter #1}} {{15-28=y: 7}} {{30-34=2, 3, 4, 5, 6}}
+variadics5(1, 2, 3, 4, 5, 6, y: 7) // expected-error{{argument 'y' must precede unnamed argument #2}} {{15-28=y: 7}} {{30-34=2, 3, 4, 5, 6}}
 variadics5(y: 1, 2, 3, 4, 5, 6, 7) // expected-error{{missing argument for parameter #1 in call}}
 
 func variadics6(x: Int..., y: Int = 2, z: Int) { }
@@ -233,7 +233,7 @@ variadics6(x: 1) // expected-error{{missing argument for parameter 'z' in call}}
 variadics6() // expected-error{{missing argument for parameter 'z' in call}}
 
 func outOfOrder(_ a : Int, b: Int) {
-  outOfOrder(b: 42, 52)  // expected-error {{unnamed parameter #1 must precede argument 'b'}} {{14-19=52}} {{21-23=b: 42}}
+  outOfOrder(b: 42, 52)  // expected-error {{unnamed argument #2 must precede argument 'b'}} {{14-19=52}} {{21-23=b: 42}}
 }
 
 // -------------------------------------------

@@ -805,7 +805,7 @@ func nilComparison(i: Int, o: AnyObject) {
 // FIXME: Bad diagnostic
 func secondArgumentNotLabeled(a:Int, _ b: Int) { }
 secondArgumentNotLabeled(10, 20)
-// expected-error@-1 {{unnamed parameter #1 must precede unnamed parameter #0}}
+// expected-error@-1 {{unnamed argument #2 must precede unnamed argument #1}}
 
 // <rdar://problem/23709100> QoI: incorrect ambiguity error due to implicit conversion
 func testImplConversion(a : Float?) -> Bool {}

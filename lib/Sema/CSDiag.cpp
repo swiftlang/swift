@@ -4424,15 +4424,15 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
 
     if (first.empty() && second.empty()) {
       TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_unnamed,
-                  OOOArgIdx, OOOPrevArgIdx)
+                  OOOArgIdx + 1, OOOPrevArgIdx + 1)
         .fixItExchange(firstRange, secondRange);
     } else if (first.empty() && !second.empty()) {
       TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_named,
-                  OOOArgIdx, second)
+                  OOOArgIdx + 1, second)
         .fixItExchange(firstRange, secondRange);
     } else if (!first.empty() && second.empty()) {
       TC.diagnose(diagLoc, diag::argument_out_of_order_named_unnamed,
-                  first, OOOPrevArgIdx)
+                  first, OOOPrevArgIdx + 1)
         .fixItExchange(firstRange, secondRange);
     } else {
       TC.diagnose(diagLoc, diag::argument_out_of_order_named_named,
