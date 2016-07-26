@@ -45,6 +45,32 @@ mayBridgeToObjectiveC(Module *M, CanType T) {
   return false;
 }
 
+static bool
+mustBridgeToSwiftValueBox(Module *M, CanType T) {
+  // If the target type is either an unknown dynamic type, or statically
+  // known to bridge, the cast may succeed.
+  if (T->hasArchetype())
+    return false;
+
+  if (T->isAnyExistentialType())
+    return false;
+
+  // getBridgedToObjC() might return a null-type for bridged foundation types
+  // during compiling the standard library. Exclude this case here.
+  if (auto N = T->getAnyNominal())
+    if (M->getASTContext().isStandardLibraryTypeBridgedInFoundation(N))
+      return false;
+
+  auto bridgeTy  = M->getASTContext().getBridgedToObjC(M, T, nullptr);
+  if (!bridgeTy.hasValue())
+    return false;
+
+  if (bridgeTy->isNull())
+    return true;
+
+  return false;
+}
+
 static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
                                                  bool isWholeModuleOpts) {
   while (CD) {
@@ -414,6 +440,24 @@ swift::classifyDynamicCast(Module *M,
       return DynamicCastFeasibility::WillFail;
     }
 
+    // Casts from a class into a non-class can never succeed if the target must
+    // be bridged to a SwiftValueBox. You would need an AnyObject source for
+    // that.
+    if (!target.isAnyExistentialType() &&
+        !target.getClassOrBoundGenericClass() &&
+        !isa<ArchetypeType>(target) &&
+        mustBridgeToSwiftValueBox(M, target)) {
+      assert((target.getEnumOrBoundGenericEnum() ||
+              target.getStructOrBoundGenericStruct() ||
+              isa<TupleType>(target) ||
+              isa<SILFunctionType>(target) ||
+              isa<FunctionType>(target) ||
+              isa<MetatypeType>(target)) &&
+             "Target should be an enum, struct, tuple, metatype or function type");
+      return DynamicCastFeasibility::WillFail;
+    }
+
+
     // In the Objective-C runtime, class metatypes are also class instances.
     // The cast may succeed if the target type can be inhabited by a class
     // metatype.
@@ -438,6 +482,22 @@ swift::classifyDynamicCast(Module *M,
 
   // FIXME: Be more careful with bridging conversions from
   // NSArray, NSDictionary and NSSet as they may fail?
+
+  // We know that a cast from Int -> class foobar will fail.
+  if (targetClass &&
+      !source.isAnyExistentialType() &&
+      !source.getClassOrBoundGenericClass() &&
+      !isa<ArchetypeType>(source) &&
+      mustBridgeToSwiftValueBox(M, source)) {
+      assert((source.getEnumOrBoundGenericEnum() ||
+              source.getStructOrBoundGenericStruct() ||
+              isa<TupleType>(source) ||
+              isa<SILFunctionType>(source) ||
+              isa<FunctionType>(source) ||
+              isa<MetatypeType>(source)) &&
+             "Source should be an enum, struct, tuple, metatype or function type");
+    return DynamicCastFeasibility::WillFail;
+  }
 
   // Check if there might be a bridging conversion.
   if (source->isBridgeableObjectType() && mayBridgeToObjectiveC(M, target)) {
