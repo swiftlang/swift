@@ -230,7 +230,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
       var someProperty: String = ""
     }
     let f = ObjCClass()
-    UM.registerUndoWithTarget(f) { target in
+    UM.registerUndo(withTarget: f) { target in
       target.someProperty = "expected"
     }
     UM.undo()
@@ -245,7 +245,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
       var someOtherProperty: String = ""
     }
     var b = SwiftClass()
-    UM.registerUndoWithTarget(b) { target in
+    UM.registerUndo(withTarget:b) { target in
       target.someOtherProperty = "expected"
     }
     UM.undo()

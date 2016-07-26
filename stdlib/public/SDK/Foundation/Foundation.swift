@@ -1259,10 +1259,13 @@ internal func NS_Swift_NSUndoManager_registerUndoWithTargetHandler(
   _ handler: @convention(block) (AnyObject) -> Void)
 
 extension UndoManager {
+  @available(*, unavailable, renamed: "registerUndo(withTarget:handler:)")
+  public func registerUndoWithTarget<TargetType : AnyObject>(_ target: TargetType, handler: (TargetType) -> Void) {
+    fatalError("This API has been renamed")
+  }
+
   @available(OSX 10.11, iOS 9.0, *)
-  public func registerUndoWithTarget<TargetType : AnyObject>(
-    _ target: TargetType, handler: (TargetType) -> Void
-  ) {
+  public func registerUndo<TargetType : AnyObject>(withTarget target: TargetType, handler: (TargetType) -> Void) {
     // The generic blocks use a different ABI, so we need to wrap the provided
     // handler in something ObjC compatible.
     let objcCompatibleHandler: (AnyObject) -> Void = { internalTarget in
