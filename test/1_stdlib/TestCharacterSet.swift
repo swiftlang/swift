@@ -166,6 +166,20 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_AnyHashableCreatedFromNSCharacterSet() {
+        let values: [NSCharacterSet] = [
+            NSCharacterSet(charactersIn: "ABC"),
+            NSCharacterSet(charactersIn: "XYZ"),
+            NSCharacterSet(charactersIn: "XYZ"),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("CharacterSet", String(anyHashables[0].base.dynamicType))
+        expectEqual("CharacterSet", String(anyHashables[1].base.dynamicType))
+        expectEqual("CharacterSet", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 
@@ -180,6 +194,7 @@ CharacterSetTests.test("testInsertAndRemove") { TestCharacterSet().testInsertAnd
 CharacterSetTests.test("testBasics") { TestCharacterSet().testBasics() }
 CharacterSetTests.test("test_classForCoder") { TestCharacterSet().test_classForCoder() }
 CharacterSetTests.test("test_AnyHashableContainingCharacterSet") { TestCharacterSet().test_AnyHashableContainingCharacterSet() }
+CharacterSetTests.test("test_AnyHashableCreatedFromNSCharacterSet") { TestCharacterSet().test_AnyHashableCreatedFromNSCharacterSet() }
 runAllTests()
 #endif
 

@@ -771,6 +771,20 @@ class TestIndexSet : TestIndexSetSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_AnyHashableCreatedFromNSIndexSet() {
+        let values: [NSIndexSet] = [
+            NSIndexSet(index: 0),
+            NSIndexSet(index: 1),
+            NSIndexSet(index: 1),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("IndexSet", String(anyHashables[0].base.dynamicType))
+        expectEqual("IndexSet", String(anyHashables[1].base.dynamicType))
+        expectEqual("IndexSet", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -794,6 +808,7 @@ IndexSetTests.test("testFilteringRanges") { TestIndexSet().testFilteringRanges()
 IndexSetTests.test("testShift") { TestIndexSet().testShift() }
 // IndexSetTests.test("testIndexingPerformance") { TestIndexSet().testIndexingPerformance() }
 IndexSetTests.test("test_AnyHashableContainingIndexSet") { TestIndexSet().test_AnyHashableContainingIndexSet() }
+IndexSetTests.test("test_AnyHashableCreatedFromNSIndexSet") { TestIndexSet().test_AnyHashableCreatedFromNSIndexSet() }
 runAllTests()
 #endif
 

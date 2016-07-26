@@ -130,6 +130,20 @@ class TestUserInfo : TestUserInfoSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_AnyHashableCreatedFromNSNotification() {
+        let values: [NSNotification] = [
+            NSNotification(name: Notification.Name(rawValue: "TestSwiftNotification"), object: nil),
+            NSNotification(name: Notification.Name(rawValue: "TestOtherSwiftNotification"), object: nil),
+            NSNotification(name: Notification.Name(rawValue: "TestOtherSwiftNotification"), object: nil),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("Notification", String(anyHashables[0].base.dynamicType))
+        expectEqual("Notification", String(anyHashables[1].base.dynamicType))
+        expectEqual("Notification", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -138,5 +152,6 @@ UserInfoTests.test("test_userInfoPost") { TestUserInfo().test_userInfoPost() }
 UserInfoTests.test("test_equality") { TestUserInfo().test_equality() }
 UserInfoTests.test("test_classForCoder") { TestUserInfo().test_classForCoder() }
 UserInfoTests.test("test_AnyHashableContainingNotification") { TestUserInfo().test_AnyHashableContainingNotification() }
+UserInfoTests.test("test_AnyHashableCreatedFromNSNotification") { TestUserInfo().test_AnyHashableCreatedFromNSNotification() }
 runAllTests()
 #endif
