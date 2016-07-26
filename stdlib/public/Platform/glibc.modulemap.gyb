@@ -344,6 +344,10 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/socket.h"
         export *
       }
+      module sendfile {
+        header "${GLIBC_ARCH_INCLUDE_PATH}/sys/sendfile.h"
+        export *
+      }
       module stat {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/stat.h"
         export *
