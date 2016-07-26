@@ -395,14 +395,6 @@ swift::swift_dynamicCastFailure(const Metadata *sourceType,
                            targetType, targetName.c_str(), message);
 }
 
-
-/// Report a corrupted type object.
-LLVM_ATTRIBUTE_NORETURN
-LLVM_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
-static void _failCorruptType(const Metadata *type) {
-  swift::crash("Corrupt Swift type object");
-}
-
 #if SWIFT_OBJC_INTEROP
 // Objective-C bridging helpers.
 namespace {

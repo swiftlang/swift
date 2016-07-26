@@ -16,6 +16,7 @@ else()
 endif()
 
 add_swift_library(swiftStdlibStubs OBJECT_LIBRARY TARGET_LIBRARY
+  AnyHashableSupport.cpp
   Assert.cpp
   CommandLine.cpp
   GlobalObjects.cpp

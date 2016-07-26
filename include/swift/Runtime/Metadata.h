@@ -3447,6 +3447,10 @@ void swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C"
+const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
+
 } // end namespace swift
 
 #pragma clang diagnostic pop

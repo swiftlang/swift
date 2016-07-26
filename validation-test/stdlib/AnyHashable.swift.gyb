@@ -1,0 +1,495 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+// FIXME(id-as-any): add tests that use CF objects (is this even
+// possible?)
+
+// FIXME(id-as-any): add tests that use Swift errors and
+// Objective-C errors.
+
+// FIXME(id-as-any): add tests for enums.
+
+// FIXME(id-as-any): add tests for unboxing.
+
+%{
+import re
+
+class SwiftClass(object):
+  def __init__(self, full_name):
+    m = re.match(r'([A-Za-z0-9_]+)(<(.+)>)?', full_name)
+    self.type_name = m.group(1)
+    if m.group(3) is not None:
+      self.generic_parameters_list = [m.group(3)]
+    else:
+      self.generic_parameters_list = []
+
+  @property
+  def is_generic(self):
+    return len(self.generic_parameters_list) != 0
+
+  @property
+  def generic_parameters_decl(self):
+    if not self.is_generic:
+      return ''
+    assert len(self.generic_parameters_list) == 1
+    return '<%s>' % (self.generic_parameters_list[0])
+
+  @property
+  def full_name(self):
+    return '%s%s' % (self.type_name, self.generic_parameters_decl)
+
+  def specialize_with(self, substitutions):
+    assert len(substitutions) == 1
+    assert len(self.generic_parameters_list) == 1
+    return SwiftClassSpecialization(
+      '%s<%s>' % (
+        self.type_name,
+        substitutions[self.generic_parameters_list[0]]))
+
+class SwiftClassSpecialization(object):
+  def __init__(self, full_name):
+    m = re.match(r'(.+)(<(.+)>)?', full_name)
+    self.type_name = m.group(1)
+    self.full_name = full_name
+
+}%
+
+import StdlibUnittest
+#if _runtime(_ObjC)
+import Foundation
+#endif
+
+let AnyHashableTests = TestSuite("AnyHashableTests")
+
+AnyHashableTests.test("CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable") {
+  var v = AnyHashable(CustomPrintableValue(1))
+  expectPrinted("(value: 1).description", v)
+  expectDebugPrinted("AnyHashable((value: 1).debugDescription)", v)
+  expectDumped(
+    "▿ AnyHashable((value: 1).debugDescription)\n" +
+    "  ▿ value: (value: 1).debugDescription\n" +
+    "    - value: 1\n" +
+    "    - identity: 0\n",
+    v)
+}
+
+% for wrapped in ['MinimalHashableValue', 'MinimalHashableClass']:
+AnyHashableTests.test("AnyHashable(${wrapped})/Hashable") {
+  let xs = (0...5).flatMap {
+    [ ${wrapped}($0, identity: 0),
+      ${wrapped}($0, identity: 1) ]
+  }
+  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+
+  let anyHashableXs = xs.map(AnyHashable.init)
+  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+}
+% end
+
+% for wrapped in ['GenericMinimalHashableValue', 'GenericMinimalHashableClass']:
+%   for payload in [ 'OpaqueValue<Int>', 'LifetimeTracked' ]:
+AnyHashableTests.test("AnyHashable(${wrapped}<OpaqueValue<Int>>)/Hashable") {
+  ${wrapped}_equalImpl.value = {
+    ($0 as! ${payload}).value == ($1 as! ${payload}).value
+  }
+  ${wrapped}_hashValueImpl.value = {
+    ($0 as! ${payload}).value
+  }
+  let xs = (0...5).flatMap {
+    [ ${wrapped}(${payload}($0), identity: 0),
+      ${wrapped}(${payload}($0), identity: 1) ]
+  }
+  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+
+  let anyHashableXs = xs.map(AnyHashable.init)
+  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+}
+%   end
+% end
+
+% for (kw, name) in [
+%   ('class', 'Class'),
+%   ('struct', 'PODStruct'),
+%   ('struct', 'RCStruct'),
+% ]:
+${kw} HasCustomRepresentation_${name}
+  : Hashable, _HasCustomAnyHashableRepresentation
+{
+%   if name == 'RCStruct':
+  var lifetimeTrackedValue: LifetimeTracked
+  var value: Int {
+    return lifetimeTrackedValue.value
+  }
+%   else:
+  var value: Int
+%   end
+  var identity: Int
+  var hasDefaultAnyHashableRepresentation: Bool
+  init(_ value: Int, identity: Int, hasDefaultAnyHashableRepresentation: Bool) {
+%   if name == 'RCStruct':
+    self.lifetimeTrackedValue = LifetimeTracked(value)
+%   else:
+    self.value = value
+%   end
+    self.identity = identity
+    self.hasDefaultAnyHashableRepresentation = hasDefaultAnyHashableRepresentation
+  }
+  var hashValue: Int {
+    return value
+  }
+  func _toCustomAnyHashable() -> AnyHashable? {
+    if hasDefaultAnyHashableRepresentation {
+      return nil
+    }
+    let customRepresentation =
+      MinimalHashableValue(value, identity: identity)
+    return AnyHashable(customRepresentation)
+  }
+  static func == (
+    lhs: HasCustomRepresentation_${name},
+    rhs: HasCustomRepresentation_${name}
+  ) -> Bool {
+    return lhs.value == rhs.value
+  }
+}
+
+${kw} HasCustomRepresentation_Generic${name}<Wrapped>
+  : Hashable, _HasCustomAnyHashableRepresentation
+{
+  var value: Wrapped
+  var identity: Int
+  var hasDefaultAnyHashableRepresentation: Bool
+  init(
+    _ value: Wrapped,
+    identity: Int,
+    hasDefaultAnyHashableRepresentation: Bool
+  ) {
+    self.value = value
+    self.identity = identity
+    self.hasDefaultAnyHashableRepresentation = hasDefaultAnyHashableRepresentation
+  }
+  var hashValue: Int {
+    return asGenericMinimalHashableValue.hashValue
+  }
+  func _toCustomAnyHashable() -> AnyHashable? {
+    if hasDefaultAnyHashableRepresentation {
+      return nil
+    }
+    let customRepresentation =
+      GenericMinimalHashableValue(value, identity: identity)
+    return AnyHashable(customRepresentation)
+  }
+  var asGenericMinimalHashableValue: GenericMinimalHashableValue<Wrapped> {
+    return GenericMinimalHashableValue(value, identity: identity)
+  }
+  static func == <Wrapped> (
+    lhs: HasCustomRepresentation_Generic${name}<Wrapped>,
+    rhs: HasCustomRepresentation_Generic${name}<Wrapped>
+  ) -> Bool {
+    return
+      lhs.asGenericMinimalHashableValue ==
+      rhs.asGenericMinimalHashableValue
+  }
+}
+% end
+
+% for name in [ 'Class', 'PODStruct', 'RCStruct' ]:
+%   wrapped = 'HasCustomRepresentation_%s' % name
+%   genericWrapped = 'HasCustomRepresentation_Generic%s' % name
+AnyHashableTests.test("AnyHashable with ${wrapped}") {
+  let xs = (-2...2).flatMap {
+    [ ${wrapped}(
+        $0, identity: 0,
+        hasDefaultAnyHashableRepresentation: $0 < 0),
+      ${wrapped}(
+        $0, identity: 1,
+        hasDefaultAnyHashableRepresentation: $0 < 0) ]
+  }
+  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+
+  let anyHashableXs = xs.map(AnyHashable.init)
+  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+}
+
+%   for payload in [ 'OpaqueValue<Int>', 'LifetimeTracked' ]:
+AnyHashableTests.test("AnyHashable with ${genericWrapped} with ${payload}") {
+  GenericMinimalHashableValue_equalImpl.value = {
+    ($0 as! ${payload}).value == ($1 as! ${payload}).value
+  }
+  GenericMinimalHashableValue_hashValueImpl.value = {
+    ($0 as! ${payload}).value
+  }
+  let xs = (-2...2).flatMap {
+    [ ${genericWrapped}(
+        ${payload}($0), identity: 0,
+        hasDefaultAnyHashableRepresentation: $0 < 0),
+      ${genericWrapped}(
+        ${payload}($0), identity: 1,
+        hasDefaultAnyHashableRepresentation: $0 < 0) ]
+  }
+  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+
+  let anyHashableXs = xs.map(AnyHashable.init)
+  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+}
+%   end
+% end
+
+struct HasCustomRepresentationRecursively
+  : Hashable, _HasCustomAnyHashableRepresentation {
+
+  var value: Int
+  init(_ value: Int) {
+    self.value = value
+  }
+  var hashValue: Int {
+    return value
+  }
+  func _toCustomAnyHashable() -> AnyHashable? {
+    if value == 0 {
+      return AnyHashable(HasCustomRepresentationRecursively(value + 1))
+    } else {
+      return nil
+    }
+  }
+  static func == (
+    lhs: HasCustomRepresentationRecursively,
+    rhs: HasCustomRepresentationRecursively
+  ) -> Bool {
+    return lhs.value == rhs.value
+  }
+}
+
+AnyHashableTests.test("AnyHashable with recursive custom representations") {
+  GenericMinimalHashableValue_equalImpl.value = {
+    ($0 as! ${payload}).value == ($1 as! ${payload}).value
+  }
+  GenericMinimalHashableValue_hashValueImpl.value = {
+    ($0 as! ${payload}).value
+  }
+  // If the custom representation has its own custom representation,
+  // we ignore it.
+  let x = AnyHashable(HasCustomRepresentationRecursively(0))
+  expectPrinted("HasCustomRepresentationRecursively(value: 1)", x)
+}
+
+class T2_Base {}
+class T3_Base {}
+class T4_Base1 {}
+class T4_Base : T4_Base1 {}
+class T5_Base1 {}
+class T5_Base : T5_Base1 {}
+
+class T6_GenericBase<T> {}
+class T7_GenericBase<T> {}
+class T8_GenericBase1<T> {}
+class T8_GenericBase<T> : T8_GenericBase1<T> {}
+class T9_GenericBase1<T> {}
+class T9_GenericBase<T> : T9_GenericBase1<T> {}
+
+#if _runtime(_ObjC)
+class T10_ObjC_Base : NSObject {}
+class T11_ObjC_GenericBase<T> : NSObject {}
+#endif
+
+% for prefix in [ 'T0', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10_ObjC', 'T11_ObjC' ]:
+%   base = None
+%   if prefix in ['T0', 'T1']:
+%     pass
+%   elif prefix in ['T2', 'T3', 'T4', 'T5', 'T10_ObjC']:
+%     base = SwiftClass(prefix + '_Base')
+%   elif prefix in ['T6', 'T7', 'T8', 'T9', 'T11_ObjC']:
+%     base = SwiftClass(prefix + '_GenericBase<T>')
+%   else:
+%     assert False
+%   end
+%   hashable_base = None
+%   if prefix in ['T0', 'T2', 'T4', 'T6', 'T8', 'T10_ObjC']:
+%     hashable_base = SwiftClass(prefix + '_HashableBase')
+%   elif prefix in ['T1', 'T3', 'T5', 'T7', 'T9', 'T11_ObjC']:
+%     hashable_base = SwiftClass(prefix + '_HashableGenericBase<T>')
+%   else:
+%       assert False
+%   end
+%   if base and base.is_generic and not hashable_base.is_generic:
+%     base = base.specialize_with({'T':'Int'})
+%   end
+%   bases = []
+%   if base:
+%     bases += [base]
+%   if not 'ObjC' in prefix:
+%     bases += [SwiftClass('Hashable')]
+%   end
+
+${'#if _runtime(_ObjC)' if 'ObjC' in prefix else ''}
+class ${hashable_base.full_name} : ${', '.join([b.full_name for b in bases])} {
+  var value: Int
+  init(_ value: Int) {
+    self.value = value
+  }
+  ${'override' if 'ObjC' in prefix else ''} var hashValue: Int {
+    return value
+  }
+%   if 'ObjC' in prefix:
+  override func isEqual(_ object: Any?) -> Bool {
+    guard let rhs = object as? ${hashable_base.full_name} else {
+      return false
+    }
+    return self.value == rhs.value
+  }
+%   end
+%   if not 'ObjC' in prefix:
+  static func == ${hashable_base.generic_parameters_decl} (
+    lhs: ${hashable_base.full_name},
+    rhs: ${hashable_base.full_name}
+  ) -> Bool {
+    return lhs.value == rhs.value
+  }
+%   end
+}
+
+%{
+generic = hashable_base.generic_parameters_decl
+derivedA = SwiftClass(prefix + '_DerivedA' + generic)
+derivedB = SwiftClass(prefix + '_DerivedB' + generic)
+derivedAA = SwiftClass(prefix + '_DerivedAA' + generic)
+derivedAB = SwiftClass(prefix + '_DerivedAB' + generic)
+derivedBA = SwiftClass(prefix + '_DerivedBA' + generic)
+derivedBB = SwiftClass(prefix + '_DerivedBB' + generic)
+derivedAAA = SwiftClass(prefix + '_DerivedAAA' + generic)
+derivedAAB = SwiftClass(prefix + '_DerivedAAB' + generic)
+derivedABA = SwiftClass(prefix + '_DerivedABA' + generic)
+derivedABB = SwiftClass(prefix + '_DerivedABB' + generic)
+derivedBAA = SwiftClass(prefix + '_DerivedBAA' + generic)
+derivedBAB = SwiftClass(prefix + '_DerivedBAB' + generic)
+derivedBBA = SwiftClass(prefix + '_DerivedBBA' + generic)
+derivedBBB = SwiftClass(prefix + '_DerivedBBB' + generic)
+
+types = [
+  (hashable_base, base),
+  (derivedA, hashable_base),
+  (derivedB, hashable_base),
+  (derivedAA, derivedA),
+  (derivedAB, derivedA),
+  (derivedBA, derivedB),
+  (derivedBB, derivedB),
+  (derivedAAA, derivedAA),
+  (derivedAAB, derivedAA),
+  (derivedABA, derivedAB),
+  (derivedABB, derivedAB),
+  (derivedBAA, derivedBA),
+  (derivedBAB, derivedBA),
+  (derivedBBA, derivedBB),
+  (derivedBBB, derivedBB),
+]
+}%
+
+% for (Self, Super) in types:
+%   if 'Base' not in Self.type_name:
+class ${Self.full_name} : ${Super.full_name} {}
+%   end
+% end
+
+AnyHashableTests.test("AnyHashable with classes from the ${prefix} hierarchy") {
+  typealias T = Int
+  let xs = [
+% for (i, (Self, _)) in enumerate(types):
+%   ConcreteSelf = Self
+%   if ConcreteSelf.is_generic:
+%     ConcreteSelf = ConcreteSelf.specialize_with({'T':'Int'})
+%   end
+    ${Self.full_name}(${len(types) + i}),
+%   for j in range(0, len(types)):
+    ${Self.full_name}(${j}),
+%   end
+% end
+  ]
+  func equalityOracle(_ lhs: Int, rhs: Int) -> Bool {
+    if lhs == rhs {
+      return true
+    }
+    let p = ${len(types) + 1}
+    if lhs % p == 0 || rhs % p == 0 {
+      return false
+    }
+    return lhs % p == rhs % p
+  }
+  checkHashable(xs, equalityOracle: equalityOracle)
+
+  let anyHashableXs = xs.map(AnyHashable.init)
+  checkHashable(anyHashableXs, equalityOracle: equalityOracle)
+}
+${'#endif' if 'ObjC' in prefix else ''}
+
+% end
+
+#if _runtime(_ObjC)
+// There is no public way to define new CF types, so we are using
+// CFBitVector and CFMutableBitVector.
+extension CFBitVector : Hashable {
+  static func makeImmutable(from values: Array<UInt8>) -> CFBitVector {
+    return CFBitVectorCreate(/*allocator:*/ nil, values, values.count * 8)
+  }
+  var asArray: Array<UInt8> {
+    var result = [UInt8](repeating: 0, count: CFBitVectorGetCount(self) / 8)
+    CFBitVectorGetBits(
+      self,
+      CFRange(location: 0, length: result.count * 8),
+      &result)
+    return result
+  }
+  public var hashValue: Int {
+    // This is a bad hash function, but acceptable for tests.
+    return 0
+  }
+  public static func == (lhs: CFBitVector, rhs: CFBitVector) -> Bool {
+    return lhs.asArray == rhs.asArray
+  }
+}
+
+extension CFMutableBitVector {
+  static func makeMutable(from values: Array<UInt8>) -> CFMutableBitVector {
+    return CFBitVectorCreateMutableCopy(
+      /*allocator:*/ nil,
+      /*capacity:*/ 0,
+      CFBitVector.makeImmutable(from: values))
+  }
+}
+
+let interestingBitVectorArrays: [[UInt8]] = [
+  [],
+  [0x00],
+  [0xaa],
+  [0xff],
+  [0xff, 0x00],
+  [0x00, 0xff],
+  [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88],
+]
+
+AnyHashableTests.test("CFBitVector/Hashable") {
+  let bitVectors = interestingBitVectorArrays.map(CFBitVector.makeImmutable)
+  let arrays = bitVectors.map { $0.asArray }
+  func isEq(_ lhs: [[UInt8]], _ rhs: [[UInt8]]) -> Bool {
+    return zip(lhs, rhs).map { $0 == $1 }.reduce(true, { $0 && $1 })
+  }
+  expectEqualTest(interestingBitVectorArrays, arrays, sameValue: isEq)
+  checkHashable(bitVectors, equalityOracle: { $0 == $1 })
+}
+
+AnyHashableTests.test("CFMutableBitVector/Hashable") {
+  // CFMutableBitVector inherits the Hashable conformance from
+  // CFBitVector.
+  let bitVectors =
+    interestingBitVectorArrays.map(CFMutableBitVector.makeMutable)
+  let arrays = bitVectors.map { $0.asArray }
+  func isEq(_ lhs: [[UInt8]], _ rhs: [[UInt8]]) -> Bool {
+    return zip(lhs, rhs).map { $0 == $1 }.reduce(true, { $0 && $1 })
+  }
+  expectEqualTest(interestingBitVectorArrays, arrays, sameValue: isEq)
+  checkHashable(bitVectors, equalityOracle: { $0 == $1 })
+}
+
+#endif
+
+runAllTests()
+
