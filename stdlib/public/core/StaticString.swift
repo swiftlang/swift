@@ -36,9 +36,12 @@ public struct StaticString
     CustomDebugStringConvertible,
     CustomReflectable {
 
-  /// Either a pointer to the start of UTF-8 data, represented as an integer,
-  /// or an integer representation of a single Unicode scalar.
-  internal var _startPtrOrData: Builtin.Word
+  // FIXME(ABI): RawPointer is non-nullable, but we can store a null Unicode
+  // scalar in it.  Change it to an integer.
+  //
+  /// Either a pointer to the start of UTF-8 data, or an integer representation
+  /// of a single Unicode scalar.
+  internal var _startPtrOrData: Builtin.RawPointer
 
   /// If `_startPtrOrData` is a pointer, contains the length of the UTF-8 data
   /// in bytes.
@@ -63,7 +66,7 @@ public struct StaticString
     _precondition(
       hasPointerRepresentation,
       "StaticString should have pointer representation")
-    return UnsafePointer(bitPattern: UInt(_startPtrOrData))!
+    return UnsafePointer(_startPtrOrData)
   }
 
   /// The stored Unicode scalar value.
@@ -76,7 +79,9 @@ public struct StaticString
     _precondition(
       !hasPointerRepresentation,
       "StaticString should have Unicode scalar representation")
-    return UnicodeScalar(UInt32(UInt(_startPtrOrData)))
+    return UnicodeScalar(
+      UInt32(UInt(bitPattern: UnsafePointer<Builtin.RawPointer>(_startPtrOrData)))
+    )
   }
 
   /// The length in bytes of the static string's ASCII or UTF-8 representation.
@@ -155,10 +160,7 @@ public struct StaticString
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
-    // We don't go through UnsafePointer here to make things simpler for alias
-    // analysis. A higher-level algorithm may be trying to make sure an
-    // unrelated buffer is not accessed or freed.
-    self._startPtrOrData = Builtin.ptrtoint_Word(_start)
+    self._startPtrOrData = _start
     self._utf8CodeUnitCount = utf8CodeUnitCount
     self._flags = Bool(isASCII) ? (0x2 as UInt8)._value : (0x0 as UInt8)._value
   }
@@ -168,7 +170,11 @@ public struct StaticString
   internal init(
     unicodeScalar: Builtin.Int32
   ) {
-    self._startPtrOrData = UInt(UInt32(unicodeScalar))._builtinWordValue
+    self._startPtrOrData =
+      unsafeBitCast(
+        UInt(UInt32(unicodeScalar)),
+        to: OpaquePointer.self
+      )._rawValue
     self._utf8CodeUnitCount = 0._builtinWordValue
     self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII
       ? (0x3 as UInt8)._value
