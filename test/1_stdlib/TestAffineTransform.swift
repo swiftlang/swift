@@ -337,9 +337,9 @@ class TestAffineTransform : TestAffineTransformSuper {
             AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33)
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("AffineTransform", String(anyHashables[0].base.dynamicType))
-        expectEqual("AffineTransform", String(anyHashables[1].base.dynamicType))
-        expectEqual("AffineTransform", String(anyHashables[2].base.dynamicType))
+        expectEqual("AffineTransform", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("AffineTransform", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("AffineTransform", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -356,9 +356,9 @@ class TestAffineTransform : TestAffineTransformSuper {
             makeNSAffineTransform(rotatedByDegrees: 10),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("AffineTransform", String(anyHashables[0].base.dynamicType))
-        expectEqual("AffineTransform", String(anyHashables[1].base.dynamicType))
-        expectEqual("AffineTransform", String(anyHashables[2].base.dynamicType))
+        expectEqual("AffineTransform", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("AffineTransform", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("AffineTransform", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }

@@ -171,7 +171,7 @@ public protocol CustomStringConvertible {
 ///
 /// The description property of a conforming type must be a value-preserving
 /// representation of the original value. As such, it should be possible to
-/// attempt to re-create an instance from its string representation.
+/// re-create an instance from its string representation.
 public protocol LosslessStringConvertible : CustomStringConvertible {
   /// Instantiates an instance of the conforming type from a string
   /// representation.

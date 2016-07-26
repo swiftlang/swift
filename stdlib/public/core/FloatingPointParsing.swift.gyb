@@ -42,7 +42,7 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 % end
 
 //===--- Parsing ----------------------------------------------------------===//
-extension ${Self} {
+extension ${Self} : LosslessStringConvertible {
   /// Construct from an ASCII representation.
   ///
   /// Returns the result of calling the POSIX function

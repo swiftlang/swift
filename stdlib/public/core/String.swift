@@ -983,7 +983,7 @@ extension String {
   }
   
   /// Creates an instance from the description of a given
-  /// LosslessStringConvertible instance.
+  /// `LosslessStringConvertible` instance.
   public init<T : LosslessStringConvertible>(_ value: T) {
     self = value.description
   }

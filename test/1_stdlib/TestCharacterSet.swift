@@ -160,9 +160,9 @@ class TestCharacterSet : TestCharacterSetSuper {
             CharacterSet(charactersIn: "XYZ")
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("CharacterSet", String(anyHashables[0].base.dynamicType))
-        expectEqual("CharacterSet", String(anyHashables[1].base.dynamicType))
-        expectEqual("CharacterSet", String(anyHashables[2].base.dynamicType))
+        expectEqual("CharacterSet", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("CharacterSet", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("CharacterSet", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -174,9 +174,9 @@ class TestCharacterSet : TestCharacterSetSuper {
             NSCharacterSet(charactersIn: "XYZ"),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("CharacterSet", String(anyHashables[0].base.dynamicType))
-        expectEqual("CharacterSet", String(anyHashables[1].base.dynamicType))
-        expectEqual("CharacterSet", String(anyHashables[2].base.dynamicType))
+        expectEqual("CharacterSet", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("CharacterSet", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("CharacterSet", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }

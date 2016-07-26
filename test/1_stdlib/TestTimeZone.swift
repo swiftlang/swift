@@ -70,9 +70,9 @@ class TestTimeZone : TestTimeZoneSuper {
             TimeZone(identifier: "Europe/Kiev")!,
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("TimeZone", String(anyHashables[0].base.dynamicType))
-        expectEqual("TimeZone", String(anyHashables[1].base.dynamicType))
-        expectEqual("TimeZone", String(anyHashables[2].base.dynamicType))
+        expectEqual("TimeZone", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("TimeZone", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("TimeZone", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -84,9 +84,9 @@ class TestTimeZone : TestTimeZoneSuper {
             NSTimeZone(name: "Europe/Kiev")!,
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("TimeZone", String(anyHashables[0].base.dynamicType))
-        expectEqual("TimeZone", String(anyHashables[1].base.dynamicType))
-        expectEqual("TimeZone", String(anyHashables[2].base.dynamicType))
+        expectEqual("TimeZone", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("TimeZone", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("TimeZone", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }

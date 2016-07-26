@@ -97,9 +97,9 @@ class TestUUID : TestUUIDSuper {
             UUID(uuidString: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")!,
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("UUID", String(anyHashables[0].base.dynamicType))
-        expectEqual("UUID", String(anyHashables[1].base.dynamicType))
-        expectEqual("UUID", String(anyHashables[2].base.dynamicType))
+        expectEqual("UUID", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("UUID", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("UUID", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -111,9 +111,9 @@ class TestUUID : TestUUIDSuper {
             NSUUID(uuidString: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")!,
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("UUID", String(anyHashables[0].base.dynamicType))
-        expectEqual("UUID", String(anyHashables[1].base.dynamicType))
-        expectEqual("UUID", String(anyHashables[2].base.dynamicType))
+        expectEqual("UUID", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("UUID", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("UUID", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }

@@ -355,7 +355,7 @@ public struct Character :
 
 extension Character : CustomStringConvertible {
   public var description: String {
-    return String(self)
+    return String(describing: self)
   }
 }
 

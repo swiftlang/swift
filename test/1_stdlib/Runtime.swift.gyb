@@ -74,8 +74,8 @@ protocol Q1 {}
 
 extension P1 {
   var success: Bool {
-    print(String(customMirror))
-    return String(customMirror) == "Mirror for ()"
+    print(String(describing: customMirror))
+    return String(describing: customMirror) == "Mirror for ()"
   }
 }
 

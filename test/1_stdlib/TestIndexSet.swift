@@ -765,9 +765,9 @@ class TestIndexSet : TestIndexSetSuper {
             IndexSet([0, 1, 2]),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("IndexSet", String(anyHashables[0].base.dynamicType))
-        expectEqual("IndexSet", String(anyHashables[1].base.dynamicType))
-        expectEqual("IndexSet", String(anyHashables[2].base.dynamicType))
+        expectEqual("IndexSet", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("IndexSet", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("IndexSet", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -779,9 +779,9 @@ class TestIndexSet : TestIndexSetSuper {
             NSIndexSet(index: 1),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("IndexSet", String(anyHashables[0].base.dynamicType))
-        expectEqual("IndexSet", String(anyHashables[1].base.dynamicType))
-        expectEqual("IndexSet", String(anyHashables[2].base.dynamicType))
+        expectEqual("IndexSet", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("IndexSet", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("IndexSet", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }

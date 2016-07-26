@@ -38,10 +38,7 @@ NSSetAPI.test("ExpressibleByArrayLiteral") {
 }
 
 NSSetAPI.test("CustomStringConvertible") {
-  // FIXME: rdar://problem/27515965 Type checker tries to use the
-  // sequence-of-Character initializer here instead of the printing initializer
-  // without the 'Any' cast.
-  let result = String(NSSet(objects:"a", "b", "c", "42") as Any)
+  let result = String(describing: NSSet(objects:"a", "b", "c", "42"))
   let expect = "{(\n    b,\n    42,\n    c,\n    a\n)}"
   expectEqual(expect, result)
 }
@@ -64,10 +61,7 @@ NSOrderedSetAPI.test("ExpressibleByArrayLiteral") {
 }
 
 NSOrderedSetAPI.test("CustomStringConvertible") {
-  // FIXME: rdar://problem/27515965 Type checker tries to use the
-  // sequence-of-Character initializer here instead of the printing initializer
-  // without the 'Any' cast.
-  let result = String(NSOrderedSet(objects:"a", "b", "c", "42") as Any)
+  let result = String(describing: NSOrderedSet(objects:"a", "b", "c", "42"))
   let expect = "{(\n    a,\n    b,\n    c,\n    42\n)}"
   expectEqual(expect, result)
 }

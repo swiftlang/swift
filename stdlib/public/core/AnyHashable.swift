@@ -151,7 +151,7 @@ extension AnyHashable : Hashable {
 
 extension AnyHashable : CustomStringConvertible {
   public var description: String {
-    return String(base)
+    return String(describing: base)
   }
 }
 

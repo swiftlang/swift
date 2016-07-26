@@ -375,7 +375,7 @@ OptionalTests.test("Optional TextOutputStream") {
   expectFalse(canGenericCast(optNoString, Streamable.self))
   expectTrue(optNoString is CustomDebugStringConvertible)
   expectTrue(canGenericCast(optNoString, CustomDebugStringConvertible.self))
-  expectEqual(String(optNoString), "Optional(main.TestNoString)")
+  expectEqual(String(describing: optNoString), "Optional(main.TestNoString)")
   expectEqual(debugPrintStr(optNoString), "Optional(main.TestNoString)")
 
   let optString: TestString? = TestString()
@@ -383,8 +383,8 @@ OptionalTests.test("Optional TextOutputStream") {
   expectTrue(canGenericCast(optString, CustomStringConvertible.self))
   expectTrue(optString is CustomDebugStringConvertible)
   expectTrue(canGenericCast(optString, CustomDebugStringConvertible.self))
-  expectEqual(String(TestString()), "AString")
-  expectEqual(String(optString), "Optional(XString)")
+  expectEqual(String(describing: TestString()), "AString")
+  expectEqual(String(describing: optString), "Optional(XString)")
   expectEqual(debugPrintStr(optString), "Optional(XString)")
 
   let optStream: TestStream? = TestStream()
@@ -392,8 +392,8 @@ OptionalTests.test("Optional TextOutputStream") {
   expectTrue(canGenericCast(optStream, Streamable.self))
   expectTrue(optStream is CustomDebugStringConvertible)
   expectTrue(canGenericCast(optStream, CustomDebugStringConvertible.self))
-  expectEqual(String(TestStream()), "AStream")
-  expectEqual(String(optStream), "Optional(AStream)")
+  expectEqual(String(describing: TestStream()), "AStream")
+  expectEqual(String(describing: optStream), "Optional(AStream)")
   expectEqual(debugPrintStr(optStream), "Optional(AStream)")
 }
 

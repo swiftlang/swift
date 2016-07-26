@@ -89,9 +89,9 @@ class TestIndexPath : TestIndexPathSuper {
             IndexPath(indexes: [1, 2, 3]),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("IndexPath", String(anyHashables[0].base.dynamicType))
-        expectEqual("IndexPath", String(anyHashables[1].base.dynamicType))
-        expectEqual("IndexPath", String(anyHashables[2].base.dynamicType))
+        expectEqual("IndexPath", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("IndexPath", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("IndexPath", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -103,9 +103,9 @@ class TestIndexPath : TestIndexPathSuper {
             NSIndexPath(index: 2),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("IndexPath", String(anyHashables[0].base.dynamicType))
-        expectEqual("IndexPath", String(anyHashables[1].base.dynamicType))
-        expectEqual("IndexPath", String(anyHashables[2].base.dynamicType))
+        expectEqual("IndexPath", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("IndexPath", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("IndexPath", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }

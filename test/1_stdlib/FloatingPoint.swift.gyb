@@ -370,6 +370,17 @@ FloatingPoint.test("${Self}.addingProduct") {
   let ulp = ${Self}.ulpOfOne
   expectEqual(ulp*ulp, one.addingProduct(ulp + one, ulp - one))
 }
+
+FloatingPoint.test("${Self}/LosslessStringConvertible") {
+  let instances = [ 
+    1.0, -1.0,
+    0.0, -0.0,
+    ${Self}.infinity, -${Self}.infinity 
+  ]
+
+  checkLosslessStringConvertible(instances)
+  expectTrue(Float(String(Float.nan))!.isNaN)
+}
 % if Self == 'Float80':
 #endif
 % end
