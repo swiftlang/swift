@@ -287,6 +287,7 @@ namespace {
     
     ImportResult VisitPointerType(const clang::PointerType *type) {      
       auto pointeeQualType = type->getPointeeType();
+      auto quals = pointeeQualType.getQualifiers();
 
       // Special case for NSZone*, which has its own Swift wrapper.
       if (const clang::RecordType *pointee =
@@ -303,7 +304,19 @@ namespace {
             return {wrapperTy, ImportHint::OtherPointer};
         }
       }
-      
+
+      // Import 'void*' as 'UnsafeMutableRawPointer' and 'const void*' as
+      // 'UnsafeRawPointer'. This is Swift's version of an untyped pointer. Note
+      // that 'Unsafe[Mutable]Pointer<T>' implicitly converts to
+      // 'Unsafe[Mutable]RawPointer' for interoperability.
+      if (pointeeQualType->isVoidType()) {
+        return {
+          (quals.hasConst() ? Impl.SwiftContext.getUnsafeRawPointerDecl()
+           : Impl.SwiftContext.getUnsafeMutableRawPointerDecl())
+            ->getDeclaredType(),
+            ImportHint::OtherPointer};
+      }
+
       // All other C pointers to concrete types map to
       // UnsafeMutablePointer<T> or OpaquePointer (FIXME:, except in
       // parameter position under the pre-
@@ -336,8 +349,6 @@ namespace {
         };
       }
 
-      auto quals = pointeeQualType.getQualifiers();
-      
       if (quals.hasConst()) {
         return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                      "UnsafePointer",

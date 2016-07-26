@@ -111,8 +111,8 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
-  public var identity: UnsafePointer<Void> {
-    return UnsafePointer(firstElementAddress)
+  public var identity: UnsafeRawPointer {
+    return UnsafeRawPointer(firstElementAddress)
   }
 
   /// An object that keeps the elements stored in this buffer alive.

@@ -7,8 +7,8 @@ import Foundation
 
 func takesMutablePointer(_ x: UnsafeMutablePointer<Int>) {}
 func takesConstPointer(_ x: UnsafePointer<Int>) {}
-func takesMutableVoidPointer(_ x: UnsafeMutablePointer<Void>) {}
-func takesConstVoidPointer(_ x: UnsafePointer<Void>) {}
+func takesMutableVoidPointer(_ x: UnsafeMutableRawPointer) {}
+func takesConstVoidPointer(_ x: UnsafeRawPointer) {}
 func takesMutableRawPointer(_ x: UnsafeMutableRawPointer) {}
 func takesConstRawPointer(_ x: UnsafeRawPointer) {}
 
@@ -25,7 +25,7 @@ func pointerToPointer(_ mp: UnsafeMutablePointer<Int>,
   takesMutableVoidPointer(mp)
   // CHECK: [[TAKES_MUTABLE_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion23takesMutableVoidPointer
   // CHECK: [[CONVERT:%.*]] = function_ref @_TFs32_convertPointerToPointerArgument
-  // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafeMutablePointer<()>>
+  // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafeMutableRawPointer>
   // CHECK: apply [[TAKES_MUTABLE_VOID_POINTER]]
 
   takesMutableRawPointer(mp)
@@ -41,9 +41,9 @@ func pointerToPointer(_ mp: UnsafeMutablePointer<Int>,
   // CHECK: apply [[TAKES_CONST_POINTER]]
 
   takesConstVoidPointer(mp)
-  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGSPT__T_
+  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFSVT_
   // CHECK: [[CONVERT:%.*]] = function_ref @_TFs32_convertPointerToPointerArgument
-  // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafePointer<()>>
+  // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafeRawPointer>
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]
 
   takesConstRawPointer(mp)
@@ -57,9 +57,9 @@ func pointerToPointer(_ mp: UnsafeMutablePointer<Int>,
   // CHECK: apply [[TAKES_CONST_POINTER]]([[CP]])
 
   takesConstVoidPointer(cp)
-  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGSPT__T_
+  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFSVT_
   // CHECK: [[CONVERT:%.*]] = function_ref @_TFs32_convertPointerToPointerArgument
-  // CHECK: apply [[CONVERT]]<UnsafePointer<Int>, UnsafePointer<()>>
+  // CHECK: apply [[CONVERT]]<UnsafePointer<Int>, UnsafeRawPointer>
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]
 
   takesConstRawPointer(cp)
@@ -115,9 +115,9 @@ func arrayToPointer() {
 // CHECK-LABEL: sil hidden @_TF18pointer_conversion15stringToPointerFSST_ 
 func stringToPointer(_ s: String) {
   takesConstVoidPointer(s)
-  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGSPT__T_
+  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFSV
   // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_TFs40_convertConstStringToUTF8PointerArgument
-  // CHECK: [[OWNER:%.*]] = apply [[CONVERT_STRING]]<UnsafePointer<()>>([[POINTER_BUF:%[0-9]*]],
+  // CHECK: [[OWNER:%.*]] = apply [[CONVERT_STRING]]<UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]([[POINTER]])
   // CHECK: release_value [[OWNER]]

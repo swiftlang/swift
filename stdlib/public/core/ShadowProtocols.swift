@@ -89,7 +89,7 @@ public protocol _NSDictionaryCore :
   // The designated initializer of `NSDictionary`.
   init(
     objects: UnsafePointer<AnyObject?>,
-    forKeys: UnsafePointer<Void>, count: Int)
+    forKeys: UnsafeRawPointer, count: Int)
 
   var count: Int { get }
 

@@ -59,7 +59,7 @@ UnmanagedTests.test("Opaque") {
   let opaquePtr = Unmanaged.passUnretained(ref).toOpaque()
   
   let unknownPtr = Int(bitPattern: opaquePtr)
-  let voidPtr = UnsafePointer<Void>(bitPattern: unknownPtr)
+  let voidPtr = UnsafeRawPointer(bitPattern: unknownPtr)
   expectNotEmpty(voidPtr, "toOpaque must not return null pointer")
   
   let unmanaged = Unmanaged<Foobar>.fromOpaque(voidPtr!)

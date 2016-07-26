@@ -120,7 +120,7 @@ public protocol _ArrayBufferProtocol
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
-  var identity: UnsafePointer<Void> { get }
+  var identity: UnsafeRawPointer { get }
 
   var startIndex: Int { get }
 }
