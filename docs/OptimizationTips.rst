@@ -319,8 +319,8 @@ generics. Some more examples of generics:
 
   func myAlgorithm(_ a: [T], length: Int) { ... }
 
-  // The compiler can specialize code of MyStack[Int]
-  var stackOfInts: MyStack[Int]
+  // The compiler can specialize code of MyStack<Int>
+  var stackOfInts: MyStack<Int>
   // Use stack of ints.
   for i in ... {
     stack.push(...)
@@ -522,7 +522,7 @@ count operations are expensive and unavoidable when using Swift classes.
 Advice: Use unmanaged references to avoid reference counting overhead
 ---------------------------------------------------------------------
 
-Note, ``Unmanaged<T>._withUnsafeGuaranteedRef`` is not public api and will go
+Note, ``Unmanaged<T>._withUnsafeGuaranteedRef`` is not a public API and will go
 away in the future. Therefore, don't use it in code that you can not change in
 the future.
 
@@ -530,7 +530,7 @@ In performance-critical code you can choose to use unmanaged references. The
 ``Unmanaged<T>`` structure allows developers to disable automatic reference
 counting for a specific reference.
 
-When you do this you need to make sure that there exists another reference to
+When you do this, you need to make sure that there exists another reference to
 instance held by the ``Unmanaged`` struct instance for the duration of the use
 of ``Unmanaged`` (see `Unmanaged.swift`_ for more details) that keeps the instance
 alive.
