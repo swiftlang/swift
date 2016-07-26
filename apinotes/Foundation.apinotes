@@ -572,6 +572,12 @@ Classes:
   SwiftName: NSSpecifierTest
 - Name: NSSpellServer
   SwiftName: NSSpellServer
+- Name: NSTask
+  SwiftName: Process
+  Methods:
+  - Selector: 'launchedTaskWithLaunchPath:arguments:'
+    SwiftName: launchedProcess(launchPath:arguments:)
+    MethodKind: Class
 - Name: NSArchiver
   SwiftName: NSArchiver
 - Name: NSUnarchiver
@@ -1246,7 +1252,7 @@ Tags:
 - Name: NSStreamEvent
   SwiftName: Stream.Event
 - Name: NSTaskTerminationReason
-  SwiftName: Task.TerminationReason
+  SwiftName: Process.TerminationReason
 - Name: NSTextCheckingType
   SwiftName: NSTextCheckingResult.CheckingType
 - Name: NSTextCheckingTypes
@@ -1459,7 +1465,7 @@ Globals:
 - Name: NSProcessInfoThermalStateDidChangeNotification
   SwiftName: ProcessInfo.thermalStateDidChangeNotification
 - Name: NSTaskDidTerminateNotification
-  SwiftName: Task.didTerminateNotification
+  SwiftName: Process.didTerminateNotification
 - Name: NSTextCheckingAllSystemTypes
   SwiftName: NSTextCheckingResult.CheckingType.allSystemTypes
 - Name: NSTextCheckingAllCustomTypes
