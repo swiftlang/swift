@@ -91,7 +91,7 @@ class TestUUID : TestUUIDSuper {
     }
 
     func test_AnyHashableContainingUUID() {
-        let values = [
+        let values: [UUID] = [
             UUID(uuidString: "e621e1f8-c36c-495a-93fc-0c247a3e6e5f")!,
             UUID(uuidString: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")!,
             UUID(uuidString: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")!,

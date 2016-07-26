@@ -83,7 +83,7 @@ class TestIndexPath : TestIndexPathSuper {
     }
 
     func test_AnyHashableContainingIndexPath() {
-        let values = [
+        let values: [IndexPath] = [
             IndexPath(indexes: [1, 2]),
             IndexPath(indexes: [1, 2, 3]),
             IndexPath(indexes: [1, 2, 3]),

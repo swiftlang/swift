@@ -118,7 +118,7 @@ class TestUserInfo : TestUserInfoSuper {
     }
 
     func test_AnyHashableContainingNotification() {
-        let values = [
+        let values: [Notification] = [
             Notification(name: Notification.Name(rawValue: "TestSwiftNotification")),
             Notification(name: Notification.Name(rawValue: "TestOtherSwiftNotification")),
             Notification(name: Notification.Name(rawValue: "TestOtherSwiftNotification")),

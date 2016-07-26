@@ -867,7 +867,7 @@ class TestData : TestDataSuper {
     }
 
     func test_AnyHashableContainingData() {
-        let values = [
+        let values: [Data] = [
             Data(base64Encoded: "AAAA")!,
             Data(base64Encoded: "AAAB")!,
             Data(base64Encoded: "AAAB")!,

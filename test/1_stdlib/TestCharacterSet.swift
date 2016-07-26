@@ -154,7 +154,7 @@ class TestCharacterSet : TestCharacterSetSuper {
     }
 
     func test_AnyHashableContainingCharacterSet() {
-        let values = [
+        let values: [CharacterSet] = [
             CharacterSet(charactersIn: "ABC"),
             CharacterSet(charactersIn: "XYZ"),
             CharacterSet(charactersIn: "XYZ")

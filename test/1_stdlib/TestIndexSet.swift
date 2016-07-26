@@ -759,7 +759,7 @@ class TestIndexSet : TestIndexSetSuper {
     }
 
     func test_AnyHashableContainingIndexSet() {
-        let values = [
+        let values: [IndexSet] = [
             IndexSet([0, 1]),
             IndexSet([0, 1, 2]),
             IndexSet([0, 1, 2]),

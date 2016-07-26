@@ -64,7 +64,7 @@ class TestTimeZone : TestTimeZoneSuper {
     }
 
     func test_AnyHashableContainingTimeZone() {
-        let values = [
+        let values: [TimeZone] = [
             TimeZone(identifier: "America/Los_Angeles")!,
             TimeZone(identifier: "Europe/Kiev")!,
             TimeZone(identifier: "Europe/Kiev")!,

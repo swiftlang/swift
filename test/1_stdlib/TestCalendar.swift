@@ -257,7 +257,7 @@ class TestCalendar : TestCalendarSuper {
     }
 
     func test_AnyHashableContainingCalendar() {
-        let values = [
+        let values: [Calendar] = [
             Calendar(identifier: .gregorian),
             Calendar(identifier: .japanese),
             Calendar(identifier: .japanese)

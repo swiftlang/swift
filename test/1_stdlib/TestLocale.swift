@@ -110,7 +110,7 @@ class TestLocale : TestLocaleSuper {
     }
 
     func test_AnyHashableContainingLocale() {
-        let values = [
+        let values: [Locale] = [
             Locale(identifier: "en"),
             Locale(identifier: "uk"),
             Locale(identifier: "uk"),

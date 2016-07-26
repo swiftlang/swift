@@ -134,7 +134,7 @@ class TestDateInterval : TestDateIntervalSuper {
         if #available(iOS 10.10, OSX 10.12, tvOS 10.0, watchOS 3.0, *) {
             let start = dateWithString("2010-05-17 14:49:47 -0700")
             let duration = 10000000.0
-            let values = [
+            let values: [DateInterval] = [
                 DateInterval(start: start, duration: duration),
                 DateInterval(start: start, duration: duration / 2),
                 DateInterval(start: start, duration: duration / 2),

@@ -331,7 +331,7 @@ class TestAffineTransform : TestAffineTransformSuper {
     }
 
     func test_AnyHashableContainingAffineTransform() {
-        let values = [
+        let values: [AffineTransform] = [
             AffineTransform.identity,
             AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33),
             AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33)

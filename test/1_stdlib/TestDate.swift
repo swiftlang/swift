@@ -151,7 +151,7 @@ class TestDate : TestDateSuper {
     }
 
     func test_AnyHashableContainingDateComponents() {
-        let values = [
+        let values: [DateComponents] = [
             DateComponents(year: 2016),
             DateComponents(year: 1995),
             DateComponents(year: 1995),
