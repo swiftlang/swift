@@ -389,11 +389,11 @@ public protocol _BridgedStoredNSError :
 }
 
 /// TODO: Better way to do this?
-internal func _stringDictToNSObjectDict(_ input: [String : Any])
-    -> [NSObject : Any] {
-  var result: [NSObject : Any] = [:]
+internal func _stringDictToAnyHashableDict(_ input: [String : Any])
+    -> [AnyHashable : Any] {
+  var result: [AnyHashable : Any] = [:]
   for (k, v) in input {
-    result[k as NSString] = v
+    result[k] = v
   }
   return result
 }
@@ -411,7 +411,7 @@ public extension _BridgedStoredNSError
   public init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: Self._nsErrorDomain,
                                 code: numericCast(code.rawValue),
-                                userInfo: _stringDictToNSObjectDict(userInfo)))
+                                userInfo: _stringDictToAnyHashableDict(userInfo)))
   }
 
   /// The user-info dictionary for an error that was bridged from
@@ -432,7 +432,7 @@ public extension _BridgedStoredNSError
   public init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: Self._nsErrorDomain,
                                 code: numericCast(code.rawValue),
-                                userInfo: _stringDictToNSObjectDict(userInfo)))
+                                userInfo: _stringDictToAnyHashableDict(userInfo)))
   }
 }
 
@@ -461,7 +461,7 @@ public extension _BridgedStoredNSError {
   var errorUserInfo: [String : Any] {
     var result: [String : Any] = [:]
     for (key, value) in _nsError.userInfo {
-      guard let stringKey = key as? String else { continue }
+      guard let stringKey = key.base as? String else { continue }
       result[stringKey] = value
     }
     return result
@@ -528,7 +528,7 @@ public struct CocoaError : _BridgedStoredNSError {
 }
 
 public extension CocoaError {
-  private var _nsUserInfo: [NSObject : Any] {
+  private var _nsUserInfo: [AnyHashable : Any] {
     return (self as NSError).userInfo
   }
 
@@ -1329,7 +1329,7 @@ public struct URLError : _BridgedStoredNSError {
 }
 
 public extension URLError {
-  private var _nsUserInfo: [NSObject : Any] {
+  private var _nsUserInfo: [AnyHashable : Any] {
     return (self as NSError).userInfo
   }
 

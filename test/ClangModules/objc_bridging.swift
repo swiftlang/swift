@@ -35,11 +35,11 @@ func foo() {
   _  = arrayToArray as (Array<Any>!) -> (Array<Any>!)
   DummyClass().arrayProperty.onlyOnArray()
 
-  _ = dictToDict as (Dictionary<NSObject, Any>!) -> Dictionary<NSObject, Any>!
+  _ = dictToDict as (Dictionary<AnyHashable, Any>!) -> Dictionary<AnyHashable, Any>!
 
   DummyClass().dictProperty.onlyOnDictionary()
 
-  _ = setToSet as (Set<NSObject>!) -> Set<NSObject>!
+  _ = setToSet as (Set<AnyHashable>!) -> Set<AnyHashable>!
   DummyClass().setProperty.onlyOnSet()
 }
 

@@ -50,9 +50,9 @@ extension CIFilter {
 extension CISampler {
   // - (id)initWithImage:(CIImage *)im keysAndValues:key0, ...;
   convenience init(im: CIImage, elements: (String, Any)...) {
-    var dict: [NSObject : Any] = [:]
+    var dict: [AnyHashable : Any] = [:]
     for (key, value) in elements {
-      dict[key as NSObject] = value
+      dict[key] = value
     }
 
     // @objc(initWithImage:options:)

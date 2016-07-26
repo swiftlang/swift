@@ -919,12 +919,18 @@ namespace {
               return Type();
 
             // The first type argument for Dictionary or Set needs
-            // to be NSObject-bound.
+            // to be Hashable. Everything that inherits NSObject has a
+            // -hash code in ObjC, but if something isn't NSObject, fall back
+            // to AnyHashable as a key type.
             if (unboundDecl == Impl.SwiftContext.getDictionaryDecl() ||
                 unboundDecl == Impl.SwiftContext.getSetDecl()) {
               auto &keyType = importedTypeArgs[0];
-              if (!Impl.matchesNSObjectBound(keyType))
-                keyType = Impl.getNSObjectType();
+              if (!Impl.matchesNSObjectBound(keyType)) {
+                if (auto anyHashable = Impl.SwiftContext.getAnyHashableDecl())
+                  keyType = anyHashable->getDeclaredType();
+                else
+                  keyType = Type();
+              }
             }
 
             // Form the specialized type.
@@ -2635,6 +2641,7 @@ bool ClangImporter::Implementation::matchesNSObjectBound(Type type) {
     return true;
 
   // Struct or enum type must have been bridged.
+  // TODO: Check that the bridged type is Hashable?
   if (type->getStructOrBoundGenericStruct() ||
       type->getEnumOrBoundGenericEnum())
     return true;

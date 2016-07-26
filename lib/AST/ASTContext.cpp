@@ -138,6 +138,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Dictionary<T>.
   NominalTypeDecl *DictionaryDecl = nullptr;
 
+  /// The declaration of Swift.AnyHashable.
+  NominalTypeDecl *AnyHashableDecl = nullptr;
+
   /// The declaration of Swift.Optional<T>.
   EnumDecl *OptionalDecl = nullptr;
 
@@ -635,6 +638,12 @@ NominalTypeDecl *ASTContext::getDictionaryDecl() const {
   if (!Impl.DictionaryDecl)
     Impl.DictionaryDecl = findStdlibType(*this, "Dictionary", 2);
   return Impl.DictionaryDecl;
+}
+
+NominalTypeDecl *ASTContext::getAnyHashableDecl() const {
+  if (!Impl.AnyHashableDecl)
+    Impl.AnyHashableDecl = findStdlibType(*this, "AnyHashable", 0);
+  return Impl.AnyHashableDecl;
 }
 
 EnumDecl *ASTContext::getOptionalDecl(OptionalTypeKind kind) const {
@@ -4011,6 +4020,7 @@ bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
           nominal == getSetDecl() ||
           nominal == getStringDecl() ||
           nominal == getErrorDecl() ||
+          nominal == getAnyHashableDecl() ||
           // Weird one-off case where CGFloat is bridged to NSNumber.
           nominal->getName() == Id_CGFloat);
 }

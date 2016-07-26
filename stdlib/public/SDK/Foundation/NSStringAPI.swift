@@ -1180,7 +1180,8 @@ extension String {
   /// values found in the `String`.
   public
   func propertyListFromStringsFileFormat() -> [String : String] {
-    return _ns.propertyListFromStringsFileFormat() as! [String : String]
+    return _ns.propertyListFromStringsFileFormat()! as [NSObject : AnyObject]
+      as! [String : String]
   }
 
   // - (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)aSet

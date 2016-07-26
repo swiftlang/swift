@@ -178,3 +178,24 @@ extension NSError : Error {
   public var _code: Int { return code }
 }
 
+extension AnyHashable : _ObjectiveCBridgeable {
+  public func _bridgeToObjectiveC() -> NSObject {
+    fatalError()
+  }
+  public static func _forceBridgeFromObjectiveC(
+    _ x: NSObject,
+    result: inout AnyHashable?
+  ) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSObject,
+    result: inout AnyHashable?
+  ) -> Bool {
+    fatalError()
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ x: NSObject?
+  ) -> AnyHashable {
+    fatalError()
+  }
+}
