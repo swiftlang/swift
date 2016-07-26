@@ -16,7 +16,7 @@ protocol MyCollection : MySequence {
 protocol P : MyCollection {
   init()
 }
-postfix operator ~>> {}
+postfix operator ~>>
 
 postfix func ~>> <_Self : MySequence, A : P>(_:_Self) -> A
   where _Self.Iterator.Element == A.Iterator.Element {

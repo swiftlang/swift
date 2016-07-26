@@ -73,6 +73,7 @@
 #endif
 
 // Keywords that start decls.
+DECL_KEYWORD(associatedtype)
 DECL_KEYWORD(class)
 DECL_KEYWORD(deinit)
 DECL_KEYWORD(enum)
@@ -83,11 +84,11 @@ DECL_KEYWORD(init)
 DECL_KEYWORD(inout)
 DECL_KEYWORD(let)
 DECL_KEYWORD(operator)
+DECL_KEYWORD(precedencegroup)
 DECL_KEYWORD(protocol)
 DECL_KEYWORD(struct)
 DECL_KEYWORD(subscript)
 DECL_KEYWORD(typealias)
-DECL_KEYWORD(associatedtype)
 DECL_KEYWORD(var)
 
 DECL_KEYWORD(fileprivate)

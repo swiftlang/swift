@@ -300,6 +300,8 @@ public:
                                            SourceLoc diagLoc = {});
   PostfixOperatorDecl *lookupPostfixOperator(Identifier name,
                                              SourceLoc diagLoc = {});
+  PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name,
+                                             SourceLoc diagLoc = {});
   /// @}
 
   /// Finds all class members defined in this module.
@@ -847,6 +849,7 @@ public:
   OperatorMap<InfixOperatorDecl*> InfixOperators;
   OperatorMap<PostfixOperatorDecl*> PostfixOperators;
   OperatorMap<PrefixOperatorDecl*> PrefixOperators;
+  OperatorMap<PrecedenceGroupDecl*> PrecedenceGroups;
 
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.
@@ -943,6 +946,8 @@ public:
   PrefixOperatorDecl *lookupPrefixOperator(Identifier name, bool isCascading,
                                            SourceLoc diagLoc = {});
   PostfixOperatorDecl *lookupPostfixOperator(Identifier name, bool isCascading,
+                                             SourceLoc diagLoc = {});
+  PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name, bool isCascading,
                                              SourceLoc diagLoc = {});
   /// @}
 
@@ -1113,6 +1118,13 @@ public:
   ///
   /// \param fixity One of PrefixOperator, InfixOperator, or PostfixOperator.
   virtual OperatorDecl *lookupOperator(Identifier name, DeclKind fixity) const {
+    return nullptr;
+  }
+
+  /// Look up a precedence group.
+  ///
+  /// \param name The precedence group name.
+  virtual PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name) const {
     return nullptr;
   }
 

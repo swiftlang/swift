@@ -187,6 +187,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
+    return false;
+  }
+
   bool visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (doIt(TAD->getUnderlyingTypeLoc()))
       return true;

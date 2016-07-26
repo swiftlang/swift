@@ -109,6 +109,12 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     Loc = OpD->getLoc();
     if (Loc.isValid())
       NameLen = OpD->getName().getLength();
+
+  } else if (auto PrecD = dyn_cast<PrecedenceGroupDecl>(D)) {
+    Loc = PrecD->getLoc();
+    if (Loc.isValid())
+      NameLen = PrecD->getName().getLength();
+
   } else {
     return true;
   }

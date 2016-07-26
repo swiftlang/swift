@@ -47,7 +47,7 @@ struct S1 : P1 {
   func foo() -> X {}
 }
 
-prefix operator % {}
+prefix operator %
 
 protocol P2 {
   associatedtype Assoc2
@@ -82,7 +82,7 @@ struct S4<T> : P3, P4 {
 takeP4(S4<Int>())
 
 // <rdar://problem/14680393>
-infix operator ~> { precedence 255 }
+infix operator ~>
 
 protocol P5 { }
 

@@ -100,9 +100,11 @@ func func3() {
 
 struct a_struct { var x : Int }
 
-infix operator *** {
-  associativity left
-  precedence 97
+infix operator *** : Starry
+precedencegroup Starry {
+  associativity: left
+  higherThan: AssignmentPrecedence
+  lowerThan: TernaryPrecedence
 }
 
 func ***(lhs: Int, rhs: Int) -> Int {
@@ -170,11 +172,11 @@ var qualifiedvalue : Int = themodule.importedtype
 var qualifiedtype : themodule.x_ty = 5
 
 
-prefix operator +++ {}
-postfix operator +++ {}
+prefix operator +++
+postfix operator +++
 
-prefix operator ++ {}
-postfix operator ++ {}
+prefix operator ++
+postfix operator ++
 
 prefix func +++(a: inout Int) { a += 2 }
 postfix func +++(a: inout Int) { a += 2 }

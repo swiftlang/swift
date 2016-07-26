@@ -625,6 +625,26 @@ ERROR(nonfinal_operator_in_class,none,
       "operator %0 declared in non-final class %1 must be 'final'",
       (Identifier, Type))
 
+// Precedence groups
+ERROR(ambiguous_precedence_groups,none,
+      "multiple precedence groups found", ())
+NOTE(found_this_precedence_group,none,
+     "found this matching precedence group", ())
+ERROR(unknown_precedence_group,none,
+      "unknown precedence group %0", (Identifier))
+ERROR(precedence_group_cycle,none,
+      "cycle in higherThan relation: %0", (StringRef))
+ERROR(precedence_group_lower_within_module,none,
+      "precedence group cannot be given lower precedence than group in same"
+      " module; make the other precedence group higher than this one instead",
+      ())
+NOTE(precedence_group_declared_here,none,"precedence group declared here",
+      ())
+ERROR(precedence_group_redeclared,none,
+      "precedence group redeclared", ())
+NOTE(previous_precedence_group_decl,none,
+     "previous precedence group declaration here", ())
+
 //------------------------------------------------------------------------------
 // Type Check Coercions
 //------------------------------------------------------------------------------
@@ -1990,11 +2010,15 @@ ERROR(construct_protocol_by_name,none,
 // Operators
 ERROR(unknown_binop,none,
        "operator is not a known binary operator", ())
-ERROR(non_assoc_adjacent,none,
-      "non-associative operator is adjacent to operator of same precedence", ())
-ERROR(incompatible_assoc,none,
-      "operator is adjacent to operator of same precedence"
-      " but incompatible associativity", ())
+ERROR(non_associative_adjacent_operators,none,
+      "adjacent operators are in non-associative precedence group %0",
+      (Identifier))
+ERROR(unordered_adjacent_operators,none,
+      "adjacent operators are in unordered precedence groups %0 and %1",
+      (Identifier, Identifier))
+ERROR(missing_builtin_precedence_group,none,
+      "broken standard library: missing builtin precedence group %0",
+      (Identifier))
 
 // If you change this, also change enum TryKindForDiagnostics.
 #define TRY_KIND_SELECT(SUB) "%select{try|try!|try?}" #SUB

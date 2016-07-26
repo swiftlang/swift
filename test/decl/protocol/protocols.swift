@@ -316,8 +316,8 @@ protocol Eq {
 extension Int : Eq { }
 
 // Matching prefix/postfix.
-prefix operator <> {}
-postfix operator <> {}
+prefix operator <>
+postfix operator <>
 
 protocol IndexValue {
   static prefix func <> (_ max: Self) -> Int

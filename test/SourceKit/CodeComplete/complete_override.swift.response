@@ -231,6 +231,15 @@
     },
     {
       key.kind: source.lang.swift.keyword,
+      key.name: "precedencegroup",
+      key.sourcetext: "precedencegroup",
+      key.description: "precedencegroup",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
       key.name: "prefix",
       key.sourcetext: "prefix",
       key.description: "prefix",

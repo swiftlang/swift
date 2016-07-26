@@ -507,6 +507,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::OPERATORS:
         OperatorDecls = readDeclTable(scratch, blobData);
         break;
+      case index_block::PRECEDENCE_GROUPS:
+        PrecedenceGroupDecls = readDeclTable(scratch, blobData);
+        break;
       case index_block::EXTENSIONS:
         ExtensionDecls = readDeclTable(scratch, blobData);
         break;
@@ -1205,6 +1208,21 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
   return nullptr;
 }
 
+PrecedenceGroupDecl *ModuleFile::lookupPrecedenceGroup(Identifier name) {
+  PrettyModuleFileDeserialization stackEntry(*this);
+
+  if (!PrecedenceGroupDecls)
+    return nullptr;
+
+  auto iter = PrecedenceGroupDecls->find(name);
+  if (iter == PrecedenceGroupDecls->end())
+    return nullptr;
+
+  auto data = *iter;
+  assert(data.size() == 1);
+  return cast<PrecedenceGroupDecl>(getDecl(data[0].second));
+}
+
 void ModuleFile::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &results,
     Module::ImportFilter filter) {
@@ -1472,6 +1490,13 @@ ModuleFile::collectLinkLibraries(Module::LinkLibraryCallback callback) const {
 
 void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
   PrettyModuleFileDeserialization stackEntry(*this);
+  if (PrecedenceGroupDecls) {
+    for (auto entry : PrecedenceGroupDecls->data()) {
+      for (auto item : entry)
+        results.push_back(getDecl(item.second));
+    }
+  }
+
   if (OperatorDecls) {
     for (auto entry : OperatorDecls->data()) {
       for (auto item : entry)

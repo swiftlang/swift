@@ -1,5 +1,7 @@
 // All of this is required in order to produce materializeForSet
 // declarations for A's properties.
+precedencegroup AssignmentPrecedence { assignment: true }
+
 public protocol ExpressibleByNilLiteral {
   init(nilLiteral: ())
 }

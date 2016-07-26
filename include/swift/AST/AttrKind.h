@@ -23,7 +23,7 @@
 namespace swift {
 
 /// The associativity of a binary operator.
-enum class Associativity {
+enum class Associativity : unsigned char {
   /// Non-associative operators cannot be written next to other
   /// operators with the same precedence.  Relational operators are
   /// typically non-associative.

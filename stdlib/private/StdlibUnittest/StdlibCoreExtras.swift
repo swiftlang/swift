@@ -97,7 +97,7 @@ public final class Box<T> {
   public var value: T
 }
 
-infix operator <=> {}
+infix operator <=>
 
 public func <=> <T: Comparable>(lhs: T, rhs: T) -> ExpectedComparisonResult {
   return lhs < rhs

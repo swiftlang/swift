@@ -253,6 +253,10 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       out << "- \"" << escape(cast<OperatorDecl>(D)->getName()) << "\"\n";
       break;
 
+    case DeclKind::PrecedenceGroup:
+      out << "- \"" << escape(cast<PrecedenceGroupDecl>(D)->getName()) << "\"\n";
+      break;
+
     case DeclKind::Enum:
     case DeclKind::Struct:
     case DeclKind::Class:

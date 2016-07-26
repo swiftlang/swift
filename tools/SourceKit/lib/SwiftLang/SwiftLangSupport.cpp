@@ -92,6 +92,8 @@ static UIdent KindDeclFunctionInfixOperator("source.lang.swift.decl.function.ope
 static UIdent KindRefFunctionPrefixOperator("source.lang.swift.ref.function.operator.prefix");
 static UIdent KindRefFunctionPostfixOperator("source.lang.swift.ref.function.operator.postfix");
 static UIdent KindRefFunctionInfixOperator("source.lang.swift.ref.function.operator.infix");
+static UIdent KindDeclPrecedenceGroup("source.lang.swift.decl.precedencegroup");
+static UIdent KindRefPrecedenceGroup("source.lang.swift.ref.precedencegroup");
 static UIdent KindDeclSubscript("source.lang.swift.decl.function.subscript");
 static UIdent KindRefSubscript("source.lang.swift.ref.function.subscript");
 static UIdent KindDeclVarGlobal("source.lang.swift.decl.var.global");
@@ -354,6 +356,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
     case CodeCompletionDeclKind::PrefixOperatorFunction: return KindRefFunctionPrefixOperator;
     case CodeCompletionDeclKind::PostfixOperatorFunction: return KindRefFunctionPostfixOperator;
     case CodeCompletionDeclKind::InfixOperatorFunction: return KindRefFunctionInfixOperator;
+    case CodeCompletionDeclKind::PrecedenceGroup: return KindRefPrecedenceGroup;
     case CodeCompletionDeclKind::FreeFunction: return KindRefFunctionFree;
     case CodeCompletionDeclKind::StaticVar: return KindRefVarClass;
     case CodeCompletionDeclKind::InstanceVar: return KindRefVarInstance;
@@ -380,6 +383,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
   case CodeCompletionDeclKind::PrefixOperatorFunction: return KindDeclFunctionPrefixOperator;
   case CodeCompletionDeclKind::PostfixOperatorFunction: return KindDeclFunctionPostfixOperator;
   case CodeCompletionDeclKind::InfixOperatorFunction: return KindDeclFunctionInfixOperator;
+  case CodeCompletionDeclKind::PrecedenceGroup: return KindDeclPrecedenceGroup;
   case CodeCompletionDeclKind::FreeFunction: return KindDeclFunctionFree;
   case CodeCompletionDeclKind::StaticVar: return KindDeclVarClass;
   case CodeCompletionDeclKind::InstanceVar: return KindDeclVarInstance;

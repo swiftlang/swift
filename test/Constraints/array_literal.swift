@@ -31,7 +31,7 @@ final class Dict<K,V> : ExpressibleByArrayLiteral {
   init(arrayLiteral elements: (K,V)...) {}
 }
 
-infix operator => {}
+infix operator =>
 
 func => <K, V>(k: K, v: V) -> (K,V) { return (k,v) }
 

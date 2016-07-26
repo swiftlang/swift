@@ -80,9 +80,10 @@ func basictest() {
 }
 
 // Infix operators and attribute lists.
-infix operator %% {
-  associativity left
-  precedence 2
+infix operator %% : MinPrecedence
+precedencegroup MinPrecedence {
+  associativity: left
+  lowerThan: AssignmentPrecedence
 }
 
 func %%(a: Int, b: Int) -> () {}
@@ -179,7 +180,7 @@ func foo1(_ a: Int, b: Int) -> Int {}
 func foo2(_ a: Int) -> (b: Int) -> Int {}
 func foo3(_ a: Int = 2, b: Int = 3) {}
 
-prefix operator ^^ {}
+prefix operator ^^
 
 prefix func ^^(a: Int) -> Int {
   return a + 1
@@ -246,7 +247,7 @@ func test_floating_point() {
 
 func test_nonassoc(_ x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
-  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '==' exist with these partially matching parameter lists:}}
+  return x == y == x // expected-error {{adjacent operators are in non-associative precedence ground 'ComparisonPrecedence'}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '==' exist with these partially matching parameter lists:}}
 }
 
 // More realistic examples.
@@ -622,7 +623,7 @@ func magic_literals() {
 //===----------------------------------------------------------------------===//
 
 
-infix operator +-+= {}
+infix operator +-+=
 @discardableResult
 func +-+= (x: inout Int, y: Int) -> Int { return 0}
 

@@ -101,6 +101,7 @@ static void toDisplayString(CodeCompletionResult *Result,
       if (Result->getKind() == CodeCompletionResult::Declaration) {
         switch (Result->getAssociatedDeclKind()) {
         case CodeCompletionDeclKind::Module:
+        case CodeCompletionDeclKind::PrecedenceGroup:
         case CodeCompletionDeclKind::Class:
         case CodeCompletionDeclKind::Struct:
         case CodeCompletionDeclKind::Enum:

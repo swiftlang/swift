@@ -1144,6 +1144,8 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
       return M->lookupPrefixOperator(opName);
     case OperatorKind::Postfix:
       return M->lookupPostfixOperator(opName);
+    case OperatorKind::PrecedenceGroup:
+      return M->lookupPrecedenceGroup(opName);
     default:
       // Unknown operator kind.
       error();
@@ -2791,7 +2793,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto DC = getDeclContext(contextID);
     declOrOffset = createDecl<PrefixOperatorDecl>(DC, SourceLoc(),
                                                   getIdentifier(nameID),
-                                                  SourceLoc(), SourceLoc(),
                                                   SourceLoc());
     break;
   }
@@ -2806,7 +2807,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto DC = getDeclContext(contextID);
     declOrOffset = createDecl<PostfixOperatorDecl>(DC, SourceLoc(),
                                                    getIdentifier(nameID),
-                                                   SourceLoc(), SourceLoc(),
                                                    SourceLoc());
     break;
   }
@@ -2814,20 +2814,48 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::INFIX_OPERATOR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    uint8_t rawAssociativity;
-    unsigned precedence;
-    bool isAssignment;
-    bool isAssocImplicit;
-    bool isPrecedenceImplicit;
-    bool isAssignmentImplicit;
+    DeclID precedenceGroupID;
 
-    decls_block::InfixOperatorLayout::readRecord(scratch, nameID,
-                                                 contextID,
-                                                 rawAssociativity, precedence,
-                                                 isAssignment,
-                                                 isAssocImplicit,
-                                                 isPrecedenceImplicit,
-                                                 isAssignmentImplicit);
+    decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
+                                                 precedenceGroupID);
+
+    PrecedenceGroupDecl *precedenceGroup = nullptr;
+    Identifier precedenceGroupName;
+    if (precedenceGroupID) {
+      precedenceGroup =
+        dyn_cast_or_null<PrecedenceGroupDecl>(getDecl(precedenceGroupID));
+      if (precedenceGroup) {
+        precedenceGroupName = precedenceGroup->getName();
+      }
+    }
+
+    auto DC = getDeclContext(contextID);
+
+    auto result = createDecl<InfixOperatorDecl>(DC, SourceLoc(),
+                                                 getIdentifier(nameID),
+                                                 SourceLoc(), SourceLoc(),
+                                                 precedenceGroupName,
+                                                 SourceLoc());
+    result->setPrecedenceGroup(precedenceGroup);
+
+    declOrOffset = result;
+    break;
+  }
+
+  case decls_block::PRECEDENCE_GROUP_DECL: {
+    IdentifierID nameID;
+    DeclContextID contextID;
+    uint8_t rawAssociativity;
+    bool assignment;
+    unsigned numHigherThan;
+    ArrayRef<uint64_t> rawRelations;
+
+    decls_block::PrecedenceGroupLayout::readRecord(scratch, nameID, contextID,
+                                                   rawAssociativity,
+                                                   assignment, numHigherThan,
+                                                   rawRelations);
+
+    auto DC = getDeclContext(contextID);
 
     auto associativity = getActualAssociativity(rawAssociativity);
     if (!associativity.hasValue()) {
@@ -2835,21 +2863,47 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    InfixData infixData(precedence, associativity.getValue(),
-                        isAssignment);
+    if (numHigherThan > rawRelations.size()) {
+      error();
+      return nullptr;
+    }
 
-    auto DC = getDeclContext(contextID);
+    SmallVector<PrecedenceGroupDecl::Relation, 4> higherThan;
+    for (auto relID : rawRelations.slice(0, numHigherThan)) {
+      PrecedenceGroupDecl *rel = nullptr;
+      if (relID)
+        rel = dyn_cast_or_null<PrecedenceGroupDecl>(getDecl(relID));
+      if (!rel) {
+        error();
+        return nullptr;
+      }
 
-    declOrOffset = createDecl<InfixOperatorDecl>(DC, SourceLoc(),
-                                                 getIdentifier(nameID),
-                                                 SourceLoc(), SourceLoc(),
-                                                 isAssocImplicit,
-                                                 SourceLoc(), SourceLoc(),
-                                                 isPrecedenceImplicit,
-                                                 SourceLoc(), SourceLoc(),
-                                                 isAssignmentImplicit,
-                                                 SourceLoc(),
-                                                 SourceLoc(), infixData);
+      higherThan.push_back({SourceLoc(), rel->getName(), rel});
+    }
+
+    SmallVector<PrecedenceGroupDecl::Relation, 4> lowerThan;
+    for (auto relID : rawRelations.slice(numHigherThan)) {
+      PrecedenceGroupDecl *rel = nullptr;
+      if (relID)
+        rel = dyn_cast_or_null<PrecedenceGroupDecl>(getDecl(relID));
+      if (!rel) {
+        error();
+        return nullptr;
+      }
+
+      lowerThan.push_back({SourceLoc(), rel->getName(), rel});
+    }
+
+    declOrOffset = PrecedenceGroupDecl::create(DC, SourceLoc(), SourceLoc(),
+                                               getIdentifier(nameID),
+                                               SourceLoc(),
+                                               SourceLoc(), SourceLoc(),
+                                               *associativity,
+                                               SourceLoc(), SourceLoc(),
+                                               assignment,
+                                               SourceLoc(), higherThan,
+                                               SourceLoc(), lowerThan,
+                                               SourceLoc());
     break;
   }
 

@@ -80,15 +80,8 @@ func test_auto_closure_without_capture() -> Bool {
   // CHECK: [[FALSE:%.*]] = struct $Bool ([[FV:%.*]] : $Builtin.Int1)
   // CHECK: return [[FALSE]]
 
-infix operator &&& {
-  associativity left
-  precedence 120
-}
-
-infix operator ||| {
-  associativity left
-  precedence 110
-}
+infix operator &&& : LogicalConjunctionPrecedence
+infix operator ||| : LogicalDisjunctionPrecedence
 
 @_transparent func &&& (lhs: Bool, rhs: @autoclosure () -> Bool) -> Bool {
   if lhs {

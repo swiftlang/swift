@@ -313,7 +313,8 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
     return id.first;
   }
 
-  assert((!isDeclXRef(D) || isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
+  assert((!isDeclXRef(D) || isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
+          isa<PrecedenceGroupDecl>(D)) &&
          "cannot cross-reference this decl");
 
   // Record any generic parameters that come from this decl, so that we can use
@@ -472,6 +473,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
   BLOCK_RECORD(index_block, NORMAL_CONFORMANCE_OFFSETS);
+  BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
 
   BLOCK(SIL_BLOCK);
   BLOCK_RECORD(sil_block, SIL_FUNCTION);
@@ -1220,6 +1222,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::TopLevelCode:
   case DeclKind::Extension:
   case DeclKind::Module:
+  case DeclKind::PrecedenceGroup:
     llvm_unreachable("decl should never be a member");
 
   case DeclKind::IfConfig:
@@ -1478,6 +1481,18 @@ void Serializer::writeCrossReference(const Decl *D) {
     return;
   }
 
+  if (auto prec = dyn_cast<PrecedenceGroupDecl>(D)) {
+    writeCrossReference(prec->getModuleContext(), 1);
+
+    abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
+    auto nameID = addIdentifierRef(prec->getName());
+    uint8_t fixity = OperatorKind::PrecedenceGroup;
+    XRefOperatorOrAccessorPathPieceLayout::emitRecord(Out, ScratchRecord,
+                                                      abbrCode, nameID,
+                                                      fixity);
+    return;
+  }
+
   if (auto fn = dyn_cast<AbstractFunctionDecl>(D)) {
     // Functions are special because they might be operators.
     writeCrossReference(fn, 0);
@@ -1564,6 +1579,7 @@ DEF_VERIFY_ATTR(Func)
 DEF_VERIFY_ATTR(Extension)
 DEF_VERIFY_ATTR(PatternBinding)
 DEF_VERIFY_ATTR(Operator)
+DEF_VERIFY_ATTR(PrecedenceGroup)
 DEF_VERIFY_ATTR(TypeAlias)
 DEF_VERIFY_ATTR(Type)
 DEF_VERIFY_ATTR(Struct)
@@ -2123,23 +2139,40 @@ void Serializer::writeDecl(const Decl *D) {
     // Top-level code is ignored; external clients don't need to know about it.
     break;
 
+  case DeclKind::PrecedenceGroup: {
+    auto group = cast<PrecedenceGroupDecl>(D);
+    verifyAttrSerializable(group);
+
+    auto contextID = addDeclContextRef(group->getDeclContext());
+    auto nameID = addIdentifierRef(group->getName());
+    auto associativity = getRawStableAssociativity(group->getAssociativity());
+
+    SmallVector<DeclID, 8> relations;
+    for (auto &rel : group->getHigherThan())
+      relations.push_back(addDeclRef(rel.Group));
+    for (auto &rel : group->getLowerThan())
+      relations.push_back(addDeclRef(rel.Group));
+
+    unsigned abbrCode = DeclTypeAbbrCodes[PrecedenceGroupLayout::Code];
+    PrecedenceGroupLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      nameID, contextID, associativity,
+                                      group->isAssignment(),
+                                      group->getHigherThan().size(),
+                                      relations);
+    break;
+  }
+
   case DeclKind::InfixOperator: {
     auto op = cast<InfixOperatorDecl>(D);
     verifyAttrSerializable(op);
 
     auto contextID = addDeclContextRef(op->getDeclContext());
-    auto associativity = getRawStableAssociativity(op->getAssociativity());
+    auto nameID = addIdentifierRef(op->getName());
+    auto groupID = addDeclRef(op->getPrecedenceGroup());
 
     unsigned abbrCode = DeclTypeAbbrCodes[InfixOperatorLayout::Code];
     InfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addIdentifierRef(op->getName()),
-                                    contextID,
-                                    associativity,
-                                    op->getPrecedence(),
-                                    op->isAssignment(),
-                                    op->isAssociativityImplicit(),
-                                    op->isPrecedenceImplicit(),
-                                    op->isAssignmentImplicit());
+                                    nameID, contextID, groupID);
     break;
   }
 
@@ -3277,6 +3310,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PrefixOperatorLayout>();
   registerDeclTypeAbbr<PostfixOperatorLayout>();
   registerDeclTypeAbbr<InfixOperatorLayout>();
+  registerDeclTypeAbbr<PrecedenceGroupLayout>();
   registerDeclTypeAbbr<ClassLayout>();
   registerDeclTypeAbbr<EnumLayout>();
   registerDeclTypeAbbr<EnumElementLayout>();
@@ -3935,6 +3969,7 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
 
 void Serializer::writeAST(ModuleOrSourceFile DC) {
   DeclTable topLevelDecls, extensionDecls, operatorDecls, operatorMethodDecls;
+  DeclTable precedenceGroupDecls;
   ObjCMethodTable objcMethods;
   LocalTypeHashTableGenerator localTypeGenerator;
   bool hasLocalTypes = false;
@@ -3967,6 +4002,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
         operatorDecls[OD->getName()]
           .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
+      } else if (auto PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
+        precedenceGroupDecls[PGD->getName()]
+          .push_back({ decls_block::PRECEDENCE_GROUP_DECL, addDeclRef(D) });
       }
 
       // If this is a global variable, force the accessors to be
@@ -4027,6 +4065,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     index_block::DeclListLayout DeclList(Out);
     writeDeclTable(DeclList, index_block::TOP_LEVEL_DECLS, topLevelDecls);
     writeDeclTable(DeclList, index_block::OPERATORS, operatorDecls);
+    writeDeclTable(DeclList, index_block::PRECEDENCE_GROUPS, precedenceGroupDecls);
     writeDeclTable(DeclList, index_block::EXTENSIONS, extensionDecls);
     writeDeclTable(DeclList, index_block::CLASS_MEMBERS, ClassMembersByName);
     writeDeclTable(DeclList, index_block::OPERATOR_METHODS, operatorMethodDecls);
