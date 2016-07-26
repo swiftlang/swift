@@ -336,5 +336,16 @@ simdTestSuite.test("matrix elements") {
 % end # for type
 }
 
+simdTestSuite.test("determinant") {
+% for type in float_types:
+%   for cols in [2,3,4]:
+%     mattype = ctype[type] + str(cols) + 'x' + str(cols)
+%     mat = 'm_' + mattype
+  var ${mat} = ${mattype}(2)
+  expectEqual(${mat}.determinant, ${1 << cols})
+%   end
+% end
+}
+
 runAllTests()
 
