@@ -245,7 +245,14 @@ extension Decimal : ExpressibleByIntegerLiteral {
     }
 }
 
-extension Decimal : SignedNumber { }
+extension Decimal : SignedArithmetic {
+  public var magnitude: Decimal { return self }
+
+  // FIXME(integers): implement properly
+  public init?<T : BinaryInteger>(exactly source: T) {
+    fatalError()
+  }
+}
 
 extension Decimal : Strideable {
     public func distance(to other: Decimal) -> Decimal {

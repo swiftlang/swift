@@ -545,11 +545,6 @@ public prefix func + <T : FloatingPoint>(x: T) -> T {
   return x
 }
 
-@_transparent
-public prefix func - <T : FloatingPoint>(x: T) -> T {
-  return x.negated()
-}
-
 %{
 binary_arithmetic = [
 ('+', 'adding',      'add',      None),

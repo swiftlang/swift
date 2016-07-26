@@ -189,7 +189,13 @@ public func ${x.operator}= <T: ${Protocol}>(lhs: inout T, rhs: T) {
 % end
 
 @_transparent
-public prefix func - <T: SignedArithmetic>(x: T) -> T {
+public prefix func - <T : SignedArithmetic>(x: T) -> T {
+  return x.negated()
+}
+
+// FIXME(integers): remove this once SignedNumber is gone
+public prefix func - <T : SignedNumber>(x: T) -> T
+  where T : SignedArithmetic {
   return x.negated()
 }
 
@@ -218,8 +224,7 @@ public protocol BinaryInteger :
 
   init<T : BinaryInteger>(clamping source: T)
 
-  func word(at n: Int) -> UInt
-
+  func word(at n: Int) -> UInt 
   var bitWidth : Int { get }
 
   var minimumSignedRepresentationBitWidth: Int { get }
@@ -790,6 +795,7 @@ extension SignedInteger where Self : FixedWidthInteger {
 %   u = 's' if signed else 'u'
 %   U = 'U' if signed else ''
 %   z = 's' if signed else 'z'
+@_fixed_layout
 public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
     _ExpressibleByBuiltinIntegerLiteral {
@@ -1123,8 +1129,15 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 }
 % end
 
-% end # end of concrete FixedWidthInteger section
 
+// FIXME(integers): this conformance should be removed along with the
+// BitwiseOperations protocol
+@_transparent
+extension ${Self} : BitwiseOperations {
+  /// The empty bitset of type `${Self}`.
+  public static var allZeros: ${Self} { return 0 }
+}
+//===--- end of FIXME(integers) -------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 // FIXME(integers): Remove these operators in favour of the generic ones on
@@ -1148,6 +1161,8 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 }
 % end
 //===--- end of FIXME(integers) -------------------------------------------===//
+
+% end # end of concrete FixedWidthInteger section
 
 
 // FIXME(integers): inline manually everywhere
@@ -1178,3 +1193,14 @@ internal func _unsafeMultiply(_ lhs: Int, _ rhs: Int) -> Int {
   return lhs &* rhs
 #endif
 }
+
+// FIXME(integers): resolving the ambiguity. Should be gone along with the
+// BitwiseOperations protocol
+% for x in binaryBitwise:
+@_transparent
+public func ${x.operator}= <
+  T : BitwiseOperations
+>(lhs: inout T, rhs: T) where T : FixedWidthInteger {
+  lhs = lhs.${x.name}(rhs)
+}
+% end

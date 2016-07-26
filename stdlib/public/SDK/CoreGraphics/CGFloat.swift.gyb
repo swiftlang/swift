@@ -67,7 +67,7 @@ public struct CGFloat {
   public var native: NativeType
 }
 
-extension CGFloat : Arithmetic {
+extension CGFloat : SignedArithmetic {
   // FIXME(integers): implement properly
   public init?<T : BinaryInteger>(exactly source: T) {
     fatalError()
