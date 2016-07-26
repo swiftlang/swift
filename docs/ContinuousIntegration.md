@@ -5,9 +5,11 @@
 
 - [Introduction](#introduction)
 - [Pull Request Testing](#pull-request-testing)
+    - [@swift-ci](#swift-ci)
     - [Smoke Testing](#smoke-testing)
     - [Validation Testing](#validation-testing)
     - [Lint Testing](#lint-testing)
+- [Cross Repository Testing](#cross-repository-testing)
 - [ci.swift.org bots](#ciswiftorg-bots)
 
 ## Introduction
