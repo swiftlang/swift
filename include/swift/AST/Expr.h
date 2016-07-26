@@ -273,6 +273,22 @@ class alignas(8) Expr {
   enum { NumMagicIdentifierLiteralExprBits = NumLiteralExprBits + 4 };
   static_assert(NumMagicIdentifierLiteralExprBits <= 32, "fits in an unsigned");
 
+  class ObjectLiteralExprBitfields {
+    friend class ObjectLiteralExpr;
+    unsigned : NumLiteralExprBits;
+
+    unsigned LitKind : 3;
+    /// # of argument labels stored after the ObjectLiteralExpr.
+    unsigned NumArgLabels : 16;
+    /// Whether the ObjectLiteralExpr also has source locations for the argument
+    /// label.
+    unsigned HasArgLabelLocs : 1;
+    /// Whether the last argument is a trailing closure.
+    unsigned HasTrailingClosure : 1;
+  };
+  enum { NumObjectLiteralExprBits = NumLiteralExprBits + 21 };
+  static_assert(NumObjectLiteralExprBits <= 32, "fits in an unsigned");
+
   class AbstractClosureExprBitfields {
     friend class AbstractClosureExpr;
     unsigned : NumExprBits;
@@ -399,6 +415,7 @@ protected:
     OverloadedMemberRefExprBitfields OverloadedMemberRefExprBits;
     BooleanLiteralExprBitfields BooleanLiteralExprBits;
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
+    ObjectLiteralExprBitfields ObjectLiteralExprBits;
     AbstractClosureExprBitfields AbstractClosureExprBits;
     ClosureExprBitfields ClosureExprBits;
     BindOptionalExprBitfields BindOptionalExprBits;
@@ -1004,7 +1021,9 @@ public:
 // '#colorLiteral(red: 1, blue: 0, green: 0, alpha: 1)' with a name and a list
 // argument. The components of the list argument are meant to be themselves
 // constant.
-class ObjectLiteralExpr : public LiteralExpr {
+class ObjectLiteralExpr final
+    : public LiteralExpr,
+      public TrailingCallArguments<ObjectLiteralExpr> {
 public:
   /// The kind of object literal.
   enum LiteralKind : unsigned {
@@ -1013,29 +1032,54 @@ public:
   };
 
 private:
-  LiteralKind LitKind;
   Expr *Arg;
   Expr *SemanticExpr;
   SourceLoc PoundLoc;
 
-public:
   ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
-                    Expr *Arg, bool implicit = false)
-    : LiteralExpr(ExprKind::ObjectLiteral, implicit), 
-      LitKind(LitKind), Arg(Arg), SemanticExpr(nullptr),
-      PoundLoc(PoundLoc) {}
+                    Expr *Arg,
+                    ArrayRef<Identifier> argLabels,
+                    ArrayRef<SourceLoc> argLabelLocs,
+                    bool hasTrailingClosure,
+                    bool implicit);
 
-  LiteralKind getLiteralKind() const { return LitKind; }
+public:
+  /// Create a new object literal expression.
+  ///
+  /// Note: prefer to use the second entry point, which separates out
+  /// arguments/labels/etc.
+  static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
+                                   LiteralKind kind, Expr *arg, bool implicit);
+
+  /// Create a new object literal expression.
+  static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
+                                   LiteralKind kind,
+                                   SourceLoc lParenLoc,
+                                   ArrayRef<Expr *> args,
+                                   ArrayRef<Identifier> argLabels,
+                                   ArrayRef<SourceLoc> argLabelLocs,
+                                   SourceLoc rParenLoc,
+                                   Expr *trailingClosure,
+                                   bool implicit);
+
+  LiteralKind getLiteralKind() const {
+    return static_cast<LiteralKind>(ObjectLiteralExprBits.LitKind);
+  }
 
   Expr *getArg() const { return Arg; }
   void setArg(Expr *arg) { Arg = arg; }
 
-  /// Retrieve the argument labels for the argument.
-  ///
-  /// \param scratch Scratch space that will be used when the argument labels
-  /// aren't already stored in the AST context.
-  ArrayRef<Identifier>
-  getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const;
+  unsigned getNumArguments() const {
+    return ObjectLiteralExprBits.NumArgLabels;
+  }
+  bool hasArgumentLabelLocs() const {
+    return ObjectLiteralExprBits.HasArgLabelLocs;
+  }
+
+  /// Whether this call with written with a trailing closure.
+  bool hasTrailingClosure() const {
+    return ObjectLiteralExprBits.HasTrailingClosure;
+  }
 
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
@@ -3465,6 +3509,9 @@ public:
   /// aren't already stored in the AST context.
   ArrayRef<Identifier>
   getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const;
+
+  /// Whether this application was written using a trailing closure.
+  bool hasTrailingClosure() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ApplyExpr &&

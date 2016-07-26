@@ -337,19 +337,6 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   return member->getAccessSemanticsFromContext(DC);
 }
 
-/// Determine whether the given expression has a trailing closure.
-static bool hasTrailingClosure(Expr *expr) {
-  if (!expr) return false;
-
-  if (ParenExpr *parenExpr = dyn_cast<ParenExpr>(expr))
-    return parenExpr->hasTrailingClosure();
-
-  if (TupleExpr *tupleExpr = dyn_cast<TupleExpr>(expr))
-   return tupleExpr->hasTrailingClosure();
-
-  return false;
-}
-
 namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
@@ -1231,6 +1218,7 @@ namespace {
     /// \param isImplicit Whether this is an implicit subscript.
     Expr *buildSubscript(Expr *base, Expr *index,
                          ArrayRef<Identifier> argLabels,
+                         bool hasTrailingClosure,
                          ConstraintLocatorBuilder locator,
                          bool isImplicit, AccessSemantics semantics) {
       // Determine the declaration selected for this subscript operation.
@@ -1275,7 +1263,7 @@ namespace {
       // Coerce the index argument.
       index = coerceCallArguments(
           index, indexTy, LevelTy(1), argLabels,
-          ::hasTrailingClosure(index),
+          hasTrailingClosure,
           locator.withPathElement(ConstraintLocator::SubscriptIndex));
       if (!index)
         return nullptr;
@@ -2620,6 +2608,7 @@ namespace {
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             expr->getArgumentLabels(),
+                            expr->hasTrailingClosure(),
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(),
                             expr->getAccessSemantics());
@@ -2763,6 +2752,7 @@ namespace {
     Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             expr->getArgumentLabels(),
+                            expr->hasTrailingClosure(),
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(), AccessSemantics::Ordinary);
     }

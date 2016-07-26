@@ -905,8 +905,9 @@ shallowCloneImpl(const MagicIdentifierLiteralExpr *E, ASTContext &Ctx) {
 
 static LiteralExpr *
 shallowCloneImpl(const ObjectLiteralExpr *E, ASTContext &Ctx) {
-  auto res = new (Ctx) ObjectLiteralExpr(E->getStartLoc(), E->getLiteralKind(),
-                                         E->getArg());
+  auto res = ObjectLiteralExpr::create(Ctx, E->getStartLoc(),
+                                       E->getLiteralKind(),
+                                       E->getArg(), E->isImplicit());
   res->setSemanticExpr(E->getSemanticExpr());
   return res;
 }
@@ -1062,8 +1063,180 @@ getArgumentLabelsFromArgument(Expr *arg, SmallVectorImpl<Identifier> &scratch,
   return scratch;    
 }
 
+/// Compute the type of an argument to a call (or call-like) AST
+static void computeSingleArgumentType(ASTContext &ctx, Expr *arg,
+                                      bool implicit) {
+  // Propagate 'implicit' to the argument.
+  if (implicit)
+    arg->setImplicit(true);
+
+  // Handle parenthesized expressions.
+  if (auto paren = dyn_cast<ParenExpr>(arg)) {
+    if (auto type = paren->getSubExpr()->getType()) {
+      arg->setType(ParenType::get(ctx, type));
+    }
+    return;
+  }
+
+  // Handle tuples.
+  auto tuple = dyn_cast<TupleExpr>(arg);
+  SmallVector<TupleTypeElt, 4> typeElements;
+  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+    auto type = tuple->getElement(i)->getType();
+    if (!type) return;
+
+    typeElements.push_back(TupleTypeElt(type, tuple->getElementName(i)));
+  }
+  arg->setType(TupleType::get(typeElements, ctx));
+}
+
+/// Pack the argument information into a single argument, to match the
+/// representation expected by the AST.
+///
+/// \param argLabels The argument labels, which might be updated by this
+/// function.
+///
+/// \param argLabelLocs The argument label locations, which might be updated by
+/// this function.
+static Expr *packSingleArgument(
+    ASTContext &ctx,
+    SourceLoc lParenLoc,
+    ArrayRef<Expr *> args,
+    ArrayRef<Identifier> &argLabels,
+    ArrayRef<SourceLoc> &argLabelLocs,
+    SourceLoc rParenLoc,
+    Expr *trailingClosure,
+    bool implicit,
+    SmallVectorImpl<Identifier> &argLabelsScratch,
+    SmallVectorImpl<SourceLoc> &argLabelLocsScratch) {
+  // Clear out our scratch space.
+  argLabelsScratch.clear();
+  argLabelLocsScratch.clear();
+
+  // Construct a TupleExpr or ParenExpr, as appropriate, for the argument.
+  if (!trailingClosure) {
+    // Do we have a single, unlabeled argument?
+    if (args.size() == 1 && (argLabels.empty() || argLabels[0].empty())) {
+      auto arg = new (ctx) ParenExpr(lParenLoc, args[0], rParenLoc,
+                                     /*hasTrailingClosure=*/false);
+      computeSingleArgumentType(ctx, arg, implicit);
+      argLabelsScratch.push_back(Identifier());
+      argLabels = argLabelsScratch;
+      argLabelLocs = { };
+      return arg;
+    }
+
+    // Construct the argument tuple.
+    auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels, argLabelLocs,
+                                 rParenLoc, /*hasTrailingClosure=*/false,
+                                 /*implicit=*/false);
+    computeSingleArgumentType(ctx, arg, implicit);
+    return arg;
+  }
+
+  // If we have no other arguments, represent the trailing closure as a
+  // parenthesized expression.
+  if (args.size() == 0) {
+    auto arg = new (ctx) ParenExpr(lParenLoc, trailingClosure, rParenLoc,
+                                   /*hasTrailingClosure=*/true);
+    computeSingleArgumentType(ctx, arg, implicit);
+    argLabelsScratch.push_back(Identifier());
+    argLabels = argLabelsScratch;
+    argLabelLocs = { };
+    return arg;
+  }
+
+  // Form a tuple, including the trailing closure.
+  SmallVector<Expr *, 4> argsScratch;
+  argsScratch.reserve(args.size() + 1);
+  argsScratch.append(args.begin(), args.end());
+  argsScratch.push_back(trailingClosure);
+  auto arg = TupleExpr::create(ctx, lParenLoc, argsScratch, argLabels,
+                               argLabelLocs, rParenLoc,
+                               /*hasTrailingClosure=*/true,
+                               /*implicit=*/false);
+  computeSingleArgumentType(ctx, arg, implicit);
+
+  argLabelsScratch.reserve(argLabelsScratch.size() + 1);
+  argLabelsScratch.append(argLabels.begin(), argLabels.end());
+  argLabelsScratch.push_back(Identifier());
+  argLabels = argLabelsScratch;
+
+  if (!argLabelLocs.empty() || argLabels.empty()) {
+    argLabelLocsScratch.reserve(argLabelLocs.size() + 1);
+    argLabelLocsScratch.append(argLabelLocs.begin(), argLabelLocs.end());
+    argLabelLocsScratch.push_back(SourceLoc());
+  }
+  argLabelLocs = argLabelLocsScratch;
+
+  return arg;
+}
+
+ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
+                                     Expr *Arg,
+                                     ArrayRef<Identifier> argLabels,
+                                     ArrayRef<SourceLoc> argLabelLocs,
+                                     bool hasTrailingClosure,
+                                     bool implicit)
+    : LiteralExpr(ExprKind::ObjectLiteral, implicit), 
+      Arg(Arg), SemanticExpr(nullptr), PoundLoc(PoundLoc) {
+  ObjectLiteralExprBits.LitKind = static_cast<unsigned>(LitKind);
+  assert(getLiteralKind() == LitKind);
+  ObjectLiteralExprBits.NumArgLabels = argLabels.size();
+  ObjectLiteralExprBits.HasArgLabelLocs = !argLabelLocs.empty();
+  ObjectLiteralExprBits.HasTrailingClosure = hasTrailingClosure;
+  initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);  
+}
+
+ObjectLiteralExpr *ObjectLiteralExpr::create(ASTContext &ctx,
+                                             SourceLoc poundLoc,
+                                             LiteralKind kind,
+                                             Expr *arg,
+                                             bool implicit) {
+  // Inspect the argument to dig out the argument labels, their location, and
+  // whether there is a trailing closure.
+  SmallVector<Identifier, 4> argLabelsScratch;
+  SmallVector<SourceLoc, 4> argLabelLocs;
+  bool hasTrailingClosure = false;
+  auto argLabels = getArgumentLabelsFromArgument(arg, argLabelsScratch,
+                                                 &argLabelLocs,
+                                                 &hasTrailingClosure);
+
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs, hasTrailingClosure);
+
+  void *memory = ctx.Allocate(size, alignof(ObjectLiteralExpr));
+  return new (memory) ObjectLiteralExpr(poundLoc, kind, arg, argLabels,
+                                        argLabelLocs, hasTrailingClosure,
+                                        implicit);
+}
+
+ObjectLiteralExpr *ObjectLiteralExpr::create(ASTContext &ctx,
+                                             SourceLoc poundLoc,
+                                             LiteralKind kind,
+                                             SourceLoc lParenLoc,
+                                             ArrayRef<Expr *> args,
+                                             ArrayRef<Identifier> argLabels,
+                                             ArrayRef<SourceLoc> argLabelLocs,
+                                             SourceLoc rParenLoc,
+                                             Expr *trailingClosure,
+                                             bool implicit) {
+  SmallVector<Identifier, 4> argLabelsScratch;
+  SmallVector<SourceLoc, 4> argLabelLocsScratch;
+  Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
+                                 rParenLoc, trailingClosure, implicit,
+                                 argLabelsScratch, argLabelLocsScratch);
+
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
+                                 trailingClosure != nullptr);
+
+  void *memory = ctx.Allocate(size, alignof(ObjectLiteralExpr));
+  return new (memory) ObjectLiteralExpr(poundLoc, kind, arg, argLabels,
+                                        argLabelLocs,
+                                        trailingClosure != nullptr, implicit);
+}
+
 StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
-  switch (LitKind) {
+  switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return #Name;
 #include "swift/Parse/Tokens.def"    
   }
@@ -1071,16 +1244,11 @@ StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
 }
 
 StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
-  switch (LitKind) {
+  switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return Desc;
 #include "swift/Parse/Tokens.def"    
   }
   llvm_unreachable("unspecified literal");
-}
-
-ArrayRef<Identifier> ObjectLiteralExpr::getArgumentLabels(
-    SmallVectorImpl<Identifier> &scratch) const {
-  return getArgumentLabelsFromArgument(getArg(), scratch);
 }
 
 void DeclRefExpr::setSpecialized() {
@@ -1250,115 +1418,6 @@ static ValueDecl *getCalledValue(Expr *E) {
 
 ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
-}
-
-/// Compute the type of an argument to a call (or call-like) AST
-static void computeSingleArgumentType(ASTContext &ctx, Expr *arg,
-                                      bool implicit) {
-  // Propagate 'implicit' to the argument.
-  if (implicit)
-    arg->setImplicit(true);
-
-  // Handle parenthesized expressions.
-  if (auto paren = dyn_cast<ParenExpr>(arg)) {
-    if (auto type = paren->getSubExpr()->getType()) {
-      arg->setType(ParenType::get(ctx, type));
-    }
-    return;
-  }
-
-  // Handle tuples.
-  auto tuple = dyn_cast<TupleExpr>(arg);
-  SmallVector<TupleTypeElt, 4> typeElements;
-  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-    auto type = tuple->getElement(i)->getType();
-    if (!type) return;
-
-    typeElements.push_back(TupleTypeElt(type, tuple->getElementName(i)));
-  }
-  arg->setType(TupleType::get(typeElements, ctx));
-}
-
-/// Pack the argument information into a single argument, to match the
-/// representation expected by the AST.
-///
-/// \param argLabels The argument labels, which might be updated by this
-/// function.
-///
-/// \param argLabelLocs The argument label locations, which might be updated by
-/// this function.
-static Expr *packSingleArgument(
-    ASTContext &ctx,
-    SourceLoc lParenLoc,
-    ArrayRef<Expr *> args,
-    ArrayRef<Identifier> &argLabels,
-    ArrayRef<SourceLoc> &argLabelLocs,
-    SourceLoc rParenLoc,
-    Expr *trailingClosure,
-    bool implicit,
-    SmallVectorImpl<Identifier> &argLabelsScratch,
-    SmallVectorImpl<SourceLoc> &argLabelLocsScratch) {
-  // Clear out our scratch space.
-  argLabelsScratch.clear();
-  argLabelLocsScratch.clear();
-
-  // Construct a TupleExpr or ParenExpr, as appropriate, for the argument.
-  if (!trailingClosure) {
-    // Do we have a single, unlabeled argument?
-    if (args.size() == 1 && (argLabels.empty() || argLabels[0].empty())) {
-      auto arg = new (ctx) ParenExpr(lParenLoc, args[0], rParenLoc,
-                                     /*hasTrailingClosure=*/false);
-      computeSingleArgumentType(ctx, arg, implicit);
-      argLabelsScratch.push_back(Identifier());
-      argLabels = argLabelsScratch;
-      argLabelLocs = { };
-      return arg;
-    }
-
-    // Construct the argument tuple.
-    auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                                 rParenLoc, /*hasTrailingClosure=*/false,
-                                 /*implicit=*/false);
-    computeSingleArgumentType(ctx, arg, implicit);
-    return arg;
-  }
-
-  // If we have no other arguments, represent the trailing closure as a
-  // parenthesized expression.
-  if (args.size() == 0) {
-    auto arg = new (ctx) ParenExpr(lParenLoc, trailingClosure, rParenLoc,
-                                   /*hasTrailingClosure=*/true);
-    computeSingleArgumentType(ctx, arg, implicit);
-    argLabelsScratch.push_back(Identifier());
-    argLabels = argLabelsScratch;
-    argLabelLocs = { };
-    return arg;
-  }
-
-  // Form a tuple, including the trailing closure.
-  SmallVector<Expr *, 4> argsScratch;
-  argsScratch.reserve(args.size() + 1);
-  argsScratch.append(args.begin(), args.end());
-  argsScratch.push_back(trailingClosure);
-  auto arg = TupleExpr::create(ctx, lParenLoc, argsScratch, argLabels,
-                               argLabelLocs, rParenLoc,
-                               /*hasTrailingClosure=*/true,
-                               /*implicit=*/false);
-  computeSingleArgumentType(ctx, arg, implicit);
-
-  argLabelsScratch.reserve(argLabelsScratch.size() + 1);
-  argLabelsScratch.append(argLabels.begin(), argLabels.end());
-  argLabelsScratch.push_back(Identifier());
-  argLabels = argLabelsScratch;
-
-  if (!argLabelLocs.empty() || argLabels.empty()) {
-    argLabelLocsScratch.reserve(argLabelLocs.size() + 1);
-    argLabelLocsScratch.append(argLabelLocs.begin(), argLabelLocs.end());
-    argLabelLocsScratch.push_back(SourceLoc());
-  }
-  argLabelLocs = argLabelLocsScratch;
-
-  return arg;
 }
 
 SubscriptExpr::SubscriptExpr(Expr *base, Expr *index,
@@ -1591,6 +1650,13 @@ ArrayRef<Identifier> ApplyExpr::getArgumentLabels(
   // For calls, get the argument labels directly.
   auto call = cast<CallExpr>(this);
   return call->getArgumentLabels();
+}
+
+bool ApplyExpr::hasTrailingClosure() const {
+  if (auto call = dyn_cast<CallExpr>(this))
+    return call->hasTrailingClosure();
+
+  return false;
 }
 
 CallExpr::CallExpr(Expr *fn, Expr *arg, bool Implicit,

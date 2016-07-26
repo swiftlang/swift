@@ -467,19 +467,6 @@ matchCallArguments(ArrayRef<CallArgParam> args,
   return listener.relabelArguments(actualArgNames);
 }
 
-/// Determine whether the given expression has a trailing closure.
-static bool hasTrailingClosure(Expr *expr) {
-  if (!expr) return false;
-
-  if (ParenExpr *parenExpr = dyn_cast<ParenExpr>(expr))
-    return parenExpr->hasTrailingClosure();
-
-  if (TupleExpr *tupleExpr = dyn_cast<TupleExpr>(expr))
-   return tupleExpr->hasTrailingClosure();
-
-  return false;
-}
-
 /// Find the callee declaration and uncurry level for a given call
 /// locator.
 static std::tuple<ValueDecl *, unsigned, ArrayRef<Identifier>, bool>
@@ -523,10 +510,10 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   } else {
     if (auto apply = dyn_cast<ApplyExpr>(callExpr)) {
       argLabels = apply->getArgumentLabels(argLabelsScratch);
-      assert(! ::hasTrailingClosure(apply->getArg()));
+      assert(!apply->hasTrailingClosure());
     } else if (auto objectLiteral = dyn_cast<ObjectLiteralExpr>(callExpr)) {
-      argLabels = objectLiteral->getArgumentLabels(argLabelsScratch);
-      hasTrailingClosure = ::hasTrailingClosure(objectLiteral->getArg());
+      argLabels = objectLiteral->getArgumentLabels();
+      hasTrailingClosure = objectLiteral->hasTrailingClosure();
     }
     return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
   }

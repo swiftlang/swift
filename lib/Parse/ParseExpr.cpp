@@ -2646,8 +2646,8 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
   }
 
   return makeParserResult(
-    new (Context) ObjectLiteralExpr(PoundLoc, LitKind, Arg.get(),
-                                    /*implicit=*/false));
+    ObjectLiteralExpr::create(Context, PoundLoc, LitKind, Arg.get(),
+                              /*implicit=*/false));
 }
 
 /// \brief Parse an expression call suffix.
