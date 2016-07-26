@@ -206,3 +206,9 @@ func forcedDowncastToOptional(_ b: B) {
 
 _ = b1 as Int    // expected-error {{cannot convert value of type 'Bool' to type 'Int' in coercion}}
 _ = seven as Int // expected-error {{cannot convert value of type 'Double' to type 'Int' in coercion}}
+
+// SR-164
+class A {}
+let iouNoString : A! = A()
+print(iouNoString is CustomStringConvertible)
+

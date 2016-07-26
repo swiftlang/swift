@@ -2918,9 +2918,11 @@ namespace {
 
       // Set the type we checked against.
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
-      auto fromType = sub->getType();
+      auto castFromType = sub->getType();
+      if (auto iuoTy = cs.lookThroughImplicitlyUnwrappedOptionalType(castFromType))
+        castFromType = OptionalType::get(iuoTy);
       auto castKind = tc.typeCheckCheckedCast(
-                        fromType, toType, cs.DC,
+                        castFromType, toType, cs.DC,
                         expr->getLoc(),
                         sub->getSourceRange(),
                         expr->getCastTypeLoc().getSourceRange(),
@@ -2966,6 +2968,7 @@ namespace {
       }
 
       // Dig through the optionals in the from/to types.
+      auto fromType = sub->getType();
       SmallVector<Type, 2> fromOptionals;
       fromType->lookThroughAllAnyOptionalTypes(fromOptionals);
       SmallVector<Type, 2> toOptionals;
@@ -2980,6 +2983,12 @@ namespace {
           castKind == CheckedCastKind::DictionaryDowncastBridged ||
           castKind == CheckedCastKind::SetDowncast ||
           castKind == CheckedCastKind::SetDowncastBridged) {
+        // "is" treats an IUO as an Optional, while "as?"
+        // treats an IUO as the underlying type, so it needs wrapping.
+        if (cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
+          sub = new (tc.Context) InjectIntoOptionalExpr(sub, OptionalType::get(fromType));
+          sub->setImplicit();
+        }
         auto toOptType = OptionalType::get(toType);
         ConditionalCheckedCastExpr *cast
           = new (tc.Context) ConditionalCheckedCastExpr(
