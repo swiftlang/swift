@@ -933,16 +933,15 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
             CharSourceRange(ConfigD->getEndLoc(), 6/*'#endif'*/) }))
         return false;
 
+  } else if (auto PrecD = dyn_cast<PrecedenceGroupDecl>(D)) {
+    // Highlight specifiers like "associativity" or "assignment" as keywords.
+    SmallVector<CharSourceRange, 3> KeywordsRanges;
+    PrecD->collectOperatorKeywordRanges(KeywordsRanges);
+    for (auto &Range : KeywordsRanges) {
+      passNonTokenNode({SyntaxNodeKind::Keyword, Range});
+    };
+
   } else if (auto OperD = dyn_cast<OperatorDecl>(D)) {
-    // If the operator is infix operator, highlight specifiers like
-    // "associativity" or "assignment" as keywords.
-    if (auto IFO = dyn_cast<InfixOperatorDecl>(OperD)) {
-      SmallVector<CharSourceRange, 3> KeywordsRanges;
-      IFO->collectOperatorKeywordRanges(KeywordsRanges);
-      for (auto &Range : KeywordsRanges) {
-        passNonTokenNode({SyntaxNodeKind::Keyword, Range});
-      };
-    }
     if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
           CharSourceRange(OperD->getOperatorLoc(), strlen("operator")) }))
       return false;

@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-infix operator • { }
+infix operator •
 
 protocol Runcible { func runce() }
 protocol Fungible { func funge() }

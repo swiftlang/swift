@@ -524,19 +524,19 @@ func testInstanceTrailingClosure() {
 @available(*, unavailable, renamed: "+")
 func add(_ value: Int, _ other: Int) {} // expected-note {{here}}
 
-infix operator *** {}
+infix operator ***
 @available(*, unavailable, renamed: "add")
 func ***(value: (), other: ()) {} // expected-note {{here}}
 @available(*, unavailable, renamed: "Int.foo(self:_:)")
 func ***(value: Int, other: Int) {} // expected-note {{here}}
 
-prefix operator *** {}
+prefix operator ***
 @available(*, unavailable, renamed: "add")
 prefix func ***(value: Int?) {} // expected-note {{here}}
 @available(*, unavailable, renamed: "Int.foo(self:)")
 prefix func ***(value: Int) {} // expected-note {{here}}
 
-postfix operator *** {}
+postfix operator ***
 @available(*, unavailable, renamed: "add")
 postfix func ***(value: Int?) {} // expected-note {{here}}
 @available(*, unavailable, renamed: "Int.foo(self:)")

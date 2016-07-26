@@ -883,30 +883,44 @@ namespace {
   using OperatorMap = SourceFile::OperatorMap<T>;
 
   template <typename T>
-  struct OperatorKind {
+  struct OperatorLookup {
     static_assert(static_cast<T*>(nullptr), "Only usable with operators");
   };
 
   template <>
-  struct OperatorKind<PrefixOperatorDecl> {
-    static const auto value = DeclKind::PrefixOperator;
+  struct OperatorLookup<PrefixOperatorDecl> {
+    template <typename T>
+    static PrefixOperatorDecl *lookup(T &container, Identifier name) {
+      return cast_or_null<PrefixOperatorDecl>(
+               container.lookupOperator(name, DeclKind::PrefixOperator));
+    }
   };
 
   template <>
-  struct OperatorKind<InfixOperatorDecl> {
-    static const auto value = DeclKind::InfixOperator;
+  struct OperatorLookup<InfixOperatorDecl> {
+    template <typename T>
+    static InfixOperatorDecl *lookup(T &container, Identifier name) {
+      return cast_or_null<InfixOperatorDecl>(
+               container.lookupOperator(name, DeclKind::InfixOperator));
+    }
   };
 
   template <>
-  struct OperatorKind<PostfixOperatorDecl> {
-    static const auto value = DeclKind::PostfixOperator;
+  struct OperatorLookup<PostfixOperatorDecl> {
+    template <typename T>
+    static PostfixOperatorDecl *lookup(T &container, Identifier name) {
+      return cast_or_null<PostfixOperatorDecl>(
+               container.lookupOperator(name, DeclKind::PostfixOperator));
+    }
   };
-}
 
-template <typename Op, typename T>
-static Op *lookupOperator(T &container, Identifier name) {
-  return cast_or_null<Op>(container.lookupOperator(name,
-                                                   OperatorKind<Op>::value));
+  template <>
+  struct OperatorLookup<PrecedenceGroupDecl> {
+    template <typename T>
+    static PrecedenceGroupDecl *lookup(T &container, Identifier name) {
+      return container.lookupPrecedenceGroup(name);
+    }
+  };
 }
 
 /// A helper class to sneak around C++ access control rules.
@@ -925,6 +939,50 @@ static Optional<OP_DECL *>
 lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
                           OperatorMap<OP_DECL *> SourceFile::*OP_MAP);
 
+template<typename OP_DECL>
+using ImportedOperatorsMap = llvm::SmallDenseMap<OP_DECL*, bool, 16>;
+
+template<typename OP_DECL>
+static typename ImportedOperatorsMap<OP_DECL>::iterator
+checkOperatorConflicts(const SourceFile &SF, SourceLoc loc,
+                       ImportedOperatorsMap<OP_DECL> &importedOperators) {
+  // Check for conflicts.
+  auto i = importedOperators.begin(), end = importedOperators.end();
+  auto start = i;
+  for (++i; i != end; ++i) {
+    if (i->first->conflictsWith(start->first)) {
+      if (loc.isValid()) {
+        ASTContext &C = SF.getASTContext();
+        C.Diags.diagnose(loc, diag::ambiguous_operator_decls);
+        C.Diags.diagnose(start->first->getLoc(),
+                         diag::found_this_operator_decl);
+        C.Diags.diagnose(i->first->getLoc(), diag::found_this_operator_decl);
+      }
+      return end;
+    }
+  }
+  return start;
+}
+
+template<>
+typename ImportedOperatorsMap<PrecedenceGroupDecl>::iterator
+checkOperatorConflicts(const SourceFile &SF, SourceLoc loc,
+               ImportedOperatorsMap<PrecedenceGroupDecl> &importedGroups) {
+  if (importedGroups.size() == 1)
+    return importedGroups.begin();
+
+  // Any sort of ambiguity is an error.
+  if (loc.isValid()) {
+    ASTContext &C = SF.getASTContext();
+    C.Diags.diagnose(loc, diag::ambiguous_precedence_groups);
+    for (auto &entry : importedGroups) {
+      C.Diags.diagnose(entry.first->getLoc(),
+                       diag::found_this_precedence_group);
+    }
+  }
+  return importedGroups.end();
+}
+
 // Returns None on error, Optional(nullptr) if no operator decl found, or
 // Optional(decl) if decl was found.
 template<typename OP_DECL>
@@ -942,7 +1000,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
     break;
   case FileUnitKind::SerializedAST:
   case FileUnitKind::ClangModule:
-    return lookupOperator<OP_DECL>(cast<LoadedFile>(File), Name);
+    return OperatorLookup<OP_DECL>::lookup(cast<LoadedFile>(File), Name);
   }
 
   auto &SF = cast<SourceFile>(File);
@@ -957,7 +1015,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
   // Record whether they come from re-exported modules.
   // FIXME: We ought to prefer operators elsewhere in this module before we
   // check imports.
-  llvm::SmallDenseMap<OP_DECL*, bool, 16> importedOperators;
+  ImportedOperatorsMap<OP_DECL> importedOperators;
   for (auto &imported : SourceFile::Impl::getImportsForSourceFile(SF)) {
     bool isExported =
         imported.second.contains(SourceFile::ImportFlags::Exported);
@@ -976,21 +1034,9 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
   typename OperatorMap<OP_DECL *>::mapped_type result = { nullptr, true };
   
   if (!importedOperators.empty()) {
-    // Check for conflicts.
-    auto i = importedOperators.begin(), end = importedOperators.end();
-    auto start = i;
-    for (++i; i != end; ++i) {
-      if (i->first->conflictsWith(start->first)) {
-        if (Loc.isValid()) {
-          ASTContext &C = SF.getASTContext();
-          C.Diags.diagnose(Loc, diag::ambiguous_operator_decls);
-          C.Diags.diagnose(start->first->getLoc(),
-                           diag::found_this_operator_decl);
-          C.Diags.diagnose(i->first->getLoc(), diag::found_this_operator_decl);
-        }
-        return None;
-      }
-    }
+    auto start = checkOperatorConflicts(SF, Loc, importedOperators);
+    if (start == importedOperators.end())
+      return None;
     result = { start->first, start->second };
   }
 
@@ -1029,17 +1075,16 @@ lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
 }
 
 #define LOOKUP_OPERATOR(Kind) \
-Kind##OperatorDecl * \
-Module::lookup##Kind##Operator(Identifier name, SourceLoc loc) { \
+Kind##Decl * \
+Module::lookup##Kind(Identifier name, SourceLoc loc) { \
   auto result = lookupOperatorDeclForName(this, loc, name, \
-                                          &SourceFile::Kind##Operators); \
+                                          &SourceFile::Kind##s); \
   return result ? *result : nullptr; \
 } \
-Kind##OperatorDecl * \
-SourceFile::lookup##Kind##Operator(Identifier name, bool isCascading, \
-                                   SourceLoc loc) { \
+Kind##Decl * \
+SourceFile::lookup##Kind(Identifier name, bool isCascading, SourceLoc loc) { \
   auto result = lookupOperatorDeclForName(*this, loc, name, true, \
-                                          &SourceFile::Kind##Operators); \
+                                          &SourceFile::Kind##s); \
   if (!result.hasValue()) \
     return nullptr; \
   if (ReferencedNames) {\
@@ -1050,14 +1095,15 @@ SourceFile::lookup##Kind##Operator(Identifier name, bool isCascading, \
   } \
   if (!result.getValue()) { \
     result = lookupOperatorDeclForName(getParentModule(), loc, name, \
-                                       &SourceFile::Kind##Operators); \
+                                       &SourceFile::Kind##s); \
   } \
   return result.hasValue() ? result.getValue() : nullptr; \
 }
 
-LOOKUP_OPERATOR(Prefix)
-LOOKUP_OPERATOR(Infix)
-LOOKUP_OPERATOR(Postfix)
+LOOKUP_OPERATOR(PrefixOperator)
+LOOKUP_OPERATOR(InfixOperator)
+LOOKUP_OPERATOR(PostfixOperator)
+LOOKUP_OPERATOR(PrecedenceGroup)
 #undef LOOKUP_OPERATOR
 
 void Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,

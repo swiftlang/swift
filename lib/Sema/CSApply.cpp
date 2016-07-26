@@ -6130,98 +6130,92 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(Expr *expr,
   return { parent, 0 };
 }
 
-// Return infix data representing the precedence of E.
-// FIXME: unify this with getInfixData() in lib/Sema/TypeCheckExpr.cpp; the
-// function there is meant to return infix data for expressions that have not
-// yet been folded, so currently the correct behavior for this infixData() and
-// that one are mutually exclusive.
-static InfixData getInfixDataForFixIt(DeclContext *DC, Expr *E) {
-  assert(E);
-  if (isa<IfExpr>(E)) {
-    return InfixData(IntrinsicPrecedences::IfExpr,
-                     Associativity::Right,
-                     /*assignment*/ false);
-  } else if (isa<AssignExpr>(E)) {
-    return InfixData(IntrinsicPrecedences::AssignExpr,
-                     Associativity::Right,
-                     /*assignment*/ true);
-  } else if (isa<ExplicitCastExpr>(E)) {
-    return InfixData(IntrinsicPrecedences::ExplicitCastExpr,
-                     Associativity::None,
-                     /*assignment*/ false);
-  } else if (auto *binary = dyn_cast<BinaryExpr>(E)) {
-    auto *fn = binary->getFn();
-    if (auto *DRE = dyn_cast<DeclRefExpr>(fn)) {
-      SourceFile *SF = DC->getParentSourceFile();
-      Identifier name = DRE->getDecl()->getName();
-      bool isCascading = DC->isCascadingContextForLookup(true);
-      if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, isCascading,
-                                                          E->getLoc()))
-        return op->getInfixData();
-    } else if (auto *OO = dyn_cast<OverloadedDeclRefExpr>(fn)) {
-      SourceFile *SF = DC->getParentSourceFile();
-      Identifier name = OO->getDecls()[0]->getName();
-      bool isCascading = DC->isCascadingContextForLookup(true);
-      if (InfixOperatorDecl *op = SF->lookupInfixOperator(name, isCascading,
-                                                          E->getLoc()))
-        return op->getInfixData();
-    }
-  // These cases are /not/ in the version in TypeCheckExpr, since they never
-  // appear in operator position. They are only used for determining whether
-  // it is necessary to add parentheses in a fix-it.
-  } else if (isa<PrefixUnaryExpr>(E)) {
-    return InfixData(IntrinsicPrecedences::PrefixUnaryExpr,
-                     Associativity::Left,
-                     /*assignment*/ false);
-  } else if (isa<OptionalTryExpr>(E)) {
-    return InfixData(IntrinsicPrecedences::MinPrecedence,
-                     Associativity::Left,
-                     /*assignment*/ false);
+/// Return true if, when replacing "<expr>" with "<expr> op <something>",
+/// parentheses must be added around "<expr>" to allow the new operator
+/// to bind correctly.
+static bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC,
+                                                   DeclContext *DC, Expr *expr,
+                                            PrecedenceGroupDecl *followingPG) {
+  if (expr->isInfixOperator()) {
+    auto exprPG = TC.lookupPrecedenceGroupForInfixOperator(DC, expr);
+    if (!exprPG) return true;
+
+    return TC.Context.associateInfixOperators(exprPG, followingPG)
+             != Associativity::Left;
   }
-  
-  return InfixData(IntrinsicPrecedences::MaxPrecedence,
-                   Associativity::Left,
-                   /*assignment*/ false);
+
+  // We want to parenthesize a 'try?' on the LHS, but we don't care about
+  // capturing the new operator inside a 'try' or 'try!'.
+  if (isa<OptionalTryExpr>(expr))
+    return true;
+
+  return false;
 }
 
-// Return the minimum precedence that an expression in the place of 'expr' must
-// have without needing to be surrounded by parentheses.
-static unsigned char getMinPrecedenceForExpr(DeclContext *DC, Expr *expr,
-                                             Expr *rootExpr) {
+/// Return true if, when replacing "<expr>" with "<expr> op <something>"
+/// within the given root expression, parentheses must be added around
+/// the new operator to prevent it from binding incorrectly in the
+/// surrounding context.
+static bool exprNeedsParensOutsideFollowingOperator(TypeChecker &TC,
+                                                    DeclContext *DC, Expr *expr,
+                                                    Expr *rootExpr,
+                                            PrecedenceGroupDecl *followingPG) {
   Expr *parent;
   unsigned index;
   std::tie(parent, index) = getPrecedenceParentAndIndex(expr, rootExpr);
   if (!parent || isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
-    return IntrinsicPrecedences::MinPrecedence;
-  } else if (isa<BinaryExpr>(parent) || isa<IfExpr>(parent) ||
-             isa<AssignExpr>(parent) || isa<ExplicitCastExpr>(parent)) {
-    auto infixData = getInfixDataForFixIt(DC, parent);
-    unsigned result = infixData.getPrecedence();
-    if (result < IntrinsicPrecedences::MaxPrecedence &&
-        ((index == 0 && !infixData.isLeftAssociative()) ||
-         (index > 0 && !infixData.isRightAssociative()))) {
-      result++;
-    }
-    return result;
-  } else {
-    return IntrinsicPrecedences::MaxPrecedence;
+    return false;
   }
+
+  if (parent->isInfixOperator()) {
+    auto parentPG = TC.lookupPrecedenceGroupForInfixOperator(DC, parent);
+    if (!parentPG) return true;
+
+    // If the index is 0, this is on the LHS of the parent.
+    if (index == 0) {
+      return TC.Context.associateInfixOperators(followingPG, parentPG)
+               != Associativity::Left;
+    } else {
+      return TC.Context.associateInfixOperators(parentPG, followingPG)
+               != Associativity::Right;
+    }
+  }
+
+  return true;
 }
 
 // Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.
-static bool exprNeedsParensBeforeAddingAs(DeclContext *DC, Expr *expr) {
-  return (getInfixDataForFixIt(DC, expr).getPrecedence() <
-          IntrinsicPrecedences::ExplicitCastExpr);
+static bool exprNeedsParensBeforeAddingAs(TypeChecker &TC, DeclContext *DC,
+                                          Expr *expr) {
+  auto asPG =
+    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_CastingPrecedence,
+                             SourceLoc());
+  if (!asPG) return true;
+  return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
 }
 
 // Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
 // to be added around the new expression in order to maintain the correct
 // precedence.
-static bool exprNeedsParensAfterAddingAs(DeclContext *DC, Expr *expr,
-                                         Expr *rootExpr) {
-  return (IntrinsicPrecedences::ExplicitCastExpr <
-          getMinPrecedenceForExpr(DC, expr, rootExpr));
+static bool exprNeedsParensAfterAddingAs(TypeChecker &TC, DeclContext *DC,
+                                         Expr *expr, Expr *rootExpr) {
+  auto asPG =
+    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_CastingPrecedence,
+                             SourceLoc());
+  if (!asPG) return true;
+  return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
+}
+
+static bool exprNeedsParensInsidePostfixOperator(TypeChecker &TC,
+                                                 DeclContext *DC,
+                                                 Expr *expr) {
+  // Prefix and infix operators will bind outside of a postfix operator.
+  // Postfix operators will get token-merged with a new postfix operator.
+  return (isa<PrefixUnaryExpr>(expr) ||
+          isa<PostfixUnaryExpr>(expr) ||
+          isa<OptionalEvaluationExpr>(expr) ||
+          expr->isInfixOperator());
 }
 
 namespace {
@@ -6393,9 +6387,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
       auto diag = TC.diagnose(affected->getLoc(),
                               diag::missing_unwrap_optional, type);
       bool parensNeeded =
-          (getInfixDataForFixIt(DC, affected).getPrecedence() <
-           IntrinsicPrecedences::PostfixUnaryExpr) ||
-          isa<OptionalEvaluationExpr>(affected);
+        exprNeedsParensInsidePostfixOperator(TC, DC, affected);
 
       if (parensNeeded) {
         diag.fixItInsert(affected->getStartLoc(), "(")
@@ -6427,8 +6419,8 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     if (!useAs && !useAsBang)
       return false;
 
-    bool needsParensInside = exprNeedsParensBeforeAddingAs(DC, affected);
-    bool needsParensOutside = exprNeedsParensAfterAddingAs(DC, affected,
+    bool needsParensInside = exprNeedsParensBeforeAddingAs(TC, DC, affected);
+    bool needsParensOutside = exprNeedsParensAfterAddingAs(TC, DC, affected,
                                                            expr);
     llvm::SmallString<2> insertBefore;
     llvm::SmallString<32> insertAfter;

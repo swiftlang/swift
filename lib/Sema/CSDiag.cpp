@@ -3878,7 +3878,9 @@ static bool isSymmetricBinaryOperator(const CalleeCandidateInfo &CCI) {
     auto decl = dyn_cast_or_null<FuncDecl>(candidate.getDecl());
     if (!decl) return false;
     auto op = dyn_cast_or_null<InfixOperatorDecl>(decl->getOperatorDecl());
-    if (!op || op->isAssignment()) return false;
+    if (!op || !op->getPrecedenceGroup() ||
+        op->getPrecedenceGroup()->isAssignment())
+      return false;
 
     // It must have exactly two parameters.
     auto params = decl->getParameterLists().back();

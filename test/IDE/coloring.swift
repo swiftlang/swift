@@ -186,20 +186,28 @@ protocol Prot {
   var protocolProperty2: Int { get set }
 }
 
-// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-* { <kw>associativity</kw> left <kw>precedence</kw> <int>140</int> }{{$}}
-infix operator *-* { associativity left precedence 140 }
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-* : FunnyPrecedence{{$}}
+infix operator *-* : FunnyPrecedence
+
+// CHECK: <kw>precedencegroup</kw> FunnyPrecedence
+// CHECK-NEXT: <kw>associativity</kw>: left{{$}}
+// CHECK-NEXT: <kw>higherThan</kw>: MultiplicationPrecedence
+precedencegroup FunnyPrecedence {
+  associativity: left
+  higherThan: MultiplicationPrecedence
+}
 
 // CHECK: <kw>func</kw> *-*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
 func *-*(l: Int, r: Int) -> Int { return l }
 
-// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-+* { <kw>associativity</kw> left }{{$}}
-infix operator *-+* { associativity left }
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-+* : FunnyPrecedence
+infix operator *-+* : FunnyPrecedence
 
 // CHECK: <kw>func</kw> *-+*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
 func *-+*(l: Int, r: Int) -> Int { return l }
 
-// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *--* {}{{$}}
-infix operator *--* {}
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *--*{{$}}
+infix operator *--*
 
 // CHECK: <kw>func</kw> *--*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
 func *--*(l: Int, r: Int) -> Int { return l }

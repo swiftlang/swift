@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen -module-name Swift %s | FileCheck %s
 
+precedencegroup AssignmentPrecedence { assignment: true }
+
 enum Optional<Wrapped> {
   case none
   case some(Wrapped)

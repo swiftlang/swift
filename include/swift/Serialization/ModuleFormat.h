@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 257; // Last change: private/fileprivate
+const uint16_t VERSION_MINOR = 258; // Last change: precedencegroup
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -147,7 +147,8 @@ using SILFunctionTypeRepresentationField = BCFixed<4>;
 enum OperatorKind : uint8_t {
   Infix = 0,
   Prefix,
-  Postfix
+  Postfix,
+  PrecedenceGroup,  // only for cross references
 };
 // This is currently required to have the same width as AccessorKindField.
 using OperatorKindField = BCFixed<3>;
@@ -945,12 +946,17 @@ namespace decls_block {
     INFIX_OPERATOR_DECL,
     IdentifierIDField, // name
     DeclContextIDField,// context decl
-    AssociativityField,
-    BCFixed<8>,  // precedence
-    BCFixed<1>,  // assignment
-    BCFixed<1>,  // IsAssocImplicit flag
-    BCFixed<1>,  // IsPrecedenceImplicit flag
-    BCFixed<1>   // IsAssignmentImplicit flag
+    DeclIDField        // precedence group
+  >;
+
+  using PrecedenceGroupLayout = BCRecordLayout<
+    PRECEDENCE_GROUP_DECL,
+    IdentifierIDField, // name
+    DeclContextIDField,// context decl
+    AssociativityField,// associativity
+    BCFixed<1>,        // assignment
+    BCVBR<2>,          // numHigherThan
+    BCArray<DeclIDField> // higherThan, followed by lowerThan
   >;
 
   using EnumElementLayout = BCRecordLayout<
@@ -1462,6 +1468,8 @@ namespace index_block {
     DECL_CONTEXT_OFFSETS,
     LOCAL_TYPE_DECLS,
     NORMAL_CONFORMANCE_OFFSETS,
+
+    PRECEDENCE_GROUPS,
   };
 
   using OffsetsLayout = BCGenericRecordLayout<

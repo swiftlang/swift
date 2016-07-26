@@ -984,19 +984,44 @@ namespace {
       Indent -= 2;
       OS << ')';
     }
+
+    void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
+      printCommon(PGD, "precedence_group_decl ");
+      OS << PGD->getName() << "\n";
+
+      OS.indent(Indent+2);
+      OS << "associativity ";
+      switch (PGD->getAssociativity()) {
+      case Associativity::None: OS << "none\n"; break;
+      case Associativity::Left: OS << "left\n"; break;
+      case Associativity::Right: OS << "right\n"; break;
+      }
+
+      OS.indent(Indent+2);
+      OS << "assignment " << (PGD->isAssignment() ? "true" : "false");
+
+      auto printRelations =
+          [&](StringRef label, ArrayRef<PrecedenceGroupDecl::Relation> rels) {
+        if (rels.empty()) return;
+        OS << '\n';
+        OS.indent(Indent+2);
+        OS << label << ' ' << rels[0].Name;
+        for (auto &rel : rels.slice(1))
+          OS << ", " << rel.Name;
+      };
+      printRelations("higherThan", PGD->getHigherThan());
+      printRelations("lowerThan", PGD->getLowerThan());
+
+      OS << ')';
+    }
     
     void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
       printCommon(IOD, "infix_operator_decl ");
       OS << IOD->getName() << "\n";
       OS.indent(Indent+2);
-      OS << "associativity ";
-      switch (IOD->getAssociativity()) {
-      case Associativity::None: OS << "none\n"; break;
-      case Associativity::Left: OS << "left\n"; break;
-      case Associativity::Right: OS << "right\n"; break;
-      }
-      OS.indent(Indent+2);
-      OS << "precedence " << IOD->getPrecedence() << ')';
+      OS << "precedence " << IOD->getPrecedenceGroupName();
+      if (!IOD->getPrecedenceGroup()) OS << " <null>";
+      OS << ')';
     }
     
     void visitPrefixOperatorDecl(PrefixOperatorDecl *POD) {

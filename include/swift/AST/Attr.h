@@ -41,69 +41,6 @@ class Decl;
 class ClassDecl;
 struct TypeLoc;
 
-class InfixData {
-  unsigned Precedence : 8;
-
-  /// Zero if invalid, or else an Associativity+1.
-  unsigned InvalidOrAssoc : 2;
-  
-  unsigned Assignment : 1;
-  
-public:
-  InfixData() : Precedence(0), InvalidOrAssoc(0), Assignment(0) {}
-  InfixData(unsigned char prec, Associativity assoc, bool isAssignment)
-    : Precedence(prec), InvalidOrAssoc(unsigned(assoc) + 1),
-      Assignment((unsigned)isAssignment) {}
-
-  bool isValid() const { return InvalidOrAssoc != 0; }
-
-  Associativity getAssociativity() const {
-    assert(isValid());
-    return Associativity(InvalidOrAssoc - 1);
-  }
-  bool isLeftAssociative() const {
-    return getAssociativity() == Associativity::Left;
-  }
-  bool isRightAssociative() const {
-    return getAssociativity() == Associativity::Right;
-  }
-  bool isNonAssociative() const {
-    return getAssociativity() == Associativity::None;
-  }
-
-  unsigned getPrecedence() const {
-    assert(isValid());
-    return Precedence;
-  }
-  
-  bool isAssignment() const {
-    assert(isValid());
-    return (bool)Assignment;
-  }
-
-  friend bool operator==(InfixData L, InfixData R) {
-    return L.Precedence == R.Precedence
-        && L.InvalidOrAssoc == R.InvalidOrAssoc
-        && L.Assignment == R.Assignment;
-  }
-  friend bool operator!=(InfixData L, InfixData R) {
-    return !operator==(L, R);
-  }
-};
-
-namespace IntrinsicPrecedences {
-  enum : unsigned char {
-    MinPrecedence = 0,
-    ArrowExpr = 0, // ->
-    IfExpr = 100, // ?:
-    AssignExpr = 90, // =
-    ExplicitCastExpr = 132, // 'is' and 'as'
-    PrefixUnaryExpr = 254,
-    PostfixUnaryExpr = 255,
-    MaxPrecedence = 255
-  };
-}
-
 /// TypeAttributes - These are attributes that may be applied to types.
 class TypeAttributes {
   // Get a SourceLoc for every possible attribute that can be parsed in source.
@@ -324,6 +261,7 @@ public:
     // There is one entry for each DeclKind here, and some higher level buckets
     // down below.  These are used in Attr.def to control which kinds of
     // declarations an attribute can be attached to.
+    OnPrecedenceGroup  = 1 << 7,
     OnImport           = 1 << 8,
     OnExtension        = 1 << 9,
     OnPatternBinding   = 1 << 10,
@@ -359,7 +297,8 @@ public:
                 OnTopLevelCode|OnIfConfig|OnInfixOperator|OnPrefixOperator|
                 OnPostfixOperator|OnEnum|OnStruct|OnClass|OnProtocol|
                 OnTypeAlias|OnVar|OnSubscript|OnConstructor|OnDestructor|
-                OnFunc|OnEnumElement|OnGenericTypeParam|OnAssociatedType|OnParam
+                OnFunc|OnEnumElement|OnGenericTypeParam|OnAssociatedType|
+                OnParam|OnPrecedenceGroup
   };
 
   static unsigned getOptions(DeclAttrKind DK);

@@ -205,6 +205,7 @@ public:
   void visitEnumCaseDecl(EnumCaseDecl *d) {}
   void visitEnumElementDecl(EnumElementDecl *d) {}
   void visitOperatorDecl(OperatorDecl *d) {}
+  void visitPrecedenceGroupDecl(PrecedenceGroupDecl *d) {}
   void visitTypeAliasDecl(TypeAliasDecl *d) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *d) {}
   void visitSubscriptDecl(SubscriptDecl *d) {}

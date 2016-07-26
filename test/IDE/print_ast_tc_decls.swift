@@ -1087,10 +1087,9 @@ enum d2400_EnumDeclWithValues2 : Double {
 //===--- Custom operator printing.
 //===---
 
-postfix operator <*> {}
+postfix operator <*>
 
-// PASS_2500-LABEL: {{^}}postfix operator <*> {{{$}}
-// PASS_2500-NEXT: {{^}}}{{$}}
+// PASS_2500-LABEL: {{^}}postfix operator <*>{{$}}
 
 protocol d2600_ProtocolWithOperator1 {
   static postfix func <*>(_: Int)
@@ -1100,40 +1099,40 @@ protocol d2600_ProtocolWithOperator1 {
 // PASS_2500-NEXT: {{^}}}{{$}}
 
 struct d2601_TestAssignment {}
-infix operator %%% { }
+infix operator %%%
 func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }
-// PASS_2500-LABEL: {{^}}infix operator %%% {
-// PASS_2500-NOT: associativity
-// PASS_2500-NOT: precedence
-// PASS_2500-NOT: assignment
+// PASS_2500-LABEL: {{^}}infix operator %%%{{$}}
 // PASS_2500: {{^}}func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
 
-infix operator %%< {
-// PASS_2500-LABEL: {{^}}infix operator %%< {{{$}}
-  associativity left
-// PASS_2500-NEXT: {{^}}  associativity left{{$}}
-  precedence 47
-// PASS_2500-NEXT: {{^}}  precedence 47{{$}}
+precedencegroup BoringPrecedence {
+// PASS_2500-LABEL: {{^}}precedencegroup BoringPrecedence {{{$}}
+  associativity: left
+// PASS_2500-NEXT: {{^}}  associativity: left{{$}}
+  higherThan: AssignmentPrecedence
+// PASS_2500-NEXT: {{^}}  higherThan: AssignmentPrecedence{{$}}
 // PASS_2500-NOT:         assignment
+// PASS_2500-NOT:         lowerThan
 }
 
-infix operator %%> {
-// PASS_2500-LABEL: {{^}}infix operator %%> {{{$}}
-  associativity right
-// PASS_2500-NEXT: {{^}}  associativity right{{$}}
-// PASS_2500-NOT: precedence
+precedencegroup ReallyBoringPrecedence {
+// PASS_2500-LABEL: {{^}}precedencegroup ReallyBoringPrecedence {{{$}}
+  associativity: right
+// PASS_2500-NEXT: {{^}}  associativity: right{{$}}
+// PASS_2500-NOT: higherThan
+// PASS_2500-NOT: lowerThan
 // PASS_2500-NOT: assignment
 }
 
-infix operator %%<> {
-// PASS_2500-LABEL: {{^}}infix operator %%<> {{{$}}
-  precedence 47
-  assignment
-// PASS_2500-NEXT: {{^}}  precedence 47{{$}}
-// PASS_2500-NEXT: {{^}}  assignment{{$}}
+precedencegroup BoringAssignmentPrecedence {
+// PASS_2500-LABEL: {{^}}precedencegroup BoringAssignmentPrecedence {{{$}}
+  lowerThan: AssignmentPrecedence
+  assignment: true
+// PASS_2500-NEXT: {{^}}  assignment: true{{$}}
+// PASS_2500-NEXT: {{^}}  lowerThan: AssignmentPrecedence{{$}}
 // PASS_2500-NOT: associativity
+// PASS_2500-NOT: higherThan
 }
 // PASS_2500: {{^}}}{{$}}
 

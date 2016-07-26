@@ -838,6 +838,9 @@ public:
                                                     SourceLoc NameLoc,
                                                     DeclAttributes &Attrs);
 
+  ParserResult<PrecedenceGroupDecl>
+  parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
+
   //===--------------------------------------------------------------------===//
   // SIL Parsing.
 

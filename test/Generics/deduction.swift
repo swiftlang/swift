@@ -259,7 +259,7 @@ func testGetVectorSize(_ vi: MyVector<Int>, vf: MyVector<Float>) {
 }
 
 // <rdar://problem/15104554>
-postfix operator <*> {}
+postfix operator <*>
 
 protocol MetaFunction {
   associatedtype Result

@@ -21,8 +21,8 @@ func useS0b(s1i: S0b<Int>, s: String) {
 }
 
 // Use operators defined within a protocol extension.
-infix operator %%% { }
-infix operator %%%% { }
+infix operator %%%
+infix operator %%%%
 
 protocol P1 {
   static func %%%(lhs: Self, rhs: Self) -> Bool

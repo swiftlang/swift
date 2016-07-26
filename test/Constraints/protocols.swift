@@ -53,7 +53,7 @@ g(f1) // okay (exact match)
 g(f2) // expected-error{{cannot convert value of type '(Float) -> ()' to expected argument type '(Barable & Fooable) -> ()'}}
 
 // FIXME: Workaround for ?? not playing nice with function types.
-infix operator ??* {}
+infix operator ??*
 func ??*<T>(lhs: T?, rhs: T) -> T { return lhs ?? rhs }
 g(nilFunc ??* f0)
 

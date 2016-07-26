@@ -1,8 +1,8 @@
 // RUN: %target-parse-verify-swift
 
-infix operator ==== {}
-infix operator <<<< {}
-infix operator <><> {}
+infix operator ====
+infix operator <<<<
+infix operator <><>
 
 // <rdar://problem/13782566>
 // Check that func op<T>() parses without a space between the name and the
@@ -128,7 +128,7 @@ func rdar16786220(inout let c: Int) -> () { // expected-error {{parameter may no
 
 
 // <rdar://problem/17763388> ambiguous operator emits same candidate multiple times
-infix operator !!! {}
+infix operator !!!
 
 func !!!<T>(lhs: Array<T>, rhs: Array<T>) -> Bool { return false }
 func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false }

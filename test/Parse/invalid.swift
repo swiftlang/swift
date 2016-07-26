@@ -117,7 +117,7 @@ leavings<T>(x: T) {} // expected-error {{found an unexpected second identifier i
 // expected-note@-1 {{join the identifiers together}} {{6-9=hammerleavings}}
 // expected-note@-2 {{join the identifiers together with camel-case}} {{6-9=hammerLeavings}}
 
-prefix operator % {}
+prefix operator %
 prefix func %<T>(x: T) -> T { return x } // No error expected - the < is considered an identifier but is peeled off by the parser.
 
 struct Weak<T: class> { // expected-error {{'class' constraint can only appear on protocol declarations}}

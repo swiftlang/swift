@@ -280,6 +280,7 @@ private:
 
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
+  std::unique_ptr<SerializedDeclTable> PrecedenceGroupDecls;
   std::unique_ptr<SerializedDeclTable> ExtensionDecls;
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
@@ -528,6 +529,12 @@ public:
   ///
   /// If none is found, returns null.
   OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
+
+  /// Searches the module's precedence groups for one with the given
+  /// name and fixity.
+  ///
+  /// If none is found, returns null.
+  PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name);
 
   /// Adds any imported modules to the given vector.
   void getImportedModules(SmallVectorImpl<Module::ImportedModule> &results,

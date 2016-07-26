@@ -740,6 +740,8 @@ public:
                    UnsatisfiedDependency *unsatisfiedDependency = nullptr);
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
+  void validateDecl(OperatorDecl *decl);
+  void validateDecl(PrecedenceGroupDecl *decl);
 
   /// Resolves the accessibility of the given declaration.
   void validateAccessibility(ValueDecl *D);
@@ -1674,6 +1676,14 @@ public:
   LookupResult lookupConstructors(DeclContext *dc, Type type,
                                   NameLookupOptions options
                                     = defaultConstructorLookupOptions);
+
+  /// Given an expression that's known to be an infix operator,
+  /// look up its precedence group.
+  PrecedenceGroupDecl *
+  lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op);
+
+  PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc, Identifier name,
+                                             SourceLoc nameLoc);
 
   /// \brief Look up the Bool type in the standard library.
   Type lookupBoolType(const DeclContext *dc);
