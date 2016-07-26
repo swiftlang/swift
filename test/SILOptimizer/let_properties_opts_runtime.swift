@@ -56,7 +56,7 @@ struct Boo3 {
   //public 
   let Prop0: Int32
   let Prop1: Int32
-  private let Prop2: Int32
+  fileprivate let Prop2: Int32
   internal let Prop3: Int32
 
   @inline(__always)
