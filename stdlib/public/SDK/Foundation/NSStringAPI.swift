@@ -782,7 +782,7 @@ extension String {
   /// in a given encoding, and optionally frees the buffer.  WARNING:
   /// this initializer is not memory-safe!
   public init?(
-    bytesNoCopy bytes: UnsafeMutableRawPointer, length: Int,
+    bytesNoCopy bytes: UnsafeMutablePointer<Void>, length: Int,
     encoding: Encoding, freeWhenDone flag: Bool
   ) {
     if let ns = NSString(

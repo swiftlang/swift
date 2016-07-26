@@ -41,7 +41,7 @@ internal func NS_Swift_performErrorRecoverySelector(
   delegate: AnyObject?,
   selector: Selector,
   success: ObjCBool,
-  contextInfo: UnsafeMutableRawPointer?)
+  contextInfo: UnsafeMutablePointer<Void>?)
 
 /// Class that implements the informal protocol
 /// NSErrorRecoveryAttempting, which is used by NSError when it
@@ -52,7 +52,7 @@ class _NSErrorRecoveryAttempter {
                        optionIndex recoveryOptionIndex: Int,
                        delegate: AnyObject?,
                        didRecoverSelector: Selector,
-                       contextInfo: UnsafeMutableRawPointer?) {
+                       contextInfo: UnsafeMutablePointer<Void>?) {
     let error = nsError as Error as! RecoverableError
     error.attemptRecovery(optionIndex: recoveryOptionIndex) { success in
       NS_Swift_performErrorRecoverySelector(

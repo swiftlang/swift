@@ -52,24 +52,24 @@ func curry_bridged(_ x: CurryTest) -> (String!) -> String! {
 // CHECK:   strong_release %1
 // CHECK:   return {{%.*}} : $ImplicitlyUnwrappedOptional<String>
 
-func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer! {
+func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutablePointer<Void>! {
   return x.returnsInnerPointer
 }
-// CHECK-LABEL: sil hidden @_TF13objc_currying25curry_returnsInnerPointerFCSo9CurryTestFT_GSQSv_ : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutableRawPointer> {
-// CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER:@_TTOFCSo9CurryTest19returnsInnerPointerFT_GSQSv_]]
+// CHECK-LABEL: sil hidden @_TF13objc_currying25curry_returnsInnerPointerFCSo9CurryTestFT_GSQGSpT___ : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>> {
+// CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER:@_TTOFCSo9CurryTest19returnsInnerPointerFT_GSQGSpT___]]
 // CHECK:         [[FN:%.*]] = apply [[THUNK]](%0)
 // CHECK:         return [[FN]]
 
-// CHECK: sil shared [thunk] [[THUNK_RETURNSINNERPOINTER]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutableRawPointer>
-// CHECK:   [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER_2:@_TTOFCSo9CurryTest19returnsInnerPointerfT_GSQSv_]]
+// CHECK: sil shared [thunk] [[THUNK_RETURNSINNERPOINTER]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>>
+// CHECK:   [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER_2:@_TTOFCSo9CurryTest19returnsInnerPointerfT_GSQGSpT___]]
 // CHECK:   [[FN:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK:   return [[FN]]
 
-// CHECK: sil shared [thunk] @_TTOFCSo9CurryTest19returnsInnerPointerfT_GSQSv_ : $@convention(method) (@guaranteed CurryTest) -> ImplicitlyUnwrappedOptional<UnsafeMutableRawPointer>
+// CHECK: sil shared [thunk] @_TTOFCSo9CurryTest19returnsInnerPointerfT_GSQGSpT___ : $@convention(method) (@guaranteed CurryTest) -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>>
 // CHECK:  bb0([[ARG1:%.*]] : 
 // CHECK:   strong_retain [[ARG1]]
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %0 : $CurryTest, #CurryTest.returnsInnerPointer!1.foreign
-// CHECK:   [[RES:%.*]] = apply [[METHOD]](%0) : $@convention(objc_method) (CurryTest) -> @unowned_inner_pointer ImplicitlyUnwrappedOptional<UnsafeMutableRawPointer>
+// CHECK:   [[RES:%.*]] = apply [[METHOD]](%0) : $@convention(objc_method) (CurryTest) -> @unowned_inner_pointer ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>>
 // CHECK:   autorelease_value %0
 // CHECK:   return [[RES]]
 
@@ -125,12 +125,12 @@ func curry_returnsSelf_AnyObject(_ x: AnyObject) -> () -> AnyObject! {
   return x.returnsSelf!
 }
 
-// CHECK-LABEL: sil hidden @_TF13objc_currying35curry_returnsInnerPointer_AnyObjectFPs9AnyObject_FT_GSQSv_
+// CHECK-LABEL: sil hidden @_TF13objc_currying35curry_returnsInnerPointer_AnyObjectFPs9AnyObject_FT_GSQGSpT___
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@opened({{.*}}) AnyObject, #CurryTest.returnsInnerPointer!1.foreign, [[HAS_METHOD:bb[0-9]+]]
-// CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @unowned_inner_pointer ImplicitlyUnwrappedOptional<UnsafeMutableRawPointer>):
+// CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @unowned_inner_pointer ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>>):
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])
-// CHECK:         [[PA]]{{.*}}@owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutableRawPointer>
+// CHECK:         [[PA]]{{.*}}@owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>>
 
-func curry_returnsInnerPointer_AnyObject(_ x: AnyObject) -> () -> UnsafeMutableRawPointer! {
+func curry_returnsInnerPointer_AnyObject(_ x: AnyObject) -> () -> UnsafeMutablePointer<Void>! {
   return x.returnsInnerPointer!
 }

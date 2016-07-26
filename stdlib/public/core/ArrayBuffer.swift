@@ -432,7 +432,7 @@ extension _ArrayBuffer {
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
-  public var identity: UnsafeRawPointer {
+  public var identity: UnsafePointer<Void> {
     if _isNative {
       return _native.identity
     }

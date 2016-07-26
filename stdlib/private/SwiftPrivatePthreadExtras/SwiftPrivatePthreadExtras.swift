@@ -27,7 +27,7 @@ internal class PthreadBlockContext {
   /// Execute the block, and return an `UnsafeMutablePointer` to memory
   /// allocated with `UnsafeMutablePointer.alloc` containing the result of the
   /// block.
-  func run() -> UnsafeMutableRawPointer { fatalError("abstract") }
+  func run() -> UnsafeMutablePointer<Void> { fatalError("abstract") }
 }
 
 internal class PthreadBlockContextImpl<Argument, Result>: PthreadBlockContext {
@@ -40,17 +40,17 @@ internal class PthreadBlockContextImpl<Argument, Result>: PthreadBlockContext {
     super.init()
   }
 
-  override func run() -> UnsafeMutableRawPointer {
+  override func run() -> UnsafeMutablePointer<Void> {
     let result = UnsafeMutablePointer<Result>.allocate(capacity: 1)
     result.initialize(to: block(arg))
-    return UnsafeMutableRawPointer(result)
+    return UnsafeMutablePointer(result)
   }
 }
 
 /// Entry point for `pthread_create` that invokes a block context.
 internal func invokeBlockContext(
-  _ contextAsVoidPointer: UnsafeMutableRawPointer?
-) -> UnsafeMutableRawPointer! {
+  _ contextAsVoidPointer: UnsafeMutablePointer<Void>?
+) -> UnsafeMutablePointer<Void>! {
   // The context is passed in +1; we're responsible for releasing it.
   let context = Unmanaged<PthreadBlockContext>
     .fromOpaque(contextAsVoidPointer!)
@@ -95,14 +95,12 @@ public func _stdlib_pthread_join<Result>(
   _ thread: pthread_t,
   _ resultType: Result.Type
 ) -> (CInt, Result?) {
-  var threadResultRawPtr: UnsafeMutableRawPointer? = nil
-  let result = pthread_join(thread, &threadResultRawPtr)
+  var threadResultPtr: UnsafeMutablePointer<Void>? = nil
+  let result = pthread_join(thread, &threadResultPtr)
   if result == 0 {
-    let threadResultPtr = threadResultRawPtr!.assumingMemoryBound(
-      to: Result.self)
-    let threadResult = threadResultPtr.pointee
-    threadResultPtr.deinitialize()
-    threadResultPtr.deallocate(capacity: 1)
+    let threadResult = UnsafeMutablePointer<Result>(threadResultPtr!).pointee
+    threadResultPtr!.deinitialize()
+    threadResultPtr!.deallocate(capacity: 1)
     return (result, threadResult)
   } else {
     return (result, nil)

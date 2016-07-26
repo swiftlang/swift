@@ -1486,13 +1486,13 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
 extension ${Self} {
   @_versioned
   @_transparent
-  internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
+  internal func _cPointerArgs() -> (AnyObject?, UnsafePointer<Void>?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
-      return (_owner, UnsafeRawPointer(p))
+      return (_owner, UnsafePointer(p))
     }
     let n = ContiguousArray(self._buffer)._buffer
-    return (n.owner, UnsafeRawPointer(n.firstElementAddress))
+    return (n.owner, UnsafePointer(n.firstElementAddress))
   }
 }
 

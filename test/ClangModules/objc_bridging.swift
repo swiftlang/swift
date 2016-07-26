@@ -43,7 +43,7 @@ func foo() {
   DummyClass().setProperty.onlyOnSet()
 }
 
-func allocateMagic(_ zone: NSZone) -> UnsafeMutableRawPointer {
+func allocateMagic(_ zone: NSZone) -> UnsafeMutablePointer<Void> {
   return allocate(zone)
 }
 

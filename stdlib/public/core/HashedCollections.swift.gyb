@@ -3319,7 +3319,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   @objc
   internal required init(
     objects: UnsafePointer<AnyObject?>,
-    forKeys: UnsafeRawPointer,
+    forKeys: UnsafePointer<Void>,
     count: Int
   ) {
     _sanityCheckFailure("don't call this designated initializer")

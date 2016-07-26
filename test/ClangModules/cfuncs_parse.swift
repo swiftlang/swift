@@ -85,7 +85,7 @@ func test_pointer() {
   param_const_pointer(ia)
   param_const_pointer([1, 2, 3])
 
-  param_void_pointer(nil as UnsafeMutableRawPointer?)
+  param_void_pointer(nil as UnsafeMutablePointer<Void>?)
   param_void_pointer(nil as UnsafeMutablePointer<CInt>?)
   param_void_pointer(nil as UnsafeMutablePointer<CFloat>?)
   param_void_pointer(&i)
@@ -93,10 +93,10 @@ func test_pointer() {
   param_void_pointer(&f)
   param_void_pointer(&fa)
 
-  param_const_void_pointer(nil as UnsafeMutableRawPointer?)
+  param_const_void_pointer(nil as UnsafeMutablePointer<Void>?)
   param_const_void_pointer(nil as UnsafeMutablePointer<CInt>?)
   param_const_void_pointer(nil as UnsafeMutablePointer<CFloat>?)
-  param_const_void_pointer(nil as UnsafeRawPointer?)
+  param_const_void_pointer(nil as UnsafePointer<Void>?)
   param_const_void_pointer(nil as UnsafePointer<CInt>?)
   param_const_void_pointer(nil as UnsafePointer<CFloat>?)
   param_const_void_pointer(&i)

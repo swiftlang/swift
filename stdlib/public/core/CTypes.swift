@@ -151,13 +151,13 @@ extension OpaquePointer : CustomDebugStringConvertible {
 
 extension Int {
   public init(bitPattern pointer: OpaquePointer?) {
-    self.init(bitPattern: UnsafeRawPointer(pointer))
+    self.init(bitPattern: UnsafePointer<Void>(pointer))
   }
 }
 
 extension UInt {
   public init(bitPattern pointer: OpaquePointer?) {
-    self.init(bitPattern: UnsafeRawPointer(pointer))
+    self.init(bitPattern: UnsafePointer<Void>(pointer))
   }
 }
 
@@ -170,10 +170,10 @@ extension OpaquePointer : Equatable {
 /// The corresponding Swift type to `va_list` in imported C APIs.
 @_fixed_layout
 public struct CVaListPointer {
-  var value: UnsafeMutableRawPointer
+  var value: UnsafeMutablePointer<Void>
 
   public // @testable
-  init(_fromUnsafeMutablePointer from: UnsafeMutableRawPointer) {
+  init(_fromUnsafeMutablePointer from: UnsafeMutablePointer<Void>) {
     value = from
   }
 }
@@ -186,8 +186,8 @@ extension CVaListPointer : CustomDebugStringConvertible {
 }
 
 func _memcpy(
-  dest destination: UnsafeMutableRawPointer,
-  src: UnsafeMutableRawPointer,
+  dest destination: UnsafeMutablePointer<Void>,
+  src: UnsafeMutablePointer<Void>,
   size: UInt
 ) {
   let dest = destination._rawValue

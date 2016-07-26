@@ -20,19 +20,19 @@ all_array_types = ['ContiguousArray', 'ArraySlice', 'Array']
 }%
 
 extension Array {
-  var identity: UnsafeRawPointer {
+  var identity: UnsafePointer<Void> {
     return self._buffer.identity
   }
 }
 
 extension ArraySlice {
-  var identity: UnsafeRawPointer {
+  var identity: UnsafePointer<Void> {
     return self._buffer.identity
   }
 }
 
 extension ContiguousArray {
-  var identity: UnsafeRawPointer {
+  var identity: UnsafePointer<Void> {
     return self._buffer.identity
   }
 }

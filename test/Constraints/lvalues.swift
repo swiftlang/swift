@@ -172,7 +172,7 @@ takeArrayRef(["asdf", "1234"]) // expected-error{{contextual type 'inout Array<S
 
 // <rdar://problem/19835413> Reference to value from array changed
 func rdar19835413() {
-  func f1(_ p: UnsafeMutableRawPointer) {}
+  func f1(_ p: UnsafeMutablePointer<Void>) {}
   func f2(_ a: [Int], i: Int, pi: UnsafeMutablePointer<Int>) {
     var a = a
     f1(&a)

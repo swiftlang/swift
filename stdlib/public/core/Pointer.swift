@@ -57,7 +57,7 @@ func _convertConstArrayToPointerArgument<
     validPointer = ToPointer(addr._rawValue)
   } else {
     let lastAlignedValue = ~(alignof(FromElement.self) - 1)
-    let lastAlignedPointer = UnsafeRawPointer(bitPattern: lastAlignedValue)!
+    let lastAlignedPointer = UnsafePointer<Void>(bitPattern: lastAlignedValue)!
     validPointer = ToPointer(lastAlignedPointer._rawValue)
   }
   return (owner, validPointer)

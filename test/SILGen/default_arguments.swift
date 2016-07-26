@@ -189,11 +189,11 @@ func testTakeDefaultArgUnnamed(_ i: Int) {
   takeDefaultArgUnnamed(i)
 }
 
-func takeDSOHandle(_ handle: UnsafeMutableRawPointer = #dsohandle) { }
+func takeDSOHandle(_ handle: UnsafeMutablePointer<Void> = #dsohandle) { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments13testDSOHandleFT_T_
 func testDSOHandle() {
-  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr @__dso_handle : $*UnsafeMutableRawPointer
+  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr @__dso_handle : $*UnsafeMutablePointer<()>
   takeDSOHandle()
 }
 

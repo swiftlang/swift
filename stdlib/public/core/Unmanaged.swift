@@ -29,7 +29,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @_transparent
-  public static func fromOpaque(_ value: UnsafeRawPointer) -> Unmanaged {
+  public static func fromOpaque(_ value: UnsafePointer<Void>) -> Unmanaged {
     return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
   }
 
@@ -41,8 +41,8 @@ public struct Unmanaged<Instance : AnyObject> {
   ///     let bits = Unmanaged.passUnretained(str0)
   ///     let ptr = bits.toOpaque()
   @_transparent
-  public func toOpaque() -> UnsafeMutableRawPointer {
-    return unsafeBitCast(_value, to: UnsafeMutableRawPointer.self)
+  public func toOpaque() -> UnsafeMutablePointer<Void> {
+    return unsafeBitCast(_value, to: UnsafeMutablePointer<Void>.self)
   }
 
   /// Create an unmanaged reference with an unbalanced retain.
@@ -216,13 +216,13 @@ public struct Unmanaged<Instance : AnyObject> {
 
 extension Unmanaged {
   @available(*, unavailable, 
-    message:"use 'fromOpaque(_: UnsafeRawPointer)' instead")
+    message:"use 'fromOpaque(_: UnsafePointer<Void>)' instead")
   public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
     Builtin.unreachable()
   }
   
   @available(*, unavailable, 
-    message:"use 'toOpaque() -> UnsafeRawPointer' instead")
+    message:"use 'toOpaque() -> UnsafePointer<Void>' instead")
   public func toOpaque() -> OpaquePointer {
     Builtin.unreachable()
   }

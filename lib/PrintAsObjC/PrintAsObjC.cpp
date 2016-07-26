@@ -949,8 +949,6 @@ private:
       MAP(Bool, "BOOL", false);
 
       MAP(OpaquePointer, "void *", true);
-      MAP(UnsafeRawPointer, "void const *", true);
-      MAP(UnsafeMutableRawPointer, "void *", true);
 
       Identifier ID_ObjectiveC = ctx.Id_ObjectiveC;
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] 

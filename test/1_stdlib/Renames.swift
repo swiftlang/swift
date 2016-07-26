@@ -481,8 +481,8 @@ func _UnicodeScalar(s: UnicodeScalar) {
 }
 
 func _Unmanaged<T>(x: Unmanaged<T>, p: OpaquePointer) {
-  _ = Unmanaged<T>.fromOpaque(p) // expected-error {{'fromOpaque' is unavailable: use 'fromOpaque(_: UnsafeRawPointer)' instead}} {{none}}
-  let _: OpaquePointer = x.toOpaque() // expected-error {{'toOpaque()' is unavailable: use 'toOpaque() -> UnsafeRawPointer' instead}} {{none}}
+  _ = Unmanaged<T>.fromOpaque(p) // expected-error {{'fromOpaque' is unavailable: use 'fromOpaque(_: UnsafePointer<Void>)' instead}} {{none}}
+  let _: OpaquePointer = x.toOpaque() // expected-error {{'toOpaque()' is unavailable: use 'toOpaque() -> UnsafePointer<Void>' instead}} {{none}}
 }
 
 func _UnsafeBufferPointer() {

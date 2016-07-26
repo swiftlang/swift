@@ -219,7 +219,7 @@ internal func _swift_Platform_fcntl(
 internal func _swift_Platform_fcntlPtr(
   _ fd: Int32,
   _ cmd: Int32,
-  _ ptr: UnsafeMutableRawPointer
+  _ ptr: UnsafeMutablePointer<Void>
 ) -> Int32
 
 public func fcntl(
@@ -240,7 +240,7 @@ public func fcntl(
 public func fcntl(
   _ fd: Int32,
   _ cmd: Int32,
-  _ ptr: UnsafeMutableRawPointer
+  _ ptr: UnsafeMutablePointer<Void>
 ) -> Int32 {
   return _swift_Platform_fcntlPtr(fd, cmd, ptr)
 }
@@ -313,7 +313,7 @@ internal func _swift_Platform_ioctl(
 internal func _swift_Platform_ioctlPtr(
   _ fd: CInt,
   _ request: UInt,
-  _ ptr: UnsafeMutableRawPointer
+  _ ptr: UnsafeMutablePointer<Void>
 ) -> CInt
 
 public func ioctl(
@@ -327,7 +327,7 @@ public func ioctl(
 public func ioctl(
   _ fd: CInt,
   _ request: UInt,
-  _ ptr: UnsafeMutableRawPointer
+  _ ptr: UnsafeMutablePointer<Void>
 ) -> CInt {
   return _swift_Platform_ioctlPtr(fd, request, ptr)
 }

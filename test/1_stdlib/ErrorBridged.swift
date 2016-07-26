@@ -438,7 +438,7 @@ extension MySwiftCustomizedError : RecoverableError {
                        optionIndex recoveryOptionIndex: Int,
                        delegate: AnyObject?,
                        didRecoverSelector: Selector,
-                       contextInfo: UnsafeMutableRawPointer?)
+                       contextInfo: UnsafeMutablePointer<Void>?)
 
   @objc(attemptRecoveryFromError:optionIndex:)
   func attemptRecovery(fromError nsError: Error,
@@ -447,16 +447,16 @@ extension MySwiftCustomizedError : RecoverableError {
 
 class RecoveryDelegate {
   let expectedSuccess: Bool
-  let expectedContextInfo: UnsafeMutableRawPointer?
+  let expectedContextInfo: UnsafeMutablePointer<Void>?
   var called = false
 
   init(expectedSuccess: Bool,
-       expectedContextInfo: UnsafeMutableRawPointer?) {
+       expectedContextInfo: UnsafeMutablePointer<Void>?) {
     self.expectedSuccess = expectedSuccess
     self.expectedContextInfo = expectedContextInfo
   }
 
-  @objc func recover(success: Bool, contextInfo: UnsafeMutableRawPointer?) {
+  @objc func recover(success: Bool, contextInfo: UnsafeMutablePointer<Void>?) {
     expectEqual(expectedSuccess, success)
     expectEqual(expectedContextInfo, contextInfo)
     called = true

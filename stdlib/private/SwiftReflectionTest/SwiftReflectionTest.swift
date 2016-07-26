@@ -48,7 +48,7 @@ public enum InstanceKind : UInt8 {
 /// Represents a section in a loaded image in this process.
 internal struct Section {
   /// The absolute start address of the section's data in this address space.
-  let startAddress: UnsafeRawPointer
+  let startAddress: UnsafePointer<Void>
 
   /// The size of the section in bytes.
   let size: UInt
@@ -211,7 +211,7 @@ internal func sendBytes() {
   let count = Int(readUInt())
   debugLog("Parent requested \(count) bytes from \(address)")
   var totalBytesWritten = 0
-  var pointer = unsafeBitCast(address, to: UnsafeMutableRawPointer.self)
+  var pointer = unsafeBitCast(address, to: UnsafeMutablePointer<Void>.self)
   while totalBytesWritten < count {
     let bytesWritten = Int(fwrite(pointer, 1, Int(count), stdout))
     fflush(stdout)
@@ -228,7 +228,7 @@ internal func sendSymbolAddress() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let name = readLine()!
   name.withCString {
-    let handle = unsafeBitCast(Int(-2), to: UnsafeMutableRawPointer.self)
+    let handle = unsafeBitCast(Int(-2), to: UnsafeMutablePointer<Void>.self)
     let symbol = dlsym(handle, $0)
     let symbolAddress = unsafeBitCast(symbol, to: UInt.self)
     sendValue(symbolAddress)
@@ -247,7 +247,7 @@ internal func sendStringLength() {
 /// Send the size of this architecture's pointer type.
 internal func sendPointerSize() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  let pointerSize = UInt8(sizeof(UnsafeRawPointer.self))
+  let pointerSize = UInt8(sizeof(UnsafePointer<Void>.self))
   sendValue(pointerSize)
 }
 
@@ -412,8 +412,8 @@ struct ThickFunction3 {
 }
 
 struct ThickFunctionParts {
-  var function: UnsafeRawPointer
-  var context: Optional<UnsafeRawPointer>
+  var function: UnsafePointer<Void>
+  var context: Optional<UnsafePointer<Void>>
 }
 
 /// Reflect a closure context. The given function must be a Swift-native

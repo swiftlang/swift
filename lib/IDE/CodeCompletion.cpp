@@ -4656,7 +4656,7 @@ static void addExprKeywords(CodeCompletionResultSink &Sink) {
   // Same: Swift.IntegerLiteralType.
   AddKeyword("#line", "Int", CodeCompletionKeywordKind::pound_line);
   AddKeyword("#column", "Int", CodeCompletionKeywordKind::pound_column);
-  AddKeyword("#dsohandle", "UnsafeMutableRawPointer", CodeCompletionKeywordKind::pound_dsohandle);
+  AddKeyword("#dsohandle", "UnsafeMutablePointer<Void>", CodeCompletionKeywordKind::pound_dsohandle);
 }
 
 static void addAnyTypeKeyword(CodeCompletionResultSink &Sink) {

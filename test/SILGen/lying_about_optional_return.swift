@@ -4,8 +4,8 @@
 func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
   let _: ()? = voidReturning()
-  // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeMutableRawPointer to $Optional<UnsafeMutableRawPointer>
-  let _: UnsafeMutableRawPointer? = voidPointerReturning()
+  // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeMutablePointer<()> to $Optional<UnsafeMutablePointer<()>>
+  let _: UnsafeMutablePointer<Void>? = voidPointerReturning()
   // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeMutablePointer<Int8> to $Optional<UnsafeMutablePointer<Int8>>
   let _: UnsafeMutablePointer<Int8>? = pointerReturning()
   // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafePointer<Int8> to $Optional<UnsafePointer<Int8>>
@@ -15,7 +15,7 @@ func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {
 
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
   a?.voidReturning()
-  // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeMutableRawPointer to $Optional<UnsafeMutableRawPointer>
+  // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeMutablePointer<()> to $Optional<UnsafeMutablePointer<()>>
   a?.voidPointerReturning()
   // CHECK: unchecked_trivial_bit_cast {{%.*}} : $UnsafeMutablePointer<Int8> to $Optional<UnsafeMutablePointer<Int8>>
   a?.pointerReturning()

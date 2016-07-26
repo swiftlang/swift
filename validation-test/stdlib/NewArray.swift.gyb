@@ -32,7 +32,7 @@ func printSequence<T : Sequence>(_ x: T) {
   print("]")
 }
 
-typealias BufferID = UnsafeRawPointer?
+typealias BufferID = UnsafePointer<Void>?
 
 func bufferID<T : _ArrayProtocol>(_ x: T) -> BufferID {
   return x._buffer.identity

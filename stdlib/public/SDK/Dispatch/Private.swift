@@ -67,7 +67,7 @@ func dispatch_write(_ fd: Int32, _ data: __DispatchData, _ queue: DispatchQueue,
 }
 
 @available(*, unavailable, renamed:"DispatchData.init(bytes:)")
-public func dispatch_data_create(_ buffer: UnsafeRawPointer, _ size: Int, _ queue: DispatchQueue?, _ destructor: (() -> Void)?) -> __DispatchData
+public func dispatch_data_create(_ buffer: UnsafePointer<Void>, _ size: Int, _ queue: DispatchQueue?, _ destructor: (() -> Void)?) -> __DispatchData
 {
 	fatalError()
 }
@@ -79,7 +79,7 @@ public func dispatch_data_get_size(_ data: __DispatchData) -> Int
 }
 
 @available(*, unavailable, renamed:"DispatchData.withUnsafeBytes(self:body:)")
-public func dispatch_data_create_map(_ data: __DispatchData, _ buffer_ptr: UnsafeMutablePointer<UnsafeRawPointer?>?, _ size_ptr: UnsafeMutablePointer<Int>?) -> __DispatchData
+public func dispatch_data_create_map(_ data: __DispatchData, _ buffer_ptr: UnsafeMutablePointer<UnsafePointer<Void>?>?, _ size_ptr: UnsafeMutablePointer<Int>?) -> __DispatchData
 {
 	fatalError()
 }
@@ -97,7 +97,7 @@ public func dispatch_data_create_subrange(_ data: __DispatchData, _ offset: Int,
 }
 
 @available(*, unavailable, renamed:"DispatchData.enumerateBytes(self:block:)")
-public func dispatch_data_apply(_ data: __DispatchData, _ applier: (__DispatchData, Int, UnsafeRawPointer, Int) -> Bool) -> Bool
+public func dispatch_data_apply(_ data: __DispatchData, _ applier: (__DispatchData, Int, UnsafePointer<Void>, Int) -> Bool) -> Bool
 {
 	fatalError()
 }
@@ -211,19 +211,19 @@ public func dispatch_barrier_sync(_ queue: DispatchQueue, _ block: @noescape () 
 }
 
 @available(*, unavailable, renamed:"DispatchQueue.setSpecific(self:key:value:)")
-public func dispatch_queue_set_specific(_ queue: DispatchQueue, _ key: UnsafeRawPointer, _ context: UnsafeMutableRawPointer?, _ destructor: (@convention(c) (UnsafeMutableRawPointer?) -> Void)?)
+public func dispatch_queue_set_specific(_ queue: DispatchQueue, _ key: UnsafePointer<Void>, _ context: UnsafeMutablePointer<Void>?, _ destructor: (@convention(c) (UnsafeMutablePointer<Void>?) -> Void)?)
 {
 	fatalError()
 }
 
 @available(*, unavailable, renamed:"DispatchQueue.getSpecific(self:key:)")
-public func dispatch_queue_get_specific(_ queue: DispatchQueue, _ key: UnsafeRawPointer) -> UnsafeMutableRawPointer?
+public func dispatch_queue_get_specific(_ queue: DispatchQueue, _ key: UnsafePointer<Void>) -> UnsafeMutablePointer<Void>?
 {
 	fatalError()
 }
 
 @available(*, unavailable, renamed:"DispatchQueue.getSpecific(key:)")
-public func dispatch_get_specific(_ key: UnsafeRawPointer) -> UnsafeMutableRawPointer?
+public func dispatch_get_specific(_ key: UnsafePointer<Void>) -> UnsafeMutablePointer<Void>?
 {
 	fatalError()
 }

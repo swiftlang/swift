@@ -467,22 +467,22 @@ public func == <Pointee>(
 @_fixed_layout
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
-  internal var _item0: UnsafeRawPointer?
-  internal var _item1: UnsafeRawPointer?
-  internal var _item2: UnsafeRawPointer?
-  internal var _item3: UnsafeRawPointer?
-  internal var _item4: UnsafeRawPointer?
-  internal var _item5: UnsafeRawPointer?
-  internal var _item6: UnsafeRawPointer?
-  internal var _item7: UnsafeRawPointer?
-  internal var _item8: UnsafeRawPointer?
-  internal var _item9: UnsafeRawPointer?
-  internal var _item10: UnsafeRawPointer?
-  internal var _item11: UnsafeRawPointer?
-  internal var _item12: UnsafeRawPointer?
-  internal var _item13: UnsafeRawPointer?
-  internal var _item14: UnsafeRawPointer?
-  internal var _item15: UnsafeRawPointer?
+  internal var _item0: UnsafePointer<Void>?
+  internal var _item1: UnsafePointer<Void>?
+  internal var _item2: UnsafePointer<Void>?
+  internal var _item3: UnsafePointer<Void>?
+  internal var _item4: UnsafePointer<Void>?
+  internal var _item5: UnsafePointer<Void>?
+  internal var _item6: UnsafePointer<Void>?
+  internal var _item7: UnsafePointer<Void>?
+  internal var _item8: UnsafePointer<Void>?
+  internal var _item9: UnsafePointer<Void>?
+  internal var _item10: UnsafePointer<Void>?
+  internal var _item11: UnsafePointer<Void>?
+  internal var _item12: UnsafePointer<Void>?
+  internal var _item13: UnsafePointer<Void>?
+  internal var _item14: UnsafePointer<Void>?
+  internal var _item15: UnsafePointer<Void>?
 
   @_transparent
   internal var count: Int {
@@ -508,7 +508,7 @@ internal struct _CocoaFastEnumerationStackBuf {
     _item15 = _item0
 
     _sanityCheck(sizeofValue(self) >=
-                   sizeof(Optional<UnsafeRawPointer>.self) * count)
+                   sizeof(Optional<UnsafePointer<Void>>.self) * count)
   }
 }
 

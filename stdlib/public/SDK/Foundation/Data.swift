@@ -13,13 +13,13 @@
 @_exported import Foundation // Clang module
 
 @_silgen_name("__NSDataInvokeDeallocatorVM")
-internal func __NSDataInvokeDeallocatorVM(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorVM(_ mem: UnsafeMutablePointer<Void>, _ length: Int) -> Void
 
 @_silgen_name("__NSDataInvokeDeallocatorUnmap")
-internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutablePointer<Void>, _ length: Int) -> Void
 
 @_silgen_name("__NSDataInvokeDeallocatorFree")
-internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutablePointer<Void>, _ length: Int) -> Void
 
 @_silgen_name("_NSWriteDataToFile_Swift")
 internal func _NSWriteDataToFile_Swift(url: URL, data: NSData, options: UInt, error: NSErrorPointer) -> Bool
@@ -104,7 +104,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         /// A custom deallocator.
         case custom((UnsafeMutablePointer<UInt8>, Int) -> Void)
         
-        fileprivate var _deallocator : ((UnsafeMutableRawPointer, Int) -> Void)? {
+        fileprivate var _deallocator : ((UnsafeMutablePointer<Void>, Int) -> Void)? {
             switch self {
             case .virtualMemory:
                 return { __NSDataInvokeDeallocatorVM($0, $1) }
@@ -116,9 +116,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 return nil
             case .custom(let b):
                 return { (ptr, len) in
-                    // Bind memory to UInt8 since that is what the public deallocation function expects.
-                    let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: len)
-                    b(bytePtr, len)
+                    b(UnsafeMutablePointer<UInt8>(ptr), len)
                 }
             }
         }
@@ -273,7 +271,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
 
 
-    private func _getUnsafeBytesPointer() -> UnsafeRawPointer {
+    private func _getUnsafeBytesPointer() -> UnsafePointer<Void> {
         return _mapUnmanaged { return $0.bytes }
     }
     
@@ -283,11 +281,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public func withUnsafeBytes<ResultType, ContentType>(_ body: @noescape (UnsafePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         let bytes =  _getUnsafeBytesPointer()
         defer { _fixLifetime(self)}
-        let contentPtr = bytes.bindMemory(to: ContentType.self, capacity: count / strideof(ContentType.self))
-        return try body(contentPtr)
+        return try body(UnsafePointer(bytes))
     }
     
-    private mutating func _getUnsafeMutableBytesPointer() -> UnsafeMutableRawPointer {
+    private mutating func _getUnsafeMutableBytesPointer() -> UnsafeMutablePointer<Void> {
         return _applyUnmanagedMutation {
             return $0.mutableBytes
         }
@@ -300,8 +297,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public mutating func withUnsafeMutableBytes<ResultType, ContentType>(_ body: @noescape (UnsafeMutablePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         let mutableBytes = _getUnsafeMutableBytesPointer()
         defer { _fixLifetime(self)}
-        let contentPtr = mutableBytes.bindMemory(to: ContentType.self, capacity: count / strideof(ContentType.self))
-        return try body(UnsafeMutablePointer(contentPtr))
+        return try body(UnsafeMutablePointer(mutableBytes))
     }
     
     // MARK: -
@@ -430,8 +426,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         _mapUnmanaged {
             $0.enumerateBytes { (ptr, range, stop) in
                 var stopv = false
-                let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: range.length)
-                block(buffer: UnsafeBufferPointer(start: bytePtr, count: range.length), byteIndex: range.length, stop: &stopv)
+                block(buffer: UnsafeBufferPointer(start: UnsafePointer<UInt8>(ptr), count: range.length), byteIndex: range.length, stop: &stopv)
                 if stopv {
                     stop.pointee = true
                 }
@@ -661,10 +656,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     @available(*, unavailable, message: "use withUnsafeBytes instead")
-    public var bytes: UnsafeRawPointer { fatalError() }
+    public var bytes: UnsafePointer<Void> { fatalError() }
     
     @available(*, unavailable, message: "use withUnsafeMutableBytes instead")
-    public var mutableBytes: UnsafeMutableRawPointer { fatalError() }
+    public var mutableBytes: UnsafeMutablePointer<Void> { fatalError() }
 
     /// Returns `true` if the two `Data` arguments are equal.
     public static func ==(d1 : Data, d2 : Data) -> Bool {
@@ -744,7 +739,7 @@ extension _SwiftNSData {
     }
     
     @objc(bytes)
-    var bytes : UnsafeRawPointer {
+    var bytes : UnsafePointer<Void> {
         return _mapUnmanaged { $0.bytes }
     }
     
@@ -754,12 +749,12 @@ extension _SwiftNSData {
     }
     
     @objc(getBytes:length:)
-    func getBytes(_ buffer: UnsafeMutableRawPointer, length: Int) {
+    func getBytes(_ buffer: UnsafeMutablePointer<Void>, length: Int) {
         return _mapUnmanaged { $0.getBytes(buffer, length: length) }
     }
     
     @objc(getBytes:range:)
-    func getBytes(_ buffer: UnsafeMutableRawPointer, range: NSRange) {
+    func getBytes(_ buffer: UnsafeMutablePointer<Void>, range: NSRange) {
         return _mapUnmanaged { $0.getBytes(buffer, range: range) }
     }
     
@@ -781,7 +776,7 @@ extension _SwiftNSData {
     }
     
     @objc(enumerateByteRangesUsingBlock:)
-    func enumerateByteRanges(using block: @noescape (UnsafeRawPointer, NSRange, UnsafeMutablePointer<ObjCBool>) -> Void) {
+    func enumerateByteRanges(using block: @noescape (UnsafePointer<Void>, NSRange, UnsafeMutablePointer<ObjCBool>) -> Void) {
         return _mapUnmanaged { $0.enumerateBytes(block) }
     }
     

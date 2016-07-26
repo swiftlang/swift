@@ -371,16 +371,23 @@ VarDecl *Module::getDSOHandle() {
   if (DSOHandle)
     return DSOHandle;
 
-  auto unsafeMutableRawPtr = getASTContext().getUnsafeMutableRawPointerDecl();
-  if (!unsafeMutableRawPtr)
+  auto unsafeMutablePtr = getASTContext().getUnsafeMutablePointerDecl();
+  if (!unsafeMutablePtr)
     return nullptr;
 
+  Type arg;
   auto &ctx = getASTContext();
+  if (auto voidDecl = ctx.getVoidDecl()) {
+    arg = voidDecl->getDeclaredInterfaceType();
+  } else {
+    arg = TupleType::getEmpty(ctx);
+  }
+  
+  Type type = BoundGenericType::get(unsafeMutablePtr, Type(), { arg });
   auto handleVar = new (ctx) VarDecl(/*IsStatic=*/false, /*IsLet=*/false,
                                      SourceLoc(),
                                      ctx.getIdentifier("__dso_handle"),
-                                     unsafeMutableRawPtr->getDeclaredType(),
-                                     Files[0]);
+                                     type, Files[0]);
   handleVar->setImplicit(true);
   handleVar->getAttrs().add(
     new (ctx) SILGenNameAttr("__dso_handle", /*Implicit=*/true));
