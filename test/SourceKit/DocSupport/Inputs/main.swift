@@ -148,7 +148,7 @@ struct S1 : Prot2 {
   func foo() {}
 }
 
-func genfoo<T : Prot2 where T.Element == Int>(_ x: T) {}
+func genfoo<T : Prot2>(_ x: T) where T.Element == Int {}
 
 protocol Prot3 {
   static func +(x: Self, y: Self)

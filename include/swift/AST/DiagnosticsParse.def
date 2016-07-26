@@ -1294,6 +1294,9 @@ ERROR(where_without_generic_params,none,
       "'where' clause cannot be attached to "
       "%select{a non-generic|a protocol|an associated type}0 "
       "declaration", (unsigned))
+WARNING(where_inside_brackets,none,
+        "'where' clause next to generic parameters is deprecated "
+        "and will be removed in the future version of Swift", ())
 
 //------------------------------------------------------------------------------
 // Conditional compilation parsing diagnostics

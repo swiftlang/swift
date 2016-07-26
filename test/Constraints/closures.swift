@@ -184,13 +184,13 @@ func someFunc(_ foo: ((String) -> String)?, bar: (String) -> String) {
 
 // SR-1069 - Error diagnostic refers to wrong argument
 class SR1069_W<T> {
-  func append<Key: AnyObject where Key: Hashable>(value: T, forKey key: Key) {}
+  func append<Key: AnyObject>(value: T, forKey key: Key) where Key: Hashable {}
 }
 class SR1069_C<T> { let w: SR1069_W<(AnyObject, T) -> ()> = SR1069_W() }
 struct S<T> {
   let cs: [SR1069_C<T>] = []
 
-  func subscribe<Object: AnyObject where Object: Hashable>(object: Object?, method: (Object, T) -> ()) {
+  func subscribe<Object: AnyObject>(object: Object?, method: (Object, T) -> ()) where Object: Hashable {
     let wrappedMethod = { (object: AnyObject, value: T) in }
     // expected-error @+1 {{value of optional type 'Object?' not unwrapped; did you mean to use '!' or '?'?}}
     cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }

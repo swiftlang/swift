@@ -120,7 +120,7 @@ func archetype<T: Zim>(_: T) {
   _ = T.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}} {{9-20=self}}
 }
 
-func assocType<T: Zim where T.Zang: Zim>(_: T) {
+func assocType<T: Zim>(_: T) where T.Zang: Zim {
   _ = T.Zang.self
   _ = T.Zang()
   // TODO _ = T.Zang.prop

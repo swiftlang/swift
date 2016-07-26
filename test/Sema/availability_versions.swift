@@ -937,7 +937,7 @@ class SomeGenericClass<T> { }
 class SubclassAvailableOn10_9OfSomeGenericClassOfProtocolAvailableOn10_51 : SomeGenericClass<ProtocolAvailableOn10_51> { // expected-error {{'ProtocolAvailableOn10_51' is only available on OS X 10.51 or newer}}
 }
 
-func GenericWhereClause<T where T: ProtocolAvailableOn10_51>(_ t: T) { // expected-error * {{'ProtocolAvailableOn10_51' is only available on OS X 10.51 or newer}}
+func GenericWhereClause<T>(_ t: T) where T: ProtocolAvailableOn10_51 { // expected-error * {{'ProtocolAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing global function}}
 }
 

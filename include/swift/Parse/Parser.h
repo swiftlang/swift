@@ -1241,6 +1241,8 @@ public:
   ParserResult<GenericParamList> parseGenericParameters();
   ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
   ParserResult<GenericParamList> maybeParseGenericParams();
+  void
+  diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
 
   enum class WhereClauseKind : unsigned {
     Declaration,

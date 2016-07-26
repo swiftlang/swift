@@ -201,7 +201,7 @@ var obj2 : AnyObject & P = Y()
 
 class Z2 : AnyObject { }
 class Z3<T : AnyObject> { }
-class Z4<T where T : AnyObject> { }
+class Z4<T> where T : AnyObject { }
 
 // Don't allow one to call instance methods on the Type via
 // dynamic method lookup.

@@ -208,9 +208,7 @@ func callMin(_ x: Int, y: Int, a: Float, b: Float) {
   min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
 }
 
-func rangeOfIsBefore<
-  R : IteratorProtocol where R.Element : IsBefore
->(_ range: R) { }
+func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {}
 
 func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.makeIterator())

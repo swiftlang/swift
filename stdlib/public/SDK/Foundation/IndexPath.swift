@@ -34,7 +34,8 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     }
     
     /// Initialize with a sequence of integers.
-    public init<ElementSequence : Sequence where ElementSequence.Iterator.Element == Element>(indexes: ElementSequence) {
+    public init<ElementSequence : Sequence>(indexes: ElementSequence)
+      where ElementSequence.Iterator.Element == Element {
         _indexes = indexes.map { $0 }
     }
     

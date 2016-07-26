@@ -412,9 +412,8 @@ extension LazyCollectionProtocol
 % end
 
 @available(*, unavailable, renamed: "FlattenIterator")
-public struct FlattenGenerator<
-  Base : IteratorProtocol where Base.Element : Sequence
-> {}
+public struct FlattenGenerator<Base : IteratorProtocol>
+  where Base.Element : Sequence {}
 
 extension FlattenSequence {
   @available(*, unavailable, renamed: "makeIterator()")

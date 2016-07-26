@@ -105,9 +105,8 @@ public func ⨁ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Set<T>
 }
 
 /// Assigns to `lhs` the set with elements in `lhs` or `rhs` but not in both.
-public func ⨁= <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: inout Set<T>, rhs: S) {
+public func ⨁= <T, S: Sequence>(lhs: inout Set<T>, rhs: S)
+  where S.Iterator.Element == T {
   lhs.formSymmetricDifference(rhs)
 }
 

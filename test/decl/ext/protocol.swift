@@ -78,12 +78,12 @@ protocol SelfP1 {
 protocol SelfP2 {
 }
 
-func acceptSelfP1<T, U : SelfP1 where U.AssocType == T>(_ t: T, _ u: U) -> T {
+func acceptSelfP1<T, U : SelfP1>(_ t: T, _ u: U) -> T where U.AssocType == T {
   return t
 }
 
 extension SelfP1 {
-  final func tryAcceptSelfP1<Z : SelfP1 where Z.AssocType == Self>(_ z: Z) -> Self {
+  final func tryAcceptSelfP1<Z : SelfP1>(_ z: Z)-> Self where Z.AssocType == Self  {
     return acceptSelfP1(self, z)
   }
 }
