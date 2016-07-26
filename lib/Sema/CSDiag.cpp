@@ -4560,8 +4560,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   
   
   CalleeCandidateInfo calleeInfo(Type(), result.ViableCandidates,
-                                 /*FIXME: Subscript trailing closures*/
-                                 /*hasTrailingClosure*/false, CS,
+                                 SE->hasTrailingClosure(), CS,
                                  /*selfAlreadyApplied*/false);
 
   // We're about to typecheck the index list, which needs to be processed with
