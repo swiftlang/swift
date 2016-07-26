@@ -801,6 +801,7 @@ void TypeChecker::finalizeGenericParamList(ArchetypeBuilder &builder,
     access = nominal->getFormalAccess();
   else
     access = Accessibility::Internal;
+  access = std::max(access, Accessibility::Internal);
 
   // Wire up the archetypes.
   for (auto GP : *genericParams) {

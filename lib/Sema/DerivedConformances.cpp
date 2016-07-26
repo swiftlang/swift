@@ -151,7 +151,8 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   } else
     interfaceType = type;
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->setAccessibility(typeDecl->getFormalAccess());
+  getterDecl->setAccessibility(std::max(typeDecl->getFormalAccess(),
+                                        Accessibility::Internal));
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -181,7 +182,7 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   propDecl->setImplicit();
   propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                          SourceLoc());
-  propDecl->setAccessibility(typeDecl->getFormalAccess());
+  propDecl->setAccessibility(getterDecl->getFormalAccess());
   propDecl->setInterfaceType(propertyInterfaceType);
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);

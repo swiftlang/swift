@@ -1354,10 +1354,22 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
   if (!D->hasAccessibility()) {
     DeclContext *DC = D->getDeclContext();
     switch (DC->getContextKind()) {
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::AbstractClosureExpr:
-    case DeclContextKind::Initializer:
     case DeclContextKind::TopLevelCodeDecl:
+      // Variables declared in a top-level 'guard' statement can be accessed in
+      // later top-level code.
+      D->setAccessibility(Accessibility::FilePrivate);
+      break;
+    case DeclContextKind::AbstractClosureExpr:
+      if (isa<ParamDecl>(D)) {
+        // Closure parameters may need to be accessible to the enclosing
+        // context, for single-expression closures.
+        D->setAccessibility(Accessibility::FilePrivate);
+      } else {
+        D->setAccessibility(Accessibility::Private);
+      }
+      break;
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::Initializer:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
       D->setAccessibility(Accessibility::Private);
@@ -1371,7 +1383,7 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
       validateAccessibility(generic);
       Accessibility access = Accessibility::Internal;
       if (isa<ProtocolDecl>(generic))
-        access = generic->getFormalAccess();
+        access = std::max(access, generic->getFormalAccess());
       D->setAccessibility(access);
       break;
     }
@@ -3522,9 +3534,7 @@ public:
     assocType->setIsBeingTypeChecked();
 
     TC.checkDeclAttributesEarly(assocType);
-    if (!assocType->hasAccessibility())
-      assocType->setAccessibility(assocType->getProtocol()->getFormalAccess());
-
+    TC.validateAccessibility(assocType);
     TC.checkInheritanceClause(assocType);
 
     // Check the default definition, if there is one.
@@ -5785,12 +5795,7 @@ public:
     
 
     TC.checkDeclAttributesEarly(EED);
-
-    EnumDecl *ED = EED->getParentEnum();
-
-    if (!EED->hasAccessibility())
-      EED->setAccessibility(ED->getFormalAccess());
-    
+    TC.validateAccessibility(EED);
     EED->setIsBeingTypeChecked();
 
     // Only attempt to validate the argument type or raw value if the element
@@ -5811,6 +5816,7 @@ public:
 
       // If we have a raw value, make sure there's a raw type as well.
       if (auto *rawValue = EED->getRawValueExpr()) {
+        EnumDecl *ED = EED->getParentEnum();
         if (!ED->hasRawType()) {
           TC.diagnose(rawValue->getLoc(),diag::enum_raw_value_without_raw_type);
           // Recover by setting the raw type as this element's type.
@@ -6522,7 +6528,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (!assocType->hasType())
           assocType->computeType();
       if (!typeParam->hasAccessibility())
-        typeParam->setAccessibility(nominal->getFormalAccess());
+        typeParam->setAccessibility(std::max(nominal->getFormalAccess(),
+                                             Accessibility::Internal));
       break;
     }
 
@@ -6543,7 +6550,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (!assocType->hasType())
           assocType->computeType();
       if (!typeParam->hasAccessibility())
-        typeParam->setAccessibility(fn->getFormalAccess());
+        typeParam->setAccessibility(std::max(fn->getFormalAccess(),
+                                             Accessibility::Internal));
       break;
     }
     }
@@ -6905,7 +6913,8 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
       auto assocType = cast<AssociatedTypeDecl>(D);
       auto prot = assocType->getProtocol();
       validateAccessibility(prot);
-      assocType->setAccessibility(prot->getFormalAccess());
+      assocType->setAccessibility(std::max(prot->getFormalAccess(),
+                                           Accessibility::Internal));
       break;
     }
 
@@ -6928,7 +6937,8 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
     } else {
       auto container = cast<NominalTypeDecl>(D->getDeclContext());
       validateAccessibility(container);
-      D->setAccessibility(container->getFormalAccess());
+      D->setAccessibility(std::max(container->getFormalAccess(),
+                                   Accessibility::Internal));
     }
     break;
   }

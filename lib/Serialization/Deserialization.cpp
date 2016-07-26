@@ -3036,7 +3036,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       elem->setInterfaceType(interfaceType);
     if (isImplicit)
       elem->setImplicit();
-    elem->setAccessibility(cast<EnumDecl>(DC)->getFormalAccess());
+    elem->setAccessibility(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
+                                    Accessibility::Internal));
 
     break;
   }
@@ -3203,7 +3204,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                            /*selfpat*/nullptr, DC);
     declOrOffset = dtor;
 
-    dtor->setAccessibility(cast<ClassDecl>(DC)->getFormalAccess());
+    dtor->setAccessibility(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
+                                    Accessibility::Internal));
     auto *selfParams = readParameterList();
     selfParams->get(0)->setImplicit();  // self is implicit.
 

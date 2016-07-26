@@ -9,7 +9,7 @@ import Swift
 import SwiftShims
 
 private class Base {
-	private init()
+	init()
 }
 
 private class Derived : Base {
