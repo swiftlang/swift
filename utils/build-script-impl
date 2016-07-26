@@ -226,6 +226,7 @@ KNOWN_SETTINGS=(
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
     llvm-targets-to-build              "X86;ARM;AArch64;PowerPC;SystemZ" "The code generators that LLVM should build"
+    build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
 )
 
 # Centralized access point for traced command invocation.
@@ -752,9 +753,9 @@ function set_build_options_for_host() {
     #
     # *NOTE* Currently we do not support testing LLVM via build-script. But in a
     # future commit we will.
-    for arg in "$(compute_cmake_llvm_tool_disable_flags)"; do
-        llvm_cmake_options+=( ${arg} )
-    done
+    #for arg in "$(compute_cmake_llvm_tool_disable_flags)"; do
+    #    llvm_cmake_options+=( ${arg} )
+    #done
 
     if [[ "${llvm_target_arch}" ]] ; then
         llvm_cmake_options+=(
@@ -1951,6 +1952,28 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     "${llvm_cmake_options[@]}"
                 )
+
+                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
+                    cmake_options+=(
+                    -DLLVM_BUILD_TOOLS=NO
+                    -DLLVM_INSTALL_TOOLCHAIN_ONLY=YES
+                    -DLLVM_INCLUDE_TESTS=NO
+                    -DCLANG_INCLUDE_TESTS=NO
+                    -DLLVM_INCLUDE_UTILS=NO
+                    -DLLVM_TOOL_LLI_BUILD=NO
+                    -DLLVM_TOOL_LLVM_AR_BUILD=NO
+                    -DCLANG_TOOL_CLANG_CHECK_BUILD=NO
+                    -DCLANG_TOOL_ARCMT_TEST_BUILD=NO
+                    -DCLANG_TOOL_C_ARCMT_TEST_BUILD=NO
+                    -DCLANG_TOOL_C_INDEX_TEST_BUILD=NO
+                    -DCLANG_TOOL_DRIVER_BUILD=NO
+                    -DCLANG_TOOL_DIAGTOOL_BUILD=NO
+                    -DCLANG_TOOL_SCAN_BUILD_BUILD=NO
+                    -DCLANG_TOOL_SCAN_VIEW_BUILD=NO
+                    -DCLANG_TOOL_CLANG_FORMAT_BUILD=NO
+                    )
+                fi
+
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -2057,6 +2080,23 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     "${swift_cmake_options[@]}"
                 )
+
+                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
+                    cmake_options+=(
+                    -DSWIFT_TOOL_SIL_OPT_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_IDE_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_REMOTEAST_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_LLDB_MODULEIMPORT_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SIL_EXTRACT_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_LLVM_OPT_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_SDK_ANALYZER_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_SDK_DIGESTER_BUILD=FALSE
+                    -DSWIFT_TOOL_SOURCEKITD_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SOURCEKITD_REPL_BUILD=FALSE
+                    -DSWIFT_TOOL_COMPLETE_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_REFLECTION_DUMP_BUILD=FALSE
+                    )
+                fi
 
                 cmake_options=(
                     "${cmake_options[@]}"
