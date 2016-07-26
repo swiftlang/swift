@@ -67,36 +67,6 @@ public func withUnsafeMutablePointer<T, Result>(
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&arg)))
 }
 
-/// Like `withUnsafeMutablePointer`, but passes pointers to `arg0` and `arg1`.
-public func withUnsafeMutablePointers<A0, A1, Result>(
-  _ arg0: inout A0,
-  _ arg1: inout A1,
-  _ body: @noescape (
-    UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) throws -> Result
-) rethrows -> Result {
-  return try body(
-    UnsafeMutablePointer<A0>(Builtin.addressof(&arg0)),
-    UnsafeMutablePointer<A1>(Builtin.addressof(&arg1)))
-}
-
-/// Like `withUnsafeMutablePointer`, but passes pointers to `arg0`, `arg1`,
-/// and `arg2`.
-public func withUnsafeMutablePointers<A0, A1, A2, Result>(
-  _ arg0: inout A0,
-  _ arg1: inout A1,
-  _ arg2: inout A2,
-  _ body: @noescape (
-    UnsafeMutablePointer<A0>,
-    UnsafeMutablePointer<A1>,
-    UnsafeMutablePointer<A2>
-  ) throws -> Result
-) rethrows -> Result {
-  return try body(
-    UnsafeMutablePointer<A0>(Builtin.addressof(&arg0)),
-    UnsafeMutablePointer<A1>(Builtin.addressof(&arg1)),
-    UnsafeMutablePointer<A2>(Builtin.addressof(&arg2)))
-}
-
 /// Invokes `body` with an `UnsafePointer` to `arg` and returns the
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer.
@@ -106,33 +76,4 @@ public func withUnsafePointer<T, Result>(
 ) rethrows -> Result
 {
   return try body(UnsafePointer<T>(Builtin.addressof(&arg)))
-}
-
-/// Like `withUnsafePointer`, but passes pointers to `arg0` and `arg1`.
-public func withUnsafePointers<A0, A1, Result>(
-  _ arg0: inout A0,
-  _ arg1: inout A1,
-  _ body: @noescape (UnsafePointer<A0>, UnsafePointer<A1>) throws -> Result
-) rethrows -> Result {
-  return try body(
-    UnsafePointer<A0>(Builtin.addressof(&arg0)),
-    UnsafePointer<A1>(Builtin.addressof(&arg1)))
-}
-
-/// Like `withUnsafePointer`, but passes pointers to `arg0`, `arg1`,
-/// and `arg2`.
-public func withUnsafePointers<A0, A1, A2, Result>(
-  _ arg0: inout A0,
-  _ arg1: inout A1,
-  _ arg2: inout A2,
-  _ body: @noescape (
-    UnsafePointer<A0>,
-    UnsafePointer<A1>,
-    UnsafePointer<A2>
-  ) throws -> Result
-) rethrows -> Result {
-  return try body(
-    UnsafePointer<A0>(Builtin.addressof(&arg0)),
-    UnsafePointer<A1>(Builtin.addressof(&arg1)),
-    UnsafePointer<A2>(Builtin.addressof(&arg2)))
 }
