@@ -226,17 +226,6 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   return (path.empty() ? anchor : nullptr);
 }
 
-bool constraints::hasTrailingClosure(const ConstraintLocatorBuilder &locator) {
-  if (Expr *e = locator.trySimplifyToExpr()) {
-    if (ParenExpr *parenExpr = dyn_cast<ParenExpr>(e)) {
-      return parenExpr->hasTrailingClosure();
-    } else if (TupleExpr *tupleExpr = dyn_cast<TupleExpr>(e)) {
-      return tupleExpr->hasTrailingClosure();
-    }
-  }
-  return false;
-}
-
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//

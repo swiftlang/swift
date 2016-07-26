@@ -4577,8 +4577,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
     --calleeInfo.candidates[i].level;
 
-  SmallVector<Identifier, 2> argLabelsScratch;
-  ArrayRef<Identifier> argLabels = SE->getArgumentLabels(argLabelsScratch);
+  ArrayRef<Identifier> argLabels = SE->getArgumentLabels();
   if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
     return true;
 

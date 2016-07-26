@@ -198,9 +198,46 @@ class alignas(8) Expr {
     unsigned : NumExprBits;
     unsigned Semantics : 2; // an AccessSemantics
     unsigned IsSuper : 1;
+    /// # of argument labels stored after the SubscriptExpr.
+    unsigned NumArgLabels : 16;
+    /// Whether the SubscriptExpr also has source locations for the argument
+    /// label.
+    unsigned HasArgLabelLocs : 1;
+    /// Whether the last argument is a trailing closure.
+    unsigned HasTrailingClosure : 1;
   };
-  enum { NumSubscriptExprBits = NumExprBits + 3 };
+  enum { NumSubscriptExprBits = NumExprBits + 21 };
   static_assert(NumSubscriptExprBits <= 32, "fits in an unsigned");
+
+  class DynamicSubscriptExprBitfields {
+    friend class DynamicSubscriptExpr;
+    unsigned : NumExprBits;
+    /// # of argument labels stored after the DynamicSubscriptExpr.
+    unsigned NumArgLabels : 16;
+    /// Whether the DynamicSubscriptExpr also has source locations for the
+    /// argument label.
+    unsigned HasArgLabelLocs : 1;
+    /// Whether the last argument is a trailing closure.
+    unsigned HasTrailingClosure : 1;
+  };
+  enum { NumDynamicSubscriptExprBits = NumExprBits + 18 };
+  static_assert(NumDynamicSubscriptExprBits <= 32, "fits in an unsigned");
+
+  class UnresolvedMemberExprBitfields {
+    friend class UnresolvedMemberExpr;
+    unsigned : NumExprBits;
+    /// Whether the UnresolvedMemberExpr has arguments.
+    unsigned HasArguments : 1;
+    /// # of argument labels stored after the UnresolvedMemberExpr.
+    unsigned NumArgLabels : 16;
+    /// Whether the UnresolvedMemberExpr also has source locations for the
+    /// argument label.
+    unsigned HasArgLabelLocs : 1;
+    /// Whether the last argument is a trailing closure.
+    unsigned HasTrailingClosure : 1;
+  };
+  enum { NumUnresolvedMemberExprBits = NumExprBits + 19 };
+  static_assert(NumUnresolvedMemberExprBits <= 32, "fits in an unsigned");
 
   class OverloadSetRefExprBitfields {
     friend class OverloadSetRefExpr;
@@ -235,6 +272,22 @@ class alignas(8) Expr {
   };
   enum { NumMagicIdentifierLiteralExprBits = NumLiteralExprBits + 4 };
   static_assert(NumMagicIdentifierLiteralExprBits <= 32, "fits in an unsigned");
+
+  class ObjectLiteralExprBitfields {
+    friend class ObjectLiteralExpr;
+    unsigned : NumLiteralExprBits;
+
+    unsigned LitKind : 3;
+    /// # of argument labels stored after the ObjectLiteralExpr.
+    unsigned NumArgLabels : 16;
+    /// Whether the ObjectLiteralExpr also has source locations for the argument
+    /// label.
+    unsigned HasArgLabelLocs : 1;
+    /// Whether the last argument is a trailing closure.
+    unsigned HasTrailingClosure : 1;
+  };
+  enum { NumObjectLiteralExprBits = NumLiteralExprBits + 21 };
+  static_assert(NumObjectLiteralExprBits <= 32, "fits in an unsigned");
 
   class AbstractClosureExprBitfields {
     friend class AbstractClosureExpr;
@@ -290,6 +343,19 @@ class alignas(8) Expr {
   enum { NumApplyExprBits = NumExprBits + 2 };
   static_assert(NumApplyExprBits <= 32, "fits in an unsigned");
 
+  class CallExprBitfields {
+    friend class CallExpr;
+    unsigned : NumApplyExprBits;
+    /// # of argument labels stored after the CallExpr.
+    unsigned NumArgLabels : 16;
+    /// Whether the CallExpr also has source locations for the argument label.
+    unsigned HasArgLabelLocs : 1;
+    /// Whether the last argument is a trailing closure.
+    unsigned HasTrailingClosure : 1;
+  };
+  enum { NumCallExprBits = NumApplyExprBits + 18 };
+  static_assert(NumCallExprBits <= 32, "fits in an unsigned");
+
   enum { NumCheckedCastKindBits = 4 };
   class CheckedCastExprBitfields {
     friend class CheckedCastExpr;
@@ -343,14 +409,18 @@ protected:
     TupleExprBitfields TupleExprBits;
     MemberRefExprBitfields MemberRefExprBits;
     SubscriptExprBitfields SubscriptExprBits;
+    DynamicSubscriptExprBitfields DynamicSubscriptExprBits;
+    UnresolvedMemberExprBitfields UnresolvedMemberExprBits;
     OverloadSetRefExprBitfields OverloadSetRefExprBits;
     OverloadedMemberRefExprBitfields OverloadedMemberRefExprBits;
     BooleanLiteralExprBitfields BooleanLiteralExprBits;
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
+    ObjectLiteralExprBitfields ObjectLiteralExprBits;
     AbstractClosureExprBitfields AbstractClosureExprBits;
     ClosureExprBitfields ClosureExprBits;
     BindOptionalExprBitfields BindOptionalExprBits;
     ApplyExprBitfields ApplyExprBits;
+    CallExprBitfields CallExprBits;
     CheckedCastExprBitfields CheckedCastExprBits;
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
     TupleShuffleExprBitfields TupleShuffleExprBits;
@@ -550,6 +620,81 @@ public:
   void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 
     return Mem; 
+  }
+};
+
+/// Helper class to capture trailing call argument labels and related
+/// information, for expression nodes that involve argument labels, trailing
+/// closures, etc.
+template<typename Derived>
+class TrailingCallArguments
+    : private llvm::TrailingObjects<Derived, Identifier, SourceLoc> {
+  using TrailingObjects = llvm::TrailingObjects<Derived, Identifier, SourceLoc>;
+  friend TrailingObjects;
+
+  Derived &asDerived() {
+    return *static_cast<Derived *>(this);
+  }
+
+  const Derived &asDerived() const {
+    return *static_cast<const Derived *>(this);
+  }
+
+  size_t numTrailingObjects(
+      typename TrailingObjects::template OverloadToken<Identifier>) const {
+    return asDerived().getNumArguments();
+  }
+
+  size_t numTrailingObjects(
+      typename TrailingObjects::template OverloadToken<SourceLoc>) const {
+    return asDerived().hasArgumentLabelLocs()
+             ? asDerived().getNumArguments()
+             : 0;
+  }
+
+  /// Retrieve the buffer containing the argument labels.
+  MutableArrayRef<Identifier> getArgumentLabelsBuffer() {
+    return { this->template getTrailingObjects<Identifier>(),
+             asDerived().getNumArguments() };
+  }
+
+  /// Retrieve the buffer containing the argument label locations.
+  MutableArrayRef<SourceLoc> getArgumentLabelLocsBuffer() {
+    if (!asDerived().hasArgumentLabelLocs())
+      return { };
+    
+    return { this->template getTrailingObjects<SourceLoc>(),
+             asDerived().getNumArguments() };
+  }
+
+protected:
+  /// Determine the total size to allocate.
+  static size_t totalSizeToAlloc(ArrayRef<Identifier> argLabels,
+                                 ArrayRef<SourceLoc> argLabelLocs,
+                                 bool hasTrailingClosure) {
+    return TrailingObjects::template totalSizeToAlloc<Identifier, SourceLoc>(
+        argLabels.size(), argLabelLocs.size());
+  }
+
+  /// Initialize the actual call arguments.
+  void initializeCallArguments(ArrayRef<Identifier> argLabels,
+                               ArrayRef<SourceLoc> argLabelLocs,
+                               bool hasTrailingClosure) {
+    if (!argLabels.empty()) {
+      std::uninitialized_copy(argLabels.begin(), argLabels.end(),
+                              this->template getTrailingObjects<Identifier>());
+    }
+    
+    if (!argLabelLocs.empty())
+      std::uninitialized_copy(argLabelLocs.begin(), argLabelLocs.end(),
+                              this->template getTrailingObjects<SourceLoc>());
+  }
+
+public:
+  /// Retrieve the argument labels provided at the call site.
+  ArrayRef<Identifier> getArgumentLabels() const {
+    return { this->template getTrailingObjects<Identifier>(),
+             asDerived().getNumArguments() };
   }
 };
 
@@ -876,7 +1021,9 @@ public:
 // '#colorLiteral(red: 1, blue: 0, green: 0, alpha: 1)' with a name and a list
 // argument. The components of the list argument are meant to be themselves
 // constant.
-class ObjectLiteralExpr : public LiteralExpr {
+class ObjectLiteralExpr final
+    : public LiteralExpr,
+      public TrailingCallArguments<ObjectLiteralExpr> {
 public:
   /// The kind of object literal.
   enum LiteralKind : unsigned {
@@ -885,28 +1032,54 @@ public:
   };
 
 private:
-  LiteralKind LitKind;
   Expr *Arg;
   Expr *SemanticExpr;
   SourceLoc PoundLoc;
 
-public:
   ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
-                    Expr *Arg, bool implicit = false)
-    : LiteralExpr(ExprKind::ObjectLiteral, implicit), 
-      LitKind(LitKind), Arg(Arg), SemanticExpr(nullptr),
-      PoundLoc(PoundLoc) {}
+                    Expr *Arg,
+                    ArrayRef<Identifier> argLabels,
+                    ArrayRef<SourceLoc> argLabelLocs,
+                    bool hasTrailingClosure,
+                    bool implicit);
 
-  LiteralKind getLiteralKind() const { return LitKind; }
+public:
+  /// Create a new object literal expression.
+  ///
+  /// Note: prefer to use the second entry point, which separates out
+  /// arguments/labels/etc.
+  static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
+                                   LiteralKind kind, Expr *arg, bool implicit);
+
+  /// Create a new object literal expression.
+  static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
+                                   LiteralKind kind,
+                                   SourceLoc lParenLoc,
+                                   ArrayRef<Expr *> args,
+                                   ArrayRef<Identifier> argLabels,
+                                   ArrayRef<SourceLoc> argLabelLocs,
+                                   SourceLoc rParenLoc,
+                                   Expr *trailingClosure,
+                                   bool implicit);
+
+  LiteralKind getLiteralKind() const {
+    return static_cast<LiteralKind>(ObjectLiteralExprBits.LitKind);
+  }
 
   Expr *getArg() const { return Arg; }
   void setArg(Expr *arg) { Arg = arg; }
 
-  /// Retrieve the argument labels for the argument.
-  ///
-  /// \param scratch Scratch space that will be used when the argument labels
-  /// aren't already stored in the AST context.
-  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+  unsigned getNumArguments() const {
+    return ObjectLiteralExprBits.NumArgLabels;
+  }
+  bool hasArgumentLabelLocs() const {
+    return ObjectLiteralExprBits.HasArgLabelLocs;
+  }
+
+  /// Whether this call with written with a trailing closure.
+  bool hasTrailingClosure() const {
+    return ObjectLiteralExprBits.HasTrailingClosure;
+  }
 
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
@@ -1393,16 +1566,39 @@ public:
 /// var x : AnyObject = <some value>
 /// print(x[27]! // x[27] has type String?
 /// \endcode
-class DynamicSubscriptExpr : public DynamicLookupExpr {
+class DynamicSubscriptExpr final
+    : public DynamicLookupExpr,
+      public TrailingCallArguments<DynamicSubscriptExpr> {
+  friend TrailingCallArguments;
+
   Expr *Base;
   Expr *Index;
   ConcreteDeclRef Member;
 
+  DynamicSubscriptExpr(Expr *base, Expr *index, ArrayRef<Identifier> argLabels,
+                       ArrayRef<SourceLoc> argLabelLocs,
+                       bool hasTrailingClosure, ConcreteDeclRef member,
+                       bool implicit);
+
 public:
-  DynamicSubscriptExpr(Expr *base, Expr *index, 
-                       ConcreteDeclRef member)
-    : DynamicLookupExpr(ExprKind::DynamicSubscript),
-      Base(base), Index(index), Member(member) { }
+  /// Create a dynamic subscript.
+  ///
+  /// Note: do not create new callers to this entry point; use the entry point
+  /// that takes separate index arguments.
+  static DynamicSubscriptExpr *create(ASTContext &ctx, Expr *base, Expr *index,
+                                      ConcreteDeclRef decl,
+                                      bool implicit);
+
+  /// Create a new dynamic subscript.
+  static DynamicSubscriptExpr *create(ASTContext &ctx, Expr *base,
+                                      SourceLoc lSquareLoc,
+                                      ArrayRef<Expr *> indexArgs,
+                                      ArrayRef<Identifier> indexArgLabels,
+                                      ArrayRef<SourceLoc> indexArgLabelLocs,
+                                      SourceLoc rSquareLoc,
+                                      Expr *trailingClosure,
+                                      ConcreteDeclRef decl,
+                                      bool implicit);
 
   /// Retrieve the base of the expression.
   Expr *getBase() const { return Base; }
@@ -1415,11 +1611,18 @@ public:
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
 
-  /// Retrieve the argument labels for the indices.
-  ///
-  /// \param scratch Scratch space that will be used when the argument labels
-  /// aren't already stored in the AST context.
-  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+  unsigned getNumArguments() const {
+    return DynamicSubscriptExprBits.NumArgLabels;
+  }
+
+  bool hasArgumentLabelLocs() const {
+    return DynamicSubscriptExprBits.HasArgLabelLocs;
+  }
+
+  /// Whether this call with written with a trailing closure.
+  bool hasTrailingClosure() const {
+    return DynamicSubscriptExprBits.HasTrailingClosure;
+  }
 
   /// Retrieve the member to which this access refers.
   ConcreteDeclRef getMember() const { return Member; }
@@ -1437,18 +1640,45 @@ public:
 /// UnresolvedMemberExpr - This represents '.foo', an unresolved reference to a
 /// member, which is to be resolved with context sensitive type information into
 /// bar.foo.  These always have unresolved type.
-class UnresolvedMemberExpr : public Expr {
+class UnresolvedMemberExpr final
+    : public Expr,
+      public TrailingCallArguments<UnresolvedMemberExpr>  {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclName Name;
   Expr *Argument;
 
-public:  
   UnresolvedMemberExpr(SourceLoc dotLoc, DeclNameLoc nameLoc,
-                       DeclName name, Expr *argument)
-    : Expr(ExprKind::UnresolvedMember, /*Implicit=*/false),
-      DotLoc(dotLoc), NameLoc(nameLoc), Name(name), Argument(argument) {
-  }
+                       DeclName name, Expr *argument,
+                       ArrayRef<Identifier> argLabels,
+                       ArrayRef<SourceLoc> argLabelLocs,
+                       bool hasTrailingClosure,
+                       bool implicit);
+
+public:
+  /// Create a new unresolved member expression.
+  ///
+  /// Note: do not add new callers for this entry point; use the entry points
+  /// that take separate arguments.
+  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
+                                      DeclNameLoc nameLoc, DeclName name,
+                                      Expr *arg, bool implicit);
+
+  /// Create a new unresolved member expression with no arguments.
+  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
+                                      DeclNameLoc nameLoc, DeclName name,
+                                      bool implicit);
+
+  /// Create a new unresolved member expression.
+  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
+                                      DeclNameLoc nameLoc, DeclName name,
+                                      SourceLoc lParenLoc,
+                                      ArrayRef<Expr *> args,
+                                      ArrayRef<Identifier> argLabels,
+                                      ArrayRef<SourceLoc> argLabelLocs,
+                                      SourceLoc rParenLoc,
+                                      Expr *trailingClosure,
+                                      bool implicit);
 
   DeclName getName() const { return Name; }
   DeclNameLoc getNameLoc() const { return NameLoc; }
@@ -1456,11 +1686,23 @@ public:
   Expr *getArgument() const { return Argument; }
   void setArgument(Expr *argument) { Argument = argument; }
 
-  /// Retrieve the argument labels for the argument, if provided.
-  ///
-  /// \param scratch Scratch space that will be used when the argument labels
-  /// aren't already stored in the AST context.
-  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+  /// Whether this reference has arguments.
+  bool hasArguments() const {
+    return UnresolvedMemberExprBits.HasArguments;
+  }
+
+  unsigned getNumArguments() const {
+    return UnresolvedMemberExprBits.NumArgLabels;
+  }
+
+  bool hasArgumentLabelLocs() const {
+    return UnresolvedMemberExprBits.HasArgLabelLocs;
+  }
+
+  /// Whether this call with written with a trailing closure.
+  bool hasTrailingClosure() const {
+    return UnresolvedMemberExprBits.HasTrailingClosure;
+  }
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
 
@@ -1877,22 +2119,42 @@ public:
 /// type-checked and well-formed subscript expression refers to a subscript
 /// declaration, which provides a getter and (optionally) a setter that will
 /// be used to perform reads/writes.
-class SubscriptExpr : public Expr {
+class SubscriptExpr final : public Expr,
+                            public TrailingCallArguments<SubscriptExpr> {
+  friend TrailingCallArguments;
+
   ConcreteDeclRef TheDecl;
   Expr *Base;
   Expr *Index;
+
+  SubscriptExpr(Expr *base, Expr *index, ArrayRef<Identifier> argLabels,
+                ArrayRef<SourceLoc> argLabelLocs, bool hasTrailingClosure,
+                ConcreteDeclRef decl, bool implicit, AccessSemantics semantics);
   
 public:
-  SubscriptExpr(Expr *base, Expr *index,
-                ConcreteDeclRef decl = ConcreteDeclRef(),
-                bool implicit = false,
-                AccessSemantics semantics = AccessSemantics::Ordinary)
-    : Expr(ExprKind::Subscript, implicit, Type()),
-      TheDecl(decl), Base(base), Index(index) {
-    SubscriptExprBits.Semantics = (unsigned) semantics;
-    SubscriptExprBits.IsSuper = false;
-  }
-  
+  /// Create a subscript.
+  ///
+  /// Note: do not create new callers to this entry point; use the entry point
+  /// that takes separate index arguments.
+  static SubscriptExpr *create(ASTContext &ctx, Expr *base, Expr *index,
+                               ConcreteDeclRef decl = ConcreteDeclRef(),
+                               bool implicit = false,
+                               AccessSemantics semantics
+                                 = AccessSemantics::Ordinary);
+
+  /// Create a new subscript.
+  static SubscriptExpr *create(ASTContext &ctx, Expr *base,
+                               SourceLoc lSquareLoc,
+                               ArrayRef<Expr *> indexArgs,
+                               ArrayRef<Identifier> indexArgLabels,
+                               ArrayRef<SourceLoc> indexArgLabelLocs,
+                               SourceLoc rSquareLoc,
+                               Expr *trailingClosure,
+                               ConcreteDeclRef decl = ConcreteDeclRef(),
+                               bool implicit = false,
+                               AccessSemantics semantics
+                                 = AccessSemantics::Ordinary);
+
   /// getBase - Retrieve the base of the subscript expression, i.e., the
   /// value being indexed.
   Expr *getBase() const { return Base; }
@@ -1903,11 +2165,18 @@ public:
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
 
-  /// Retrieve the argument labels for the indices.
-  ///
-  /// \param scratch Scratch space that will be used when the argument labels
-  /// aren't already stored in the AST context.
-  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+  unsigned getNumArguments() const {
+    return SubscriptExprBits.NumArgLabels;
+  }
+
+  bool hasArgumentLabelLocs() const {
+    return SubscriptExprBits.HasArgLabelLocs;
+  }
+
+  /// Whether this call with written with a trailing closure.
+  bool hasTrailingClosure() const {
+    return SubscriptExprBits.HasTrailingClosure;
+  }
 
   /// Determine whether this subscript reference should bypass the
   /// ordinary accessors.
@@ -3238,7 +3507,11 @@ public:
   ///
   /// \param scratch Scratch space that will be used when the argument labels
   /// aren't already stored in the AST context.
-  ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
+  ArrayRef<Identifier>
+  getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const;
+
+  /// Whether this application was written using a trailing closure.
+  bool hasTrailingClosure() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ApplyExpr &&
@@ -3249,9 +3522,15 @@ public:
 /// CallExpr - Application of an argument to a function, which occurs
 /// syntactically through juxtaposition with a TupleExpr whose
 /// leading '(' is unspaced.
-class CallExpr : public ApplyExpr {
-  CallExpr(Expr *fn, Expr *arg, bool Implicit, Type ty = Type())
-    : ApplyExpr(ExprKind::Call, fn, arg, Implicit, ty) {}
+class CallExpr final : public ApplyExpr,
+                       public TrailingCallArguments<CallExpr> {
+  friend TrailingCallArguments;
+
+  CallExpr(Expr *fn, Expr *arg, bool Implicit,
+           ArrayRef<Identifier> argLabels,
+           ArrayRef<SourceLoc> argLabelLocs,
+           bool hasTrailingClosure,
+           Type ty);
 
 public:
   /// Create a new call expression.
@@ -3306,6 +3585,14 @@ public:
     SourceLoc FnLoc = getFn()->getLoc(); 
     return FnLoc.isValid() ? FnLoc : getArg()->getLoc();
   }
+
+  unsigned getNumArguments() const { return CallExprBits.NumArgLabels; }
+  bool hasArgumentLabelLocs() const { return CallExprBits.HasArgLabelLocs; }
+
+  /// Whether this call with written with a trailing closure.
+  bool hasTrailingClosure() const { return CallExprBits.HasTrailingClosure; }
+
+  using TrailingCallArguments::getArgumentLabels;
 
   /// Retrieve the expression that direct represents the callee.
   ///

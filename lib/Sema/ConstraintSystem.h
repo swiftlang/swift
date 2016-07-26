@@ -2129,11 +2129,6 @@ static inline bool computeTupleShuffle(TupleType *fromTuple,
                              sources, variadicArgs);
 }
 
-
-/// \brief Return whether the function argument indicated by `locator` has a
-/// trailing closure.
-bool hasTrailingClosure(const ConstraintLocatorBuilder &locator);
-
 /// Describes the arguments to which a parameter binds.
 /// FIXME: This is an awful data structure. We want the equivalent of a
 /// TinyPtrVector for unsigned values.

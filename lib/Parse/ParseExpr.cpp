@@ -845,7 +845,8 @@ ParserResult<Expr> Parser::parseExprSuper() {
       return makeParserCodeCompletionResult<Expr>();
     if (idx.isNull())
       return nullptr;
-    return makeParserResult(new (Context) SubscriptExpr(superRef, idx.get()));
+    return makeParserResult(
+             SubscriptExpr::create(Context, superRef, idx.get()));
   }
 
   if (Tok.is(tok::code_complete)) {
@@ -1231,10 +1232,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     DeclNameLoc NameLoc;
 
     if (Tok.is(tok::code_complete)) {
-      auto Expr = new (Context) UnresolvedMemberExpr(
-                                  DotLoc,
-                                  DeclNameLoc(DotLoc.getAdvancedLoc(1)),
-                                  Context.getIdentifier("_"), nullptr);
+      auto Expr = UnresolvedMemberExpr::create(
+                    Context, DotLoc, DeclNameLoc(DotLoc.getAdvancedLoc(1)),
+                    Context.getIdentifier("_"), /*implicit=*/false);
       Result = makeParserResult(Expr);
       if (CodeCompletion) {
         std::vector<StringRef> Identifiers;
@@ -1279,8 +1279,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
     // Handle .foo by just making an AST node.
     Result = makeParserResult(
-               new (Context) UnresolvedMemberExpr(DotLoc, NameLoc, Name,
-                                                  Arg.getPtrOrNull()));
+               UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
+                                            Arg.getPtrOrNull(),
+                                            /*implicit=*/false));
     break;
   }
       
@@ -1529,7 +1530,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       if (Idx.isNull() || Result.isNull())
         return nullptr;
       Result = makeParserResult(
-          new (Context) SubscriptExpr(Result.get(), Idx.get()));
+                 SubscriptExpr::create(Context, Result.get(), Idx.get()));
       continue;
     }
 
@@ -1557,12 +1558,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       if (auto call = dyn_cast<CallExpr>(Result.get())) {
         // When a closure follows a call, it becomes the last argument of
         // that call.
+        // FIXME: Wasteful to allocate another CallExpr here. Delay the
+        // allocation.
         Expr *arg = addTrailingClosureToArgument(Context, call->getArg(),
                                                  closure.get());
-        call->setArg(arg);
-
-        if (closure.hasCodeCompletion())
-          Result.setHasCodeCompletion();
+        Result = makeParserResult(
+                   ParserStatus(closure),
+                   CallExpr::create(Context, call->getFn(), arg,
+                                    call->isImplicit()));
       } else {
         // Otherwise, the closure implicitly forms a call.
         Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
@@ -2643,8 +2646,8 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
   }
 
   return makeParserResult(
-    new (Context) ObjectLiteralExpr(PoundLoc, LitKind, Arg.get(),
-                                    /*implicit=*/false));
+    ObjectLiteralExpr::create(Context, PoundLoc, LitKind, Arg.get(),
+                              /*implicit=*/false));
 }
 
 /// \brief Parse an expression call suffix.

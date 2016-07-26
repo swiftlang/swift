@@ -2093,6 +2093,12 @@ public:
       OS << " super";
     if (E->isThrowsSet())
       OS << (E->throws() ? " throws" : " nothrow");
+    if (auto call = dyn_cast<CallExpr>(E)) {
+      OS << "  arg_labels=";
+      for (auto label : call->getArgumentLabels()) 
+        OS << (label.empty() ? "_" : label.str()) << ":";
+    }
+
     OS << '\n';
     printRec(E->getFn());
     OS << '\n';
