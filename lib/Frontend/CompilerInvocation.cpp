@@ -778,7 +778,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
-  Opts.EnableProtocolTypealiases |= Args.hasArg(OPT_enable_protocol_typealiases);
   Opts.EnableIdAsAny |= Args.hasArg(OPT_enable_id_as_any);
 
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
