@@ -22,6 +22,7 @@ import TestsUtils
 import DriverUtils
 import Ackermann
 import AngryPhonebook
+import AnyHashableWithAClass
 import Array2D
 import ArrayAppend
 import ArrayInClass
@@ -100,6 +101,7 @@ import XorLoop
 
 precommitTests = [
   "AngryPhonebook": run_AngryPhonebook,
+  "AnyHashableWithAClass": run_AnyHashableWithAClass,
   "Array2D": run_Array2D,
   "ArrayAppend": run_ArrayAppend,
   "ArrayAppendReserved": run_ArrayAppendReserved,
