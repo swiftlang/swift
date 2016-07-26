@@ -255,6 +255,20 @@ class TestCalendar : TestCalendarSuper {
             expectFalse(c.date(d, matchesComponents: DateComponents(month: 7, day: 31)))
         }
     }
+
+    func test_AnyHashableContainingCalendar() {
+        let values = [
+            Calendar(identifier: .gregorian),
+            Calendar(identifier: .japanese),
+            Calendar(identifier: .japanese)
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("Calendar", String(anyHashables[0].base.dynamicType))
+        expectEqual("Calendar", String(anyHashables[1].base.dynamicType))
+        expectEqual("Calendar", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -263,5 +277,6 @@ CalendarTests.test("test_copyOnWrite") { TestCalendar().test_copyOnWrite() }
 CalendarTests.test("test_bridgingAutoupdating") { TestCalendar().test_bridgingAutoupdating() }
 CalendarTests.test("test_equality") { TestCalendar().test_equality() }
 CalendarTests.test("test_properties") { TestCalendar().test_properties() }
+CalendarTests.test("test_AnyHashableContainingCalendar") { TestCalendar().test_AnyHashableContainingCalendar() }
 runAllTests()
 #endif

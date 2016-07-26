@@ -129,6 +129,24 @@ class TestDateInterval : TestDateIntervalSuper {
             expectFalse(testInterval.contains(earlierStart))
         }
     }
+
+    func test_AnyHashableContainingDateInterval() {
+        if #available(iOS 10.10, OSX 10.12, tvOS 10.0, watchOS 3.0, *) {
+            let start = dateWithString("2010-05-17 14:49:47 -0700")
+            let duration = 10000000.0
+            let values = [
+                DateInterval(start: start, duration: duration),
+                DateInterval(start: start, duration: duration / 2),
+                DateInterval(start: start, duration: duration / 2),
+            ]
+            let anyHashables = values.map(AnyHashable.init)
+            expectEqual("DateInterval", String(anyHashables[0].base.dynamicType))
+            expectEqual("DateInterval", String(anyHashables[1].base.dynamicType))
+            expectEqual("DateInterval", String(anyHashables[2].base.dynamicType))
+            expectNotEqual(anyHashables[0], anyHashables[1])
+            expectEqual(anyHashables[1], anyHashables[2])
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -137,5 +155,6 @@ DateIntervalTests.test("test_compareDateIntervals") { TestDateInterval().test_co
 DateIntervalTests.test("test_isEqualToDateInterval") { TestDateInterval().test_isEqualToDateInterval() }
 DateIntervalTests.test("test_checkIntersection") { TestDateInterval().test_checkIntersection() }
 DateIntervalTests.test("test_validIntersections") { TestDateInterval().test_validIntersections() }
+DateIntervalTests.test("test_AnyHashableContainingDateInterval") { TestDateInterval().test_AnyHashableContainingDateInterval() }
 runAllTests()
 #endif

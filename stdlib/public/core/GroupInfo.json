@@ -78,7 +78,9 @@
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
-        "HashedCollections.swift"]
+        "HashedCollections.swift",
+        "HashedCollectionsAnyHashableExtensions.swift"
+      ]
     }
   ],
   "C": [
@@ -123,6 +125,7 @@
     "ShadowProtocols.swift"
   ],
   "Misc": [
+    "AnyHashable.swift",
     "Interval.swift",
     "Hashing.swift",
     "ErrorType.swift",

@@ -370,6 +370,12 @@ extension URLComponents : _ObjectiveCBridgeable {
     }
 }
 
+extension NSURLComponents : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as URLComponents)
+    }
+}
+
 
 /// A single name-value pair, for use with `URLComponents`.
 @available(OSX 10.10, iOS 8.0, *)
@@ -452,5 +458,12 @@ extension URLQueryItem : _ObjectiveCBridgeable {
         var result: URLQueryItem? = nil
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
+    }
+}
+
+@available(OSX 10.10, iOS 8.0, *)
+extension NSURLQueryItem : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as URLQueryItem)
     }
 }

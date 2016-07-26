@@ -135,3 +135,11 @@ extension PersonNameComponents : _ObjectiveCBridgeable {
         return result!
     }
 }
+
+@available(OSX 10.11, iOS 9.0, *)
+extension NSPersonNameComponents : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as PersonNameComponents)
+    }
+}
+

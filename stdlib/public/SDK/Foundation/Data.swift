@@ -723,6 +723,12 @@ extension Data : _ObjectiveCBridgeable {
     }
 }
 
+extension NSData : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as Data)
+    }
+}
+
 /// A NSData subclass that uses Swift reference counting.
 ///
 /// This subclass implements the API of NSData by holding an instance and forwarding all implementation to that object.

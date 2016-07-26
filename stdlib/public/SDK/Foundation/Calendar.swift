@@ -1128,3 +1128,9 @@ extension Calendar : _ObjectiveCBridgeable {
     }
 }
 
+extension NSCalendar : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as Calendar)
+    }
+}
+

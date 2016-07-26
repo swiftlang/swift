@@ -237,3 +237,10 @@ extension IndexPath : _ObjectiveCBridgeable {
         return IndexPath(nsIndexPath: source!)
     }    
 }
+
+extension NSIndexPath : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as IndexPath)
+    }
+}
+

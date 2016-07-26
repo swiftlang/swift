@@ -151,3 +151,10 @@ extension Notification : _ObjectiveCBridgeable {
         return result!
     }
 }
+
+extension NSNotification : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as Notification)
+    }
+}
+

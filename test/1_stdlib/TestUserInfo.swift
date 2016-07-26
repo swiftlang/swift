@@ -116,6 +116,20 @@ class TestUserInfo : TestUserInfoSuper {
         let xml = NSString(data: plistAsData, encoding: String.Encoding.utf8.rawValue)!
         expectEqual(xml.range(of: "_NSUserInfoDictionary").location, NSNotFound)
     }
+
+    func test_AnyHashableContainingNotification() {
+        let values = [
+            Notification(name: Notification.Name(rawValue: "TestSwiftNotification")),
+            Notification(name: Notification.Name(rawValue: "TestOtherSwiftNotification")),
+            Notification(name: Notification.Name(rawValue: "TestOtherSwiftNotification")),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("Notification", String(anyHashables[0].base.dynamicType))
+        expectEqual("Notification", String(anyHashables[1].base.dynamicType))
+        expectEqual("Notification", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -123,5 +137,6 @@ var UserInfoTests = TestSuite("UserInfo")
 UserInfoTests.test("test_userInfoPost") { TestUserInfo().test_userInfoPost() }
 UserInfoTests.test("test_equality") { TestUserInfo().test_equality() }
 UserInfoTests.test("test_classForCoder") { TestUserInfo().test_classForCoder() }
+UserInfoTests.test("test_AnyHashableContainingNotification") { TestUserInfo().test_AnyHashableContainingNotification() }
 runAllTests()
 #endif

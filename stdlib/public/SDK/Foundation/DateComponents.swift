@@ -345,3 +345,9 @@ extension DateComponents : _ObjectiveCBridgeable {
     }
 }
 
+extension NSDateComponents : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as DateComponents)
+    }
+}
+

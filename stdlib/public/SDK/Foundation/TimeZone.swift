@@ -276,3 +276,9 @@ extension TimeZone : _ObjectiveCBridgeable {
     }
 }
 
+extension NSTimeZone : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as TimeZone)
+    }
+}
+

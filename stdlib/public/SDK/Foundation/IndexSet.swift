@@ -884,6 +884,12 @@ extension IndexSet : _ObjectiveCBridgeable {
     
 }
 
+extension NSIndexSet : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as IndexSet)
+    }
+}
+
 @_silgen_name("__NSIndexSetRangeCount")
 internal func __NSIndexSetRangeCount(_ indexSet: NSIndexSet) -> UInt
 

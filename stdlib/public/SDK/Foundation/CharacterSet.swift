@@ -463,6 +463,12 @@ extension CharacterSet : _ObjectiveCBridgeable {
     
 }
 
+extension NSCharacterSet : _HasCustomAnyHashableRepresentation {
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as CharacterSet)
+    }
+}
+
 extension _SwiftNSCharacterSet {
     
     // Stubs

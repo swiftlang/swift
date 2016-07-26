@@ -27,6 +27,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   NotificationThunks.m
   NSStringEncodings.swift
   PersonNameComponents.swift
+  TypePreservingNSNumber.mm
   URL.swift
   URLComponents.swift
   URLRequest.swift

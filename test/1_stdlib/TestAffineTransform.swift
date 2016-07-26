@@ -329,6 +329,20 @@ class TestAffineTransform : TestAffineTransformSuper {
             expectEqual(ref.hashValue, val.hashValue)
         }
     }
+
+    func test_AnyHashableContainingAffineTransform() {
+        let values = [
+            AffineTransform.identity,
+            AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33),
+            AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33)
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("AffineTransform", String(anyHashables[0].base.dynamicType))
+        expectEqual("AffineTransform", String(anyHashables[1].base.dynamicType))
+        expectEqual("AffineTransform", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -349,6 +363,7 @@ AffineTransformTests.test("test_PrependTransform") { TestAffineTransform().test_
 AffineTransformTests.test("test_TransformComposition") { TestAffineTransform().test_TransformComposition() }
 AffineTransformTests.test("test_hashing_identity") { TestAffineTransform().test_hashing_identity() }
 AffineTransformTests.test("test_hashing_values") { TestAffineTransform().test_hashing_values() }
+AffineTransformTests.test("test_AnyHashableContainingAffineTransform") { TestAffineTransform().test_AnyHashableContainingAffineTransform() }
 runAllTests()
 #endif
     

@@ -71,6 +71,13 @@ extension NSString : ExpressibleByStringLiteral {
   }
 }
 
+extension NSString : _HasCustomAnyHashableRepresentation {
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    // Consistently use Swift equality and hashing semantics for all strings.
+    return AnyHashable(self as String)
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // New Strings
 //===----------------------------------------------------------------------===//
@@ -123,6 +130,82 @@ extension String : _ObjectiveCBridgeable {
 // Numbers
 //===----------------------------------------------------------------------===//
 
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithInt")
+internal func _swift_Foundation_TypePreservingNSNumberWithInt(
+  _ value: Int
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithUInt")
+internal func _swift_Foundation_TypePreservingNSNumberWithUInt(
+  _ value: UInt
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithFloat")
+internal func _swift_Foundation_TypePreservingNSNumberWithFloat(
+  _ value: Float
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithDouble")
+internal func _swift_Foundation_TypePreservingNSNumberWithDouble(
+  _ value: Double
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithCGFloat")
+internal func _swift_Foundation_TypePreservingNSNumberWithCGFloat(
+  _ value: CGFloat
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithBool")
+internal func _swift_Foundation_TypePreservingNSNumberWithBool(
+  _ value: Bool
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetKind")
+internal func _swift_Foundation_TypePreservingNSNumberGetKind(
+  _ value: NSNumber
+) -> UInt32
+
+// This enum has a matching counterpart in TypePreservingNSNumber.mm, please
+// update both copies when changing it.
+internal enum _SwiftTypePreservingNSNumberTag : Int {
+  case SwiftInt = 1
+  case SwiftUInt = 2
+  case SwiftFloat = 3
+  case SwiftDouble = 4
+  case CoreGraphicsCGFloat = 5
+  case SwiftBool = 6
+}
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsInt")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsInt(
+  _ value: NSNumber
+) -> Int
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsUInt")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsUInt(
+  _ value: NSNumber
+) -> UInt
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsFloat")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsFloat(
+  _ value: NSNumber
+) -> Float
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsDouble")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsDouble(
+  _ value: NSNumber
+) -> Double
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsCGFloat")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsCGFloat(
+  _ value: NSNumber
+) -> CGFloat
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsBool")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsBool(
+  _ value: NSNumber
+) -> Bool
+
 // Conversions between NSNumber and various numeric types. The
 // conversion to NSNumber is automatic (auto-boxing), while conversion
 // back to a specific numeric type requires a cast.
@@ -134,7 +217,7 @@ extension Int : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(value: self)
+    return _swift_Foundation_TypePreservingNSNumberWithInt(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -166,7 +249,7 @@ extension UInt : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(value: self)
+    return _swift_Foundation_TypePreservingNSNumberWithUInt(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -198,7 +281,7 @@ extension Float : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(value: self)
+    return _swift_Foundation_TypePreservingNSNumberWithFloat(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -230,7 +313,7 @@ extension Double : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(value: self)
+    return _swift_Foundation_TypePreservingNSNumberWithDouble(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -262,7 +345,7 @@ extension Bool: _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(value: self)
+    return _swift_Foundation_TypePreservingNSNumberWithBool(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -295,7 +378,7 @@ extension CGFloat : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return self.native._bridgeToObjectiveC()
+    return _swift_Foundation_TypePreservingNSNumberWithCGFloat(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -324,8 +407,11 @@ extension CGFloat : _ObjectiveCBridgeable {
 }
 
 // Literal support for NSNumber
-extension NSNumber : ExpressibleByFloatLiteral, ExpressibleByIntegerLiteral,
-                     ExpressibleByBooleanLiteral {
+extension NSNumber
+  : ExpressibleByFloatLiteral,
+    ExpressibleByIntegerLiteral,
+    ExpressibleByBooleanLiteral
+{
   /// Create an instance initialized to `value`.
   public required convenience init(integerLiteral value: Int) {
     self.init(value: value)
@@ -339,6 +425,30 @@ extension NSNumber : ExpressibleByFloatLiteral, ExpressibleByIntegerLiteral,
   /// Create an instance initialized to `value`.
   public required convenience init(booleanLiteral value: Bool) {
     self.init(value: value)
+  }
+}
+
+extension NSNumber : _HasCustomAnyHashableRepresentation {
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    guard let kind = _SwiftTypePreservingNSNumberTag(
+      rawValue: Int(_swift_Foundation_TypePreservingNSNumberGetKind(self))
+    ) else {
+      return nil
+    }
+    switch kind {
+    case .SwiftInt:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsInt(self))
+    case .SwiftUInt:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsUInt(self))
+    case .SwiftFloat:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsFloat(self))
+    case .SwiftDouble:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsDouble(self))
+    case .CoreGraphicsCGFloat:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsCGFloat(self))
+    case .SwiftBool:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsBool(self))
+    }
   }
 }
 
@@ -814,6 +924,22 @@ extension Set : _ObjectiveCBridgeable {
     return builder.take()
   }
 }
+
+/*
+FIXME(id-as-any): uncomment this when we can cast NSSet to Set<AnyHashable>.
+extension NSSet : _HasCustomAnyHashableRepresentation {
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    var builder = _SetBuilder<Element>(count: s!.count)
+    // FIXME(id-as-any): how to get the Hashable conformance here?
+    s!.enumerateObjects({
+      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
+      builder.add(member: Swift._forceBridgeFromObjectiveC(
+        anyMember as AnyObject, Element.self))
+    })
+    return AnyHashable(self as Set<AnyHashable>)
+  }
+}
+*/
 
 extension NSDictionary : Sequence {
   // FIXME: A class because we can't pass a struct with class fields through an
