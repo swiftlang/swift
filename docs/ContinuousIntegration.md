@@ -14,8 +14,15 @@
 
 FIXME: FILL ME IN!
 
-## @swiftci Pull Request Testing
+## Pull Request Testing
 
+In order for the Swift project to be able to advance quickly, it is important that we maintain a green build [[1]](#footnote-1). 
+
+Because of these implications, an important general rule is that *all* non-trivial checkins to any Swift Project repository should at least perform a smoke test if simulators will not be impacted *or* a full validation test if simulators may be impacted. If in addition one is attempting to make a source breaking change across multiple repositories one should follow the cross repo source breaking changes workflow below.
+
+### @swift-ci
+
+We perform 
 The swift-ci is triggered by writing a comment on this PR addressed to the
 GitHub user @swift-ci. Different tests will run depending on the specific
 comment that you use. The current test types are:
@@ -27,7 +34,6 @@ comment that you use. The current test types are:
 We describe each in detail below:
 
 ### Smoke Testing
-
 
         Platform     | Comment
         ------------ | -------------
@@ -74,3 +80,8 @@ A smoke test on Linux does the following:
 
 FIXME: FILL ME IN!
 
+<a name="footnote-1">[1]</a> Even though it should be without saying, the reason why having a green build is important is that:
+
+1. A full build break can prevent other developers from testing their work.
+2. A test break can make it difficult for developers to know whether or not their specific commit has broken a test, requiring them to perform an initial clean build, wasting time.
+3. @swift-ci pull request testing becomes less effective since one can not perform a test and merge and one must reason about the source of a given failure.
