@@ -412,9 +412,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       SourceLoc StartLoc = Tok.getLoc();
       auto CD = cast<ConstructorDecl>(CurDeclContext);
       // Hint at missing 'self.' or 'super.' then skip this statement.
-      bool isConvenient = CD->isConvenienceInit();
-      diagnose(StartLoc, diag::invalid_nested_init, isConvenient)
-        .fixItInsert(StartLoc, isConvenient ? "self." : "super.");
+      bool isSelf = !CD->isDesignatedInit() || !isa<ClassDecl>(CD->getParent());
+      diagnose(StartLoc, diag::invalid_nested_init, isSelf)
+        .fixItInsert(StartLoc, isSelf ? "self." : "super.");
       NeedParseErrorRecovery = true;
     } else {
       ParserStatus ExprOrStmtStatus = parseExprOrStmt(Result);

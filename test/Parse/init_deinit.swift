@@ -103,11 +103,21 @@ func barFunc() {
 // SR-852
 class Aaron {
   init(x: Int) {}
-  convenience init() { init(x: 1) } // expected-error {{missing 'self.' at initializer invocation}}
+  convenience init() { init(x: 1) } // expected-error {{missing 'self.' at initializer invocation}} {{24-24=self.}}
 }
 
 class Theodosia: Aaron {
   init() {
-    init(x: 2) // expected-error {{missing 'super.' at initializer invocation}}
+    init(x: 2) // expected-error {{missing 'super.' at initializer invocation}} {{5-5=super.}}
   }
+}
+
+struct AaronStruct {
+  init(x: Int) {}
+  init() { init(x: 1) } // expected-error {{missing 'self.' at initializer invocation}} {{12-12=self.}}
+}
+
+enum AaronEnum: Int {
+  case A = 1
+  init(x: Int) { init(rawValue: x)! } // expected-error {{missing 'self.' at initializer invocation}} {{18-18=self.}}
 }
