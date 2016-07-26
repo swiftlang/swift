@@ -1523,7 +1523,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       Result = makeParserResult(
                  ParserStatus(closure),
                  CallExpr::create(Context, Result.get(), SourceLoc(),
-                                  { }, { Identifier() }, { }, SourceLoc(),
+                                  { }, { }, { }, SourceLoc(),
                                   closure.get(), /*implicit=*/false));
 
       if (Result.hasCodeCompletion())

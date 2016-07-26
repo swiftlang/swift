@@ -1126,6 +1126,12 @@ static Expr *packSingleArgument(
       return arg;
     }
 
+    // Make sure we have argument labels.
+    if (argLabels.empty()) {
+      argLabelsScratch.assign(args.size(), Identifier());
+      argLabels = argLabelsScratch;
+    }
+
     // Construct the argument tuple.
     if (argLabels.empty() && !args.empty()) {
       argLabelsScratch.assign(args.size(), Identifier());
@@ -1578,31 +1584,6 @@ UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
                                                    SourceLoc dotLoc,
                                                    DeclNameLoc nameLoc,
                                                    DeclName name,
-                                                   Expr *arg, bool implicit) {
-  // Inspect the argument to dig out the argument labels, their location, and
-  // whether there is a trailing closure.
-  SmallVector<Identifier, 4> argLabelsScratch;
-  SmallVector<SourceLoc, 4> argLabelLocs;
-  bool hasTrailingClosure = false;
-  ArrayRef<Identifier> argLabels;
-  if (arg) {
-    argLabels = getArgumentLabelsFromArgument(arg, argLabelsScratch,
-                                              &argLabelLocs,
-                                              &hasTrailingClosure);
-  }
-
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs, hasTrailingClosure);
-
-  void *memory = ctx.Allocate(size, alignof(UnresolvedMemberExpr));
-  return new (memory) UnresolvedMemberExpr(dotLoc, nameLoc, name, arg,
-                                           argLabels, argLabelLocs,
-                                           hasTrailingClosure, implicit);
-}
-
-UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
-                                                   SourceLoc dotLoc,
-                                                   DeclNameLoc nameLoc,
-                                                   DeclName name,
                                                    bool implicit) {
   size_t size = totalSizeToAlloc({ }, { }, /*hasTrailingClosure=*/false);
 
@@ -1686,15 +1667,20 @@ CallExpr::CallExpr(Expr *fn, Expr *arg, bool Implicit,
 }
 
 CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, Expr *arg,
+                           ArrayRef<Identifier> argLabels,
+                           ArrayRef<SourceLoc> argLabelLocs,
+                           bool hasTrailingClosure,
                            bool implicit, Type type) {
-  // Inspect the argument to dig out the argument labels, their location, and
-  // whether there is a trailing closure.
   SmallVector<Identifier, 4> argLabelsScratch;
-  SmallVector<SourceLoc, 4> argLabelLocs;
-  bool hasTrailingClosure = false;
-  auto argLabels = getArgumentLabelsFromArgument(arg, argLabelsScratch,
-                                                 &argLabelLocs,
-                                                 &hasTrailingClosure);
+  SmallVector<SourceLoc, 4> argLabelLocsScratch;
+  if (argLabels.empty()) {
+    // Inspect the argument to dig out the argument labels, their location, and
+    // whether there is a trailing closure.
+    argLabels = getArgumentLabelsFromArgument(arg, argLabelsScratch,
+                                              &argLabelLocsScratch,
+                                              &hasTrailingClosure);
+    argLabelLocs = argLabelLocsScratch;
+  }
 
   size_t size = totalSizeToAlloc(argLabels, argLabelLocs, hasTrailingClosure);
 

@@ -2189,7 +2189,10 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     return ctor;
   }
 
-  Expr *superCall = CallExpr::create(ctx, ctorRef, ctorArgs, /*Implicit=*/true);
+  Expr *superCall =
+    CallExpr::create(ctx, ctorRef, ctorArgs,
+                     superclassCtor->getFullName().getArgumentNames(), { },
+                     /*hasTrailingClosure=*/false, /*implicit=*/true);
   if (superclassCtor->hasThrows()) {
     superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
                                   /*Implicit=*/true);

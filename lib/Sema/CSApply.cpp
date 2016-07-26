@@ -2369,6 +2369,9 @@ namespace {
       // If there was an argument, apply it.
       if (auto arg = expr->getArgument()) {
         ApplyExpr *apply = CallExpr::create(tc.Context, result, arg,
+                                            expr->getArgumentLabels(),
+                                            expr->getArgumentLabelLocs(),
+                                            expr->hasTrailingClosure(),
                                             /*implicit=*/false);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
@@ -6666,15 +6669,14 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // FIXME: Standardize all callers to always provide all argument names,
   // rather than hack around this.
   CallExpr *call;
+  auto argLabels = witness->getFullName().getArgumentNames();
   if (arguments.size() == 1 &&
       (isVariadicWitness(witness) ||
-       argumentNamesMatch(arguments[0], 
-                          witness->getFullName().getArgumentNames()))) {
-    call = CallExpr::create(Context, unresolvedDot, arguments[0],
+       argumentNamesMatch(arguments[0], argLabels))) {
+    call = CallExpr::create(Context, unresolvedDot, arguments[0], { },
+                            { }, /*hasTrailingClosure=*/false,
                             /*implicit=*/true);
   } else {
-    auto names = witness->getFullName().getArgumentNames();
-
     // The tuple should have the source range enclosing its arguments unless
     // they are invalid or there are no arguments.
     SourceLoc TupleStartLoc = base->getStartLoc();
@@ -6690,7 +6692,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
     call = CallExpr::create(Context, unresolvedDot,
                             TupleStartLoc,
-                            arguments, names, { },
+                            arguments, argLabels, { },
                             TupleEndLoc,
                             /*trailingClosure=*/nullptr,
                             /*implicit=*/true);

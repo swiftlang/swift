@@ -1191,7 +1191,7 @@ public:
                              SourceLoc &rightLoc,
                              Expr *&trailingClosure);
 
-  ParserResult<Expr> parseTrailingClosure(SourceRange callee);
+  ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
 
   // NOTE: used only for legacy support for old object literal syntax.
   // Will be removed in the future.

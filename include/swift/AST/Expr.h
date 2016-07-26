@@ -696,6 +696,21 @@ public:
     return { this->template getTrailingObjects<Identifier>(),
              asDerived().getNumArguments() };
   }
+
+  /// Retrieve the buffer containing the argument label locations.
+  ArrayRef<SourceLoc> getArgumentLabelLocs() const {
+    if (!asDerived().hasArgumentLabelLocs())
+      return { };
+    
+    return { this->template getTrailingObjects<SourceLoc>(),
+             asDerived().getNumArguments() };
+  }
+
+  /// Retrieve the location of the ith argument label.
+  SourceLoc getArgumentLabelLoc(unsigned i) const {
+    auto locs = getArgumentLabelLocs();
+    return i < locs.size() ? locs[i] : SourceLoc();
+  }
 };
 
 /// ErrorExpr - Represents a semantically erroneous subexpression in the AST,
@@ -1656,14 +1671,6 @@ class UnresolvedMemberExpr final
                        bool implicit);
 
 public:
-  /// Create a new unresolved member expression.
-  ///
-  /// Note: do not add new callers for this entry point; use the entry points
-  /// that take separate arguments.
-  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
-                                      DeclNameLoc nameLoc, DeclName name,
-                                      Expr *arg, bool implicit);
-
   /// Create a new unresolved member expression with no arguments.
   static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
                                       DeclNameLoc nameLoc, DeclName name,
@@ -3535,9 +3542,11 @@ class CallExpr final : public ApplyExpr,
 public:
   /// Create a new call expression.
   ///
-  /// Note: prefer to use the second entry point, which separates out
-  /// arguments/labels/etc.
+  /// Note: prefer to use the entry points that separate out the arguments.
   static CallExpr *create(ASTContext &ctx, Expr *fn, Expr *arg,
+                          ArrayRef<Identifier> argLabels,
+                          ArrayRef<SourceLoc> argLabelLocs,
+                          bool hasTrailingClosure,
                           bool implicit, Type type = Type());
 
   /// Create a new implicit call expression without any source-location
