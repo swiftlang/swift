@@ -454,6 +454,8 @@ public:
     EnumElementDecl *referencedElement
       = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseName(),
                                 ude->getLoc());
+    if (!referencedElement)
+      return nullptr;
     
     // Build a TypeRepr from the head of the full path.
     // FIXME: Compound names.

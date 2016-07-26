@@ -279,3 +279,30 @@ func f0(values: [Whatever]) { // expected-note {{did you mean 'values'?}}
         break
     }
 }
+
+// sr-720
+enum Whichever {
+  case Thing
+  static let title = "title"
+  static let alias: Whichever = .Thing
+}
+func f1(x: String, y: Whichever) {
+  switch x {
+    case Whichever.title: // Ok. Don't emit diagnostics for static member of enum.
+        break
+    case Whichever.buzz: // expected-error {{type 'Whichever' has no member 'buzz'}}
+        break
+    case Whichever.alias: // expected-error {{expression pattern of type 'Whichever' cannot match values of type 'String'}}
+        break
+    default:
+      break
+  }
+  switch y {
+    case Whichever.Thing: // Ok.
+        break
+    case Whichever.alias: // Ok. Don't emit diagnostics for static member of enum.
+        break
+    case Whichever.title: // expected-error {{expression pattern of type 'String' cannot match values of type 'Whichever'}}
+        break
+  }
+}
