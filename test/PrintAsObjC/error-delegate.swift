@@ -20,8 +20,10 @@ import Foundation
 
 // CHECK-LABEL: @interface Test : NSObject <ABCErrorProtocol>
 // CHECK-NEXT: - (void)didFail:(NSError * _Nonnull)error;
+// CHECK-NEXT: - (void)didFailOptional:(NSError * _Nullable)error;
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 class Test : NSObject, ABCErrorProtocol {
     func didFail(_ error: Swift.Error) {}
+    func didFailOptional(_ error: Swift.Error?) {}
 }

@@ -4,5 +4,6 @@
 @protocol ABCErrorProtocol <NSObject>
 
 - (void)didFail:(NSError * _Nonnull)error;
+- (void)didFailOptional:(NSError * _Nullable)error;
 
 @end
