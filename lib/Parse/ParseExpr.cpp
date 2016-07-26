@@ -1232,10 +1232,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     DeclNameLoc NameLoc;
 
     if (Tok.is(tok::code_complete)) {
-      auto Expr = new (Context) UnresolvedMemberExpr(
-                                  DotLoc,
-                                  DeclNameLoc(DotLoc.getAdvancedLoc(1)),
-                                  Context.getIdentifier("_"), nullptr);
+      auto Expr = UnresolvedMemberExpr::create(
+                    Context, DotLoc, DeclNameLoc(DotLoc.getAdvancedLoc(1)),
+                    Context.getIdentifier("_"), /*implicit=*/false);
       Result = makeParserResult(Expr);
       if (CodeCompletion) {
         std::vector<StringRef> Identifiers;
@@ -1280,8 +1279,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
     // Handle .foo by just making an AST node.
     Result = makeParserResult(
-               new (Context) UnresolvedMemberExpr(DotLoc, NameLoc, Name,
-                                                  Arg.getPtrOrNull()));
+               UnresolvedMemberExpr::create(Context, DotLoc, NameLoc, Name,
+                                            Arg.getPtrOrNull(),
+                                            /*implicit=*/false));
     break;
   }
       

@@ -223,6 +223,22 @@ class alignas(8) Expr {
   enum { NumDynamicSubscriptExprBits = NumExprBits + 18 };
   static_assert(NumDynamicSubscriptExprBits <= 32, "fits in an unsigned");
 
+  class UnresolvedMemberExprBitfields {
+    friend class UnresolvedMemberExpr;
+    unsigned : NumExprBits;
+    /// Whether the UnresolvedMemberExpr has arguments.
+    unsigned HasArguments : 1;
+    /// # of argument labels stored after the UnresolvedMemberExpr.
+    unsigned NumArgLabels : 16;
+    /// Whether the UnresolvedMemberExpr also has source locations for the
+    /// argument label.
+    unsigned HasArgLabelLocs : 1;
+    /// Whether the last argument is a trailing closure.
+    unsigned HasTrailingClosure : 1;
+  };
+  enum { NumUnresolvedMemberExprBits = NumExprBits + 19 };
+  static_assert(NumUnresolvedMemberExprBits <= 32, "fits in an unsigned");
+
   class OverloadSetRefExprBitfields {
     friend class OverloadSetRefExpr;
     unsigned : NumExprBits;
@@ -378,6 +394,7 @@ protected:
     MemberRefExprBitfields MemberRefExprBits;
     SubscriptExprBitfields SubscriptExprBits;
     DynamicSubscriptExprBitfields DynamicSubscriptExprBits;
+    UnresolvedMemberExprBitfields UnresolvedMemberExprBits;
     OverloadSetRefExprBitfields OverloadSetRefExprBits;
     OverloadedMemberRefExprBitfields OverloadedMemberRefExprBits;
     BooleanLiteralExprBitfields BooleanLiteralExprBits;
@@ -1579,18 +1596,45 @@ public:
 /// UnresolvedMemberExpr - This represents '.foo', an unresolved reference to a
 /// member, which is to be resolved with context sensitive type information into
 /// bar.foo.  These always have unresolved type.
-class UnresolvedMemberExpr : public Expr {
+class UnresolvedMemberExpr final
+    : public Expr,
+      public TrailingCallArguments<UnresolvedMemberExpr>  {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclName Name;
   Expr *Argument;
 
-public:  
   UnresolvedMemberExpr(SourceLoc dotLoc, DeclNameLoc nameLoc,
-                       DeclName name, Expr *argument)
-    : Expr(ExprKind::UnresolvedMember, /*Implicit=*/false),
-      DotLoc(dotLoc), NameLoc(nameLoc), Name(name), Argument(argument) {
-  }
+                       DeclName name, Expr *argument,
+                       ArrayRef<Identifier> argLabels,
+                       ArrayRef<SourceLoc> argLabelLocs,
+                       bool hasTrailingClosure,
+                       bool implicit);
+
+public:
+  /// Create a new unresolved member expression.
+  ///
+  /// Note: do not add new callers for this entry point; use the entry points
+  /// that take separate arguments.
+  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
+                                      DeclNameLoc nameLoc, DeclName name,
+                                      Expr *arg, bool implicit);
+
+  /// Create a new unresolved member expression with no arguments.
+  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
+                                      DeclNameLoc nameLoc, DeclName name,
+                                      bool implicit);
+
+  /// Create a new unresolved member expression.
+  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
+                                      DeclNameLoc nameLoc, DeclName name,
+                                      SourceLoc lParenLoc,
+                                      ArrayRef<Expr *> args,
+                                      ArrayRef<Identifier> argLabels,
+                                      ArrayRef<SourceLoc> argLabelLocs,
+                                      SourceLoc rParenLoc,
+                                      Expr *trailingClosure,
+                                      bool implicit);
 
   DeclName getName() const { return Name; }
   DeclNameLoc getNameLoc() const { return NameLoc; }
@@ -1598,12 +1642,23 @@ public:
   Expr *getArgument() const { return Argument; }
   void setArgument(Expr *argument) { Argument = argument; }
 
-  /// Retrieve the argument labels for the argument, if provided.
-  ///
-  /// \param scratch Scratch space that will be used when the argument labels
-  /// aren't already stored in the AST context.
-  ArrayRef<Identifier>
-  getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const;
+  /// Whether this reference has arguments.
+  bool hasArguments() const {
+    return UnresolvedMemberExprBits.HasArguments;
+  }
+
+  unsigned getNumArguments() const {
+    return UnresolvedMemberExprBits.NumArgLabels;
+  }
+
+  bool hasArgumentLabelLocs() const {
+    return UnresolvedMemberExprBits.HasArgLabelLocs;
+  }
+
+  /// Whether this call with written with a trailing closure.
+  bool hasTrailingClosure() const {
+    return UnresolvedMemberExprBits.HasTrailingClosure;
+  }
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
 

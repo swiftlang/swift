@@ -1486,10 +1486,87 @@ DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, SourceLoc lSquareLoc,
                                            decl, implicit);
 }
 
-ArrayRef<Identifier> UnresolvedMemberExpr::getArgumentLabels(
-    SmallVectorImpl<Identifier> &scratch) const {
-  if (!getArgument()) return { };
-  return getArgumentLabelsFromArgument(getArgument(), scratch);
+UnresolvedMemberExpr::UnresolvedMemberExpr(SourceLoc dotLoc,
+                                           DeclNameLoc nameLoc,
+                                           DeclName name, Expr *argument,
+                                           ArrayRef<Identifier> argLabels,
+                                           ArrayRef<SourceLoc> argLabelLocs,
+                                           bool hasTrailingClosure,
+                                           bool implicit)
+  : Expr(ExprKind::UnresolvedMember, implicit),
+    DotLoc(dotLoc), NameLoc(nameLoc), Name(name), Argument(argument) {
+  UnresolvedMemberExprBits.HasArguments = (argument != nullptr);
+  UnresolvedMemberExprBits.NumArgLabels = argLabels.size();
+  UnresolvedMemberExprBits.HasArgLabelLocs = !argLabelLocs.empty();
+  UnresolvedMemberExprBits.HasTrailingClosure = hasTrailingClosure;
+  initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);
+}
+
+UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
+                                                   SourceLoc dotLoc,
+                                                   DeclNameLoc nameLoc,
+                                                   DeclName name,
+                                                   Expr *arg, bool implicit) {
+  // Inspect the argument to dig out the argument labels, their location, and
+  // whether there is a trailing closure.
+  SmallVector<Identifier, 4> argLabelsScratch;
+  SmallVector<SourceLoc, 4> argLabelLocs;
+  bool hasTrailingClosure = false;
+  ArrayRef<Identifier> argLabels;
+  if (arg) {
+    argLabels = getArgumentLabelsFromArgument(arg, argLabelsScratch,
+                                              &argLabelLocs,
+                                              &hasTrailingClosure);
+  }
+
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs, hasTrailingClosure);
+
+  void *memory = ctx.Allocate(size, alignof(UnresolvedMemberExpr));
+  return new (memory) UnresolvedMemberExpr(dotLoc, nameLoc, name, arg,
+                                           argLabels, argLabelLocs,
+                                           hasTrailingClosure, implicit);
+}
+
+UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
+                                                   SourceLoc dotLoc,
+                                                   DeclNameLoc nameLoc,
+                                                   DeclName name,
+                                                   bool implicit) {
+  size_t size = totalSizeToAlloc({ }, { }, /*hasTrailingClosure=*/false);
+
+  void *memory = ctx.Allocate(size, alignof(UnresolvedMemberExpr));
+  return new (memory) UnresolvedMemberExpr(dotLoc, nameLoc, name, nullptr,
+                                           { }, { },
+                                           /*hasTrailingClosure=*/false,
+                                           implicit);
+}
+
+UnresolvedMemberExpr *
+UnresolvedMemberExpr::create(ASTContext &ctx, SourceLoc dotLoc,
+                             DeclNameLoc nameLoc, DeclName name,
+                             SourceLoc lParenLoc,
+                             ArrayRef<Expr *> args,
+                             ArrayRef<Identifier> argLabels,
+                             ArrayRef<SourceLoc> argLabelLocs,
+                             SourceLoc rParenLoc,
+                             Expr *trailingClosure,
+                             bool implicit) {
+  SmallVector<Identifier, 4> argLabelsScratch;
+  SmallVector<SourceLoc, 4> argLabelLocsScratch;
+  Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels,
+                                 argLabelLocs, rParenLoc,
+                                 trailingClosure, implicit,
+                                 argLabelsScratch,
+                                 argLabelLocsScratch);
+
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
+                                 trailingClosure != nullptr);
+
+  void *memory = ctx.Allocate(size, alignof(UnresolvedMemberExpr));
+  return new (memory) UnresolvedMemberExpr(dotLoc, nameLoc, name, arg,
+                                           argLabels, argLabelLocs,
+                                           trailingClosure != nullptr,
+                                           implicit);
 }
 
 ArrayRef<Identifier> ApplyExpr::getArgumentLabels(

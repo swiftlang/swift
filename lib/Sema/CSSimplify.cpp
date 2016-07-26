@@ -510,8 +510,8 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     hasTrailingClosure = call->hasTrailingClosure();
   } else if (auto unresolved = dyn_cast<UnresolvedMemberExpr>(callExpr)) {
     calleeExpr = callExpr;
-    argLabels = unresolved->getArgumentLabels(argLabelsScratch);
-    hasTrailingClosure = ::hasTrailingClosure(unresolved->getArgument());
+    argLabels = unresolved->getArgumentLabels();
+    hasTrailingClosure = unresolved->hasTrailingClosure();
   } else if (auto subscript = dyn_cast<SubscriptExpr>(callExpr)) {
     calleeExpr = callExpr;
     argLabels = subscript->getArgumentLabels();
