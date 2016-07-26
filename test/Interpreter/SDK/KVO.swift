@@ -31,7 +31,7 @@ class Observer : NSObject {
     model.number = 42
   }
 
-  override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutablePointer<Void>?) {
+  override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
     if context != &kvoContext {
       // FIXME: we shouldn't need to unwrap these here, but it doesn't work on
       // older SDKs where these are non-optional types.

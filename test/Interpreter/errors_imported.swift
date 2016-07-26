@@ -34,7 +34,7 @@ ErrorHandlingTests.test("pointerFailure") {
 ErrorHandlingTests.test("pointerSuccess") {
   do {
     var pointer = try TestingNSError.maybeThrow(false)
-    expectType(UnsafeMutablePointer<Void>.self, &pointer)
+    expectType(UnsafeMutableRawPointer.self, &pointer)
     expectEqual(UnsafeMutablePointer(bitPattern: 42)!, pointer)
   } catch {
     expectUnreachableCatch(error)

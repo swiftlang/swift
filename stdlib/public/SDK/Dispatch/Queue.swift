@@ -333,7 +333,7 @@ public extension DispatchQueue {
 	}
 }
 
-private func _destructDispatchSpecificValue(ptr: UnsafeMutablePointer<Void>?) {
+private func _destructDispatchSpecificValue(ptr: UnsafeMutableRawPointer?) {
 	if let p = ptr {
 		Unmanaged<AnyObject>.fromOpaque(p).release()
 	}

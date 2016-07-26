@@ -14,10 +14,12 @@
 
 extension UnsafeBufferPointer {
   /// Initialize an `UnsafeBufferPointer<Element>` from an `AudioBuffer`.
+  /// Binds the the buffer's memory type to `Element`.
   public init(_ audioBuffer: AudioBuffer) {
-    self.init(
-      start: UnsafePointer<Element>(audioBuffer.mData),
-      count: Int(audioBuffer.mDataByteSize) / strideof(Element.self))
+    let count = Int(audioBuffer.mDataByteSize) / strideof(Element.self)
+    let elementPtr = audioBuffer.mData?.bindMemory(
+      to: Element.self, capacity: count)
+    self.init(start: elementPtr, count: count)
   }
 }
 
@@ -25,9 +27,10 @@ extension UnsafeMutableBufferPointer {
   /// Initialize an `UnsafeMutableBufferPointer<Element>` from an
   /// `AudioBuffer`.
   public init(_ audioBuffer: AudioBuffer) {
-    self.init(
-      start: UnsafeMutablePointer<Element>(audioBuffer.mData),
-      count: Int(audioBuffer.mDataByteSize) / strideof(Element.self))
+    let count = Int(audioBuffer.mDataByteSize) / strideof(Element.self)
+    let elementPtr = audioBuffer.mData?.bindMemory(
+      to: Element.self, capacity: count)
+    self.init(start: elementPtr, count: count)
   }
 }
 
@@ -39,7 +42,7 @@ extension AudioBuffer {
     numberOfChannels: Int
   ) {
     self.mNumberChannels = UInt32(numberOfChannels)
-    self.mData = UnsafeMutablePointer<Void>(typedBuffer.baseAddress)
+    self.mData = UnsafeMutableRawPointer(typedBuffer.baseAddress)
     self.mDataByteSize = UInt32(typedBuffer.count * strideof(Element.self))
   }
 }
@@ -68,8 +71,10 @@ extension AudioBufferList {
     _precondition(ablMemory != nil,
       "failed to allocate memory for an AudioBufferList")
 
-    let abl = UnsafeMutableAudioBufferListPointer(
-        UnsafeMutablePointer<AudioBufferList>(ablMemory!))
+    let listPtr = ablMemory!.bindMemory(to: AudioBufferList.self, capacity: 1)
+    (ablMemory! + strideof(AudioBufferList.self)).bindMemory(
+      to: AudioBuffer.self, capacity: maximumBuffers)
+    let abl = UnsafeMutableAudioBufferListPointer(listPtr)
     abl.count = maximumBuffers
     return abl
   }
@@ -108,7 +113,8 @@ public struct UnsafeMutableAudioBufferListPointer {
     // AudioBufferList has one AudioBuffer in a "flexible array member".
     // Position the pointer after that, and skip one AudioBuffer back.  This
     // brings us to the start of AudioBuffer array.
-    return UnsafeMutablePointer<AudioBuffer>(unsafeMutablePointer + 1) - 1
+    let rawPtr = UnsafeMutableRawPointer(unsafeMutablePointer + 1)
+    return rawPtr.assumingMemoryBound(to: AudioBuffer.self) - 1
   }
 
   // FIXME: the properties 'unsafePointer' and 'unsafeMutablePointer' should be

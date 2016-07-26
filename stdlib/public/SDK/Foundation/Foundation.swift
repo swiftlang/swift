@@ -56,7 +56,7 @@ extension NSString : ExpressibleByStringLiteral {
     var immutableResult: NSString
     if value.hasPointerRepresentation {
       immutableResult = NSString(
-        bytesNoCopy: UnsafeMutablePointer<Void>(value.utf8Start),
+        bytesNoCopy: UnsafeMutableRawPointer(mutating: value.utf8Start),
         length: Int(value.utf8CodeUnitCount),
         encoding: value.isASCII ? String.Encoding.ascii.rawValue : String.Encoding.utf8.rawValue,
         freeWhenDone: false)!
