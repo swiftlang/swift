@@ -483,6 +483,8 @@ extension Locale : _ObjectiveCBridgeable {
 }
 
 extension NSLocale : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
     public func _toCustomAnyHashable() -> AnyHashable? {
         return AnyHashable(self as Locale)
     }
