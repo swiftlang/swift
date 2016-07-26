@@ -314,7 +314,7 @@ extension String {
       return UTF16View(_core)
     }
     set {
-      self = String(newValue)
+      self = String(describing: newValue)
     }
   }
 

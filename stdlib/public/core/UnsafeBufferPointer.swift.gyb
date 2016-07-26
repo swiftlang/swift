@@ -219,7 +219,7 @@ extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "Unsafe${Mutable}BufferPointer"
-      + "(start: \(_position.map(String.init(_:)) ?? "nil"), count: \(count))"
+      + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
   }
 }
 %end
