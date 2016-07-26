@@ -101,17 +101,19 @@ swift_install_in_component(compiler
     FILES ${sources}
     DESTINATION "lib/swift/shims")
 
-# Install Clang headers under the Swift library so that an installed Swift's
-# module importer can find the compiler headers corresponding to its Clang.
-swift_install_in_component(clang-builtin-headers
-    DIRECTORY "${clang_headers_location}/"
-    DESTINATION "lib/swift/clang"
-    PATTERN "*.h")
-
-# Alternatively, install a symbolic link to the Clang resource directory.
-swift_install_in_component(clang-resource-dir-symlink
-    DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift/install-tmp/install-tmp/clang"
-    DESTINATION "lib/swift")
+if (SWIFT_BUILT_STANDALONE)
+  # Install Clang headers under the Swift library so that an installed Swift's
+  # module importer can find the compiler headers corresponding to its Clang.
+  swift_install_in_component(clang-builtin-headers
+                             DIRECTORY "${clang_headers_location}/"
+                             DESTINATION "lib/swift/clang"
+                             PATTERN "*.h")
+else()
+  # Alternatively, install a symbolic link to the Clang resource directory.
+  swift_install_in_component(clang-resource-dir-symlink
+                             DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift/install-tmp/install-tmp/clang"
+                             DESTINATION "lib/swift")
+endif()
 
 # Possibly install Clang headers under Clang's resource directory in case we
 # need to use a different version of the headers than the installed Clang. This
