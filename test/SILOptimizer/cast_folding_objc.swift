@@ -205,7 +205,7 @@ print("test0=\(test0())")
 // CHECK:         unconditional_checked_cast_addr
 
 // CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyObjectToNonClassType
-// CHECK:         builtin "int_trap"
+// CHECK-NOT:         builtin "int_trap"
 
 // CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyToAnyClass{{.*}}
 // CHECK:         unconditional_checked_cast_addr
