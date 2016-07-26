@@ -1,16 +1,26 @@
 #!/bin/bash
+# This script is a linter for Python files in the Swift codebase.
+# If there are any linting errors, the script exits with code 1; otherwise
+# it exists with retcode 0.
+#
+# Optionally, you can supply the name of one or more files (relative to the
+# root of the codebase) to limit the linting to those files.
 
+# Full directory name of this script.
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 python -c 'import flake8; import flake8_import_order' 2>/dev/null
-if [[ $? != 0 ]]; then
+if (( $? != 0 )); then
   echo "Missing modules flake8 or flake8-import-order. Please be sure to install these python packages before linting."
   exit 1
 fi
 
+# This script lives in the utils directory in the Swift codebase, so
+# this command should take us to the root of the codebase.
 cd "$SCRIPT_DIR/.."
-if [[ $? != 0 ]]; then
+if (( $? != 0 )); then
   echo "Could not change directory to '$SCRIPT_DIR/..'."
   exit 1
 fi
-flake8
+
+flake8 $@
