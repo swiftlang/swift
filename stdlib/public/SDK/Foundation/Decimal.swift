@@ -73,7 +73,7 @@ extension Decimal {
 
     public mutating func divide(by other: Decimal) {
         var rhs = other
-        NSDecimalMultiply(&self, &self, &rhs, .plain)
+        NSDecimalDivide(&self, &self, &rhs, .plain)
     }
 
     public mutating func negate() {
