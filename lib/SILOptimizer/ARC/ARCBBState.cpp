@@ -127,9 +127,6 @@ void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
       PtrToTopDownState.blot(RefCountedValue);
       continue;
     }
-
-    DEBUG(llvm::dbgs() << "            Partial: "
-                       << (RefCountState.isPartial() ? "yes" : "no") << "\n");
   }
 }
 

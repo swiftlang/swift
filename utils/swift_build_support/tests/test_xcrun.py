@@ -14,18 +14,19 @@ import unittest
 from swift_build_support import xcrun
 
 
-class FindTestCase(unittest.TestCase):
-    def setUp(self):
-        if platform.system() != 'Darwin':
-            self.skipTest('xcrun tests should only be run on OS X')
+@unittest.skipUnless(platform.system() == 'Darwin',
+                     'xcrun is avaiable in Darwin platform only')
+class XCRunTestCase(unittest.TestCase):
+    def test_find(self):
+        # Unknown tool
+        self.assertIsNone(xcrun.find('a-tool-that-isnt-on-osx',
+                                     sdk='macosx',
+                                     toolchain='default'))
 
-    def test_when_tool_not_found_returns_none(self):
-        self.assertIsNone(xcrun.find(
-            toolchain='default', tool='a-tool-that-isnt-on-osx'))
-
-    def test_when_tool_found_returns_path(self):
-        self.assertTrue(xcrun.find(
-            toolchain='default', tool='clang').endswith('/clang'))
+        # Avaiable tool
+        self.assertTrue(xcrun.find('clang',
+                                   sdk='macosx',
+                                   toolchain='default').endswith('/clang'))
 
 
 if __name__ == '__main__':

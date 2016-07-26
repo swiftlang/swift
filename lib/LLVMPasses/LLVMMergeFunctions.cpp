@@ -697,7 +697,7 @@ int FunctionComparator::cmpConstants(const Constant *L,
       BasicBlock *RBB = RBA->getBasicBlock();
       if (LBB == RBB)
         return 0;
-      for(BasicBlock &BB : F->getBasicBlockList()) {
+      for (BasicBlock &BB : F->getBasicBlockList()) {
         if (&BB == LBB) {
           assert(&BB != RBB);
           return -1;

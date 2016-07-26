@@ -148,9 +148,6 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
       PtrToTopDownState.blot(RefCountedValue);
       continue;
     }
-
-    DEBUG(llvm::dbgs() << "            Partial: "
-                       << (RefCountState.isPartial() ? "yes" : "no") << "\n");
   }
 }
 
@@ -202,7 +199,6 @@ static bool isARCSignificantTerminator(TermInst *TI) {
 void ARCRegionState::processBlockBottomUpPredTerminators(
     const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
     ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
-  auto &BB = *R->getBlock();
   llvm::TinyPtrVector<SILInstruction *> PredTerminators;
   for (unsigned PredID : R->getPreds()) {
     auto *PredRegion = LRFI->getRegion(PredID);
@@ -215,13 +211,12 @@ void ARCRegionState::processBlockBottomUpPredTerminators(
     PredTerminators.push_back(TermInst);
   }
 
-  auto *InsertPt = &*BB.begin();
   for (auto &OtherState : getBottomupStates()) {
     // If the other state's value is blotted, skip it.
     if (!OtherState.hasValue())
       continue;
 
-    OtherState->second.updateForPredTerminators(PredTerminators, InsertPt,
+    OtherState->second.updateForPredTerminators(PredTerminators,
                                                 SetFactory, AA);
   }
 }
@@ -266,8 +261,6 @@ static bool processBlockBottomUpInsts(
     // that the instruction "visits".
     SILValue Op = Result.RCIdentity;
 
-    auto *InsertPt = &*std::next(I->getIterator());
-
     // For all other (reference counted value, ref count state) we are
     // tracking...
     for (auto &OtherState : State.getBottomupStates()) {
@@ -280,7 +273,7 @@ static bool processBlockBottomUpInsts(
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(I, InsertPt, SetFactory, AA);
+      OtherState->second.updateForSameLoopInst(I, SetFactory, AA);
     }
   }
 
@@ -372,8 +365,7 @@ bool ARCRegionState::processLoopBottomUp(
       continue;
 
     for (auto *I : State->getSummarizedInterestingInsts())
-      OtherState->second.updateForDifferentLoopInst(I, InsertPts, SetFactory,
-                                                    AA);
+      OtherState->second.updateForDifferentLoopInst(I, SetFactory, AA);
   }
 
   return false;
@@ -460,7 +452,7 @@ bool ARCRegionState::processBlockTopDown(
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(I, I, SetFactory, AA);
+      OtherState->second.updateForSameLoopInst(I, SetFactory, AA);
     }
   }
 
@@ -485,9 +477,6 @@ bool ARCRegionState::processLoopTopDown(
   assert(PredRegion->isBlock() && "Expected the predecessor region to be a "
                                   "block");
 
-  // Our insert point is going to be the terminator inst.
-  SILInstruction *InsertPt = PredRegion->getBlock()->getTerminator();
-
   // For each state that we are currently tracking, apply our summarized
   // instructions to it.
   for (auto &OtherState : getTopDownStates()) {
@@ -495,8 +484,7 @@ bool ARCRegionState::processLoopTopDown(
       continue;
 
     for (auto *I : State->getSummarizedInterestingInsts())
-      OtherState->second.updateForDifferentLoopInst(I, InsertPt, SetFactory,
-                                                    AA);
+      OtherState->second.updateForDifferentLoopInst(I, SetFactory, AA);
   }
 
   return false;
