@@ -1354,10 +1354,22 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
   if (!D->hasAccessibility()) {
     DeclContext *DC = D->getDeclContext();
     switch (DC->getContextKind()) {
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::AbstractClosureExpr:
-    case DeclContextKind::Initializer:
     case DeclContextKind::TopLevelCodeDecl:
+      // Variables declared in a top-level 'guard' statement can be accessed in
+      // later top-level code.
+      D->setAccessibility(Accessibility::FilePrivate);
+      break;
+    case DeclContextKind::AbstractClosureExpr:
+      if (isa<ParamDecl>(D)) {
+        // Closure parameters may need to be accessible to the enclosing
+        // context, for single-expression closures.
+        D->setAccessibility(Accessibility::FilePrivate);
+      } else {
+        D->setAccessibility(Accessibility::Private);
+      }
+      break;
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::Initializer:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
       D->setAccessibility(Accessibility::Private);
