@@ -1291,11 +1291,10 @@ namespace {
           return nullptr;
 
         // TODO: diagnose if semantics != AccessSemantics::Ordinary?
-        auto subscriptExpr = new (tc.Context) DynamicSubscriptExpr(base,
-                                                                   index,
-                                                                   subscript);
+        auto subscriptExpr = DynamicSubscriptExpr::create(tc.Context, base,
+                                                          index, subscript,
+                                                          isImplicit);
         subscriptExpr->setType(resultTy);
-        subscriptExpr->setImplicit(isImplicit);
         Expr *result = subscriptExpr;
         closeExistential(result);
         return result;
@@ -2762,9 +2761,8 @@ namespace {
     }
 
     Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
-      SmallVector<Identifier, 2> argLabelsScratch;
       return buildSubscript(expr->getBase(), expr->getIndex(),
-                            expr->getArgumentLabels(argLabelsScratch),
+                            expr->getArgumentLabels(),
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(), AccessSemantics::Ordinary);
     }

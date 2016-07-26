@@ -1425,9 +1425,65 @@ SubscriptExpr *SubscriptExpr::create(ASTContext &ctx, Expr *base,
                                     decl, implicit, semantics);
 }
 
-ArrayRef<Identifier> DynamicSubscriptExpr::getArgumentLabels(
-    SmallVectorImpl<Identifier> &scratch) const {
-  return getArgumentLabelsFromArgument(getIndex(), scratch);
+DynamicSubscriptExpr::DynamicSubscriptExpr(Expr *base, Expr *index,
+                                           ArrayRef<Identifier> argLabels,
+                                           ArrayRef<SourceLoc> argLabelLocs,
+                                           bool hasTrailingClosure,
+                                           ConcreteDeclRef member,
+                                           bool implicit)
+    : DynamicLookupExpr(ExprKind::DynamicSubscript),
+      Base(base), Index(index), Member(member) {
+  DynamicSubscriptExprBits.NumArgLabels = argLabels.size();
+  DynamicSubscriptExprBits.HasArgLabelLocs = !argLabelLocs.empty();
+  DynamicSubscriptExprBits.HasTrailingClosure = hasTrailingClosure;
+  initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);
+  if (implicit) setImplicit(implicit);
+}
+
+DynamicSubscriptExpr *
+DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, Expr *index,
+                             ConcreteDeclRef decl, bool implicit) {
+  // Inspect the argument to dig out the argument labels, their location, and
+  // whether there is a trailing closure.
+  SmallVector<Identifier, 4> argLabelsScratch;
+  SmallVector<SourceLoc, 4> argLabelLocs;
+  bool hasTrailingClosure = false;
+  auto argLabels = getArgumentLabelsFromArgument(index, argLabelsScratch,
+                                                 &argLabelLocs,
+                                                 &hasTrailingClosure);
+
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs, hasTrailingClosure);
+
+  void *memory = ctx.Allocate(size, alignof(DynamicSubscriptExpr));
+  return new (memory) DynamicSubscriptExpr(base, index, argLabels, argLabelLocs,
+                                           hasTrailingClosure, decl, implicit);
+}
+
+DynamicSubscriptExpr *
+DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, SourceLoc lSquareLoc,
+                             ArrayRef<Expr *> indexArgs,
+                             ArrayRef<Identifier> indexArgLabels,
+                             ArrayRef<SourceLoc> indexArgLabelLocs,
+                             SourceLoc rSquareLoc,
+                             Expr *trailingClosure,
+                             ConcreteDeclRef decl,
+                             bool implicit) {
+  SmallVector<Identifier, 4> indexArgLabelsScratch;
+  SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
+  Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
+                                   indexArgLabelLocs, rSquareLoc,
+                                   trailingClosure, implicit,
+                                   indexArgLabelsScratch,
+                                   indexArgLabelLocsScratch);
+
+  size_t size = totalSizeToAlloc(indexArgLabels, indexArgLabelLocs,
+                                 trailingClosure != nullptr);
+
+  void *memory = ctx.Allocate(size, alignof(DynamicSubscriptExpr));
+  return new (memory) DynamicSubscriptExpr(base, index, indexArgLabels,
+                                           indexArgLabelLocs,
+                                           trailingClosure != nullptr,
+                                           decl, implicit);
 }
 
 ArrayRef<Identifier> UnresolvedMemberExpr::getArgumentLabels(

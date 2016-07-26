@@ -209,6 +209,20 @@ class alignas(8) Expr {
   enum { NumSubscriptExprBits = NumExprBits + 21 };
   static_assert(NumSubscriptExprBits <= 32, "fits in an unsigned");
 
+  class DynamicSubscriptExprBitfields {
+    friend class DynamicSubscriptExpr;
+    unsigned : NumExprBits;
+    /// # of argument labels stored after the DynamicSubscriptExpr.
+    unsigned NumArgLabels : 16;
+    /// Whether the DynamicSubscriptExpr also has source locations for the
+    /// argument label.
+    unsigned HasArgLabelLocs : 1;
+    /// Whether the last argument is a trailing closure.
+    unsigned HasTrailingClosure : 1;
+  };
+  enum { NumDynamicSubscriptExprBits = NumExprBits + 18 };
+  static_assert(NumDynamicSubscriptExprBits <= 32, "fits in an unsigned");
+
   class OverloadSetRefExprBitfields {
     friend class OverloadSetRefExpr;
     unsigned : NumExprBits;
@@ -363,6 +377,7 @@ protected:
     TupleExprBitfields TupleExprBits;
     MemberRefExprBitfields MemberRefExprBits;
     SubscriptExprBitfields SubscriptExprBits;
+    DynamicSubscriptExprBitfields DynamicSubscriptExprBits;
     OverloadSetRefExprBitfields OverloadSetRefExprBits;
     OverloadedMemberRefExprBitfields OverloadedMemberRefExprBits;
     BooleanLiteralExprBitfields BooleanLiteralExprBits;
@@ -571,6 +586,81 @@ public:
   void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 
     return Mem; 
+  }
+};
+
+/// Helper class to capture trailing call argument labels and related
+/// information, for expression nodes that involve argument labels, trailing
+/// closures, etc.
+template<typename Derived>
+class TrailingCallArguments
+    : private llvm::TrailingObjects<Derived, Identifier, SourceLoc> {
+  using TrailingObjects = llvm::TrailingObjects<Derived, Identifier, SourceLoc>;
+  friend TrailingObjects;
+
+  Derived &asDerived() {
+    return *static_cast<Derived *>(this);
+  }
+
+  const Derived &asDerived() const {
+    return *static_cast<const Derived *>(this);
+  }
+
+  size_t numTrailingObjects(
+      typename TrailingObjects::template OverloadToken<Identifier>) const {
+    return asDerived().getNumArguments();
+  }
+
+  size_t numTrailingObjects(
+      typename TrailingObjects::template OverloadToken<SourceLoc>) const {
+    return asDerived().hasArgumentLabelLocs()
+             ? asDerived().getNumArguments()
+             : 0;
+  }
+
+  /// Retrieve the buffer containing the argument labels.
+  MutableArrayRef<Identifier> getArgumentLabelsBuffer() {
+    return { this->template getTrailingObjects<Identifier>(),
+             asDerived().getNumArguments() };
+  }
+
+  /// Retrieve the buffer containing the argument label locations.
+  MutableArrayRef<SourceLoc> getArgumentLabelLocsBuffer() {
+    if (!asDerived().hasArgumentLabelLocs())
+      return { };
+    
+    return { this->template getTrailingObjects<SourceLoc>(),
+             asDerived().getNumArguments() };
+  }
+
+protected:
+  /// Determine the total size to allocate.
+  static size_t totalSizeToAlloc(ArrayRef<Identifier> argLabels,
+                                 ArrayRef<SourceLoc> argLabelLocs,
+                                 bool hasTrailingClosure) {
+    return TrailingObjects::template totalSizeToAlloc<Identifier, SourceLoc>(
+        argLabels.size(), argLabelLocs.size());
+  }
+
+  /// Initialize the actual call arguments.
+  void initializeCallArguments(ArrayRef<Identifier> argLabels,
+                               ArrayRef<SourceLoc> argLabelLocs,
+                               bool hasTrailingClosure) {
+    if (!argLabels.empty()) {
+      std::uninitialized_copy(argLabels.begin(), argLabels.end(),
+                              this->template getTrailingObjects<Identifier>());
+    }
+    
+    if (!argLabelLocs.empty())
+      std::uninitialized_copy(argLabelLocs.begin(), argLabelLocs.end(),
+                              this->template getTrailingObjects<SourceLoc>());
+  }
+
+public:
+  /// Retrieve the argument labels provided at the call site.
+  ArrayRef<Identifier> getArgumentLabels() const {
+    return { this->template getTrailingObjects<Identifier>(),
+             asDerived().getNumArguments() };
   }
 };
 
@@ -1415,16 +1505,39 @@ public:
 /// var x : AnyObject = <some value>
 /// print(x[27]! // x[27] has type String?
 /// \endcode
-class DynamicSubscriptExpr : public DynamicLookupExpr {
+class DynamicSubscriptExpr final
+    : public DynamicLookupExpr,
+      public TrailingCallArguments<DynamicSubscriptExpr> {
+  friend TrailingCallArguments;
+
   Expr *Base;
   Expr *Index;
   ConcreteDeclRef Member;
 
+  DynamicSubscriptExpr(Expr *base, Expr *index, ArrayRef<Identifier> argLabels,
+                       ArrayRef<SourceLoc> argLabelLocs,
+                       bool hasTrailingClosure, ConcreteDeclRef member,
+                       bool implicit);
+
 public:
-  DynamicSubscriptExpr(Expr *base, Expr *index, 
-                       ConcreteDeclRef member)
-    : DynamicLookupExpr(ExprKind::DynamicSubscript),
-      Base(base), Index(index), Member(member) { }
+  /// Create a dynamic subscript.
+  ///
+  /// Note: do not create new callers to this entry point; use the entry point
+  /// that takes separate index arguments.
+  static DynamicSubscriptExpr *create(ASTContext &ctx, Expr *base, Expr *index,
+                                      ConcreteDeclRef decl,
+                                      bool implicit);
+
+  /// Create a new dynamic subscript.
+  static DynamicSubscriptExpr *create(ASTContext &ctx, Expr *base,
+                                      SourceLoc lSquareLoc,
+                                      ArrayRef<Expr *> indexArgs,
+                                      ArrayRef<Identifier> indexArgLabels,
+                                      ArrayRef<SourceLoc> indexArgLabelLocs,
+                                      SourceLoc rSquareLoc,
+                                      Expr *trailingClosure,
+                                      ConcreteDeclRef decl,
+                                      bool implicit);
 
   /// Retrieve the base of the expression.
   Expr *getBase() const { return Base; }
@@ -1437,12 +1550,18 @@ public:
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
 
-  /// Retrieve the argument labels for the indices.
-  ///
-  /// \param scratch Scratch space that will be used when the argument labels
-  /// aren't already stored in the AST context.
-  ArrayRef<Identifier>
-  getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const;
+  unsigned getNumArguments() const {
+    return DynamicSubscriptExprBits.NumArgLabels;
+  }
+
+  bool hasArgumentLabelLocs() const {
+    return DynamicSubscriptExprBits.HasArgLabelLocs;
+  }
+
+  /// Whether this call with written with a trailing closure.
+  bool hasTrailingClosure() const {
+    return DynamicSubscriptExprBits.HasTrailingClosure;
+  }
 
   /// Retrieve the member to which this access refers.
   ConcreteDeclRef getMember() const { return Member; }
@@ -1894,81 +2013,6 @@ public:
   }
 };
 
-/// Helper class to capture trailing call argument labels and related
-/// information, for expression nodes that involve argument labels, trailing
-/// closures, etc.
-template<typename Derived>
-class TrailingCallArguments
-    : private llvm::TrailingObjects<Derived, Identifier, SourceLoc> {
-  using TrailingObjects = llvm::TrailingObjects<Derived, Identifier, SourceLoc>;
-  friend TrailingObjects;
-
-  Derived &asDerived() {
-    return *static_cast<Derived *>(this);
-  }
-
-  const Derived &asDerived() const {
-    return *static_cast<const Derived *>(this);
-  }
-
-  size_t numTrailingObjects(
-      typename TrailingObjects::template OverloadToken<Identifier>) const {
-    return asDerived().getNumArguments();
-  }
-
-  size_t numTrailingObjects(
-      typename TrailingObjects::template OverloadToken<SourceLoc>) const {
-    return asDerived().hasArgumentLabelLocs()
-             ? asDerived().getNumArguments()
-             : 0;
-  }
-
-  /// Retrieve the buffer containing the argument labels.
-  MutableArrayRef<Identifier> getArgumentLabelsBuffer() {
-    return { this->template getTrailingObjects<Identifier>(),
-             asDerived().getNumArguments() };
-  }
-
-  /// Retrieve the buffer containing the argument label locations.
-  MutableArrayRef<SourceLoc> getArgumentLabelLocsBuffer() {
-    if (!asDerived().hasArgumentLabelLocs())
-      return { };
-    
-    return { this->template getTrailingObjects<SourceLoc>(),
-             asDerived().getNumArguments() };
-  }
-
-protected:
-  /// Determine the total size to allocate.
-  static size_t totalSizeToAlloc(ArrayRef<Identifier> argLabels,
-                                 ArrayRef<SourceLoc> argLabelLocs,
-                                 bool hasTrailingClosure) {
-    return TrailingObjects::template totalSizeToAlloc<Identifier, SourceLoc>(
-        argLabels.size(), argLabelLocs.size());
-  }
-
-  /// Initialize the actual call arguments.
-  void initializeCallArguments(ArrayRef<Identifier> argLabels,
-                               ArrayRef<SourceLoc> argLabelLocs,
-                               bool hasTrailingClosure) {
-    if (!argLabels.empty()) {
-      std::uninitialized_copy(argLabels.begin(), argLabels.end(),
-                              this->template getTrailingObjects<Identifier>());
-    }
-    
-    if (!argLabelLocs.empty())
-      std::uninitialized_copy(argLabelLocs.begin(), argLabelLocs.end(),
-                              this->template getTrailingObjects<SourceLoc>());
-  }
-
-public:
-  /// Retrieve the argument labels provided at the call site.
-  ArrayRef<Identifier> getArgumentLabels() const {
-    return { this->template getTrailingObjects<Identifier>(),
-             asDerived().getNumArguments() };
-  }
-};
-
 /// Subscripting expressions like a[i] that refer to an element within a
 /// container.
 ///
@@ -2034,8 +2078,6 @@ public:
   bool hasTrailingClosure() const {
     return SubscriptExprBits.HasTrailingClosure;
   }
-
-  using TrailingCallArguments::getArgumentLabels;
 
   /// Determine whether this subscript reference should bypass the
   /// ordinary accessors.
