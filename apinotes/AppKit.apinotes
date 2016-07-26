@@ -353,6 +353,9 @@ Classes:
     MethodKind: Class
 - Name: NSApplication
   Methods:
+  - Selector: 'activateIgnoringOtherApps:'
+    SwiftName: activate(ignoringOtherApps:)
+    MethodKind: Instance
   - Selector: 'runModalSession:'
     SwiftName: runModalSession(_:)
     MethodKind: Instance
