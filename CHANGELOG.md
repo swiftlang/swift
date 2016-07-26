@@ -3,6 +3,25 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0116](https://github.com/apple/swift-evolution/blob/master/proposals/0116-id-as-any.md):
+  Objective-C APIs using `id` now import into Swift as `Any` instead of as `AnyObject`.
+  Similarly, APIs using untyped `NSArray` and `NSDictionary` import as `[Any]` and
+  `[NSObject: Any]`, respectively.
+
+* [SE-0072](https://github.com/apple/swift-evolution/blob/master/proposals/0072-eliminate-implicit-bridging-conversions.md):
+  Bridging conversions are no longer implicit. The conversion from a Swift value type to
+  its corresponding object can be forced with `as`, e.g. `string as NSString`. Any Swift
+  value can also be converted to its boxed `id` representation with `as AnyObject`.
+
+* Collection subtype conversions and dynamic casts now work with protocol types:
+
+    ```swift
+    protocol P {}; extension Int: P {}
+    var x: [Int] = [1, 2, 3]
+    var p: [P] = x
+    var x2 = p as! [Int]
+    ```
+
 * [SR-2131](https://bugs.swift.org/browse/SR-2131):
   The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a
   prefix and suffix of all strings.
