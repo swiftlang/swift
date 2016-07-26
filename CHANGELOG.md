@@ -13,6 +13,7 @@ Swift 3.0
 
   func performOperation<T>(continuation: T -> Never) { ... }         // old
   func performOperation<T>(continuation: @noreturn T -> ()) { ... }  // new
+  ```
 
 * [SE-0116](https://github.com/apple/swift-evolution/blob/master/proposals/0116-id-as-any.md):
   Objective-C APIs using `id` now import into Swift as `Any` instead of as `AnyObject`.
