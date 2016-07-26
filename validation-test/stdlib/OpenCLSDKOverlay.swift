@@ -186,13 +186,16 @@ tests.test("clSetKernelArgsListAPPLE") {
   // Set the arguments to our compute kernel
   //
   err = 0
-  err = withUnsafePointers(&input, &output, &count) {
-    inputPtr, outputPtr, countPtr in
-    clSetKernelArgsListAPPLE(
-      kernel!, 3,
-      0, sizeof(cl_mem.self), inputPtr,
-      1, sizeof(cl_mem.self), outputPtr,
-      2, sizeofValue(count), countPtr)
+  err = withUnsafePointer(&input) { inputPtr in
+    withUnsafePointer(&output) { outputPtr in
+      withUnsafePointer(&count) { countPtr in
+        clSetKernelArgsListAPPLE(
+          kernel!, 3,
+          0, sizeof(cl_mem.self), inputPtr,
+          1, sizeof(cl_mem.self), outputPtr,
+          2, sizeofValue(count), countPtr)
+      }
+    }
   }
 
   
