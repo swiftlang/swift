@@ -20,7 +20,7 @@
 // CHECK: {{^[}]$}}
 
 // CHECK-LABEL: class NSObject : NSObjectProtocol {
-// CHECK-DAG: func copy() -> AnyObject
+// CHECK-DAG: func copy() -> Any
 // CHECK-DAG: class func hash() -> Int
 // CHECK-WITH-FORWARD-DECLS-DAG: class func description() -> String
 // CHECK-WITH-FORWARD-DECLS-DAG: func forwardInvocation(_ anInvocation: Invocation!)

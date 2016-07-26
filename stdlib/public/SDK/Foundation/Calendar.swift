@@ -107,7 +107,7 @@ public struct Calendar : CustomStringConvertible, CustomDebugStringConvertible, 
     ///
     /// - parameter identifier: The kind of calendar to use.
     public init(identifier: Identifier) {
-        let result = __NSCalendarInit(Calendar._toNSCalendarIdentifier(identifier))!
+        let result = __NSCalendarInit(Calendar._toNSCalendarIdentifier(identifier).rawValue as NSString)!
         _handle = _MutableHandle(adoptingReference: result)
         _autoupdating = false
     }
@@ -1082,10 +1082,6 @@ public struct Calendar : CustomStringConvertible, CustomDebugStringConvertible, 
 }
 
 extension Calendar : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSCalendar {
         return _handle._copiedReference()

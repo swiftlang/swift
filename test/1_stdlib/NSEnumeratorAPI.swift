@@ -16,7 +16,7 @@ NSEnumeratorAPI.test("Sequence") {
 }
 
 NSEnumeratorAPI.test("keyEnumerator") {
-  let result = [1: "one", 2: "two"]
+  let result = [1 as NSNumber: "one", 2 as NSNumber: "two"]
   expectEqualsUnordered(
     [1, 2], NSDictionary(dictionary: result).keyEnumerator()) {
       switch ($0 as! Int, $1 as! Int) {

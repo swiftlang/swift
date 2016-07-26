@@ -113,7 +113,7 @@ import SwiftShims
 public protocol Error {
   var _domain: String { get }
   var _code: Int { get }
-  var _userInfo: AnyObject? { get }
+  var _userInfo: Any? { get }
 }
 
 #if _runtime(_ObjC)
@@ -135,7 +135,7 @@ public func _stdlib_getErrorCode<T : Error>(_ x: UnsafePointer<T>) -> Int {
 @_silgen_name("swift_stdlib_getErrorUserInfoNSDictionary")
 public func _stdlib_getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>)
 -> AnyObject? {
-  return x.pointee._userInfo
+  return x.pointee._userInfo.map { $0 as AnyObject }
 }
 
 @_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
@@ -172,7 +172,7 @@ extension Error {
     return String(reflecting: self.dynamicType)
   }
 
-  public var _userInfo: AnyObject? {
+  public var _userInfo: Any? {
 #if _runtime(_ObjC)
     return _stdlib_getErrorDefaultUserInfo(self)
 #else

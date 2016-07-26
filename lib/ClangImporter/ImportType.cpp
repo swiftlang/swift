@@ -969,10 +969,9 @@ namespace {
       // id maps to Any in bridgeable contexts, AnyObject otherwise.
       if (type->isObjCIdType()) {
         if (Impl.SwiftContext.LangOpts.EnableIdAsAny)
-          return {
-              proto->getDeclaredType(),
-              ImportHint(ImportHint::ObjCBridged,
-                         Impl.SwiftContext.TheAnyType)};
+          return {proto->getDeclaredType(),
+                  ImportHint(ImportHint::ObjCBridged,
+                             Impl.SwiftContext.TheAnyType)};
         return {proto->getDeclaredType(), ImportHint::ObjCPointer};
       }
 
@@ -2235,6 +2234,11 @@ Type ClangImporter::Implementation::importMethodType(
           swiftResultTy->getAnyOptionalObjectType(OptionalityOfReturn);
       if (!nonOptionalTy)
         nonOptionalTy = swiftResultTy;
+
+      // Undo 'Any' bridging.
+      if (nonOptionalTy->isAny())
+        nonOptionalTy = SwiftContext.getProtocol(KnownProtocolKind::AnyObject)
+          ->getDeclaredType();
 
       if (nonOptionalTy->isAnyClassReferenceType()) {
         swiftResultTy = getUnmanagedType(*this, nonOptionalTy);

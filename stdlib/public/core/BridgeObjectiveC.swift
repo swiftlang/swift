@@ -19,14 +19,6 @@
 public protocol _ObjectiveCBridgeable {
   associatedtype _ObjectiveCType : AnyObject
 
-  /// Returns `true` iff instances of `Self` can be converted to
-  /// Objective-C.  Even if this method returns `true`, a given
-  /// instance of `Self._ObjectiveCType` may, or may not, convert
-  /// successfully to `Self`; for example, an `NSArray` will only
-  /// convert successfully to `[String]` if it contains only
-  /// `NSString`s.
-  static func _isBridgedToObjectiveC() -> Bool
-
   /// Convert `self` to Objective-C.
   func _bridgeToObjectiveC() -> _ObjectiveCType
 
@@ -91,6 +83,13 @@ public protocol _ObjectiveCBridgeable {
       -> Self
 }
 
+// TODO: stub for unit testing purposes
+extension _ObjectiveCBridgeable {
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+}
+
 //===--- Bridging for metatypes -------------------------------------------===//
 
 /// A stand-in for a value of metatype type.
@@ -105,10 +104,6 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
   internal var value: AnyObject.Type
 
   public typealias _ObjectiveCType = AnyObject
-
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
 
   public func _bridgeToObjectiveC() -> AnyObject {
     return value
@@ -149,66 +144,19 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 // implementations.
 //===----------------------------------------------------------------------===//
 
-/// Attempt to convert `x` to its Objective-C representation.
-///
-/// - If `T` is a class type, it is always bridged verbatim, the function
-///   returns `x`;
-///
-/// - otherwise, `T` conforms to `_ObjectiveCBridgeable`:
-///   + if `T._isBridgedToObjectiveC()` returns `false`, then the
-///     result is empty;
-///   + otherwise, returns the result of `x._bridgeToObjectiveC()`;
-///
-/// - otherwise, the result is empty.
-public func _bridgeToObjectiveC<T>(_ x: T) -> AnyObject? {
-  if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return unsafeBitCast(x, to: AnyObject.self)
-  }
-  return _bridgeNonVerbatimToObjectiveC(x)
-}
-
-public func _bridgeToObjectiveCUnconditional<T>(_ x: T) -> AnyObject {
-  let optResult: AnyObject? = _bridgeToObjectiveC(x)
-  _precondition(optResult != nil,
-      "value failed to bridge from Swift type to a Objective-C type")
-  return optResult!
-}
-
-/// Same as `_bridgeToObjectiveCUnconditional`, but autoreleases the
-/// return value if `T` is bridged non-verbatim.
-func _bridgeToObjectiveCUnconditionalAutorelease<T>(_ x: T) -> AnyObject
-{
-  if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return unsafeBitCast(x, to: AnyObject.self)
-  }
-  guard let bridged = _bridgeNonVerbatimToObjectiveC(x) else {
-    _preconditionFailure(
-      "Dictionary key failed to bridge from Swift type to a Objective-C type")
-  }
-
-  _autorelease(bridged)
-  return bridged
-}
-
-@_silgen_name("_swift_bridgeNonVerbatimToObjectiveC")
-func _bridgeNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject?
-
 /// Bridge an arbitrary value to an Objective-C object.
 ///
 /// - If `T` is a class type, it is always bridged verbatim, the function
 ///   returns `x`;
 ///
-/// - otherwise, `T` conforms to `_ObjectiveCBridgeable`:
-///   + if `T._isBridgedToObjectiveC()` returns `false`, then
-///     we fall back to boxing (below);
-///   + otherwise, returns the result of `x._bridgeToObjectiveC()`;
+/// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`,
+///   returns the result of `x._bridgeToObjectiveC()`;
 ///
 /// - otherwise, we use **boxing** to bring the value into Objective-C.
 ///   The value is wrapped in an instance of a private Objective-C class
 ///   that is `id`-compatible and dynamically castable back to the type of
 ///   the boxed value, but is otherwise opaque.
 ///
-/// TODO: This should subsume `_bridgeToObjectiveC` above.
 /// COMPILER_INTRINSIC
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
@@ -217,7 +165,6 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   return _bridgeAnythingNonVerbatimToObjectiveC(x)
 }
 
-// TODO: This should subsume `_bridgeNonVerbatimToObjectiveC` above.
 /// COMPILER_INTRINSIC
 @_silgen_name("_swift_bridgeAnythingNonVerbatimToObjectiveC")
 public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject
@@ -262,8 +209,6 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
 ///   - if the dynamic type of `x` is `T` or a subclass of it, it is bridged
 ///     verbatim, the function returns `x`;
 /// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`:
-///   + if `T._isBridgedToObjectiveC()` returns `false`, then the result is
-///     empty;
 ///   + otherwise, if the dynamic type of `x` is not `T._ObjectiveCType`
 ///     or a subclass of it, the result is empty;
 ///   + otherwise, returns the result of
@@ -301,6 +246,27 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
   _ result: inout T?
 )
 
+/// Helper stub to upcast to Any and store the result to an inout Any?
+/// on the C++ runtime's behalf.
+// COMPILER_INTRINSIC
+@_silgen_name("_swift_bridgeNonVerbatimFromObjectiveCToAny")
+public func _bridgeNonVerbatimFromObjectiveCToAny(
+    _ x: AnyObject,
+    _ result: inout Any?
+) {
+  result = x as Any
+}
+
+/// Helper stub to upcast to Optional on the C++ runtime's behalf.
+// COMPILER_INTRINSIC
+@_silgen_name("_swift_bridgeNonVerbatimBoxedValue")
+public func _bridgeNonVerbatimBoxedValue<NativeType>(
+    _ x: UnsafePointer<NativeType>,
+    _ result: inout NativeType?
+) {
+  result = x.pointee
+}
+
 /// Runtime optional to conditionally perform a bridge from an object to a value
 /// type.
 ///
@@ -319,8 +285,7 @@ func _bridgeNonVerbatimFromObjectiveCConditional<T>(
 /// representation.
 ///
 /// - If `T` is a class type, returns `true`;
-/// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`, returns
-///   `T._isBridgedToObjectiveC()`.
+/// - otherwise, returns whether `T` conforms to `_ObjectiveCBridgeable`.
 public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return true

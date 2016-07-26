@@ -32,9 +32,9 @@ ArrayOfClassObjectBridging.test("bridging class object array to NSArray") {
   let classesBridged: NSArray = classes as NSArray
 
   expectTrue(classesBridged.count == 3)
-  expectTrue(classesBridged[0] === NSObject.self)
-  expectTrue(classesBridged[1] === NSString.self)
-  expectTrue(classesBridged[2] === NSArray.self)
+  expectTrue(classesBridged[0] as AnyObject === NSObject.self)
+  expectTrue(classesBridged[1] as AnyObject === NSString.self)
+  expectTrue(classesBridged[2] as AnyObject === NSArray.self)
 }
 
 ArrayOfClassObjectBridging.test("bridging NSArray of class objects to [AnyObject]") {

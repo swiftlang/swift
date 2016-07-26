@@ -24,9 +24,9 @@ func testNSSetBridging(_ hive: Hive) {
 public func expectType<T>(_: T.Type, _ x: inout T) {}
 
 func testNSMutableDictionarySubscript(
-  _ dict: NSMutableDictionary, key: NSCopying, value: AnyObject) {
+  _ dict: NSMutableDictionary, key: NSCopying, value: Any) {
   var oldValue = dict[key]
-  expectType(Optional<AnyObject>.self, &oldValue)
+  expectType(Optional<Any>.self, &oldValue)
 
   dict[key] = value
 }
@@ -56,7 +56,7 @@ func j(_ x: GenericClass<NSString>?) {
 
 class Desk {}
 class Rock: NSObject, Pettable {
-  required init(fur: AnyObject) {}
+  required init(fur: Any) {}
   func other() -> Self { return self }
   class func adopt() -> Self { fatalError("") }
   func pet() {}
@@ -69,7 +69,7 @@ class Rock: NSObject, Pettable {
 class Porcupine: Animal {
 }
 class Cat: Animal, Pettable {
-  required init(fur: AnyObject) {}
+  required init(fur: Any) {}
   func other() -> Self { return self }
   class func adopt() -> Self { fatalError("") }
   func pet() {}
@@ -181,13 +181,14 @@ extension AnimalContainer {
     _ = #selector(y.create)
   }
 
-  func doesntUseGenericParam2(_ x: T, _ y: T.Type) {
+  // TODO: 'Any' bridging should not require reifying generic params.
+  func doesntUseGenericParam2(_ x: T, _ y: T.Type) { // expected-error{{cannot access the class's generic parameters}}
     let a = x.another()
     _ = a.another()
     _ = x.another().another()
 
     _ = x.dynamicType.create().another()
-    _ = x.dynamicType.init(noise: x).another()
+    _ = x.dynamicType.init(noise: x).another() // expected-note{{here}}
     _ = y.create().another()
     _ = y.init(noise: x).another()
     _ = y.init(noise: x.another()).another()
@@ -240,13 +241,14 @@ extension AnimalContainer {
 
   func crashWithInvalidSubscript(x: NSArray) {
     _ = funcWithWrongArgType(x: x[12])
-    // expected-error@-1{{'AnyObject' is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}}
+    // expected-error@-1{{cannot convert value of type 'Any' to expected argument type 'NSObject'}}
   }
 }
 
 extension PettableContainer {
-  func doesntUseGenericParam(_ x: T, _ y: T.Type) {
-    _ = x.dynamicType.init(fur: x).other()
+  // TODO: Any erasure shouldn't use generic parameter metadata.
+  func doesntUseGenericParam(_ x: T, _ y: T.Type) { // expected-error{{cannot access the class's generic parameters}}
+    _ = x.dynamicType.init(fur: x).other() // expected-note{{here}}
     _ = x.dynamicType.adopt().other()
     _ = y.init(fur: x).other()
     _ = y.adopt().other()

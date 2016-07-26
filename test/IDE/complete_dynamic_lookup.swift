@@ -123,8 +123,8 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#Int8#}][#Int?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#TopLevelObjcClass#}][#Int?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#TopLevelObjcProtocol#}][#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#Int32#}][#AnyObject!?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#AnyObject!#}][#AnyObject!?#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#Int32#}][#Any!?#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#Any!#}][#Any!?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT: End completions
 // GLOBAL_NEGATIVE-NOT:.objectAtIndexedSubscript
 

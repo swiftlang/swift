@@ -145,7 +145,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     let resultPtr = result.baseAddress
     let p = __manager._elementPointer
     for i in 0..<count {
-      (resultPtr + i).initialize(to: _bridgeToObjectiveCUnconditional(p[i]))
+      (resultPtr + i).initialize(to: _bridgeAnythingToObjectiveC(p[i]))
     }
     _fixLifetime(__manager)
     return result
@@ -428,9 +428,6 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Complexity: O(1).
   public func _asCocoaArray() -> _NSArrayCore {
-    _sanityCheck(
-        _isBridgedToObjectiveC(Element.self),
-        "Array element type is not bridged to Objective-C")
     if count == 0 {
       return _emptyArrayStorage
     }

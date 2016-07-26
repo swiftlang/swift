@@ -89,12 +89,12 @@ func ==(x: OtherClass, y: OtherClass) -> Bool { return true }
 
 // Basic bridging
 func bridgeToObjC(_ s: BridgedStruct) -> BridgedClass {
-  return s 
+  return s // expected-error{{cannot convert return expression of type 'BridgedStruct' to return type 'BridgedClass'}}
   return s as BridgedClass
 }
 
 func bridgeToAnyObject(_ s: BridgedStruct) -> AnyObject {
-  return s 
+  return s // expected-error{{return expression of type 'BridgedStruct' does not conform to 'AnyObject'}}
   return s as AnyObject
 }
 
@@ -112,17 +112,17 @@ func bridgeFromObjCDerived(_ s: BridgedClassSub) -> BridgedStruct {
 func arrayToNSArray() {
   var nsa: NSArray
 
-  nsa = [AnyObject]() 
-  nsa = [BridgedClass]()
-  nsa = [OtherClass]() 
-  nsa = [BridgedStruct]()
+  nsa = [AnyObject]() // expected-error {{cannot assign value of type '[AnyObject]' to type 'NSArray'}}
+  nsa = [BridgedClass]() // expected-error {{cannot assign value of type '[BridgedClass]' to type 'NSArray'}}
+  nsa = [OtherClass]() // expected-error {{cannot assign value of type '[OtherClass]' to type 'NSArray'}}
+  nsa = [BridgedStruct]() // expected-error {{cannot assign value of type '[BridgedStruct]' to type 'NSArray'}}
   nsa = [NotBridgedStruct]() // expected-error{{cannot assign value of type '[NotBridgedStruct]' to type 'NSArray'}}
 
   nsa = [AnyObject]() as NSArray
   nsa = [BridgedClass]() as NSArray
   nsa = [OtherClass]() as NSArray
   nsa = [BridgedStruct]() as NSArray
-  nsa = [NotBridgedStruct]() as NSArray // expected-error{{cannot convert value of type '[NotBridgedStruct]' to type 'NSArray' in coercion}}
+  nsa = [NotBridgedStruct]() as NSArray
   _ = nsa
 }
 
@@ -132,13 +132,13 @@ func nsArrayToArray(_ nsa: NSArray) {
   var _: [BridgedClass] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedClass]'}} {{30-30= as! [BridgedClass]}}
   var _: [OtherClass] = nsa // expected-error{{'NSArray' is not convertible to '[OtherClass]'}} {{28-28= as! [OtherClass]}}
   var _: [BridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'}} {{31-31= as! [BridgedStruct]}}
-  var _: [NotBridgedStruct] = nsa // expected-error{{cannot convert value of type 'NSArray' to specified type '[NotBridgedStruct]'}}
+  var _: [NotBridgedStruct] = nsa // expected-error{{use 'as!' to force downcast}}
 
   var _: [AnyObject] = nsa as [AnyObject]
   var _: [BridgedClass] = nsa as [BridgedClass] // expected-error{{'NSArray' is not convertible to '[BridgedClass]'; did you mean to use 'as!' to force downcast?}} {{31-33=as!}}
   var _: [OtherClass] = nsa as [OtherClass] // expected-error{{'NSArray' is not convertible to '[OtherClass]'; did you mean to use 'as!' to force downcast?}} {{29-31=as!}}
   var _: [BridgedStruct] = nsa as [BridgedStruct] // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'; did you mean to use 'as!' to force downcast?}} {{32-34=as!}}
-  var _: [NotBridgedStruct] = nsa as [NotBridgedStruct] // expected-error{{cannot convert value of type 'NSArray' to type '[NotBridgedStruct]' in coercion}}
+  var _: [NotBridgedStruct] = nsa as [NotBridgedStruct] // expected-error{{use 'as!' to force downcast}}
 
   var arr6: Array = nsa as Array
   arr6 = arr1
@@ -150,34 +150,34 @@ func dictionaryToNSDictionary() {
 
   var nsd: NSDictionary
 
-  nsd = [NSObject : AnyObject]()
+  nsd = [NSObject : AnyObject]() // expected-error {{cannot assign value of type '[NSObject : AnyObject]' to type 'NSDictionary'}}
   nsd = [NSObject : AnyObject]() as NSDictionary
-  nsd = [NSObject : BridgedClass]()
+  nsd = [NSObject : BridgedClass]() // expected-error {{cannot assign value of type '[NSObject : BridgedClass]' to type 'NSDictionary'}}
   nsd = [NSObject : BridgedClass]() as NSDictionary
-  nsd = [NSObject : OtherClass]()
+  nsd = [NSObject : OtherClass]() // expected-error {{cannot assign value of type '[NSObject : OtherClass]' to type 'NSDictionary'}}
   nsd = [NSObject : OtherClass]() as NSDictionary
-  nsd = [NSObject : BridgedStruct]()
+  nsd = [NSObject : BridgedStruct]() // expected-error {{cannot assign value of type '[NSObject : BridgedStruct]' to type 'NSDictionary'}}
   nsd = [NSObject : BridgedStruct]() as NSDictionary
   nsd = [NSObject : NotBridgedStruct]() // expected-error{{cannot assign value of type '[NSObject : NotBridgedStruct]' to type 'NSDictionary'}}
-  nsd = [NSObject : NotBridgedStruct]() as NSDictionary // expected-error{{cannot convert value of type '[NSObject : NotBridgedStruct]' to type 'NSDictionary' in coercion}}
+  nsd = [NSObject : NotBridgedStruct]() as NSDictionary
 
   nsd = [NSObject : BridgedClass?]() // expected-error{{cannot assign value of type '[NSObject : BridgedClass?]' to type 'NSDictionary'}}
-  nsd = [NSObject : BridgedClass?]() as NSDictionary // expected-error{{cannot convert value of type '[NSObject : BridgedClass?]' to type 'NSDictionary' in coercion}}
+  nsd = [NSObject : BridgedClass?]() as NSDictionary
   nsd = [NSObject : BridgedStruct?]()  // expected-error{{cannot assign value of type '[NSObject : BridgedStruct?]' to type 'NSDictionary'}}
-  nsd = [NSObject : BridgedStruct?]() as NSDictionary //expected-error{{cannot convert value of type '[NSObject : BridgedStruct?]' to type 'NSDictionary' in coercion}}
+  nsd = [NSObject : BridgedStruct?]() as NSDictionary
 
-  nsd = [BridgedClass : AnyObject]()
+  nsd = [BridgedClass : AnyObject]() // expected-error {{cannot assign value of type '[BridgedClass : AnyObject]' to type 'NSDictionary'}}
   nsd = [BridgedClass : AnyObject]() as NSDictionary
-  nsd = [OtherClass : AnyObject]()
+  nsd = [OtherClass : AnyObject]() // expected-error {{cannot assign value of type '[OtherClass : AnyObject]' to type 'NSDictionary'}}
   nsd = [OtherClass : AnyObject]() as NSDictionary
-  nsd = [BridgedStruct : AnyObject]()
+  nsd = [BridgedStruct : AnyObject]() // expected-error {{cannot assign value of type '[BridgedStruct : AnyObject]' to type 'NSDictionary'}}
   nsd = [BridgedStruct : AnyObject]() as NSDictionary
   nsd = [NotBridgedStruct : AnyObject]()  // expected-error{{cannot assign value of type '[NotBridgedStruct : AnyObject]' to type 'NSDictionary'}}
-  nsd = [NotBridgedStruct : AnyObject]() as NSDictionary  // expected-error{{cannot convert value of type '[NotBridgedStruct : AnyObject]' to type 'NSDictionary' in coercion}}
+  nsd = [NotBridgedStruct : AnyObject]() as NSDictionary
 
   // <rdar://problem/17134986>
   var bcOpt: BridgedClass?
-  nsd = [BridgedStruct() : bcOpt] // expected-error{{value of optional type 'BridgedClass?' not unwrapped; did you mean to use '!' or '?'?}}
+  nsd = [BridgedStruct() : bcOpt] // expected-error{{value of type 'BridgedStruct' does not conform to expected dictionary key type 'NSCopying'}}
   bcOpt = nil
   _ = nsd
 }
@@ -233,7 +233,7 @@ func rdar19695671() {
 // This failed at one point while fixing rdar://problem/19600325.
 func getArrayOfAnyObject(_: AnyObject) -> [AnyObject] { return [] }
 func testCallback(_ f: (AnyObject) -> AnyObject?) {}
-testCallback { return getArrayOfAnyObject($0) }
+testCallback { return getArrayOfAnyObject($0) } // expected-error {{cannot convert value of type '[AnyObject]' to closure result type 'AnyObject?'}}
 
 // <rdar://problem/19724719> Type checker thinks "(optionalNSString ?? nonoptionalNSString) as String" is a forced cast
 func rdar19724719(_ f: (String) -> (), s1: NSString?, s2: NSString) {
@@ -293,10 +293,10 @@ func rdar19836341(_ ns: NSString?, vns: NSString?) {
 
 // <rdar://problem/20029786> Swift compiler sometimes suggests changing "as!" to "as?!"
 func rdar20029786(_ ns: NSString?) {
-  var s: String = ns ?? "str" as String as String // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}
-  var s2 = ns ?? "str" as String as String
+  var s: String = ns ?? "str" as String as String // expected-error{{cannot convert value of type 'NSString?' to expected argument type 'String?'}}
+  var s2 = ns ?? "str" as String as String // expected-error {{binary operator '??' cannot be applied to operands of type 'NSString?' and 'String'}} expected-note{{}}
 
-  let s3: NSString? = "str" as String?
+  let s3: NSString? = "str" as String? // expected-error {{cannot convert value of type 'String?' to specified type 'NSString?'}}
 
   var s4: String = ns ?? "str" // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{20-20=(}}{{31-31=) as String}}
   var s5: String = (ns ?? "str") as String // fixed version
@@ -347,7 +347,15 @@ func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: An
   z = e
   z = f
   z = g
-  z = h // todo{{does not conform to 'AnyObject'}}
+  z = h // expected-error{{does not conform to 'AnyObject'}}
+
+  _ = z
+}
+
+func bridgeAnyContainerToAnyObject(x: [Any], y: [NSObject: Any]) {
+  var z: AnyObject
+  z = x as AnyObject
+  z = y as AnyObject
 
   _ = z
 }

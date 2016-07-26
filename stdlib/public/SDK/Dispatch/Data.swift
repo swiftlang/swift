@@ -262,10 +262,6 @@ public struct DispatchDataIterator : IteratorProtocol, Sequence {
 }
 
 extension DispatchData {
-	public static func _isBridgedToObjectiveC() -> Bool {
-		return true
-	}
-
 	@_semantics("convertToObjectiveC")
 	public func _bridgeToObjectiveC() -> __DispatchData {
 		return unsafeBitCast(__wrapped, to: __DispatchData.self)

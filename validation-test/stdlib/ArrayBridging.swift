@@ -39,7 +39,7 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialData {
     _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     let nsa = raceData.nsa
-    let v: AnyObject = nsa.object(at: 0)
+    let v = nsa.object(at: 0) as AnyObject
     return Observation(unsafeBitCast(v, to: UInt.self))
   }
 
@@ -79,10 +79,10 @@ struct ArrayBridge_FastEnumeration_ObjC_RaceTest :
     let objcValues = NSMutableArray()
     slurpFastEnumerationOfArrayFromObjCImpl(nsa, nsa, objcValues)
     return Observation(
-      unsafeBitCast(objcValues[0], to: UInt.self),
-      unsafeBitCast(objcValues[1], to: UInt.self),
-      unsafeBitCast(objcValues[2], to: UInt.self),
-      unsafeBitCast(objcValues[3], to: UInt.self))
+      unsafeBitCast(objcValues[0] as AnyObject, to: UInt.self),
+      unsafeBitCast(objcValues[1] as AnyObject, to: UInt.self),
+      unsafeBitCast(objcValues[2] as AnyObject, to: UInt.self),
+      unsafeBitCast(objcValues[3] as AnyObject, to: UInt.self))
   }
 
   func evaluateObservations(

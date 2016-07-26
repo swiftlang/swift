@@ -189,7 +189,7 @@ ImportedObjCGenerics.test("InheritInSwift") {
 }
 
 ImportedObjCGenerics.test("BridgedInitializer") {
-  let strings: [String] = ["hello", "world"]
+  let strings: [NSString] = ["hello", "world"]
   let s = BridgedInitializer(array: strings)
   expectEqual(s.count, 2)
 }

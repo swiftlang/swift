@@ -296,8 +296,15 @@ func passingToNullableId<T: CP, U>(receiver: IdLover,
   receiver.takesNullableId(optOptC)
 }
 
+protocol Anyable {
+  init(any: Any)
+  init(anyMaybe: Any?)
+  var anyProperty: Any { get }
+  var maybeAnyProperty: Any? { get }
+}
+
 // Make sure we generate correct bridging thunks
-class SwiftIdLover : NSObject {
+class SwiftIdLover : NSObject, Anyable {
 
   func methodReturningAny() -> Any {}
   // CHECK-LABEL: sil hidden @_TFC17objc_bridging_any12SwiftIdLover18methodReturningAnyfT_P_ : $@convention(method) (@guaranteed SwiftIdLover) -> @out Any
@@ -473,4 +480,21 @@ class SwiftIdLover : NSObject {
   func methodReturningBlockReturningOptionalAny() -> (() -> Any?) {}
   // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__iGSqP___XFdCb__aGSqPs9AnyObject___
   // CHECK: function_ref @_TFs27_bridgeAnythingToObjectiveC
+
+  override init() { super.init() }
+  dynamic required convenience init(any: Any) { self.init() }
+  dynamic required convenience init(anyMaybe: Any?) { self.init() }
+  dynamic var anyProperty: Any
+  dynamic var maybeAnyProperty: Any?
+
+  subscript(_: IndexForAnySubscript) -> Any { get {} set {} }
+
+  func methodReturningAnyOrError() throws -> Any {}
+}
+
+class IndexForAnySubscript {}
+
+func dynamicLookup(x: AnyObject) {
+  _ = x.anyProperty
+  _ = x[IndexForAnySubscript()]
 }

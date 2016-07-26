@@ -32,10 +32,10 @@ func foo() {
   _  = BOOLtoBOOL as (Bool) -> Bool
   _  = DummyClass().boolProperty.onlyOnBool() as Bool
 
-  _  = arrayToArray as (Array<AnyObject>!) -> (Array<AnyObject>!)
+  _  = arrayToArray as (Array<Any>!) -> (Array<Any>!)
   DummyClass().arrayProperty.onlyOnArray()
 
-  _ = dictToDict as (Dictionary<NSObject, AnyObject>!) -> Dictionary<NSObject, AnyObject>!
+  _ = dictToDict as (Dictionary<NSObject, Any>!) -> Dictionary<NSObject, Any>!
 
   DummyClass().dictProperty.onlyOnDictionary()
 

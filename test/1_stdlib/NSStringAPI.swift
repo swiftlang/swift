@@ -30,7 +30,7 @@ class NonContiguousNSString : NSString {
     super.init()
   }
 
-  @objc(copyWithZone:) override func copy(with zone: NSZone?) -> AnyObject {
+  @objc(copyWithZone:) override func copy(with zone: NSZone?) -> Any {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -1029,8 +1029,8 @@ NSStringAPIs.test("paragraphRangeFor(_:)") {
 }
 
 NSStringAPIs.test("pathComponents") {
-  expectEqual([ "/", "foo", "bar" ] as [NSString], ("/foo/bar" as NSString).pathComponents)
-  expectEqual([ "/", "абв", "где" ] as [NSString], ("/абв/где" as NSString).pathComponents)
+  expectEqual([ "/", "foo", "bar" ] as [NSString], ("/foo/bar" as NSString).pathComponents as [NSString])
+  expectEqual([ "/", "абв", "где" ] as [NSString], ("/абв/где" as NSString).pathComponents as [NSString])
 }
 
 NSStringAPIs.test("pathExtension") {
@@ -1632,10 +1632,10 @@ NSStringAPIs.test("trimmingCharacters(in:)") {
 }
 
 NSStringAPIs.test("NSString.stringsByAppendingPaths(_:)") {
-  expectEqual([] as [NSString], ("" as NSString).strings(byAppendingPaths: []))
+  expectEqual([] as [NSString], ("" as NSString).strings(byAppendingPaths: []) as [NSString])
   expectEqual(
     [ "/tmp/foo", "/tmp/bar" ] as [NSString],
-    ("/tmp" as NSString).strings(byAppendingPaths: [ "foo", "bar" ]))
+    ("/tmp" as NSString).strings(byAppendingPaths: [ "foo", "bar" ]) as [NSString])
 }
 
 NSStringAPIs.test("substring(from:)") {

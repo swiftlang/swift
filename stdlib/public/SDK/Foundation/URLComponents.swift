@@ -316,10 +316,6 @@ public struct URLComponents : ReferenceConvertible, Hashable, CustomStringConver
 }
 
 extension URLComponents : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSURLComponents.self
     }
@@ -384,10 +380,6 @@ public struct URLQueryItem : ReferenceConvertible, Hashable, Equatable, CustomSt
 
 @available(OSX 10.10, iOS 8.0, *)
 extension URLQueryItem : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSURLQueryItem.self
     }

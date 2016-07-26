@@ -166,20 +166,20 @@ public struct Mirror {
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
   ) -> () -> Mirror? {
 
-    if let subject = subject as? AnyObject,
-      let subjectClass = Subject.self as? AnyClass,
-      let superclass = _getSuperclass(subjectClass) {
+    if let subjectClass = Subject.self as? AnyClass,
+       let superclass = _getSuperclass(subjectClass) {
 
       switch ancestorRepresentation {
       case .generated:
         return {
-          self._legacyMirror(subject, asClass: superclass).map {
+          self._legacyMirror(_unsafeDowncastToAnyObject(fromAny: subject), asClass: superclass).map {
             Mirror(legacy: $0, subjectType: superclass)
           }
         }
       case .customized(let makeAncestor):
         return {
-          Mirror(subject, subjectClass: superclass, ancestor: makeAncestor())
+          Mirror(_unsafeDowncastToAnyObject(fromAny: subject), subjectClass: superclass,
+                 ancestor: makeAncestor())
         }
       case .suppressed:
         break

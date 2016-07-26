@@ -16,11 +16,11 @@ tests.test("user info") {
   let error = NSError(domain: "MyDomain", code: 1, userInfo: [
       // CHECK-WARNINGS: warning: 'localizedDescriptionKey' is deprecated: renamed to 'NSLocalizedDescriptionKey'
       // CHECK-WARNINGS: note: use 'NSLocalizedDescriptionKey' instead
-        ErrorUserInfoKey.localizedDescriptionKey.rawValue: "description",
-        NSLocalizedFailureReasonErrorKey: "reason"
+        ErrorUserInfoKey.localizedDescriptionKey.rawValue as NSString: "description",
+        NSLocalizedFailureReasonErrorKey as NSString: "reason"
       ])
-  expectEqual("description", error.userInfo[NSLocalizedDescriptionKey]! as! String)
-  expectEqual("reason", error.userInfo[ErrorUserInfoKey.localizedFailureReasonErrorKey.rawValue]! as! String)
+  expectEqual("description", error.userInfo[NSLocalizedDescriptionKey as NSString]! as! String)
+  expectEqual("reason", error.userInfo[ErrorUserInfoKey.localizedFailureReasonErrorKey.rawValue as NSObject]! as! String)
 
   expectEqual("reason", error.userInfo[ErrorUserInfoKey.localizedFailureReasonErrorKey as NSObject]! as! String)
 }

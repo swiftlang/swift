@@ -118,7 +118,7 @@ public struct Locale : CustomStringConvertible, CustomDebugStringConvertible, Ha
     /// For example, in the "en" locale, the result for `.buddhist` is `"Buddhist Calendar"`.
     public func localizedString(for calendarIdentifier: Calendar.Identifier) -> String? {
         // NSLocale doesn't export a constant for this
-        let result = CFLocaleCopyDisplayNameForPropertyValue(unsafeBitCast(_wrapped, to: CFLocale.self), .calendarIdentifier, Calendar._toNSCalendarIdentifier(calendarIdentifier)) as String
+        let result = CFLocaleCopyDisplayNameForPropertyValue(unsafeBitCast(_wrapped, to: CFLocale.self), .calendarIdentifier, Calendar._toNSCalendarIdentifier(calendarIdentifier).rawValue as CFString) as String
         return result
     }
 
@@ -441,10 +441,6 @@ public struct Locale : CustomStringConvertible, CustomDebugStringConvertible, Ha
 
 
 extension Locale : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSLocale {
         return _wrapped

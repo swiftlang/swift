@@ -144,7 +144,7 @@ namespace swift {
     bool EnableExperimentalNestedGenericTypes = false;
 
     /// \brief Enable generalized collection casting.
-    bool EnableExperimentalCollectionCasts = false;
+    bool EnableExperimentalCollectionCasts = true;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
@@ -165,7 +165,7 @@ namespace swift {
     bool StripNSPrefix = true;
 
     /// Should 'id' in Objective-C be imported as 'Any' in Swift?
-    bool EnableIdAsAny = false;
+    bool EnableIdAsAny = true;
 
     /// Enable the Swift 3 migration via Fix-Its.
     bool Swift3Migration = false;

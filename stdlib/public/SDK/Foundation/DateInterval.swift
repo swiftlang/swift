@@ -183,10 +183,6 @@ public struct DateInterval : ReferenceConvertible, Comparable, Hashable {
 
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension DateInterval : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSDateInterval.self
     }

@@ -43,7 +43,7 @@ func printIdentity(_ lhs: AnyObject, _ rhs: AnyObject, _ lhsName: String, _ rhsN
 
 print("NoisyEqual ==")
 class NoisyEqual : NSObject {
-  override func isEqual(_ rhs: AnyObject?) -> Bool {
+  override func isEqual(_ rhs: Any?) -> Bool {
     print("wow much equal")
     return super.isEqual(rhs)
   }
@@ -164,7 +164,7 @@ class ValueLike : NSObject {
     super.init()
   }
 
-  override func isEqual(_ rhs: AnyObject?) -> Bool {
+  override func isEqual(_ rhs: Any?) -> Bool {
     if let rhs2 = rhs as? ValueLike {
       return x == rhs2.x
     }

@@ -51,7 +51,7 @@ func instanceMethods(_ b: B) {
   // Both class and instance methods exist.
   _ = b.description
   b.instanceTakesObjectClassTakesFloat(b)
-  b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{cannot convert value of type 'Double' to expected argument type 'AnyObject!'}}
+  b.instanceTakesObjectClassTakesFloat(2.0)
 
   // Instance methods with keyword components
   var obj = NSObject()
@@ -241,18 +241,18 @@ func almostSubscriptableValueMismatch(_ as1: AlmostSubscriptable, a: A) {
 func almostSubscriptableKeyMismatch(_ bc: BadCollection, key: NSString) {
   // FIXME: We end up importing this as read-only due to the mismatch between
   // getter/setter element types.
-  var _ : AnyObject = bc[key]
+  var _ : Any = bc[key]
 }
 
 func almostSubscriptableKeyMismatchInherited(_ bc: BadCollectionChild,
                                              key: String) {
-  var value : AnyObject = bc[key] // no-warning, inherited from parent
+  var value : Any = bc[key] // no-warning, inherited from parent
   bc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
 func almostSubscriptableKeyMismatchInherited(_ roc: ReadOnlyCollectionChild,
                                              key: String) {
-  var value : AnyObject = roc[key] // no-warning, inherited from parent
+  var value : Any = roc[key] // no-warning, inherited from parent
   roc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
@@ -283,7 +283,8 @@ extension Wobbler2 : MaybeInitWobble { // expected-error{{type 'Wobbler2' does n
 func optionalMemberAccess(_ w: Wobbling) {
   w.wobble()
   w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}} {{11-11=!}}
-  var x: AnyObject = w[5] // expected-error{{value of optional type 'AnyObject!?' not unwrapped; did you mean to use '!' or '?'?}} {{26-26=!}}
+  let x = w[5]!!
+  _ = x
 }
 
 func protocolInheritance(_ s: NSString) {
@@ -308,8 +309,8 @@ func customAccessors(_ hive: Hive, bee: Bee) {
   markUsed(hive.makingHoney()) // expected-error{{cannot call value of non-function type 'Bool'}}{{28-30=}}
   hive.setMakingHoney(true) // expected-error{{value of type 'Hive' has no member 'setMakingHoney'}}
 
-  _ = hive.`guard`.description // okay
-  _ = hive.`guard`.description! // no-warning
+  _ = (hive.`guard` as AnyObject).description // okay
+  _ = (hive.`guard` as AnyObject).description! // no-warning
   hive.`guard` = bee // no-warning
 }
 
@@ -390,7 +391,7 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
   rev.dynamicType.classRef = nil
   rev.dynamicType.classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
 
-  var value: AnyObject
+  var value: Any
   value = obj.protoProp()
   value = obj.protoPropRO()
   value = obj.dynamicType.protoClassProp()
@@ -469,7 +470,7 @@ class IncompleteProtocolAdopter : Incomplete, IncompleteOptional { // expected-e
 
 func testNullarySelectorPieces(_ obj: AnyObject) {
   obj.foo(1, bar: 2, 3) // no-warning
-  obj.foo(1, 2, bar: 3) // expected-error{{cannot call value of non-function type 'AnyObject?!'}}
+  obj.foo(1, 2, bar: 3) // expected-error{{cannot call value of non-function type 'Any?!'}}
 }
 
 func testFactoryMethodAvailability() {
@@ -490,8 +491,8 @@ class FooDelegateImpl : NSObject, FooDelegate {
 }
 
 class ProtoAdopter : NSObject, ExplicitSetterProto, OptionalSetterProto {
-  var foo: AnyObject? // no errors about conformance
-  var bar: AnyObject? // no errors about conformance
+  var foo: Any? // no errors about conformance
+  var bar: Any? // no errors about conformance
 }
 
 func testUnusedResults(_ ur: UnusedResults) {

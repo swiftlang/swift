@@ -253,7 +253,7 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
     ///
     /// - parameter reference: The instance of `NSData` that you wish to wrap. This instance will be copied by `struct Data`.
     public init(referencing reference: NSData) {
-        _wrapped = _SwiftNSData(immutableObject: reference.copy())
+        _wrapped = _SwiftNSData(immutableObject: reference.copy() as AnyObject)
     }
     
     // -----------------------------------
@@ -678,10 +678,6 @@ public struct Data : ReferenceConvertible, CustomStringConvertible, Equatable, H
 
 /// Provides bridging functionality for struct Data to class NSData and vice-versa.
 extension Data : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSData {
         return unsafeBitCast(_wrapped, to: NSData.self)

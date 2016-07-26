@@ -229,10 +229,6 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
 }
 
 extension Date : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSDate {
         return NSDate(timeIntervalSinceReferenceDate: _time)

@@ -51,9 +51,7 @@ public enum _DebuggerSupport {
     otherwise: ()->T
   ) -> T {
     if isClass(value) {
-      if let ao = value as? AnyObject {
-        return ifClass(ao)
-      }
+      return ifClass(_unsafeDowncastToAnyObject(fromAny: value))
     }
     return otherwise()
   }

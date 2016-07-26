@@ -2744,6 +2744,10 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
   // Simple case: bridgeable object types.
   if (type->isBridgeableObjectType())
     return true;
+  
+  // Any bridges to AnyObject.
+  if (type->isAny())
+    return true;
 
   // Determine whether this type is bridged to Objective-C.
   ASTContext &ctx = type->getASTContext();

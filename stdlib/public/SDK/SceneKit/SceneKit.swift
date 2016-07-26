@@ -229,7 +229,7 @@ internal func SCN_Swift_SCNSceneSource_entryWithIdentifier(
 extension SCNSceneSource {
   public func entryWithIdentifier<T>(_ uid: String, withClass entryClass: T.Type) -> T? {
     return SCN_Swift_SCNSceneSource_entryWithIdentifier(
-      self, uid as NSString, entryClass as! AnyObject) as! T?
+      self, uid as NSString, entryClass as! AnyClass) as! T?
   }
 }
 

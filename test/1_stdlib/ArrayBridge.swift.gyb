@@ -58,7 +58,7 @@ class Base : NSObject, Fooable {
     serialNumber = -serialNumber
   }
 
-  override func isEqual(_ other: AnyObject?) -> Bool {
+  override func isEqual(_ other: Any?) -> Bool {
     return (other as? Base)?.value == self.value
   }
   
@@ -140,8 +140,8 @@ class Thunks : NSObject {
     expecting expected: NSArray
   )  {
     expectEqualSequence(
-      expected.lazy.map { ObjectIdentifier($0) },
-      x.lazy.map { ObjectIdentifier($0) }
+      expected.lazy.map { ObjectIdentifier($0 as AnyObject) },
+      x.lazy.map { ObjectIdentifier($0 as AnyObject) }
     )
   }
 
@@ -160,8 +160,8 @@ class Thunks : NSObject {
     _ produced: NSArray, expecting expected: NSArray
   ) {
     expectEqualSequence(
-      expected.lazy.map { ObjectIdentifier($0) },
-      produced.lazy.map { ObjectIdentifier($0) }
+      expected.lazy.map { ObjectIdentifier($0 as AnyObject) },
+      produced.lazy.map { ObjectIdentifier($0 as AnyObject) }
     )
   }
   
@@ -300,8 +300,8 @@ tests.test("testExplicitlyBridged/${Any}") {
   
   let bridgeableValuesAsNSArray = bridgeableValues as NSArray
   expectEqual(2, bridgeableValuesAsNSArray.count)
-  expectEqual(42, bridgeableValuesAsNSArray[0].value)
-  expectEqual(17, bridgeableValuesAsNSArray[1].value)
+  expectEqual(42, (bridgeableValuesAsNSArray[0] as AnyObject).value)
+  expectEqual(17, (bridgeableValuesAsNSArray[1] as AnyObject).value)
 
   // Make sure we can bridge back.
   let roundTrippedValues = Swift._forceBridgeFromObjectiveC(
@@ -319,7 +319,7 @@ tests.test("testExplicitlyBridged/${Any}") {
     %if Any == 'Any':
     // FIXME: should just be "as [Any]" but the typechecker doesn't allow it
     // yet. -enable-experimental-collection-casts doesn't change that.
-    as [AnyObject] as [Any] as! [AnyObject]
+    as [AnyObject] as [Any] as [AnyObject]
     %else:
     as [${Any}]
     %end
@@ -340,13 +340,13 @@ tests.test("testExplicitlyBridged/${Any}") {
   let expectedBases = expectedSubclasses.lazy.map { $0 as Base }
 
   // Up-casts.
-  let bridgeableValuesAsSubclasses: [Subclass] = bridgeableValues
+  let bridgeableValuesAsSubclasses = bridgeableValues as [Subclass]
   expectEqualSequence(expectedSubclasses, bridgeableValuesAsSubclasses)
 
-  let bridgeableValuesAsBases: [Base] = bridgeableValues
+  let bridgeableValuesAsBases = bridgeableValues as [Base]
   expectEqualSequence(expectedBases, bridgeableValuesAsBases)
 
-  let bridgeableValuesAsAnys: [${Any}] = bridgeableValues
+  let bridgeableValuesAsAnys = bridgeableValues as [Any]
   expectEqualSequence(
     expectedBases,
     bridgeableValuesAsAnys.lazy.map { $0 as! Base })

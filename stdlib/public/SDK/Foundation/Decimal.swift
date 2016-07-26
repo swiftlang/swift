@@ -436,10 +436,6 @@ extension Decimal : CustomStringConvertible {
 }
 
 extension Decimal : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSDecimalNumber {
         return NSDecimalNumber(decimal: self)

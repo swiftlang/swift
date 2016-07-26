@@ -84,7 +84,7 @@ class TestObjCKeyTy : NSObject, NSCopying {
   }
 
   @objc(copyWithZone:)
-  func copy(with zone: NSZone?) -> AnyObject {
+  func copy(with zone: NSZone?) -> Any {
     return TestObjCKeyTy(value)
   }
 
@@ -93,7 +93,7 @@ class TestObjCKeyTy : NSObject, NSCopying {
     return value.description
   }
 
-  override func isEqual(_ object: AnyObject!) -> Bool {
+  override func isEqual(_ object: Any!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
@@ -136,7 +136,7 @@ class TestObjCInvalidKeyTy {
   }
 
   @objc
-  func isEqual(_ object: AnyObject!) -> Bool {
+  func isEqual(_ object: Any!) -> Bool {
     fatalError()
   }
 
@@ -207,7 +207,7 @@ class TestObjCEquatableValueTy : NSObject {
     serial = -serial
   }
 
-  override func isEqual(_ object: AnyObject!) -> Bool {
+  override func isEqual(_ object: Any!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCEquatableValueTy {
         return self.value == otherObjcKey.value
@@ -586,7 +586,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
     }
     for i in 0..<returnedCount {
       let key: AnyObject = state.itemsPtr![i]!
-      let value: AnyObject = d.object(forKey: key)!
+      let value: AnyObject = d.object(forKey: key)! as AnyObject
       let kv = (key, value)
       sink(kv)
       itemsReturned += 1
@@ -611,7 +611,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   slurpFastEnumerationFromSwift(
     a, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let value = enumerator.nextObject() {
-    sink(value)
+    sink(value as AnyObject)
   }
 }
 
@@ -623,8 +623,8 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   slurpFastEnumerationFromSwift(
     d, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.object(forKey: key)!
-    let kv = (key, value)
+    let value: AnyObject = d.object(forKey: key)! as AnyObject
+    let kv = (key as AnyObject, value)
     sink(kv)
   }
 }
@@ -635,7 +635,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(a, fe, objcValues)
   for value in objcValues {
-    sink(value)
+    sink(value as AnyObject)
   }
 }
 
@@ -759,7 +759,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(s, fe, objcValues)
   for value in objcValues {
-    sink(value)
+    sink(value as AnyObject)
   }
 }
 
@@ -770,7 +770,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   slurpFastEnumerationFromSwift(
     s, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let value = enumerator.nextObject() {
-    sink(value)
+    sink(value as AnyObject)
   }
 }
 
@@ -862,8 +862,8 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   let objcPairs = NSMutableArray()
   slurpFastEnumerationOfDictionaryFromObjCImpl(d, fe, objcPairs)
   for i in 0..<objcPairs.count/2 {
-    let key: AnyObject = objcPairs[i * 2]
-    let value: AnyObject = objcPairs[i * 2 + 1]
+    let key = objcPairs[i * 2] as AnyObject
+    let value = objcPairs[i * 2 + 1] as AnyObject
     let kv = (key, value)
     sink(kv)
   }

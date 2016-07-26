@@ -77,7 +77,7 @@ class Sub : Base {
   // FIXME: expected-error@+2 {{getter for 'prop' with Objective-C selector 'prop' conflicts with getter for 'prop' from superclass 'Base' with the same Objective-C selector}}
   // expected-note@+1 {{type does not match superclass var with type 'Refrigerator'}} {{22-37=Refrigerator}}
   override var prop: APPRefrigerator { // expected-error {{property 'prop' with type 'APPRefrigerator' cannot override a property with type 'Refrigerator'}}
-    return super.prop // implicitly bridged
+    return super.prop as APPRefrigerator
   }
   // FIXME: expected-error@+2 {{getter for 'propGeneric' with Objective-C selector 'propGeneric' conflicts with getter for 'propGeneric' from superclass 'Base' with the same Objective-C selector}}
   // expected-note@+1 {{type does not match superclass var with type 'ManufacturerInfo<NSString>'}} {{29-59=ManufacturerInfo<NSString>}}

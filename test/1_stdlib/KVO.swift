@@ -51,8 +51,8 @@ class Observer : NSObject {
   }
 
   override func observeValue(forKeyPath:String?,
-                             of obj:AnyObject?,
-                             change:Dictionary<NSKeyValueChangeKey, AnyObject>?,
+                             of obj:Any?,
+                             change:Dictionary<NSKeyValueChangeKey, Any>?,
                              context:UnsafeMutablePointer<Void>?) {
     target!.print()
   }
@@ -100,8 +100,8 @@ class ObserverKVO : NSObject {
   }
 
   override func observeValue(forKeyPath:String?,
-                             of obj:AnyObject?,
-                             change:Dictionary<NSKeyValueChangeKey, AnyObject>?,
+                             of obj:Any?,
+                             change:Dictionary<NSKeyValueChangeKey, Any>?,
                              context:UnsafeMutablePointer<Void>?) {
     if context == &kvoContext {
       target!.print()

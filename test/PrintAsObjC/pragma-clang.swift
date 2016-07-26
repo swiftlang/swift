@@ -18,7 +18,7 @@
 // CHECK: @interface Test
 @objc class Test : NSObject, TestProto {
   var str: String = ""
-  var strongProp: AnyObject?
+  var strongProp: Any?
 }
 // CHECK: #pragma clang diagnostic pop
 // CHECK-NOT: clang diagnostic

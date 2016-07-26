@@ -5,22 +5,22 @@
 import CoreCooling
 
 func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
-  let ao1: AnyObject = sc.methodA(osc)
+  let ao1: Any = sc.methodA(osc)
   _ = ao1
-  if sc.methodA(osc) == nil { } // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
+  if sc.methodA(osc) == nil { } // expected-warning {{comparing non-optional value of type 'Any' to nil always returns false}}
 
-  let ao2: AnyObject = sc.methodB(nil)
+  let ao2: Any = sc.methodB(nil)
   _ = ao2
-  if sc.methodA(osc) == nil { }// expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
+  if sc.methodA(osc) == nil { }// expected-warning {{comparing non-optional value of type 'Any' to nil always returns false}}
 
-  let ao3: AnyObject = sc.property // expected-error{{value of optional type 'AnyObject?' not unwrapped; did you mean to use '!' or '?'?}} {{35-35=!}}
+  let ao3: Any? = sc.property.flatMap { .some($0) }
   _ = ao3
-  let ao3_ok: AnyObject? = sc.property // okay
+  let ao3_ok: Any? = sc.property // okay
   _ = ao3_ok
 
-  let ao4: AnyObject = sc.methodD()
+  let ao4: Any = sc.methodD()
   _ = ao4
-  if sc.methodD() == nil { } // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
+  if sc.methodD() == nil { } // expected-warning {{comparing non-optional value of type 'Any' to nil always returns false}}
 
   sc.methodE(sc)
   sc.methodE(osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}

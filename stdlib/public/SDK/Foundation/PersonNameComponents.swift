@@ -87,10 +87,6 @@ public struct PersonNameComponents : ReferenceConvertible, Hashable, Equatable, 
 
 @available(OSX 10.11, iOS 9.0, *)
 extension PersonNameComponents : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSPersonNameComponents.self
     }
