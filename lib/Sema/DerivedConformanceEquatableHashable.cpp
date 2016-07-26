@@ -417,7 +417,8 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     interfaceType = FunctionType::get(selfType, methodType);
   
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->setAccessibility(enumDecl->getFormalAccess());
+  getterDecl->setAccessibility(std::max(Accessibility::Internal,
+                                        enumDecl->getFormalAccess()));
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -433,7 +434,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   hashValueDecl->setImplicit();
   hashValueDecl->makeComputed(SourceLoc(), getterDecl,
                               nullptr, nullptr, SourceLoc());
-  hashValueDecl->setAccessibility(enumDecl->getFormalAccess());
+  hashValueDecl->setAccessibility(getterDecl->getFormalAccess());
 
   Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
   hashValuePat->setType(intType);

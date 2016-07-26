@@ -1960,7 +1960,14 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
       TC.computeAccessibility(nominal);
-      aliasDecl->setAccessibility(nominal->getFormalAccess());
+      // FIXME: Ideally this would use the protocol's access too---that is,
+      // a typealias added for an internal protocol shouldn't need to be
+      // public---but that can be problematic if the same type conforms to two
+      // protocols with different access levels.
+      Accessibility aliasAccess = nominal->getFormalAccess();
+      aliasAccess = std::max(aliasAccess, Accessibility::Internal);
+      aliasDecl->setAccessibility(aliasAccess);
+
       if (nominal == DC) {
         nominal->addMember(aliasDecl);
       } else {

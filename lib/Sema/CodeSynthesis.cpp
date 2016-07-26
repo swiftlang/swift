@@ -1917,9 +1917,9 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
                                                   ImplicitConstructorKind ICK) {
   ASTContext &context = tc.Context;
   SourceLoc Loc = decl->getLoc();
-  Accessibility accessLevel = decl->getFormalAccess();
-  if (!decl->hasClangNode())
-    accessLevel = std::min(accessLevel, Accessibility::Internal);
+  auto accessLevel = Accessibility::Internal;
+  if (decl->hasClangNode())
+    accessLevel = std::max(accessLevel, decl->getFormalAccess());
 
   // Determine the parameter type of the implicit constructor.
   SmallVector<ParamDecl*, 8> params;
@@ -2114,8 +2114,11 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                               /*GenericParams=*/nullptr, classDecl);
 
   ctor->setImplicit();
-  ctor->setAccessibility(std::min(classDecl->getFormalAccess(),
-                                  superclassCtor->getFormalAccess()));
+
+  Accessibility access = classDecl->getFormalAccess();
+  access = std::max(access, Accessibility::Internal);
+  access = std::min(access, superclassCtor->getFormalAccess());
+  ctor->setAccessibility(access);
 
   // Make sure the constructor is only as available as its superclass's
   // constructor.
