@@ -408,7 +408,7 @@ StringTests.test("appendToSubstring") {
           sliceEnd < sliceStart {
           continue
         }
-        var s0 = String(repeating: UnicodeScalar("x"), count: initialSize)
+        var s0 = String(repeating: "x", count: initialSize)
         let originalIdentity = s0.bufferID
         s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
         expectEqual(originalIdentity, s0.bufferID)
@@ -417,11 +417,15 @@ StringTests.test("appendToSubstring") {
         // and we could get some unused capacity in the buffer.  In that case,
         // the identity would not change.
         if sliceEnd != initialSize {
-          expectNotEqual(originalIdentity, s0.bufferID)
+          if sliceStart != sliceEnd {
+            expectNotEqual(originalIdentity, s0.bufferID)
+          } else {
+            expectEqual(0, s0.bufferID)
+          }
         }
         expectEqual(
           String(
-            repeating: UnicodeScalar("x"),
+            repeating: "x",
             count: sliceEnd - sliceStart + 1),
           s0)
       }
@@ -450,8 +454,8 @@ StringTests.test("appendToSubstringBug") {
   let prefixSize = size - suffixSize
   for i in 1..<10 {
     // We will be overflowing s0 with s1.
-    var s0 = String(repeating: UnicodeScalar("x"), count: size)
-    let s1 = String(repeating: UnicodeScalar("x"), count: prefixSize)
+    var s0 = String(repeating: "x", count: size)
+    let s1 = String(repeating: "x", count: prefixSize)
     let originalIdentity = s0.bufferID
 
     // Turn s0 into a slice that points to the end.
@@ -460,16 +464,22 @@ StringTests.test("appendToSubstringBug") {
     // Slicing should not reallocate.
     expectEqual(originalIdentity, s0.bufferID)
 
+    let originalCapacity = s0.capacity
+
     // Overflow.
     s0 += s1
 
-    // We should correctly determine that the storage is too small and
+    // We should correctly determine if the storage is too small and
     // reallocate.
-    expectNotEqual(originalIdentity, s0.bufferID)
+    if originalCapacity < suffixSize + prefixSize {
+      expectNotEqual(originalIdentity, s0.bufferID)
+    } else {
+      expectEqual(originalIdentity, s0.bufferID)
+    }
 
     expectEqual(
       String(
-        repeating: UnicodeScalar("x"),
+        repeating: "x",
         count: suffixSize + prefixSize),
       s0)
   }
@@ -553,7 +563,7 @@ StringTests.test("COW/removeSubrange/end") {
     expectEqual("12345678", slice)
 
     // No more reallocations are expected.
-    str.append(UnicodeScalar("x"))
+    str.append("x")
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
     expectEqual(heapStrIdentity, str.bufferID)
     expectEqual(literalIdentity, slice.bufferID)
@@ -561,7 +571,7 @@ StringTests.test("COW/removeSubrange/end") {
     expectEqual("12345678", slice)
 
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
-    str.append(UnicodeScalar("x"))
+    str.append("x")
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
     expectEqual(heapStrIdentity, str.bufferID)
     expectEqual(literalIdentity, slice.bufferID)
@@ -589,7 +599,7 @@ StringTests.test("COW/removeSubrange/end") {
     expectEqual("123456", slice)
 
     // No more reallocations are expected.
-    str.append(UnicodeScalar("x"))
+    str.append("x")
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
     expectEqual(heapStrIdentity, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
@@ -597,7 +607,7 @@ StringTests.test("COW/removeSubrange/end") {
     expectEqual("123456", slice)
 
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
-    str.append(UnicodeScalar("x"))
+    str.append("x")
     str.removeSubrange(str.index(_nthLast: 1)..<str.endIndex)
     expectEqual(heapStrIdentity, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
@@ -1159,25 +1169,25 @@ StringTests.test("String.append(_: UnicodeScalar)") {
   do {
     // U+0061 LATIN SMALL LETTER A
     let input: UnicodeScalar = "\u{61}"
-    s.append(input)
+    s.append(String(input))
     expectEqual(["\u{61}"], Array(s.unicodeScalars))
   }
   do {
     // U+304B HIRAGANA LETTER KA
     let input: UnicodeScalar = "\u{304b}"
-    s.append(input)
+    s.append(String(input))
     expectEqual(["\u{61}", "\u{304b}"], Array(s.unicodeScalars))
   }
   do {
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     let input: UnicodeScalar = "\u{3099}"
-    s.append(input)
+    s.append(String(input))
     expectEqual(["\u{61}", "\u{304b}", "\u{3099}"], Array(s.unicodeScalars))
   }
   do {
     // U+1F425 FRONT-FACING BABY CHICK
     let input: UnicodeScalar = "\u{1f425}"
-    s.append(input)
+    s.append(String(input))
     expectEqual(
       ["\u{61}", "\u{304b}", "\u{3099}", "\u{1f425}"],
       Array(s.unicodeScalars))

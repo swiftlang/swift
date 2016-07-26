@@ -651,8 +651,9 @@ extension String {
   ///
   /// - Complexity: Appending a Unicode scalar to a string averages to O(1)
   ///   over many additions.
+  @available(*, unavailable, message: "Replaced by append(_: String)")
   public mutating func append(_ x: UnicodeScalar) {
-    _core.append(x)
+    Builtin.unreachable()
   }
 
   public // SPI(Foundation)
