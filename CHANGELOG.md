@@ -3,6 +3,17 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0102](https://github.com/apple/swift-evolution/blob/master/proposals/0102-noreturn-bottom-type.md)
+  The `@noreturn` attribute on function declarations and function types has been removed,
+  in favor of an empty `Never` type:
+
+  ```swift
+  @noreturn func fatalError(msg: String) { ... }  // old
+  func fatalError(msg: String) -> Never { ... }   // new
+
+  func performOperation<T>(continuation: T -> Never) { ... }         // old
+  func performOperation<T>(continuation: @noreturn T -> ()) { ... }  // new
+
 * [SE-0116](https://github.com/apple/swift-evolution/blob/master/proposals/0116-id-as-any.md):
   Objective-C APIs using `id` now import into Swift as `Any` instead of as `AnyObject`.
   Similarly, APIs using untyped `NSArray` and `NSDictionary` import as `[Any]` and
