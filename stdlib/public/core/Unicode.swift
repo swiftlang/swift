@@ -344,7 +344,7 @@ public struct UTF8 : UnicodeCodec {
         return (nil, 3)
       }
       // Extract data bits.
-      // FIXME(integers): remove extra type casts
+      // FIXME(integers): remove extra type hints
       let value = (buffer & 0x3f000000) >> (24 as UInt32)
                 | (buffer & 0x003f0000) >> (10 as UInt32)
                 | (buffer & 0x00003f00) << (4 as UInt32)

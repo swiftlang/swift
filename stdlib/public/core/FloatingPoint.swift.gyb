@@ -829,7 +829,7 @@ extension FloatingPoint {
   }
 %end
 
-  // FIXME(integers): maybe uncomment it back
+// FIXME(integers): maybe uncomment it back
 #if false
   @_transparent
   public func negated() -> Self {
