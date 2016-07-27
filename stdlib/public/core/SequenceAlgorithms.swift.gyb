@@ -615,7 +615,7 @@ extension Sequence {
   ///     // [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
   ///
   /// In fact, `s.flatMap(transform)`  is equivalent to
-  /// `Array(s.map(transform).flatten())`.
+  /// `Array(s.map(transform).joined())`.
   ///
   /// - Parameter transform: A closure that accepts an element of this
   ///   sequence as its argument and returns a sequence or collection.

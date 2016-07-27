@@ -14,14 +14,14 @@ extension LazySequenceProtocol {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
-  ///     self.map(transform).flatten()
+  ///     self.map(transform).joined()
   ///
   /// - Complexity: O(1)
   public func flatMap<SegmentOfResult : Sequence>(
     _ transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazySequence<
     FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
-    return self.map(transform).flatten()
+    return self.map(transform).joined()
   }
   
   /// Returns a `LazyMapSequence` containing the concatenated non-nil
@@ -47,7 +47,7 @@ extension LazyCollectionProtocol {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
-  ///     self.map(transform).flatten()
+  ///     self.map(transform).joined()
   ///
   /// - Complexity: O(1)
   public func flatMap<SegmentOfResult : Collection>(
@@ -56,7 +56,7 @@ extension LazyCollectionProtocol {
     FlattenCollection<
       LazyMapCollection<Elements, SegmentOfResult>>
   > {
-    return self.map(transform).flatten()
+    return self.map(transform).joined()
   }
   
   /// Returns a `LazyMapCollection` containing the concatenated non-nil
@@ -86,7 +86,7 @@ extension LazyCollectionProtocol
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
-  ///     self.map(transform).flatten()
+  ///     self.map(transform).joined()
   ///
   /// - Complexity: O(1)
   public func flatMap<SegmentOfResult : Collection>(
@@ -95,7 +95,7 @@ extension LazyCollectionProtocol
     FlattenBidirectionalCollection<
       LazyMapBidirectionalCollection<Elements, SegmentOfResult>>>
     where SegmentOfResult : BidirectionalCollection {
-    return self.map(transform).flatten()
+    return self.map(transform).joined()
   }
   
   /// Returns a `LazyMapBidirectionalCollection` containing the concatenated non-nil
