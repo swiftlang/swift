@@ -1243,9 +1243,16 @@ private:
   void visitProtocolType(ProtocolType *PT, 
                          Optional<OptionalTypeKind> optionalKind, 
                          bool isMetatype = false) {
+    auto proto = PT->getDecl();
+    if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
+      if (isMetatype) os << "Class";
+      else os << "NSError *";
+      printNullability(optionalKind);
+      return;
+    }
+
     os << (isMetatype ? "Class" : "id");
 
-    auto proto = PT->getDecl();
     assert(proto->isObjC());
     if (auto knownKind = proto->getKnownProtocolKind()) {
       if (*knownKind == KnownProtocolKind::AnyObject) {
@@ -1266,15 +1273,27 @@ private:
       return visitProtocolType(singleProto, optionalKind, isMetatype);
     PCT = cast<ProtocolCompositionType>(canonicalComposition);
 
-    os << (isMetatype ? "Class" : "id");
-
+    // Dig out the protocols. If we see 'Error', record that we saw it.
+    bool hasError = false;
     SmallVector<ProtocolDecl *, 4> protos;
-    std::transform(PCT->getProtocols().begin(), PCT->getProtocols().end(),
-                   std::back_inserter(protos),
-                   [] (Type ty) -> ProtocolDecl * {
-      return ty->castTo<ProtocolType>()->getDecl();
-    });
+    for (auto protoTy : PCT->getProtocols()) {
+      auto proto = protoTy->castTo<ProtocolType>()->getDecl();
+      if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
+        hasError = true;
+        continue;
+      }
+
+      protos.push_back(proto);
+    }
+
+    os << (isMetatype ? "Class"
+           : hasError ? "NSError"
+           : "id");
     printProtocols(protos);
+
+    if (hasError && !isMetatype)
+      os << " *";
+
     printNullability(optionalKind);
   }
 
@@ -1630,7 +1649,8 @@ public:
 
   void forwardDeclare(const ProtocolDecl *PD) {
     assert(PD->isObjC() ||
-           *PD->getKnownProtocolKind() == KnownProtocolKind::AnyObject);
+           *PD->getKnownProtocolKind() == KnownProtocolKind::AnyObject ||
+           *PD->getKnownProtocolKind() == KnownProtocolKind::Error);
     forwardDeclare(PD, [&]{
       os << "@protocol " << getNameForObjC(PD) << ";\n";
     });
