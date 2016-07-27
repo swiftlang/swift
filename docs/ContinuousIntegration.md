@@ -26,7 +26,8 @@ swift-ci pull request testing is triggered by writing a comment on this PR addre
 
 1. Smoke Testing
 2. Validation Testing
-3. Lint Testing
+3. Benchmarking.
+4. Lint Testing
 
 We describe each in detail below:
 
@@ -64,8 +65,13 @@ A smoke test on Linux does the following:
         All supported platforms     | @swift-ci Please test
         All supported platforms     | @swift-ci Please test and merge
         OS X platform               | @swift-ci Please test OS X platform
-        OS X platform               | @swift-ci Please benchmark
         Linux platform              | @swift-ci Please test Linux platform
+
+### Benchmarking
+
+        Platform       | Comment
+        ------------   | -------------
+        OS X platform  | @swift-ci Please benchmark
 
 ### Lint Testing
 
