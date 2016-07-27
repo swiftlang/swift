@@ -463,9 +463,15 @@ func _StringCharacterView<S, C>(x: String.CharacterView, s: S, c: C, i: String.C
   x.appendContentsOf(s) // expected-error {{'appendContentsOf' has been renamed to 'append(contentsOf:)'}} {{5-21=append}} {{22-22=contentsOf: }} {{none}}
 }
 
+func _StringAppend(s: inout String, u: UnicodeScalar) {
+  s.append(u) // expected-error {{'append' is unavailable: Replaced by append(_: String)}} {{none}}
+}
+
 func _StringLegacy(c: Character, u: UnicodeScalar) {
   _ = String(count: 1, repeatedValue: c) // expected-error {{'init(count:repeatedValue:)' is unavailable: Renamed to init(repeating:count:) and reordered parameters}} {{none}}
   _ = String(count: 1, repeatedValue: u) // expected-error {{'init(count:repeatedValue:)' is unavailable: Renamed to init(repeating:count:) and reordered parameters}} {{none}}
+  _ = String(repeating: c, count: 1) // expected-error {{'init(repeating:count:)' is unavailable: Replaced by init(repeating: String, count: Int)}} {{none}}
+  _ = String(repeating: u, count: 1) // expected-error {{'init(repeating:count:)' is unavailable: Replaced by init(repeating: String, count: Int)}} {{none}}
 }
 
 func _Unicode() {
