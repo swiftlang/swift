@@ -4060,6 +4060,9 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
           return None;
       }
     }
+  } else {
+    // Under id-as-any, anything is bridged to objective c.
+    knownBridgedToObjC = true;
   }
 
   if (auto metaTy = type->getAs<MetatypeType>())
