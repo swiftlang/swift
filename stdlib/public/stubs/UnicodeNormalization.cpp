@@ -153,7 +153,7 @@ swift::_swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
 /// ==0 the strings are equal according to their collation.
 ///  >0 the left string is greater than the right string.
 int32_t
-swift::_swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
+swift::_swift_stdlib_unicode_compare_utf8_utf16(const unsigned char *LeftString,
                                                 int32_t LeftLength,
                                                 const uint16_t *RightString,
                                                 int32_t RightLength) {
@@ -183,9 +183,9 @@ swift::_swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
 /// ==0 the strings are equal according to their collation.
 ///  >0 the left string is greater than the right string.
 int32_t
-swift::_swift_stdlib_unicode_compare_utf8_utf8(const char *LeftString,
+swift::_swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *LeftString,
                                                int32_t LeftLength,
-                                               const char *RightString,
+                                               const unsigned char *RightString,
                                                int32_t RightLength) {
   UCharIterator LeftIterator;
   UCharIterator RightIterator;
@@ -266,7 +266,7 @@ swift::_swift_stdlib_unicode_hash(const uint16_t *Str, int32_t Length) {
   return hashFinish(HashState);
 }
 
-intptr_t swift::_swift_stdlib_unicode_hash_ascii(const char *Str,
+intptr_t swift::_swift_stdlib_unicode_hash_ascii(const unsigned char *Str,
                                                  int32_t Length) {
   const ASCIICollation *Table = ASCIICollation::getTable();
   intptr_t HashState = HASH_SEED;

@@ -395,8 +395,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   }
 
   /// The address of this instance in a convenient pointer-to-bytes form
-  internal var _address: UnsafePointer<UInt8> {
-    return UnsafePointer(Builtin.bridgeToRawPointer(_nativeBuffer))
+  internal var _address: UnsafeMutableRawPointer {
+    return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_nativeBuffer))
   }
 
   /// Offset from the allocated storage for `self` to the stored `Header`
@@ -412,7 +412,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// guarantee it doesn't dangle
   internal var _headerPointer: UnsafeMutablePointer<Header> {
     _onFastPath()
-    return UnsafeMutablePointer(_address + _My._headerOffset)
+    return (_address + _My._headerOffset).assumingMemoryBound(
+      to: Header.self)
   }
 
   /// An **unmanaged** pointer to the storage for `Element`s.  Not
@@ -420,7 +421,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// dangle.
   internal var _elementPointer: UnsafeMutablePointer<Element> {
     _onFastPath()
-    return UnsafeMutablePointer(_address + _My._elementOffset)
+    return (_address + _My._elementOffset).assumingMemoryBound(
+      to: Element.self)
   }
 
   /// Offset from the allocated storage for `self` to the `Element` storage

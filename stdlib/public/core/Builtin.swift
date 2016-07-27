@@ -88,9 +88,11 @@ internal func _roundUp(_ offset: Int, toAlignment alignment: Int) -> Int {
   return Int(_roundUpImpl(UInt(bitPattern: offset), toAlignment: alignment))
 }
 
+// This function takes a raw pointer and returns a typed pointer. It implicitly
+// assumes that memory at the returned pointer is bound to `Destination` type.
 @_versioned
-internal func _roundUp<T, DestinationType>(
-  _ pointer: UnsafeMutablePointer<T>,
+internal func _roundUp<DestinationType>(
+  _ pointer: UnsafeMutableRawPointer,
   toAlignmentOf destinationType: DestinationType.Type
 ) -> UnsafeMutablePointer<DestinationType> {
   // Note: unsafe unwrap is safe because this operation can only increase the
@@ -245,11 +247,11 @@ public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to: T.Type) -> T {
 
 @inline(__always)
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
-  -> UnsafeMutablePointer<UInt8> {
+  -> UnsafeMutableRawPointer {
   let storedPropertyOffset = _roundUp(
     sizeof(_HeapObject.self),
     toAlignment: alignof(Optional<AnyObject>.self))
-  return UnsafeMutablePointer<UInt8>(Builtin.bridgeToRawPointer(x)) +
+  return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(x)) +
     storedPropertyOffset
 }
 

@@ -66,7 +66,8 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
     }
     
     return contiguousCount >= subRange.upperBound
-      ? UnsafeMutablePointer<AnyObject>(enumerationState.itemsPtr!)
+      ? UnsafeMutableRawPointer(enumerationState.itemsPtr!)
+          .assumingMemoryBound(to: AnyObject.self)
         + subRange.lowerBound
       : nil
   }

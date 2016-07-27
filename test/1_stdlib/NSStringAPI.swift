@@ -204,7 +204,9 @@ NSStringAPIs.test("init(utf8String:)") {
     i += 1
   }
   up[i] = 0
-  expectOptionalEqual(s, String(utf8String: UnsafePointer(up)))
+  let cstr = UnsafeMutableRawPointer(up)
+    .bindMemory(to: CChar.self, capacity: 100)
+  expectOptionalEqual(s, String(utf8String: cstr))
   up.deallocate(capacity: 100)
 }
 

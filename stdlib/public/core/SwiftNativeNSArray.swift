@@ -138,7 +138,8 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   internal let _nativeStorage: _ContiguousArrayStorageBase
 
   internal var _heapBufferBridgedPtr: UnsafeMutablePointer<AnyObject?> {
-    return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+      to: Optional<AnyObject>.self)
   }
 
   internal typealias HeapBufferStorage = _HeapBufferStorage<Int, AnyObject>

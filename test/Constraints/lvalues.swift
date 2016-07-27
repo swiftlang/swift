@@ -179,7 +179,7 @@ func rdar19835413() {
     f1(&a[i])
     f1(&a[0])
     f1(pi)
-    f1(UnsafeMutablePointer(pi))
+    f1(pi)
   }
 }
 

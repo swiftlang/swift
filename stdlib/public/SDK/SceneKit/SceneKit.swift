@@ -170,7 +170,7 @@ extension SCNGeometryElement {
       fatalError("Expected constant number of indices per primitive")
     }
     self.init(
-      data: Data(bytes: UnsafePointer<UInt8>(indices), count: indexCount * sizeof(IndexType.self)),
+      data: Data(bytes: indices, count: indexCount * sizeof(IndexType.self)),
       primitiveType: primitiveType,
       primitiveCount: primitiveCount,
       bytesPerIndex: sizeof(IndexType.self))

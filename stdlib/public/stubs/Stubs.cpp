@@ -261,14 +261,14 @@ extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 ///
 /// \returns Size of character data returned in \c LinePtr, or -1
 /// if an error occurred, or EOF was reached.
-ssize_t swift::swift_stdlib_readLine_stdin(char **LinePtr) {
+ssize_t swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 #if defined(_MSC_VER)
   if (LinePtr == nullptr)
     return -1;
 
   ssize_t Capacity = 0;
   ssize_t Pos = 0;
-  char *ReadBuf = nullptr;
+  unsigned char *ReadBuf = nullptr;
 
   _lock_file(stdin);
 
@@ -285,7 +285,8 @@ ssize_t swift::swift_stdlib_readLine_stdin(char **LinePtr) {
     if (Capacity - Pos <= 1) {
       // Capacity changes to 128, 128*2, 128*4, 128*8, ...
       Capacity = Capacity ? Capacity * 2 : 128;
-      char *NextReadBuf = static_cast<char *>(realloc(ReadBuf, Capacity));
+      char *NextReadBuf =
+        static_cast<unsigned char *>(realloc(ReadBuf, Capacity));
       if (NextReadBuf == nullptr) {
         if (ReadBuf)
           free(ReadBuf);
@@ -308,7 +309,7 @@ ssize_t swift::swift_stdlib_readLine_stdin(char **LinePtr) {
   return Pos;
 #else
   size_t Capacity = 0;
-  return getline(LinePtr, &Capacity, stdin);
+  return getline((char **)LinePtr, &Capacity, stdin);
 #endif
 }
 

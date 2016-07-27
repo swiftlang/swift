@@ -584,28 +584,20 @@ extension String {
 #else
     switch (_core.isASCII, rhs._core.isASCII) {
     case (true, false):
-      let lhsPtr = UnsafePointer<Int8>(_core.startASCII)
-      let rhsPtr = UnsafePointer<UTF16.CodeUnit>(rhs._core.startUTF16)
-
       return Int(_swift_stdlib_unicode_compare_utf8_utf16(
-        lhsPtr, Int32(_core.count), rhsPtr, Int32(rhs._core.count)))
+          _core.startASCII, Int32(_core.count),
+          rhs._core.startUTF16, Int32(rhs._core.count)))
     case (false, true):
       // Just invert it and recurse for this case.
       return -rhs._compareDeterministicUnicodeCollation(self)
     case (false, false):
-      let lhsPtr = UnsafePointer<UTF16.CodeUnit>(_core.startUTF16)
-      let rhsPtr = UnsafePointer<UTF16.CodeUnit>(rhs._core.startUTF16)
-
       return Int(_swift_stdlib_unicode_compare_utf16_utf16(
-        lhsPtr, Int32(_core.count),
-        rhsPtr, Int32(rhs._core.count)))
+        _core.startUTF16, Int32(_core.count),
+        rhs._core.startUTF16, Int32(rhs._core.count)))
     case (true, true):
-      let lhsPtr = UnsafePointer<Int8>(_core.startASCII)
-      let rhsPtr = UnsafePointer<Int8>(rhs._core.startASCII)
-
       return Int(_swift_stdlib_unicode_compare_utf8_utf8(
-        lhsPtr, Int32(_core.count),
-        rhsPtr, Int32(rhs._core.count)))
+        _core.startASCII, Int32(_core.count),
+        rhs._core.startASCII, Int32(rhs._core.count)))
     }
 #endif
   }
@@ -699,15 +691,10 @@ extension String : Hashable {
     }
 #else
     if self._core.isASCII {
-      return _core.startASCII.withMemoryRebound(
-        to: CChar.self, capacity: _core.count) {
-        _swift_stdlib_unicode_hash_ascii($0, Int32(_core.count))
-      }
+      return _swift_stdlib_unicode_hash_ascii(
+        _core.startASCII, Int32(_core.count))
     } else {
-      return _core.startUTF16.withMemoryRebound(
-        to: UInt16.self, capacity: _core.count) {
-        _swift_stdlib_unicode_hash($0, Int32(_core.count))
-      }
+      return _swift_stdlib_unicode_hash(_core.startUTF16, Int32(_core.count))
     }
 #endif
   }
@@ -822,9 +809,12 @@ internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
   var buffer = _StringBuffer(
     capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
 
-  // Try to write it out to the same length.
+  // Allocation of a StringBuffer requires binding the memory to the correct
+  // encoding type.
   let dest = buffer.start.bindMemory(
     to: UTF16.CodeUnit.self, capacity: str._core.count)
+
+  // Try to write it out to the same length.
   let z = _swift_stdlib_unicode_strToLower(
     dest, Int32(str._core.count),
     str._core.startUTF16, Int32(str._core.count))
@@ -847,9 +837,12 @@ internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
   var buffer = _StringBuffer(
     capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
 
-  // Try to write it out to the same length.
+  // Allocation of a StringBuffer requires binding the memory to the correct
+  // encoding type.
   let dest = buffer.start.bindMemory(
     to: UTF16.CodeUnit.self, capacity: str._core.count)
+
+  // Try to write it out to the same length.
   let z = _swift_stdlib_unicode_strToUpper(
     dest, Int32(str._core.count),
     str._core.startUTF16, Int32(str._core.count))

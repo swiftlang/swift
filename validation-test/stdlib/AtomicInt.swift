@@ -704,7 +704,8 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
     var _atomicReference: AnyObject? = nil
 
     var atomicReferencePtr: UnsafeMutablePointer<AnyObject?> {
-      return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+      return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+        to: Optional<AnyObject>.self)
     }
 
     init() {}

@@ -97,11 +97,17 @@ public func _stdlib_select(
         let readAddr = readfds.baseAddress
         let writeAddr = writefds.baseAddress
         let errorAddr = errorfds.baseAddress
+        func asFdSetPtr(
+          _ p: UnsafeMutablePointer<UInt>?
+        ) -> UnsafeMutablePointer<fd_set>? {
+          return UnsafeMutableRawPointer(p)?
+            .assumingMemoryBound(to: fd_set.self)
+        }
         return select(
           _stdlib_FD_SETSIZE,
-          UnsafeMutablePointer(readAddr),
-          UnsafeMutablePointer(writeAddr),
-          UnsafeMutablePointer(errorAddr),
+          asFdSetPtr(readAddr),
+          asFdSetPtr(writeAddr),
+          asFdSetPtr(errorAddr),
           timeout)
       }
     }
