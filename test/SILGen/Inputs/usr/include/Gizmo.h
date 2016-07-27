@@ -48,6 +48,9 @@ typedef long NSInteger;
 - (void) foo;
 - (void* _Nonnull) getBytes NS_RETURNS_INNER_POINTER;
 
+- (void)doTheThingWithOptions:(nonnull NSDictionary *)options;
+- (void)doTheOtherThingWithOptionalOptions:(nullable NSDictionary *)options;
+
 @property (nonnull) void *innerProperty;
 - (void* _Nonnull) innerProperty NS_RETURNS_INNER_POINTER;
 - (void) setInnerProperty: (void*)p;
