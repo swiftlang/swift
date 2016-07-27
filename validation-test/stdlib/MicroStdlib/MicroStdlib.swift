@@ -9,5 +9,4 @@
 // RUN: %target-run %t/hello | FileCheck %s
 // REQUIRES: executable_test
 // CHECK: Hello
-// REQUIRES: rdar27558848
 
