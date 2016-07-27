@@ -297,7 +297,7 @@ internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
 /// The superclass is not (yet?) visited.
 public func reflect(object: AnyObject) {
   defer { _fixLifetime(object) }
-  var address = Unmanaged.passUnretained(object).toOpaque()
+  let address = Unmanaged.passUnretained(object).toOpaque()
   let addressValue = UInt(bitPattern: address)
   reflect(instanceAddress: addressValue, kind: .Object)
 }
