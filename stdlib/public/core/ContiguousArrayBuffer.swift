@@ -115,7 +115,8 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   ) rethrows {
     if _isBridgedVerbatimToObjectiveC(Element.self) {
       let count = __manager.header.count
-      let elements = UnsafePointer<AnyObject>(__manager._elementPointer)
+      let elements = UnsafeMutableRawPointer(__manager._elementPointer)
+        .assumingMemoryBound(to: AnyObject.self)
       defer { _fixLifetime(__manager) }
       try body(UnsafeBufferPointer(start: elements, count: count))
     }

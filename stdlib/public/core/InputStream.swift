@@ -59,9 +59,11 @@ public func readLine(strippingNewline: Bool = true) -> String? {
       }
     }
   }
+  let lineBytes = UnsafeMutableRawPointer(linePtr).bindMemory(
+    to: UTF8.CodeUnit.self, capacity: readBytes)
   let result = String._fromCodeUnitSequenceWithRepair(UTF8.self,
     input: UnsafeMutableBufferPointer(
-      start: UnsafeMutablePointer<UTF8.CodeUnit>(linePtr),
+      start: lineBytes,
       count: readBytes)).0
   _swift_stdlib_free(linePtr)
   return result

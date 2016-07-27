@@ -25,9 +25,13 @@ public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CIn
   var utf8 = template.nulTerminatedUTF8
   let (fd, fileName) = utf8.withUnsafeMutableBufferPointer {
     (utf8) -> (CInt, String) in
-    let fd = mkstemps(UnsafeMutablePointer(utf8.baseAddress!), suffixlen)
-    let fileName = String(cString: utf8.baseAddress!)
-    return (fd, fileName)
+    return utf8.baseAddress!.withMemoryRebound(
+      to: CChar.self, capacity: Int(suffixlen)) {
+
+      let fd = mkstemps($0, suffixlen)
+      let fileName = String(cString: $0)
+      return (fd, fileName)
+    }
   }
   template = fileName
   return fd
@@ -97,11 +101,13 @@ public func _stdlib_select(
         let readAddr = readfds.baseAddress
         let writeAddr = writefds.baseAddress
         let errorAddr = errorfds.baseAddress
+        let bindAsFdSet = { (p: UnsafeMutablePointer<UInt>?) in
+          UnsafeMutableRawPointer(p)?.assumingMemoryBound(to: fd_set.self) }
         return select(
           _stdlib_FD_SETSIZE,
-          UnsafeMutablePointer(readAddr),
-          UnsafeMutablePointer(writeAddr),
-          UnsafeMutablePointer(errorAddr),
+          bindAsFdSet(readAddr),
+          bindAsFdSet(writeAddr),
+          bindAsFdSet(errorAddr),
           timeout)
       }
     }

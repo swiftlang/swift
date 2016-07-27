@@ -169,8 +169,10 @@ extension SCNGeometryElement {
     case .polygon:
       fatalError("Expected constant number of indices per primitive")
     }
+    // FIXME: Data should have an initializer for raw pointers.
+    let bytePtr = unsafeBitCast(UnsafeRawPointer(indices), to: UnsafePointer<UInt8>.self)
     self.init(
-      data: Data(bytes: UnsafePointer<UInt8>(indices), count: indexCount * sizeof(IndexType.self)),
+      data: Data(bytes: bytePtr, count: indexCount * sizeof(IndexType.self)),
       primitiveType: primitiveType,
       primitiveCount: primitiveCount,
       bytesPerIndex: sizeof(IndexType.self))

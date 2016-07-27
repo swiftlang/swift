@@ -113,7 +113,7 @@ public class _stdlib_Barrier {
   var _pthreadBarrier: _stdlib_pthread_barrier_t
 
   var _pthreadBarrierPtr: UnsafeMutablePointer<_stdlib_pthread_barrier_t> {
-    return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(to: _stdlib_pthread_barrier_t.self)
   }
 
   public init(threadCount: Int) {

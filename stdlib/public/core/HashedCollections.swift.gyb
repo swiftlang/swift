@@ -2585,7 +2585,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
         _UnsafeBitMap.sizeInWords(forSizeInBits: _body.capacity),
         strideof(UInt.self))
     let start =
-      UnsafeMutablePointer<UInt8>(_initializedHashtableEntriesBitMapStorage)
+      UnsafeMutableRawPointer(_initializedHashtableEntriesBitMapStorage)
       + bitMapSizeInBytes
     return _roundUp(start, toAlignmentOf: Key.self)
   }
@@ -2594,7 +2594,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _values: UnsafeMutablePointer<Value> {
     let keysSizeInBytes = _unsafeMultiply(_body.capacity, strideof(Key.self))
-    let start = UnsafeMutablePointer<UInt8>(_keys) + keysSizeInBytes
+    let start = UnsafeMutableRawPointer(_keys) + keysSizeInBytes
     return _roundUp(start, toAlignmentOf: Value.self)
   }
 %end
@@ -3360,7 +3360,8 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   /// Returns the pointer to the stored property, which contains bridged
   /// ${Self} elements.
   internal var _heapBufferBridgedPtr: UnsafeMutablePointer<AnyObject?> {
-    return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+      to: Optional<AnyObject>.self)
   }
 
   /// The storage for bridged ${Self} elements, if present.
@@ -4755,12 +4756,14 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
 
   internal var _fastEnumerationStatePtr:
     UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
-    return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+      to: _SwiftNSFastEnumerationState.self)
   }
 
   internal var _fastEnumerationStackBufPtr:
     UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
-    return UnsafeMutablePointer(_fastEnumerationStatePtr + 1)
+    return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
+      .assumingMemoryBound(to: _CocoaFastEnumerationStackBuf.self)
   }
 
   // These members have to be word-sized integers, they cannot be limited to
@@ -4789,7 +4792,8 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
       // state struct.
       itemCount = cocoa${Self}.countByEnumerating(
         with: _fastEnumerationStatePtr,
-        objects: UnsafeMutablePointer(_fastEnumerationStackBufPtr),
+        objects: UnsafeMutableRawPointer(_fastEnumerationStackBufPtr)
+          .assumingMemoryBound(to: AnyObject.self),
         count: stackBufCount)
       if itemCount == 0 {
         itemIndex = -1
@@ -4797,8 +4801,9 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
       }
       itemIndex = 0
     }
-    let itemsPtrUP: UnsafeMutablePointer<AnyObject> =
-      UnsafeMutablePointer(_fastEnumerationState.itemsPtr!)
+    let itemsPtrUP =
+    UnsafeMutableRawPointer(_fastEnumerationState.itemsPtr!)
+      .assumingMemoryBound(to: AnyObject.self)
     let itemsPtr = _UnmanagedAnyObjectArray(itemsPtrUP)
     let key: AnyObject = itemsPtr[itemIndex]
     itemIndex += 1

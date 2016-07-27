@@ -584,8 +584,9 @@ extension String {
 #else
     switch (_core.isASCII, rhs._core.isASCII) {
     case (true, false):
-      let lhsPtr = UnsafePointer<Int8>(_core.startASCII)
-      let rhsPtr = UnsafePointer<UTF16.CodeUnit>(rhs._core.startUTF16)
+      let lhsPtr = unsafeBitCast(_core.startASCII,
+        to: UnsafePointer<CChar>.self)
+      let rhsPtr = UnsafePointer(rhs._core.startUTF16)
 
       return Int(_swift_stdlib_unicode_compare_utf8_utf16(
         lhsPtr, Int32(_core.count), rhsPtr, Int32(rhs._core.count)))
@@ -593,15 +594,17 @@ extension String {
       // Just invert it and recurse for this case.
       return -rhs._compareDeterministicUnicodeCollation(self)
     case (false, false):
-      let lhsPtr = UnsafePointer<UTF16.CodeUnit>(_core.startUTF16)
-      let rhsPtr = UnsafePointer<UTF16.CodeUnit>(rhs._core.startUTF16)
+      let lhsPtr = UnsafePointer(_core.startUTF16)
+      let rhsPtr = UnsafePointer(rhs._core.startUTF16)
 
       return Int(_swift_stdlib_unicode_compare_utf16_utf16(
         lhsPtr, Int32(_core.count),
         rhsPtr, Int32(rhs._core.count)))
     case (true, true):
-      let lhsPtr = UnsafePointer<Int8>(_core.startASCII)
-      let rhsPtr = UnsafePointer<Int8>(rhs._core.startASCII)
+      let lhsPtr = unsafeBitCast(_core.startASCII,
+        to: UnsafePointer<CChar>.self)
+      let rhsPtr = unsafeBitCast(rhs._core.startASCII,
+        to: UnsafePointer<CChar>.self)
 
       return Int(_swift_stdlib_unicode_compare_utf8_utf8(
         lhsPtr, Int32(_core.count),

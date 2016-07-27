@@ -259,10 +259,6 @@ func stringArguments(_ s: String) {
 }
 
 
-func pointerConstructor(_ x: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<Float> {
-  return UnsafeMutablePointer(x)
-}
-
 func optionality(_ op: UnsafeMutablePointer<Float>?) {
   takesMutableVoidPointer(op)
 % if not suffix:
@@ -286,10 +282,10 @@ func genericPointerArithmetic<T>(_ x: UnsafeMutablePointer<T>, i: Int, t: T) -> 
   p.initialize(to: t)
 }
 
-func passPointerToClosure(_ f: (UnsafeMutablePointer<Float>) -> Int) -> Int { }
+func passPointerToClosure(_ f: (UnsafeMutablePointer<Int>) -> Int) -> Int { }
 
-func pointerInClosure(_ f: (UnsafeMutablePointer<Int>) -> Int) -> Int {
-  return passPointerToClosure { f(UnsafeMutablePointer($0)) }
+func pointerInClosure(_ f: (UnsafePointer<Int>) -> Int) -> Int {
+  return passPointerToClosure { f($0) }
 }
 
 struct NotEquatable {}

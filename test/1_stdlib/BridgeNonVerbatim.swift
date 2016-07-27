@@ -92,9 +92,9 @@ func testScope() {
   objects.withUnsafeMutableBufferPointer {
     // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
     (buf: inout UnsafeMutableBufferPointer<Int>) -> () in
-    nsx.getObjects(
-      UnsafeMutablePointer<AnyObject>(buf.baseAddress!),
-      range: _SwiftNSRange(location: 1, length: 2))
+    let objPtr = UnsafeMutableRawPointer(buf.baseAddress!).bindMemory(
+      to: AnyObject.self, capacity: 2)
+    nsx.getObjects(objPtr, range: _SwiftNSRange(location: 1, length: 2))
   }
 
   // CHECK-NEXT: getObjects yields them at +0: true

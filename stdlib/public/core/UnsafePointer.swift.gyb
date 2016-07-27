@@ -69,6 +69,8 @@ public struct ${Self}<Pointee>
   }
 
   /// Construct ${a_Self} with a given pattern of bits.
+  ///
+  /// Returns nil if `bitPattern` is zero.
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
@@ -120,6 +122,25 @@ public struct ${Self}<Pointee>
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
+
+%  if mutable:
+  /// Convert from `UnsafePointer` to `UnsafeMutablePointer` of the same
+  /// `Pointee`.
+  @_transparent
+  public init(mutating other: UnsafePointer<Pointee>) {
+    self._rawValue = other._rawValue
+  }
+
+  /// Convert from `UnsafePointer` to `UnsafeMutablePointer` of the same
+  /// `Pointee`.
+  ///
+  /// Returns nil if `bitPattern` is zero.
+  @_transparent
+  public init?(mutating other: UnsafePointer<Pointee>?) {
+    guard let unwrapped = other else { return nil }
+    self.init(mutating: unwrapped)
+  }
+%  end
 
 %  if mutable:
   /// Allocate and point at uninitialized aligned memory for `count`
