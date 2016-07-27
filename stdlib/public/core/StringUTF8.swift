@@ -43,8 +43,8 @@ extension _StringCore {
       var result: _UTF8Chunk = ~0 // Start with all bits set
 
       _memcpy(
-        dest: UnsafeMutablePointer(Builtin.addressof(&result)),
-        src: UnsafeMutablePointer(startASCII + i),
+        dest: UnsafeMutableRawPointer(Builtin.addressof(&result)),
+        src: startASCII + i,
         size: numericCast(utf16Count))
 
       // Convert the _UTF8Chunk into host endianness.

@@ -28,13 +28,13 @@
 public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Internals
-  public var _baseAddress: OpaquePointer?
+  public var _baseAddress: UnsafeMutableRawPointer?
   var _countAndFlags: UInt
   public var _owner: AnyObject?
 
   /// (private) create the implementation of a string from its component parts.
   init(
-    baseAddress: OpaquePointer?,
+    baseAddress: UnsafeMutableRawPointer?,
     _countAndFlags: UInt,
     owner: AnyObject?
   ) {
@@ -68,10 +68,9 @@ public struct _StringCore {
       _sanityCheck(!hasCocoaBuffer)
       _sanityCheck(elementWidth == buffer.elementWidth,
         "_StringCore elementWidth doesn't match its buffer's")
-      _sanityCheck(UnsafeMutablePointer(_baseAddress!) >= buffer.start)
-      _sanityCheck(UnsafeMutablePointer(_baseAddress!) <= buffer.usedEnd)
-      _sanityCheck(
-          UnsafeMutablePointer(_pointer(toElementAt: count)) <= buffer.usedEnd)
+      _sanityCheck(_baseAddress! >= buffer.start)
+      _sanityCheck(_baseAddress! <= buffer.usedEnd)
+      _sanityCheck(_pointer(toElementAt: count) <= buffer.usedEnd)
     }
 #endif
   }
@@ -97,29 +96,28 @@ public struct _StringCore {
   /// storage.  Caveats: The string must have contiguous storage; the
   /// element may be 1 or 2 bytes wide, depending on elementWidth; the
   /// result may be null if the string is empty.
-  func _pointer(toElementAt n: Int) -> OpaquePointer {
+  func _pointer(toElementAt n: Int) -> UnsafeMutableRawPointer {
     _sanityCheck(hasContiguousStorage && n >= 0 && n <= count)
-    return OpaquePointer(
-      UnsafeMutablePointer<_RawByte>(_baseAddress!) + (n << elementShift))
+    return _baseAddress! + (n << elementShift)
   }
 
   static func _copyElements(
-    _ srcStart: OpaquePointer, srcElementWidth: Int,
-    dstStart: OpaquePointer, dstElementWidth: Int,
+    _ srcStart: UnsafeMutableRawPointer, srcElementWidth: Int,
+    dstStart: UnsafeMutableRawPointer, dstElementWidth: Int,
     count: Int
   ) {
     // Copy the old stuff into the new storage
     if _fastPath(srcElementWidth == dstElementWidth) {
       // No change in storage width; we can use memcpy
       _memcpy(
-        dest: UnsafeMutablePointer(dstStart),
-        src: UnsafeMutablePointer(srcStart),
+        dest: dstStart,
+        src: srcStart,
         size: UInt(count << (srcElementWidth - 1)))
     }
     else if (srcElementWidth < dstElementWidth) {
       // Widening ASCII to UTF-16; we need to copy the bytes manually
-      var dest = UnsafeMutablePointer<UTF16.CodeUnit>(dstStart)
-      var src = UnsafeMutablePointer<UTF8.CodeUnit>(srcStart)
+      var dest = dstStart.assumingMemoryBound(to: UTF16.CodeUnit.self)
+      var src = srcStart.assumingMemoryBound(to: UTF8.CodeUnit.self)
       let srcEnd = src + count
       while (src != srcEnd) {
         dest.pointee = UTF16.CodeUnit(src.pointee)
@@ -129,8 +127,8 @@ public struct _StringCore {
     }
     else {
       // Narrowing UTF-16 to ASCII; we need to copy the bytes manually
-      var dest = UnsafeMutablePointer<UTF8.CodeUnit>(dstStart)
-      var src = UnsafeMutablePointer<UTF16.CodeUnit>(srcStart)
+      var dest = dstStart.assumingMemoryBound(to: UTF8.CodeUnit.self)
+      var src = srcStart.assumingMemoryBound(to: UTF16.CodeUnit.self)
       let srcEnd = src + count
       while (src != srcEnd) {
         dest.pointee = UTF8.CodeUnit(src.pointee)
@@ -143,7 +141,7 @@ public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Initialization
   public init(
-    baseAddress: OpaquePointer?,
+    baseAddress: UnsafeMutableRawPointer?,
     count: Int,
     elementShift: Int,
     hasCocoaBuffer: Bool,
@@ -165,7 +163,7 @@ public struct _StringCore {
   /// Create a _StringCore that covers the entire length of the _StringBuffer.
   init(_ buffer: _StringBuffer) {
     self = _StringCore(
-      baseAddress: OpaquePointer(buffer.start),
+      baseAddress: buffer.start,
       count: buffer.usedCount,
       elementShift: buffer.elementShift,
       hasCocoaBuffer: false,
@@ -199,7 +197,7 @@ public struct _StringCore {
   }
 
   /// Left shift amount to apply to an offset N so that when
-  /// added to a UnsafeMutablePointer<_RawByte>, it traverses N elements.
+  /// added to a UnsafeMutableRawPointer, it traverses N elements.
   var elementShift: Int {
     return Int(_countAndFlags >> (UInt._sizeInBits - 1))
   }
@@ -227,7 +225,7 @@ public struct _StringCore {
 
   public var startASCII: UnsafeMutablePointer<UTF8.CodeUnit> {
     _sanityCheck(elementWidth == 1, "String does not contain contiguous ASCII")
-    return UnsafeMutablePointer(_baseAddress!)
+    return _baseAddress!.assumingMemoryBound(to: UTF8.CodeUnit.self)
   }
 
   /// True iff a contiguous ASCII buffer available.
@@ -239,7 +237,7 @@ public struct _StringCore {
     _sanityCheck(
       count == 0 || elementWidth == 2,
       "String does not contain contiguous UTF-16")
-    return UnsafeMutablePointer(_baseAddress!)
+    return _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self)
   }
 
   /// the native _StringBuffer, if any, or `nil`.
@@ -336,7 +334,7 @@ public struct _StringCore {
     if _fastPath(_baseAddress != nil) {
       if _fastPath(elementWidth == 1) {
         for x in UnsafeBufferPointer(
-          start: UnsafeMutablePointer<UTF8.CodeUnit>(_baseAddress!),
+          start: _baseAddress!.assumingMemoryBound(to: UTF8.CodeUnit.self),
           count: count
         ) {
           Encoding.encode(UnicodeScalar(x), into: processCodeUnit)
@@ -345,7 +343,7 @@ public struct _StringCore {
       else {
         let hadError = transcode(
           UnsafeBufferPointer(
-            start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress!),
+            start: _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self),
             count: count
           ).makeIterator(),
           from: UTF16.self,
@@ -381,7 +379,7 @@ public struct _StringCore {
   ///   existing buffer, the suggested new capacity will at least double
   ///   the existing buffer's storage.
   mutating func _claimCapacity(
-    _ newSize: Int, minElementWidth: Int) -> (Int, OpaquePointer?) {
+    _ newSize: Int, minElementWidth: Int) -> (Int, UnsafeMutableRawPointer?) {
     if _fastPath((nativeBuffer != nil) && elementWidth >= minElementWidth) {
       var buffer = nativeBuffer!
 
@@ -394,7 +392,7 @@ public struct _StringCore {
       // Attempt to claim unused capacity in the buffer
       if _fastPath(
         buffer.grow(
-          oldBounds: UnsafePointer(usedStart)..<UnsafePointer(usedEnd),
+          oldBounds: UnsafeRawPointer(usedStart)..<UnsafeRawPointer(usedEnd),
           newUsedCount: newSize)
       ) {
         count = newSize
@@ -415,7 +413,7 @@ public struct _StringCore {
   /// you must immediately copy valid data into that storage.
   mutating func _growBuffer(
     _ newSize: Int, minElementWidth: Int
-  ) -> OpaquePointer {
+  ) -> UnsafeMutableRawPointer {
     let (newCapacity, existingStorage)
       = _claimCapacity(newSize, minElementWidth: minElementWidth)
 
@@ -455,7 +453,7 @@ public struct _StringCore {
     if hasContiguousStorage {
       _StringCore._copyElements(
         _baseAddress!, srcElementWidth: elementWidth,
-        dstStart: OpaquePointer(newStorage.start),
+        dstStart: UnsafeMutableRawPointer(newStorage.start),
         dstElementWidth: newElementWidth, count: oldCount)
     }
     else {
@@ -465,7 +463,8 @@ public struct _StringCore {
       // FIXME: can we get Cocoa to tell us quickly that an opaque
       // string is ASCII?  Do we care much about that edge case?
       _sanityCheck(newStorage.elementShift == 1)
-      _cocoaStringReadAll(cocoaBuffer!, UnsafeMutablePointer(newStorage.start))
+      _cocoaStringReadAll(cocoaBuffer!,
+        newStorage.start.assumingMemoryBound(to: UTF16.CodeUnit.self))
 #else
       _sanityCheckFailure("_copyInPlace: non-native string without objc runtime")
 #endif
@@ -502,15 +501,14 @@ public struct _StringCore {
       count + utf16Width, minElementWidth: minBytesPerCodeUnit)
 
     if _fastPath(elementWidth == 1) {
-      _sanityCheck(
-        _pointer(toElementAt:count)
-        == OpaquePointer(UnsafeMutablePointer<_RawByte>(destination) + 1))
+      _sanityCheck(_pointer(toElementAt:count) == destination + 1)
 
-      UnsafeMutablePointer<UTF8.CodeUnit>(destination)[0] = UTF8.CodeUnit(u0)
+      destination.assumingMemoryBound(to: UTF8.CodeUnit.self)[0]
+        = UTF8.CodeUnit(u0)
     }
     else {
       let destination16
-        = UnsafeMutablePointer<UTF16.CodeUnit>(destination._rawValue)
+      = destination.assumingMemoryBound(to: UTF16.CodeUnit.self)
 
       destination16[0] = u0
       if u1 != nil {
@@ -539,7 +537,8 @@ public struct _StringCore {
     else {
 #if _runtime(_ObjC)
       _sanityCheck(elementWidth == 2)
-      _cocoaStringReadAll(rhs.cocoaBuffer!, UnsafeMutablePointer(destination))
+      _cocoaStringReadAll(rhs.cocoaBuffer!,
+        destination.assumingMemoryBound(to: UTF16.CodeUnit.self))
 #else
       _sanityCheckFailure("subscript: non-native string without objc runtime")
 #endif
@@ -560,7 +559,7 @@ public struct _StringCore {
     }
     let unsafeBuffer =
       UnsafeBufferPointer(
-        start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
+        start: _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self),
         count: count)
     return !unsafeBuffer.contains { $0 > 0x7f }
   }
@@ -618,24 +617,23 @@ extension _StringCore : RangeReplaceableCollection {
     ) ? _claimCapacity(newCount, minElementWidth: width).1 : nil
 
     if _fastPath(existingStorage != nil) {
-      let rangeStart = UnsafeMutablePointer<UInt8>(
-        _pointer(toElementAt:bounds.lowerBound))
+      let rangeStart = _pointer(toElementAt:bounds.lowerBound)
       let tailStart = rangeStart + (replacedCount << elementShift)
 
       if growth > 0 {
-        (tailStart + (growth << elementShift)).assign(
+        (tailStart + (growth << elementShift)).copyBytes(
           from: tailStart, count: tailCount << elementShift)
       }
 
       if _fastPath(elementWidth == 1) {
-        var dst = rangeStart
+        var dst = rangeStart.assumingMemoryBound(to: UTF8.CodeUnit.self)
         for u in newElements {
           dst.pointee = UInt8(truncatingBitPattern: u)
           dst += 1
         }
       }
       else {
-        var dst = UnsafeMutablePointer<UTF16.CodeUnit>(rangeStart)
+        var dst = rangeStart.assumingMemoryBound(to: UTF16.CodeUnit.self)
         for u in newElements {
           dst.pointee = u
           dst += 1
@@ -643,7 +641,7 @@ extension _StringCore : RangeReplaceableCollection {
       }
 
       if growth < 0 {
-        (tailStart + (growth << elementShift)).assign(
+        (tailStart + (growth << elementShift)).copyBytes(
           from: tailStart, count: tailCount << elementShift)
       }
     }
@@ -668,8 +666,9 @@ extension _StringCore : RangeReplaceableCollection {
     if _fastPath(!hasCocoaBuffer) {
       if _fastPath(isKnownUniquelyReferenced(&_owner)) {
 
-        let bounds: Range<UnsafePointer<_RawByte>>
-          = UnsafePointer(_pointer(toElementAt:0))..<UnsafePointer(_pointer(toElementAt:count))
+        let bounds: Range<UnsafeRawPointer>
+          = UnsafeRawPointer(_pointer(toElementAt:0))
+          ..< UnsafeRawPointer(_pointer(toElementAt:count))
 
         if _fastPath(nativeBuffer!.hasCapacity(n, forSubRange: bounds)) {
           return
@@ -700,13 +699,15 @@ extension _StringCore : RangeReplaceableCollection {
       let newSize = count + growth
       let destination = _growBuffer(newSize, minElementWidth: width)
       if elementWidth == 1 {
-        let destination8 = UnsafeMutablePointer<UTF8.CodeUnit>(destination)
+        let destination8
+          = destination.assumingMemoryBound(to: UTF8.CodeUnit.self)
         for i in 0..<growth {
           destination8[i] = UTF8.CodeUnit(iter.next()!)
         }
       }
       else {
-        let destination16 = UnsafeMutablePointer<UTF16.CodeUnit>(destination)
+        let destination16
+          = destination.assumingMemoryBound(to: UTF16.CodeUnit.self)
         for i in 0..<growth {
           destination16[i] = iter.next()!
         }
@@ -723,7 +724,6 @@ extension _StringCore : RangeReplaceableCollection {
 // storage have a non-NULL base address.
 var _emptyStringStorage: UInt32 = 0
 
-var _emptyStringBase: OpaquePointer {
-  return OpaquePointer(
-    UnsafeMutablePointer<UInt16>(Builtin.addressof(&_emptyStringStorage)))
+var _emptyStringBase: UnsafeMutableRawPointer {
+  return UnsafeMutableRawPointer(Builtin.addressof(&_emptyStringStorage))
 }

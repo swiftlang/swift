@@ -265,11 +265,11 @@ internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bo
 /// Like `UnsafeMutablePointer<Unmanaged<AnyObject>>`, or `id
 /// __unsafe_unretained *` in Objective-C ARC.
 internal struct _UnmanagedAnyObjectArray {
-  /// Underlying pointer, Unmanaged to escape reference counting.
-  internal var value: UnsafeMutablePointer<Unmanaged<AnyObject>>
+  /// Underlying pointer.
+  internal var value: UnsafeMutableRawPointer
 
   internal init(_ up: UnsafeMutablePointer<AnyObject>) {
-    self.value = UnsafeMutablePointer(up)
+    self.value = UnsafeMutableRawPointer(up)
   }
 
   internal init?(_ up: UnsafeMutablePointer<AnyObject>?) {
@@ -279,10 +279,16 @@ internal struct _UnmanagedAnyObjectArray {
 
   internal subscript(i: Int) -> AnyObject {
     get {
-      return value[i].takeUnretainedValue()
+      let unmanaged = value.load(
+        fromByteOffset: i * strideof(AnyObject.self),
+        as: Unmanaged<AnyObject>.self)
+      return unmanaged.takeUnretainedValue()
     }
     nonmutating set(newValue) {
-      value[i] = Unmanaged.passUnretained(newValue)
+      let unmanaged = Unmanaged.passUnretained(newValue)
+      value.storeBytes(of: unmanaged,
+        toByteOffset: i * strideof(AnyObject.self),
+        as: Unmanaged<AnyObject>.self)
     }
   }
 }

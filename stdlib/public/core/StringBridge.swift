@@ -54,7 +54,7 @@ func _cocoaStringToSwiftString_NonASCII(
   let start = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue)
 
   return String(_StringCore(
-    baseAddress: OpaquePointer(start),
+    baseAddress: start,
     count: length,
     elementShift: 1,
     hasCocoaBuffer: true,
@@ -81,7 +81,7 @@ internal func _cocoaStringToContiguous(
 
   _swift_stdlib_CFStringGetCharacters(
     source, _swift_shims_CFRange(location: startIndex, length: count), 
-    UnsafeMutablePointer<_swift_shims_UniChar>(buffer.start))
+    buffer.start.assumingMemoryBound(to: _swift_shims_UniChar.self))
   
   return buffer
 }
@@ -163,13 +163,13 @@ extension String {
 
     // start will hold the base pointer of contiguous storage, if it
     // is found.
-    var start: OpaquePointer?
+    var start: UnsafeMutableRawPointer?
     let isUTF16 = (nulTerminatedASCII == nil)
     if isUTF16 {
       let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
-      start = OpaquePointer(utf16Buf)
+      start = UnsafeMutableRawPointer(mutating: utf16Buf)
     } else {
-      start = OpaquePointer(nulTerminatedASCII)
+      start = UnsafeMutableRawPointer(mutating: nulTerminatedASCII)
     }
 
     self._core = _StringCore(
