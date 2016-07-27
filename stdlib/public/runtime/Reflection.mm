@@ -845,15 +845,6 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
   return object;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool swift_isKind(id object, NSString *className) {
-  bool result = [object isKindOfClass:NSClassFromString(className)];
-  [object release];
-  [className release];
-
-  return result;
-}
-
 #endif
   
 // -- MagicMirror implementation.

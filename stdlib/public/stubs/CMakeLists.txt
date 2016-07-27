@@ -6,6 +6,7 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
       Availability.mm
       DispatchShims.mm
       FoundationHelpers.mm
+      Reflection.mm
       SwiftNativeNSXXXBase.mm.gyb)
   set(LLVM_OPTIONAL_SOURCES
       UnicodeNormalization.cpp)
