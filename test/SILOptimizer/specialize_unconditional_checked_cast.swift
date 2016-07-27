@@ -343,9 +343,9 @@ public func ExistentialToArchetype<T>(o o : AnyObject, t : T) -> T {
 
 // AnyObject -> Non Class (should always fail)
 // CHECK-LABEL: sil shared [noinline] @_TTSg5Vs5UInt8___TF37specialize_unconditional_checked_cast22ExistentialToArchetype{{.*}} : $@convention(thin) (@owned AnyObject, UInt8) -> UInt8 {
-// CHECK-NOT: builtin "int_trap"()
-// CHECK-NOT: unreachable
-// CHECK: return
+// CHECK: builtin "int_trap"()
+// CHECK: unreachable
+// CHECK-NEXT: }
 
 // AnyObject -> AnyObject
 // CHECK-LABEL: sil shared [noinline] @_TTSg5Ps9AnyObject____TF37specialize_unconditional_checked_cast22ExistentialToArchetype{{.*}} : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> @owned AnyObject {
