@@ -50,19 +50,27 @@ public extension DispatchQueue {
 
 	public enum GlobalQueuePriority {
 		@available(OSX, deprecated: 10.10, message: "Use qos attributes instead")
-		@available(*, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(iOS, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(tvOS, deprecated, message: "Use qos attributes instead")
+		@available(watchOS, deprecated, message: "Use qos attributes instead")
 		case high
 
 		@available(OSX, deprecated: 10.10, message: "Use qos attributes instead")
-		@available(*, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(iOS, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(tvOS, deprecated, message: "Use qos attributes instead")
+		@available(watchOS, deprecated, message: "Use qos attributes instead")
 		case `default`
 
 		@available(OSX, deprecated: 10.10, message: "Use qos attributes instead")
-		@available(*, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(iOS, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(tvOS, deprecated, message: "Use qos attributes instead")
+		@available(watchOS, deprecated, message: "Use qos attributes instead")
 		case low
 
 		@available(OSX, deprecated: 10.10, message: "Use qos attributes instead")
-		@available(*, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(iOS, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(tvOS, deprecated, message: "Use qos attributes instead")
+		@available(watchOS, deprecated, message: "Use qos attributes instead")
 		case background
 
 		internal var _translatedValue: Int {
@@ -111,8 +119,10 @@ public extension DispatchQueue {
 		return _swift_dispatch_get_main_queue()
 	}
 
-	@available(OSX, deprecated: 10.10, message: "")
-	@available(*, deprecated: 8.0, message: "")
+	@available(OSX, deprecated: 10.10)
+	@available(iOS, deprecated: 8.0)
+	@available(tvOS, deprecated)
+	@available(watchOS, deprecated)
 	public class func global(priority: GlobalQueuePriority) -> DispatchQueue {
 		return __dispatch_get_global_queue(priority._translatedValue, 0)
 	}
