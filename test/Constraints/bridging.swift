@@ -359,3 +359,9 @@ func bridgeAnyContainerToAnyObject(x: [Any], y: [NSObject: Any]) {
 
   _ = z
 }
+
+func bridgeTupleToAnyObject() {
+  let x = (1, "two")
+  let y = x as AnyObject
+  _ = y
+}
