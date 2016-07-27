@@ -134,7 +134,7 @@ func while_loop_multi() {
   // CHECK: br [[LOOP_EXIT0]]
 
   // CHECK: [[LOOP_BODY]]([[B:%[0-9]+]] : $String):
-  while let a = foo(), b = bar() {
+  while let a = foo(), let b = bar() {
     // CHECK:   debug_value [[B]] : $String, let, name "b"
     // CHECK:   debug_value [[A]] : $String, let, name "c"
     // CHECK:   release_value [[B]]
@@ -229,7 +229,7 @@ func if_multi_where() {
   // CHECK:   strong_release [[BBOX]]
   // CHECK:   release_value [[A]]
   // CHECK:   br [[IF_DONE:bb[0-9]+]]
-  if let a = foo(), var b = bar() where a == b {
+  if let a = foo(), var b = bar(), a == b {
     // CHECK: [[IF_BODY]]:
     // CHECK:   strong_release [[BBOX]]
     // CHECK:   release_value [[A]]
