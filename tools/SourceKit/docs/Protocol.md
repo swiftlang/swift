@@ -455,6 +455,43 @@ Welcome to SourceKit.  Type ':help' for assistance.
 }
 ```
 
+## Protocol Version
+
+SourceKit can provide information about the version of the protocol that is being used.
+
+### Request
+
+```
+{
+	<key.request>: (UID) <source.request.protocol_version>
+}
+```
+
+### Response
+
+```
+{
+	<key.version_major>: (int64) // The major version number in a version string
+	<key.version_minor>: (int64) // The minor version number in a version string
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=version
+```
+
+or
+
+```
+$ sourcekitd-repl
+Welcome to SourceKit.  Type ':help' for assistance.
+(SourceKit) {
+	key.request: source.request.protocol_version
+}
+```
+
 # UIDs
 
 ## Keys
@@ -472,3 +509,5 @@ Welcome to SourceKit.  Type ':help' for assistance.
 - `key.sourcetext`
 - `key.typename`
 - `key.usr`
+- `key.version_major`
+- `key.version_minor`
