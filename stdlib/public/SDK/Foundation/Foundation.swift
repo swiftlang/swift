@@ -439,6 +439,9 @@ extension NSNumber : _HasCustomAnyHashableRepresentation {
     guard let kind = _SwiftTypePreservingNSNumberTag(
       rawValue: Int(_swift_Foundation_TypePreservingNSNumberGetKind(self))
     ) else {
+      if let nsDecimalNumber: NSDecimalNumber = self as? NSDecimalNumber {
+        return AnyHashable(nsDecimalNumber as Decimal)
+      }
       return nil
     }
     switch kind {

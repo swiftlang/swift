@@ -30,8 +30,6 @@ enum _SwiftTypePreservingNSNumberTag {
   SwiftDouble = 4,
   SwiftCGFloat = 5,
   SwiftBool = 6
-  // FIXME(id-as-any): add support for NSDecimal and
-  // Foundation.Decimal.
 };
 
 @implementation _SwiftTypePreservingNSNumber {
