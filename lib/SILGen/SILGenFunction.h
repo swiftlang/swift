@@ -1253,6 +1253,9 @@ public:
                                 ArrayRef<Substitution> subs,
                                 ArrayRef<SILValue> args);
 
+  /// Emit a literal that applies the various initializers.
+  RValue emitLiteral(LiteralExpr *literal, SGFContext C);
+
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       SILResultInfo exnResult,
                                       bool isSuppressed);

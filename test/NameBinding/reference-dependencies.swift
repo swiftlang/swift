@@ -446,7 +446,6 @@ struct Sentinel2 {}
 
 // String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: "String"
-// NEGATIVE-NOT: "SS"
 // These are used by the other file in this module, but not by this one.
 // NEGATIVE-NOT: "ExpressibleByFloatLiteral"
 // NEGATIVE-NOT: "Int16"

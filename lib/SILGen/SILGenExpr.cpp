@@ -22,7 +22,6 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/Unicode.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -739,78 +738,9 @@ RValue RValueEmitter::visitBooleanLiteralExpr(BooleanLiteralExpr *E,
   return RValue(SGF, E, ManagedValue::forUnmanaged(boolValue));
 }
 
-RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
-                                        SGFContext C,
-                                        StringLiteralExpr::Encoding encoding) {
-  uint64_t Length;
-  bool isASCII = true;
-  for (unsigned char c : Str) {
-    if (c > 127) {
-      isASCII = false;
-      break;
-    }
-  }
-
-  StringLiteralInst::Encoding instEncoding;
-  switch (encoding) {
-  case StringLiteralExpr::UTF8:
-    instEncoding = StringLiteralInst::Encoding::UTF8;
-    Length = Str.size();
-    break;
-
-  case StringLiteralExpr::UTF16: {
-    instEncoding = StringLiteralInst::Encoding::UTF16;
-    Length = unicode::getUTF16Length(Str);
-    break;
-  }
-  case StringLiteralExpr::OneUnicodeScalar: {
-    SILType Ty = SGF.getLoweredLoadableType(E->getType());
-    SILValue UnicodeScalarValue =
-        SGF.B.createIntegerLiteral(E, Ty,
-                                   unicode::extractFirstUnicodeScalar(Str));
-    return RValue(SGF, E, ManagedValue::forUnmanaged(UnicodeScalarValue));
-  }
-  }
-
-  // The string literal provides the data.
-  StringLiteralInst *string = SGF.B.createStringLiteral(E, Str, instEncoding);
-  CanType ty = E->getType()->getCanonicalType();
-
-  // The length is lowered as an integer_literal.
-  auto WordTy = SILType::getBuiltinWordType(SGF.getASTContext());
-  auto *lengthInst = SGF.B.createIntegerLiteral(E, WordTy, Length);
-
-  // The 'isascii' bit is lowered as an integer_literal.
-  auto Int1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
-  auto *isASCIIInst = SGF.B.createIntegerLiteral(E, Int1Ty, isASCII);
-
-  ManagedValue EltsArray[] = {
-    ManagedValue::forUnmanaged(string),
-    ManagedValue::forUnmanaged(lengthInst),
-    ManagedValue::forUnmanaged(isASCIIInst)
-  };
-
-  ArrayRef<ManagedValue> Elts;
-  switch (instEncoding) {
-  case StringLiteralInst::Encoding::UTF16:
-    Elts = llvm::makeArrayRef(EltsArray).slice(0, 2);
-    break;
-
-  case StringLiteralInst::Encoding::UTF8:
-    Elts = EltsArray;
-    break;
-
-  case StringLiteralInst::Encoding::ObjCSelector:
-    llvm_unreachable("Objective-C selectors cannot be formed here");
-  }
-
-  return RValue(Elts, ty);
-}
-
-
 RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
                                              SGFContext C) {
-  return emitStringLiteral(E, E->getValue(), C, E->getEncoding());
+  return SGF.emitLiteral(E, C);
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
@@ -2039,17 +1969,6 @@ RValue RValueEmitter::visitObjCKeyPathExpr(ObjCKeyPathExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
 }
 
-static StringRef
-getMagicFunctionString(SILGenFunction &gen) {
-  assert(gen.MagicFunctionName
-         && "asking for #function but we don't have a function name?!");
-  if (gen.MagicFunctionString.empty()) {
-    llvm::raw_string_ostream os(gen.MagicFunctionString);
-    gen.MagicFunctionName.printPretty(os);
-  }
-  return gen.MagicFunctionString;
-}
-
 RValue RValueEmitter::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   ASTContext &Ctx = SGF.getASTContext();
@@ -2064,21 +1983,9 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
     Loc = E->getStartLoc();
   
   switch (E->getKind()) {
-  case MagicIdentifierLiteralExpr::File: {
-    StringRef Value = "";
-    if (Loc.isValid()) {
-      unsigned BufferID = Ctx.SourceMgr.findBufferContainingLoc(Loc);
-      Value = Ctx.SourceMgr.getIdentifierForBuffer(BufferID);
-    }
-
-    return emitStringLiteral(E, Value, C, E->getStringEncoding());
-  }
-  case MagicIdentifierLiteralExpr::Function: {
-    StringRef Value = "";
-    if (Loc.isValid())
-      Value = getMagicFunctionString(SGF);
-    return emitStringLiteral(E, Value, C, E->getStringEncoding());
-  }
+  case MagicIdentifierLiteralExpr::File:
+  case MagicIdentifierLiteralExpr::Function:
+    return SGF.emitLiteral(E, C);
   case MagicIdentifierLiteralExpr::Line: {
     unsigned Value = 0;
     if (Loc.isValid())

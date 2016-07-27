@@ -1630,7 +1630,12 @@ public:
     printCommon(E, "string_literal_expr")
       << " encoding=";
     printStringEncoding(E->getEncoding());
-    OS << " value=" << QuotedString(E->getValue()) << ')';
+    OS << " value=" << QuotedString(E->getValue())
+       << " builtin_initializer=";
+    E->getBuiltinInitializer().dump(OS);
+    OS << " initializer=";
+    E->getInitializer().dump(OS);
+    OS << ')';
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     printCommon(E, "interpolated_string_literal_expr");
@@ -1656,6 +1661,13 @@ public:
     case MagicIdentifierLiteralExpr::Line:  OS << "#line"; break;
     case MagicIdentifierLiteralExpr::Column:  OS << "#column"; break;
     case MagicIdentifierLiteralExpr::DSOHandle:  OS << "#dsohandle"; break;
+    }
+
+    if (E->isString()) {
+      OS << " builtin_initializer=";
+      E->getBuiltinInitializer().dump(OS);
+      OS << " initializer=";
+      E->getInitializer().dump(OS);
     }
     OS << ')';
   }
