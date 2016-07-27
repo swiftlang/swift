@@ -370,7 +370,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(MagicIdentifierLiteral);
   NO_REFERENCE(DiscardAssignment);
 
-  SIMPLE_REFERENCE(DeclRef, getDecl);
+  SIMPLE_REFERENCE(DeclRef, getDeclRef);
   SIMPLE_REFERENCE(SuperRef, getSelf);
 
   case ExprKind::Type: {
@@ -381,7 +381,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
     return ident->getComponentRange().back()->getBoundDecl();
   }
 
-  SIMPLE_REFERENCE(OtherConstructorDeclRef, getDecl);
+  SIMPLE_REFERENCE(OtherConstructorDeclRef, getDeclRef);
 
   PASS_THROUGH_REFERENCE(DotSyntaxBaseIgnored, getRHS);
 
@@ -439,8 +439,8 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(PostfixUnary);
   NO_REFERENCE(Binary);
   NO_REFERENCE(DotSyntaxCall);
-  NO_REFERENCE(ConstructorRefCall);
 
+  PASS_THROUGH_REFERENCE(ConstructorRefCall, getFn);
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
   NO_REFERENCE(TupleShuffle);
   NO_REFERENCE(UnresolvedTypeConversion);

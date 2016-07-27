@@ -883,13 +883,13 @@ public:
   }
 };
   
-/// StringLiteralExpr - String literal, like '"foo"'.  After semantic
-/// analysis assigns types, this is guaranteed to only have a
-/// BuiltinRawPointerType.
+/// StringLiteralExpr - String literal, like '"foo"'.
 class StringLiteralExpr : public LiteralExpr {
   StringRef Val;
   SourceRange Range;
-  
+  ConcreteDeclRef BuiltinInitializer;
+  ConcreteDeclRef Initializer;
+
 public:
   /// The encoding that should be used for the string literal.
   enum Encoding : unsigned {
@@ -924,6 +924,32 @@ public:
 
   bool isSingleExtendedGraphemeCluster() const {
     return StringLiteralExprBits.IsSingleExtendedGraphemeCluster;
+  }
+
+  /// Retrieve the builtin initializer that will be used to construct the string
+  /// literal.
+  ///
+  /// Any type-checked string literal will have a builtin initializer, which is
+  /// called first to form a concrete Swift type.
+  ConcreteDeclRef getBuiltinInitializer() const { return BuiltinInitializer; }
+
+  /// Set the builtin initializer that will be used to construct the string
+  /// literal.
+  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
+    BuiltinInitializer = builtinInitializer;
+  }
+
+  /// Retrieve the initializer that will be used to construct the string
+  /// literal from the result of the initializer.
+  ///
+  /// Only string literals that have no builtin literal conformance will have
+  /// this initializer, which will be called on the result of the builtin
+  /// initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the string literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
   }
 
   static bool classof(const Expr *E) {
@@ -978,7 +1004,9 @@ public:
   };
 private:
   SourceLoc Loc;
-  
+  ConcreteDeclRef BuiltinInitializer;
+  ConcreteDeclRef Initializer;
+
 public:
   MagicIdentifierLiteralExpr(Kind kind, SourceLoc loc, bool implicit = false)
     : LiteralExpr(ExprKind::MagicIdentifierLiteral, implicit), Loc(loc) {
@@ -1029,6 +1057,40 @@ public:
     assert(isString() && "Magic identifier literal has non-string encoding");
     MagicIdentifierLiteralExprBits.StringEncoding
       = static_cast<unsigned>(encoding);
+  }
+
+  /// Retrieve the builtin initializer that will be used to construct the string
+  /// literal.
+  ///
+  /// Any type-checked string literal will have a builtin initializer, which is
+  /// called first to form a concrete Swift type.
+  ConcreteDeclRef getBuiltinInitializer() const {
+    assert(isString() && "Magic identifier literal is not a string");
+    return BuiltinInitializer;
+  }
+
+  /// Set the builtin initializer that will be used to construct the string
+  /// literal.
+  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
+    assert(isString() && "Magic identifier literal is not a string");
+    BuiltinInitializer = builtinInitializer;
+  }
+
+  /// Retrieve the initializer that will be used to construct the string
+  /// literal from the result of the initializer.
+  ///
+  /// Only string literals that have no builtin literal conformance will have
+  /// this initializer, which will be called on the result of the builtin
+  /// initializer.
+  ConcreteDeclRef getInitializer() const {
+    assert(isString() && "Magic identifier literal is not a string");
+    return Initializer;
+  }
+
+  /// Set the initializer that will be used to construct the string literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    assert(isString() && "Magic identifier literal is not a string");
+    Initializer = initializer;
   }
 
   static bool classof(const Expr *E) {

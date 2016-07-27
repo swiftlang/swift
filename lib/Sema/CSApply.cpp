@@ -218,7 +218,8 @@ Type Solution::computeSubstitutions(
 template <typename DeclTy>
 static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
                                     ProtocolDecl *proto, DeclName name,
-                                    Diag<> diag) {
+                                    Diag<> diag,
+                                    ProtocolConformance *conformance = nullptr){
   // Find the named requirement.
   DeclTy *requirement = nullptr;
   for (auto member : proto->getMembers()) {
@@ -238,12 +239,13 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
   }
 
   // Find the member used to satisfy the named requirement.
-  ProtocolConformance *conformance = 0;
-  bool conforms = tc.conformsToProtocol(type, proto, dc,
-                                        ConformanceCheckFlags::InExpression,
-                                        &conformance);
-  if (!conforms)
-    return nullptr;
+  if (!conformance) {
+    bool conforms = tc.conformsToProtocol(type, proto, dc,
+                                          ConformanceCheckFlags::InExpression,
+                                          &conformance);
+    if (!conforms)
+      return nullptr;
+  }
 
   // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
@@ -1099,6 +1101,52 @@ namespace {
                          Diag<> brokenProtocolDiag,
                          Diag<> brokenBuiltinProtocolDiag);
 
+    /// \brief Convert the given literal expression via a protocol pair.
+    ///
+    /// This routine handles the two-step literal conversion process used
+    /// by integer, float, character, extended grapheme cluster, and string
+    /// literals. The first step uses \c builtinProtocol while the second
+    /// step uses \c protocol.
+    ///
+    /// \param literal The literal expression.
+    ///
+    /// \param type The literal type. This type conforms to \c protocol,
+    /// and may also conform to \c builtinProtocol.
+    ///
+    /// \param protocol The protocol that describes the literal requirement.
+    ///
+    /// \param literalType The name of the associated type in \c protocol that
+    /// describes the argument type of the conversion function (\c
+    /// literalFuncName).
+    ///
+    /// \param literalFuncName The name of the conversion function requirement
+    /// in \c protocol.
+    ///
+    /// \param builtinProtocol The "builtin" form of the protocol, which
+    /// always takes builtin types and can only be properly implemented
+    /// by standard library types. If \c type does not conform to this
+    /// protocol, it's literal type will.
+    ///
+    /// \param builtinLiteralFuncName The name of the conversion function
+    /// requirement in \c builtinProtocol.
+    ///
+    /// \param brokenProtocolDiag The diagnostic to emit if the protocol
+    /// is broken.
+    ///
+    /// \param brokenBuiltinProtocolDiag The diagnostic to emit if the builtin
+    /// protocol is broken.
+    ///
+    /// \returns the converted literal expression.
+    Expr *convertLiteralInPlace(Expr *literal,
+                                Type type,
+                                ProtocolDecl *protocol,
+                                Identifier literalType,
+                                DeclName literalFuncName,
+                                ProtocolDecl *builtinProtocol,
+                                DeclName builtinLiteralFuncName,
+                                Diag<> brokenProtocolDiag,
+                                Diag<> brokenBuiltinProtocolDiag);
+
     /// \brief Finish a function application by performing the appropriate
     /// conversions on the function and argument expressions and setting
     /// the resulting type.
@@ -1889,17 +1937,12 @@ namespace {
         isGraphemeClusterLiteral = false;
       }
 
-      assert(tc.conformsToProtocol(type, protocol, cs.DC,
-                                   ConformanceCheckFlags::InExpression));
-
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       if (auto defaultType = tc.getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
-
-      SmallVector<TupleTypeElt, 3> elements;
 
       ProtocolDecl *builtinProtocol;
       Identifier literalType;
@@ -1938,12 +1981,6 @@ namespace {
                        { tc.Context.Id_builtinUTF16StringLiteral,
                          tc.Context.getIdentifier("utf16CodeUnitCount") });
 
-          elements.push_back(
-            TupleTypeElt(tc.Context.TheRawPointerType,
-                         tc.Context.Id_builtinUTF16StringLiteral));
-          elements.push_back(
-            TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                         tc.Context.getIdentifier("utf16CodeUnitCount")));
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF16);
           else
@@ -1958,14 +1995,6 @@ namespace {
                        { tc.Context.Id_builtinStringLiteral,
                          tc.Context.getIdentifier("utf8CodeUnitCount"),
                          tc.Context.getIdentifier("isASCII") });
-          elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType,
-                                         tc.Context.Id_builtinStringLiteral));
-          elements.push_back(
-            TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                         tc.Context.getIdentifier("utf8CodeUnitCount")));
-          elements.push_back(
-            TupleTypeElt(BuiltinIntegerType::get(1, tc.Context),
-                         tc.Context.getIdentifier("isASCII")));
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF8);
           else
@@ -1987,15 +2016,6 @@ namespace {
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral);
-        elements.push_back(
-          TupleTypeElt(tc.Context.TheRawPointerType,
-                       tc.Context.Id_builtinExtendedGraphemeClusterLiteral));
-        elements.push_back(
-          TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
-                       tc.Context.getIdentifier("utf8CodeUnitCount")));
-        elements.push_back(
-          TupleTypeElt(BuiltinIntegerType::get(1, tc.Context),
-                       tc.Context.getIdentifier("isASCII")));
         brokenProtocolDiag =
             diag::extended_grapheme_cluster_literal_broken_proto;
         brokenBuiltinProtocolDiag =
@@ -2014,11 +2034,6 @@ namespace {
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral);
-        builtinProtocol = tc.getProtocol(
-            expr->getLoc(),
-            KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral);
-
-        elements.push_back(BuiltinIntegerType::get(32, tc.Context));
 
         brokenProtocolDiag = diag::unicode_scalar_literal_broken_proto;
         brokenBuiltinProtocolDiag =
@@ -2027,18 +2042,15 @@ namespace {
         stringLiteral->setEncoding(StringLiteralExpr::OneUnicodeScalar);
       }
 
-      return convertLiteral(expr,
-                            type,
-                            expr->getType(),
-                            protocol,
-                            literalType,
-                            literalFuncName,
-                            builtinProtocol,
-                            TupleType::get(elements, tc.Context),
-                            builtinLiteralFuncName,
-                            nullptr,
-                            brokenProtocolDiag,
-                            brokenBuiltinProtocolDiag);
+      return convertLiteralInPlace(expr,
+                                   type,
+                                   protocol,
+                                   literalType,
+                                   literalFuncName,
+                                   builtinProtocol,
+                                   builtinLiteralFuncName,
+                                   brokenProtocolDiag,
+                                   brokenBuiltinProtocolDiag);
     }
     
     Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {
@@ -5825,6 +5837,138 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
                            literal, brokenProtocolDiag);
   if (literal)
     literal->setType(type);
+  return literal;
+}
+
+Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
+                                          Type type,
+                                          ProtocolDecl *protocol,
+                                          Identifier literalType,
+                                          DeclName literalFuncName,
+                                          ProtocolDecl *builtinProtocol,
+                                          DeclName builtinLiteralFuncName,
+                                          Diag<> brokenProtocolDiag,
+                                          Diag<> brokenBuiltinProtocolDiag) {
+  auto &tc = cs.getTypeChecker();
+
+  // If coercing a literal to an unresolved type, we don't try to look up the
+  // witness members, just do it.
+  if (type->is<UnresolvedType>()) {
+    // Instead of updating the literal expr in place, allocate a new node.  This
+    // avoids issues where Builtin types end up on expr nodes and pollute
+    // diagnostics.
+    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context);
+    
+    // The literal expression has this type.
+    literal->setType(type);
+    return literal;
+  }
+
+  // Check whether this literal type conforms to the builtin protocol. If so,
+  // initialize via the builtin protocol.
+  ProtocolConformance *builtinConformance = nullptr;
+  if (builtinProtocol &&
+      tc.conformsToProtocol(type, builtinProtocol, cs.DC,
+                            ConformanceCheckFlags::InExpression,
+                            &builtinConformance)) {
+    // Find the witness that we'll use to initialize the type via a builtin
+    // literal.
+    auto witness = findNamedWitnessImpl<AbstractFunctionDecl>(
+                     tc, dc, type->getRValueType(), builtinProtocol,
+                     builtinLiteralFuncName, brokenBuiltinProtocolDiag,
+                     builtinConformance);
+    if (!witness)
+      return nullptr;
+
+    // Form a reference to the builtin conversion function.
+    // FIXME: Bogus location info.
+    Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
+                                              tc.Context);
+    Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
+                                             base, SourceLoc(),
+                                             witness->getFullName(),
+                                             DeclNameLoc(base->getEndLoc()),
+                                             /*Implicit=*/true);
+    (void)tc.typeCheckExpression(unresolvedDot, dc);
+    ConcreteDeclRef builtinRef = unresolvedDot->getReferencedDecl();
+    if (!builtinRef) {
+      tc.diagnose(base->getLoc(), brokenBuiltinProtocolDiag);
+      return nullptr;
+    }
+
+    // Set the builtin initializer.
+    if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
+      stringLiteral->setBuiltinInitializer(builtinRef);
+    else {
+      cast<MagicIdentifierLiteralExpr>(literal)
+        ->setBuiltinInitializer(builtinRef);
+    }
+
+    // The literal expression has this type.
+    literal->setType(type);
+
+    return literal;
+  }
+
+  // This literal type must conform to the (non-builtin) protocol.
+  assert(protocol && "requirements should have stopped recursion");
+  ProtocolConformance *conformance = nullptr;
+  bool conforms = tc.conformsToProtocol(type, protocol, cs.DC,
+                                        ConformanceCheckFlags::InExpression,
+                                        &conformance);
+  assert(conforms && "must conform to literal protocol");
+  (void)conforms;
+
+  // Dig out the literal type and perform a builtin literal conversion to it.
+  if (!literalType.empty()) {
+    // Extract the literal type.
+    Type builtinLiteralType = tc.getWitnessType(type, protocol, conformance,
+                                                literalType,
+                                                brokenProtocolDiag);
+    if (!builtinLiteralType)
+      return nullptr;
+
+    // Perform the builtin conversion.
+    if (!convertLiteralInPlace(literal, builtinLiteralType, nullptr,
+                               Identifier(), DeclName(), builtinProtocol,
+                               builtinLiteralFuncName, brokenProtocolDiag,
+                               brokenBuiltinProtocolDiag))
+      return nullptr;
+  }
+
+  // Find the witness that we'll use to initialize the literal value.
+  auto witness = findNamedWitnessImpl<AbstractFunctionDecl>(
+                   tc, dc, type->getRValueType(), protocol,
+                   literalFuncName, brokenProtocolDiag,
+                   conformance);
+  if (!witness)
+    return nullptr;
+
+  // Form a reference to the conversion function.
+  // FIXME: Bogus location info.
+  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
+                                            tc.Context);
+  Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
+                                           base, SourceLoc(),
+                                           witness->getFullName(),
+                                           DeclNameLoc(base->getEndLoc()),
+                                           /*Implicit=*/true);
+  (void)tc.typeCheckExpression(unresolvedDot, dc);
+  ConcreteDeclRef ref = unresolvedDot->getReferencedDecl();
+  if (!ref) {
+    tc.diagnose(base->getLoc(), brokenProtocolDiag);
+    return nullptr;
+  }
+
+  // Set the initializer.
+  if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
+    stringLiteral->setInitializer(ref);
+  else
+    cast<MagicIdentifierLiteralExpr>(literal)->setInitializer(ref);
+
+  // The literal expression has this type.
+  literal->setType(type);
+
   return literal;
 }
 

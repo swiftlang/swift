@@ -13,11 +13,11 @@
 // CHECK: return [[RESULT]] : $Int
 
 // Default argument for third parameter.
-// CHECK-LABEL: sil hidden @_TIF17default_arguments7defarg1{{.*}} : $@convention(thin) () -> @owned String
-// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSSC
-// CHECK: [[STRING:%[0-9]+]] = metatype $@thin String.Type
+// CHECK-LABEL: sil hidden @_TIF17default_arguments7defarg1FT1iSi1dSd1sSS_T_A1_{{.*}} : $@convention(thin) () -> @owned String
 // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "Hello"
 // CHECK: [[LEN:%[0-9]+]] = integer_literal $Builtin.Word, 5
+// CHECK: [[STRING:%[0-9]+]] = metatype $@thin String.Type
+// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSSC
 // CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[LEN]], {{[^,]+}}, [[STRING]]) : $@convention(method)
 // CHECK: return [[RESULT]] : $String
 func defarg1(i: Int = 17, d: Double, s: String = "Hello") { }
