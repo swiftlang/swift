@@ -1976,10 +1976,10 @@ public:
   /// \brief Simplify the system of constraints, by breaking down complex
   /// constraints into simpler constraints.
   ///
-  /// The result of simplification is a constraint system that consisting of
+  /// The result of simplification is a constraint system consisting of
   /// only simple constraints relating type variables to each other or
   /// directly to fixed types. There are no constraints that involve
-  /// type constructors on both sides. the simplified constraint system may,
+  /// type constructors on both sides. The simplified constraint system may,
   /// of course, include type variables for which we have constraints but
   /// no fixed type. Such type variables are left to the solver to bind.
   ///
