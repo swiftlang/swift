@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-// REQUIRES: rdar17028332
 
 // XFAIL: interpret
 
@@ -472,7 +471,7 @@ StringTests.test("appendToSubstringBug") {
 
     // We should correctly determine if the storage is too small and
     // reallocate.
-    if originalCapacity < suffixSize + prefixSize {
+    if size + prefixSize >= originalCapacity {
       expectNotEqual(originalIdentity, s0.bufferID)
     } else {
       expectEqual(originalIdentity, s0.bufferID)
