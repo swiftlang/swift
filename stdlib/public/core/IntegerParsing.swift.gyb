@@ -17,24 +17,19 @@ from SwiftIntTypes import all_integer_types, int_max_bits
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
-IntMax = 'Int%s' % int_max_bits
-UIntMax = 'UInt%s' % int_max_bits
-
 }%
 
 //===--- Parsing helpers --------------------------------------------------===//
 
-// FIXME(integers): Needs to get rid of `IntMax`
-#if false
 /// If text is an ASCII representation in the given `radix` of a
 /// non-negative number <= `maximum`, return that number.  Otherwise,
 /// return `nil`.
 ///
 /// - Note: If `text` begins with `"+"` or `"-"`, even if the rest of
 ///   the characters are `"0"`, the result is `nil`.
-internal func _parseUnsignedAsciiAsUIntMax(
-  _ u16: String.UTF16View, _ radix: Int, _ maximum: UIntMax
-) -> UIntMax? {
+internal func _parseUnsignedAsciiAsUInt64(
+  _ u16: String.UTF16View, _ radix: Int, _ maximum: UInt64
+) -> UInt64? {
   if u16.isEmpty { return nil }
 
   let digit = _ascii16("0")..._ascii16("9")
@@ -46,21 +41,23 @@ internal func _parseUnsignedAsciiAsUIntMax(
     radix <= numericCast(10 + lower.count),
     "Radix exceeds what can be expressed using the English alphabet")
 
-  let uRadix = UIntMax(bitPattern: IntMax(radix))
-  var result: UIntMax = 0
+  let uRadix = UInt64(bitPattern: Int64(radix))
+  var result: UInt64 = 0
   for c in u16 {
-    let n: UIntMax
+    let n: UInt64
     switch c {
-    case digit: n = UIntMax(c - digit.lowerBound)
-    case lower: n = UIntMax(c - lower.lowerBound) + 10
-    case upper: n = UIntMax(c - upper.lowerBound) + 10
+    case digit: n = UInt64(c - digit.lowerBound)
+    case lower: n = UInt64(c - lower.lowerBound) + 10
+    case upper: n = UInt64(c - upper.lowerBound) + 10
     default: return nil
     }
     if n >= uRadix { return nil }
-    let (result1, overflow1) = UIntMax.multiplyWithOverflow(result, uRadix)
-    let (result2, overflow2) = UIntMax.addWithOverflow(result1, n)
+    let (result1, overflow1) = result.multipliedWithOverflow(by: uRadix)
+    let (result2, overflow2) = result1.addingWithOverflow(n)
     result = result2
-    if overflow1 || overflow2 || result > maximum { return nil }
+    if overflow1 != .none || overflow2 != .none || result > maximum {
+      return nil
+    }
   }
   return result
 }
@@ -71,14 +68,14 @@ internal func _parseUnsignedAsciiAsUIntMax(
 ///
 /// - Note: For text matching the regular expression "-0+", the result
 ///   is `0`, not `nil`.
-internal func _parseAsciiAsUIntMax(
-  _ utf16: String.UTF16View, _ radix: Int, _ maximum: UIntMax
-) -> UIntMax? {
+internal func _parseAsciiAsUInt64(
+  _ utf16: String.UTF16View, _ radix: Int, _ maximum: UInt64
+) -> UInt64? {
   if utf16.isEmpty { return nil }
   // Parse (optional) sign.
   let (digitsUTF16, hasMinus) = _parseOptionalAsciiSign(utf16)
   // Parse digits.
-  guard let result = _parseUnsignedAsciiAsUIntMax(digitsUTF16, radix, maximum)
+  guard let result = _parseUnsignedAsciiAsUInt64(digitsUTF16, radix, maximum)
     else { return nil }
   // Disallow < 0.
   if hasMinus && result != 0 { return nil }
@@ -92,22 +89,21 @@ internal func _parseAsciiAsUIntMax(
 ///
 /// - Note: For text matching the regular expression "-0+", the result
 ///   is `0`, not `nil`.
-internal func _parseAsciiAsIntMax(
-  _ utf16: String.UTF16View, _ radix: Int, _ maximum: IntMax
-) -> IntMax? {
+internal func _parseAsciiAsInt64(
+  _ utf16: String.UTF16View, _ radix: Int, _ maximum: Int64
+) -> Int64? {
   _sanityCheck(maximum >= 0, "maximum should be non-negative")
   if utf16.isEmpty { return nil }
   // Parse (optional) sign.
   let (digitsUTF16, hasMinus) = _parseOptionalAsciiSign(utf16)
   // Parse digits. +1 for negatives because e.g. Int8's range is -128...127.
-  let absValueMax = UIntMax(bitPattern: maximum) + (hasMinus ? 1 : 0)
+  let absValueMax = UInt64(bitPattern: maximum) + (hasMinus ? 1 : 0)
   guard let absValue =
-    _parseUnsignedAsciiAsUIntMax(digitsUTF16, radix, absValueMax)
+    _parseUnsignedAsciiAsUInt64(digitsUTF16, radix, absValueMax)
     else { return nil }
   // Convert to signed.
-  return IntMax(bitPattern: hasMinus ? 0 &- absValue : absValue)
+  return Int64(bitPattern: hasMinus ? 0 &- absValue : absValue)
 }
-#endif
 
 /// Strip an optional single leading ASCII plus/minus sign from `utf16`.
 private func _parseOptionalAsciiSign(
@@ -132,16 +128,14 @@ extension ${Self} {
   /// "[+-]?[0-9a-zA-Z]+", or the value it denotes in the given `radix`
   /// is not representable, the result is `nil`.
   public init?(_ text: String, radix: Int = 10) {
-    // FIXME(integers): implement
-    fatalError()
-    //if let value = _parseAsciiAs${'' if signed else 'U'}IntMax(
-      //text.utf16, radix, ${'' if signed else 'U'}IntMax(${Self}.max)) {
-      //self.init(
-        //${'' if Self in (IntMax, UIntMax) else 'truncatingBitPattern:'} value)
-    //}
-    //else {
-      //return nil
-    //}
+    if let value = _parseAsciiAs${'' if signed else 'U'}Int${int_max_bits}(
+      text.utf16, radix, ${'' if signed else 'U'}Int${int_max_bits}(${Self}.max)) {
+      self.init(
+        ${'' if Self in ('Int64', 'UInt64') else 'truncatingBitPattern:'} value)
+    }
+    else {
+      return nil
+    }
   }
 }
 
