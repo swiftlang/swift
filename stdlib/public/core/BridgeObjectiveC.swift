@@ -83,7 +83,7 @@ public protocol _ObjectiveCBridgeable {
       -> Self
 }
 
-// TODO: stub for unit testing purposes
+// FIXME(ABI): stub for unit testing purposes
 extension _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
