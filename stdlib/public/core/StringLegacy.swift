@@ -63,12 +63,6 @@ extension String {
   }
 }
 
-extension String {
-  public init(_ _c: UnicodeScalar) {
-    self = String(repeating: _c, count: 1)
-  }
-}
-
 #if _runtime(_ObjC)
 /// Determines if `theString` starts with `prefix` comparing the strings under
 /// canonical equivalence.
