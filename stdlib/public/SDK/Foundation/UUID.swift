@@ -56,9 +56,11 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     public var uuidString: String {
         var bytes: uuid_string_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         var localValue = uuid
-        return withUnsafeMutablePointers(&localValue, &bytes) { val, str -> String in
-            uuid_unparse(unsafeBitCast(val, to: UnsafePointer<UInt8>.self), unsafeBitCast(str, to: UnsafeMutablePointer<Int8>.self))
-            return String(cString: unsafeBitCast(str, to: UnsafePointer<CChar>.self), encoding: .utf8)!
+        return withUnsafeMutablePointer(&localValue) { val -> String in
+            return withUnsafeMutablePointer(&bytes) { str -> String in
+                uuid_unparse(unsafeBitCast(val, to: UnsafePointer<UInt8>.self), unsafeBitCast(str, to: UnsafeMutablePointer<Int8>.self))
+                return String(cString: unsafeBitCast(str, to: UnsafePointer<CChar>.self), encoding: .utf8)!
+            }
         }
     }
     

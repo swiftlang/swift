@@ -4777,7 +4777,7 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
     let cocoa${Self} = self.cocoa${Self}
     if itemIndex == itemCount {
       let stackBufCount = _fastEnumerationStackBuf.count
-      // We can't use `withUnsafeMutablePointers` here to get pointers to
+      // We can't use `withUnsafeMutablePointer` here to get pointers to
       // properties, because doing so might introduce a writeback buffer, but
       // fast enumeration relies on the pointer identity of the enumeration
       // state struct.
