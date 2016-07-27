@@ -12,7 +12,7 @@ var CUUIDTestSuite = TestSuite("CUUID")
 /// Generates a random UUID
 CUUIDTestSuite.test("uuid") {
   var uuid: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-  withUnsafeMutablePointer(&uuid) {
+  withUnsafeMutablePointer(to: &uuid) {
     uuid_generate_random(unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self))
   }
 }

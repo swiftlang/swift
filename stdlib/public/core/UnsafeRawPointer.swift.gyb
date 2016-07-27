@@ -405,7 +405,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
       "storeBytes to misaligned raw pointer")
 
     var temp = value
-    withUnsafeMutablePointer(&temp) { source in
+    withUnsafeMutablePointer(to: &temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue
       // FIXME: to be replaced by _memcpy when conversions are implemented.
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
