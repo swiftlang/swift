@@ -25,7 +25,7 @@ extension CIFilter {
   //            arguments args: [AnyObject]?,
   //            options dict: Dictionary<NSObject, AnyObject>?) -> CIImage?
   func apply(_ k: CIKernel, args: [AnyObject], options: (String, AnyObject)...) -> CIImage? {
-    var dict: [String : AnyObject] = [:]
+    var dict = [String : AnyObject](minimumCapacity: options.count)
     for (key, value) in options {
       dict[key] = value
     }
@@ -38,7 +38,7 @@ extension CIFilter {
   convenience init?(
     name: String, elements: (String, AnyObject)...
   ) {
-    var dict: [String : AnyObject] = [:]
+    var dict = [String : AnyObject](minimumCapacity: elements.count)
     for (key, value) in elements {
       dict[key] = value
     }
@@ -50,7 +50,7 @@ extension CIFilter {
 extension CISampler {
   // - (id)initWithImage:(CIImage *)im keysAndValues:key0, ...;
   convenience init(im: CIImage, elements: (String, Any)...) {
-    var dict: [AnyHashable : Any] = [:]
+    var dict = [AnyHashable : Any](minimumCapacity: elements.count)
     for (key, value) in elements {
       dict[key] = value
     }
