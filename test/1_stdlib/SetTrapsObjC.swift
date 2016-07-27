@@ -79,10 +79,6 @@ class TestObjCKeyTy : NSObject {
 }
 
 struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   init(_ value: Int) { self.value = value }
 
   var hashValue: Int { return value }

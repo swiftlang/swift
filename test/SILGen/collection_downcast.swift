@@ -19,10 +19,6 @@ class BridgedObjC : NSObject { }
 func == (x: BridgedObjC, y: BridgedObjC) -> Bool { return true }
 
 struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   var hashValue: Int { return 0 }
 
   func _bridgeToObjectiveC() -> BridgedObjC {

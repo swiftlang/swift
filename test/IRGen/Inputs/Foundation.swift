@@ -32,10 +32,6 @@ func _convertNSSetToSet<T: NSObject>(s: NSSet?) -> Set<T> {
 }
 
 extension String : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
@@ -77,9 +73,6 @@ extension Array : _ObjectiveCBridgeable {
   ) -> Array {
     return Array()
   }
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(Element.self)
-  }
 }
 
 extension Dictionary : _ObjectiveCBridgeable {
@@ -102,9 +95,6 @@ extension Dictionary : _ObjectiveCBridgeable {
   ) -> Dictionary {
     return Dictionary()
   }
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(Key.self) && Swift._isBridgedToObjectiveC(Value.self)
-  }
 }
 
 extension Set : _ObjectiveCBridgeable {
@@ -126,9 +116,6 @@ extension Set : _ObjectiveCBridgeable {
     _ x: NSSet?
   ) -> Set {
     return Set()
-  }
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(Element.self)
   }
 }
 

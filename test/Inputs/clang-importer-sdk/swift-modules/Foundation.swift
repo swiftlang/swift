@@ -46,10 +46,6 @@ internal func _convertNSSetToSet<T : Hashable>(_ s: NSSet?) -> Set<T> {
 }
 
 extension String : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
@@ -68,10 +64,6 @@ extension String : _ObjectiveCBridgeable {
 }
 
 extension Int : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
@@ -94,10 +86,6 @@ extension Int : _ObjectiveCBridgeable {
 }
 
 extension Array : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
@@ -120,10 +108,6 @@ extension Array : _ObjectiveCBridgeable {
 }
 
 extension Dictionary : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
@@ -146,10 +130,6 @@ extension Dictionary : _ObjectiveCBridgeable {
 }
 
 extension Set : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   public func _bridgeToObjectiveC() -> NSSet {
     return NSSet()
   }
@@ -172,10 +152,6 @@ extension Set : _ObjectiveCBridgeable {
 }
 
 extension CGFloat : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
@@ -198,10 +174,6 @@ extension CGFloat : _ObjectiveCBridgeable {
 }
 
 extension NSRange : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSValue {
     return NSValue()
   }
@@ -233,10 +205,6 @@ public struct URL : _ObjectiveCBridgeable {
 
   public init?(string: String) { return nil }
 
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSURL {
     return NSURL()
   }

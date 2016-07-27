@@ -27,10 +27,6 @@ class ObjC : Root {
 class DerivesObjC : ObjC { }
 
 struct BridgedToObjC : Hashable, _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> ObjC {
     return ObjC()
   }

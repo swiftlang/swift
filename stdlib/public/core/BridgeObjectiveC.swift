@@ -83,13 +83,6 @@ public protocol _ObjectiveCBridgeable {
       -> Self
 }
 
-// FIXME(ABI): stub for unit testing purposes
-extension _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-}
-
 //===--- Bridging for metatypes -------------------------------------------===//
 
 /// A stand-in for a value of metatype type.

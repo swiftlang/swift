@@ -22,9 +22,6 @@ class AnNSArray {
 struct AnArray<T> : _ObjectiveCBridgeable {
   @sil_stored var Buffer : Builtin.NativeObject
 
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
   func _bridgeToObjectiveC() -> AnNSArray {
     return AnNSArray()
   }

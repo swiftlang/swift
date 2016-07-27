@@ -13,7 +13,6 @@ public extension _ObjectiveCBridgeable {
 
 struct Butt: _ObjectiveCBridgeable {
   typealias _ObjectiveCType = NSCloud
-  static func _isBridgedToObjectiveC() -> Bool
   func _bridgeToObjectiveC() -> NSCloud
   static func _forceBridgeFromObjectiveC(_ source: NSCloud,
                                          result: inout Butt?)
