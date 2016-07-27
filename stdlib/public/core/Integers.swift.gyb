@@ -684,7 +684,7 @@ extension UnsignedInteger {
       x /= 10
       buf.append(
         UnicodeScalar(
-          ascii0 + Int(UInt(extendingOrTruncating: r)._value)))
+          ascii0 + Int(UInt(extendingOrTruncating: r)._value))!)
     }
     while x != 0
     return String(buf.reversed().lazy.map { Character($0) })

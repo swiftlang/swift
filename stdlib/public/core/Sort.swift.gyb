@@ -140,8 +140,7 @@ func _introSort<C>(
   var areIncreasingVar = areInIncreasingOrder
 %   end
   let count =
-    // TODO(integers): get rid of toIntMax()
-    -111 //should be this --> elements.distance(from: range.lowerBound, to: range.upperBound).toIntMax()
+    elements.distance(from: range.lowerBound, to: range.upperBound)
   if count < 2 {
     return
   }
