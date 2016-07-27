@@ -67,6 +67,33 @@ A smoke test on Linux does the following:
         OS X platform               | @swift-ci Please test OS X platform
         Linux platform              | @swift-ci Please test Linux platform
 
+The core principles of validation testing is that:
+
+1. A validation test should build and run tests for /all/ platforms and all
+   architectures supported by the CI.
+2. A validation test should not be incremental. We want there to be a
+   definitiveness to a validation test. If one uses a validation test, one
+   should be sure that there is no nook or cranny in the code base that has not
+   been tested.
+
+With that being said, a validation test on macOS does the following:
+
+1. Removes the workspace.
+2. Builds the compiler.
+3. Builds the standard library for macOS and the simulators for all platforms.
+4. lldb is /not/ build/tested [[2]](#footnote-2)
+5. The tests, validation-tests are run for all simulators and macOS both with
+   and without optimizations enabled.
+
+A validation test on Linux does the following:
+
+1. Removes the workspace.
+2. Builds the compiler.
+3. Builds the standard library.
+4. lldb is built.
+5. Run the swift test and validation-test targets with and without optimization.
+6. lldb is tested.
+
 ### Benchmarking
 
         Platform       | Comment
@@ -110,3 +137,5 @@ FIXME: FILL ME IN!
 1. A full build break can prevent other developers from testing their work.
 2. A test break can make it difficult for developers to know whether or not their specific commit has broken a test, requiring them to perform an initial clean build, wasting time.
 3. @swift-ci pull request testing becomes less effective since one can not perform a test and merge and one must reason about the source of a given failure.
+
+<a name="footnote-2">[2]</a> This is due to unrelated issues relating to running lldb tests on macOS.
