@@ -206,13 +206,13 @@ internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
 /// Returns an `UnsafePointer` to the storage used for `object`.  There's
 /// not much you can do with this other than use it to identify the
 /// object.
-@_transparent
-public func unsafeAddress(of object: AnyObject) -> UnsafeRawPointer {
-  return UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
+@available(*, unavailable, message: "Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.")
+public func unsafeAddress(of object: AnyObject) -> UnsafePointer<Void> {
+  Builtin.unreachable()
 }
 
-@available(*, unavailable, renamed: "unsafeAddress(of:)")
-public func unsafeAddressOf(_ object: AnyObject) -> UnsafeRawPointer {
+@available(*, unavailable, message: "Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.")
+public func unsafeAddressOf(_ object: AnyObject) -> UnsafePointer<Void> {
   Builtin.unreachable()
 }
 
@@ -293,17 +293,19 @@ public func _onFastPath() {
 
 /// Returns `true` iff the class indicated by `theClass` uses native
 /// Swift reference-counting.
+#if _runtime(_ObjC)
+// Declare it here instead of RuntimeShims.h, because we need to specify
+// the type of argument to be AnyClass. This is currently not possible
+// when using RuntimeShims.h
+@_silgen_name("swift_objc_class_usesNativeSwiftReferenceCounting")
+func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
+#else
 @_versioned
 @inline(__always)
-internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
-#if _runtime(_ObjC)
-  return swift_objc_class_usesNativeSwiftReferenceCounting(
-    unsafeAddress(of: theClass)
-  )
-#else
+func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
   return true
-#endif
 }
+#endif
 
 @_silgen_name("swift_class_getInstanceExtents")
 func swift_class_getInstanceExtents(_ theClass: AnyClass)

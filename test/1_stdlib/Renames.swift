@@ -31,7 +31,8 @@ func _Arrays<T>(e: T) {
 }
 
 func _Builtin(o: AnyObject, oo: AnyObject?) {
-  _ = unsafeAddressOf(o) // expected-error {{'unsafeAddressOf' has been renamed to 'unsafeAddress(of:)'}} {{7-22=unsafeAddress}} {{23-23=of: }} {{none}}
+  _ = unsafeAddressOf(o) // expected-error {{Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.}} {{none}}
+  _ = unsafeAddress(of: o) // expected-error {{Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.}} {{none}}
   _ = unsafeUnwrap(oo) // expected-error {{Removed in Swift 3. Please use Optional.unsafelyUnwrapped instead.}} {{none}}
 }
 

@@ -385,8 +385,10 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 }
 
 // version for SwiftShims
+SWIFT_RUNTIME_EXPORT
+extern "C"
 bool
-swift::swift_objc_class_usesNativeSwiftReferenceCounting(const void *theClass) {
+swift_objc_class_usesNativeSwiftReferenceCounting(const void *theClass) {
 #if SWIFT_OBJC_INTEROP
   return usesNativeSwiftReferenceCounting((const ClassMetadata *)theClass);
 #else

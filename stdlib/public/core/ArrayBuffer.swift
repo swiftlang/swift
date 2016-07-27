@@ -437,7 +437,7 @@ extension _ArrayBuffer {
       return _native.identity
     }
     else {
-      return unsafeAddress(of: _nonNative)
+      return UnsafeRawPointer(Unmanaged.passUnretained(_nonNative).toOpaque())
     }
   }
   
