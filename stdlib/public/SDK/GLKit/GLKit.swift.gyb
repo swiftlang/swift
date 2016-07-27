@@ -35,7 +35,7 @@ vectorElementNames = [
 public func _indexHomogeneousValue<TTT, T>(_ aggregate: UnsafePointer<TTT>,
                                            _ index: Int) -> T {
   return UnsafeRawPointer(aggregate).load(
-    fromByteOffset: index * strideof(T), as: T.self)
+    fromByteOffset: index * strideof(T.self), as: T.self)
 }
 
 %{

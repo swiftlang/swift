@@ -37,8 +37,8 @@ func repr(_ x: _StringCore) -> String {
   if x.hasContiguousStorage {
     if let b = x.nativeBuffer {
     var offset = x.elementWidth == 2
-      ? UnsafeMutablePointer(b.start) - x.startUTF16
-      : UnsafeMutablePointer(b.start) - x.startASCII
+      ? b.start - UnsafeMutableRawPointer(x.startUTF16)
+      : b.start - UnsafeMutableRawPointer(x.startASCII)
       return "Contiguous(owner: "
       + "\(hexAddr(x._owner))[\(offset)...\(x.count + offset)]"
       + ", capacity = \(b.capacity))"

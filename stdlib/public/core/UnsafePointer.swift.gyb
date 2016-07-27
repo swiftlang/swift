@@ -629,16 +629,6 @@ extension UInt {
 }
 % end # for mutable
 
-/// A byte-sized thing that isn't designed to interoperate with
-/// any other types; it makes a decent parameter to
-/// `UnsafeMutablePointer<Pointee>` when you just want to do bytewise
-/// pointer arithmetic.
-@_fixed_layout
-public // @testable
-struct _RawByte {
-  let _inaccessible: UInt8
-}
-
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:
