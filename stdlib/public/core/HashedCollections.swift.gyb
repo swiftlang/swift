@@ -368,7 +368,6 @@ internal struct _UnmanagedAnyObjectArray {
 ///     print(primes.intersection(favoriteNumbers))
 ///     // Prints "[5, 7]"
 ///
-///
 /// Sequence and Collection Operations
 /// ==================================
 ///
