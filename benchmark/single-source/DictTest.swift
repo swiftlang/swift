@@ -146,7 +146,7 @@ public func run_Dictionary(scale: Int) {
                "IncorrectResults in DictTest: \(count) != \(N*541).")
 }
 
-class Box<T : Hashable where T : Equatable> : Hashable {
+class Box<T : Hashable> : Hashable {
   var value: T
 
   init(_ v: T) {
@@ -156,13 +156,10 @@ class Box<T : Hashable where T : Equatable> : Hashable {
   var hashValue: Int {
     return value.hashValue
   }
-}
 
-extension Box : Equatable {
-}
-
-func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
-  return lhs.value == rhs.value
+  static func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
+    return lhs.value == rhs.value
+  }
 }
 
 @inline(never)
