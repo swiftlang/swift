@@ -68,7 +68,7 @@ internal final class _SwiftNSData : _SwiftNativeNSData, _SwiftNativeFoundationTy
  
  This type provides "copy-on-write" behavior, and is also bridged to the Objective-C `NSData` class. You can wrap an instance of a custom subclass of `NSData` in `struct Data` by converting it using `myData as Data`.
  
- `Data` can be initialized with an `UnsafePointer` and count, an array of `UInt8` (the primitive byte type), or an `UnsafeBufferPointer`. The buffer-oriented functions provide an extra measure of safety by automatically performing the size calculation, as the type is known at compile time.
+ `Data` can be initialized with an `UnsafeRawPointer` and count, an array of `UInt8` (the primitive byte type), an `UnsafeBufferPointer`, the contents of a file, or base-64 encoded data or strings. The buffer-oriented functions provide an extra measure of safety by automatically performing the size calculation, as the type is known at compile time.
  */
 public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessCollection, MutableCollection, RangeReplaceableCollection, _MutablePairBoxing {
     /// The Objective-C bridged type of `Data`.
@@ -102,7 +102,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         case none
 
         /// A custom deallocator.
-        case custom((UnsafeMutablePointer<UInt8>, Int) -> Void)
+        case custom((UnsafeMutableRawPointer, Int) -> Void)
         
         fileprivate var _deallocator : ((UnsafeMutableRawPointer, Int) -> Void)? {
             switch self {
@@ -116,9 +116,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 return nil
             case .custom(let b):
                 return { (ptr, len) in
-                    // Bind memory to UInt8 since that is what the public deallocation function expects.
-                    let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: len)
-                    b(bytePtr, len)
+                    b(ptr, len)
                 }
             }
         }
@@ -131,7 +129,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// - parameter bytes: A pointer to the memory. It will be copied.
     /// - parameter count: The number of bytes to copy.
-    public init(bytes: UnsafePointer<UInt8>, count: Int) {
+    public init(bytes: UnsafeRawPointer, count: Int) {
         _wrapped = _SwiftNSData(immutableObject: NSData(bytes: bytes, length: count))
     }
 
@@ -207,7 +205,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter bytes: A pointer to the bytes.
     /// - parameter count: The size of the bytes.
     /// - parameter deallocator: Specifies the mechanism to free the indicated buffer, or `.none`.
-    public init(bytesNoCopy bytes: UnsafeMutablePointer<UInt8>, count: Int, deallocator: Deallocator) {
+    public init(bytesNoCopy bytes: UnsafeMutableRawPointer, count: Int, deallocator: Deallocator) {
         let whichDeallocator = deallocator._deallocator
         _wrapped = _SwiftNSData(immutableObject: NSData(bytesNoCopy: bytes, length: count, deallocator: whichDeallocator))
     }
