@@ -13,12 +13,14 @@
 import SwiftShims
 
 /// Convert the given numeric value to a hexadecimal string.
+  // FIXME(integers): support a more general BinaryInteger protocol
 public func asHex<T : FixedWidthInteger>(_ x: T) -> String {
   return "0x" + String(x, radix: 16)
 }
 
 /// Convert the given sequence of numeric values to a string representing
 /// their hexadecimal values.
+  // FIXME(integers): support a more general BinaryInteger protocol
 public func asHex<S : Sequence>(_ x: S) -> String
   where
   S.Iterator.Element : FixedWidthInteger {

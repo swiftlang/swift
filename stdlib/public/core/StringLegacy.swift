@@ -242,6 +242,7 @@ extension String {
   ///     let max = String(Int.max)
   ///     print("\(max) has \(max.utf16.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
+  // FIXME(integers): support a more general BinaryInteger protocol
   public init<T : FixedWidthInteger>(_ v: T) {
     self = _int64ToString(Int64(v))
   }
@@ -254,6 +255,7 @@ extension String {
   ///     let max = String(UInt.max)
   ///     print("\(max) has \(max.utf16.count) digits.")
   ///     // Prints "18446744073709551615 has 20 digits."
+  // FIXME(integers): support a more general BinaryInteger protocol
   public init<T : FixedWidthInteger>(_ v: T)
     where T : UnsignedInteger {
     self = _uint64ToString(UInt64(v))
@@ -280,6 +282,7 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
+  // FIXME(integers): support a more general BinaryInteger protocol
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int, uppercase: Bool = false
   ) {
@@ -309,6 +312,7 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
+  // FIXME(integers): support a more general BinaryInteger protocol
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int, uppercase: Bool = false
   ) where T : UnsignedInteger {
