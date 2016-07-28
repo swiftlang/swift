@@ -362,7 +362,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     /// Retrieve the value the pointer points to.
     @_transparent get {
       // We can do a strong load normally.
-      return UnsafeMutablePointer<Pointee>(self).pointee
+      return unsafeBitCast(self, to: UnsafeMutablePointer<Pointee>.self).pointee
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -409,6 +409,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// This is inherently unsafe; UnsafeMutablePointer assumes the
   /// referenced memory has +1 strong ownership semantics, whereas
   /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
+  ///
+  /// - Warning: Accessing `pointee` as a type that is unrelated to
+  ///   the underlying memory's bound type is undefined.
   @_transparent public
   init<U>(_ from: UnsafeMutablePointer<U>) {
     self._rawValue = from._rawValue
@@ -421,6 +424,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// This is inherently unsafe; UnsafeMutablePointer assumes the
   /// referenced memory has +1 strong ownership semantics, whereas
   /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
+  ///
+  /// - Warning: Accessing `pointee` as a type that is unrelated to
+  ///   the underlying memory's bound type is undefined.
   @_transparent public
   init?<U>(_ from: UnsafeMutablePointer<U>?) {
     guard let unwrapped = from else { return nil }
@@ -431,6 +437,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// This is inherently unsafe because UnsafePointers do not imply
   /// mutability.
+  ///
+  /// - Warning: Accessing `pointee` as a type that is unrelated to
+  ///   the underlying memory's bound type is undefined.
   @_transparent
   init<U>(_ from: UnsafePointer<U>) {
     self._rawValue = from._rawValue
@@ -442,10 +451,29 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// This is inherently unsafe because UnsafePointers do not imply
   /// mutability.
+  ///
+  /// - Warning: Accessing `pointee` as a type that is unrelated to
+  ///   the underlying memory's bound type is undefined.
   @_transparent
   init?<U>(_ from: UnsafePointer<U>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
+  }
+}
+
+extension UnsafeMutableRawPointer {
+  /// Convert from `AutoreleasingUnsafeMutablePointer`.
+  @_transparent
+  public init<T>(_ from: AutoreleasingUnsafeMutablePointer<T>) {
+    _rawValue = from._rawValue
+  }
+}
+
+extension UnsafeRawPointer {
+  /// Convert from `AutoreleasingUnsafeMutablePointer`.
+  @_transparent
+  public init<T>(_ from: AutoreleasingUnsafeMutablePointer<T>) {
+    _rawValue = from._rawValue
   }
 }
 

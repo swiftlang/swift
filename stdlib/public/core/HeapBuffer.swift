@@ -92,19 +92,20 @@ struct _HeapBuffer<Value, Element> : Equatable {
             : (heapAlign < elementAlign ? elementAlign : heapAlign))
   }
 
-  internal var _address: UnsafeMutablePointer<Int8> {
-    return UnsafeMutablePointer(
+  internal var _address: UnsafeMutableRawPointer {
+    return UnsafeMutableRawPointer(
       Builtin.bridgeToRawPointer(self._nativeObject))
   }
 
   internal var _value: UnsafeMutablePointer<Value> {
-    return UnsafeMutablePointer(
-      _HeapBuffer._valueOffset() + _address)
+    return (_HeapBuffer._valueOffset() + _address).assumingMemoryBound(
+      to: Value.self)
   }
 
   public // @testable
   var baseAddress: UnsafeMutablePointer<Element> {
-    return UnsafeMutablePointer(_HeapBuffer._elementOffset() + _address)
+    return (_HeapBuffer._elementOffset() + _address).assumingMemoryBound(
+      to: Element.self)
   }
 
   internal func _allocatedSize() -> Int {

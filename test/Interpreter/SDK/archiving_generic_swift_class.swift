@@ -70,10 +70,11 @@ func driver() {
     }
 
     // Spawn the archiver process.
+    let str = "-archive" as StaticString
+    let optStr = UnsafeMutableRawPointer(mutating: str.utf8Start).bindMemory(
+      to: CChar.self, capacity: str.utf8CodeUnitCount)
     let archiverArgv: [UnsafeMutablePointer<Int8>?] = [
-      CommandLine.unsafeArgv[0],
-      UnsafeMutablePointer(("-archive" as StaticString).utf8Start),
-      nil
+      CommandLine.unsafeArgv[0], optStr, nil
     ]
     guard posix_spawn(&archiver, CommandLine.unsafeArgv[0],
                       &archiverActions, nil,
@@ -99,11 +100,12 @@ func driver() {
     }
 
     // Spawn the unarchiver process.
+    let str = "-unarchive" as StaticString
+    let optStr = UnsafeMutableRawPointer(mutating: str.utf8Start).bindMemory(
+      to: CChar.self, capacity: str.utf8CodeUnitCount)
     var unarchiver: pid_t = 0
     let unarchiverArgv: [UnsafeMutablePointer<Int8>?] = [
-      CommandLine.unsafeArgv[0],
-      UnsafeMutablePointer(("-unarchive" as StaticString).utf8Start),
-      nil
+      CommandLine.unsafeArgv[0], optStr, nil
     ]
     guard posix_spawn(&unarchiver, CommandLine.unsafeArgv[0],
                       &unarchiverActions, nil,

@@ -316,7 +316,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         _mapUnmanaged { $0.getBytes(pointer, length: count) }
     }
     
-    private func _copyBytesHelper(to pointer: UnsafeMutablePointer<UInt8>, from range: NSRange) {
+    private func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: NSRange) {
         _mapUnmanaged { $0.getBytes(pointer, range: range) }
     }
     
@@ -357,8 +357,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         guard !copyRange.isEmpty else { return 0 }
         
         let nsRange = NSMakeRange(copyRange.lowerBound, copyRange.upperBound - copyRange.lowerBound)
-        let pointer : UnsafeMutablePointer<UInt8> = UnsafeMutablePointer<UInt8>(buffer.baseAddress!)
-        _copyBytesHelper(to: pointer, from: nsRange)
+        _copyBytesHelper(to: buffer.baseAddress!, from: nsRange)
         return copyRange.count
     }
     

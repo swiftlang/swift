@@ -72,7 +72,7 @@ struct AddressorAndGet {
 
   subscript(index: Int) -> Int {
     unsafeAddress { // expected-error {{subscript cannot provide both 'address' and a getter}}
-      return UnsafePointer(base)
+      return base
     }
     get {
       return base.get()
@@ -85,7 +85,7 @@ struct AddressorAndSet {
 
   subscript(index: Int) -> Int {
     unsafeAddress {
-      return UnsafePointer(base)
+      return base
     }
     set { // expected-error {{subscript cannot provide both 'address' and a setter; use an ordinary getter instead}}
     }

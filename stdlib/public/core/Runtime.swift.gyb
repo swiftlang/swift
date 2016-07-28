@@ -121,8 +121,9 @@ func _stdlib_atomicCompareExchangeStrongInt${bits}(
   expected: UnsafeMutablePointer<Int${bits}>,
   desired: Int${bits}) -> Bool {
   return _stdlib_atomicCompareExchangeStrongUInt${bits}(
-    object: UnsafeMutablePointer(target),
-    expected: UnsafeMutablePointer(expected),
+    object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt${bits}>.self),
+    expected: unsafeBitCast(expected,
+      to: UnsafeMutablePointer<UInt${bits}>.self),
     desired: UInt${bits}(bitPattern: desired))
 }
 
@@ -139,7 +140,7 @@ func _swift_stdlib_atomicStoreInt${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,
   desired: Int${bits}) {
   return _swift_stdlib_atomicStoreUInt${bits}(
-    object: UnsafeMutablePointer(target),
+    object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt${bits}>.self),
     desired: UInt${bits}(bitPattern: desired))
 }
 
@@ -155,7 +156,8 @@ func _swift_stdlib_atomicLoadInt${bits}(
   object target: UnsafeMutablePointer<Int${bits}>) -> Int${bits} {
   return Int${bits}(bitPattern:
     _swift_stdlib_atomicLoadUInt${bits}(
-      object: UnsafeMutablePointer(target)))
+      object: unsafeBitCast(target,
+        to: UnsafeMutablePointer<UInt${bits}>.self)))
 }
 
 %   for operation in ['Add', 'And', 'Or', 'Xor']:
@@ -178,7 +180,7 @@ func _swift_stdlib_atomicFetch${operation}Int${bits}(
   operand: Int${bits}) -> Int${bits} {
   return Int${bits}(bitPattern:
     _swift_stdlib_atomicFetch${operation}UInt${bits}(
-      object: UnsafeMutablePointer(target),
+      object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt${bits}>.self),
       operand: UInt${bits}(bitPattern: operand)))
 }
 %   end
@@ -196,8 +198,8 @@ func _stdlib_atomicCompareExchangeStrongInt(
     desired: UInt32(bitPattern: Int32(desired)))
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   return _stdlib_atomicCompareExchangeStrongUInt64(
-    object: UnsafeMutablePointer(target),
-    expected: UnsafeMutablePointer(expected),
+    object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt64>.self),
+    expected: unsafeBitCast(expected, to: UnsafeMutablePointer<UInt64>.self),
     desired: UInt64(bitPattern: Int64(desired)))
 #endif
 }
@@ -211,7 +213,7 @@ func _swift_stdlib_atomicStoreInt(
     desired: UInt32(bitPattern: Int32(desired)))
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   return _swift_stdlib_atomicStoreUInt64(
-    object: UnsafeMutablePointer(target),
+    object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt64>.self),
     desired: UInt64(bitPattern: Int64(desired)))
 #endif
 }
@@ -226,7 +228,7 @@ public func _swift_stdlib_atomicLoadInt(
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   return Int(Int64(bitPattern:
     _swift_stdlib_atomicLoadUInt64(
-      object: UnsafeMutablePointer(target))))
+        object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt64>.self))))
 #endif
 }
 
@@ -245,7 +247,7 @@ func _stdlib_atomicLoadARCRef(
   object target: UnsafeMutablePointer<AnyObject?>
 ) -> AnyObject? {
   let result = _swift_stdlib_atomicLoadPtrImpl(
-    object: UnsafeMutablePointer(target))
+    object: unsafeBitCast(target, to: UnsafeMutablePointer<OpaquePointer>.self))
   if let unwrapped = result {
     return Unmanaged<AnyObject>.fromOpaque(
       UnsafePointer(unwrapped)).takeUnretainedValue()
@@ -261,12 +263,12 @@ public func _swift_stdlib_atomicFetch${operation}Int(
 #if arch(i386) || arch(arm)
   return Int(Int32(bitPattern:
     _swift_stdlib_atomicFetch${operation}UInt32(
-      object: UnsafeMutablePointer(target),
-      operand: UInt32(bitPattern: Int32(operand)))))
+        object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt32>.self),
+        operand: UInt32(bitPattern: Int32(operand)))))
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   return Int(Int64(bitPattern:
     _swift_stdlib_atomicFetch${operation}UInt64(
-      object: UnsafeMutablePointer(target),
+      object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt64>.self),
       operand: UInt64(bitPattern: Int64(operand)))))
 #endif
 }
@@ -276,7 +278,8 @@ public final class _stdlib_AtomicInt {
   var _value: Int
 
   var _valuePtr: UnsafeMutablePointer<Int> {
-    return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+      to: Int.self)
   }
 
   public init(_ value: Int = 0) {
@@ -383,7 +386,8 @@ func _float${bits}ToString(_ value: Float${bits}, debug: Bool) -> String {
   var buffer = _Buffer32()
   return withUnsafeMutablePointer(to: &buffer) {
     (bufferPtr) in
-    let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
+    let bufferUTF8Ptr = UnsafeMutableRawPointer(bufferPtr)
+      .bindMemory(to: UTF8.CodeUnit.self, capacity: 32)
     let actualLength = _float${bits}ToStringImpl(bufferUTF8Ptr, 32, value, debug)
     return String._fromWellFormedCodeUnitSequence(
       UTF8.self,
@@ -412,7 +416,8 @@ func _int64ToString(
     var buffer = _Buffer32()
     return withUnsafeMutablePointer(to: &buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
+      let bufferUTF8Ptr = UnsafeMutableRawPointer(bufferPtr)
+        .bindMemory(to: UTF8.CodeUnit.self, capacity: 32)
       let actualLength =
         _int64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
@@ -424,7 +429,8 @@ func _int64ToString(
     var buffer = _Buffer72()
     return withUnsafeMutablePointer(to: &buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
+      let bufferUTF8Ptr = UnsafeMutableRawPointer(bufferPtr).bindMemory(
+        to: UTF8.CodeUnit.self, capacity: 72)
       let actualLength =
         _int64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
@@ -449,7 +455,8 @@ func _uint64ToString(
     var buffer = _Buffer32()
     return withUnsafeMutablePointer(to: &buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
+      let bufferUTF8Ptr = UnsafeMutableRawPointer(bufferPtr)
+        .bindMemory(to: UTF8.CodeUnit.self, capacity: 32)
       let actualLength =
         _uint64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
@@ -461,7 +468,8 @@ func _uint64ToString(
     var buffer = _Buffer72()
     return withUnsafeMutablePointer(to: &buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
+      let bufferUTF8Ptr = UnsafeMutableRawPointer(bufferPtr)
+        .bindMemory(to: UTF8.CodeUnit.self, capacity: 72)
       let actualLength =
         _uint64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
