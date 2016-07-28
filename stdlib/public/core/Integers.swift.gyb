@@ -311,15 +311,11 @@ public func < <T : BinaryInteger>(lhs: T, rhs: T) -> Bool {
   return lhs.isLess(than: rhs)
 }
 
-// FIXME(integers): these seem to be important for Int-backed enums
+// FIXME(integers): without this overload enums don't compile with the
+//                  following error: "error: no overload of '==' for Int"
 @_transparent
-public func ==(lhs: Int, rhs: Int) -> Bool {
+public func == (lhs: Int, rhs: Int) -> Bool {
   return lhs.isEqual(to: rhs)
-}
-
-//@_transparent
-public func < (lhs: Int, rhs: Int) -> Bool {
-  return lhs.isLess(than: rhs)
 }
 
 //===----------------------------------------------------------------------===//
