@@ -16,6 +16,18 @@ The protocol is documented in the following format:
 - `"[opt]"` indicates an optional key.
 - Specific UIDs are written as `<UID string>`.
 
+# Table of Contents
+
+| Request Name | Request Key |
+| -------------:|:------------|
+| [Code Completion](#code-completion) | source.request.codecomplete |
+| [Cursor Info](#cursor-info) | source.request.cursorinfo |
+| [Demangling](#demangling) | source.request.demangle |
+| [Documentation](#documentation) | source.request.docinfo |
+| [Module interface generation](#module-interface-generation) | source.request.editor.open.interface |
+| [Indexing](#indexing) | source.request.indexsource  |
+| [Protocol Version](#protocol-version) | source.request.protocol_version |
+
 
 # Requests
 
@@ -393,7 +405,7 @@ range ::=
 
 Sub-diagnostics are only diagnostic notes currently.
 
-# Demangling
+## Demangling
 
 SourceKit is capable of "demangling" mangled Swift symbols. In other words,
 it's capable of taking the symbol `_TF13MyCoolPackageg6raichuVS_7Pokemon` as
