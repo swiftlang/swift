@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
-// FIXME(id-as-any): add tests that use CF objects (is this even
-// possible?)
-
 // FIXME(id-as-any): add tests that use Swift errors and
 // Objective-C errors.
 
@@ -471,20 +468,37 @@ let interestingBitVectorArrays: [[UInt8]] = [
   [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88],
 ]
 
-AnyHashableTests.test("CFBitVector/Hashable") {
-  let bitVectors = interestingBitVectorArrays.map(CFBitVector.makeImmutable)
+AnyHashableTests.test("AnyHashable with CFBitVector") {
+  let bitVectors: [CFBitVector] =
+    interestingBitVectorArrays.map(CFBitVector.makeImmutable)
   let arrays = bitVectors.map { $0.asArray }
   func isEq(_ lhs: [[UInt8]], _ rhs: [[UInt8]]) -> Bool {
     return zip(lhs, rhs).map { $0 == $1 }.reduce(true, { $0 && $1 })
   }
   expectEqualTest(interestingBitVectorArrays, arrays, sameValue: isEq)
   checkHashable(bitVectors, equalityOracle: { $0 == $1 })
+
+  expectEqual(.foreignClass, SwiftRuntime.metadataKind(of: bitVectors.first!))
+
+  checkHashable(
+    bitVectors.map(AnyHashable.init),
+    equalityOracle: { $0 == $1 })
+
+  let bitVectorsAsAnyObjects: [NSObject] = bitVectors.map {
+    ($0 as AnyObject) as! NSObject
+  }
+  expectEqual(
+    .objCClassWrapper,
+    SwiftRuntime.metadataKind(of: bitVectorsAsAnyObjects.first!))
+  checkHashable(
+    bitVectorsAsAnyObjects.map(AnyHashable.init),
+    equalityOracle: { $0 == $1 })
 }
 
-AnyHashableTests.test("CFMutableBitVector/Hashable") {
+AnyHashableTests.test("AnyHashable with CFMutableBitVector") {
   // CFMutableBitVector inherits the Hashable conformance from
   // CFBitVector.
-  let bitVectors =
+  let bitVectors: [CFMutableBitVector] =
     interestingBitVectorArrays.map(CFMutableBitVector.makeMutable)
   let arrays = bitVectors.map { $0.asArray }
   func isEq(_ lhs: [[UInt8]], _ rhs: [[UInt8]]) -> Bool {
@@ -492,6 +506,23 @@ AnyHashableTests.test("CFMutableBitVector/Hashable") {
   }
   expectEqualTest(interestingBitVectorArrays, arrays, sameValue: isEq)
   checkHashable(bitVectors, equalityOracle: { $0 == $1 })
+
+  expectEqual(.foreignClass, SwiftRuntime.metadataKind(of: bitVectors.first!))
+
+  checkHashable(
+    bitVectors.map(AnyHashable.init),
+    equalityOracle: { $0 == $1 })
+
+  let bitVectorsAsAnyObjects: [NSObject] = bitVectors.map {
+    ($0 as AnyObject) as! NSObject
+  }
+  checkHashable(bitVectors, equalityOracle: { $0 == $1 })
+  expectEqual(
+    .objCClassWrapper,
+    SwiftRuntime.metadataKind(of: bitVectorsAsAnyObjects.first!))
+  checkHashable(
+    bitVectorsAsAnyObjects.map(AnyHashable.init),
+    equalityOracle: { $0 == $1 })
 }
 
 #endif
