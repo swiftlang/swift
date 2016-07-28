@@ -87,6 +87,31 @@ class HotDogs {
   }
 }
 
+// Local type in extension of type in another module
+extension String {
+  func foo() {
+    // CHECK-LABEL: // (extension in nested_generics):Swift.String.(foo () -> ()).(Cheese #1).init (material : A) -> (extension in nested_generics):Swift.String.(foo () -> ()).(Cheese #1)<A>
+    // CHECK-LABEL: sil shared @_TFVFE15nested_genericsSS3fooFT_T_L_6CheeseCfT8materialx_GS0_x_
+    struct Cheese<Milk> {
+      let material: Milk
+    }
+    let r = Cheese(material: "cow")
+  }
+}
+
+// Local type in extension of type in same module
+extension HotDogs {
+  func applyRelish() {
+    // CHECK-LABEL: // nested_generics.HotDogs.(applyRelish () -> ()).(Relish #1).init (material : A) -> nested_generics.HotDogs.(applyRelish () -> ()).(Relish #1)<A>
+    // CHECK-LABEL: sil shared @_TFVFC15nested_generics7HotDogs11applyRelishFT_T_L_6RelishCfT8materialx_GS1_x_
+
+    struct Relish<Material> {
+      let material: Material
+    }
+    let r = Relish(material: "pickles")
+  }
+}
+
 struct Pepper {}
 struct ChiliFlakes {}
 

@@ -1161,7 +1161,10 @@ private:
   NodePointer demangleBoundGenericArgs(NodePointer nominalType) {
     // Generic arguments for the outermost type come first.
     NodePointer parentOrModule = nominalType->getChild(0);
-    if (parentOrModule->getKind() != Node::Kind::Module) {
+
+    if (parentOrModule->getKind() != Node::Kind::Module &&
+        parentOrModule->getKind() != Node::Kind::Function &&
+        parentOrModule->getKind() != Node::Kind::Extension) {
       parentOrModule = demangleBoundGenericArgs(parentOrModule);
 
       // Rebuild this type with the new parent type, which may have
