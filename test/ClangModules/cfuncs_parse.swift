@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify -I %S/Inputs %s
 
-// XFAIL: linux
-
 import cfuncs
 
 func test_cfunc1(_ i: Int) {

@@ -332,6 +332,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
           // Don't emit LLVM IR.
           "-fsyntax-only",
 
+          // enable block support
+          "-fblocks",
+
           "-fretain-comments-from-system-headers",
 
           SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
@@ -341,7 +344,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   if (triple.isOSDarwin()) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
       // Darwin uses Objective-C ARC.
-      "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fblocks",
+      "-x", "objective-c", "-std=gnu11", "-fobjc-arc",
 
       // Define macros that Swift bridging headers use.
       "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
