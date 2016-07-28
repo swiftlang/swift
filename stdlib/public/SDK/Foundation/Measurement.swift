@@ -294,6 +294,8 @@ FIXME(id-as-any): can't write this code because of:
 
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension NSMeasurement : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
     public func _toCustomAnyHashable() -> AnyHashable? {
         return AnyHashable(self as Measurement)
     }

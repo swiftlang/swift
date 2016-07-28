@@ -110,10 +110,24 @@ class TestLocale : TestLocaleSuper {
     }
 
     func test_AnyHashableContainingLocale() {
-        let values = [
+        let values: [Locale] = [
             Locale(identifier: "en"),
             Locale(identifier: "uk"),
             Locale(identifier: "uk"),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("Locale", String(anyHashables[0].base.dynamicType))
+        expectEqual("Locale", String(anyHashables[1].base.dynamicType))
+        expectEqual("Locale", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSLocale() {
+        let values: [NSLocale] = [
+            NSLocale(localeIdentifier: "en"),
+            NSLocale(localeIdentifier: "uk"),
+            NSLocale(localeIdentifier: "uk"),
         ]
         let anyHashables = values.map(AnyHashable.init)
         expectEqual("Locale", String(anyHashables[0].base.dynamicType))
@@ -131,5 +145,6 @@ LocaleTests.test("test_equality") { TestLocale().test_equality() }
 LocaleTests.test("test_localizedStringFunctions") { TestLocale().test_localizedStringFunctions() }
 LocaleTests.test("test_properties") { TestLocale().test_properties() }
 LocaleTests.test("test_AnyHashableContainingLocale") { TestLocale().test_AnyHashableContainingLocale() }
+LocaleTests.test("test_AnyHashableCreatedFromNSLocale") { TestLocale().test_AnyHashableCreatedFromNSLocale() }
 runAllTests()
 #endif

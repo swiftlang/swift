@@ -44,10 +44,35 @@ class TestPersonNameComponents : TestPersonNameComponentsSuper {
             expectEqual(anyHashables[1], anyHashables[2])
         }
     }
+
+    @available(OSX 10.11, iOS 9.0, *)
+    func makeNSPersonNameComponents(givenName: String, familyName: String) -> NSPersonNameComponents {
+        let result = NSPersonNameComponents()
+        result.givenName = givenName
+        result.familyName = familyName
+        return result
+    }
+
+    func test_AnyHashableCreatedFromNSPersonNameComponents() {
+        if #available(OSX 10.11, iOS 9.0, *) {
+            let values: [NSPersonNameComponents] = [
+                makeNSPersonNameComponents(givenName: "Kevin", familyName: "Frank"),
+                makeNSPersonNameComponents(givenName: "John", familyName: "Appleseed"),
+                makeNSPersonNameComponents(givenName: "John", familyName: "Appleseed"),
+            ]
+            let anyHashables = values.map(AnyHashable.init)
+            expectEqual("PersonNameComponents", String(anyHashables[0].base.dynamicType))
+            expectEqual("PersonNameComponents", String(anyHashables[1].base.dynamicType))
+            expectEqual("PersonNameComponents", String(anyHashables[2].base.dynamicType))
+            expectNotEqual(anyHashables[0], anyHashables[1])
+            expectEqual(anyHashables[1], anyHashables[2])
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
 var PersonNameComponentsTests = TestSuite("TestPersonNameComponents")
 PersonNameComponentsTests.test("test_AnyHashableContainingPersonNameComponents") { TestPersonNameComponents().test_AnyHashableContainingPersonNameComponents() }
+PersonNameComponentsTests.test("test_AnyHashableCreatedFromNSPersonNameComponents") { TestPersonNameComponents().test_AnyHashableCreatedFromNSPersonNameComponents() }
 runAllTests()
 #endif

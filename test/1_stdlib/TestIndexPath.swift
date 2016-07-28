@@ -83,10 +83,24 @@ class TestIndexPath : TestIndexPathSuper {
     }
 
     func test_AnyHashableContainingIndexPath() {
-        let values = [
+        let values: [IndexPath] = [
             IndexPath(indexes: [1, 2]),
             IndexPath(indexes: [1, 2, 3]),
             IndexPath(indexes: [1, 2, 3]),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("IndexPath", String(anyHashables[0].base.dynamicType))
+        expectEqual("IndexPath", String(anyHashables[1].base.dynamicType))
+        expectEqual("IndexPath", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSIndexPath() {
+        let values: [NSIndexPath] = [
+            NSIndexPath(index: 1),
+            NSIndexPath(index: 2),
+            NSIndexPath(index: 2),
         ]
         let anyHashables = values.map(AnyHashable.init)
         expectEqual("IndexPath", String(anyHashables[0].base.dynamicType))
@@ -108,6 +122,7 @@ IndexPathTests.test("testRanges") { TestIndexPath().testRanges() }
 IndexPathTests.test("testMoreRanges") { TestIndexPath().testMoreRanges() }
 IndexPathTests.test("testIteration") { TestIndexPath().testIteration() }
 IndexPathTests.test("test_AnyHashableContainingIndexPath") { TestIndexPath().test_AnyHashableContainingIndexPath() }
+IndexPathTests.test("test_AnyHashableCreatedFromNSIndexPath") { TestIndexPath().test_AnyHashableCreatedFromNSIndexPath() }
 runAllTests()
 #endif
 
