@@ -2275,23 +2275,6 @@ namespace {
                           AccessSemantics::Ordinary);
     }
 
-    Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
-      auto memberLocator = cs.getConstraintLocator(expr,
-                                                   ConstraintLocator::Member);
-      auto selected = getOverloadChoice(memberLocator);
-      bool isDynamic = selected.choice.getKind()
-                         == OverloadChoiceKind::DeclViaDynamic;
-      return buildMemberRef(expr->getBase(),
-                            selected.openedFullType,
-                            expr->getDotLoc(),
-                            selected.choice.getDecl(), expr->getMemberLoc(),
-                            selected.openedType,
-                            cs.getConstraintLocator(expr),
-                            memberLocator,
-                            expr->isImplicit(), expr->getAccessSemantics(),
-                            isDynamic);
-    }
-
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
       // FIXME: We should have generated an overload set from this, in which
       // case we can emit a typo-correction error here but recover well.
@@ -3856,7 +3839,6 @@ resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
     return ctorRef->getDeclRef();
 
   if (isa<OverloadedDeclRefExpr>(anchor) ||
-      isa<OverloadedMemberRefExpr>(anchor) ||
       isa<UnresolvedDeclRefExpr>(anchor)) {
     // Overloaded and unresolved cases: find the resolved overload.
     auto anchorLocator = cs.getConstraintLocator(anchor);

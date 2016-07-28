@@ -246,14 +246,6 @@ class alignas(8) Expr {
   enum { NumOverloadSetRefExprBits = NumExprBits };
   static_assert(NumOverloadSetRefExprBits <= 32, "fits in an unsigned");
 
-  class OverloadedMemberRefExprBitfields {
-    friend class OverloadedMemberRefExpr;
-    unsigned : NumOverloadSetRefExprBits;
-    unsigned Semantics : 2; // an AccessSemantics
-  };
-  enum { NumOverloadedMemberRefExprBits = NumOverloadSetRefExprBits + 2 };
-  static_assert(NumOverloadedMemberRefExprBits <= 32, "fits in an unsigned");
-
   class BooleanLiteralExprBitfields {
     friend class BooleanLiteralExpr;
     unsigned : NumLiteralExprBits;
@@ -412,7 +404,6 @@ protected:
     DynamicSubscriptExprBitfields DynamicSubscriptExprBits;
     UnresolvedMemberExprBitfields UnresolvedMemberExprBits;
     OverloadSetRefExprBitfields OverloadSetRefExprBits;
-    OverloadedMemberRefExprBitfields OverloadedMemberRefExprBits;
     BooleanLiteralExprBitfields BooleanLiteralExprBits;
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
     ObjectLiteralExprBitfields ObjectLiteralExprBits;
@@ -1419,45 +1410,6 @@ public:
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OverloadedDeclRef;
-  }
-};
-
-/// OverloadedMemberRefExpr - A reference to an overloaded name that is a
-/// member, relative to some base expression, that will eventually be
-/// resolved to some kind of member-reference expression.
-class OverloadedMemberRefExpr : public OverloadSetRefExpr {
-  Expr *SubExpr;
-  SourceLoc DotLoc;
-  DeclNameLoc MemberLoc;
-  
-public:
-  OverloadedMemberRefExpr(Expr *SubExpr, SourceLoc DotLoc,
-                          ArrayRef<ValueDecl *> Decls, DeclNameLoc MemberLoc,
-                          bool Implicit, Type Ty = Type(),
-                          AccessSemantics semantics = AccessSemantics::Ordinary)
-    : OverloadSetRefExpr(ExprKind::OverloadedMemberRef, Decls, Implicit, Ty),
-      SubExpr(SubExpr), DotLoc(DotLoc), MemberLoc(MemberLoc) {
-    OverloadedMemberRefExprBits.Semantics = unsigned(semantics);
-  }
-
-  SourceLoc getDotLoc() const { return DotLoc; }
-  DeclNameLoc getMemberLoc() const { return MemberLoc; }
-  Expr *getBase() const { return SubExpr; }
-  void setBase(Expr *E) { SubExpr = E; }
-  
-  SourceLoc getLoc() const { return MemberLoc.getBaseNameLoc(); }
-  SourceLoc getStartLoc() const {
-    return DotLoc.isValid()? SubExpr->getStartLoc()
-                           : MemberLoc.getBaseNameLoc();
-  }
-  SourceLoc getEndLoc() const { return MemberLoc.getSourceRange().End; }
-
-  AccessSemantics getAccessSemantics() const {
-    return AccessSemantics(OverloadedMemberRefExprBits.Semantics);
-  }
-
-  static bool classof(const Expr *E) {
-  return E->getKind() == ExprKind::OverloadedMemberRef;
   }
 };
 

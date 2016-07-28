@@ -387,7 +387,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
 
   // FIXME: Return multiple results?
   case ExprKind::OverloadedDeclRef:
-  case ExprKind::OverloadedMemberRef:
     return ConcreteDeclRef();
 
   NO_REFERENCE(UnresolvedDeclRef);
@@ -673,9 +672,6 @@ bool Expr::canAppendCallParentheses() const {
       return false;
     return !overloadedExpr->getDecls().front()->getName().isOperator();
   }
-
-  case ExprKind::OverloadedMemberRef:
-    return true;
 
   case ExprKind::UnresolvedDeclRef:
     return cast<UnresolvedDeclRefExpr>(this)->getName().isOperator();
@@ -1306,9 +1302,6 @@ MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
 Type OverloadSetRefExpr::getBaseType() const {
   if (isa<OverloadedDeclRefExpr>(this))
     return Type();
-  if (auto *DRE = dyn_cast<OverloadedMemberRefExpr>(this)) {
-    return DRE->getBase()->getType()->getRValueType();
-  }
   
   llvm_unreachable("Unhandled overloaded set reference expression");
 }

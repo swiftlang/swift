@@ -3136,8 +3136,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // which is the most specialized) even then all the constraints are being
   // fulfilled by UnresolvedType, which doesn't tell us anything.
   if (convertTypePurpose == CTP_Unused &&
-      (isa<OverloadedDeclRefExpr>(subExpr->getValueProvidingExpr()) ||
-       isa<OverloadedMemberRefExpr>(subExpr->getValueProvidingExpr()))) {
+      (isa<OverloadedDeclRefExpr>(subExpr->getValueProvidingExpr()))) {
     return subExpr;
   }
   

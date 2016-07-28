@@ -1391,38 +1391,6 @@ namespace {
       return tv;
     }
 
-    Type visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
-      // For a reference to an overloaded declaration, we create a type variable
-      // that will be bound to different types depending on which overload
-      // is selected.
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                      TVO_CanBindToLValue);
-      ArrayRef<ValueDecl*> decls = expr->getDecls();
-      SmallVector<OverloadChoice, 4> choices;
-      auto baseTy = expr->getBase()->getType();
-      for (unsigned i = 0, n = decls.size(); i != n; ++i) {
-        // If the result is invalid, skip it.
-        // FIXME: Note this as invalid, in case we don't find a solution,
-        // so we don't let errors cascade further.
-        CS.getTypeChecker().validateDecl(decls[i], true);
-        if (decls[i]->isInvalid())
-          continue;
-
-        choices.push_back(OverloadChoice(baseTy, decls[i],
-                                         /*isSpecialized=*/false,
-                                         CS));
-      }
-
-      // If there are no valid overloads, give up.
-      if (choices.empty())
-        return nullptr;
-
-      // Record this overload set.
-      auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
-      CS.addOverloadSet(tv, choices, locator);
-      return tv;
-    }
-    
     Type visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
       // This is an error case, where we're trying to use type inference
       // to help us determine which declaration the user meant to refer to.
@@ -2755,11 +2723,9 @@ namespace {
         DeclNameLoc memberLoc;
         if (auto member = findReferencedDecl(dotCall->getFn(), memberLoc)) {
           auto base = skipImplicitConversions(dotCall->getArg());
-          auto members
-            = TC.Context.AllocateCopy(ArrayRef<ValueDecl *>(&member, 1));
-          return new (TC.Context) OverloadedMemberRefExpr(base,
-                                   dotCall->getDotLoc(), members, memberLoc,
-                                   expr->isImplicit());
+          return new (TC.Context) MemberRefExpr(base,
+                                    dotCall->getDotLoc(), member, memberLoc,
+                                    expr->isImplicit());
         }
       }
 
@@ -2771,10 +2737,8 @@ namespace {
         DeclNameLoc memberLoc;
         if (auto member = findReferencedDecl(dotIgnored->getRHS(), memberLoc)) {
           auto base = skipImplicitConversions(dotIgnored->getLHS());
-          auto members
-            = TC.Context.AllocateCopy(ArrayRef<ValueDecl *>(&member, 1));
-          return new (TC.Context) OverloadedMemberRefExpr(base,
-                                    dotIgnored->getDotLoc(), members,
+          return new (TC.Context) MemberRefExpr(base,
+                                    dotIgnored->getDotLoc(), member,
                                     memberLoc, expr->isImplicit());
         }
       }

@@ -1730,18 +1730,6 @@ public:
     }
     OS << ')';
   }
-  void visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *E) {
-    printCommon(E, "overloaded_member_ref_expr")
-      << " name=" << E->getDecls()[0]->getName()
-      << " #decls=" << E->getDecls().size() << "\n";
-    printRec(E->getBase());
-    for (ValueDecl *D : E->getDecls()) {
-      OS << '\n';
-      OS.indent(Indent);
-      D->dumpRef(OS);
-    }
-    OS << ')';
-  }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     printCommon(E, "unresolved_decl_ref_expr")
       << " name=" << E->getName()
