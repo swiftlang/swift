@@ -190,7 +190,7 @@ ${kw} HasCustomRepresentation_Generic${name}<Wrapped>
 % for name in [ 'Class', 'PODStruct', 'RCStruct' ]:
 %   wrapped = 'HasCustomRepresentation_%s' % name
 %   genericWrapped = 'HasCustomRepresentation_Generic%s' % name
-AnyHashableTests.test("AnyHashable with ${wrapped}") {
+AnyHashableTests.test("AnyHashable containing ${wrapped}") {
   let xs = (-2...2).flatMap {
     [ ${wrapped}(
         $0, identity: 0,
@@ -207,7 +207,7 @@ AnyHashableTests.test("AnyHashable with ${wrapped}") {
 }
 
 %   for payload in [ 'OpaqueValue<Int>', 'LifetimeTracked' ]:
-AnyHashableTests.test("AnyHashable with ${genericWrapped} with ${payload}") {
+AnyHashableTests.test("AnyHashable containing ${genericWrapped} with ${payload}") {
   GenericMinimalHashableValue_equalImpl.value = {
     ($0 as! ${payload}).value == ($1 as! ${payload}).value
   }
@@ -256,7 +256,7 @@ struct HasCustomRepresentationRecursively
   }
 }
 
-AnyHashableTests.test("AnyHashable with recursive custom representations") {
+AnyHashableTests.test("AnyHashable containing values with recursive custom representations") {
   GenericMinimalHashableValue_equalImpl.value = {
     ($0 as! ${payload}).value == ($1 as! ${payload}).value
   }
@@ -386,7 +386,7 @@ class ${Self.full_name} : ${Super.full_name} {}
 %   end
 % end
 
-AnyHashableTests.test("AnyHashable with classes from the ${prefix} hierarchy") {
+AnyHashableTests.test("AnyHashable containing classes from the ${prefix} hierarchy") {
   typealias T = Int
   let xs = [
 % for (i, (Self, _)) in enumerate(types):
@@ -463,7 +463,7 @@ let interestingBitVectorArrays: [[UInt8]] = [
   [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88],
 ]
 
-AnyHashableTests.test("AnyHashable with CFBitVector") {
+AnyHashableTests.test("AnyHashable containing CFBitVector") {
   let bitVectors: [CFBitVector] =
     interestingBitVectorArrays.map(CFBitVector.makeImmutable)
   let arrays = bitVectors.map { $0.asArray }
@@ -490,7 +490,7 @@ AnyHashableTests.test("AnyHashable with CFBitVector") {
     equalityOracle: { $0 == $1 })
 }
 
-AnyHashableTests.test("AnyHashable with CFMutableBitVector") {
+AnyHashableTests.test("AnyHashable containing CFMutableBitVector") {
   // CFMutableBitVector inherits the Hashable conformance from
   // CFBitVector.
   let bitVectors: [CFMutableBitVector] =
