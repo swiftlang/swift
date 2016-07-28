@@ -627,10 +627,6 @@ extension FixedWidthInteger {
     return Self.init(_truncatingBits: UInt(Self.bitWidth._value) &- 1)
   }
 
-  public var popcount: Int {
-    fatalError()
-  }
-
   public static func doubleWidthDivide(
     _ lhs: (high: Self, low: Magnitude), _ rhs: Self)
     -> (quotient: Self, remainder: Self) {
@@ -927,6 +923,14 @@ public struct ${Self}
     return Int(
       ${Self}(
         Builtin.int_ctlz_Int${bits}(self._value, false._value)
+      )._lowUWord._value)
+  }
+
+  @_transparent
+  public var popcount: Int {
+    return Int(
+      ${Self}(
+        Builtin.int_ctpop_Int${bits}(self._value)
       )._lowUWord._value)
   }
 
