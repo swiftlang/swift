@@ -21,7 +21,7 @@
 ///
 /// - SeeAlso: `EmptyCollection<Element>`.
 public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
-  /// Construct an instance.
+  /// Creates an instance.
   public init() {}
 
   /// Returns `nil`, indicating that there are no more elements.
@@ -42,7 +42,7 @@ public struct EmptyCollection<Element> :
   public typealias IndexDistance = Int
   public typealias SubSequence = EmptyCollection<Element>
 
-  /// Construct an instance.
+  /// Creates an instance.
   public init() {}
 
   /// Always zero, just like `endIndex`.
@@ -57,7 +57,7 @@ public struct EmptyCollection<Element> :
 
   /// Always traps.
   ///
-  /// EmptyCollection does not have any element indices, so it is not
+  /// `EmptyCollection` does not have any element indices, so it is not
   /// possible to advance indices.
   public func index(after i: Index) -> Index {
     _preconditionFailure("EmptyCollection can't advance indices")
@@ -65,22 +65,20 @@ public struct EmptyCollection<Element> :
 
   /// Always traps.
   ///
-  /// EmptyCollection does not have any element indices, so it is not
+  /// `EmptyCollection` does not have any element indices, so it is not
   /// possible to advance indices.
   public func index(before i: Index) -> Index {
     _preconditionFailure("EmptyCollection can't advance indices")
   }
 
   /// Returns an empty iterator.
-  ///
-  /// - Complexity: O(1).
   public func makeIterator() -> EmptyIterator<Element> {
     return EmptyIterator()
   }
 
-  /// Access the element at `position`.
+  /// Accesses the element at the given position.
   ///
-  /// Should never be called, since this collection is always empty.
+  /// Must never be called, since this collection is always empty.
   public subscript(position: Index) -> Element {
     get {
       _preconditionFailure("Index out of range")
