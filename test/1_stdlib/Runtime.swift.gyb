@@ -21,7 +21,7 @@ func _stdlib_demangleImpl(
 ) -> UnsafeMutablePointer<CChar>?
 
 func _stdlib_demangleName(_ mangledName: String) -> String {
-  return mangledName.nulTerminatedUTF8.withUnsafeBufferPointer {
+  return mangledName.nullTerminatedUTF8.withUnsafeBufferPointer {
     (mangledNameUTF8) in
 
     let demangledNamePtr = _stdlib_demangleImpl(

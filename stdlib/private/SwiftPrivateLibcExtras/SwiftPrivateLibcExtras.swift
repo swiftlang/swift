@@ -22,7 +22,7 @@ public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CIn
 #if os(Android)
   preconditionFailure("mkstemps doesn't work on Android")
 #else
-  var utf8 = template.nulTerminatedUTF8
+  var utf8 = template.nullTerminatedUTF8
   let (fd, fileName) = utf8.withUnsafeMutableBufferPointer {
     (utf8) -> (CInt, String) in
     let fd = mkstemps(UnsafeMutablePointer(utf8.baseAddress!), suffixlen)

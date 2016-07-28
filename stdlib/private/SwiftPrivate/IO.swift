@@ -100,7 +100,7 @@ public struct _FDOutputStream : TextOutputStream {
   }
 
   public mutating func write(_ string: String) {
-    let utf8 = string.nulTerminatedUTF8
+    let utf8 = string.nullTerminatedUTF8
     utf8.withUnsafeBufferPointer {
       (utf8) -> Void in
       var writtenBytes = 0
