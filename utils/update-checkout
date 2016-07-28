@@ -43,6 +43,8 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
         if should_clean:
             shell.call(['git', 'clean', '-fdx'],
                        echo=True)
+            shell.call(['git', 'reset', '--hard', 'HEAD'],
+                       echo=True)
 
         if branch:
             status = shell.capture(['git', 'status', '--porcelain', '-uno'],
