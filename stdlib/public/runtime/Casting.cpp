@@ -2281,6 +2281,14 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
   if (!srcType)
     return unwrapResult.success;
 
+#if SWIFT_OBJC_INTEROP
+  // A class or AnyObject reference may point at a boxed SwiftValue.
+  if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,
+                                    targetType, flags)) {
+    return true;
+  }
+#endif
+
   switch (targetType->getKind()) {
   // Handle wrapping an Optional target.
   case MetadataKind::Optional: {
@@ -2412,17 +2420,6 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
         return true;
       }
 #endif
-      SWIFT_FALLTHROUGH;
-    }
-
-    case MetadataKind::Existential: {
-#if SWIFT_OBJC_INTEROP
-      // A class or AnyObject reference may point at a boxed SwiftValue.
-      if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,
-                                        targetType, flags)) {
-        return true;
-      }
-#endif
       break;
     }
 
@@ -2436,6 +2433,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
       }
       break;
 
+    case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Enum:
     case MetadataKind::Optional:

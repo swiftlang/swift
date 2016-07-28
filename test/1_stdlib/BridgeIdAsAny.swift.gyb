@@ -94,18 +94,41 @@ func boxedTypeRoundTripsThroughDynamicCasting(original: KnownUnbridged,
   expectEqual(bridged as? String, nil)
 }
 
+func tupleCanBeDynamicallyCast(original: (Int, String),
+                               bridged: AnyObject) {
+  expectTrue(original == bridged as! (Int, String))
+}
+func metatypeCanBeDynamicallyCast(original: Int.Type,
+                               bridged: AnyObject) {
+  expectTrue(original == bridged as! Int.Type)
+  expectTrue(original == bridged as! Any.Type)
+}
+
+func guineaPigFunction() -> Int {
+  return 1738
+}
+
+func functionCanBeDynamicallyCast(original: () -> Int,
+                                  bridged: AnyObject) {
+  expectEqual(original(), (bridged as! () -> Int)())
+  expectEqual(original(), try! (bridged as! () throws -> Int)())
+}
+
 // We want to exhaustively check all paths through the bridging and dynamic
 // casting infrastructure, so expand out test cases that wrap the different
 // interesting bridging cases in different kinds of existential container.
 %{
 testCases = [
-  ("classes",        "LifetimeTracked(0)", "bridgedObjectPreservesIdentity"),
-  ("strings",        '"vitameatavegamin"', "stringBridgesToEqualNSString"),
-  ("unbridged type", "KnownUnbridged()",   "boxedTypeRoundTripsThroughDynamicCasting"),
+  ("classes",        "LifetimeTracked(0)", "bridgedObjectPreservesIdentity",           True),
+  ("strings",        '"vitameatavegamin"', "stringBridgesToEqualNSString",             True),
+  ("unbridged type", "KnownUnbridged()",   "boxedTypeRoundTripsThroughDynamicCasting", True),
+  ("tuple",          '(1, "2")',           "tupleCanBeDynamicallyCast",                False),
+  ("metatype",       'Int.self',           "metatypeCanBeDynamicallyCast",             False),
+  ("function",       'guineaPigFunction',  "functionCanBeDynamicallyCast",             False),
 ]
 }%
 
-% for testName, valueExpr, testFunc in testCases:
+% for testName, valueExpr, testFunc, conformsToError in testCases:
 BridgeAnything.test("${testName}") {
   do {
     let x = ${valueExpr}
@@ -120,6 +143,7 @@ BridgeAnything.test("${testName}") {
     ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInAnyInAny))
     ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInAnyInAny))
 
+%  if conformsToError:
     let xInError: Error = x
     ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInError))
     ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInError))
@@ -127,6 +151,7 @@ BridgeAnything.test("${testName}") {
     let xInErrorInAny = wantonlyWrapInAny(xInError)
     ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInErrorInAny))
     ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInErrorInAny))
+%  end
   }
 }
 % end
