@@ -26,7 +26,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     public typealias Index = Array<Int>.Index
     public typealias Indices = DefaultRandomAccessIndices<IndexPath>
     
-    private var _indexes : Array<Int>
+    fileprivate var _indexes : Array<Int>
     
     /// Initialize an empty index path.
     public init() {

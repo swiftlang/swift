@@ -6168,7 +6168,9 @@ public:
         const DeclContext *desiredAccessScope;
         switch (AA->getAccess()) {
         case Accessibility::Private:
-          // TODO: Implement 'private'.
+          assert(ED->getDeclContext()->isModuleScopeContext() &&
+                 "non-top-level extensions make 'private' != 'fileprivate'");
+          SWIFT_FALLTHROUGH;
         case Accessibility::FilePrivate:
           desiredAccessScope = ED->getModuleScopeContext();
           break;

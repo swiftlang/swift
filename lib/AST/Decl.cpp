@@ -1869,10 +1869,17 @@ const DeclContext *
 ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
   const DeclContext *result = getDeclContext();
   Accessibility access = getFormalAccess(useDC);
+  bool swift3PrivateChecked = false;
 
   while (!result->isModuleScopeContext()) {
     if (result->isLocalContext())
       return result;
+
+    if (access == Accessibility::Private && !swift3PrivateChecked) {
+      if (result->getASTContext().LangOpts.EnableSwift3Private)
+        return result;
+      swift3PrivateChecked = true;
+    }
 
     if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {
       access = std::min(access, enclosingNominal->getFormalAccess(useDC));
@@ -1895,7 +1902,6 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
 
   switch (access) {
   case Accessibility::Private:
-    // TODO: Implement 'private'
   case Accessibility::FilePrivate:
     assert(result->isModuleScopeContext());
     return result;
