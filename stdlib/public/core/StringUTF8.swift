@@ -414,11 +414,11 @@ extension String {
     if ptr != nil {
       return try body(UnsafeBufferPointer(start: ptr, count: _core.count))
     }
-    var nulTerminatedUTF8 = ContiguousArray<UTF8.CodeUnit>()
-    nulTerminatedUTF8.reserveCapacity(utf8.count + 1)
-    nulTerminatedUTF8 += utf8
-    nulTerminatedUTF8.append(0)
-    return try nulTerminatedUTF8.withUnsafeBufferPointer(body)
+    var nullTerminatedUTF8 = ContiguousArray<UTF8.CodeUnit>()
+    nullTerminatedUTF8.reserveCapacity(utf8.count + 1)
+    nullTerminatedUTF8 += utf8
+    nullTerminatedUTF8.append(0)
+    return try nullTerminatedUTF8.withUnsafeBufferPointer(body)
   }
 
   /// Creates a string corresponding to the given sequence of UTF-8 code units.
@@ -718,11 +718,6 @@ extension String.UTF8View : CustomPlaygroundQuickLookable {
 extension String {
   @available(*, unavailable, message: "Please use String.utf8CString instead.")
   public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "utf8CString")
-  public var nulTerminatedUTF8CString: ContiguousArray<CChar> {
     Builtin.unreachable()
   }
 }
