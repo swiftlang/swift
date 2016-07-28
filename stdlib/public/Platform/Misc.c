@@ -28,52 +28,52 @@
 
 #if !defined(_WIN32) || defined(__CYGWIN__)
 SWIFT_CC(swift)
-extern int _swift_Platform_open(const char *path, int oflag, mode_t mode) {
+int _swift_Platform_open(const char *path, int oflag, mode_t mode) {
   return open(path, oflag, mode);
 }
 #else
 SWIFT_CC(swift)
-extern int _swift_Platform_open(const char *path, int oflag, int mode) {
+int _swift_Platform_open(const char *path, int oflag, int mode) {
   return _open(path, oflag, mode);
 }
 #endif
 
 #if !defined(_WIN32) || defined(__CYGWIN__)
 SWIFT_CC(swift)
-extern int _swift_Platform_openat(int fd, const char *path, int oflag,
+int _swift_Platform_openat(int fd, const char *path, int oflag,
                                   mode_t mode) {
   return openat(fd, path, oflag, mode);
 }
 
 SWIFT_CC(swift)
-extern sem_t *_swift_Platform_sem_open2(const char *name, int oflag) {
+sem_t *_swift_Platform_sem_open2(const char *name, int oflag) {
   return sem_open(name, oflag);
 }
 
 SWIFT_CC(swift)
-extern sem_t *_swift_Platform_sem_open4(const char *name, int oflag,
+sem_t *_swift_Platform_sem_open4(const char *name, int oflag,
                                         mode_t mode, unsigned int value) {
   return sem_open(name, oflag, mode, value);
 }
 
 SWIFT_CC(swift)
-extern int _swift_Platform_fcntl(int fd, int cmd, int value) {
+int _swift_Platform_fcntl(int fd, int cmd, int value) {
   return fcntl(fd, cmd, value);
 }
 
 SWIFT_CC(swift)
-extern int _swift_Platform_fcntlPtr(int fd, int cmd, void* ptr) {
+int _swift_Platform_fcntlPtr(int fd, int cmd, void* ptr) {
   return fcntl(fd, cmd, ptr);
 }
 
 SWIFT_CC(swift)
-extern int
+int
 _swift_Platform_ioctl(int fd, unsigned long int request, int value) {
   return ioctl(fd, request, value);
 }
 
 SWIFT_CC(swift)
-extern int
+int
 _swift_Platform_ioctlPtr(int fd, unsigned long int request, void* ptr) {
   return ioctl(fd, request, ptr);
 }
@@ -84,35 +84,36 @@ _swift_Platform_ioctlPtr(int fd, unsigned long int request, void* ptr) {
 #include <math.h>
 
 SWIFT_CC(swift)
-extern float _swift_Darwin_lgammaf_r(float x, int *psigngam) {
+float _swift_Darwin_lgammaf_r(float x, int *psigngam) {
   return lgammaf_r(x, psigngam);
 }
 
 SWIFT_CC(swift)
-extern double _swift_Darwin_lgamma_r(double x, int *psigngam) {
+double _swift_Darwin_lgamma_r(double x, int *psigngam) {
   return lgamma_r(x, psigngam);
 }
 
 SWIFT_CC(swift)
-extern long double _swift_Darwin_lgammal_r(long double x, int *psigngam) {
+long double _swift_Darwin_lgammal_r(long double x, int *psigngam) {
   return lgammal_r(x, psigngam);
 }
 #endif // defined(__APPLE__)
 
 #if defined(__FreeBSD__)
-SWIFT_CC(swift) extern char **_swift_FreeBSD_getEnv() {
+SWIFT_CC(swift)
+char **_swift_FreeBSD_getEnv() {
   extern char **environ;
   return environ;
 }
 #endif // defined(__FreeBSD__)
 
 SWIFT_CC(swift)
-extern int _swift_Platform_getErrno() {
+int _swift_Platform_getErrno() {
   return errno;
 }
 
 SWIFT_CC(swift)
-extern void _swift_Platform_setErrno(int value) {
+void _swift_Platform_setErrno(int value) {
   errno = value;
 }
 
