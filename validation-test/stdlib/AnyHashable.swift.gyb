@@ -81,8 +81,9 @@ AnyHashableTests.test("AnyHashable(${wrapped})/Hashable") {
   }
   checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
 
-  let anyHashableXs = xs.map(AnyHashable.init)
-  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
 }
 % end
 
@@ -101,8 +102,9 @@ AnyHashableTests.test("AnyHashable(${wrapped}<OpaqueValue<Int>>)/Hashable") {
   }
   checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
 
-  let anyHashableXs = xs.map(AnyHashable.init)
-  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
 }
 %   end
 % end
@@ -207,8 +209,9 @@ AnyHashableTests.test("AnyHashable with ${wrapped}") {
   }
   checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
 
-  let anyHashableXs = xs.map(AnyHashable.init)
-  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
 }
 
 %   for payload in [ 'OpaqueValue<Int>', 'LifetimeTracked' ]:
@@ -229,8 +232,9 @@ AnyHashableTests.test("AnyHashable with ${genericWrapped} with ${payload}") {
   }
   checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
 
-  let anyHashableXs = xs.map(AnyHashable.init)
-  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
 }
 %   end
 % end
@@ -416,8 +420,9 @@ AnyHashableTests.test("AnyHashable with classes from the ${prefix} hierarchy") {
   }
   checkHashable(xs, equalityOracle: equalityOracle)
 
-  let anyHashableXs = xs.map(AnyHashable.init)
-  checkHashable(anyHashableXs, equalityOracle: equalityOracle)
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: equalityOracle)
 }
 ${'#endif' if 'ObjC' in prefix else ''}
 
