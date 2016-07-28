@@ -1359,6 +1359,8 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
           // Simple case: use the nominal type's generic parameters.
           paramList = nominal->getGenericParams();
         }
+      } else if (auto alias = dyn_cast<TypeAliasDecl>(base)) {
+        paramList = alias->getGenericParams();
       } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base))
         paramList = fn->getGenericParams();
 
