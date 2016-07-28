@@ -257,15 +257,15 @@ public extension DispatchSourceProcess {
 
 public extension DispatchSourceTimer {
 	public func scheduleOneshot(deadline: DispatchTime, leeway: DispatchTimeInterval = .nanoseconds(0)) {
-		__dispatch_source_set_timer(self as! DispatchSource, deadline.rawValue, ~0, UInt64(leeway.rawValue))
+		__dispatch_source_set_timer(self as! DispatchSource, UInt64(deadline.rawValue), ~0, UInt64(leeway.rawValue))
 	}
 
 	public func scheduleOneshot(wallDeadline: DispatchWallTime, leeway: DispatchTimeInterval = .nanoseconds(0)) {
-		__dispatch_source_set_timer(self as! DispatchSource, wallDeadline.rawValue, ~0, UInt64(leeway.rawValue))
+		__dispatch_source_set_timer(self as! DispatchSource, UInt64(wallDeadline.rawValue), ~0, UInt64(leeway.rawValue))
 	}
 
 	public func scheduleRepeating(deadline: DispatchTime, interval: DispatchTimeInterval, leeway: DispatchTimeInterval = .nanoseconds(0)) {
-		__dispatch_source_set_timer(self as! DispatchSource, deadline.rawValue, interval.rawValue, UInt64(leeway.rawValue))
+		__dispatch_source_set_timer(self as! DispatchSource, deadline.rawValue, UInt64(interval.rawValue), UInt64(leeway.rawValue))
 	}
 
 	public func scheduleRepeating(deadline: DispatchTime, interval: Double, leeway: DispatchTimeInterval = .nanoseconds(0)) {
@@ -273,7 +273,7 @@ public extension DispatchSourceTimer {
 	}
 
 	public func scheduleRepeating(wallDeadline: DispatchWallTime, interval: DispatchTimeInterval, leeway: DispatchTimeInterval = .nanoseconds(0)) {
-		__dispatch_source_set_timer(self as! DispatchSource, wallDeadline.rawValue, interval.rawValue, UInt64(leeway.rawValue))
+		__dispatch_source_set_timer(self as! DispatchSource, wallDeadline.rawValue, UInt64(interval.rawValue), UInt64(leeway.rawValue))
 	}
 
 	public func scheduleRepeating(wallDeadline: DispatchWallTime, interval: Double, leeway: DispatchTimeInterval = .nanoseconds(0)) {

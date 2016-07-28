@@ -85,23 +85,23 @@ public enum DispatchTimeInterval {
 	case microseconds(Int)
 	case nanoseconds(Int)
 
-	internal var rawValue: UInt64 {
+	internal var rawValue: Int64 {
 		switch self {
-		case .seconds(let s): return UInt64(s) * NSEC_PER_SEC
-		case .milliseconds(let ms): return UInt64(ms) * NSEC_PER_MSEC
-		case .microseconds(let us): return UInt64(us) * NSEC_PER_USEC
-		case .nanoseconds(let ns): return UInt64(ns)
+		case .seconds(let s): return Int64(s) * Int64(NSEC_PER_SEC)
+		case .milliseconds(let ms): return Int64(ms) * Int64(NSEC_PER_MSEC)
+		case .microseconds(let us): return Int64(us) * Int64(NSEC_PER_USEC)
+		case .nanoseconds(let ns): return Int64(ns)
 		}
 	}
 }
 
 public func +(time: DispatchTime, interval: DispatchTimeInterval) -> DispatchTime {
-	let t = __dispatch_time(time.rawValue, Int64(interval.rawValue))
+	let t = __dispatch_time(time.rawValue, interval.rawValue)
 	return DispatchTime(rawValue: t)
 }
 
 public func -(time: DispatchTime, interval: DispatchTimeInterval) -> DispatchTime {
-	let t = __dispatch_time(time.rawValue, -Int64(interval.rawValue))
+	let t = __dispatch_time(time.rawValue, -interval.rawValue)
 	return DispatchTime(rawValue: t)
 }
 
@@ -116,12 +116,12 @@ public func -(time: DispatchTime, seconds: Double) -> DispatchTime {
 }
 
 public func +(time: DispatchWallTime, interval: DispatchTimeInterval) -> DispatchWallTime {
-	let t = __dispatch_time(time.rawValue, Int64(interval.rawValue))
+	let t = __dispatch_time(time.rawValue, interval.rawValue)
 	return DispatchWallTime(rawValue: t)
 }
 
 public func -(time: DispatchWallTime, interval: DispatchTimeInterval) -> DispatchWallTime {
-	let t = __dispatch_time(time.rawValue, -Int64(interval.rawValue))
+	let t = __dispatch_time(time.rawValue, -interval.rawValue)
 	return DispatchWallTime(rawValue: t)
 }
 

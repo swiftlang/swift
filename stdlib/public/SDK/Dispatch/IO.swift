@@ -86,7 +86,7 @@ public extension DispatchIO {
 	}
 
 	public func setInterval(interval: DispatchTimeInterval, flags: IntervalFlags = []) {
-		__dispatch_io_set_interval(self, interval.rawValue, flags.rawValue)
+		__dispatch_io_set_interval(self, UInt64(interval.rawValue), flags.rawValue)
 	}
 
 	public func close(flags: CloseFlags = []) {
