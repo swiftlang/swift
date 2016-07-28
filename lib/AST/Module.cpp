@@ -367,28 +367,6 @@ void Module::removeFile(FileUnit &existingFile) {
   Files.erase(I.base());
 }
 
-VarDecl *Module::getDSOHandle() {
-  if (DSOHandle)
-    return DSOHandle;
-
-  auto unsafeMutableRawPtr = getASTContext().getUnsafeMutableRawPointerDecl();
-  if (!unsafeMutableRawPtr)
-    return nullptr;
-
-  auto &ctx = getASTContext();
-  auto handleVar = new (ctx) VarDecl(/*IsStatic=*/false, /*IsLet=*/false,
-                                     SourceLoc(),
-                                     ctx.getIdentifier("__dso_handle"),
-                                     unsafeMutableRawPtr->getDeclaredType(),
-                                     Files[0]);
-  handleVar->setImplicit(true);
-  handleVar->getAttrs().add(
-    new (ctx) SILGenNameAttr("__dso_handle", /*Implicit=*/true));
-  handleVar->setAccessibility(Accessibility::Internal);
-  DSOHandle = handleVar;
-  return handleVar;
-}
-
 #define FORWARD(name, args) \
   for (const FileUnit *file : getFiles()) \
     file->name args;
