@@ -48,10 +48,10 @@
 /// `Comparable` protocols, which allow more uses of your custom type, such as
 /// constructing sets or sorting the elements of a collection.
 ///
-/// To adopt the `Equatable` protocol, implement the equal-to operator (`==`).
-/// The standard library provides an implementation for the not-equal-to
-/// operator (`!=`) for any `Equatable` type, which calls the custom `==`
-/// function and negates its result.
+/// To adopt the `Equatable` protocol, implement the equal-to operator (`==`)
+/// as a static method of your type. The standard library provides an
+/// implementation for the not-equal-to operator (`!=`) for any `Equatable`
+/// type, which calls the custom `==` function and negates its result.
 ///
 /// As an example, consider a `StreetAddress` structure that holds the parts of
 /// a street address: a house or building number, the street name, and an
@@ -76,12 +76,12 @@
 /// `Equatable`.
 ///
 ///     extension StreetAddress: Equatable {
-///       static func == (lhs: StreetAddress, rhs: StreetAddress) -> Bool {
-///         return
-///             lhs.number == rhs.number &&
-///             lhs.street == rhs.street &&
-///             lhs.unit == rhs.unit
-///       }
+///         static func == (lhs: StreetAddress, rhs: StreetAddress) -> Bool {
+///             return
+///                 lhs.number == rhs.number &&
+///                 lhs.street == rhs.street &&
+///                 lhs.unit == rhs.unit
+///         }
 ///     }
 ///
 /// The `StreetAddress` type now conforms to `Equatable`. You can use `==` to

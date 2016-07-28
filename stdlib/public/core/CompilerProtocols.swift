@@ -262,7 +262,7 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 ///     // Prints "ñ"
 ///
 /// Conforming to ExpressibleByUnicodeScalarLiteral
-/// =============================================
+/// ===============================================
 ///
 /// To add `ExpressibleByUnicodeScalarLiteral` conformance to your custom type,
 /// implement the required initializer.
@@ -305,7 +305,7 @@ public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
 ///     // Prints "❄︎"
 ///
 /// Conforming to ExpressibleByExtendedGraphemeClusterLiteral
-/// =======================================================
+/// =========================================================
 ///
 /// To add `ExpressibleByExtendedGraphemeClusterLiteral` conformance to your
 /// custom type, implement the required initializer.
@@ -349,7 +349,7 @@ public protocol _ExpressibleByBuiltinUTF16StringLiteral
 ///     let picnicGuest = "Deserving porcupine"
 ///
 /// Conforming to ExpressibleByStringLiteral
-/// ======================================
+/// ========================================
 ///
 /// To add `ExpressibleByStringLiteral` conformance to your custom type,
 /// implement the required initializer.
@@ -456,7 +456,7 @@ public protocol ExpressibleByStringLiteral
 ///     // Prints "Zero integers: []"
 ///
 /// Conforming to ExpressibleByArrayLiteral
-/// =====================================
+/// =======================================
 ///
 /// Add the capability to be initialized with an array literal to your own
 /// custom types by declaring an `init(arrayLiteral:)` initializer. The
@@ -514,7 +514,7 @@ public protocol ExpressibleByArrayLiteral {
 ///   by assigning an instance of one of these types.
 ///
 /// Conforming to the ExpressibleByDictionaryLiteral Protocol
-/// =======================================================
+/// =========================================================
 ///
 /// To add the capability to be initialized with a dictionary literal to your
 /// own custom types, declare an `init(dictionaryLiteral:)` initializer. The
@@ -565,7 +565,7 @@ public protocol ExpressibleByDictionaryLiteral {
 ///     // Prints "One cookie: $2, 3 cookies: $6."
 ///
 /// Conforming to the ExpressibleByStringInterpolation Protocol
-/// =========================================================
+/// ===========================================================
 ///
 /// To use string interpolation to initialize instances of your custom type,
 /// implement the required initializers for `ExpressibleByStringInterpolation`

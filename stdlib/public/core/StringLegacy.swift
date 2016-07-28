@@ -36,14 +36,13 @@ extension String {
   ///     let zeroes = String("0" as UnicodeScalar, count: 10)
   ///     print(zeroes)
   ///     // Prints "0000000000"
-
   @available(*, unavailable, message: "Replaced by init(repeating: String, count: Int)")
   public init(repeating repeatedValue: UnicodeScalar, count: Int) {
     Builtin.unreachable()
   }
 
-  /// Creates a string representing the given string repeated the
-  /// specified number of times.
+  /// Creates a new string representing the given string repeated the specified
+  /// number of times.
   ///
   /// For example, use this initializer to create a string with ten `"00"`
   /// strings in a row.
@@ -51,6 +50,11 @@ extension String {
   ///     let zeroes = String(repeating: "00", count: 10)
   ///     print(zeroes)
   ///     // Prints "00000000000000000000"
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The string to repeat.
+  ///   - count: The number of times to repeat `repeatedValue` in the resulting
+  ///     string.
   public init(repeating repeatedValue: String, count: Int) {
     if count == 0 {
       self = ""

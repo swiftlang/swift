@@ -63,12 +63,13 @@
 /// - `a < b` and `b < c` implies `a < c` (Transitivity)
 ///
 /// To add `Comparable` conformance to your custom types, define the `<` and
-/// `==` operators. The `==` operator is a requirement of the `Equatable`
-/// protocol, which `Comparable` extends---see that protocol's documentation
-/// for more information about equality in Swift. Because default
-/// implementations of the remainder of the relational operators are provided
-/// by the standard library, you'll be able to use `!=`, `>`, `<=`, and `>=`
-/// with instances of your type without any further code.
+/// `==` operators as static methods of your types. The `==` operator is a
+/// requirement of the `Equatable` protocol, which `Comparable` extends---see
+/// that protocol's documentation for more information about equality in
+/// Swift. Because default implementations of the remainder of the relational
+/// operators are provided by the standard library, you'll be able to use
+/// `!=`, `>`, `<=`, and `>=` with instances of your type without any further
+/// code.
 ///
 /// As an example, here's an implementation of a `Date` structure that stores
 /// the year, month, and day of a date:
@@ -92,7 +93,6 @@
 ///                 return lhs.day < rhs.day
 ///             }
 ///         }
-///     }
 ///
 /// This function uses the least specific nonmatching property of the date to
 /// determine the result of the comparison. For example, if the two `year`
@@ -102,9 +102,10 @@
 /// Next, implement the `==` operator function, the requirement inherited from
 /// the `Equatable` protocol.
 ///
-///     func == (lhs: Date, rhs: Date) -> Bool {
-///         return lhs.year == rhs.year && lhs.month == rhs.month
-///             && lhs.day == rhs.day
+///         static func == (lhs: Date, rhs: Date) -> Bool {
+///             return lhs.year == rhs.year && lhs.month == rhs.month
+///                 && lhs.day == rhs.day
+///         }
 ///     }
 ///
 /// Two `Date` instances are equal if each of their corresponding properties is

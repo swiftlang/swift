@@ -31,8 +31,8 @@ public struct UnsafeBufferPointerIterator<Element>
 }
 
 %for Mutable in ('Mutable', ''):
-/// A non-owning pointer to buffer of ${Mutable.lower()} `Element`s stored
-/// contiguously in memory, presenting a `Collection` interface to the
+/// A non-owning pointer to a buffer of ${Mutable.lower()} elements stored
+/// contiguously in memory, presenting a collection interface to the
 /// underlying elements.
 ///
 /// The pointer should be aligned to `alignof(Element.self)`.
