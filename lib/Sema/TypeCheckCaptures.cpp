@@ -73,6 +73,9 @@ public:
     if (!type)
       return;
 
+    // We want to look through type aliases here.
+    type = type->getCanonicalType();
+
     // If the type contains dynamic 'Self', conservatively assume we will
     // need 'Self' metadata at runtime. We could generalize the analysis
     // used below for usages of generic parameters in Objective-C
@@ -95,42 +98,22 @@ public:
       });
     }
 
-    // Nothing to do if the type is concrete.
-    if (!type->hasArchetype())
-      return;
-
-    // Walk the type to see if we have any archetypes that are *not* open
-    // existentials and that aren't type-erased.
-    class CapturesTypeWalker final : public TypeWalker {
-      SourceLoc &GenericParamCaptureLoc;
-      SourceLoc CurLoc;
-
-    public:
-      CapturesTypeWalker(SourceLoc &GenericParamCaptureLoc,
-                         SourceLoc curLoc)
-        : GenericParamCaptureLoc(GenericParamCaptureLoc),
-          CurLoc(curLoc) {}
-
-      Action walkToTypePre(Type t) override {
-        // Similar to dynamic 'Self', IRGen doesn't really need type metadata
-        // for class-bound archetypes in nearly as many cases as with opaque
-        // archetypes.
-        //
-        // Perhaps this entire analysis should happen at the SILGen level,
-        // instead, but even there we don't really have enough information to
-        // perform it accurately.
-        if (t->is<ArchetypeType>() && !t->isOpenedExistential()) {
-          if (GenericParamCaptureLoc.isInvalid())
-            GenericParamCaptureLoc = CurLoc;
-          return Action::Continue;
+    // Similar to dynamic 'Self', IRGen doesn't really need type metadata
+    // for class-bound archetypes in nearly as many cases as with opaque
+    // archetypes.
+    //
+    // Perhaps this entire analysis should happen at the SILGen level,
+    // instead, but even there we don't really have enough information to
+    // perform it accurately.
+    if (type->hasArchetype()) {
+      type.visit([&](Type t) {
+        if (t->is<ArchetypeType>() &&
+            !t->isOpenedExistential() &&
+          GenericParamCaptureLoc.isInvalid()) {
+          GenericParamCaptureLoc = loc;
         }
-
-        return Action::Continue;
-      }
-    };
-
-    type.walk(CapturesTypeWalker(GenericParamCaptureLoc,
-                                 loc));
+      });
+    }
   }
 
   /// Add the specified capture to the closure's capture list, diagnosing it

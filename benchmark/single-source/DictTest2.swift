@@ -37,7 +37,7 @@ public func run_Dictionary2(_ N: Int) {
   CheckResults(res == ref_result, "Incorrect results in Dictionary2: \(res) != \(ref_result)")
 }
 
-class Box<T : Hashable where T : Equatable> : Hashable {
+class Box<T : Hashable> : Hashable {
   var value: T
 
   init(_ v: T) {
@@ -47,13 +47,10 @@ class Box<T : Hashable where T : Equatable> : Hashable {
   var hashValue: Int {
     return value.hashValue
   }
-}
 
-extension Box : Equatable {
-}
-
-func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
-  return lhs.value == rhs.value
+  static func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
+    return lhs.value == rhs.value
+  }
 }
 
 @inline(never)

@@ -1,15 +1,9 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
-// FIXME(id-as-any): add tests that use CF objects (is this even
-// possible?)
-
-// FIXME(id-as-any): add tests that use Swift errors and
-// Objective-C errors.
-
-// FIXME(id-as-any): add tests for enums.
-
 // FIXME(id-as-any): add tests for unboxing.
+
+// FIXME(id-as-any): add tests for the _ObjectiveCBridgeable conformance.
 
 %{
 import re
@@ -81,8 +75,9 @@ AnyHashableTests.test("AnyHashable(${wrapped})/Hashable") {
   }
   checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
 
-  let anyHashableXs = xs.map(AnyHashable.init)
-  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
 }
 % end
 
@@ -101,8 +96,9 @@ AnyHashableTests.test("AnyHashable(${wrapped}<OpaqueValue<Int>>)/Hashable") {
   }
   checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
 
-  let anyHashableXs = xs.map(AnyHashable.init)
-  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
 }
 %   end
 % end
@@ -196,7 +192,7 @@ ${kw} HasCustomRepresentation_Generic${name}<Wrapped>
 % for name in [ 'Class', 'PODStruct', 'RCStruct' ]:
 %   wrapped = 'HasCustomRepresentation_%s' % name
 %   genericWrapped = 'HasCustomRepresentation_Generic%s' % name
-AnyHashableTests.test("AnyHashable with ${wrapped}") {
+AnyHashableTests.test("AnyHashable containing ${wrapped}") {
   let xs = (-2...2).flatMap {
     [ ${wrapped}(
         $0, identity: 0,
@@ -207,12 +203,13 @@ AnyHashableTests.test("AnyHashable with ${wrapped}") {
   }
   checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
 
-  let anyHashableXs = xs.map(AnyHashable.init)
-  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
 }
 
 %   for payload in [ 'OpaqueValue<Int>', 'LifetimeTracked' ]:
-AnyHashableTests.test("AnyHashable with ${genericWrapped} with ${payload}") {
+AnyHashableTests.test("AnyHashable containing ${genericWrapped} with ${payload}") {
   GenericMinimalHashableValue_equalImpl.value = {
     ($0 as! ${payload}).value == ($1 as! ${payload}).value
   }
@@ -229,8 +226,9 @@ AnyHashableTests.test("AnyHashable with ${genericWrapped} with ${payload}") {
   }
   checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
 
-  let anyHashableXs = xs.map(AnyHashable.init)
-  checkHashable(anyHashableXs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
 }
 %   end
 % end
@@ -260,7 +258,7 @@ struct HasCustomRepresentationRecursively
   }
 }
 
-AnyHashableTests.test("AnyHashable with recursive custom representations") {
+AnyHashableTests.test("AnyHashable containing values with recursive custom representations") {
   GenericMinimalHashableValue_equalImpl.value = {
     ($0 as! ${payload}).value == ($1 as! ${payload}).value
   }
@@ -390,7 +388,7 @@ class ${Self.full_name} : ${Super.full_name} {}
 %   end
 % end
 
-AnyHashableTests.test("AnyHashable with classes from the ${prefix} hierarchy") {
+AnyHashableTests.test("AnyHashable containing classes from the ${prefix} hierarchy") {
   typealias T = Int
   let xs = [
 % for (i, (Self, _)) in enumerate(types):
@@ -416,8 +414,9 @@ AnyHashableTests.test("AnyHashable with classes from the ${prefix} hierarchy") {
   }
   checkHashable(xs, equalityOracle: equalityOracle)
 
-  let anyHashableXs = xs.map(AnyHashable.init)
-  checkHashable(anyHashableXs, equalityOracle: equalityOracle)
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: equalityOracle)
 }
 ${'#endif' if 'ObjC' in prefix else ''}
 
@@ -466,20 +465,37 @@ let interestingBitVectorArrays: [[UInt8]] = [
   [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88],
 ]
 
-AnyHashableTests.test("CFBitVector/Hashable") {
-  let bitVectors = interestingBitVectorArrays.map(CFBitVector.makeImmutable)
+AnyHashableTests.test("AnyHashable containing CFBitVector") {
+  let bitVectors: [CFBitVector] =
+    interestingBitVectorArrays.map(CFBitVector.makeImmutable)
   let arrays = bitVectors.map { $0.asArray }
   func isEq(_ lhs: [[UInt8]], _ rhs: [[UInt8]]) -> Bool {
     return zip(lhs, rhs).map { $0 == $1 }.reduce(true, { $0 && $1 })
   }
   expectEqualTest(interestingBitVectorArrays, arrays, sameValue: isEq)
   checkHashable(bitVectors, equalityOracle: { $0 == $1 })
+
+  expectEqual(.foreignClass, SwiftRuntime.metadataKind(of: bitVectors.first!))
+
+  checkHashable(
+    bitVectors.map(AnyHashable.init),
+    equalityOracle: { $0 == $1 })
+
+  let bitVectorsAsAnyObjects: [NSObject] = bitVectors.map {
+    ($0 as AnyObject) as! NSObject
+  }
+  expectEqual(
+    .objCClassWrapper,
+    SwiftRuntime.metadataKind(of: bitVectorsAsAnyObjects.first!))
+  checkHashable(
+    bitVectorsAsAnyObjects.map(AnyHashable.init),
+    equalityOracle: { $0 == $1 })
 }
 
-AnyHashableTests.test("CFMutableBitVector/Hashable") {
+AnyHashableTests.test("AnyHashable containing CFMutableBitVector") {
   // CFMutableBitVector inherits the Hashable conformance from
   // CFBitVector.
-  let bitVectors =
+  let bitVectors: [CFMutableBitVector] =
     interestingBitVectorArrays.map(CFMutableBitVector.makeMutable)
   let arrays = bitVectors.map { $0.asArray }
   func isEq(_ lhs: [[UInt8]], _ rhs: [[UInt8]]) -> Bool {
@@ -487,8 +503,123 @@ AnyHashableTests.test("CFMutableBitVector/Hashable") {
   }
   expectEqualTest(interestingBitVectorArrays, arrays, sameValue: isEq)
   checkHashable(bitVectors, equalityOracle: { $0 == $1 })
+
+  expectEqual(.foreignClass, SwiftRuntime.metadataKind(of: bitVectors.first!))
+
+  checkHashable(
+    bitVectors.map(AnyHashable.init),
+    equalityOracle: { $0 == $1 })
+
+  let bitVectorsAsAnyObjects: [NSObject] = bitVectors.map {
+    ($0 as AnyObject) as! NSObject
+  }
+  checkHashable(bitVectors, equalityOracle: { $0 == $1 })
+  expectEqual(
+    .objCClassWrapper,
+    SwiftRuntime.metadataKind(of: bitVectorsAsAnyObjects.first!))
+  checkHashable(
+    bitVectorsAsAnyObjects.map(AnyHashable.init),
+    equalityOracle: { $0 == $1 })
 }
 
+#endif
+
+enum MinimalHashablePODSwiftError : Error, Hashable {
+  case caseA
+  case caseB
+  case caseC
+}
+
+enum MinimalHashableRCSwiftError : Error, Hashable {
+  case caseA(LifetimeTracked)
+  case caseB(LifetimeTracked)
+  case caseC(LifetimeTracked)
+
+  var hashValue: Int {
+    return 0
+  }
+
+  static func == (
+    lhs: MinimalHashableRCSwiftError,
+    rhs: MinimalHashableRCSwiftError
+  ) -> Bool {
+    switch (lhs, rhs) {
+    case (.caseA(let lhs), .caseA(let rhs)):
+      return lhs == rhs
+    case (.caseB(let lhs), .caseB(let rhs)):
+      return lhs == rhs
+    case (.caseC(let lhs), .caseC(let rhs)):
+      return lhs == rhs
+    default:
+      return false
+    }
+  }
+}
+
+AnyHashableTests.test("AnyHashable containing MinimalHashablePODSwiftError") {
+  let xs: [MinimalHashablePODSwiftError] = [
+    .caseA, .caseA,
+    .caseB, .caseB,
+    .caseC, .caseC,
+  ]
+  expectEqual(.enum, SwiftRuntime.metadataKind(of: xs.first!))
+  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
+}
+
+AnyHashableTests.test("AnyHashable containing MinimalHashableRCSwiftError") {
+  let xs: [MinimalHashableRCSwiftError] = [
+    .caseA(LifetimeTracked(1)), .caseA(LifetimeTracked(1)),
+    .caseA(LifetimeTracked(2)), .caseA(LifetimeTracked(2)),
+    .caseB(LifetimeTracked(1)), .caseB(LifetimeTracked(1)),
+    .caseB(LifetimeTracked(2)), .caseB(LifetimeTracked(2)),
+    .caseC(LifetimeTracked(1)), .caseC(LifetimeTracked(1)),
+    .caseC(LifetimeTracked(2)), .caseC(LifetimeTracked(2)),
+  ]
+  expectEqual(.enum, SwiftRuntime.metadataKind(of: xs.first!))
+  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
+}
+
+#if _runtime(_ObjC)
+AnyHashableTests.test("AnyHashable containing _SwiftNativeNSError") {
+  let swiftErrors: [MinimalHashablePODSwiftError] = [
+    .caseA, .caseA,
+    .caseB, .caseB,
+    .caseC, .caseC,
+  ]
+  let nsErrors: [NSError] = swiftErrors.map { $0 as NSError }
+  expectEqual(
+    .objCClassWrapper,
+    SwiftRuntime.metadataKind(of: nsErrors.first!))
+  expectEqual("_SwiftNativeNSError", String(nsErrors[0].dynamicType))
+  checkHashable(nsErrors, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    nsErrors.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
+}
+
+AnyHashableTests.test("AnyHashable containing NSError") {
+  let nsErrors: [NSError] = [
+    NSError(domain: "Foo", code: 0),
+    NSError(domain: "Foo", code: 0),
+    NSError(domain: "Foo", code: 1),
+    NSError(domain: "Foo", code: 1),
+    NSError(domain: "Foo", code: 2),
+    NSError(domain: "Foo", code: 2),
+  ]
+  expectEqual(
+    .objCClassWrapper,
+    SwiftRuntime.metadataKind(of: nsErrors.first!))
+  checkHashable(nsErrors, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    nsErrors.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
+}
 #endif
 
 runAllTests()

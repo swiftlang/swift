@@ -371,6 +371,8 @@ extension URLComponents : _ObjectiveCBridgeable {
 }
 
 extension NSURLComponents : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
     public func _toCustomAnyHashable() -> AnyHashable? {
         return AnyHashable(self as URLComponents)
     }
@@ -463,6 +465,8 @@ extension URLQueryItem : _ObjectiveCBridgeable {
 
 @available(OSX 10.10, iOS 8.0, *)
 extension NSURLQueryItem : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
     public func _toCustomAnyHashable() -> AnyHashable? {
         return AnyHashable(self as URLQueryItem)
     }

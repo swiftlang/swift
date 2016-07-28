@@ -134,10 +134,28 @@ class TestDateInterval : TestDateIntervalSuper {
         if #available(iOS 10.10, OSX 10.12, tvOS 10.0, watchOS 3.0, *) {
             let start = dateWithString("2010-05-17 14:49:47 -0700")
             let duration = 10000000.0
-            let values = [
+            let values: [DateInterval] = [
                 DateInterval(start: start, duration: duration),
                 DateInterval(start: start, duration: duration / 2),
                 DateInterval(start: start, duration: duration / 2),
+            ]
+            let anyHashables = values.map(AnyHashable.init)
+            expectEqual("DateInterval", String(anyHashables[0].base.dynamicType))
+            expectEqual("DateInterval", String(anyHashables[1].base.dynamicType))
+            expectEqual("DateInterval", String(anyHashables[2].base.dynamicType))
+            expectNotEqual(anyHashables[0], anyHashables[1])
+            expectEqual(anyHashables[1], anyHashables[2])
+        }
+    }
+
+    func test_AnyHashableCreatedFromNSDateInterval() {
+        if #available(iOS 10.10, OSX 10.12, tvOS 10.0, watchOS 3.0, *) {
+            let start = dateWithString("2010-05-17 14:49:47 -0700")
+            let duration = 10000000.0
+            let values: [NSDateInterval] = [
+                NSDateInterval(start: start, duration: duration),
+                NSDateInterval(start: start, duration: duration / 2),
+                NSDateInterval(start: start, duration: duration / 2),
             ]
             let anyHashables = values.map(AnyHashable.init)
             expectEqual("DateInterval", String(anyHashables[0].base.dynamicType))
@@ -156,5 +174,6 @@ DateIntervalTests.test("test_isEqualToDateInterval") { TestDateInterval().test_i
 DateIntervalTests.test("test_checkIntersection") { TestDateInterval().test_checkIntersection() }
 DateIntervalTests.test("test_validIntersections") { TestDateInterval().test_validIntersections() }
 DateIntervalTests.test("test_AnyHashableContainingDateInterval") { TestDateInterval().test_AnyHashableContainingDateInterval() }
+DateIntervalTests.test("test_AnyHashableCreatedFromNSDateInterval") { TestDateInterval().test_AnyHashableCreatedFromNSDateInterval() }
 runAllTests()
 #endif

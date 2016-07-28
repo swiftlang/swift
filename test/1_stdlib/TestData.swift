@@ -127,9 +127,11 @@ class TestData : TestDataSuper {
     // String of course has its own way to get data, but this way tests our own data struct
     func dataFrom(_ string : String) -> Data {
         // Create a Data out of those bytes
-        return string.nulTerminatedUTF8.withUnsafeBufferPointer { (ptr) in
-            // Subtract 1 so we don't get the null terminator byte. This matches NSString behavior.
-            return Data(bytes: ptr.baseAddress!, count: ptr.count - 1)
+        return string.utf8CString.withUnsafeBufferPointer { (ptr) in
+            ptr.baseAddress!.withMemoryRebound(to: UInt8.self, capacity: ptr.count) {
+                // Subtract 1 so we don't get the null terminator byte. This matches NSString behavior.
+                return Data(bytes: $0, count: ptr.count - 1)
+            }
         }
     }
     
@@ -867,10 +869,24 @@ class TestData : TestDataSuper {
     }
 
     func test_AnyHashableContainingData() {
-        let values = [
+        let values: [Data] = [
             Data(base64Encoded: "AAAA")!,
             Data(base64Encoded: "AAAB")!,
             Data(base64Encoded: "AAAB")!,
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("Data", String(anyHashables[0].base.dynamicType))
+        expectEqual("Data", String(anyHashables[1].base.dynamicType))
+        expectEqual("Data", String(anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSData() {
+        let values: [NSData] = [
+            NSData(base64Encoded: "AAAA")!,
+            NSData(base64Encoded: "AAAB")!,
+            NSData(base64Encoded: "AAAB")!,
         ]
         let anyHashables = values.map(AnyHashable.init)
         expectEqual("Data", String(anyHashables[0].base.dynamicType))
@@ -921,6 +937,7 @@ DataTests.test("test_passing") { TestData().test_passing() }
 DataTests.test("test_bufferSizeCalculation") { TestData().test_bufferSizeCalculation() }
 DataTests.test("test_classForCoder") { TestData().test_classForCoder() }
 DataTests.test("test_AnyHashableContainingData") { TestData().test_AnyHashableContainingData() }
+DataTests.test("test_AnyHashableCreatedFromNSData") { TestData().test_AnyHashableCreatedFromNSData() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

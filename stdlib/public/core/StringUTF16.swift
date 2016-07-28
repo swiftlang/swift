@@ -318,7 +318,7 @@ extension String {
     }
   }
 
-  /// Creates a string corresponding to the given sequence of UTF-8 code units.
+  /// Creates a string corresponding to the given sequence of UTF-16 code units.
   ///
   /// If `utf16` contains unpaired UTF-16 surrogates, the result is `nil`.
   ///

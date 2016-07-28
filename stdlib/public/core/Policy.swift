@@ -343,7 +343,7 @@ public typealias AnyClass = AnyObject.Type
 ///         let z = x | y           // 0b00001111
 ///
 ///   Performing a bitwise OR operation with a value and `allZeros` always
-/// returns the same value.
+///   returns the same value.
 ///
 ///         print(x | .allZeros)    // 0b00000101
 ///         // Prints "5"
@@ -357,7 +357,7 @@ public typealias AnyClass = AnyObject.Type
 ///         let z = x & y           // 0b00000100
 ///
 ///   Performing a bitwise AND operation with a value and `allZeros` always
-/// returns `allZeros`.
+///   returns `allZeros`.
 ///
 ///         print(x & .allZeros)    // 0b00000000
 ///         // Prints "0"
@@ -372,7 +372,7 @@ public typealias AnyClass = AnyObject.Type
 ///         let z = x ^ y           // 0b00001011
 ///
 ///   Performing a bitwise XOR operation with a value and `allZeros` always
-/// returns the same value.
+///   returns the same value.
 ///
 ///         print(x ^ .allZeros)    // 0b00000101
 ///         // Prints "5"

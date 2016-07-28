@@ -506,15 +506,15 @@ func _getClassChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 @_silgen_name("swift_ClassMirror_quickLookObject")
 public func _swift_ClassMirror_quickLookObject(_: _MagicMirrorData) -> AnyObject
 
-@_silgen_name("swift_isKind")
-func _swift_isKind(_ object: AnyObject, of: AnyObject) -> Bool
+@_silgen_name("_swift_stdlib_NSObject_isKindOfClass")
+internal func _swift_NSObject_isImpl(_ object: AnyObject, kindOf: AnyObject) -> Bool
 
-func _isKind(_ object: AnyObject, of: String) -> Bool {
-  return _swift_isKind(object, of: _bridgeAnythingToObjectiveC(of))
+internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
+  return _swift_NSObject_isImpl(object, kindOf: `class` as AnyObject)
 }
 
 func _getClassPlaygroundQuickLook(_ object: AnyObject) -> PlaygroundQuickLook? {
-  if _isKind(object, of: "NSNumber") {
+  if _is(object, kindOf: "NSNumber") {
     let number: _NSNumber = unsafeBitCast(object, to: _NSNumber.self)
     switch UInt8(number.objCType[0]) {
     case UInt8(ascii: "d"):
@@ -526,22 +526,22 @@ func _getClassPlaygroundQuickLook(_ object: AnyObject) -> PlaygroundQuickLook? {
     default:
       return .int(number.longLongValue)
     }
-  } else if _isKind(object, of: "NSAttributedString") {
+  } else if _is(object, kindOf: "NSAttributedString") {
     return .attributedString(object)
-  } else if _isKind(object, of: "NSImage") ||
-            _isKind(object, of: "UIImage") ||
-            _isKind(object, of: "NSImageView") ||
-            _isKind(object, of: "UIImageView") ||
-            _isKind(object, of: "CIImage") ||
-            _isKind(object, of: "NSBitmapImageRep") {
+  } else if _is(object, kindOf: "NSImage") ||
+            _is(object, kindOf: "UIImage") ||
+            _is(object, kindOf: "NSImageView") ||
+            _is(object, kindOf: "UIImageView") ||
+            _is(object, kindOf: "CIImage") ||
+            _is(object, kindOf: "NSBitmapImageRep") {
     return .image(object)
-  } else if _isKind(object, of: "NSColor") ||
-            _isKind(object, of: "UIColor") {
+  } else if _is(object, kindOf: "NSColor") ||
+            _is(object, kindOf: "UIColor") {
     return .color(object)
-  } else if _isKind(object, of: "NSBezierPath") ||
-            _isKind(object, of: "UIBezierPath") {
+  } else if _is(object, kindOf: "NSBezierPath") ||
+            _is(object, kindOf: "UIBezierPath") {
     return .bezierPath(object)
-  } else if _isKind(object, of: "NSString") {
+  } else if _is(object, kindOf: "NSString") {
     return .text(_forceBridgeFromObjectiveC(object, String.self))
   }
 

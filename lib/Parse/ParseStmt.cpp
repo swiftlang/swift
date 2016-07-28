@@ -1188,7 +1188,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     // they were in Swift 2 and earlier.
     SourceLoc whereLoc;
     if (consumeIf(tok::kw_where, whereLoc)) {
-      diagnose(whereLoc, diag::expected_comma_stmtcondition_w)
+      diagnose(whereLoc, diag::expected_comma_stmtcondition)
         .fixItReplace(whereLoc, ",");
       return true;
     }

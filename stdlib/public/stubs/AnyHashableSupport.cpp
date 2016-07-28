@@ -103,7 +103,6 @@ extern "C" void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass: {
-    // FIXME(id-as-any): handle ForeignClass.
     _swift_stdlib_makeAnyHashableUsingDefaultRepresentation(
         value, anyHashableResultPointer, findHashableBaseType(type),
         hashableWT);
@@ -118,7 +117,8 @@ extern "C" void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
     return;
 
   case MetadataKind::ErrorObject:
-    // FIXME(id-as-any): handle ErrorObject.
+    // ErrorObject metadata is not used for any Swift-level values, so
+    // this case is unreachable.
     _failCorruptType(type);
 
   case MetadataKind::Opaque:

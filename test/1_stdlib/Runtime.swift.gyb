@@ -13,20 +13,20 @@ import SwiftShims
 @_silgen_name("swift_demangle")
 public
 func _stdlib_demangleImpl(
-  mangledName: UnsafePointer<UInt8>?,
+  mangledName: UnsafePointer<CChar>?,
   mangledNameLength: UInt,
-  outputBuffer: UnsafeMutablePointer<UInt8>?,
+  outputBuffer: UnsafeMutablePointer<CChar>?,
   outputBufferSize: UnsafeMutablePointer<UInt>?,
   flags: UInt32
 ) -> UnsafeMutablePointer<CChar>?
 
 func _stdlib_demangleName(_ mangledName: String) -> String {
-  return mangledName.nulTerminatedUTF8.withUnsafeBufferPointer {
-    (mangledNameUTF8) in
+  return mangledName.utf8CString.withUnsafeBufferPointer {
+    (mangledNameUTF8CStr) in
 
     let demangledNamePtr = _stdlib_demangleImpl(
-      mangledName: mangledNameUTF8.baseAddress,
-      mangledNameLength: UInt(mangledNameUTF8.count - 1),
+      mangledName: mangledNameUTF8CStr.baseAddress,
+      mangledNameLength: UInt(mangledNameUTF8CStr.count - 1),
       outputBuffer: nil,
       outputBufferSize: nil,
       flags: 0)

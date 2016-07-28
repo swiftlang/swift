@@ -1674,7 +1674,9 @@ public:
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     printCommon(E, "object_literal") 
-      << " kind='" << E->getLiteralKindPlainName() << "'\n";
+      << " kind='" << E->getLiteralKindPlainName() << "'";
+    printArgumentLabels(E->getArgumentLabels());
+    OS << "\n";
     printRec(E->getArg());
   }
 
@@ -1779,6 +1781,7 @@ public:
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     printCommon(E, "unresolved_member_expr")
       << " name='" << E->getName() << "'";
+    printArgumentLabels(E->getArgumentLabels());
     if (E->getArgument()) {
       OS << '\n';
       printRec(E->getArgument());
@@ -1846,6 +1849,7 @@ public:
       OS << "  decl=";
       E->getDecl().dump(OS);
     }
+    printArgumentLabels(E->getArgumentLabels());
     OS << '\n';
     printRec(E->getBase());
     OS << '\n';
@@ -1856,6 +1860,7 @@ public:
     printCommon(E, "dynamic_subscript_expr")
       << " decl=";
     E->getMember().dump(OS);
+    printArgumentLabels(E->getArgumentLabels());
     OS << '\n';
     printRec(E->getBase());
     OS << '\n';
@@ -2124,17 +2129,20 @@ public:
     OS << ')';
   }
 
+  void printArgumentLabels(ArrayRef<Identifier> argLabels) {
+    OS << "  arg_labels=";
+    for (auto label : argLabels) 
+      OS << (label.empty() ? "_" : label.str()) << ":";
+  }
+
   void printApplyExpr(ApplyExpr *E, const char *NodeName) {
     printCommon(E, NodeName);
     if (E->isSuper())
       OS << " super";
     if (E->isThrowsSet())
       OS << (E->throws() ? " throws" : " nothrow");
-    if (auto call = dyn_cast<CallExpr>(E)) {
-      OS << "  arg_labels=";
-      for (auto label : call->getArgumentLabels()) 
-        OS << (label.empty() ? "_" : label.str()) << ":";
-    }
+    if (auto call = dyn_cast<CallExpr>(E))
+      printArgumentLabels(call->getArgumentLabels());
 
     OS << '\n';
     printRec(E->getFn());
