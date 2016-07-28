@@ -391,7 +391,7 @@ public protocol _BridgedStoredNSError :
 /// TODO: Better way to do this?
 internal func _stringDictToAnyHashableDict(_ input: [String : Any])
     -> [AnyHashable : Any] {
-  var result: [AnyHashable : Any] = [:]
+  var result = [AnyHashable : Any](minimumCapacity: input.count)
   for (k, v) in input {
     result[k] = v
   }
