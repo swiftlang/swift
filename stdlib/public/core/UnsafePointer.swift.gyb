@@ -77,50 +77,19 @@ public struct ${Self}<Pointee>
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Convert from any `UnsafeMutablePointer`, possibly with a
-  /// different `Pointee`.
-  ///
-  /// - Warning: the behavior of accesses to pointee as a type
-  ///   different from that to which it was initialized is undefined.
+  /// Construct ${a_Self} from another ${a_Self}.
   @_transparent
-  public init<U>(_ from : UnsafeMutablePointer<U>) {
-    _rawValue = from._rawValue
+  public init(_ other: ${Self}<Pointee>) {
+    self = other
   }
 
-  /// Convert from any `UnsafeMutablePointer`, possibly with a
-  /// different `Pointee`.
+  /// Construct ${a_Self} from another ${a_Self}.
   ///
-  /// Returns nil if `from` is nil.
-  ///
-  /// - Warning: the behavior of accesses to pointee as a type
-  ///   different from that to which it was initialized is undefined.
+  /// Returns nil if `other` is nil.
   @_transparent
-  public init?<U>(_ from : UnsafeMutablePointer<U>?) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
-  }
-
-  /// Convert from any `UnsafePointer`, possibly with a
-  /// different `Pointee`.
-  ///
-  /// - Warning: the behavior of accesses to pointee as a type
-  ///   different from that to which it was initialized is undefined.
-  @_transparent
-  public init<U>(_ from : UnsafePointer<U>) {
-    _rawValue = from._rawValue
-  }
-
-  /// Convert from any `UnsafePointer`, possibly with a
-  /// different `Pointee`.
-  ///
-  /// Returns nil if `from` is nil.
-  ///
-  /// - Warning: the behavior of accesses to pointee as a type
-  ///   different from that to which it was initialized is undefined.
-  @_transparent
-  public init?<U>(_ from : UnsafePointer<U>?) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
+  public init?(_ other: ${Self}<Pointee>?) {
+    guard let unwrapped = other else { return nil }
+    self = unwrapped
   }
 
 %  if mutable:
@@ -139,6 +108,21 @@ public struct ${Self}<Pointee>
   public init?(mutating other: UnsafePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
     self.init(mutating: unwrapped)
+  }
+% else:
+  /// Convert from `UnsafeMutablePointer` to ${a_Self} of the same `Pointee`.
+  @_transparent
+  public init(_ other: UnsafeMutablePointer<Pointee>) {
+    self._rawValue = other._rawValue
+  }
+
+  /// Convert from `UnsafeMutablePointer` to ${a_Self} of the same `Pointee`.
+  ///
+  /// Returns nil if `from` is nil.
+  @_transparent
+  public init?(_ other: UnsafeMutablePointer<Pointee>?) {
+    guard let unwrapped = other else { return nil }
+    self.init(unwrapped)
   }
 %  end
 
