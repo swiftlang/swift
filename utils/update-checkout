@@ -32,13 +32,17 @@ sys.path.append(os.path.join(SCRIPT_DIR, 'swift_build_support'))
 from swift_build_support import shell  # noqa (E402)
 
 
-def update_single_repository(repo_path, branch, reset_to_remote):
+def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
     if not os.path.isdir(repo_path):
         return
 
     print("--- Updating '" + repo_path + "' ---")
     with shell.pushd(repo_path, dry_run=False, echo=False):
         shell.call(["git", "fetch"], echo=False)
+
+        if should_clean:
+            shell.call(['git', 'clean', '-fdx'],
+                       echo=False)
 
         if branch:
             status = shell.capture(['git', 'status', '--porcelain', '-uno'],
@@ -83,7 +87,8 @@ def update_all_repositories(args, config, scheme_name):
 
         update_single_repository(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
                                  repo_branch,
-                                 args.reset_to_remote)
+                                 args.reset_to_remote,
+                                 args.clean)
 
 
 def obtain_additional_swift_sources(
@@ -193,6 +198,10 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     parser.add_argument(
         '--reset-to-remote',
         help='Reset each branch to the remote state.',
+        action='store_true')
+    parser.add_argument(
+        '--clean',
+        help='Clean unrelated files from each repository.',
         action='store_true')
     parser.add_argument(
         "--config",
