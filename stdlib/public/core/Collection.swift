@@ -174,9 +174,8 @@ public protocol Indexable : IndexableBase {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -197,9 +196,9 @@ public protocol Indexable : IndexableBase {
   /// unless that distance is beyond a given limiting index.
   ///
   /// The following example obtains an index advanced four positions from a
-  /// string's starting index and then prints the character at that position. The
-  /// operation doesn't require going beyond the limiting `s.endIndex` value,
-  /// so it succeeds.
+  /// string's starting index and then prints the character at that position.
+  /// The operation doesn't require going beyond the limiting `s.endIndex`
+  /// value, so it succeeds.
   ///
   ///     let s = "Swift"
   ///     if let i = s.index(s.startIndex, offsetBy: 4, limitedBy: s.endIndex) {
@@ -215,17 +214,17 @@ public protocol Indexable : IndexableBase {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
   ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     `limit` has no effect if it is less than `i`. Likewise, if `n < 0`,
-  ///     `limit` has no effect if it is greater than `i`.
+  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
+  ///     limit that is greater than `i` has no effect.
   /// - Returns: An index offset by `n` from the index `i`, unless that index
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
@@ -240,11 +239,10 @@ public protocol Indexable : IndexableBase {
 
   /// Offsets the given index by the specified distance.
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
-  /// - Parameters
+  /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
@@ -258,9 +256,9 @@ public protocol Indexable : IndexableBase {
   /// Offsets the given index by the specified distance, or so that it equals
   /// the given limiting index.
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. Make
-  /// sure the value passed as `n` does not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -645,8 +643,10 @@ public protocol Collection : Indexable, Sequence {
   /// Returns a subsequence from the start of the collection up to, but not
   /// including, the specified position.
   ///
-  /// The resulting subsequence *does not include* the element at the
-  /// position `end`.
+  /// The resulting subsequence *does not include* the element at the position
+  /// `end`. The following example searches for the index of the number `40`
+  /// in an array of integers, and then prints the prefix of the array up to,
+  /// but not including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
@@ -671,7 +671,9 @@ public protocol Collection : Indexable, Sequence {
   /// Returns a subsequence from the specified position to the end of the
   /// collection.
   ///
-  /// For example:
+  /// The following example searches for the index of the number `40` in an
+  /// array of integers, and then prints the suffix of the array starting at
+  /// that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
@@ -695,7 +697,10 @@ public protocol Collection : Indexable, Sequence {
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
   ///
-  /// The resulting subsequence *includes* the element at the position `end`.
+  /// The resulting subsequence *includes* the element at the position `end`. 
+  /// The following example searches for the index of the number `40` in an
+  /// array of integers, and then prints the prefix of the array up to, and
+  /// including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
@@ -768,9 +773,8 @@ public protocol Collection : Indexable, Sequence {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. Make
-  /// sure the value passed as `n` does not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -809,17 +813,17 @@ public protocol Collection : Indexable, Sequence {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
   ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     `limit` has no effect if it is less than `i`. Likewise, if `n < 0`,
-  ///     `limit` has no effect if it is greater than `i`.
+  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
+  ///     limit that is greater than `i` has no effect.
   /// - Returns: An index offset by `n` from the index `i`, unless that index
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
@@ -898,9 +902,8 @@ extension Indexable {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -941,17 +944,17 @@ extension Indexable {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
   ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     `limit` has no effect if it is less than `i`. Likewise, if `n < 0`,
-  ///     `limit` has no effect if it is greater than `i`.
+  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
+  ///     limit that is greater than `i` has no effect.
   /// - Returns: An index offset by `n` from the index `i`, unless that index
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
@@ -968,11 +971,10 @@ extension Indexable {
 
   /// Offsets the given index by the specified distance.
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
-  /// - Parameters
+  /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
@@ -988,9 +990,9 @@ extension Indexable {
   /// Offsets the given index by the specified distance, or so that it equals
   /// the given limiting index.
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. Make
-  /// sure the value passed as `n` does not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -1372,8 +1374,10 @@ extension Collection {
   /// Returns a subsequence from the start of the collection up to, but not
   /// including, the specified position.
   ///
-  /// The resulting subsequence *does not include* the element at the
-  /// position `end`.
+  /// The resulting subsequence *does not include* the element at the position
+  /// `end`. The following example searches for the index of the number `40`
+  /// in an array of integers, and then prints the prefix of the array up to,
+  /// but not including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
@@ -1400,7 +1404,9 @@ extension Collection {
   /// Returns a subsequence from the specified position to the end of the
   /// collection.
   ///
-  /// For example:
+  /// The following example searches for the index of the number `40` in an
+  /// array of integers, and then prints the suffix of the array starting at
+  /// that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
@@ -1414,8 +1420,8 @@ extension Collection {
   ///     print(numbers.suffix(from: numbers.endIndex))
   ///     // Prints "[]"
   ///
-  /// - Parameter start: The index at which to start the resulting
-  ///   subsequence. `start` must be a valid index of the collection.
+  /// - Parameter start: The index at which to start the resulting subsequence.
+  ///   `start` must be a valid index of the collection.
   /// - Returns: A subsequence starting at the `start` position.
   ///
   /// - Complexity: O(1)
@@ -1426,8 +1432,10 @@ extension Collection {
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
   ///
-  /// The resulting subsequence *includes* the element at the position
-  /// `end`.
+  /// The resulting subsequence *includes* the element at the position `end`. 
+  /// The following example searches for the index of the number `40` in an
+  /// array of integers, and then prints the prefix of the array up to, and
+  /// including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
