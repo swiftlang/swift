@@ -46,7 +46,7 @@ extension ${Self} : LosslessStringConvertible {
   /// Creates a new instance from the given string.
   ///
   /// The string passed as `text` can represent a real number in decimal or
-  /// hexidecimal format or special floating-point values for infinty and NaN
+  /// hexadecimal format or special floating-point values for infinty and NaN
   /// ("not a number").
   ///
   /// The given string may begin with a plus or minus sign character (`+` or
@@ -71,17 +71,17 @@ extension ${Self} : LosslessStringConvertible {
   ///       let e = ${Self}("2837.5e-2")
   ///       // e == 28.375
   ///
-  /// - A *hexidecimal value* contains the significand, either `0X` or `0x`,
-  ///   followed by a sequence of hexidecimal digits. The significand may
+  /// - A *hexadecimal value* contains the significand, either `0X` or `0x`,
+  ///   followed by a sequence of hexadecimal digits. The significand may
   ///   include a decimal point.
   ///
   ///       let f = ${Self}("0x1c.6")
   ///       // f == 28.375
   ///
-  ///   A hexidecimal value may also include an exponent following the
+  ///   A hexadecimal value may also include an exponent following the
   ///   significand, indicating the power of 2 by which the significand should
   ///   be multiplied. If included, the exponent is separated by a single
-  ///   character `p` or `P` and consists of an optional plus or minus sign
+  ///   character, `p` or `P`, and consists of an optional plus or minus sign
   ///   character and a sequence of decimal digits.
   ///
   ///       let g = ${Self}("0x1.c6p4")
@@ -104,7 +104,7 @@ extension ${Self} : LosslessStringConvertible {
   ///
   ///   An NaN value may also include a payload in parentheses following the
   ///   `"nan"` keyword. The payload consists of a sequence of decimal digits,
-  ///   or the characters `0X` or `0x` followed by a sequence of hexidecimal
+  ///   or the characters `0X` or `0x` followed by a sequence of hexadecimal
   ///   digits. If the payload contains any other characters, it is ignored.
   ///   If the value of the payload is larger than can be stored as the
   ///   payload of a `${Self}.nan`, the least significant bits are used.

@@ -87,14 +87,14 @@ internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
 
 /// A type-erased hashable value.
 ///
-/// Forwards equality comparisons and hashing operations to an
-/// underlying hashable value, hiding its specific type.
+/// The `AnyHashable` type forwards equality comparisons and hashing operations
+/// to an underlying hashable value, hiding its specific underlying type.
 ///
-/// You can store mixed-type keys in `Dictionary` and other
-/// collections that require `Hashable` by wrapping mixed-type keys in
+/// You can store mixed-type keys in dictionaries and other collections that
+/// require `Hashable` conformance by wrapping mixed-type keys in
 /// `AnyHashable` instances:
 ///
-///     let descriptions: [AnyHashable : Any] = [
+///     let descriptions: [AnyHashable: Any] = [
 ///         AnyHashable("😄"): "emoji",
 ///         AnyHashable(42): "an Int",
 ///         AnyHashable(Int8(43)): "an Int8",
@@ -107,17 +107,24 @@ internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
 public struct AnyHashable {
   internal var _box: _AnyHashableBox
 
-  /// Creates an opaque hashable value that wraps `base`.
+  /// Creates a type-erased hashable value that wraps the given instance.
   ///
-  /// Example:
+  /// The following example creates two type-erased hashable values: `x` wraps
+  /// an `Int` with the value 42, while `y` wraps a `UInt8` with the same
+  /// numeric value. Because the underlying types of `x` and `y` are
+  /// different, the two variables do not compare as equal despite having
+  /// equal underlying values.
   ///
   ///     let x = AnyHashable(Int(42))
   ///     let y = AnyHashable(UInt8(42))
   ///
-  ///     print(x == y) // Prints "false" because `Int` and `UInt8`
-  ///                   // are different types.
+  ///     print(x == y)
+  ///     // Prints "false" because `Int` and `UInt8` are different types
   ///
-  ///     print(x == AnyHashable(Int(42))) // Prints "true".
+  ///     print(x == AnyHashable(Int(42)))
+  ///     // Prints "true"
+  ///
+  /// - Parameter base: A hashable value to wrap.
   public init<H : Hashable>(_ base: H) {
     if let customRepresentation =
       (base as? _HasCustomAnyHashableRepresentation)?._toCustomAnyHashable() {
@@ -135,11 +142,16 @@ public struct AnyHashable {
     self._box = _ConcreteHashableBox(base)
   }
 
-  /// The value wrapped in this `AnyHashable` instance.
+  /// The value wrapped by this instance.
   ///
-  ///     let anyMessage = AnyHashable("Hello")
-  ///     let unwrappedMessage: Any = anyMessage.base
-  ///     print(unwrappedMessage) // prints "hello"
+  /// The `base` property can be cast back to its original type using one of
+  /// the casting operators (`as?`, `as!`, or `as`).
+  ///
+  ///     let anyMessage = AnyHashable("Hello world!")
+  ///     if let unwrappedMessage = anyMessage.base as? String {
+  ///         print(unwrappedMessage)
+  ///     }
+  ///     // Prints "Hello world!"
   public var base: Any {
     return _box._base
   }
@@ -155,6 +167,31 @@ public struct AnyHashable {
 }
 
 extension AnyHashable : Equatable {
+  /// Returns a Boolean value indicating whether two type-erased hashable
+  /// instances wrap the same type and value.
+  ///
+  /// Two instances of `AnyHashable` compare as equal if and only if the
+  /// underlying types have the same conformance to the `Equatable` protocol
+  /// and the underlying values compare as equal.
+  ///
+  /// The following example creates two type-erased hashable values: `x` wraps
+  /// an `Int` with the value 42, while `y` wraps a `UInt8` with the same
+  /// numeric value. Because the underlying types of `x` and `y` are
+  /// different, the two variables do not compare as equal despite having
+  /// equal underlying values.
+  ///
+  ///     let x = AnyHashable(Int(42))
+  ///     let y = AnyHashable(UInt8(42))
+  ///
+  ///     print(x == y)
+  ///     // Prints "false" because `Int` and `UInt8` are different types
+  ///
+  ///     print(x == AnyHashable(Int(42)))
+  ///     // Prints "true"
+  ///
+  /// - Parameters:
+  ///   - lhs: A type-erased hashable value.
+  ///   - rhs: Another type-erased hashable value.
   public static func == (lhs: AnyHashable, rhs: AnyHashable) -> Bool {
     return lhs._box._isEqual(to: rhs._box)
   }

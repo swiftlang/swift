@@ -125,9 +125,9 @@ extension RandomAccessIndexable {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
@@ -211,9 +211,8 @@ where Index : Strideable,
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
