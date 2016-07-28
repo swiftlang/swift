@@ -38,11 +38,13 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
 
     print("--- Updating '" + repo_path + "' ---")
     with shell.pushd(repo_path, dry_run=False, echo=False):
-        shell.call(["git", "fetch"], echo=False)
+        shell.call(["git", "fetch"], echo=True)
 
         if should_clean:
             shell.call(['git', 'clean', '-fdx'],
-                       echo=False)
+                       echo=True)
+            shell.call(['git', 'reset', '--hard', 'HEAD'],
+                       echo=True)
 
         if branch:
             status = shell.capture(['git', 'status', '--porcelain', '-uno'],
@@ -51,21 +53,21 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
                 print("Please, commit your changes.")
                 print(status)
                 exit(1)
-            shell.call(['git', 'checkout', branch], echo=False)
+            shell.call(['git', 'checkout', branch], echo=True)
 
             # If we were asked to reset to the specified branch, do the hard
             # reset and return.
             if reset_to_remote:
                 shell.call(['git', 'reset', '--hard', "origin/%s" % branch],
-                           echo=False)
+                           echo=True)
                 return
 
         # Prior to Git 2.6, this is the way to do a "git pull
         # --rebase" that respects rebase.autostash.  See
         # http://stackoverflow.com/a/30209750/125349
-        shell.call(["git", "rebase", "FETCH_HEAD"], echo=False)
+        shell.call(["git", "rebase", "FETCH_HEAD"], echo=True)
         shell.call(["git", "submodule", "update", "--recursive"],
-                   echo=False)
+                   echo=True)
 
 
 def update_all_repositories(args, config, scheme_name):
@@ -119,10 +121,10 @@ def obtain_additional_swift_sources(
 
             if skip_history:
                 shell.call(['git', 'clone', '--recursive', '--depth', '1',
-                            remote, repo_name], echo=False)
+                            remote, repo_name], echo=True)
             else:
                 shell.call(['git', 'clone', '--recursive', remote,
-                            repo_name], echo=False)
+                            repo_name], echo=True)
             if scheme_name:
                 for v in config['branch-schemes'].values():
                     if scheme_name not in v['aliases']:
