@@ -48,13 +48,15 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 
   // CHECK:      [[FN:%.*]] = function_ref @_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject
   // CHECK-NEXT: [[METHOD:%.*]] = partial_apply [[FN]]<T>()
-  // CHECK-NEXT: strong_release [[METHOD]]
+  // CHECK:      [[THUNK:%.*]] = function_ref @_TTRGRx14objc_protocols9NSRuncing
+  // CHECK-NEXT: [[METHOD_FLAT:%.*]] = partial_apply [[THUNK]]<T>([[METHOD]]
+  // CHECK-NEXT: strong_release [[METHOD_FLAT]]
   _ = T.runce
 
   // CHECK:      [[FN:%.*]] = function_ref @_TTOZFP14objc_protocols9NSRuncing5minceFT_CSo8NSObject
   // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick T.Type
   // CHECK-NEXT: [[METHOD:%.*]] = apply [[FN]]<T>([[METATYPE]])
-  // CHECK-NEXT: strong_release [[METHOD:%.*]]
+  // CHECK-NEXT: strong_release [[METHOD]]
   _ = T.mince
 }
 

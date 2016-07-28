@@ -41,26 +41,23 @@ final class Archimedes : Gymnast {
 ////
 
 func genericOlympicGames<T: Gymnast>(_ g1: T) -> T {
-  let f1: (T) -> (Double) -> T = T.backflip
-  let f2: (Double) -> T = f1(g1)
-  let g2: T = f2(180)
+  let f1: (T, Double) -> T = T.backflip
+  let g2: T = f1(g1, 180)
 
   let f3: (Double) -> T = g2.backflip
   let g3: T = f3(360)
 
-  let f4: (T) -> () -> (Medal) -> T = T.compete
-  let f5: () -> (Medal) -> T = f4(g3)
-  let f6: (Medal) -> T = f5()
-  let g4: T = f6(Medal.Silver)
+  let f4: (T) -> (Medal) -> T = T.compete
+  let f5: (Medal) -> T = f4(g3)
+  let g4: T = f5(Medal.Silver)
 
   let f7: () -> (Medal) -> T = g4.compete
   let f8: (Medal) -> T = f7()
   let g5: T = f8(Medal.Gold)
 
-  let f9: (T) -> () -> (Steroids) -> () = T.scandal
-  let f10: () -> (Steroids) -> () = f9(g5)
-  let f11: (Steroids) -> () = f10()
-  f11(Steroids())
+  let f9: (T) -> (Steroids) -> () = T.scandal
+  let f10: (Steroids) -> () = f9(g5)
+  f10(Steroids())
 
   let f12: () -> (Steroids) -> () = g5.scandal
   let f13: (Steroids) -> () = f12()

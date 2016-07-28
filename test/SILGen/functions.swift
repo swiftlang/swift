@@ -130,7 +130,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[THUNK:%.*]] = function_ref @_TFV9functions10SomeStruct6method{{.*}}
   // CHECK: [[THUNK_THICK:%.*]] = thin_to_thick_function [[THUNK]]
   var stm1 = SomeStruct.method
-  stm1(&st)(i)
+  stm1(&st, i)
 
   // -- Curry 'self' onto method argument lists dispatched using class_method.
 
@@ -149,17 +149,14 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: apply [[METHOD]]([[I]], [[C]])
   c.method(i)
 
-  // -- Curry 'self' onto unapplied methods dispatched using class_method.
-  // CHECK: [[METHOD_CURRY_THUNK:%.*]] = function_ref @_TFC9functions9SomeClass6method{{.*}}
-  // CHECK: apply [[METHOD_CURRY_THUNK]]
-  var cm1 = SomeClass.method(c)
-  cm1(i)
-
+  // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_TFC9functions9SomeClass6methodFBi64_T_ : $@convention(thin) (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()
+  // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
+  // CHECK: [[THUNK:%[0-9]+]] = function_ref @_TTRXFo_oC9functions9SomeClass{{.*}} : $@convention(thin) (@owned SomeClass, Builtin.Int64, @owned @callee_owned (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()) -> ()
+  // CHECK: [[METHOD:%[0-9]+]] = partial_apply [[THUNK]]([[FUNC_THICK]])
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: apply [[METHOD]]([[I]], [[C]])
-  SomeClass.method(c)(i)
+  // CHECK: apply [[METHOD]]([[C]], [[I]])
+  SomeClass.method(c, i)
 
   // -- Curry the Type onto static method argument lists.
   

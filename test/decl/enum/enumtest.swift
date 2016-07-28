@@ -215,7 +215,7 @@ func f() {
   
   // Test that we can get the "address of a member".
   var _ : () -> () = UnionTest1.baz
-  var _ : (UnionTest1) -> () -> () = UnionTest1.bar
+  var _ : (UnionTest1) -> () = UnionTest1.bar
 }
 
 func union_error(_ a: ZeroOneTwoThree) {

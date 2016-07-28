@@ -205,7 +205,8 @@ func validateSaveButton(_ text: String) {
 // <rdar://problem/20201968> QoI: poor diagnostic when calling a class method via a metatype
 class r20201968C {
   func blah() {
-    r20201968C.blah()  // expected-error {{use of instance member 'blah' on type 'r20201968C'; did you mean to use a value of type 'r20201968C' instead?}}
+    r20201968C.blah()  // FIXME-error {{use of instance member 'blah' on type 'r20201968C'; did you mean to use a value of type 'r20201968C' instead?}}
+    // expected-error @-1 {{missing argument for parameter #1 in call}}
   }
 }
 
@@ -363,8 +364,8 @@ f8(b: 1.0)         // expected-error {{cannot convert value of type 'Double' to 
 
 class CurriedClass {
   func method1() {}
-  func method2(_ a: Int) -> (b : Int) -> () { return { b in () } }
-  func method3(_ a: Int, b : Int) {}
+  func method2(_ a: Int) -> (b: Int) -> () { return { b in () } }
+  func method3(_ a: Int, b: Int) {}
 }
 
 let c = CurriedClass()
@@ -379,29 +380,28 @@ c.method2(1)(b: 2.0) // expected-error {{cannot convert value of type 'Double' t
 c.method2(1.0)(b: 2) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 c.method2(1.0)(b: 2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-CurriedClass.method1(c)()
-_ = CurriedClass.method1(c)
-CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
-CurriedClass.method1(2.0)(1)       // expected-error {{use of instance member 'method1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+CurriedClass.method1(c)
+CurriedClass.method1(c, 1)         // expected-error {{extra argument in call}}
+CurriedClass.method1(2.0)(1)       // FIXME-error {{use of instance member 'method1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+// expected-error @-1 {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
 
-CurriedClass.method2(c)(32)(b: 1)
-_ = CurriedClass.method2(c)
-_ = CurriedClass.method2(c)(32)
-_ = CurriedClass.method2(1,2)      // expected-error {{use of instance member 'method2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
-CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
+CurriedClass.method2(c, 32)(b: 1)
+_ = CurriedClass.method2(c, 32)
+_ = CurriedClass.method2(1,2)      // FIXME-error {{use of instance member 'method2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+// expected-error @-1 {{cannot convert value of type 'Int' to expected argument type 'CurriedClass'}}
+CurriedClass.method2(c, 1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+CurriedClass.method2(c, 1)(b: 1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+CurriedClass.method2(c, 2)(c: 1.0) // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
 
-CurriedClass.method3(c)(32, b: 1)
-_ = CurriedClass.method3(c)
-_ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}} {{32-32=b: }}
-_ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
-_ = CurriedClass.method3(1, 2)           // expected-error {{use of instance member 'method3' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
-CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
+CurriedClass.method3(c, 32, b: 1)
+_ = CurriedClass.method3(c, 1, 2)        // expected-error {{missing argument label 'b:' in call}} {{32-32=b: }}
+_ = CurriedClass.method3(c, 1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
+_ = CurriedClass.method3(1, 2)           // FIXME-error {{use of instance member 'method3' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+// expected-error @-1 {{missing argument for parameter 'b' in call}}
+CurriedClass.method3(c, 1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+CurriedClass.method3(c, 1)               // expected-error {{missing argument for parameter 'b' in call}}
 
-CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter 'b' in call}}
-
+CurriedClass.method3(c, c: 1.0)          // expected-error {{missing argument for parameter 'b' in call}}
 
 extension CurriedClass {
   func f() {
@@ -419,15 +419,12 @@ extension CurriedClass {
 }
 
 // <rdar://problem/23718816> QoI: "Extra argument" error when accidentally currying a method
-CurriedClass.m1(2, b: 42)   // expected-error {{use of instance member 'm1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
-
+CurriedClass.m1(2, b: 42)   // FIXME-error {{use of instance member 'm1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+// expected-error @-1 {{missing argument for parameter #2 in call}}
 
 // <rdar://problem/22108559> QoI: Confusing error message when calling an instance method as a class method
-CurriedClass.m2(12)  // expected-error {{use of instance member 'm2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
-
-
-
-
+CurriedClass.m2(12)  // FIXME-error {{use of instance member 'm2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+// expected-error @-1 {{missing argument for parameter #2 in call}}
 
 // <rdar://problem/19870975> Incorrect diagnostic for failed member lookups within closures passed as arguments ("(_) -> _")
 func ident<T>(_ t: T) -> T {}

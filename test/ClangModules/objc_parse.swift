@@ -373,7 +373,8 @@ func testPreferClassMethodToCurriedInstanceMethod(_ obj: NSObject) {
   // FIXME: We shouldn't need the ": Bool" type annotation here.
   // <rdar://problem/18006008>
   let _: Bool = NSObject.isEqual(obj)
-  _ = NSObject.isEqual(obj) as (NSObject!) -> Bool // no-warning
+  _ = NSObject.isEqual as (NSObject, NSObject) -> Bool // no-warning
+  _ = obj.isEqual as (NSObject!) -> Bool
 }
 
 
@@ -598,4 +599,3 @@ func testNSUInteger(_ obj: NSUIntegerTests, uint: UInt, int: Int) {
   let num = NSNumber(value: uint)
   let _: String = num.uintValue // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
 }
-

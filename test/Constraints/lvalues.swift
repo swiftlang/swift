@@ -148,7 +148,7 @@ struct FooStruct {
 }
 
 func testFooStruct() {
-  FooStruct.instanceFunc0(FooStruct())()
+  FooStruct.instanceFunc0(FooStruct())
 }
 
 // Don't load from explicit lvalues.
@@ -232,4 +232,3 @@ func r23331567(_ fn: (x: inout Int) -> Void) {
   fn(x: &a)
 }
 r23331567 { $0 += 1 }
-
