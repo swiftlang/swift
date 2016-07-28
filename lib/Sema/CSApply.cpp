@@ -845,10 +845,7 @@ namespace {
         // No substitutions required; the declaration reference is simple.
         containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
         memberRef = member;
-        auto baseDeclRefExpr = dyn_cast<DeclRefExpr>(base);
-        refTy = tc.getUnopenedTypeOfReference(member, Type(), dc,
-                                              baseDeclRefExpr,
-                                              /*wantInterfaceType=*/true);
+        refTy = openedFullType;
       }
 
       // If we opened up an existential when referencing this member, update
