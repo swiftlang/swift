@@ -1,11 +1,6 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
-// FIXME(id-as-any): add tests that use Swift errors and
-// Objective-C errors.
-
-// FIXME(id-as-any): add tests for enums.
-
 // FIXME(id-as-any): add tests for unboxing.
 
 %{
@@ -525,6 +520,104 @@ AnyHashableTests.test("AnyHashable with CFMutableBitVector") {
     equalityOracle: { $0 == $1 })
 }
 
+#endif
+
+enum MinimalHashablePODSwiftError : Error, Hashable {
+  case caseA
+  case caseB
+  case caseC
+}
+
+enum MinimalHashableRCSwiftError : Error, Hashable {
+  case caseA(LifetimeTracked)
+  case caseB(LifetimeTracked)
+  case caseC(LifetimeTracked)
+
+  var hashValue: Int {
+    return 0
+  }
+
+  static func == (
+    lhs: MinimalHashableRCSwiftError,
+    rhs: MinimalHashableRCSwiftError
+  ) -> Bool {
+    switch (lhs, rhs) {
+    case (.caseA(let lhs), .caseA(let rhs)):
+      return lhs == rhs
+    case (.caseB(let lhs), .caseB(let rhs)):
+      return lhs == rhs
+    case (.caseC(let lhs), .caseC(let rhs)):
+      return lhs == rhs
+    default:
+      return false
+    }
+  }
+}
+
+AnyHashableTests.test("AnyHashable containing MinimalHashablePODSwiftError") {
+  let xs: [MinimalHashablePODSwiftError] = [
+    .caseA, .caseA,
+    .caseB, .caseB,
+    .caseC, .caseC,
+  ]
+  expectEqual(.enum, SwiftRuntime.metadataKind(of: xs.first!))
+  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
+}
+
+AnyHashableTests.test("AnyHashable containing MinimalHashableRCSwiftError") {
+  let xs: [MinimalHashableRCSwiftError] = [
+    .caseA(LifetimeTracked(1)), .caseA(LifetimeTracked(1)),
+    .caseA(LifetimeTracked(2)), .caseA(LifetimeTracked(2)),
+    .caseB(LifetimeTracked(1)), .caseB(LifetimeTracked(1)),
+    .caseB(LifetimeTracked(2)), .caseB(LifetimeTracked(2)),
+    .caseC(LifetimeTracked(1)), .caseC(LifetimeTracked(1)),
+    .caseC(LifetimeTracked(2)), .caseC(LifetimeTracked(2)),
+  ]
+  expectEqual(.enum, SwiftRuntime.metadataKind(of: xs.first!))
+  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
+}
+
+#if _runtime(_ObjC)
+AnyHashableTests.test("AnyHashable containing _SwiftNativeNSError") {
+  let swiftErrors: [MinimalHashablePODSwiftError] = [
+    .caseA, .caseA,
+    .caseB, .caseB,
+    .caseC, .caseC,
+  ]
+  let nsErrors: [NSError] = swiftErrors.map { $0 as NSError }
+  expectEqual(
+    .objCClassWrapper,
+    SwiftRuntime.metadataKind(of: nsErrors.first!))
+  expectEqual("_SwiftNativeNSError", String(nsErrors[0].dynamicType))
+  checkHashable(nsErrors, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    nsErrors.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
+}
+
+AnyHashableTests.test("AnyHashable containing NSError") {
+  let nsErrors: [NSError] = [
+    NSError(domain: "Foo", code: 0),
+    NSError(domain: "Foo", code: 0),
+    NSError(domain: "Foo", code: 1),
+    NSError(domain: "Foo", code: 1),
+    NSError(domain: "Foo", code: 2),
+    NSError(domain: "Foo", code: 2),
+  ]
+  expectEqual(
+    .objCClassWrapper,
+    SwiftRuntime.metadataKind(of: nsErrors.first!))
+  checkHashable(nsErrors, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    nsErrors.map(AnyHashable.init),
+    equalityOracle: { $0 / 2 == $1 / 2 })
+}
 #endif
 
 runAllTests()
