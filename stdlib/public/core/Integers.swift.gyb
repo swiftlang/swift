@@ -257,8 +257,8 @@ extension BinaryInteger {
 
   @_transparent
   public func signum() -> Self {
-    if self < (0 as Self) { return -1 }
-    if self > (0 as Self) { return 1 }
+    if self < 0 { return -1 }
+    if self > 0 { return 1 }
     return 0
   }
 
@@ -340,8 +340,8 @@ public func != <T : BinaryInteger, U : BinaryInteger>(lhs:T, rhs: U) -> Bool {
 
 @_transparent
 public func < <T : BinaryInteger, U : BinaryInteger>(lhs: T, rhs: U) -> Bool {
-  let lhsSign = lhs < (0 as T) ? -1 : lhs > (0 as T) ? 1 : 0
-  let rhsSign = rhs < (0 as U) ? -1 : rhs > (0 as U) ? 1 : 0
+  let lhsSign = lhs.isLess(than: 0) ? -1 : lhs > 0 ? 1 : 0
+  let rhsSign = rhs.isLess(than: 0) ? -1 : rhs > 0 ? 1 : 0
   if lhsSign != rhsSign { return lhsSign < rhsSign }
 
   // if we get here, lhs and rhs have the same sign.  If they're
