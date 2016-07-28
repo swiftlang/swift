@@ -1062,6 +1062,11 @@ public struct ${Self}
 % end
   }
 % end
+
+  @available(*, unavailable, message: "Use initializers instead")
+  public func to${U}IntMax() -> ${U}IntMax {
+    fatalError("Unavailable function")
+  }
 }
 %# end of concrete type: ${Self}
 
@@ -1218,3 +1223,25 @@ public func ${x.operator}= <
   lhs = lhs.${x.name}(rhs)
 }
 % end
+
+
+@available(*, unavailable, message: "Use Arithmetic protocol instead")
+public typealias _IntegerArithmetic = Arithmetic
+
+@available(*, unavailable, message: "Use Arithmetic protocol instead")
+public typealias IntegerArithmetic = Arithmetic
+
+@available(*, unavailable, message: "Use Arithmetic protocol instead")
+public typealias SignedNumber = SignedArithmetic
+
+@available(*, unavailable, message: "Use SignedArithmetic protocol instead")
+public typealias AbsoluteValuable = SignedArithmetic
+
+@available(*, unavailable, message: "Use BinaryInteger protocol instead")
+public typealias _Integer = BinaryInteger
+
+@available(*, unavailable, message: "Use BinaryInteger protocol instead")
+public typealias Integer = BinaryInteger
+
+@available(*, unavailable, message: "Use SignedInteger protocol instead")
+public typealias _SignedInteger = SignedInteger
