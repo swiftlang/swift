@@ -220,3 +220,6 @@ _TF21$__lldb_module_for_E0au3$E0Ps5Error_ ---> $__lldb_module_for_E0.$E0.unsafeM
 _TMps10Comparable ---> protocol descriptor for Swift.Comparable
 _TFC4testP33_83378C430F65473055F1BD53F3ADCDB71C5doFoofT_T_ ---> test.(C in _83378C430F65473055F1BD53F3ADCDB7).doFoo () -> ()
 _TFVV15nested_generics5Lunch6DinnerCfT11firstCoursex12secondCourseGSqqd___9leftoversx14transformationFxqd___GS1_x_qd___ ---> nested_generics.Lunch.Dinner.init (firstCourse : A, secondCourse : A1?, leftovers : A, transformation : (A) -> A1) -> nested_generics.Lunch<A>.Dinner<A1>
+_TFVFC15nested_generics7HotDogs11applyRelishFT_T_L_6RelishCfT8materialx_GS1_x_ ---> nested_generics.HotDogs.(applyRelish () -> ()).(Relish #1).init (material : A) -> nested_generics.HotDogs.(applyRelish () -> ()).(Relish #1)<A>
+_TFVFE15nested_genericsSS3fooFT_T_L_6CheeseCfT8materialx_GS0_x_ ---> (extension in nested_generics):Swift.String.(foo () -> ()).(Cheese #1).init (material : A) -> (extension in nested_generics):Swift.String.(foo () -> ()).(Cheese #1)<A>
+
