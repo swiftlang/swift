@@ -12,18 +12,19 @@
 
 /// Returns the lesser of `x` and `y`.
 ///
-/// If `x == y`, returns `x`.
+/// - Important: If `x == y`, this function returns `x`.
 public func min<T : Comparable>(_ x: T, _ y: T) -> T {
-  // In case `x == y` we pick `x`.
+  // In case `x == y`, we pick `x`.
   // This preserves any pre-existing order in case `T` has identity,
-  // which is important for e.g. the stability of sorting algorithms.
+  // which e.g. could be important for the stability of sorting algorithms.
   // `(min(x, y), max(x, y))` should return `(x, y)` in case `x == y`.
   return y < x ? y : x
 }
 
 /// Returns the least argument passed.
 ///
-/// If there are multiple equal least arguments, returns the first one.
+/// - Important: If there are multiple equal least arguments,
+///   this function returns the first one.
 public func min<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var minValue = min(min(x, y), z)
   // In case `value == minValue`, we pick `minValue`. See min(_:_:).
@@ -35,7 +36,7 @@ public func min<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 
 /// Returns the greater of `x` and `y`.
 ///
-/// If `x == y`, returns `y`.
+/// - Important: If `x == y`, this function returns `y`.
 public func max<T : Comparable>(_ x: T, _ y: T) -> T {
   // In case `x == y`, we pick `y`. See min(_:_:).
   return y >= x ? y : x
@@ -43,10 +44,11 @@ public func max<T : Comparable>(_ x: T, _ y: T) -> T {
 
 /// Returns the greatest argument passed.
 ///
-/// If there are multiple equal greatest arguments, returns the last one.
+/// - Important: If there are multiple equal greatest arguments,
+///   this function returns the last one.
 public func max<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var maxValue = max(max(x, y), z)
-  // In case `value == maxValue`, we pick `value`. See min(_:_:).
+  // In case `value == maxValue`, we pick `value`. See max(_:_:).
   for value in rest where value >= maxValue {
     maxValue = value
   }
@@ -63,7 +65,7 @@ public func max<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 ///     iterator.next() // (1, "bar")
 ///     iterator.next() // nil
 ///
-/// - Note: Idiomatic usage is to call `enumerate` instead of
+/// - Note: Idiomatic usage is to call `enumerated()` instead of
 ///   constructing an `EnumerateIterator` directly.
 public struct EnumeratedIterator<
   Base : IteratorProtocol
@@ -71,7 +73,7 @@ public struct EnumeratedIterator<
   internal var _base: Base
   internal var _count: Int
 
-  /// Construct from a `Base` iterator.
+  /// Initialize from a `Base` iterator.
   internal init(_base: Base) {
     self._base = _base
     self._count = 0
@@ -83,33 +85,33 @@ public struct EnumeratedIterator<
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
-  /// Once `nil` has been returned, all subsequent calls return `nil`.
+  /// - Note: Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
-    guard let b = _base.next() else { return nil }
+    guard let nextElement = _base.next() else { return nil }
     defer { _count += 1 }
-    return (offset: _count, element: b)
+    return (offset: _count, element: nextElement)
   }
 }
 
-/// The type of the `enumerated()` property.
+/// The type returned by `Sequence`'s `enumerated()` method.
 ///
 /// `EnumeratedSequence` is a sequence of pairs (*n*, *x*), where *n*s
 /// are consecutive `Int`s starting at zero, and *x*s are the elements
 /// of a `Base` `Sequence`:
 ///
-///     var s = ["foo", "bar"].enumerated()
-///     Array(s) // [(0, "foo"), (1, "bar")]
+///     var enumeratedSeq = ["foo", "bar"].enumerated()
+///     Array(enumeratedSeq) // [(0, "foo"), (1, "bar")]
 public struct EnumeratedSequence<Base : Sequence> : Sequence {
   internal var _base: Base
 
-  /// Construct from a `Base` sequence.
+  /// Initialize from a `Base` sequence.
   internal init(_base: Base) {
     self._base = _base
   }
 
   /// Returns an iterator over the elements of this sequence.
   ///
-  /// - Complexity: O(1).
+  /// - Complexity: O(1)
   public func makeIterator() -> EnumeratedIterator<Base.Iterator> {
     return EnumeratedIterator(_base: _base.makeIterator())
   }
@@ -119,17 +121,19 @@ public struct EnumeratedSequence<Base : Sequence> : Sequence {
 public struct EnumerateGenerator<Base : IteratorProtocol> { }
 
 @available(*, unavailable, renamed: "EnumeratedSequence")
-public struct EnumerateSequence<Base : Sequence> {}
+public struct EnumerateSequence<Base : Sequence> { }
 
 extension EnumeratedIterator {
-  @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
+  // Calling `makeIterator()` on an `EnumeratedSequence` is currently
+  // the only public way to obtain an `EnumeratedIterator`.
+  @available(*, unavailable, message: "Construct an `EnumeratedSequence` and call `makeIterator()` on it.")
   public init(_ base: Base) {
     Builtin.unreachable()
   }
 }
 
 extension EnumeratedSequence {
-  @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
+  @available(*, unavailable, message: "Use the 'enumerated()' method on the sequence.")
   public init(_ base: Base) {
     Builtin.unreachable()
   }
