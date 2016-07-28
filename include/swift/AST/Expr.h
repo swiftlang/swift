@@ -360,6 +360,14 @@ class alignas(8) Expr {
                   < (1 << NumCheckedCastKindBits),
                 "unable to fit a CheckedCastKind in the given number of bits");
 
+  class FunctionConversionExprBitfields {
+    friend class FunctionConversionExpr;
+    unsigned : NumImplicitConversionExprBits;
+    unsigned Flattening : 1;
+  };
+  enum { NumFunctionConversionExprBits = NumImplicitConversionExprBits + 1 };
+  static_assert(NumFunctionConversionExprBits <= 32, "fits in an unsigned");
+
   class CollectionUpcastConversionExprBitfields {
     friend class CollectionUpcastConversionExpr;
     unsigned : NumExprBits;
@@ -413,6 +421,7 @@ protected:
     ApplyExprBitfields ApplyExprBits;
     CallExprBitfields CallExprBits;
     CheckedCastExprBitfields CheckedCastExprBits;
+    FunctionConversionExprBitfields FunctionConversionExprBits;
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
     TupleShuffleExprBitfields TupleShuffleExprBits;
     ObjCSelectorExprBitfields ObjCSelectorExprBits;
@@ -2761,8 +2770,22 @@ public:
 class FunctionConversionExpr : public ImplicitConversionExpr {
 public:
   FunctionConversionExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::FunctionConversion, subExpr, type) {}
-  
+      : ImplicitConversionExpr(ExprKind::FunctionConversion, subExpr, type) {
+    FunctionConversionExprBits.Flattening = false;
+  }
+
+  /// Set whether this function conversion flattens an unapplied member
+  /// function.
+  void setFlattening() {
+    FunctionConversionExprBits.Flattening = true;
+  }
+
+  /// Returns whether this function conversion flattens an unapplied member
+  /// function.
+  bool isFlattening() const {
+    return FunctionConversionExprBits.Flattening;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FunctionConversion;
   }
