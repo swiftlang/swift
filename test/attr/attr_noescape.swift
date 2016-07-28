@@ -303,5 +303,5 @@ func noescapeT(f: @noescape () -> Bool) {} // ok
 func autoclosureD(@autoclosure f: () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure }}
 func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
 
-func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {}
+func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // expected-error {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}}
 func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure }}
