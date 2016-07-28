@@ -1738,7 +1738,8 @@ public:
   /// the given set of declarations.
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                      DeclNameLoc NameLoc, bool Implicit,
-                     bool isSpecialized = false);
+                     bool isSpecialized,
+                     FunctionRefKind functionRefKind);
   /// @}
 
   /// \brief Retrieve a specific, known protocol.

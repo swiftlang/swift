@@ -2619,6 +2619,10 @@ MemberLookupResult ConstraintSystem::
 performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
                     Type baseTy, ConstraintLocator *memberLocator,
                     bool includeInaccessibleMembers) {
+  // FIXME: FunctionRefKind::DoubleApply is a hack that maintains all
+  // label info.
+  FunctionRefKind functionRefKind = FunctionRefKind::DoubleApply;
+
   Type baseObjTy = baseTy->getRValueType();
 
   // Dig out the instance type and figure out what members of the instance type
@@ -2843,8 +2847,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         }
       }
       
-      result.addViable(OverloadChoice(baseTy, ctor,
-                                      /*isSpecialized=*/false, *this));
+      result.addViable(OverloadChoice(baseTy, ctor, /*isSpecialized=*/false,
+                                      functionRefKind));
     }
 
 
@@ -2887,7 +2891,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         return result.markErrorAlreadyDiagnosed();
       
       result.addViable(OverloadChoice(baseTy, candidate.first,
-                                      /*isSpecialized=*/false));
+                                      /*isSpecialized=*/false,
+                                      functionRefKind));
     }
     
     return result;
@@ -3000,13 +3005,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       assert(cand->getDeclContext()->isTypeContext() && "Dynamic lookup bug");
 
       // We found this declaration via dynamic lookup, record it as such.
-      result.addViable(OverloadChoice::getDeclViaDynamic(baseTy, cand));
+      result.addViable(OverloadChoice::getDeclViaDynamic(baseTy, cand,
+                                                         functionRefKind));
       return;
     }
 
     // If we have a bridged type, we found this declaration via bridging.
     if (isBridged) {
-      result.addViable(OverloadChoice::getDeclViaBridge(bridgedType, cand));
+      result.addViable(OverloadChoice::getDeclViaBridge(bridgedType, cand,
+                                                        functionRefKind));
       return;
     }
 
@@ -3017,11 +3024,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
         ->getInstanceType()
         ->getAnyOptionalObjectType());
-      result.addViable(OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy,
-                                                                   cand));
+      result.addViable(
+        OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
+                                                    functionRefKind));
     } else {
       result.addViable(OverloadChoice(ovlBaseTy, cand,
-                                      /*isSpecialized=*/false, *this));
+                                      /*isSpecialized=*/false,
+                                      functionRefKind));
     }
   };
 

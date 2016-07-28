@@ -942,18 +942,19 @@ matchWitness(TypeChecker &tc,
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfMemberReference(selfTy, witness,
-                                      /*isTypeReference=*/false,
-                                      /*isDynamicResult=*/false,
-                                      witnessLocator,
-                                      /*base=*/nullptr,
-                                      /*opener=*/nullptr);
+                                       /*isTypeReference=*/false,
+                                       /*isDynamicResult=*/false,
+                                       witnessLocator,
+                                       /*base=*/nullptr,
+                                       /*opener=*/nullptr);
     } else {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfReference(witness,
-                                /*isTypeReference=*/false,
-                                /*isDynamicResult=*/false,
-                                witnessLocator,
-                                /*base=*/nullptr);
+                                 /*isTypeReference=*/false,
+                                 /*isDynamicResult=*/false,
+                                 FunctionRefKind::DoubleApply,
+                                 witnessLocator,
+                                 /*base=*/nullptr);
     }
     openWitnessType = openWitnessType->getRValueType();
     

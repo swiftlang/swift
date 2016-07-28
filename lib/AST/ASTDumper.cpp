@@ -1689,6 +1689,7 @@ public:
       << " decl=";
     E->getDeclRef().dump(OS);
     OS << E->getAccessSemantics();
+    OS << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
     OS << " specialized=" << (E->isSpecialized()? "yes" : "no");
 
     for (auto TR : E->getGenericArgs()) {
@@ -1721,7 +1722,8 @@ public:
     printCommon(E, "overloaded_decl_ref_expr")
       << " name=" << E->getDecls()[0]->getName()
       << " #decls=" << E->getDecls().size()
-      << " specialized=" << (E->isSpecialized()? "yes" : "no");
+      << " specialized=" << (E->isSpecialized()? "yes" : "no")
+      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
 
     for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
@@ -1733,7 +1735,8 @@ public:
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     printCommon(E, "unresolved_decl_ref_expr")
       << " name=" << E->getName()
-      << " specialized=" << (E->isSpecialized()? "yes" : "no") << ')';
+      << " specialized=" << (E->isSpecialized()? "yes" : "no") << ')'
+      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
   }
   void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
     printCommon(E, "unresolved_specialize_expr") << '\n';

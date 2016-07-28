@@ -322,7 +322,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The number of type variables referenced by this constraint.
   ///
   /// The type variables themselves are tail-allocated.
-  unsigned NumTypeVariables : 12;
+  unsigned NumTypeVariables : 11;
 
   union {
     struct {

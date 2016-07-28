@@ -997,10 +997,12 @@ namespace {
 
     /// \brief Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
-    Type addMemberRefConstraints(Expr *expr, Expr *base, DeclName name) {
+    Type addMemberRefConstraints(Expr *expr, Expr *base, DeclName name,
+                                 FunctionRefKind functionRefKind) {
       // The base must have a member of the given name, such that accessing
       // that member through the base returns a value convertible to the type
       // of this expression.
+      // FIXME: use functionRefKind
       auto baseTy = base->getType();
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator(expr, ConstraintLocator::Member),
@@ -1012,7 +1014,8 @@ namespace {
 
     /// \brief Add constraints for a reference to a specific member of the given
     /// base type, and return the type of such a reference.
-    Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl) {
+    Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl,
+                                 FunctionRefKind functionRefKind) {
       // If we're referring to an invalid declaration, fail.
       if (!decl)
         return nullptr;
@@ -1025,7 +1028,8 @@ namespace {
         CS.getConstraintLocator(expr, ConstraintLocator::Member);
       auto tv = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
       
-      OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false, CS);
+      OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false,
+                           functionRefKind);
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator);
       return tv;
@@ -1115,7 +1119,7 @@ namespace {
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (decl) {
         OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false,
-                              CS);
+                              FunctionRefKind::SingleApply);
         CS.addBindOverloadConstraint(fnTy, choice, subscriptMemberLocator);
       } else {
         CS.addValueMemberConstraint(baseTy, Context.Id_subscript,
@@ -1314,7 +1318,8 @@ namespace {
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
       CS.resolveOverload(locator, tv,
                          OverloadChoice(Type(), E->getDecl(),
-                                        E->isSpecialized(), CS));
+                                        E->isSpecialized(),
+                                        E->getFunctionRefKind()));
       
       if (E->getDecl()->getType() &&
           !E->getDecl()->getType()->getAs<TypeVariableType>()) {
@@ -1379,7 +1384,7 @@ namespace {
 
         choices.push_back(OverloadChoice(Type(), decls[i],
                                          expr->isSpecialized(),
-                                         CS));
+                                         /*FIXME:*/FunctionRefKind::DoubleApply));
       }
 
       // If there are no valid overloads, give up.
@@ -1401,12 +1406,14 @@ namespace {
     
     Type visitMemberRefExpr(MemberRefExpr *expr) {
       return addMemberRefConstraints(expr, expr->getBase(),
-                                     expr->getMember().getDecl());
+                                     expr->getMember().getDecl(),
+                                     /*FIXME:*/FunctionRefKind::DoubleApply);
     }
     
     Type visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
       return addMemberRefConstraints(expr, expr->getBase(),
-                                     expr->getMember().getDecl());
+                                     expr->getMember().getDecl(),
+                                     /*FIXME:*/FunctionRefKind::DoubleApply);
     }
     
     virtual Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
@@ -1495,7 +1502,8 @@ namespace {
         return methodTy;
       }
 
-      return addMemberRefConstraints(expr, expr->getBase(), expr->getName());
+      return addMemberRefConstraints(expr, expr->getBase(), expr->getName(),
+                                     /*FIXME:*/FunctionRefKind::DoubleApply);
     }
     
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
@@ -1842,7 +1850,8 @@ namespace {
       ASTContext &context = CS.getASTContext();
       Identifier name
         = context.getIdentifier(llvm::utostr(expr->getFieldNumber()));
-      return addMemberRefConstraints(expr, expr->getBase(), name);
+      return addMemberRefConstraints(expr, expr->getBase(), name,
+                                     FunctionRefKind::Unapplied);
     }
 
     /// Give each parameter in a ClosureExpr a fresh type variable if parameter

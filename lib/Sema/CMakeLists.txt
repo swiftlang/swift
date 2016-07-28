@@ -20,7 +20,6 @@ add_swift_library(swiftSema STATIC
   IterativeTypeChecker.cpp
   MiscDiagnostics.cpp
   NameBinding.cpp
-  OverloadChoice.cpp
   PlaygroundTransform.cpp
   SourceLoader.cpp
   TypeCheckAttr.cpp

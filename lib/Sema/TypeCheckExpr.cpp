@@ -618,7 +618,8 @@ Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, DeclContext *UseDC,
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                 DeclContext *UseDC, DeclNameLoc NameLoc,
-                                bool Implicit, bool isSpecialized) {
+                                bool Implicit, bool isSpecialized,
+                                FunctionRefKind functionRefKind) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
@@ -631,8 +632,10 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   }
 
   Decls = Context.AllocateCopy(Decls);
-  auto result = new (Context) OverloadedDeclRefExpr(Decls, NameLoc, Implicit);
-  result->setSpecialized(isSpecialized);
+  auto result = new (Context) OverloadedDeclRefExpr(Decls, NameLoc, 
+                                                    isSpecialized,
+                                                    functionRefKind,
+                                                    Implicit);
   return result;
 }
 

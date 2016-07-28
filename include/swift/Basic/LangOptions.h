@@ -95,6 +95,9 @@ namespace swift {
     /// was not compiled with -enable-testing.
     bool EnableTestableAttrRequiresTestableModule = true;
 
+    /// Whether to implement SE-0111, the removal of argument labels in types.
+    bool SuppressArgumentLabelsInTypes = false;
+
     ///
     /// Flags for developers
     ///

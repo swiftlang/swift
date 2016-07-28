@@ -792,6 +792,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_testable_attr_requires_testable_module);
   }
 
+  Opts.SuppressArgumentLabelsInTypes |=
+    Args.hasArg(OPT_suppress_argument_labels_in_types);
+
   if (const Arg *A = Args.getLastArg(OPT_debug_constraints_attempt)) {
     unsigned attempt;
     if (StringRef(A->getValue()).getAsInteger(10, attempt)) {

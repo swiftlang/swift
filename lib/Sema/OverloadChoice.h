@@ -21,6 +21,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 
@@ -91,24 +92,38 @@ class OverloadChoice {
   /// overload choice kind shifted by 1 with the low bit set.
   uintptr_t DeclOrKind;
 
+  /// The kind of function reference.
+  /// FIXME: This needs two bits. Can we pack them somewhere?
+  FunctionRefKind TheFunctionRefKind;
+
 public:
   OverloadChoice()
-      : BaseAndBits(nullptr, 0), DeclOrKind() {}
+    : BaseAndBits(nullptr, 0), DeclOrKind(),
+      TheFunctionRefKind(FunctionRefKind::Unapplied) {}
 
-  OverloadChoice(
-      Type base, ValueDecl *value, bool isSpecialized, ConstraintSystem &CS);
+  OverloadChoice(Type base, ValueDecl *value, bool isSpecialized,
+                 FunctionRefKind functionRefKind)
+    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
+      TheFunctionRefKind(functionRefKind) {
+    assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
+           "Badly aligned decl");
+    
+    DeclOrKind = reinterpret_cast<uintptr_t>(value);
+  }
   
-  OverloadChoice(Type base, TypeDecl *type, bool isSpecialized)
-    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0) {
+  OverloadChoice(Type base, TypeDecl *type, bool isSpecialized,
+                 FunctionRefKind functionRefKind)
+    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
+      TheFunctionRefKind(functionRefKind) {
     assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0
            && "Badly aligned decl");
     DeclOrKind = reinterpret_cast<uintptr_t>(type) | 0x01;
   }
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
-    : BaseAndBits(base, 0),
-      DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x03)
-      {
+      : BaseAndBits(base, 0),
+        DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x03),
+        TheFunctionRefKind(FunctionRefKind::Unapplied) {
     assert(base && "Must have a base type for overload choice");
     assert(kind != OverloadChoiceKind::Decl &&
            kind != OverloadChoiceKind::DeclViaDynamic &&
@@ -119,40 +134,48 @@ public:
   }
 
   OverloadChoice(Type base, unsigned index)
-    : BaseAndBits(base, 0),
-      DeclOrKind(((uintptr_t)index
-                  + (uintptr_t)OverloadChoiceKind::TupleIndex) << 2
-                 | (uintptr_t)0x03) {
+      : BaseAndBits(base, 0),
+        DeclOrKind(((uintptr_t)index
+                    + (uintptr_t)OverloadChoiceKind::TupleIndex) << 2
+                    | (uintptr_t)0x03),
+        TheFunctionRefKind(FunctionRefKind::Unapplied) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
   }
 
   /// Retrieve an overload choice for a declaration that was found via
   /// dynamic lookup.
-  static OverloadChoice getDeclViaDynamic(Type base, ValueDecl *value) {
+  static OverloadChoice getDeclViaDynamic(Type base, ValueDecl *value,
+                                          FunctionRefKind functionRefKind) {
     OverloadChoice result;
     result.BaseAndBits.setPointer(base);
     result.DeclOrKind = reinterpret_cast<uintptr_t>(value) | 0x02;
+    result.TheFunctionRefKind = functionRefKind;
     return result;
   }
 
   /// Retrieve an overload choice for a declaration that was found via
   /// bridging to an Objective-C class.
-  static OverloadChoice getDeclViaBridge(Type base, ValueDecl *value) {
+  static OverloadChoice getDeclViaBridge(Type base, ValueDecl *value,
+                                         FunctionRefKind functionRefKind) {
     OverloadChoice result;
     result.BaseAndBits.setPointer(base);
     result.BaseAndBits.setInt(IsBridgedBit);
     result.DeclOrKind = reinterpret_cast<uintptr_t>(value);
+    result.TheFunctionRefKind = functionRefKind;
     return result;
   }
 
   /// Retrieve an overload choice for a declaration that was found
   /// by unwrapping an optional context type.
-  static OverloadChoice getDeclViaUnwrappedOptional(Type base,
-                                                    ValueDecl *value) {
+  static OverloadChoice getDeclViaUnwrappedOptional(
+      Type base,
+      ValueDecl *value,
+      FunctionRefKind functionRefKind) {
     OverloadChoice result;
     result.BaseAndBits.setPointer(base);
     result.BaseAndBits.setInt(IsUnwrappedOptionalBit);
     result.DeclOrKind = reinterpret_cast<uintptr_t>(value);
+    result.TheFunctionRefKind = functionRefKind;
     return result;
   }
 
@@ -224,6 +247,11 @@ public:
   /// \brief Retrieves an opaque choice that ignores the base type.
   void *getOpaqueChoiceSimple() const {
     return reinterpret_cast<void*>(DeclOrKind);
+  }
+
+  FunctionRefKind getFunctionRefKind() const {
+    assert(isDecl() && "only makes sense for declaration choices");
+    return TheFunctionRefKind;
   }
 };
 

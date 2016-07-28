@@ -1547,6 +1547,7 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openFunctionType(
       AnyFunctionType *funcType,
+      unsigned numArgumentLabelsToRemove,
       ConstraintLocatorBuilder locator,
       llvm::DenseMap<CanType, TypeVariableType *> &replacements,
       DeclContext *innerDC,
@@ -1605,6 +1606,7 @@ public:
                           ValueDecl *decl,
                           bool isTypeReference,
                           bool isSpecialized,
+                          FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr);
 

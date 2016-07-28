@@ -30,6 +30,19 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
+StringRef swift::getFunctionRefKindStr(FunctionRefKind refKind) {
+  switch (refKind) {
+  case FunctionRefKind::Unapplied:
+    return "unapplied";
+  case FunctionRefKind::SingleApply:
+    return "single";
+  case FunctionRefKind::DoubleApply:
+    return "double";
+  case FunctionRefKind::Compound:
+    return "compound";
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Expr methods.
 //===----------------------------------------------------------------------===//
