@@ -1179,6 +1179,7 @@ public func numericCast<T : BinaryInteger, U : BinaryInteger>(_ x: T) -> U {
   return U(x)
 }
 
+// FIXME(integers): switch to using `FixedWidthInteger.unsafeAdding`
 internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   return lhs + rhs
@@ -1187,6 +1188,7 @@ internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 #endif
 }
 
+// FIXME(integers): switch to using `FixedWidthInteger.unsafeSubtracting`
 internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   return lhs - rhs
@@ -1195,6 +1197,7 @@ internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 #endif
 }
 
+// FIXME(integers): switch to using `FixedWidthInteger.unsafeMultiplied(by:)`
 internal func _unsafeMultiply(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   return lhs * rhs
