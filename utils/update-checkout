@@ -38,7 +38,7 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
 
     print("--- Updating '" + repo_path + "' ---")
     with shell.pushd(repo_path, dry_run=False, echo=False):
-        shell.call(["git", "fetch"], echo=False)
+        shell.call(["git", "fetch"], echo=True)
 
         if should_clean:
             shell.call(['git', 'clean', '-fdx'],
@@ -119,10 +119,10 @@ def obtain_additional_swift_sources(
 
             if skip_history:
                 shell.call(['git', 'clone', '--recursive', '--depth', '1',
-                            remote, repo_name], echo=False)
+                            remote, repo_name], echo=True)
             else:
                 shell.call(['git', 'clone', '--recursive', remote,
-                            repo_name], echo=False)
+                            repo_name], echo=True)
             if scheme_name:
                 for v in config['branch-schemes'].values():
                     if scheme_name not in v['aliases']:
