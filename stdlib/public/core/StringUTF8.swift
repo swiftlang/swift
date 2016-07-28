@@ -383,35 +383,21 @@ extension String {
     return _core.elementWidth == 1 ? _core.startASCII : nil
   }
 
-  /// A contiguously stored null-terminated UTF-8 representation of
-  /// the string.
+  /// A contiguously stored null-terminated UTF-8 representation of the string.
   ///
-  /// To access the underlying memory, invoke
-  /// `withUnsafeBufferPointer` on the array.
+  /// To access the underlying memory, invoke `withUnsafeBufferPointer` on the
+  /// array.
   ///
   ///     let s = "Hello!"
-  ///     let bytes = s.nulTerminatedUTF8
+  ///     let bytes = s.utf8CString
   ///     print(bytes)
   ///     // Prints "[72, 101, 108, 108, 111, 33, 0]"
-  ///     
+  ///
   ///     bytes.withUnsafeBufferPointer { ptr in
-  ///         print(strlen(UnsafePointer(ptr.baseAddress!)))
+  ///         print(strlen(ptr.baseAddress!))
   ///     }
   ///     // Prints "6"
-  public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
-    var result = ContiguousArray<UTF8.CodeUnit>()
-    result.reserveCapacity(utf8.count + 1)
-    result += utf8
-    result.append(0)
-    return result
-  }
-
-  /// A contiguously stored null-terminated UTF-8 representation of
-  /// the string.
-  ///
-  /// This is a variation on nulTerminatedUTF8 that creates an array
-  /// of element type CChar for use with CString API's.
-  public var nulTerminatedUTF8CString: ContiguousArray<CChar> {
+  public var utf8CString: ContiguousArray<CChar> {
     var result = ContiguousArray<CChar>()
     result.reserveCapacity(utf8.count + 1)
     for c in utf8 {
@@ -428,6 +414,10 @@ extension String {
     if ptr != nil {
       return try body(UnsafeBufferPointer(start: ptr, count: _core.count))
     }
+    var nulTerminatedUTF8 = ContiguousArray<UTF8.CodeUnit>()
+    nulTerminatedUTF8.reserveCapacity(utf8.count + 1)
+    nulTerminatedUTF8 += utf8
+    nulTerminatedUTF8.append(0)
     return try nulTerminatedUTF8.withUnsafeBufferPointer(body)
   }
 
@@ -725,3 +715,14 @@ extension String.UTF8View : CustomPlaygroundQuickLookable {
   }
 }
 
+extension String {
+  @available(*, unavailable, message: "Please use String.utf8CString instead.")
+  public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "utf8CString")
+  public var nulTerminatedUTF8CString: ContiguousArray<CChar> {
+    Builtin.unreachable()
+  }
+}
