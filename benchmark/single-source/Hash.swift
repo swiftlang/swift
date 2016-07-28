@@ -96,7 +96,7 @@ class Hash {
     var Res = ""
     for _ in 0..<8 {
       Res = HexTbl[Int(In & 0xF)] + Res
-      In = In >> 4
+      In = In &>> 4
     }
     return Res
   }
@@ -106,9 +106,9 @@ class Hash {
     var In = In
     for i in 0..<4 {
       // Convert one byte each iteration.
-      Res[Index + 2*i] = HexTblFast[Int(In >> 4) & 0xF]
+      Res[Index + 2*i] = HexTblFast[Int(In &>> 4) & 0xF]
       Res[Index + 2*i + 1] = HexTblFast[Int(In & 0xF)]
-      In = In >> 8
+      In = In &>> 8
     }
   }
 
