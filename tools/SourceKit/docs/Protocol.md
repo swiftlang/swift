@@ -492,6 +492,86 @@ Welcome to SourceKit.  Type ':help' for assistance.
 }
 ```
 
+## Cursor Info
+
+SourceKit is capable of providing information about a specific symbol at a specific cursor, or offset, position in a document.
+
+To gather documentation, SourceKit must be given either the name of a module (key.modulename), the path to a file (key.sourcefile), or some text (key.sourcetext). key.sourcefile is ignored when key.sourcetext is also provided, and both of those keys are ignored if key.modulename is provided.
+
+### Request
+
+```
+{
+	<key.request>:            (UID)     <source.request.cursorinfo>,
+	[opt] <key.sourcetext>:   (string)  // Source contents.
+	[opt] <key.sourcefile>:   (string)  // Absolute path to the file.
+	                                    // **Require**: key.sourcetext or key.sourcefile
+	[opt] <key.offset>:       (int64)   // Byte offset of code point inside the source contents.
+	[opt] <key.usr>:          (string)  // USR string for the entity.
+	                                    // **Require**: key.offset or key.usr
+	[opt] <key.compilerargs>: [string*] // Array of zero or more strings for the compiler arguments,
+                                        // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
+                                        // these must include the path to that file.
+}
+```
+
+### Response
+
+```
+{
+    <key.kind>:                  (UID)    // UID for the declaration or reference kind (function, class, etc.).
+    <key.name>:                  (string) // Displayed name for the token.
+    <key.usr>:                   (string) // USR string for the token.
+    <key.filepath>:              (string) // Path to the file.
+    <key.offset>:                (int64)  // Byte offset of the token inside the souce contents.
+    <key.length>:                (ist64)  // Length of the token.
+    <key.typename>:              (string) // Text describing the type of the result.
+    <key.annotated_decl>:        (string) // XML representing how the token was declared.
+    <key.fully_annotated_decl>:  (string) // XML representing the token.
+    [opt] <key.doc.full_as_xml>: (string) // XML representing the token and its documentation.
+    <key.typeusr>:               (string) // USR string for the type.
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=cursor -offset=<offset> <file> [-- <compiler args>]
+$ sourcekitd-test -req=cursor -pos=<line>:<column> <file> [-- <compiler args>]
+```
+
+For example, using a document containing:
+
+```
+struct Foo {
+    let bar: String
+}
+```
+
+To get the information about the type `Foo` you would make one of the following requests:
+
+```
+$ sourcekitd-test -req=cursor -offset=7 /path/to/file.swift -- /path/to/file.swift
+$ sourcekitd-test -req=cursor -pos=1:8 /path/to/file.swift -- /path/to/file.swift
+```
+
+Note that when using `sourcekitd-test`, the output is output in an ad hoc text format, not JSON.
+
+You could also issue the following request in the `sourcekitd-repl`, which produces JSON:
+
+```
+$ sourcekitd-repl
+Welcome to SourceKit.  Type ':help' for assistance.
+(SourceKit) {
+  key.request: source.request.cursorinfo,
+  key.sourcefile: "/path/to/file.swift",
+  key.offset: 7,
+  key.compilerargs: [ "/path/to/file.swift" ]
+}
+```
+
+
+
 # UIDs
 
 ## Keys
@@ -511,3 +591,7 @@ Welcome to SourceKit.  Type ':help' for assistance.
 - `key.usr`
 - `key.version_major`
 - `key.version_minor`
+- `key.annotated_decl`
+- `key.fully_annotated_decl`
+- `key.doc.full_as_xml`
+- `key.typeusr`
