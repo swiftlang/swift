@@ -919,7 +919,6 @@ public struct ${Self}
 
   @_transparent
   public var leadingZeros: Int {
-    fatalError()
     return Int(
       ${Self}(
         Builtin.int_ctlz_Int${bits}(self._value, false._value)
@@ -977,9 +976,6 @@ public struct ${Self}
 %     dbits = bits*2
   public static func doubleWidthMultiply(_ self_: ${Self}, _ other: ${Self})
     -> (high: ${Self}, low: ${Self}.Magnitude) {
-%       if bits > 64:
-    fatalError("${bits}-bit integer multiplication is not supported")
-%       else:
     let lhs = Builtin.${z}ext_Int${bits}_Int${dbits}(self_._value)
     let rhs = Builtin.${z}ext_Int${bits}_Int${dbits}(other._value)
 
@@ -990,7 +986,6 @@ public struct ${Self}
       Builtin.zextOrBitCast_Int8_Int${dbits}(shift._value))
     let high = ${Self}(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(shifted))
     return (high: high, low: low)
-%       end
   }
 
 %  if bits > 8:
