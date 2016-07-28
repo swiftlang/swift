@@ -2220,7 +2220,8 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   
   MemberLookupResult result =
     CS->performMemberLookup(constraint->getKind(), constraint->getMember(),
-                            baseTy, constraint->getLocator(),
+                            baseTy, constraint->getFunctionRefKind(),
+                            constraint->getLocator(),
                             /*includeInaccessibleMembers*/true);
 
   switch (result.OverallResult) {
@@ -4535,7 +4536,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   
   MemberLookupResult result =
     CS->performMemberLookup(ConstraintKind::ValueMember, subscriptName,
-                            baseType, locator,
+                            baseType, FunctionRefKind::DoubleApply, locator,
                             /*includeInaccessibleMembers*/true);
 
   
@@ -5716,7 +5717,9 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   MemberLookupResult result =
     CS->performMemberLookup(memberConstraint->getKind(),
                             memberConstraint->getMember(),
-                            baseObjTy, memberConstraint->getLocator(),
+                            baseObjTy,
+                            memberConstraint->getFunctionRefKind(),
+                            memberConstraint->getLocator(),
                             /*includeInaccessibleMembers*/true);
 
   switch (result.OverallResult) {

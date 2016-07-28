@@ -406,7 +406,8 @@ ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar,
     auto memberTypeVar = createTypeVariable(loc, options);
     addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
                                      baseTypeVar, memberTypeVar, 
-                                     assocType->getName(), loc));
+                                     assocType->getName(), 
+                                     FunctionRefKind::Compound, loc));
     return memberTypeVar;
   });
 }
@@ -441,7 +442,9 @@ namespace {
                                                      TVO_PrefersSubtypeBinding);
           CS.addConstraint(Constraint::create(CS, ConstraintKind::TypeMember,
                                               baseTypeVar, memberTypeVar,
-                                              member->getName(), locator));
+                                              member->getName(),
+                                              FunctionRefKind::Compound,
+                                              locator));
           return memberTypeVar;
         }
                                 
@@ -472,7 +475,9 @@ namespace {
         // Bind the member's type variable as a type member of the base.
         CS.addConstraint(Constraint::create(CS, ConstraintKind::TypeMember,
                                             baseTypeVar, memberTypeVar, 
-                                            member->getName(), locator));
+                                            member->getName(),
+                                            FunctionRefKind::Compound,
+                                            locator));
 
         if (!archetype) {
           // If the nested type is not an archetype (because it was constrained
@@ -1176,12 +1181,10 @@ ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value,
     bool isTypeReference,
     bool isDynamicResult,
+    FunctionRefKind functionRefKind,
     ConstraintLocatorBuilder locator,
     const DeclRefExpr *base,
     llvm::DenseMap<CanType, TypeVariableType *> *replacementsPtr) {
-  // FIXME: Should receive the function reference kind as a parameter.
-  FunctionRefKind functionRefKind = FunctionRefKind::DoubleApply;
-
   // Figure out the instance type used for the base.
   TypeVariableType *baseTypeVar = nullptr;
   Type baseObjTy = getFixedTypeRecursive(baseTy, baseTypeVar, 
@@ -1253,11 +1256,12 @@ ConstraintSystem::getTypeOfMemberReference(
   auto isClassBoundExistential = false;
   llvm::DenseMap<CanType, TypeVariableType *> localReplacements;
   auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
+  bool isCurriedInstanceReference = value->isInstanceMember() && !isInstance;
+  unsigned numRemovedArgumentLabels =
+    getNumRemovedArgumentLabels(TC.Context, value, isCurriedInstanceReference,
+                                functionRefKind);
+
   if (auto genericFn = value->getInterfaceType()->getAs<GenericFunctionType>()){
-    bool isCurriedInstanceReference = value->isInstanceMember() && !isInstance;
-    unsigned numRemovedArgumentLabels =
-      getNumRemovedArgumentLabels(TC.Context, value, isCurriedInstanceReference,
-                                  functionRefKind);
     openedType = openFunctionType(genericFn, numRemovedArgumentLabels,
                                   locator, replacements, innerDC, outerDC,
                                   /*skipProtocolSelfConstraint=*/true);
@@ -1301,6 +1305,9 @@ ConstraintSystem::getTypeOfMemberReference(
     } else {
       selfTy = outerDC->getDeclaredTypeOfContext();
     }
+
+    // Remove argument labels, if needed.
+    openedType = removeArgumentLabels(openedType, numRemovedArgumentLabels);
 
     // If we have a type reference, look through the metatype.
     if (isTypeReference)
@@ -1509,6 +1516,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       std::tie(openedFullType, refType)
         = getTypeOfMemberReference(choice.getBaseType(), choice.getDecl(),
                                    isTypeReference, isDynamicResult,
+                                   choice.getFunctionRefKind(),
                                    locator, base, nullptr);
     } else {
       std::tie(openedFullType, refType)

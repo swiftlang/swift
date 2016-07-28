@@ -1860,7 +1860,8 @@ public:
   }
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     printCommon(E, "unresolved_dot_expr")
-      << " field '" << E->getName() << "'";
+      << " field '" << E->getName() << "'"
+      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
     if (E->getBase()) {
       OS << '\n';
       printRec(E->getBase());

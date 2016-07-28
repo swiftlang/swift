@@ -205,6 +205,14 @@ class alignas(8) Expr {
   enum { NumTupleExprBits = NumExprBits + 3 };
   static_assert(NumTupleExprBits <= 32, "fits in an unsigned");
 
+  class UnresolvedDotExprBitfields {
+    friend class UnresolvedDotExpr;
+    unsigned : NumExprBits;
+    unsigned FunctionRefKind : 2;
+  };
+  enum { NumUnresolvedDotExprExprBits = NumExprBits + 2 };
+  static_assert(NumUnresolvedDotExprExprBits <= 32, "fits in an unsigned");
+
   class SubscriptExprBitfields {
     friend class SubscriptExpr;
     unsigned : NumExprBits;
@@ -254,17 +262,17 @@ class alignas(8) Expr {
   class OverloadSetRefExprBitfields {
     friend class OverloadSetRefExpr;
     unsigned : NumExprBits;
+    unsigned FunctionRefKind : 2;
   };
-  enum { NumOverloadSetRefExprBits = NumExprBits };
+  enum { NumOverloadSetRefExprBits = NumExprBits + 2};
   static_assert(NumOverloadSetRefExprBits <= 32, "fits in an unsigned");
 
   class OverloadedDeclRefExprBitfields {
     friend class OverloadedDeclRefExpr;
     unsigned : NumOverloadSetRefExprBits;
     unsigned IsSpecialized : 1;
-    unsigned FunctionRefKind : 2;
   };
-  enum { NumOverloadedDeclRefExprBits = NumOverloadSetRefExprBits + 3 };
+  enum { NumOverloadedDeclRefExprBits = NumOverloadSetRefExprBits + 1 };
   static_assert(NumOverloadedDeclRefExprBits <= 32, "fits in an unsigned");
 
   class BooleanLiteralExprBitfields {
@@ -422,6 +430,7 @@ protected:
     UnresolvedDeclRefExprBitfields UnresolvedDeclRefExprBits;
     TupleExprBitfields TupleExprBits;
     MemberRefExprBitfields MemberRefExprBits;
+    UnresolvedDotExprBitfields UnresolvedDotExprBits;
     SubscriptExprBitfields SubscriptExprBits;
     DynamicSubscriptExprBitfields DynamicSubscriptExprBits;
     UnresolvedMemberExprBitfields UnresolvedMemberExprBits;
@@ -1400,9 +1409,12 @@ class OverloadSetRefExpr : public Expr {
   ArrayRef<ValueDecl*> Decls;
 
 protected:
-  OverloadSetRefExpr(ExprKind Kind, ArrayRef<ValueDecl*> decls, bool Implicit,
-                     Type Ty)
-    : Expr(Kind, Implicit, Ty), Decls(decls) {}
+  OverloadSetRefExpr(ExprKind Kind, ArrayRef<ValueDecl*> decls,
+                     FunctionRefKind functionRefKind, bool Implicit, Type Ty)
+      : Expr(Kind, Implicit, Ty), Decls(decls) {
+    OverloadSetRefExprBits.FunctionRefKind =
+      static_cast<unsigned>(functionRefKind);
+  }
 
 public:
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
@@ -1415,6 +1427,17 @@ public:
   /// hasBaseObject - Determine whether this overloaded expression has a
   /// concrete base object (which is not a metatype).
   bool hasBaseObject() const;
+
+  /// Retrieve the kind of function reference.
+  FunctionRefKind getFunctionRefKind() const {
+    return static_cast<FunctionRefKind>(
+             OverloadSetRefExprBits.FunctionRefKind);
+  }
+
+  /// Set the kind of function reference.
+  void setFunctionRefKind(FunctionRefKind refKind) {
+    OverloadSetRefExprBits.FunctionRefKind = static_cast<unsigned>(refKind);
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_OverloadSetRefExpr &&
@@ -1432,11 +1455,10 @@ public:
                         bool isSpecialized,
                         FunctionRefKind functionRefKind,
                         bool Implicit, Type Ty = Type())
-      : OverloadSetRefExpr(ExprKind::OverloadedDeclRef, Decls, Implicit, Ty),
+      : OverloadSetRefExpr(ExprKind::OverloadedDeclRef, Decls, functionRefKind,
+                           Implicit, Ty),
         Loc(Loc) {
     OverloadedDeclRefExprBits.IsSpecialized = isSpecialized;
-    OverloadedDeclRefExprBits.FunctionRefKind =
-      static_cast<unsigned>(functionRefKind);
   }
   
   DeclNameLoc getNameLoc() const { return Loc; }
@@ -1447,17 +1469,6 @@ public:
   /// specialized by <...>.
   bool isSpecialized() const {
     return OverloadedDeclRefExprBits.IsSpecialized;
-  }
-
-  /// Retrieve the kind of function reference.
-  FunctionRefKind getFunctionRefKind() const {
-    return static_cast<FunctionRefKind>(
-             OverloadedDeclRefExprBits.FunctionRefKind);
-  }
-
-  /// Set the kind of function reference.
-  void setFunctionRefKind(FunctionRefKind refKind) {
-    OverloadedDeclRefExprBits.FunctionRefKind = static_cast<unsigned>(refKind);
   }
 
   static bool classof(const Expr *E) {
@@ -2317,8 +2328,12 @@ class UnresolvedDotExpr : public Expr {
 public:
   UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc, DeclName name,
                     DeclNameLoc nameloc, bool Implicit)
-  : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr), DotLoc(dotloc),
-    NameLoc(nameloc), Name(name) {}
+    : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr), DotLoc(dotloc),
+      NameLoc(nameloc), Name(name) {
+    UnresolvedDotExprBits.FunctionRefKind =
+      static_cast<unsigned>(NameLoc.isCompound() ? FunctionRefKind::Compound
+                                                 : FunctionRefKind::Unapplied);
+  }
   
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
 
@@ -2336,6 +2351,16 @@ public:
 
   DeclName getName() const { return Name; }
   DeclNameLoc getNameLoc() const { return NameLoc; }
+
+  /// Retrieve the kind of function reference.
+  FunctionRefKind getFunctionRefKind() const {
+    return static_cast<FunctionRefKind>(UnresolvedDotExprBits.FunctionRefKind);
+  }
+
+  /// Set the kind of function reference.
+  void setFunctionRefKind(FunctionRefKind refKind) {
+    UnresolvedDotExprBits.FunctionRefKind = static_cast<unsigned>(refKind);
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedDot;

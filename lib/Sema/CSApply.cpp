@@ -6787,6 +6787,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
     = cs.getTypeOfMemberReference(base->getType(), witness,
                                   /*isTypeReference=*/false,
                                   /*isDynamicResult=*/false,
+                                  FunctionRefKind::DoubleApply,
                                   dotLocator);
 
   // Form the call argument.

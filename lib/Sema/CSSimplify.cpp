@@ -2122,10 +2122,9 @@ commit_to_conversions:
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyConstructionConstraint(Type valueType, 
-                                                 FunctionType *fnType,
-                                                 unsigned flags,
-                                                 ConstraintLocator *locator) {
+ConstraintSystem::simplifyConstructionConstraint(
+    Type valueType, FunctionType *fnType, unsigned flags,
+    FunctionRefKind functionRefKind, ConstraintLocator *locator) {
   // Desugar the value type.
   auto desugarValueType = valueType->getDesugaredType();
 
@@ -2231,7 +2230,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
   addValueMemberConstraint(MetatypeType::get(valueType, TC.Context), name,
-                           FunctionType::get(tv, resultType),
+                           FunctionType::get(tv, resultType), functionRefKind,
                            getConstraintLocator(
                              fnLocator, 
                              ConstraintLocator::ConstructorMember));
@@ -2617,12 +2616,9 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// referenced.
 MemberLookupResult ConstraintSystem::
 performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
-                    Type baseTy, ConstraintLocator *memberLocator,
+                    Type baseTy, FunctionRefKind functionRefKind,
+                    ConstraintLocator *memberLocator,
                     bool includeInaccessibleMembers) {
-  // FIXME: FunctionRefKind::DoubleApply is a hack that maintains all
-  // label info.
-  FunctionRefKind functionRefKind = FunctionRefKind::DoubleApply;
-
   Type baseObjTy = baseTy->getRValueType();
 
   // Dig out the instance type and figure out what members of the instance type
@@ -3139,7 +3135,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   MemberLookupResult result =
     performMemberLookup(constraint.getKind(), constraint.getMember(),
-                        baseTy, constraint.getLocator(),
+                        baseTy, constraint.getFunctionRefKind(),
+                        constraint.getLocator(),
                         /*includeInaccessibleMembers*/false);
   
   Type memberTy = constraint.getSecondType();
@@ -3192,6 +3189,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                                        baseObjTy->getOptionalObjectType(),
                                        constraint.getSecondType(),
                                        constraint.getMember(),
+                                       constraint.getFunctionRefKind(),
                                        constraint.getLocator()));
       return SolutionKind::Solved;
     }
@@ -3224,6 +3222,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
                              constraint.getMember(),
                              constraint.getSecondType(),
+                             constraint.getFunctionRefKind(),
                              constraint.getLocator());
     return SolutionKind::Solved;
   }
@@ -3451,7 +3450,8 @@ retry:
   if (auto meta2 = dyn_cast<AnyMetatypeType>(desugar2)) {
     // Construct the instance from the input arguments.
     return simplifyConstructionConstraint(meta2->getInstanceType(), func1,
-                                          flags, 
+                                          flags,
+                                          FunctionRefKind::SingleApply,
                                           getConstraintLocator(outerLocator));
   }
 
@@ -3749,14 +3749,17 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                        btv2, TC.getInt8Type(DC),
                                        DeclName(),
+                                       FunctionRefKind::Compound,
                                        getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
                                         btv2, TC.getUInt8Type(DC),
                                         DeclName(),
+                                        FunctionRefKind::Compound,
                                         getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
                                         btv2, TC.Context.TheEmptyTupleType,
                                         DeclName(),
+                                        FunctionRefKind::Compound,
                                         getConstraintLocator(locator));
         
         Constraint *disjunctionChoices[] = {int8Con, uint8Con, voidCon};
@@ -4113,6 +4116,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
             Constraint::create(*this,
                                ConstraintKind::BridgedToObjectiveC,
                                arg, Type(), DeclName(),
+                               FunctionRefKind::Compound,
                                getConstraintLocator(
                                  locator.withPathElement(
                                    LocatorPathElt::getGenericArgument(
