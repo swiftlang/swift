@@ -581,7 +581,7 @@ extension FixedWidthInteger {
   /// Note: use this function to avoid the cost of overflow checking
   /// when you are sure that the operation won't overflow.
   @_transparent
-  public func unsafe${capitalize(x.name)}(other: Self) -> Self {
+  public func unsafe${capitalize(x.name)}(${x.firstArg} other: Self) -> Self {
     let (result, overflow) = self.${x.name}WithOverflow(${callLabel}other)
 
     if (overflow != .none) {
