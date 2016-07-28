@@ -168,6 +168,14 @@ extension SignedArithmetic {
   }
 }
 
+
+/// Returns the absolute value of `x`.
+@_transparent
+public func abs<T : SignedArithmetic>(_ x: T) -> T
+  where T.Magnitude == T {
+  return x.magnitude
+}
+
 //===----------------------------------------------------------------------===//
 //===--- Arithmetic operators ---------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -192,10 +200,9 @@ public prefix func - <T : SignedArithmetic>(x: T) -> T {
   return x.negated()
 }
 
-// FIXME(integers): remove this once SignedNumber is gone
-public prefix func - <T : SignedNumber>(x: T) -> T
-  where T : SignedArithmetic {
-  return x.negated()
+@_transparent
+public prefix func + <T : Arithmetic>(x: T) -> T {
+  return x
 }
 
 //===----------------------------------------------------------------------===//

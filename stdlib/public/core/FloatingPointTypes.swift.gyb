@@ -144,6 +144,7 @@ extension ${Self} : CustomDebugStringConvertible {
 
 extension ${Self}: BinaryFloatingPoint {
 
+  public typealias Magnitude = ${Self}
   public typealias Exponent = Int
   public typealias RawSignificand = ${RawSignificand}
 
@@ -750,7 +751,7 @@ extension ${Self} : Hashable {
   }
 }
 
-extension ${Self} : SignedArithmetic {
+extension ${Self} {
   @_transparent
   public var magnitude: ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(_value))

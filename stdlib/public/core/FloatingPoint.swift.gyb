@@ -27,8 +27,10 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 /// The BinaryFloatingPoint protocol refines these requirements, adds some
 /// additional operations that only make sense for a fixed radix, and also
 /// provides default implementations of some of the FloatingPoint APIs.
-public protocol FloatingPoint: Comparable, Arithmetic,
-  SignedNumber, Strideable {
+public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
+
+  // For the minimumMagnitude and maximumMagnitude methods
+  associatedtype Magnitude : Comparable = Self
 
   /// An integer type that can represent any written exponent.
   associatedtype Exponent: SignedInteger
@@ -540,11 +542,6 @@ public enum FloatingPointRoundingRule {
   case awayFromZero
 }
 
-@_transparent
-public prefix func + <T : FloatingPoint>(x: T) -> T {
-  return x
-}
-
 %{
 binary_arithmetic = [
 ('+', 'adding',      'add',      None),
@@ -798,7 +795,7 @@ extension FloatingPoint {
       //  Produce a quiet NaN matching platform arithmetic behavior.
       return left + right
     }
-    if abs(left) <= abs(right) || right.isNaN { return left }
+    if left.magnitude <= right.magnitude || right.isNaN { return left }
     return right
   }
   
@@ -807,7 +804,7 @@ extension FloatingPoint {
       //  Produce a quiet NaN matching platform arithmetic behavior.
       return left + right
     }
-    if abs(left) > abs(right) || right.isNaN { return left }
+    if left.magnitude > right.magnitude || right.isNaN { return left }
     return right
   }
 
@@ -905,12 +902,6 @@ extension BinaryFloatingPoint {
     return Other(self).totalOrder(with: other)
   }
   */
-}
-
-/// Returns the absolute value of `x`.
-@_transparent
-public func abs<T : FloatingPoint>(_ x: T) -> T where T.Magnitude == T {
-  return x.magnitude
 }
 
 @available(*, unavailable, renamed: "FloatingPoint")

@@ -246,7 +246,12 @@ extension Decimal : ExpressibleByIntegerLiteral {
 }
 
 extension Decimal : SignedArithmetic {
-  public var magnitude: Decimal { return self }
+  public var magnitude: Decimal {
+    return Decimal(
+      _exponent: self._exponent, _length: self._length,
+       _isNegative: 0, _isCompact: self._isCompact,
+       _reserved: 0, _mantissa: self._mantissa)
+  }
 
   // FIXME(integers): implement properly
   public init?<T : BinaryInteger>(exactly source: T) {
@@ -261,12 +266,6 @@ extension Decimal : Strideable {
 
     public func advanced(by n: Decimal) -> Decimal {
         return self + n
-    }
-}
-
-extension Decimal : AbsoluteValuable {
-    public static func abs(_ x: Decimal) -> Decimal {
-        return Decimal(_exponent: x._exponent, _length: x._length, _isNegative: 0, _isCompact: x._isCompact, _reserved: 0, _mantissa: x._mantissa)
     }
 }
 
