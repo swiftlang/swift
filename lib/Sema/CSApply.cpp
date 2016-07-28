@@ -1517,15 +1517,24 @@ namespace {
       auto valueSub = Substitution(valueType, {});
       auto bridgeAnythingRef = ConcreteDeclRef(tc.Context, bridgeAnything,
                                                valueSub);
+      auto valueParenTy = ParenType::get(tc.Context, value->getType());
       auto bridgeTy = tc.Context.getProtocol(KnownProtocolKind::AnyObject)
         ->getDeclaredType();
-      auto bridgeFnTy = FunctionType::get(valueType, bridgeTy);
+      auto bridgeFnTy = FunctionType::get(valueParenTy, bridgeTy);
+      // FIXME: Wrap in ParenExpr to prevent bogus "tuple passed as argument"
+      // errors.
+      auto valueParen = new (tc.Context) ParenExpr(SourceLoc(),
+                                                   value,
+                                                   SourceLoc(),
+                                                   /*trailing closure*/ false);
+      valueParen->setImplicit();
+      valueParen->setType(valueParenTy);
       auto fnRef = new (tc.Context) DeclRefExpr(bridgeAnythingRef,
                                                 DeclNameLoc(),
                                                 /*implicit*/ true,
                                                 AccessSemantics::Ordinary,
                                                 bridgeFnTy);
-      Expr *call = CallExpr::createImplicit(tc.Context, fnRef, value,
+      Expr *call = CallExpr::createImplicit(tc.Context, fnRef, valueParen,
                                             { Identifier() });
       call->setType(bridgeTy);
       return call;
