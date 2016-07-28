@@ -4112,6 +4112,10 @@ bool TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
   return false;
 }
 
+// FIXME: This is a bug-prone interface.
+/// Returns true if T conforms to Proto. For concrete conformances,
+/// Conformance is set to the lookup result, but for abstract
+/// conformances, Conformance is set to nullptr.
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                      DeclContext *DC,
                                      ConformanceCheckOptions options,
