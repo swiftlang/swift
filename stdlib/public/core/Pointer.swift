@@ -87,6 +87,6 @@ public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
   ToPointer : _Pointer
 >(_ str: String) -> (AnyObject?, ToPointer) {
-  let utf8 = Array(str.nulTerminatedUTF8)
+  let utf8 = Array(str.utf8CString)
   return _convertConstArrayToPointerArgument(utf8)
 }

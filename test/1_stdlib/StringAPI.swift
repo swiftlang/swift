@@ -483,19 +483,17 @@ CStringTests.test("String.decodeCString") {
   }
 }
 
-CStringTests.test("String.nulTerminatedUTF8") {
+CStringTests.test("String.utf8CString") {
   do {
     let (cstr, dealloc) = getASCIICString()
     let str = String(cString: cstr)
-    expectEqualCString(cstr, str.nulTerminatedUTF8)
-    expectEqualCString(cstr, str.nulTerminatedUTF8CString)
+    expectEqualCString(cstr, str.utf8CString)
     dealloc()
   }
   do {
     let (cstr, dealloc) = getNonASCIICString()
     let str = String(cString: cstr)
-    expectEqualCString(cstr, str.nulTerminatedUTF8)
-    expectEqualCString(cstr, str.nulTerminatedUTF8CString)
+    expectEqualCString(cstr, str.utf8CString)
     dealloc()
   }
 }
