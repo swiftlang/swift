@@ -466,29 +466,31 @@ public func == <Header, Element>(
 // FIXME: when our calling convention changes to pass self at +0,
 // inout should be dropped from the arguments to these functions.
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with
-/// a single strong reference.
+/// Returns a Boolean value indicating whether the given object is a class
+/// instance known to have a single strong reference.
 ///
-/// * Does *not* modify `object`; the use of `inout` is an
-///   implementation artifact.
-/// * If `object` is an Objective-C class instance, returns `false`.
-/// * Weak references do not affect the result of this function.
-///
-/// Useful for implementing the copy-on-write optimization for the
-/// deep storage of value types:
+/// The `isUniquelyReferencedNonObjC(_:)` function is useful for implementating
+/// the copy-on-write optimization for the deep storage of value types:
 ///
 ///     mutating func modifyMe(_ arg: X) {
-///       if isUniquelyReferencedNonObjC(&myStorage) {
-///         myStorage.modifyInPlace(arg)
-///       }
-///       else {
-///         myStorage = self.createModified(myStorage, arg)
-///       }
+///         if isUniquelyReferencedNonObjC(&myStorage) {
+///             myStorage.modifyInPlace(arg)
+///         } else {
+///             myStorage = self.createModified(myStorage, arg)
+///         }
 ///     }
 ///
-/// This function is safe to use for `mutating` functions in
-/// multithreaded code because a false positive would imply that there
-/// is already a user-level data race on the value being mutated.
+/// Weak references do not affect the result of this function.
+///
+/// This function is safe to use for mutating functions in multithreaded code
+/// because a false positive implies that there is already a user-level data
+/// race on the value being mutated.
+///
+/// - Parameter object: An instance of a class. This function does *not* modify
+///   `object`; the use of `inout` is an implementation artifact.
+/// - Returns: `true` if `object` is a known to have a single strong reference;
+///   otherwise, `false`. If `object` is an Objective-C class instance, the
+///   return value is `false`.
 public func isUniquelyReferencedNonObjC<T : AnyObject>(_ object: inout T) -> Bool
 {
   return _isUnique(&object)
@@ -498,57 +500,61 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(_ object: inout
   return _isUniqueOrPinned(&object)
 }
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with a single
-/// strong reference.
+/// Returns a Boolean value indicating whether the given object is a class
+/// instance known to have a single strong reference.
 ///
-/// * Does *not* modify `object`; the use of `inout` is an
-///   implementation artifact.
-/// * Weak references do not affect the result of this function.
-///
-/// Useful for implementing the copy-on-write optimization for the
-/// deep storage of value types:
+/// The `isUniquelyReferenced(_:)` function is useful for implementating
+/// the copy-on-write optimization for the deep storage of value types:
 ///
 ///     mutating func modifyMe(_ arg: X) {
-///       if isUniquelyReferenced(&myStorage) {
-///         myStorage.modifyInPlace(arg)
-///       }
-///       else {
-///         myStorage = myStorage.createModified(arg)
-///       }
+///         if isUniquelyReferenced(&myStorage) {
+///             myStorage.modifyInPlace(arg)
+///         } else {
+///             myStorage = self.createModified(myStorage, arg)
+///         }
 ///     }
 ///
-/// This function is safe to use for `mutating` functions in
-/// multithreaded code because a false positive would imply that there
-/// is already a user-level data race on the value being mutated.
+/// Weak references do not affect the result of this function.
+///
+/// This function is safe to use for mutating functions in multithreaded code
+/// because a false positive implies that there is already a user-level data
+/// race on the value being mutated.
+///
+/// - Parameter object: An instance of a class. This function does *not* modify
+///   `object`; the use of `inout` is an implementation artifact.
+/// - Returns: `true` if `object` is a known to have a single strong reference;
+///   otherwise, `false`.
 public func isUniquelyReferenced<T : NonObjectiveCBase>(
   _ object: inout T
 ) -> Bool {
   return _isUnique(&object)
 }
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with
-/// a single strong reference.
+/// Returns a Boolean value indicating whether the given object is a class
+/// instance known to have a single strong reference.
 ///
-/// * Does *not* modify `object`; the use of `inout` is an
-///   implementation artifact.
-/// * If `object` is an Objective-C class instance, returns `false`.
-/// * Weak references do not affect the result of this function.
-///
-/// Useful for implementing the copy-on-write optimization for the
-/// deep storage of value types:
+/// The `isUniquelyReferencedNonObjC(_:)` function is useful for implementating
+/// the copy-on-write optimization for the deep storage of value types:
 ///
 ///     mutating func modifyMe(_ arg: X) {
-///       if isUniquelyReferencedNonObjC(&myStorage) {
-///         myStorage.modifyInPlace(arg)
-///       }
-///       else {
-///         myStorage = self.createModified(myStorage, arg)
-///       }
+///         if isUniquelyReferencedNonObjC(&myStorage) {
+///             myStorage.modifyInPlace(arg)
+///         } else {
+///             myStorage = self.createModified(myStorage, arg)
+///         }
 ///     }
 ///
-/// This function is safe to use for `mutating` functions in
-/// multithreaded code because a false positive would imply that there
-/// is already a user-level data race on the value being mutated.
+/// Weak references do not affect the result of this function.
+///
+/// This function is safe to use for mutating functions in multithreaded code
+/// because a false positive implies that there is already a user-level data
+/// race on the value being mutated.
+///
+/// - Parameter object: An instance of a class. This function does *not* modify
+///   `object`; the use of `inout` is an implementation artifact.
+/// - Returns: `true` if `object` is a known to have a single strong reference;
+///   otherwise, `false`. If `object` is `nil` or is an Objective-C class
+///   instance, the return value is `false`.
 public func isUniquelyReferencedNonObjC<T : AnyObject>(
   _ object: inout T?
 ) -> Bool {

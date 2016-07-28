@@ -547,7 +547,7 @@ public protocol ExpressibleByDictionaryLiteral {
   associatedtype Key
   /// The value type of a dictionary literal.
   associatedtype Value
-  /// Create an instance initialized with `elements`.
+  /// Creates an instance initialized with the given key-value pairs.
   init(dictionaryLiteral elements: (Key, Value)...)
 }
 

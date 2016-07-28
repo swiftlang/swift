@@ -56,7 +56,7 @@ extension Sequence {
   /// This example enumerates the characters of the string "Swift" and prints
   /// each character along with its place in the string.
   ///
-  ///     > for (n, c) in "Swift".characters.enumerated() {
+  ///     for (n, c) in "Swift".characters.enumerated() {
   ///         print("\(n): '\(c)'")
   ///     }
   ///     // Prints "0: 'S'"
@@ -64,6 +64,35 @@ extension Sequence {
   ///     // Prints "2: 'i'"
   ///     // Prints "3: 'f'"
   ///     // Prints "4: 't'"
+  ///
+  /// When enumerating a collection, the integer part of each pair is a counter
+  /// for the enumeration, not necessarily the index of the paired value.
+  /// These counters can only be used as indices in instances of zero-based,
+  /// integer-indexed collections, such as `Array` and `ContiguousArray`. For
+  /// other collections the counters may be out of range or of the wrong type
+  /// to use as an index. To iterate over the elements of collection with its
+  /// indices, use the `zip(_:_:)` function.
+  ///
+  /// This example iterates over the indices and elements of a set, building a
+  /// list of indices of names with five or fewer letters.
+  ///
+  ///     let names: Set = ["Sofia", "Camilla", "Martina", "Mateo", "Nicolás"]
+  ///     var shorterIndices: [SetIndex<String>] = []
+  ///     for (i, name) in zip(names.indices, names) {
+  ///         if name.characters.count <= 5 {
+  ///             shorterIndices.append(i)
+  ///         }
+  ///     }
+  ///
+  /// Now that the `shorterIndices` array holds the indices of the shorter
+  /// names in the `names` set, you can use those indices to access elements in
+  /// the set.
+  ///
+  ///     for i in shorterIndices {
+  ///         print(names[i])
+  ///     }
+  ///     // Prints "Sofia"
+  ///     // Prints "Mateo"
   ///
   /// - Returns: A sequence of pairs enumerating the sequence.
   public func enumerated() -> EnumeratedSequence<Self> {
@@ -214,28 +243,33 @@ ${equivalenceExplanation}
   ///   - areEquivalent: A predicate that returns `true` if its two arguments
   ///     are equivalent; otherwise, `false`.
   /// - Returns: `true` if the initial elements of the sequence are equivalent
-  ///   to the elements of `possiblePrefix`; otherwise, `false`. Returns
-  ///   `true` if `possiblePrefix` has no elements.
+  ///   to the elements of `possiblePrefix`; otherwise, `false`. If
+  ///   `possiblePrefix` has no elements, the return value is `true`.
   ///
   /// - SeeAlso: `starts(with:)`
 %   else:
   /// Returns a Boolean value indicating whether the initial elements of the
   /// sequence are the same as the elements in another sequence.
   ///
-  /// For example:
+  /// This example tests whether one countable range begins with the elements
+  /// of another countable range.
   ///
   ///     let a = 1...3
   ///     let b = 1...10
   ///
   ///     print(b.starts(with: a))
   ///     // Prints "true"
+  ///
+  /// Passing an sequence with no elements or an empty collection as
+  /// `possiblePrefix` always results in `true`.
+  ///
   ///     print(b.starts(with: []))
   ///     // Prints "true"
   ///
   /// - Parameter possiblePrefix: A sequence to compare to this sequence.
   /// - Returns: `true` if the initial elements of the sequence are the same as
-  ///   the elements of `possiblePrefix`; otherwise, `false`. Returns `true`
-  ///   if `possiblePrefix` has no elements.
+  ///   the elements of `possiblePrefix`; otherwise, `false`. If
+  ///   `possiblePrefix` has no elements, the return value is `true`.
   ///
   /// - SeeAlso: `starts(with:by:)`
 %   end
@@ -299,7 +333,8 @@ ${equivalenceExplanation}
   ///
   /// At least one of the sequences must be finite.
   ///
-  /// For example:
+  /// This example tests whether one countable range shares the same elements
+  /// as another countable range and as an array with the same elements.
   ///
   ///     let a = 1...3
   ///     let b = 1...10
@@ -380,7 +415,8 @@ ${orderingExplanation}
   /// sequence in a lexicographical ("dictionary") ordering, using the
   /// less-than operator (`<`) to compare elements.
   ///
-  /// For example:
+  /// This example uses the `lexicographicallyPrecedes` method to test which
+  /// array of integers comes first in a lexicographical ordering.
   ///
   ///     let a = [1, 2, 2, 2]
   ///     let b = [1, 2, 3, 4]
@@ -551,7 +587,7 @@ extension Sequence {
   ///     value and an element of the sequence into a new accumulating
   ///     value, to be used in the next call of the
   ///     `nextPartialResult` closure or returned to the caller.
-    /// - Returns: The final accumulated value.
+  /// - Returns: The final accumulated value.
   public func reduce<Result>(
     _ initialResult: Result,
     _ nextPartialResult:

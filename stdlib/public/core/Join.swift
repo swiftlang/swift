@@ -18,7 +18,7 @@ internal enum _JoinIteratorState {
 }
 
 /// An iterator that presents the elements of the sequences traversed
-/// by `Base`, concatenated using a given separator.
+/// by a base iterator, concatenated using a given separator.
 public struct JoinedIterator<Base : IteratorProtocol> : IteratorProtocol
   where Base.Element : Sequence {
 
@@ -86,7 +86,7 @@ public struct JoinedIterator<Base : IteratorProtocol> : IteratorProtocol
   internal var _state: _JoinIteratorState = .start
 }
 
-/// A sequence that presents the elements of the `Base` sequences
+/// A sequence that presents the elements of a base sequence of sequences
 /// concatenated using a given separator.
 public struct JoinedSequence<Base : Sequence> : Sequence
   where Base.Iterator.Element : Sequence {

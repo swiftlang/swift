@@ -60,11 +60,10 @@
 /// more idiomatic approach to traversing a sequence in Swift. Some
 /// algorithms, however, may call for direct iterator use.
 ///
-/// One example is the `reduce1(_:)` method. Similar to the
-/// `reduce(_:)` method defined in the standard
-/// library, which takes an initial value and a combining closure,
-/// `reduce1(_:)` uses the first element of the sequence as the
-/// initial value.
+/// One example is the `reduce1(_:)` method. Similar to the `reduce(_:_:)`
+/// method defined in the standard library, which takes an initial value and a
+/// combining closure, `reduce1(_:)` uses the first element of the sequence as
+/// the initial value.
 ///
 /// Here's an implementation of the `reduce1(_:)` method. The sequence's
 /// iterator is used directly to retrieve the initial value before looping
@@ -467,6 +466,7 @@ public protocol Sequence {
   ///
   /// - Parameter n: The number of elements to drop off the end of the
   ///   sequence. `n` must be greater than or equal to zero.
+  /// - Returns: A subsequence leaving off the specified number of elements.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   func dropLast(_ n: Int) -> SubSequence
@@ -1077,11 +1077,11 @@ extension Sequence where
     return AnySequence(_DropFirstSequence(_iterator: makeIterator(), limit: n))
   }
 
-  /// Returns a subsequence containing all but the given number of final 
+  /// Returns a subsequence containing all but the given number of final
   /// elements.
   ///
   /// The sequence must be finite. If the number of elements to drop exceeds
-  /// the number of elements in the sequence, the result is an empty 
+  /// the number of elements in the sequence, the result is an empty
   /// subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
@@ -1092,6 +1092,8 @@ extension Sequence where
   ///
   /// - Parameter n: The number of elements to drop off the end of the
   ///   sequence. `n` must be greater than or equal to zero.
+  /// - Returns: A subsequence leaving off the specified number of elements.
+  ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   public func dropLast(_ n: Int) -> AnySequence<Iterator.Element> {
     _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
@@ -1151,22 +1153,41 @@ extension Sequence {
   /// Returns a subsequence containing all but the first element of the
   /// sequence.
   ///
-  /// For example:
+  /// The following example drops the first element from an array of integers.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
   ///     print(numbers.dropFirst())
   ///     // Prints "[2, 3, 4, 5]"
   ///
+  /// If the sequence has no elements, the result is an empty subsequence.
+  ///
+  ///     let empty: [Int] = []
+  ///     print(empty.dropFirst())
+  ///     // Prints "[]"
+  ///
+  /// - Returns: A subsequence starting after the first element of the
+  ///   sequence.
+  ///
   /// - Complexity: O(1)
   public func dropFirst() -> SubSequence { return dropFirst(1) }
 
-  /// Returns a subsequence containing all but the last element of the sequence.
+  /// Returns a subsequence containing all but the last element of the
+  /// sequence.
   ///
-  /// The sequence must be finite.
+  /// The sequence must be finite. If the sequence has no elements, the result
+  /// is an empty subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
   ///     print(numbers.dropLast())
   ///     // Prints "[1, 2, 3, 4]"
+  ///
+  /// If the sequence has no elements, the result is an empty subsequence.
+  ///
+  ///     let empty: [Int] = []
+  ///     print(empty.dropLast())
+  ///     // Prints "[]"
+  ///
+  /// - Returns: A subsequence leaving off the last element of the sequence.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   public func dropLast() -> SubSequence  { return dropLast(1) }
@@ -1197,7 +1218,7 @@ extension Sequence {
 public struct IteratorSequence<
   Base : IteratorProtocol
 > : IteratorProtocol, Sequence {
-  /// Construct an instance whose iterator is a copy of `base`.
+  /// Creates an instance whose iterator is a copy of `base`.
   public init(_ base: Base) {
     _base = base
   }

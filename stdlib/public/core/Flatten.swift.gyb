@@ -133,7 +133,8 @@ extension LazySequenceProtocol
   Elements.Iterator.Element == Iterator.Element,
   Iterator.Element : Sequence {
 
-  /// A concatenation of the elements of `self`.
+  /// Returns a lazy sequence that concatenates the elements of this sequence of
+  /// sequences.
   public func flatten() -> LazySequence<
     FlattenSequence<Elements>
   > {
@@ -316,7 +317,7 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
   }
 % end
 
-  /// Access the element at `position`.
+  /// Accesses the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.

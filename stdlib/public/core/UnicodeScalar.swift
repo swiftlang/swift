@@ -352,10 +352,11 @@ extension UnicodeScalar.UTF16View : RandomAccessCollection {
     return 0 + UTF16.width(value)
   }
 
-  /// Access the code unit at `position`.
+  /// Accesses the code unit at the specified position.
   ///
-  /// - Precondition: `position` is a valid position in `self` and
-  ///   `position != endIndex`.
+  /// - Parameter position: The position of the element to access. `position`
+  ///   must be a valid index of the collection that is not equal to the
+  ///   `endIndex` property.
   subscript(position: Int) -> UTF16.CodeUnit {
     return position == 0 ? (
       endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
