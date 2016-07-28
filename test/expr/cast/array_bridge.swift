@@ -17,10 +17,6 @@ class A {
 }
 
 struct B : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> A {
     return A()
   }
@@ -59,10 +55,6 @@ class E {
 }
 
 struct F : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> E {
     return E()
   }
@@ -104,9 +96,6 @@ struct H : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
-  static func _isBridgedToObjectiveC() -> Bool {
-    return false
-  }
 }
 
 var g: [G] = []
@@ -116,10 +105,6 @@ g = h as [G] // should type check, but cause a failure at runtime
 
 
 struct I : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> AnyObject {
     return A()
   }

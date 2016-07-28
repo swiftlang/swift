@@ -7,8 +7,6 @@ public struct Refrigerator {
 extension Refrigerator : _ObjectiveCBridgeable {
   public typealias _ObjectiveCType = APPRefrigerator
 
-  public static func _isBridgedToObjectiveC() -> Bool { return true }
-
   public func _bridgeToObjectiveC() -> _ObjectiveCType {
     return APPRefrigerator(temperature: temperature)
   }
@@ -43,8 +41,6 @@ public struct ManufacturerInfo<DataType: AnyObject> {
 
 extension ManufacturerInfo : _ObjectiveCBridgeable {
   public typealias _ObjectiveCType = APPManufacturerInfo<DataType>
-
-  public static func _isBridgedToObjectiveC() -> Bool { return true }
 
   public func _bridgeToObjectiveC() -> _ObjectiveCType {
     return impl

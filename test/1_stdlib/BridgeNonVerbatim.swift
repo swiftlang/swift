@@ -27,10 +27,6 @@ import ObjectiveC
 import StdlibUnittest
 
 struct X : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   init(_ value: Int) {
     self.value = value
   }

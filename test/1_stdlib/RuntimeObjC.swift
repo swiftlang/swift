@@ -60,10 +60,6 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     return ClassA(value: value)
   }
 
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   static func _forceBridgeFromObjectiveC(
     _ x: ClassA,
     result: inout BridgedValueType?
@@ -111,10 +107,6 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
   func _bridgeToObjectiveC() -> ClassA {
     assert(value == value0)
     return ClassA(value: value0)
-  }
-
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
   }
 
   static func _forceBridgeFromObjectiveC(

@@ -40,10 +40,6 @@ func testBridging<T>(_ x: T, _ name: String) {
 
 //===----------------------------------------------------------------------===//
 struct BridgedValueType : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> C {
     return C()
   }

@@ -17,8 +17,6 @@ public class BridgedClassSub : BridgedClass { }
 extension LazyFilterIterator : _ObjectiveCBridgeable { // expected-error{{conformance of 'LazyFilterIterator' to '_ObjectiveCBridgeable' can only be written in module 'Swift'}}
   public typealias _ObjectiveCType = BridgedClassSub
 
-  public static func _isBridgedToObjectiveC() -> Bool { return true }
-
   public func _bridgeToObjectiveC() -> _ObjectiveCType {
     return BridgedClassSub()
   }
@@ -46,10 +44,6 @@ extension LazyFilterIterator : _ObjectiveCBridgeable { // expected-error{{confor
 struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
   var hashValue: Int { return 0 }
 
- static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
   }

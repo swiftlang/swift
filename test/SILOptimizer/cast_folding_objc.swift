@@ -13,10 +13,6 @@ import Foundation
 class ObjCX : NSObject {}
 
 struct CX: _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   func _bridgeToObjectiveC() -> ObjCX {
     return ObjCX()
   }

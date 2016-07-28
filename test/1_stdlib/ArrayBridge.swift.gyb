@@ -80,10 +80,6 @@ struct BridgeableValue : _ObjectiveCBridgeable, Equatable {
     return Subclass(trak.value)
   }
 
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   static func _forceBridgeFromObjectiveC(
     _ x: Subclass,
     result: inout BridgeableValue?
