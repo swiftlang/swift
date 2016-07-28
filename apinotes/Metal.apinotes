@@ -8,7 +8,9 @@ Tags:
 - Name: MTLRenderPipelineError
   SwiftName: MTLRenderPipelineErrorDomain
 Enumerators:
-- Name: MTLTextureUsageUnknown
-  SwiftName: unknown
+- Name: MTLResourceStorageModeShared
+  SwiftName: storageModeShared
 - Name: MTLStorageModeShared
   SwiftName: shared
+- Name: MTLTextureUsageUnknown
+  SwiftName: unknown
