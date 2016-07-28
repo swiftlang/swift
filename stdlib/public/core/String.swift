@@ -767,9 +767,9 @@ extension Sequence where Iterator.Element == String {
   ///     // Prints "Vivien, Marlon, Kim, Karl"
   ///
   /// - Parameter separator: A string to insert between each of the elements
-  ///   in this sequence.
+  ///   in this sequence. The default separator is an empty string.
   /// - Returns: A single, concatenated string.
-  public func joined(separator: String) -> String {
+  public func joined(separator: String = "") -> String {
     var result = ""
 
     // FIXME(performance): this code assumes UTF-16 in-memory representation.

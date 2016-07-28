@@ -83,4 +83,4 @@ extension D {
 // TYPE5-DAG: public func split(separator: String, maxSplits: Int = default, omittingEmptySubsequences: Bool = default) -> [ArraySlice<String>]
 // TYPE5-DAG: public func formIndex(_ i: inout Int, offsetBy n: Int)
 // TYPE5-DAG: public func distance(from start: Int, to end: Int) -> Int
-// TYPE5-DAG: public func joined(separator: String) -> String
+// TYPE5-DAG: public func joined(separator: String = default) -> String
