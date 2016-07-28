@@ -128,8 +128,10 @@ class TestData : TestDataSuper {
     func dataFrom(_ string : String) -> Data {
         // Create a Data out of those bytes
         return string.utf8CString.withUnsafeBufferPointer { (ptr) in
-            // Subtract 1 so we don't get the null terminator byte. This matches NSString behavior.
-            return Data(bytes: UnsafeRawPointer(ptr.baseAddress!), count: ptr.count - 1)
+            ptr.baseAddress!.withMemoryRebound(to: UInt8.self, capacity: ptr.count) {
+                // Subtract 1 so we don't get the null terminator byte. This matches NSString behavior.
+                return Data(bytes: $0, count: ptr.count - 1)
+            }
         }
     }
     
