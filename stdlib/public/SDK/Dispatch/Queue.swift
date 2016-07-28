@@ -344,7 +344,3 @@ internal func _swift_dispatch_queue_concurrent() -> __OS_dispatch_queue_attr
 
 @_silgen_name("_swift_dispatch_get_main_queue")
 internal func _swift_dispatch_get_main_queue() -> DispatchQueue
-
-@_silgen_name("_swift_dispatch_apply_current_root_queue")
-internal func _swift_dispatch_apply_current_root_queue() -> DispatchQueue
-

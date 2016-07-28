@@ -84,12 +84,12 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public func enumerateBytes(
 		block: @noescape (buffer: UnsafeBufferPointer<UInt8>, byteIndex: Int, stop: inout Bool) -> Void) 
 	{
-		_swift_dispatch_data_apply(__wrapped) { (data: __DispatchData, offset: Int, ptr: UnsafeRawPointer, size: Int) in
+		_swift_dispatch_data_apply(__wrapped) { (_, offset: Int, ptr: UnsafeRawPointer, size: Int) in
             let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: size)
 			let bp = UnsafeBufferPointer(start: bytePtr, count: size)
 			var stop = false
 			block(buffer: bp, byteIndex: offset, stop: &stop)
-			return !stop
+			return stop ? 0 : 1
 		}
 	}
 
@@ -284,11 +284,6 @@ extension DispatchData {
 		return result!
 	}
 }
-
-typealias _swift_data_applier = @convention(block) @noescape (__DispatchData, Int, UnsafeRawPointer, Int) -> Bool
-
-@_silgen_name("_swift_dispatch_data_apply")
-internal func _swift_dispatch_data_apply(_ data: __DispatchData, _ block: _swift_data_applier)
 
 @_silgen_name("_swift_dispatch_data_empty")
 internal func _swift_dispatch_data_empty() -> __DispatchData

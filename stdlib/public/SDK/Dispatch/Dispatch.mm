@@ -87,18 +87,6 @@ _swift_dispatch_data_destructor_munmap(void) {
   return _dispatch_data_destructor_munmap;
 }
 
-SWIFT_CC(swift) DISPATCH_RUNTIME_STDLIB_INTERFACE
-extern "C" bool
-_swift_dispatch_data_apply(dispatch_data_t data, bool (^applier)(dispatch_data_t, size_t, const void *, size_t)) {
-  return dispatch_data_apply(data, applier);
-}
-
-// DISPATCH_RUNTIME_STDLIB_INTERFACE
-// extern "C" dispatch_queue_t
-// _swift_apply_current_root_queue() {
-//   return DISPATCH_APPLY_CURRENT_ROOT_QUEUE;
-// }
-
 #define SOURCE(t)                                                              \
   SWIFT_CC(swift)                                                              \
   DISPATCH_RUNTIME_STDLIB_INTERFACE extern "C" dispatch_source_type_t  \

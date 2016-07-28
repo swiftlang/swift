@@ -131,3 +131,12 @@ swift::_swift_dispatch_data_create(
 	return dispatch_data_create(buffer, size, cast(queue), cast(destructor));
 }
 
+unsigned int
+swift::_swift_dispatch_data_apply(
+		__swift_shims_dispatch_data_t data, 
+		__swift_shims_dispatch_data_applier SWIFT_DISPATCH_NOESCAPE applier)
+{
+	return dispatch_data_apply(data, ^bool(dispatch_data_t data, size_t off, const void *loc, size_t size){
+		return applier(data, off, loc, size);
+	});
+}
