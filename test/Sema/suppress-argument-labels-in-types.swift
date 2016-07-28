@@ -57,11 +57,8 @@ func testF4(a: Int, b: Int, c: Double, d: Double) {
   let _: (Int, Int) -> Int = f4
   let _: (Double, Double) -> Double = f4
   
-  // Note: these will become ill-formed when the rest of SE-0111 is
-  // implemented. For now, they check that the labels were removed by the type
-  // system.
-  let _: (x: Int, y: Int) -> Int = f4
-  let _: (x: Double, y: Double) -> Double = f4
+  let _: (_ x: Int, _ y: Int) -> Int = f4
+  let _: (_ x: Double, _ y: Double) -> Double = f4
 }
 
 // Test module-qualified function references.
@@ -87,11 +84,8 @@ func testModuleQualifiedRef(a: Int, b: Int, c: Double, d: Double) {
   let _: (Int, Int) -> Int = TestModule.f4
   let _: (Double, Double) -> Double = TestModule.f4
 
-  // Note: these will become ill-formed when the rest of SE-0111 is
-  // implemented. For now, they check that the labels were removed by the type
-  // system.
-  let _: (x: Int, y: Int) -> Int = TestModule.f4
-  let _: (x: Double, y: Double) -> Double = TestModule.f4
+  let _: (_ x: Int, _ y: Int) -> Int = TestModule.f4
+  let _: (_ x: Double, _ y: Double) -> Double = TestModule.f4
 }
 
 // Test member references.
@@ -135,11 +129,8 @@ func testS0Methods(s0: S0, a: Int, b: Int, c: Double, d: Double) {
   let _: (Int, Int) -> Int = s0.f4
   let _: (Double, Double) -> Double = s0.f4
 
-  // Note: these will become ill-formed when the rest of SE-0111 is
-  // implemented. For now, they check that the labels were removed by the type
-  // system.
-  let _: (x: Int, y: Int) -> Int = s0.f4
-  let _: (x: Double, y: Double) -> Double = s0.f4
+  let _: (_ x: Int, _ y: Int) -> Int = s0.f4
+  let _: (_ x: Double, _ y: Double) -> Double = s0.f4
 }
 
 // Curried instance methods.
@@ -170,9 +161,28 @@ func testS0Initializers(s0: S0, a: Int, b: Int) {
   let _: Int = s0c2 // expected-error{{cannot convert value of type '(Int, Int) -> S0' to specified type 'Int'}}
 }
 
-func testS0Subscripts(s0: S0, a: Int, b: Int) {
+struct S1 {
+  subscript (i: Int) -> Int {
+    get { }
+    nonmutating set { }
+  }
+}
+
+func testS0Subscripts(s0: S0, s1: S1, a: Int, b: Int) {
   let _ = s0[a: a, b: b]
 
   var s0Var = s0
   s0Var[a: a, b: b] = a
+
+  let _ = s1[a]
+  s1[a] = b
+}
+
+struct S2 {
+  let s1: S1
+}
+
+func testS1Subscripts(s2: S2, a: Int) {
+  let _ = s2.s1[a]
+  s2.s1[a] = a
 }

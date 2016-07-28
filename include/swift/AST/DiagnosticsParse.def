@@ -616,6 +616,9 @@ ERROR(expected_type_before_arrow,none,
       "expected type before '->'", ())
 ERROR(expected_type_after_arrow,none,
       "expected type after '->'", ())
+ERROR(function_type_argument_label,none,
+      "function types cannot have argument label %0; use '_' instead",
+      (Identifier))
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,
@@ -647,6 +650,8 @@ ERROR(protocol_method_argument_init,none,
       "default argument not permitted in a protocol method", ())
 ERROR(protocol_init_argument_init,none,
       "default argument not permitted in a protocol initializer", ())
+ERROR(tuple_type_multiple_labels,none,
+      "tuple element cannot have two labels", ())
 
 // Protocol Types
 ERROR(expected_rangle_protocol,PointsToFirstBadToken,
@@ -704,6 +709,8 @@ ERROR(expected_parameter_type,PointsToFirstBadToken,
       "expected parameter type following ':'", ())
 ERROR(expected_parameter_name,PointsToFirstBadToken,
       "expected parameter name followed by ':'", ())
+ERROR(expected_parameter_colon,PointsToFirstBadToken,
+      "expected ':' following argumant label and parameter name", ())
 ERROR(missing_parameter_type,PointsToFirstBadToken,
       "parameter requires an explicit type", ())
 ERROR(multiple_parameter_ellipsis,none,
