@@ -1031,10 +1031,9 @@ namespace {
         auto newTy = result->getType()
                          ->castTo<AnyFunctionType>()
                          ->getUncurriedFunction();
-        result = coerceToType(
-            result, newTy, locator.withPathElement(ConstraintLocator::Member));
-        cast<FunctionConversionExpr>(result)->setFlattening();
-        return result;
+        auto conversion = new FunctionConversionExpr(result, newTy);
+        conversion->setFlattening();
+        return conversion;
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
