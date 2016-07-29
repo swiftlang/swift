@@ -4129,11 +4129,12 @@ void ClangModuleUnit::collectLinkLibraries(
 }
 
 StringRef ClangModuleUnit::getFilename() const {
-  if (!clangModule) {
+  if (!clangModule)
     return "<imports>";
-  }
-  return clangModule->getASTFile()
-    ? clangModule->getASTFile()->getName() : StringRef();
+  if (const clang::FileEntry *F = clangModule->getASTFile())
+    if (F->getName())
+      return F->getName();
+  return StringRef();
 }
 
 clang::TargetInfo &ClangImporter::getTargetInfo() const {
