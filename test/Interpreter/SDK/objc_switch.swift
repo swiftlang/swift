@@ -3,6 +3,9 @@
 
 // REQUIRES: objc_interop
 
+// rdar://problem/27616753
+// XFAIL: *
+
 import Foundation
 
 func testAnyObjectIsa(_ obj: AnyObject) {

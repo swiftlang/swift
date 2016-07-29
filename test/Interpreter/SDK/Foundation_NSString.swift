@@ -136,7 +136,7 @@ testComparisons()
 // CHECK-LABEL: Variadic methods:
 print("Variadic methods:")
 // CHECK-NEXT: x y
-print(NSString(format: "%@ %@", "x", "y"))
+print(NSString(format: "%@ %@", "x" as NSString, "y" as NSString))
 // CHECK-NEXT: 1{{.*}}024,25
 print(NSString(
   format: "%g",
@@ -144,13 +144,13 @@ print(NSString(
   1024.25
 ))
 // CHECK-NEXT: x y z
-print(("x " as NSString).appendingFormat("%@ %@", "y", "z"))
+print(("x " as NSString).appendingFormat("%@ %@", "y" as NSString, "z" as NSString))
 // CHECK-NEXT: a b c
 let s = NSMutableString(string: "a ")
-s.appendFormat("%@ %@", "b", "c")
+s.appendFormat("%@ %@", "b" as NSString, "c" as NSString)
 print(s)
 
-let m = NSMutableString.localizedStringWithFormat("<%@ %@>", "q", "r")
+let m = NSMutableString.localizedStringWithFormat("<%@ %@>", "q" as NSString, "r" as NSString)
 // CHECK-NEXT: <q r>
 print(m)
 m.append(" lever")

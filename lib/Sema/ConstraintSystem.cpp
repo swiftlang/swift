@@ -256,15 +256,6 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 
   SmallVector<Type, 4> types;
 
-  // If the default literal type is bridged to a class type, add the class type.
-  if (auto proto = TC.Context.getProtocol(kind)) {
-    if (auto defaultType = TC.getDefaultType(proto, DC)) {
-      if (auto bridgedClassType = TC.getBridgedToObjC(DC, defaultType)) {
-        types.push_back(bridgedClassType);
-      }
-    }
-  }
-
   // Some literal kinds are related.
   switch (kind) {
 #define PROTOCOL_WITH_NAME(Id, Name) \

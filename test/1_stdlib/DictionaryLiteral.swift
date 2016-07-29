@@ -51,8 +51,8 @@ let anNSString = "Foo" as NSString
 var stringNSStringLet: DictionaryLiteral = [ "a": aString as NSString, "b": anNSString]
 expectType(DictionaryLiteral<String, NSString>.self, &stringNSStringLet)
 
-var hetero1: DictionaryLiteral = ["a": 1, "b": "Foo" as NSString]
+var hetero1: DictionaryLiteral = ["a": 1 as NSNumber, "b": "Foo" as NSString]
 expectType(DictionaryLiteral<String, NSObject>.self, &hetero1)
 
-var hetero2: DictionaryLiteral = ["a": 1, "b": "Foo"]
+var hetero2: DictionaryLiteral = ["a": 1 as NSNumber, "b": "Foo" as NSString]
 expectType(DictionaryLiteral<String, NSObject>.self, &hetero2)
