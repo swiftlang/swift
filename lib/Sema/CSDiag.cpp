@@ -5458,15 +5458,22 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       return visitExpr(E);
 
     // Check to see if the contextual type conforms.
-    bool foundConformance =
+    bool typeConforms =
       CS->TC.conformsToProtocol(contextualType, ALC, CS->DC,
                                 ConformanceCheckFlags::InExpression,
                                 &Conformance);
+    (void) typeConforms;
+
+    // The type can conform, but not have a concrete conformance, in
+    // which case Conformance will be nullptr, but typeConforms will
+    // still be true.
+    assert((!Conformance || typeConforms) &&
+           "Expected null Conformance if the type doesn't conform!");
     
     // If not, we may have an implicit conversion going on.  If the contextual
     // type is an UnsafePointer or UnsafeMutablePointer, then that is probably
     // what is happening.
-    if (!foundConformance) {
+    if (!Conformance) {
       // TODO: Not handling various string conversions or void conversions.
       Type unwrappedTy = contextualType;
       if (Type unwrapped = contextualType->getAnyOptionalObjectType())
@@ -5475,17 +5482,20 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       if (Type pointeeTy = unwrappedTy->getAnyPointerElementType(pointerKind)) {
         if (pointerKind == PTK_UnsafePointer) {
           auto arrayTy = ArraySliceType::get(pointeeTy);
-          foundConformance =
+          typeConforms =
             CS->TC.conformsToProtocol(arrayTy, ALC, CS->DC,
                                       ConformanceCheckFlags::InExpression,
                                       &Conformance);
-          if (foundConformance)
+          assert((!Conformance || typeConforms) &&
+                 "Expected null Conformance if the type doesn't conform!");
+
+          if (Conformance)
             contextualType = arrayTy;
         }
       }
     }
     
-    if (!foundConformance) {
+    if (!Conformance) {
       // If the contextual type conforms to ExpressibleByDictionaryLiteral and
       // this is an empty array, then they meant "[:]".
       if (E->getNumElements() == 0 &&
