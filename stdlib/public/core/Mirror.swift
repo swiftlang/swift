@@ -162,24 +162,24 @@ public struct Mirror {
     return nil
   }
   
-  internal static func _superclassIterator<Subject : Any>(
+  internal static func _superclassIterator<Subject>(
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
   ) -> () -> Mirror? {
 
-    if let subject = subject as? AnyObject,
-      let subjectClass = Subject.self as? AnyClass,
-      let superclass = _getSuperclass(subjectClass) {
+    if let subjectClass = Subject.self as? AnyClass,
+       let superclass = _getSuperclass(subjectClass) {
 
       switch ancestorRepresentation {
       case .generated:
         return {
-          self._legacyMirror(subject, asClass: superclass).map {
+          self._legacyMirror(_unsafeDowncastToAnyObject(fromAny: subject), asClass: superclass).map {
             Mirror(legacy: $0, subjectType: superclass)
           }
         }
       case .customized(let makeAncestor):
         return {
-          Mirror(subject, subjectClass: superclass, ancestor: makeAncestor())
+          Mirror(_unsafeDowncastToAnyObject(fromAny: subject), subjectClass: superclass,
+                 ancestor: makeAncestor())
         }
       case .suppressed:
         break
@@ -855,7 +855,7 @@ extension String {
   ///     }
   ///
   ///     let p = Point(x: 21, y: 30)
-  ///     print(String(p))
+  ///     print(String(describing: p))
   ///     // Prints "Point(x: 21, y: 30)"
   ///
   /// After adding `CustomStringConvertible` conformance by implementing the
@@ -867,11 +867,11 @@ extension String {
   ///         }
   ///     }
   ///
-  ///     print(String(p))
+  ///     print(String(describing: p))
   ///     // Prints "(21, 30)"
   ///
   /// - SeeAlso: `String.init<Subject>(reflecting: Subject)`
-  public init<Subject>(_ instance: Subject) {
+  public init<Subject>(describing instance: Subject) {
     self.init()
     _print_unlocked(instance, &self)
   }

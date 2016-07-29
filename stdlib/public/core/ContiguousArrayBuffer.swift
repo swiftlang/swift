@@ -115,7 +115,8 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   ) rethrows {
     if _isBridgedVerbatimToObjectiveC(Element.self) {
       let count = __manager.header.count
-      let elements = UnsafePointer<AnyObject>(__manager._elementPointer)
+      let elements = UnsafeMutableRawPointer(__manager._elementPointer)
+        .assumingMemoryBound(to: AnyObject.self)
       defer { _fixLifetime(__manager) }
       try body(UnsafeBufferPointer(start: elements, count: count))
     }
@@ -145,7 +146,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     let resultPtr = result.baseAddress
     let p = __manager._elementPointer
     for i in 0..<count {
-      (resultPtr + i).initialize(with: _bridgeToObjectiveCUnconditional(p[i]))
+      (resultPtr + i).initialize(to: _bridgeAnythingToObjectiveC(p[i]))
     }
     _fixLifetime(__manager)
     return result
@@ -239,7 +240,7 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     let verbatim = false
 #endif
 
-    __bufferPointer._headerPointer.initialize(with: 
+    __bufferPointer._headerPointer.initialize(to: 
       _ArrayBody(
         count: count,
         capacity: capacity,
@@ -384,9 +385,8 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     _sanityCheck(bounds.upperBound <= count)
 
     let initializedCount = bounds.upperBound - bounds.lowerBound
-    target.initializeFrom(
-      firstElementAddress + bounds.lowerBound,
-      count: initializedCount)
+    target.initialize(
+      from: firstElementAddress + bounds.lowerBound, count: initializedCount)
     _fixLifetime(owner)
     return target + initializedCount
   }
@@ -412,14 +412,14 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///   may need to be considered, such as whether the buffer could be
   ///   some immutable Cocoa container.
   public mutating func isUniquelyReferenced() -> Bool {
-    return __bufferPointer.holdsUniqueReference()
+    return __bufferPointer.isUniqueReference()
   }
 
   /// Returns `true` iff this buffer's storage is either
   /// uniquely-referenced or pinned.  NOTE: this does not mean
   /// the buffer is mutable; see the comment on isUniquelyReferenced.
   public mutating func isUniquelyReferencedOrPinned() -> Bool {
-    return __bufferPointer.holdsUniqueOrPinnedReference()
+    return __bufferPointer._isUniqueOrPinnedReference()
   }
 
 #if _runtime(_ObjC)
@@ -429,9 +429,6 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Complexity: O(1).
   public func _asCocoaArray() -> _NSArrayCore {
-    _sanityCheck(
-        _isBridgedToObjectiveC(Element.self),
-        "Array element type is not bridged to Objective-C")
     if count == 0 {
       return _emptyArrayStorage
     }
@@ -456,8 +453,8 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// Two buffers address the same elements when they have the same
   /// identity and count.
-  public var identity: UnsafePointer<Void> {
-    return UnsafePointer(firstElementAddress)
+  public var identity: UnsafeRawPointer {
+    return UnsafeRawPointer(firstElementAddress)
   }
   
   /// Returns `true` iff we have storage for elements of the given
@@ -507,18 +504,18 @@ public func += <Element, C : Collection>(
 
   if _fastPath(newCount <= lhs.capacity) {
     lhs.count = newCount
-    (lhs.firstElementAddress + oldCount).initializeFrom(rhs)
+    (lhs.firstElementAddress + oldCount).initialize(from: rhs)
   }
   else {
     var newLHS = _ContiguousArrayBuffer<Element>(
       uninitializedCount: newCount,
       minimumCapacity: _growArrayCapacity(lhs.capacity))
 
-    newLHS.firstElementAddress.moveInitializeFrom(
-      lhs.firstElementAddress, count: oldCount)
+    newLHS.firstElementAddress.moveInitialize(
+      from: lhs.firstElementAddress, count: oldCount)
     lhs.count = 0
     swap(&lhs, &newLHS)
-    (lhs.firstElementAddress + oldCount).initializeFrom(rhs)
+    (lhs.firstElementAddress + oldCount).initialize(from: rhs)
   }
 }
 
@@ -609,7 +606,7 @@ internal func _copyCollectionToContiguousArray<
   var i = source.startIndex
   for _ in 0..<count {
     // FIXME(performance): use _copyContents(initializing:).
-    p.initialize(with: source[i])
+    p.initialize(to: source[i])
     source.formIndex(after: &i)
     p += 1
   }
@@ -653,9 +650,8 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
         uninitializedCount: newCapacity, minimumCapacity: 0)
       p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
-      newResult.firstElementAddress.moveInitializeFrom(
-        result.firstElementAddress,
-        count: result.capacity)
+      newResult.firstElementAddress.moveInitialize(
+        from: result.firstElementAddress, count: result.capacity)
       result.count = 0
       swap(&result, &newResult)
     }
@@ -669,7 +665,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
     remainingCapacity -= 1
 
-    p.initialize(with: element)
+    p.initialize(to: element)
     p += 1
   }
 

@@ -25,7 +25,7 @@ hasNoPrototype()
 // CHECK:   apply [[NOPROTO]]()
 
 // -- Constructors for imported Ansible
-// CHECK-LABEL: sil  shared @_TFCSo7AnsibleC{{.*}} : $@convention(method) (@owned ImplicitlyUnwrappedOptional<AnyObject>, @thick Ansible.Type) -> @owned ImplicitlyUnwrappedOptional<Ansible>
+// CHECK-LABEL: sil  shared @_TFCSo7AnsibleC{{.*}} : $@convention(method) (@in ImplicitlyUnwrappedOptional<Any>, @thick Ansible.Type) -> @owned ImplicitlyUnwrappedOptional<Ansible>
 
 
 // -- Constructors for imported NSObject

@@ -1,9 +1,9 @@
 // RUN: %target-parse-verify-swift
 
-infix operator +++ {}
+infix operator +++
 
 protocol ConcatToAnything {
-  func +++ <T>(lhs: Self, other: T)
+  static func +++ <T>(lhs: Self, other: T)
 }
 
 func min<T : Comparable>(_ x: T, y: T) -> T {
@@ -106,9 +106,9 @@ protocol BinaryMethodWorkaround {
 protocol Squigglable : BinaryMethodWorkaround {
 }
 
-infix operator ~~~ { }
+infix operator ~~~
 
-func ~~~ <T : Squigglable where T.MySelf == T>(lhs: T, rhs: T) -> Bool {
+func ~~~ <T : Squigglable>(lhs: T, rhs: T) -> Bool where T.MySelf == T {
   return true
 }
 
@@ -120,11 +120,9 @@ var rdar14005696 : UInt8
 _ = rdar14005696 ~~~ 5
 
 // <rdar://problem/15168483>
-public struct SomeIterator<
-  C: Collection, Indices: Sequence
-  where
-  C.Index == Indices.Iterator.Element
-> : IteratorProtocol, Sequence {
+public struct SomeIterator<C: Collection, Indices: Sequence>
+  : IteratorProtocol, Sequence
+  where C.Index == Indices.Iterator.Element {
   var seq : C
   var indices : Indices.Iterator
 
@@ -170,8 +168,8 @@ class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
 
 // <rdar://problem/22459135> error: 'print' is unavailable: Please wrap your tuple argument in parentheses: 'print((...))'
 func r22459135() {
-  func h<S : Sequence where S.Iterator.Element : Integer>
-    (_ sequence: S) -> S.Iterator.Element {
+  func h<S : Sequence>(_ sequence: S) -> S.Iterator.Element
+    where S.Iterator.Element : Integer {
     return 0
   }
 
@@ -238,3 +236,20 @@ Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be infer
 // <rdar://problem/21718955> Swift useless error: cannot invoke 'foo' with no arguments
 Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}}
 
+// <rdar://problem/27515965> Type checker doesn't enforce same-type constraint if associated type is Any
+protocol P27515965 {
+  associatedtype R
+  func f() -> R
+}
+
+struct S27515965 : P27515965 {
+  func f() -> Any { return self }
+}
+
+struct V27515965 {
+  init<T : P27515965>(_ tp: T) where T.R == Float {}
+}
+
+func test(x: S27515965) -> V27515965 {
+  return V27515965(x) // expected-error {{generic parameter 'T' could not be inferred}}
+}

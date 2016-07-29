@@ -287,6 +287,7 @@ namespace {
     
     ImportResult VisitPointerType(const clang::PointerType *type) {      
       auto pointeeQualType = type->getPointeeType();
+      auto quals = pointeeQualType.getQualifiers();
 
       // Special case for NSZone*, which has its own Swift wrapper.
       if (const clang::RecordType *pointee =
@@ -303,7 +304,19 @@ namespace {
             return {wrapperTy, ImportHint::OtherPointer};
         }
       }
-      
+
+      // Import 'void*' as 'UnsafeMutableRawPointer' and 'const void*' as
+      // 'UnsafeRawPointer'. This is Swift's version of an untyped pointer. Note
+      // that 'Unsafe[Mutable]Pointer<T>' implicitly converts to
+      // 'Unsafe[Mutable]RawPointer' for interoperability.
+      if (pointeeQualType->isVoidType()) {
+        return {
+          (quals.hasConst() ? Impl.SwiftContext.getUnsafeRawPointerDecl()
+           : Impl.SwiftContext.getUnsafeMutableRawPointerDecl())
+            ->getDeclaredType(),
+            ImportHint::OtherPointer};
+      }
+
       // All other C pointers to concrete types map to
       // UnsafeMutablePointer<T> or OpaquePointer (FIXME:, except in
       // parameter position under the pre-
@@ -336,8 +349,6 @@ namespace {
         };
       }
 
-      auto quals = pointeeQualType.getQualifiers();
-      
       if (quals.hasConst()) {
         return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                      "UnsafePointer",
@@ -908,12 +919,18 @@ namespace {
               return Type();
 
             // The first type argument for Dictionary or Set needs
-            // to be NSObject-bound.
+            // to be Hashable. Everything that inherits NSObject has a
+            // -hash code in ObjC, but if something isn't NSObject, fall back
+            // to AnyHashable as a key type.
             if (unboundDecl == Impl.SwiftContext.getDictionaryDecl() ||
                 unboundDecl == Impl.SwiftContext.getSetDecl()) {
               auto &keyType = importedTypeArgs[0];
-              if (!Impl.matchesNSObjectBound(keyType))
-                keyType = Impl.getNSObjectType();
+              if (!Impl.matchesNSObjectBound(keyType)) {
+                if (auto anyHashable = Impl.SwiftContext.getAnyHashableDecl())
+                  keyType = anyHashable->getDeclaredType();
+                else
+                  keyType = Type();
+              }
             }
 
             // Form the specialized type.
@@ -969,10 +986,9 @@ namespace {
       // id maps to Any in bridgeable contexts, AnyObject otherwise.
       if (type->isObjCIdType()) {
         if (Impl.SwiftContext.LangOpts.EnableIdAsAny)
-          return {
-              proto->getDeclaredType(),
-              ImportHint(ImportHint::ObjCBridged,
-                         Impl.SwiftContext.getAnyDecl()->getDeclaredType())};
+          return {proto->getDeclaredType(),
+                  ImportHint(ImportHint::ObjCBridged,
+                             Impl.SwiftContext.TheAnyType)};
         return {proto->getDeclaredType(), ImportHint::ObjCPointer};
       }
 
@@ -1518,12 +1534,12 @@ importFunctionType(DeclContext *dc,
   if (!parameterList)
     return Type();
 
-  FunctionType::ExtInfo extInfo;
-  extInfo = extInfo.withIsNoReturn(isNoReturn);
+  if (isNoReturn)
+    swiftResultTy = SwiftContext.getNeverType();
 
   // Form the function type.
   auto argTy = parameterList->getType(SwiftContext);
-  return FunctionType::get(argTy, swiftResultTy, extInfo);
+  return FunctionType::get(argTy, swiftResultTy);
 }
 
 ParameterList *ClangImporter::Implementation::importFunctionParameterList(
@@ -1599,7 +1615,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   if (isVariadic) {
     auto paramTy =
         BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
-                              {SwiftContext.getAnyDecl()->getDeclaredType()});
+                              {SwiftContext.TheAnyType});
     auto name = SwiftContext.getIdentifier("varargs");
     auto param = new (SwiftContext)
         ParamDecl(true, SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
@@ -2035,8 +2051,8 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
       }
     }
 
-  // NSDictionary arguments default to [:] if "options", "attributes",
-  // or "userInfo" occur in the argument label or (if there is no
+  // NSDictionary arguments default to [:] (or nil, if nullable) if "options",
+  // "attributes", or "userInfo" occur in the argument label or (if there is no
   // argument label) at the end of the base name.
   if (auto objcPtrTy = type->getAs<clang::ObjCObjectPointerType>()) {
     if (auto objcClass = objcPtrTy->getInterfaceDecl()) {
@@ -2045,13 +2061,17 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
         if (searchStr.empty() && !baseName.empty())
           searchStr = baseName.str();
 
+        auto emptyDictionaryKind = DefaultArgumentKind::EmptyDictionary;
+        if (clangOptionality == OTK_Optional)
+          emptyDictionaryKind = DefaultArgumentKind::Nil;
+
         bool sawInfo = false;
         for (auto word : reversed(camel_case::getWords(searchStr))) {
           if (camel_case::sameWordIgnoreFirstCase(word, "options"))
-            return DefaultArgumentKind::EmptyDictionary;
+            return emptyDictionaryKind;
 
           if (camel_case::sameWordIgnoreFirstCase(word, "attributes"))
-            return DefaultArgumentKind::EmptyDictionary;
+            return emptyDictionaryKind;
 
           if (camel_case::sameWordIgnoreFirstCase(word, "info")) {
             sawInfo = true;
@@ -2059,7 +2079,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
           }
 
           if (sawInfo && camel_case::sameWordIgnoreFirstCase(word, "user"))
-            return DefaultArgumentKind::EmptyDictionary;
+            return emptyDictionaryKind;
 
           if (argumentLabel.empty())
             break;
@@ -2235,6 +2255,11 @@ Type ClangImporter::Implementation::importMethodType(
           swiftResultTy->getAnyOptionalObjectType(OptionalityOfReturn);
       if (!nonOptionalTy)
         nonOptionalTy = swiftResultTy;
+
+      // Undo 'Any' bridging.
+      if (nonOptionalTy->isAny())
+        nonOptionalTy = SwiftContext.getProtocol(KnownProtocolKind::AnyObject)
+          ->getDeclaredType();
 
       if (nonOptionalTy->isAnyClassReferenceType()) {
         swiftResultTy = getUnmanagedType(*this, nonOptionalTy);
@@ -2430,9 +2455,13 @@ Type ClangImporter::Implementation::importMethodType(
   
   // Form the parameter list.
   *bodyParams = ParameterList::create(SwiftContext, swiftParams);
-  
+
+  if (isNoReturn) {
+    origSwiftResultTy = SwiftContext.getNeverType();
+    swiftResultTy = SwiftContext.getNeverType();
+  }
+
   FunctionType::ExtInfo extInfo;
-  extInfo = extInfo.withIsNoReturn(isNoReturn);
 
   if (errorInfo) {
     foreignErrorInfo = getForeignErrorInfo(*errorInfo, errorParamType,
@@ -2616,6 +2645,7 @@ bool ClangImporter::Implementation::matchesNSObjectBound(Type type) {
     return true;
 
   // Struct or enum type must have been bridged.
+  // TODO: Check that the bridged type is Hashable?
   if (type->getStructOrBoundGenericStruct() ||
       type->getEnumOrBoundGenericEnum())
     return true;

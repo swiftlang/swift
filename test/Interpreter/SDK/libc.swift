@@ -13,8 +13,8 @@
   import Glibc
 #endif
 
-let sourcePath = Process.arguments[1]
-let tempPath = Process.arguments[2] + "/libc.txt"
+let sourcePath = CommandLine.arguments[1]
+let tempPath = CommandLine.arguments[2] + "/libc.txt"
 
 // CHECK: Hello world
 fputs("Hello world", stdout)
@@ -25,7 +25,7 @@ print("\(UINT32_MAX)")
 // CHECK: the magic word is ///* magic *///
 let sourceFile = open(sourcePath, O_RDONLY)
 assert(sourceFile >= 0)
-var bytes = UnsafeMutablePointer<CChar>(allocatingCapacity: 12)
+var bytes = UnsafeMutablePointer<CChar>.allocate(capacity: 12)
 var readed = read(sourceFile, bytes, 11)
 close(sourceFile)
 assert(readed == 11)

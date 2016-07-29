@@ -13,4 +13,4 @@ if [[ $? != 0 ]]; then
   echo "Could not change directory to '$SCRIPT_DIR/..'."
   exit 1
 fi
-flake8
+flake8 $@

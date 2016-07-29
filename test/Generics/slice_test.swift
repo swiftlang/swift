@@ -2,20 +2,23 @@
 
 import Swift
 
-infix operator < {
-  associativity none
-  precedence 170
+infix operator < : ComparisonPrecedence
+precedencegroup ComparisonPrecedence {
+  associativity: none
+  higherThan: EqualityPrecedence
 }
 
-infix operator == {
-  associativity none
-  precedence 160
+infix operator == : EqualityPrecedence
+infix operator != : EqualityPrecedence
+precedencegroup EqualityPrecedence {
+  associativity: none
+  higherThan: AssignmentPrecedence
 }
 
-infix operator != {
-  associativity none
-  precedence 160
+precedencegroup AssignmentPrecedence {
+  assignment: true
 }
+
 
 func testslice(_ s: Array<Int>) {
   for i in 0..<s.count { print(s[i]+1) }
@@ -24,8 +27,8 @@ func testslice(_ s: Array<Int>) {
   _ = s[0...1]
 }
 
-@_silgen_name("malloc") func c_malloc(_ size: Int) -> UnsafeMutablePointer<Void>
-@_silgen_name("free") func c_free(_ p: UnsafeMutablePointer<Void>)
+@_silgen_name("malloc") func c_malloc(_ size: Int) -> UnsafeMutableRawPointer
+@_silgen_name("free") func c_free(_ p: UnsafeMutableRawPointer)
 
 class Vector<T> {
   var length : Int
@@ -42,15 +45,16 @@ class Vector<T> {
     if length == capacity {
       let newcapacity = capacity * 2 + 2
       let size = Int(Builtin.sizeof(T.self))
-      let newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size))
+      let newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size)
+        .bindMemory(to: T.self, capacity: newcapacity))
       for i in 0..<length {
-        (newbase + i).initialize(with: (base+i).move())
+        (newbase + i).initialize(to: (base+i).move())
       }
       c_free(base)
       base = newbase
       capacity = newcapacity
     }
-    (base+length).initialize(with: elem)
+    (base+length).initialize(to: elem)
     length += 1
   }
 
@@ -83,7 +87,7 @@ class Vector<T> {
 }
 
 protocol Comparable {
-  func <(lhs: Self, rhs: Self) -> Bool
+  static func <(lhs: Self, rhs: Self) -> Bool
 }
 
 func sort<T : Comparable>(_ array: inout [T]) {
@@ -117,6 +121,6 @@ func findIf<T>(_ array: [T], fn: (T) -> Bool) -> Int {
 }
 
 protocol Eq {
-  func ==(lhs: Self, rhs: Self) -> Bool
-  func !=(lhs: Self, rhs: Self) -> Bool
+  static func ==(lhs: Self, rhs: Self) -> Bool
+  static func !=(lhs: Self, rhs: Self) -> Bool
 }

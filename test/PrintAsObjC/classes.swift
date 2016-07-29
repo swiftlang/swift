@@ -278,7 +278,7 @@ typealias AliasForNSRect = NSRect
   func testNested(_ a: UnsafeMutablePointer<UnsafeMutablePointer<Int>>) {}
 
   func testBridging(_ a: UnsafePointer<Int>, b: UnsafeMutablePointer<Int>, c: AutoreleasingUnsafeMutablePointer<Methods>) {}
-  func testBridgingVoid(_ a: UnsafeMutablePointer<Void>, b: UnsafePointer<Void>) {}
+  func testBridgingVoid(_ a: UnsafeMutableRawPointer, b: UnsafeRawPointer) {}
 
   func testBridgingOptionality(_ a: UnsafePointer<Int>?, b: UnsafeMutablePointer<Int>!, c: AutoreleasingUnsafeMutablePointer<Methods?>?) {}
 }

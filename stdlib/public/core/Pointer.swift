@@ -57,7 +57,7 @@ func _convertConstArrayToPointerArgument<
     validPointer = ToPointer(addr._rawValue)
   } else {
     let lastAlignedValue = ~(alignof(FromElement.self) - 1)
-    let lastAlignedPointer = UnsafePointer<Void>(bitPattern: lastAlignedValue)!
+    let lastAlignedPointer = UnsafeRawPointer(bitPattern: lastAlignedValue)!
     validPointer = ToPointer(lastAlignedPointer._rawValue)
   }
   return (owner, validPointer)
@@ -87,6 +87,6 @@ public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
   ToPointer : _Pointer
 >(_ str: String) -> (AnyObject?, ToPointer) {
-  let utf8 = Array(str.nulTerminatedUTF8)
+  let utf8 = Array(str.utf8CString)
   return _convertConstArrayToPointerArgument(utf8)
 }

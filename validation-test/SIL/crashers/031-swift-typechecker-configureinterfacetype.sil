@@ -1,0 +1,3 @@
+// RUN: not --crash %target-sil-opt %s
+// REQUIRES: asserts
+func y:@opened(Any

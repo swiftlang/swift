@@ -12,7 +12,7 @@ func foo1(_ a : inout [Int]) {
 struct S1 {}
 
 func foo2(_ a : inout [S1]) {
-  a = a.sorted(isOrderedBefore: { (a, b) -> Bool in
+  a = a.sorted(by: { (a, b) -> Bool in
     return false
   })
   a.append(S1())
@@ -37,9 +37,9 @@ func foo3(a: Float, b: Bool) {}
 // CHECK-REPLACEMENT1: <Group>Collection/Array</Group>
 // CHECK-REPLACEMENT1: <Declaration>func sorted() -&gt; [<Type usr="s:Si">Int</Type>]</Declaration>
 // CHECK-REPLACEMENT1: RELATED BEGIN
-// CHECK-REPLACEMENT1: sorted(isOrderedBefore: @noescape (Int, Int) -&gt; Bool) -&gt; [Int]</RelatedName>
+// CHECK-REPLACEMENT1: sorted(by: @noescape (Int, Int) -&gt; Bool) -&gt; [Int]</RelatedName>
 // CHECK-REPLACEMENT1: sorted() -&gt; [Int]</RelatedName>
-// CHECK-REPLACEMENT1: sorted(isOrderedBefore: @noescape (Int, Int) -&gt; Bool) -&gt; [Int]</RelatedName>
+// CHECK-REPLACEMENT1: sorted(by: @noescape (Int, Int) -&gt; Bool) -&gt; [Int]</RelatedName>
 // CHECK-REPLACEMENT1: RELATED END
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT2 %s
@@ -48,10 +48,10 @@ func foo3(a: Float, b: Bool) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=15:10 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT3 %s
 // CHECK-REPLACEMENT3: <Group>Collection/Array</Group>
-// CHECK-REPLACEMENT3: func sorted(isOrderedBefore: @noescape (<Type usr="s:V13cursor_stdlib2S1">S1</Type>
+// CHECK-REPLACEMENT3: func sorted(by areInIncreasingOrder: @noescape (<Type usr="s:V13cursor_stdlib2S1">S1</Type>
 // CHECK-REPLACEMENT3: sorted() -&gt; [S1]</RelatedName>
 // CHECK-REPLACEMENT3: sorted() -&gt; [S1]</RelatedName>
-// CHECK-REPLACEMENT3: sorted(isOrderedBefore: @noescape (S1, S1) -&gt; Bool) -&gt; [S1]</RelatedName>
+// CHECK-REPLACEMENT3: sorted(by: @noescape (S1, S1) -&gt; Bool) -&gt; [S1]</RelatedName>
 
 // RUN: %sourcekitd-test -req=cursor -pos=18:8 %s -- %s %mcp_opt %clang-importer-sdk | FileCheck -check-prefix=CHECK-REPLACEMENT4 %s
 // CHECK-REPLACEMENT4: <Group>Collection/Array</Group>

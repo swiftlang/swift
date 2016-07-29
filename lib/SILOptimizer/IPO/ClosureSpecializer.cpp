@@ -673,7 +673,7 @@ void ClosureSpecCloner::populateCloned() {
       auto NoReturnApply = FullApplySite::isa(&*PrevIter);
 
       // We insert the release value right before the no return apply so that if
-      // the partial apply is passed into the @noreturn function as an @owned
+      // the partial apply is passed into the no-return function as an @owned
       // value, we will retain the partial apply before we release it and
       // potentially eliminate it.
       Builder.setInsertionPoint(NoReturnApply.getInstruction());

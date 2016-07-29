@@ -13,4 +13,8 @@ class Foo: NSObject {
   @objc func method(x: Any) -> Any { return x }
 
   @objc func indirectAny(x: UnsafePointer<Any>) {} // expected-error{{type of the parameter cannot be represented in Objective-C}}
+
+  @objc func throwingMethod(x: Any) throws -> Any { return x }
+
+  @objc func throwingMethod(x: Any) throws -> Any? { return x } // expected-error{{throwing method cannot be marked @objc because it returns a value of optional type 'Any?'; 'nil' indicates failure to Objective-C}}
 }

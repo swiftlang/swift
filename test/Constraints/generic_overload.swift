@@ -27,14 +27,14 @@ d = f0_x2
 
 // Overloading based on the requirements of associated types
 func f1<T : P1>(_ t: T) -> Int { return 0 }
-func f1<T : P1 where T.Assoc : P3>(_ t: T) -> Double { return 0 }
+func f1<T : P1>(_ t: T) -> Double where T.Assoc : P3 { return 0 }
 
 var f1_x1 = f1(x1)
 d = f1_x1
 
 // Overloading based on same-type constraints.
 func f2<T : P1, U : P1>(_ t: T, _ u: U) -> Int { return 0 }
-func f2<T : P1, U : P1 where T.Assoc == U.Assoc>(_ t : T, _ u : U) -> Double { return 0 }
+func f2<T : P1, U : P1>(_ t : T, _ u : U) -> Double where T.Assoc == U.Assoc { return 0 }
 
 var f2_x1_x1 = f2(x1, x1)
 d = f2_x1_x1

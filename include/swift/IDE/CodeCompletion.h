@@ -409,6 +409,7 @@ enum class CodeCompletionDeclKind {
   InstanceVar,
   LocalVar,
   GlobalVar,
+  PrecedenceGroup,
 };
 
 enum class CodeCompletionLiteralKind {

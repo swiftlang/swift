@@ -31,7 +31,7 @@ public func f(_ i : Int) -> Int { // 301
 // CHECK-SIL-SAME: perf_inlined_at line:203:10
 // CHECK-SIL-SAME: perf_inlined_at line:302:10
 
-// CHECK: define {{.*}}@_TF9inlinedAt1fFSiSi
+// CHECK: define {{.*}}@_TF9inlinedAt1fFSiSi({{.*}})
 // CHECK-NOT: ret
 // CHECK: @llvm.dbg.value
 // CHECK: @llvm.dbg.value

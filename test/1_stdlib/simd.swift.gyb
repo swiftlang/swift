@@ -99,24 +99,24 @@ simdTestSuite.test("vector init") {
 
   //  Check empty initializer.
   var ${vec} = ${vectype}()
-  expectEqual(${[0]*size}, ${vec}, sameValue: same)
+  expectEqualTest(${[0]*size}, ${vec}, sameValue: same)
 
   //  Check literal initializer.
   ${vec} = ${vectype}(2)
-  expectEqual(${[2]*size}, ${vec}, sameValue: same)
+  expectEqualTest(${[2]*size}, ${vec}, sameValue: same)
 
   //  Check scalar initializer.
-  expectEqual(${vectype}(${type}(2)), ${vec}, sameValue: same)
+  expectEqualTest(${vectype}(${type}(2)), ${vec}, sameValue: same)
 
   //  Check elementwise initializer.
   ${vec} = ${vectype}(${', '.join(map(lambda i: str(i), range(size)))})
-  expectEqual(${range(size)}, ${vec}, sameValue: same)
+  expectEqualTest(${range(size)}, ${vec}, sameValue: same)
 
   //  Check labeled elementwise initializer.
   ${vec} = ${vectype}(${', '.join(map(lambda i:
                       component[i][1:] + ':' + str(i),
                       range(size)))})
-  expectEqual(${range(size)}, ${vec}, sameValue: same)
+  expectEqualTest(${range(size)}, ${vec}, sameValue: same)
 
   //  Previous checks implicitly use the array initializer, so we're good
   //  with that one already.
@@ -141,7 +141,7 @@ simdTestSuite.test("vector elements") {
 
   //  Check getting and setting [i]
   for i in 0..<${size} { ${vec}[i] = ${vec}[i]/2 }
-  expectEqual(${vec}, ${range(size)}, sameValue: same)
+  expectEqualTest(${vec}, ${range(size)}, sameValue: same)
 
 %   end # for size in [2,3,4]
 % end # for type in scalar_types
@@ -245,7 +245,7 @@ simdTestSuite.test("matrix init") {
 
   //  Check empty initializer.
   var ${mat} = ${mattype}()
-  expectEqual(${mat}, ${mattype}(${[[0]*rows]*cols}), sameValue: same)
+  expectEqualTest(${mat}, ${mattype}(${[[0]*rows]*cols}), sameValue: same)
 
   //  Check scalar initializer.
   ${mat} = ${mattype}(2)
@@ -280,7 +280,7 @@ simdTestSuite.test("matrix init") {
   }
 
   //  Round-trip through C matrix type.
-  expectEqual(${mat}, ${mattype}(${mat}.cmatrix), sameValue: same)
+  expectEqualTest(${mat}, ${mattype}(${mat}.cmatrix), sameValue: same)
 
 %     end # for rows
 %   end # for cols
@@ -311,10 +311,10 @@ simdTestSuite.test("matrix elements") {
   for i in 0..<${cols} {
     ${mat}[i] = ${type}(i+1)*${basis}[i]
   }
-  expectEqual(
+  expectEqualTest(
     ${mat}, ${mattype}(diagonal:${range(1, diagsize + 1)}), sameValue: same)
   for i in 0..<${cols} {
-    expectEqual(${mat}[i], ${type}(i + 1)*${basis}[i], sameValue: same)
+    expectEqualTest(${mat}[i], ${type}(i + 1)*${basis}[i], sameValue: same)
   }
 
   //  Check getting and setting elements (and transpose).

@@ -413,7 +413,7 @@ func canBeClass<T>(_ f: (Builtin.Int8) -> (), _: T) {
   f(Builtin.canBeClass(O.self))
   // CHECK: call void {{%.*}}(i8 1
   f(Builtin.canBeClass(OP1.self))
-  typealias ObjCCompo = protocol<OP1, OP2>
+  typealias ObjCCompo = OP1 & OP2
   // CHECK: call void {{%.*}}(i8 1
   f(Builtin.canBeClass(ObjCCompo.self))
 
@@ -423,7 +423,7 @@ func canBeClass<T>(_ f: (Builtin.Int8) -> (), _: T) {
   f(Builtin.canBeClass(C.self))
   // CHECK: call void {{%.*}}(i8 0
   f(Builtin.canBeClass(P.self))
-  typealias MixedCompo = protocol<OP1, P>
+  typealias MixedCompo = OP1 & P
   // CHECK: call void {{%.*}}(i8 0
   f(Builtin.canBeClass(MixedCompo.self))
 

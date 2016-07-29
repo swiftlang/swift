@@ -111,8 +111,8 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
-  public var identity: UnsafePointer<Void> {
-    return UnsafePointer(firstElementAddress)
+  public var identity: UnsafeRawPointer {
+    return UnsafeRawPointer(firstElementAddress)
   }
 
   /// An object that keeps the elements stored in this buffer alive.
@@ -190,7 +190,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     _sanityCheck(bounds.upperBound >= bounds.lowerBound)
     _sanityCheck(bounds.upperBound <= endIndex)
     let c = bounds.count
-    target.initializeFrom(subscriptBaseAddress + bounds.lowerBound, count: c)
+    target.initialize(from: subscriptBaseAddress + bounds.lowerBound, count: c)
     return target + c
   }
 
@@ -235,11 +235,11 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   }
 
   mutating func isUniquelyReferenced() -> Bool {
-    return isUniquelyReferencedNonObjC(&owner)
+    return isKnownUniquelyReferenced(&owner)
   }
 
   mutating func isUniquelyReferencedOrPinned() -> Bool {
-    return isUniquelyReferencedOrPinnedNonObjC(&owner)
+    return _isKnownUniquelyReferencedOrPinned(&owner)
   }
 
   @_versioned
@@ -338,8 +338,8 @@ extension _SliceBuffer {
     let result = _ContiguousArrayBuffer<Element>(
       uninitializedCount: count,
       minimumCapacity: 0)
-    result.firstElementAddress.initializeFrom(
-      firstElementAddress, count: count)
+    result.firstElementAddress.initialize(
+      from: firstElementAddress, count: count)
     return ContiguousArray(_buffer: result)
   }
 }

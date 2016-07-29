@@ -22,6 +22,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
@@ -120,9 +121,6 @@ namespace {
     
     /// \brief The witness did not match because of mutating conflicts.
     MutatingConflict,
-
-    /// The witness is not @noreturn, but the requirement is.
-    NoReturnConflict,
 
     /// The witness is not rethrows, but the requirement is.
     RethrowsConflict,
@@ -314,7 +312,6 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
-      case MatchKind::NoReturnConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
       case MatchKind::NonObjC:
@@ -338,7 +335,6 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
-      case MatchKind::NoReturnConflict:
       case MatchKind::RethrowsConflict:
       case MatchKind::ThrowsConflict:
       case MatchKind::NonObjC:
@@ -707,7 +703,9 @@ matchWitness(TypeChecker &tc,
     auto funcWitness = cast<FuncDecl>(witness);
 
     // Either both must be 'static' or neither.
-    if (funcReq->isStatic() != funcWitness->isStatic())
+    if (funcReq->isStatic() != funcWitness->isStatic() &&
+        !(funcReq->isOperator() &&
+          !funcWitness->getDeclContext()->isTypeContext()))
       return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
 
     // If we require a prefix operator and the witness is not a prefix operator,
@@ -725,11 +723,6 @@ matchWitness(TypeChecker &tc,
     // Check that the mutating bit is ok.
     if (checkMutating(funcReq, funcWitness, funcWitness))
       return RequirementMatch(witness, MatchKind::MutatingConflict);
-
-    /// If the requirement is @noreturn, the witness must also be @noreturn.
-    if (reqAttrs.hasAttribute<NoReturnAttr>() &&
-        !witnessAttrs.hasAttribute<NoReturnAttr>())
-      return RequirementMatch(witness, MatchKind::NoReturnConflict);
 
     // If the requirement is rethrows, the witness must either be
     // rethrows or be non-throwing.
@@ -949,18 +942,20 @@ matchWitness(TypeChecker &tc,
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfMemberReference(selfTy, witness,
-                                      /*isTypeReference=*/false,
-                                      /*isDynamicResult=*/false,
-                                      witnessLocator,
-                                      /*base=*/nullptr,
-                                      /*opener=*/nullptr);
+                                       /*isTypeReference=*/false,
+                                       /*isDynamicResult=*/false,
+                                       FunctionRefKind::DoubleApply,
+                                       witnessLocator,
+                                       /*base=*/nullptr,
+                                       /*opener=*/nullptr);
     } else {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfReference(witness,
-                                /*isTypeReference=*/false,
-                                /*isDynamicResult=*/false,
-                                witnessLocator,
-                                /*base=*/nullptr);
+                                 /*isTypeReference=*/false,
+                                 /*isDynamicResult=*/false,
+                                 FunctionRefKind::DoubleApply,
+                                 witnessLocator,
+                                 /*base=*/nullptr);
     }
     openWitnessType = openWitnessType->getRValueType();
     
@@ -976,6 +971,7 @@ matchWitness(TypeChecker &tc,
       = cs->getTypeOfMemberReference(selfTy, req,
                                      /*isTypeReference=*/false,
                                      /*isDynamicResult=*/false,
+                                     FunctionRefKind::DoubleApply,
                                      reqLocator,
                                      /*base=*/nullptr,
                                      &replacements);
@@ -1224,23 +1220,42 @@ checkWitnessAccessibility(Accessibility *requiredAccess,
                           bool *isSetter) {
   *isSetter = false;
 
-  // FIXME: Handle "private(set)" requirements.
   *requiredAccess = std::min(Proto->getFormalAccess(), *requiredAccess);
+  if (TC.getLangOpts().EnableSwift3Private)
+    *requiredAccess = std::max(*requiredAccess, Accessibility::FilePrivate);
 
-  if (*requiredAccess > Accessibility::Private) {
-    if (witness->getFormalAccess() < *requiredAccess)
-      return true;
+  Accessibility witnessAccess = witness->getFormalAccess(DC);
 
-    if (requirement->isSettable(DC)) {
-      *isSetter = true;
+  // Leave a hole for old-style top-level operators to be declared 'private' for
+  // a fileprivate conformance.
+  if (witnessAccess == Accessibility::Private &&
+      witness->getDeclContext()->isModuleScopeContext()) {
+    witnessAccess = Accessibility::FilePrivate;
+  }
 
-      auto ASD = cast<AbstractStorageDecl>(witness);
-      const DeclContext *accessDC = nullptr;
-      if (*requiredAccess == Accessibility::Internal)
-        accessDC = DC->getParentModule();
-      if (!ASD->isSetterAccessibleFrom(accessDC))
-        return true;
+  if (witnessAccess < *requiredAccess)
+    return true;
+
+  if (requirement->isSettable(DC)) {
+    *isSetter = true;
+
+    auto ASD = cast<AbstractStorageDecl>(witness);
+    const DeclContext *accessDC;
+    switch (*requiredAccess) {
+    case Accessibility::Public:
+      accessDC = nullptr;
+      break;
+    case Accessibility::Internal:
+      accessDC = DC->getParentModule();
+      break;
+    case Accessibility::FilePrivate:
+    case Accessibility::Private:
+      accessDC = DC->getModuleScopeContext();
+      break;
     }
+
+    if (!ASD->isSetterAccessibleFrom(accessDC))
+      return true;
   }
 
   return false;
@@ -1507,8 +1522,7 @@ static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
 }
 
 /// Clean up the given declaration type for display purposes.
-static Type getTypeForDisplay(TypeChecker &tc, Module *module,
-                              ValueDecl *decl) {
+static Type getTypeForDisplay(Module *module, ValueDecl *decl) {
   // If we're not in a type context, just grab the interface type.
   Type type = decl->getInterfaceType();
   if (!decl->getDeclContext()->isTypeContext() ||
@@ -1541,7 +1555,7 @@ static Type getTypeForDisplay(TypeChecker &tc, Module *module,
 static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
                                          NormalProtocolConformance *conformance,
                                          ValueDecl *req) {
-  auto type = getTypeForDisplay(tc, module, req);
+  auto type = getTypeForDisplay(module, req);
 
   // Replace generic type parameters and associated types with their
   // witnesses, when we have them.
@@ -1735,7 +1749,7 @@ diagnoseMatch(TypeChecker &tc, Module *module,
 
   case MatchKind::TypeConflict: {
     auto diag = tc.diagnose(match.Witness, diag::protocol_witness_type_conflict,
-                            getTypeForDisplay(tc, module, match.Witness),
+                            getTypeForDisplay(module, match.Witness),
                             withAssocTypes);
     if (!isa<TypeDecl>(req))
       fixItOverrideDeclarationTypes(tc, diag, match.Witness, req);
@@ -1781,10 +1795,6 @@ diagnoseMatch(TypeChecker &tc, Module *module,
   case MatchKind::MutatingConflict:
     // FIXME: Could emit a Fix-It here.
     tc.diagnose(match.Witness, diag::protocol_witness_mutating_conflict);
-    break;
-  case MatchKind::NoReturnConflict:
-    // FIXME: Could emit a Fix-It here.
-    tc.diagnose(match.Witness, diag::protocol_witness_noreturn_conflict);
     break;
   case MatchKind::RethrowsConflict:
     // FIXME: Could emit a Fix-It here.
@@ -1962,7 +1972,14 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
       TC.computeAccessibility(nominal);
-      aliasDecl->setAccessibility(nominal->getFormalAccess());
+      // FIXME: Ideally this would use the protocol's access too---that is,
+      // a typealias added for an internal protocol shouldn't need to be
+      // public---but that can be problematic if the same type conforms to two
+      // protocols with different access levels.
+      Accessibility aliasAccess = nominal->getFormalAccess();
+      aliasAccess = std::max(aliasAccess, Accessibility::Internal);
+      aliasDecl->setAccessibility(aliasAccess);
+
       if (nominal == DC) {
         nominal->addMember(aliasDecl);
       } else {
@@ -1985,6 +2002,77 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     assocType,
     getArchetypeSubstitution(TC, DC, assocType->getArchetype(), type),
     typeDecl);
+}
+
+/// Generates a note for a protocol requirement for which no witness was found
+/// and provides a fixit to add a stub to the adopter
+static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
+                              NormalProtocolConformance *Conformance,
+                              TypeChecker &TC) {
+  SourceLoc FixitLocation;
+  SourceLoc TypeLoc;
+  if (auto Extension = dyn_cast<ExtensionDecl>(Conformance->getDeclContext())) {
+    FixitLocation = Extension->getBraces().Start.getAdvancedLocOrInvalid(1);
+    TypeLoc = Extension->getStartLoc();
+  } else if (auto Nominal =
+               dyn_cast<NominalTypeDecl>(Conformance->getDeclContext())) {
+    FixitLocation = Nominal->getBraces().Start.getAdvancedLocOrInvalid(1);
+    TypeLoc = Nominal->getStartLoc();
+  } else {
+    llvm_unreachable("Unknown adopter kind");
+  }
+
+  // FIXME: Infer body indentation from the source rather than hard-coding
+  // 4 spaces.
+  std::string ExtraIndent = "    ";
+  StringRef CurrentIndent = Lexer::getIndentationForLine(TC.Context.SourceMgr,
+                                                         TypeLoc);
+  std::string StubIndent = CurrentIndent.str() + ExtraIndent;
+
+  std::string FixitString;
+  llvm::raw_string_ostream FixitStream(FixitString);
+  ExtraIndentStreamPrinter Printer(FixitStream, StubIndent);
+
+  if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
+    Printer.printNewline();
+    Printer << "typealias " << MissingTypeWitness->getName() << " = <#type#>";
+    Printer << "\n";
+
+    TC.diagnose(MissingTypeWitness, diag::no_witnesses_type,
+                MissingTypeWitness->getName())
+      .fixItInsert(FixitLocation, FixitStream.str());
+  } else {
+
+    PrintOptions Options = PrintOptions::printForDiagnostics();
+    Options.AccessibilityFilter = Accessibility::Private;
+    Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
+    if (isa<ClassDecl>(Conformance->getDeclContext())) {
+      Type SelfType = Conformance->getDeclContext()->getSelfTypeInContext();
+      DeclContext *Adopter = Conformance->getDeclContext();
+      Options.setArchetypeSelfTransform(SelfType, Adopter);
+    } else {
+      Type SelfType = Conformance->getDeclContext()->getSelfTypeInContext();
+      DeclContext *Adopter = Conformance->getDeclContext();
+      Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
+    }
+    Options.CurrentModule = Conformance->getDeclContext()->getParentModule();
+    if (isa<NominalTypeDecl>(Conformance->getDeclContext())) {
+      // Create a variable declaration instead of a computed property in nominal
+      // types
+      Options.PrintPropertyAccessors = false;
+    }
+
+    Printer.printNewline();
+    Requirement->print(Printer, Options);
+    Printer << "\n";
+
+    // Point out the requirement that wasn't met.
+    TC.diagnose(Requirement, diag::no_witnesses,
+                            getRequirementKind(Requirement),
+                            Requirement->getFullName(),
+                            RequirementType)
+      .fixItInsert(FixitLocation, FixitStream.str());
+  }
 }
 
 ResolveWitnessResult
@@ -2291,24 +2379,26 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       Type reqType = getRequirementTypeForDisplay(tc, dc->getParentModule(),
                                                   conformance, requirement);
 
-      // Point out the requirement that wasn't met.
-      tc.diagnose(requirement,
-                  numViable > 0 ? (ignoringNames
-                                   ? diag::ambiguous_witnesses_wrong_name
-                                   : diag::ambiguous_witnesses)
-                                : diag::no_witnesses,
-                  getRequirementKind(requirement),
-                  requirement->getFullName(),
-                  reqType);
+      if (numViable > 0) {
+        auto diagnosticMessage = diag::ambiguous_witnesses;
+        if (ignoringNames) {
+          diagnosticMessage = diag::ambiguous_witnesses_wrong_name;
+        }
+        tc.diagnose(requirement, diagnosticMessage,
+                    getRequirementKind(requirement),
+                    requirement->getFullName(),
+                    reqType);
+      } else {
+        // Generate diagnostics for the missing requirement and a fixit to add
+        // it
+        diagnoseNoWitness(requirement, reqType, conformance, tc);
+      }
 
       // Diagnose each of the matches.
       for (const auto &match : matches)
         diagnoseMatch(tc, dc->getParentModule(), conformance, requirement,
                       match);
     });
-
-
-  // FIXME: Suggest a new declaration that does match?
 
   return ResolveWitnessResult::ExplicitFailed;
 }
@@ -3417,8 +3507,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
       diagnoseOrDefer(missingTypeWitness, true,
         [missingTypeWitness](TypeChecker &tc,
                              NormalProtocolConformance *conformance) {
-          tc.diagnose(missingTypeWitness, diag::no_witnesses_type,
-                      missingTypeWitness->getName());
+          diagnoseNoWitness(missingTypeWitness, Type(), conformance, tc);
         });
     }
 
@@ -4035,6 +4124,10 @@ bool TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
   return false;
 }
 
+// FIXME: This is a bug-prone interface.
+/// Returns true if T conforms to Proto. For concrete conformances,
+/// Conformance is set to the lookup result, but for abstract
+/// conformances, Conformance is set to nullptr.
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                      DeclContext *DC,
                                      ConformanceCheckOptions options,
@@ -4495,8 +4588,8 @@ static void diagnosePotentialWitness(TypeChecker &tc,
                 witness->getFullName(), static_cast<unsigned>(*move));
   }
 
-  // If adding 'private' or 'internal' can help, suggest that.
-  if (accessibility != Accessibility::Private &&
+  // If adding 'private', 'fileprivate', or 'internal' can help, suggest that.
+  if (accessibility > Accessibility::FilePrivate &&
       !witness->getAttrs().hasAttribute<AccessibilityAttr>()) {
     tc.diagnose(witness, diag::optional_req_near_match_accessibility,
                 witness->getFullName(),
@@ -4535,7 +4628,13 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     // For anything with a Clang node, lazily check conformances.
     if (ext->hasClangNode()) return;
 
-    defaultAccessibility = ext->getDefaultAccessibility();
+    Type extendedTy = ext->getExtendedType();
+    if (!extendedTy)
+      return;
+    const NominalTypeDecl *nominal = extendedTy->getAnyNominal();
+    if (!nominal)
+      return;
+    defaultAccessibility = nominal->getFormalAccess();
   } else {
     // For anything with a Clang node, lazily check conformances.
     auto nominal = cast<NominalTypeDecl>(dc);
@@ -4588,7 +4687,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     if (tracker)
       tracker->addUsedMember({conformance->getProtocol(), Identifier()},
-                             defaultAccessibility != Accessibility::Private);
+                             defaultAccessibility > Accessibility::FilePrivate);
   }
 
   // Diagnose any conflicts attributed to this declaration context.

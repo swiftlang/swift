@@ -140,7 +140,7 @@ print(NSString(format: "%@ %@", "x", "y"))
 // CHECK-NEXT: 1{{.*}}024,25
 print(NSString(
   format: "%g",
-  locale: Locale(localeIdentifier: "fr_FR"),
+  locale: Locale(identifier: "fr_FR"),
   1024.25
 ))
 // CHECK-NEXT: x y z

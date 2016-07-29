@@ -899,6 +899,9 @@ public:
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
 
+  /// The original CS if this CS was created as a simplification of another CS
+  ConstraintSystem *baseCS = nullptr;
+
 private:
 
   /// \brief Allocator used for all of the related constraint systems.
@@ -1248,6 +1251,10 @@ public:
     return contextualType;
   }
 
+  const Expr *getContextualTypeNode() const {
+    return contextualTypeNode;
+  }
+
   ContextualTypePurpose getContextualTypePurpose() const {
     return contextualTypePurpose;
   }
@@ -1349,7 +1356,7 @@ public:
     assert(first && "Missing first type");
     assert(second && "Missing second type");
     auto c = Constraint::create(*this, kind, first, second, DeclName(),
-                                locator);
+                                FunctionRefKind::Compound, locator);
     if (isFavored) c->setFavored();
     addConstraint(c);
   }
@@ -1363,25 +1370,29 @@ public:
 
   /// \brief Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
+                                FunctionRefKind functionRefKind,
                                 ConstraintLocator *locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
     addConstraint(Constraint::create(*this, ConstraintKind::ValueMember,
-                                     baseTy, memberTy, name, locator));
+                                     baseTy, memberTy, name, functionRefKind,
+                                     locator));
   }
 
   /// \brief Add a value member constraint for an UnresolvedMemberRef
   /// to the constraint system.
   void addUnresolvedValueMemberConstraint(Type baseTy, DeclName name,
                                           Type memberTy,
+                                          FunctionRefKind functionRefKind,
                                           ConstraintLocator *locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
     addConstraint(Constraint::create(*this,
                                      ConstraintKind::UnresolvedValueMember,
-                                     baseTy, memberTy, name, locator));
+                                     baseTy, memberTy, name, functionRefKind,
+                                     locator));
   }
 
   /// \brief Add an archetype constraint.
@@ -1389,7 +1400,7 @@ public:
     assert(baseTy);
     addConstraint(Constraint::create(*this, ConstraintKind::Archetype,
                                      baseTy, Type(), DeclName(),
-                                         locator));
+                                     FunctionRefKind::Compound, locator));
   }
   
   /// \brief Remove an inactive constraint from the current constraint graph.
@@ -1540,6 +1551,7 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openFunctionType(
       AnyFunctionType *funcType,
+      unsigned numArgumentLabelsToRemove,
       ConstraintLocatorBuilder locator,
       llvm::DenseMap<CanType, TypeVariableType *> &replacements,
       DeclContext *innerDC,
@@ -1598,6 +1610,7 @@ public:
                           ValueDecl *decl,
                           bool isTypeReference,
                           bool isSpecialized,
+                          FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr);
 
@@ -1625,6 +1638,7 @@ public:
                           Type baseTy, ValueDecl *decl,
                           bool isTypeReference,
                           bool isDynamicResult,
+                          FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr,
                           llvm::DenseMap<CanType, TypeVariableType *>
@@ -1721,10 +1735,6 @@ public:
     /// Indicates we're unwrapping an optional type for a value-to-optional
     /// conversion.
     TMF_UnwrappingOptional = 0x8,
-    
-    /// Indicates we're applying an operator function with a nil-literal
-    /// argument.
-    TMF_ApplyingOperatorWithNil = 0x10,
   };
 
 private:
@@ -1825,6 +1835,7 @@ public:
   /// referenced.
   MemberLookupResult performMemberLookup(ConstraintKind constraintKind,
                                          DeclName memberName, Type baseTy,
+                                         FunctionRefKind functionRefKind,
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
@@ -1860,6 +1871,7 @@ private:
   SolutionKind simplifyConstructionConstraint(Type valueType, 
                                               FunctionType *fnType,
                                               unsigned flags,
+                                              FunctionRefKind functionRefKind,
                                               ConstraintLocator *locator);
 
   /// \brief Attempt to simplify the given conformance constraint.
@@ -2125,11 +2137,6 @@ static inline bool computeTupleShuffle(TupleType *fromTuple,
   return computeTupleShuffle(fromTuple->getElements(), toTuple->getElements(),
                              sources, variadicArgs);
 }
-
-
-/// \brief Return whether the function argument indicated by `locator` has a
-/// trailing closure.
-bool hasTrailingClosure(const ConstraintLocatorBuilder &locator);
 
 /// Describes the arguments to which a parameter binds.
 /// FIXME: This is an awful data structure. We want the equivalent of a

@@ -29,7 +29,7 @@ ArrayTraps.test("downcast1")
   let da = ba as! [Derived]
   let d0 = da[0]
   expectCrashLater()
-  da[1]
+  _ = da[1]
 }
 
 ArrayTraps.test("downcast2")
@@ -41,7 +41,7 @@ ArrayTraps.test("downcast2")
   let sa = a as! [NSString]
   let s0 = sa[0]
   expectCrashLater()
-  sa[1]
+  _ = sa[1]
 }
 
 ArrayTraps.test("downcast3")
@@ -56,7 +56,7 @@ ArrayTraps.test("downcast3")
   let d1a0 = d1a[0]
   let d1a1 = d1a[1]
   expectCrashLater()
-  d1a[2]
+  _ = d1a[2]
 }
 
 @objc protocol ObjCProto { }
@@ -72,7 +72,7 @@ ArrayTraps.test("downcast4")
   let da = ba as! [ObjCDerived]
   let d0 = da[0]
   expectCrashLater()
-  da[1]
+  _ = da[1]
 }
 
 ArrayTraps.test("bounds_with_downcast")

@@ -9,30 +9,30 @@ func getAnyValue<T>(_ opt: T?) -> T { return opt! }
 // dispatch/io.h
 let io = DispatchIO(type: .stream, fileDescriptor: 0, queue: DispatchQueue.main, cleanupHandler: { (error: Int32) -> () in fatalError() })
 io.close(flags: .stop)
-io.setInterval(interval: 0, flags: .strictInterval)
+io.setInterval(interval: .seconds(0), flags: .strictInterval)
 
 // dispatch/queue.h
-let q = DispatchQueue(label: "", attributes: .serial)
+let q = DispatchQueue(label: "", attributes: [])
 _ = DispatchQueue(label: "", attributes: .concurrent)
 _ = q.label
 if #available(OSX 10.10, iOS 8.0, *) {
-	_ = DispatchQueue.global(attributes: .qosUserInteractive)
-	_ = DispatchQueue.global(attributes: .qosBackground)
-	_ = DispatchQueue.global(attributes: .qosDefault)	
+	_ = DispatchQueue.global(qos: .userInteractive)
+	_ = DispatchQueue.global(qos: .background)
+	_ = DispatchQueue.global(qos: .default)	
 }
 
 // dispatch/source.h
-_ = DispatchSource.userDataAdd()
-_ = DispatchSource.userDataOr()
-_ = DispatchSource.machSend(port: mach_port_t(0), eventMask: [])
-_ = DispatchSource.machReceive(port: mach_port_t(0))
-_ = DispatchSource.memoryPressure(eventMask: [])
-_ = DispatchSource.process(identifier: 0, eventMask: [])
-_ = DispatchSource.read(fileDescriptor: 0)
-_ = DispatchSource.signal(signal: SIGINT)
-_ = DispatchSource.timer()
-_ = DispatchSource.fileSystemObject(fileDescriptor: 0, eventMask: [])
-_ = DispatchSource.write(fileDescriptor: 0)
+_ = DispatchSource.makeUserDataAddSource()
+_ = DispatchSource.makeUserDataOrSource()
+_ = DispatchSource.makeMachSendSource(port: mach_port_t(0), eventMask: [])
+_ = DispatchSource.makeMachReceiveSource(port: mach_port_t(0))
+_ = DispatchSource.makeMemoryPressureSource(eventMask: [])
+_ = DispatchSource.makeProcessSource(identifier: 0, eventMask: [])
+_ = DispatchSource.makeReadSource(fileDescriptor: 0)
+_ = DispatchSource.makeSignalSource(signal: SIGINT)
+_ = DispatchSource.makeTimerSource()
+_ = DispatchSource.makeFileSystemObjectSource(fileDescriptor: 0, eventMask: [])
+_ = DispatchSource.makeWriteSource(fileDescriptor: 0)
 
 // dispatch/time.h
 _ = DispatchTime.now()

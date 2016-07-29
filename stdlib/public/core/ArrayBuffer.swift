@@ -112,13 +112,8 @@ extension _ArrayBuffer {
 
   /// Convert to an NSArray.
   ///
-  /// - Precondition: `_isBridgedToObjectiveC(Element.self)`.
-  ///   O(1) if the element type is bridged verbatim, O(N) otherwise.
+  /// O(1) if the element type is bridged verbatim, O(N) otherwise.
   public func _asCocoaArray() -> _NSArrayCore {
-    _sanityCheck(
-      _isBridgedToObjectiveC(Element.self),
-      "Array element type is not bridged to Objective-C")
-
     return _fastPath(_isNative) ? _native._asCocoaArray() : _nonNative
   }
 
@@ -209,7 +204,8 @@ extension _ArrayBuffer {
       location: bounds.lowerBound,
       length: bounds.upperBound - bounds.lowerBound)
 
-    let buffer = UnsafeMutablePointer<AnyObject>(target)
+    let buffer = UnsafeMutableRawPointer(target).assumingMemoryBound(
+      to: AnyObject.self)
     
     // Copies the references out of the NSArray without retaining them
     nonNative.getObjects(buffer, range: nsSubRange)
@@ -217,7 +213,7 @@ extension _ArrayBuffer {
     // Make another pass to retain the copied objects
     var result = target
     for _ in CountableRange(bounds) {
-      result.initialize(with: result.pointee)
+      result.initialize(to: result.pointee)
       result += 1
     }
     return result
@@ -247,9 +243,11 @@ extension _ArrayBuffer {
         cocoa.contiguousStorage(Range(self.indices))
 
       if let cocoaStorageBaseAddress = cocoaStorageBaseAddress {
+        let basePtr = UnsafeMutableRawPointer(cocoaStorageBaseAddress)
+          .assumingMemoryBound(to: Element.self)
         return _SliceBuffer(
           owner: nonNative,
-          subscriptBaseAddress: UnsafeMutablePointer(cocoaStorageBaseAddress),
+          subscriptBaseAddress: basePtr,
           indices: bounds,
           hasNativeBuffer: false)
       }
@@ -260,7 +258,8 @@ extension _ArrayBuffer {
 
       // Tell Cocoa to copy the objects into our storage
       cocoa.buffer.getObjects(
-        UnsafeMutablePointer(result.firstElementAddress),
+        UnsafeMutableRawPointer(result.firstElementAddress)
+          .assumingMemoryBound(to: AnyObject.self),
         range: _SwiftNSRange(location: bounds.lowerBound, length: boundsCount))
 
       return _SliceBuffer(result, shiftedToStartIndex: bounds.lowerBound)
@@ -437,12 +436,12 @@ extension _ArrayBuffer {
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
-  public var identity: UnsafePointer<Void> {
+  public var identity: UnsafeRawPointer {
     if _isNative {
       return _native.identity
     }
     else {
-      return unsafeAddress(of: _nonNative)
+      return UnsafeRawPointer(Unmanaged.passUnretained(_nonNative).toOpaque())
     }
   }
   

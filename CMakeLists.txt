@@ -8,6 +8,9 @@ endif()
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+# First include general CMake utilities.
+include(SwiftUtils)
+
 #
 # User-configurable options that control the inclusion and default build
 # behavior for components which may not strictly be necessary (tools, examples,
@@ -79,7 +82,6 @@ set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
 set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
     STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
 
-include(SwiftBuildType)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
 if(swift_optimized)
   set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
@@ -351,13 +353,12 @@ set(CMAKE_CXX_ARCHIVE_FINISH "")
 
 include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
-include(SwiftUtils)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
 include(SwiftSource)
 include(AddSwift)
 include(SwiftConfigureSDK)
-include(SwiftInstallComponents)
+include(SwiftComponents)
 include(SwiftList)
 
 swift_configure_install_components("${SWIFT_INSTALL_COMPONENTS}")
@@ -831,11 +832,6 @@ if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
   add_subdirectory(tools)
-endif()
-
-is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
-if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
-  add_subdirectory(tools/swift-reflection-dump)
 endif()
 
 add_subdirectory(utils)

@@ -826,23 +826,17 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   if (!ConformsTo.empty()) {
     Out << " : ";
 
-    if (ConformsTo.size() != 1)
-      Out << "protocol<";
-
     bool First = true;
     for (const auto &ProtoAndSource : ConformsTo) {
       if (First)
         First = false;
       else
-        Out << ", ";
+        Out << " & ";
 
       Out << ProtoAndSource.first->getName().str() << " [";
       ProtoAndSource.second.dump(Out, SrcMgr);
       Out << "]";
     }
-
-    if (ConformsTo.size() != 1)
-      Out << ">";
   }
 
   if (Representative != this) {

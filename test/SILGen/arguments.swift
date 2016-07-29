@@ -4,6 +4,8 @@ struct Int {}
 struct Float {}
 struct UnicodeScalar {}
 
+enum Never {}
+
 // Minimal implementation to support varargs.
 struct Array<T> { }
 

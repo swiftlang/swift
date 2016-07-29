@@ -102,6 +102,7 @@ enum class SyntaxStructureKind : uint8_t {
   SwitchStatement,
   CaseStatement,
   Parameter,
+  Argument,
   BraceStatement,
   CallExpression,
   ArrayExpression,

@@ -22,6 +22,7 @@
 
 // STRIP_REFLECTION_METADATA-NOT: @"\01l__swift3_reflection_metadata"
 
+// CHECK-DAG: @__swift_reflection_version = linkonce_odr hidden constant i16 {{[0-9]+}}
 // CHECK-DAG: private constant [2 x i8] c"i\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 // CHECK-DAG: private constant [3 x i8] c"ms\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 // CHECK-DAG: private constant [3 x i8] c"me\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"

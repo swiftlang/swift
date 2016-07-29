@@ -54,13 +54,13 @@ extension Gizmo : Bells {
 // subscript requirement. rdar://problem/20371661
 
 protocol Subscriptable {
-  subscript(x: Int) -> AnyObject { get }
+  subscript(x: Int) -> Any { get }
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWCSo7NSArray14objc_witnesses13SubscriptableS0_FS1_g9subscriptFSiPs9AnyObject_ : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @owned AnyObject {
-// CHECK:         function_ref @_TTOFCSo7NSArrayg9subscriptFSiPs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject
-// CHECK-LABEL: sil shared [thunk] @_TTOFCSo7NSArrayg9subscriptFSiPs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject {
-// CHECK:         class_method [volatile] %1 : $NSArray, #NSArray.subscript!getter.1.foreign
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWCSo7NSArray14objc_witnesses13SubscriptableS0_FS1_g9subscriptFSiP_ : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @out Any {
+// CHECK:         function_ref @_TTOFCSo7NSArrayg9subscriptFSiP_ : $@convention(method) (Int, @guaranteed NSArray) -> @out Any
+// CHECK-LABEL: sil shared [thunk] @_TTOFCSo7NSArrayg9subscriptFSiP_ : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
+// CHECK:         class_method [volatile] {{%.*}} : $NSArray, #NSArray.subscript!getter.1.foreign
 extension NSArray: Subscriptable {}
 
 // witness is a dynamic thunk:

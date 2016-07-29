@@ -570,7 +570,7 @@ public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 ///
 /// - SeeAlso: `BitwiseOperations`
 @_transparent
-public prefix func ~(rhs: ${Self}) -> ${Self} {
+public prefix func ~ (rhs: ${Self}) -> ${Self} {
   let mask = ${Self}.subtractWithOverflow(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs._value, mask._value))
 }

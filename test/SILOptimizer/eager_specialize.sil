@@ -116,7 +116,7 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 // CHECK:   %10 = apply %9<T, T.Elt>(%0, %2, %1) : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, G<τ_0_0>) -> @out τ_0_0
 // CHECK:   br bb2
 
-// CHECK: bb2:                                              // Preds: bb1 bb3
+// CHECK: bb2:                                              // Preds: bb3 bb1
 // CHECK:   %12 = tuple ()
 // CHECK:   return %12 : $()
 
@@ -219,7 +219,7 @@ bb2:                                              // Preds: bb0
 // CHECK: bb2:                                              // Preds: bb1
 // CHECK:   br bb3(%{{.*}} : $Error)
 
-// CHECK: bb3(%{{.*}} : $Error):                        // Preds: bb2 bb7
+// CHECK: bb3(%{{.*}} : $Error):                        // Preds: bb7 bb2
 // CHECK:   throw %{{.*}} : $Error
 
 // CHECK: bb4:                                              // Preds: bb1
@@ -227,7 +227,7 @@ bb2:                                              // Preds: bb0
 // CHECK:   apply %{{.*}}<T>({{.*}}) : $@convention(witness_method) <τ_0_0 where τ_0_0 : IntegerArithmetic> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   br bb5
 
-// CHECK: bb5:                                              // Preds: bb4 bb8
+// CHECK: bb5:                                              // Preds: bb8 bb4
 // CHECK:   %{{.*}} = tuple ()
 // CHECK:   return %{{.*}} : $()
 
@@ -307,7 +307,7 @@ bb0(%0 : $*T):
 // CHECK:   apply %13<T>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int64
 // CHECK:   br bb3
 
-// CHECK: bb3:                                              // Preds: bb2 bb4 bb5
+// CHECK: bb3:                                              // Preds: bb5 bb4 bb2
 // CHECK:   tuple ()
 // CHECK:   return
 
@@ -361,7 +361,7 @@ sil_scope 37 {  parent 36 }
 // CHECK:   apply %13<T>
 // CHECK:   br bb3(%{{.*}} : $Int64)
 
-// CHECK: bb3(%{{.*}} : $Int64):                                  // Preds: bb2 bb4 bb5
+// CHECK: bb3(%{{.*}} : $Int64):                                  // Preds: bb5 bb4 bb2
 // CHECK:   return %{{.*}} : $Int64
 
 // CHECK: bb4:                                              // Preds: bb1

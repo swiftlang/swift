@@ -229,6 +229,16 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   llvm_unreachable("bad decl context");
 }
 
+static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
+  printFullContext(Decl->getDeclContext(), OS);
+  assert(Decl->hasName());
+
+  if (Decl->isOperator())
+    OS << '"' << Decl->getName() << '"';
+  else
+    OS << Decl->getName();
+}
+
 /// SILDeclRef uses sigil "#" and prints the fully qualified dotted path.
 void SILDeclRef::print(raw_ostream &OS) const {
   OS << "#";
@@ -242,53 +252,42 @@ void SILDeclRef::print(raw_ostream &OS) const {
     OS << "<anonymous function>";
   } else if (kind == SILDeclRef::Kind::Func) {
     auto *FD = cast<FuncDecl>(getDecl());
-    ValueDecl *decl = FD;
-    const char *Suffix;
     switch (FD->getAccessorKind()) {
     case AccessorKind::IsWillSet:
-      Suffix = "!willSet";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!willSet";
       break;
     case AccessorKind::IsDidSet:
-      Suffix = "!didSet";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!didSet";
       break;
     case AccessorKind::NotAccessor:
-      Suffix = "";
+      printValueDecl(FD, OS);
       isDot = false;
       break;
     case AccessorKind::IsGetter:
-      Suffix = "!getter";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!getter";
       break;
     case AccessorKind::IsSetter:
-      Suffix = "!setter";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!setter";
       break;
     case AccessorKind::IsMaterializeForSet:
-      Suffix = "!materializeForSet";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!materializeForSet";
       break;
     case AccessorKind::IsAddressor:
-      Suffix = "!addressor";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!addressor";
       break;
     case AccessorKind::IsMutableAddressor:
-      Suffix = "!mutableAddressor";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!mutableAddressor";
       break;
     }
-
-    printFullContext(decl->getDeclContext(), OS);
-    assert(decl->hasName());
-
-    if (decl->isOperator())
-      OS << '"' << decl->getName() << '"' << Suffix;
-    else
-      OS << decl->getName() << Suffix;
   } else {
-    printFullContext(getDecl()->getDeclContext(), OS);
-    OS << getDecl()->getName();
+    printValueDecl(getDecl(), OS);
   }
   switch (kind) {
   case SILDeclRef::Kind::Func:
@@ -480,12 +479,17 @@ public:
           *this << 's';
         *this << ": ";
 
-        // Display the user ids sorted to give a stable use order in the printer's
-        // output. This makes diffing large sections of SIL significantly easier.
         llvm::SmallVector<ID, 32> UserIDs;
         for (auto *Op : V->getUses())
           UserIDs.push_back(getID(Op->getUser()));
-        std::sort(UserIDs.begin(), UserIDs.end());
+
+        // Display the user ids sorted to give a stable use order in the
+        // printer's output if we are asked to do so. This makes diffing large
+        // sections of SIL significantly easier at the expense of not showing
+        // the _TRUE_ order of the users in the use list.
+        if (Ctx.sortSIL()) {
+          std::sort(UserIDs.begin(), UserIDs.end());
+        }
 
         interleave(UserIDs.begin(), UserIDs.end(),
             [&] (ID id) { *this << id; },
@@ -512,13 +516,18 @@ public:
       
       *this << "// Preds:";
 
-      // Display the predecessors ids sorted to give a stable use order in the
-      // printer's output. This makes diffing large sections of SIL
-      // significantly easier.
       llvm::SmallVector<ID, 32> PredIDs;
       for (auto *BBI : BB->getPreds())
         PredIDs.push_back(getID(BBI));
-      std::sort(PredIDs.begin(), PredIDs.end());
+
+      // Display the pred ids sorted to give a stable use order in the printer's
+      // output if we are asked to do so. This makes diffing large sections of
+      // SIL significantly easier at the expense of not showing the _TRUE_ order
+      // of the users in the use list.
+      if (Ctx.sortSIL()) {
+        std::sort(PredIDs.begin(), PredIDs.end());
+      }
+
       for (auto Id : PredIDs)
         *this << ' ' << Id;
     }
@@ -551,12 +560,16 @@ public:
       *this << 's';
     *this << ": ";
 
-    // Display the user ids sorted to give a stable use order in the printer's
-    // output. This makes diffing large sections of SIL significantly easier.
     llvm::SmallVector<ID, 32> UserIDs;
     for (auto *Op : V->getUses())
       UserIDs.push_back(getID(Op->getUser()));
-    std::sort(UserIDs.begin(), UserIDs.end());
+
+    // If we are asked to, display the user ids sorted to give a stable use
+    // order in the printer's output. This makes diffing large sections of SIL
+    // significantly easier.
+    if (Ctx.sortSIL()) {
+      std::sort(UserIDs.begin(), UserIDs.end());
+    }
 
     interleave(UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
                [&] { *this << ", "; });
@@ -1027,6 +1040,13 @@ public:
     if (CI->isInitializationOfDest())
       *this << "[initialization] ";
     *this << getIDAndType(CI->getDest());
+  }
+
+  void visitBindMemoryInst(BindMemoryInst *BI) {
+    *this << "bind_memory ";
+    *this << getIDAndType(BI->getBase()) << ", ";
+    *this << getIDAndType(BI->getIndex()) << " to ";
+    *this << BI->getBoundType();
   }
   
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand,
@@ -1727,6 +1747,14 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   for (auto *Attr : getSpecializeAttrs()) {
     OS << "[_specialize "; Attr->print(OS); OS << "] ";
   }
+
+  // TODO: Handle clang node owners which don't have a name.
+  if (hasClangNode() && getClangNodeOwner()->hasName()) {
+    OS << "[clang ";
+    printValueDecl(getClangNodeOwner(), OS);
+    OS << "] ";
+  }
+
   printName(OS);
   OS << " : $";
   

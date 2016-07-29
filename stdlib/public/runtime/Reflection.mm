@@ -47,7 +47,7 @@ using namespace swift;
 
 namespace {
   
-/// The layout of protocol<>.
+/// The layout of Any.
 using Any = OpaqueExistentialContainer;
 
 // Swift assumes Any is returned in memory. 
@@ -843,15 +843,6 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
   }
 
   return object;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool swift_isKind(id object, NSString *className) {
-  bool result = [object isKindOfClass:NSClassFromString(className)];
-  [object release];
-  [className release];
-
-  return result;
 }
 
 #endif

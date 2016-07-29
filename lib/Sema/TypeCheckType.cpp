@@ -519,8 +519,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     if (auto outerSig = TAD->getDeclContext()->getGenericSignatureOfContext()) {
       for (auto outerParam : outerSig->getGenericParams()) {
         subs[outerParam->getCanonicalType().getPointer()] =
-            ArchetypeBuilder::mapTypeIntoContext(TAD->getDeclContext(),
-                                                 outerParam);
+            resolver->resolveGenericTypeParamType(outerParam);
       }
     }
 
@@ -652,6 +651,10 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   } else {
     // Validate the declaration.
     TC.validateDecl(typeDecl);
+
+    // FIXME: More principled handling of circularity.
+    if (!isa<AssociatedTypeDecl>(typeDecl) && !typeDecl->hasType())
+      return ErrorType::get(TC.Context);
   }
 
   // Resolve the type declaration to a specific type. How this occurs
@@ -832,7 +835,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       comp->getIdentifier() == TC.Context.Id_Self) {
     auto func = cast<FuncDecl>(DC);
     assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
-
+    
     return func->getDynamicSelf();
   }
 
@@ -1816,9 +1819,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     // Resolve the function type directly with these attributes.
-    SILFunctionType::ExtInfo extInfo(rep,
-                                     attrs.has(TAK_noreturn),
-                                     attrs.has(TAK_pseudogeneric));
+    SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric));
 
     ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     if (!ty || ty->is<ErrorType>()) return ty;
@@ -1854,9 +1855,23 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.clearAttribute(TAK_autoclosure);
     }
 
+    // @noreturn has been replaced with a 'Never' return type.
+    if (fnRepr && attrs.has(TAK_noreturn)) {
+      auto &SM = TC.Context.SourceMgr;
+      auto loc = attrs.getLoc(TAK_noreturn);
+      auto attrRange = SourceRange(
+        loc.getAdvancedLoc(-1),
+        Lexer::getLocForEndOfToken(SM, loc));
+
+      auto resultRange = fnRepr->getResultTypeRepr()->getSourceRange();
+
+      TC.diagnose(loc, diag::noreturn_not_supported)
+          .fixItRemove(attrRange)
+          .fixItReplace(resultRange, "Never");
+    }
+
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(rep,
-                                  attrs.has(TAK_noreturn),
                                   attrs.has(TAK_autoclosure),
                                   attrs.has(TAK_noescape),
                                   attrs.has(TAK_escaping),
@@ -2355,9 +2370,11 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       complained = true;
     } 
 
-    // Single-element labeled tuples are not permitted, either.
-    if (elements.size() == 1 && elements[0].hasName() &&
-        !(options & TR_EnumCase)) {
+    // Single-element labeled tuples are not permitted outside of declarations
+    // or SIL, either.
+    if (elements.size() == 1 && elements[0].hasName()
+        && !(options & TR_SILType)
+        && !(options & TR_EnumCase)) {
       if (!complained) {
         auto named = cast<NamedTypeRepr>(repr->getElement(0));
         TC.diagnose(repr->getElement(0)->getStartLoc(),
@@ -2732,6 +2749,10 @@ bool TypeChecker::isCIntegerType(const DeclContext *DC, Type T) {
 static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
   // Simple case: bridgeable object types.
   if (type->isBridgeableObjectType())
+    return true;
+  
+  // Any bridges to AnyObject.
+  if (type->isAny())
     return true;
 
   // Determine whether this type is bridged to Objective-C.
@@ -3182,7 +3203,7 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   SmallVector<ProtocolDecl *, 4> Protocols;
   if (T->isExistentialType(Protocols)) {
     if (Protocols.empty()) {
-      // protocol<> is not @objc.
+      // Any is not @objc.
       diagnose(TypeRange.Start, diag::not_objc_empty_protocol_composition);
       return;
     }

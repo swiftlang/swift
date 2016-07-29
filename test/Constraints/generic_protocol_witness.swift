@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-infix operator • { }
+infix operator •
 
 protocol Runcible { func runce() }
 protocol Fungible { func funge() }
@@ -9,18 +9,18 @@ protocol Ansible { func anse() }
 protocol NeedsGenericMethods {
   func oneArgNoConstraints<T>(x : T) // expected-note {{protocol requires function 'oneArgNoConstraints(x:)' with type '<T> (x: T) -> ()'}}
   func oneArgWithConstraint<T : Runcible>(x: T) // expected-note {{protocol requires function 'oneArgWithConstraint(x:)' with type '<T> (x: T) -> ()'}}
-  func oneArgWithConstraints<T : protocol<Runcible, Fungible>>(x: T) // expected-note {{protocol requires function 'oneArgWithConstraints(x:)' with type '<T> (x: T) -> ()'}}
+  func oneArgWithConstraints<T : Runcible & Fungible>(x: T) // expected-note {{protocol requires function 'oneArgWithConstraints(x:)' with type '<T> (x: T) -> ()'}}
 
   func twoArgsOneVar<T>(x: T, y: T) // expected-note {{protocol requires function 'twoArgsOneVar(x:y:)' with type '<T> (x: T, y: T) -> ()'}}
   func twoArgsTwoVars<T, U>(x: T, y: U) // expected-note {{protocol requires function 'twoArgsTwoVars(x:y:)' with type '<T, U> (x: T, y: U) -> ()'}}
 
-  func •<T : Fungible>(x: Self, y: T) // expected-note {{protocol requires function '•' with type '<T> (TooTightConstraints, T) -> ()'}}
+  static func •<T : Fungible>(x: Self, y: T) // expected-note {{protocol requires function '•' with type '<T> (TooTightConstraints, T) -> ()'}}
 }
 
 class EqualConstraints : NeedsGenericMethods {
   func oneArgNoConstraints<U>(x: U) {}
   func oneArgWithConstraint<U : Runcible>(x: U) {}
-  func oneArgWithConstraints<U : protocol<Fungible, Runcible>>(x: U) {}
+  func oneArgWithConstraints<U : Fungible & Runcible>(x: U) {}
 
   func twoArgsOneVar<U>(x: U, y: U) {}
   func twoArgsTwoVars<V, U>(x: U, y: V) {}
@@ -40,7 +40,7 @@ func •<T>(_ x: LooseConstraints, y: T) {} // expected-note {{candidate has non
 class TooTightConstraints : NeedsGenericMethods { // expected-error{{type 'TooTightConstraints' does not conform to protocol 'NeedsGenericMethods'}}
   func oneArgNoConstraints<U : Runcible>(x: U) {} // expected-note{{candidate has non-matching type '<U> (x: U) -> ()'}}
   func oneArgWithConstraint<U : Fungible>(x: U) {} // expected-note{{candidate has non-matching type '<U> (x: U) -> ()'}}
-  func oneArgWithConstraints<U : protocol<Runcible, Fungible, Ansible>>(x: U) {} // expected-note{{candidate has non-matching type '<U> (x: U) -> ()'}}
+  func oneArgWithConstraints<U : Runcible & Fungible & Ansible>(x: U) {} // expected-note{{candidate has non-matching type '<U> (x: U) -> ()'}}
 
   func twoArgsOneVar<U : Runcible>(x: U) {} // expected-note{{candidate has non-matching type '<U> (x: U) -> ()'}}
   func twoArgsTwoVars<U>(x: U, y: U) {} // expected-note{{candidate has non-matching type '<U> (x: U, y: U) -> ()'}}

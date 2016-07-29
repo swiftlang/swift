@@ -293,16 +293,16 @@ public protocol RangeReplaceableCollection
   <rdar://problem/16566712> Dependent type should have been substituted by Sema
   or SILGen
 
-  func +<S : Sequence>(_: Self, _: S) -> Self
+  func + <S : Sequence>(_: Self, _: S) -> Self
     where S.Iterator.Element == Iterator.Element
 
-  func +<S : Sequence>(_: S, _: Self) -> Self
+  func + <S : Sequence>(_: S, _: Self) -> Self
     where S.Iterator.Element == Iterator.Element
 
-  func +<S : Collection>(_: Self, _: S) -> Self
+  func + <S : Collection>(_: Self, _: S) -> Self
     where S.Iterator.Element == Iterator.Element
 
-  func +<RC : RangeReplaceableCollection>(_: Self, _: S) -> Self
+  func + <RC : RangeReplaceableCollection>(_: Self, _: S) -> Self
     where RC.Iterator.Element == Iterator.Element
   */
 
@@ -366,7 +366,7 @@ public protocol RangeReplaceableCollection
   <rdar://problem/16566712> Dependent type should have been substituted by Sema
   or SILGen
 
-  func +=<S : Sequence>(inout _: Self, _: S)
+  func += <S : Sequence>(inout _: Self, _: S)
     where S.Iterator.Element == Iterator.Element
   */
 
@@ -1078,7 +1078,7 @@ extension RangeReplaceableCollection
 /// - Parameters:
 ///   - lhs: A range-replaceable collection.
 ///   - rhs: A collection or finite sequence.
-public func +<C : RangeReplaceableCollection, S : Sequence>(lhs: C, rhs: S) -> C
+public func + <C : RangeReplaceableCollection, S : Sequence>(lhs: C, rhs: S) -> C
   where S.Iterator.Element == C.Iterator.Element {
 
   var lhs = lhs
@@ -1106,7 +1106,7 @@ public func +<C : RangeReplaceableCollection, S : Sequence>(lhs: C, rhs: S) -> C
 /// - Parameters:
 ///   - lhs: A collection or finite sequence.
 ///   - rhs: A range-replaceable collection.
-public func +<C : RangeReplaceableCollection, S : Sequence>(lhs: S, rhs: C) -> C
+public func + <C : RangeReplaceableCollection, S : Sequence>(lhs: S, rhs: C) -> C
   where S.Iterator.Element == C.Iterator.Element {
 
   var result = C()

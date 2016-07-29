@@ -343,13 +343,13 @@ func return_generic_tuple()
   return standalone_generic
 }
 
-// CHECK-LABEL: sil hidden @_TF9functions16testNoReturnAttrFT_T_ : $@convention(thin) @noreturn () -> ()
-@noreturn func testNoReturnAttr() -> () {}
-// CHECK-LABEL: sil hidden @_TF9functions20testNoReturnAttrPoly{{.*}} : $@convention(thin) @noreturn <T> (@in T) -> ()
-@noreturn func testNoReturnAttrPoly<T>(_ x: T) -> () {}
+// CHECK-LABEL: sil hidden @_TF9functions16testNoReturnAttrFT_Os5Never : $@convention(thin) () -> Never
+func testNoReturnAttr() -> Never {}
+// CHECK-LABEL: sil hidden @_TF9functions20testNoReturnAttrPoly{{.*}} : $@convention(thin) <T> (@in T) -> Never
+func testNoReturnAttrPoly<T>(_ x: T) -> Never {}
 
-// CHECK-LABEL: sil hidden @_TF9functions21testNoReturnAttrParam{{.*}} : $@convention(thin) (@owned @noreturn @callee_owned () -> ()) -> ()
-func testNoReturnAttrParam(_ fptr: @noreturn () -> ()) -> () {}
+// CHECK-LABEL: sil hidden @_TF9functions21testNoReturnAttrParam{{.*}} : $@convention(thin) (@owned @callee_owned () -> Never) -> ()
+func testNoReturnAttrParam(_ fptr: () -> Never) -> () {}
 
 // CHECK-LABEL: sil hidden [transparent] @_TF9functions15testTransparent{{.*}} : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
 @_transparent func testTransparent(_ x: Bool) -> Bool {

@@ -31,7 +31,7 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
     /// An object that the poster wishes to send to observers.
     ///
     /// Typically this is the object that posted the notification.
-    public var object: AnyObject?
+    public var object: Any?
     
     /// Storage for values or objects related to this notification.
     public var userInfo: [String : Any]?
@@ -39,7 +39,7 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
     /// Initialize a new `Notification`.
     ///
     /// The default value for `userInfo` is nil.
-    public init(name: Name, object: AnyObject? = nil, userInfo: [String : Any]? = nil) {
+    public init(name: Name, object: Any? = nil, userInfo: [String : Any]? = nil) {
         self.name = name
         self.object = object
         self.userInfo = userInfo
@@ -59,46 +59,57 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
 
     // FIXME: Handle directly via API Notes
     public typealias Name = NSNotification.Name
+
+    /// Compare two notifications for equality.
+    ///
+    /// - note: Notifications that contain non NSObject values in userInfo will never compare as equal. This is because the type information is not preserved in the `userInfo` dictionary.
+    public static func ==(lhs: Notification, rhs: Notification) -> Bool {
+        if lhs.name.rawValue != rhs.name.rawValue {
+            return false
+        }
+        if let lhsObj = lhs.object {
+            if let rhsObj = rhs.object {
+                if lhsObj as AnyObject !== rhsObj as AnyObject {
+                    return false
+                }
+            } else {
+                return false
+            }
+        } else if rhs.object != nil {
+            return false
+        }
+        if let lhsUserInfo = lhs.userInfo {
+            if let rhsUserInfo = rhs.userInfo {
+                if lhsUserInfo.count != rhsUserInfo.count {
+                    return false
+                }
+                return _NSUserInfoDictionary.compare(lhsUserInfo, rhsUserInfo)
+            } else {
+                return false
+            }
+        } else if rhs.userInfo != nil {
+            return false
+        }
+        return true
+    }
 }
 
-/// Compare two notifications for equality.
-///
-/// - note: Notifications that contain non NSObject values in userInfo will never compare as equal. This is because the type information is not preserved in the `userInfo` dictionary.
-public func ==(lhs: Notification, rhs: Notification) -> Bool {
-    if lhs.name.rawValue != rhs.name.rawValue {
-        return false
-    }
-    if let lhsObj = lhs.object {
-        if let rhsObj = rhs.object {
-            if lhsObj !== rhsObj {
-                return false
-            }
-        } else {
-            return false
+extension Notification: CustomReflectable {
+    public var customMirror: Mirror {
+        var children: [(label: String?, value: Any)] = []
+        children.append((label: "name", value: self.name.rawValue))
+        if let o = self.object {
+            children.append((label: "object", value: o))
         }
-    } else if rhs.object != nil {
-        return false
-    }
-    if let lhsUserInfo = lhs.userInfo {
-        if let rhsUserInfo = rhs.userInfo {
-            if lhsUserInfo.count != rhsUserInfo.count {
-                return false
-            }
-            return _NSUserInfoDictionary.compare(lhsUserInfo, rhsUserInfo)
-        } else {
-            return false
+        if let u = self.userInfo {
+            children.append((label: "userInfo", value: u))
         }
-    } else if rhs.userInfo != nil {
-        return false
+        let m = Mirror(self, children:children, displayStyle: Mirror.DisplayStyle.class)
+        return m
     }
-    return true
 }
 
 extension Notification : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSNotification.self
     }
@@ -106,7 +117,7 @@ extension Notification : _ObjectiveCBridgeable {
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSNotification {
         if let info = userInfo {
-            return __NSNotificationCreate(name.rawValue as NSString, object, _NSUserInfoDictionary.bridgeValue(from: info))
+            return __NSNotificationCreate(name.rawValue as NSString, object.map { $0 as AnyObject }, _NSUserInfoDictionary.bridgeValue(from: info))
         }
 
         return NSNotification(name: name, object: object, userInfo: nil)    
@@ -140,3 +151,12 @@ extension Notification : _ObjectiveCBridgeable {
         return result!
     }
 }
+
+extension NSNotification : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as Notification)
+    }
+}
+

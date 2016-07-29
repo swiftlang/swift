@@ -62,7 +62,7 @@
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 public struct Character :
   _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
-  ExpressibleByExtendedGraphemeClusterLiteral, Equatable, Hashable, Comparable {
+  ExpressibleByExtendedGraphemeClusterLiteral, Hashable {
 
   // Fundamentally, it is just a String, but it is optimized for the
   // common case where the UTF-8 representation fits in 63 bits.  The
@@ -92,7 +92,7 @@ public struct Character :
       shift += 8
     }
 
-    UTF8.encode(scalar, sendingOutputTo: output)
+    UTF8.encode(scalar, into: output)
     asInt |= (~0) << shift
     _representation = .small(Builtin.trunc_Int64_Int63(asInt._value))
   }
@@ -183,7 +183,7 @@ public struct Character :
     }
     else {
       if let native = s._core.nativeBuffer,
-         native.start == UnsafeMutablePointer(s._core._baseAddress!) {
+         native.start == s._core._baseAddress! {
         _representation = .large(native._storage)
         return
       }
@@ -297,7 +297,7 @@ public struct Character :
         _SmallUTF8(u8).makeIterator(),
         from: UTF8.self, to: UTF16.self,
         stoppingOnError: false,
-        sendingOutputTo: output)
+        into: output)
       self.data = u16
     }
 
@@ -353,6 +353,14 @@ public struct Character :
   internal var _representation: Representation
 }
 
+extension Character : CustomStringConvertible {
+  public var description: String {
+    return String(describing: self)
+  }
+}
+
+extension Character : LosslessStringConvertible {}
+
 extension Character : CustomDebugStringConvertible {
   /// A textual representation of the character, suitable for debugging.
   public var debugDescription: String {
@@ -391,30 +399,35 @@ internal var _minASCIICharReprBuiltin: Builtin.Int63 {
   }
 }
 
-public func ==(lhs: Character, rhs: Character) -> Bool {
-  switch (lhs._representation, rhs._representation) {
-  case let (.small(lbits), .small(rbits)) where
-    Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
-    && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
-    return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
-  default:
-    // FIXME(performance): constructing two temporary strings is extremely
-    // wasteful and inefficient.
-    return String(lhs) == String(rhs)
+extension Character : Equatable {
+  public static func == (lhs: Character, rhs: Character) -> Bool {
+    switch (lhs._representation, rhs._representation) {
+    case let (.small(lbits), .small(rbits)) where
+      Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
+      && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
+      return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
+    default:
+      // FIXME(performance): constructing two temporary strings is extremely
+      // wasteful and inefficient.
+      return String(lhs) == String(rhs)
+    }
   }
 }
 
-public func <(lhs: Character, rhs: Character) -> Bool {
-  switch (lhs._representation, rhs._representation) {
-  case let (.small(lbits), .small(rbits)) where
-    // Note: This is consistent with Foundation but unicode incorrect.
-    // See String._compareASCII.
-    Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
-    && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
-    return Bool(Builtin.cmp_ult_Int63(lbits, rbits))
-  default:
-    // FIXME(performance): constructing two temporary strings is extremely
-    // wasteful and inefficient.
-    return String(lhs) < String(rhs)
+extension Character : Comparable {
+  public static func < (lhs: Character, rhs: Character) -> Bool {
+    switch (lhs._representation, rhs._representation) {
+    case let (.small(lbits), .small(rbits)) where
+      // Note: This is consistent with Foundation but unicode incorrect.
+      // See String._compareASCII.
+      Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
+      && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
+      return Bool(Builtin.cmp_ult_Int63(lbits, rbits))
+    default:
+      // FIXME(performance): constructing two temporary strings is extremely
+      // wasteful and inefficient.
+      return String(lhs) < String(rhs)
+    }
   }
 }
+

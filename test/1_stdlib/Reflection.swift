@@ -181,11 +181,11 @@ var randomUnsafeMutablePointerString = UnsafeMutablePointer<String>(
 dump(randomUnsafeMutablePointerString)
 
 // CHECK-NEXT: Hello panda
-var sanePointerString = UnsafeMutablePointer<String>(allocatingCapacity: 1)
-sanePointerString.initialize(with: "Hello panda")
+var sanePointerString = UnsafeMutablePointer<String>.allocate(capacity: 1)
+sanePointerString.initialize(to: "Hello panda")
 dump(sanePointerString.pointee)
 sanePointerString.deinitialize()
-sanePointerString.deallocateCapacity(1)
+sanePointerString.deallocate(capacity: 1)
 
 // Don't crash on types with opaque metadata. rdar://problem/19791252
 // CHECK-NEXT: (Opaque Value)

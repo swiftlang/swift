@@ -27,7 +27,7 @@ func printRollCall(_ x: RollCallable) {
   print(x.rollCall())
 }
 
-func printRollCallWithSnark(_ x: protocol<RollCallable, Snarker>) {
+func printRollCallWithSnark(_ x: RollCallable & Snarker) {
   printRollCall(x)
   print("(\(x.snark()))")
 }

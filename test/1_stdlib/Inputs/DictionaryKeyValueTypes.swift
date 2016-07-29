@@ -11,11 +11,11 @@ func acceptsAnyDictionary<KeyTy : Hashable, ValueTy>(
 func equalsUnordered<T : Comparable>(
   _ lhs: Array<(T, T)>, _ rhs: Array<(T, T)>
 ) -> Bool {
-  func comparePair(_ lhs: (T, T), _ rhs: (T, T)) -> Bool {
+  func areInAscendingOrder(_ lhs: (T, T), _ rhs: (T, T)) -> Bool {
     return [ lhs.0, lhs.1 ].lexicographicallyPrecedes([ rhs.0, rhs.1 ])
   }
-  return lhs.sorted(isOrderedBefore: comparePair)
-    .elementsEqual(rhs.sorted(isOrderedBefore: comparePair)) {
+  return lhs.sorted(by: areInAscendingOrder)
+    .elementsEqual(rhs.sorted(by: areInAscendingOrder)) {
     (lhs: (T, T), rhs: (T, T)) -> Bool in
     lhs.0 == rhs.0 && lhs.1 == rhs.1
   }

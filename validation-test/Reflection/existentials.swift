@@ -47,9 +47,9 @@ struct MyCustomError : MyProtocol, MyErrorProtocol {}
 
 struct HasError {
   let singleError: Error
-  let errorInComposition: protocol<MyProtocol, Error>
+  let errorInComposition: MyProtocol & Error
   let customError: MyErrorProtocol
-  let customErrorInComposition: protocol<MyErrorProtocol, MyProtocol>
+  let customErrorInComposition: MyErrorProtocol & MyProtocol
 }
 
 // This will be projected as a class existential, so its

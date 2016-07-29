@@ -14,18 +14,19 @@ import SwiftShims
 // TODO: API review
 /// A type representing an error value that can be thrown.
 ///
-/// Any type that declares conformance to `Error` can be used to
-/// represent an error in Swift's error handling system. Because
-/// `Error` has no requirements of its own, you can declare
-/// conformance on any custom type you create.
+/// Any type that declares conformance to the `Error` protocol can be used to
+/// represent an error in Swift's error handling system. Because the `Error`
+/// protocol has no requirements of its own, you can declare conformance on
+/// any custom type you create.
 ///
 /// Using Enumerations as Errors
 /// ============================
 ///
 /// Swift's enumerations are well suited to represent simple errors. Create an
-/// enumeration that conforms to `Error` with a case for each possible
-/// error. If there are additional details about the error that could be
-/// helpful for recovery, use associated values to include that information.
+/// enumeration that conforms to the `Error` protocol with a case for each
+/// possible error. If there are additional details about the error that could
+/// be helpful for recovery, use associated values to include that
+/// information.
 ///
 /// The following example shows an `IntParsingError` enumeration that captures
 /// two different kinds of errors that can occur when parsing an integer from
@@ -112,7 +113,7 @@ import SwiftShims
 public protocol Error {
   var _domain: String { get }
   var _code: Int { get }
-  var _userInfo: AnyObject? { get }
+  var _userInfo: Any? { get }
 }
 
 #if _runtime(_ObjC)
@@ -134,7 +135,7 @@ public func _stdlib_getErrorCode<T : Error>(_ x: UnsafePointer<T>) -> Int {
 @_silgen_name("swift_stdlib_getErrorUserInfoNSDictionary")
 public func _stdlib_getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>)
 -> AnyObject? {
-  return x.pointee._userInfo
+  return x.pointee._userInfo.map { $0 as AnyObject }
 }
 
 @_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
@@ -171,7 +172,7 @@ extension Error {
     return String(reflecting: self.dynamicType)
   }
 
-  public var _userInfo: AnyObject? {
+  public var _userInfo: Any? {
 #if _runtime(_ObjC)
     return _stdlib_getErrorDefaultUserInfo(self)
 #else

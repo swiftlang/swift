@@ -26,7 +26,10 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
                                                       ForDefinition_t forDef) {
   // First, get a mangled name for the declaration.
   std::string mangledName;
-  {
+
+  if (auto SILGenName = gDecl->getAttrs().getAttribute<SILGenNameAttr>()) {
+    mangledName = SILGenName->Name;
+  } else {
     Mangler mangler;
     mangler.mangleGlobalVariableFull(gDecl);
     mangledName = mangler.finalize();

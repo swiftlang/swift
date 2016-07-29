@@ -49,10 +49,11 @@ TypeNameTests.test("Prints") {
     _typeName(GC2<Model, Model2>.self))
   
   expectEqual("main.P", _typeName(P.self))
-  typealias PP2 = protocol<P, P2>
-  expectEqual("protocol<main.P, main.P2>",
+  typealias PP2 = P & P2
+  expectEqual("main.P & main.P2",
     _typeName(PP2.self))
-  expectEqual("protocol<>", _typeName(Any.self))
+  expectEqual("Any", _typeName(Any.self))
+  expectEqual("main.P & main.P2", _typeName((P & P2).self))
 
   typealias F = () -> ()
   typealias F2 = () -> () -> ()
@@ -61,7 +62,8 @@ TypeNameTests.test("Prints") {
   expectEqual("(()) -> ()", _typeName(F.self))
   expectEqual("(()) -> (()) -> ()", _typeName(F2.self))
   expectEqual("(((()) -> ())) -> ()", _typeName(F3.self))
-
+  expectEqual("(()) -> ()", _typeName((() -> ()).self))
+  
   #if _runtime(_ObjC)
   typealias B = @convention(block) () -> ()
   typealias B2 = () -> @convention(block) () -> ()
@@ -76,8 +78,8 @@ TypeNameTests.test("Prints") {
   expectEqual("((()) -> ()).Type", _typeName(F.Type.self))
   expectEqual("main.C.Type", _typeName(C.Type.self))
   expectEqual("main.C.Type.Type", _typeName(C.Type.Type.self))
-  expectEqual("protocol<>.Type", _typeName(Any.Type.self))
-  expectEqual("protocol<>.Protocol", _typeName(Any.Protocol.self))
+  expectEqual("Any.Type", _typeName(Any.Type.self))
+  expectEqual("Any.Protocol", _typeName(Any.Protocol.self))
   expectEqual("Swift.AnyObject", _typeName(AnyObject.self))
   expectEqual("Swift.AnyObject.Type", _typeName(AnyClass.self))
   expectEqual("Swift.Optional<Swift.AnyObject>",
@@ -86,7 +88,7 @@ TypeNameTests.test("Prints") {
 
 
   typealias Tup = (Any, F, C)
-  expectEqual("(protocol<>, (()) -> (), main.C)",
+  expectEqual("(Any, (()) -> (), main.C)",
     _typeName(Tup.self))
 }
 
@@ -113,7 +115,7 @@ TypeNameTests.test("Inout") {
     _typeName(IF3c.self))
   expectEqual("(inout ((()) -> ())) -> ()",
     _typeName(IF4.self))
-  expectEqual("(inout Swift.Int, protocol<>) -> ()",
+  expectEqual("(inout Swift.Int, Any) -> ()",
     _typeName(IF5.self))
 }
 

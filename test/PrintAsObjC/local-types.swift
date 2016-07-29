@@ -59,7 +59,7 @@ class ANonObjCClass {}
   func e(_ e: ZForwardProtocol2.Type) {}
   func e2(_ e: ZForwardProtocol2) {}
   func f(_ f: (ZForwardProtocol3, ZForwardProtocol4) -> ZForwardProtocol5) {}
-  func g(_ g: protocol<ZForwardProtocol6, ZForwardProtocol7>) {}
+  func g(_ g: ZForwardProtocol6 & ZForwardProtocol7) {}
 
   func h(_ h: ANonObjCClass) -> ANonObjCClass.Type { return h.dynamicType }
   func i(_: ZForwardProtocol8) {}

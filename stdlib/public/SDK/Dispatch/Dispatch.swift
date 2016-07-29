@@ -57,11 +57,6 @@ public struct DispatchQoS : Equatable {
 	@available(OSX 10.10, iOS 8.0, *)
 	public static let `default` = DispatchQoS(qosClass: .default, relativePriority: 0)
 
-	@available(OSX, introduced: 10.10, deprecated: 10.10, renamed: "DispatchQoS.default")
-	@available(iOS, introduced: 8.0, deprecated: 8.0, renamed: "DispatchQoS.default")
-	@available(*, deprecated, renamed: "DispatchQoS.default")
-	public static let defaultQoS = DispatchQoS.default
-
 	@available(OSX 10.10, iOS 8.0, *)
 	public static let userInitiated = DispatchQoS(qosClass: .userInitiated, relativePriority: 0)
 
@@ -80,11 +75,6 @@ public struct DispatchQoS : Equatable {
 		@available(OSX 10.10, iOS 8.0, *)
 		case `default`
 
-		@available(OSX, introduced: 10.10, deprecated: 10.10, renamed: "QoSClass.default")
-		@available(iOS, introduced: 8.0, deprecated: 8.0, renamed: "QoSClass.default")
-		@available(*, deprecated, renamed: "QoSClass.default")
-		static let defaultQoS = QoSClass.default
-
 		@available(OSX 10.10, iOS 8.0, *)
 		case userInitiated
 
@@ -94,8 +84,8 @@ public struct DispatchQoS : Equatable {
 		case unspecified
 
 		@available(OSX 10.10, iOS 8.0, *)
-		internal init?(qosClass: qos_class_t) {
-			switch qosClass {
+		public init?(rawValue: qos_class_t) {
+			switch rawValue {
 			case QOS_CLASS_BACKGROUND: self = .background
 			case QOS_CLASS_UTILITY: self = .utility
 			case QOS_CLASS_DEFAULT: self = .default
@@ -107,7 +97,7 @@ public struct DispatchQoS : Equatable {
 		}
 
 		@available(OSX 10.10, iOS 8.0, *)
-		internal var rawValue: qos_class_t {
+		public var rawValue: qos_class_t {
 			switch self {
 			case .background: return QOS_CLASS_BACKGROUND
 			case .utility: return QOS_CLASS_UTILITY
@@ -132,8 +122,8 @@ public func ==(a: DispatchQoS, b: DispatchQoS) -> Bool {
 /// 
 
 public enum DispatchTimeoutResult {
-	case Success
-	case TimedOut
+	case success
+	case timedOut
 }
 
 /// dispatch_group
@@ -158,21 +148,11 @@ public extension DispatchGroup {
 	}
 
 	public func wait(timeout: DispatchTime) -> DispatchTimeoutResult {
-		return __dispatch_group_wait(self, timeout.rawValue) == 0 ? .Success : .TimedOut
+		return __dispatch_group_wait(self, timeout.rawValue) == 0 ? .success : .timedOut
 	}
 
 	public func wait(wallTimeout timeout: DispatchWallTime) -> DispatchTimeoutResult {
-		return __dispatch_group_wait(self, timeout.rawValue) == 0 ? .Success : .TimedOut
-	}
-}
-
-public extension DispatchGroup {
-	@available(*, deprecated, renamed: "DispatchGroup.wait(self:wallTimeout:)")
-	public func wait(walltime timeout: DispatchWallTime) -> Int {
-		switch wait(wallTimeout: timeout) {
-		case .Success: return 0
-		case .TimedOut: return Int(KERN_OPERATION_TIMED_OUT)
-		}
+		return __dispatch_group_wait(self, timeout.rawValue) == 0 ? .success : .timedOut
 	}
 }
 
@@ -189,20 +169,11 @@ public extension DispatchSemaphore {
 	}
 
 	public func wait(timeout: DispatchTime) -> DispatchTimeoutResult {
-		return __dispatch_semaphore_wait(self, timeout.rawValue) == 0 ? .Success : .TimedOut
+		return __dispatch_semaphore_wait(self, timeout.rawValue) == 0 ? .success : .timedOut
 	}
 
 	public func wait(wallTimeout: DispatchWallTime) -> DispatchTimeoutResult {
-		return __dispatch_semaphore_wait(self, wallTimeout.rawValue) == 0 ? .Success : .TimedOut
+		return __dispatch_semaphore_wait(self, wallTimeout.rawValue) == 0 ? .success : .timedOut
 	}
 }
 
-public extension DispatchSemaphore {
-	@available(*, deprecated, renamed: "DispatchSemaphore.wait(self:wallTimeout:)")
-	public func wait(walltime timeout: DispatchWalltime) -> Int {
-		switch wait(wallTimeout: timeout) {
-		case .Success: return 0
-		case .TimedOut: return Int(KERN_OPERATION_TIMED_OUT)
-		}
-	}
-}

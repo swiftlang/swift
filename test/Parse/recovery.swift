@@ -286,7 +286,7 @@ struct ErrorTypeInVarDecl8 {
 }
 
 struct ErrorTypeInVarDecl9 {
-  var v1 : protocol // expected-error {{expected '<' in protocol composition type}}
+  var v1 : protocol // expected-error {{expected identifier for type name}}
   var v2 : Int
 }
 
@@ -301,13 +301,30 @@ struct ErrorTypeInVarDecl11 {
 }
 
 func ErrorTypeInPattern1(_: protocol<) { } // expected-error {{expected identifier for type name}}
-
 func ErrorTypeInPattern2(_: protocol<F) { } // expected-error {{expected '>' to complete protocol composition type}}
-// expected-note@-1 {{to match this opening '<'}}
-// expected-error@-2 {{use of undeclared type 'F'}}
+                                            // expected-note@-1 {{to match this opening '<'}}
+                                            // expected-error@-2 {{use of undeclared type 'F'}}
 
 func ErrorTypeInPattern3(_: protocol<F,) { } // expected-error {{expected identifier for type name}}
-// expected-error@-1 {{use of undeclared type 'F'}}
+                                             // expected-error@-1 {{use of undeclared type 'F'}}
+
+struct ErrorTypeInVarDecl12 {
+  var v1 : FooProtocol & // expected-error{{expected identifier for type name}}
+  var v2 : Int
+}
+
+struct ErrorTypeInVarDecl13 { // expected-note {{in declaration of 'ErrorTypeInVarDecl13'}}
+  var v1 : & FooProtocol // expected-error {{expected type}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error{{expected declaration}} 
+  var v2 : Int
+}
+
+struct ErrorTypeInVarDecl16 {
+  var v1 : FooProtocol & // expected-error {{expected identifier for type name}}
+  var v2 : Int
+}
+
+func ErrorTypeInPattern4(_: FooProtocol & ) { } // expected-error {{expected identifier for type name}}
+
 
 struct ErrorGenericParameterList1< // expected-error {{expected an identifier to name generic parameter}} expected-error {{expected '{' in struct}}
 
@@ -541,7 +558,7 @@ func f1() {
 
 // <rdar://problem/20489838> QoI: Nonsensical error and fixit if "let" is missing between 'if let ... where' clauses
 func testMultiPatternConditionRecovery(x: Int?) {
-  // expected-warning@+1 {{expected ',' joining parts of a multi-clause condition}} {{16-21=,}}
+  // expected-error@+1 {{expected ',' joining parts of a multi-clause condition}} {{16-21=,}}
   if let y = x where y == 0, let z = x {
     _ = y
     _ = z
@@ -551,13 +568,14 @@ func testMultiPatternConditionRecovery(x: Int?) {
     z = y; y = z
   }
 
-  if var y = x, z = x { // expected-warning {{expected 'var' in conditional}} {{17-17=var }}
+  if var y = x, z = x { // expected-error {{expected 'var' in conditional}} {{17-17=var }}
     z = y; y = z
   }
 
 
   // <rdar://problem/20883210> QoI: Following a "let" condition with boolean condition spouts nonsensical errors
   guard let x: Int? = 1, x == 1 else {  }
+  // expected-warning @-1 {{explicitly specified type 'Int?' adds an additional level of optional to the initializer, making the optional check always succeed}} {{16-22=Int}}
 }
 
 // rdar://20866942
@@ -639,6 +657,7 @@ infix operator · {  // expected-error {{'·' is considered to be an identifier,
 // <rdar://problem/21712891> Swift Compiler bug: String subscripts with range should require closing bracket.
 func r21712891(s : String) -> String {
   let a = s.startIndex..<s.startIndex
+  _ = a
   // The specific errors produced don't actually matter, but we need to reject this.
   return "\(s[a)"  // expected-error 3 {{}}
 }

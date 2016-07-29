@@ -14,9 +14,6 @@ func func3(fp fpx : @autoclosure () -> Int) {func3(fp: 0)}
 func func4(fp : @autoclosure () -> Int) {func4(fp: 0)}
 func func6(_: @autoclosure () -> Int) {func6(0)}
 
-// multi attributes
-func func7(_: @autoclosure @noreturn () -> Int) {func7(0)}
-
 // autoclosure + inout don't make sense.
 func func8(_ x: inout @autoclosure () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be used on parameters}}
 }

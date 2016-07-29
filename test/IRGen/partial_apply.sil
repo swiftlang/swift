@@ -261,13 +261,13 @@ sil public_external @indirect_guaranteed_captured_class_param : $@convention(thi
 // CHECK:         ret {{.*}} [[T0]]
 
 // CHECK:       define internal i64 [[PARTIAL_APPLY_FORWARDER]]
-// CHECK:         [[X_TMP:%.*]] = alloca %C13partial_apply10SwiftClass*
-// CHECK-NEXT:    [[X:%.*]] = bitcast %swift.refcounted* %1 to %C13partial_apply10SwiftClass*
-// CHECK-NEXT:    store %C13partial_apply10SwiftClass* [[X]], %C13partial_apply10SwiftClass** [[X_TMP]], align
+// CHECK:         [[X_TMP:%.*]] = alloca %swift.refcounted*
+// CHECK-NEXT:    store %swift.refcounted* %1, %swift.refcounted** [[X_TMP]], align
+// CHECK-NEXT:    [[X_CAST:%.*]] = bitcast %swift.refcounted** [[X_TMP]] to %C13partial_apply10SwiftClass**
 // CHECK-NOT:     load
 // CHECK-NOT:     retain
 // CHECK-NOT:     release
-// CHECK:         [[RESULT:%.*]] = call i64 @indirect_guaranteed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** noalias nocapture dereferenceable({{.*}}) [[X_TMP]])
+// CHECK:         [[RESULT:%.*]] = call i64 @indirect_guaranteed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** noalias nocapture dereferenceable({{.*}}) [[X_CAST]]
 // CHECK-NOT:     retain
 // CHECK:         call void @rt_swift_release(%swift.refcounted* %1)
 // CHECK:         ret i64 [[RESULT]]
@@ -290,13 +290,13 @@ sil public_external @indirect_consumed_captured_class_param : $@convention(thin)
 // CHECK:         ret {{.*}} [[T0]]
 
 // CHECK:       define internal i64 [[PARTIAL_APPLY_FORWARDER]]
-// CHECK:         [[X_TMP:%.*]] = alloca %C13partial_apply10SwiftClass*
-// CHECK-NEXT:    [[X:%.*]] = bitcast %swift.refcounted* %1 to %C13partial_apply10SwiftClass*
-// CHECK-NEXT:    store %C13partial_apply10SwiftClass* [[X]], %C13partial_apply10SwiftClass** [[X_TMP]], align
+// CHECK:         [[X_TMP:%.*]] = alloca %swift.refcounted*
+// CHECK-NEXT:    store %swift.refcounted* %1, %swift.refcounted** [[X_TMP]], align
+// CHECK-NEXT:    [[X_CAST:%.*]] = bitcast %swift.refcounted** [[X_TMP]] to %C13partial_apply10SwiftClass**
 // CHECK-NOT:     load
 // CHECK-NOT:     retain
 // CHECK-NOT:     release
-// CHECK:         [[RESULT:%.*]] = tail call i64 @indirect_consumed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** noalias nocapture dereferenceable({{.*}}) [[X_TMP]])
+// CHECK:         [[RESULT:%.*]] = tail call i64 @indirect_consumed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** noalias nocapture dereferenceable({{.*}}) [[X_CAST]])
 // CHECK-NOT:     retain
 // CHECK-NOT:     release
 // CHECK:         ret i64 [[RESULT]]

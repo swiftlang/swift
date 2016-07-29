@@ -15,7 +15,7 @@ func foo() -> UInt64 {
   var v0: UInt64 = 1
   var v1: UInt64 = 2
   var b: Bool = true
-  return withUnsafeMutablePointer(&buffer) { bufferPtr in 
+  return withUnsafeMutablePointer(to: &buffer) { bufferPtr in
     bufferPtr.pointee.x0 = 5
     bufferPtr.pointee.x1 = v0
     bufferPtr.pointee.x2 = v1

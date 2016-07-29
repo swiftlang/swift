@@ -29,7 +29,7 @@ internal class _NSUserInfoDictionaryKeyEnumerator : NSEnumerator {
     }
     
     @objc
-    internal override func nextObject() -> AnyObject? {
+    internal override func nextObject() -> Any? {
         if let next = _objcKeyGenerator?.next() {
             return next
         } else {
@@ -46,8 +46,8 @@ internal class _NSUserInfoDictionaryKeyEnumerator : NSEnumerator {
 }
 
 internal class _NSUserInfoDictionary : NSMutableDictionary {
-    private var _objc = [NSObject : AnyObject]()
-    private var _swift = [NSObject : Any]()
+    fileprivate var _objc = [NSObject : AnyObject]()
+    fileprivate var _swift = [NSObject : Any]()
     
     /// Note: these two init methods are the only proper method of construction and must be marked as "convenience" and call super.init() because the overlay has required init methods in extensions
     private convenience init(objc: [NSObject : AnyObject], swift: [NSObject : Any]) {
@@ -59,7 +59,7 @@ internal class _NSUserInfoDictionary : NSMutableDictionary {
     internal convenience init(dictionary dict: NSDictionary) {
         self.init()
         dict.enumerateKeysAndObjects(options: []) { k, v, stop in
-            _objc[k as! NSObject] = v
+            _objc[k as! NSObject] = v as AnyObject
         }
     }
 
@@ -69,7 +69,7 @@ internal class _NSUserInfoDictionary : NSMutableDictionary {
     }
     
     @objc
-    internal override func object(forKey aKey: AnyObject) -> AnyObject? {
+    internal override func object(forKey aKey: Any) -> Any? {
         if let key = aKey as? String {
             if let val = _objc[key as NSString] {
                 return val
@@ -86,17 +86,17 @@ internal class _NSUserInfoDictionary : NSMutableDictionary {
     }
     
     @objc
-    internal override func copy(with zone: NSZone?) -> AnyObject {
+    internal override func copy(with zone: NSZone?) -> Any {
         return self
     }
     
     @objc
-    internal override func mutableCopy(with zone: NSZone?) -> AnyObject {
+    internal override func mutableCopy(with zone: NSZone?) -> Any {
         return _NSUserInfoDictionary(objc: _objc, swift: _swift)
     }
     
     @objc
-    internal override func removeObject(forKey key: AnyObject) {
+    internal override func removeObject(forKey key: Any) {
         if let k = key as? String {
             _objc[k as NSString] = nil
             _swift[k as NSString] = nil
@@ -104,7 +104,7 @@ internal class _NSUserInfoDictionary : NSMutableDictionary {
     }
     
     @objc
-    internal override func setObject(_ anObject: AnyObject, forKey aKey: NSCopying) {
+    internal override func setObject(_ anObject: Any, forKey aKey: NSCopying) {
         if let key = aKey as? String {
             if let obj = anObject as? NSObject {
                 if let box = obj as? _NSSwiftUserInfoItem {
@@ -152,6 +152,7 @@ internal class _NSUserInfoDictionary : NSMutableDictionary {
         return true
     }
 
+    @nonobjc
     internal static func bridgeValue(from source: [String : Any]) -> AnyObject {
         var objc = [NSObject : AnyObject]()
         var swift = [NSObject : Any]()
@@ -168,6 +169,7 @@ internal class _NSUserInfoDictionary : NSMutableDictionary {
         return _NSUserInfoDictionary(objc: objc, swift: swift)
     }
 
+    @nonobjc
     internal static func bridgeValue(from source: [NSObject : Any]) -> AnyObject {
         var objc = [NSObject : AnyObject]()
         var swift = [NSObject : Any]()

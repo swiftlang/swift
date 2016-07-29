@@ -210,8 +210,8 @@ TypeRepr *CloneVisitor::visitProtocolCompositionTypeRepr(
   }
 
   return new (Ctx) ProtocolCompositionTypeRepr(protocols,
-                                               T->getProtocolLoc(),
-                                               T->getAngleBrackets());
+                                               T->getStartLoc(),
+                                               T->getCompositionRange());
 }
 
 TypeRepr *CloneVisitor::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
@@ -275,7 +275,6 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
 
 void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   const TypeAttributes &Attrs = getAttrs();
-  if (Attrs.has(TAK_noreturn))     Printer << "@noreturn ";
 
   switch (Attrs.has(TAK_autoclosure)*2 + Attrs.has(TAK_noescape)) {
   case 0: break;  // Nothing specified.
@@ -426,24 +425,26 @@ void NamedTypeRepr::printImpl(ASTPrinter &Printer,
 ProtocolCompositionTypeRepr *
 ProtocolCompositionTypeRepr::create(ASTContext &C,
                                     ArrayRef<IdentTypeRepr *> Protocols,
-                                    SourceLoc ProtocolLoc,
-                                    SourceRange AngleBrackets) {
+                                    SourceLoc FirstTypeLoc,
+                                    SourceRange CompositionRange) {
   return new (C) ProtocolCompositionTypeRepr(C.AllocateCopy(Protocols),
-                                             ProtocolLoc, AngleBrackets);
+                                             FirstTypeLoc, CompositionRange);
 }
 
 void ProtocolCompositionTypeRepr::printImpl(ASTPrinter &Printer,
                                             const PrintOptions &Opts) const {
-  Printer << "protocol<";
-  bool First = true;
-  for (auto Proto : Protocols) {
-    if (First)
-      First = false;
-    else
-      Printer << ", ";
-    printTypeRepr(Proto, Printer, Opts);
+  if (Protocols.empty()) {
+    Printer << "Any";
+  } else {
+    bool First = true;
+    for (auto Proto : Protocols) {
+      if (First)
+        First = false;
+      else
+        Printer << " & ";
+      printTypeRepr(Proto, Printer, Opts);
+    }
   }
-  Printer << ">";
 }
 
 void MetatypeTypeRepr::printImpl(ASTPrinter &Printer,

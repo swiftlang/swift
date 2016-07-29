@@ -43,7 +43,8 @@ using namespace swift;
 
 @implementation _SwiftNativeNSError
 
-+ (instancetype)alloc {
++ (instancetype)allocWithZone:(NSZone *)zone {
+  (void)zone;
   swift::crash("_SwiftNativeNSError cannot be instantiated");
 }
 

@@ -329,7 +329,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
 static bool matchesDiscriminator(Identifier discriminator,
                                  const ValueDecl *value) {
-  if (value->getFormalAccess() != Accessibility::Private)
+  if (value->getFormalAccess() > Accessibility::FilePrivate)
     return false;
 
   auto containingFile =
@@ -563,11 +563,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             if (FD->isStatic() && !isMetatypeType)
               continue;
           } else if (isa<EnumElementDecl>(Result)) {
-            auto lookupRes = UnqualifiedLookupResult(MetaBaseDecl, Result);
-            if (!BaseDecl->getType()->is<MetatypeType>()) {
-              lookupRes.IsPromotedInstanceRef = true;
-            }
-            Results.push_back(lookupRes);
+            Results.push_back(UnqualifiedLookupResult(BaseDecl, Result));
             continue;
           }
 
@@ -1021,8 +1017,13 @@ static bool checkAccessibility(const DeclContext *useDC,
   if (!useDC)
     return access == Accessibility::Public;
 
+  assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
   switch (access) {
   case Accessibility::Private:
+    if (sourceDC->getASTContext().LangOpts.EnableSwift3Private)
+      return useDC == sourceDC || useDC->isChildContextOf(sourceDC);
+    SWIFT_FALLTHROUGH;
+  case Accessibility::FilePrivate:
     return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
   case Accessibility::Internal: {
     const Module *sourceModule = sourceDC->getParentModule();

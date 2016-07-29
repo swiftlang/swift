@@ -14,7 +14,7 @@
 ///
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
-public struct ObjectIdentifier : Hashable, Comparable {
+public struct ObjectIdentifier : Hashable {
   internal let _value: Builtin.RawPointer
 
   // FIXME: Better hashing algorithm
@@ -47,25 +47,27 @@ extension ObjectIdentifier : CustomDebugStringConvertible {
   }
 }
 
-public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
-  return UInt(lhs) < UInt(rhs)
-}
+extension ObjectIdentifier : Comparable {
+  public static func < (lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
+    return UInt(bitPattern: lhs) < UInt(bitPattern: rhs)
+  }
 
-public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
+  public static func == (x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
+  }
 }
 
 extension UInt {
   /// Create a `UInt` that captures the full value of `objectID`.
-  public init(_ objectID: ObjectIdentifier) {
+  public init(bitPattern objectID: ObjectIdentifier) {
     self.init(Builtin.ptrtoint_Word(objectID._value))
   }
 }
 
 extension Int {
   /// Create an `Int` that captures the full value of `objectID`.
-  public init(_ objectID: ObjectIdentifier) {
-    self.init(bitPattern: UInt(objectID))
+  public init(bitPattern objectID: ObjectIdentifier) {
+    self.init(bitPattern: UInt(bitPattern: objectID))
   }
 }
 
@@ -130,7 +132,7 @@ public protocol _Mirror {
 @_silgen_name("swift_getSummary")
 public // COMPILER_INTRINSIC
 func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
-  out.initialize(with: String(reflecting: x))
+  out.initialize(to: String(reflecting: x))
 }
 
 /// Produce a mirror for any value.  The runtime produces a mirror that
@@ -140,7 +142,7 @@ internal func _reflect<T>(_ x: T) -> _Mirror
 
 /// Dump an object's contents using its mirror to the specified output stream.
 @discardableResult
-public func dump<T, TargetStream : OutputStream>(
+public func dump<T, TargetStream : TextOutputStream>(
   _ value: T,
   to target: inout TargetStream,
   name: String? = nil,
@@ -183,7 +185,7 @@ public func dump<T>(
 }
 
 /// Dump an object's contents. User code should use dump().
-internal func _dump_unlocked<TargetStream : OutputStream>(
+internal func _dump_unlocked<TargetStream : TextOutputStream>(
   _ value: Any,
   to target: inout TargetStream,
   name: String?,
@@ -212,10 +214,9 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
   _dumpPrint_unlocked(value, mirror, &target)
 
   let id: ObjectIdentifier?
-  if let classInstance = value as? AnyObject,
-     value.dynamicType is AnyObject.Type {
+  if value.dynamicType is AnyObject.Type {
     // Object is a class (but not an ObjC-bridged struct)
-    id = ObjectIdentifier(classInstance)
+    id = ObjectIdentifier(_unsafeDowncastToAnyObject(fromAny: value))
   } else if let metatypeInstance = value as? Any.Type {
     // Object is a metatype
     id = ObjectIdentifier(metatypeInstance)
@@ -282,7 +283,7 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
 
 /// Dump information about an object's superclass, given a mirror reflecting
 /// that superclass.
-internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
+internal func _dumpSuperclass_unlocked<TargetStream : TextOutputStream>(
   mirror: Mirror,
   to target: inout TargetStream,
   indent: Int,
@@ -380,7 +381,7 @@ public struct _MagicMirrorData {
     return result
   }
 
-  public func _loadValue<T>() -> T {
+  public func _loadValue<T>(ofType _: T.Type) -> T {
     return Builtin.load(ptr) as T
   }
 }
@@ -505,15 +506,15 @@ func _getClassChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 @_silgen_name("swift_ClassMirror_quickLookObject")
 public func _swift_ClassMirror_quickLookObject(_: _MagicMirrorData) -> AnyObject
 
-@_silgen_name("swift_isKind")
-func _swift_isKind(_ object: AnyObject, of: AnyObject) -> Bool
+@_silgen_name("_swift_stdlib_NSObject_isKindOfClass")
+internal func _swift_NSObject_isImpl(_ object: AnyObject, kindOf: AnyObject) -> Bool
 
-func _isKind(_ object: AnyObject, of: String) -> Bool {
-  return _swift_isKind(object, of: _bridgeToObjectiveC(of)!)
+internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
+  return _swift_NSObject_isImpl(object, kindOf: `class` as AnyObject)
 }
 
 func _getClassPlaygroundQuickLook(_ object: AnyObject) -> PlaygroundQuickLook? {
-  if _isKind(object, of: "NSNumber") {
+  if _is(object, kindOf: "NSNumber") {
     let number: _NSNumber = unsafeBitCast(object, to: _NSNumber.self)
     switch UInt8(number.objCType[0]) {
     case UInt8(ascii: "d"):
@@ -525,22 +526,22 @@ func _getClassPlaygroundQuickLook(_ object: AnyObject) -> PlaygroundQuickLook? {
     default:
       return .int(number.longLongValue)
     }
-  } else if _isKind(object, of: "NSAttributedString") {
+  } else if _is(object, kindOf: "NSAttributedString") {
     return .attributedString(object)
-  } else if _isKind(object, of: "NSImage") ||
-            _isKind(object, of: "UIImage") ||
-            _isKind(object, of: "NSImageView") ||
-            _isKind(object, of: "UIImageView") ||
-            _isKind(object, of: "CIImage") ||
-            _isKind(object, of: "NSBitmapImageRep") {
+  } else if _is(object, kindOf: "NSImage") ||
+            _is(object, kindOf: "UIImage") ||
+            _is(object, kindOf: "NSImageView") ||
+            _is(object, kindOf: "UIImageView") ||
+            _is(object, kindOf: "CIImage") ||
+            _is(object, kindOf: "NSBitmapImageRep") {
     return .image(object)
-  } else if _isKind(object, of: "NSColor") ||
-            _isKind(object, of: "UIColor") {
+  } else if _is(object, kindOf: "NSColor") ||
+            _is(object, kindOf: "UIColor") {
     return .color(object)
-  } else if _isKind(object, of: "NSBezierPath") ||
-            _isKind(object, of: "UIBezierPath") {
+  } else if _is(object, kindOf: "NSBezierPath") ||
+            _is(object, kindOf: "UIBezierPath") {
     return .bezierPath(object)
-  } else if _isKind(object, of: "NSString") {
+  } else if _is(object, kindOf: "NSString") {
     return .text(_forceBridgeFromObjectiveC(object, String.self))
   }
 
@@ -555,7 +556,7 @@ struct _ClassMirror : _Mirror {
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? {
-    return data._loadValue() as ObjectIdentifier
+    return data._loadValue(ofType: ObjectIdentifier.self)
   }
   var count: Int {
     return _getClassCount(data)
@@ -607,7 +608,7 @@ struct _MetatypeMirror : _Mirror {
   var valueType: Any.Type { return data.valueType }
 
   var objectIdentifier: ObjectIdentifier? {
-    return data._loadValue() as ObjectIdentifier
+    return data._loadValue(ofType: ObjectIdentifier.self)
   }
 
   var count: Int {
@@ -617,7 +618,7 @@ struct _MetatypeMirror : _Mirror {
     _preconditionFailure("no children")
   }
   var summary: String {
-    return _typeName(data._loadValue() as Any.Type)
+    return _typeName(data._loadValue(ofType: Any.Type.self))
   }
   var quickLookObject: PlaygroundQuickLook? { return nil }
 
@@ -628,6 +629,20 @@ struct _MetatypeMirror : _Mirror {
 extension ObjectIdentifier {
   @available(*, unavailable, message: "use the 'UInt(_:)' initializer")
   public var uintValue: UInt {
+    Builtin.unreachable()
+  }
+}
+
+extension UInt {
+  @available(*, unavailable, renamed: "init(bitPattern:)")
+  public init(_ objectID: ObjectIdentifier) {
+    Builtin.unreachable()
+  }
+}
+
+extension Int {
+  @available(*, unavailable, renamed: "init(bitPattern:)")
+  public init(_ objectID: ObjectIdentifier) {
     Builtin.unreachable()
   }
 }

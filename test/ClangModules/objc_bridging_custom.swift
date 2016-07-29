@@ -77,7 +77,7 @@ class Sub : Base {
   // FIXME: expected-error@+2 {{getter for 'prop' with Objective-C selector 'prop' conflicts with getter for 'prop' from superclass 'Base' with the same Objective-C selector}}
   // expected-note@+1 {{type does not match superclass var with type 'Refrigerator'}} {{22-37=Refrigerator}}
   override var prop: APPRefrigerator { // expected-error {{property 'prop' with type 'APPRefrigerator' cannot override a property with type 'Refrigerator'}}
-    return super.prop // implicitly bridged
+    return super.prop as APPRefrigerator
   }
   // FIXME: expected-error@+2 {{getter for 'propGeneric' with Objective-C selector 'propGeneric' conflicts with getter for 'propGeneric' from superclass 'Base' with the same Objective-C selector}}
   // expected-note@+1 {{type does not match superclass var with type 'ManufacturerInfo<NSString>'}} {{29-59=ManufacturerInfo<NSString>}}
@@ -87,21 +87,21 @@ class Sub : Base {
 }
 
 protocol TestProto {
-  func test(a: Refrigerator, b: Refrigerator) -> Refrigerator? // expected-note {{protocol requires}} {{none}}
-  func testGeneric(a: ManufacturerInfo<NSString>, b: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? // expected-note {{protocol requires}} {{none}}
-  static func testInout(_: inout Refrigerator) // expected-note {{protocol requires}} {{none}}
-  func testUnmigrated(a: RuncingMode, b: Refrigerator, c: NSCoding) // expected-note {{protocol requires}} {{none}}
-  func testPartialMigrated(a: RuncingMode, b: Refrigerator) // expected-note {{protocol requires}} {{none}}
+  func test(a: Refrigerator, b: Refrigerator) -> Refrigerator? // expected-note {{protocol requires}}
+  func testGeneric(a: ManufacturerInfo<NSString>, b: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? // expected-note {{protocol requires}}
+  static func testInout(_: inout Refrigerator) // expected-note {{protocol requires}}
+  func testUnmigrated(a: RuncingMode, b: Refrigerator, c: NSCoding) // expected-note {{protocol requires}}
+  func testPartialMigrated(a: RuncingMode, b: Refrigerator) // expected-note {{protocol requires}}
 
-  subscript(a a: Refrigerator, b b: Refrigerator) -> Refrigerator? { get } // expected-note {{protocol requires}} {{none}}
-  subscript(generic a: ManufacturerInfo<NSString>, b b: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? { get } // expected-note {{protocol requires}} {{none}}
+  subscript(a a: Refrigerator, b b: Refrigerator) -> Refrigerator? { get } // expected-note {{protocol requires}}
+  subscript(generic a: ManufacturerInfo<NSString>, b b: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? { get } // expected-note {{protocol requires}}
 
-  init?(a: Refrigerator, b: Refrigerator) // expected-note {{protocol requires}} {{none}}
-  init?(generic: ManufacturerInfo<NSString>, b: ManufacturerInfo<NSString>) // expected-note {{protocol requires}} {{none}}
-  init(singleArgument: Refrigerator) // expected-note {{protocol requires}} {{none}}
+  init?(a: Refrigerator, b: Refrigerator) // expected-note {{protocol requires}}
+  init?(generic: ManufacturerInfo<NSString>, b: ManufacturerInfo<NSString>) // expected-note {{protocol requires}}
+  init(singleArgument: Refrigerator) // expected-note {{protocol requires}}
 
-  var prop: Refrigerator? { get } // expected-note {{protocol requires}} {{none}}
-  var propGeneric: ManufacturerInfo<NSString>? { get } // expected-note {{protocol requires}} {{none}}
+  var prop: Refrigerator? { get } // expected-note {{protocol requires}}
+  var propGeneric: ManufacturerInfo<NSString>? { get } // expected-note {{protocol requires}}
 }
 
 class TestProtoImpl : NSObject, TestProto { // expected-error {{type 'TestProtoImpl' does not conform to protocol 'TestProto'}}

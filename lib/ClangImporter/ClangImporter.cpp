@@ -48,6 +48,7 @@
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Rewrite/Frontend/FrontendActions.h"
 #include "clang/Rewrite/Frontend/Rewriters.h"
@@ -4128,11 +4129,12 @@ void ClangModuleUnit::collectLinkLibraries(
 }
 
 StringRef ClangModuleUnit::getFilename() const {
-  if (!clangModule) {
+  if (!clangModule)
     return "<imports>";
-  }
-  return clangModule->getASTFile()
-    ? clangModule->getASTFile()->getName() : StringRef();
+  if (const clang::FileEntry *F = clangModule->getASTFile())
+    if (F->getName())
+      return F->getName();
+  return StringRef();
 }
 
 clang::TargetInfo &ClangImporter::getTargetInfo() const {

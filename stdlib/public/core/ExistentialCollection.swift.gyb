@@ -24,8 +24,11 @@ from gyb_stdlib_support import (
 
 import SwiftShims
 
-@noreturn @inline(never)
-internal func _abstract(_ file: StaticString = #file, line: UInt = #line) {
+@inline(never)
+internal func _abstract(
+  file: StaticString = #file,
+  line: UInt = #line
+) -> Never {
   fatalError("Method must be overridden", file: file, line: line)
 }
 
@@ -147,7 +150,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   internal func _filter(
-    _ includeElement: @noescape (Element) throws -> Bool
+    _ isIncluded: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
     _abstract()
   }
@@ -200,7 +203,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   internal func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     _abstract()
   }
@@ -335,9 +338,9 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     return try _base.map(transform)
   }
   internal override func _filter(
-    _ includeElement: @noescape (Element) throws -> Bool
+    _ isIncluded: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
-    return try _base.filter(includeElement)
+    return try _base.filter(isIncluded)
   }
   internal override func _forEach(
     _ body: @noescape (Element) throws -> Void
@@ -376,12 +379,12 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
 %   for ResultKind in EqualAndWeakerKinds:
   internal override func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${ResultKind}<Element>] {
     return try _base.split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: isSeparator)
+      whereSeparator: isSeparator)
       .map {
         Any${ResultKind}(_box: _${Kind}Box<S.SubSequence>(_base: $0))
       }
@@ -579,9 +582,9 @@ extension Any${Kind} {
   }
 
   public func filter(
-    _ includeElement: @noescape (Element) throws -> Bool
+    _ isIncluded: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
-    return try _box._filter(includeElement)
+    return try _box._filter(isIncluded)
   }
 
   public func forEach(
@@ -609,12 +612,12 @@ extension Any${Kind} {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     return try _box._split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: isSeparator)
+      whereSeparator: isSeparator)
   }
 
   public func _preprocessingPass<R>(
@@ -681,7 +684,7 @@ internal final class _IndexBox<
 /// the specific underlying type.
 ///
 /// - SeeAlso: `AnyCollection`
-public struct AnyIndex : Comparable {
+public struct AnyIndex {
   /// Creates a new index wrapping `base`.
   public init<BaseIndex : Comparable>(_ base: BaseIndex) {
     self._box = _IndexBox(_base: base)
@@ -698,47 +701,30 @@ public struct AnyIndex : Comparable {
   internal var _box: _AnyIndexBox
 }
 
-/// Returns `true` iff `lhs` and `rhs` wrap equal underlying indices.
-///
-/// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
-///   identical.
-public func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._isEqual(to: rhs._box)
-}
+extension AnyIndex : Comparable {
+  /// Returns `true` iff `lhs` and `rhs` wrap equal underlying indices.
+  ///
+  /// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
+  ///   identical.
+  public static func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    return lhs._box._isEqual(to: rhs._box)
+  }
 
-public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._isLess(than: rhs._box)
+  public static func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    return lhs._box._isLess(than: rhs._box)
+  }
 }
 
 //===--- Collections ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// A protocol for `AnyCollection<Element>`,
-/// `AnyBidirectionalCollection<Element>`, and
-/// `AnyRandomAccessCollection<Element>`.
-///
-/// This protocol can be considered an implementation detail of the
-/// `===` and `!==` implementations for these types.
-public protocol AnyCollectionProtocol : Collection {
+public // @testable
+protocol _AnyCollectionProtocol : Collection {
   /// Identifies the underlying collection stored by `self`. Instances
-  /// copied from one another have the same `_underlyingCollectionID`.
-  var _underlyingCollectionID: ObjectIdentifier { get }
-}
-
-/// Returns `true` iff `lhs` and `rhs` store the same underlying collection.
-public func === <
-  L : AnyCollectionProtocol, R : AnyCollectionProtocol
->(lhs: L, rhs: R) -> Bool {
-  return lhs._underlyingCollectionID == rhs._underlyingCollectionID
-}
-
-/// Returns `false` iff `lhs` and `rhs` store the same underlying collection.
-public func !== <
-  L : AnyCollectionProtocol, R : AnyCollectionProtocol
->(lhs: L, rhs: R) -> Bool {
-  return lhs._underlyingCollectionID != rhs._underlyingCollectionID
+  /// copied or upgraded/downgraded from one another have the same `_boxID`.
+  var _boxID: ObjectIdentifier { get }
 }
 
 % for (ti, Traversal) in enumerate(TRAVERSALS):
@@ -753,7 +739,7 @@ public func !== <
 ///
 /// - SeeAlso: ${', '.join('`Any%sCollection`' % t for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
 public struct ${Self}<Element>
-  : AnyCollectionProtocol, ${SelfProtocol} {
+  : _AnyCollectionProtocol, ${SelfProtocol} {
 
   internal init(_box: _${Self}Box<Element>) {
     self._box = _box
@@ -950,7 +936,7 @@ public struct ${Self}<Element>
 
   /// Uniquely identifies the stored underlying collection.
   public // Due to language limitations only
-  var _underlyingCollectionID: ObjectIdentifier {
+  var _boxID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }
 
@@ -978,10 +964,13 @@ extension Any${Kind} {
 }
 %end
 
-@available(*, unavailable, renamed: "AnyCollectionProtocol")
-public typealias AnyCollectionType = AnyCollectionProtocol
+@available(*, unavailable, renamed: "_AnyCollectionProtocol")
+public typealias AnyCollectionType = _AnyCollectionProtocol
 
-extension AnyCollectionProtocol {
+@available(*, unavailable, renamed: "_AnyCollectionProtocol")
+public typealias AnyCollectionProtocol = _AnyCollectionProtocol
+
+extension _AnyCollectionProtocol {
   @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> AnyIterator<Iterator.Element> {
     Builtin.unreachable()
@@ -1001,5 +990,19 @@ public func anyGenerator<G : IteratorProtocol>(_ base: G) -> AnyIterator<G.Eleme
 
 @available(*, unavailable, renamed: "AnyIterator.init(_:)")
 public func anyGenerator<Element>(_ body: () -> Element?) -> AnyIterator<Element> {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable)
+public func === <
+  L : _AnyCollectionProtocol, R : _AnyCollectionProtocol
+>(lhs: L, rhs: R) -> Bool {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable)
+public func !== <
+  L : _AnyCollectionProtocol, R : _AnyCollectionProtocol
+>(lhs: L, rhs: R) -> Bool {
   Builtin.unreachable()
 }

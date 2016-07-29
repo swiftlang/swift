@@ -22,7 +22,7 @@ public var noErr: OSStatus { return 0 }
 ///
 /// The C type is a typedef for `unsigned char`.
 @_fixed_layout
-public struct DarwinBoolean : Boolean, ExpressibleByBooleanLiteral {
+public struct DarwinBoolean : ExpressibleByBooleanLiteral {
   var _value: UInt8
 
   public init(_ value: Bool) {
@@ -66,26 +66,7 @@ func _convertBoolToDarwinBoolean(_ x: Bool) -> DarwinBoolean {
 }
 public // COMPILER_INTRINSIC
 func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
-  return Bool(x)
-}
-
-// FIXME: We can't make the fully-generic versions @_transparent due to
-// rdar://problem/19418937, so here are some @_transparent overloads
-// for DarwinBoolean.
-@_transparent
-public func && <T : Boolean>(
-  lhs: T,
-  rhs: @autoclosure () -> DarwinBoolean
-) -> Bool {
-  return lhs.boolValue ? rhs().boolValue : false
-}
-
-@_transparent
-public func || <T : Boolean>(
-  lhs: T,
-  rhs: @autoclosure () -> DarwinBoolean
-) -> Bool {
-  return lhs.boolValue ? true : rhs().boolValue
+  return x.boolValue
 }
 
 #endif
@@ -142,7 +123,7 @@ public var stderr : UnsafeMutablePointer<FILE> {
   }
 }
 
-public func dprintf(_ fd: Int, _ format: UnsafeMutablePointer<Int8>, _ args: CVarArg...) -> Int32 {
+public func dprintf(_ fd: Int, _ format: UnsafePointer<Int8>, _ args: CVarArg...) -> Int32 {
   let va_args = getVaList(args)
   return vdprintf(Int32(fd), format, va_args)
 }
@@ -238,7 +219,7 @@ internal func _swift_Platform_fcntl(
 internal func _swift_Platform_fcntlPtr(
   _ fd: Int32,
   _ cmd: Int32,
-  _ ptr: UnsafeMutablePointer<Void>
+  _ ptr: UnsafeMutableRawPointer
 ) -> Int32
 
 public func fcntl(
@@ -259,7 +240,7 @@ public func fcntl(
 public func fcntl(
   _ fd: Int32,
   _ cmd: Int32,
-  _ ptr: UnsafeMutablePointer<Void>
+  _ ptr: UnsafeMutableRawPointer
 ) -> Int32 {
   return _swift_Platform_fcntlPtr(fd, cmd, ptr)
 }
@@ -332,7 +313,7 @@ internal func _swift_Platform_ioctl(
 internal func _swift_Platform_ioctlPtr(
   _ fd: CInt,
   _ request: UInt,
-  _ ptr: UnsafeMutablePointer<Void>
+  _ ptr: UnsafeMutableRawPointer
 ) -> CInt
 
 public func ioctl(
@@ -346,7 +327,7 @@ public func ioctl(
 public func ioctl(
   _ fd: CInt,
   _ request: UInt,
-  _ ptr: UnsafeMutablePointer<Void>
+  _ ptr: UnsafeMutableRawPointer
 ) -> CInt {
   return _swift_Platform_ioctlPtr(fd, request, ptr)
 }

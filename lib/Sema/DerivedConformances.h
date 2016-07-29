@@ -107,12 +107,6 @@ ValueDecl *deriveBridgedNSError(TypeChecker &tc,
                                 NominalTypeDecl *type,
                                 ValueDecl *requirement);
 
-/// Insert an operator declaration associated with a declaration
-/// context. The operator declaration is added at global scope.
-void insertOperatorDecl(ASTContext &C,
-                        IterableDeclContext *scope,
-                        Decl *member);
-
 /// Declare a getter for a derived property.
 FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
                                        Decl *parentDecl,

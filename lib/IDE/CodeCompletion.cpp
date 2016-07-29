@@ -592,6 +592,8 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
     return CodeCompletionDeclKind::PrefixOperatorFunction;
   case DeclKind::PostfixOperator:
     return CodeCompletionDeclKind::PostfixOperatorFunction;
+  case DeclKind::PrecedenceGroup:
+    return CodeCompletionDeclKind::PrecedenceGroup;
   case DeclKind::EnumElement:
     return CodeCompletionDeclKind::EnumElement;
   case DeclKind::Subscript:
@@ -671,6 +673,9 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
       break;
     case CodeCompletionDeclKind::Module:
       Prefix.append("[Module]");
+      break;
+    case CodeCompletionDeclKind::PrecedenceGroup:
+      Prefix.append("[PrecedenceGroup]");
       break;
     }
     break;
@@ -3291,9 +3296,9 @@ public:
     // We allocate these expressions on the stack because we know they can't
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::BinaryOperator,
-                               DeclNameLoc(SourceLoc()));
+                               DeclNameLoc(LHS->getEndLoc()));
     sequence.drop_back(1).back() = &UDRE;
-    CodeCompletionExpr CCE((SourceRange()));
+    CodeCompletionExpr CCE(LHS->getSourceRange());
     sequence.back() = &CCE;
 
     SWIFT_DEFER {
@@ -3301,6 +3306,17 @@ public:
       SE->setElement(SE->getNumElements() - 1, nullptr);
       SE->setElement(SE->getNumElements() - 2, nullptr);
       eraseErrorTypes(SE);
+
+      // Reset any references to operators in types, so they are properly
+      // handled as operators by sequence folding.
+      //
+      // FIXME: Would be better to have some kind of 'OperatorRefExpr'?
+      for (auto &element : sequence.drop_back(2)) {
+        if (auto operatorRef = element->getMemberOperatorRef()) {
+          operatorRef->setType(nullptr);
+          element = operatorRef;
+        }
+      }
     };
 
     Expr *expr = SE;
@@ -3755,7 +3771,7 @@ public:
           if (seenTypes.insert(Ele.getType().getPointer()).second)
             ExpectedTypes.push_back(Ele.getType());
         }
-      } else if (Position == 0 && !HasName) {
+      } else if (Position == 0) {
         // The only param.
         TypeBase *T = Type->getDesugaredType();
         if (seenTypes.insert(T).second)
@@ -4049,10 +4065,10 @@ public:
       DeclNameOffsetLocatorPrinter Printer(OS);
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
-        Options.setArchetypeTransform(transformType, VD->getDeclContext());
+        Options.setArchetypeSelfTransform(transformType, VD->getDeclContext());
       Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
-      Options.ExclusiveAttrList.push_back(DAK_NoReturn);
+      Options.SkipAttributes = true;
       Options.PrintOverrideKeyword = false;
       Options.PrintPropertyAccessors = false;
       VD->print(Printer, Options);
@@ -4130,7 +4146,7 @@ public:
       llvm::raw_svector_ostream OS(DeclStr);
       PrintOptions Options;
       Options.PrintImplicitAttrs = false;
-      Options.ExclusiveAttrList.push_back(DAK_NoReturn);
+      Options.SkipAttributes = true;
       Options.PrintDefaultParameterPlaceholder = false;
       CD->print(OS, Options);
     }
@@ -4645,7 +4661,16 @@ static void addExprKeywords(CodeCompletionResultSink &Sink) {
   // Same: Swift.IntegerLiteralType.
   AddKeyword("#line", "Int", CodeCompletionKeywordKind::pound_line);
   AddKeyword("#column", "Int", CodeCompletionKeywordKind::pound_column);
-  AddKeyword("#dsohandle", "UnsafeMutablePointer<Void>", CodeCompletionKeywordKind::pound_dsohandle);
+  AddKeyword("#dsohandle", "UnsafeMutableRawPointer", CodeCompletionKeywordKind::pound_dsohandle);
+}
+
+static void addAnyTypeKeyword(CodeCompletionResultSink &Sink) {
+  CodeCompletionResultBuilder Builder(
+      Sink, CodeCompletionResult::ResultKind::Keyword,
+      SemanticContextKind::None, {});
+  Builder.setKeywordKind(CodeCompletionKeywordKind::None);
+  Builder.addTextChunk("Any");
+  Builder.addTypeAnnotation("Any");
 }
 
 
@@ -4676,19 +4701,23 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addSuperKeyword(Sink);
     addLetVarKeywords(Sink);
     addExprKeywords(Sink);
+    addAnyTypeKeyword(Sink);
     break;
 
   case CompletionKind::PostfixExpr:
   case CompletionKind::PostfixExprParen:
   case CompletionKind::SuperExpr:
   case CompletionKind::SuperExprDot:
-  case CompletionKind::TypeSimpleBeginning:
-  case CompletionKind::TypeIdentifierWithDot:
-  case CompletionKind::TypeIdentifierWithoutDot:
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::CaseStmtDotPrefix:
+  case CompletionKind::TypeIdentifierWithDot:
+  case CompletionKind::TypeIdentifierWithoutDot:
     break;
 
+  case CompletionKind::TypeSimpleBeginning:
+    addAnyTypeKeyword(Sink);
+    break;
+      
   case CompletionKind::NominalMemberBeginning:
     addDeclKeywords(Sink);
     addLetVarKeywords(Sink);
@@ -5374,6 +5403,7 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       if (R->getKind() != CodeCompletionResult::Declaration)
         return false;
       switch(R->getAssociatedDeclKind()) {
+      case CodeCompletionDeclKind::PrecedenceGroup:
       case CodeCompletionDeclKind::Module:
       case CodeCompletionDeclKind::Class:
       case CodeCompletionDeclKind::Struct:

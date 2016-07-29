@@ -205,6 +205,7 @@ public:
   void visitEnumCaseDecl(EnumCaseDecl *d) {}
   void visitEnumElementDecl(EnumElementDecl *d) {}
   void visitOperatorDecl(OperatorDecl *d) {}
+  void visitPrecedenceGroupDecl(PrecedenceGroupDecl *d) {}
   void visitTypeAliasDecl(TypeAliasDecl *d) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *d) {}
   void visitSubscriptDecl(SubscriptDecl *d) {}
@@ -352,6 +353,10 @@ public:
   SILDeclRef getDarwinBooleanToBoolFn();
   SILDeclRef getNSErrorToErrorFn();
   SILDeclRef getErrorToNSErrorFn();
+
+#define FUNC_DECL(NAME, ID) \
+  FuncDecl *get##NAME(SILLocation loc);
+#include "swift/AST/KnownDecls.def"
   
   /// Retrieve the _ObjectiveCBridgeable protocol definition.
   ProtocolDecl *getObjectiveCBridgeable(SILLocation loc);

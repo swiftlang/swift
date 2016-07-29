@@ -73,4 +73,4 @@ enum SE3<T : ExpressibleByIntegerLiteral> : T {
   }
 }
 
-enum SE4<T : protocol<ExpressibleByIntegerLiteral, Equatable> > : T { case X }
+enum SE4<T : ExpressibleByIntegerLiteral & Equatable> : T { case X }

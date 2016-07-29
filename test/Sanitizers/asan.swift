@@ -7,12 +7,12 @@
 
 // Test AddressSanitizer execution end-to-end.
 
-var a = UnsafeMutablePointer<Int>(allocatingCapacity: 1)
-a.initialize(with: 5)
+var a = UnsafeMutablePointer<Int>.allocate(capacity: 1)
+a.initialize(to: 5)
 a.deinitialize(count: 1)
-a.deallocateCapacity(1)
+a.deallocate(capacity: 1)
 print(a.pointee)
 a.deinitialize(count: 1)
-a.deallocateCapacity(1)
+a.deallocate(capacity: 1)
 
 // CHECK: AddressSanitizer: heap-use-after-free

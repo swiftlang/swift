@@ -26,7 +26,7 @@ extension vU1024: ExpressibleByIntegerLiteral, CustomStringConvertible, Equatabl
     var digit: vU1024 = 0
     repeat {
       (intermediate, digit) = quorem(intermediate, 10)
-      digits.append(Character(UnicodeScalar(Int(digit) + 48)))
+      digits.append(Character(UnicodeScalar(Int(digit) + 48)!))
     } while intermediate != 0
     return String(digits.reversed())
   }

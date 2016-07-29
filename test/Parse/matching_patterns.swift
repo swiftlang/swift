@@ -54,7 +54,7 @@ case _:
 }
 
 
-var e : protocol<> = 0
+var e : Any = 0
 
 switch e {
 // 'is' pattern.
@@ -291,8 +291,8 @@ case NonNominal(): // expected-error{{non-nominal type 'NonNominal' (aka '(foo: 
 
 var t = (1, 2, 3)
 
-prefix operator +++ {}
-infix operator +++ {}
+prefix operator +++
+infix operator +++
 prefix func +++(x: (Int,Int,Int)) -> (Int,Int,Int) { return x }
 func +++(x: (Int,Int,Int), y: (Int,Int,Int)) -> (Int,Int,Int) {
   return (x.0+y.0, x.1+y.1, x.2+y.2)

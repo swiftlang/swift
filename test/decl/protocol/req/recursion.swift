@@ -7,7 +7,7 @@ protocol SomeProtocol {
 extension SomeProtocol where T == Optional<T> { } // expected-error{{same-type constraint 'Self.T' == 'Optional<Self.T>' is recursive}}
 
 // rdar://problem/19840527
-class X<T where T == X> { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
+class X<T> where T == X { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
     var type: T { return self.dynamicType } // expected-error{{cannot convert return expression of type 'X<T>.Type' to return type 'T'}}
 }
 
@@ -20,7 +20,7 @@ protocol Y {
 public protocol P {
   associatedtype T
 }
-public struct S<A: P where A.T == S<A>> {} // expected-error{{type may not reference itself as a requirement}}
+public struct S<A: P> where A.T == S<A> {} // expected-error{{type may not reference itself as a requirement}}
 
 protocol I {
   init()
@@ -30,21 +30,21 @@ protocol PI {
   associatedtype T : I
 }
 
-struct SI<A: PI where A : I, A.T == SI<A>> : I { // expected-error{{type may not reference itself as a requirement}}
+struct SI<A: PI> : I where A : I, A.T == SI<A> { // expected-error{{type may not reference itself as a requirement}}
 }
 
 /* FIXME: Infinite recursion
 
-struct S4<A: PI where A : I> : I {
+struct S4<A: PI> : I where A : I {
 }
 
-struct S5<A: PI where A : I, A.T == S4<A>> : I {
+struct S5<A: PI> : I where A : I, A.T == S4<A> {
 }*/
 
 /* FIXME: Hits ArchetypeBuilder assertions
 
-struct SU<A: P where A.T == SU> {
+struct SU<A: P> where A.T == SU {
 }
 
-struct SIU<A: PI where A : I, A.T == SIU> : I {
+struct SIU<A: PI> : I where A : I, A.T == SIU {
 }*/

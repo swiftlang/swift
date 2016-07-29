@@ -136,6 +136,8 @@ MAP_STDLIB_TYPE("SInt", SignedInt, 32, "CInt", false, DoNothing)
 // Dispatch types.
 MAP_TYPE("dispatch_block_t", Block, 0, "Dispatch", "dispatch_block_t",
          true, DoNothing)
+MAP_TYPE("__swift_shims_dispatch_block_t", Block, 0, "Dispatch", "_DispatchBlock", 
+         true, DoNothing)
 
 // Objective-C types.
 MAP_TYPE("BOOL", ObjCBool, 8, "ObjectiveC", "ObjCBool", false, DoNothing)

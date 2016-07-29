@@ -60,7 +60,7 @@ extension SubSub {
 
 // SR-1025
 extension Base {
-  private static var x = 1
+  fileprivate static var x = 1
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_extensions19testStaticVarAccessFT_T_

@@ -15,7 +15,7 @@ func avalancheTest(_ bits: Int, _ hashUnderTest: (UInt64) -> UInt64, _ pValue: D
 
   for inputBit in 0..<bits {
     // Using an array here makes the test too slow.
-    var bitFlips = UnsafeMutablePointer<Int>(allocatingCapacity: bits)
+    var bitFlips = UnsafeMutablePointer<Int>.allocate(capacity: bits)
     for i in 0..<bits {
       bitFlips[i] = 0
     }
@@ -37,7 +37,7 @@ func avalancheTest(_ bits: Int, _ hashUnderTest: (UInt64) -> UInt64, _ pValue: D
         chiSquaredUniform2(testsInBatch, bitFlips[outputBit], pValue),
         "inputBit: \(inputBit), outputBit: \(outputBit)")
     }
-    bitFlips.deallocateCapacity(bits)
+    bitFlips.deallocate(capacity: bits)
   }
 }
 

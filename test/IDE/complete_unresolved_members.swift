@@ -30,6 +30,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_25 | FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_26 | FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_27 | FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_27_NOCRASH > /dev/null
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_28 | FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_29 | FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_30 | FileCheck %s -check-prefix=UNRESOLVED_2
@@ -241,12 +242,12 @@ extension C7 {
 var cInst1 = C7()
 cInst1.extendedf1(.#^UNRESOLVED_26^#
 
-      
-// This #if works around:
-// <rdar://problem/26057202> Crash in code completion on invalid input
-#if false
-#endif
-      
+func nocrash1() -> SomeEnum1 {
+  return .#^UNRESOLVED_27_NOCRASH^#
+}
+
+func resetParser1() {}
+
 func f() -> SomeEnum1 {
   return .#^UNRESOLVED_27^#
 }

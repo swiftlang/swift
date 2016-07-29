@@ -13,7 +13,7 @@ foo(a: [
   3: 3
 ])
 
-operator <> {
+precedencegroup Whatever {
 x
 }
 

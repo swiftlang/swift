@@ -28,6 +28,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
@@ -1366,6 +1367,8 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
                               getTriple().getArchName() +
                               ".a");
     Arguments.push_back(context.Args.MakeArgString(LibProfile));
+    Arguments.push_back(context.Args.MakeArgString(
+        Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
   }
 
   // Always add the stdlib

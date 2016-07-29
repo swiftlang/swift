@@ -29,7 +29,7 @@ func f4(_ x: Int) -> Int { }
 
 func f5<T : P2>(_ : T) { }
 
-func f6<T : P, U : P where T.SomeType == U.SomeType>(_ t: T, _ u: U) {}
+func f6<T : P, U : P>(_ t: T, _ u: U) where T.SomeType == U.SomeType {}
 
 var i : Int
 var d : Double
@@ -123,18 +123,17 @@ func f(_ x: Shoes, asType t: Shoes.Type) {
   return t.select(x) // expected-error{{unexpected non-void return value in void function}}
 }
 
-infix operator **** {
-  associativity left
-  precedence 200
+precedencegroup Starry {
+  associativity: left
+  higherThan: MultiplicationPrecedence
 }
+
+infix operator **** : Starry
 
 func ****(_: Int, _: String) { }
 i **** i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
-infix operator ***~ {
-  associativity left
-  precedence 200
-}
+infix operator ***~ : Starry
 
 func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
@@ -192,10 +191,10 @@ func r17224804(_ monthNumber : Int) {
 
 // <rdar://problem/17020197> QoI: Operand of postfix '!' should have optional type; type is 'Int?'
 func r17020197(_ x : Int?, y : Int) {
-  if x! {  }  // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
+  if x! {  }  // expected-error {{'Int' is not convertible to 'Bool'}}
 
   // <rdar://problem/12939553> QoI: diagnostic for using an integer in a condition is utterly terrible
-  if y {}    // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
+  if y {}    // expected-error {{'Int' is not convertible to 'Bool'}}
 }
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
@@ -213,7 +212,8 @@ class r20201968C {
 
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(_ a : Int) {
-  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{type 'Int' is not optional, value can never be nil}}
+  assert(a != nil, "ASSERT COMPILATION ERROR")
+  // expected-warning @-1 {{comparing non-optional value of type 'Int' to nil always returns true}}
 }
 
 
@@ -318,9 +318,11 @@ func rdar19804707() {
 
   knownOps = .BinaryOperator({$1 - $0})
 
-  // FIXME: rdar://19804707 - These two statements should be accepted by the type checker.
-  knownOps = .BinaryOperator(){$1 - $0} // expected-error {{reference to member 'BinaryOperator' cannot be resolved without a contextual type}}
-  knownOps = .BinaryOperator{$1 - $0}   // expected-error {{reference to member 'BinaryOperator' cannot be resolved without a contextual type}}
+  // rdar://19804707 - trailing closures for contextual member references.
+  knownOps = .BinaryOperator(){$1 - $0}
+  knownOps = .BinaryOperator{$1 - $0}
+
+  _ = knownOps
 }
 
 
@@ -554,7 +556,7 @@ func r22020088bar(_ p: r22020088P?) {
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
 func f(_ arguments: [String]) -> [ArraySlice<String>] {
-  return arguments.split(maxSplits: 1, omittingEmptySubsequences: false, isSeparator: { $0 == "--" })
+  return arguments.split(maxSplits: 1, omittingEmptySubsequences: false, whereSeparator: { $0 == "--" })
 }
 
 
@@ -590,16 +592,17 @@ func r21684487() {
 func r18397777(_ d : r21447318?) {
   let c = r21447318()
 
-  if c != nil { // expected-error {{type 'r21447318' is not optional, value can never be nil}}
+  if c != nil { // expected-warning {{comparing non-optional value of type 'r21447318' to nil always returns true}}
   }
   
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
   }
   
-  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
+  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{8-8= != nil)}}
+
   }
 
-  if !Optional(c) { // expected-error {{optional type 'Optional<_>' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
+  if !Optional(c) { // expected-error {{optional type 'Optional<r21447318>' cannot be used as a boolean; test for '!= nil' instead}} {{7-7=(}} {{18-18= != nil)}}
   }
 }
 
@@ -641,8 +644,8 @@ func r22470302(_ c: r22470302Class) {
 // <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
 extension String {
   @available(*, unavailable, message: "calling this is unwise")
-  func unavail<T : Sequence where T.Iterator.Element == String> // expected-note 2 {{'unavail' has been explicitly marked unavailable here}}
-    (_ a : T) -> String {}
+  func unavail<T : Sequence> // expected-note 2 {{'unavail' has been explicitly marked unavailable here}}
+    (_ a : T) -> String where T.Iterator.Element == String {}
 }
 extension Array {
   func g() -> String {
@@ -699,8 +702,8 @@ _ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an op
 
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis
 func f23433271(_ x : UnsafePointer<Int>) {}
-func segfault23433271(_ a : UnsafeMutablePointer<Void>) {
-  f23433271(a[0])  // expected-error {{cannot convert value of type 'Void' (aka '()') to expected argument type 'UnsafePointer<Int>'}}
+func segfault23433271(_ a : UnsafeMutableRawPointer) {
+  f23433271(a[0])  // expected-error {{type 'UnsafeMutableRawPointer' has no subscript members}}
 }
 
 // <rdar://problem/22058555> crash in cs diags in withCString
@@ -755,7 +758,9 @@ func r24251022() {
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
   // https://twitter.com/_jlfischer/status/712337382175952896
-  return a == b && 1 == 2  // expected-error {{'&&' produces 'Bool', not the expected contextual result type 'Int'}}
+  // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
+  return a == b && 1 == 2  // expected-error {{binary operator '&&' cannot be applied to two 'Bool' operands}}
+  // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
 }
 
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
@@ -770,35 +775,36 @@ class SR1594 {
   func sr1594(bytes : UnsafeMutablePointer<Int>, _ i : Int?) {
     _ = (i === nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15===}}
     _ = (bytes === nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self === nil) // expected-error {{type 'SR1594' is not optional, value can never be nil}}
+    _ = (self === nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
     _ = (i !== nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15=!=}}
     _ = (bytes !== nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self !== nil) // expected-error {{type 'SR1594' is not optional, value can never be nil}}
+    _ = (self !== nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
   }
 }
 
 func nilComparison(i: Int, o: AnyObject) {
-  _ = i == nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil == i  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i != nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil != i  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i < nil   // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil < i   // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i <= nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil <= i  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i > nil   // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil > i   // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = i >= nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
-  _ = nil >= i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i == nil // expected-warning {{comparing non-optional value of type 'Int' to nil always returns false}}
+  _ = nil == i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns false}}
+  _ = i != nil // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
+  _ = nil != i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
+  
+  _ = i < nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil < i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i <= nil // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil <= i // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i > nil  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil > i  // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = i >= nil // expected-error {{type 'Int' is not optional, value can never be nil}}
+  _ = nil >= i // expected-error {{type 'Int' is not optional, value can never be nil}}
 
-  _ = o === nil // expected-error {{type 'AnyObject' is not optional, value can never be nil}}
-  _ = o !== nil // expected-error {{type 'AnyObject' is not optional, value can never be nil}}
+  _ = o === nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
+  _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
 }
 
 // FIXME: Bad diagnostic
 func secondArgumentNotLabeled(a:Int, _ b: Int) { }
 secondArgumentNotLabeled(10, 20)
-// expected-error@-1 {{unnamed parameter #1 must precede unnamed parameter #0}}
+// expected-error@-1 {{unnamed argument #2 must precede unnamed argument #1}}
 
 // <rdar://problem/23709100> QoI: incorrect ambiguity error due to implicit conversion
 func testImplConversion(a : Float?) -> Bool {}
@@ -815,18 +821,20 @@ class Foo23752537 {
 
 extension Foo23752537 {
   func isEquivalent(other: Foo23752537) {
-    // expected-error @+1 {{'&&' produces 'Bool', not the expected contextual result type '()'}}
+    // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
+    // expected-error @+1 {{binary operator '&&' cannot be applied to two 'Bool' operands}}
     return (self.title != other.title && self.message != other.message)
+    // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
   }
 }
 
 
 // <rdar://problem/22276040> QoI: not great error message with "withUnsafePointer" sametype constraints
-func read2(_ p: UnsafeMutablePointer<Void>, maxLength: Int) {}
+func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
 func read<T : Integer>() -> T? {
   var buffer : T 
-  let n = withUnsafePointer(&buffer) { (p) in
-    read2(UnsafePointer(p), maxLength: sizeof(T)) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
+  let n = withUnsafePointer(to: &buffer) { (p) in
+    read2(UnsafePointer(p), maxLength: sizeof(T)) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer'}}
   }
 }
 

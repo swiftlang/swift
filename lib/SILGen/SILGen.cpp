@@ -152,6 +152,22 @@ GET_BRIDGING_FN(Foundation, REQUIRED, Error, REQUIRED, NSError)
 #undef OPTIONAL
 #undef GENERIC
 
+static FuncDecl *diagnoseMissingIntrinsic(SILGenModule &sgm,
+                                          SILLocation loc,
+                                          const char *name) {
+  sgm.diagnose(loc, diag::bridging_function_missing,
+               sgm.getASTContext().StdlibModuleName.str(), name);
+  return nullptr;
+}
+
+#define FUNC_DECL(NAME, ID)                             \
+  FuncDecl *SILGenModule::get##NAME(SILLocation loc) {  \
+    if (auto fn = getASTContext().get##NAME(nullptr))   \
+      return fn;                                        \
+    return diagnoseMissingIntrinsic(*this, loc, ID);    \
+  }
+#include "swift/AST/KnownDecls.def"
+
 ProtocolDecl *SILGenModule::getObjectiveCBridgeable(SILLocation loc) {
   if (ObjectiveCBridgeable)
     return *ObjectiveCBridgeable;

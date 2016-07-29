@@ -10,7 +10,7 @@ func f1(_ i: Int32) {} // expected-note{{found this candidate}}
 
 f1(0) // expected-error{{ambiguous use of 'f1'}}
 
-infix operator +++ { } 
+infix operator +++
 
 func +++(i: Int, d: Double) {} // expected-note{{found this candidate}}
 func +++(d: Double, i: Int) {} // expected-note{{found this candidate}}

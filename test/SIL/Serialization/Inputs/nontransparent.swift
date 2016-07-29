@@ -1,3 +1,4 @@
+precedencegroup AssignmentPrecedence { assignment: true }
 
 public enum Optional<T> {
   case none

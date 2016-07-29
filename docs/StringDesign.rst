@@ -993,7 +993,7 @@ Building
 .. sidebar:: ``append``
 
    the ``append`` method is a consequence of ``String``\ 's
-   conformance to ``OutputStream``.  See the *Swift
+   conformance to ``TextOutputStream``.  See the *Swift
    formatting proposal* for details.
 
 :Swift:

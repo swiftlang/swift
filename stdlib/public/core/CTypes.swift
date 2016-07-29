@@ -77,7 +77,7 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 @_fixed_layout
-public struct OpaquePointer : Equatable, Hashable {
+public struct OpaquePointer : Hashable {
   internal var _rawValue: Builtin.RawPointer
 
   @_versioned
@@ -151,27 +151,29 @@ extension OpaquePointer : CustomDebugStringConvertible {
 
 extension Int {
   public init(bitPattern pointer: OpaquePointer?) {
-    self.init(bitPattern: UnsafePointer<Void>(pointer))
+    self.init(bitPattern: UnsafeRawPointer(pointer))
   }
 }
 
 extension UInt {
   public init(bitPattern pointer: OpaquePointer?) {
-    self.init(bitPattern: UnsafePointer<Void>(pointer))
+    self.init(bitPattern: UnsafeRawPointer(pointer))
   }
 }
 
-public func ==(lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+extension OpaquePointer : Equatable {
+  public static func == (lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 }
 
 /// The corresponding Swift type to `va_list` in imported C APIs.
 @_fixed_layout
 public struct CVaListPointer {
-  var value: UnsafeMutablePointer<Void>
+  var value: UnsafeMutableRawPointer
 
   public // @testable
-  init(_fromUnsafeMutablePointer from: UnsafeMutablePointer<Void>) {
+  init(_fromUnsafeMutablePointer from: UnsafeMutableRawPointer) {
     value = from
   }
 }
@@ -184,14 +186,32 @@ extension CVaListPointer : CustomDebugStringConvertible {
 }
 
 func _memcpy(
-  dest destination: UnsafeMutablePointer<Void>,
-  src: UnsafeMutablePointer<Void>,
+  dest destination: UnsafeMutableRawPointer,
+  src: UnsafeMutableRawPointer,
   size: UInt
 ) {
   let dest = destination._rawValue
   let src = src._rawValue
   let size = UInt64(size)._value
   Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+    dest, src, size,
+    /*alignment:*/ Int32()._value,
+    /*volatile:*/ false._value)
+}
+
+/// Copy `count` bytes of memory from `src` into `dest`.
+///
+/// The memory regions `source..<source + count` and
+/// `dest..<dest + count` may overlap.
+func _memmove(
+  dest destination: UnsafeMutableRawPointer,
+  src: UnsafeRawPointer,
+  size: UInt
+) {
+  let dest = destination._rawValue
+  let src = src._rawValue
+  let size = UInt64(size)._value
+  Builtin.int_memmove_RawPointer_RawPointer_Int64(
     dest, src, size,
     /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)

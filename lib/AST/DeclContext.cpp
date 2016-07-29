@@ -488,14 +488,14 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
       return false;
     auto *AFD = cast<AbstractFunctionDecl>(this);
     if (AFD->hasAccessibility())
-      return AFD->getFormalAccess() > Accessibility::Private;
+      return AFD->getFormalAccess() > Accessibility::FilePrivate;
     break;
   }
 
   case DeclContextKind::SubscriptDecl: {
     auto *SD = cast<SubscriptDecl>(this);
     if (SD->hasAccessibility())
-      return SD->getFormalAccess() > Accessibility::Private;
+      return SD->getFormalAccess() > Accessibility::FilePrivate;
     break;
   }
       
@@ -506,17 +506,17 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
   case DeclContextKind::GenericTypeDecl: {
     auto *nominal = cast<GenericTypeDecl>(this);
     if (nominal->hasAccessibility())
-      return nominal->getFormalAccess() > Accessibility::Private;
+      return nominal->getFormalAccess() > Accessibility::FilePrivate;
     break;
   }
 
   case DeclContextKind::ExtensionDecl: {
     auto *extension = cast<ExtensionDecl>(this);
     if (extension->hasDefaultAccessibility())
-      return extension->getDefaultAccessibility() > Accessibility::Private;
+      return extension->getDefaultAccessibility() > Accessibility::FilePrivate;
     // FIXME: duplicated from computeDefaultAccessibility in TypeCheckDecl.cpp.
     if (auto *AA = extension->getAttrs().getAttribute<AccessibilityAttr>())
-      return AA->getAccess() > Accessibility::Private;
+      return AA->getAccess() > Accessibility::FilePrivate;
     if (Type extendedTy = extension->getExtendedType()) {
 
       // Need to check if extendedTy is ErrorType

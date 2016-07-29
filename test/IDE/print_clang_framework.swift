@@ -1,3 +1,6 @@
+// TODO: Properties with unowned or weak ownership should not be bridged.
+// XFAIL: *
+
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 

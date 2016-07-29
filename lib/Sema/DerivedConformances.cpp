@@ -93,26 +93,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   return nullptr;
 }
 
-void DerivedConformance::insertOperatorDecl(ASTContext &C,
-                                            IterableDeclContext *scope,
-                                            Decl *member) {
-  // Find the module.
-  auto mod = member->getModuleContext();
-
-  // Add it to the module in a DerivedFileUnit.
-  mod->getDerivedFileUnit().addDerivedDecl(cast<FuncDecl>(member));
-
-  // Add it as a derived global decl to the nominal type.
-  auto oldDerived = scope->getDerivedGlobalDecls();
-  auto oldSize = std::distance(oldDerived.begin(), oldDerived.end());
-  auto newDerived = C.Allocate<Decl*>(oldSize + 1);
-
-  std::move(oldDerived.begin(), oldDerived.end(), newDerived.begin());
-  newDerived[oldSize] = member;
-
-  scope->setDerivedGlobalDecls(newDerived);
-}
-
 DeclRefExpr *
 DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
   ASTContext &C = fn->getASTContext();
@@ -171,7 +151,8 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   } else
     interfaceType = type;
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->setAccessibility(typeDecl->getFormalAccess());
+  getterDecl->setAccessibility(std::max(typeDecl->getFormalAccess(),
+                                        Accessibility::Internal));
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -201,7 +182,7 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   propDecl->setImplicit();
   propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                          SourceLoc());
-  propDecl->setAccessibility(typeDecl->getFormalAccess());
+  propDecl->setAccessibility(getterDecl->getFormalAccess());
   propDecl->setInterfaceType(propertyInterfaceType);
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);

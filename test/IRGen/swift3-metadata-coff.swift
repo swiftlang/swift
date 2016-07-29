@@ -1,5 +1,11 @@
 // RUN: %swift -target thumbv7--windows-itanium -parse-stdlib -parse-as-library -module-name Swift -O -emit-ir %s -o - | FileCheck %s
 
+// REQUIRES: CODEGENERATOR=ARM
+
+precedencegroup AssignmentPrecedence {
+  assignment: true
+}
+
 public enum Optional<Wrapped> {
   case none
   case some(Wrapped)

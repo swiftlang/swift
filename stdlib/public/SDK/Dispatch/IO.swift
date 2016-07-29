@@ -38,8 +38,8 @@ public extension DispatchIO {
 		}
 	}
 
-	public class func write(fromFileDescriptor: Int32, data: DispatchData, runningHandlerOn queue: DispatchQueue, handler: (data: DispatchData?, error: Int32) -> Void) {
-		__dispatch_write(fromFileDescriptor, data as __DispatchData, queue) { (data: __DispatchData?, error: Int32) in
+	public class func write(toFileDescriptor: Int32, data: DispatchData, runningHandlerOn queue: DispatchQueue, handler: (data: DispatchData?, error: Int32) -> Void) {
+		__dispatch_write(toFileDescriptor, data as __DispatchData, queue) { (data: __DispatchData?, error: Int32) in
 			handler(data: data.flatMap { DispatchData(data: $0) }, error: error)
 		}
 	}
@@ -94,34 +94,3 @@ public extension DispatchIO {
 	}
 }
 
-extension DispatchIO {
-	@available(*, deprecated, renamed: "DispatchIO.read(fromFileDescriptor:maxLength:runningHandlerOn:handler:)")
-	public class func read(fd: Int32, length: Int, queue: DispatchQueue, handler: (DispatchData, Int32) -> Void) {
-		DispatchIO.read(fromFileDescriptor: fd, maxLength: length, runningHandlerOn: queue, handler: handler)
-	}
-
-	@available(*, deprecated, renamed: "DispatchIO.write(fromFileDescriptor:data:runningHandlerOn:handler:)")
-	public class func write(fd: Int32, data: DispatchData, queue: DispatchQueue, handler: (DispatchData?, Int32) -> Void) {
-		DispatchIO.write(fromFileDescriptor: fd, data: data, runningHandlerOn: queue, handler: handler)
-	}
-
-	@available(*, deprecated, renamed: "DispatchIO.barrier(self:execute:)")
-	public func withBarrier(barrier work: () -> ()) {
-		barrier(execute: work)
-	}
-
-	@available(*, deprecated, renamed: "DispatchIO.setLimit(self:highWater:)")
-	public func setHighWater(highWater: Int) {
-		setLimit(highWater: highWater)
-	}
-
-	@available(*, deprecated, renamed: "DispatchIO.setLimit(self:lowWater:)")
-	public func setLowWater(lowWater: Int) {
-		setLimit(lowWater: lowWater)
-	}
-
-	@available(*, deprecated, renamed: "DispatchIO.setInterval(self:interval:flags:)")
-	public func setInterval(interval: UInt64, flags: IntervalFlags) {
-		setInterval(interval: .nanoseconds(Int(interval)), flags: flags)
-	}
-}

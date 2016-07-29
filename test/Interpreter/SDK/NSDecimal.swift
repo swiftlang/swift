@@ -107,3 +107,13 @@ print(two + "not a number" == two) // CHECK: false
 let one: NSDecimalResult = "1"
 print(one.pow10(2)) // CHECK: 100
 print(one.pow10(-2)) // CHECK: 0.01
+
+var twenty = Decimal(20)
+var ten = Decimal(10)
+twenty.multiply(by: ten)
+print(twenty) // CHECK: 200
+
+twenty = Decimal(20)
+ten = Decimal(10)
+twenty.divide(by: ten)
+print(twenty) // CHECK: 2

@@ -93,19 +93,19 @@ entry(%a : $@thick Any.Type):
 // CHECK:         ret { i8*, i8**, i8** }
 // CHECK:       fail:
 // CHECK:         call void @llvm.trap()
-sil @u_cast_to_class_existential_2 : $@convention(thin) (@owned AnyObject) -> @owned protocol<CP, CP2> {
+sil @u_cast_to_class_existential_2 : $@convention(thin) (@owned AnyObject) -> @owned CP & CP2 {
 entry(%a : $AnyObject):
-  %p = unconditional_checked_cast %a : $AnyObject to $protocol<CP, CP2>
-  return %p : $protocol<CP, CP2>
+  %p = unconditional_checked_cast %a : $AnyObject to $CP & CP2
+  return %p : $CP & CP2
 }
 
 // CHECK-LABEL: define{{( protected)?}} { %objc_object*, i8**, i8** } @u_cast_to_class_existential_mixed(%objc_object*)
 // CHECK:         call %objc_object* @swift_dynamicCastObjCProtocolUnconditional
 // CHECK:         call { i8*, i8**, i8** } @dynamic_cast_existential_2_unconditional(i8* {{%.*}}, %swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
-sil @u_cast_to_class_existential_mixed : $@convention(thin) (@owned AnyObject) -> @owned protocol<CP, OP, CP2> {
+sil @u_cast_to_class_existential_mixed : $@convention(thin) (@owned AnyObject) -> @owned CP & OP & CP2 {
 entry(%a : $AnyObject):
-  %p = unconditional_checked_cast %a : $AnyObject to $protocol<CP, OP, CP2>
-  return %p : $protocol<CP, OP, CP2>
+  %p = unconditional_checked_cast %a : $AnyObject to $CP & OP & CP2
+  return %p : $CP & OP & CP2
 }
 
 // CHECK-LABEL: define{{( protected)?}} { %swift.type*, i8**, i8** } @u_cast_to_existential_metatype_mixed(%swift.type*)
@@ -114,10 +114,10 @@ entry(%a : $AnyObject):
 // CHECK:         [[OBJPTR:%.*]] = extractvalue { i8*, i8**, i8** } [[CAST]], 0
 // CHECK:         [[OBJ:%.*]] = bitcast i8* [[OBJPTR]] to %swift.type*
 // CHECK:         insertvalue {{.*}} [[OBJ]]
-sil @u_cast_to_existential_metatype_mixed : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick protocol<CP, OP, CP2>.Type {
+sil @u_cast_to_existential_metatype_mixed : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick (CP & OP & CP2).Type {
 entry(%a : $@thick Any.Type):
-  %p = unconditional_checked_cast %a : $@thick Any.Type to $@thick protocol<CP, OP, CP2>.Type
-  return %p : $@thick protocol<CP, OP, CP2>.Type
+  %p = unconditional_checked_cast %a : $@thick Any.Type to $@thick (CP & OP & CP2).Type
+  return %p : $@thick (CP & OP & CP2).Type
 }
 
 
@@ -165,11 +165,11 @@ nay:
 // CHECK:         ret { i8*, i8**, i8** }
 // CHECK:       fail:
 // CHECK:         ret { i8*, i8**, i8** } zeroinitializer
-sil @c_cast_to_class_existential_2 : $@convention(thin) (@owned AnyObject) -> @owned protocol<CP, CP2> {
+sil @c_cast_to_class_existential_2 : $@convention(thin) (@owned AnyObject) -> @owned CP & CP2 {
 entry(%a : $AnyObject):
-  checked_cast_br %a : $AnyObject to $protocol<CP, CP2>, yea, nay
-yea(%p : $protocol<CP, CP2>):
-  return %p : $protocol<CP, CP2>
+  checked_cast_br %a : $AnyObject to $CP & CP2, yea, nay
+yea(%p : $CP & CP2):
+  return %p : $CP & CP2
 nay:
   unreachable
 }
@@ -183,11 +183,11 @@ nay:
 // CHECK:         br label %cont
 // CHECK:       cont:
 // CHECK:         phi %objc_object* [ [[CAST:%.*]], %success ], [ null, %entry ]
-sil @c_cast_to_class_existential_mixed : $@convention(thin) (@owned AnyObject) -> @owned protocol<CP, OP, CP2> {
+sil @c_cast_to_class_existential_mixed : $@convention(thin) (@owned AnyObject) -> @owned CP & OP & CP2 {
 entry(%a : $AnyObject):
-  checked_cast_br %a : $AnyObject to $protocol<CP, OP, CP2>, yea, nay
-yea(%p : $protocol<CP, OP, CP2>):
-  return %p : $protocol<CP, OP, CP2>
+  checked_cast_br %a : $AnyObject to $CP & OP & CP2, yea, nay
+yea(%p : $CP & OP & CP2):
+  return %p : $CP & OP & CP2
 nay:
   unreachable
 }
@@ -198,11 +198,11 @@ nay:
 // CHECK:         br i1 [[IS_NULL]], label %cont, label %success
 // CHECK:       success:
 // CHECK:         call { i8*, i8**, i8** } @dynamic_cast_existential_2_conditional(i8* {{.*}}, %swift.type* %0, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
-sil @c_cast_to_existential_metatype_mixed : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick protocol<CP, OP, CP2>.Type {
+sil @c_cast_to_existential_metatype_mixed : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick (CP & OP & CP2).Type {
 entry(%a : $@thick Any.Type):
-  checked_cast_br %a : $@thick Any.Type to $@thick protocol<CP, OP, CP2>.Type, yea, nay
-yea(%p : $@thick protocol<CP, OP, CP2>.Type):
-  return %p : $@thick protocol<CP, OP, CP2>.Type
+  checked_cast_br %a : $@thick Any.Type to $@thick (CP & OP & CP2).Type, yea, nay
+yea(%p : $@thick (CP & OP & CP2).Type):
+  return %p : $@thick (CP & OP & CP2).Type
 nay:
   unreachable
 }

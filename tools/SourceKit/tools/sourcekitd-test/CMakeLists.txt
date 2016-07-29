@@ -8,6 +8,10 @@ else()
   set(SOURCEKITD_TEST_DEPEND sourcekitd)
 endif()
 
+if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+  set(SOURCEKITD_TEST_DEPEND ${SOURCEKITD_TEST_DEPEND} dispatch swiftCore)
+endif()
+
 add_sourcekit_executable(sourcekitd-test
   sourcekitd-test.cpp
   TestOptions.cpp

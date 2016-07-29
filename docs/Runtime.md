@@ -251,7 +251,6 @@ process start and the function returns.
 should be implementable in the standard library now.
 
 ```
-0000000000003b60 T _swift_bridgeNonVerbatimFromObjectiveC
 0000000000003c80 T _swift_bridgeNonVerbatimFromObjectiveCConditional
 00000000000037e0 T _swift_bridgeNonVerbatimToObjectiveC
 00000000000039c0 T _swift_getBridgedNonVerbatimObjectiveCType

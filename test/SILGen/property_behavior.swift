@@ -9,7 +9,7 @@ extension behavior {
   }
 }
 
-// TODO: global accessor doesn't get walked because it's in DerivedFileUnit
+// TODO: global accessor doesn't get walked??
 var global: Int __behavior behavior
 
 struct S1<T> {

@@ -1204,12 +1204,12 @@ class CustomImmutableNSSet : NSSet {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone?) -> AnyObject {
+  override func copy(with zone: NSZone?) -> Any {
     CustomImmutableNSSet.timesCopyWithZoneWasCalled += 1
     return self
   }
 
-  override func member(_ object: AnyObject) -> AnyObject? {
+  override func member(_ object: Any) -> Any? {
     CustomImmutableNSSet.timesMemberWasCalled += 1
     return getAsNSSet([ 1010, 1020, 1030 ]).member(object)
   }
@@ -2170,15 +2170,15 @@ SetTestSuite.test("BridgedToObjC.Verbatim.Count") {
 SetTestSuite.test("BridgedToObjC.Verbatim.Contains") {
   let s = getBridgedNSSetOfRefTypesBridgedVerbatim()
 
-  var v: AnyObject? = s.member(TestObjCKeyTy(1010))
+  var v: AnyObject? = s.member(TestObjCKeyTy(1010)).map { $0 as AnyObject }
   expectEqual(1010, (v as! TestObjCKeyTy).value)
   let idValue10 = unsafeBitCast(v, to: UInt.self)
 
-  v = s.member(TestObjCKeyTy(2020))
+  v = s.member(TestObjCKeyTy(2020)).map { $0 as AnyObject }
   expectEqual(2020, (v as! TestObjCKeyTy).value)
   let idValue20 = unsafeBitCast(v, to: UInt.self)
 
-  v = s.member(TestObjCKeyTy(3030))
+  v = s.member(TestObjCKeyTy(3030)).map { $0 as AnyObject }
   expectEqual(3030, (v as! TestObjCKeyTy).value)
   let idValue30 = unsafeBitCast(v, to: UInt.self)
 
@@ -2191,13 +2191,13 @@ SetTestSuite.test("BridgedToObjC.Verbatim.Contains") {
 
   for i in 0..<3 {
     expectEqual(idValue10,
-      unsafeBitCast(s.member(TestObjCKeyTy(1010)), to: UInt.self))
+      unsafeBitCast(s.member(TestObjCKeyTy(1010)).map { $0 as AnyObject }, to: UInt.self))
 
     expectEqual(idValue20,
-      unsafeBitCast(s.member(TestObjCKeyTy(2020)), to: UInt.self))
+      unsafeBitCast(s.member(TestObjCKeyTy(2020)).map { $0 as AnyObject }, to: UInt.self))
 
     expectEqual(idValue30,
-      unsafeBitCast(s.member(TestObjCKeyTy(3030)), to: UInt.self))
+      unsafeBitCast(s.member(TestObjCKeyTy(3030)).map { $0 as AnyObject }, to: UInt.self))
   }
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
@@ -2489,7 +2489,7 @@ SetTestSuite.test("SetUpcastBridged") {
   }
 
   do {
-    var s: Set<NSObject> = s
+    var s = s as Set<NSObject>
 
     expectEqual(3, s.count)
     expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
@@ -2498,7 +2498,7 @@ SetTestSuite.test("SetUpcastBridged") {
   }
 
   do {
-    var s: Set<TestObjCKeyTy> = s
+    var s = s as Set<TestObjCKeyTy>
 
     expectEqual(3, s.count)
     expectTrue(s.contains(TestBridgedKeyTy(1010) as TestObjCKeyTy))
@@ -3526,13 +3526,13 @@ class MockSetWithCustomCount : NSSet {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone?) -> AnyObject {
+  override func copy(with zone: NSZone?) -> Any {
     // Ensure that copying this set produces an object of the same
     // dynamic type.
     return self
   }
 
-  override func member(_ object: AnyObject) -> AnyObject? {
+  override func member(_ object: Any) -> Any? {
     expectUnreachable()
     return object
   }

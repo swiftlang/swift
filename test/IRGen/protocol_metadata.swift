@@ -79,8 +79,8 @@ func reify_metadata<T>(_ x: T) {}
 
 // CHECK: define hidden void @_TF17protocol_metadata14protocol_types
 func protocol_types(_ a: A,
-                    abc: protocol<A, B, C>,
-                    abco: protocol<A, B, C, O>) {
+                    abc: A & B & C,
+                    abco: A & B & C & O) {
   // CHECK: store %swift.protocol* @_TMp17protocol_metadata1A
   // CHECK: call %swift.type* @rt_swift_getExistentialTypeMetadata(i64 1, %swift.protocol** {{%.*}})
   reify_metadata(a)

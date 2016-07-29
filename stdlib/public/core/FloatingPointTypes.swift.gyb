@@ -756,12 +756,12 @@ extension ${Self} : Arithmetic {
 }
 
 @_transparent
-public prefix func +(x: ${Self}) -> ${Self} {
+public prefix func + (x: ${Self}) -> ${Self} {
   return x
 }
 
 @_transparent
-public prefix func -(x: ${Self}) -> ${Self} {
+public prefix func - (x: ${Self}) -> ${Self} {
   return ${Self}(_bits: Builtin.fneg_FPIEEE${bits}(x._value))
 }
 
@@ -838,42 +838,42 @@ extension ${Self} {
 //  definitions in the standard lib, or both.
 
 @_transparent
-public func +(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+public func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return lhs.adding(rhs)
 }
 
 @_transparent
-public func -(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+public func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return lhs.subtracting(rhs)
 }
 
 @_transparent
-public func *(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+public func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return lhs.multiplied(by: rhs)
 }
 
 @_transparent
-public func /(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+public func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return lhs.divided(by: rhs)
 }
 
 @_transparent
-public func +=(lhs: inout ${Self}, rhs: ${Self}) {
+public func += (lhs: inout ${Self}, rhs: ${Self}) {
   lhs.add(rhs)
 }
 
 @_transparent
-public func -=(lhs: inout ${Self}, rhs: ${Self}) {
+public func -= (lhs: inout ${Self}, rhs: ${Self}) {
   lhs.subtract(rhs)
 }
 
 @_transparent
-public func *=(lhs: inout ${Self}, rhs: ${Self}) {
+public func *= (lhs: inout ${Self}, rhs: ${Self}) {
   lhs.multiply(by: rhs)
 }
 
 @_transparent
-public func /=(lhs: inout ${Self}, rhs: ${Self}) {
+public func /= (lhs: inout ${Self}, rhs: ${Self}) {
   lhs.divide(by: rhs)
 }
 
@@ -908,38 +908,38 @@ extension ${Self} : Strideable {
 
 @_transparent
 @available(*, unavailable, message: "Use truncatingRemainder instead")
-public func %(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+public func % (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   fatalError("% is not available.")
 }
 
 @_transparent
 @available(*, unavailable, message: "Use formTruncatingRemainder instead")
-public func %=(lhs: inout ${Self}, rhs: ${Self}) {
+public func %= (lhs: inout ${Self}, rhs: ${Self}) {
   fatalError("%= is not available.")
 }
 
 @_transparent
 @available(*, unavailable, message: "use += 1")
 @discardableResult
-public prefix func ++(rhs: inout ${Self}) -> ${Self} {
+public prefix func ++ (rhs: inout ${Self}) -> ${Self} {
   fatalError("++ is not available")
 }
 @_transparent
 @available(*, unavailable, message: "use -= 1")
 @discardableResult
-public prefix func --(rhs: inout ${Self}) -> ${Self} {
+public prefix func -- (rhs: inout ${Self}) -> ${Self} {
   fatalError("-- is not available")
 }
 @_transparent
 @available(*, unavailable, message: "use += 1")
 @discardableResult
-public postfix func ++(lhs: inout ${Self}) -> ${Self} {
+public postfix func ++ (lhs: inout ${Self}) -> ${Self} {
   fatalError("++ is not available")
 }
 @_transparent
 @available(*, unavailable, message: "use -= 1")
 @discardableResult
-public postfix func --(lhs: inout ${Self}) -> ${Self} {
+public postfix func -- (lhs: inout ${Self}) -> ${Self} {
   fatalError("-- is not available")
 }
 

@@ -64,7 +64,7 @@ duplicateAttr(1) // expected-error{{argument passed to call that takes no argume
 
 // CHECK ALLOWED DECLS
 private import Swift // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-9=}}
-private(set) infix operator ~~~ {} // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-14=}}
+private(set) infix operator ~~~ // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-14=}}
 
 private typealias MyInt = Int
 
@@ -158,26 +158,26 @@ internal struct InternalStruct {} // expected-note * {{declared here}}
 private struct PrivateStruct {} // expected-note * {{declared here}}
 
 protocol InternalProto { // expected-note * {{declared here}}
-  associatedtype Assoc // expected-note {{type declared here}}
+  associatedtype Assoc
 }
 public extension InternalProto {} // expected-error {{extension of internal protocol cannot be declared public}} {{1-8=}}
 internal extension InternalProto where Assoc == PublicStruct {}
 internal extension InternalProto where Assoc == InternalStruct {}
-internal extension InternalProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared internal because its generic requirement uses a private type}}
+internal extension InternalProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared internal because its generic requirement uses a fileprivate type}}
 private extension InternalProto where Assoc == PublicStruct {}
 private extension InternalProto where Assoc == InternalStruct {}
 private extension InternalProto where Assoc == PrivateStruct {}
 
 public protocol PublicProto {
-  associatedtype Assoc // expected-note * {{type declared here}}
+  associatedtype Assoc
 }
 public extension PublicProto {}
 public extension PublicProto where Assoc == PublicStruct {}
 public extension PublicProto where Assoc == InternalStruct {} // expected-error {{extension cannot be declared public because its generic requirement uses an internal type}}
-public extension PublicProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared public because its generic requirement uses a private type}}
+public extension PublicProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared public because its generic requirement uses a fileprivate type}}
 internal extension PublicProto where Assoc == PublicStruct {}
 internal extension PublicProto where Assoc == InternalStruct {}
-internal extension PublicProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared internal because its generic requirement uses a private type}}
+internal extension PublicProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared internal because its generic requirement uses a fileprivate type}}
 private extension PublicProto where Assoc == PublicStruct {}
 private extension PublicProto where Assoc == InternalStruct {}
 private extension PublicProto where Assoc == PrivateStruct {}

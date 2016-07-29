@@ -101,7 +101,7 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
       from: codec,
       to: UTF32.self,
       stoppingOnError: true,
-      sendingOutputTo: output)
+      into: output)
     if expectedHead != decoded {
       return assertionFailure()
           .withDescription("\n")
@@ -122,7 +122,7 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
       from: codec,
       to: UTF32.self,
       stoppingOnError: false,
-      sendingOutputTo: output)
+      into: output)
     if expected != decoded {
       return assertionFailure()
           .withDescription("\n")
@@ -167,7 +167,7 @@ func checkEncodeUTF8(_ expected: [UInt8],
     from: UTF32.self,
     to: UTF8.self,
     stoppingOnError: true,
-    sendingOutputTo: output)
+    into: output)
   expectFalse(hadError)
   if expected != encoded {
     return assertionFailure()
@@ -764,6 +764,7 @@ UnicodeScalarTests.test("init") {
   expectEqual("g", UnicodeScalar(UInt32(103)))
   expectEqual("h", UnicodeScalar(UInt16(104)))
   expectEqual("i", UnicodeScalar(UInt8(105)))
+  expectEqual(nil, UnicodeScalar(UInt32(0xD800)))
 }
 
 var UTF8Decoder = TestSuite("UTF8Decoder")
@@ -2061,7 +2062,7 @@ UnicodeAPIs.test("transcode/MutableArray") {
     from: UTF16.self,
     to: UTF16.self,
     stoppingOnError: true,
-    sendingOutputTo: output)
+    into: output)
   expectEqual(input, transcoded)
 }
 
@@ -2074,7 +2075,7 @@ UnicodeAPIs.test("transcode/ReferenceTypedArray") {
     from: UTF16.self,
     to: UTF16.self,
     stoppingOnError: true,
-    sendingOutputTo: output)
+    into: output)
   expectEqual(input, transcoded)
 }
 
@@ -2102,7 +2103,7 @@ class NonContiguousNSString : NSString {
       from: UTF8.self,
       to: UTF16.self,
       stoppingOnError: true,
-      sendingOutputTo: output)
+      into: output)
     expectFalse(hadError)
     self.init(encoded)
   }
@@ -2121,13 +2122,13 @@ class NonContiguousNSString : NSString {
       from: UTF32.self,
       to: UTF16.self,
       stoppingOnError: true,
-      sendingOutputTo: output)
+      into: output)
     expectFalse(hadError)
     self.init(encoded)
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone?) -> AnyObject {
+  override func copy(with zone: NSZone?) -> Any {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -2182,7 +2183,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
       from: UTF32.self,
       to: UTF16.self,
       stoppingOnError: false,
-      sendingOutputTo: output)
+      into: output)
 
     backingStorage.withUnsafeBufferPointer {
       (ptr) -> Void in
@@ -2208,7 +2209,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
       from: UTF32.self,
       to: UTF8.self,
       stoppingOnError: false,
-      sendingOutputTo: output)
+      into: output)
 
     checkUTF8View(expected, subject, test.loc.withCurrentLoc())
   }
@@ -2259,7 +2260,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16") {
         from: UTF32.self,
         to: UTF8.self,
         stoppingOnError: false,
-        sendingOutputTo: output)
+        into: output)
 
       var nss = NonContiguousNSString(test.encoded)
       verifyThatStringIsOpaqueForCoreFoundation(nss)
@@ -2332,7 +2333,7 @@ StringCookedViews.test("UTF16") {
       from: UTF32.self,
       to: UTF16.self,
       stoppingOnError: false,
-      sendingOutputTo: output)
+      into: output)
 
     var nss = NonContiguousNSString(test.scalars)
     checkUTF16View(expected, nss as String, test.loc.withCurrentLoc())
@@ -2349,7 +2350,7 @@ StringCookedViews.test("UTF16") {
       from: UTF32.self,
       to: UTF16.self,
       stoppingOnError: false,
-      sendingOutputTo: output)
+      into: output)
 
     checkUTF16View(expected, subject, test.loc.withCurrentLoc())
   }
@@ -2357,7 +2358,7 @@ StringCookedViews.test("UTF16") {
 
 StringCookedViews.test("UnicodeScalars") {
   for test in UTF8TestsSmokeTest {
-    let expectedScalars = test.scalars.map { UnicodeScalar($0) }
+    let expectedScalars = test.scalars.map { UnicodeScalar($0)! }
     let subject = NonContiguousNSString(test.scalars) as String
     checkSliceableWithBidirectionalIndex(
       expectedScalars, subject.unicodeScalars)
@@ -2366,7 +2367,7 @@ StringCookedViews.test("UnicodeScalars") {
   forStringsWithUnpairedSurrogates {
     (test: UTF16Test, subject: String) -> Void in
     let expectedScalars = (test.scalarsHead + test.scalarsRepairedTail).map {
-      UnicodeScalar($0)
+      UnicodeScalar($0)!
     }
     checkSliceableWithBidirectionalIndex(
       expectedScalars, subject.unicodeScalars)
@@ -2379,7 +2380,7 @@ StringTests.test("StreamableConformance") {
   forStringsWithUnpairedSurrogates {
     (test: UTF16Test, subject: String) -> Void in
     let expected = test.scalarsHead + test.scalarsRepairedTail
-    let printedSubject = String(subject)
+    let printedSubject = subject
     let actual = printedSubject.unicodeScalars.map { $0.value }
     expectEqual(expected, actual)
   }

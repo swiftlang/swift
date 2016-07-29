@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -suppress-argument-labels-in-types %s | FileCheck %s
 
 import Swift
 
@@ -22,12 +23,12 @@ func generic_nondependent_context<T>(_ x: T, y: Int) -> Int {
 func generic_capture<T>(_ x: T) -> Any.Type {
   func foo() -> Any.Type { return T.self }
 
-  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures15generic_capture{{.*}} : $@convention(thin) <τ_0_0> () -> @thick protocol<>.Type
+  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures15generic_capture{{.*}} : $@convention(thin) <τ_0_0> () -> @thick Any.Type
   // CHECK: [[FOO_CLOSURE:%.*]] = partial_apply [[FOO]]<T>()
   // CHECK: strong_release [[FOO_CLOSURE]]
   let _ = foo
 
-  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures15generic_capture{{.*}} : $@convention(thin) <τ_0_0> () -> @thick protocol<>.Type
+  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures15generic_capture{{.*}} : $@convention(thin) <τ_0_0> () -> @thick Any.Type
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]<T>()
   return foo()
 }
@@ -36,12 +37,12 @@ func generic_capture<T>(_ x: T) -> Any.Type {
 func generic_capture_cast<T>(_ x: T, y: Any) -> Bool {
   func foo(_ a: Any) -> Bool { return a is T }
 
-  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures20generic_capture_cast{{.*}} : $@convention(thin) <τ_0_0> (@in protocol<>) -> Bool
+  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures20generic_capture_cast{{.*}} : $@convention(thin) <τ_0_0> (@in Any) -> Bool
   // CHECK: [[FOO_CLOSURE:%.*]] = partial_apply [[FOO]]<T>()
   // CHECK: strong_release [[FOO_CLOSURE]]
   let _ = foo
 
-  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures20generic_capture_cast{{.*}} : $@convention(thin) <τ_0_0> (@in protocol<>) -> Bool
+  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures20generic_capture_cast{{.*}} : $@convention(thin) <τ_0_0> (@in Any) -> Bool
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]<T>([[ARG:%.*]])
   return foo(y)
 }

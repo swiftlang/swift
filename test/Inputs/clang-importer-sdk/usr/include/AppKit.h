@@ -255,6 +255,7 @@ struct Point3D { double x, y, z; };
 -(void)drawInView:(nullable NSView *)view;
 -(void)drawAnywhereInView:(nullable NSView *)view options:(nonnull NSDictionary *)options;
 -(void)drawAnywhereWithOptions:(nonnull NSDictionary *)options;
+-(void)drawAnywhereWithOptionalOptions:(nullable NSDictionary *)options;
 @end
 
 @interface NSBezierPath : NSObject

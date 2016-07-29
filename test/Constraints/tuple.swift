@@ -60,7 +60,7 @@ any = (label: 4)
 
 // Scalars don't have .0/.1/etc
 i = j.0 // expected-error{{value of type 'Int' has no member '0'}}
-any.1 // expected-error{{value of type 'Any' (aka 'protocol<>') has no member '1'}}
+any.1 // expected-error{{value of type 'Any' has no member '1'}}
 
 // Fun with tuples
 protocol PosixErrorReturn {
@@ -71,7 +71,7 @@ extension Int : PosixErrorReturn {
   static func errorReturnValue() -> Int { return -1 }
 }
 
-func posixCantFail<A, T : protocol<Comparable, PosixErrorReturn>>
+func posixCantFail<A, T : Comparable & PosixErrorReturn>
   (_ f:(A) -> T) -> (args:A) -> T
 {
   return { args in
@@ -159,7 +159,7 @@ protocol Kingdom {
   associatedtype King
 }
 struct Victory<General> {
-  init<K: Kingdom where K.King == General>(_ king: K) {}
+  init<K: Kingdom>(_ king: K) where K.King == General {}
 }
 struct MagicKingdom<K> : Kingdom {
   typealias King = K

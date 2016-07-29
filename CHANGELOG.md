@@ -3,6 +3,105 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0025](https://github.com/apple/swift-evolution/blob/master/proposals/0025-scoped-access-level.md): A declaration marked as `private` can now only be accessed within the lexical scope it is declared in (essentially the enclosing curly braces `{}`). A `private` declaration at the top level of a file can be accessed anywhere in that file, as in Swift 2. The access level formerly known as `private` is now called `fileprivate`.
+
+* [SE-0131](https://github.com/apple/swift-evolution/blob/master/proposals/0131-anyhashable.md):
+  The standard library provides a new type `AnyHashable` for use in heterogenous
+  hashed collections. Untyped `NSDictionary` and `NSSet` APIs from Objective-C
+  now import as `[AnyHashable: Any]` and `Set<AnyHashable>`.
+
+* [SE-0102](https://github.com/apple/swift-evolution/blob/master/proposals/0102-noreturn-bottom-type.md)
+  The `@noreturn` attribute on function declarations and function types has been removed,
+  in favor of an empty `Never` type:
+
+  ```swift
+  @noreturn func fatalError(msg: String) { ... }  // old
+  func fatalError(msg: String) -> Never { ... }   // new
+
+  func performOperation<T>(continuation: @noreturn T -> ()) { ... }  // old
+  func performOperation<T>(continuation: T -> Never) { ... }         // new
+  ```
+
+* [SE-0116](https://github.com/apple/swift-evolution/blob/master/proposals/0116-id-as-any.md):
+  Objective-C APIs using `id` now import into Swift as `Any` instead of as `AnyObject`.
+  Similarly, APIs using untyped `NSArray` and `NSDictionary` import as `[Any]` and
+  `[AnyHashable: Any]`, respectively.
+
+* [SE-0072](https://github.com/apple/swift-evolution/blob/master/proposals/0072-eliminate-implicit-bridging-conversions.md):
+  Bridging conversions are no longer implicit. The conversion from a Swift value type to
+  its corresponding object can be forced with `as`, e.g. `string as NSString`. Any Swift
+  value can also be converted to its boxed `id` representation with `as AnyObject`.
+
+* Collection subtype conversions and dynamic casts now work with protocol types:
+
+    ```swift
+    protocol P {}; extension Int: P {}
+    var x: [Int] = [1, 2, 3]
+    var p: [P] = x
+    var x2 = p as! [Int]
+    ```
+
+* [SR-2131](https://bugs.swift.org/browse/SR-2131):
+  The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a
+  prefix and suffix of all strings.
+
+* [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md):
+  The `protocol<...>` composition construct has been removed. In its
+  place, an infix type operator `&` has been introduced.
+
+  ```swift
+  let a: Foo & Bar
+  let b = value as? A & B & C
+  func foo<T : Foo & Bar>(x: T) { … }
+  func bar(x: Foo & Bar) { … }
+  typealias G = GenericStruct<Foo & Bar>
+  ```
+
+  The empty protocol composition, the `Any` type, was previously 
+  defined as being `protocol<>`. This has been removed from the 
+  standard library and `Any` is now a keyword with the same behaviour.
+
+* [SE-0091](https://github.com/apple/swift-evolution/blob/master/proposals/0091-improving-operators-in-protocols.md):
+  Operators can now be defined within types or extensions thereof. For example:
+
+  ```swift
+  struct Foo: Equatable {
+    let value: Int
+
+    static func ==(lhs: Foo, rhs: Foo) -> Bool {
+      return lhs.value == rhs.value
+    }
+  }
+  ```
+
+  Such operators must be declared as `static` (or, within a class, `class
+  final`), and have the same signature as their global counterparts. As part of
+  this change, operator requirements declared in protocols must also be
+  explicitly declared `static`:
+
+  ```swift
+  protocol Equatable {
+    static func ==(lhs: Self, rhs: Self) -> Bool
+  }
+  ```
+
+  Note that the type checker performance optimization described by SE-0091 is
+  not yet implemented.
+
+* [SE-0099](https://github.com/apple/swift-evolution/blob/master/proposals/0099-conditionclauses.md):
+  Condition clauses in `if`, `guard`, and `while` statements now use a more
+  regular syntax. Each pattern or optional binding must be prefixed with `case`
+  or `let` respectively, and all conditions are separated by `,` instead of
+  `where`.
+
+  ```swift
+  // before
+  if let a = a, b = b where a == b { }
+
+  // after
+  if let a = a, let b = b, a == b { }
+  ```
+
 * [SE-0112](https://github.com/apple/swift-evolution/blob/master/proposals/0112-nserror-bridging.md):
   The `NSError` type is now bridged to the Swift `Error` protocol type
   (formerly called `ErrorProtocol` in Swift 3, `ErrorType` in Swift 2)
@@ -51,6 +150,7 @@ Swift 3.0
 
   Similarly, the new `RecoverableError` and `CustomNSError` protocols
   allow additional control over the handling of the error.
+
 
 * [SE-0060](https://github.com/apple/swift-evolution/blob/master/proposals/0060-defaulted-parameter-order.md):
   Function parameters with default arguments must now be specified in
@@ -187,6 +287,9 @@ Swift 3.0
   - Foundation container classes `NS[Mutable]Array`, `NS[Mutable]Set`, and
     `NS[Mutable]Dictionary` are still imported as nongeneric classes for
     the time being.
+
+* [SE-0036](https://github.com/apple/swift-evolution/blob/master/proposals/0036-enum-dot.md): 
+  Enum elements can no longer be accessed as instance members in instance methods.
 
 * As part of the changes for SE-0055 (see below), the *pointee* types of
   imported pointers (e.g. the `id` in `id *`) are no longer assumed to always

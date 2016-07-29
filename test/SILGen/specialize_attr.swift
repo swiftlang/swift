@@ -48,7 +48,7 @@ public class ASubscriptable<Element> : TestSubscriptable {
   var storage: UnsafeMutablePointer<Element>
 
   init(capacity: Int) {
-    storage = UnsafeMutablePointer<Element>(allocatingCapacity: capacity)
+    storage = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
   }
 
   public subscript(i: Int) -> Element {
@@ -76,7 +76,7 @@ public class Addressable<Element> : TestSubscriptable {
   var storage: UnsafeMutablePointer<Element>
 
   init(capacity: Int) {
-    storage = UnsafeMutablePointer<Element>(allocatingCapacity: capacity)
+    storage = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
   }
 
   public subscript(i: Int) -> Element {

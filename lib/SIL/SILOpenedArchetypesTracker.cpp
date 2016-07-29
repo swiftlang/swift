@@ -14,6 +14,60 @@
 
 using namespace swift;
 
+void SILOpenedArchetypesTracker::addOpenedArchetypeDef(Type archetype,
+                                                       SILValue Def) {
+  archetype = archetype->getDesugaredType();
+  assert(archetype->is<ArchetypeType>() && "The type should be an archetype");
+  auto OldDef = getOpenedArchetypeDef(archetype);
+  if (OldDef && isa<GlobalAddrInst>(OldDef)) {
+    // It is a forward definition created during deserialization.
+    // Replace it with the real definition now.
+    OldDef->replaceAllUsesWith(Def);
+    OldDef = SILValue();
+  }
+  assert(!OldDef &&
+         "There can be only one definition of an opened archetype");
+  OpenedArchetypeDefs[archetype] = Def;
+}
+
+/// Check if there are any unresolved forward definitions of opened
+/// archetypes.
+bool SILOpenedArchetypesTracker::hasUnresolvedOpenedArchetypeDefinitions() {
+  for (auto &KV : getOpenedArchetypeDefs()) {
+    assert(KV.getFirst()->is<ArchetypeType>() && "The type should be an archetype");
+    if (!KV.getSecond() || isa<GlobalAddrInst>(KV.getSecond()))
+      return true;
+  }
+  return false;
+}
+
+void SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(Type Ty) {
+  // Nothing else to be done if the type does not contain an opened archetype.
+  if (!Ty || !Ty->hasOpenedExistential())
+    return;
+
+  // Find all opened existentials used by this type and check if their
+  // definitions are known.
+  Ty.visit([&](Type ty) {
+    if (!ty->isOpenedExistential())
+      return;
+
+    ty = ty->getDesugaredType();
+
+    // Nothing to do if a definition was seen already.
+    if (getOpenedArchetypeDef(ty))
+      return;
+
+    auto &SILMod = this->getFunction().getModule();
+    // Create a placeholder representing a forward definition.
+    auto Placeholder = new (SILMod)
+        GlobalAddrInst(SILDebugLocation(), SILMod.Types.getLoweredType(ty));
+    // Make it available to SILBuilder, so that instructions using this
+    // archetype can be constructed.
+    addOpenedArchetypeDef(ty, Placeholder);
+  });
+}
+
 // Register archetypes opened by a given instruction.
 // Can be used to incrementally populate the mapping, e.g.
 // if it is done when performing a scan of all instructions

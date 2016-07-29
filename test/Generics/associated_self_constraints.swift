@@ -11,7 +11,7 @@ protocol Observer {
 protocol Observable {
     associatedtype Value
 
-    func subscribe<O: Observer where O.Value == Value>(_ observer: O) -> Any
+    func subscribe<O: Observer>(_ observer: O) -> Any where O.Value == Value
 }
 
 class Subject<T>: Observer, Observable {
@@ -37,7 +37,7 @@ class Subject<T>: Observer, Observable {
     
     // Observable implementation
     
-    func subscribe<O: Observer where O.Value == T>(_ observer: O) -> Any {
+    func subscribe<O: Observer>(_ observer: O) -> Any where O.Value == T {
         self.onNextFunc = { (item: T) -> Void in
             observer.onNext(item)
         }

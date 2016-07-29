@@ -2,6 +2,8 @@
 // A bare-bones Swift standard library
 //
 
+precedencegroup AssignmentPrecedence { assignment: true }
+
 public enum Optional<Wrapped> {
   case none
   case some(Wrapped)

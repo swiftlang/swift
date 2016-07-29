@@ -37,9 +37,6 @@ typedef struct Metadata Metadata;
 #define bool _Bool
 #endif
 
-SWIFT_RUNTIME_EXPORT
-bool swift_objc_class_usesNativeSwiftReferenceCounting(const void *);
-
 /// Return an NSString to be used as the Mirror summary of the object
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void *_swift_objCMirrorSummary(const void * nsObject);

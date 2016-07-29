@@ -109,14 +109,14 @@ func _reportUnimplementedInitializer(
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
 @_versioned
-@noreturn @inline(never)
+@inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
   // FIXME(ABI): add argument labels to conform to API guidelines.
   _ prefix: StaticString, _ message: StaticString,
   _ file: StaticString, _ line: UInt,
   flags: UInt32
-) {
+) -> Never {
   prefix.withUTF8Buffer {
     (prefix) -> Void in
     message.withUTF8Buffer {
@@ -141,14 +141,14 @@ func _assertionFailed(
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
 @_versioned
-@noreturn @inline(never)
+@inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
   // FIXME(ABI): add argument labels to conform to API guidelines.
   _ prefix: StaticString, _ message: String,
   _ file: StaticString, _ line: UInt,
   flags: UInt32
-) {
+) -> Never {
   prefix.withUTF8Buffer {
     (prefix) -> Void in
     message._withUnsafeBufferPointerToUTF8 {
@@ -173,7 +173,7 @@ func _assertionFailed(
 /// This function should not be inlined because it is cold and it inlining just
 /// bloats code.
 @_versioned
-@noreturn @inline(never)
+@inline(never)
 @_semantics("stdlib_binary_only")
 @_semantics("arc.programtermination_point")
 func _fatalErrorMessage(
@@ -181,7 +181,7 @@ func _fatalErrorMessage(
   _ prefix: StaticString, _ message: StaticString,
   _ file: StaticString, _ line: UInt,
   flags: UInt32
-) {
+) -> Never {
 #if INTERNAL_CHECKS_ENABLED
   prefix.withUTF8Buffer {
     (prefix) in
@@ -213,16 +213,16 @@ func _fatalErrorMessage(
   Builtin.int_trap()
 }
 
-// FIXME(ABI): rename to lower camel case to conform to API guidelines.
 /// Prints a fatal error message when an unimplemented initializer gets
 /// called by the Objective-C runtime.
-@_transparent @noreturn
+@_transparent
 public // COMPILER_INTRINSIC
-func _unimplemented_initializer(className: StaticString,
-                                initName: StaticString = #function,
-                                file: StaticString = #file,
-                                line: UInt = #line,
-                                column: UInt = #column) {
+func _unimplementedInitializer(className: StaticString,
+                               initName: StaticString = #function,
+                               file: StaticString = #file,
+                               line: UInt = #line,
+                               column: UInt = #column
+) -> Never {
   // This function is marked @_transparent so that it is inlined into the caller
   // (the initializer stub), and, depending on the build configuration,
   // redundant parameter values (#file etc.) are eliminated, and don't leak
@@ -260,7 +260,6 @@ func _unimplemented_initializer(className: StaticString,
 }
 
 // FIXME(ABI): rename to something descriptive.
-@noreturn
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   _ message: @autoclosure () -> String = String(),

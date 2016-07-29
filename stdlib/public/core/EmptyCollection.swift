@@ -32,7 +32,7 @@ public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
 
 /// A collection whose element type is `Element` but that is always empty.
 public struct EmptyCollection<Element> :
-  RandomAccessCollection, MutableCollection, Equatable
+  RandomAccessCollection, MutableCollection
 {
   /// A type that represents a valid position in the collection.
   ///
@@ -145,10 +145,12 @@ public struct EmptyCollection<Element> :
   public typealias Indices = CountableRange<Int>
 }
 
-public func == <Element>(
-  lhs: EmptyCollection<Element>, rhs: EmptyCollection<Element>
-) -> Bool {
-  return true
+extension EmptyCollection : Equatable {
+  public static func == (
+    lhs: EmptyCollection<Element>, rhs: EmptyCollection<Element>
+  ) -> Bool {
+    return true
+  }
 }
 
 @available(*, unavailable, renamed: "EmptyIterator")

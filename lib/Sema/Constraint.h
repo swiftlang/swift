@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_CONSTRAINT_H
 
 #include "OverloadChoice.h"
+#include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -242,9 +243,6 @@ enum class FixKind : uint8_t {
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
   
-  /// Introduce a '!= nil' to convert an Optional to a Boolean expression.
-  OptionalToBoolean,
-  
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
 };
@@ -298,11 +296,11 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of restriction placed on this constraint.
   ConversionRestrictionKind Restriction : 8;
 
-  /// The kind of fix to be applied to the constraint before visiting it.
-  FixKind TheFix;
-
   /// Data associated with the fix.
   uint16_t FixData;
+
+  /// The kind of fix to be applied to the constraint before visiting it.
+  FixKind TheFix;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
@@ -325,7 +323,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The number of type variables referenced by this constraint.
   ///
   /// The type variables themselves are tail-allocated.
-  unsigned NumTypeVariables : 12;
+  unsigned NumTypeVariables : 11;
+
+  /// The kind of function reference, for member references.
+  unsigned TheFunctionRefKind : 2;
 
   union {
     struct {
@@ -365,7 +366,9 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   /// Construct a new constraint.
   Constraint(ConstraintKind kind, Type first, Type second, DeclName member,
-             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
+             FunctionRefKind functionRefKind,
+             ConstraintLocator *locator,
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new overload-binding constraint.
   Constraint(Type type, OverloadChoice choice, ConstraintLocator *locator,
@@ -390,6 +393,7 @@ public:
   /// Create a new constraint.
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
                             Type First, Type Second, DeclName Member,
+                            FunctionRefKind functionRefKind,
                             ConstraintLocator *locator);
 
   /// Create an overload-binding constraint.
@@ -525,6 +529,16 @@ public:
     return kind == ConstraintKind::ValueMember
         || kind == ConstraintKind::UnresolvedValueMember
         || kind == ConstraintKind::TypeMember;
+  }
+
+  /// Determine the kind of function reference we have for a member reference.
+  FunctionRefKind getFunctionRefKind() const {
+    if (Kind == ConstraintKind::ValueMember ||
+        Kind == ConstraintKind::UnresolvedValueMember)
+      return static_cast<FunctionRefKind>(TheFunctionRefKind);
+
+    // Conservative answer: drop all of the labels.
+    return FunctionRefKind::Compound;
   }
 
   /// Retrieve the set of constraints in a disjunction.

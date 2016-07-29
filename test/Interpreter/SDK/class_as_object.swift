@@ -12,8 +12,8 @@ classes.add(NSObject.self)
 classes.add(NSString.self)
 classes.add(NSNumber.self)
 
-for obj: AnyObject in classes {
-  print(obj.description)
+for obj in classes {
+  print((obj as AnyObject).description)
 }
 // CHECK: NSObject
 // CHECK-NEXT: NSString

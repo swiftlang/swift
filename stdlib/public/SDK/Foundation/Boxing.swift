@@ -15,8 +15,9 @@
 /// A class type which acts as a handle (pointer-to-pointer) to a Foundation reference type which has only a mutable class (e.g., NSURLComponents).
 ///
 /// Note: This assumes that the result of calling copy() is mutable. The documentation says that classes which do not have a mutable/immutable distinction should just adopt NSCopying instead of NSMutableCopying.
-internal final class _MutableHandle<MutableType : NSObject where MutableType : NSCopying> {
-    private var _pointer : MutableType
+internal final class _MutableHandle<MutableType : NSObject>
+  where MutableType : NSCopying {
+    fileprivate var _pointer : MutableType
     
     init(reference : MutableType) {
         _pointer = reference.copy() as! MutableType
@@ -54,7 +55,7 @@ extension _MutableBoxing {
     @inline(__always)
     mutating func _applyMutation<ReturnType>(_ whatToDo : @noescape(ReferenceType) -> ReturnType) -> ReturnType {
         // Only create a new box if we are not uniquely referenced
-        if !isUniquelyReferencedNonObjC(&_handle) {
+        if !isKnownUniquelyReferenced(&_handle) {
             let ref = _handle._pointer
             _handle = _MutableHandle(reference: ref)
         }
@@ -62,7 +63,8 @@ extension _MutableBoxing {
     }
 }
 
-internal enum _MutableUnmanagedWrapper<ImmutableType : NSObject, MutableType : NSObject where MutableType : NSMutableCopying> {
+internal enum _MutableUnmanagedWrapper<ImmutableType : NSObject, MutableType : NSObject>
+  where MutableType : NSMutableCopying{
     case Immutable(Unmanaged<ImmutableType>)
     case Mutable(Unmanaged<MutableType>)
 }
@@ -75,7 +77,7 @@ internal protocol _SwiftNativeFoundationType : class {
     init(unmanagedImmutableObject: Unmanaged<ImmutableType>)
     init(unmanagedMutableObject: Unmanaged<MutableType>)
     
-    func mutableCopy(with zone : NSZone) -> AnyObject
+    func mutableCopy(with zone : NSZone?) -> Any
     
     var hashValue: Int { get }
     var description: String { get }
@@ -115,7 +117,7 @@ extension _SwiftNativeFoundationType {
         }
     }
     
-    func mutableCopy(with zone : NSZone) -> AnyObject {
+    func mutableCopy(with zone : NSZone?) -> Any {
         return _mapUnmanaged { $0.mutableCopy() }
     }
     
@@ -187,7 +189,7 @@ extension _MutablePairBoxing {
         case .Immutable(_):
             break
         case .Mutable(_):
-            unique = isUniquelyReferencedNonObjC(&_wrapped)
+            unique = isKnownUniquelyReferenced(&_wrapped)
         }
 
         switch (wrapper) {

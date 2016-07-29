@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/Unicode.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/PrettyStackTrace.h"
 
@@ -298,7 +299,6 @@ private:
       buildSubstSelfType(selfType, protocolSelfType, ctx);
 
     auto extInfo = FunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                         /*noreturn*/ false,
                                          /*throws*/ OrigFormalInterfaceType->throws());
 
     SubstFormalType = CanFunctionType::get(substSelfType, SubstFormalType,
@@ -843,8 +843,7 @@ public:
         // actually be using the allocating constructor. Update the type
         // appropriately.
         // FIXME: Re-derive the type from the declaration + substitutions?
-        auto ctorRef = cast<OtherConstructorDeclRefExpr>(
-                         site->getFn()->getSemanticsProvidingExpr());
+        auto ctorRef = cast<OtherConstructorDeclRefExpr>(site->getSemanticFn());
         auto fnType = ctorRef->getType()->castTo<FunctionType>();
         auto selfTy = MetatypeType::get(
                         fnType->getInput()->getInOutObjectType());
@@ -1687,6 +1686,85 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
   // Enter the normal path.
   B.emitBlock(normalBB);
   return normalBB->createBBArg(resultType);
+}
+
+static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
+                                SGFContext C,
+                                StringLiteralExpr::Encoding encoding) {
+  uint64_t Length;
+  bool isASCII = true;
+  for (unsigned char c : Str) {
+    if (c > 127) {
+      isASCII = false;
+      break;
+    }
+  }
+
+  StringLiteralInst::Encoding instEncoding;
+  switch (encoding) {
+  case StringLiteralExpr::UTF8:
+    instEncoding = StringLiteralInst::Encoding::UTF8;
+    Length = Str.size();
+    break;
+
+  case StringLiteralExpr::UTF16: {
+    instEncoding = StringLiteralInst::Encoding::UTF16;
+    Length = unicode::getUTF16Length(Str);
+    break;
+  }
+  case StringLiteralExpr::OneUnicodeScalar: {
+    SILType Int32Ty = SILType::getBuiltinIntegerType(32, SGF.getASTContext());
+    SILValue UnicodeScalarValue =
+        SGF.B.createIntegerLiteral(E, Int32Ty,
+                                   unicode::extractFirstUnicodeScalar(Str));
+    return RValue(SGF, E, Int32Ty.getSwiftRValueType(),
+                  ManagedValue::forUnmanaged(UnicodeScalarValue));
+  }
+  }
+
+  // The string literal provides the data.
+  StringLiteralInst *string = SGF.B.createStringLiteral(E, Str, instEncoding);
+
+  // The length is lowered as an integer_literal.
+  auto WordTy = SILType::getBuiltinWordType(SGF.getASTContext());
+  auto *lengthInst = SGF.B.createIntegerLiteral(E, WordTy, Length);
+
+  // The 'isascii' bit is lowered as an integer_literal.
+  auto Int1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+  auto *isASCIIInst = SGF.B.createIntegerLiteral(E, Int1Ty, isASCII);
+
+  ManagedValue EltsArray[] = {
+    ManagedValue::forUnmanaged(string),
+    ManagedValue::forUnmanaged(lengthInst),
+    ManagedValue::forUnmanaged(isASCIIInst)
+  };
+
+  TupleTypeElt TypeEltsArray[] = {
+    EltsArray[0].getSwiftType(),
+    EltsArray[1].getSwiftType(),
+    EltsArray[2].getSwiftType()
+  };
+
+  ArrayRef<ManagedValue> Elts;
+  ArrayRef<TupleTypeElt> TypeElts;
+  switch (instEncoding) {
+  case StringLiteralInst::Encoding::UTF16:
+    Elts = llvm::makeArrayRef(EltsArray).slice(0, 2);
+    TypeElts = llvm::makeArrayRef(TypeEltsArray).slice(0, 2);
+    break;
+
+  case StringLiteralInst::Encoding::UTF8:
+    Elts = EltsArray;
+    TypeElts = TypeEltsArray;
+    break;
+
+  case StringLiteralInst::Encoding::ObjCSelector:
+    llvm_unreachable("Objective-C selectors cannot be formed here");
+  }
+
+  CanType ty =
+    TupleType::get(TypeElts, SGF.getASTContext())->getCanonicalType();
+  return RValue(Elts, ty);
 }
 
 /// Emit a raw apply operation, performing no additional lowering of
@@ -3072,7 +3150,10 @@ namespace {
       // boxing.
       // TODO: Generalize. Similarly, when bridging from NSFoo -> Foo -> NSFoo,
       // we should elide the bridge altogether and pass the original object.
-      if (isAnyObjectType(param.getType()) && !arg.isRValue()) {
+      auto paramObjTy = param.getType();
+      if (auto objTy = paramObjTy.getAnyOptionalObjectType())
+        paramObjTy = objTy;
+      if (isAnyObjectType(paramObjTy) && !arg.isRValue()) {
         return emitNativeToBridgedObjectArgument(std::move(arg).asKnownExpr(),
                                                  loweredSubstArgType,
                                                  origParamType, param);
@@ -3087,8 +3168,60 @@ namespace {
                                       
     }
     
-    Expr *lookThroughExistentialErasures(Expr *argExpr) {
+    enum class ExistentialPeepholeOptionality {
+      /// A non-optional value erased to a non-optional existential.
+      Nonoptional,
+      
+      /// A non-optional value erased to an optional existential.
+      NonoptionalToOptional,
+      
+      /// An optional value erased to an optional existential.
+      OptionalToOptional,
+    };
+    
+    std::pair<Expr *, ExistentialPeepholeOptionality>
+    lookThroughExistentialErasures(Expr *argExpr) {
+      auto origArgExpr = argExpr;
+    
+      auto optionality = ExistentialPeepholeOptionality::Nonoptional;
       argExpr = argExpr->getSemanticsProvidingExpr();
+      
+      // Check for an OptionalEvaluation. If we see one we'll want to match it
+      // to the inner BindOptional.
+      if (auto optEval = dyn_cast<OptionalEvaluationExpr>(argExpr)) {
+        
+        // The result of the conversion should be promoted back to optional
+        // at the outermost level.
+        if (auto inject = dyn_cast<InjectIntoOptionalExpr>(
+                         optEval->getSubExpr()->getSemanticsProvidingExpr())) {
+          optionality = ExistentialPeepholeOptionality::OptionalToOptional;
+          argExpr = inject->getSubExpr()->getSemanticsProvidingExpr();
+        }
+      }
+      
+      // Look through a BindOptionalExpr if we have an optional-to-optional
+      // peephole, or fail the peephole if there isn't a BindOptionalToOptional.
+      auto tryToBindOptional =
+        [&](Expr *subExpr) -> std::pair<Expr *, ExistentialPeepholeOptionality> {
+          if (optionality ==
+                ExistentialPeepholeOptionality::OptionalToOptional) {
+            // If we see the binding, look through it.
+            if (auto bind = dyn_cast<BindOptionalExpr>(subExpr))
+              return {bind->getSubExpr()->getSemanticsProvidingExpr(),
+                      optionality};
+            // Otherwise, we don't know what we're seeing. Back out of the
+            // peephole.
+            return {origArgExpr, ExistentialPeepholeOptionality::Nonoptional};
+          }
+          
+          return {subExpr, optionality};
+        };
+      
+      // Look through an optional injection.
+      if (auto inject = dyn_cast<InjectIntoOptionalExpr>(argExpr)) {
+        optionality = ExistentialPeepholeOptionality::NonoptionalToOptional;
+        argExpr = inject->getSubExpr()->getSemanticsProvidingExpr();
+      }
 
       // When converting from an existential type to a more general existential,
       // the inner existential is opened first. Look through this pattern.
@@ -3100,17 +3233,18 @@ namespace {
         // If we drilled down to the underlying opened existential, look
         // through it.
         if (subExpr == open->getOpaqueValue())
-          return open->getExistentialValue();
+          return tryToBindOptional(open->getExistentialValue());
         // TODO: Maybe there are other peepholes we could attempt on opened
         // existentials?
-        return open;
+        return tryToBindOptional(open);
       }
       
       // Look through ErasureExprs and try to bridge the underlying
       // concrete value instead.
       while (auto erasure = dyn_cast<ErasureExpr>(argExpr))
         argExpr = erasure->getSubExpr()->getSemanticsProvidingExpr();
-      return argExpr;
+
+      return tryToBindOptional(argExpr);
     }
     
     /// Emit an argument expression that we know will be bridged to an
@@ -3119,54 +3253,94 @@ namespace {
                                                SILType loweredSubstArgType,
                                                AbstractionPattern origParamType,
                                                SILParameterInfo param) {
-      argExpr = lookThroughExistentialErasures(argExpr);
+      auto origArgExpr = argExpr;
+      (void) origArgExpr;
+      // Look through existential erasures.
+      ExistentialPeepholeOptionality optionality;
+      std::tie(argExpr, optionality) = lookThroughExistentialErasures(argExpr);
       
       // Emit the argument.
       auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
       ManagedValue emittedArg = SGF.emitRValue(argExpr, contexts.ForEmission)
         .getScalarValue();
       
-      // If the argument is not already a class instance, bridge it.
-      if (!argExpr->getType()->mayHaveSuperclass()
-          && !argExpr->getType()->isClassExistentialType()) {
-        emittedArg = SGF.emitNativeToBridgedValue(argExpr, emittedArg,
-                                                  Rep, param.getType());
+      // Early exit if we already exactly match the parameter type.
+      if (emittedArg.getType() == param.getSILType()) {
+        return emittedArg;
       }
-      auto emittedArgTy = emittedArg.getType().getSwiftRValueType();
-      assert(emittedArgTy->mayHaveSuperclass()
-        || emittedArgTy->isClassExistentialType());
       
-      // Upcast reference types to AnyObject.
-      if (!isAnyObjectType(emittedArgTy)) {
-        // Open class existentials first to upcast the reference inside.
-        if (emittedArgTy->isClassExistentialType()) {
-          emittedArgTy = ArchetypeType::getOpened(emittedArgTy);
-          auto opened = SGF.B.createOpenExistentialRef(argExpr,
+      // Factor the bridging conversion out in case we need to do it as an
+      // optional-to-optional transform.
+      auto doBridge = [&](SILGenFunction &gen,
+                          SILLocation loc,
+                          ManagedValue emittedArg,
+                          SILType loweredResultTy) -> ManagedValue {
+        // If the argument is not already a class instance, bridge it.
+        if (!emittedArg.getType().getSwiftRValueType()->mayHaveSuperclass()
+            && !emittedArg.getType().isClassExistentialType()) {
+          emittedArg = SGF.emitNativeToBridgedValue(loc, emittedArg, Rep,
+                                          loweredResultTy.getSwiftRValueType());
+        }
+        auto emittedArgTy = emittedArg.getType().getSwiftRValueType();
+        assert(emittedArgTy->mayHaveSuperclass()
+          || emittedArgTy->isClassExistentialType());
+        
+        // Upcast reference types to AnyObject.
+        if (!isAnyObjectType(emittedArgTy)) {
+          // Open class existentials first to upcast the reference inside.
+          if (emittedArgTy->isClassExistentialType()) {
+            emittedArgTy = ArchetypeType::getOpened(emittedArgTy);
+            auto opened = SGF.B.createOpenExistentialRef(loc,
                                  emittedArg.getValue(),
                                  SILType::getPrimitiveObjectType(emittedArgTy));
-          emittedArg = ManagedValue(opened, emittedArg.getCleanup());
-        }
-        
-        // Erase to AnyObject.
-        auto conformance = SGF.SGM.SwiftModule->lookupConformance(
-          emittedArgTy,
-          SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject),
-          nullptr);
-        assert(conformance &&
-               "no AnyObject conformance for class?!");
-        
-        ArrayRef<ProtocolConformanceRef> conformances(*conformance);
-        auto ctxConformances = SGF.getASTContext().AllocateCopy(conformances);
-        
-        auto erased = SGF.B.createInitExistentialRef(argExpr,
+            emittedArg = ManagedValue(opened, emittedArg.getCleanup());
+          }
+          
+          // Erase to AnyObject.
+          auto conformance = SGF.SGM.SwiftModule->lookupConformance(
+            emittedArgTy,
+            SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject),
+            nullptr);
+          assert(conformance &&
+                 "no AnyObject conformance for class?!");
+          
+          ArrayRef<ProtocolConformanceRef> conformances(*conformance);
+          auto ctxConformances = SGF.getASTContext().AllocateCopy(conformances);
+          
+          auto erased = SGF.B.createInitExistentialRef(loc,
                            SILType::getPrimitiveObjectType(getAnyObjectType()),
                            emittedArgTy, emittedArg.getValue(),
                            ctxConformances);
-        emittedArg = ManagedValue(erased, emittedArg.getCleanup());
-      }
+          emittedArg = ManagedValue(erased, emittedArg.getCleanup());
+        }
+        
+        assert(isAnyObjectType(emittedArg.getSwiftType()));
+        return emittedArg;
+      };
       
-      assert(isAnyObjectType(emittedArg.getSwiftType()));
-      return emittedArg;
+      // Bind the optional value if we started with an optional.
+      bool nativeIsOptional = (bool)emittedArg.getType().getSwiftRValueType()
+        ->getAnyOptionalObjectType();
+      bool bridgedIsOptional = (bool)param.getSILType().getSwiftRValueType()
+        ->getAnyOptionalObjectType();
+      if (nativeIsOptional && bridgedIsOptional) {
+        return SGF.emitOptionalToOptional(argExpr,
+                                          emittedArg, param.getSILType(),
+                                          doBridge);
+      } else if (!nativeIsOptional && bridgedIsOptional) {
+        OptionalTypeKind otk;
+        auto paramObjTy = param.getSILType()
+          .getAnyOptionalObjectType(SGF.SGM.M, otk);
+        auto transformed = doBridge(SGF, argExpr, emittedArg,
+                                    paramObjTy);
+        // Inject into optional.
+        auto opt = SGF.B.createEnum(argExpr, transformed.getValue(),
+                                  SGF.getASTContext().getOptionalSomeDecl(otk),
+                                  param.getSILType());
+        return ManagedValue(opt, transformed.getCleanup());
+      } else {
+        return doBridge(SGF, argExpr, emittedArg, param.getSILType());
+      }
     }
     
     struct EmittedArgument {
@@ -4411,6 +4585,227 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                    options, None, None, ctx);
 }
 
+static StringRef
+getMagicFunctionString(SILGenFunction &gen) {
+  assert(gen.MagicFunctionName
+         && "asking for #function but we don't have a function name?!");
+  if (gen.MagicFunctionString.empty()) {
+    llvm::raw_string_ostream os(gen.MagicFunctionString);
+    gen.MagicFunctionName.printPretty(os);
+  }
+  return gen.MagicFunctionString;
+}
+
+/// Emit an application of the given allocating initializer.
+static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             ConcreteDeclRef init,
+                                             RValue &&args,
+                                             Type overriddenSelfType,
+                                             SGFContext C) {
+  ConstructorDecl *ctor = cast<ConstructorDecl>(init.getDecl());
+
+  // Form the reference to the allocating initializer.
+  SILDeclRef initRef(ctor,
+                     SILDeclRef::Kind::Allocator,
+                     SILDeclRef::ConstructAtBestResilienceExpansion,
+                     SILDeclRef::ConstructAtNaturalUncurryLevel,
+                     requiresForeignEntryPoint(ctor));
+  SILConstantInfo initConstant = SGF.getConstantInfo(initRef);
+
+  // Scope any further writeback just within this operation.
+  WritebackScope writebackScope(SGF);
+
+  // Determine the formal and substituted types.
+  CanAnyFunctionType substFormalType = initConstant.FormalInterfaceType;
+  auto subs = init.getSubstitutions();
+  if (!subs.empty()) {
+    auto genericFnType = cast<GenericFunctionType>(substFormalType);
+    auto applied = genericFnType->substGenericArgs(SGF.SGM.SwiftModule, subs);
+    substFormalType = cast<FunctionType>(applied->getCanonicalType());
+  }
+
+  // For an inheritable initializer, determine whether we'll need to adjust the
+  // result type.
+  bool requiresDowncast = false;
+  if (ctor->isInheritable() && overriddenSelfType) {
+    CanType substResultType = substFormalType;
+    for (unsigned i : range(ctor->getNumParameterLists())) {
+      (void)i;
+      substResultType = cast<FunctionType>(substResultType).getResult();
+    }
+
+    if (!substResultType->isEqual(overriddenSelfType))
+      requiresDowncast = true;
+  }
+
+  // Form the metatype argument.
+  ManagedValue selfMetaVal;
+  SILType selfMetaTy;
+  {
+    // Determine the self metatype type.
+    CanSILFunctionType substFnType =
+      SGF.getLoweredType(substFormalType, /*uncurryLevel=*/1)
+      .castTo<SILFunctionType>();
+    SILType selfParamMetaTy = substFnType->getSelfParameter().getSILType();
+
+    if (overriddenSelfType) {
+      // If the 'self' type has been overridden, form a metatype to the
+      // overriding 'Self' type.
+      Type overriddenSelfMetaType =
+        MetatypeType::get(overriddenSelfType, SGF.getASTContext());
+      selfMetaTy =
+        SGF.getLoweredType(overriddenSelfMetaType->getCanonicalType());
+    } else {
+      selfMetaTy = selfParamMetaTy;
+    }
+
+    // Form the metatype value.
+    SILValue selfMeta = SGF.B.createMetatype(loc, selfMetaTy);
+
+    // If the types differ, we need an upcast.
+    if (selfMetaTy != selfParamMetaTy)
+      selfMeta = SGF.B.createUpcast(loc, selfMeta, selfParamMetaTy);
+
+    selfMetaVal = ManagedValue::forUnmanaged(selfMeta);
+  }
+
+  // Form the callee.
+  Optional<Callee> callee;
+  if (isa<ProtocolDecl>(ctor->getDeclContext())) {
+    ArgumentSource selfSource(loc, 
+                              RValue(SGF, loc,
+                                     selfMetaVal.getType().getSwiftRValueType(),
+                                     selfMetaVal));
+    callee.emplace(prepareArchetypeCallee(SGF, loc, initRef, selfSource,
+                                          substFormalType, subs));
+  } else {
+    callee.emplace(Callee::forDirect(SGF, initRef, substFormalType, loc));
+  }
+  if (!subs.empty())
+    callee->setSubstitutions(SGF, loc, subs);
+
+  // Form the call emission.
+  CallEmission emission(SGF, std::move(*callee), std::move(writebackScope));
+
+  // Self metatype.
+  emission.addCallSite(loc,
+                       ArgumentSource(loc,
+                                      RValue(SGF, loc,
+                                             selfMetaVal.getType()
+                                               .getSwiftRValueType(),
+                                             std::move(selfMetaVal))),
+                       substFormalType);
+
+  // Arguments
+  emission.addCallSite(loc, ArgumentSource(loc, std::move(args)),
+                       cast<FunctionType>(substFormalType.getResult()));
+
+  // Perform the call.
+  RValue result = emission.apply(requiresDowncast ? SGFContext() : C);
+
+  // If we need a downcast, do it down.
+  if (requiresDowncast) {
+    ManagedValue v = std::move(result).getAsSingleValue(SGF, loc);
+    CanType canOverriddenSelfType = overriddenSelfType->getCanonicalType();
+    SILType loweredResultTy = SGF.getLoweredType(canOverriddenSelfType);
+    v = ManagedValue(SGF.B.createUncheckedRefCast(loc,
+                                                  v.getValue(),
+                                                  loweredResultTy),
+                     v.getCleanup());
+    result = RValue(SGF, loc, canOverriddenSelfType, v);
+  }
+
+  return result;
+}
+
+/// Emit a literal that applies the various initializers.
+RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
+  ConcreteDeclRef builtinInit;
+  ConcreteDeclRef init;
+  // Emit the raw, builtin literal arguments.
+  RValue builtinLiteralArgs;
+  if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal)) {
+    builtinLiteralArgs = emitStringLiteral(*this, literal,
+                                           stringLiteral->getValue(), C,
+                                           stringLiteral->getEncoding());
+    builtinInit = stringLiteral->getBuiltinInitializer();
+    init = stringLiteral->getInitializer();
+  } else {
+    ASTContext &ctx = getASTContext();
+    SourceLoc loc;
+  
+    // If "overrideLocationForMagicIdentifiers" is set, then we use it as the
+    // location point for these magic identifiers.
+    if (overrideLocationForMagicIdentifiers)
+      loc = overrideLocationForMagicIdentifiers.getValue();
+    else
+      loc = literal->getStartLoc();
+
+    auto magicLiteral = cast<MagicIdentifierLiteralExpr>(literal);
+    switch (magicLiteral->getKind()) {
+    case MagicIdentifierLiteralExpr::File: {
+      StringRef value = "";
+      if (loc.isValid()) {
+        unsigned bufferID = ctx.SourceMgr.findBufferContainingLoc(loc);
+        value = ctx.SourceMgr.getIdentifierForBuffer(bufferID);
+      }
+      builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
+                                             magicLiteral->getStringEncoding());
+      builtinInit = magicLiteral->getBuiltinInitializer();
+      init = magicLiteral->getInitializer();
+      break;
+    }
+
+    case MagicIdentifierLiteralExpr::Function: {
+      StringRef value = "";
+      if (loc.isValid())
+        value = getMagicFunctionString(*this);
+      builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
+                                             magicLiteral->getStringEncoding());
+      builtinInit = magicLiteral->getBuiltinInitializer();
+      init = magicLiteral->getInitializer();
+      break;
+    }
+
+    case MagicIdentifierLiteralExpr::Line:
+    case MagicIdentifierLiteralExpr::Column:
+    case MagicIdentifierLiteralExpr::DSOHandle:
+      llvm_unreachable("handled elsewhere");
+    }
+  }
+
+  // Helper routine to add an argument label if we need one.
+  auto relabelArgument = [&](ConcreteDeclRef callee, RValue &arg) {
+    auto name = callee.getDecl()->getFullName();
+    auto argLabels = name.getArgumentNames();
+    if (argLabels.size() == 1 && !argLabels[0].empty() &&
+        !isa<TupleType>(arg.getType())) {
+      Type newType = TupleType::get({TupleTypeElt(arg.getType(), argLabels[0])},
+                                    getASTContext());
+      arg.rewriteType(newType->getCanonicalType());
+    }
+  };
+
+  // Call the builtin initializer.
+  relabelArgument(builtinInit, builtinLiteralArgs);
+  RValue builtinLiteral =
+    emitApplyAllocatingInitializer(*this, literal, builtinInit,
+                                   std::move(builtinLiteralArgs),
+                                   Type(),
+                                   init ? SGFContext() : C);
+
+  // If we were able to directly initialize the literal we wanted, we're done.
+  if (!init) return builtinLiteral;
+
+  // Otherwise, perform the second initialization step.
+  relabelArgument(init, builtinLiteral);
+  RValue result = emitApplyAllocatingInitializer(*this, literal, init,
+                                                 std::move(builtinLiteral),
+                                                 literal->getType(), C);
+  return result;
+}
+
 /// Allocate an uninitialized array of a given size, returning the array
 /// and a pointer to its uninitialized contents, which must be initialized
 /// before the array is valid.
@@ -5101,16 +5496,22 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     // Create the result value.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, operand,
                                               cast<FunctionType>(methodTy));
+    Scope applyScope(Cleanups, CleanupLocation(e));
+    RValue resultRV;
     if (isa<VarDecl>(e->getMember().getDecl())) {
-      result = B.createApply(e, result, result->getType(),
-                             getLoweredType(valueTy), {}, {});
+      resultRV = emitMonomorphicApply(e, ManagedValue::forUnmanaged(result),
+                                      {}, valueTy,
+                                      ApplyOptions::DoesNotThrow,
+                                      None, None);
+    } else {
+      resultRV = RValue(*this, e, valueTy,
+                        emitManagedRValueWithCleanup(result));
     }
 
     // Package up the result in an optional.
-    RValue resultRV = RValue(*this, e, valueTy,
-                             emitManagedRValueWithCleanup(result));
     emitInjectOptionalValueInto(e, {e, std::move(resultRV)}, optTemp, optTL);
 
+    applyScope.pop();
     // Branch to the continuation block.
     B.createBranch(e, contBB);
   }
@@ -5129,7 +5530,9 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   B.emitBlock(contBB);
 
   // Package up the result.
-  auto optResult = B.createLoad(e, optTemp);
+  auto optResult = optTemp;
+  if (optTL.isLoadable())
+    optResult = B.createLoad(e, optResult);
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }
 
@@ -5189,17 +5592,19 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, base,
                                               cast<FunctionType>(methodTy));
     // Emit the index.
-    llvm::SmallVector<SILValue, 1> indexArgs;
-    std::move(index).forwardAll(*this, indexArgs);
-    auto &valueTL = getTypeLowering(valueTy);
-    result = B.createApply(e, result, result->getType(),
-                           valueTL.getLoweredType(), {}, indexArgs);
+    llvm::SmallVector<ManagedValue, 2> indexArgs;
+    std::move(index).getAll(indexArgs);
+    
+    Scope applyScope(Cleanups, CleanupLocation(e));
+    auto resultRV = emitMonomorphicApply(e, ManagedValue::forUnmanaged(result),
+                                         indexArgs, valueTy,
+                                         ApplyOptions::DoesNotThrow,
+                                         None, None);
 
     // Package up the result in an optional.
-    RValue resultRV =
-      RValue(*this, e, valueTy, emitManagedRValueWithCleanup(result, valueTL));
     emitInjectOptionalValueInto(e, {e, std::move(resultRV)}, optTemp, optTL);
 
+    applyScope.pop();
     // Branch to the continuation block.
     B.createBranch(e, contBB);
   }
@@ -5218,6 +5623,8 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   B.emitBlock(contBB);
 
   // Package up the result.
-  auto optValue = B.createLoad(e, optTemp);
-  return RValue(*this, e, emitManagedRValueWithCleanup(optValue, optTL));
+  auto optResult = optTemp;
+  if (optTL.isLoadable())
+    optResult = B.createLoad(e, optResult);
+  return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }

@@ -21,6 +21,7 @@ set(SWIFT_BENCH_MODULES
     single-source/unit-tests/StackPromo
     single-source/Ackermann
     single-source/AngryPhonebook
+    single-source/AnyHashableWithAClass
     single-source/Array2D
     single-source/ArrayAppend
     single-source/ArrayInClass
@@ -36,6 +37,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CaptureProp
     single-source/Chars
     single-source/ClassArrayGetter
+    single-source/Data
     single-source/DeadArray
     single-source/DictionaryBridge
     single-source/DictionaryLiteral

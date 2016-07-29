@@ -12,19 +12,24 @@
 
 #import <Foundation/Foundation.h>
 
-extern /*"C"*/ NS_RETURNS_RETAINED id NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(
-    NSFileManager *NS_RELEASES_ARGUMENT __nonnull self_,
-    NSURL *NS_RELEASES_ARGUMENT __nonnull originalItemURL,
-    NSURL *NS_RELEASES_ARGUMENT __nonnull newItemURL,
-    NSString *NS_RELEASES_ARGUMENT __nonnull backupItemName,
-    NSUInteger options,
-    NSError *__nullable *__nullable error) {
+extern /*"C"*/ NS_RETURNS_RETAINED id
+NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(
+    NSFileManager *NS_RELEASES_ARGUMENT _Nonnull self_,
+    NSURL *NS_RELEASES_ARGUMENT _Nonnull originalItemURL,
+    NSURL *NS_RELEASES_ARGUMENT _Nonnull newItemURL,
+    NSString *NS_RELEASES_ARGUMENT _Nonnull backupItemName, NSUInteger options,
+    NSError *_Nullable *_Nullable error) {
 
-    NSURL *result = nil;
-    [self_ replaceItemAtURL:originalItemURL withItemAtURL:originalItemURL backupItemName:backupItemName options:(NSFileManagerItemReplacementOptions)options resultingItemURL:&result error:error];
-    [self_ release];
-    [originalItemURL release];
-    [newItemURL release];
-    [backupItemName release];
-    return [result retain];
+  NSURL *result = nil;
+  [self_ replaceItemAtURL:originalItemURL
+            withItemAtURL:originalItemURL
+           backupItemName:backupItemName
+                  options:(NSFileManagerItemReplacementOptions)options
+         resultingItemURL:&result
+                    error:error];
+  [self_ release];
+  [originalItemURL release];
+  [newItemURL release];
+  [backupItemName release];
+  return [result retain];
 }

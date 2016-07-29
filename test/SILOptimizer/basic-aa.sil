@@ -563,7 +563,7 @@ bb0(%0 : $X):
 
 // CHECK-LABEL: @alloc_stack_and_addr_cast
 // CHECK: PAIR #1.
-// CHECK-NEXT:   %0 = alloc_stack $C{{.*}}                             // users: %1, %2
+// CHECK-NEXT:   %0 = alloc_stack $C{{.*}}                             // users: %2, %1
 // CHECK-NEXT:   %1 = unchecked_addr_cast %0 : $*C to $*Optional<C>
 // CHECK-NEXT: MayAlias
 sil @alloc_stack_and_addr_cast : $@convention(thin) () -> () {

@@ -138,7 +138,7 @@ case _:
 // CHECK-NEXT: got the expected quick look color
 // CHECK-NEXT: got the expected quick look bezier path
 
-let image = OSImage(contentsOfFile:Process.arguments[1])!
+let image = OSImage(contentsOfFile:CommandLine.arguments[1])!
 switch PlaygroundQuickLook(reflecting: image) {
 case .image(let image2 as OSImage) where image === image2:
   print("got the expected quick look image")

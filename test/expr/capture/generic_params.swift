@@ -22,4 +22,13 @@ func outerGeneric<T>(t: T, x: AnyObject) {
   // they're not mentioned in the function body
   // CHECK: func_decl "innerGeneric(u:)"<U> type='<U> (u: U) -> ()' {{.*}} captures=(<generic> )
   func innerGeneric<U>(u: U) {}
+
+  // Make sure we look through typealiases
+  typealias TT = (a: T, b: T)
+
+  // CHECK: func_decl "localFunction(tt:)" type='<T> (tt: TT) -> ()' {{.*}} captures=(<generic> )
+  func localFunction(tt: TT) {}
+
+  // CHECK: closure_expr type='(TT) -> ()' {{.*}} captures=(<generic> )
+  let _: (TT) -> () = { _ in }
 }

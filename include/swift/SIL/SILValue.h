@@ -603,6 +603,16 @@ public:
       new (p++) Operand(user, op);
     }
   }
+  static void InitOperandsList(Operand *p, SILInstruction *user,
+                               SILValue operand0, SILValue operand1,
+                               ArrayRef<SILValue> operands) {
+    assert(p && "Trying to initialize operands using a nullptr");
+    new (p++) Operand(user, operand0);
+    new (p++) Operand(user, operand1);
+    for (auto op : operands) {
+      new (p++) Operand(user, op);
+    }
+  }
 
   static void InitOperandsList(Operand *p, SILInstruction *user,
                                ArrayRef<SILValue> operands) {

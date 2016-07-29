@@ -100,9 +100,6 @@ class Attributes {
 // CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@objc</attr-builtin> <kw>var</kw> {{(<attr-builtin>)?}}v3{{(</attr-builtin>)?}}: <type>String</type>
   @IBOutlet @objc var v3: String
 
-// CHECK: <attr-builtin>@noreturn</attr-builtin> <kw>func</kw> f0() {}
-  @noreturn func f0() {}
-
 // CHECK: <attr-builtin>@available</attr-builtin>(*, unavailable) <kw>func</kw> f1() {}
   @available(*, unavailable) func f1() {}
 
@@ -111,9 +108,6 @@ class Attributes {
 
 // CHECK: <attr-builtin>@IBAction</attr-builtin> <attr-builtin>@available</attr-builtin>(*, unavailable) <kw>func</kw> f3() {}
   @IBAction @available(*, unavailable) func f3() {}
-
-// CHECK: <attr-builtin>@IBAction</attr-builtin> <attr-builtin>@available</attr-builtin>(*, unavailable) <attr-builtin>@noreturn</attr-builtin> <kw>func</kw> f4() {}
-  @IBAction @available(*, unavailable) @noreturn func f4() {}
 
 // CHECK: <attr-builtin>mutating</attr-builtin> <kw>func</kw> func_mutating_1() {}
   mutating func func_mutating_1() {}
@@ -192,20 +186,28 @@ protocol Prot {
   var protocolProperty2: Int { get set }
 }
 
-// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-* { <kw>associativity</kw> left <kw>precedence</kw> <int>140</int> }{{$}}
-infix operator *-* { associativity left precedence 140 }
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-* : FunnyPrecedence{{$}}
+infix operator *-* : FunnyPrecedence
+
+// CHECK: <kw>precedencegroup</kw> FunnyPrecedence
+// CHECK-NEXT: <kw>associativity</kw>: left{{$}}
+// CHECK-NEXT: <kw>higherThan</kw>: MultiplicationPrecedence
+precedencegroup FunnyPrecedence {
+  associativity: left
+  higherThan: MultiplicationPrecedence
+}
 
 // CHECK: <kw>func</kw> *-*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
 func *-*(l: Int, r: Int) -> Int { return l }
 
-// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-+* { <kw>associativity</kw> left }{{$}}
-infix operator *-+* { associativity left }
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-+* : FunnyPrecedence
+infix operator *-+* : FunnyPrecedence
 
 // CHECK: <kw>func</kw> *-+*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
 func *-+*(l: Int, r: Int) -> Int { return l }
 
-// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *--* {}{{$}}
-infix operator *--* {}
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *--*{{$}}
+infix operator *--*
 
 // CHECK: <kw>func</kw> *--*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
 func *--*(l: Int, r: Int) -> Int { return l }

@@ -65,7 +65,7 @@ extension String : ExpressibleByStringInterpolation {
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
   public init<T>(stringInterpolationSegment expr: T) {
-    self = String(expr)
+    self = String(describing: expr)
   }
 
 % for Type in StreamableTypes:

@@ -279,6 +279,11 @@ namespace {
       return (X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest());
     }
 
+    bool visitBindMemoryInst(const BindMemoryInst *RHS) {
+      auto *X = cast<BindMemoryInst>(LHS);
+      return X->getBoundType() == RHS->getBoundType();
+    }
+
     bool visitFunctionRefInst(const FunctionRefInst *RHS) {
       auto *X = cast<FunctionRefInst>(LHS);
       return X->getReferencedFunction() == RHS->getReferencedFunction();

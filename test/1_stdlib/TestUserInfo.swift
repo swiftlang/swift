@@ -104,11 +104,54 @@ class TestUserInfo : TestUserInfoSuper {
     func notification(_ notif: Notification) {
         posted = notif
     }
+
+    // MARK: -
+    func test_classForCoder() {
+        // confirm internal bridged impl types are not exposed to archival machinery
+        // we have to be circuitous here, as bridging makes it very difficult to confirm this
+        let note = Notification(name: Notification.Name(rawValue: "TestSwiftNotification"), userInfo: ["key":"value"])
+        let archivedNote = NSKeyedArchiver.archivedData(withRootObject: note)
+        let noteAsPlist = try! PropertyListSerialization.propertyList(from: archivedNote, options: [], format: nil)
+        let plistAsData = try! PropertyListSerialization.data(fromPropertyList: noteAsPlist, format: .xml, options: 0)
+        let xml = NSString(data: plistAsData, encoding: String.Encoding.utf8.rawValue)!
+        expectEqual(xml.range(of: "_NSUserInfoDictionary").location, NSNotFound)
+    }
+
+    func test_AnyHashableContainingNotification() {
+        let values: [Notification] = [
+            Notification(name: Notification.Name(rawValue: "TestSwiftNotification")),
+            Notification(name: Notification.Name(rawValue: "TestOtherSwiftNotification")),
+            Notification(name: Notification.Name(rawValue: "TestOtherSwiftNotification")),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("Notification", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("Notification", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("Notification", String(describing: anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSNotification() {
+        let values: [NSNotification] = [
+            NSNotification(name: Notification.Name(rawValue: "TestSwiftNotification"), object: nil),
+            NSNotification(name: Notification.Name(rawValue: "TestOtherSwiftNotification"), object: nil),
+            NSNotification(name: Notification.Name(rawValue: "TestOtherSwiftNotification"), object: nil),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual("Notification", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("Notification", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("Notification", String(describing: anyHashables[2].base.dynamicType))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
 var UserInfoTests = TestSuite("UserInfo")
 UserInfoTests.test("test_userInfoPost") { TestUserInfo().test_userInfoPost() }
 UserInfoTests.test("test_equality") { TestUserInfo().test_equality() }
+UserInfoTests.test("test_classForCoder") { TestUserInfo().test_classForCoder() }
+UserInfoTests.test("test_AnyHashableContainingNotification") { TestUserInfo().test_AnyHashableContainingNotification() }
+UserInfoTests.test("test_AnyHashableCreatedFromNSNotification") { TestUserInfo().test_AnyHashableCreatedFromNSNotification() }
 runAllTests()
 #endif

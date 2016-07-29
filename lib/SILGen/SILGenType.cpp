@@ -332,10 +332,6 @@ public:
       visit(member);
     }
 
-    for (Decl *member : theType->getDerivedGlobalDecls()) {
-      SGM.visit(member);
-    }
-
     if (auto protocol = dyn_cast<ProtocolDecl>(theType)) {
       if (!protocol->isObjC())
         SGM.emitDefaultWitnessTable(protocol);
@@ -440,8 +436,6 @@ public:
   void emitExtension(ExtensionDecl *e) {
     for (Decl *member : e->getMembers())
       visit(member);
-    for (Decl *member : e->getDerivedGlobalDecls())
-      SGM.visit(member);
 
     if (!e->getExtendedType()->isExistentialType()) {
       // Emit witness tables for protocol conformances introduced by the

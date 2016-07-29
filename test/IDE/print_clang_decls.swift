@@ -86,7 +86,7 @@
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}class NSArray : NSObject {{{$}}
-// FOUNDATION-NEXT: subscript(idx: Int) -> AnyObject { get }
+// FOUNDATION-NEXT: subscript(idx: Int) -> Any { get }
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}enum RuncingMode : UInt {{{$}}
@@ -115,16 +115,16 @@
 // CTYPESBITS-NEXT: {{^}}var MY_INT: Int32 { get }{{$}}
 // CTYPESBITS-NOT: FooStruct1
 
-// CHECK-NULLABILITY: func getId1() -> AnyObject?
+// CHECK-NULLABILITY: func getId1() -> Any?
 // CHECK-NULLABILITY: var global_id: AnyObject?
 // CHECK-NULLABILITY: class SomeClass {
-// CHECK-NULLABILITY:   class func methodA(_ obj: SomeClass?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodA(_ obj: SomeClass?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   class func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodC() -> AnyObject?
-// CHECK-NULLABILITY:   var property: AnyObject?
+// CHECK-NULLABILITY:   class func methodA(_ obj: SomeClass?) -> Any{{$}}
+// CHECK-NULLABILITY:   func methodA(_ obj: SomeClass?) -> Any{{$}}
+// CHECK-NULLABILITY:   class func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> Any{{$}}
+// CHECK-NULLABILITY:   func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> Any{{$}}
+// CHECK-NULLABILITY:   func methodC() -> Any?
+// CHECK-NULLABILITY:   var property: Any?
 // CHECK-NULLABILITY:   func stringMethod() -> String{{$}}
-// CHECK-NULLABILITY:   func optArrayMethod() -> [AnyObject]?
+// CHECK-NULLABILITY:   func optArrayMethod() -> [Any]?
 // CHECK-NULLABILITY: }
 // CHECK-NULLABILITY: func compare_classes(_ sc1: SomeClass, _ sc2: SomeClass, _ sc3: SomeClass!)

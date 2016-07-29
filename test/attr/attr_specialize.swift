@@ -67,7 +67,7 @@ struct FloatElement : HasElt {
 }
 @_specialize(FloatElement)
 @_specialize(IntElement) // expected-error{{'<T : HasElt where T.Element == Float> (T) -> ()' requires the types 'Element' (aka 'Int') and 'Float' be equivalent}}
-func sameTypeRequirement<T : HasElt where T.Element == Float>(_ t: T) {}
+func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 
 class Base {}
 class Sub : Base {}

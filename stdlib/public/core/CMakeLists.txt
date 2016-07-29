@@ -17,6 +17,7 @@
 # configuring with -DSWIFT_CHECK_ESSENTIAL_STDLIB=YES
 set(SWIFTLIB_ESSENTIAL
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
+  # Some files can't be sorted alphabetically, see notes in the list below.
   Algorithm.swift
   ArrayBody.swift
   ArrayBuffer.swift
@@ -28,7 +29,6 @@ set(SWIFTLIB_ESSENTIAL
   AssertCommon.swift
   BidirectionalCollection.swift
   Bool.swift
-  Boolean.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   Builtin.swift
@@ -57,6 +57,11 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPointTypes.swift.gyb
   Hashable.swift
   HashedCollections.swift.gyb
+  # WORKAROUND: This file name is not sorted alphabetically in the list because
+  # if we do so, the compiler crashes.
+  AnyHashable.swift
+  # END WORKAROUND
+  HashedCollectionsAnyHashableExtensions.swift.gyb
   Hashing.swift
   HeapBuffer.swift
   ImplicitlyUnwrappedOptional.swift
@@ -122,6 +127,7 @@ set(SWIFTLIB_ESSENTIAL
   UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
+  UnsafeRawPointer.swift.gyb
   WriteBackMutableSlice.swift
   )
 
@@ -134,7 +140,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb
   Mirror.swift
-  Process.swift
+  CommandLine.swift
   SliceBuffer.swift
   Tuple.swift.gyb
   UnfoldSequence.swift

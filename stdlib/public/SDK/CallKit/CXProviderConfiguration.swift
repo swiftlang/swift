@@ -23,7 +23,8 @@ extension CXProviderConfiguration {
       })
     }
     set {
-      __supportedHandleTypes = Set(newValue.map { $0.rawValue })
+      __supportedHandleTypes =
+        Set(newValue.lazy.map { $0.rawValue as NSNumber })
     }
   }
 }

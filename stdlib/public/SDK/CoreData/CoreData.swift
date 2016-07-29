@@ -261,7 +261,7 @@ extension CocoaError {
 
 extension CocoaError {
   /// Object that failed to validate for a validation error.
-  public var validationObject: AnyObject? {
+  public var validationObject: Any? {
     return userInfo[NSValidationObjectErrorKey]
   }
 
@@ -278,7 +278,7 @@ extension CocoaError {
 
   /// The value for the key that failed to validate for a validation
   /// error.
-  public var validationValue: AnyObject? {
+  public var validationValue: Any? {
     return userInfo[NSValidationValueErrorKey]
   }
 

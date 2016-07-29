@@ -325,17 +325,10 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isClangImported())
     return ClangLinkage;
 
-  // Declarations that were derived on behalf of types in Clang modules get
-  // shared linkage.
-  if (auto *FD = dyn_cast<FuncDecl>(d)) {
-    if (auto derivedFor = FD->getDerivedForTypeDecl())
-      if (isa<ClangModuleUnit>(derivedFor->getModuleScopeContext()))
-        return ClangLinkage;
-  }
-  
   // Otherwise, we have external linkage.
   switch (d->getEffectiveAccess()) {
     case Accessibility::Private:
+    case Accessibility::FilePrivate:
       return (forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 
     case Accessibility::Internal:

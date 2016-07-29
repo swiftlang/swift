@@ -449,7 +449,7 @@ class DelegatingCtorClass {
   }                // expected-error {{self.init isn't called on all paths before returning from initializer}}
 
   convenience init(bool: Bool) {
-    doesntReturn()
+    doesNotReturn()
   }
 
   convenience init(double: Double) {
@@ -608,8 +608,7 @@ class Foo {
 
 
 
-@noreturn
-func doesntReturn() {
+func doesNotReturn() -> Never {
   while true {}
 }
 
@@ -620,7 +619,7 @@ func testNoReturn1(_ b : Bool) -> Any {
   if b {
     a = 42
   } else {
-    doesntReturn()
+    doesNotReturn()
   }
 
   return a   // Ok, because the noreturn call path isn't viable.
@@ -639,10 +638,10 @@ func testNoReturn2(_ b : Bool) -> Any {
 }
 
 class PerpetualMotion {
-  @noreturn func start() {
+  func start() -> Never {
     repeat {} while true
   }
-  @noreturn static func stop() {
+  static func stop() -> Never {
     repeat {} while true
   }
 }

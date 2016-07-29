@@ -84,11 +84,11 @@ struct X2z : P2 { // expected-error{{type 'X2z' does not conform to protocol 'P2
 }
 
 // Protocol with prefix unary function
-prefix operator ~~ {}
+prefix operator ~~
 
 protocol P3 {
   associatedtype Assoc : P1
-  prefix func ~~(_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X3z) -> Assoc'}}
+  static prefix func ~~(_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X3z) -> Assoc'}}
 }
 
 // Global operator match
@@ -108,10 +108,10 @@ struct X3z : P3 { // expected-error{{type 'X3z' does not conform to protocol 'P3
 postfix func ~~(_: X3z) -> X1a {} // expected-note{{candidate is postfix, not prefix as required}} expected-note{{candidate has non-matching type '(X3z) -> X1a'}}
 
 // Protocol with postfix unary function
-postfix operator ~~ {}
+postfix operator ~~
 protocol P4 {
   associatedtype Assoc : P1
-  postfix func ~~ (_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X4z) -> Assoc'}}
+  static postfix func ~~ (_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type '(X4z) -> Assoc'}}
 }
 
 // Global operator match
@@ -169,7 +169,8 @@ func f(_ args: T1) {
 
 f(T0(1, "Hi"))
 
-infix operator ~>> { precedence 255 }
+infix operator ~>> : MaxPrecedence
+precedencegroup MaxPrecedence { higherThan: BitwiseShiftPrecedence }
 
 func ~>> (x: Int, args: T0) {}
 func ~>> (x: Int, args: T1) {}
@@ -178,8 +179,8 @@ func ~>> (x: Int, args: T1) {}
 3~>>T1(2, "Hi")
 
 protocol Crankable {
-  func ~>> (x: Self, args: T0)
-  func ~>> (x: Self, args: T1)
+  static func ~>> (x: Self, args: T0)
+  static func ~>> (x: Self, args: T1)
 }
 
 extension Int : Crankable {}
@@ -201,7 +202,7 @@ protocol P7 {
 struct X7 : P7 { }
 
 // Selecting the most specialized witness.
-prefix operator %%% {}
+prefix operator %%%
 
 protocol P8 {
   func foo()
@@ -210,7 +211,7 @@ protocol P8 {
 prefix func %%% <T : P8>(x: T) -> T { }
 
 protocol P9 : P8 {
-  prefix func %%% (x: Self) -> Self
+  static prefix func %%% (x: Self) -> Self
 }
 
 struct X9 : P9 {
@@ -231,7 +232,7 @@ struct X10 : P10 {
 }
 
 protocol P11 {
-  func ==(x: Self, y: Self) -> Bool
+  static func ==(x: Self, y: Self) -> Bool
 }
 
 protocol P12 {

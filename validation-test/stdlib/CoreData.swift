@@ -23,8 +23,8 @@ CoreDataTests.test("downcasting") {
 
   let casted = dictionaries as? [[NSObject: AnyObject]]
   expectNotEmpty(casted)
-  expectEqual([[:], [:]], casted!)
-  expectEqual([[:], [:]], dictionaries as! [[NSObject: AnyObject]])
+  expectEqual([[:], [:]] as NSArray, casted! as NSArray)
+  expectEqual([[:], [:]] as NSArray, dictionaries as! [[NSObject: AnyObject]] as NSArray)
 }
 
 CoreDataTests.test("bridging") {
@@ -34,8 +34,8 @@ CoreDataTests.test("bridging") {
 
   let casted = dictionaries as? [[NSObject: AnyObject]]
   expectNotEmpty(casted)
-  expectEqual([[:], [:]], casted!)
-  expectEqual([[:], [:]], dictionaries as! [[NSObject: AnyObject]])
+  expectEqual([[:], [:]] as NSArray, casted! as NSArray)
+  expectEqual([[:], [:]] as NSArray, dictionaries as! [[NSObject: AnyObject]] as NSArray)
 }
 
 runAllTests()

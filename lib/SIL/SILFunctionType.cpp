@@ -817,8 +817,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   //   We should bring it back when we have those optimizations.
   auto silExtInfo = SILFunctionType::ExtInfo()
     .withRepresentation(extInfo.getSILRepresentation())
-    .withIsPseudogeneric(pseudogeneric)
-    .withIsNoReturn(extInfo.isNoReturn());
+    .withIsPseudogeneric(pseudogeneric);
   
   return SILFunctionType::get(genericSig,
                               silExtInfo, calleeConvention,
@@ -2426,12 +2425,6 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
     // levels and so throws if any of them do.
     if (fnType->getExtInfo().throws())
       extInfo = extInfo.withThrows();
-
-    // The @noreturn property of the uncurried function really comes
-    // from the innermost function. It is not meaningful for intermediate
-    // functions to also be @noreturn, but we don't prohibit it here.
-    if (fnType->getExtInfo().isNoReturn())
-      extInfo = extInfo.withIsNoReturn();
 
     if (uncurryLevel-- == 0)
       break;

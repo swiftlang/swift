@@ -4,7 +4,9 @@ set(swift_stubs_unicode_normalization_sources)
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   set(swift_stubs_objc_sources
       Availability.mm
+      DispatchShims.mm
       FoundationHelpers.mm
+      Reflection.mm
       SwiftNativeNSXXXBase.mm.gyb)
   set(LLVM_OPTIONAL_SOURCES
       UnicodeNormalization.cpp)
@@ -15,6 +17,7 @@ else()
 endif()
 
 add_swift_library(swiftStdlibStubs OBJECT_LIBRARY TARGET_LIBRARY
+  AnyHashableSupport.cpp
   Assert.cpp
   CommandLine.cpp
   GlobalObjects.cpp

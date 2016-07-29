@@ -110,7 +110,7 @@ protocol PAssoc {
   associatedtype Assoc
 }
 
-struct Model_P3_P4_Eq<T : P3, U : P4 where T.P3Assoc == U.P4Assoc> { }
+struct Model_P3_P4_Eq<T : P3, U : P4> where T.P3Assoc == U.P4Assoc {}
 
 // CHECK-LABEL: .inferSameType1@
 // CHECK-NEXT: Requirements:
@@ -132,20 +132,20 @@ func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) { }
 // CHECK-NEXT:   U : P4 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:33]
 // CHECK-NEXT:   T[.P3].P3Assoc witness marker
 // CHECK-NEXT:   T[.P3].P3Assoc : P1 [protocol @ {{.*}}requirement_inference.swift:{{.*}}:18]
-// CHECK-NEXT:   T[.P3].P3Assoc : P2 [redundant @ {{.*}}requirement_inference.swift:{{.*}}:54]
-// CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [explicit @ {{.*}}requirement_inference.swift:{{.*}}:68]
-func inferSameType2<T : P3, U : P4 where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc>(_: T) { }
+// CHECK-NEXT:   T[.P3].P3Assoc : P2 [redundant @ {{.*}}requirement_inference.swift:{{.*}}:61]
+// CHECK-NEXT:   U[.P4].P4Assoc == T[.P3].P3Assoc [explicit @ {{.*}}requirement_inference.swift:{{.*}}:75]
+func inferSameType2<T : P3, U : P4>(_: T) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
 
 // CHECK-LABEL: .inferSameType3@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   T witness marker
 // CHECK-NEXT:   T : PCommonAssoc1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:25]
-// CHECK-NEXT:   T : PCommonAssoc2 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:69]
+// CHECK-NEXT:   T : PCommonAssoc2 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:76]
 // CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc witness marker
-// CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc : P1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:61]
-// CHECK-NEXT:   T[.PCommonAssoc2].CommonAssoc == T[.PCommonAssoc1].CommonAssoc [inferred @ {{.*}}requirement_inference.swift:{{.*}}:69]
+// CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc : P1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:68]
+// CHECK-NEXT:   T[.PCommonAssoc2].CommonAssoc == T[.PCommonAssoc1].CommonAssoc [inferred @ {{.*}}requirement_inference.swift:{{.*}}:76]
 // CHECK-NEXT: Generic signature
-func inferSameType3<T : PCommonAssoc1 where T.CommonAssoc : P1, T : PCommonAssoc2>(_: T) { }
+func inferSameType3<T : PCommonAssoc1>(_: T) where T.CommonAssoc : P1, T : PCommonAssoc2 {}
 
 protocol P5 {
   associatedtype Element

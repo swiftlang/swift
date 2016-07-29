@@ -65,7 +65,7 @@ extension TestSuite {
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(C.Type.self)
+    testNamePrefix += String(describing: C.Type.self)
 
     //===------------------------------------------------------------------===//
     // removeFirst()
@@ -151,8 +151,8 @@ extension TestSuite {
   } // addRangeReplaceableSliceTests
 
   public func addRangeReplaceableBidirectionalSliceTests<
-    C : protocol<BidirectionalCollection, RangeReplaceableCollection>,
-    CollectionWithEquatableElement : protocol<BidirectionalCollection, RangeReplaceableCollection>
+    C : BidirectionalCollection & RangeReplaceableCollection,
+    CollectionWithEquatableElement : BidirectionalCollection & RangeReplaceableCollection
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
@@ -210,7 +210,7 @@ extension TestSuite {
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(C.Type.self)
+    testNamePrefix += String(describing: C.Type.self)
 
     //===------------------------------------------------------------------===//
     // removeLast()
@@ -298,8 +298,8 @@ extension TestSuite {
   } // addRangeReplaceableBidirectionalSliceTests
 
   public func addRangeReplaceableRandomAccessSliceTests<
-    C : protocol<RandomAccessCollection, RangeReplaceableCollection>,
-    CollectionWithEquatableElement : protocol<RandomAccessCollection, RangeReplaceableCollection>
+    C : RandomAccessCollection & RangeReplaceableCollection,
+    CollectionWithEquatableElement : RandomAccessCollection & RangeReplaceableCollection
   >(
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
@@ -351,7 +351,7 @@ extension TestSuite {
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
-    testNamePrefix += String(C.Type.self)
+    testNamePrefix += String(describing: C.Type.self)
 
     // No tests yet.
   } // addRangeReplaceableRandomAccessSliceTests

@@ -153,13 +153,13 @@ class Foo2 {
 // CHECK: key.sourcetext: "                     5)"
 
 //                        "    func foo6<T1: Testable,"
-// CHECK: key.sourcetext: "              T2: Testable,"
+// CHECK: key.sourcetext: "        T2: Testable,"
 
 //                        "     T2: Testable,"
-// CHECK: key.sourcetext: "     T3: Testable,"
+// CHECK: key.sourcetext: "        T3: Testable,"
 
 //                        "           T3: Testable,"
-// CHECK: key.sourcetext: "           T4: where T4 : Testable>(t1 : T1, t2 : T2, t3 : T2) {}"
+// CHECK: key.sourcetext: "        T4: where T4 : Testable>(t1 : T1, t2 : T2, t3 : T2) {}"
 
 //                        "    func foo7(i1: Int, i2: Int,"
 // CHECK: key.sourcetext: "              i3: Int, i4: Int,"

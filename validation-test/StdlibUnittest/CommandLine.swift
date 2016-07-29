@@ -11,7 +11,7 @@ import StdlibUnittest
 
 var CommandLineArguments = TestSuite("CommandLineArguments")
 CommandLineArguments.test("printCommandLineArguments") {
-  debugPrint(Process.arguments)
+  debugPrint(CommandLine.arguments)
 }
 // CHECK-EMPTY: {{^}}stdout>>> ["{{[^"]+}}", "--stdlib-unittest-run-child"]{{$}}
 // CHECK-1: {{^}}stdout>>> ["{{[^"]+}}", "--stdlib-unittest-run-child", "--abc"]{{$}}

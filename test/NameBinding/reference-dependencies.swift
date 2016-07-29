@@ -139,7 +139,7 @@ func lookUpManyTopLevelNames() {
 
   // CHECK-DAG: !private "UInt"
   // CHECK-DAG: !private "+"
-  let _: UInt = [1, 2].reduce(0, combine: +)
+  let _: UInt = [1, 2].reduce(0, +)
   
   // CHECK-DAG: !private "-"
   let _: UInt = 3 - 2 - 1
@@ -307,7 +307,9 @@ private extension Use4 {
 // CHECK-DAG: !private "PrivateTopLevelTy2"
 // CHECK-DAG: "PrivateProto2"
 extension Private2 : PrivateProto2 {
-  var privateTy2: PrivateTopLevelTy2? { return nil }
+  // FIXME: This test is supposed to check that we get this behavior /without/
+  // marking the property private, just from the base type.
+  private var privateTy2: PrivateTopLevelTy2? { return nil }
 }
 // CHECK-DAG: !private "PrivateTopLevelTy3"
 func outerPrivateTy3() {
@@ -444,7 +446,6 @@ struct Sentinel2 {}
 
 // String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: "String"
-// NEGATIVE-NOT: "SS"
 // These are used by the other file in this module, but not by this one.
 // NEGATIVE-NOT: "ExpressibleByFloatLiteral"
 // NEGATIVE-NOT: "Int16"

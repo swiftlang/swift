@@ -15,3 +15,22 @@ func foo3 () {
   foo2(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UnsafePointer<Int>'}} {{none}}
   foo4(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UnsafeMutablePointer<Int>'}} {{none}}
 }
+
+class A {}
+class B : A {}
+func foo5(b : B) {}
+func foo6(a : A) {
+  foo5(b : a) // expected-error {{cannot convert value of type 'A' to expected argument type 'B'}} {{13-13= as! B}}
+}
+
+func foo7(b : [B]) {}
+func foo8(a : [A]) {
+  foo7(b : a) // expected-error {{cannot convert value of type '[A]' to expected argument type '[B]'}} {{13-13= as! [B]}}
+}
+
+protocol P1 {}
+struct S1 : P1 {}
+func foo9(s : S1) {}
+func foo10(p : P1) {
+  foo9(s : p) // expected-error {{cannot convert value of type 'P1' to expected argument type 'S1'}} {{13-13= as! S1}}
+}

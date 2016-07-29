@@ -279,25 +279,25 @@ bb0(%0 : $*T):
 
 protocol Bendable { }
 
-// CHECK: $@convention(thin) (@in protocol<Bendable, Runcible>) -> @out Runcible
-sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in protocol<Bendable, Runcible>) -> @out Runcible {
-bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
+// CHECK: $@convention(thin) (@in Bendable & Runcible) -> @out Runcible
+sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in Bendable & Runcible) -> @out Runcible {
+bb0(%0 : $*Runcible, %1 : $*Bendable & Runcible):
   // CHECK: alloc_box
-  %2 = alloc_box $protocol<Bendable, Runcible>
-  %2a = project_box %2 : $@box protocol<Bendable, Runcible>
-  // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*protocol<Bendable, Runcible>
-  %3 = copy_addr [take] %1 to [initialization] %2a : $*protocol<Bendable, Runcible>
+  %2 = alloc_box $Bendable & Runcible
+  %2a = project_box %2 : $@box Bendable & Runcible
+  // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*Bendable & Runcible
+  %3 = copy_addr [take] %1 to [initialization] %2a : $*Bendable & Runcible
   // CHECK: alloc_stack
-  %4 = alloc_stack $protocol<Bendable, Runcible>
-  // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*protocol<Bendable, Runcible>
-  %5 = copy_addr %2a to [initialization] %4 : $*protocol<Bendable, Runcible>
+  %4 = alloc_stack $Bendable & Runcible
+  // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*Bendable & Runcible
+  %5 = copy_addr %2a to [initialization] %4 : $*Bendable & Runcible
   %7 = tuple ()
   // CHECK: destroy_addr
-  %8 = destroy_addr %4 : $*protocol<Bendable, Runcible>
+  %8 = destroy_addr %4 : $*Bendable & Runcible
   // CHECK: dealloc_stack
-  %9 = dealloc_stack %4 : $*protocol<Bendable, Runcible>
+  %9 = dealloc_stack %4 : $*Bendable & Runcible
   // CHECK: release
-  %10 = strong_release %2 : $@box protocol<Bendable, Runcible>
+  %10 = strong_release %2 : $@box Bendable & Runcible
   // CHECK: return
   %11 = return %7 : $()
 }
@@ -1519,6 +1519,15 @@ bb0(%0 : $Builtin.RawPointer, %1 : $X):
   store %1 to %3 : $*X
   // CHECK: [[T3:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [strict] $*X
   // CHECK-NEXT: store %1 to [[T3]] : $*X
+  %28 = tuple ()
+  return %28 : $()
+}
+
+// CHECK-LABEL: sil @test_bind_memory
+sil @test_bind_memory : $(Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $*X
+  // CHECK: bind_memory {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*X
   %28 = tuple ()
   return %28 : $()
 }

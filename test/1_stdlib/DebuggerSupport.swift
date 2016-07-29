@@ -27,8 +27,6 @@ struct DontBridgeThisStruct {
 extension DontBridgeThisStruct : _ObjectiveCBridgeable {
   typealias _ObjectiveCType = AnyObject
 
-  static func _isBridgedToObjectiveC() -> Bool { return true }
-
   func _bridgeToObjectiveC() -> _ObjectiveCType {
     fatalError("tried to bridge DontBridgeThisStruct")
   }

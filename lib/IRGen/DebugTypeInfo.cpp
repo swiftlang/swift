@@ -24,28 +24,19 @@
 using namespace swift;
 using namespace irgen;
 
-DebugTypeInfo::DebugTypeInfo(swift::Type Ty,
-                             llvm::Type *StorageTy,
-                             uint64_t SizeInBytes,
-                             uint32_t AlignInBytes,
+DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy,
+                             uint64_t SizeInBytes, uint32_t AlignInBytes,
                              DeclContext *DC)
-  : DeclOrContext(DC),
-    Type(Ty.getPointer()),
-    StorageType(StorageTy),
-    size(SizeInBytes),
-    align(AlignInBytes) {
+    : DeclCtx(DC), Type(Ty.getPointer()), StorageType(StorageTy),
+      size(SizeInBytes), align(AlignInBytes) {
   assert(StorageType && "StorageType is a nullptr");
   assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy,
-                             Size size, Alignment align,
-                             DeclContext *DC)
-  : DeclOrContext(DC),
-    Type(Ty.getPointer()),
-    StorageType(StorageTy),
-    size(size),
-    align(align) {
+DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, Size size,
+                             Alignment align, DeclContext *DC)
+    : DeclCtx(DC), Type(Ty.getPointer()), StorageType(StorageTy),
+      size(size), align(align) {
   assert(StorageType && "StorageType is a nullptr");
   assert(align.getValue() != 0);
 }
@@ -69,13 +60,12 @@ initFromTypeInfo(Size &size, Alignment &align, llvm::Type *&StorageType,
 
 DebugTypeInfo::DebugTypeInfo(swift::Type Ty, const TypeInfo &Info,
                              DeclContext *DC)
-  : DeclOrContext(DC),
-    Type(Ty.getPointer()) {
+    : DeclCtx(DC), Type(Ty.getPointer()) {
   initFromTypeInfo(size, align, StorageType, Info);
 }
 
-DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
-  : DeclOrContext(Decl) {
+DebugTypeInfo::DebugTypeInfo(TypeDecl *Decl, const TypeInfo &Info)
+    : DeclCtx(Decl->getDeclContext()) {
   // Use the sugared version of the type, if there is one.
   if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
     Type = AliasDecl->getAliasType();
@@ -85,12 +75,10 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
   initFromTypeInfo(size, align, StorageType, Info);
 }
 
-DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageTy,
-                             Size size, Alignment align)
-  : DeclOrContext(Decl),
-    StorageType(StorageTy),
-    size(size),
-    align(align) {
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageTy, Size size,
+                             Alignment align)
+    : DeclCtx(Decl->getDeclContext()), StorageType(StorageTy), size(size),
+      align(align) {
   // Use the sugared version of the type, if there is one.
   if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
     Type = AliasDecl->getAliasType();
@@ -101,9 +89,9 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageTy,
   assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
+DebugTypeInfo::DebugTypeInfo(VarDecl *Decl, swift::Type Ty,
                              const TypeInfo &Info, bool Unwrap)
-  : DeclOrContext(Decl) {
+    : DeclCtx(Decl->getDeclContext()) {
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
   CanType DeclType = Decl->getType()->getCanonicalType();
@@ -129,13 +117,10 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
   initFromTypeInfo(size, align, StorageType, Info);
 }
 
-DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
-                             llvm::Type *StorageTy,
-                             Size size, Alignment align)
-  : DeclOrContext(Decl),
-    StorageType(StorageTy),
-    size(size),
-    align(align) {
+DebugTypeInfo::DebugTypeInfo(VarDecl *Decl, swift::Type Ty,
+                             llvm::Type *StorageTy, Size size, Alignment align)
+    : DeclCtx(Decl->getDeclContext()), StorageType(StorageTy), size(size),
+      align(align) {
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
   if (Decl->getType().getCanonicalTypeOrNull() == Ty.getCanonicalTypeOrNull())
@@ -172,13 +157,25 @@ bool DebugTypeInfo::operator!=(DebugTypeInfo T) const {
   return !operator==(T);
 }
 
+TypeDecl *DebugTypeInfo::getDecl() const {
+  if (auto *N = dyn_cast<NominalType>(Type))
+    return N->getDecl();
+  if (auto *TA = dyn_cast<NameAliasType>(Type))
+    return TA->getDecl();
+  if (auto *UBG = dyn_cast<UnboundGenericType>(Type))
+    return UBG->getDecl();
+  if (auto *BG = dyn_cast<BoundGenericType>(Type))
+    return BG->getDecl();
+  if (auto *AT = dyn_cast<AssociatedTypeType>(Type))
+    return AT->getDecl();
+  return nullptr;
+}
+
 void DebugTypeInfo::dump() const {
   llvm::errs() << "[Size " << size.getValue()
                << " Alignment " << align.getValue()<<"] ";
-  if (getDecl())
-    getDecl()->dump(llvm::errs());
-  else
-    getType()->dump();
+
+  getType()->dump();
   if (StorageType) {
     llvm::errs() << "StorageType=";
     StorageType->dump();

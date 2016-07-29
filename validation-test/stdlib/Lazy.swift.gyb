@@ -638,12 +638,12 @@ func expectSequencePassthrough<
   }
 
   SequenceLog._copyContents.expectIncrement(baseType) { () -> Void in
-    let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
+    let buf = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
   
     let end = s._copyContents(initializing: buf)
     expectTrue(end <= buf + count)
     buf.deinitialize(count: end - buf)
-    buf.deallocateCapacity(count)
+    buf.deallocate(capacity: count)
   }
 }
 
@@ -1057,7 +1057,7 @@ tests.test("LazyFilterSequence") {
   // Try again using explicit construction
   filtered = LazyFilterSequence(
     _base: MinimalSequence(elements: base),
-    whereElementsSatisfy: { x in calls += 1; return x.value % 2 == 0})
+    { x in calls += 1; return x.value % 2 == 0})
 
   expectEqual(100, calls)
 
@@ -1219,14 +1219,14 @@ do {
     tests.test("FlattenSequence/\(data)") {
       var base = MinimalSequence(
         elements: data.map { MinimalSequence(elements: $0) })
-      checkSequence(expected, base.flatten(), resiliencyChecks: .none)
+      checkSequence(expected, base.joined(), resiliencyChecks: .none)
 
       // Checking that flatten doesn't introduce laziness
 
       // checkSequence consumed base, so reassign
       base = MinimalSequence(
         elements: data.map { MinimalSequence(elements: $0) })
-      let flattened = base.flatten()
+      let flattened = base.joined()
       var calls = 0
       _ = flattened.map { _ in calls += 1 }
       expectEqual(
@@ -1240,7 +1240,7 @@ do {
         elements: data.map { MinimalSequence(elements: $0) }
       ).lazy.map { $0 }
 
-      let flattened = base.flatten()
+      let flattened = base.joined()
       var calls = 0
       _ = flattened.map { _ in calls += 1 }
       expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
@@ -1252,7 +1252,7 @@ do {
       let base = Minimal${TraversalCollection}(
         elements: data.map { Minimal${TraversalCollection}(elements: $0) })
 
-      let flattened = base.flatten()
+      let flattened = base.joined()
       check${Traversal}Collection(expected, flattened, resiliencyChecks: .none)
 
       // Checking that flatten doesn't introduce laziness
@@ -1269,7 +1269,7 @@ do {
         elements: data.map { Minimal${TraversalCollection}(elements: $0) }
       ).lazy.map { $0 }
 
-      let flattened = base.flatten()
+      let flattened = base.joined()
 
       var calls = 0
       _ = flattened.map { _ in calls += 1 }

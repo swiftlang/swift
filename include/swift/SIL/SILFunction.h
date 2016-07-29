@@ -215,6 +215,8 @@ public:
     return LoweredType;
   }
 
+  bool isNoReturnFunction() const;
+
   /// Unsafely rewrite the lowered type of this function.
   ///
   /// This routine does not touch the entry block arguments

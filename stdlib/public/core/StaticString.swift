@@ -76,7 +76,7 @@ public struct StaticString
     _precondition(
       !hasPointerRepresentation,
       "StaticString should have Unicode scalar representation")
-    return UnicodeScalar(UInt32(UInt(_startPtrOrData)))
+    return UnicodeScalar(UInt32(UInt(_startPtrOrData)))!
   }
 
   /// The length in bytes of the static string's ASCII or UTF-8 representation.
@@ -124,7 +124,7 @@ public struct StaticString
   ///   `withUTF8Buffer(invoke:)` method.
   /// - Returns: The return value of the `body` closure, if any.
   public func withUTF8Buffer<R>(
-    invoke body: @noescape (UnsafeBufferPointer<UInt8>) -> R) -> R {
+    _ body: @noescape (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
       return body(UnsafeBufferPointer(
         start: utf8Start, count: Int(utf8CodeUnitCount)))
@@ -135,7 +135,7 @@ public struct StaticString
         buffer = buffer | (UInt64($0) << (UInt64(i) * 8))
         i += 1
       }
-      UTF8.encode(unicodeScalar, sendingOutputTo: sink)
+      UTF8.encode(unicodeScalar, into: sink)
       return body(UnsafeBufferPointer(
         start: UnsafePointer(Builtin.addressof(&buffer)),
         count: i))
@@ -255,7 +255,7 @@ public struct StaticString
 
 extension StaticString {
   public var customMirror: Mirror {
-    return Mirror(reflecting: String(self))
+    return Mirror(reflecting: description)
   }
 }
 

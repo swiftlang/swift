@@ -633,7 +633,15 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
         initArgTy = argTy;
     }
 
-    auto info = applyFunctionTypeAttributes(func, i);
+    // 'throws' only applies to the innermost function.
+    AnyFunctionType::ExtInfo info;
+    if (i == 0 && func->hasThrows())
+      info = info.withThrows();
+
+    assert(!argTy->hasArchetype());
+    assert(!funcTy->hasArchetype());
+    if (initFuncTy)
+      assert(!initFuncTy->hasArchetype());
 
     if (sig && i == e-1) {
       funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
@@ -647,12 +655,9 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
   }
 
   // Record the interface type.
-  assert(!funcTy->hasArchetype());
   func->setInterfaceType(funcTy);
-  if (initFuncTy) {
-    assert(!initFuncTy->hasArchetype());
+  if (initFuncTy)
     cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
-  }
 
   if (func->getGenericParams()) {
     // Collect all generic params referenced in parameter types,
@@ -796,6 +801,7 @@ void TypeChecker::finalizeGenericParamList(ArchetypeBuilder &builder,
     access = nominal->getFormalAccess();
   else
     access = Accessibility::Internal;
+  access = std::max(access, Accessibility::Internal);
 
   // Wire up the archetypes.
   for (auto GP : *genericParams) {

@@ -14,7 +14,7 @@ class Sub : Base {
 
 // CHECK-LABEL: sil hidden @_TFC21accessibility_vtables3SubcfT_S0_ : $@convention(method) (@owned Sub) -> @owned Sub
 // CHECK:       bb0(%0 : $Sub):
-// CHECK:         function_ref @_TFs26_unimplemented_initializerFT9classNameVs12StaticString8initNameS_4fileS_4lineSu6columnSu_T_
+// CHECK:         function_ref @_TFs25_unimplementedInitializerFT9classNameVs12StaticString8initNameS_4fileS_4lineSu6columnSu_Os5Never
 
 // CHECK-LABEL: sil_vtable Sub {
 // CHECK-NEXT:  #Base.internalMethod!1: _TFC28accessibility_vtables_helper4Base14internalMethod

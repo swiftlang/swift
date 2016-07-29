@@ -36,10 +36,8 @@ class TypeInfo;
 /// for a type.
 class DebugTypeInfo {
 public:
-  /// The Decl holds the DeclContext, location, but also allows to
-  /// look up struct members. If there is no Decl, generic types
-  /// mandate there be at least a DeclContext.
-  PointerUnion<ValueDecl *, DeclContext *> DeclOrContext;
+  /// The DeclContext if this is has an Archetype.
+  DeclContext *DeclCtx;
   /// The type we need to emit may be different from the type
   /// mentioned in the Decl, for example, stripped of qualifiers.
   TypeBase *Type;
@@ -51,30 +49,26 @@ public:
 
   // FIXME: feels like there might be too many constructors here
 
-  DebugTypeInfo() : Type(nullptr), StorageType(nullptr), size(0), align(1) {}
+  DebugTypeInfo()
+      : DeclCtx(nullptr), Type(nullptr), StorageType(nullptr), size(0),
+        align(1) {}
   DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, uint64_t SizeInBytes,
                 uint32_t AlignInBytes, DeclContext *DC);
   DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, Size size,
                 Alignment align, DeclContext *DC);
   DebugTypeInfo(swift::Type Ty, const TypeInfo &Info, DeclContext *DC);
-  DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info);
+  DebugTypeInfo(TypeDecl *Decl, const TypeInfo &Info);
   DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageType, Size size,
                 Alignment align);
-  DebugTypeInfo(ValueDecl *Decl, swift::Type Ty, const TypeInfo &Info,
+  DebugTypeInfo(VarDecl *Decl, swift::Type Ty, const TypeInfo &Info,
                 bool Unwrap);
-  DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
+  DebugTypeInfo(VarDecl *Decl, swift::Type Ty,
                 llvm::Type *StorageType, Size size,
                 Alignment align);
   TypeBase *getType() const { return Type; }
 
-  ValueDecl *getDecl() const { return DeclOrContext.dyn_cast<ValueDecl *>(); }
-
-  DeclContext *getDeclContext() const {
-    if (ValueDecl *D = getDecl())
-      return D->getDeclContext();
-    else
-      return DeclOrContext.get<DeclContext *>();
-  }
+  TypeDecl *getDecl() const;
+  DeclContext *getDeclContext() const { return DeclCtx; }
 
   void unwrapLValueOrInOutType() {
     Type = Type->getLValueOrInOutObjectType().getPointer();

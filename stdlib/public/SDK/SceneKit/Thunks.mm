@@ -15,11 +15,10 @@
 #include "swift/Runtime/Config.h"
 
 SWIFT_CC(swift)
-extern "C" NS_RETURNS_RETAINED __nullable id
+extern "C" NS_RETURNS_RETAINED _Nullable id
 SCN_Swift_SCNSceneSource_entryWithIdentifier(
-    id NS_RELEASES_ARGUMENT __nonnull self_,
-    NSString *NS_RELEASES_ARGUMENT __nonnull uid,
-    Class __nonnull entryClass) {
+    id NS_RELEASES_ARGUMENT _Nonnull self_,
+    NSString *NS_RELEASES_ARGUMENT _Nonnull uid, Class _Nonnull entryClass) {
   SCNSceneSource *sceneSource = self_;
   id Result = [[sceneSource entryWithIdentifier:uid withClass:entryClass] retain];
   [self_ release];

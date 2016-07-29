@@ -62,7 +62,7 @@ class TestObjCKeyTy : NSObject {
     self.value = value
   }
 
-  override func isEqual(_ object: AnyObject!) -> Bool {
+  override func isEqual(_ object: Any?) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
@@ -79,10 +79,6 @@ class TestObjCKeyTy : NSObject {
 }
 
 struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   init(_ value: Int) { self.value = value }
 
   var hashValue: Int { return value }

@@ -27,10 +27,6 @@ class ObjC : Root {
 class DerivesObjC : ObjC { }
 
 struct BridgedToObjC : Hashable, _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> ObjC {
     return ObjC()
   }
@@ -60,8 +56,8 @@ func testUpcastBridge() {
   var setB = Set<BridgedToObjC>()
 
   // Upcast to object types.
-  setR = setB; _ = setR
-  setO = setB; _ = setO
+  setR = setB as Set<Root>; _ = setR
+  setO = setB as Set<ObjC>; _ = setO
 
   // Upcast object to bridged type
   setB = setO // expected-error{{cannot assign value of type 'Set<ObjC>' to type 'Set<BridgedToObjC>'}}
@@ -78,7 +74,7 @@ func testForcedDowncastBridge() {
   let setB = Set<BridgedToObjC>()
 
   _ = setR as! Set<BridgedToObjC>
-  _ = setO as! Set<BridgedToObjC>
+  _ = setO as Set<BridgedToObjC>
   _ = setD as! Set<BridgedToObjC> // expected-error {{'ObjC' is not a subtype of 'DerivesObjC'}}
   // expected-note @-1 {{in cast from type 'Set<DerivesObjC>' to 'Set<BridgedToObjC>'}}
 
@@ -99,7 +95,7 @@ func testConditionalDowncastBridge() {
   var setB = Set<BridgedToObjC>()
 
   if let s = setR as? Set<BridgedToObjC> { }
-  if let s = setO as? Set<BridgedToObjC> { }
+  let s1 = setO as Set<BridgedToObjC>
   if let s = setD as? Set<BridgedToObjC> { } // expected-error {{'ObjC' is not a subtype of 'DerivesObjC'}}
   // expected-note @-1 {{in cast from type 'Set<DerivesObjC>' to 'Set<BridgedToObjC>'}}
 

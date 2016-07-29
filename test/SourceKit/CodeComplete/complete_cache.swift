@@ -25,6 +25,15 @@ func test1() {
 func test2() {
   for i in 1...#^VOID_2,fooFunc^# {}
 }
+// VOID_1: key.name: "fooFuncNoreturn1()",
+// VOID_1-NEXT: key.sourcetext:
+// VOID_1-NEXT: key.description:
+// VOID_1-NEXT: key.typename: "Never",
+// VOID_1-NEXT: key.context: source.codecompletion.context.othermodule,
+// VOID_1-NEXT: key.moduleimportdepth: 1,
+// VOID_1-NEXT: key.num_bytes_to_erase: 0,
+// VOID_1-NEXT: key.substructure:
+
 // VOID_1: key.name: "fooHelperSubFunc1(:)",
 // VOID_1-NEXT: key.sourcetext:
 // VOID_1-NEXT: key.description:
@@ -32,16 +41,6 @@ func test2() {
 // VOID_1-NEXT: key.context: source.codecompletion.context.othermodule,
 // VOID_1-NEXT: key.moduleimportdepth: 2,
 // VOID_1-NEXT: key.num_bytes_to_erase: 0,
-// VOID_1-NEXT: key.substructure:
-
-// VOID_1: key.name: "fooFuncNoreturn1()",
-// VOID_1-NEXT: key.sourcetext:
-// VOID_1-NEXT: key.description:
-// VOID_1-NEXT: key.typename: "Void",
-// VOID_1-NEXT: key.context: source.codecompletion.context.othermodule,
-// VOID_1-NEXT: key.moduleimportdepth: 1,
-// VOID_1-NEXT: key.num_bytes_to_erase: 0,
-// VOID_1-NEXT: key.not_recommended: 1,
 // VOID_1-NEXT: key.substructure:
 
 func test3() {

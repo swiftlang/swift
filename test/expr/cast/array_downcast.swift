@@ -41,10 +41,6 @@ class A {
 }
 
 struct B : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> A {
     return A()
   }

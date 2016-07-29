@@ -21,7 +21,7 @@ func f(crash crash: Bool) -> Int {
   }
 }
 
-if Process.arguments.last == "--crash" {
+if CommandLine.arguments.last == "--crash" {
   print("the value is \(f(crash: true))")
 } else {
   print("the value is \(f(crash: false))")

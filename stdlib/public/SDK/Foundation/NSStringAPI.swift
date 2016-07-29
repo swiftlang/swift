@@ -128,7 +128,8 @@ extension Optional {
   /// `body` is complicated than that results in unnecessarily repeated code.
   internal func _withNilOrAddress<NSType : AnyObject, ResultType>(
     of object: inout NSType?,
-    body: @noescape (AutoreleasingUnsafeMutablePointer<NSType?>?) -> ResultType
+    _ body:
+      @noescape (AutoreleasingUnsafeMutablePointer<NSType?>?) -> ResultType
   ) -> ResultType {
     return self == nil ? body(nil) : body(&object)
   }
@@ -438,12 +439,10 @@ extension String {
         outputArray in
         // FIXME: completePath(...) is incorrectly annotated as requiring
         // non-optional output parameters. rdar://problem/25494184
-        let outputNonOptionalName = AutoreleasingUnsafeMutablePointer<NSString?>(
-          UnsafeMutablePointer<NSString>(outputName)
-        )
-        let outputNonOptionalArray = AutoreleasingUnsafeMutablePointer<NSArray?>(
-          UnsafeMutablePointer<NSArray>(outputArray)
-        )
+        let outputNonOptionalName = unsafeBitCast(
+          outputName, to: AutoreleasingUnsafeMutablePointer<NSString?>.self)
+        let outputNonOptionalArray = unsafeBitCast(
+          outputArray, to: AutoreleasingUnsafeMutablePointer<NSArray?>.self)
         return self._ns.completePath(
           into: outputNonOptionalName,
           caseSensitive: caseSensitive,
@@ -547,14 +546,16 @@ extension String {
   //     enumerateLinesUsing:(void (^)(NSString *line, BOOL *stop))block
 
   /// Enumerates all the lines in a string.
-  public func enumerateLines(_ body: (line: String, stop: inout Bool) -> ()) {
+  public func enumerateLines(
+    invoking body: (line: String, stop: inout Bool) -> ()
+  ) {
     _ns.enumerateLines {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
     in
       var stop_ = false
       body(line: line, stop: &stop_)
       if stop_ {
-        UnsafeMutablePointer<ObjCBool>(stop).pointee = true
+        stop.pointee = true
       }
     }
   }
@@ -578,7 +579,7 @@ extension String {
     scheme tagScheme: String,
     options opts: NSLinguisticTagger.Options = [],
     orthography: NSOrthography? = nil,
-    _ body:
+    invoking body:
       (String, Range<Index>, Range<Index>, inout Bool) -> ()
   ) {
     _ns.enumerateLinguisticTags(
@@ -590,7 +591,7 @@ extension String {
       var stop_ = false
       body($0, self._range($1), self._range($2), &stop_)
       if stop_ {
-        UnsafeMutablePointer($3).pointee = true
+        $3.pointee = true
       }
     }
   }
@@ -831,7 +832,7 @@ extension String {
   /// in a given encoding, and optionally frees the buffer.  WARNING:
   /// this initializer is not memory-safe!
   public init?(
-    bytesNoCopy bytes: UnsafeMutablePointer<Void>, length: Int,
+    bytesNoCopy bytes: UnsafeMutableRawPointer, length: Int,
     encoding: Encoding, freeWhenDone flag: Bool
   ) {
     if let ns = NSString(
@@ -872,7 +873,7 @@ extension String {
     freeWhenDone flag: Bool
   ) {
     self = NSString(
-      charactersNoCopy: UnsafeMutablePointer(utf16CodeUnitsNoCopy),
+      charactersNoCopy: UnsafeMutablePointer(mutating: utf16CodeUnitsNoCopy),
       length: count,
       freeWhenDone: flag) as String
   }
@@ -1219,7 +1220,7 @@ extension String {
   /// Parses the `String` as a text representation of a
   /// property list, returning an NSString, NSData, NSArray, or
   /// NSDictionary object, according to the topmost element.
-  public func propertyList() -> AnyObject {
+  public func propertyList() -> Any {
     return _ns.propertyList()
   }
 
@@ -1229,7 +1230,8 @@ extension String {
   /// values found in the `String`.
   public
   func propertyListFromStringsFileFormat() -> [String : String] {
-    return _ns.propertyListFromStringsFileFormat() as! [String : String]
+    return _ns.propertyListFromStringsFileFormat()! as [NSObject : AnyObject]
+      as! [String : String]
   }
 
   // - (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)aSet

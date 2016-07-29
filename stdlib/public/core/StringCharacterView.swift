@@ -103,7 +103,9 @@ extension String {
   /// - Parameter body: A closure that takes a character view as its argument.
   /// - Returns: The return value of the `body` closure, if any, is the return
   ///   value of this method.
-  public mutating func withMutableCharacters<R>(_ body: (inout CharacterView) -> R) -> R {
+  public mutating func withMutableCharacters<R>(
+    _ body: (inout CharacterView) -> R
+  ) -> R {
     // Naively mutating self.characters forces multiple references to
     // exist at the point of mutation. Instead, temporarily move the
     // core of this string into a CharacterView.

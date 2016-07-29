@@ -88,9 +88,11 @@ internal func _roundUp(_ offset: Int, toAlignment alignment: Int) -> Int {
   return Int(_roundUpImpl(UInt(bitPattern: offset), toAlignment: alignment))
 }
 
+// This function takes a raw pointer and returns a typed pointer. It implicitly
+// assumes that memory at the returned pointer is bound to `Destination` type.
 @_versioned
-internal func _roundUp<T, DestinationType>(
-  _ pointer: UnsafeMutablePointer<T>,
+internal func _roundUp<DestinationType>(
+  _ pointer: UnsafeMutableRawPointer,
   toAlignmentOf destinationType: DestinationType.Type
 ) -> UnsafeMutablePointer<DestinationType> {
   // Note: unsafe unwrap is safe because this operation can only increase the
@@ -129,22 +131,22 @@ internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
 }
 
 @_transparent
-func ==(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
+func == (lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
-func !=(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
+func != (lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return !(lhs == rhs)
 }
 
 @_transparent
-func ==(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
+func == (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
-func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
+func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
 }
 
@@ -175,8 +177,8 @@ internal func _unreachable(_ condition: Bool = true) {
 
 /// Tell the optimizer that this code is unreachable if this builtin is
 /// reachable after constant folding build configuration builtins.
-@_versioned @_transparent @noreturn internal
-func _conditionallyUnreachable() {
+@_versioned @_transparent internal
+func _conditionallyUnreachable() -> Never {
   Builtin.conditionallyUnreachable()
 }
 
@@ -206,12 +208,12 @@ internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
 /// Returns an `UnsafePointer` to the storage used for `object`.  There's
 /// not much you can do with this other than use it to identify the
 /// object.
-@_transparent
+@available(*, unavailable, message: "Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.")
 public func unsafeAddress(of object: AnyObject) -> UnsafePointer<Void> {
-  return UnsafePointer(Builtin.bridgeToRawPointer(object))
+  Builtin.unreachable()
 }
 
-@available(*, unavailable, renamed: "unsafeAddress(of:)")
+@available(*, unavailable, message: "Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.")
 public func unsafeAddressOf(_ object: AnyObject) -> UnsafePointer<Void> {
   Builtin.unreachable()
 }
@@ -245,11 +247,11 @@ public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to: T.Type) -> T {
 
 @inline(__always)
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
-  -> UnsafeMutablePointer<UInt8> {
+  -> UnsafeMutableRawPointer {
   let storedPropertyOffset = _roundUp(
     sizeof(_HeapObject.self),
     toAlignment: alignof(Optional<AnyObject>.self))
-  return UnsafeMutablePointer<UInt8>(Builtin.bridgeToRawPointer(x)) +
+  return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(x)) +
     storedPropertyOffset
 }
 
@@ -264,23 +266,22 @@ public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
 @_versioned
 @_transparent
 @_semantics("branchhint")
-internal func _branchHint<C : Boolean>(_ actual: C, expected: Bool)
-  -> Bool {
-  return Bool(Builtin.int_expect_Int1(actual.boolValue._value, expected._value))
+internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
+  return Bool(Builtin.int_expect_Int1(actual._value, expected._value))
 }
 
 /// Optimizer hint that `x` is expected to be `true`.
 @_transparent
 @_semantics("fastpath")
-public func _fastPath<C: Boolean>(_ x: C) -> Bool {
-  return _branchHint(x.boolValue, expected: true)
+public func _fastPath(_ x: Bool) -> Bool {
+  return _branchHint(x, expected: true)
 }
 
 /// Optimizer hint that `x` is expected to be `false`.
 @_transparent
 @_semantics("slowpath")
-public func _slowPath<C : Boolean>(_ x: C) -> Bool {
-  return _branchHint(x.boolValue, expected: false)
+public func _slowPath(_ x: Bool) -> Bool {
+  return _branchHint(x, expected: false)
 }
 
 /// Optimizer hint that the code where this function is called is on the fast
@@ -294,17 +295,19 @@ public func _onFastPath() {
 
 /// Returns `true` iff the class indicated by `theClass` uses native
 /// Swift reference-counting.
+#if _runtime(_ObjC)
+// Declare it here instead of RuntimeShims.h, because we need to specify
+// the type of argument to be AnyClass. This is currently not possible
+// when using RuntimeShims.h
+@_silgen_name("swift_objc_class_usesNativeSwiftReferenceCounting")
+func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
+#else
 @_versioned
 @inline(__always)
-internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
-#if _runtime(_ObjC)
-  return swift_objc_class_usesNativeSwiftReferenceCounting(
-    unsafeAddress(of: theClass)
-  )
-#else
+func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
   return true
-#endif
 }
+#endif
 
 @_silgen_name("swift_class_getInstanceExtents")
 func swift_class_getInstanceExtents(_ theClass: AnyClass)
@@ -593,4 +596,20 @@ func _isOptional<T>(_ type: T.Type) -> Bool {
 @available(*, unavailable, message: "Removed in Swift 3. Please use Optional.unsafelyUnwrapped instead.")
 public func unsafeUnwrap<T>(_ nonEmpty: T?) -> T {
   Builtin.unreachable()
+}
+
+/// Extract an object reference from an Any known to contain an object.
+internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
+  _sanityCheck(any.dynamicType is AnyObject.Type
+               || any.dynamicType is AnyObject.Protocol,
+               "Any expected to contain object reference")
+  // With a SIL instruction, we could more efficiently grab the object reference
+  // out of the Any's inline storage.
+
+  // On Linux, bridging isn't supported, so this is a force cast.
+#if _runtime(_ObjC)
+  return any as AnyObject
+#else
+  return any as! AnyObject
+#endif
 }

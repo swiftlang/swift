@@ -1890,7 +1890,7 @@ static void VisitNodeProtocolList(
     nodes.push_back(cur_node->getFirstChild());
     VisitNode(ast, nodes, protocol_types_result, generic_context);
     if (protocol_types_result._error
-            .empty() /* cannot check for empty type list as protocol<> is allowed */) {
+            .empty() /* cannot check for empty type list as Any is allowed */) {
       if (ast) {
         result._types.push_back(
             ProtocolCompositionType::get(*ast, protocol_types_result._types));

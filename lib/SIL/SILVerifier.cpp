@@ -797,7 +797,7 @@ public:
     // Check that if the apply is of a noreturn callee, make sure that an
     // unreachable is the next instruction.
     if (AI->getModule().getStage() == SILStage::Raw ||
-        !AI->getCallee()->getType().getAs<SILFunctionType>()->isNoReturn())
+        !AI->isCalleeNoReturn())
       return;
     require(isa<UnreachableInst>(std::next(SILBasicBlock::iterator(AI))),
             "No return apply without an unreachable as a next instruction.");
@@ -1537,6 +1537,16 @@ public:
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
     require(DI->getOperand()->getType().isAddress(),
             "Operand of destroy_addr must be address");
+  }
+
+  void checkBindMemoryInst(BindMemoryInst *BI) {
+    require(!BI->getType(), "BI must not produce a type");
+    require(BI->getBoundType(), "BI must have a bound type");
+    require(BI->getBase()->getType().is<BuiltinRawPointerType>(),
+            "bind_memory base be a RawPointer");
+    require(BI->getIndex()->getType()
+            == SILType::getBuiltinWordType(F.getASTContext()),
+            "bind_memory index must be a Word");
   }
 
   void checkIndexAddrInst(IndexAddrInst *IAI) {

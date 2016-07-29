@@ -51,13 +51,18 @@ internal final class _SwiftNSCharacterSet : _SwiftNativeNSCharacterSet, _SwiftNa
     }
 
     @objc(copyWithZone:)
-    func copy(with zone: NSZone? = nil) -> AnyObject {
+    func copy(with zone: NSZone? = nil) -> Any {
         return _mapUnmanaged { $0.copy(with: zone) }
     }
 
     @objc(mutableCopyWithZone:)
-    func mutableCopy(with zone: NSZone? = nil) -> AnyObject {
+    func mutableCopy(with zone: NSZone? = nil) -> Any {
         return _mapUnmanaged { $0.mutableCopy(with: zone) }
+    }
+
+    @objc
+    public var classForCoder: AnyClass {
+        return NSCharacterSet.self
     }
 }
 
@@ -77,9 +82,9 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     
     // MARK: Init methods
     
-    private init(_bridged characterSet: NSCharacterSet) {
+    fileprivate init(_bridged characterSet: NSCharacterSet) {
         // We must copy the input because it might be mutable; just like storing a value type in ObjC
-        _wrapped = _SwiftNSCharacterSet(immutableObject: characterSet.copy())
+        _wrapped = _SwiftNSCharacterSet(immutableObject: characterSet.copy() as AnyObject)
     }
     
     /// Initialize an empty instance.
@@ -98,7 +103,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
     public init(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)
+        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
         _wrapped = _SwiftNSCharacterSet(immutableObject: NSCharacterSet(range: _utfRangeToNSRange(halfOpenRange)))
     }
 
@@ -202,9 +207,14 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
         return CharacterSet(reference: NSCharacterSet.illegalCharacters as NSCharacterSet)
     }
     
-    /// Returns a character set containing the characters in Unicode General Category P*.
+    @available(*, unavailable, renamed: "punctuationCharacters")
     public static var punctuation : CharacterSet {
-        return CharacterSet(reference: NSCharacterSet.punctuation as NSCharacterSet)
+        return CharacterSet(reference: NSCharacterSet.punctuationCharacters as NSCharacterSet)
+    }
+
+    /// Returns a character set containing the characters in Unicode General Category P*.
+    public static var punctuationCharacters : CharacterSet {
+        return CharacterSet(reference: NSCharacterSet.punctuationCharacters as NSCharacterSet)
     }
     
     /// Returns a character set containing the characters in Unicode General Category Lt.
@@ -289,7 +299,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
     public mutating func insert(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)
+        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
         let nsRange = _utfRangeToNSRange(halfOpenRange)
         _applyUnmanagedMutation {
             $0.addCharacters(in: nsRange)
@@ -306,7 +316,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
 
     /// Remove a closed range of integer values from the `CharacterSet`.
     public mutating func remove(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)
+        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
         let nsRange = _utfRangeToNSRange(halfOpenRange)
         _applyUnmanagedMutation {
             $0.removeCharacters(in: nsRange)
@@ -424,20 +434,16 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     public func isSuperset(of other: CharacterSet) -> Bool {
         return _mapUnmanaged { $0.isSuperset(of: other) }
     }
-}
 
-/// Returns true if the two `CharacterSet`s are equal.
-public func ==(lhs : CharacterSet, rhs: CharacterSet) -> Bool {
-    return lhs._wrapped.isEqual(rhs as NSCharacterSet)
+    /// Returns true if the two `CharacterSet`s are equal.
+    public static func ==(lhs : CharacterSet, rhs: CharacterSet) -> Bool {
+        return lhs._wrapped.isEqual(rhs as NSCharacterSet)
+    }
 }
 
 
 // MARK: Objective-C Bridging
 extension CharacterSet : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSCharacterSet.self
     }
@@ -460,6 +466,14 @@ extension CharacterSet : _ObjectiveCBridgeable {
         return CharacterSet(_bridged: source!)
     }
     
+}
+
+extension NSCharacterSet : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as CharacterSet)
+    }
 }
 
 extension _SwiftNSCharacterSet {

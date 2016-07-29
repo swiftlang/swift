@@ -51,9 +51,7 @@ public enum _DebuggerSupport {
     otherwise: ()->T
   ) -> T {
     if isClass(value) {
-      if let ao = value as? AnyObject {
-        return ifClass(ao)
-      }
+      return ifClass(_unsafeDowncastToAnyObject(fromAny: value))
     }
     return otherwise()
   }
@@ -158,7 +156,7 @@ public enum _DebuggerSupport {
     }
   }
 
-  internal static func printForDebuggerImpl<StreamType : OutputStream>(
+  internal static func printForDebuggerImpl<StreamType : TextOutputStream>(
     value: Any?,
     mirror: Mirror,
     name: String?,

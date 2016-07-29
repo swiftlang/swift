@@ -29,7 +29,7 @@
 #include "../SwiftShims/RuntimeStubs.h"
 #include "../SwiftShims/GlobalObjects.h"
 
-// Backing storage for overrides of `Swift.Process.arguments`.
+// Backing storage for overrides of `Swift.CommandLine.arguments`.
 static char **_swift_stdlib_ProcessOverrideUnsafeArgv = nullptr;
 static int _swift_stdlib_ProcessOverrideUnsafeArgc = 0;
 

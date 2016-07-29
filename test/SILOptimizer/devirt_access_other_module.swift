@@ -8,7 +8,7 @@
 // rdar://21408247
 
 public class ExternalClass {
-  private func foo() {}
+  fileprivate func foo() {}
 }
 
 public func getExternalClass() -> ExternalClass {
@@ -32,9 +32,9 @@ public func getExternalClass() -> ExternalClass {
 }
 
 private class PrivateSubclass : ExternalClass {
-  override private func foo() {}
+  override fileprivate func foo() {}
 }
 
 internal class InternalSubclass : ExternalClass {
-  override private func foo() {}
+  override fileprivate func foo() {}
 }

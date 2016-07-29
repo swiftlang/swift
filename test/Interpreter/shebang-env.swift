@@ -10,7 +10,7 @@
 // REQUIRES: swift_interpreter
 
 print("Begin")
-for arg in Process.arguments {
+for arg in CommandLine.arguments {
   print(arg)
 }
 print("End")

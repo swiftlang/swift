@@ -388,7 +388,7 @@ public func check${Traversal}Collection<
         successor3 = succ(successor3)
         for s in [ successor1, successor2, successor3 ] {
           expectEqual(allIndices[i + 1], s, ${trace})
-          expectEqual(
+          expectEqualTest(
             expectedArray[i + 1], collection[s], ${trace}, sameValue: sameValue)
         }
       }
@@ -403,14 +403,14 @@ public func check${Traversal}Collection<
         predecessor3 = pred(predecessor3)
         for p in [ predecessor1, predecessor2, predecessor3 ] {
           expectEqual(allIndices[i - 1], p, ${trace})
-          expectEqual(
+          expectEqualTest(
             expectedArray[i - 1], collection[p], ${trace}, sameValue: sameValue)
         }
       }
       for i in 1..<allIndices.count {
         let index = succ(pred(allIndices[i]))
         expectEqual(allIndices[i], index, ${trace})
-        expectEqual(
+        expectEqualTest(
           expectedArray[i], collection[index], ${trace}, sameValue: sameValue)
       }
 

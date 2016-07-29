@@ -89,8 +89,17 @@ bool TypeBase::hasReferenceSemantics() {
   return getCanonicalType().hasReferenceSemantics();
 }
 
+bool TypeBase::isNever() {
+  if (auto nominalDecl = getAnyNominal())
+    if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
+      if (enumDecl->getAllElements().empty())
+        return true;
+
+  return false;
+}
+
 bool TypeBase::isAny() {
-  return isEqual(getASTContext().getAnyDecl()->getDeclaredType());
+  return isEqual(getASTContext().TheAnyType);
 }
 
 bool TypeBase::isAnyClassReferenceType() {
@@ -510,8 +519,19 @@ bool TypeBase::isLegalSILType() {
 }
 
 bool TypeBase::isVoid() {
-  return isEqual(getASTContext().TheEmptyTupleType);
+  if (auto TT = getAs<TupleType>())
+    return TT->getNumElements() == 0;
+  return false;
 }
+
+/// \brief Check if this type is equal to Swift.Bool.
+bool TypeBase::isBool() {
+  if (auto NTD = getAnyNominal())
+    if (isa<StructDecl>(NTD))
+      return getASTContext().getBoolDecl() == NTD;
+  return false;
+}
+
 
 bool TypeBase::isAssignableType() {
   if (isLValueType()) return true;
@@ -597,8 +617,18 @@ CanType CanType::getAnyOptionalObjectTypeImpl(CanType type,
 }
 
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
+  auto &C = getASTContext();
+  if (auto nominalTy = getAs<NominalType>()) {
+    if (nominalTy->getDecl() == C.getUnsafeMutableRawPointerDecl()) {
+      PTK = PTK_UnsafeMutableRawPointer;
+      return C.TheEmptyTupleType;
+    }
+    if (nominalTy->getDecl() == C.getUnsafeRawPointerDecl()) {
+      PTK = PTK_UnsafeRawPointer;
+      return C.TheEmptyTupleType;
+    }
+  }
   if (auto boundTy = getAs<BoundGenericType>()) {
-    auto &C = getASTContext();
     if (boundTy->getDecl() == C.getUnsafeMutablePointerDecl()) {
       PTK = PTK_UnsafeMutablePointer;
     } else if (boundTy->getDecl() == C.getUnsafePointerDecl()) {
@@ -786,8 +816,53 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
-SmallVector<CallArgParam, 4> swift::decomposeArgType(Type type) {
-  return decomposeParamType(type, nullptr, /*level=*/0);
+SmallVector<CallArgParam, 4>
+swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
+  SmallVector<CallArgParam, 4> result;
+  switch (type->getKind()) {
+  case TypeKind::Tuple: {
+    auto tupleTy = cast<TupleType>(type.getPointer());
+
+    // If we have one argument label but a tuple argument with != 1 element,
+    // put the whole tuple into the argument.
+    // FIXME: This horribleness is due to the mis-modeling of arguments as
+    // ParenType or TupleType.
+    if (argumentLabels.size() == 1 && tupleTy->getNumElements() != 1) {
+      // Break out to do the default thing below.
+      break;
+    }
+
+    for (auto i : range(0, tupleTy->getNumElements())) {
+      const auto &elt = tupleTy->getElement(i);
+      assert(!elt.isVararg() && "Vararg argument tuple doesn't make sense");
+      CallArgParam argParam;
+      argParam.Ty = elt.getType();
+      argParam.Label = argumentLabels[i];
+      result.push_back(argParam);
+    }
+    return result;
+  }
+
+  case TypeKind::Paren: {
+    CallArgParam argParam;
+    argParam.Ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
+    result.push_back(argParam);
+    return result;
+  }
+
+  default:
+    // Default behavior below; inject the argument as the sole parameter.
+    break;
+  }
+
+  // Just inject this parameter.
+  assert(result.empty());
+  CallArgParam argParam;
+  argParam.Ty = type;
+  assert(argumentLabels.size() == 1);
+  argParam.Label = argumentLabels[0];
+  result.push_back(argParam);
+  return result;
 }
 
 SmallVector<CallArgParam, 4>
@@ -906,27 +981,6 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
   return FunctionType::get(input,
                            fnTy->getResult(),
                            fnTy->getExtInfo());
-}
-
-Type TypeBase::getWithoutNoReturn(unsigned UncurryLevel) {
-  if (UncurryLevel == 0)
-    return this;
-
-  auto *FnType = this->castTo<AnyFunctionType>();
-  Type InputType = FnType->getInput();
-  Type ResultType = FnType->getResult()->getWithoutNoReturn(UncurryLevel - 1);
-  auto TheExtInfo = FnType->getExtInfo().withIsNoReturn(false);
-  if (auto *GFT = dyn_cast<GenericFunctionType>(FnType)) {
-    return GenericFunctionType::get(GFT->getGenericSignature(),
-                                    InputType, ResultType,
-                                    TheExtInfo);
-  }
-  if (auto *PFT = dyn_cast<PolymorphicFunctionType>(FnType)) {
-    return PolymorphicFunctionType::get(InputType, ResultType,
-                                        &PFT->getGenericParams(),
-                                        TheExtInfo);
-  }
-  return FunctionType::get(InputType, ResultType, TheExtInfo);
 }
 
 /// Retrieve the object type for a 'self' parameter, digging into one-element
@@ -1532,8 +1586,6 @@ bool TypeBase::isSpelledLike(Type other) {
       return false;
     if (fMe->getRepresentation() != fThem->getRepresentation())
       return false;
-    if (fMe->isNoReturn() != fThem->isNoReturn())
-      return false;
     if (!fMe->getInput()->isSpelledLike(fThem->getInput()))
       return false;
     if (!fMe->getResult()->isSpelledLike(fThem->getResult()))
@@ -1975,11 +2027,11 @@ static ForeignRepresentableKind
 getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   // @objc metatypes are representable when their instance type is.
   if (auto metatype = type->getAs<AnyMetatypeType>()) {
-    // If the instance type is not representable, the metatype is not
+    // If the instance type is not representable verbatim, the metatype is not
     // representable.
     auto instanceType = metatype->getInstanceType();
     if (getObjCObjectRepresentable(instanceType, dc)
-          == ForeignRepresentableKind::None)
+          != ForeignRepresentableKind::Object)
       return ForeignRepresentableKind::None;
 
     // Objective-C metatypes are trivially representable.
@@ -2215,6 +2267,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   PointerTypeKind pointerKind;
   if (auto pointerElt = type->getAnyPointerElementType(pointerKind)) {
     switch (pointerKind) {
+    case PTK_UnsafeMutableRawPointer:
+    case PTK_UnsafeRawPointer:
     case PTK_UnsafeMutablePointer:
     case PTK_UnsafePointer:
       // An UnsafeMutablePointer<T> or UnsafePointer<T> is
@@ -2410,13 +2464,10 @@ static bool canOverride(CanType t1, CanType t2,
     if (!fn1)
       return false;
 
-    // Allow ExtInfos to differ in these ways:
-    //   - the overriding type may be noreturn even if the base type isn't
-    //   - the base type may be throwing even if the overriding type isn't
+    // Allow the base type to be throwing even if the overriding type isn't
     auto ext1 = fn1->getExtInfo();
     auto ext2 = fn2->getExtInfo();
     if (ext2.throws()) ext1 = ext1.withThrows(true);
-    if (ext1.isNoReturn()) ext2 = ext2.withIsNoReturn(true);
     if (ext1 != ext2)
       return false;
 

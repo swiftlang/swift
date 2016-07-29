@@ -45,7 +45,7 @@ extension ImplicitlyUnwrappedOptional : CustomStringConvertible {
   public var description: String {
     switch self {
     case .some(let value):
-      return String(value)
+      return String(describing: value)
     case .none:
       return "nil"
     }
@@ -71,7 +71,7 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
       _preconditionFailure("attempt to bridge an implicitly unwrapped optional containing nil")
 
     case .some(let x):
-      return Swift._bridgeToObjectiveC(x)!
+      return Swift._bridgeAnythingToObjectiveC(x)
     }
   }
 
@@ -93,10 +93,6 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
     }
 
     return false
-  }
-
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(Wrapped.self)
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)

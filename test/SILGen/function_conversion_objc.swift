@@ -69,7 +69,7 @@ func blockToFunc(_ x: @convention(block) () -> ()) -> () -> () {
 
 // ==== Representation change + function type conversion
 
-// CHECK-LABEL: sil hidden @_TF24function_conversion_objc22blockToFuncExistentialFbT_SiFT_P_ : $@convention(thin) (@owned @convention(block) () -> Int) -> @owned @callee_owned () -> @out protocol<>
+// CHECK-LABEL: sil hidden @_TF24function_conversion_objc22blockToFuncExistentialFbT_SiFT_P_ : $@convention(thin) (@owned @convention(block) () -> Int) -> @owned @callee_owned () -> @out Any
 // CHECK:         function_ref @_TTRXFdCb__dSi_XFo__dSi_
 // CHECK:         partial_apply
 // CHECK:         function_ref @_TTRXFo__dSi_XFo__iP__
@@ -81,7 +81,7 @@ func blockToFuncExistential(_ x: @convention(block) () -> Int) -> () -> Any {
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFdCb__dSi_XFo__dSi_ : $@convention(thin) (@owned @convention(block) () -> Int) -> Int
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSi_XFo__iP__ : $@convention(thin) (@owned @callee_owned () -> Int) -> @out protocol<>
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSi_XFo__iP__ : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Any
 
 // C function pointer conversions
 

@@ -28,10 +28,13 @@ extension C : A { } // expected-error{{extension of type 'C' cannot inherit from
 struct S2 : struct { } // expected-error{{expected identifier for type name}}
 
 // Protocol composition in inheritance clauses
-struct S3 : P, protocol<P> { } // expected-error{{duplicate inheritance from 'P'}}
-                               // expected-error@-1{{protocol composition is neither allowed nor needed here}}{{16-25=}}{{26-27=}}
-struct S4 : protocol< { } // expected-error{{expected identifier for type name}}
-                          // expected-error@-1{{protocol composition is neither allowed nor needed here}}{{13-23=}}
+struct S3 : P, P & Q { } // expected-error {{duplicate inheritance from 'P'}}
+                         // expected-error @-1 {{protocol composition is neither allowed nor needed here}}
+struct S4 : P, P { }     // expected-error {{duplicate inheritance from 'P'}}
+struct S6 : P & { }      // expected-error {{expected identifier for type name}}
+                         // expected-error @-1 {{protocol composition is neither allowed nor needed here}}
+struct S7 : protocol<P, Q> { }  // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+                                // expected-error @-1 {{protocol composition is neither allowed nor needed here}}{{13-22=}} {{26-27=}}
 
 class GenericBase<T> {}
 
@@ -39,8 +42,8 @@ class GenericSub<T> : GenericBase<T> {} // okay
 
 class InheritGenericParam<T> : T {} // expected-error {{inheritance from non-protocol, non-class type 'T'}}
 class InheritBody : T { // expected-error {{use of undeclared type 'T'}}
-	typealias T = A
+  typealias T = A
 }
 class InheritBodyBad : fn { // expected-error {{use of undeclared type 'fn'}}
-	func fn() {}
+  func fn() {}
 }

@@ -202,6 +202,7 @@ protected:
     SILLinkage linkage;
     switch (accessibility) {
     case Accessibility::Private:
+    case Accessibility::FilePrivate:
       linkage = SILLinkage::Private;
       break;
     case Accessibility::Internal:

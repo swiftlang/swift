@@ -47,7 +47,7 @@ import Glibc
 #if _runtime(_ObjC)
 import ObjectiveC
 #else
-func autoreleasepool(_ code: @noescape () -> Void) {
+func autoreleasepool(invoking code: @noescape () -> Void) {
   // Native runtime does not have autorelease pools.  Execute the code
   // directly.
   code()
@@ -596,7 +596,9 @@ internal struct ClosureBasedRaceTest : RaceTestWithPerTrialData {
   ) {}
 }
 
-public func runRaceTest(trials: Int, threads: Int? = nil, body: () -> ()) {
+public func runRaceTest(
+  trials: Int, threads: Int? = nil, invoking body: () -> ()
+) {
   ClosureBasedRaceTest.thread = body
   runRaceTest(ClosureBasedRaceTest.self, trials: trials, threads: threads)
 }

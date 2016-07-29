@@ -65,7 +65,7 @@ bb0(%0 : $Int):
 
 
 struct AddressOnlyStruct {
-  var a : protocol<>
+  var a : Any
   var b : Int
 }
 

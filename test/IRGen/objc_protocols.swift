@@ -152,7 +152,7 @@ func objc_erasure(_ x: NSSpoon) -> NSRuncing {
 }
 
 // CHECK: define hidden void @_TF14objc_protocols25objc_protocol_composition{{.*}}(%objc_object*)
-func objc_protocol_composition(_ x: protocol<NSRuncing, NSFunging>) {
+func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   x.runce()
   // CHECK: [[RUNCE:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
   // CHECK: bitcast %objc_object* %0 to [[OBJTYPE:.*]]*
@@ -164,7 +164,7 @@ func objc_protocol_composition(_ x: protocol<NSRuncing, NSFunging>) {
 
 // CHECK: define hidden void @_TF14objc_protocols31objc_swift_protocol_composition{{.*}}(%objc_object*, i8**)
 func objc_swift_protocol_composition
-(_ x:protocol<NSRuncing, Ansible, NSFunging>) {
+(_ x: NSRuncing & Ansible & NSFunging) {
   x.runce()
   // CHECK: [[RUNCE:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
   // CHECK: bitcast %objc_object* %0 to [[OBJTYPE:.*]]*

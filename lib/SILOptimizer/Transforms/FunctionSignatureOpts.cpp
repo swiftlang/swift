@@ -499,7 +499,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   }
 
   // Set up the return results.
-  if (NewF->getLoweredFunctionType()->isNoReturn()) {
+  if (NewF->isNoReturnFunction()) {
     Builder.createUnreachable(Loc);
   } else {
     Builder.createReturn(Loc, ReturnValue);

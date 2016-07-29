@@ -10,6 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FIXME(ABI)(compiler limitation): This protocol exists to identify
+// hashable types.  It is used for defining an imitation of a generic
+// subscript on `Dictionary<AnyHashable, *>`.
+public protocol _Hashable {
+  func _toAnyHashable() -> AnyHashable
+}
+
 /// A type that provides an integer hash value.
 ///
 /// You can use any type that conforms to the `Hashable` protocol in a set or
@@ -37,7 +44,7 @@
 /// To use your own custom type in a set or as the key type of a dictionary,
 /// add `Hashable` conformance to your type by providing a `hashValue`
 /// property. The `Hashable` protocol inherits from the `Equatable` protocol,
-/// so you must also add an is-equal-to operator (`==`) function for your
+/// so you must also add an equal-to operator (`==`) function for your
 /// custom type.
 ///
 /// As an example, consider a `GridPoint` type that describes a location in a
@@ -54,13 +61,13 @@
 /// as the `Element` type for a set. To add `Hashable` conformance, provide an
 /// `==` operator function and a `hashValue` property.
 ///
-///     func ==(lhs: GridPoint, rhs: GridPoint) -> Bool {
-///         return lhs.x == rhs.x && lhs.y == rhs.y
-///     }
-///
 ///     extension GridPoint: Hashable {
 ///         var hashValue: Int {
 ///             return x.hashValue ^ y.hashValue
+///         }
+///
+///         static func == (lhs: GridPoint, rhs: GridPoint) -> Bool {
+///             return lhs.x == rhs.x && lhs.y == rhs.y
 ///         }
 ///     }
 ///
@@ -83,7 +90,7 @@
 ///         print("New tap detected at (\(nextTap.x), \(nextTap.y)).")
 ///     }
 ///     // Prints "New tap detected at (0, 1).")
-public protocol Hashable : Equatable {
+public protocol Hashable : _Hashable, Equatable {
   /// The hash value.
   ///
   /// Hash values are not guaranteed to be equal across different executions of

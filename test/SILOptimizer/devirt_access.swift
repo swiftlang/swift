@@ -40,7 +40,7 @@ func testInternalPrivate() {
 
 
 class LocalInternalClass {
-  private func foo() {}
+  fileprivate func foo() {}
   func bar() {}
 }
 
@@ -72,8 +72,8 @@ func testLocalPrivate() {
 
 
 private class PrivateClass {
-  private func foo() {}
-  private func bar() {}
+  fileprivate func foo() {}
+  fileprivate func bar() {}
 }
 
 private class LocalPrivateSubclass : PrivateClass {

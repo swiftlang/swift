@@ -394,6 +394,22 @@ public:
       }
     }
 
+    //  let msg = String([65, 108, 105, 103, 110].map { c in
+    //    Character(UnicodeScalar(c))
+    //  }) <--- No indentation here.
+    auto AtCursorExpr = Cursor->getAsExpr();
+    if (AtCursorExpr && (isa<ParenExpr>(AtCursorExpr) ||
+                         isa<TupleExpr>(AtCursorExpr))) {
+      if (AtExprEnd && isa<CallExpr>(AtExprEnd)) {
+        if (AtExprEnd->getEndLoc().isValid() &&
+            AtCursorExpr->getEndLoc().isValid() &&
+            Line == SM.getLineNumber(AtExprEnd->getEndLoc()) &&
+            Line == SM.getLineNumber(AtCursorExpr->getEndLoc())) {
+          return false;
+        }
+      }
+    }
+
     // Indent another level from the outer context by default.
     return true;
   }

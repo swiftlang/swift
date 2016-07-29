@@ -30,7 +30,7 @@ class NonContiguousNSString : NSString {
     super.init()
   }
 
-  @objc(copyWithZone:) override func copy(with zone: NSZone?) -> AnyObject {
+  @objc(copyWithZone:) override func copy(with zone: NSZone?) -> Any {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -197,15 +197,17 @@ NSStringAPIs.test("init(cString_:encoding:)") {
 
 NSStringAPIs.test("init(utf8String:)") {
   var s = "foo あいう"
-  var up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
+  var up = UnsafeMutablePointer<UInt8>.allocate(capacity: 100)
   var i = 0
   for b in s.utf8 {
     up[i] = b
     i += 1
   }
   up[i] = 0
-  expectOptionalEqual(s, String(utf8String: UnsafePointer(up)))
-  up.deallocateCapacity(100)
+  let cstr = UnsafeMutableRawPointer(up)
+    .bindMemory(to: CChar.self, capacity: 100)
+  expectOptionalEqual(s, String(utf8String: cstr))
+  up.deallocate(capacity: 100)
 }
 
 NSStringAPIs.test("canBeConvertedToEncoding(_:)") {
@@ -262,22 +264,18 @@ func expectLocalizedEquality(
   _ localeID: String? = nil,
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
 
   let locale = localeID.map {
-    Locale(localeIdentifier: $0)
+    Locale(identifier: $0)
   } ?? Locale.current
   
   expectEqual(
     expected, op(locale),
-    message(), stackTrace: trace)
-  
-  expectEqual(
-    op(Locale.system), op(nil),
-    message(), stackTrace: trace)
+    message(), stackTrace: trace)  
 }
 
 NSStringAPIs.test("capitalizedString(with:)") {
@@ -838,8 +836,6 @@ NSStringAPIs.test("init(format:locale:_:...)") {
   var world: NSString = "world"
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, world, 42))
-  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: Locale.system, world, 42))
 }
 
 NSStringAPIs.test("init(format:locale:arguments:)") {
@@ -847,8 +843,6 @@ NSStringAPIs.test("init(format:locale:arguments:)") {
   let args: [CVarArg] = [ world, 42 ]
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, arguments: args))
-  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: Locale.system, arguments: args))
 }
 
 NSStringAPIs.test("lastPathComponent") {
@@ -1041,8 +1035,8 @@ NSStringAPIs.test("paragraphRangeFor(_:)") {
 }
 
 NSStringAPIs.test("pathComponents") {
-  expectEqual([ "/", "foo", "bar" ] as [NSString], ("/foo/bar" as NSString).pathComponents)
-  expectEqual([ "/", "абв", "где" ] as [NSString], ("/абв/где" as NSString).pathComponents)
+  expectEqual([ "/", "foo", "bar" ] as [NSString], ("/foo/bar" as NSString).pathComponents as [NSString])
+  expectEqual([ "/", "абв", "где" ] as [NSString], ("/абв/где" as NSString).pathComponents as [NSString])
 }
 
 NSStringAPIs.test("pathExtension") {
@@ -1644,10 +1638,10 @@ NSStringAPIs.test("trimmingCharacters(in:)") {
 }
 
 NSStringAPIs.test("NSString.stringsByAppendingPaths(_:)") {
-  expectEqual([] as [NSString], ("" as NSString).strings(byAppendingPaths: []))
+  expectEqual([] as [NSString], ("" as NSString).strings(byAppendingPaths: []) as [NSString])
   expectEqual(
     [ "/tmp/foo", "/tmp/bar" ] as [NSString],
-    ("/tmp" as NSString).strings(byAppendingPaths: [ "foo", "bar" ]))
+    ("/tmp" as NSString).strings(byAppendingPaths: [ "foo", "bar" ]) as [NSString])
 }
 
 NSStringAPIs.test("substring(from:)") {

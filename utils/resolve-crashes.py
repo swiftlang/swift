@@ -15,15 +15,15 @@ def execute_cmd(cmd):
 
 # The regular expression we use to match compiler-crasher lines.
 regex = re.compile(
-    '.*Swift :: '
+    '.*Swift(.*) :: '
     '(compiler_crashers|compiler_crashers_2|IDE/crashers)/(.*\.swift).*')
 
 # Take the output of lit as standard input.
 for line in sys.stdin:
     match = regex.match(line)
     if match:
-        suffix = match.group(1)
-        filename = match.group(2)
+        suffix = match.group(2)
+        filename = match.group(3)
 
         # Move the test over to the fixed suite.
         from_filename = 'validation-test/%s/%s' % (suffix, filename)

@@ -24,7 +24,7 @@ class A_Child : Base {
   // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
   override var prop: Int { return 0 }
   // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
-  override subscript(x: Int) -> AnyObject? { return nil }
+  override subscript(x: Int) -> Any? { return nil }
 
   // CHECK-NEXT: - (NSUInteger)foo;
   override func foo() -> Int { return 0 }
@@ -48,7 +48,7 @@ class A_Grandchild : A_Child {
   // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
   override var prop: Int { return 0 }
   // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
-  override subscript(x: Int) -> AnyObject? { return nil }
+  override subscript(x: Int) -> Any? { return nil }
 
   // CHECK-NEXT: - (NSUInteger)foo;
   override func foo() -> Int { return 0 }
@@ -75,7 +75,7 @@ class B_GrandchildViaEmpty : B_EmptyChild {
 
   // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
   // CHECK-NEXT: - (void)setObject:(id _Nullable)newValue atIndexedSubscript:(NSUInteger)x;
-  override subscript(x: Int) -> AnyObject? {
+  override subscript(x: Int) -> Any? {
     get { return nil }
     set {}
   }

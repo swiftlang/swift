@@ -134,7 +134,7 @@ func testObjectiveCBridgeStubURLAppendPathRef() {
   for _ in 0 ..< 10_000 {
     var url = startUrl
     for _ in 0 ..< 10 {
-      url = try! url.appendingPathComponent("foo")
+      url = url.appendingPathComponent("foo")
     }
   }
 }
@@ -153,7 +153,7 @@ func testObjectiveCBridgeStubNSDataAppend() {
   let proto = NSMutableData()
   var value: UInt8 = 1
   for _ in 0 ..< 1_000 {
-    let d = proto.mutableCopy()
+    let d = proto.mutableCopy() as! NSMutableData
     for _ in 0 ..< 100 {
        d.append(&value, length: 1)
     }

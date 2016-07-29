@@ -756,11 +756,11 @@ protocol BazProtocol {
   func bazInstanceFunc0() -> Double
 }
 
-typealias BarBazProtocolComposition = protocol<BarProtocol, BazProtocol>
+typealias BarBazProtocolComposition = BarProtocol & BazProtocol
 
 let fooProtocolInstance: FooProtocol = FooProtocolImpl()
-let fooBarProtocolInstance: protocol<FooProtocol, BarProtocol>
-let fooExBarExProtocolInstance: protocol<FooExProtocol, BarExProtocol>
+let fooBarProtocolInstance: FooProtocol & BarProtocol
+let fooExBarExProtocolInstance: FooExProtocol & BarExProtocol
 
 typealias FooTypealias = Int
 
@@ -1055,7 +1055,7 @@ func testLookInProto3() {
 // PROTO_MEMBERS_3-NEXT: End completions
 }
 
-func testLookInProto4(_ a: protocol<FooProtocol, BarBazProtocolComposition>) {
+func testLookInProto4(_ a: FooProtocol & BarBazProtocolComposition) {
   a.#^PROTO_MEMBERS_4^#
 // PROTO_MEMBERS_4: Begin completions
 // PROTO_MEMBERS_4-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
@@ -1086,7 +1086,7 @@ func testResolveFuncParam3<Foo : FooProtocol>(_ foo: Foo) {
 // RESOLVE_FUNC_PARAM_3-NEXT: End completions
 }
 
-func testResolveFuncParam4<FooBar : protocol<FooProtocol, BarProtocol>>(_ fooBar: FooBar) {
+func testResolveFuncParam4<FooBar : FooProtocol & BarProtocol>(_ fooBar: FooBar) {
   fooBar.#^RESOLVE_FUNC_PARAM_4^#
 // RESOLVE_FUNC_PARAM_4: Begin completions
 // RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceVar]/Super:    barInstanceVar[#Int#]{{; name=.+$}}
@@ -1099,7 +1099,7 @@ func testResolveFuncParam4<FooBar : protocol<FooProtocol, BarProtocol>>(_ fooBar
 // RESOLVE_FUNC_PARAM_4-NEXT: End completions
 }
 
-func testResolveFuncParam5<FooExBarEx : protocol<FooExProtocol, BarExProtocol>>(_ a: FooExBarEx) {
+func testResolveFuncParam5<FooExBarEx : FooExProtocol & BarExProtocol>(_ a: FooExBarEx) {
   a.#^RESOLVE_FUNC_PARAM_5^#
 // RESOLVE_FUNC_PARAM_5: Begin completions
 // RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceVar]/Super:    barInstanceVar[#Int#]{{; name=.+$}}

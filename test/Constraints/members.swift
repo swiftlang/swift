@@ -146,10 +146,6 @@ func goo() {
 
 func id<T>(_ t: T) -> T { return t }
 
-func doGetLogicValue<T : Boolean>(_ t: T) {
-  t.boolValue  // expected-warning {{expression of type 'Bool' is unused}}
-}
-
 protocol P {
   init()
   func bar(_ x: Int)
@@ -308,6 +304,15 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   let _: P! = id(p.returnSelfIUOStatic(true))
 }
 
+protocol StaticP {
+  static func foo(a: Int)
+}
+extension StaticP {
+  func bar() {
+    _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype 'StaticP.Protocol'}} {{9-16=Self}}
+  }
+}
+
 func existentialClassP(_ p: ClassP) {
   // Instance member of existential)
   let _: (Int) -> () = id(p.bas)
@@ -376,7 +381,7 @@ func testPreferClassMethodToCurriedInstanceMethod(_ obj: InstanceOrClassMethod) 
 }
 
 protocol Numeric {
-  func +(x: Self, y: Self) -> Self
+  static func +(x: Self, y: Self) -> Self
 }
 
 func acceptBinaryFunc<T>(_ x: T, _ fn: (T, T) -> T) { }

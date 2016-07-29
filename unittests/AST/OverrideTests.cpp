@@ -52,36 +52,34 @@ class TestContext : public TestContextBase {
   SourceFile *FileForLookups;
 
   void declareOptionalType(Identifier name) {
-    auto wrapped = new (Ctx) GenericTypeParamDecl(File,
+    auto wrapped = new (Ctx) GenericTypeParamDecl(FileForLookups,
                                                   Ctx.getIdentifier("Wrapped"),
                                                   SourceLoc(), /*depth*/0,
                                                   /*index*/0);
     auto params = GenericParamList::create(Ctx, SourceLoc(), wrapped,
                                            SourceLoc());
     auto decl = new (Ctx) EnumDecl(SourceLoc(), name, SourceLoc(),
-                                   /*inherited*/{}, params, File);
+                                   /*inherited*/{}, params, FileForLookups);
     wrapped->setDeclContext(decl);
     FileForLookups->Decls.push_back(decl);
   }
 
 public:
   ASTContext Ctx;
-  DerivedFileUnit *File;
 
   TestContext(ShouldDeclareOptionalTypes optionals = DoNotDeclareOptionalTypes)
       : Ctx(LangOpts, SearchPathOpts, SourceMgr, Diags) {
     auto stdlibID = Ctx.getIdentifier(STDLIB_NAME);
     auto *module = ModuleDecl::create(stdlibID, Ctx);
     Ctx.LoadedModules[stdlibID] = module;
-    File = new (Ctx) DerivedFileUnit(*module);
+
+    using ImplicitModuleImportKind = SourceFile::ImplicitModuleImportKind;
+    FileForLookups = new (Ctx) SourceFile(*module, SourceFileKind::Library,
+                                          /*buffer*/None,
+                                          ImplicitModuleImportKind::None);
+    module->addFile(*FileForLookups);
 
     if (optionals == DeclareOptionalTypes) {
-      using ImplicitModuleImportKind = SourceFile::ImplicitModuleImportKind;
-      FileForLookups = new (Ctx) SourceFile(*module, SourceFileKind::Library,
-                                            /*buffer*/None,
-                                            ImplicitModuleImportKind::None);
-      module->addFile(*FileForLookups);
-
       declareOptionalType(Ctx.getIdentifier("Optional"));
       declareOptionalType(Ctx.getIdentifier("ImplicitlyUnwrappedOptional"));
     }
@@ -92,7 +90,7 @@ public:
                        GenericParamList *genericParams = nullptr) {
     auto result = new (Ctx) Nominal(SourceLoc(), Ctx.getIdentifier(name),
                                     SourceLoc(), /*inherited*/{},
-                                    genericParams, File);
+                                    genericParams, FileForLookups);
     result->setAccessibility(Accessibility::Internal);
     return result;
   }

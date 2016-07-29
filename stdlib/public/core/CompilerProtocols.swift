@@ -12,51 +12,6 @@
 // Intrinsic protocols shared with the compiler
 //===----------------------------------------------------------------------===//
 
-/// A type that represents a Boolean value.
-///
-/// Types that conform to the `Boolean` protocol can be used as the condition
-/// in control statements, such as `if` and `while`, and in other contexts
-/// that require a logical value, such as the `where` clause of a `case`
-/// statement.
-///
-/// Swift uses only simple Boolean values in conditional contexts to help avoid
-/// accidental programming errors and to help maintain the clarity of each
-/// control statement. Unlike other programming languages, integers or strings
-/// cannot be used where a Boolean value is expected.
-///
-/// For example, the following code sample will not compile, because it
-/// attempts to use the integer `i` in a logical context:
-///
-///     var i = 5
-///     while i {
-///         print(i)
-///         i -= 1
-///     }
-///
-/// The correct approach in Swift is to compare the `i` value with zero in the
-/// `while` statement.
-///
-///     while i != 0 {
-///         print(i)
-///         i -= 1
-///     }
-///
-/// Conforming to the Boolean Protocol
-/// ==================================
-///
-/// Only three types provided by Swift---`Bool`, `DarwinBoolean`, and
-/// `ObjCBool`---conform to the `Boolean` protocol. Expanding this set to
-/// include types that represent more than simple Boolean values is
-/// discouraged.
-///
-/// To add `Boolean` conformance to your custom type, implement a `boolValue`
-/// property that represents your type as an instance of `Bool`, the default
-/// concrete type for the `Boolean` protocol.
-public protocol Boolean {
-  /// This value expressed as a `Bool` instance.
-  var boolValue: Bool { get }
-}
-
 /// A type that can be converted to and from an associated raw value.
 ///
 /// With a `RawRepresentable` type, you can switch back and forth between a
@@ -307,7 +262,7 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 ///     // Prints "ñ"
 ///
 /// Conforming to ExpressibleByUnicodeScalarLiteral
-/// =============================================
+/// ===============================================
 ///
 /// To add `ExpressibleByUnicodeScalarLiteral` conformance to your custom type,
 /// implement the required initializer.
@@ -350,7 +305,7 @@ public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
 ///     // Prints "❄︎"
 ///
 /// Conforming to ExpressibleByExtendedGraphemeClusterLiteral
-/// =======================================================
+/// =========================================================
 ///
 /// To add `ExpressibleByExtendedGraphemeClusterLiteral` conformance to your
 /// custom type, implement the required initializer.
@@ -394,7 +349,7 @@ public protocol _ExpressibleByBuiltinUTF16StringLiteral
 ///     let picnicGuest = "Deserving porcupine"
 ///
 /// Conforming to ExpressibleByStringLiteral
-/// ======================================
+/// ========================================
 ///
 /// To add `ExpressibleByStringLiteral` conformance to your custom type,
 /// implement the required initializer.
@@ -476,7 +431,7 @@ public protocol ExpressibleByStringLiteral
 /// array as a parameter:
 ///
 ///     func sum(values: [Int]) -> Int {
-///         return values.reduce(0, combine: +)
+///         return values.reduce(0, +)
 ///     }
 ///
 ///     let sumOfFour = sum([5, 10, 15, 20])
@@ -501,7 +456,7 @@ public protocol ExpressibleByStringLiteral
 ///     // Prints "Zero integers: []"
 ///
 /// Conforming to ExpressibleByArrayLiteral
-/// =====================================
+/// =======================================
 ///
 /// Add the capability to be initialized with an array literal to your own
 /// custom types by declaring an `init(arrayLiteral:)` initializer. The
@@ -559,7 +514,7 @@ public protocol ExpressibleByArrayLiteral {
 ///   by assigning an instance of one of these types.
 ///
 /// Conforming to the ExpressibleByDictionaryLiteral Protocol
-/// =======================================================
+/// =========================================================
 ///
 /// To add the capability to be initialized with a dictionary literal to your
 /// own custom types, declare an `init(dictionaryLiteral:)` initializer. The
@@ -610,7 +565,7 @@ public protocol ExpressibleByDictionaryLiteral {
 ///     // Prints "One cookie: $2, 3 cookies: $6."
 ///
 /// Conforming to the ExpressibleByStringInterpolation Protocol
-/// =========================================================
+/// ===========================================================
 ///
 /// To use string interpolation to initialize instances of your custom type,
 /// implement the required initializers for `ExpressibleByStringInterpolation`
@@ -706,8 +661,8 @@ public protocol _ExpressibleByFileReferenceLiteral {
 public protocol _DestructorSafeContainer {
 }
 
-@available(*, unavailable, renamed: "Boolean")
-public typealias BooleanType = Boolean
+@available(*, unavailable, renamed: "Bool")
+public typealias BooleanType = Bool
 
 // Deprecated by SE-0115.
 

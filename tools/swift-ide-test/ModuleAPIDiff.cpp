@@ -192,7 +192,6 @@ decl-attributes ::=
         IsFinal: <bool>
         IsLazy: <bool>
         IsMutating: <bool>
-        IsNoreturn: <bool>
         IsObjC: <bool>
         IsOptional: <bool>
         IsRequired: <bool>
@@ -258,7 +257,6 @@ using llvm::Optional;
   MACRO(IsFinal) \
   MACRO(IsLazy) \
   MACRO(IsMutating) \
-  MACRO(IsNoreturn) \
   MACRO(IsObjC) \
   MACRO(IsOptional) \
   MACRO(IsRequired) \

@@ -958,11 +958,14 @@ namespace  {
 static UIdent getAccessibilityUID(Accessibility Access) {
   static UIdent AccessPublic("source.lang.swift.accessibility.public");
   static UIdent AccessInternal("source.lang.swift.accessibility.internal");
+  static UIdent AccessFilePrivate("source.lang.swift.accessibility.fileprivate");
   static UIdent AccessPrivate("source.lang.swift.accessibility.private");
 
   switch (Access) {
   case Accessibility::Private:
     return AccessPrivate;
+  case Accessibility::FilePrivate:
+    return AccessFilePrivate;
   case Accessibility::Internal:
     return AccessInternal;
   case Accessibility::Public:

@@ -1426,6 +1426,11 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   assert(Src->getType().isAddress() && "Source should have an address type");
   assert(Dest->getType().isAddress() && "Source should have an address type");
 
+  if (!Src->getType().isLoadable(M) || !Dest->getType().isLoadable(M)) {
+    // TODO: Handle address only types.
+    return nullptr;
+  }
+
   if (SILBridgedTy != Src->getType()) {
     // Check if we can simplify a cast into:
     // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
@@ -1603,6 +1608,11 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
+  
+  if (!Src->getType().isLoadable(M) || !Dest->getType().isLoadable(M)) {
+    // TODO: Handle address-only types.
+    return nullptr;
+  }
 
   // Find the _BridgedToObjectiveC protocol.
   auto BridgedProto =
@@ -1613,8 +1623,6 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   assert(Conf && "_ObjectiveCBridgeable conformance should exist");
   (void) Conf;
-
-  bool isCurrentModuleBridgeToObjectiveC = false;
 
   // Generate code to invoke _bridgeToObjectiveC
   SILBuilderWithScope Builder(Inst);
@@ -1637,16 +1645,13 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     M.getSwiftModule()->lookupMember(Results, Source.getNominalOrBoundGenericNominal(),
                       M.getASTContext().Id_bridgeToObjectiveC, Identifier());
     ResultsRef = Results;
-    isCurrentModuleBridgeToObjectiveC = true;
   }
   if (ResultsRef.size() != 1)
     return nullptr;
 
   auto MemberDeclRef = SILDeclRef(Results.front());
-  auto Linkage = (isCurrentModuleBridgeToObjectiveC)
-                     ? ForDefinition_t::ForDefinition
-                     : ForDefinition_t::NotForDefinition;
-  auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef, Linkage);
+  auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef,
+                                            ForDefinition_t::NotForDefinition);
   assert(BridgedFunc &&
          "Implementation of _bridgeToObjectiveC could not be found");
 
@@ -1746,6 +1751,8 @@ optimizeBridgedCasts(SILInstruction *Inst,
     return nullptr;
 
   auto BridgedSourceTy = getCastFromObjC(M, target, source);
+  if (!BridgedSourceTy)
+    return nullptr;
 
   CanType CanBridgedTargetTy(BridgedTargetTy);
   CanType CanBridgedSourceTy(BridgedSourceTy);
@@ -2594,6 +2601,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
     return false;
   case Accessibility::Internal:
     return M.isWholeModule();
+  case Accessibility::FilePrivate:
   case Accessibility::Private:
     return true;
   }

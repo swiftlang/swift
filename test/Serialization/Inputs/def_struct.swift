@@ -65,7 +65,7 @@ public protocol Computable {
   func compute()
 }
 
-public typealias Cacheable = protocol<Resettable, Computable>
+public typealias Cacheable = Resettable & Computable
 
 public protocol SpecialResettable : Resettable, Computable {}
 

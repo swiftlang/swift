@@ -70,6 +70,13 @@ bool SILType::isReferenceCounted(SILModule &M) const {
   return M.getTypeLowering(*this).isReferenceCounted();
 }
 
+bool SILType::isNoReturnFunction() const {
+  if (auto funcTy = dyn_cast<SILFunctionType>(getSwiftRValueType()))
+    return funcTy->getSILResult().getSwiftRValueType()->isNever();
+
+  return false;
+}
+
 std::string SILType::getAsString() const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);

@@ -13,6 +13,8 @@
 // RUN: %swift -target thumbv7--windows-msvc -parse-as-library -parse-stdlib -module-name autolink -I %t -D MAIN_MODULE -emit-ir -o - %s | FileCheck %s -check-prefix CHECK-MSVC-IR
 // RUN: %swift -target thumbv7--windows-msvc -parse-as-library -parse-stdlib -module-name autolink -I %t -D MAIN_MODULE -S -o - %s | FileCheck %s -check-prefix CHECK-MSVC-ASM
 
+// REQUIRES: CODEGENERATOR=ARM
+
 #if MAIN_MODULE
 import module
 #endif

@@ -895,13 +895,20 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
     llvm::Value *argValue;
     if (isIndirectParameter(argConvention)) {
-      expectedArgTy = expectedArgTy->getPointerElementType();
-      auto temporary = subIGF.createAlloca(expectedArgTy,
+      // We can use rawData's type for the alloca because it is a swift
+      // retainable value. Defensively, give it that type. We can't use the
+      // expectedArgType because it might be a generic parameter and therefore
+      // have opaque storage.
+      auto RetainableValue = rawData;
+      if (RetainableValue->getType() != subIGF.IGM.RefCountedPtrTy)
+        RetainableValue = subIGF.Builder.CreateBitCast(
+            RetainableValue, subIGF.IGM.RefCountedPtrTy);
+      auto temporary = subIGF.createAlloca(RetainableValue->getType(),
                                            subIGF.IGM.getPointerAlignment(),
                                            "partial-apply.context");
-      argValue = subIGF.Builder.CreateBitCast(rawData, expectedArgTy);
-      subIGF.Builder.CreateStore(argValue, temporary);
+      subIGF.Builder.CreateStore(RetainableValue, temporary);
       argValue = temporary.getAddress();
+      argValue = subIGF.Builder.CreateBitCast(argValue, expectedArgTy);
     } else {
       argValue = subIGF.Builder.CreateBitCast(rawData, expectedArgTy);
     }

@@ -67,9 +67,9 @@ protocol CustomNameType2 {}
 
   func testRawAnyTypes(_ any: AnyObject, other: AnyObject.Type)
 
-  func testSingleProtocolTypes(_ a : A, aAgain a2: protocol<A>, b: B, bAgain b2: protocol<B>, both: protocol<A, B>)
-  func testSingleProtocolClassTypes(_ a : A.Type, aAgain a2: protocol<A>.Type, b: B.Type, bAgain b2: protocol<B>.Type, both: protocol<A, B>.Type)
-  func testComposition(_ x: protocol<A, ZZZ>, meta xClass: protocol<A, ZZZ>.Type)
+  func testSingleProtocolTypes(_ a : A, aAgain a2: A, b: B, bAgain b2: B, both: A & B)
+  func testSingleProtocolClassTypes(_ a : A.Type, aAgain a2: A.Type, b: B.Type, bAgain b2: B.Type, both: (A & B).Type)
+  func testComposition(_ x: A & ZZZ, meta xClass: (A & ZZZ).Type)
 
   func testOptional(_ opt: A?, meta m: A.Type?)
 }

@@ -254,7 +254,7 @@ protocol P {
   init(proto: String)
 }
 
-func foo<T: C where T: P>(_ x: T, y: T.Type) {
+func foo<T: C>(_ x: T, y: T.Type) where T: P {
   var c1 = x.dynamicType.init(required: 0)
   var c2 = x.dynamicType.init(x: 0) // expected-error{{'required' initializer}}
   var c3 = x.dynamicType.init() // expected-error{{'required' initializer}}

@@ -56,7 +56,7 @@ extension NSString : ExpressibleByStringLiteral {
     var immutableResult: NSString
     if value.hasPointerRepresentation {
       immutableResult = NSString(
-        bytesNoCopy: UnsafeMutablePointer<Void>(value.utf8Start),
+        bytesNoCopy: UnsafeMutableRawPointer(mutating: value.utf8Start),
         length: Int(value.utf8CodeUnitCount),
         encoding: value.isASCII ? String.Encoding.ascii.rawValue : String.Encoding.utf8.rawValue,
         freeWhenDone: false)!
@@ -68,6 +68,16 @@ extension NSString : ExpressibleByStringLiteral {
         encoding: String.Encoding.utf32.rawValue)!
     }
     self.init(string: immutableResult as String)
+  }
+}
+
+extension NSString : _HasCustomAnyHashableRepresentation {
+  // Must be @nonobjc to prevent infinite recursion trying to bridge
+  // AnyHashable to NSObject.
+  @nonobjc
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    // Consistently use Swift equality and hashing semantics for all strings.
+    return AnyHashable(self as String)
   }
 }
 
@@ -86,16 +96,12 @@ extension String {
 }
 
 extension String : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSString {
     // This method should not do anything extra except calling into the
     // implementation inside core.  (These two entry points should be
     // equivalent.)
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSString.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject, to: NSString.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -127,22 +133,94 @@ extension String : _ObjectiveCBridgeable {
 // Numbers
 //===----------------------------------------------------------------------===//
 
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithInt")
+internal func _swift_Foundation_TypePreservingNSNumberWithInt(
+  _ value: Int
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithUInt")
+internal func _swift_Foundation_TypePreservingNSNumberWithUInt(
+  _ value: UInt
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithFloat")
+internal func _swift_Foundation_TypePreservingNSNumberWithFloat(
+  _ value: Float
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithDouble")
+internal func _swift_Foundation_TypePreservingNSNumberWithDouble(
+  _ value: Double
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithCGFloat")
+internal func _swift_Foundation_TypePreservingNSNumberWithCGFloat(
+  _ value: CGFloat
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithBool")
+internal func _swift_Foundation_TypePreservingNSNumberWithBool(
+  _ value: Bool
+) -> NSNumber
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetKind")
+internal func _swift_Foundation_TypePreservingNSNumberGetKind(
+  _ value: NSNumber
+) -> UInt32
+
+// This enum has a matching counterpart in TypePreservingNSNumber.mm, please
+// update both copies when changing it.
+internal enum _SwiftTypePreservingNSNumberTag : Int {
+  case SwiftInt = 1
+  case SwiftUInt = 2
+  case SwiftFloat = 3
+  case SwiftDouble = 4
+  case CoreGraphicsCGFloat = 5
+  case SwiftBool = 6
+}
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsInt")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsInt(
+  _ value: NSNumber
+) -> Int
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsUInt")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsUInt(
+  _ value: NSNumber
+) -> UInt
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsFloat")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsFloat(
+  _ value: NSNumber
+) -> Float
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsDouble")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsDouble(
+  _ value: NSNumber
+) -> Double
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsCGFloat")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsCGFloat(
+  _ value: NSNumber
+) -> CGFloat
+
+@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsBool")
+internal func _swift_Foundation_TypePreservingNSNumberGetAsBool(
+  _ value: NSNumber
+) -> Bool
+
 // Conversions between NSNumber and various numeric types. The
 // conversion to NSNumber is automatic (auto-boxing), while conversion
 // back to a specific numeric type requires a cast.
 // FIXME: Incomplete list of types.
 extension Int : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   public init(_ number: NSNumber) {
     self = number.intValue
   }
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(value: self)
+    return _swift_Foundation_TypePreservingNSNumberWithInt(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -168,17 +246,13 @@ extension Int : _ObjectiveCBridgeable {
 }
 
 extension UInt : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   public init(_ number: NSNumber) {
     self = number.uintValue
   }
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(value: self)
+    return _swift_Foundation_TypePreservingNSNumberWithUInt(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -204,17 +278,13 @@ extension UInt : _ObjectiveCBridgeable {
 }
 
 extension Float : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   public init(_ number: NSNumber) {
     self = number.floatValue
   }
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(value: self)
+    return _swift_Foundation_TypePreservingNSNumberWithFloat(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -240,17 +310,13 @@ extension Float : _ObjectiveCBridgeable {
 }
 
 extension Double : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   public init(_ number: NSNumber) {
     self = number.doubleValue
   }
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(value: self)
+    return _swift_Foundation_TypePreservingNSNumberWithDouble(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -276,17 +342,13 @@ extension Double : _ObjectiveCBridgeable {
 }
 
 extension Bool: _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   public init(_ number: NSNumber) {
     self = number.boolValue
   }
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(value: self)
+    return _swift_Foundation_TypePreservingNSNumberWithBool(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -313,17 +375,13 @@ extension Bool: _ObjectiveCBridgeable {
 
 // CGFloat bridging.
 extension CGFloat : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   public init(_ number: NSNumber) {
     self.native = CGFloat.NativeType(number)
   }
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return self.native._bridgeToObjectiveC()
+    return _swift_Foundation_TypePreservingNSNumberWithCGFloat(self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -352,8 +410,11 @@ extension CGFloat : _ObjectiveCBridgeable {
 }
 
 // Literal support for NSNumber
-extension NSNumber : ExpressibleByFloatLiteral, ExpressibleByIntegerLiteral,
-                     ExpressibleByBooleanLiteral {
+extension NSNumber
+  : ExpressibleByFloatLiteral,
+    ExpressibleByIntegerLiteral,
+    ExpressibleByBooleanLiteral
+{
   /// Create an instance initialized to `value`.
   public required convenience init(integerLiteral value: Int) {
     self.init(value: value)
@@ -370,6 +431,36 @@ extension NSNumber : ExpressibleByFloatLiteral, ExpressibleByIntegerLiteral,
   }
 }
 
+extension NSNumber : _HasCustomAnyHashableRepresentation {
+  // Must be @nonobjc to prevent infinite recursion trying to bridge
+  // AnyHashable to NSObject.
+  @nonobjc
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    guard let kind = _SwiftTypePreservingNSNumberTag(
+      rawValue: Int(_swift_Foundation_TypePreservingNSNumberGetKind(self))
+    ) else {
+      if let nsDecimalNumber: NSDecimalNumber = self as? NSDecimalNumber {
+        return AnyHashable(nsDecimalNumber as Decimal)
+      }
+      return nil
+    }
+    switch kind {
+    case .SwiftInt:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsInt(self))
+    case .SwiftUInt:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsUInt(self))
+    case .SwiftFloat:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsFloat(self))
+    case .SwiftDouble:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsDouble(self))
+    case .CoreGraphicsCGFloat:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsCGFloat(self))
+    case .SwiftBool:
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsBool(self))
+    }
+  }
+}
+
 public let NSNotFound: Int = .max
 
 //===----------------------------------------------------------------------===//
@@ -378,7 +469,7 @@ public let NSNotFound: Int = .max
 
 extension NSArray : ExpressibleByArrayLiteral {
   /// Create an instance initialized with `elements`.
-  public required convenience init(arrayLiteral elements: AnyObject...) {
+  public required convenience init(arrayLiteral elements: Any...) {
     // Let bridging take care of it.
     self.init(array: elements)
   }
@@ -405,16 +496,12 @@ extension Array : _ObjectiveCBridgeable {
     // and watchOS.
     self = Array(
       _immutableCocoaArray:
-        unsafeBitCast(_cocoaArray.copy(), to: _NSArrayCore.self))
-  }
-
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(Element.self)
+        unsafeBitCast(_cocoaArray.copy() as AnyObject, to: _NSArrayCore.self))
   }
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSArray {
-    return unsafeBitCast(self._buffer._asCocoaArray(), to: NSArray.self)
+    return unsafeBitCast(self._buffer._asCocoaArray() as AnyObject, to: NSArray.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -455,10 +542,6 @@ extension Array : _ObjectiveCBridgeable {
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSArray?
   ) -> Array {
-    _precondition(
-      Swift._isBridgedToObjectiveC(Element.self),
-      "array element type is not bridged to Objective-C")
-
     // `nil` has historically been used as a stand-in for an empty
     // array; map it to an empty array instead of failing.
     if _slowPath(source == nil) { return Array() }
@@ -514,7 +597,8 @@ extension Dictionary {
     // and watchOS.
     self = Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copy(with: nil), to: _NSDictionary.self))
+        unsafeBitCast(_cocoaDictionary.copy(with: nil) as AnyObject,
+                      to: _NSDictionary.self))
   }
 }
 
@@ -522,7 +606,8 @@ extension Dictionary {
 extension Dictionary : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSDictionary {
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSDictionary.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject,
+                         to: NSDictionary.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -538,7 +623,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
       result = [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d, to: _NSDictionary.self))
+        _cocoaDictionary: unsafeBitCast(d as AnyObject, to: _NSDictionary.self))
       return
     }
 
@@ -546,8 +631,10 @@ extension Dictionary : _ObjectiveCBridgeable {
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d.count)
     d.enumerateKeysAndObjects({
-      (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
+      (anyKey: Any, anyValue: Any,
        stop: UnsafeMutablePointer<ObjCBool>) in
+      let anyObjectKey = anyKey as AnyObject
+      let anyObjectValue = anyValue as AnyObject
       builder.add(
           key: Swift._forceBridgeFromObjectiveC(anyObjectKey, Key.self),
           value: Swift._forceBridgeFromObjectiveC(anyObjectValue, Value.self))
@@ -570,11 +657,6 @@ extension Dictionary : _ObjectiveCBridgeable {
     return result != nil
   }
 
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(Key.self) &&
-           Swift._isBridgedToObjectiveC(Value.self)
-  }
-
   public static func _unconditionallyBridgeFromObjectiveC(
     _ d: NSDictionary?
   ) -> Dictionary {
@@ -590,18 +672,18 @@ extension Dictionary : _ObjectiveCBridgeable {
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
       return [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d!, to: _NSDictionary.self))
+        _cocoaDictionary: unsafeBitCast(d! as AnyObject, to: _NSDictionary.self))
     }
 
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d!.count)
     d!.enumerateKeysAndObjects({
-      (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
+      (anyKey: Any, anyValue: Any,
        stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(
-          key: Swift._forceBridgeFromObjectiveC(anyObjectKey, Key.self),
-          value: Swift._forceBridgeFromObjectiveC(anyObjectValue, Value.self))
+          key: Swift._forceBridgeFromObjectiveC(anyKey as AnyObject, Key.self),
+          value: Swift._forceBridgeFromObjectiveC(anyValue as AnyObject, Value.self))
     })
     return builder.take()
   }
@@ -644,14 +726,14 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
 
   var objects: [Unmanaged<AnyObject>?]
 
-  public func next() -> AnyObject? {
+  public func next() -> Any? {
     if n == count {
       // FIXME: Is this check necessary before refresh()?
       if count == 0 { return nil }
       refresh()
       if count == 0 { return nil }
     }
-    let next: AnyObject = state[0].itemsPtr![n]!
+    let next: Any = state[0].itemsPtr![n]!
     n += 1
     return next
   }
@@ -720,7 +802,7 @@ extension Set {
     // and watchOS.
     self = Set(
       _immutableCocoaSet:
-        unsafeBitCast(_cocoaSet.copy(with: nil), to: _NSSet.self))
+        unsafeBitCast(_cocoaSet.copy(with: nil) as AnyObject, to: _NSSet.self))
   }
 }
 
@@ -784,7 +866,7 @@ extension NSIndexSet : Sequence {
 extension Set : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSSet {
-    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSSet.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject, to: NSSet.self)
   }
 
   public static func _forceBridgeFromObjectiveC(_ s: NSSet, result: inout Set?) {
@@ -804,9 +886,9 @@ extension Set : _ObjectiveCBridgeable {
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s.count)
     s.enumerateObjects({
-      (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
+      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
-        anyObjectMember, Element.self))
+        anyMember as AnyObject, Element.self))
     })
     result = builder.take()
   }
@@ -836,24 +918,39 @@ extension Set : _ObjectiveCBridgeable {
     }
 
     if _isBridgedVerbatimToObjectiveC(Element.self) {
-      return Set<Element>(_cocoaSet: unsafeBitCast(s!, to: _NSSet.self))
+      return Set<Element>(_cocoaSet: unsafeBitCast(s! as AnyObject,
+                                                   to: _NSSet.self))
     }
 
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s!.count)
     s!.enumerateObjects({
-      (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
+      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
-        anyObjectMember, Element.self))
+        anyMember as AnyObject, Element.self))
     })
     return builder.take()
   }
+}
 
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(Element.self)
+/*
+FIXME(id-as-any): uncomment this when we can cast NSSet to Set<AnyHashable>.
+extension NSSet : _HasCustomAnyHashableRepresentation {
+  // Must be @nonobjc to avoid infinite recursion during bridging
+  @nonobjc
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    var builder = _SetBuilder<Element>(count: s!.count)
+    // FIXME(id-as-any): how to get the Hashable conformance here?
+    s!.enumerateObjects({
+      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
+      builder.add(member: Swift._forceBridgeFromObjectiveC(
+        anyMember as AnyObject, Element.self))
+    })
+    return AnyHashable(self as Set<AnyHashable>)
   }
 }
+*/
 
 extension NSDictionary : Sequence {
   // FIXME: A class because we can't pass a struct with class fields through an
@@ -864,7 +961,7 @@ extension NSDictionary : Sequence {
       return _fastIterator.enumerable as! NSDictionary
     }
 
-    public func next() -> (key: AnyObject, value: AnyObject)? {
+    public func next() -> (key: Any, value: Any)? {
       if let key = _fastIterator.next() {
         // Deliberately avoid the subscript operator in case the dictionary
         // contains non-copyable keys. This is rare since NSMutableDictionary
@@ -1071,33 +1168,33 @@ extension NSMutableString {
 
 extension NSArray {
   // Overlay: - (instancetype)initWithObjects:(id)firstObj, ...
-  public convenience init(objects elements: AnyObject...) {
+  public convenience init(objects elements: Any...) {
     self.init(array: elements)
   }
 }
 
 extension NSOrderedSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
-  public convenience init(objects elements: AnyObject...) {
+  public convenience init(objects elements: Any...) {
     self.init(array: elements)
   }
 }
 
 extension NSSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
-  public convenience init(objects elements: AnyObject...) {
+  public convenience init(objects elements: Any...) {
     self.init(array: elements)
   }
 }
 
 extension NSSet : ExpressibleByArrayLiteral {
-  public required convenience init(arrayLiteral elements: AnyObject...) {
+  public required convenience init(arrayLiteral elements: Any...) {
     self.init(array: elements)
   }
 }
 
 extension NSOrderedSet : ExpressibleByArrayLiteral {
-  public required convenience init(arrayLiteral elements: AnyObject...) {
+  public required convenience init(arrayLiteral elements: Any...) {
     self.init(array: elements)
   }
 }
@@ -1117,7 +1214,7 @@ extension NSArray {
   ///
   /// Discussion: After an immutable array has been initialized in
   /// this way, it cannot be modified.
-  @objc(_swiftInitWithArray_NSArray:)
+  @nonobjc
   public convenience init(array anArray: NSArray) {
     self.init(array: anArray as Array)
   }
@@ -1130,7 +1227,7 @@ extension NSString {
   /// - Returns: An `NSString` object initialized by copying the
   ///   characters from `aString`. The returned object may be different
   ///   from the original receiver.
-  @objc(_swiftInitWithString_NSString:)
+  @nonobjc
   public convenience init(string aString: NSString) {
     self.init(string: aString as String)
   }
@@ -1143,9 +1240,10 @@ extension NSSet {
   /// - Returns: An initialized objects set containing the objects from
   ///   `set`. The returned set might be different than the original
   ///   receiver.
-  @objc(_swiftInitWithSet_NSSet:)
+  @nonobjc
   public convenience init(set anSet: NSSet) {
-    self.init(set: anSet as Set)
+    // FIXME: This is a bit weird. Maybe there's a better way?
+    self.init(set: anSet as Set<NSObject> as Set<AnyHashable>)
   }
 }
 
@@ -1158,7 +1256,9 @@ extension NSDictionary {
   ///   found in `otherDictionary`.
   @objc(_swiftInitWithDictionary_NSDictionary:)
   public convenience init(dictionary otherDictionary: NSDictionary) {
-    self.init(dictionary: otherDictionary as Dictionary)
+    // FIXME: This is a bit weird. Maybe there's a better way?
+    self.init(dictionary: otherDictionary as [NSObject: AnyObject]
+                                          as [AnyHashable: Any])
   }
 }
 
@@ -1173,10 +1273,13 @@ internal func NS_Swift_NSUndoManager_registerUndoWithTargetHandler(
   _ handler: @convention(block) (AnyObject) -> Void)
 
 extension UndoManager {
+  @available(*, unavailable, renamed: "registerUndo(withTarget:handler:)")
+  public func registerUndoWithTarget<TargetType : AnyObject>(_ target: TargetType, handler: (TargetType) -> Void) {
+    fatalError("This API has been renamed")
+  }
+
   @available(OSX 10.11, iOS 9.0, *)
-  public func registerUndoWithTarget<TargetType : AnyObject>(
-    _ target: TargetType, handler: (TargetType) -> Void
-  ) {
+  public func registerUndo<TargetType : AnyObject>(withTarget target: TargetType, handler: (TargetType) -> Void) {
     // The generic blocks use a different ABI, so we need to wrap the provided
     // handler in something ObjC compatible.
     let objcCompatibleHandler: (AnyObject) -> Void = { internalTarget in
@@ -1248,20 +1351,21 @@ extension NSCoder {
   }
 
   @nonobjc
-  public func decodeObject(of classes: [AnyClass]?, forKey key: String) -> AnyObject? {
+  public func decodeObject(of classes: [AnyClass]?, forKey key: String) -> Any? {
     var classesAsNSObjects: NSSet? = nil
     if let theClasses = classes {
       classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }
-    return NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, nil)
+    return NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, nil).map { $0 as Any }
   }
 
+  @nonobjc
   @available(OSX 10.11, iOS 9.0, *)
-  public func decodeTopLevelObject() throws -> AnyObject? {
+  public func decodeTopLevelObject() throws -> Any? {
     var error: NSError?
     let result = NS_Swift_NSCoder_decodeObject(self as AnyObject, &error)
     try resolveError(error)
-    return result
+    return result.map { $0 as Any }
   }
 
   @available(*, unavailable, renamed: "decodeTopLevelObject(forKey:)")
@@ -1269,6 +1373,7 @@ extension NSCoder {
     fatalError("This API has been renamed")
   }
 
+  @nonobjc
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObject(forKey key: String) throws -> AnyObject? {
     var error: NSError?
@@ -1296,13 +1401,15 @@ extension NSCoder {
     return result as? DecodedObjectType
   }
 
+  @nonobjc
   @available(*, unavailable, renamed: "decodeTopLevelObject(of:forKey:)")
   public func decodeTopLevelObjectOfClasses(_ classes: NSSet?, forKey key: String) throws -> AnyObject? {
     fatalError("This API has been renamed")
   }
 
+  @nonobjc
   @available(OSX 10.11, iOS 9.0, *)
-  public func decodeTopLevelObject(of classes: [AnyClass]?, forKey key: String) throws -> AnyObject? {
+  public func decodeTopLevelObject(of classes: [AnyClass]?, forKey key: String) throws -> Any? {
     var error: NSError? = nil
     var classesAsNSObjects: NSSet? = nil
     if let theClasses = classes {
@@ -1310,7 +1417,7 @@ extension NSCoder {
     }
     let result = NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, &error)
     try resolveError(error)
-    return result
+    return result.map { $0 as Any }
   }
 }
 
@@ -1326,6 +1433,7 @@ internal func NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
 
 extension NSKeyedUnarchiver {
   @available(OSX 10.11, iOS 9.0, *)
+  @nonobjc
   public class func unarchiveTopLevelObjectWithData(_ data: NSData) throws -> AnyObject? {
     var error: NSError?
     let result = NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(self, data as AnyObject, &error)
@@ -1405,4 +1513,40 @@ typealias KeyedUnarchiver = NSKeyedUnarchiver
 
 @available(*, deprecated, renamed:"NSKeyedArchiver", message: "Please use NSKeyedArchiver")
 typealias KeyedArchiver = NSKeyedArchiver
+
+//===----------------------------------------------------------------------===//
+// AnyHashable
+//===----------------------------------------------------------------------===//
+
+extension AnyHashable : _ObjectiveCBridgeable {
+  public func _bridgeToObjectiveC() -> NSObject {
+    // This is unprincipled, but pretty much any object we'll encounter in
+    // Swift is NSObject-conforming enough to have -hash and -isEqual:.
+    return unsafeBitCast(base as AnyObject, to: NSObject.self)
+  }
+
+  public static func _forceBridgeFromObjectiveC(
+    _ x: NSObject,
+    result: inout AnyHashable?
+  ) {
+    result = AnyHashable(x)
+  }
+
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSObject,
+    result: inout AnyHashable?
+  ) -> Bool {
+    self._forceBridgeFromObjectiveC(x, result: &result)
+    return result != nil
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ source: NSObject?
+  ) -> AnyHashable {
+    // `nil` has historically been used as a stand-in for an empty
+    // string; map it to an empty string.
+    if _slowPath(source == nil) { return AnyHashable(String()) }
+    return AnyHashable(source!)
+  }
+}
 

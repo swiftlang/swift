@@ -39,7 +39,6 @@ func test1() {
 protocol Bogus : Int {} // expected-error{{inheritance from non-protocol type 'Int'}}
 
 // Explicit conformance checks (successful).
-protocol Any { }
 
 protocol CustomStringConvertible { func print() } // expected-note{{protocol requires function 'print()' with type '() -> ()'}} expected-note{{protocol requires}} expected-note{{protocol requires}} expected-note{{protocol requires}}
 
@@ -311,18 +310,18 @@ func StaticProtocolGenericFunc<t : StaticP>(_: t) {
 // Operators
 //===----------------------------------------------------------------------===//
 protocol Eq {
-  func ==(lhs: Self, rhs: Self) -> Bool
+  static func ==(lhs: Self, rhs: Self) -> Bool
 }
 
 extension Int : Eq { }
 
 // Matching prefix/postfix.
-prefix operator <> {}
-postfix operator <> {}
+prefix operator <>
+postfix operator <>
 
 protocol IndexValue {
-  prefix func <> (_ max: Self) -> Int
-  postfix func <> (min: Self) -> Int
+  static prefix func <> (_ max: Self) -> Int
+  static postfix func <> (min: Self) -> Int
 }
 
 prefix func <> (max: Int) -> Int  { return 0 }
@@ -417,7 +416,7 @@ protocol P1 {
 protocol P2 {
 }
 
-struct X3<T : P1 where T.Assoc : P2> { }
+struct X3<T : P1> where T.Assoc : P2 {}
 
 struct X4 : P1 { // expected-error{{type 'X4' does not conform to protocol 'P1'}}
   func getX1() -> X3<X4> { return X3() }

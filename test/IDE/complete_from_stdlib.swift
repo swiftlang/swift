@@ -147,9 +147,9 @@ func testArchetypeReplacement2<BAR : Equatable>(_ a: [BAR]) {
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropFirst()[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropLast()[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         enumerated()[#EnumeratedSequence<[Equatable]>#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         min({#isOrderedBefore: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         max({#isOrderedBefore: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         reduce({#(initial): T#}, {#combine: (T, Equatable) throws -> T##(T, Equatable) throws -> T#})[' rethrows'][#T#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         min({#by: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         max({#by: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         reduce({#(initialResult): Result#}, {#(nextPartialResult): (partialResult: Result, Equatable) throws -> Result##(partialResult: Result, Equatable) throws -> Result#})[' rethrows'][#Result#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropFirst({#(n): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         flatMap({#(transform): (Equatable) throws -> Sequence##(Equatable) throws -> Sequence#})[' rethrows'][#[SegmentOfResult.Iterator.Element]#]{{; name=.+}}
 
@@ -166,7 +166,7 @@ func testArchetypeReplacement3 (_ a : [Int]) {
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         dropLast({#(n): Int#})[#ArraySlice<Int>#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         dropFirst({#(n): Int#})[#AnySequence<Int>#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         prefix({#(maxLength): Int#})[#AnySequence<Int>#]
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         elementsEqual({#(other): Sequence#}, {#isEquivalent: (Int, Int) throws -> Bool##(Int, Int) throws -> Bool#})[' rethrows'][#Bool#]
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         elementsEqual({#(other): Sequence#}, {#by: (Int, Int) throws -> Bool##(Int, Int) throws -> Bool#})[' rethrows'][#Bool#]
 
 
 protocol P2 {
@@ -190,7 +190,7 @@ class MyClass2 : P2 {
 protocol P1{}
 
 class MyClass3 {
-  func foo<T: protocol<P1, P2>>(_ t : T) {}
+  func foo<T: P1 & P2>(_ t : T) {}
 }
 
 func testArchetypeReplacement4(_ a : MyClass1) {
@@ -212,7 +212,7 @@ func testArchetypeReplacement6() {
 }
 
 // PRIVATE_NOMINAL_MEMBERS_10: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_10-DAG: Decl[InstanceMethod]/CurrNominal:   foo({#(t): protocol<P1, P2>#})[#Void#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_10-DAG: Decl[InstanceMethod]/CurrNominal:   foo({#(t): P1 & P2#})[#Void#]{{; name=.+}}
 
 // rdar://problem/22334700
 struct Test1000 : Sequence {

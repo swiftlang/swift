@@ -279,6 +279,21 @@ static void insertOperatorDecl(NameBinder &Binder,
   Operators[OpDecl->getName()] = { OpDecl, true };
 }
 
+static void insertPrecedenceGroupDecl(NameBinder &binder, SourceFile &SF,
+                                      PrecedenceGroupDecl *group) {
+  auto previousDecl = SF.PrecedenceGroups.find(group->getName());
+  if (previousDecl != SF.PrecedenceGroups.end()) {
+    binder.diagnose(group->getLoc(), diag::precedence_group_redeclared);
+    binder.diagnose(previousDecl->second.getPointer(),
+                    diag::previous_precedence_group_decl);
+    return;
+  }
+
+  // FIXME: The second argument indicates whether the given precedence
+  // group is visible outside the current file.
+  SF.PrecedenceGroups[group->getName()] = { group, true };  
+}
+
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
 ///
@@ -312,6 +327,8 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
       insertOperatorDecl(Binder, SF.PostfixOperators, OD);
     } else if (auto *OD = dyn_cast<InfixOperatorDecl>(D)) {
       insertOperatorDecl(Binder, SF.InfixOperators, OD);
+    } else if (auto *PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
+      insertPrecedenceGroupDecl(Binder, SF, PGD);
     }
   }
 

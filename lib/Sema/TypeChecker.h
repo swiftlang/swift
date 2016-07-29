@@ -63,13 +63,6 @@ public:
     /// The base declaration through which we found the declaration.
     ValueDecl *Base;
 
-    /// Whether this should actually reference an instance but has been promoted
-    /// to a type reference to access an enum element
-    ///
-    /// This is purely transitional and will be removed when referencing enum
-    /// elements on instance members becomes an error
-    bool IsPromotedInstanceRef;
-
     operator ValueDecl*() const { return Decl; }
     ValueDecl *operator->() const { return Decl; }
   };
@@ -467,12 +460,18 @@ public:
   /// during type checking.
   llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
 
-  /// Caches whether a particular type is accessible from a particular file
-  /// unit.
+  using TypeAccessScopeCacheMap = llvm::DenseMap<Type, const DeclContext *>;
+
+  /// Caches the outermost scope where a particular type can be used, relative
+  /// to a particular file.
+  ///
+  /// The file is used to handle things like \c \@testable. A null-but-present
+  /// value means the type is public.
   ///
   /// This can't use CanTypes because typealiases may have more limited types
   /// than their underlying types.
-  llvm::DenseMap<Type, Accessibility> TypeAccessibilityCache;
+  llvm::DenseMap<const SourceFile *, TypeAccessScopeCacheMap>
+    TypeAccessScopeCache;
 
   // Caches whether a given declaration is "as specialized" as another.
   llvm::DenseMap<std::pair<ValueDecl*, ValueDecl*>, bool> 
@@ -741,6 +740,8 @@ public:
                    UnsatisfiedDependency *unsatisfiedDependency = nullptr);
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
+  void validateDecl(OperatorDecl *decl);
+  void validateDecl(PrecedenceGroupDecl *decl);
 
   /// Resolves the accessibility of the given declaration.
   void validateAccessibility(ValueDecl *D);
@@ -968,11 +969,6 @@ public:
   resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) override {
     handleExternalDecl(nominal);
   }
-
-  /// Determine attributes for the given function and curry level, with a level
-  /// of 0 indicating the innermost function.
-  AnyFunctionType::ExtInfo
-  applyFunctionTypeAttributes(AbstractFunctionDecl *func, unsigned i);
 
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
@@ -1204,12 +1200,17 @@ public:
   /// events in the type checking of this expression, and which can introduce
   /// additional constraints.
   ///
+  /// \param baseCS If this type checking process is the simplification of
+  /// another constraint system, set the original constraint system. \c null
+  /// otherwise
+  ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            TypeLoc convertType = TypeLoc(),
                            ContextualTypePurpose convertTypePurpose =CTP_Unused,
                            TypeCheckExprOptions options =TypeCheckExprOptions(),
-                           ExprTypeCheckListener *listener = nullptr);
+                           ExprTypeCheckListener *listener = nullptr,
+                           constraints::ConstraintSystem *baseCS = nullptr);
 
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            ExprTypeCheckListener *listener) {
@@ -1676,6 +1677,14 @@ public:
                                   NameLookupOptions options
                                     = defaultConstructorLookupOptions);
 
+  /// Given an expression that's known to be an infix operator,
+  /// look up its precedence group.
+  PrecedenceGroupDecl *
+  lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op);
+
+  PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc, Identifier name,
+                                             SourceLoc nameLoc);
+
   /// \brief Look up the Bool type in the standard library.
   Type lookupBoolType(const DeclContext *dc);
 
@@ -1729,7 +1738,8 @@ public:
   /// the given set of declarations.
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                      DeclNameLoc NameLoc, bool Implicit,
-                     bool isSpecialized = false);
+                     bool isSpecialized,
+                     FunctionRefKind functionRefKind);
   /// @}
 
   /// \brief Retrieve a specific, known protocol.

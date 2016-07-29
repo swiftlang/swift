@@ -27,7 +27,7 @@ print("testing...")
 
 let replacementUTF16: UTF16.CodeUnit = 0xFFFD
 let replacementUTF8: [UTF8.CodeUnit] = [0xEF, 0xBF, 0xBD]
-let replacementScalar = UnicodeScalar(replacementUTF16)
+let replacementScalar = UnicodeScalar(replacementUTF16)!
 let replacementCharacter = Character(replacementScalar)
 
 // This string contains a variety of non-ASCII characters, including
@@ -393,14 +393,14 @@ tests.test("index-mapping/utf8-to-utf16") {
 //===--- To UnicodeScalar -------------------------------------------------===//
 tests.test("index-mapping/character-to-unicode-scalar") {
   let winterCharacterUnicodeScalars: [UnicodeScalar] = [
-    UnicodeScalar(0x1f3c2),
-    UnicodeScalar(0x2603),
-    UnicodeScalar(0x2745),
-    UnicodeScalar(0x2746),
-    UnicodeScalar(0x2744), // 0xfe0e,
-    UnicodeScalar(0x26c4), // 0xfe0f,
-    UnicodeScalar(0x2744), // 0xfe0f
-    replacementScalar, UnicodeScalar(0x20), replacementScalar, replacementScalar
+    UnicodeScalar(0x1f3c2)!,
+    UnicodeScalar(0x2603)!,
+    UnicodeScalar(0x2745)!,
+    UnicodeScalar(0x2746)!,
+    UnicodeScalar(0x2744)!, // 0xfe0e,
+    UnicodeScalar(0x26c4)!, // 0xfe0f,
+    UnicodeScalar(0x2744)!, // 0xfe0f
+    replacementScalar, UnicodeScalar(0x20)!, replacementScalar, replacementScalar
   ]
   
   expectEqualSequence(
@@ -676,7 +676,7 @@ tests.test("UTF8 indexes") {
       for n0 in 0..<8 {
         var u8i1b = u8i1
         for n1 in 0..<8 {
-          expectEqual(u8i0b, u8i1b, sameValue: n0 == n1 ? (==) : (!=))
+          expectEqualTest(u8i0b, u8i1b, sameValue: n0 == n1 ? (==) : (!=))
           if u8i1b == u8.endIndex { break }
           u8i1b = u8.index(u8i1b, offsetBy: 1)
         }

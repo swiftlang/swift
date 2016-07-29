@@ -998,7 +998,13 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
   }
   return false;
 }
-  
+
+static bool isDiscardableType(Type type) {
+  return (type->is<ErrorType>() ||
+          type->isNever() ||
+          type->lookThroughAllAnyOptionalTypes()->isVoid());
+}
+
 void TypeChecker::checkIgnoredExpr(Expr *E) {
   // For parity with C, several places in the grammar accept multiple
   // comma-separated expressions and then bind them together as an implicit
@@ -1041,10 +1047,10 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     return;
   }
 
-  // If the result of this expression is of type "()" potentially wrapped in
-  // optionals, then it is safe to ignore.
-  if (valueE->getType()->lookThroughAllAnyOptionalTypes()->isVoid() ||
-      valueE->getType()->is<ErrorType>())
+  // If the result of this expression is of type "Never" or "()"
+  // (the latter potentially wrapped in optionals) then it is
+  // safe to ignore.
+  if (isDiscardableType(valueE->getType()))
     return;
   
   // Complain about '#selector'.
@@ -1299,9 +1305,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   Expr *r = new (Context) UnresolvedDotExpr(superRef, SourceLoc(),
                                             Context.Id_init, DeclNameLoc(),
                                             /*Implicit=*/true);
-  Expr *args = TupleExpr::createEmpty(Context, SourceLoc(), SourceLoc(),
-                                      /*Implicit=*/true);
-  r = new (Context) CallExpr(r, args, /*Implicit=*/true);
+  r = CallExpr::createImplicit(Context, r, { }, { });
 
   if (ctor->hasThrows())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*Implicit=*/true);
@@ -1321,7 +1325,7 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
                            ApplyExpr *apply, bool implicitlyGenerated) {
   // Make sure we are referring to a designated initializer.
   auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
-                        apply->getFn()->getSemanticsProvidingExpr());
+                        apply->getSemanticFn());
   if (!otherCtorRef)
     return false;
   
@@ -1457,8 +1461,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
 
         std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
           if (auto apply = dyn_cast<ApplyExpr>(E)) {
-            if (isa<OtherConstructorDeclRefExpr>(
-                  apply->getFn()->getSemanticsProvidingExpr())) {
+            if (isa<OtherConstructorDeclRefExpr>(apply->getSemanticFn())) {
               Found = apply;
               return { false, E };
             }

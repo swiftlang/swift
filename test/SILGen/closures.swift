@@ -178,7 +178,7 @@ func small_closure_capture_with_argument(_ x: Int) -> (y: Int) -> Int {
 // CHECK: sil shared @[[CLOSURE_NAME]] : $@convention(thin) (Int, @owned @box Int) -> Int
 // CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : $@box Int):
 // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
-// CHECK: [[PLUS:%[0-9]+]] = function_ref @_TZFsoi1pFTSiSi_Si{{.*}}
+// CHECK: [[PLUS:%[0-9]+]] = function_ref @_TFsoi1pFTSiSi_Si{{.*}}
 // CHECK: [[LHS:%[0-9]+]] = load [[XADDR]]
 // CHECK: [[RET:%[0-9]+]] = apply [[PLUS]]([[LHS]], [[DOLLAR0]])
 // CHECK: release [[XBOX]]
