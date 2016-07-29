@@ -7,8 +7,8 @@ func archetype_method<T: X>(x: T, y: T) -> T {
   var y = y
   return x.selfTypes(x: y)
 }
-// CHECK-LABEL: sil hidden @_T09witnesses16archetype_method{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : X> (@in T, @in T) -> @out T {
-// CHECK:         [[METHOD:%.*]] = witness_method $T, #X.selfTypes!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : X> (@in τ_0_0, @inout τ_0_0) -> @out τ_0_0
+// CHECK-LABEL: sil hidden @_T09witnesses16archetype_method{{[_0-9a-zA-Z]*}}F{{.*}} : $@convention(thin) <T where T : X> (@in T, @in T) -> @out T {
+// CHECK:         [[METHOD:%.*]] = witness_method $T, #X.selfTypes!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : X> (@in τ_0_0, @inout τ_0_0) -> @out τ_0_0
 // CHECK:         apply [[METHOD]]<T>({{%.*}}, {{%.*}}, {{%.*}}) : $@convention(witness_method) <τ_0_0 where τ_0_0 : X> (@in τ_0_0, @inout τ_0_0) -> @out τ_0_0
 // CHECK:       }
 
@@ -16,8 +16,8 @@ func archetype_generic_method<T: X>(x: T, y: Loadable) -> Loadable {
   var x = x
   return x.generic(x: y)
 }
-// CHECK-LABEL: sil hidden @_T09witnesses24archetype_generic_method{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : X> (@in T, Loadable) -> Loadable {
-// CHECK:         [[METHOD:%.*]] = witness_method $T, #X.generic!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : X><τ_1_0> (@in τ_1_0, @inout τ_0_0) -> @out τ_1_0
+// CHECK-LABEL: sil hidden @_T09witnesses24archetype_generic_method{{[_0-9a-zA-Z]*}}F{{.*}} : $@convention(thin) <T where T : X> (@in T, Loadable) -> Loadable {
+// CHECK:         [[METHOD:%.*]] = witness_method $T, #X.generic!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : X><τ_1_0> (@in τ_1_0, @inout τ_0_0) -> @out τ_1_0
 // CHECK:         apply [[METHOD]]<T, Loadable>({{%.*}}, {{%.*}}, {{%.*}}) : $@convention(witness_method) <τ_0_0 where τ_0_0 : X><τ_1_0> (@in τ_1_0, @inout τ_0_0) -> @out τ_1_0
 // CHECK:       }
 
@@ -31,7 +31,7 @@ protocol StaticMethod { static func staticMethod() }
 
 // CHECK-LABEL: sil hidden @_T09witnesses23archetype_static_method{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : StaticMethod> (@in T) -> ()
 func archetype_static_method<T: StaticMethod>(x: T) {
-  // CHECK: [[METHOD:%.*]] = witness_method $T, #StaticMethod.staticMethod!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : StaticMethod> (@thick τ_0_0.Type) -> ()
+  // CHECK: [[METHOD:%.*]] = witness_method $T, #StaticMethod.staticMethod!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : StaticMethod> (@thick τ_0_0.Type) -> ()
   // CHECK: apply [[METHOD]]<T>
   T.staticMethod()
 }
@@ -492,7 +492,7 @@ class CrashableBase {
 // CHECK-NEXT: copy_addr %0 to [initialization] [[BOX]] : $*GenericCrashable<τ_0_0>
 // CHECK-NEXT: [[SELF:%.*]] = load [take] [[BOX]] : $*GenericCrashable<τ_0_0>
 // CHECK-NEXT: [[BASE:%.*]] = upcast [[SELF]] : $GenericCrashable<τ_0_0> to $CrashableBase
-// CHECK-NEXT: [[FN:%.*]] = class_method [[BASE]] : $CrashableBase, #CrashableBase.crash!1 : (CrashableBase) -> () -> () , $@convention(method) (@guaranteed CrashableBase) -> ()
+// CHECK-NEXT: [[FN:%.*]] = class_method [[BASE]] : $CrashableBase, #CrashableBase.crash!1 : (CrashableBase) -> () -> (), $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: apply [[FN]]([[BASE]]) : $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: destroy_value [[SELF]] : $GenericCrashable<τ_0_0>

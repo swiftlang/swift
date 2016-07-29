@@ -50,7 +50,7 @@ bb0(%0 : $Int, %1 : $REC):
 
 bb1:                                              // Preds: bb0
   strong_retain %1 : $REC                         // id: %13
-  %14 = class_method %1 : $REC, #REC.recursive!1 : (REC) -> (Int) -> () , $@convention(method) (Int, @guaranteed REC) -> () // user: %21
+  %14 = class_method %1 : $REC, #REC.recursive!1 : (REC) -> (Int) -> (), $@convention(method) (Int, @guaranteed REC) -> () // user: %21
   // function_ref Swift.- @infix (Swift.Int, Swift.Int) -> Swift.Int
   %15 = function_ref @_TFsoi1sFTSiSi_Si : $@convention(thin) (Int, Int) -> Int // user: %20
   // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
@@ -129,7 +129,7 @@ bb0(%0 : $Int):
   %4 = apply %2(%3) : $@convention(thin) (@thick REC.Type) -> @owned REC // users: %5, %6, %7, %8, %9
   debug_value %4 : $REC, let, name "rec" // id: %5
   strong_retain %4 : $REC                         // id: %6
-  %7 = class_method %4 : $REC, #REC.recursive!1 : (REC) -> (Int) -> () , $@convention(method) (Int, @guaranteed REC) -> () // user: %8
+  %7 = class_method %4 : $REC, #REC.recursive!1 : (REC) -> (Int) -> (), $@convention(method) (Int, @guaranteed REC) -> () // user: %8
   %8 = apply %7(%0, %4) : $@convention(method) (Int, @guaranteed REC) -> ()
   strong_release %4 : $REC                        // id: %9
   %10 = tuple ()                                  // user: %11

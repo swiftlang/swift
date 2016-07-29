@@ -354,7 +354,7 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   // -- Reference types need to be copy_valued as property method args.
   r.int_prop = i
   // CHECK: [[R1:%[0-9]+]] = load [copy] [[PR]]
-  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : (RefWithProp) -> (Int) -> () , $@convention(method) (Int, @guaranteed RefWithProp) -> ()
+  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : (RefWithProp) -> (Int) -> (), $@convention(method) (Int, @guaranteed RefWithProp) -> ()
   // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R1]])
   // CHECK: destroy_value [[R1]]
 

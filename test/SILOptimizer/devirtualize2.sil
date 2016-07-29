@@ -35,7 +35,7 @@ bb0:
   store %6 to %0 : $*Bar                          // id: %7
   %8 = load %0 : $*Bar                            // users: %11, %10, %9
   strong_retain %6 : $Bar                         // id: %9
-  %10 = class_method %6 : $Bar, #Bar.ping!1 : (Bar) -> () -> () , $@convention(method) (@guaranteed Bar) -> () // user: %11
+  %10 = class_method %6 : $Bar, #Bar.ping!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %11
   %11 = apply %10(%8) : $@convention(method) (@guaranteed Bar) -> ()
   %12 = tuple ()                                  // user: %13
   return %12 : $()                                // id: %13
@@ -62,7 +62,7 @@ bb3(%3 : $Bar):
 
 bb4(%4 : $Bar):
   // Devirtualizer should be able to figure out that the exact dynamic type of %1 is Bar.
-  %5 = class_method %4 : $Bar, #Bar.ping!1 : (Bar) -> () -> () , $@convention(method) (@guaranteed Bar) -> ()
+  %5 = class_method %4 : $Bar, #Bar.ping!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
   %6 = apply %5(%4) : $@convention(method) (@guaranteed Bar) -> ()
   br bb6
 
@@ -94,7 +94,7 @@ bb2:
 
 bb3(%4 : $Bar):
   // Devirtualizer should be able to figure out that the exact dynamic type of %4 is Bar.
-  %5 = class_method %4 : $Bar, #Bar.ping!1 : (Bar) -> () -> () , $@convention(method) (@guaranteed Bar) -> ()
+  %5 = class_method %4 : $Bar, #Bar.ping!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
   %6 = apply %5(%4) : $@convention(method) (@guaranteed Bar) -> ()
   br bb4
 
