@@ -691,7 +691,7 @@ ERROR(did_not_call_method,none,
       (Identifier))
 
 ERROR(init_not_instance_member,none,
-      "'init' is a member of the type; insert '.dynamicType' to initialize "
+      "'init' is a member of the type; use 'type(of: ...)' to initialize "
       "a new object of the same dynamic type", ())
 ERROR(super_initializer_not_in_initializer,none,
       "'super.init' cannot be called outside of an initializer", ())
