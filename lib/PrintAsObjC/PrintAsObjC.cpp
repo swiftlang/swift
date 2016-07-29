@@ -137,9 +137,19 @@ public:
     visit(const_cast<Decl *>(D));
   }
 
-  bool shouldInclude(const ValueDecl *VD) {
-    return (VD->isObjC() || VD->getAttrs().hasAttribute<CDeclAttr>()) &&
-      VD->getFormalAccess() >= minRequiredAccess;
+  bool shouldInclude(const ValueDecl *VD, bool checkParent = true) {
+    if (!(VD->isObjC() || VD->getAttrs().hasAttribute<CDeclAttr>()))
+      return false;
+    if (VD->getFormalAccess() >= minRequiredAccess) {
+      return true;
+    } else if (checkParent) {
+      if (auto ctor = dyn_cast<ConstructorDecl>(VD)) {
+        // Check if we're overriding an initializer that is visible to obj-c
+        if (auto parent = ctor->getOverriddenDecl())
+          return shouldInclude(parent, false);
+      }
+    }
+    return false;
   }
 
 private:
@@ -477,7 +487,10 @@ private:
 
     // Swift designated initializers are Objective-C designated initializers.
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
-      if (ctor->hasStubImplementation()) {
+      if (ctor->hasStubImplementation()
+          || ctor->getFormalAccess() < minRequiredAccess) {
+        // This will only be reached if the overridden initializer has the
+        // required access
         os << " SWIFT_UNAVAILABLE";
       } else if (ctor->isDesignatedInit() &&
           !isa<ProtocolDecl>(ctor->getDeclContext())) {
