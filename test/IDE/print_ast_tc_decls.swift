@@ -1298,8 +1298,8 @@ public func ParamAttrs2(a : @autoclosure(escaping) () -> ()) {
   a()
 }
 
-// PASS_PRINT_AST: public func ParamAttrs3(a: () -> ())
-public func ParamAttrs3(a : () -> ()) {
+// PASS_PRINT_AST: public func ParamAttrs3(a: @noescape () -> ())
+public func ParamAttrs3(a : @noescape () -> ()) {
   a()
 }
 

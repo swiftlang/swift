@@ -1628,6 +1628,10 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
     return;
   }
 
+  // Just stop if we've already applied this attribute.
+  if (FTy->isNoEscape())
+    return;
+
   // This range can be implicit e.g. if we're in the middle of diagnosing
   // @autoclosure.
   auto attrRemovalRange = attr->getRangeWithAt();
@@ -1640,10 +1644,6 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type, "@noescape")
     .fixItRemove(attrRemovalRange) 
     .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape ");
-
-  // Stop if we've already applied this attribute.
-  if (FTy->isNoEscape())
-    return;
 
   // Change the type to include the noescape bit.
   PD->overwriteType(FunctionType::get(FTy->getInput(), FTy->getResult(),

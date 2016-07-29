@@ -21,7 +21,7 @@ extension dispatch_queue_t {} // expected-error {{'dispatch_queue_t' is unavaila
 
 // Make sure you can extend a dispatch type via its common name.
 extension DispatchQueue {
-  func myAsync(_ block: @escaping () -> Void) {
+  func myAsync(_ block: () -> Void) {
     async(execute: block)
   }
 }

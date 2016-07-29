@@ -128,8 +128,8 @@ func anonymousClosureArgsInClosureWithArgs() {
   var a3 = { (z: Int) in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
 }
 
-func doStuff(_ fn : @escaping () -> Int) {}
-func doVoidStuff(_ fn : @escaping () -> ()) {}
+func doStuff(_ fn : () -> Int) {}
+func doVoidStuff(_ fn : () -> ()) {}
 
 // <rdar://problem/16193162> Require specifying self for locations in code where strong reference cycles are likely
 class ExplicitSelfRequiredTest {

@@ -46,7 +46,7 @@ public struct LazyFilterIterator<
   /// for which `isIncluded(x) == true`.
   internal init(
     _base: Base,
-    _ isIncluded: @escaping (Base.Element) -> Bool
+    _ isIncluded: (Base.Element) -> Bool
   ) {
     self._base = _base
     self._predicate = isIncluded
@@ -83,7 +83,7 @@ public struct LazyFilterSequence<Base : Sequence>
   public // @testable
   init(
     _base base: Base,
-    _ isIncluded: @escaping (Base.Iterator.Element) -> Bool
+    _ isIncluded: (Base.Iterator.Element) -> Bool
   ) {
     self.base = base
     self._include = isIncluded
@@ -192,7 +192,7 @@ public struct ${Self}<
   public // @testable
   init(
     _base: Base,
-    _ isIncluded: @escaping (Base.Iterator.Element) -> Bool
+    _ isIncluded: (Base.Iterator.Element) -> Bool
   ) {
     self._base = _base
     self._predicate = isIncluded
@@ -300,7 +300,7 @@ extension LazySequenceProtocol {
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   public func filter(
-    _ isIncluded: @escaping (Elements.Iterator.Element) -> Bool
+    _ isIncluded: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(
       _base: self.elements, isIncluded)
@@ -321,7 +321,7 @@ extension LazyCollectionProtocol
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   public func filter(
-    _ isIncluded: @escaping (Elements.Iterator.Element) -> Bool
+    _ isIncluded: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilter${collectionForTraversal(Traversal)}<Self.Elements> {
     return LazyFilter${collectionForTraversal(Traversal)}(
       _base: self.elements, isIncluded)

@@ -597,7 +597,7 @@ internal struct ClosureBasedRaceTest : RaceTestWithPerTrialData {
 }
 
 public func runRaceTest(
-  trials: Int, threads: Int? = nil, invoking body: @escaping () -> ()
+  trials: Int, threads: Int? = nil, invoking body: () -> ()
 ) {
   ClosureBasedRaceTest.thread = body
   runRaceTest(ClosureBasedRaceTest.self, trials: trials, threads: threads)

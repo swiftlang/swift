@@ -248,7 +248,7 @@ testCocoa()
 #endif // _runtime(_ObjC)
 
 extension ArraySlice {
-  mutating func qsort(_ compare: @escaping (Element, Element) -> Bool) {
+  mutating func qsort(_ compare: (Element, Element) -> Bool) {
     _introSort(&self, subRange: Range(self.indices), by: compare)
   }
 }
@@ -320,14 +320,14 @@ let testWidth = 11
 %arrayTypes = ['ContiguousArray', 'Array', 'ArraySlice']
 %for A in arrayTypes:
 
-func testReplace(_ make: @escaping () -> ${A}<LifetimeTracked>) {
+func testReplace(_ make: () -> ${A}<LifetimeTracked>) {
 
   checkRangeReplaceable(
     make, { LifetimeTracked(100)..<LifetimeTracked(100 + $0) })
 }
 
 func testReplace${A}(
-  makeOne: @escaping () -> ${A}<LifetimeTracked> = {
+  makeOne: () -> ${A}<LifetimeTracked> = {
     var x = ${A}<LifetimeTracked>()
     // make sure some - but not all - replacements will have to grow the buffer
     x.reserveCapacity(testWidth * 3 / 2)

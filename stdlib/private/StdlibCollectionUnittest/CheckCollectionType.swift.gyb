@@ -500,15 +500,15 @@ internal func _product<C1 : Collection, C2 : Collection>(
 
   testParams = '''
     _ testNamePrefix: String = "",
-    makeCollection: @escaping ([C.Iterator.Element]) -> C,
-    wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-    extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([C.Iterator.Element]) -> C,
+    wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
+    extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: @escaping (
+    makeCollectionOfEquatable: (
       [CollectionWithEquatableElement.Iterator.Element]
     ) -> CollectionWithEquatableElement,
 
-    wrapValueIntoEquatable: @escaping (
+    wrapValueIntoEquatable: (
       MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
 
     extractValueFromEquatable:

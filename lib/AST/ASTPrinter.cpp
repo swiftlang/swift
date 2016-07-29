@@ -2535,11 +2535,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
 }
 
 void PrintAST::visitParamDecl(ParamDecl *decl) {
-  // Set and restore in-parameter-position printing of types
-  auto prior = Options.PrintAsInParamType;
-  Options.PrintAsInParamType = true;
-  visitVarDecl(decl);
-  Options.PrintAsInParamType = prior;
+  return visitVarDecl(decl);
 }
 
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
@@ -2593,11 +2589,7 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
       TheTypeLoc.setType(BGT->getGenericArgs()[0]);
   }
 
-  // Set and restore in-parameter-position printing of types
-  auto prior = Options.PrintAsInParamType;
-  Options.PrintAsInParamType = true;
   printTypeLoc(TheTypeLoc);
-  Options.PrintAsInParamType = prior;
 
   if (param->isVariadic())
     Printer << "...";
@@ -3321,10 +3313,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   const PrintOptions &Options;
   Optional<std::vector<GenericParamList *>> UnwrappedGenericParams;
 
-  /// Whether we are printing something in a function parameter position, and
-  /// thus want to print @escaping if it escapes.
-  bool inParameterPrinting;
-
   void printDeclContext(DeclContext *DC) {
     switch (DC->getContextKind()) {
     case DeclContextKind::Module: {
@@ -3492,8 +3480,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
 public:
   TypePrinter(ASTPrinter &Printer, const PrintOptions &PO)
-      : Printer(Printer), Options(PO),
-        inParameterPrinting(Options.PrintAsInParamType) {}
+      : Printer(Printer), Options(PO) {}
 
   void visit(Type T) {
     Printer.printTypePre(TypeLoc::withoutLoc(T));
@@ -3758,10 +3745,11 @@ public:
         Printer << "@autoclosure ";
       else
         Printer << "@autoclosure(escaping) ";
-    } else if (inParameterPrinting) {
-      if (!info.isNoEscape()) {
-        Printer << "@escaping ";
-      }
+    } else if (info.isNoEscape()) {
+      // autoclosure implies noescape.
+      Printer << "@noescape ";
+    } else if (info.isExplicitlyEscaping()) {
+      Printer << "@escaping ";
     }
 
     if (Options.PrintFunctionRepresentationAttrs) {
@@ -3853,17 +3841,8 @@ public:
     
     if (needsParens)
       Printer << "(";
-
-    // Set in-parameter-position printing to print our parameters, then unset it
-    // for the return type (in case it is also a function), and restore at the
-    // end.
-    auto prior = inParameterPrinting;
-    inParameterPrinting = true;
+    
     visit(inputType);
-    inParameterPrinting = false;
-    SWIFT_DEFER {
-      inParameterPrinting = prior;
-    };
     
     if (needsParens)
       Printer << ")";

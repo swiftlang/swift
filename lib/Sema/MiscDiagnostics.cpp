@@ -464,16 +464,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
                   DRE->getDecl()->getName(), isa<ParamDecl>(DRE->getDecl()));
-
-      // If we're a parameter, emit a helpful fixit to add @escaping
-      auto paramDecl = dyn_cast<ParamDecl>(DRE->getDecl());
-      auto isAutoClosure = AFT->isAutoClosure();
-      if (paramDecl && !isAutoClosure) {
-        TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
-                    paramDecl->getName())
-            .fixItInsert(paramDecl->getTypeLoc().getLoc(), "@escaping ");
-      } else if (isAutoClosure)
-        // TODO: add in a fixit for autoclosure
+      if (AFT->isAutoClosure())
         TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
                     DRE->getDecl()->getName());
     }

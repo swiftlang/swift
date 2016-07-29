@@ -514,7 +514,7 @@ public func checkSliceableWithBidirectionalIndex<
 
 
 public func checkRangeReplaceable<C, N>(
-  _ makeCollection: @escaping () -> C,
+  _ makeCollection: () -> C,
   _ makeNewValues: (Int) -> N
 ) where
   C : RangeReplaceableCollection,

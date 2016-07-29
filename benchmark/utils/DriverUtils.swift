@@ -50,7 +50,7 @@ struct Test {
   let index: Int
   let f: (Int) -> ()
   var run: Bool
-  init(name: String, n: Int, f: @escaping (Int) -> ()) {
+  init(name: String, n: Int, f: (Int) -> ()) {
     self.name = name
     self.index = n
     self.f = f

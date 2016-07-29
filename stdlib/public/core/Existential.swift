@@ -20,7 +20,7 @@ internal struct _CollectionOf<
 
   internal init(
     _startIndex: IndexType, endIndex: IndexType,
-    _ subscriptImpl: @escaping (IndexType) -> Element
+    _ subscriptImpl: (IndexType) -> Element
   ) {
     self.startIndex = _startIndex
     self.endIndex = endIndex
