@@ -134,17 +134,17 @@ in the following ``C.array1`` and ``D.array1`` will be accessed directly
      d.array2[i] = ... // Will access D.array2 through dynamic dispatch.
   }
 
-Advice: Use 'private' when declaration does not need to be accessed outside of file
------------------------------------------------------------------------------------
+Advice: Use 'private' and 'fileprivate' when declaration does not need to be accessed outside of file
+-----------------------------------------------------------------------------------------------------
 
-Applying the ``private`` keyword to a declaration restricts the visibility of
-the declaration to the file in which it is declared. This allows the compiler to
-be able to ascertain all other potentially overriding declarations. Thus the
-absence of any such declarations enables the compiler to infer the ``final``
-keyword automatically and remove indirect calls for methods and field accesses
-accordingly. For instance in the following, ``e.doSomething()`` and
-``f.myPrivateVar``, will be able to be accessed directly assuming ``E``, ``F``
-do not have any overriding declarations in the same file:
+Applying the ``private`` or ``fileprivate`` keywords to a declaration restricts
+the visibility of the declaration to the file in which it is declared. This
+allows the compiler to be able to ascertain all other potentially overriding
+declarations. Thus the absence of any such declarations enables the compiler to
+infer the ``final`` keyword automatically and remove indirect calls for methods
+and field accesses accordingly. For instance in the following,
+``e.doSomething()`` and ``f.myPrivateVar``, will be able to be accessed directly
+assuming ``E``, ``F`` do not have any overriding declarations in the same file:
 
 ::
 
@@ -153,7 +153,7 @@ do not have any overriding declarations in the same file:
   }
 
   class F {
-    private var myPrivateVar : Int
+    fileprivate var myPrivateVar : Int
   }
 
   func usingE(_ e: E) {
