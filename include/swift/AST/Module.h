@@ -243,9 +243,6 @@ public:
     DebugClient = R;
   }
 
-  /// Retrieve the magic __dso_handle variable.
-  VarDecl *getDSOHandle();
-
   /// Returns true if this module was or is being compiled for testing.
   bool isTestingEnabled() const {
     return Flags.TestingEnabled;

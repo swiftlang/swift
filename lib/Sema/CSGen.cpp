@@ -1240,7 +1240,9 @@ namespace {
         if (tc.requirePointerArgumentIntrinsics(expr->getLoc()))
           return nullptr;
 
-        return CS.DC->getParentModule()->getDSOHandle()->getInterfaceType();
+        auto unsafeRawPointer =
+          CS.getASTContext().getUnsafeRawPointerDecl();
+        return unsafeRawPointer->getDeclaredType();
       }
       }
     }

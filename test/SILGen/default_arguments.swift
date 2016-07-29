@@ -189,11 +189,11 @@ func testTakeDefaultArgUnnamed(_ i: Int) {
   takeDefaultArgUnnamed(i)
 }
 
-func takeDSOHandle(_ handle: UnsafeMutableRawPointer = #dsohandle) { }
+func takeDSOHandle(_ handle: UnsafeRawPointer = #dsohandle) { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments13testDSOHandleFT_T_
 func testDSOHandle() {
-  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr @__dso_handle : $*UnsafeMutableRawPointer
+  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr @__dso_handle : $*Builtin.RawPointer
   takeDSOHandle()
 }
 
@@ -225,7 +225,7 @@ class ReabstractDefaultArgument<T> {
 // CHECK-NEXT: apply [[INITFN]]<Int>(%7, 
 
 func testDefaultArgumentReabstraction() {
-  ReabstractDefaultArgument<Int>()
+  _ = ReabstractDefaultArgument<Int>()
 }
 
 // <rdar://problem/20494437> SILGen crash handling default arguments

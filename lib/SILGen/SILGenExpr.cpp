@@ -2004,8 +2004,27 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   }
 
   case MagicIdentifierLiteralExpr::DSOHandle: {
-    return SGF.emitRValueForDecl(E, SGF.SGM.SwiftModule->getDSOHandle(), 
-                                 E->getType(), AccessSemantics::Ordinary, C);
+    auto SILLoc = SILLocation(E);
+    auto UnsafeRawPointer = SGF.getASTContext().getUnsafeRawPointerDecl();
+    auto UnsafeRawPtrTy =
+      SGF.getLoweredType(UnsafeRawPointer->getDeclaredInterfaceType());
+    SILType BulitinRawPtrTy = SILType::getRawPointerType(SGF.getASTContext());
+
+
+    auto DSOGlobal = SGF.SGM.M.lookUpGlobalVariable("__dso_handle");
+    if (!DSOGlobal)
+      DSOGlobal = SILGlobalVariable::create(SGF.SGM.M,
+                                            SILLinkage::HiddenExternal,
+                                            IsNotFragile, "__dso_handle",
+                                            BulitinRawPtrTy);
+    auto DSOAddr = SGF.B.createGlobalAddr(SILLoc, DSOGlobal);
+
+    auto DSOPointer = SGF.B.createAddressToPointer(SILLoc, DSOAddr,
+                                                   BulitinRawPtrTy);
+
+    auto UnsafeRawPtrStruct = SGF.B.createStruct(SILLoc, UnsafeRawPtrTy,
+                                                 { DSOPointer });
+    return RValue(SGF, E, ManagedValue::forUnmanaged(UnsafeRawPtrStruct));
   }
   }
 }
