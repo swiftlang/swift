@@ -48,7 +48,7 @@ struct SatisfySameTypeAssocTypeRequirementDependent<T>
 public struct GeneratorOf<T> : IteratorProtocol, Sequence {
 
   /// Construct an instance whose `next()` method calls `nextElement`.
-  public init(_ nextElement: () -> T?) {
+  public init(_ nextElement: @escaping () -> T?) {
     self._next = nextElement
   }
   
@@ -85,7 +85,7 @@ public struct LazySequenceOf<S : Sequence, A> : Sequence where S.Iterator.Elemen
   public subscript(i : A) -> A { return i }
 }
 
-public func iterate<A>(_ f : (A) -> A) -> (x : A) -> LazySequenceOf<Iterate<A>, A>? {
+public func iterate<A>(_ f : @escaping (A) -> A) -> (x : A) -> LazySequenceOf<Iterate<A>, A>? {
   return { x in nil }
 }
 
@@ -105,7 +105,7 @@ public final class IterateGenerator<A> : IteratorProtocol {
 // rdar://problem/18475138
 public protocol Observable : class {
     associatedtype Output
-    func addObserver(_ obj : (Output) -> Void)
+    func addObserver(_ obj : @escaping (Output) -> Void)
 }
 
 public protocol Bindable : class {
@@ -124,7 +124,7 @@ infix operator <- : AssignmentPrecedence
 
 func <- <
     Right : Observable
-    >(lhs:(Right.Output) -> Void, rhs: Right) -> Composed<SideEffect<Right>, Right>?
+    >(lhs: @escaping (Right.Output) -> Void, rhs: Right) -> Composed<SideEffect<Right>, Right>?
 {
   return nil
 }

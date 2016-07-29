@@ -38,7 +38,7 @@ public struct DispatchWorkItemFlags : OptionSet, RawRepresentable {
 public class DispatchWorkItem {
 	internal var _block: _DispatchBlock
 
-	public init(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], block: @convention(block) () -> ()) {
+	public init(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], block: @escaping @convention(block) () -> ()) {
 		_block =  _swift_dispatch_block_create_with_qos_class(flags.rawValue,
 			qos.qosClass.rawValue.rawValue, Int32(qos.relativePriority), block)
 	}
@@ -69,7 +69,7 @@ public class DispatchWorkItem {
 		qos: DispatchQoS = .unspecified, 
 		flags: DispatchWorkItemFlags = [], 
 		queue: DispatchQueue, 
-		execute: @convention(block) () -> Void) 
+		execute: @escaping @convention(block) () -> Void) 
 	{
 		if qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: execute)

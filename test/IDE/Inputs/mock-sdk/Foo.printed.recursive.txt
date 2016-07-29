@@ -73,8 +73,8 @@ var fooIntVar: Int32
 func fooFunc1(_ a: Int32) -> Int32
 func fooFunc1AnonymousParam(_: Int32) -> Int32
 func fooFunc3(_ a: Int32, _ b: Float, _ c: Double, _ d: UnsafeMutablePointer<Int32>!) -> Int32
-func fooFuncWithBlock(_ blk: ((Float) -> Int32)!)
-func fooFuncWithFunctionPointer(_ fptr: (@convention(c) (Float) -> Int32)!)
+func fooFuncWithBlock(_ blk: (@escaping (Float) -> Int32)!)
+func fooFuncWithFunctionPointer(_ fptr: (@escaping @convention(c) (Float) -> Int32)!)
 func fooFuncNoreturn1() -> Never
 func fooFuncNoreturn2() -> Never
 

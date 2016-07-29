@@ -69,7 +69,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///     var x = 7
   ///     let iterator = AnyIterator { x < 15 ? x++ : nil }
   ///     let a = Array(iterator) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
-  public init(_ body: () -> Element?) {
+  public init(_ body: @escaping () -> Element?) {
     self._box = _IteratorBox(_ClosureBasedIterator(body))
   }
 
@@ -93,7 +93,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
 extension AnyIterator : Sequence {}
 
 internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
-  internal init(_ body: () -> Element?) {
+  internal init(_ body: @escaping () -> Element?) {
     self._body = body
   }
   internal func next() -> Element? { return _body() }
@@ -514,7 +514,7 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
 internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
   : Sequence {
 
-  internal init(_ makeUnderlyingIterator: () -> Iterator) {
+  internal init(_ makeUnderlyingIterator: @escaping () -> Iterator) {
     self._makeUnderlyingIterator = makeUnderlyingIterator
   }
 
@@ -522,7 +522,7 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
     return _makeUnderlyingIterator()
   }
 
-  internal var _makeUnderlyingIterator: () -> Iterator
+  internal var _makeUnderlyingIterator: @escaping () -> Iterator
 }
 
 /// A type-erased sequence.
@@ -546,7 +546,7 @@ public struct AnySequence<Element> : Sequence {
   /// Creates a sequence whose `makeIterator()` method forwards to
   /// `makeUnderlyingIterator`.
   public init<I : IteratorProtocol>(
-    _ makeUnderlyingIterator: () -> I
+    _ makeUnderlyingIterator: @escaping () -> I
   ) where I.Element == Element {
     self.init(_ClosureBasedSequence(makeUnderlyingIterator))
   }

@@ -51,22 +51,22 @@ class TestError : NSObject {
   convenience init(aa x: Any?, error: ()) throws
   @available(*, unavailable, message: "use object construction 'TestError(aa:error:)'")
   class func err2(_ x: Any?) throws -> Self
-  convenience init(aa x: Any?, error: (), block: () -> Void) throws
+  convenience init(aa x: Any?, error: (), block: @escaping () -> Void) throws
   @available(*, unavailable, message: "use object construction 'TestError(aa:error:block:)'")
-  class func err3(_ x: Any?, callback block: () -> Void) throws -> Self
-  convenience init(error: (), block: () -> Void) throws
+  class func err3(_ x: Any?, callback block: @escaping () -> Void) throws -> Self
+  convenience init(error: (), block: @escaping () -> Void) throws
   @available(*, unavailable, message: "use object construction 'TestError(error:block:)'")
-  class func err4(callback block: () -> Void) throws -> Self
+  class func err4(callback block: @escaping () -> Void) throws -> Self
   
   convenience init(aa x: Any?) throws
   @available(*, unavailable, message: "use object construction 'TestError(aa:)'")
   class func err5(_ x: Any?) throws -> Self
-  convenience init(aa x: Any?, block: () -> Void) throws
+  convenience init(aa x: Any?, block: @escaping () -> Void) throws
   @available(*, unavailable, message: "use object construction 'TestError(aa:block:)'")
-  class func err6(_ x: Any?, callback block: () -> Void) throws -> Self
-  convenience init(block: () -> Void) throws
+  class func err6(_ x: Any?, callback block: @escaping () -> Void) throws -> Self
+  convenience init(block: @escaping () -> Void) throws
   @available(*, unavailable, message: "use object construction 'TestError(block:)'")
-  class func err7(callback block: () -> Void) throws -> Self
+  class func err7(callback block: @escaping () -> Void) throws -> Self
   
   // Would-be initializers.
   class func ww(_ x: Any?) throws -> Self
@@ -89,10 +89,10 @@ class TestSub : Test {
 class TestErrorSub : TestError {
   convenience init(error: ()) throws
   convenience init(aa x: Any?, error: ()) throws
-  convenience init(aa x: Any?, error: (), block: () -> Void) throws
-  convenience init(error: (), block: () -> Void) throws
+  convenience init(aa x: Any?, error: (), block: @escaping () -> Void) throws
+  convenience init(error: (), block: @escaping () -> Void) throws
   convenience init(aa x: Any?) throws
-  convenience init(aa x: Any?, block: () -> Void) throws
-  convenience init(block: () -> Void) throws
+  convenience init(aa x: Any?, block: @escaping () -> Void) throws
+  convenience init(block: @escaping () -> Void) throws
   init()
 }

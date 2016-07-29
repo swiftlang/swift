@@ -154,12 +154,22 @@ public:
       // Otherwise, diagnose this as an invalid capture.
       bool isDecl = AFR.getAbstractFunctionDecl() != nullptr;
 
-      TC.diagnose(Loc, isDecl ? diag::decl_closure_noescape_use :
-                  diag::closure_noescape_use, VD->getName());
+      TC.diagnose(Loc, isDecl ? diag::decl_closure_noescape_use
+                              : diag::closure_noescape_use,
+                  VD->getName());
 
-      if (VD->getType()->castTo<AnyFunctionType>()->isAutoClosure())
-        TC.diagnose(VD->getLoc(), diag::noescape_autoclosure,
-                    VD->getName());
+      // If we're a parameter, emit a helpful fixit to add @escaping
+      auto paramDecl = dyn_cast<ParamDecl>(VD);
+      bool isAutoClosure =
+          VD->getType()->castTo<AnyFunctionType>()->isAutoClosure();
+      if (paramDecl && !isAutoClosure) {
+        TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
+                    paramDecl->getName())
+            .fixItInsert(paramDecl->getTypeLoc().getLoc(), "@escaping ");
+      } else if (isAutoClosure) {
+        // TODO: add in a fixit for autoclosure
+        TC.diagnose(VD->getLoc(), diag::noescape_autoclosure, VD->getName());
+      }
     }
   }
 

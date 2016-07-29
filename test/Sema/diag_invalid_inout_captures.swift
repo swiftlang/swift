@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 func no_escape(_ you_say_price_of_my_love_is: @noescape () -> ()) {}
-func do_escape(_ not_a_price_you_are_willing_to_pay: () -> ()) {}
+func do_escape(_ not_a_price_you_are_willing_to_pay: @escaping () -> ()) {}
 
 struct you_cry_in_your_tea {
   mutating func which_you_hurl_in_the_sea_when_you_see_me_go_by() {

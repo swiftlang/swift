@@ -4,32 +4,35 @@
 
 func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{@escaping conflicts with @noescape}}
 
-func doesEscape(_ fn : () -> Int) {}
+func doesEscape(_ fn : @escaping () -> Int) {}
 
 func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {}
 
 
-func takesNoEscapeClosure(_ fn : @noescape () -> Int) {
+func takesNoEscapeClosure(_ fn : () -> Int) {
+  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}}
+  // expected-note@-2{{parameter 'fn' is implicitly non-escaping}}
+  // expected-note@-3{{parameter 'fn' is implicitly non-escaping}}
   takesNoEscapeClosure { 4 }  // ok
 
   _ = fn()  // ok
 
-  var x = fn  // expected-error {{@noescape parameter 'fn' may only be called}}
+  var x = fn  // expected-error {{non-escaping parameter 'fn' may only be called}}
 
   // This is ok, because the closure itself is noescape.
   takesNoEscapeClosure { fn() }
 
   // This is not ok, because it escapes the 'fn' closure.
-  doesEscape { fn() }   // expected-error {{closure use of @noescape parameter 'fn' may allow it to escape}}
+  doesEscape { fn() }   // expected-error {{closure use of non-escaping parameter 'fn' may allow it to escape}}
 
   // This is not ok, because it escapes the 'fn' closure.
   func nested_function() {
-    _ = fn()   // expected-error {{declaration closing over @noescape parameter 'fn' may allow it to escape}}
+    _ = fn()   // expected-error {{declaration closing over non-escaping parameter 'fn' may allow it to escape}}
   }
 
   takesNoEscapeClosure(fn)  // ok
 
-  doesEscape(fn)                   // expected-error {{invalid conversion from non-escaping function of type '@noescape () -> Int' to potentially escaping function type '() -> Int'}}
+  doesEscape(fn)                   // expected-error {{invalid conversion from non-escaping function of type '() -> Int' to potentially escaping function type '() -> Int'}}
   takesGenericClosure(4, fn)       // ok
   takesGenericClosure(4) { fn() }  // ok.
 }
@@ -165,8 +168,8 @@ func takeNoEscapeTest2(_ fn : @noescape () -> ()) {
 
 // Autoclosure implies noescape, but produce nice diagnostics so people know
 // why noescape problems happen.
-func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly @noescape because it was declared @autoclosure}}
-  doesEscape { a() }  // expected-error {{closure use of @noescape parameter 'a' may allow it to escape}}
+func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly non-escaping because it was declared @autoclosure}}
+  doesEscape { a() }  // expected-error {{closure use of non-escaping parameter 'a' may allow it to escape}}
 }
 
 
@@ -183,14 +186,14 @@ protocol P2 : P1 {
   associatedtype Element
 }
 
-func overloadedEach<O: P1, T>(_ source: O, _ transform: (O.Element) -> (), _: T) {}
+func overloadedEach<O: P1, T>(_ source: O, _ transform: @escaping (O.Element) -> (), _: T) {}
 
-func overloadedEach<P: P2, T>(_ source: P, _ transform: (P.Element) -> (), _: T) {}
+func overloadedEach<P: P2, T>(_ source: P, _ transform: @escaping (P.Element) -> (), _: T) {}
 
 struct S : P2 {
   typealias Element = Int
   func each(_ transform: @noescape (Int) -> ()) {
-    overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @noescape (Int) -> (), Int)'}}
+    overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, (Int) -> (), Int)'}}
                    transform, 1)
     // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, (O.Element) -> (), T), (P, (P.Element) -> (), T)}}
   }
@@ -249,10 +252,10 @@ func curriedFlatMap2<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] {
   }
 }
 
-func bad(_ a : (Int)-> Int) -> Int { return 42 }
+func bad(_ a : @escaping (Int)-> Int) -> Int { return 42 }
 func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int {
   return { f in
-    bad(f)  // expected-error {{invalid conversion from non-escaping function of type '@noescape (Int) -> Int' to potentially escaping function type '(Int) -> Int'}}
+    bad(f)  // expected-error {{invalid conversion from non-escaping function of type '(Int) -> Int' to potentially escaping function type '(Int) -> Int'}}
   }
 }
 
@@ -262,15 +265,17 @@ func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int {
 typealias CompletionHandlerNE = @noescape (success: Bool) -> ()
 typealias CompletionHandler = (success: Bool) -> ()
 var escape : CompletionHandlerNE
-func doThing1(_ completion: @noescape (success: Bool) -> ()) {
-  // expected-error @+2 {{@noescape value 'escape' may only be called}}
-  // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
-  escape = completion // expected-error {{declaration closing over @noescape parameter 'escape' may allow it to escape}}
+func doThing1(_ completion: (success: Bool) -> ()) {
+  // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
+  // expected-error @+2 {{non-escaping value 'escape' may only be called}}
+  // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
+  escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
 }
 func doThing2(_ completion: CompletionHandlerNE) {
-  // expected-error @+2 {{@noescape value 'escape' may only be called}}
-  // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
-  escape = completion // expected-error {{declaration closing over @noescape parameter 'escape' may allow it to escape}}
+  // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
+  // expected-error @+2 {{non-escaping value 'escape' may only be called}}
+  // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
+  escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
 }
 
 // <rdar://problem/19997680> @noescape doesn't work on parameters of function type
@@ -298,10 +303,10 @@ enum r19997577Type {
 }
 
 // type attribute and decl attribute
-func noescapeD(@noescape f: () -> Bool) {} // expected-error {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape }}
+func noescapeD(@noescape f: @escaping () -> Bool) {} // expected-error {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape }}
 func noescapeT(f: @noescape () -> Bool) {} // ok
 func autoclosureD(@autoclosure f: () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure }}
 func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
 
-func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {}
+func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // expected-error {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}}
 func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure }}

@@ -5587,7 +5587,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         swift::AnyFunctionType::ExtInfo newEI(fromEI.getRepresentation(),
                                         toEI.isAutoClosure(),
                                         toEI.isNoEscape() | fromEI.isNoEscape(),
-                                        toEI.isExplicitlyEscaping() | fromEI.isExplicitlyEscaping(),
                                         toEI.throws() & fromEI.throws());
         auto newToType = FunctionType::get(fromFunc->getInput(),
                                            fromFunc->getResult(), newEI);

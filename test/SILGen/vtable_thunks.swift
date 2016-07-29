@@ -129,7 +129,7 @@ class Y: X<D> {
 // optional.
 
 class Foo {
-  func foo(x: (Int) -> Int) -> ((Int) -> Int)? {}
+  func foo(x: @escaping (Int) -> Int) -> ((Int) -> Int)? {}
 }
 
 class Bar: Foo {

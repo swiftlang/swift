@@ -105,7 +105,7 @@ func testSubtypeArgument1(_ x1: (fn: ((String) -> Int)) -> Int,
 func subtypeArgument2(_ x: (fn: ((String) throws -> Int)) -> Int) { }
 func testSubtypeArgument2(_ x1: (fn: ((String) -> Int)) -> Int,
                           x2: (fn: ((String) throws -> Int)) -> Int) {
-  subtypeArgument2(x1) // expected-error{{cannot convert value of type '(fn: ((String) -> Int)) -> Int' to expected argument type '(fn: ((String) throws -> Int)) -> Int'}}
+  subtypeArgument2(x1) // expected-error{{cannot convert value of type '(fn: (@escaping (String) -> Int)) -> Int' to expected argument type '(fn: (@escaping (String) throws -> Int)) -> Int'}}
   subtypeArgument2(x2)
 }
 
