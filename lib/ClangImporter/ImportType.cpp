@@ -2051,8 +2051,8 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
       }
     }
 
-  // NSDictionary arguments default to [:] if "options", "attributes",
-  // or "userInfo" occur in the argument label or (if there is no
+  // NSDictionary arguments default to [:] (or nil, if nullable) if "options",
+  // "attributes", or "userInfo" occur in the argument label or (if there is no
   // argument label) at the end of the base name.
   if (auto objcPtrTy = type->getAs<clang::ObjCObjectPointerType>()) {
     if (auto objcClass = objcPtrTy->getInterfaceDecl()) {
@@ -2061,13 +2061,17 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
         if (searchStr.empty() && !baseName.empty())
           searchStr = baseName.str();
 
+        auto emptyDictionaryKind = DefaultArgumentKind::EmptyDictionary;
+        if (clangOptionality == OTK_Optional)
+          emptyDictionaryKind = DefaultArgumentKind::Nil;
+
         bool sawInfo = false;
         for (auto word : reversed(camel_case::getWords(searchStr))) {
           if (camel_case::sameWordIgnoreFirstCase(word, "options"))
-            return DefaultArgumentKind::EmptyDictionary;
+            return emptyDictionaryKind;
 
           if (camel_case::sameWordIgnoreFirstCase(word, "attributes"))
-            return DefaultArgumentKind::EmptyDictionary;
+            return emptyDictionaryKind;
 
           if (camel_case::sameWordIgnoreFirstCase(word, "info")) {
             sawInfo = true;
@@ -2075,7 +2079,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
           }
 
           if (sawInfo && camel_case::sameWordIgnoreFirstCase(word, "user"))
-            return DefaultArgumentKind::EmptyDictionary;
+            return emptyDictionaryKind;
 
           if (argumentLabel.empty())
             break;

@@ -209,7 +209,7 @@
 // CHECK-APPKIT: func drawInAir(at: Point3D)
 
 // Note: with<something> -> <something>
-// CHECK-APPKIT: func draw(at: Point3D, withAttributes: [String : Any]? = [:])
+// CHECK-APPKIT: func draw(at: Point3D, withAttributes: [String : Any]? = nil)
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
 // CHECK-APPKIT: func setTextColor(_: NSColor?)
@@ -220,6 +220,7 @@
 // Note: NSDictionary default arguments for "options"
 // CHECK-APPKIT: func drawAnywhere(in: NSView?, options: [AnyHashable : Any] = [:])
 // CHECK-APPKIT: func drawAnywhere(options: [AnyHashable : Any] = [:])
+// CHECK-APPKIT: func drawAnywhere(optionalOptions: [AnyHashable : Any]? = nil)
 
 // Note: no lowercasing of initialisms when there might be a prefix.
 // CHECK-CORECOOLING: func CFBottom() ->
