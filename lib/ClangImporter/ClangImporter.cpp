@@ -1309,13 +1309,6 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     DeprecatedAsUnavailableMessage =
       "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
   }
-
-  // Prepopulate the set of module prefixes.
-  // FIXME: Hard-coded list should move into the module map language.
-  if (ctx.LangOpts.StripNSPrefix) {
-    ModulePrefixes["Foundation"] = "NS";
-    ModulePrefixes["ObjectiveC"] = "NS";
-  }
 }
 
 
@@ -1817,8 +1810,7 @@ static unsigned stripModulePrefixLength(
   // Check whether this is a known Foundation entity that conflicts with the
   // standard library.
   if (auto known = getKnownFoundationEntity(baseName))
-    if (nameConflictsWithStandardLibrary(*known))
-      return 0;
+    return 0;
 
   // If the character following the prefix is a '_', eat that, too.
   unsigned prefixLen = prefixPos->second.size();
@@ -4436,7 +4428,6 @@ ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
                             Impl.InferImportAsMember,
-                            Impl.SwiftContext.LangOpts.StripNSPrefix,
                             Impl.HonorSwiftNewtypeAttr);
 }
 

@@ -262,25 +262,25 @@ func classAnyObject(_ obj: NSObject) {
 }
 
 // Protocol conformances
-class Wobbler : Wobbling { // expected-note{{candidate has non-matching type '()'}}
+class Wobbler : NSWobbling { // expected-note{{candidate has non-matching type '()'}}
   @objc func wobble() { }
 
-  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'Wobbling'}}{{none}}
+  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'NSWobbling'}}{{none}}
   // expected-error@-1{{method cannot be an implementation of an @objc requirement because its result type cannot be represented in Objective-C}}
 }
 
-extension Wobbler : MaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'MaybeInitWobble'}}
+extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'NSMaybeInitWobble'}}
 }
 
-@objc class Wobbler2 : NSObject, Wobbling { // expected-note{{candidate has non-matching type '()'}}
+@objc class Wobbler2 : NSObject, NSWobbling { // expected-note{{candidate has non-matching type '()'}}
   func wobble() { }
   func returnMyself() -> Self { return self }
 }
 
-extension Wobbler2 : MaybeInitWobble { // expected-error{{type 'Wobbler2' does not conform to protocol 'MaybeInitWobble'}}
+extension Wobbler2 : NSMaybeInitWobble { // expected-error{{type 'Wobbler2' does not conform to protocol 'NSMaybeInitWobble'}}
 }
 
-func optionalMemberAccess(_ w: Wobbling) {
+func optionalMemberAccess(_ w: NSWobbling) {
   w.wobble()
   w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}} {{11-11=!}}
   let x = w[5]!!
@@ -315,7 +315,7 @@ func customAccessors(_ hive: Hive, bee: Bee) {
 }
 
 // instancetype/Dynamic Self invocation.
-func testDynamicSelf(_ queen: Bee, wobbler: Wobbling) {
+func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
   var hive = Hive()
 
   // Factory method with instancetype result.
@@ -330,7 +330,7 @@ func testDynamicSelf(_ queen: Bee, wobbler: Wobbling) {
 
   // Instance method on a protocol with instancetype result.
   var wobbler2 = wobbler.returnMyself()!
-  var wobbler: Wobbling = wobbler2
+  var wobbler: NSWobbling = wobbler2
   wobbler2 = wobbler
 
   // Instance method on a base class with instancetype result, called on the

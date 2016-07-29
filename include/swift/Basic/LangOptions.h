@@ -161,9 +161,6 @@ namespace swift {
     /// and methods.
     bool InferImportAsMember = false;
 
-    /// Whether we are stripping the "NS" prefix from Foundation et al.
-    bool StripNSPrefix = true;
-
     /// Should 'id' in Objective-C be imported as 'Any' in Swift?
     bool EnableIdAsAny = true;
 

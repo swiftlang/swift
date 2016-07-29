@@ -12,6 +12,8 @@ Classes:
   - Selector: 'filteredArrayUsingPredicate:'
     SwiftName: filtered(using:)
     MethodKind: Instance
+- Name: NSCachedURLResponse
+  SwiftName: CachedURLResponse
 - Name: NSCharacterSet
   SwiftName: NSCharacterSet
   SwiftBridge: CharacterSet
@@ -158,10 +160,17 @@ Classes:
   - Name: lowercaseString
     SwiftName: lowercased
 - Name: NSDistributedNotificationCenter
+  SwiftName: DistributedNotificationCenter
   Methods:
   - Selector: 'notificationCenterForType:'
     MethodKind: Class
     FactoryAsInit: C
+- Name: NSHTTPCookie
+  SwiftName: HTTPCookie
+- Name: NSHTTPCookieStorage
+  SwiftName: HTTPCookieStorage
+- Name: NSHTTPURLResponse
+  SwiftName: HTTPURLResponse
 - Name: NSKeyedArchiver
   SwiftName: NSKeyedArchiver
   Methods:
@@ -210,6 +219,7 @@ Classes:
   SwiftName: NSPersonNameComponents
   SwiftBridge: PersonNameComponents
 - Name: NSProcessInfo
+  SwiftName: ProcessInfo
   Methods:
   - Selector: processInfo
     MethodKind: Class
@@ -248,11 +258,30 @@ Classes:
   - Selector: 'URLRelativeToURL:'
     SwiftName: url(relativeTo:)
     MethodKind: Instance
+- Name: NSURLResponse
+  SwiftName: URLResponse
+- Name: NSURLSession
+  SwiftName: URLSession
 - Name: NSURLSessionConfiguration
+  SwiftName: URLSessionConfiguration
   Methods:
   - Selector: 'backgroundSessionConfigurationWithIdentifier:'
     SwiftName: background(withIdentifier:)
     MethodKind: Class
+- Name: NSURLSessionDataTask
+  SwiftName: URLSessionDataTask
+- Name: NSURLSessionDownloadTask
+  SwiftName: URLSessionDownloadTask
+- Name: NSURLSessionStreamTask
+  SwiftName: URLSessionStreamTask
+- Name: NSURLSessionTask
+  SwiftName: URLSessionTask
+- Name: NSURLSessionTaskMetrics
+  SwiftName: URLSessionTaskMetrics
+- Name: NSURLSessionTaskTransactionMetrics
+  SwiftName: URLSessionTaskTransactionMetrics
+- Name: NSURLSessionUploadTask
+  SwiftName: URLSessionUploadTask
 - Name: NSURLRequest
   SwiftBridge: URLRequest
 - Name: NSURLQueryItem
@@ -283,6 +312,8 @@ Classes:
   - Selector: 'expressionForBlock:arguments:'
     SwiftName: init(block:arguments:)
     MethodKind: Class
+- Name: NSMessagePort
+  SwiftName: MessagePort
 - Name: NSMetadataItem
   SwiftName: NSMetadataItem
 - Name: NSMetadataQuery
@@ -291,6 +322,12 @@ Classes:
   SwiftName: NSMetadataQueryAttributeValueTuple
 - Name: NSMetadataQueryResultGroup
   SwiftName: NSMetadataQueryResultGroup
+- Name: NSPort
+  SwiftName: Port
+- Name: NSPortMessage
+  SwiftName: PortMessage
+- Name: NSSocketPort
+  SwiftName: SocketPort
 - Name: NSAppleEventDescriptor
   SwiftName: NSAppleEventDescriptor
 - Name: NSAppleEventManager
@@ -606,6 +643,18 @@ Classes:
   SwiftName: NSValue
 - Name: NSWhoseSpecifier
   SwiftName: NSWhoseSpecifier
+- Name: NSXMLDTD
+  SwiftName: XMLDTD
+- Name: NSXMLDTDNode
+  SwiftName: XMLDTDNode
+- Name: NSXMLDocument
+  SwiftName: XMLDocument
+- Name: NSXMLElement
+  SwiftName: XMLElement
+- Name: NSXMLNode
+  SwiftName: XMLNode
+- Name: NSXMLParser
+  SwiftName: XMLParser
 - Name: NSXPCConnection
   SwiftName: NSXPCConnection
 - Name: NSXPCInterface
@@ -616,9 +665,12 @@ Classes:
   SwiftName: NSXPCListenerEndpoint
 - Name: NSAppleScript
   SwiftName: NSAppleScript
+- Name: NSBlockOperation
+  SwiftName: BlockOperation
 - Name: NSBundleResourceRequest
   SwiftName: NSBundleResourceRequest
 - Name: NSBundle
+  SwiftName: Bundle
   Methods:
   - Selector: 'URLForAuxiliaryExecutable:'
     SwiftName: url(forAuxiliaryExecutable:)
@@ -669,10 +721,13 @@ Classes:
     SwiftName: object(forInfoDictionaryKey:)
     MethodKind: Instance
 - Name: NSByteCountFormatter
+  SwiftName: ByteCountFormatter
   Methods:
   - Selector: 'stringFromByteCount:'
     SwiftName: string(fromByteCount:)
     MethodKind: Instance
+- Name: NSHost
+  SwiftName: Host
 - Name: NSLocale
   SwiftName: NSLocale
   SwiftBridge: Locale
@@ -705,15 +760,21 @@ Classes:
     SwiftName: isDateInWeekend(_:)
     MethodKind: Instance
 - Name: NSDateComponentsFormatter
+  SwiftName: DateComponentsFormatter
   Methods:
   - Selector: 'stringFromTimeInterval:'
     SwiftName: string(from:)
     MethodKind: Instance
 - Name: NSDateFormatter
+  SwiftName: DateFormatter
   Methods:
   - Selector: 'localizedStringFromDate:dateStyle:timeStyle:'
     SwiftName: localizedString(from:dateStyle:timeStyle:)
     MethodKind: Class
+- Name: NSDateIntervalFormatter
+  SwiftName: DateIntervalFormatter
+- Name: NSEnergyFormatter
+  SwiftName: EnergyFormatter
 - Name: NSObject
   Methods:
   - Selector: 'attemptRecoveryFromError:optionIndex:delegate:didRecoverSelector:contextInfo:'
@@ -750,6 +811,7 @@ Classes:
     SwiftName: prepare(forReadingItemsAt:options:writingItemsAt:options:error:byAccessor:)
     MethodKind: Instance
 - Name: NSFileHandle
+  SwiftName: FileHandle
   Properties:
   - Name: fileHandleWithStandardInput
     SwiftName: standardInput
@@ -760,6 +822,7 @@ Classes:
   - Name: fileHandleWithNullDevice
     SwiftName: nullDevice
 - Name: NSFileManager
+  SwiftName: FileManager
   Methods:
   - Selector: 'mountedVolumeURLsIncludingResourceValuesForKeys:options:'
     SwiftName: mountedVolumeURLs(includingResourceValuesForKeys:options:)
@@ -786,22 +849,41 @@ Classes:
     SwiftName: version(itemAt:forPersistentIdentifier:)
     MethodKind: Class
 - Name: NSFileWrapper
+  SwiftName: FileWrapper
   Methods:
   - Selector: 'keyForFileWrapper:'
     SwiftName: keyForChildFileWrapper(_:)
     MethodKind: Instance
 - Name: NSFormatter
+  SwiftName: Formatter
   Methods:
   - Selector: 'isPartialStringValid:newEditingString:errorDescription:'
     SwiftName: isPartialStringValid(_:newEditingString:errorDescription:)
     MethodKind: Instance
+- Name: NSInputStream
+  SwiftName: InputStream
+- Name: NSISO8601DateFormatter
+  SwiftName: ISO8601DateFormatter
+- Name: NSJSONSerialization
+  SwiftName: JSONSerialization
+- Name: NSLengthFormatter
+  SwiftName: LengthFormatter
+- Name: NSMassFormatter
+  SwiftName: MassFormatter
+- Name: NSMeasurementFormatter
+  SwiftName: MeasurementFormatter
 - Name: NSConditionLock
   SwiftName: NSConditionLock
   Methods:
   - Selector: 'tryLockWhenCondition:'
     SwiftName: tryLock(whenCondition:)
     MethodKind: Instance
+- Name: NSNetService
+  SwiftName: NetService
+- Name: NSNetServiceBrowser
+  SwiftName: NetServiceBrowser
 - Name: NSNotificationCenter
+  SwiftName: NotificationCenter
   Methods:
   - Selector: 'postNotificationName:object:'
     SwiftName: post(name:object:)
@@ -809,12 +891,28 @@ Classes:
   - Selector: 'postNotificationName:object:userInfo:'
     SwiftName: post(name:object:userInfo:)
     MethodKind: Instance
+- Name: NSNotificationQueue
+  SwiftName: NotificationQueue
+- Name: NSNumberFormatter
+  SwiftName: NumberFormatter
+- Name: NSOperation
+  SwiftName: Operation
+- Name: NSOperationQueue
+  SwiftName: OperationQueue
+- Name: NSOutputStream
+  SwiftName: OutputStream
+- Name: NSPersonNameComponentsFormatter
+  SwiftName: PersonNameComponentsFormatter
+- Name: NSPipe
+  SwiftName: Pipe
 - Name: NSProgress
+  SwiftName: Progress
   Methods:
   - Selector: 'discreteProgressWithTotalUnitCount:'
     SwiftName: discreteProgress(totalUnitCount:)
     MethodKind: Class
 - Name: NSPropertyListSerialization
+  SwiftName: PropertyListSerialization
   Methods:
   - Selector: 'dataWithPropertyList:format:options:error:'
     SwiftName: data(fromPropertyList:format:options:)
@@ -829,11 +927,13 @@ Classes:
     SwiftName: propertyListFromData(_:mutabilityOption:format:errorDescription:)
     MethodKind: Class
 - Name: NSRunLoop
+  SwiftName: RunLoop
   Methods:
   - Selector: 'runMode:beforeDate:'
     SwiftName: run(mode:before:)
     MethodKind: Instance
 - Name: NSScanner
+  SwiftName: Scanner
   Methods:
   - Selector: 'scanInt:'
     SwiftName: scanInt32(_:)
@@ -853,6 +953,8 @@ Classes:
   - Selector: 'scanUpToString:intoString:'
     SwiftName: scanUpTo(_:into:)
     MethodKind: Instance
+- Name: NSStream
+  SwiftName: Stream
 - Name: NSTextCheckingResult
   SwiftName: NSTextCheckingResult
   Methods:
@@ -907,7 +1009,10 @@ Classes:
   - Selector: 'transitInformationCheckingResultWithRange:components:'
     SwiftName: transitInformationCheckingResult(range:components:)
     MethodKind: Class
+- Name: NSThread
+  SwiftName: Thread
 - Name: NSTimer
+  SwiftName: Timer
   Methods:
   - Selector: 'scheduledTimerWithTimeInterval:invocation:repeats:'
     SwiftName: scheduledTimer(timeInterval:invocation:repeats:)
@@ -918,12 +1023,18 @@ Classes:
   - Selector: 'initWithFireDate:interval:target:selector:userInfo:repeats:'
     SwiftName: init(fireAt:interval:target:selector:userInfo:repeats:)
     MethodKind: Instance
+- Name: NSURLAuthenticationChallenge
+  SwiftName: URLAuthenticationChallenge
+- Name: NSURLCache
+  SwiftName: URLCache
 - Name: NSURLCredential
+  SwiftName: URLCredential
   Methods:
   - Selector: 'credentialForTrust:'
     SwiftName: init(trust:)
     MethodKind: Class
 - Name: NSURLCredentialStorage
+  SwiftName: URLCredentialStorage
   Methods:
   - Selector: 'setCredential:forProtectionSpace:'
     SwiftName: set(_:for:)
@@ -934,6 +1045,10 @@ Classes:
   - Selector: 'setCredential:forProtectionSpace:task:'
     SwiftName: set(_:for:task:)
     MethodKind: Instance
+- Name: NSURLProtectionSpace
+  SwiftName: URLProtectionSpace
+- Name: NSURLProtocol
+  SwiftName: URLProtocol
 - Name: NSUbiquitousKeyValueStore
   SwiftName: NSUbiquitousKeyValueStore
   Methods:
@@ -962,11 +1077,13 @@ Classes:
     SwiftName: set(_:forKey:)
     MethodKind: Instance
 - Name: NSUndoManager
+  SwiftName: UndoManager
   Methods:
   - Selector: 'registerUndoWithTarget:handler:'
     SwiftName: __registerUndoWithTarget(_:handler:)
     MethodKind: Instance
 - Name: NSUserDefaults
+  SwiftName: UserDefaults
   Methods:
   - Selector: 'registerDefaults:'
     SwiftName: register(defaults:)
@@ -995,6 +1112,8 @@ Classes:
   - Selector: 'removeSuiteNamed:'
     SwiftName: removeSuite(named:)
     MethodKind: Instance
+- Name: NSValueTransformer
+  SwiftName: ValueTransformer
 - Name: NSDataDetector
   SwiftName: NSDataDetector
 - Name: NSDirectoryEnumerator
@@ -1045,7 +1164,61 @@ Classes:
   SwiftName: NSRecursiveLock
 - Name: NSSortDescriptor
   SwiftName: NSSortDescriptor
+- Name: NSDimension
+  SwiftName: Dimension
+- Name: NSUnit
+  SwiftName: Unit
+- Name: NSUnitAcceleration
+  SwiftName: UnitAcceleration
+- Name: NSUnitAngle
+  SwiftName: UnitAngle
+- Name: NSUnitArea
+  SwiftName: UnitArea
+- Name: NSUnitConcentrationMass
+  SwiftName: UnitConcentrationMass
+- Name: NSUnitConverter
+  SwiftName: UnitConverter
+- Name: NSUnitConverterLinear
+  SwiftName: UnitConverterLinear
+- Name: NSUnitDispersion
+  SwiftName: UnitDispersion
+- Name: NSUnitDuration
+  SwiftName: UnitDuration
+- Name: NSUnitElectricCharge
+  SwiftName: UnitElectricCharge
+- Name: NSUnitElectricCurrent
+  SwiftName: UnitElectricCurrent
+- Name: NSUnitElectricPotentialDifference
+  SwiftName: UnitElectricPotentialDifference
+- Name: NSUnitElectricResistance
+  SwiftName: UnitElectricResistance
+- Name: NSUnitEnergy
+  SwiftName: UnitEnergy
+- Name: NSUnitFrequency
+  SwiftName: UnitFrequency
+- Name: NSUnitFuelEfficiency
+  SwiftName: UnitFuelEfficiency
+- Name: NSUnitIlluminance
+  SwiftName: UnitIlluminance
+- Name: NSUnitLength
+  SwiftName: UnitLength
+- Name: NSUnitMass
+  SwiftName: UnitMass
+- Name: NSUnitPower
+  SwiftName: UnitPower
+- Name: NSUnitPressure
+  SwiftName: UnitPressure
+- Name: NSUnitSpeed
+  SwiftName: UnitSpeed
+- Name: NSUnitVolume
+  SwiftName: UnitVolume
+- Name: NSUnitTemperature
+  SwiftName: UnitTemperature
 Protocols:
+- Name: NSKeyedArchiverDelegate
+  SwiftName: KeyedArchiverDelegate
+- Name: NSKeyedUnarchiverDelegate
+  SwiftName: KeyedUnarchiverDelegate
 - Name: NSLocking
   SwiftName: NSLocking
 - Name: NSMetadataQueryDelegate
@@ -1062,12 +1235,26 @@ Protocols:
   SwiftName: NSFastEnumeration
 - Name: NSExtensionRequestHandling
   SwiftName: NSExtensionRequestHandling
+- Name: NSNetServiceBrowserDelegate
+  SwiftName: NetServiceBrowserDelegate
+- Name: NSNetServiceDelegate
+  SwiftName: NetServiceDelegate
+- Name: NSPortDelegate
+  SwiftName: PortDelegate
+- Name: NSProgressReporting
+  SwiftName: ProgressReporting
 - Name: NSSpellServerDelegate
   SwiftName: NSSpellServerDelegate
+- Name: NSStreamDelegate
+  SwiftName: StreamDelegate
+- Name: NSURLAuthenticationChallengeSender
+  SwiftName: URLAuthenticationChallengeSender
 - Name: NSUserActivityDelegate
   SwiftName: NSUserActivityDelegate
 - Name: NSUserNotificationCenterDelegate
   SwiftName: NSUserNotificationCenterDelegate
+- Name: NSXMLParserDelegate
+  SwiftName: XMLParserDelegate
 - Name: NSXPCListenerDelegate
   SwiftName: NSXPCListenerDelegate
 - Name: NSXPCProxyCreating
@@ -1089,6 +1276,8 @@ Protocols:
   - Selector: 'presentedSubitemAtURL:didResolveConflictVersion:'
     SwiftName: presentedSubitem(at:didResolve:)
     MethodKind: Instance
+- Name: NSFileManagerDelegate
+  SwiftName: FileManagerDelegate
 - Name: NSDiscardableContent
   SwiftName: NSDiscardableContent
   Methods:
@@ -1108,6 +1297,18 @@ Protocols:
   SwiftName: NSURLDownloadDelegate
 - Name: NSURLHandleClient
   SwiftName: NSURLHandleClient
+- Name: NSURLProtocolClient
+  SwiftName: URLProtocolClient
+- Name: NSURLSessionDataDelegate
+  SwiftName: URLSessionDataDelegate
+- Name: NSURLSessionDelegate
+  SwiftName: URLSessionDelegate
+- Name: NSURLSessionDownloadDelegate
+  SwiftName: URLSessionDownloadDelegate
+- Name: NSURLSessionStreamDelegate
+  SwiftName: URLSessionStreamDelegate
+- Name: NSURLSessionTaskDelegate
+  SwiftName: URLSessionTaskDelegate
 - Name: NSMachPortDelegate
   SwiftName: NSMachPortDelegate
 - Name: NSCacheDelegate
@@ -1115,8 +1316,14 @@ Protocols:
 Tags:
 - Name: NSActivityOptions
   SwiftName: ProcessInfo.ActivityOptions
+- Name: NSAlignmentOptions
+  SwiftName: AlignmentOptions
 - Name: NSBackgroundActivityResult
   SwiftName: NSBackgroundActivityScheduler.Result
+- Name: NSComparisonResult
+  SwiftName: ComparisonResult
+- Name: NSEdgeInsets
+  SwiftName: EdgeInsets
 - Name: NSExpressionType
   SwiftName: NSExpression.ExpressionType
 - Name: NSKeyValueChange
@@ -1243,6 +1450,8 @@ Tags:
   SwiftName: PropertyListSerialization.MutabilityOptions
 - Name: NSPropertyListFormat
   SwiftName: PropertyListSerialization.PropertyListFormat
+- Name: NSQualityOfService
+  SwiftName: QualityOfService
 - Name: NSRegularExpressionOptions
   SwiftName: NSRegularExpression.Options
 - Name: NSMatchingOptions
@@ -1258,6 +1467,7 @@ Tags:
 - Name: NSTextCheckingType
   SwiftName: NSTextCheckingResult.CheckingType
 - Name: NSTextCheckingTypes
+  SwiftName: TextCheckingTypes
   Availability: nonswift
   AvailabilityMsg: Use 'NSTextCheckingResult.CheckingType'
 - Name: NSTimeZoneNameStyle
@@ -1324,8 +1534,6 @@ Tags:
   SwiftName: FileManager.SearchPathDomainMask
 - Name: NSStringCompareOptions
   SwiftName: NSString.CompareOptions
-- Name: NSStringEncoding
-  SwiftName: NSString.Encoding
 - Name: NSStringEncodingConversionOptions
   SwiftName: NSString.EncodingConversionOptions
 - Name: NSStringEnumerationOptions
@@ -1336,11 +1544,23 @@ Tags:
   SwiftName: NSURL.BookmarkResolutionOptions
 - Name: NSURLHandleStatus
   SwiftName: NSURLHandle.Status
+- Name: NSBinarySearchingOptions
+  SwiftName: BinarySearchingOptions
+- Name: NSEnumerationOptions
+  SwiftName: EnumerationOptions
+- Name: NSSortOptions
+  SwiftName: SortOptions
 Typedefs:
 - Name: NSAffineTransformStruct
   SwiftName: AffineTransform
+- Name: NSComparator
+  SwiftName: Comparator
+- Name: NSDecimal
+  SwiftName: Decimal
 - Name: NSKeyValueChangeKey
   SwiftName: NSKeyValueChangeKey
+- Name: NSTimeInterval
+  SwiftName: TimeInterval
 - Name: NSPoint
   SwiftName: NSPoint
 - Name: NSPointArray
@@ -1359,8 +1579,6 @@ Typedefs:
   SwiftName: NSSizePointer
 - Name: NSAppleEventManagerSuspensionID
   SwiftName: NSAppleEventManager.SuspensionID
-- Name: NSEdgeInsets
-  SwiftName: NSEdgeInsets
 - Name: NSExceptionName
   SwiftName: NSExceptionName
 - Name: NSFastEnumerationState
@@ -1381,6 +1599,14 @@ Typedefs:
   SwiftName: NSBackgroundActivityScheduler.CompletionHandler
 - Name: NSCalendarIdentifier
   SwiftName: NSCalendar.Identifier
+- Name: NSFileAttributeKey
+  SwiftName: FileAttributeKey
+- Name: NSFileAttributeType
+  SwiftName: FileAttributeType
+- Name: NSFileProtectionType
+  SwiftName: FileProtectionType
+- Name: NSHTTPCookiePropertyKey
+  SwiftName: HTTPCookiePropertyKey
 - Name: NSItemProviderCompletionHandler
   SwiftName: NSItemProvider.CompletionHandler
 - Name: NSItemProviderLoadHandler
@@ -1389,6 +1615,8 @@ Typedefs:
   SwiftName: NSLocale.Key
 - Name: NSNotificationName
   SwiftName: NSNotification.Name
+- Name: NSOperatingSystemVersion
+  SwiftName: OperatingSystemVersion
 - Name: NSProgressFileOperationKind
   SwiftName: Progress.FileOperationKind
 - Name: NSProgressUnpublishingHandler
@@ -1397,12 +1625,30 @@ Typedefs:
   SwiftName: Progress.PublishingHandler
 - Name: NSProgressKey
   SwiftName: Progress.Key
+- Name: NSProgressKind
+  SwiftName: ProgressKind
+- Name: NSProgressUserInfoKey
+  SwiftName: ProgressUserInfoKey
 - Name: NSPropertyListReadOptions
   SwiftName: PropertyListSerialization.ReadOptions
 - Name: NSPropertyListWriteOptions
   SwiftName: PropertyListSerialization.WriteOptions
+- Name: NSSocketNativeHandle
+  SwiftName: SocketNativeHandle
 - Name: NSStreamPropertyKey
   SwiftName: Stream.PropertyKey
+- Name: NSStreamNetworkServiceTypeValue
+  SwiftName: StreamNetworkServiceTypeValue
+- Name: NSStreamSOCKSProxyConfiguration
+  SwiftName: StreamSOCKSProxyConfiguration
+- Name: NSStreamSOCKSProxyVersion
+  SwiftName: StreamSOCKSProxyVersion
+- Name: NSStreamSocketSecurityLevel
+  SwiftName: StreamSocketSecurityLevel
+- Name: NSStringEncodingDetectionOptionsKey
+  SwiftName: StringEncodingDetectionOptionsKey
+- Name: NSStringTransform
+  SwiftName: StringTransform
 - Name: NSUserScriptTaskCompletionHandler
   SwiftName: NSUserScriptTask.CompletionHandler
 - Name: NSUserUnixTaskCompletionHandler
@@ -1427,6 +1673,14 @@ Typedefs:
   SwiftName: DistributedNotificationCenter.CenterType
 - Name: NSURLFileProtectionType
   SwiftName: URLFileProtection
+- Name: NSURLFileResourceType
+  SwiftName: URLFileResourceType
+- Name: NSURLResourceKey
+  SwiftName: URLResourceKey
+- Name: NSURLThumbnailDictionaryItem
+  SwiftName: URLThumbnailDictionaryItem
+- Name: NSURLUbiquitousItemDownloadingStatus
+  SwiftName: URLUbiquitousItemDownloadingStatus
 - Name: NSURLBookmarkFileCreationOptions
   SwiftName: NSURL.BookmarkFileCreationOptions
 - Name: NSMapTableValueCallBacks
@@ -1437,6 +1691,8 @@ Typedefs:
   SwiftName: NSValueTransformerName
 - Name: NSErrorDomain
   SwiftName: NSErrorDomain
+- Name: NSRunLoopMode
+  SwiftName: RunLoopMode
 Globals:
 - Name: NSAppleScriptErrorMessage
   SwiftName: NSAppleScript.errorMessage

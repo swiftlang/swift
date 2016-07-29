@@ -283,7 +283,7 @@ typealias AliasForNSRect = NSRect
   func emptyArray() -> NSArray { return NSArray() }
   func maybeArray() -> NSArray? { return nil }
 
-  func someEnum() -> RuncingMode { return .mince }
+  func someEnum() -> NSRuncingMode { return .mince }
   func protocolClass() -> NSCoding.Type? { return nil }
 
   func zone() -> NSZone? { return nil }

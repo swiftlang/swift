@@ -309,11 +309,6 @@ HonorSwiftNewtypeAttr("enable-swift-newtype",
                       llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-StripNSPrefix("enable-strip-ns-prefix",
-              llvm::cl::desc("Strip the NS prefix from Foundation et al"),
-              llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
     "disable-objc-attr-requires-foundation-module",
     llvm::cl::desc("Allow @objc to be used freely"),
@@ -2785,7 +2780,6 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().Swift3Migration |= options::Swift3Migration;
   InitInvok.getLangOptions().InferImportAsMember |=
     options::InferImportAsMember;
-  InitInvok.getLangOptions().StripNSPrefix |= options::StripNSPrefix;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=

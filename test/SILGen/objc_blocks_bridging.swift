@@ -110,7 +110,7 @@ class Test: NSObject {
 // CHECK:         [[RESULT:%.*]] = apply {{%.*}}([[CLOSURE]])
 // CHECK:         return [[RESULT]]
 
-func clearDraggingItemImageComponentsProvider(_ x: DraggingItem) {
+func clearDraggingItemImageComponentsProvider(_ x: NSDraggingItem) {
   x.imageComponentsProvider = {}
 }
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oGSaP___XFdCb__aGSqCSo7NSArray__
