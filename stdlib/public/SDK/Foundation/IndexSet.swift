@@ -787,7 +787,7 @@ extension IndexSet : CustomStringConvertible, CustomDebugStringConvertible, Cust
 
 /// Iterate two index sets on the boundaries of their ranges. This is where all of the interesting stuff happens for exclusive or, intersect, etc.
 private struct IndexSetBoundaryIterator : IteratorProtocol {
-    private typealias Element = IndexSet.Element
+    typealias Element = IndexSet.Element
     
     private var i1 : IndexSet.RangeView.Iterator
     private var i2 : IndexSet.RangeView.Iterator

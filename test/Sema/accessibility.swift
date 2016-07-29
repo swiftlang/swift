@@ -22,7 +22,7 @@ public struct PublicStruct: PublicProto, InternalProto, FilePrivateProto, Privat
   private func publicReq() {} // expected-error {{method 'publicReq()' must be declared public because it matches a requirement in public protocol 'PublicProto'}} {{3-10=public}}
   private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
   private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
-  private func privateReq() {}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PrivateProto'}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }
@@ -32,7 +32,7 @@ internal struct InternalStruct: PublicProto, InternalProto, FilePrivateProto, Pr
   private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=internal}}
   private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
   private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
-  private func privateReq() {}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PrivateProto'}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }
@@ -42,17 +42,17 @@ fileprivate struct FilePrivateStruct: PublicProto, InternalProto, FilePrivatePro
   private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=fileprivate}}
   private func internalReq() {} // expected-error {{method 'internalReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'InternalProto'}} {{3-10=fileprivate}}
   private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
-  private func privateReq() {}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PrivateProto'}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }
 
 // expected-note@+1 * {{type declared here}}
 private struct PrivateStruct: PublicProto, InternalProto, FilePrivateProto, PrivateProto {
-  private func publicReq() {}
-  private func internalReq() {}
-  private func filePrivateReq() {}
-  private func privateReq() {}
+  private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=fileprivate}}
+  private func internalReq() {} // expected-error {{method 'internalReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'InternalProto'}} {{3-10=fileprivate}}
+  private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PrivateProto'}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }

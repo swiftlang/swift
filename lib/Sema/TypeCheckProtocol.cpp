@@ -1217,11 +1217,9 @@ checkWitnessAccessibility(Accessibility *requiredAccess,
                           bool *isSetter) {
   *isSetter = false;
 
-  // FIXME: Handle "private(set)" requirements.
   *requiredAccess = std::min(Proto->getFormalAccess(), *requiredAccess);
-
-  if (*requiredAccess == Accessibility::Private)
-    return false;
+  if (TC.getLangOpts().EnableSwift3Private)
+    *requiredAccess = std::max(*requiredAccess, Accessibility::FilePrivate);
 
   Accessibility witnessAccess = witness->getFormalAccess(DC);
 
@@ -1239,9 +1237,20 @@ checkWitnessAccessibility(Accessibility *requiredAccess,
     *isSetter = true;
 
     auto ASD = cast<AbstractStorageDecl>(witness);
-    const DeclContext *accessDC = nullptr;
-    if (*requiredAccess == Accessibility::Internal)
+    const DeclContext *accessDC;
+    switch (*requiredAccess) {
+    case Accessibility::Public:
+      accessDC = nullptr;
+      break;
+    case Accessibility::Internal:
       accessDC = DC->getParentModule();
+      break;
+    case Accessibility::FilePrivate:
+    case Accessibility::Private:
+      accessDC = DC->getModuleScopeContext();
+      break;
+    }
+
     if (!ASD->isSetterAccessibleFrom(accessDC))
       return true;
   }
