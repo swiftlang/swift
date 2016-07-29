@@ -1118,6 +1118,7 @@ public:
   ParserResult<Expr> parseExprSuper(bool isExprBasic);
   ParserResult<Expr> parseExprConfiguration();
   ParserResult<Expr> parseExprStringLiteral();
+  ParserResult<Expr> parseExprTypeOf();
 
   /// If the token is an escaped identifier being used as an argument
   /// label, but doesn't need to be, diagnose it.
