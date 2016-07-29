@@ -21,6 +21,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 
@@ -132,8 +133,8 @@ public:
   /// Retrieve an overload choice for a declaration that was found via
   /// dynamic lookup.
   static OverloadChoice getDeclViaDynamic(Type base, ValueDecl *value, bool isFlattened = false) {
-    // assert((!isFlattened || isa<FuncDecl>(value)) &&
-    //        "can only flatten function decls");
+    assert((!isFlattened || isa<FuncDecl>(value)) &&
+           "can only flatten function decls");
     OverloadChoice result;
     result.BaseAndBits.setPointer(base);
     result.DeclOrKind = reinterpret_cast<uintptr_t>(value) | 0x02;
@@ -145,8 +146,8 @@ public:
   /// bridging to an Objective-C class.
   static OverloadChoice getDeclViaBridge(Type base, ValueDecl *value,
                                          bool isFlattened = false) {
-    // assert((!isFlattened || isa<FuncDecl>(value)) &&
-    //        "can only flatten function decls");
+    assert((!isFlattened || isa<FuncDecl>(value)) &&
+           "can only flatten function decls");
     OverloadChoice result;
     result.BaseAndBits.setPointer(base);
     result.BaseAndBits.setInt(IsBridgedBit);
@@ -159,8 +160,8 @@ public:
   /// by unwrapping an optional context type.
   static OverloadChoice getDeclViaUnwrappedOptional(Type base, ValueDecl *value,
                                                     bool isFlattened = false) {
-    // assert((!isFlattened || isa<FuncDecl>(value)) &&
-    //        "can only flatten function decls");
+    assert((!isFlattened || isa<FuncDecl>(value)) &&
+           "can only flatten function decls");
     OverloadChoice result;
     result.BaseAndBits.setPointer(base);
     result.BaseAndBits.setInt(IsUnwrappedOptionalBit);
