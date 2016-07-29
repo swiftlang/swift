@@ -168,7 +168,7 @@ extension Sequence where Iterator.Element : Sequence {
   ///   sequence's elements.
   /// - Returns: The joined sequence of elements.
   ///
-  /// - SeeAlso: `flatten()`
+  /// - SeeAlso: `joined()`
   public func joined<Separator : Sequence>(
     separator: Separator
   ) -> JoinedSequence<Self>
