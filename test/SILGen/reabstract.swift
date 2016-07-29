@@ -48,7 +48,7 @@ func notFun(_ c: inout C, i: Int) {}
 func testInoutOpaque(_ c: C, i: Int) {
   var c = c
   let box = Box(t: notFun)
-  box.t(&c, i: i)
+  box.t(&c, i)
 }
 
 // CHECK-LABEL: sil hidden @_TF10reabstract15testInoutOpaqueFTCS_1C1iSi_T_

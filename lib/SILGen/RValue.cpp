@@ -559,7 +559,17 @@ getElementRange(CanTupleType tupleType, unsigned eltIndex) {
 RValue RValue::extractElement(unsigned n) && {
   assert(isComplete() && "rvalue is not complete");
 
-  auto tupleTy = cast<TupleType>(type);
+  CanTupleType tupleTy = dyn_cast<TupleType>(type);
+	if (!tupleTy) {
+		assert(n == 0);
+    unsigned to = getRValueSize(type);
+		assert(to == values.size());
+		RValue element({llvm::makeArrayRef(values).slice(0, to), type});
+		makeUsed();
+		return element;
+  }
+
+
   auto range = getElementRange(tupleTy, n);
   unsigned from = range.first, to = range.second;
 
@@ -572,8 +582,17 @@ RValue RValue::extractElement(unsigned n) && {
 void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   assert(isComplete() && "rvalue is not complete");
 
+  CanTupleType tupleTy = dyn_cast<TupleType>(type);
+	if (!tupleTy) {
+    unsigned to = getRValueSize(type);
+		assert(to == values.size());
+		elements.push_back({llvm::makeArrayRef(values).slice(0, to), type});
+		makeUsed();
+		return;
+  }
+
   unsigned from = 0;
-  for (auto eltType : cast<TupleType>(type).getElementTypes()) {
+  for (auto eltType : tupleTy.getElementTypes()) {
     unsigned to = from + getRValueSize(eltType);
     elements.push_back({llvm::makeArrayRef(values).slice(from, to - from),
                         eltType});

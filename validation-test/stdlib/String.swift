@@ -896,10 +896,10 @@ StringTests.test("toInt") {
   // then print if the new String is or is not still an Int.
   func testConvertabilityOfStringWithModification(
     _ initialValue: Int,
-    modification: (chars: inout [UTF8.CodeUnit]) -> Void
+    modification: (_ chars: inout [UTF8.CodeUnit]) -> Void
   ) {
     var chars = Array(String(initialValue).utf8)
-    modification(chars: &chars)
+    modification(&chars)
     let str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)
     expectEmpty(Int(str))
   }

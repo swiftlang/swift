@@ -495,13 +495,13 @@ extension String {
 
   /// Enumerates all the lines in a string.
   public func enumerateLines(
-    invoking body: @escaping (line: String, stop: inout Bool) -> ()
+    invoking body: @escaping (_ line: String, _ stop: inout Bool) -> ()
   ) {
     _ns.enumerateLines {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
     in
       var stop_ = false
-      body(line: line, stop: &stop_)
+      body(line, &stop_)
       if stop_ {
         stop.pointee = true
       }
@@ -561,16 +561,16 @@ extension String {
     in range: Range<Index>,
     options opts: EnumerationOptions = [],
     _ body: @escaping (
-      substring: String?, substringRange: Range<Index>,
-      enclosingRange: Range<Index>, inout Bool
+      _ substring: String?, _ substringRange: Range<Index>,
+      _ enclosingRange: Range<Index>, inout Bool
     ) -> ()
   ) {
     _ns.enumerateSubstrings(in: _toNSRange(range), options: opts) {
       var stop_ = false
 
-      body(substring: $0,
-        substringRange: self._range($1),
-        enclosingRange: self._range($2),
+      body($0,
+        self._range($1),
+        self._range($2),
         &stop_)
 
       if stop_ {
@@ -1778,8 +1778,8 @@ extension String {
     _ range: Range<Index>,
     options opts: EnumerationOptions = [],
     _ body: (
-      substring: String?, substringRange: Range<Index>,
-      enclosingRange: Range<Index>, inout Bool
+      _ substring: String?, _ substringRange: Range<Index>,
+      _ enclosingRange: Range<Index>, inout Bool
     ) -> ()
   ) {
     fatalError("unavailable function can't be called")

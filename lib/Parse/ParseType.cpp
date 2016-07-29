@@ -681,7 +681,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       SourceLoc secondNameLoc = std::get<3>(currentLabel);
 
       // True tuples have labels.
-      if (!isFunctionType || !Context.LangOpts.SuppressArgumentLabelsInTypes) {
+      if (!isFunctionType) {
         // If there were two names, complain.
         if (firstNameLoc.isValid() && secondNameLoc.isValid()) {
           auto diag = diagnose(firstNameLoc, diag::tuple_type_multiple_labels);

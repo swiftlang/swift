@@ -31,7 +31,7 @@ struct SomeType {
 class SomeClass { }
 
 // Function types.
-typealias functionType = (in: SomeRange) -> Bool
+typealias functionType = (_ in: SomeRange) -> Bool
 
 // Calls
 func testCalls(_ range: SomeRange) {

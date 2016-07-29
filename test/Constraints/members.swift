@@ -333,7 +333,7 @@ protocol Functional {
   func apply(_ v: Vector) -> Scalar
 }
 protocol Coalgebra {
-  func coproduct(_ f: Functional) -> (v1: Vector, v2: Vector) -> Scalar
+  func coproduct(_ f: Functional) -> (_ v1: Vector, _ v2: Vector) -> Scalar
 }
 
 // Make sure existential is closed early when we partially apply

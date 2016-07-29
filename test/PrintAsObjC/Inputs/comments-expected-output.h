@@ -127,7 +127,7 @@ SWIFT_CLASS("_TtC8comments16ClosureContainer")
   \a combine error: Nothing.
 
 */
-- (void)closureParameterExplodedExplodedWithA:(NSInteger)a combine:(NSInteger (^ _Nonnull)(NSInteger lhs, NSInteger rhs))combine;
+- (void)closureParameterExplodedExplodedWithA:(NSInteger)a combine:(NSInteger (^ _Nonnull)(NSInteger, NSInteger))combine;
 /**
   Partially applies a binary operator.
   \param a The left-hand side to partially apply.
@@ -150,7 +150,7 @@ SWIFT_CLASS("_TtC8comments16ClosureContainer")
   \a combine error: Nothing.
 
 */
-- (void)closureParameterOutlineExplodedWithA:(NSInteger)a combine:(NSInteger (^ _Nonnull)(NSInteger lhs, NSInteger rhs))combine;
+- (void)closureParameterOutlineExplodedWithA:(NSInteger)a combine:(NSInteger (^ _Nonnull)(NSInteger, NSInteger))combine;
 /**
   Partially applies a binary operator.
   \param a The left-hand side to partially apply.
@@ -173,7 +173,7 @@ SWIFT_CLASS("_TtC8comments16ClosureContainer")
   \a combine error: Nothing.
 
 */
-- (void)closureParameterOutlineOutlineWithA:(NSInteger)a combine:(NSInteger (^ _Nonnull)(NSInteger lhs, NSInteger rhs))combine;
+- (void)closureParameterOutlineOutlineWithA:(NSInteger)a combine:(NSInteger (^ _Nonnull)(NSInteger, NSInteger))combine;
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 

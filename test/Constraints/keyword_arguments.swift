@@ -365,10 +365,10 @@ mismatchOverloaded1.method2(5) { $0 }
 // -------------------------------------------
 // Values of function type
 // -------------------------------------------
-func testValuesOfFunctionType(_ f1: (_: Int, arg: Int) -> () ) {
-  f1(3, arg: 5)
-  f1(x: 3, 5) // expected-error{{incorrect argument labels in call (have 'x:_:', expected '_:arg:')}} {{6-9=}} {{12-12=arg: }}
-  f1(3, 5) // expected-error{{missing argument label 'arg:' in call}} {{9-9=arg: }}
+func testValuesOfFunctionType(_ f1: (_: Int, _ arg: Int) -> () ) {
+  f1(3, arg: 5) // expected-error{{extraneous argument label 'arg:' in call}}{{9-14=}}
+  f1(x: 3, 5) // expected-error{{extraneous argument label 'x:' in call}} {{6-9=}} 
+  f1(3, 5)
 }
 
 

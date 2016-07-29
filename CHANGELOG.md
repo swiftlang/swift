@@ -3,6 +3,37 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0111](https://github.com/apple/swift-evolution/blob/master/proposals/0111-remove-arg-label-type-significance.md):
+
+  Argument labels have been removed from Swift function types. Instead, they are
+  part of the name of a function, subscript, or initializer. Calls to a function
+  or initializer, or uses of a subscript, still require argument labels, as they
+  always have:
+
+  ```swift
+    func doSomething(x: Int, y: Int) { }
+    doSomething(x: 0, y: 0)     // argument labels are required
+  ```
+
+  However, unapplied references to functions or initializers no longer carry
+  argument labels. For example:
+
+  ```swift
+  let f = doSomething(x:y:)     // inferred type is now (Int, Int) -> Void
+  ```
+
+  Additionally, explicitly-written function types can no longer carry argument
+  labels, although one can still provide parameter name for documentation
+  purposes using the '_' in the argument label position:
+
+  ```swift
+  typealias CompletionHandler =
+     (token: Token, error: Error?) -> Void   // error: function types cannot have argument labels
+
+  typealias CompletionHandler =
+     (_ token: Token, _ error: Error?) -> Void   // error: okay: names are for documentation purposes
+  ```
+
 * [SE-0025](https://github.com/apple/swift-evolution/blob/master/proposals/0025-scoped-access-level.md): A declaration marked as `private` can now only be accessed within the lexical scope it is declared in (essentially the enclosing curly braces `{}`). A `private` declaration at the top level of a file can be accessed anywhere in that file, as in Swift 2. The access level formerly known as `private` is now called `fileprivate`.
 
 * [SE-0131](https://github.com/apple/swift-evolution/blob/master/proposals/0131-anyhashable.md):

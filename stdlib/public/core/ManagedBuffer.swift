@@ -181,7 +181,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     bufferClass: AnyClass,
     minimumCapacity: Int,
     makingHeaderWith factory:
-      (buffer: AnyObject, capacity: (AnyObject) -> Int) throws -> Header
+      (_ buffer: AnyObject, _ capacity: (AnyObject) -> Int) throws -> Header
   ) rethrows {
     self = ManagedBufferPointer(
       bufferClass: bufferClass, minimumCapacity: minimumCapacity)
@@ -190,8 +190,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     try withUnsafeMutablePointerToHeader {
       $0.initialize(to: 
         try factory(
-          buffer: self.buffer,
-          capacity: {
+          self.buffer,
+          {
             ManagedBufferPointer(unsafeBufferObject: $0).capacity
           }))
     }

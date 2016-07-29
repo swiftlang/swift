@@ -14,4 +14,4 @@
 func a(b: Int = 0) {
 }
 let c = a
-c() // expected-error {{missing argument for parameter 'b' in call}}
+c() // expected-error {{missing argument for parameter #1 in call}}

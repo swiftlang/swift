@@ -74,7 +74,7 @@ struct X2x : P2 { // expected-error{{type 'X2x' does not conform to protocol 'P2
 // Mismatch in parameter types
 struct X2y : P2 { // expected-error{{type 'X2y' does not conform to protocol 'P2'}}
   typealias Assoc = X1a
-  func f1(x: X1b) { } // expected-note{{candidate has non-matching type '(x: X1b) -> ()'}}
+  func f1(x: X1b) { } // expected-note{{candidate has non-matching type '(X1b) -> ()'}}
 }
 
 // Ambiguous deduction
@@ -188,7 +188,7 @@ extension Int : Crankable {}
 // Invalid witnesses.
 protocol P6 {
   func foo(_ x: Int)
-  func bar(x: Int) // expected-note{{protocol requires function 'bar(x:)' with type '(x: Int) -> ()'}}
+  func bar(x: Int) // expected-note{{protocol requires function 'bar(x:)' with type '(Int) -> ()'}}
 }
 struct X6 : P6 { // expected-error{{type 'X6' does not conform to protocol 'P6'}}
   func foo(_ x: Missing) { } // expected-error{{use of undeclared type 'Missing'}}

@@ -85,7 +85,7 @@ public struct LazySequenceOf<S : Sequence, A> : Sequence where S.Iterator.Elemen
   public subscript(i : A) -> A { return i }
 }
 
-public func iterate<A>(_ f : @escaping (A) -> A) -> (x : A) -> LazySequenceOf<Iterate<A>, A>? {
+public func iterate<A>(_ f : @escaping (A) -> A) -> (_ x : A) -> LazySequenceOf<Iterate<A>, A>? {
   return { x in nil }
 }
 
@@ -175,13 +175,13 @@ class Cow : Animal {
 
 struct SpecificAnimal<F:Food> : Animal {
     typealias EdibleFood=F
-    let _eat:(f:F) -> ()
+    let _eat:(_ f:F) -> ()
 
     init<A:Animal>(_ selfie:A) where A.EdibleFood == F {
         _eat = { selfie.eat($0) }
     }
     func eat(_ f:F) {
-        _eat(f:f)
+        _eat(f)
     }
 }
 

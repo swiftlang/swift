@@ -13,7 +13,7 @@ var func1 : () -> ()    // No input, no output.
 var func2 : (Int) -> Int
 var func3 : () -> () -> ()                   // Takes nothing, returns a fn.
 var func3a : () -> (() -> ())                // same as func3
-var func6 : (fn : (Int,Int) -> Int) -> ()    // Takes a fn, returns nothing.
+var func6 : (_ fn : (Int,Int) -> Int) -> ()    // Takes a fn, returns nothing.
 var func7 : () -> (Int,Int,Int)              // Takes nothing, returns tuple.
 
 // Top-Level expressions.  These are 'main' content.
@@ -153,7 +153,7 @@ func test3(_ arg1: Int, arg2: Int) -> Int {
   return 4
 }
 
-func test4() -> ((arg1: Int, arg2: Int) -> Int) {
+func test4() -> ((_ arg1: Int, _ arg2: Int) -> Int) {
   return test3
 }
 
@@ -177,7 +177,7 @@ func w4(_: Int) -> Int { return 4 }
 func b1() {}
 
 func foo1(_ a: Int, b: Int) -> Int {}
-func foo2(_ a: Int) -> (b: Int) -> Int {}
+func foo2(_ a: Int) -> (_ b: Int) -> Int {}
 func foo3(_ a: Int = 2, b: Int = 3) {}
 
 prefix operator ^^

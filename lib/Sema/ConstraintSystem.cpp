@@ -819,9 +819,6 @@ void ConstraintSystem::recordOpenedTypes(
 static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
                                             bool isCurriedInstanceReference,
                                             FunctionRefKind functionRefKind) {
-  // Is this functionality enabled at all?
-  if (!ctx.LangOpts.SuppressArgumentLabelsInTypes) return 0;
-
   // Only applicable to functions. Nothing else should have argument labels in
   // the type.
   auto func = dyn_cast<AbstractFunctionDecl>(decl);

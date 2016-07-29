@@ -68,7 +68,7 @@ func testDefaultArgs2() {
 }
 // DEFAULT_ARGS_2: Begin completions
 // DEFAULT_ARGS_2-DAG: Pattern/ExprSpecific:      ({#(a): Int#})[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_2-DAG: Pattern/ExprSpecific:      ({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_2-DAG: Pattern/ExprSpecific:      ({#(a): Int#}, {#(b): Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_2: End completions
 
 func testDefaultArgs3() {

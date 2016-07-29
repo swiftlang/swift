@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-var func5 : (fn : (Int,Int) -> ()) -> () 
+var func5 : (_ fn : (Int,Int) -> ()) -> () 
 
 // Default arguments for functions.
 func foo3(a: Int = 2, b: Int = 3) {}

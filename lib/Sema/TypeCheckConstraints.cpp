@@ -778,12 +778,9 @@ namespace {
       assert(ExprStack.back() == expr);
       ExprStack.pop_back();
 
-      // When we're suppressing argument labels in types, mark the direct callee
-      // as being a callee.
-      if (TC.Context.LangOpts.SuppressArgumentLabelsInTypes) {
-        if (auto call = dyn_cast<CallExpr>(expr))
-          markDirectCallee(call->getFn());
-      }
+      // Mark the direct callee as being a callee.
+      if (auto call = dyn_cast<CallExpr>(expr))
+        markDirectCallee(call->getFn());
 
       // Fold sequence expressions.
       if (auto seqExpr = dyn_cast<SequenceExpr>(expr)) {
