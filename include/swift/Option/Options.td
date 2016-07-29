@@ -29,6 +29,9 @@ def AutolinkExtractOption : OptionFlag;
 // The option should be accepted by swift -modulewrap
 def ModuleWrapOption : OptionFlag;
 
+// The option should be accepted by swift-format
+def SwiftFormatOption : OptionFlag;
+
 // The option should not be accepted by the driver.
 def NoDriverOption : OptionFlag;
 
@@ -99,7 +102,7 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 
 def help : Flag<["-", "--"], "help">,
-  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption]>,
+  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption, SwiftFormatOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
@@ -121,7 +124,7 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         NoInteractiveOption]>,
+         NoInteractiveOption, SwiftFormatOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -309,6 +312,31 @@ def AssertConfig : Separate<["-"], "assert-config">,
   Flags<[FrontendOption]>,
   HelpText<"Specify the assert_configuration replacement. "
            "Possible values are Debug, Release, Unchecked, DisableReplacement.">;
+
+// Code formatting options
+
+def code_formatting_Group : OptionGroup<"<code formatting options>">;
+
+def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Use tabs for indentation.">;
+
+def inplace : Flag<["-"], "inplace">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Overwrite input file with formatted file.">;
+
+def tab_width : Separate<["-"], "tabwidth">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Width of tab character.">, MetaVarName<"<n>">;
+
+def indent_width : Separate<["-"], "indent-width">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Number of characters to indent.">, MetaVarName<"<n>">;
+
+def line_ranges : Separate<["-"], "line-ranges">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
+           "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
 // File types
 
