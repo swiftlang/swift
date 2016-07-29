@@ -106,9 +106,9 @@ CoreAudioTestSuite.test(
 }
 
 CoreAudioTestSuite.test("AudioBufferList.sizeInBytes(maximumBuffers: Int)") {
-  expectEqual(ablHeaderSize + strideof(AudioBuffer.self),
+  expectEqual(ablHeaderSize + MemoryLayout<AudioBuffer>.stride,
     AudioBufferList.sizeInBytes(maximumBuffers: 1))
-  expectEqual(ablHeaderSize + 16 * strideof(AudioBuffer.self),
+  expectEqual(ablHeaderSize + 16 * MemoryLayout<AudioBuffer>.stride,
     AudioBufferList.sizeInBytes(maximumBuffers: 16))
 }
 

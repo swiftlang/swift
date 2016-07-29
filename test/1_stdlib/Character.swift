@@ -136,13 +136,13 @@ CharacterTests.test("literal") {
 
 CharacterTests.test("sizeof") {
   // FIXME: should be 8.
-  // <rdar://problem/16754935> sizeof(Character.self) is 9, should be 8
+  // <rdar://problem/16754935> MemoryLayout<Character>.size is 9, should be 8
 
-  let size1 = sizeof(Character.self)
+  let size1 = MemoryLayout<Character>.size
   expectTrue(size1 == 8 || size1 == 9)
 
   var a: Character = "a"
-  let size2 = sizeofValue(a)
+  let size2 = MemoryLayout._ofInstance(a).size
   expectTrue(size2 == 8 || size2 == 9)
 
   expectEqual(size1, size2)

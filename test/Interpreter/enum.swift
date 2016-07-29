@@ -440,7 +440,7 @@ struct OptionalTuple<T> {
   }
 }
 func test_optional_generic_tuple<T>(_ a: OptionalTuple<T>) -> T {
-  print("optional pair is same size as pair: \(sizeofValue(a) == sizeof(T)*2)")
+  print("optional pair is same size as pair: \(MemoryLayout._ofInstance(a).size == MemoryLayout<T>.size*2)")
   return a.value!.0
 }
 print("Int result: \(test_optional_generic_tuple(OptionalTuple<Int>((5, 6))))")

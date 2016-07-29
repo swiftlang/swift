@@ -45,7 +45,7 @@ extension String {
 var StringTests = TestSuite("StringTests")
 
 StringTests.test("sizeof") {
-  expectEqual(3 * sizeof(Int.self), sizeof(String.self))
+  expectEqual(3 * MemoryLayout<Int>.size, MemoryLayout<String>.size)
 }
 
 StringTests.test("AssociatedTypes-UTF8View") {
