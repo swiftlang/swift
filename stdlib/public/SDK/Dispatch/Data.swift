@@ -76,7 +76,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 		var size = 0
 		let data = __dispatch_data_create_map(__wrapped, &ptr, &size)
         let contentPtr = ptr!.bindMemory(
-          to: ContentType.self, capacity: size / strideof(ContentType.self))
+          to: ContentType.self, capacity: size / MemoryLayout<ContentType>.stride)
 		defer { _fixLifetime(data) }
 		return try body(contentPtr)
 	}
@@ -114,8 +114,8 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	///
 	/// - parameter buffer: The buffer of bytes to append. The size is calculated from `SourceType` and `buffer.count`.
 	public mutating func append<SourceType>(_ buffer : UnsafeBufferPointer<SourceType>) {
-		buffer.baseAddress!.withMemoryRebound(to: UInt8.self, capacity: buffer.count * strideof(SourceType.self)) {
-			self.append($0, count: buffer.count * sizeof(SourceType.self))
+		buffer.baseAddress!.withMemoryRebound(to: UInt8.self, capacity: buffer.count * MemoryLayout<SourceType>.size) {
+			self.append($0, count: buffer.count * MemoryLayout<SourceType>.size)
 		}
 	}
 
@@ -149,7 +149,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	
 	/// Copy the contents of the data into a buffer.
 	///
-	/// This function copies the bytes in `range` from the data into the buffer. If the count of the `range` is greater than `sizeof(DestinationType) * buffer.count` then the first N bytes will be copied into the buffer.
+	/// This function copies the bytes in `range` from the data into the buffer. If the count of the `range` is greater than `MemoryLayout<DestinationType>.size * buffer.count` then the first N bytes will be copied into the buffer.
 	/// - precondition: The range must be within the bounds of the data. Otherwise `fatalError` is called.
 	/// - parameter buffer: A buffer to copy the data into.
 	/// - parameter range: A range in the data to copy into the buffer. If the range is empty, this function will return 0 without copying anything. If the range is nil, as much data as will fit into `buffer` is copied.
@@ -167,9 +167,9 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 			precondition(r.endIndex >= 0)
 			precondition(r.endIndex <= cnt, "The range is outside the bounds of the data")
 			
-			copyRange = r.startIndex..<(r.startIndex + Swift.min(buffer.count * sizeof(DestinationType.self), r.count))
+			copyRange = r.startIndex..<(r.startIndex + Swift.min(buffer.count * MemoryLayout<DestinationType>.size, r.count))
 		} else {
-			copyRange = 0..<Swift.min(buffer.count * sizeof(DestinationType.self), cnt)
+			copyRange = 0..<Swift.min(buffer.count * MemoryLayout<DestinationType>.size, cnt)
 		}
 		
 		guard !copyRange.isEmpty else { return 0 }

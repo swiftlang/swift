@@ -88,7 +88,8 @@
     "BridgeStorage.swift",
     "Builtin.swift",
     "VarArgs.swift",
-    "CTypes.swift"
+    "CTypes.swift",
+    "MemoryLayout.swift"
   ],
   "Reflection": [
     "Mirrors.swift",

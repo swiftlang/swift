@@ -35,7 +35,7 @@ public struct UnsafeBufferPointerIterator<Element>
 /// contiguously in memory, presenting a collection interface to the
 /// underlying elements.
 ///
-/// The pointer should be aligned to `alignof(Element.self)`.
+/// The pointer should be aligned to `MemoryLayout<Element>.alignment`.
 public struct Unsafe${Mutable}BufferPointer<Element>
   : ${Mutable}Indexable, ${Mutable}Collection, RandomAccessCollection {
 

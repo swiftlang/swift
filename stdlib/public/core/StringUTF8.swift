@@ -38,7 +38,7 @@ extension _StringCore {
     if _fastPath(elementWidth == 1) {
       // How many UTF-16 code units might we use before we've filled up
       // our _UTF8Chunk with UTF-8 code units?
-      let utf16Count = Swift.min(sizeof(_UTF8Chunk.self), count - i)
+      let utf16Count = Swift.min(MemoryLayout<_UTF8Chunk>.size, count - i)
 
       var result: _UTF8Chunk = ~0 // Start with all bits set
 
@@ -253,7 +253,7 @@ extension String {
 
       /// A Buffer value with the high byte set
       internal static var _bufferHiByte: Buffer {
-        return 0xFF << numericCast((sizeof(Buffer.self) &- 1) &* 8)
+        return 0xFF << numericCast((MemoryLayout<Buffer>.size &- 1) &* 8)
       }
       
       /// Consume a byte of the given buffer: shift out the low byte
