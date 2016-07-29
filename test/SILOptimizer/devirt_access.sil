@@ -19,7 +19,7 @@ class K {
 //CHECK-NEXT: return
 sil @_TFC4test1K4pingfS0_FT_Si : $@convention(method) (@guaranteed K) -> Int {
 bb0(%0 : $K):
-  %1 = class_method %0 : $K, #K.pong!1 : (K) -> () -> Int , $@convention(method) (@guaranteed K) -> Int // user: %2
+  %1 = class_method %0 : $K, #K.pong!1 : (K) -> () -> Int, $@convention(method) (@guaranteed K) -> Int // user: %2
   %2 = apply %1(%0) : $@convention(method) (@guaranteed K) -> Int // user: %3
   return %2 : $Int                                // id: %3
 }
@@ -94,7 +94,7 @@ sil @Case1 : $@convention(thin) (@owned X) -> Int {
 bb0(%0 : $X):
   debug_value %0 : $X, let, name "a" // id: %1
   strong_retain %0 : $X                           // id: %2
-  %3 = class_method %0 : $X, #X.ping!1 : (X) -> () -> Int , $@convention(method) (@guaranteed X) -> Int // user: %4
+  %3 = class_method %0 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int // user: %4
   %4 = apply %3(%0) : $@convention(method) (@guaranteed X) -> Int // user: %6
   strong_release %0 : $X                          // id: %5
   return %4 : $Int                                // id: %6
@@ -113,7 +113,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y, let, name "a" // id: %1
   strong_retain %0 : $Y                           // id: %2
   %3 = upcast %0 : $Y to $X                       // users: %4, %5
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int , $@convention(method) (@guaranteed X) -> Int // user: %5
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int // user: %5
   %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int // user: %7
   strong_release %0 : $Y                          // id: %6
   return %5 : $Int                                // id: %7
@@ -126,7 +126,7 @@ sil @Case3 : $@convention(thin) (@owned A) -> Int {
 bb0(%0 : $A):
   debug_value %0 : $A, let, name "a" // id: %1
   strong_retain %0 : $A                           // id: %2
-  %3 = class_method %0 : $A, #A.ping!1 : (A) -> () -> Int , $@convention(method) (@guaranteed A) -> Int // user: %4
+  %3 = class_method %0 : $A, #A.ping!1 : (A) -> () -> Int, $@convention(method) (@guaranteed A) -> Int // user: %4
   %4 = apply %3(%0) : $@convention(method) (@guaranteed A) -> Int // user: %6
   strong_release %0 : $A                          // id: %5
   return %4 : $Int                                // id: %6
@@ -139,7 +139,7 @@ sil @Case4 : $@convention(thin) (@owned B) -> Int {
 bb0(%0 : $B):
   debug_value %0 : $B, let, name "a" // id: %1
   strong_retain %0 : $B                           // id: %2
-  %3 = class_method %0 : $B, #B.ping!1 : (B) -> () -> Int , $@convention(method) (@guaranteed B) -> Int // user: %4
+  %3 = class_method %0 : $B, #B.ping!1 : (B) -> () -> Int, $@convention(method) (@guaranteed B) -> Int // user: %4
   %4 = apply %3(%0) : $@convention(method) (@guaranteed B) -> Int // user: %6
   strong_release %0 : $B                          // id: %5
   return %4 : $Int                                // id: %6

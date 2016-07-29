@@ -1447,19 +1447,24 @@ public:
   void visitClassMethodInst(ClassMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
-    *this << " , ";
+    *this << ", ";
     *this << AMI->getType();
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
-    *this << " , ";
+    *this << ", ";
     *this << AMI->getType();
   }
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {
+    PrintOptions QualifiedSILTypeOptions =
+        PrintOptions::printQualifiedSILType();
+    QualifiedSILTypeOptions.CurrentModule = WMI->getModule().getSwiftModule();
     if (WMI->isVolatile())
       *this << "[volatile] ";
-    *this << "$" << WMI->getLookupType() << ", " << WMI->getMember();
+    *this << "$" << WMI->getLookupType() << ", " << WMI->getMember() << " : ";
+    WMI->getMember().getDecl()->getInterfaceType().print(
+        PrintState.OS, QualifiedSILTypeOptions);
     if (!WMI->getTypeDependentOperands().empty()) {
       *this << ", ";
       *this << getIDAndType(WMI->getTypeDependentOperands()[0].get());
@@ -2182,10 +2187,30 @@ void ValueBase::printInContext(llvm::raw_ostream &OS) const {
 
 void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_vtable " << getClass()->getName() << " {\n";
+  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   for (auto &entry : getEntries()) {
     OS << "  ";
     entry.Method.print(OS);
     OS << ": ";
+
+    bool HasSingleImplementation = false;
+    switch (entry.Method.kind) {
+    default:
+      break;
+    case SILDeclRef::Kind::IVarDestroyer:
+    case SILDeclRef::Kind::Destroyer:
+    case SILDeclRef::Kind::Deallocator:
+      HasSingleImplementation = true;
+    }
+    // No need to emit the signature for methods that may have only
+    // single implementation, e.g. for destructors.
+    if (!HasSingleImplementation) {
+      QualifiedSILTypeOptions.CurrentModule =
+          entry.Method.getDecl()->getDeclContext()->getParentModule();
+      entry.Method.getDecl()->getInterfaceType().print(OS,
+                                                       QualifiedSILTypeOptions);
+      OS << " : ";
+    }
     if (entry.Linkage !=
         stripExternalFromLinkage(entry.Implementation->getLinkage())) {
       OS << getLinkageString(entry.Linkage);
@@ -2202,6 +2227,7 @@ void SILVTable::dump() const {
 
 void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   PrintOptions Options = PrintOptions::printSIL();
+  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   OS << "sil_witness_table ";
   printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
   if (isFragile())
@@ -2227,6 +2253,13 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       OS << "method ";
       methodWitness.Requirement.print(OS);
       OS << ": ";
+      QualifiedSILTypeOptions.CurrentModule =
+          methodWitness.Requirement.getDecl()
+              ->getDeclContext()
+              ->getParentModule();
+      methodWitness.Requirement.getDecl()->getInterfaceType().print(
+          OS, QualifiedSILTypeOptions);
+      OS << " : ";
       if (methodWitness.Witness) {
         methodWitness.Witness->printName(OS);
         OS << "\t// "
@@ -2284,6 +2317,7 @@ void SILWitnessTable::dump() const {
 
 void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   // sil_default_witness_table [<Linkage>] <Protocol> <MinSize>
+  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   OS << "sil_default_witness_table ";
   printLinkage(OS, getLinkage(), ForDefinition);
   OS << getProtocol()->getName() << " {\n";
@@ -2298,6 +2332,11 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << "  method ";
     witness.getRequirement().print(OS);
     OS << ": ";
+    QualifiedSILTypeOptions.CurrentModule =
+        witness.getRequirement().getDecl()->getDeclContext()->getParentModule();
+    witness.getRequirement().getDecl()->getInterfaceType().print(
+        OS, QualifiedSILTypeOptions);
+    OS << " : ";
     witness.getWitness()->printName(OS);
     OS << "\t// "
        << demangleSymbolAsString(witness.getWitness()->getName());

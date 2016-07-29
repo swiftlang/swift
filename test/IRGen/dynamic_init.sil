@@ -24,7 +24,7 @@ bb0(%0 : $@thick C.Type):
   // CHECK:   [[CTOR:%[0-9]+]] = load %C12dynamic_init1C* (%swift.type*)*, %C12dynamic_init1C* (%swift.type*)** [[VTABLE_OFFSET]], align 8
   // CHECK:   [[CTOR_I8:%[0-9]+]] = bitcast %C12dynamic_init1C* (%swift.type*)* [[CTOR]] to i8*
   // CHECK:   [[CTOR_FN:%[0-9]+]] = bitcast i8* [[CTOR_I8]] to %C12dynamic_init1C* (%swift.type*)*
-  %2 = class_method %0 : $@thick C.Type, #C.init!allocator.1 : (C.Type) -> () -> C , $@convention(method) (@thick C.Type) -> @owned C
+  %2 = class_method %0 : $@thick C.Type, #C.init!allocator.1 : (C.Type) -> () -> C, $@convention(method) (@thick C.Type) -> @owned C
   // CHECK:   [[RESULT:%[0-9]+]] = call %C12dynamic_init1C* [[CTOR_FN]](%swift.type* %0)
   %3 = apply %2(%0) : $@convention(method) (@thick C.Type) -> @owned C
   // CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%C12dynamic_init1C*)*)(%C12dynamic_init1C* [[RESULT]])

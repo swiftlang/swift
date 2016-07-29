@@ -1059,11 +1059,11 @@ sil  @_TFC4main4PingcfMS0_FT_S0_ : $@convention(method) (@owned Ping) -> @owned 
 // CHECK-NEXT:      return
 sil @_TF4main4ringFCS_4PingT_ : $@convention(thin) (@owned Ping) -> () {
 bb0(%0 : $Ping):
-  %1 = class_method %0 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping , $@convention(method) (@guaranteed Ping) -> @owned Ping
-  %2 = class_method %0 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping , $@convention(method) (@guaranteed Ping) -> @owned Ping
-  %3 = class_method %0 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping , $@convention(method) (@guaranteed Ping) -> @owned Ping
-  %4 = class_method %0 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping , $@convention(method) (@guaranteed Ping) -> @owned Ping
-  %5 = class_method %0 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping , $@convention(method) (@guaranteed Ping) -> @owned Ping
+  %1 = class_method %0 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping, $@convention(method) (@guaranteed Ping) -> @owned Ping
+  %2 = class_method %0 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping, $@convention(method) (@guaranteed Ping) -> @owned Ping
+  %3 = class_method %0 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping, $@convention(method) (@guaranteed Ping) -> @owned Ping
+  %4 = class_method %0 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping, $@convention(method) (@guaranteed Ping) -> @owned Ping
+  %5 = class_method %0 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping, $@convention(method) (@guaranteed Ping) -> @owned Ping
   %6 = apply %1(%0) : $@convention(method) (@guaranteed Ping) -> @owned Ping
   %7 = apply %2(%0) : $@convention(method) (@guaranteed Ping) -> @owned Ping
   %8 = apply %3(%0) : $@convention(method) (@guaranteed Ping) -> @owned Ping
@@ -1126,7 +1126,7 @@ sil hidden [transparent] [thunk] @_TTWC1p1TS_9ReachableS_FS1_5reachuRq_S1__fq_FT
 bb0(%0 : $*T):
   %1 = load %0 : $*T                              // users: %2, %3, %4, %5
   strong_retain %1 : $T                           // id: %2
-  %3 = class_method %1 : $T, #T.reach!1 : (T) -> () -> () , $@convention(method) (@guaranteed T) -> () // user: %4
+  %3 = class_method %1 : $T, #T.reach!1 : (T) -> () -> (), $@convention(method) (@guaranteed T) -> () // user: %4
   %4 = apply %3(%1) : $@convention(method) (@guaranteed T) -> () // user: %6
   strong_release %1 : $T                          // id: %5
   return %4 : $()                                 // id: %6
@@ -1249,7 +1249,7 @@ protocol Pingable { func ping() }
 
 // CHECK-LABEL: CSE_Existential_Simple
 // CHECK: open_existential_addr %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073")
-// CHECK: witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1, %2
+// CHECK: witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1 : {{.*}}, %2
 // CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable>(%2)
 // CHECK: open_existential_addr
 // CHECK: witness_method

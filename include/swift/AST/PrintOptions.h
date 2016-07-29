@@ -455,6 +455,12 @@ struct PrintOptions {
     return result;
   }
 
+  static PrintOptions printQualifiedSILType() {
+    PrintOptions result = PrintOptions::printSIL();
+    result.FullyQualifiedTypesIfAmbiguous = true;
+    return result;
+  }
+
   /// \brief Retrieve the set of options that prints everything.
   ///
   /// This is only intended for debug output.
