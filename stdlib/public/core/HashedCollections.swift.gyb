@@ -3215,7 +3215,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
-      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
+      theState.itemsPtr = _AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     }
 
@@ -3548,7 +3548,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
-      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
+      theState.itemsPtr = _AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       theState.extra.0 = CUnsignedLong(nativeStorage.startIndex.offset)
     }

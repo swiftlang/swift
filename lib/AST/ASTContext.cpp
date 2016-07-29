@@ -781,7 +781,7 @@ NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {
 NominalTypeDecl *ASTContext::getAutoreleasingUnsafeMutablePointerDecl() const {
   if (!Impl.AutoreleasingUnsafeMutablePointerDecl)
     Impl.AutoreleasingUnsafeMutablePointerDecl
-      = findStdlibType(*this, "AutoreleasingUnsafeMutablePointer", 1);
+      = findStdlibType(*this, "_AutoreleasingUnsafeMutablePointer", 1);
   
   return Impl.AutoreleasingUnsafeMutablePointerDecl;
 }

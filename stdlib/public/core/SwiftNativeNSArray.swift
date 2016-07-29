@@ -106,7 +106,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       objects in
       enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       enumerationState.itemsPtr =
-        AutoreleasingUnsafeMutablePointer(objects.baseAddress)
+        _AutoreleasingUnsafeMutablePointer(objects.baseAddress)
       enumerationState.state = 1
       state.pointee = enumerationState
       return objects.count

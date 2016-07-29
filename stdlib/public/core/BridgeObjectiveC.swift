@@ -327,7 +327,7 @@ internal var _nilNativeObject: AnyObject? {
 ///
 /// Passing pointers to mutable arrays of ObjC class pointers is not
 /// directly supported. Unlike `UnsafeMutablePointer<Pointee>`,
-/// `AutoreleasingUnsafeMutablePointer<Pointee>` must reference storage that
+/// `_AutoreleasingUnsafeMutablePointer<Pointee>` must reference storage that
 /// does not own a reference count to the referenced
 /// value. UnsafeMutablePointer's operations, by contrast, assume that
 /// the referenced storage owns values loaded from or stored to it.
@@ -336,7 +336,7 @@ internal var _nilNativeObject: AnyObject? {
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
 @_fixed_layout
-public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
+public struct _AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   : Equatable, _Pointer {
 
   public let _rawValue: Builtin.RawPointer
@@ -359,7 +359,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
-    /// AutoreleasingUnsafeMutablePointers are assumed to reference a
+    /// _AutoreleasingUnsafeMutablePointers are assumed to reference a
     /// value with __autoreleasing ownership semantics, like 'NSFoo**'
     /// in ARC. This autoreleases the argument before trivially
     /// storing it to the referenced memory.
@@ -401,7 +401,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// This is inherently unsafe; UnsafeMutablePointer assumes the
   /// referenced memory has +1 strong ownership semantics, whereas
-  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
+  /// _AutoreleasingUnsafeMutablePointer implies +0 semantics.
   @_transparent public
   init<U>(_ from: UnsafeMutablePointer<U>) {
     self._rawValue = from._rawValue
@@ -413,7 +413,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// This is inherently unsafe; UnsafeMutablePointer assumes the
   /// referenced memory has +1 strong ownership semantics, whereas
-  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
+  /// _AutoreleasingUnsafeMutablePointer implies +0 semantics.
   @_transparent public
   init?<U>(_ from: UnsafeMutablePointer<U>?) {
     guard let unwrapped = from else { return nil }
@@ -442,7 +442,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   }
 }
 
-extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
+extension _AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
@@ -451,8 +451,8 @@ extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
 
 @_transparent
 public func == <Pointee>(
-  lhs: AutoreleasingUnsafeMutablePointer<Pointee>,
-  rhs: AutoreleasingUnsafeMutablePointer<Pointee>
+  lhs: _AutoreleasingUnsafeMutablePointer<Pointee>,
+  rhs: _AutoreleasingUnsafeMutablePointer<Pointee>
 ) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
@@ -505,7 +505,7 @@ internal struct _CocoaFastEnumerationStackBuf {
   }
 }
 
-extension AutoreleasingUnsafeMutablePointer {
+extension _AutoreleasingUnsafeMutablePointer {
   @available(*, unavailable, renamed: "Pointee")
   public typealias Memory = Pointee
 
