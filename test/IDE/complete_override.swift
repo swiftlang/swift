@@ -463,7 +463,7 @@ class TestClassWithThrows : HasThrowing, HasThrowingProtocol {
 // HAS_THROWING: Begin completions
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         func foo() throws {|}; name=foo() throws
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func bar() throws {|}; name=bar() throws
-// FIXME: make the below require to print @escaping
+// FIXME: SR-2214 make the below require printing @escaping 
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func baz(x: {{(@escaping )?}}() throws -> ()) rethrows {|}; name=baz(x: {{(@escaping )?}}() throws -> ()) rethrows
 // HAS_THROWING-DAG: Decl[Constructor]/Super:            init() throws {|}; name=init() throws
 // HAS_THROWING: End completions

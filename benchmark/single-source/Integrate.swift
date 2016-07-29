@@ -20,7 +20,7 @@ class Integrate {
 
   let fun: (Double) -> Double
 
-  init (f: (Double) -> Double) {
+  init (f: @escaping (Double) -> Double) {
     fun = f
   }
     
