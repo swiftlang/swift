@@ -3137,7 +3137,7 @@ AnyFunctionType *AnyFunctionType::getUncurriedFunction() {
   auto innerFunction = getResult()->castTo<AnyFunctionType>();
   SmallVector<TupleTypeElt, 4> params{getInput()->getDesugaredType()};
 
-  if (auto tuple = innerFunction->getInput()->getAs<TupleType>())
+  if (auto tuple = dyn_cast<TupleType>(innerFunction->getInput().getPointer()))
     params.append(tuple->getElements().begin(), tuple->getElements().end());
   else
     params.push_back(innerFunction->getInput()->getDesugaredType());
