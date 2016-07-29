@@ -504,7 +504,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       .Case("private", Accessibility::Private)
       .Case("fileprivate", Accessibility::FilePrivate)
       .Case("internal", Accessibility::Internal)
-      .Case("public", Accessibility::Public);
+      .Case("public", Accessibility::Public)
+      .Case("open", Accessibility::Public); // FIXME: Actually implement this.
 
     if (access == Accessibility::FilePrivate &&
         !Context.LangOpts.EnableSwift3Private) {
@@ -1971,6 +1972,10 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     case tok::identifier:
       // FIXME: This is ridiculous, this all needs to be sucked into the
       // declparsing goop.
+      if (Tok.isContextualKeyword("open")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Accessibility);
+        continue;
+      }
       if (Tok.isContextualKeyword("weak") ||
           Tok.isContextualKeyword("unowned")) {
         parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Ownership);
