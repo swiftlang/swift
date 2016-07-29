@@ -75,7 +75,8 @@ protocol CustomNameType2 {}
 }
 
 // CHECK-LABEL: @interface MyObject : NSObject <NSCoding>
-// CHECK-NEXT: init
+// CHECK-NEXT: initWithCoder
+// CHECK-NEXT: init SWIFT_UNAVAILABLE
 // CHECK-NEXT: @end
 // NEGATIVE-NOT: @protocol NSCoding
 class MyObject : NSObject, NSCoding {

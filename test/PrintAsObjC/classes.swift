@@ -122,6 +122,25 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
   init(forFun: ()) { }
 }
 
+// CHECK-LABEL: @interface InheritedInitializers
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initForFun SWIFT_UNAVAILABLE;
+// CHECK-NEXT: @end
+@objc class InheritedInitializers : Initializers {
+  override init() {
+    super.init()
+  }
+}
+
+// CHECK-LABEL: @interface InheritedInitializersAgain
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+@objc class InheritedInitializersAgain : InheritedInitializers {
+  override init() {
+    super.init()
+  }
+}
+
 // NEGATIVE-NOT: NotObjC
 class NotObjC {}
 

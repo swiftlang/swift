@@ -139,9 +139,7 @@ public:
 
   bool shouldInclude(const ValueDecl *VD) {
     return (VD->isObjC() || VD->getAttrs().hasAttribute<CDeclAttr>()) &&
-      VD->getFormalAccess() >= minRequiredAccess &&
-      !(isa<ConstructorDecl>(VD) && 
-        cast<ConstructorDecl>(VD)->hasStubImplementation());
+      VD->getFormalAccess() >= minRequiredAccess;
   }
 
 private:
@@ -479,7 +477,9 @@ private:
 
     // Swift designated initializers are Objective-C designated initializers.
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
-      if (ctor->isDesignatedInit() &&
+      if (ctor->hasStubImplementation()) {
+        os << " SWIFT_UNAVAILABLE";
+      } else if (ctor->isDesignatedInit() &&
           !isa<ProtocolDecl>(ctor->getDeclContext())) {
         os << " OBJC_DESIGNATED_INITIALIZER";
       }
@@ -1960,6 +1960,9 @@ public:
            "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME) "
              "SWIFT_ENUM(_type, _name)\n"
            "# endif\n"
+           "#endif\n"
+           "#if !defined(SWIFT_UNAVAILABLE)\n"
+           "# define SWIFT_UNAVAILABLE __attribute__((unavailable))\n"
            "#endif\n"
            ;
     static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
