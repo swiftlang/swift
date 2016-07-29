@@ -144,7 +144,11 @@ struct ConformerByLocalType : TypeProto {
 }
 
 private struct PrivateConformerByLocalType : TypeProto {
-  private struct TheType {} // okay
+  struct TheType {} // okay
+}
+
+private struct PrivateConformerByLocalTypeBad : TypeProto {
+  private struct TheType {} // expected-error {{struct 'TheType' must be as accessible as its enclosing type because it matches a requirement in protocol 'TypeProto'}} {{3-10=fileprivate}}
 }
 #endif
 

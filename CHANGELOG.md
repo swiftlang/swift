@@ -3,6 +3,8 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0025](https://github.com/apple/swift-evolution/blob/master/proposals/0025-scoped-access-level.md): A declaration marked as `private` can now only be accessed within the lexical scope it is declared in (essentially the enclosing curly braces `{}`). A `private` declaration at the top level of a file can be accessed anywhere in that file, as in Swift 2. The access level formerly known as `private` is now called `fileprivate`.
+
 * [SE-0131](https://github.com/apple/swift-evolution/blob/master/proposals/0131-anyhashable.md):
   The standard library provides a new type `AnyHashable` for use in heterogenous
   hashed collections. Untyped `NSDictionary` and `NSSet` APIs from Objective-C
