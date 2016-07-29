@@ -97,7 +97,7 @@ NSNumberTests.test("Bool.init(_: NSNumber)") {
 }
 
 func isTypePreservingNSNumber(_ n: NSNumber) -> Bool {
-  let className = NSStringFromClass(type(of: n))
+  let className = String(describing: type(of: n))
   return className.range(of: "_SwiftTypePreservingNSNumber") != nil
 }
 
@@ -265,7 +265,7 @@ NSNumberTests.test("${Self} bridges to NSNumber (actually _SwiftTypePreservingNS
   expectEqual(AnyHashable(explicitNSNumber), AnyHashable(explicitNSNumber))
 
   let ah = AnyHashable(bridgedNSNumber)
-  expectEqual("${Self}", String(describing: type(of: ah.base)))
+  expectEqual(${Self}.self, type(of: ah.base))
 %   if Self in ['Float', 'Double', 'CGFloat']:
   // FIXME: remove special cases for floating point when we fix their
   // conformances to Equatable.

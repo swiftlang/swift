@@ -89,9 +89,9 @@ class TestIndexPath : TestIndexPathSuper {
             IndexPath(indexes: [1, 2, 3]),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("IndexPath", String(describing: type(of: anyHashables[0].base)))
-        expectEqual("IndexPath", String(describing: type(of: anyHashables[1].base)))
-        expectEqual("IndexPath", String(describing: type(of: anyHashables[2].base)))
+        expectEqual(IndexPath.self, type(of: anyHashables[0].base))
+        expectEqual(IndexPath.self, type(of: anyHashables[1].base))
+        expectEqual(IndexPath.self, type(of: anyHashables[2].base))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -103,9 +103,9 @@ class TestIndexPath : TestIndexPathSuper {
             NSIndexPath(index: 2),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("IndexPath", String(describing: type(of: anyHashables[0].base)))
-        expectEqual("IndexPath", String(describing: type(of: anyHashables[1].base)))
-        expectEqual("IndexPath", String(describing: type(of: anyHashables[2].base)))
+        expectEqual(IndexPath.self, type(of: anyHashables[0].base))
+        expectEqual(IndexPath.self, type(of: anyHashables[1].base))
+        expectEqual(IndexPath.self, type(of: anyHashables[2].base))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
