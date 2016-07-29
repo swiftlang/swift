@@ -248,6 +248,12 @@ public func expectOptionalEqual${Generic}(
 
 %end
 
+public func expectEqual(
+  _ expected: Any.Type, _ actual: Any.Type, ${TRACE}
+) {
+  expectEqualTest(expected, actual, ${trace}, showFrame: false) { $0 == $1 }
+}
+
 public func expectLT<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
   if !(lhs < rhs) {
     expectationFailure("\(lhs) < \(rhs)", trace: ${trace})

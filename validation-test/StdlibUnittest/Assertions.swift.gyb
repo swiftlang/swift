@@ -219,5 +219,23 @@ AssertionsTestSuite.test("expectEqual<T : Equatable, U : Equatable, V : Equatabl
   }
 }
 
+AssertionsTestSuite.test("expectEqual(_: Any.Type, _: Any.Type)") {
+  expectEqual(Int.self, Int.self)
+  expectFailure {
+    expectEqual(Int.self, Double.self)
+  }
+
+  class B {}
+  class D : B {}
+  expectEqual(B.self, B.self)
+  expectFailure {
+    expectEqual(B.self, D.self)
+  }
+  expectFailure {
+    expectEqual(D.self, B.self)
+  }
+  expectEqual(D.self, D.self)
+}
+
 runAllTests()
 
