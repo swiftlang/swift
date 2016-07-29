@@ -419,7 +419,7 @@ struct ThickFunctionParts {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: () -> ()) {
+public func reflect(function: @escaping () -> ()) {
   let fn = UnsafeMutablePointer<ThickFunction0>.allocate(
     capacity: sizeof(ThickFunction0.self))
   fn.initialize(to: ThickFunction0(function: function))
@@ -434,7 +434,7 @@ public func reflect(function: () -> ()) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: (Int) -> ()) {
+public func reflect(function: @escaping (Int) -> ()) {
   let fn =
   UnsafeMutablePointer<ThickFunction1>.allocate(
     capacity: sizeof(ThickFunction1.self))
@@ -450,7 +450,7 @@ public func reflect(function: (Int) -> ()) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: (Int, String) -> ()) {
+public func reflect(function: @escaping (Int, String) -> ()) {
   let fn = UnsafeMutablePointer<ThickFunction2>.allocate(
       capacity: sizeof(ThickFunction2.self))
   fn.initialize(to: ThickFunction2(function: function))
@@ -465,7 +465,7 @@ public func reflect(function: (Int, String) -> ()) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: (Int, String, AnyObject?) -> ()) {
+public func reflect(function: @escaping (Int, String, AnyObject?) -> ()) {
   let fn = UnsafeMutablePointer<ThickFunction3>.allocate(
       capacity: sizeof(ThickFunction3.self))
   fn.initialize(to: ThickFunction3(function: function))

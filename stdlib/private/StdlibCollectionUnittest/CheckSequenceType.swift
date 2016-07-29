@@ -97,13 +97,13 @@ public struct EnumerateTest {
 public struct FilterTest {
   public let expected: [Int]
   public let sequence: [Int]
-  public let includeElement: (Int) -> Bool
+  public let includeElement: @escaping (Int) -> Bool
   public let loc: SourceLoc
 
   public init(
     _ expected: [Int],
     _ sequence: [Int],
-    _ includeElement: (Int) -> Bool,
+    _ includeElement: @escaping (Int) -> Bool,
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
@@ -139,13 +139,13 @@ public struct FindTest {
 public struct FlatMapTest {
   public let expected: [Int32]
   public let sequence: [Int]
-  public let transform: (Int) -> [Int32]
+  public let transform: @escaping (Int) -> [Int32]
   public let loc: SourceLoc
 
   public init(
     expected: [Int32],
     sequence: [Int],
-    transform: (Int) -> [Int32],
+    transform: @escaping (Int) -> [Int32],
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
@@ -158,13 +158,13 @@ public struct FlatMapTest {
 public struct FlatMapToOptionalTest {
   public let expected: [Int32]
   public let sequence: [Int]
-  public let transform: (Int) -> Int32?
+  public let transform: @escaping (Int) -> Int32?
   public let loc: SourceLoc
 
   public init(
     _ expected: [Int32],
     _ sequence: [Int],
-    _ transform: (Int) -> Int32?,
+    _ transform: @escaping (Int) -> Int32?,
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
@@ -224,13 +224,13 @@ public struct LexicographicallyPrecedesTest {
 public struct MapTest {
   public let expected: [Int32]
   public let sequence: [Int]
-  public let transform: (Int) -> Int32
+  public let transform: @escaping (Int) -> Int32
   public let loc: SourceLoc
 
   public init(
     _ expected: [Int32],
     _ sequence: [Int],
-    _ transform: (Int) -> Int32,
+    _ transform: @escaping (Int) -> Int32,
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
@@ -1452,12 +1452,12 @@ extension TestSuite {
     SequenceWithEquatableElement : Sequence
   >(
     _ testNamePrefix: String = "",
-    makeSequence: ([S.Iterator.Element]) -> S,
-    wrapValue: (OpaqueValue<Int>) -> S.Iterator.Element,
-    extractValue: (S.Iterator.Element) -> OpaqueValue<Int>,
+    makeSequence: @escaping ([S.Iterator.Element]) -> S,
+    wrapValue: @escaping (OpaqueValue<Int>) -> S.Iterator.Element,
+    extractValue: @escaping (S.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeSequenceOfEquatable: ([SequenceWithEquatableElement.Iterator.Element]) -> SequenceWithEquatableElement,
-    wrapValueIntoEquatable: (MinimalEquatableValue) -> SequenceWithEquatableElement.Iterator.Element,
+    makeSequenceOfEquatable: @escaping ([SequenceWithEquatableElement.Iterator.Element]) -> SequenceWithEquatableElement,
+    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> SequenceWithEquatableElement.Iterator.Element,
     extractValueFromEquatable: ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all

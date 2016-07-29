@@ -8,7 +8,8 @@ import StdlibUnittest
 
 var HashingTestSuite = TestSuite("Hashing")
 
-func avalancheTest(_ bits: Int, _ hashUnderTest: (UInt64) -> UInt64, _ pValue: Double) {
+func avalancheTest(_ bits: Int, _ hashUnderTest: @escaping (UInt64) -> UInt64, 
+                   _ pValue: Double) {
   let testsInBatch = 100000
   let testData = randArray64(testsInBatch)
   let testDataHashed = Array(testData.lazy.map { hashUnderTest($0) })
