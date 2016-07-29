@@ -39,6 +39,11 @@ class SILFunction;
 } // end namespace swift
 
 namespace swift {
+/// Return true if this is a retain instruction.
+bool isRetainInstruction(SILInstruction *II);
+
+/// Return true if this is a release instruction.
+bool isReleaseInstruction(SILInstruction *II);
 
 using RetainList = llvm::SmallVector<SILInstruction *, 1>;
 using ReleaseList = llvm::SmallVector<SILInstruction *, 1>;

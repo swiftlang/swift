@@ -32,6 +32,19 @@ using namespace swift;
 using BasicBlockRetainValue = std::pair<SILBasicBlock *, SILValue>;
 
 //===----------------------------------------------------------------------===//
+//                             Utility Analysis
+//===----------------------------------------------------------------------===//
+
+bool swift::isRetainInstruction(SILInstruction *I) {
+  return isa<StrongRetainInst>(I) || isa<RetainValueInst>(I);
+}
+
+
+bool swift::isReleaseInstruction(SILInstruction *I) {
+  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
+}
+
+//===----------------------------------------------------------------------===//
 //                             Decrement Analysis
 //===----------------------------------------------------------------------===//
 

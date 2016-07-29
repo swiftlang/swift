@@ -72,6 +72,7 @@
 #define DEBUG_TYPE "sil-rr-code-motion"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
@@ -94,19 +95,8 @@ STATISTIC(NumRetainsSunk, "Number of retains sunk");
 STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
 llvm::cl::opt<bool> DisableRRCodeMotion("disable-rr-cm", llvm::cl::init(false));
-llvm::cl::opt<bool> DisableIfWithCriticalEdge("disable-with-critical-edge", llvm::cl::init(false));
-
-//===----------------------------------------------------------------------===//
-//                             Utility 
-//===----------------------------------------------------------------------===//
-
-static bool isRetainInstruction(SILInstruction *I) {
-  return isa<StrongRetainInst>(I) || isa<RetainValueInst>(I);
-}
-
-static bool isReleaseInstruction(SILInstruction *I) {
-  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
-}
+llvm::cl::opt<bool>
+DisableIfWithCriticalEdge("disable-with-critical-edge", llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 //                             Block State 
@@ -205,7 +195,8 @@ protected:
 
 public:
   /// Constructor.
-  CodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA, SILFunction *F,
+  CodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+                    SILFunction *F,
                     PostOrderFunctionInfo *PO, AliasAnalysis *AA,
                     RCIdentityFunctionInfo *RCFI)
     : MultiIteration(true), BPA(BPA), F(F), PO(PO), AA(AA), RCFI(RCFI) {}
