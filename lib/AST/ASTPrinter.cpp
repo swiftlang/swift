@@ -3748,8 +3748,9 @@ public:
     } else if (info.isNoEscape()) {
       // autoclosure implies noescape.
       Printer << "@noescape ";
-    } else if (info.isExplicitlyEscaping()) {
-      Printer << "@escaping ";
+    } else {
+        Printer << "@escaping ";
+    }
     }
 
     if (Options.PrintFunctionRepresentationAttrs) {

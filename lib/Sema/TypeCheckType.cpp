@@ -1874,7 +1874,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     FunctionType::ExtInfo extInfo(rep,
                                   attrs.has(TAK_autoclosure),
                                   attrs.has(TAK_noescape),
-                                  attrs.has(TAK_escaping),
                                   fnRepr->throws());
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);
