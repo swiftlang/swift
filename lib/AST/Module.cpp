@@ -1008,8 +1008,13 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
   // Record whether they come from re-exported modules.
   // FIXME: We ought to prefer operators elsewhere in this module before we
   // check imports.
+  auto ownModule = SF.getParentModule();
   ImportedOperatorsMap<OP_DECL> importedOperators;
   for (auto &imported : SourceFile::Impl::getImportsForSourceFile(SF)) {
+    // Protect against source files that contrive to import their own modules.
+    if (imported.first.second == ownModule)
+      continue;
+
     bool isExported =
         imported.second.contains(SourceFile::ImportFlags::Exported);
     if (!includePrivate && !isExported)
