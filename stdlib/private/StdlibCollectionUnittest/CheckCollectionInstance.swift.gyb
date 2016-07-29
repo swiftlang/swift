@@ -102,7 +102,7 @@ internal func _checkIncrementalAdvance<Instances, BaseCollection>(
       -baseCollection.distance(from: limit, to: i)
 
     var offset: BaseCollection.IndexDistance = 0
-    for _ in 0...(d * sign).toIntMax() {
+    for _ in 0...Int64(d * sign) {
       let j = baseCollection.index(i, offsetBy: offset)
       let k = baseCollection.index(i, offsetBy: offset + sign, limitedBy: limit) ?? limit
       let jAtLimit = offset == d
@@ -356,8 +356,7 @@ public func check${Traversal}Collection<
 
   let expectedArray = Array(expected)
 
-  expectEqual(
-    expectedArray.count.toIntMax(), collection.count.toIntMax(), ${trace})
+  expectTrue(expectedArray.count == collection.count, ${trace})
 
   for _ in 0..<3 {
     do {
