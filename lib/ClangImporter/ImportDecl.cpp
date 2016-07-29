@@ -2490,6 +2490,10 @@ namespace {
         if (!result)
           return nullptr;
 
+        // HACK: Make sure PrintAsObjC always omits the 'enum' tag for
+        // option set enums.
+        Impl.DeclsWithSuperfluousTypedefs.insert(decl);
+
         enumeratorContext = result;
         break;
       }
