@@ -236,3 +236,20 @@ Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be infer
 // <rdar://problem/21718955> Swift useless error: cannot invoke 'foo' with no arguments
 Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}}
 
+// <rdar://problem/27515965> Type checker doesn't enforce same-type constraint if associated type is Any
+protocol P27515965 {
+  associatedtype R
+  func f() -> R
+}
+
+struct S27515965 : P27515965 {
+  func f() -> Any { return self }
+}
+
+struct V27515965 {
+  init<T : P27515965>(_ tp: T) where T.R == Float {}
+}
+
+func test(x: S27515965) -> V27515965 {
+  return V27515965(x) // expected-error {{generic parameter 'T' could not be inferred}}
+}
