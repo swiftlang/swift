@@ -2122,10 +2122,9 @@ commit_to_conversions:
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyConstructionConstraint(Type valueType, 
-                                                 FunctionType *fnType,
-                                                 unsigned flags,
-                                                 ConstraintLocator *locator) {
+ConstraintSystem::simplifyConstructionConstraint(
+    Type valueType, FunctionType *fnType, unsigned flags,
+    FunctionRefKind functionRefKind, ConstraintLocator *locator) {
   // Desugar the value type.
   auto desugarValueType = valueType->getDesugaredType();
 
@@ -2231,7 +2230,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
   addValueMemberConstraint(MetatypeType::get(valueType, TC.Context), name,
-                           FunctionType::get(tv, resultType),
+                           FunctionType::get(tv, resultType), functionRefKind,
                            getConstraintLocator(
                              fnLocator, 
                              ConstraintLocator::ConstructorMember));
@@ -2617,7 +2616,8 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// referenced.
 MemberLookupResult ConstraintSystem::
 performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
-                    Type baseTy, ConstraintLocator *memberLocator,
+                    Type baseTy, FunctionRefKind functionRefKind,
+                    ConstraintLocator *memberLocator,
                     bool includeInaccessibleMembers) {
   Type baseObjTy = baseTy->getRValueType();
 
@@ -2843,8 +2843,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         }
       }
       
-      result.addViable(OverloadChoice(baseTy, ctor,
-                                      /*isSpecialized=*/false, *this));
+      result.addViable(OverloadChoice(baseTy, ctor, /*isSpecialized=*/false,
+                                      functionRefKind));
     }
 
 
@@ -2887,7 +2887,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         return result.markErrorAlreadyDiagnosed();
       
       result.addViable(OverloadChoice(baseTy, candidate.first,
-                                      /*isSpecialized=*/false));
+                                      /*isSpecialized=*/false,
+                                      functionRefKind));
     }
     
     return result;
@@ -3000,13 +3001,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       assert(cand->getDeclContext()->isTypeContext() && "Dynamic lookup bug");
 
       // We found this declaration via dynamic lookup, record it as such.
-      result.addViable(OverloadChoice::getDeclViaDynamic(baseTy, cand));
+      result.addViable(OverloadChoice::getDeclViaDynamic(baseTy, cand,
+                                                         functionRefKind));
       return;
     }
 
     // If we have a bridged type, we found this declaration via bridging.
     if (isBridged) {
-      result.addViable(OverloadChoice::getDeclViaBridge(bridgedType, cand));
+      result.addViable(OverloadChoice::getDeclViaBridge(bridgedType, cand,
+                                                        functionRefKind));
       return;
     }
 
@@ -3017,11 +3020,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
         ->getInstanceType()
         ->getAnyOptionalObjectType());
-      result.addViable(OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy,
-                                                                   cand));
+      result.addViable(
+        OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
+                                                    functionRefKind));
     } else {
       result.addViable(OverloadChoice(ovlBaseTy, cand,
-                                      /*isSpecialized=*/false, *this));
+                                      /*isSpecialized=*/false,
+                                      functionRefKind));
     }
   };
 
@@ -3130,7 +3135,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   MemberLookupResult result =
     performMemberLookup(constraint.getKind(), constraint.getMember(),
-                        baseTy, constraint.getLocator(),
+                        baseTy, constraint.getFunctionRefKind(),
+                        constraint.getLocator(),
                         /*includeInaccessibleMembers*/false);
   
   Type memberTy = constraint.getSecondType();
@@ -3183,6 +3189,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                                        baseObjTy->getOptionalObjectType(),
                                        constraint.getSecondType(),
                                        constraint.getMember(),
+                                       constraint.getFunctionRefKind(),
                                        constraint.getLocator()));
       return SolutionKind::Solved;
     }
@@ -3215,6 +3222,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
                              constraint.getMember(),
                              constraint.getSecondType(),
+                             constraint.getFunctionRefKind(),
                              constraint.getLocator());
     return SolutionKind::Solved;
   }
@@ -3442,7 +3450,8 @@ retry:
   if (auto meta2 = dyn_cast<AnyMetatypeType>(desugar2)) {
     // Construct the instance from the input arguments.
     return simplifyConstructionConstraint(meta2->getInstanceType(), func1,
-                                          flags, 
+                                          flags,
+                                          FunctionRefKind::SingleApply,
                                           getConstraintLocator(outerLocator));
   }
 
@@ -3740,14 +3749,17 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                        btv2, TC.getInt8Type(DC),
                                        DeclName(),
+                                       FunctionRefKind::Compound,
                                        getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
                                         btv2, TC.getUInt8Type(DC),
                                         DeclName(),
+                                        FunctionRefKind::Compound,
                                         getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
                                         btv2, TC.Context.TheEmptyTupleType,
                                         DeclName(),
+                                        FunctionRefKind::Compound,
                                         getConstraintLocator(locator));
         
         Constraint *disjunctionChoices[] = {int8Con, uint8Con, voidCon};
@@ -4104,6 +4116,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
             Constraint::create(*this,
                                ConstraintKind::BridgedToObjectiveC,
                                arg, Type(), DeclName(),
+                               FunctionRefKind::Compound,
                                getConstraintLocator(
                                  locator.withPathElement(
                                    LocatorPathElt::getGenericArgument(

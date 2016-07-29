@@ -94,6 +94,10 @@ def disable_testable_attr_requires_testable_module :
   Flag<["-"], "disable-testable-attr-requires-testable-module">,
   HelpText<"Disable checking of @testable">;
 
+def suppress_argument_labels_in_types :
+  Flag<["-"], "suppress-argument-labels-in-types">,
+  HelpText<"SE-0111: Suppress argument labels in types">;
+
 def enable_target_os_checking :
   Flag<["-"], "enable-target-os-checking">,
   HelpText<"Enable checking the target OS of serialized modules">;

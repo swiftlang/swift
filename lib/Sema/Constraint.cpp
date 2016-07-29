@@ -39,12 +39,16 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
 }
 
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, 
-                       DeclName Member, ConstraintLocator *locator,
+                       DeclName Member, FunctionRefKind functionRefKind,
+                       ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
   : Kind(Kind), HasRestriction(false), HasFix(false), IsActive(false),
     RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
     Types { First, Second, Member }, Locator(locator)
 {
+  TheFunctionRefKind = static_cast<unsigned>(functionRefKind);
+  assert(getFunctionRefKind() == functionRefKind);
+
   switch (Kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -128,7 +132,7 @@ Constraint::Constraint(ConstraintKind kind,
 Constraint::Constraint(ConstraintKind kind, Fix fix,
                        Type first, Type second, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(kind), TheFix(fix.getKind()), FixData(fix.getData()), 
+  : Kind(kind), FixData(fix.getData()), TheFix(fix.getKind()),
     HasRestriction(false), HasFix(true),
     IsActive(false), RememberChoice(false), IsFavored(false),
     NumTypeVariables(typeVars.size()),
@@ -165,7 +169,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::OptionalObject:
     return create(cs, getKind(), getFirstType(), getSecondType(),
-                  DeclName(), getLocator());
+                  DeclName(), FunctionRefKind::Compound, getLocator());
 
   case ConstraintKind::BindOverload:
     return createBindOverload(cs, getFirstType(), getOverloadChoice(),
@@ -175,17 +179,17 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::TypeMember:
     return create(cs, getKind(), getFirstType(), Type(), getMember(), 
-                  getLocator());
+                  getFunctionRefKind(), getLocator());
 
   case ConstraintKind::Defaultable:
     return create(cs, getKind(), getFirstType(), getSecondType(),
-                  getMember(), getLocator());
+                  getMember(), getFunctionRefKind(), getLocator());
 
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
   case ConstraintKind::BridgedToObjectiveC:
     return create(cs, getKind(), getFirstType(), Type(), DeclName(),
-                  getLocator());
+                  FunctionRefKind::Compound, getLocator());
 
   case ConstraintKind::Disjunction:
     return createDisjunction(cs, getNestedConstraints(), getLocator());
@@ -514,6 +518,7 @@ static void uniqueTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVars) {
 
 Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind, 
                                Type first, Type second, DeclName member,
+                               FunctionRefKind functionRefKind,
                                ConstraintLocator *locator) {
   // Collect type variables.
   SmallVector<TypeVariableType *, 4> typeVars;
@@ -526,7 +531,8 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
   // Create the constraint.
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(kind, first, second, member, locator, typeVars);
+  return new (mem) Constraint(kind, first, second, member, functionRefKind,
+                              locator, typeVars);
 }
 
 Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 

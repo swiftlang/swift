@@ -78,6 +78,9 @@ public:
   /// Whether the location information is invalid.
   bool isInvalid() const { return getBaseNameLoc().isInvalid(); }
 
+  /// Whether this was written as a compound name.
+  bool isCompound() const { return NumArgumentLabels > 0; }
+
   /// Retrieve the location of the base name.
   SourceLoc getBaseNameLoc() const {
     return getSourceLocs()[BaseNameIndex];
