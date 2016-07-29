@@ -34,7 +34,7 @@ extension TKSmartCard {
   }
 
   @available(OSX 10.12, *)
-  public func withSession<T>(_ body: () throws -> T) throws -> T {
+  public func withSession<T>(_ body: @escaping () throws -> T) throws -> T {
     var result: T? = nil
     try self.__inSession(executeBlock: {
       (errorPointer: NSErrorPointer) -> Bool in
