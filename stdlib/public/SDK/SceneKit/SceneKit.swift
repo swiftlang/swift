@@ -170,10 +170,10 @@ extension SCNGeometryElement {
       fatalError("Expected constant number of indices per primitive")
     }
     self.init(
-      data: Data(bytes: indices, count: indexCount * MemoryLayout<IndexType>.size),
+      data: Data(bytes: indices, count: indexCount * MemoryLayout<IndexType>.stride),
       primitiveType: primitiveType,
       primitiveCount: primitiveCount,
-      bytesPerIndex: MemoryLayout<IndexType>.size)
+      bytesPerIndex: MemoryLayout<IndexType>.stride)
     _fixLifetime(indices)
   }
 }
