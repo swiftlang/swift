@@ -812,7 +812,10 @@ namespace {
         if (outputOrigType.isTuple() &&
             outputOrigType.getNumTupleElements() == 1) {
           outputOrigType = outputOrigType.getTupleElementType(0);
-          outputSubstType = cast<TupleType>(outputSubstType).getElementType(0);
+          if (auto outputSubstTuple = dyn_cast<TupleType>(outputSubstType)) {
+            if (outputSubstTuple->getNumElements() > 0)
+              outputSubstType = outputSubstTuple.getElementType(0);
+          }
           return translate(inputOrigType, inputSubstType,
                            outputOrigType, outputSubstType);
         }

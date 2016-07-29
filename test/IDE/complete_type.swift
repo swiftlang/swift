@@ -637,6 +637,8 @@ typealias TypeInTypealias1 = #^TYPE_IN_TYPEALIAS_1^#
 
 typealias TypeInTypealias2 = (#^TYPE_IN_TYPEALIAS_2^#
 
+func resyncParser0() {}
+
 typealias TypeInTypealias3 = ((#^TYPE_IN_TYPEALIAS_3^#
 
 func resyncParser1() {}

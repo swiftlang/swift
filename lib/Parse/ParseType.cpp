@@ -531,6 +531,10 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   unsigned EllipsisIdx;
   SmallVector<TypeRepr *, 8> ElementsR;
 
+  // We keep track of the labels separately, and apply them at the end.
+  SmallVector<std::tuple<Identifier, SourceLoc, Identifier, SourceLoc>, 4>
+    Labels;
+
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
                                   tok::comma, /*OptionalSep=*/false,
                                   /*AllowSepAfterLast=*/false,
@@ -545,18 +549,30 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       hasAnyInOut = true;
       hasValidInOut = false;
     }
-    // If the tuple element starts with "ident :", then
-    // the identifier is an element tag, and it is followed by a type
-    // annotation.
-    if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+    // If the tuple element starts with a potential argument label followed by a
+    // ':' or another potential argument label, then the identifier is an
+    // element tag, and it is followed by a type annotation.
+    if (Tok.canBeArgumentLabel() &&
+        (peekToken().is(tok::colon) || peekToken().canBeArgumentLabel())) {
       // Consume the name
       Identifier name;
       if (!Tok.is(tok::kw__))
         name = Context.getIdentifier(Tok.getText());
       SourceLoc nameLoc = consumeToken();
 
+      // If there is a second name, consume it as well.
+      Identifier secondName;
+      SourceLoc secondNameLoc;
+      if (Tok.canBeArgumentLabel()) {
+        if (!Tok.is(tok::kw__))
+          secondName = Context.getIdentifier(Tok.getText());
+        secondNameLoc = consumeToken();
+      }
+
       // Consume the ':'.
-      consumeToken(tok::colon);
+      if (!consumeIf(tok::colon))
+        diagnose(Tok, diag::expected_parameter_colon);
+
       SourceLoc postColonLoc = Tok.getLoc();
 
       // Consume 'inout' if present.
@@ -566,7 +582,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
       SourceLoc extraneousInOutLoc;
       while (consumeIf(tok::kw_inout, extraneousInOutLoc)) {
-        diagnose(Tok.getLoc(), diag::parameter_inout_var_let_repeated)
+        diagnose(Tok, diag::parameter_inout_var_let_repeated)
           .fixItRemove(extraneousInOutLoc);
       }
 
@@ -589,9 +605,17 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       if (InOutLoc.isValid())
         type = makeParserResult(new (Context) InOutTypeRepr(type.get(),
                                                             InOutLoc));
-      
-      ElementsR.push_back(
-          new (Context) NamedTypeRepr(name, type.get(), nameLoc));
+
+      // Record the label. We will look at these at the end.
+      if (Labels.empty()) {
+        Labels.assign(ElementsR.size(),
+                      std::make_tuple(Identifier(), SourceLoc(),
+                                      Identifier(), SourceLoc()));
+      }
+      Labels.push_back(std::make_tuple(name, nameLoc,
+                                       secondName, secondNameLoc));
+
+      ElementsR.push_back(type.get());
     } else {
       // Otherwise, this has to be a type.
       ParserResult<TypeRepr> type = parseType();
@@ -602,6 +626,11 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       if (InOutLoc.isValid())
         type = makeParserResult(new (Context) InOutTypeRepr(type.get(),
                                                             InOutLoc));
+
+      if (!Labels.empty()) {
+        Labels.push_back(std::make_tuple(Identifier(), SourceLoc(),
+                                         Identifier(), SourceLoc()));
+      }
 
       ElementsR.push_back(type.get());
     }
@@ -636,6 +665,55 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
   if (EllipsisLoc.isInvalid())
     EllipsisIdx = ElementsR.size();
+
+  // If there were any labels, figure out which labels should go into the type
+  // representation.
+  if (!Labels.empty()) {
+    assert(Labels.size() == ElementsR.size());
+    bool isFunctionType = Tok.isAny(tok::arrow, tok::kw_throws,
+                                    tok::kw_rethrows);
+    for (unsigned i : indices(ElementsR)) {
+      auto &currentLabel = Labels[i];
+
+      Identifier firstName = std::get<0>(currentLabel);
+      SourceLoc firstNameLoc = std::get<1>(currentLabel);
+      Identifier secondName = std::get<2>(currentLabel);
+      SourceLoc secondNameLoc = std::get<3>(currentLabel);
+
+      // True tuples have labels.
+      if (!isFunctionType || !Context.LangOpts.SuppressArgumentLabelsInTypes) {
+        // If there were two names, complain.
+        if (firstNameLoc.isValid() && secondNameLoc.isValid()) {
+          auto diag = diagnose(firstNameLoc, diag::tuple_type_multiple_labels);
+          if (firstName.empty()) {
+            diag.fixItRemoveChars(firstNameLoc, ElementsR[i]->getStartLoc());
+          } else {
+            diag.fixItRemove(
+              SourceRange(Lexer::getLocForEndOfToken(SourceMgr,firstNameLoc),
+                          secondNameLoc));
+          }
+        }
+
+        // Form the named type representation.
+        ElementsR[i] = new (Context) NamedTypeRepr(firstName, ElementsR[i],
+                                                   firstNameLoc);
+        continue;
+      }
+
+      // If there was a first name, complain; arguments in function types are
+      // always unlabeled.
+      if (firstNameLoc.isValid() && !firstName.empty()) {
+        auto diag = diagnose(firstNameLoc, diag::function_type_argument_label,
+                             firstName);
+        if (secondNameLoc.isInvalid())
+          diag.fixItInsert(firstNameLoc, "_ ");
+        else if (secondName.empty())
+          diag.fixItRemoveChars(firstNameLoc, ElementsR[i]->getStartLoc());
+        else
+          diag.fixItReplace(SourceRange(firstNameLoc), "_");
+      }
+    }
+  }
 
   return makeParserResult(Status,
                           TupleTypeRepr::create(Context, ElementsR,
@@ -1042,8 +1120,13 @@ bool Parser::canParseTypeTupleBody() {
 
       // If the tuple element starts with "ident :", then it is followed
       // by a type annotation.
-      if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+      if (Tok.canBeArgumentLabel() && 
+          (peekToken().is(tok::colon) || peekToken().canBeArgumentLabel())) {
         consumeToken();
+        if (Tok.canBeArgumentLabel()) {
+          consumeToken();
+          if (!Tok.is(tok::colon)) return false;
+        }
         consumeToken(tok::colon);
 
         // Parse attributes then a type.

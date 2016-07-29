@@ -436,6 +436,7 @@ namespace {
     Expr *buildDeclRef(ValueDecl *decl, DeclNameLoc loc, Type openedType,
                        ConstraintLocatorBuilder locator,
                        bool specialized, bool implicit,
+                       FunctionRefKind functionRefKind,
                        AccessSemantics semantics) {
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
@@ -481,8 +482,10 @@ namespace {
                   refExpr = new (ctx) MemberRefExpr(base, SourceLoc(), witness,
                                                     loc, /*Implicit=*/true);
                 } else {
-                  refExpr = new (ctx) DeclRefExpr(witness, loc,
-                                                  /*Implicit=*/false);
+                  auto declRefExpr =  new (ctx) DeclRefExpr(witness, loc,
+                                                            /*Implicit=*/false);
+                  declRefExpr->setFunctionRefKind(functionRefKind);
+                  refExpr = declRefExpr;
                 }
 
                 if (tc.typeCheckExpression(refExpr, cs.DC,
@@ -508,8 +511,8 @@ namespace {
 
         return buildMemberRef(base, openedType, SourceLoc(), decl,
                               loc, openedFnType->getResult(),
-                              locator, locator, implicit, semantics,
-                              /*isDynamic=*/false);
+                              locator, locator, implicit, functionRefKind,
+                              semantics, /*isDynamic=*/false);
       }
 
       // If this is a declaration with generic function type, build a
@@ -523,8 +526,11 @@ namespace {
                       genericFn, dc, openedType,
                       getConstraintSystem().getConstraintLocator(locator),
                       substitutions);
-        return new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
-                                     loc, implicit, semantics, type);
+        auto declRefExpr =
+          new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
+                                loc, implicit, semantics, type);
+        declRefExpr->setFunctionRefKind(functionRefKind);
+        return declRefExpr;
       }
 
       auto type = simplifyType(openedType);
@@ -539,7 +545,10 @@ namespace {
         return nullptr;
       }
         
-      return new (ctx) DeclRefExpr(decl, loc, implicit, semantics, type);
+      auto declRefExpr = new (ctx) DeclRefExpr(decl, loc, implicit, semantics,
+                                               type);
+      declRefExpr->setFunctionRefKind(functionRefKind);
+      return declRefExpr;
     }
 
     /// Describes an opened existential that has not yet been closed.
@@ -778,8 +787,8 @@ namespace {
                          ValueDecl *member, DeclNameLoc memberLoc,
                          Type openedType, ConstraintLocatorBuilder locator,
                          ConstraintLocatorBuilder memberLocator,
-                         bool Implicit, AccessSemantics semantics,
-                         bool isDynamic) {
+                         bool Implicit, FunctionRefKind functionRefKind,
+                         AccessSemantics semantics, bool isDynamic) {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
@@ -866,7 +875,8 @@ namespace {
       if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
         if ((isa<FuncDecl>(func) &&
              (cast<FuncDecl>(func)->hasDynamicSelf() ||
-              (openedExistential && cast<FuncDecl>(func)->hasArchetypeSelf()))) ||
+              (openedExistential &&
+               cast<FuncDecl>(func)->hasArchetypeSelf()))) ||
             isPolymorphicConstructor(func)) {
           refTy = refTy->replaceCovariantResultType(containerTy,
                     func->getNumParameterLists());
@@ -901,8 +911,9 @@ namespace {
         assert(semantics == AccessSemantics::Ordinary &&
                "Direct property access doesn't make sense for this");
         assert(!dynamicSelfFnType && "No reference type to convert to");
-        Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
+        auto ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
         ref->setType(refTy);
+        ref->setFunctionRefKind(functionRefKind);
         return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
       }
 
@@ -959,6 +970,7 @@ namespace {
         Expr *ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
                                                        memberLoc);
         ref->setImplicit(Implicit);
+        // FIXME: FunctionRefKind
 
         // Compute the type of the reference.
         Type refType = simplifyType(openedType);
@@ -1005,9 +1017,11 @@ namespace {
       }
       
       // Handle all other references.
-      Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit,
-                                            semantics);
-      ref->setType(refTy);
+      auto declRefExpr = new (context) DeclRefExpr(memberRef, memberLoc,
+                                                   Implicit, semantics);
+      declRefExpr->setFunctionRefKind(functionRefKind);
+      declRefExpr->setType(refTy);
+      Expr *ref = declRefExpr;
 
       // If the reference needs to be converted, do so now.
       if (dynamicSelfFnType) {
@@ -1404,8 +1418,8 @@ namespace {
 
       // Compute the concrete reference.
       ConcreteDeclRef ref;
-      Type resultTy = ctor->getInitializerInterfaceType();
-      if (resultTy->is<GenericFunctionType>()) {
+      Type resultTy;
+      if (ctor->getInitializerInterfaceType()->is<GenericFunctionType>()) {
         // Compute the reference to the generic constructor.
         SmallVector<Substitution, 4> substitutions;
         resultTy = solution.computeSubstitutions(
@@ -1416,19 +1430,22 @@ namespace {
                      substitutions);
 
         ref = ConcreteDeclRef(ctx, ctor, substitutions);
-
-        // The constructor was opened with the allocating type, not the
-        // initializer type. Map the former into the latter.
-        auto resultFnTy = resultTy->castTo<FunctionType>();
-        auto selfTy = resultFnTy->getInput()->getRValueInstanceType();
-        if (!selfTy->hasReferenceSemantics())
-          selfTy = InOutType::get(selfTy);
-
-        resultTy = FunctionType::get(selfTy, resultFnTy->getResult(),
-                                     resultFnTy->getExtInfo());
       } else {
+        Type containerTy = ctor->getDeclContext()->getDeclaredTypeOfContext();
+        resultTy = openedFullType->replaceCovariantResultType(
+                     containerTy, ctor->getNumParameterLists());
         ref = ConcreteDeclRef(ctor);
       }
+
+      // The constructor was opened with the allocating type, not the
+      // initializer type. Map the former into the latter.
+      auto resultFnTy = resultTy->castTo<FunctionType>();
+      auto selfTy = resultFnTy->getInput()->getRValueInstanceType();
+      if (!selfTy->hasReferenceSemantics())
+        selfTy = InOutType::get(selfTy);
+      
+      resultTy = FunctionType::get(selfTy, resultFnTy->getResult(),
+                                   resultFnTy->getExtInfo());
 
       // Build the constructor reference.
       return new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit,
@@ -1449,10 +1466,10 @@ namespace {
       tc.validateDecl(fn);
 
       ConcreteDeclRef fnDeclRef(fn);
-      Expr *fnRef = new (tc.Context) DeclRefExpr(fnDeclRef,
-                                                 DeclNameLoc(loc),
-                                                 /*Implicit=*/true);
+      auto fnRef = new (tc.Context) DeclRefExpr(fnDeclRef, DeclNameLoc(loc),
+                                                /*Implicit=*/true);
       fnRef->setType(fn->getInterfaceType());
+      fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
       Expr *call = CallExpr::createImplicit(tc.Context, fnRef, { value }, { });
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
@@ -1531,6 +1548,7 @@ namespace {
                                                 /*implicit*/ true,
                                                 AccessSemantics::Ordinary,
                                                 bridgeFnTy);
+      fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
       Expr *call = CallExpr::createImplicit(tc.Context, fnRef, valueParen,
                                             { Identifier() });
       call->setType(bridgeTy);
@@ -1629,9 +1647,12 @@ namespace {
       }
 
       ConcreteDeclRef fnSpecRef(tc.Context, fn, Subs);
-      Expr *fnRef = new (tc.Context) DeclRefExpr(fnSpecRef,
-                                                 DeclNameLoc(object->getStartLoc()),
-                                                 /*Implicit=*/true);
+      auto fnRef = new (tc.Context) DeclRefExpr(fnSpecRef,
+                                                DeclNameLoc(
+                                                  object->getStartLoc()),
+                                                /*Implicit=*/true);
+      fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+
       TypeSubstitutionMap subMap;
       auto genericParam = fnGenericParams[0];
       subMap[genericParam->getCanonicalType()->castTo<SubstitutableType>()]
@@ -2128,6 +2149,7 @@ namespace {
                            DeclNameLoc(segment->getStartLoc()),
                            choice.openedType,
                            locator, locator, /*Implicit=*/true,
+                           choice.choice.getFunctionRefKind(),
                            AccessSemantics::Ordinary,
                            /*isDynamic=*/false);
         ApplyExpr *apply =
@@ -2237,6 +2259,7 @@ namespace {
       return buildDeclRef(decl, expr->getNameLoc(), selected->openedFullType,
                           locator, expr->isSpecialized(),
                           expr->isImplicit(),
+                          expr->getFunctionRefKind(),
                           expr->getAccessSemantics());
     }
 
@@ -2272,6 +2295,7 @@ namespace {
 
       return buildDeclRef(decl, expr->getNameLoc(), selected.openedFullType,
                           locator, expr->isSpecialized(), expr->isImplicit(),
+                          choice.getFunctionRefKind(),
                           AccessSemantics::Ordinary);
     }
 
@@ -2310,6 +2334,7 @@ namespace {
                             cs.getConstraintLocator(expr),
                             memberLocator,
                             expr->isImplicit(),
+                            selected.choice.getFunctionRefKind(),
                             expr->getAccessSemantics(),
                             isDynamic);
     }
@@ -2362,6 +2387,7 @@ namespace {
                                    cs.getConstraintLocator(expr),
                                    memberLocator,
                                    expr->isImplicit(),
+                                   selected.choice.getFunctionRefKind(),
                                    AccessSemantics::Ordinary,
                                    isDynamic);
       if (!result)
@@ -2395,6 +2421,7 @@ namespace {
                            DeclNameLoc nameLoc, bool implicit,
                            ConstraintLocator *ctorLocator,
                            ConstructorDecl *ctor,
+                           FunctionRefKind functionRefKind,
                            Type openedType) {
       // If the subexpression is a metatype, build a direct reference to the
       // constructor.
@@ -2405,6 +2432,7 @@ namespace {
                                 cs.getConstraintLocator(expr)),
                               ctorLocator,
                               implicit,
+                              functionRefKind,
                               AccessSemantics::Ordinary,
                               /*isDynamic=*/false);
       }
@@ -2472,7 +2500,8 @@ namespace {
         auto choice = selected->choice;
         auto *ctor = cast<ConstructorDecl>(choice.getDecl());
         return applyCtorRefExpr(expr, base, dotLoc, nameLoc, implicit,
-                                ctorLocator, ctor, selected->openedFullType);
+                                ctorLocator, ctor, choice.getFunctionRefKind(),
+                                selected->openedFullType);
       }
 
       // Determine the declaration selected for this overloaded reference.
@@ -2534,6 +2563,7 @@ namespace {
                                      cs.getConstraintLocator(expr),
                                      memberLocator,
                                      implicit,
+                                     selected.choice.getFunctionRefKind(),
                                      AccessSemantics::Ordinary,
                                      isDynamic);
 
@@ -3418,6 +3448,8 @@ namespace {
       }
       DeclRefExpr *fnRef = new (ctx) DeclRefExpr(undefinedDecl, DeclNameLoc(),
                                                  /*Implicit=*/true);
+      fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+
       StringRef msg = "attempt to evaluate editor placeholder";
       Expr *argExpr = new (ctx) StringLiteralExpr(msg, E->getLoc(),
                                                   /*implicit*/true);
@@ -6188,7 +6220,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                  selected->openedType,
                                  locator,
                                  ctorLocator,
-                                 /*Implicit=*/true, AccessSemantics::Ordinary,
+                                 /*Implicit=*/true,
+                                 choice.getFunctionRefKind(),
+                                 AccessSemantics::Ordinary,
                                  isDynamic);
   if (!declRef)
     return nullptr;
@@ -6774,11 +6808,12 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Form a syntactic expression that describes the reference to the
   // witness.
   // FIXME: Egregious hack.
-  Expr *unresolvedDot = new (Context) UnresolvedDotExpr(
-                                        base, SourceLoc(),
-                                        witness->getFullName(),
-                                        DeclNameLoc(base->getEndLoc()),
-                                        /*Implicit=*/true);
+  auto unresolvedDot = new (Context) UnresolvedDotExpr(
+                                       base, SourceLoc(),
+                                       witness->getFullName(),
+                                       DeclNameLoc(base->getEndLoc()),
+                                       /*Implicit=*/true);
+  unresolvedDot->setFunctionRefKind(FunctionRefKind::SingleApply);
   auto dotLocator = cs.getConstraintLocator(unresolvedDot);
 
   // Form a reference to the witness itself.
@@ -6850,6 +6885,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                            DeclNameLoc(base->getEndLoc()),
                                            openedType, dotLocator, dotLocator,
                                            /*Implicit=*/true,
+                                           FunctionRefKind::SingleApply,
                                            AccessSemantics::Ordinary,
                                            /*isDynamic=*/false);
   call->setFn(memberRef);
