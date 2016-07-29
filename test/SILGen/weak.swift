@@ -4,7 +4,7 @@ class C {
   func f() -> Int { return 42 }
 }
 
-func takeClosure(fn: () -> Int) {}
+func takeClosure(fn: @escaping () -> Int) {}
 
 struct A {
   weak var x: C?

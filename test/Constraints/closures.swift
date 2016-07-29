@@ -176,7 +176,8 @@ func typeCheckMultiStmtClosureCrash() {
 }
 
 // SR-832 - both these should be ok
-func someFunc(_ foo: ((String) -> String)?, bar: (String) -> String) {
+func someFunc(_ foo: (@escaping (String) -> String)?, 
+              bar: @escaping (String) -> String) {
     let _: (String) -> String = foo != nil ? foo! : bar
     let _: (String) -> String = foo ?? bar
 }

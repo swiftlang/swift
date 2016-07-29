@@ -19,11 +19,11 @@ extension Double : P {
 func f0(_ x: Int, 
         _ y: Float) { }
 
-func f1(_: (Int, Float) -> Int) { }
+func f1(_: @escaping (Int, Float) -> Int) { }
 
-func f2(_: (_: (Int) -> Int)) -> Int {}
+func f2(_: (_: @escaping (Int) -> Int)) -> Int {}
 
-func f3(_: (_: (Int) -> Float) -> Int) {}
+func f3(_: @escaping (_: @escaping (Int) -> Float) -> Int) {}
 
 func f4(_ x: Int) -> Int { }
 
@@ -60,7 +60,7 @@ f1(
    )
 
 f3(
-   f2 // expected-error {{cannot convert value of type '(((Int) -> Int)) -> Int' to expected argument type '((Int) -> Float) -> Int'}}
+   f2 // expected-error {{cannot convert value of type '((@escaping (Int) -> Int)) -> Int' to expected argument type '(@escaping (Int) -> Float) -> Int'}}
    )
 
 f4(i, d) // expected-error {{extra argument in call}}
@@ -93,7 +93,7 @@ func f7() -> (c: Int, v: A) {
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 
-func f8<T:P2>(_ n: T, _ f: (T) -> T) {}
+func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
 f8(3, f4) // expected-error {{in argument type '(Int) -> Int', 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }

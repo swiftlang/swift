@@ -1579,12 +1579,24 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   return result;
 }
 
+/// Whether the given DC is a noescape-by-default context, i.e. not a property
+/// setter
+static bool isDefaultNoEscapeContext(const DeclContext *DC) {
+  auto funcDecl = dyn_cast<FuncDecl>(DC);
+  return !funcDecl || !funcDecl->isSetter();
+}
+
 Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   assert(repr && "Cannot validate null TypeReprs!");
 
   // If we know the type representation is invalid, just return an
   // error type.
   if (repr->isInvalid()) return ErrorType::get(TC.Context);
+
+  // Remember whether this is a function parameter.
+  bool isFunctionParam =
+    options.contains(TR_FunctionInput) ||
+    options.contains(TR_ImmediateFunctionInput);
 
   // Strip the "is function input" bits unless this is a type that knows about
   // them.
@@ -1611,8 +1623,14 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
                                     UnsatisfiedDependency);
 
   case TypeReprKind::Function:
-    if (!(options & TR_SILType))
-      return resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
+    if (!(options & TR_SILType)) {
+      // Default non-escaping for closure parameters
+      auto info = AnyFunctionType::ExtInfo().withNoEscape(
+          isFunctionParam &&
+          isDefaultNoEscapeContext(DC));
+      return resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options,
+                                    info);
+    }
     return resolveSILFunctionType(cast<FunctionTypeRepr>(repr), options);
 
   case TypeReprKind::Array:
@@ -1870,10 +1888,22 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           .fixItReplace(resultRange, "Never");
     }
 
+    bool defaultNoEscape = false;
+    // TODO: Get rid of the need for checking autoclosure, by refactoring
+    // special autoclosure knowledge to just as "isEscaping" or similar.
+    if (isFunctionParam && !attrs.has(TAK_autoclosure)) {
+      // Closure params default to non-escaping
+      if (attrs.has(TAK_noescape)) {
+        // FIXME: diagnostic to tell user this is redundant and drop it
+      } else if (!attrs.has(TAK_escaping)) {
+        defaultNoEscape = isDefaultNoEscapeContext(DC);
+      }
+    }
+
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(rep,
                                   attrs.has(TAK_autoclosure),
-                                  attrs.has(TAK_noescape),
+                                  defaultNoEscape | attrs.has(TAK_noescape),
                                   fnRepr->throws());
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);
