@@ -161,7 +161,7 @@ swift::_swift_stdlib_unicode_compare_utf8_utf16(const unsigned char *LeftString,
   UCharIterator RightIterator;
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
-  uiter_setUTF8(&LeftIterator, LeftString, LeftLength);
+  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString), LeftLength);
 #if defined(__CYGWIN__) || defined(_MSC_VER)
   uiter_setString(&RightIterator, reinterpret_cast<const UChar *>(RightString),
                   RightLength);
@@ -191,8 +191,8 @@ swift::_swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *LeftString,
   UCharIterator RightIterator;
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
-  uiter_setUTF8(&LeftIterator, LeftString, LeftLength);
-  uiter_setUTF8(&RightIterator, RightString, RightLength);
+  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString), LeftLength);
+  uiter_setUTF8(&RightIterator, reinterpret_cast<const char *>(RightString), RightLength);
 
   uint32_t Diff = ucol_strcollIter(GetRootCollator(),
     &LeftIterator, &RightIterator, &ErrorCode);
@@ -272,7 +272,7 @@ intptr_t swift::_swift_stdlib_unicode_hash_ascii(const unsigned char *Str,
   intptr_t HashState = HASH_SEED;
   int32_t Pos = 0;
   while (Pos < Length) {
-    const char c = Str[Pos++];
+    const unsigned char c = Str[Pos++];
     assert((c & 0x80) == 0 && "This table only exists for the ASCII subset");
     intptr_t Elem = Table->map(c);
     // Ignore zero valued collation elements. They don't participate in the
