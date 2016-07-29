@@ -1090,7 +1090,7 @@ StringTests.test("unicodeViews") {
   // slices
   // It is 4 bytes long, so it should return a replacement character.
   expectEqual(
-    "\u{FFFD}", String(
+    "\u{FFFD}", String(describing: 
       winter.utf8[
         winter.utf8.startIndex
         ..<
