@@ -256,6 +256,11 @@ func checkHasPrefixHasSuffix(
 #endif
 }
 
+StringTests.test("LosslessStringConvertible") {
+  checkLosslessStringConvertible(comparisonTests.map { $0.lhs })
+  checkLosslessStringConvertible(comparisonTests.map { $0.rhs })
+}
+
 StringTests.test("hasPrefix,hasSuffix")
   .skip(.nativeRuntime(
     "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))

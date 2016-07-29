@@ -191,7 +191,7 @@ FoundationTestSuite.test("rdar://17584531") {
   // Type checker used to be confused by this.
   var dict: NSDictionary = ["status": 200, "people": [["id": 255, "name": ["first": "John", "last": "Appleseed"]]]]
   var dict2 = dict["people"].map { $0 as AnyObject }?[0] as! NSDictionary
-  expectEqual("Optional(255)", String(dict2["id"]))
+  expectEqual("Optional(255)", String(describing: dict2["id"]))
 }
 
 FoundationTestSuite.test("DarwinBoolean smoke test") {

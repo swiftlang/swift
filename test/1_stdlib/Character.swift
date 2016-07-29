@@ -14,7 +14,7 @@ import SwiftPrivate
 //
 // These scalars should be "base characters" with regards to their position in
 // a grapheme cluster.
-let baseScalars = [
+let baseScalars: [UnicodeScalar] = [
   // U+0065 LATIN SMALL LETTER E
   "\u{0065}",
 
@@ -54,7 +54,7 @@ let baseScalars = [
 
 // Single Unicode scalars that are "continuing characters" with regards to
 // their position in a grapheme cluster.
-let continuingScalars = [
+let continuingScalars: [UnicodeScalar] = [
   // U+0300 COMBINING GRAVE ACCENT
   "\u{0300}",
 
@@ -94,9 +94,9 @@ let testCharacters = [
 
 func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
   let n = pickRandom((minSize + 1)..<maxSize)
-  var result = pickRandom(baseScalars)
+  var result = String(pickRandom(baseScalars))
   for _ in 0..<n {
-    result += pickRandom(continuingScalars)
+    result += String(pickRandom(continuingScalars))
   }
   return result
 }
@@ -150,8 +150,8 @@ CharacterTests.test("sizeof") {
 
 CharacterTests.test("Hashable") {
   for characters in [
-    baseScalars,
-    continuingScalars,
+    baseScalars.map { String($0) },
+    continuingScalars.map { String($0) },
     testCharacters
   ] {
     for i in characters.indices {
@@ -197,8 +197,8 @@ func checkRepresentation(_ s: String) {
 CharacterTests.test("RoundTripping") {
   // Single Unicode Scalar Value tests
   for s in baseScalars {
-    checkRepresentation(s)
-    checkRoundTripThroughCharacter(s)
+    checkRepresentation(String(s))
+    checkRoundTripThroughCharacter(String(s))
   }
 
   // Edge case tests
@@ -274,7 +274,7 @@ UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)/non-ASCII should trap")
 }
 
 UnicodeScalarTests.test("UInt32(_: UnicodeScalar),UInt64(_: UnicodeScalar)") {
-  for us in baseScalars.map({ $0.unicodeScalars.first! }) {
+  for us in baseScalars {
     expectEqual(us.value, UInt32(us))
     expectEqual(UInt64(us.value), UInt64(us))
   }
@@ -302,6 +302,13 @@ UnicodeScalarTests.test("Comparable") {
   expectTrue("B" > CharA)
   expectTrue(CharA <= "B")
   expectTrue("B" >= CharA)
+}
+
+UnicodeScalarTests.test("LosslessStringConvertible") {
+  // FIXME: these tests are insufficient.
+
+  checkLosslessStringConvertible((0xE000...0xF000).map { UnicodeScalar(Int($0))! })
+  checkLosslessStringConvertible((0...127).map { UnicodeScalar(Int($0))! })
 }
 
 runAllTests()

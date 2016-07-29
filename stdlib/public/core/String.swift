@@ -981,6 +981,24 @@ extension String {
     return _nativeUnicodeUppercaseString(self)
 #endif
   }
+  
+  /// Creates an instance from the description of a given
+  /// `LosslessStringConvertible` instance.
+  public init<T : LosslessStringConvertible>(_ value: T) {
+    self = value.description
+  }
+}
+
+extension String : CustomStringConvertible {
+  public var description: String {
+    return self
+  }
+}
+
+extension String : LosslessStringConvertible {
+  public init?(_ description: String) {
+    self = description
+  }
 }
 
 extension String {

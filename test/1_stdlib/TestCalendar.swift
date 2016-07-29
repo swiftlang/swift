@@ -263,9 +263,9 @@ class TestCalendar : TestCalendarSuper {
             Calendar(identifier: .japanese)
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("Calendar", String(anyHashables[0].base.dynamicType))
-        expectEqual("Calendar", String(anyHashables[1].base.dynamicType))
-        expectEqual("Calendar", String(anyHashables[2].base.dynamicType))
+        expectEqual("Calendar", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("Calendar", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("Calendar", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -278,9 +278,9 @@ class TestCalendar : TestCalendarSuper {
                 NSCalendar(identifier: .japanese)!,
             ]
             let anyHashables = values.map(AnyHashable.init)
-            expectEqual("Calendar", String(anyHashables[0].base.dynamicType))
-            expectEqual("Calendar", String(anyHashables[1].base.dynamicType))
-            expectEqual("Calendar", String(anyHashables[2].base.dynamicType))
+            expectEqual("Calendar", String(describing: anyHashables[0].base.dynamicType))
+            expectEqual("Calendar", String(describing: anyHashables[1].base.dynamicType))
+            expectEqual("Calendar", String(describing: anyHashables[2].base.dynamicType))
             expectNotEqual(anyHashables[0], anyHashables[1])
             expectEqual(anyHashables[1], anyHashables[2])
         }

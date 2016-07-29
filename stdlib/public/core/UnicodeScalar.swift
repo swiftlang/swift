@@ -271,14 +271,27 @@ public struct UnicodeScalar :
 }
 
 extension UnicodeScalar : CustomStringConvertible, CustomDebugStringConvertible {
-  /// An escaped textual representation of the Unicode scalar.
+  /// A textual representation of the Unicode scalar.
   public var description: String {
-    return "\"\(escaped(asASCII: false))\""
+    return String._fromWellFormedCodeUnitSequence(
+      UTF32.self,
+      input: repeatElement(self.value, count: 1))
   }
+
   /// An escaped textual representation of the Unicode scalar, suitable for
   /// debugging.
   public var debugDescription: String {
     return "\"\(escaped(asASCII: true))\""
+  }
+}
+
+extension UnicodeScalar : LosslessStringConvertible {
+  public init?(_ description: String) {
+    let scalars = description.unicodeScalars
+    guard let v = scalars.first, scalars.count == 1 else {
+      return nil
+    }
+    self = v
   }
 }
 

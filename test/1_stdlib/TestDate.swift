@@ -143,9 +143,9 @@ class TestDate : TestDateSuper {
             dateWithString("2010-05-17 14:49:47 -0700"),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("Date", String(anyHashables[0].base.dynamicType))
-        expectEqual("Date", String(anyHashables[1].base.dynamicType))
-        expectEqual("Date", String(anyHashables[2].base.dynamicType))
+        expectEqual("Date", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("Date", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("Date", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -157,9 +157,9 @@ class TestDate : TestDateSuper {
             NSDate(timeIntervalSince1970: 1000000001),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("Date", String(anyHashables[0].base.dynamicType))
-        expectEqual("Date", String(anyHashables[1].base.dynamicType))
-        expectEqual("Date", String(anyHashables[2].base.dynamicType))
+        expectEqual("Date", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("Date", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("Date", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -171,9 +171,9 @@ class TestDate : TestDateSuper {
             DateComponents(year: 1995),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("DateComponents", String(anyHashables[0].base.dynamicType))
-        expectEqual("DateComponents", String(anyHashables[1].base.dynamicType))
-        expectEqual("DateComponents", String(anyHashables[2].base.dynamicType))
+        expectEqual("DateComponents", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("DateComponents", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("DateComponents", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -190,9 +190,9 @@ class TestDate : TestDateSuper {
             makeNSDateComponents(year: 1995),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("DateComponents", String(anyHashables[0].base.dynamicType))
-        expectEqual("DateComponents", String(anyHashables[1].base.dynamicType))
-        expectEqual("DateComponents", String(anyHashables[2].base.dynamicType))
+        expectEqual("DateComponents", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("DateComponents", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("DateComponents", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }

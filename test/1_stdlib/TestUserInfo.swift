@@ -124,9 +124,9 @@ class TestUserInfo : TestUserInfoSuper {
             Notification(name: Notification.Name(rawValue: "TestOtherSwiftNotification")),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("Notification", String(anyHashables[0].base.dynamicType))
-        expectEqual("Notification", String(anyHashables[1].base.dynamicType))
-        expectEqual("Notification", String(anyHashables[2].base.dynamicType))
+        expectEqual("Notification", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("Notification", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("Notification", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -138,9 +138,9 @@ class TestUserInfo : TestUserInfoSuper {
             NSNotification(name: Notification.Name(rawValue: "TestOtherSwiftNotification"), object: nil),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("Notification", String(anyHashables[0].base.dynamicType))
-        expectEqual("Notification", String(anyHashables[1].base.dynamicType))
-        expectEqual("Notification", String(anyHashables[2].base.dynamicType))
+        expectEqual("Notification", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("Notification", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("Notification", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }

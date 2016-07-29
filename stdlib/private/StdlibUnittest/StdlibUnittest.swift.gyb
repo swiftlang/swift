@@ -2215,6 +2215,12 @@ public func checkStrideable<Instances : Collection, Strides : Collection>(
   }
 }
 
+public func checkLosslessStringConvertible<Instance>(
+  _ instances: [Instance]
+) where Instance : LosslessStringConvertible & Equatable {
+  expectEqualFunctionsForDomain(instances, { $0 }, { Instance(String($0))! })
+}
+
 public func nthIndex<C: Collection>(_ x: C, _ n: Int) -> C.Index {
   return x.index(x.startIndex, offsetBy: numericCast(n))
 }

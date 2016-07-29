@@ -875,9 +875,9 @@ class TestData : TestDataSuper {
             Data(base64Encoded: "AAAB")!,
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("Data", String(anyHashables[0].base.dynamicType))
-        expectEqual("Data", String(anyHashables[1].base.dynamicType))
-        expectEqual("Data", String(anyHashables[2].base.dynamicType))
+        expectEqual("Data", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("Data", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("Data", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -889,9 +889,9 @@ class TestData : TestDataSuper {
             NSData(base64Encoded: "AAAB")!,
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("Data", String(anyHashables[0].base.dynamicType))
-        expectEqual("Data", String(anyHashables[1].base.dynamicType))
-        expectEqual("Data", String(anyHashables[2].base.dynamicType))
+        expectEqual("Data", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("Data", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("Data", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }

@@ -26,4 +26,8 @@ PrintTests.test("Printable") {
   expectPrinted("false", false)
 }
 
+PrintTests.test("LosslessStringConvertible") {
+  checkLosslessStringConvertible([ true, false ])
+}
+
 runAllTests()

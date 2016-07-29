@@ -116,9 +116,9 @@ class TestLocale : TestLocaleSuper {
             Locale(identifier: "uk"),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("Locale", String(anyHashables[0].base.dynamicType))
-        expectEqual("Locale", String(anyHashables[1].base.dynamicType))
-        expectEqual("Locale", String(anyHashables[2].base.dynamicType))
+        expectEqual("Locale", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("Locale", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("Locale", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
@@ -130,9 +130,9 @@ class TestLocale : TestLocaleSuper {
             NSLocale(localeIdentifier: "uk"),
         ]
         let anyHashables = values.map(AnyHashable.init)
-        expectEqual("Locale", String(anyHashables[0].base.dynamicType))
-        expectEqual("Locale", String(anyHashables[1].base.dynamicType))
-        expectEqual("Locale", String(anyHashables[2].base.dynamicType))
+        expectEqual("Locale", String(describing: anyHashables[0].base.dynamicType))
+        expectEqual("Locale", String(describing: anyHashables[1].base.dynamicType))
+        expectEqual("Locale", String(describing: anyHashables[2].base.dynamicType))
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
